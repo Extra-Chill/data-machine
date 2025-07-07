@@ -181,10 +181,10 @@ class Chill_Events {
             }
         }, 20);
         
-        // Initialize event meta box functionality
-        if (class_exists('ChillEvents\\Events\\EventMetaBox')) {
-            new \ChillEvents\Events\EventMetaBox();
-        }
+        // Initialize event meta box functionality (DISABLED - Block-first approach)
+        // if (class_exists('ChillEvents\\Events\\EventMetaBox')) {
+        //     new \ChillEvents\Events\EventMetaBox();
+        // }
         
         // Register REST API fields
         add_action('rest_api_init', array($this, 'register_rest_fields'));
@@ -435,6 +435,9 @@ class Chill_Events {
         // Set default options
         $this->set_default_options();
         
+        // Migrate existing settings to include new block settings
+        $this->migrate_settings();
+        
         // Log activation
         error_log('Chill Events Plugin activated successfully');
     }
@@ -465,10 +468,40 @@ class Chill_Events {
             'delete_old_events' => 'after_1_year',
             'post_status' => 'publish',
             'post_author' => 1,
-            'comment_status' => 'closed'
+            'comment_status' => 'closed',
+            // Block settings
+            'block_default_layout' => 'compact',
+            'block_auto_create' => 1,
+            // Compatibility settings
+            'meta_ticket_url' => 1,
+            'meta_artist_name' => 1
         );
         
         add_option('chill_events_settings', $default_settings);
+    }
+    
+    /**
+     * Migrate existing settings to include new block settings
+     */
+    private function migrate_settings() {
+        $existing_settings = get_option('chill_events_settings', array());
+        
+        // Add new block settings if they don't exist
+        if (!isset($existing_settings['block_default_layout'])) {
+            $existing_settings['block_default_layout'] = 'compact';
+        }
+        if (!isset($existing_settings['block_auto_create'])) {
+            $existing_settings['block_auto_create'] = 1;
+        }
+        if (!isset($existing_settings['meta_ticket_url'])) {
+            $existing_settings['meta_ticket_url'] = 1;
+        }
+        if (!isset($existing_settings['meta_artist_name'])) {
+            $existing_settings['meta_artist_name'] = 1;
+        }
+        
+        // Update the settings
+        update_option('chill_events_settings', $existing_settings);
     }
 }
 

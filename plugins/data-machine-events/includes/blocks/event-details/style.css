@@ -1,0 +1,255 @@
+/**
+ * Event Details Block Styles
+ *
+ * @package ChillEvents
+ * @since 1.0.0
+ */
+
+.chill-event-details {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    border: 1px solid #e1e5e9;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Editor Styles */
+.chill-event-details-editor {
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.chill-event-details-editor h4 {
+    margin: 0 0 1rem 0;
+    color: #333;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.chill-event-details-editor .event-dates,
+.chill-event-details-editor .event-location,
+.chill-event-details-editor .event-details {
+    margin-bottom: 1.5rem;
+}
+
+.chill-event-details-editor .date-time-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.chill-event-details-editor .date-time-field {
+    display: flex;
+    flex-direction: column;
+}
+
+.chill-event-details-editor .date-time-field label {
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #555;
+}
+
+.chill-event-details-editor .date-time-field input {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+/* Compact Layout */
+.event-details-compact .event-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.event-details-compact .event-date-time,
+.event-details-compact .event-venue,
+.event-details-compact .event-artist,
+.event-details-compact .event-price {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.event-details-compact .icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+}
+
+.event-details-compact .text {
+    flex: 1;
+    line-height: 1.4;
+}
+
+.event-details-compact .text small {
+    color: #666;
+    font-size: 0.85rem;
+}
+
+.event-details-compact .ticket-button {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background: #0073aa;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 4px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.event-details-compact .ticket-button:hover {
+    background: #005a87;
+    color: #fff;
+}
+
+/* Detailed Layout */
+.event-details-detailed {
+    display: grid;
+    gap: 2rem;
+}
+
+.event-details-detailed h3 {
+    margin: 0 0 1rem 0;
+    color: #333;
+    font-size: 1.2rem;
+    font-weight: 600;
+    border-bottom: 2px solid #0073aa;
+    padding-bottom: 0.5rem;
+}
+
+.event-details-detailed .datetime-info {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.event-details-detailed .start-datetime,
+.event-details-detailed .end-datetime {
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border-left: 3px solid #0073aa;
+}
+
+.event-details-detailed .venue-name {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 0.5rem;
+}
+
+.event-details-detailed .venue-address {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.event-details-detailed .artist-name {
+    font-weight: 600;
+    color: #333;
+}
+
+.event-details-detailed .price-amount {
+    font-weight: 600;
+    color: #28a745;
+    font-size: 1.1rem;
+}
+
+.event-details-detailed .ticket-link {
+    display: inline-block;
+    padding: 1rem 2rem;
+    background: #28a745;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 600;
+    text-align: center;
+    transition: background-color 0.2s;
+}
+
+.event-details-detailed .ticket-link:hover {
+    background: #218838;
+    color: #fff;
+}
+
+/* Minimal Layout */
+.event-details-minimal {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.event-details-minimal .event-date {
+    font-weight: 600;
+    color: #333;
+}
+
+.event-details-minimal .event-venue {
+    color: #666;
+    text-align: right;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .event-details-compact .event-info-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .event-details-detailed {
+        gap: 1.5rem;
+    }
+    
+    .event-details-minimal {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .event-details-minimal .event-venue {
+        text-align: left;
+    }
+}
+
+/* Alignment Support */
+.chill-event-details.alignwide {
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.chill-event-details.alignfull {
+    max-width: none;
+    margin-left: calc(-100vw / 2 + 100% / 2);
+    margin-right: calc(-100vw / 2 + 100% / 2);
+    width: 100vw;
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    .chill-event-details {
+        background: #2d3748;
+        border-color: #4a5568;
+        color: #e2e8f0;
+    }
+    
+    .chill-event-details-editor {
+        background: #1a202c;
+    }
+    
+    .event-details-detailed h3 {
+        color: #e2e8f0;
+    }
+    
+    .event-details-detailed .start-datetime,
+    .event-details-detailed .end-datetime {
+        background: #4a5568;
+    }
+    
+    .event-details-compact .text small {
+        color: #a0aec0;
+    }
+} 

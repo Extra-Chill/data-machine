@@ -71,6 +71,9 @@ class ImportExecutor {
         if (!is_array($taxonomy_mappings)) {
             $taxonomy_mappings = json_decode($module->taxonomy_mappings, true);
         }
+        
+        // Debug logging for taxonomy mappings
+        error_log('[ChillEvents][DEBUG] Taxonomy mappings for module ' . $module_id . ': ' . print_r($taxonomy_mappings, true));
 
         // Fetch plugin settings for meta field enable/disable
         $settings_options = get_option('chill_events_settings', array());
@@ -118,10 +121,54 @@ class ImportExecutor {
                     continue;
                 }
                 error_log('[ChillEvents][DEBUG] Importing new event: ' . $event->get('title') . ' @ ' . $event->get('start_date') . ' [ID: ' . $event_id . ']');
+                // Get block settings
+                $block_settings = get_option('chill_events_settings', array());
+                $default_layout = isset($block_settings['block_default_layout']) ? $block_settings['block_default_layout'] : 'compact';
+                $auto_create_blocks = !empty($block_settings['block_auto_create']);
+                
+                error_log('[ChillEvents][DEBUG] Block settings: ' . json_encode($block_settings));
+                error_log('[ChillEvents][DEBUG] Auto create blocks: ' . ($auto_create_blocks ? 'true' : 'false'));
+                error_log('[ChillEvents][DEBUG] Default layout: ' . $default_layout);
+
+                // Create Event Details block with all event data (if enabled)
+                if ($auto_create_blocks) {
+                    // Prepare block attributes with proper sanitization
+                    $block_attributes = array(
+                        'startDate' => $event->get('start_date') ?: '',
+                        'endDate' => $event->get('end_date') ?: '',
+                        'artist' => $event->get('artist_name') ?: '',
+                        'price' => $event->get('price') ?: '',
+                        'ticketUrl' => $event->get('ticket_url') ?: '',
+                        'venue' => $event->get('venue_name') ?: '',
+                        'address' => $event->get('address') ?: '',
+                        'description' => $event->get('description') ?: '',
+                        'showVenue' => true,
+                        'showArtist' => true,
+                        'showPrice' => true,
+                        'showTicketLink' => true,
+                        'layout' => $default_layout
+                    );
+                    
+                    // Remove empty values to avoid JSON issues
+                    $block_attributes = array_filter($block_attributes, function($value) {
+                        return $value !== '' && $value !== null;
+                    });
+                    
+                    $event_details_block = '<!-- wp:chill-events/event-details ' . wp_json_encode($block_attributes) . ' /-->';
+                    
+                    error_log('[ChillEvents][DEBUG] Created event details block: ' . $event_details_block);
+                } else {
+                    $event_details_block = '';
+                    error_log('[ChillEvents][DEBUG] Block creation disabled, using empty block');
+                }
+                
+                // Event description is now part of the Event Details block
+                $post_content = $event_details_block;
+                
                 $postarr = array(
                     'post_type'    => 'chill_events',
                     'post_title'   => $event->get('title'),
-                    'post_content' => $event->get('description'),
+                    'post_content' => $post_content,
                     'post_status'  => 'publish',
                 );
                 $existing = $wpdb->get_var($wpdb->prepare(
@@ -157,16 +204,22 @@ class ImportExecutor {
                 }
                 // Assign taxonomies
                 if (!empty($taxonomy_mappings) && is_array($taxonomy_mappings)) {
-                    foreach ($taxonomy_mappings as $field => $taxonomy) {
-                        $value = $event->get($field);
-                        if ($taxonomy === 'skip' || empty($value)) continue;
-                        if (taxonomy_exists($taxonomy)) {
-                            wp_set_object_terms($post_id, $value, $taxonomy, false);
-                            
-                            // If this is a venue taxonomy, store venue data as term meta
-                            if ($taxonomy === 'venue' && !empty($value)) {
-                                $this->process_venue_data($event, $value);
-                            }
+                    foreach ($taxonomy_mappings as $taxonomy => $term_id) {
+                        if ($term_id === 'skip' || empty($term_id)) continue;
+                        
+                        // Get the term to ensure it exists
+                        $term = get_term($term_id, $taxonomy);
+                        if (!$term || is_wp_error($term)) {
+                            error_log('[ChillEvents][DEBUG] Term not found: ' . $term_id . ' for taxonomy: ' . $taxonomy);
+                            continue;
+                        }
+                        
+                        // Assign the term to the post
+                        $result = wp_set_object_terms($post_id, $term_id, $taxonomy, false);
+                        if (is_wp_error($result)) {
+                            error_log('[ChillEvents][DEBUG] Failed to assign term ' . $term->name . ' (ID: ' . $term_id . ') to taxonomy ' . $taxonomy . ' for post ' . $post_id . ': ' . $result->get_error_message());
+                        } else {
+                            error_log('[ChillEvents][DEBUG] Successfully assigned term ' . $term->name . ' (ID: ' . $term_id . ') to taxonomy ' . $taxonomy . ' for post ' . $post_id);
                         }
                     }
                 }
@@ -174,11 +227,11 @@ class ImportExecutor {
                 // Auto-map venue_name to venue taxonomy (if not already mapped)
                 $venue_name = $event->get('venue_name');
                 if (!empty($venue_name) && taxonomy_exists('venue')) {
-                    // Check if venue_name wasn't already mapped in taxonomy_mappings
+                    // Check if venue wasn't already mapped in taxonomy_mappings
                     $venue_already_mapped = false;
                     if (!empty($taxonomy_mappings) && is_array($taxonomy_mappings)) {
-                        foreach ($taxonomy_mappings as $field => $taxonomy) {
-                            if ($field === 'venue_name' && $taxonomy === 'venue') {
+                        foreach ($taxonomy_mappings as $taxonomy => $term_id) {
+                            if ($taxonomy === 'venue' && $term_id !== 'skip') {
                                 $venue_already_mapped = true;
                                 break;
                             }

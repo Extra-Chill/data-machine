@@ -51,8 +51,8 @@ class DynamicTaxonomies {
             if (empty($module->taxonomy_mappings)) continue;
             $mappings = maybe_unserialize($module->taxonomy_mappings);
             if (!is_array($mappings)) continue;
-            foreach ($mappings as $field => $taxonomy) {
-                if ($taxonomy && $taxonomy !== 'skip') {
+            foreach ($mappings as $taxonomy => $term_id) {
+                if ($term_id && $term_id !== 'skip') {
                     $taxonomies[] = $taxonomy;
                 }
             }

@@ -30,6 +30,9 @@ class Core {
         // Register blocks on init to ensure proper timing
         add_action('init', array($this, 'register_blocks'), 20);
         
+        // Filter block types to show only in correct post type
+        add_filter('allowed_block_types_all', array($this, 'filter_allowed_block_types'), 10, 2);
+        
         // Enqueue frontend assets
         add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_assets'));
     }
@@ -108,7 +111,7 @@ class Core {
                 'align-wide',
             ),
             'show_in_rest'       => true,
-            'rest_base'          => 'events',
+            'rest_base'          => 'chill_events',
             'rest_controller_class' => 'WP_REST_Posts_Controller',
             'taxonomies'         => array(), // Will be dynamically assigned
         );
@@ -163,6 +166,9 @@ class Core {
                 'show_in_rest' => true,
             ));
         }
+        
+        // Ensure venue taxonomy is registered for chill_events post type
+        register_taxonomy_for_object_type('venue', 'chill_events');
     }
     
 
@@ -198,16 +204,78 @@ class Core {
     }
 
     /**
+     * Filter allowed block types based on post type
+     * 
+     * @param array|boolean $allowed_block_types Array of block type slugs, or boolean to enable/disable all
+     * @param WP_Block_Editor_Context $block_editor_context The current block editor context
+     * @return array|boolean
+     */
+    public function filter_allowed_block_types($allowed_block_types, $block_editor_context) {
+        // Only filter if we have a post type
+        if (!isset($block_editor_context->post) || !isset($block_editor_context->post->post_type)) {
+            return $allowed_block_types;
+        }
+        
+        $post_type = $block_editor_context->post->post_type;
+        
+        // If it's not an array, we can't filter it
+        if (!is_array($allowed_block_types)) {
+            return $allowed_block_types;
+        }
+        
+        // If we're in chill_events post type, allow our custom blocks
+        if ($post_type === 'chill_events') {
+            // Add our custom blocks to the allowed list
+            $allowed_block_types[] = 'chill-events/event-details';
+            $allowed_block_types[] = 'chill-events/calendar';
+        } else {
+            // Remove our custom blocks from other post types
+            $allowed_block_types = array_filter($allowed_block_types, function($block_type) {
+                return strpos($block_type, 'chill-events/') !== 0;
+            });
+        }
+        
+        return $allowed_block_types;
+    }
+
+    /**
      * Register blocks
      * 
      * @since 1.0.0
      */
     public function register_blocks() {
-        $block_path = CHILL_EVENTS_PLUGIN_DIR . 'includes/blocks/calendar';
-        
-        // Register calendar block with explicit render callback
-        register_block_type($block_path, array(
+        // Register calendar block
+        $calendar_block_path = CHILL_EVENTS_PLUGIN_DIR . 'includes/blocks/calendar';
+        register_block_type($calendar_block_path, array(
             'render_callback' => array($this, 'render_calendar_block')
+        ));
+        
+        // Register event details block
+        $event_details_block_path = CHILL_EVENTS_PLUGIN_DIR . 'includes/blocks/event-details';
+        register_block_type($event_details_block_path, array(
+            'render_callback' => array($this, 'render_event_details_block'),
+            'attributes' => array(
+                'startDate' => array('type' => 'string', 'default' => ''),
+                'endDate' => array('type' => 'string', 'default' => ''),
+                'startTime' => array('type' => 'string', 'default' => ''),
+                'endTime' => array('type' => 'string', 'default' => ''),
+                'venue' => array('type' => 'string', 'default' => ''),
+                'address' => array('type' => 'string', 'default' => ''),
+                'artist' => array('type' => 'string', 'default' => ''),
+                'price' => array('type' => 'string', 'default' => ''),
+                'ticketUrl' => array('type' => 'string', 'default' => ''),
+                'description' => array('type' => 'string', 'default' => ''),
+                'showVenue' => array('type' => 'boolean', 'default' => true),
+                'showArtist' => array('type' => 'boolean', 'default' => true),
+                'showPrice' => array('type' => 'boolean', 'default' => true),
+                'showTicketLink' => array('type' => 'boolean', 'default' => true),
+                'layout' => array('type' => 'string', 'default' => 'compact')
+            ),
+            'category' => 'chill-events',
+            'supports' => array(
+                'html' => false,
+                'align' => array('wide', 'full')
+            )
         ));
     }
     
@@ -222,6 +290,25 @@ class Core {
     public function render_calendar_block($attributes, $content, $block) {
         // Include the render template directly without output buffering
         include CHILL_EVENTS_PLUGIN_DIR . 'includes/blocks/calendar/render.php';
+    }
+
+    /**
+     * Render callback for event details block
+     * 
+     * @param array $attributes Block attributes
+     * @param string $content Block content
+     * @param WP_Block $block Block instance
+     * @return string HTML output
+     */
+    public function render_event_details_block($attributes, $content, $block) {
+        // Start output buffering to capture the rendered content
+        ob_start();
+        
+        // Include the render template
+        include CHILL_EVENTS_PLUGIN_DIR . 'includes/blocks/event-details/render.php';
+        
+        // Return the captured content
+        return ob_get_clean();
     }
 
     /**

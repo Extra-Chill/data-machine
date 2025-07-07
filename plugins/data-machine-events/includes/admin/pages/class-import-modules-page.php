@@ -355,7 +355,7 @@ class ImportModulesPage extends BaseAdminPage {
                         <!-- Step 3: Taxonomy Mapping -->
                         <div class="chill-step" id="step-3" style="display: none;">
                             <h3><?php _e('Step 3: Taxonomy Mapping', 'chill-events'); ?></h3>
-                            <p><?php _e('Map import fields to your site\'s taxonomies. You can skip any field you don\'t want to map.', 'chill-events'); ?></p>
+                            <p><?php _e('Map import fields to your site\'s taxonomies. You can skip any field you don\'t want to map. Note: Venue information is automatically handled by the core system.', 'chill-events'); ?></p>
                             <div id="taxonomy-mappings">
                                 <!-- Dynamic content loaded via JavaScript -->
                             </div>

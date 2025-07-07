@@ -145,6 +145,15 @@ class Admin {
         // Register settings for the main settings page
         $this->register_main_settings();
         
+        // Migrate settings if needed
+        $this->migrate_settings();
+        
+        // Debug: Check if settings were migrated
+        if (isset($_GET['debug_settings'])) {
+            $settings = get_option('chill_events_settings', array());
+            error_log('[ChillEvents][DEBUG] Current settings: ' . json_encode($settings));
+        }
+        
         // Handle database repair action
         if (isset($_GET['chill_action']) && $_GET['chill_action'] === 'repair_database' && 
             isset($_GET['_wpnonce']) && wp_verify_nonce($_GET['_wpnonce'], 'chill_repair_database')) {
@@ -353,33 +362,71 @@ class Admin {
             ]
         );
 
-        // Add Event Meta Fields Section
+        // Event Details Block Settings Section
         add_settings_section(
-            'chill_events_meta_section',
-            __('Event Meta Fields', 'chill-events'),
-            null,
+            'chill_events_block_section',
+            __('Event Details Block Settings', 'chill-events'),
+            array($this, 'render_block_section_description'),
             'chill-events-settings'
         );
+
         add_settings_field(
-            'meta_ticket_url',
-            __('Enable Ticket URL Field', 'chill-events'),
+            'block_default_layout',
+            __('Default Block Layout', 'chill-events'),
+            array($this, 'render_select_field'),
+            'chill-events-settings',
+            'chill_events_block_section',
+            [
+                'name' => 'block_default_layout',
+                'options' => [
+                    'compact' => __('Compact', 'chill-events'),
+                    'detailed' => __('Detailed', 'chill-events'),
+                    'minimal' => __('Minimal', 'chill-events'),
+                ],
+                'description' => __('Default layout for Event Details blocks when importing events.', 'chill-events'),
+            ]
+        );
+
+        add_settings_field(
+            'block_auto_create',
+            __('Auto-Create Event Details Blocks', 'chill-events'),
             array($this, 'render_checkbox_field'),
             'chill-events-settings',
-            'chill_events_meta_section',
+            'chill_events_block_section',
+            [
+                'name' => 'block_auto_create',
+                'label' => __('Automatically create Event Details blocks during import (recommended).', 'chill-events'),
+            ]
+        );
+
+        // Compatibility Settings Section
+        add_settings_section(
+            'chill_events_compatibility_section',
+            __('Compatibility Settings', 'chill-events'),
+            array($this, 'render_compatibility_section_description'),
+            'chill-events-settings'
+        );
+
+        add_settings_field(
+            'meta_ticket_url',
+            __('Enable Ticket URL Meta Field', 'chill-events'),
+            array($this, 'render_checkbox_field'),
+            'chill-events-settings',
+            'chill_events_compatibility_section',
             [
                 'name' => 'meta_ticket_url',
-                'label' => __('Save ticket URL meta for each event.', 'chill-events'),
+                'label' => __('Save ticket URL to post meta for external integrations.', 'chill-events'),
             ]
         );
         add_settings_field(
             'meta_artist_name',
-            __('Enable Artist/Performer Field', 'chill-events'),
+            __('Enable Artist/Performer Meta Field', 'chill-events'),
             array($this, 'render_checkbox_field'),
             'chill-events-settings',
-            'chill_events_meta_section',
+            'chill_events_compatibility_section',
             [
                 'name' => 'meta_artist_name',
-                'label' => __('Save artist/performer name meta for each event.', 'chill-events'),
+                'label' => __('Save artist/performer name to post meta for external integrations.', 'chill-events'),
             ]
         );
     }
@@ -461,6 +508,46 @@ class Admin {
     */
     
     /**
+     * Render block section description
+     */
+    public function render_block_section_description() {
+        echo '<p>' . __('The Event Details block is the primary data store for event information. These settings control how blocks are created during imports.', 'chill-events') . '</p>';
+        echo '<p><strong>' . __('Note:', 'chill-events') . '</strong> ' . __('Event details are now edited through the Gutenberg block editor interface, not traditional meta boxes.', 'chill-events') . '</p>';
+    }
+
+    /**
+     * Render compatibility section description
+     */
+    public function render_compatibility_section_description() {
+        echo '<p>' . __('These settings control compatibility with external integrations and legacy code. Meta fields are automatically synced from block data.', 'chill-events') . '</p>';
+        echo '<p><strong>' . __('Note:', 'chill-events') . '</strong> ' . __('The Event Details block is the primary data store. Meta fields are maintained for compatibility only.', 'chill-events') . '</p>';
+    }
+
+    /**
+     * Migrate existing settings to include new block settings
+     */
+    public function migrate_settings() {
+        $existing_settings = get_option('chill_events_settings', array());
+        
+        // Add new block settings if they don't exist
+        if (!isset($existing_settings['block_default_layout'])) {
+            $existing_settings['block_default_layout'] = 'compact';
+        }
+        if (!isset($existing_settings['block_auto_create'])) {
+            $existing_settings['block_auto_create'] = 1;
+        }
+        if (!isset($existing_settings['meta_ticket_url'])) {
+            $existing_settings['meta_ticket_url'] = 1;
+        }
+        if (!isset($existing_settings['meta_artist_name'])) {
+            $existing_settings['meta_artist_name'] = 1;
+        }
+        
+        // Update the settings
+        update_option('chill_events_settings', $existing_settings);
+    }
+
+    /**
      * Sanitize and validate settings
      * @param array $input
      * @return array
@@ -473,7 +560,12 @@ class Admin {
         $output['post_status'] = isset($input['post_status']) && in_array($input['post_status'], ['publish', 'draft', 'pending']) ? $input['post_status'] : 'publish';
         $output['post_author'] = isset($input['post_author']) ? intval($input['post_author']) : 1;
         $output['comment_status'] = isset($input['comment_status']) && in_array($input['comment_status'], ['open', 'closed']) ? $input['comment_status'] : 'closed';
-        // Meta field checkboxes
+        
+        // Block settings
+        $output['block_default_layout'] = isset($input['block_default_layout']) && in_array($input['block_default_layout'], ['compact', 'detailed', 'minimal']) ? $input['block_default_layout'] : 'compact';
+        $output['block_auto_create'] = !empty($input['block_auto_create']) ? 1 : 0;
+        
+        // Meta field checkboxes (compatibility)
         $output['meta_ticket_url'] = !empty($input['meta_ticket_url']) ? 1 : 0;
         $output['meta_artist_name'] = !empty($input['meta_artist_name']) ? 1 : 0;
         

@@ -1,0 +1,81 @@
+{
+    "apiVersion": 2,
+    "name": "chill-events/event-details",
+    "title": "Event Details",
+    "category": "chill-events",
+    "icon": "calendar-alt",
+    "description": "Display and edit event details including date, time, venue, and other information.",
+    "textdomain": "chill-events",
+    "editorScript": "file:./build/index.js",
+    "editorStyle": "file:./build/index.css",
+    "style": "file:./build/style-index.css",
+    "attributes": {
+        "startDate": {
+            "type": "string",
+            "default": ""
+        },
+        "endDate": {
+            "type": "string",
+            "default": ""
+        },
+        "startTime": {
+            "type": "string",
+            "default": ""
+        },
+        "endTime": {
+            "type": "string",
+            "default": ""
+        },
+        "venue": {
+            "type": "string",
+            "default": ""
+        },
+        "address": {
+            "type": "string",
+            "default": ""
+        },
+        "artist": {
+            "type": "string",
+            "default": ""
+        },
+        "price": {
+            "type": "string",
+            "default": ""
+        },
+        "ticketUrl": {
+            "type": "string",
+            "default": ""
+        },
+        "description": {
+            "type": "string",
+            "default": ""
+        },
+        "showVenue": {
+            "type": "boolean",
+            "default": true
+        },
+        "showArtist": {
+            "type": "boolean",
+            "default": true
+        },
+        "showPrice": {
+            "type": "boolean",
+            "default": true
+        },
+        "showTicketLink": {
+            "type": "boolean",
+            "default": true
+        },
+        "layout": {
+            "type": "string",
+            "default": "compact"
+        }
+    },
+    "supports": {
+        "html": false,
+        "align": ["wide", "full"]
+    },
+    "usesContext": ["postType"],
+    "allowedBlocks": [],
+    "parent": []
+} 

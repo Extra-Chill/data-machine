@@ -183,13 +183,28 @@ class AjaxImportModule {
         if (!wp_verify_nonce($_POST['_wpnonce'], 'chill_module_save')) {
             wp_die(__('Security check failed.', 'chill-events'));
         }
-        // NEW taxonomy-centric UI ------------------------------------
+        
+        // Get all public taxonomies except venue (handled by core)
         $taxonomies = get_taxonomies(array('public' => true), 'objects');
-
-        $html  = '<table class="form-table chill-taxonomy-mapping-table">';
+        
+        $html = '<div class="chill-taxonomy-mapping-section">';
+        
+        // Add note about venue handling
+        $html .= '<div class="notice notice-info">';
+        $html .= '<p><strong>' . __('Venue Handling:', 'chill-events') . '</strong> ';
+        $html .= __('Venue information is automatically handled by the core system. Venues are automatically created and assigned based on the event data, and venue details (address, phone, website, etc.) are stored as venue term meta.', 'chill-events');
+        $html .= '</p>';
+        $html .= '</div>';
+        
+        $html .= '<table class="form-table chill-taxonomy-mapping-table">';
         $html .= '<tr><th>' . __('Taxonomy', 'chill-events') . '</th><th>' . __('Term to Assign', 'chill-events') . '</th></tr>';
 
         foreach ($taxonomies as $taxonomy) {
+            // Skip venue taxonomy - handled by core
+            if ($taxonomy->name === 'venue') {
+                continue;
+            }
+            
             $taxonomy_name = esc_attr($taxonomy->name);
             $html .= '<tr>';
             $html .= '<th scope="row">' . esc_html($taxonomy->label) . '</th>';
@@ -214,6 +229,7 @@ class AjaxImportModule {
         }
 
         $html .= '</table>';
+        $html .= '</div>';
 
         wp_send_json_success(array('html' => $html));
     }
