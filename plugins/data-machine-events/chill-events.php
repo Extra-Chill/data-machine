@@ -37,6 +37,11 @@ define('CHILL_EVENTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('CHILL_EVENTS_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('CHILL_EVENTS_PLUGIN_BASENAME', plugin_basename(__FILE__));
 
+// Always load venue term meta admin UI in admin
+if (is_admin()) {
+    require_once CHILL_EVENTS_PLUGIN_DIR . 'includes/events/venues/class-venue-term-meta.php';
+}
+
 /**
  * PSR-4 Autoloader for Chill Events classes
  * 
@@ -166,8 +171,15 @@ class Chill_Events {
             $core = new \ChillEvents\Core();
             // Call the registration methods directly since we're already in init
             $core->register_post_types();
-            $core->register_taxonomies();
         }
+        
+        // Register taxonomies after post types are registered
+        add_action('init', function() {
+            if (class_exists('ChillEvents\\Core')) {
+                $core = new \ChillEvents\Core();
+                $core->register_taxonomies();
+            }
+        }, 20);
         
         // Initialize event meta box functionality
         if (class_exists('ChillEvents\\Events\\EventMetaBox')) {

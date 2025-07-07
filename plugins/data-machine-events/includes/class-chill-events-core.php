@@ -41,10 +41,6 @@ class Core {
      */
     public function register_post_types() {
         $this->register_event_post_type();
-        // Register dynamic taxonomies for chill_events
-        if (class_exists('ChillEvents\\Utils\\DynamicTaxonomies')) {
-            DynamicTaxonomies::register_for_chill_events();
-        }
     }
     
     /**
@@ -107,6 +103,9 @@ class Core {
                 'revisions',
                 'author',
                 'page-attributes',
+                'editor-styles',
+                'wp-block-styles',
+                'align-wide',
             ),
             'show_in_rest'       => true,
             'rest_base'          => 'events',
@@ -118,14 +117,55 @@ class Core {
     }
     
     /**
-     * Register taxonomies (placeholder for Phase 4)
+     * Register taxonomies for chill_events
      * 
      * @since 1.0.0
      */
     public function register_taxonomies() {
-        // Taxonomies will be implemented in Phase 4
-        // This ensures the hook structure is ready
+        // Register venue taxonomy for chill_events (core functionality)
+        $this->register_venue_taxonomy();
+        
+        // Register dynamic taxonomies for chill_events (theme taxonomies)
+        if (class_exists('ChillEvents\\Utils\\DynamicTaxonomies')) {
+            DynamicTaxonomies::register_for_chill_events();
+        }
     }
+    
+    /**
+     * Register venue taxonomy
+     * 
+     * @since 1.0.0
+     */
+    private function register_venue_taxonomy() {
+        // Check if venue taxonomy already exists (from theme)
+        if (taxonomy_exists('venue')) {
+            // Extend existing venue taxonomy to include chill_events
+            register_taxonomy_for_object_type('venue', 'chill_events');
+        } else {
+            // Create new venue taxonomy for both post and chill_events
+            register_taxonomy('venue', array('post', 'chill_events'), array(
+                'hierarchical' => false,
+                'labels' => array(
+                    'name' => _x('Venues', 'taxonomy general name', 'chill-events'),
+                    'singular_name' => _x('Venue', 'taxonomy singular name', 'chill-events'),
+                    'search_items' => __('Search Venues', 'chill-events'),
+                    'all_items' => __('All Venues', 'chill-events'),
+                    'edit_item' => __('Edit Venue', 'chill-events'),
+                    'update_item' => __('Update Venue', 'chill-events'),
+                    'add_new_item' => __('Add New Venue', 'chill-events'),
+                    'new_item_name' => __('New Venue Name', 'chill-events'),
+                    'menu_name' => __('Venues', 'chill-events'),
+                ),
+                'show_ui' => true,
+                'show_admin_column' => true,
+                'query_var' => true,
+                'rewrite' => array('slug' => 'venue'),
+                'show_in_rest' => true,
+            ));
+        }
+    }
+    
+
     
     /**
      * Get plugin version

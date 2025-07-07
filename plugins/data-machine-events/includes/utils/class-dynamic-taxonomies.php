@@ -64,9 +64,13 @@ class DynamicTaxonomies {
             }
         }
         
-        // Always register venue taxonomy for chill_events if it exists
-        if (taxonomy_exists('venue')) {
-            register_taxonomy_for_object_type('venue', 'chill_events');
+        // Auto-register any existing taxonomies for chill_events (theme flexibility)
+        $all_taxonomies = get_taxonomies(array('public' => true), 'names');
+        foreach ($all_taxonomies as $taxonomy) {
+            // Skip venue taxonomy (handled by core) and built-in taxonomies
+            if ($taxonomy !== 'venue' && !in_array($taxonomy, array('category', 'post_tag', 'nav_menu', 'link_category', 'post_format'))) {
+                register_taxonomy_for_object_type($taxonomy, 'chill_events');
+            }
         }
     }
 

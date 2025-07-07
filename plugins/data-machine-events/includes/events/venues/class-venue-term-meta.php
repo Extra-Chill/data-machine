@@ -213,4 +213,73 @@ class Venue_Term_Meta {
         
         return $venue_data;
     }
-} 
+}
+
+// Admin UI: Add custom fields to the Add Venue form
+add_action('venue_add_form_fields', function($taxonomy) {
+    $fields = [
+        'address'   => 'Address',
+        'city'      => 'City',
+        'state'     => 'State',
+        'zip'       => 'Postal Code',
+        'country'   => 'Country',
+        'phone'     => 'Phone',
+        'website'   => 'Website',
+        'capacity'  => 'Capacity',
+        'coordinates' => 'Coordinates',
+        'description' => 'Description'
+    ];
+    foreach ($fields as $key => $label) {
+        $meta_key = "_venue_$key";
+        echo '<div class="form-field">';
+        echo "<label for='$meta_key'>$label</label>";
+        echo "<input type='text' name='$meta_key' id='$meta_key' value='' class='regular-text' />";
+        echo '</div>';
+    }
+});
+
+// Admin UI: Add custom fields to the Edit Venue form
+add_action('venue_edit_form_fields', function($term) {
+    $fields = [
+        'address'   => 'Address',
+        'city'      => 'City',
+        'state'     => 'State',
+        'zip'       => 'Postal Code',
+        'country'   => 'Country',
+        'phone'     => 'Phone',
+        'website'   => 'Website',
+        'capacity'  => 'Capacity',
+        'coordinates' => 'Coordinates',
+        'description' => 'Description'
+    ];
+    foreach ($fields as $key => $label) {
+        $meta_key = "_venue_$key";
+        $value = get_term_meta($term->term_id, $meta_key, true);
+        echo '<tr class="form-field">';
+        echo "<th scope='row'><label for='$meta_key'>$label</label></th>";
+        echo "<td><input type='text' name='$meta_key' id='$meta_key' value='" . esc_attr($value) . "' class='regular-text' /></td>";
+        echo '</tr>';
+    }
+});
+
+// Save custom fields when a venue is created
+add_action('created_venue', function($term_id) {
+    $fields = ['address','city','state','zip','country','phone','website','capacity','coordinates','description'];
+    foreach ($fields as $key) {
+        $meta_key = "_venue_$key";
+        if (isset($_POST[$meta_key])) {
+            update_term_meta($term_id, $meta_key, sanitize_text_field($_POST[$meta_key]));
+        }
+    }
+});
+
+// Save custom fields when a venue is updated
+add_action('edited_venue', function($term_id) {
+    $fields = ['address','city','state','zip','country','phone','website','capacity','coordinates','description'];
+    foreach ($fields as $key) {
+        $meta_key = "_venue_$key";
+        if (isset($_POST[$meta_key])) {
+            update_term_meta($term_id, $meta_key, sanitize_text_field($_POST[$meta_key]));
+        }
+    }
+}); 
