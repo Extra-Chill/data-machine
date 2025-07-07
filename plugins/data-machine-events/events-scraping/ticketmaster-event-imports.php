@@ -62,7 +62,7 @@ function fetch_ticketmaster_events($location) {
 
             $venue = $event['_embedded']['venues'][0] ?? [];
             $priceRange = $event['priceRanges'][0] ?? [];
-            $event_url = isset($event['url']) ? esc_url_raw(urldecode($event['url'])) : '';
+            $event_url = isset($event['url']) ? esc_url_raw($event['url']) : '';
 
             // Ensure all necessary venue fields are present
             $venue_data = [
