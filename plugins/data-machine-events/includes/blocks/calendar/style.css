@@ -1,0 +1,442 @@
+/* Chill Events Calendar Block Styles */
+
+.chill-events-calendar {
+    margin: 2rem 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Filter Bar Styles */
+.chill-events-filter-bar {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.chill-events-filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+}
+
+/* Search Styles */
+.chill-events-search {
+    display: flex;
+    flex: 1;
+    min-width: 250px;
+    position: relative;
+}
+
+.chill-events-search-input {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    background: white;
+    transition: border-color 0.2s ease;
+}
+
+.chill-events-search-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.chill-events-search-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 4px;
+    transition: color 0.2s ease;
+}
+
+.chill-events-search-btn:hover {
+    color: #3b82f6;
+}
+
+/* Date Filter Styles */
+.chill-events-date-filter {
+    min-width: 200px;
+}
+
+.chill-events-date-range-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.chill-events-date-range-input {
+    padding: 0.75rem 1rem;
+    padding-right: 2.5rem; /* Make room for the clear button */
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+    width: 100%;
+    min-width: 200px;
+}
+
+.chill-events-date-range-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.chill-events-date-clear-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    transition: color 0.2s ease;
+    display: none; /* Hidden by default, shown when there's a value */
+}
+
+.chill-events-date-clear-btn:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.chill-events-date-clear-btn.visible {
+    display: block;
+}
+
+/* View Toggle Styles */
+.chill-events-view-toggle {
+    display: flex;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    overflow: hidden;
+    background: white;
+}
+
+.chill-events-view-btn {
+    padding: 0.75rem 1rem;
+    background: white;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #6b7280;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.chill-events-view-btn:not(:last-child) {
+    border-right: 1px solid #d1d5db;
+}
+
+.chill-events-view-btn:hover {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.chill-events-view-btn.active {
+    background: #3b82f6;
+    color: white;
+}
+
+.chill-events-view-btn .dashicons {
+    font-size: 1rem;
+}
+
+/* Content Area */
+.chill-events-content {
+    margin-top: 1rem;
+}
+
+/* List View */
+.chill-events-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.chill-event-item {
+    padding: 1.5rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: white;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.chill-event-item:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-color: #d1d5db;
+}
+
+.chill-event-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.chill-event-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #111827;
+}
+
+.chill-event-title a {
+    color: inherit;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.chill-event-title a:hover {
+    color: #3b82f6;
+}
+
+/* Event Meta Information */
+.chill-event-date,
+.chill-event-artist,
+.chill-event-venue,
+.chill-event-address {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: #6b7280;
+    line-height: 1.4;
+}
+
+.chill-event-date-icon,
+.chill-event-artist-icon,
+.chill-event-venue-icon,
+.chill-event-address-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.chill-event-date-separator {
+    color: #9ca3af;
+    margin: 0 0.25rem;
+}
+
+.chill-event-excerpt {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: #4b5563;
+    margin-top: 0.5rem;
+}
+
+/* Event Actions */
+.chill-event-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+.chill-event-link,
+.chill-event-tickets {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.chill-event-link {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+}
+
+.chill-event-link:hover {
+    background: #e5e7eb;
+    color: #111827;
+}
+
+.chill-event-tickets {
+    background: #3b82f6;
+    color: white;
+    border: 1px solid #3b82f6;
+}
+
+.chill-event-tickets:hover {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: white;
+}
+
+/* Grid View */
+.chill-events-view-grid .chill-events-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+}
+
+.chill-events-view-grid .chill-event-item {
+    height: fit-content;
+}
+
+/* Pagination */
+.chill-events-pagination {
+    margin-top: 2rem;
+    text-align: center;
+}
+
+.chill-events-pagination .page-numbers {
+    display: inline-flex;
+    gap: 0.25rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.chill-events-pagination .page-numbers li {
+    margin: 0;
+}
+
+.chill-events-pagination .page-numbers a,
+.chill-events-pagination .page-numbers span {
+    display: inline-block;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    text-decoration: none;
+    color: #374151;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.chill-events-pagination .page-numbers a:hover {
+    background: #f3f4f6;
+    border-color: #9ca3af;
+}
+
+.chill-events-pagination .page-numbers .current {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+}
+
+/* No Events */
+.chill-events-no-events {
+    text-align: center;
+    color: #6b7280;
+    font-style: italic;
+    padding: 3rem 1rem;
+    background: #f9fafb;
+    border-radius: 8px;
+    border: 1px dashed #d1d5db;
+}
+
+/* Hidden Events (for search/filter) */
+.chill-event-item.hidden {
+    display: none;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .chill-events-filter-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .chill-events-search {
+        min-width: auto;
+    }
+    
+    .chill-events-view-toggle {
+        justify-content: center;
+    }
+    
+    .chill-event-item {
+        padding: 1rem;
+    }
+    
+    .chill-event-title {
+        font-size: 1.1rem;
+    }
+    
+    .chill-events-view-grid .chill-events-list {
+        grid-template-columns: 1fr;
+    }
+    
+    .chill-event-actions {
+        flex-direction: column;
+    }
+    
+    .chill-event-link,
+    .chill-event-tickets {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .chill-events-filter-bar {
+        padding: 1rem;
+    }
+    
+    .chill-events-view-btn {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
+    }
+    
+    .chill-events-view-btn .dashicons {
+        display: none;
+    }
+}
+
+/* Flatpickr styling overrides */
+.flatpickr-calendar {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    border: 1px solid #e5e7eb;
+}
+
+.flatpickr-day.selected {
+    background: #3b82f6;
+    border-color: #3b82f6;
+}
+
+.flatpickr-day.inRange {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.2);
+}
+
+.flatpickr-day.startRange {
+    background: #3b82f6;
+    border-color: #3b82f6;
+}
+
+.flatpickr-day.endRange {
+    background: #3b82f6;
+    border-color: #3b82f6;
+}
+
+.flatpickr-day:hover {
+    background: #f3f4f6;
+}
+
+.flatpickr-day.selected:hover {
+    background: #2563eb;
+} 

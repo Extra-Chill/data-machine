@@ -1,0 +1,27 @@
+{
+  "name": "chill-events-calendar-block",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build": "webpack --mode=production",
+    "start": "webpack --mode=development --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "wordpress",
+    "block",
+    "events",
+    "calendar"
+  ],
+  "author": "Chris Huber",
+  "license": "GPL-2.0-or-later",
+  "description": "Events calendar block for Chill Events plugin",
+  "devDependencies": {
+    "@wordpress/scripts": "^30.19.0",
+    "webpack": "^5.99.9",
+    "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+    "flatpickr": "^4.6.13"
+  }
+}

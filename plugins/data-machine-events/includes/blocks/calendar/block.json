@@ -1,0 +1,66 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "chill-events/calendar",
+	"version": "1.0.0",
+	"title": "Chill Events Calendar",
+	"category": "widgets",
+	"icon": "calendar-alt",
+	"description": "Display events in a calendar or list format using Chill Events.",
+	"keywords": ["events", "calendar", "chill", "chill events"],
+	"supports": {
+		"html": false,
+		"align": ["wide", "full"],
+		"spacing": {
+			"margin": true,
+			"padding": true
+		}
+	},
+	"attributes": {
+		"defaultView": {
+			"type": "string",
+			"default": "list"
+		},
+		"eventsToShow": {
+			"type": "number",
+			"default": 10
+		},
+		"showPastEvents": {
+			"type": "boolean",
+			"default": false
+		},
+		"showFilters": {
+			"type": "boolean",
+			"default": true
+		},
+		"showSearch": {
+			"type": "boolean",
+			"default": true
+		},
+		"showDateFilter": {
+			"type": "boolean",
+			"default": true
+		},
+		"showViewToggle": {
+			"type": "boolean",
+			"default": true
+		},
+		"defaultDateRange": {
+			"type": "string",
+			"default": "current"
+		},
+		"enablePagination": {
+			"type": "boolean",
+			"default": true
+		},
+		"eventsPerPage": {
+			"type": "number",
+			"default": 12
+		}
+	},
+	"textdomain": "chill-events",
+	"editorScript": "file:./build/index.js",
+	"editorStyle": "file:./editor.css",
+	"style": "file:./style.css",
+	"render": "file:./render.php"
+} 

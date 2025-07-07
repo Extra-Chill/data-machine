@@ -1,0 +1,14 @@
+{
+    "name": "chubes/chill-events",
+    "description": "Chill Events plugin dependencies",
+    "require": {
+        "php": ">=7.4",
+        "johngrogg/ics-parser": "^3.4"
+    },
+    "authors": [
+        {
+            "name": "Chris Huber",
+            "email": "chris@chubes.net"
+        }
+    ]
+}

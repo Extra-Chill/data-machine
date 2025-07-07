@@ -1,0 +1,170 @@
+/* Chill Events Admin Styles */
+
+/* Import Modules Dashboard */
+.chill-modules-dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.chill-module-card {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 15px;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+.chill-module-card .module-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.chill-module-card h3 {
+    margin: 0;
+    font-size: 16px;
+}
+
+.status-indicator {
+    font-size: 14px;
+    margin-right: 8px;
+}
+
+.module-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.module-info p {
+    margin: 8px 0;
+    font-size: 13px;
+}
+
+.module-info strong {
+    color: #23282d;
+}
+
+/* Modal Styles */
+.chill-modal {
+    position: fixed;
+    z-index: 100000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.4);
+    overflow: auto;
+}
+
+.chill-modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    border: none;
+    width: 90%;
+    max-width: 800px;
+    border-radius: 4px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.chill-modal-header {
+    padding: 20px 25px;
+    border-bottom: 1px solid #ddd;
+    background: #f9f9f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chill-modal-header h2 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.chill-modal-close {
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.chill-modal-close:hover,
+.chill-modal-close:focus {
+    color: #000;
+}
+
+.chill-modal-body {
+    padding: 25px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.chill-modal-footer {
+    padding: 15px 25px;
+    border-top: 1px solid #ddd;
+    background: #f9f9f9;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* Step Navigation */
+.chill-step {
+    margin-bottom: 20px;
+}
+
+.chill-step h3 {
+    color: #23282d;
+    margin-bottom: 15px;
+    font-size: 18px;
+}
+
+/* Form Elements */
+.required {
+    color: #d63638;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .chill-modules-dashboard {
+        grid-template-columns: 1fr;
+    }
+    
+    .chill-modal-content {
+        width: 95%;
+        margin: 2% auto;
+    }
+    
+    .chill-module-card .module-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .module-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}
+
+/* Status Colors */
+.status-active { color: #46b450; }
+.status-inactive { color: #72777c; }
+.status-error { color: #d63638; }
+
+.chill-header-actions {
+    margin-bottom: 15px;
+}
+
+/* dashicon styling removed after icon removal */
+
+/* dashicon styling removed after icon removal */ 

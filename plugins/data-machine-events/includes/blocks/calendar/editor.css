@@ -1,0 +1,40 @@
+/* Chill Events Calendar Block Editor Styles */
+
+.chill-events-calendar-editor {
+    padding: 2rem;
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    background: #f8fafc;
+    text-align: center;
+}
+
+.chill-events-calendar-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.chill-events-calendar-icon {
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chill-events-calendar-icon svg {
+    width: 48px;
+    height: 48px;
+}
+
+.chill-events-calendar-placeholder h3 {
+    margin: 0;
+    color: #1e293b;
+    font-size: 1.25rem;
+}
+
+.chill-events-calendar-placeholder p {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.9rem;
+} 
