@@ -46,10 +46,6 @@
             "type": "string",
             "default": ""
         },
-        "description": {
-            "type": "string",
-            "default": ""
-        },
         "showVenue": {
             "type": "boolean",
             "default": true
@@ -65,10 +61,6 @@
         "showTicketLink": {
             "type": "boolean",
             "default": true
-        },
-        "layout": {
-            "type": "string",
-            "default": "compact"
         }
     },
     "supports": {

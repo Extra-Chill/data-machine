@@ -30,7 +30,7 @@ $query_args = array(
     'post_status' => 'publish',
     'posts_per_page' => $enable_pagination ? $events_per_page : $events_to_show,
     'paged' => $current_page,
-    'meta_key' => '_chill_event_start_date',
+    'meta_key' => '_chill_event_start_date_utc',
     'orderby' => 'meta_value',
     'order' => 'ASC',
 );
@@ -39,8 +39,8 @@ $query_args = array(
 if (!$show_past_events) {
     $query_args['meta_query'] = array(
         array(
-            'key' => '_chill_event_start_date',
-            'value' => current_time('Y-m-d H:i:s'),
+            'key' => '_chill_event_start_date_utc',
+            'value' => current_time('mysql', 1), // UTC time
             'compare' => '>='
         )
     );
@@ -113,95 +113,96 @@ $wrapper_attributes = get_block_wrapper_attributes(array(
             <div class="chill-events-list" id="chill-events-list">
                 <?php while ($events_query->have_posts()) : $events_query->the_post(); ?>
                     <?php
-        // Get event meta
-        $start_date = get_post_meta(get_the_ID(), '_chill_event_start_date', true);
-                    $end_date = get_post_meta(get_the_ID(), '_chill_event_end_date', true);
-        $ticket_url = get_post_meta(get_the_ID(), '_chill_event_ticket_url', true);
-                    $artist_name = get_post_meta(get_the_ID(), '_chill_event_artist_name', true);
-        
-        // Get venue data from taxonomy only
-        $venue_name = '';
-        $venue_address = '';
-        $venue_terms = get_the_terms(get_the_ID(), 'venue');
-        
-        if ($venue_terms && !is_wp_error($venue_terms)) {
-            $venue_term = $venue_terms[0]; // Get first venue
-            $venue_name = $venue_term->name;
-            $venue_address = \ChillEvents\Events\Venues\Venue_Term_Meta::get_formatted_address($venue_term->term_id);
-        }
-        
+                    // Block-first: Parse block attributes to get event data
+                    $event_data = null;
+                    if (has_blocks(get_the_content())) {
+                        $blocks = parse_blocks(get_the_content());
+                        foreach ($blocks as $block) {
+                            if ('chill-events/event-details' === $block['blockName']) {
+                                $event_data = $block['attrs'];
+                                break;
+                            }
+                        }
+                    }
+
+                    // If we couldn't get block data, skip this event
+                    if (!$event_data) {
+                        continue;
+                    }
+
+                    // Extract data from attributes
+                    $start_date = $event_data['startDate'] ?? '';
+                    $start_time = $event_data['startTime'] ?? '';
+                    $end_date = $event_data['endDate'] ?? '';
+                    $end_time = $event_data['endTime'] ?? '';
+                    $venue_name = $event_data['venue'] ?? '';
+                    $venue_address = $event_data['address'] ?? '';
+                    $artist_name = $event_data['artist'] ?? '';
+                    $price = $event_data['price'] ?? '';
+                    $ticket_url = $event_data['ticketUrl'] ?? '';
+
+                    // Get display settings from global options
+                    $settings = get_option('chill_events_settings', array());
+                    $show_venue = !empty($settings['block_show_venue']);
+                    $show_artist = !empty($settings['block_show_artist']);
+                    $show_price = !empty($settings['block_show_price']);
+                    $show_ticket_link = !empty($settings['block_show_ticket_link']);
+                    
                     // Format dates
                     $formatted_start_date = '';
-                    $formatted_end_date = '';
-        if ($start_date) {
-                        $start_date_obj = new DateTime($start_date);
-                        $formatted_start_date = $start_date_obj->format('M j, Y g:i A');
-                    }
-                    if ($end_date) {
-                        $end_date_obj = new DateTime($end_date);
-                        $formatted_end_date = $end_date_obj->format('M j, Y g:i A');
+                    if ($start_date) {
+                        $start_datetime_obj = new DateTime($start_date . ' ' . $start_time);
+                        $formatted_start_date = $start_datetime_obj->format('M j, Y g:i A');
                     }
                     ?>
-                    
-                    <article class="chill-event-item" 
-                             data-title="<?php echo esc_attr(get_the_title()); ?>"
-                             data-venue="<?php echo esc_attr($venue_name); ?>"
-                             data-artist="<?php echo esc_attr($artist_name); ?>"
-                             data-date="<?php echo esc_attr($start_date); ?>">
-                        <div class="chill-event-content">
-                            <h3 class="chill-event-title">
-                                <a href="<?php echo esc_url(get_permalink()); ?>"><?php echo esc_html(get_the_title()); ?></a>
-                            </h3>
-                            
-                            <?php if ($formatted_start_date) : ?>
-                                <div class="chill-event-date">
-                                    <?php echo esc_html($formatted_start_date); ?>
-                                    <?php if ($formatted_end_date && $formatted_end_date !== $formatted_start_date) : ?>
-                                        <span class="chill-event-date-separator">to</span>
-                                        <?php echo esc_html($end_date_obj->format('M j, Y g:i A')); ?>
+                    <div class="chill-event-item">
+                        <div class="chill-event-card">
+                            <div class="chill-event-card-body">
+                                <h3 class="chill-event-title">
+                                    <a href="<?php the_permalink(); ?>"><?php the_title(); ?></a>
+                                </h3>
+                                
+                                <div class="chill-event-meta">
+                                    <div class="chill-event-date">
+                                        <span class="dashicons dashicons-calendar-alt"></span>
+                                        <?php echo esc_html($formatted_start_date); ?>
+                                    </div>
+                                    
+                                    <?php if ($show_venue && !empty($venue_name)) : ?>
+                                    <div class="chill-event-venue">
+                                        <span class="dashicons dashicons-location"></span>
+                                        <?php echo esc_html($venue_name); ?>
+                                    </div>
+                                    <?php endif; ?>
+
+                                    <?php if ($show_artist && !empty($artist_name)) : ?>
+                                        <div class="chill-event-artist">
+                                            <span class="dashicons dashicons-admin-users"></span>
+                                            <?php echo esc_html($artist_name); ?>
+                                        </div>
                                     <?php endif; ?>
                                 </div>
-                            <?php endif; ?>
-                            
-                            <?php if ($artist_name) : ?>
-                                <div class="chill-event-artist">
-                                    <?php echo esc_html($artist_name); ?>
+                                
+                                <div class="chill-event-excerpt">
+                                    <?php the_excerpt(); ?>
                                 </div>
-                            <?php endif; ?>
+                            </div>
                             
-                            <?php if ($venue_name) : ?>
-                                <div class="chill-event-venue">
-                                    <?php echo esc_html($venue_name); ?>
-                                </div>
-                            <?php endif; ?>
-                            
-                            <?php if ($venue_address) : ?>
-                                <div class="chill-event-address">
-                                    <?php echo esc_html($venue_address); ?>
-                                </div>
-                            <?php endif; ?>
-                            
-                            <?php 
-                            $excerpt = get_the_excerpt();
-                            if (!empty(trim($excerpt))) : ?>
-                                <div class="chill-event-excerpt"><?php echo $excerpt; ?></div>
-                            <?php endif; ?>
-                            
-                            <div class="chill-event-actions">
-                                <a href="<?php echo esc_url(get_permalink()); ?>" class="chill-event-link">
+                            <div class="chill-event-card-footer">
+                                <a href="<?php the_permalink(); ?>" class="chill-event-details-link">
                                     <?php _e('View Details', 'chill-events'); ?>
                                 </a>
-                                <?php if ($ticket_url) : ?>
+                                <?php if ($show_ticket_link && !empty($ticket_url)) : ?>
                                     <a href="<?php echo esc_url($ticket_url); ?>" 
+                                       class="chill-event-ticket-link" 
                                        target="_blank" 
-                                       rel="noopener" 
-                                       class="chill-event-tickets">
+                                       rel="noopener noreferrer">
                                         <?php _e('Get Tickets', 'chill-events'); ?>
                                     </a>
                                 <?php endif; ?>
                             </div>
                         </div>
-                    </article>
+                    </div>
                 <?php endwhile; ?>
             </div>
             

@@ -12,9 +12,14 @@ A comprehensive WordPress events plugin with Import Modules system, native API i
 
 == Description ==
 
-**Chill Events** is a revolutionary WordPress events plugin designed as a complete replacement for bloated event plugins like Tribe Events Calendar. Built with modern WordPress standards and featuring the innovative Import Modules system, it provides automated event management with unprecedented flexibility.
+**Chill Events** is a revolutionary WordPress events plugin designed as a complete replacement for bloated event plugins like Tribe Events Calendar. Built with a **block-first architecture** and featuring the innovative Import Modules system, it provides automated event management with unprecedented flexibility.
 
 = Key Features =
+
+**🏗️ Block-First Architecture**
+* **Single Source of Truth:** All event data (date, time, venue, price, etc.) is managed directly within the `Event Details` block in the Gutenberg editor.
+* **No More Meta Boxes:** This modern approach eliminates the need for cumbersome custom fields and meta boxes, creating an intuitive editing experience.
+* **Optimized for Performance:** Key data, like the event start time, is automatically synced to a meta field in the background, ensuring fast and efficient calendar queries.
 
 **🚀 Revolutionary Import Modules System**
 * Visual admin interface for configuring any data source
@@ -26,19 +31,21 @@ A comprehensive WordPress events plugin with Import Modules system, native API i
 * **Ticketmaster API** - First WordPress plugin with direct Live Nation integration
 * **Dice FM API** - Independent venue and event coverage  
 * **Eventbrite API** - Community and local event integration
+* **iCal Integration** - Import events from any iCalendar feed.
 * **Manual Import Tools** - CSV, JSON, direct input support
 
 **⚡ Lightweight & Modern**
+* **Gutenberg-First:** All event data is managed via blocks, not custom meta boxes.
 * Single custom post type vs. 50+ database tables (Tribe Events)
-* Gutenberg-first with full block editor support
 * REST API enabled for headless implementations
 * Clean, modern codebase following WordPress standards
 
 **🎨 Complete Frontend System**
-* Beautiful calendar interface with month/week/day views
-* Modern, responsive event displays
-* Advanced filtering based on your site's taxonomies
-* Event detail pages with schema markup
+* **Gutenberg-Powered:** The entire frontend, including the calendar and event details, is rendered using native Gutenberg blocks.
+* Beautiful calendar interface with list and grid views.
+* Modern, responsive event displays.
+* Advanced filtering and real-time search.
+* Event detail pages with schema markup.
 
 **🔧 Universal Compatibility**
 * Works with any existing taxonomy structure

@@ -39,7 +39,7 @@ define('CHILL_EVENTS_PLUGIN_BASENAME', plugin_basename(__FILE__));
 
 // Always load venue term meta admin UI in admin
 if (is_admin()) {
-    require_once CHILL_EVENTS_PLUGIN_DIR . 'includes/events/venues/class-venue-term-meta.php';
+    require_once CHILL_EVENTS_PLUGIN_DIR . 'inc/events/venues/class-venue-term-meta.php';
 }
 
 /**
@@ -63,22 +63,11 @@ function chill_events_autoloader($class_name) {
     
     // Handle specific class name mappings
     $file_name_mappings = array(
-        'Core' => 'class-chill-events-core.php',
-        'Admin' => 'class-admin.php',
-        'EventMetaBox' => 'events/class-event-meta-box.php',
-        'Database' => 'class-database.php',
-        'ApiConfig' => 'utils/class-api-config.php',
-        'BaseDataSource' => 'class-base-data-source.php',
-        'DynamicTaxonomies' => 'utils/class-dynamic-taxonomies.php',
-        'DataSourceManager' => 'data-sources/class-data-source-manager.php',
-        'ManualImport' => 'class-manual-import.php',
-        'Encryption' => 'class-encryption.php',
-        'ImportModulesPage' => 'class-import-modules-page.php',
-        'ApiConfigurationPage' => 'class-api-configuration-page.php',
-        'ImportExecutor' => 'events/class-import-executor.php',
-        'EventDuplicateChecker' => 'events/class-event-duplicate-checker.php',
-        'StandardizedEvent' => 'events/class-standardized-event.php',
-        'VenueTermMeta' => 'events/venues/class-venue-term-meta.php',
+        'Core' => 'core/class-chill-events-core.php',
+        
+        // Events
+        'Venue_Term_Meta' => 'events/venues/class-venue-term-meta.php',
+        'Event_Data_Manager' => 'events/class-event-data-manager.php',
     );
     
     // Check if we have a specific mapping for this class
@@ -97,7 +86,7 @@ function chill_events_autoloader($class_name) {
     }
     
     // Try multiple base directories
-    $base_directories = array('includes', 'includes/admin', 'includes/admin/pages', 'includes/data-sources', 'includes/events');
+    $base_directories = array('inc', 'inc/admin', 'inc/events', 'inc/core', 'inc/utils');
     
     foreach ($base_directories as $base_directory) {
         // Try with namespace directory path
@@ -161,11 +150,6 @@ class Chill_Events {
         // Initialize core components
         $this->init_hooks();
         
-        // Verify database structure is correct
-        if (class_exists('ChillEvents\\Database')) {
-            \ChillEvents\Database::verify_table_structure();
-        }
-        
         // Initialize core functionality directly
         if (class_exists('ChillEvents\\Core')) {
             $core = new \ChillEvents\Core();
@@ -181,11 +165,6 @@ class Chill_Events {
             }
         }, 20);
         
-        // Initialize event meta box functionality (DISABLED - Block-first approach)
-        // if (class_exists('ChillEvents\\Events\\EventMetaBox')) {
-        //     new \ChillEvents\Events\EventMetaBox();
-        // }
-        
         // Register REST API fields
         add_action('rest_api_init', array($this, 'register_rest_fields'));
         
@@ -196,6 +175,12 @@ class Chill_Events {
         
         // Load frontend functionality
         $this->init_frontend();
+
+        // Initialize the Event Data Manager to handle block-to-meta sync
+        if (class_exists('ChillEvents\\Events\\Event_Data_Manager')) {
+            new \ChillEvents\Events\Event_Data_Manager();
+        }
+
     }
     
     /**
@@ -345,7 +330,6 @@ class Chill_Events {
      */
     public function enqueue_frontend_assets() {
         $css_file = CHILL_EVENTS_PLUGIN_DIR . 'assets/css/chill-events-frontend.css';
-        $js_file = CHILL_EVENTS_PLUGIN_DIR . 'assets/js/chill-events-frontend.js';
         
         // Enqueue CSS with dynamic versioning by filemtime
         if (file_exists($css_file)) {
@@ -357,16 +341,7 @@ class Chill_Events {
             );
         }
         
-        // Enqueue JS with dynamic versioning by filemtime
-        if (file_exists($js_file)) {
-            wp_enqueue_script(
-                'chill-events-frontend',
-                CHILL_EVENTS_PLUGIN_URL . 'assets/js/chill-events-frontend.js',
-                array('jquery'),
-                filemtime($js_file),
-                true
-            );
-        }
+        // Note: JavaScript is handled by individual blocks (e.g., calendar block has its own JS)
     }
     
     /**
@@ -422,13 +397,6 @@ class Chill_Events {
             new \ChillEvents\Core();
         }
         
-        // Create database tables
-        if (class_exists('ChillEvents\\Database')) {
-            \ChillEvents\Database::create_tables();
-            // Verify table structure is correct
-            \ChillEvents\Database::verify_table_structure();
-        }
-        
         // Flush rewrite rules to ensure custom post types work
         flush_rewrite_rules();
         
@@ -449,6 +417,9 @@ class Chill_Events {
         // Clear scheduled cron jobs
         wp_clear_scheduled_hook('chill_events_import_cron');
         
+        // Clean up import-related database tables (one-time cleanup)
+        $this->cleanup_import_infrastructure();
+        
         // Flush rewrite rules
         flush_rewrite_rules();
         
@@ -457,24 +428,43 @@ class Chill_Events {
     }
     
     /**
+     * Clean up import infrastructure (tables and cron jobs)
+     * This is a one-time cleanup function for the transition
+     */
+    private function cleanup_import_infrastructure() {
+        global $wpdb;
+        
+        // Drop import-related tables
+        $tables_to_drop = array(
+            $wpdb->prefix . 'chill_import_modules',
+            $wpdb->prefix . 'chill_import_logs'
+        );
+        
+        foreach ($tables_to_drop as $table) {
+            $wpdb->query("DROP TABLE IF EXISTS $table");
+        }
+        
+        // Clear any remaining scheduled events
+        wp_clear_scheduled_hook('chill_events_import_cron');
+        
+        // Clean up import-related options
+        delete_option('chill_events_import_settings');
+        delete_option('chill_events_api_config');
+        
+        error_log('Chill Events: Cleaned up import infrastructure');
+    }
+    
+
+    /**
      * Set default plugin options
      */
     private function set_default_options() {
         $default_settings = array(
-            'plugin_status' => 'enabled',
-            'import_schedule' => 'every_6_hours',
-            'import_start_time' => '02:00',
-            'default_max_events' => 50,
-            'delete_old_events' => 'after_1_year',
-            'post_status' => 'publish',
-            'post_author' => 1,
-            'comment_status' => 'closed',
-            // Block settings
-            'block_default_layout' => 'compact',
-            'block_auto_create' => 1,
-            // Compatibility settings
-            'meta_ticket_url' => 1,
-            'meta_artist_name' => 1
+            // Event Details block display settings
+            'block_show_venue' => 1,
+            'block_show_artist' => 1,
+            'block_show_price' => 1,
+            'block_show_ticket_link' => 1
         );
         
         add_option('chill_events_settings', $default_settings);
@@ -486,18 +476,18 @@ class Chill_Events {
     private function migrate_settings() {
         $existing_settings = get_option('chill_events_settings', array());
         
-        // Add new block settings if they don't exist
-        if (!isset($existing_settings['block_default_layout'])) {
-            $existing_settings['block_default_layout'] = 'compact';
+        // Add block display settings if they don't exist
+        if (!isset($existing_settings['block_show_venue'])) {
+            $existing_settings['block_show_venue'] = 1;
         }
-        if (!isset($existing_settings['block_auto_create'])) {
-            $existing_settings['block_auto_create'] = 1;
+        if (!isset($existing_settings['block_show_artist'])) {
+            $existing_settings['block_show_artist'] = 1;
         }
-        if (!isset($existing_settings['meta_ticket_url'])) {
-            $existing_settings['meta_ticket_url'] = 1;
+        if (!isset($existing_settings['block_show_price'])) {
+            $existing_settings['block_show_price'] = 1;
         }
-        if (!isset($existing_settings['meta_artist_name'])) {
-            $existing_settings['meta_artist_name'] = 1;
+        if (!isset($existing_settings['block_show_ticket_link'])) {
+            $existing_settings['block_show_ticket_link'] = 1;
         }
         
         // Update the settings

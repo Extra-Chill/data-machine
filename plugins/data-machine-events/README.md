@@ -1,18 +1,19 @@
 # Chill Events - WordPress Events Plugin
 
-A comprehensive WordPress events plugin designed as a complete replacement for bloated event plugins like Tribe Events Calendar. Built with Gutenberg-first principles and modular extensibility, it provides a full events solution with native API integrations, visual import management, and a modern calendar interface.
+A comprehensive WordPress events plugin designed as a complete replacement for bloated event plugins like Tribe Events Calendar. Built with a **block-first architecture** and modular extensibility, it provides a full events solution with native API integrations, visual import management, and a modern calendar interface.
 
 ## 🎯 Core Philosophy
 
-**KISS, DRY, and modular extensibility** - built for the AI/customization era. Complete events solution with Import Modules system for automated event management.
+**KISS, DRY, and modular extensibility** - built for the AI/customization era. We prioritize modern WordPress standards, including a block-first approach where content and data are managed directly within the Gutenberg editor for a seamless user experience.
 
 ## ✨ Key Features
 
 ### 🎪 Complete Events Solution
-- **Full Frontend System:** Main calendar page, event displays, filtering, search
-- **Import Modules System:** Visual admin interface for automated event imports
-- **Native API Integrations:** Ticketmaster, Dice FM, Eventbrite built into core
-- **Child Theme Extensions:** Site-specific scrapers and custom data sources
+- **Block-First Architecture:** Event data (date, time, venue, etc.) is managed via the `Event Details` block, making it the single source of truth.
+- **Full Frontend System:** Main calendar page, event displays, filtering, and search powered by Gutenberg blocks.
+- **Import Modules System:** Visual admin interface for automated event imports from multiple sources.
+- **Native API Integrations:** Ticketmaster, Dice FM, Eventbrite, and iCal built into core.
+- **Child Theme Extensions:** Site-specific scrapers and custom data sources.
 - **Tribe Events Replacement:** Complete migration tools for seamless transition
 
 ### 🔄 Import Modules System
@@ -21,6 +22,7 @@ A comprehensive WordPress events plugin designed as a complete replacement for b
 - **Taxonomy Mapping:** Map imported data to existing site taxonomies
 - **Global Schedule Execution:** All active modules run together on a single cron-based schedule
 - **Centralized Tracking:** Single analytics dashboard for all modules
+- **Responsive Design:** Mobile-optimized interface
 
 ### 🏢 Smart Venue Management
 - **Venue Taxonomy:** Normalized venue data with term meta storage
@@ -33,7 +35,13 @@ A comprehensive WordPress events plugin designed as a complete replacement for b
 - **Real-time Search:** Search by event title, venue, or artist
 - **Date Filtering:** Filter by current month, next month, next 3 months
 - **View Toggle:** Switch between list and grid layouts
-- **Responsive Design:** Mobile-optimized interface
+
+### 🏗️ Block-First Architecture
+Chill Events uses a modern, block-first approach. All event-specific data (start/end times, venue, artist, price, etc.) is stored directly within the `chill-events/event-details` block.
+
+- **Single Source of Truth:** The block's attributes are the canonical source for all event data, eliminating the need for traditional post meta boxes.
+- **Seamless Editing:** Manage all event information directly in the Gutenberg editor for an intuitive workflow.
+- **Optimized Performance:** A background process, `Event_Data_Manager`, automatically syncs the event's start date to a separate meta field (`_chill_event_start_date_utc`). This enables fast and efficient sorting for the calendar block without sacrificing the benefits of a block-based architecture.
 
 ## 🚀 Quick Start
 
@@ -83,7 +91,7 @@ chill-events/
 │   ├── data-sources/        # API integrations
 │   ├── events/              # Event management
 │   └── utils/               # Utility classes
-├── events-scraping/         # Legacy scrapers (migration in progress)
+├── events-scraping/         # Legacy scrapers (deprecated - replaced by Import Modules system)
 ├── languages/               # Translation files
 ├── vendor/                  # Composer dependencies
 └── chill-events.php        # Main plugin file
@@ -93,7 +101,7 @@ chill-events/
 
 ### Requirements
 - WordPress 6.0+
-- PHP 7.4+
+- PHP 8.0+
 - Composer
 
 ### Development Setup
@@ -105,7 +113,7 @@ chill-events/
 ### Architecture Overview
 
 #### **StandardizedEvent Class**
-All event data is represented by the `StandardizedEvent` class, ensuring consistency across all data sources:
+During the import process, all event data is normalized into a `StandardizedEvent` object. This ensures consistency across all data sources before the data is saved into the `Event Details` block on post creation.
 
 ```php
 $event = new StandardizedEvent([

@@ -2,8 +2,7 @@
     "name": "chubes/chill-events",
     "description": "Chill Events plugin dependencies",
     "require": {
-        "php": ">=7.4",
-        "johngrogg/ics-parser": "^3.4"
+        "php": ">=8.0"
     },
     "authors": [
         {

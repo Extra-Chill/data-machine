@@ -245,13 +245,13 @@ class Core {
      */
     public function register_blocks() {
         // Register calendar block
-        $calendar_block_path = CHILL_EVENTS_PLUGIN_DIR . 'includes/blocks/calendar';
+        $calendar_block_path = CHILL_EVENTS_PLUGIN_DIR . 'inc/blocks/calendar';
         register_block_type($calendar_block_path, array(
             'render_callback' => array($this, 'render_calendar_block')
         ));
         
         // Register event details block
-        $event_details_block_path = CHILL_EVENTS_PLUGIN_DIR . 'includes/blocks/event-details';
+        $event_details_block_path = CHILL_EVENTS_PLUGIN_DIR . 'inc/blocks/event-details';
         register_block_type($event_details_block_path, array(
             'render_callback' => array($this, 'render_event_details_block'),
             'attributes' => array(
@@ -264,12 +264,10 @@ class Core {
                 'artist' => array('type' => 'string', 'default' => ''),
                 'price' => array('type' => 'string', 'default' => ''),
                 'ticketUrl' => array('type' => 'string', 'default' => ''),
-                'description' => array('type' => 'string', 'default' => ''),
                 'showVenue' => array('type' => 'boolean', 'default' => true),
                 'showArtist' => array('type' => 'boolean', 'default' => true),
                 'showPrice' => array('type' => 'boolean', 'default' => true),
-                'showTicketLink' => array('type' => 'boolean', 'default' => true),
-                'layout' => array('type' => 'string', 'default' => 'compact')
+                'showTicketLink' => array('type' => 'boolean', 'default' => true)
             ),
             'category' => 'chill-events',
             'supports' => array(
@@ -289,7 +287,7 @@ class Core {
      */
     public function render_calendar_block($attributes, $content, $block) {
         // Include the render template directly without output buffering
-        include CHILL_EVENTS_PLUGIN_DIR . 'includes/blocks/calendar/render.php';
+        include CHILL_EVENTS_PLUGIN_DIR . 'inc/blocks/calendar/render.php';
     }
 
     /**
@@ -305,7 +303,7 @@ class Core {
         ob_start();
         
         // Include the render template
-        include CHILL_EVENTS_PLUGIN_DIR . 'includes/blocks/event-details/render.php';
+        include CHILL_EVENTS_PLUGIN_DIR . 'inc/blocks/event-details/render.php';
         
         // Return the captured content
         return ob_get_clean();
@@ -320,7 +318,7 @@ class Core {
         // Enqueue calendar block frontend JavaScript
         wp_enqueue_script(
             'chill-events-calendar-frontend',
-            CHILL_EVENTS_PLUGIN_URL . 'includes/blocks/calendar/build/frontend.js',
+            CHILL_EVENTS_PLUGIN_URL . 'inc/blocks/calendar/build/frontend.js',
             array(),
             $this->get_version(),
             true
@@ -329,7 +327,7 @@ class Core {
         // Enqueue calendar block frontend CSS (includes flatpickr styles)
         wp_enqueue_style(
             'chill-events-calendar-frontend-style',
-            CHILL_EVENTS_PLUGIN_URL . 'includes/blocks/calendar/build/frontend.css',
+            CHILL_EVENTS_PLUGIN_URL . 'inc/blocks/calendar/build/frontend.css',
             array(),
             $this->get_version()
         );
@@ -337,7 +335,7 @@ class Core {
         // Enqueue calendar block styles
         wp_enqueue_style(
             'chill-events-calendar-style',
-            CHILL_EVENTS_PLUGIN_URL . 'includes/blocks/calendar/style.css',
+            CHILL_EVENTS_PLUGIN_URL . 'inc/blocks/calendar/style.css',
             array(),
             $this->get_version()
         );
