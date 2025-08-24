@@ -2,13 +2,10 @@
 /**
  * Event Duplicate Checker for Chill Events
  *
- * Provides a reusable utility for checking if an event already exists,
- * based on title and start date. Designed for use by all data sources
- * and the import executor to prevent duplicate event imports.
+ * Utility for preventing duplicate event creation based on title and start date matching.
+ * Used by Data Machine import handlers to avoid creating duplicate events.
  *
  * @package ChillEvents\Events
- * @author Chris Huber
- * @link https://chubes.net
  * @since 1.0.0
  */
 
@@ -18,6 +15,13 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+/**
+ * Checks for existing events to prevent duplicates during import operations
+ * 
+ * Compares event title and start date using case-insensitive matching.
+ * 
+ * @since 1.0.0
+ */
 class EventDuplicateChecker {
     /**
      * Check if an event already exists by title and start date.
@@ -29,7 +33,7 @@ class EventDuplicateChecker {
     public static function event_exists($title, $start_date) {
         global $wpdb;
         $start_date_formatted = date('Y-m-d H:i:s', strtotime($start_date));
-        error_log('[ChillEvents][DEBUG] event_exists check: title=' . $title . ' | start_date=' . $start_date . ' | formatted=' . $start_date_formatted);
+        
         $query = $wpdb->prepare(
             "SELECT ID FROM {$wpdb->posts} p
              INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
@@ -41,9 +45,8 @@ class EventDuplicateChecker {
             $start_date_formatted,
             $title
         );
-        error_log('[ChillEvents][DEBUG] event_exists SQL: ' . $query);
+        
         $result = $wpdb->get_var($query);
-        error_log('[ChillEvents][DEBUG] event_exists result: ' . var_export($result, true));
         return !empty($result);
     }
 }
@@ -51,6 +54,6 @@ class EventDuplicateChecker {
 /**
  * Usage:
  *   if (EventDuplicateChecker::event_exists($title, $start_date)) {
- *       // Duplicate found, skip import
+ *       // Duplicate found, handle accordingly
  *   }
  */ 

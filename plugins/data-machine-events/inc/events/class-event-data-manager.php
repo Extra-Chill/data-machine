@@ -2,11 +2,11 @@
 /**
  * Event Data Manager
  *
- * This class handles the synchronization between the Event Details block
- * and the post meta fields used for efficient querying and sorting.
+ * Handles synchronization between Event Details blocks and meta fields for performance optimization.
+ * Block attributes serve as the single source of truth, with meta fields maintained for efficient queries.
  *
  * @package ChillEvents\Events
- * @since 1.1.0
+ * @since 1.0.0
  */
 
 namespace ChillEvents\Events;
@@ -16,6 +16,13 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+/**
+ * Synchronizes Event Details block data to meta fields for efficient calendar queries
+ * 
+ * Maintains block-first architecture while enabling performant date-based event queries.
+ * 
+ * @since 1.0.0
+ */
 class Event_Data_Manager {
     /**
      * Initialize the data manager

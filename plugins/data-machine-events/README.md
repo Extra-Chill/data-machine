@@ -1,198 +1,144 @@
 # Chill Events - WordPress Events Plugin
 
-A comprehensive WordPress events plugin designed as a complete replacement for bloated event plugins like Tribe Events Calendar. Built with a **block-first architecture** and modular extensibility, it provides a full events solution with native API integrations, visual import management, and a modern calendar interface.
+Frontend-focused WordPress events plugin with **block-first architecture**. Integrates with Data Machine plugin for automated event imports while providing elegant event display and management through Gutenberg blocks.
 
-## 🎯 Core Philosophy
+## Features
 
-**KISS, DRY, and modular extensibility** - built for the AI/customization era. We prioritize modern WordPress standards, including a block-first approach where content and data are managed directly within the Gutenberg editor for a seamless user experience.
+### Events
+- **Block-First Architecture:** Event data managed via `Event Details` block (single source of truth)
+- **Calendar Display:** Gutenberg block with filtering and search
+- **Performance Optimized:** Background sync to meta fields for efficient queries
+- **Data Machine Ready:** Works with Data Machine plugin for automated imports
 
-## ✨ Key Features
+### Venues
+- **Rich Taxonomy:** Address, phone, website, capacity data
+- **Admin Interface:** Custom term meta management
+- **SEO Ready:** Archive pages and structured data
 
-### 🎪 Complete Events Solution
-- **Block-First Architecture:** Event data (date, time, venue, etc.) is managed via the `Event Details` block, making it the single source of truth.
-- **Full Frontend System:** Main calendar page, event displays, filtering, and search powered by Gutenberg blocks.
-- **Import Modules System:** Visual admin interface for automated event imports from multiple sources.
-- **Native API Integrations:** Ticketmaster, Dice FM, Eventbrite, and iCal built into core.
-- **Child Theme Extensions:** Site-specific scrapers and custom data sources.
-- **Tribe Events Replacement:** Complete migration tools for seamless transition
+### Development
+- **PSR-4 Autoloading:** `ChillEvents\` namespace
+- **Separate Build Systems:** Calendar (webpack), Event Details (@wordpress/scripts)
+- **REST API Support:** Event metadata exposed
+- **WordPress Standards:** Native hooks and security practices
 
-### 🔄 Import Modules System
-- **Admin-Configured Modules:** Each import is a separate, configurable module
-- **Data Source Selection:** Choose from core APIs or child theme data sources
-- **Taxonomy Mapping:** Map imported data to existing site taxonomies
-- **Global Schedule Execution:** All active modules run together on a single cron-based schedule
-- **Centralized Tracking:** Single analytics dashboard for all modules
-- **Responsive Design:** Mobile-optimized interface
+### Architecture
+**Data Flow:** Data Machine → Event Details Block → Background Sync → Calendar Display
 
-### 🏢 Smart Venue Management
-- **Venue Taxonomy:** Normalized venue data with term meta storage
-- **Rich Venue Data:** Address, phone, website, capacity, coordinates
-- **SEO Benefits:** Venue archive pages, structured data
-- **Import Efficiency:** Avoid duplicate venue creation
+**Core Classes:**
+- `ChillEvents\Admin` - Settings interface  
+- `ChillEvents\Events\Event_Data_Manager` - Performance sync
+- `ChillEvents\Events\Venues\Venue_Term_Meta` - Venue administration
+- `ChillEvents\Events\Event_Duplicate_Checker` - Prevents duplicate imports
 
-### 🎨 Modern Frontend
-- **Gutenberg Calendar Block:** Comprehensive event display with filtering
-- **Real-time Search:** Search by event title, venue, or artist
-- **Date Filtering:** Filter by current month, next month, next 3 months
-- **View Toggle:** Switch between list and grid layouts
-
-### 🏗️ Block-First Architecture
-Chill Events uses a modern, block-first approach. All event-specific data (start/end times, venue, artist, price, etc.) is stored directly within the `chill-events/event-details` block.
-
-- **Single Source of Truth:** The block's attributes are the canonical source for all event data, eliminating the need for traditional post meta boxes.
-- **Seamless Editing:** Manage all event information directly in the Gutenberg editor for an intuitive workflow.
-- **Optimized Performance:** A background process, `Event_Data_Manager`, automatically syncs the event's start date to a separate meta field (`_chill_event_start_date_utc`). This enables fast and efficient sorting for the calendar block without sacrificing the benefits of a block-based architecture.
-
-## 🚀 Quick Start
+## Quick Start
 
 ### Installation
+```bash
+git clone https://github.com/yourusername/chill-events.git
+cd chill-events
+composer install
+```
+Upload to `/wp-content/plugins/chill-events/` and activate.
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/yourusername/chill-events.git
-   cd chill-events
-   ```
+### Usage
+1. **Automated Import:** Configure Data Machine plugin for Ticketmaster, Dice FM, or web scraper imports
+2. **Manual Events:** Add Event post → Insert "Event Details" block → Fill event data  
+3. **Display Events:** Add "Chill Events Calendar" block to any page/post
+4. **Manage Venues:** Events → Venues → Add venue details
 
-2. **Install dependencies:**
-   ```bash
-   composer install
-   ```
-
-3. **Activate the plugin:**
-   - Upload to `/wp-content/plugins/chill-events/`
-   - Activate through the 'Plugins' menu in WordPress
-
-### Configuration
-
-1. **API Setup:**
-   - Go to Chill Events → API Configuration
-   - Add your Ticketmaster, Eventbrite, or Dice FM API keys
-
-2. **Create Import Modules:**
-   - Go to Chill Events → Import Modules
-   - Click "Create New Import Module"
-   - Select data source and configure settings
-
-3. **Add Calendar Block:**
-   - Edit any page/post
-   - Add the "Chill Events Calendar" block
-   - Configure display settings
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 chill-events/
-├── assets/                    # Frontend assets
-│   ├── css/                  # Stylesheets
-│   └── js/                   # JavaScript files
-├── includes/                 # Core plugin files
-│   ├── admin/               # Admin interface
-│   ├── blocks/              # Gutenberg blocks
-│   ├── data-sources/        # API integrations
-│   ├── events/              # Event management
-│   └── utils/               # Utility classes
-├── events-scraping/         # Legacy scrapers (deprecated - replaced by Import Modules system)
-├── languages/               # Translation files
-├── vendor/                  # Composer dependencies
-└── chill-events.php        # Main plugin file
+├── inc/
+│   ├── admin/               # Settings interface
+│   ├── blocks/
+│   │   ├── calendar/        # Calendar block (webpack)
+│   │   └── event-details/   # Event details block (@wordpress/scripts)
+│   ├── events/              # Event data management & duplicate checking
+│   │   └── venues/          # Venue taxonomy
+│   └── steps/               # Data Machine integration
+│       ├── event-import/    # Import handlers (Ticketmaster, Dice FM, scrapers)
+│       └── publish/         # Event publishing handlers
+├── assets/                  # Frontend CSS (blocks handle own JS)
+└── chill-events.php        # Main file with autoloader
 ```
 
-## 🔧 Development
+## Development
 
-### Requirements
-- WordPress 6.0+
-- PHP 8.0+
-- Composer
+**Requirements:** WordPress 6.0+, PHP 8.0+, Composer
 
-### Development Setup
-1. Clone the repository
-2. Run `composer install`
-3. Activate the plugin in WordPress
-4. Configure API keys for testing
-
-### Architecture Overview
-
-#### **StandardizedEvent Class**
-During the import process, all event data is normalized into a `StandardizedEvent` object. This ensures consistency across all data sources before the data is saved into the `Event Details` block on post creation.
-
-```php
-$event = new StandardizedEvent([
-    'id' => 'G5eVZb0QUJ4cJ',
-    'title' => 'Mary Chapin Carpenter / Brandy Clark',
-    'start_date' => '2025-09-30T23:00:00Z',
-    'venue_name' => 'The Charleston Music Hall',
-    'venue_phone' => '(843) 853-2252',
-    'venue_website' => 'https://charlestonmusichall.com',
-    'artist_name' => 'Mary Chapin Carpenter, Brandy Clark',
-    'price' => '$61.91 - $78.48',
-    'ticket_url' => 'https://ticketmaster.com/event/2D006246B6995B66',
-]);
+**Setup:**
+```bash
+composer install
+# Build blocks
+cd inc/blocks/calendar && npm install && npm run build
+cd ../event-details && npm install && npm run build
 ```
 
-#### **Import Modules System**
-Each import module is a configurable instance that:
-- Maps to any available data source (API or custom scraper)
-- Configures taxonomy mappings for venue, artist, location, etc.
-- Runs on a global schedule with detailed logging
-- Provides real-time import status and analytics
+**Block Development:**
+```bash
+# Calendar (webpack)
+cd inc/blocks/calendar
+npm run start    # Development watch
 
-#### **Venue Taxonomy System**
-Venue data is normalized using WordPress taxonomies:
-- Venue information stored as term meta
-- Reused across multiple events
-- Rich venue data (address, phone, website, capacity)
-- SEO-friendly venue archive pages
+# Event Details (@wordpress/scripts)  
+cd inc/blocks/event-details
+npm run start    # Development watch
+npm run lint:js && npm run lint:css
+```
 
-## 📚 API Integrations
+### Code Examples
 
-### Core APIs (Built-in)
-- **Ticketmaster API:** Complete Live Nation venue network access
-- **Eventbrite API:** Community and local event integration  
-- **Dice FM API:** Independent venue and event coverage
-
-### Custom Data Sources
-Create site-specific scrapers in your child theme:
-```php
-// wp-content/themes/your-child-theme/chill-events/data-sources/scrapers/
-class MyVenueScraper extends \ChillEvents\BaseDataSource {
-    public function get_info() {
-        return [
-            'name' => 'My Venue Scraper',
-            'type' => 'scraper',
-            'description' => 'Scrapes events from My Venue.',
-        ];
-    }
-
-    public function get_events($settings = array()) {
-        // Return array of StandardizedEvent objects
-    }
+**Block Attributes (Primary Data):**
+```json
+{
+  "startDate": "2025-09-30",
+  "startTime": "19:00", 
+  "venue": "The Charleston Music Hall",
+  "artist": "Mary Chapin Carpenter"
 }
 ```
 
-## 🤝 Contributing
+**Performance Sync:**
+```php
+// Meta fields for queries only
+update_post_meta($post_id, '_chill_event_start_date_utc', $utc_date);
+```
+
+## Technical Details
+
+**Block Registration:**
+```php
+register_block_type($path, array(
+    'render_callback' => array($this, 'render_block'),
+    'attributes' => array(
+        'startDate' => array('type' => 'string'),
+        'venue' => array('type' => 'string')
+    )
+));
+```
+
+**REST API:**
+```php
+register_rest_field('chill_events', 'event_meta', array(
+    'get_callback' => array($this, 'get_event_meta_for_rest')
+));
+```
+
+## Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create feature branch (`git checkout -b feature/name`)
+3. Commit changes (`git commit -m 'Add feature'`)
+4. Push to branch (`git push origin feature/name`) 
+5. Open Pull Request
 
-## 📄 License
+## License
 
-This project is licensed under the GPL v2 or later - see the [LICENSE](LICENSE) file for details.
+GPL v2 or later - see [LICENSE](LICENSE) file.
 
-## 🙏 Acknowledgments
+## Support
 
-- Built with ❤️ by [Chris Huber](https://chubes.net)
-- Designed as a modern alternative to Tribe Events Calendar
-- Inspired by the need for lightweight, extensible event management
-
-## 📞 Support
-
-For support, feature requests, or bug reports:
-- Create an issue on GitHub
-- Contact: [chubes.net](https://chubes.net)
-
----
-
-**Chill Events** - Making WordPress event management simple, powerful, and extensible. 
+- GitHub Issues
+- Contact: [chubes.net](https://chubes.net) 

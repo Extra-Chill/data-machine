@@ -14,11 +14,10 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Admin functionality class
+ * Admin interface for Chill Events plugin
  * 
- * Handles admin interface components including:
- * - Settings page for display configuration
- * - Event Details block settings
+ * Manages Event Details block display settings through WordPress admin settings API.
+ * Provides per-field visibility controls for venue, artist, price, and ticket link fields.
  * 
  * @since 1.0.0
  */
@@ -209,9 +208,9 @@ class Admin {
      * Render block section description
      */
     public function render_block_section_description() {
-        echo '<p>' . __('Control which fields are imported and displayed in Event Details blocks. This determines both what data gets imported from event sources and what fields appear in your event blocks.', 'chill-events') . '</p>';
+        echo '<p>' . __('Control which fields are displayed in Event Details blocks. This determines what fields appear in your event blocks by default.', 'chill-events') . '</p>';
         echo '<p><strong>' . __('Simplified Calendar:', 'chill-events') . '</strong> ' . __('Disable fields you don\'t need to create a cleaner, simpler event system.', 'chill-events') . '</p>';
-        echo '<p><strong>' . __('Note:', 'chill-events') . '</strong> ' . __('Date/time and description are always imported. Users can override display settings per-block in the editor.', 'chill-events') . '</p>';
+        echo '<p><strong>' . __('Note:', 'chill-events') . '</strong> ' . __('Date/time and description are always available. Users can override display settings per-block in the editor.', 'chill-events') . '</p>';
     }
 
     /**

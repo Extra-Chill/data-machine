@@ -13,7 +13,11 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Handles venue term meta operations for storing and retrieving venue data
+ * Manages venue taxonomy term meta data and WordPress admin interface
+ * 
+ * Handles venue information storage (address, phone, capacity, etc.) and provides
+ * admin UI for editing venue details. Integrates with Event Details blocks and
+ * Data Machine import handlers for comprehensive venue management.
  * 
  * @since 1.0.0
  */
@@ -38,25 +42,16 @@ class Venue_Term_Meta {
     ];
     
     /**
-     * Update venue term meta with data from standardized event
+     * Update venue term meta with venue data array
      * 
      * @param int $term_id Venue term ID
-     * @param \ChillEvents\Events\StandardizedEvent $standardized_event Event data
+     * @param array $venue_data Associative array of venue data
      * @return bool True on success, false on failure
      */
-    public static function update_venue_meta($term_id, $standardized_event) {
-        if (!$term_id || !$standardized_event) {
+    public static function update_venue_meta($term_id, $venue_data) {
+        if (!$term_id || !is_array($venue_data)) {
             return false;
         }
-        
-        // Extract venue data from standardized event
-        $venue_data = [
-            'address' => $standardized_event->get('address'),
-            'city' => self::extract_city_from_location($standardized_event->get('location_name')),
-            'state' => self::extract_state_from_location($standardized_event->get('location_name')),
-            'phone' => $standardized_event->get('venue_phone'),
-            'website' => $standardized_event->get('venue_website'),
-        ];
         
         // Store each field as term meta
         foreach (self::$meta_fields as $data_key => $meta_key) {
