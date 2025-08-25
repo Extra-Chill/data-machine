@@ -192,7 +192,6 @@ class Chill_Events {
         register_deactivation_hook(CHILL_EVENTS_PLUGIN_FILE, array($this, 'deactivate'));
         
         // Core WordPress hooks
-        add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_assets'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
     }
     
@@ -417,24 +416,6 @@ class Chill_Events {
         );
     }
     
-    /**
-     * Enqueue frontend assets with dynamic versioning
-     */
-    public function enqueue_frontend_assets() {
-        $css_file = CHILL_EVENTS_PLUGIN_DIR . 'assets/css/chill-events-frontend.css';
-        
-        // Enqueue CSS with dynamic versioning by filemtime
-        if (file_exists($css_file)) {
-            wp_enqueue_style(
-                'chill-events-frontend',
-                CHILL_EVENTS_PLUGIN_URL . 'assets/css/chill-events-frontend.css',
-                array(),
-                filemtime($css_file)
-            );
-        }
-        
-        // Note: JavaScript is handled by individual blocks (e.g., calendar block has its own JS)
-    }
     
     /**
      * Enqueue admin assets with dynamic versioning
