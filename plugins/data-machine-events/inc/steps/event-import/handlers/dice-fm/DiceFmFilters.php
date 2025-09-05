@@ -4,7 +4,7 @@
  * 
  * Registers the Dice.fm event import handler with Data Machine.
  *
- * @package ChillEvents\Steps\EventImport\Handlers\DiceFm
+ * @package DmEvents\Steps\EventImport\Handlers\DiceFm
  * @since 1.0.0
  */
 
@@ -21,9 +21,9 @@ if (!defined('ABSPATH')) {
 add_filter('dm_handlers', function($handlers) {
     $handlers['dice_fm_events'] = [
         'type' => 'event_import',
-        'class' => 'ChillEvents\\Steps\\EventImport\\Handlers\\DiceFm\\DiceFm',
-        'label' => __('Dice.fm Events', 'chill-events'),
-        'description' => __('Import events from Dice.fm API', 'chill-events')
+        'class' => 'DmEvents\\Steps\\EventImport\\Handlers\\DiceFm\\DiceFm',
+        'label' => __('Dice.fm Events', 'dm-events'),
+        'description' => __('Import events from Dice.fm API', 'dm-events')
     ];
     
     return $handlers;
@@ -36,7 +36,7 @@ add_filter('dm_handlers', function($handlers) {
  * This enables the authentication modal for API key configuration.
  */
 add_filter('dm_auth_providers', function($providers) {
-    $providers['dice_fm_events'] = new ChillEvents\Steps\EventImport\Handlers\DiceFm\DiceFmAuth();
+    $providers['dice_fm_events'] = new DmEvents\Steps\EventImport\Handlers\DiceFm\DiceFmAuth();
     return $providers;
 });
 
@@ -47,6 +47,6 @@ add_filter('dm_auth_providers', function($providers) {
  * This enables the configuration UI for handler parameters.
  */
 add_filter('dm_handler_settings', function($all_settings) {
-    $all_settings['dice_fm_events'] = new ChillEvents\Steps\EventImport\Handlers\DiceFm\DiceFmSettings();
+    $all_settings['dice_fm_events'] = new DmEvents\Steps\EventImport\Handlers\DiceFm\DiceFmSettings();
     return $all_settings;
 });

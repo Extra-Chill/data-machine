@@ -1,5 +1,5 @@
 {
-  "name": "chill-events-calendar-block",
+  "name": "dm-events-calendar-block",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
@@ -15,7 +15,7 @@
   ],
   "author": "Chris Huber",
   "license": "GPL-2.0-or-later",
-  "description": "Events calendar block for Chill Events plugin",
+  "description": "Events calendar block for Data Machine Events plugin",
   "devDependencies": {
     "@wordpress/scripts": "^30.19.0",
     "webpack": "^5.99.9",

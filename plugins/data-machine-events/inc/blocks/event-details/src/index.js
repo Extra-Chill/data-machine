@@ -11,18 +11,18 @@ import {
 import { useSelect } from '@wordpress/data';
 import { useState, useEffect } from '@wordpress/element';
 
-registerBlockType('chill-events/event-details', {
+registerBlockType('dm-events/event-details', {
     edit: function Edit({ attributes, setAttributes, clientId }) {
         // Check if we're in the correct post type
         const { postType } = useSelect(select => ({
             postType: select('core/editor').getCurrentPostType()
         }), []);
         
-        // If not in chill_events post type, show a message
-        if (postType !== 'chill_events') {
+        // If not in dm_events post type, show a message
+        if (postType !== 'dm_events') {
             return (
-                <div className="chill-event-details-block-error">
-                    <p>{__('Event Details blocks can only be used in Events posts.', 'chill-events')}</p>
+                <div className="dm-event-details-block-error">
+                    <p>{__('Event Details blocks can only be used in Events posts.', 'dm-events')}</p>
                 </div>
             );
         }
@@ -43,7 +43,7 @@ registerBlockType('chill-events/event-details', {
         } = attributes;
 
         const blockProps = useBlockProps({
-            className: 'chill-event-details-block'
+            className: 'dm-event-details-block'
         });
 
         // Block-first architecture - all data is stored in block attributes
@@ -61,14 +61,14 @@ registerBlockType('chill-events/event-details', {
 
         return (
             <div {...blockProps}>
-                    <div className="chill-event-details-editor">
+                    <div className="dm-event-details-editor">
                         <div className="event-description-area">
-                            <h4>{__('Event Description', 'chill-events')}</h4>
+                            <h4>{__('Event Description', 'dm-events')}</h4>
                             <div className="event-description-inner">
                                 <InnerBlocks
                                     allowedBlocks={['core/paragraph', 'core/heading', 'core/image', 'core/list', 'core/quote']}
                                     template={[
-                                        ['core/paragraph', { placeholder: __('Add event description...', 'chill-events') }]
+                                        ['core/paragraph', { placeholder: __('Add event description...', 'dm-events') }]
                                     ]}
                                     templateLock={false}
                                 />
@@ -76,10 +76,10 @@ registerBlockType('chill-events/event-details', {
                         </div>
                         
                         <div className="event-dates">
-                            <h4>{__('Event Dates & Times', 'chill-events')}</h4>
+                            <h4>{__('Event Dates & Times', 'dm-events')}</h4>
                             <div className="date-time-grid">
                                 <div className="date-time-field">
-                                    <label>{__('Start Date', 'chill-events')}</label>
+                                    <label>{__('Start Date', 'dm-events')}</label>
                                     <input
                                         type="date"
                                         value={startDate}
@@ -87,7 +87,7 @@ registerBlockType('chill-events/event-details', {
                                     />
                                 </div>
                                 <div className="date-time-field">
-                                    <label>{__('Start Time', 'chill-events')}</label>
+                                    <label>{__('Start Time', 'dm-events')}</label>
                                     <input
                                         type="time"
                                         value={startTime}
@@ -95,7 +95,7 @@ registerBlockType('chill-events/event-details', {
                                     />
                                 </div>
                                 <div className="date-time-field">
-                                    <label>{__('End Date', 'chill-events')}</label>
+                                    <label>{__('End Date', 'dm-events')}</label>
                                     <input
                                         type="date"
                                         value={endDate}
@@ -103,7 +103,7 @@ registerBlockType('chill-events/event-details', {
                                     />
                                 </div>
                                 <div className="date-time-field">
-                                    <label>{__('End Time', 'chill-events')}</label>
+                                    <label>{__('End Time', 'dm-events')}</label>
                                     <input
                                         type="time"
                                         value={endTime}
@@ -114,33 +114,33 @@ registerBlockType('chill-events/event-details', {
                         </div>
 
                         <div className="event-location">
-                            <h4>{__('Location', 'chill-events')}</h4>
+                            <h4>{__('Location', 'dm-events')}</h4>
                             <TextControl
-                                label={__('Venue', 'chill-events')}
+                                label={__('Venue', 'dm-events')}
                                 value={venue}
                                 onChange={(value) => setAttributes({ venue: value })}
                             />
                             <TextControl
-                                label={__('Address', 'chill-events')}
+                                label={__('Address', 'dm-events')}
                                 value={address}
                                 onChange={(value) => setAttributes({ address: value })}
                             />
                         </div>
 
                         <div className="event-details">
-                            <h4>{__('Event Details', 'chill-events')}</h4>
+                            <h4>{__('Event Details', 'dm-events')}</h4>
                             <TextControl
-                                label={__('Artist/Performer', 'chill-events')}
+                                label={__('Artist/Performer', 'dm-events')}
                                 value={artist}
                                 onChange={(value) => handleAttributeChange('artist', value)}
                             />
                             <TextControl
-                                label={__('Price', 'chill-events')}
+                                label={__('Price', 'dm-events')}
                                 value={price}
                                 onChange={(value) => handleAttributeChange('price', value)}
                             />
                             <TextControl
-                                label={__('Ticket URL', 'chill-events')}
+                                label={__('Ticket URL', 'dm-events')}
                                 value={ticketUrl}
                                 onChange={(value) => handleAttributeChange('ticketUrl', value)}
                                 type="url"
@@ -150,7 +150,7 @@ registerBlockType('chill-events/event-details', {
 
 
                         <Notice status="info" isDismissible={false}>
-                            {__('This block is the primary data store for event information. Changes here are automatically saved to the event.', 'chill-events')}
+                            {__('This block is the primary data store for event information. Changes here are automatically saved to the event.', 'dm-events')}
                         </Notice>
                     </div>
                 </div>

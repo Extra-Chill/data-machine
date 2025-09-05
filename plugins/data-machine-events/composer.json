@@ -1,6 +1,6 @@
 {
-    "name": "chubes/chill-events",
-    "description": "Chill Events plugin dependencies",
+    "name": "chubes/dm-events",
+    "description": "Data Machine Events plugin dependencies",
     "require": {
         "php": ">=8.0",
         "johngrogg/ics-parser": "^3.0"

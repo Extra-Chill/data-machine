@@ -1,21 +1,21 @@
 <?php
 /**
- * Plugin Name: Chill Events
- * Plugin URI: https://chubes.net/chill-events
- * Description: A modern WordPress events plugin with Gutenberg block-first architecture. Features Event Details blocks for manual event creation, Calendar blocks for event display, and rich venue taxonomy management.
+ * Plugin Name: Data Machine Events
+ * Plugin URI: https://chubes.net/dm-events
+ * Description: WordPress events plugin with block-first architecture. Features AI-driven event creation via Data Machine integration, Event Details blocks for data storage, Calendar blocks for display, and venue taxonomy management.
  * Version: 1.0.0
  * Author: Chris Huber
  * Author URI: https://chubes.net
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: chill-events
+ * Text Domain: dm-events
  * Domain Path: /languages
  * Requires at least: 6.0
  * Tested up to: 6.4
  * Requires PHP: 8.0
  * Network: false
  *
- * @package ChillEvents
+ * @package DmEvents
  * @author Chris Huber
  * @since 1.0.0
  */
@@ -31,50 +31,49 @@ if (file_exists(__DIR__ . '/vendor/autoload.php')) {
 }
 
 // Define plugin constants
-define('CHILL_EVENTS_VERSION', '1.0.0');
-define('CHILL_EVENTS_PLUGIN_FILE', __FILE__);
-define('CHILL_EVENTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
-define('CHILL_EVENTS_PLUGIN_URL', plugin_dir_url(__FILE__));
-define('CHILL_EVENTS_PLUGIN_BASENAME', plugin_basename(__FILE__));
-define('CHILL_EVENTS_PATH', plugin_dir_path(__FILE__)); // Alias for Data Machine integration
+define('DM_EVENTS_VERSION', '1.0.0');
+define('DM_EVENTS_PLUGIN_FILE', __FILE__);
+define('DM_EVENTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
+define('DM_EVENTS_PLUGIN_URL', plugin_dir_url(__FILE__));
+define('DM_EVENTS_PLUGIN_BASENAME', plugin_basename(__FILE__));
+define('DM_EVENTS_PATH', plugin_dir_path(__FILE__)); // Alias for Data Machine integration
 
 // Always load venue term meta admin UI in admin
 if (is_admin()) {
-    require_once CHILL_EVENTS_PLUGIN_DIR . 'inc/events/venues/class-venue-term-meta.php';
+    require_once DM_EVENTS_PLUGIN_DIR . 'inc/events/venues/class-venue-term-meta.php';
 }
 
 /**
- * PSR-4 Autoloader for Chill Events classes
+ * PSR-4 Autoloader for Data Machine Events classes
  * 
  * @param string $class_name The class name to load
  * @return void
  */
-function chill_events_autoloader($class_name) {
+function dm_events_autoloader($class_name) {
     // Only autoload our classes
-    if (strpos($class_name, 'ChillEvents\\') !== 0) {
+    if (strpos($class_name, 'DmEvents\\') !== 0) {
         return;
     }
     
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log("DEBUG Autoloader: Loading class: " . $class_name);
+    }
+    
     // Remove namespace prefix and convert to file path
-    $class_name = str_replace('ChillEvents\\', '', $class_name);
+    $class_name = str_replace('DmEvents\\', '', $class_name);
     $class_parts = explode('\\', $class_name);
     
     // Get the actual class name (last part)
     $actual_class = end($class_parts);
     
-    // Handle specific class name mappings
-    $file_name_mappings = array(
-        // Events
-        'Venue_Term_Meta' => 'events/venues/class-venue-term-meta.php',
-        'Event_Data_Manager' => 'events/class-event-data-manager.php',
-    );
+    // Convert class name to file path
+    $file_name = 'class-' . strtolower(str_replace('_', '-', $actual_class)) . '.php';
     
-    // Check if we have a specific mapping for this class
-    if (isset($file_name_mappings[$actual_class])) {
-        $file_name = $file_name_mappings[$actual_class];
-    } else {
-        // Default conversion: PascalCase to kebab-case
-        $file_name = 'class-' . strtolower(str_replace('_', '-', $actual_class)) . '.php';
+    // Handle specific mappings for non-standard names
+    if ($actual_class === 'DmEventsSettings') {
+        $file_name = 'steps/publish/handlers/dm-events/DmEventsSettings.php';
+    } elseif ($actual_class === 'DmEventsPublisher') {
+        $file_name = 'steps/publish/handlers/dm-events/DmEventsPublisher.php';
     }
     
     // Build directory path from namespace
@@ -90,42 +89,52 @@ function chill_events_autoloader($class_name) {
     foreach ($base_directories as $base_directory) {
         // Try with namespace directory path
         if (!empty($directory_path)) {
-            $file_path = CHILL_EVENTS_PLUGIN_DIR . $base_directory . '/' . $directory_path . $file_name;
+            $file_path = DM_EVENTS_PLUGIN_DIR . $base_directory . '/' . $directory_path . $file_name;
             if (file_exists($file_path)) {
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log("DEBUG Autoloader: Found and loading: " . $file_path);
+                }
                 require_once $file_path;
                 return;
             }
         }
         // Try directly in the base directory
-        $file_path = CHILL_EVENTS_PLUGIN_DIR . $base_directory . '/' . $file_name;
+        $file_path = DM_EVENTS_PLUGIN_DIR . $base_directory . '/' . $file_name;
         if (file_exists($file_path)) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log("DEBUG Autoloader: Found and loading: " . $file_path);
+            }
             require_once $file_path;
             return;
         }
     }
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log("DEBUG Autoloader: Could not find file for class: " . $class_name);
+    }
 }
 
 // Register autoloader
-spl_autoload_register('chill_events_autoloader');
+spl_autoload_register('dm_events_autoloader');
 
 /**
- * Main Chill Events plugin class
+ * Main Data Machine Events plugin class
  * 
  * @since 1.0.0
  */
-class Chill_Events {
+class DM_Events {
     
     /**
      * Single instance of the plugin
      * 
-     * @var Chill_Events
+     * @var DM_Events
      */
     private static $instance = null;
     
     /**
      * Get single instance of the plugin
      * 
-     * @return Chill_Events
+     * @return DM_Events
      */
     public static function get_instance() {
         if (null === self::$instance) {
@@ -174,12 +183,22 @@ class Chill_Events {
         $this->init_frontend();
 
         // Initialize the Event Data Manager to handle block-to-meta sync
-        if (class_exists('ChillEvents\\Events\\Event_Data_Manager')) {
-            new \ChillEvents\Events\Event_Data_Manager();
+        if (class_exists('DmEvents\\Events\\Event_Data_Manager')) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log("DEBUG: Initializing Event_Data_Manager in dm_events.php");
+            }
+            new \DmEvents\Events\Event_Data_Manager();
+        } else {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log("DEBUG: Event_Data_Manager class not found!");
+            }
         }
         
-        // Initialize Data Machine integration if Data Machine is available
-        $this->init_data_machine_integration();
+        // Initialize Data Machine integration after taxonomies are registered
+        add_action('init', array($this, 'init_data_machine_integration'), 25);
+        
+        // Initialize status detection system
+        $this->init_status_detection();
 
     }
     
@@ -188,8 +207,8 @@ class Chill_Events {
      */
     private function init_hooks() {
         // Plugin lifecycle hooks
-        register_activation_hook(CHILL_EVENTS_PLUGIN_FILE, array($this, 'activate'));
-        register_deactivation_hook(CHILL_EVENTS_PLUGIN_FILE, array($this, 'deactivate'));
+        register_activation_hook(DM_EVENTS_PLUGIN_FILE, array($this, 'activate'));
+        register_deactivation_hook(DM_EVENTS_PLUGIN_FILE, array($this, 'deactivate'));
         
         // Core WordPress hooks
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
@@ -200,8 +219,8 @@ class Chill_Events {
      */
     private function init_admin() {
         // Initialize admin class
-        if (class_exists('ChillEvents\\Admin')) {
-            new \ChillEvents\Admin();
+        if (class_exists('DmEvents\\Admin')) {
+            new \DmEvents\Admin();
         }
     }
     
@@ -214,6 +233,23 @@ class Chill_Events {
     }
     
     /**
+     * Initialize status detection system
+     * 
+     * @since 1.0.0
+     */
+    private function init_status_detection() {
+        // Only initialize if Data Machine is available
+        if (!function_exists('apply_filters') || !has_filter('dm_detect_status')) {
+            return;
+        }
+        
+        // Initialize status detection
+        if (class_exists('DmEvents\\Admin\\Status_Detection')) {
+            new \DmEvents\Admin\Status_Detection();
+        }
+    }
+    
+    /**
      * Initialize Data Machine integration
      * 
      * Conditionally loads Data Machine integration if Data Machine plugin is active.
@@ -221,7 +257,7 @@ class Chill_Events {
      * 
      * @since 1.0.0
      */
-    private function init_data_machine_integration() {
+    public function init_data_machine_integration() {
         // Check if Data Machine is available
         if (!defined('DATA_MACHINE_VERSION')) {
             return;
@@ -237,17 +273,12 @@ class Chill_Events {
      * @since 1.0.0
      */
     private function load_data_machine_components() {
-        // Load BaseDataSource class for scrapers
-        if (file_exists(CHILL_EVENTS_PLUGIN_DIR . 'inc/events/class-base-data-source.php')) {
-            require_once CHILL_EVENTS_PLUGIN_DIR . 'inc/events/class-base-data-source.php';
-        }
-        
         // Load Event Import step
-        if (file_exists(CHILL_EVENTS_PLUGIN_DIR . 'inc/steps/event-import/EventImportStep.php')) {
-            require_once CHILL_EVENTS_PLUGIN_DIR . 'inc/steps/event-import/EventImportStep.php';
+        if (file_exists(DM_EVENTS_PLUGIN_DIR . 'inc/steps/event-import/EventImportStep.php')) {
+            require_once DM_EVENTS_PLUGIN_DIR . 'inc/steps/event-import/EventImportStep.php';
         }
-        if (file_exists(CHILL_EVENTS_PLUGIN_DIR . 'inc/steps/event-import/EventImportFilters.php')) {
-            require_once CHILL_EVENTS_PLUGIN_DIR . 'inc/steps/event-import/EventImportFilters.php';
+        if (file_exists(DM_EVENTS_PLUGIN_DIR . 'inc/steps/event-import/EventImportFilters.php')) {
+            require_once DM_EVENTS_PLUGIN_DIR . 'inc/steps/event-import/EventImportFilters.php';
         }
         
         // Load event import handlers (they self-register via filters)
@@ -266,7 +297,7 @@ class Chill_Events {
         $handlers = ['ticketmaster', 'dice-fm', 'web-scraper'];
         
         foreach ($handlers as $handler) {
-            $handler_path = CHILL_EVENTS_PLUGIN_DIR . "inc/steps/event-import/handlers/{$handler}/";
+            $handler_path = DM_EVENTS_PLUGIN_DIR . "inc/steps/event-import/handlers/{$handler}/";
             if (is_dir($handler_path)) {
                 foreach (glob($handler_path . '*.php') as $file) {
                     if (file_exists($file)) {
@@ -295,9 +326,9 @@ class Chill_Events {
      * @since 1.0.0
      */
     private function load_publish_handlers() {
-        $chill_events_handler_path = CHILL_EVENTS_PLUGIN_DIR . 'inc/steps/publish/handlers/chill-events/';
-        if (is_dir($chill_events_handler_path)) {
-            foreach (glob($chill_events_handler_path . '*.php') as $file) {
+        $dm_events_handler_path = DM_EVENTS_PLUGIN_DIR . 'inc/steps/publish/handlers/dm-events/';
+        if (is_dir($dm_events_handler_path)) {
+            foreach (glob($dm_events_handler_path . '*.php') as $file) {
                 if (file_exists($file)) {
                     require_once $file;
                 }
@@ -312,40 +343,40 @@ class Chill_Events {
      */
     public function register_rest_fields() {
         // Event meta fields for REST API
-        register_rest_field('chill_events', 'event_meta', array(
+        register_rest_field('dm_events', 'event_meta', array(
             'get_callback' => array($this, 'get_event_meta_for_rest'),
             'update_callback' => array($this, 'update_event_meta_from_rest'),
             'schema' => array(
-                'description' => __('Event metadata', 'chill-events'),
+                'description' => __('Event metadata', 'dm-events'),
                 'type' => 'object',
                 'context' => array('view', 'edit'),
                 'properties' => array(
                     'start_date' => array(
                         'type' => 'string',
                         'format' => 'date-time',
-                        'description' => __('Event start date and time', 'chill-events'),
+                        'description' => __('Event start date and time', 'dm-events'),
                     ),
                     'end_date' => array(
                         'type' => 'string',
                         'format' => 'date-time',
-                        'description' => __('Event end date and time', 'chill-events'),
+                        'description' => __('Event end date and time', 'dm-events'),
                     ),
                     'venue_name' => array(
                         'type' => 'string',
-                        'description' => __('Venue name', 'chill-events'),
+                        'description' => __('Venue name', 'dm-events'),
                     ),
                     'artist_name' => array(
                         'type' => 'string',
-                        'description' => __('Artist or performer name', 'chill-events'),
+                        'description' => __('Artist or performer name', 'dm-events'),
                     ),
                     'price' => array(
                         'type' => 'string',
-                        'description' => __('Ticket price', 'chill-events'),
+                        'description' => __('Ticket price', 'dm-events'),
                     ),
                     'ticket_url' => array(
                         'type' => 'string',
                         'format' => 'uri',
-                        'description' => __('Ticket purchase URL', 'chill-events'),
+                        'description' => __('Ticket purchase URL', 'dm-events'),
                     ),
                 ),
             ),
@@ -363,12 +394,12 @@ class Chill_Events {
         $post_id = $object['id'];
         
         return array(
-            'start_date' => get_post_meta($post_id, '_chill_event_start_date', true),
-            'end_date' => get_post_meta($post_id, '_chill_event_end_date', true),
-            'venue_name' => get_post_meta($post_id, '_chill_event_venue_name', true),
-            'artist_name' => get_post_meta($post_id, '_chill_event_artist_name', true),
-            'price' => get_post_meta($post_id, '_chill_event_price', true),
-            'ticket_url' => get_post_meta($post_id, '_chill_event_ticket_url', true),
+            'start_date' => get_post_meta($post_id, '_dm_event_start_date', true),
+            'end_date' => get_post_meta($post_id, '_dm_event_end_date', true),
+            'venue_name' => get_post_meta($post_id, '_dm_event_venue_name', true),
+            'artist_name' => get_post_meta($post_id, '_dm_event_artist_name', true),
+            'price' => get_post_meta($post_id, '_dm_event_price', true),
+            'ticket_url' => get_post_meta($post_id, '_dm_event_ticket_url', true),
         );
     }
     
@@ -388,12 +419,12 @@ class Chill_Events {
         
         $post_id = $object->ID;
         $meta_fields = array(
-            'start_date' => '_chill_event_start_date',
-            'end_date' => '_chill_event_end_date',
-            'venue_name' => '_chill_event_venue_name',
-            'artist_name' => '_chill_event_artist_name',
-            'price' => '_chill_event_price',
-            'ticket_url' => '_chill_event_ticket_url',
+            'start_date' => '_dm_event_start_date',
+            'end_date' => '_dm_event_end_date',
+            'venue_name' => '_dm_event_venue_name',
+            'artist_name' => '_dm_event_artist_name',
+            'price' => '_dm_event_price',
+            'ticket_url' => '_dm_event_ticket_url',
         );
         
         foreach ($meta_fields as $key => $meta_key) {
@@ -410,9 +441,9 @@ class Chill_Events {
      */
     public function load_textdomain() {
         load_plugin_textdomain(
-            'chill-events',
+            'dm-events',
             false,
-            dirname(CHILL_EVENTS_PLUGIN_BASENAME) . '/languages'
+            dirname(DM_EVENTS_PLUGIN_BASENAME) . '/languages'
         );
     }
     
@@ -421,19 +452,19 @@ class Chill_Events {
      * Enqueue admin assets with dynamic versioning
      */
     public function enqueue_admin_assets($hook) {
-        // Only load on Chill Events admin pages
-        if (strpos($hook, 'chill-events') === false) {
+        // Only load on Data Machine Events admin pages
+        if (strpos($hook, 'dm-events') === false) {
             return;
         }
         
-        $css_file = CHILL_EVENTS_PLUGIN_DIR . 'assets/css/admin.css';
-        $js_file = CHILL_EVENTS_PLUGIN_DIR . 'assets/js/admin.js';
+        $css_file = DM_EVENTS_PLUGIN_DIR . 'assets/css/admin.css';
+        $js_file = DM_EVENTS_PLUGIN_DIR . 'assets/js/admin.js';
         
         // Enqueue CSS with dynamic versioning by filemtime
         if (file_exists($css_file)) {
             wp_enqueue_style(
-                'chill-events-admin',
-                CHILL_EVENTS_PLUGIN_URL . 'assets/css/admin.css',
+                'dm-events-admin',
+                DM_EVENTS_PLUGIN_URL . 'assets/css/admin.css',
                 array(),
                 filemtime($css_file)
             );
@@ -442,22 +473,12 @@ class Chill_Events {
         // Enqueue JS with dynamic versioning by filemtime
         if (file_exists($js_file)) {
             wp_enqueue_script(
-                'chill-events-admin',
-                CHILL_EVENTS_PLUGIN_URL . 'assets/js/admin.js',
+                'dm-events-admin',
+                DM_EVENTS_PLUGIN_URL . 'assets/js/admin.js',
                 array('jquery', 'wp-util'),
                 filemtime($js_file),
                 true
             );
-            
-            // Pass data to JS
-            wp_localize_script('chill-events-admin', 'chillEventsAdmin', array(
-                'ajaxUrl' => admin_url('admin-ajax.php'),
-                'nonce' => wp_create_nonce('chill_events_admin'),
-                'strings' => array(
-                    'confirmDelete' => __('Are you sure you want to delete this item?', 'chill-events'),
-                    'confirmDisable' => __('Are you sure you want to disable this item?', 'chill-events'),
-                )
-            ));
         }
     }
     
@@ -479,52 +500,24 @@ class Chill_Events {
         $this->migrate_settings();
         
         // Log activation
-        error_log('Chill Events Plugin activated successfully');
+        if (function_exists('do_action')) {
+            do_action('dm_log', 'info', 'Data Machine Events Plugin activated successfully');
+        }
     }
     
     /**
      * Plugin deactivation hook
      */
     public function deactivate() {
-        // Clear any scheduled cron jobs
-        wp_clear_scheduled_hook('chill_events_import_cron');
-        
-        // Clean up import-related database tables (one-time cleanup)
-        $this->cleanup_import_infrastructure();
-        
         // Flush rewrite rules
         flush_rewrite_rules();
         
         // Log deactivation
-        error_log('Chill Events Plugin deactivated');
+        if (function_exists('do_action')) {
+            do_action('dm_log', 'info', 'Data Machine Events Plugin deactivated');
+        }
     }
     
-    /**
-     * Clean up legacy import infrastructure (tables and cron jobs)
-     * This is a migration cleanup function for installations upgrading from import-based versions
-     */
-    private function cleanup_import_infrastructure() {
-        global $wpdb;
-        
-        // Drop import-related tables
-        $tables_to_drop = array(
-            $wpdb->prefix . 'chill_import_modules',
-            $wpdb->prefix . 'chill_import_logs'
-        );
-        
-        foreach ($tables_to_drop as $table) {
-            $wpdb->query("DROP TABLE IF EXISTS $table");
-        }
-        
-        // Clear any remaining scheduled events
-        wp_clear_scheduled_hook('chill_events_import_cron');
-        
-        // Clean up legacy options from import-based versions
-        delete_option('chill_events_import_settings');
-        delete_option('chill_events_api_config');
-        
-        error_log('Chill Events: Cleaned up import infrastructure');
-    }
     
 
     /**
@@ -539,14 +532,14 @@ class Chill_Events {
             'block_show_ticket_link' => 1
         );
         
-        add_option('chill_events_settings', $default_settings);
+        add_option('dm_events_settings', $default_settings);
     }
     
     /**
      * Migrate existing settings to include new block settings
      */
     private function migrate_settings() {
-        $existing_settings = get_option('chill_events_settings', array());
+        $existing_settings = get_option('dm_events_settings', array());
         
         // Add block display settings if they don't exist
         if (!isset($existing_settings['block_show_venue'])) {
@@ -563,7 +556,7 @@ class Chill_Events {
         }
         
         // Update the settings
-        update_option('chill_events_settings', $existing_settings);
+        update_option('dm_events_settings', $existing_settings);
     }
     
     // ========================================
@@ -586,30 +579,30 @@ class Chill_Events {
      */
     private function register_event_post_type() {
         $labels = array(
-            'name'                  => _x('Events', 'Post type general name', 'chill-events'),
-            'singular_name'         => _x('Event', 'Post type singular name', 'chill-events'),
-            'menu_name'             => _x('Events', 'Admin Menu text', 'chill-events'),
-            'name_admin_bar'        => _x('Event', 'Add New on Toolbar', 'chill-events'),
-            'add_new'               => __('Add New', 'chill-events'),
-            'add_new_item'          => __('Add New Event', 'chill-events'),
-            'new_item'              => __('New Event', 'chill-events'),
-            'edit_item'             => __('Edit Event', 'chill-events'),
-            'view_item'             => __('View Event', 'chill-events'),
-            'all_items'             => __('All Events', 'chill-events'),
-            'search_items'          => __('Search Events', 'chill-events'),
-            'parent_item_colon'     => __('Parent Events:', 'chill-events'),
-            'not_found'             => __('No events found.', 'chill-events'),
-            'not_found_in_trash'    => __('No events found in Trash.', 'chill-events'),
-            'featured_image'        => _x('Event Image', 'Overrides the "Featured Image" phrase', 'chill-events'),
-            'set_featured_image'    => _x('Set event image', 'Overrides the "Set featured image" phrase', 'chill-events'),
-            'remove_featured_image' => _x('Remove event image', 'Overrides the "Remove featured image" phrase', 'chill-events'),
-            'use_featured_image'    => _x('Use as event image', 'Overrides the "Use as featured image" phrase', 'chill-events'),
-            'archives'              => _x('Event archives', 'The post type archive label', 'chill-events'),
-            'insert_into_item'      => _x('Insert into event', 'Overrides the "Insert into post" phrase', 'chill-events'),
-            'uploaded_to_this_item' => _x('Uploaded to this event', 'Overrides the "Uploaded to this post" phrase', 'chill-events'),
-            'filter_items_list'     => _x('Filter events list', 'Screen reader text for the filter links', 'chill-events'),
-            'items_list_navigation' => _x('Events list navigation', 'Screen reader text for the pagination', 'chill-events'),
-            'items_list'            => _x('Events list', 'Screen reader text for the items list', 'chill-events'),
+            'name'                  => _x('Events', 'Post type general name', 'dm-events'),
+            'singular_name'         => _x('Event', 'Post type singular name', 'dm-events'),
+            'menu_name'             => _x('Events', 'Admin Menu text', 'dm-events'),
+            'name_admin_bar'        => _x('Event', 'Add New on Toolbar', 'dm-events'),
+            'add_new'               => __('Add New', 'dm-events'),
+            'add_new_item'          => __('Add New Event', 'dm-events'),
+            'new_item'              => __('New Event', 'dm-events'),
+            'edit_item'             => __('Edit Event', 'dm-events'),
+            'view_item'             => __('View Event', 'dm-events'),
+            'all_items'             => __('All Events', 'dm-events'),
+            'search_items'          => __('Search Events', 'dm-events'),
+            'parent_item_colon'     => __('Parent Events:', 'dm-events'),
+            'not_found'             => __('No events found.', 'dm-events'),
+            'not_found_in_trash'    => __('No events found in Trash.', 'dm-events'),
+            'featured_image'        => _x('Event Image', 'Overrides the "Featured Image" phrase', 'dm-events'),
+            'set_featured_image'    => _x('Set event image', 'Overrides the "Set featured image" phrase', 'dm-events'),
+            'remove_featured_image' => _x('Remove event image', 'Overrides the "Remove featured image" phrase', 'dm-events'),
+            'use_featured_image'    => _x('Use as event image', 'Overrides the "Use as featured image" phrase', 'dm-events'),
+            'archives'              => _x('Event archives', 'The post type archive label', 'dm-events'),
+            'insert_into_item'      => _x('Insert into event', 'Overrides the "Insert into post" phrase', 'dm-events'),
+            'uploaded_to_this_item' => _x('Uploaded to this event', 'Overrides the "Uploaded to this post" phrase', 'dm-events'),
+            'filter_items_list'     => _x('Filter events list', 'Screen reader text for the filter links', 'dm-events'),
+            'items_list_navigation' => _x('Events list navigation', 'Screen reader text for the pagination', 'dm-events'),
+            'items_list'            => _x('Events list', 'Screen reader text for the items list', 'dm-events'),
         );
 
         $args = array(
@@ -644,22 +637,28 @@ class Chill_Events {
                 'align-wide',
             ),
             'show_in_rest'       => true,
-            'rest_base'          => 'chill_events',
+            'rest_base'          => 'dm_events',
             'rest_controller_class' => 'WP_REST_Posts_Controller',
             'taxonomies'         => array(), // Will be dynamically assigned
         );
 
-        register_post_type('chill_events', $args);
+        register_post_type('dm_events', $args);
     }
     
     /**
-     * Register taxonomies for chill_events
+     * Register taxonomies for dm_events
      * 
      * @since 1.0.0
      */
     public function register_taxonomies() {
-        // Register venue taxonomy for chill_events (core functionality)
+        // Register venue taxonomy for dm_events (core functionality)
         $this->register_venue_taxonomy();
+        
+        // Register all public taxonomies for dm_events (full customization support)
+        $this->register_all_public_taxonomies();
+        
+        // Setup selective admin menu display for taxonomies
+        $this->setup_admin_menu_control();
     }
     
     /**
@@ -670,22 +669,22 @@ class Chill_Events {
     private function register_venue_taxonomy() {
         // Check if venue taxonomy already exists (from theme)
         if (taxonomy_exists('venue')) {
-            // Extend existing venue taxonomy to include chill_events
-            register_taxonomy_for_object_type('venue', 'chill_events');
+            // Extend existing venue taxonomy to include dm_events
+            register_taxonomy_for_object_type('venue', 'dm_events');
         } else {
-            // Create new venue taxonomy for both post and chill_events
-            register_taxonomy('venue', array('post', 'chill_events'), array(
+            // Create new venue taxonomy for both post and dm_events
+            register_taxonomy('venue', array('post', 'dm_events'), array(
                 'hierarchical' => false,
                 'labels' => array(
-                    'name' => _x('Venues', 'taxonomy general name', 'chill-events'),
-                    'singular_name' => _x('Venue', 'taxonomy singular name', 'chill-events'),
-                    'search_items' => __('Search Venues', 'chill-events'),
-                    'all_items' => __('All Venues', 'chill-events'),
-                    'edit_item' => __('Edit Venue', 'chill-events'),
-                    'update_item' => __('Update Venue', 'chill-events'),
-                    'add_new_item' => __('Add New Venue', 'chill-events'),
-                    'new_item_name' => __('New Venue Name', 'chill-events'),
-                    'menu_name' => __('Venues', 'chill-events'),
+                    'name' => _x('Venues', 'taxonomy general name', 'dm-events'),
+                    'singular_name' => _x('Venue', 'taxonomy singular name', 'dm-events'),
+                    'search_items' => __('Search Venues', 'dm-events'),
+                    'all_items' => __('All Venues', 'dm-events'),
+                    'edit_item' => __('Edit Venue', 'dm-events'),
+                    'update_item' => __('Update Venue', 'dm-events'),
+                    'add_new_item' => __('Add New Venue', 'dm-events'),
+                    'new_item_name' => __('New Venue Name', 'dm-events'),
+                    'menu_name' => __('Venues', 'dm-events'),
                 ),
                 'show_ui' => true,
                 'show_admin_column' => true,
@@ -695,8 +694,160 @@ class Chill_Events {
             ));
         }
         
-        // Ensure venue taxonomy is registered for chill_events post type
-        register_taxonomy_for_object_type('venue', 'chill_events');
+        // Ensure venue taxonomy is registered for dm_events post type
+        register_taxonomy_for_object_type('venue', 'dm_events');
+    }
+    
+    /**
+     * Register all public taxonomies for dm_events post type
+     * 
+     * @since 1.0.0
+     */
+    private function register_all_public_taxonomies() {
+        // Get all public taxonomies (Data Machine pattern)
+        $taxonomies = get_taxonomies(['public' => true], 'names');
+        
+        if (!$taxonomies || is_wp_error($taxonomies)) {
+            return;
+        }
+        
+        foreach ($taxonomies as $taxonomy_slug) {
+            // Skip venue - already handled above
+            if ($taxonomy_slug === 'venue') {
+                continue;
+            }
+            
+            // Register each public taxonomy for dm_events post type
+            register_taxonomy_for_object_type($taxonomy_slug, 'dm_events');
+        }
+    }
+    
+    /**
+     * Setup selective admin menu display for dm_events taxonomies
+     * 
+     * Controls which taxonomies appear in the Events admin menu while keeping
+     * all taxonomies functionally registered for AI and data operations.
+     * 
+     * @since 1.0.0
+     */
+    private function setup_admin_menu_control() {
+        // Hook into WordPress admin menu system (late priority)
+        add_action('admin_menu', array($this, 'control_taxonomy_menus'), 999);
+        
+        // Filter parent file for proper menu highlighting
+        add_filter('parent_file', array($this, 'filter_parent_file'));
+        
+        // Filter submenu file for proper submenu highlighting  
+        add_filter('submenu_file', array($this, 'filter_submenu_file'));
+    }
+    
+    /**
+     * Control which taxonomy menus appear under dm_events post type
+     * 
+     * @since 1.0.0
+     */
+    public function control_taxonomy_menus() {
+        global $submenu;
+        
+        $post_type_menu = 'edit.php?post_type=dm_events';
+        
+        // Get allowed menu items via extensible filter
+        // Extensions can add their items like:
+        // add_filter('dm_events_post_type_menu_items', function($items) {
+        //     $items['my_taxonomy'] = true;  // Show taxonomy in menu
+        //     $items['custom_menu'] = ['type' => 'submenu', 'callback' => 'my_callback'];
+        //     return $items;
+        // });
+        $allowed_items = apply_filters('dm_events_post_type_menu_items', array(
+            'venue' => true,        // Always show venues
+            'settings' => true      // Always show settings  
+        ));
+        
+        // Remove non-allowed taxonomy menus
+        if (isset($submenu[$post_type_menu])) {
+            foreach ($submenu[$post_type_menu] as $key => $menu_item) {
+                // Check if this is a taxonomy menu (contains 'taxonomy=')
+                if (strpos($menu_item[2], 'taxonomy=') !== false) {
+                    // Extract taxonomy name from menu URL
+                    parse_str(parse_url($menu_item[2], PHP_URL_QUERY), $query_vars);
+                    $taxonomy = $query_vars['taxonomy'] ?? '';
+                    
+                    // Remove if not in allowed list
+                    if ($taxonomy && !isset($allowed_items[$taxonomy])) {
+                        unset($submenu[$post_type_menu][$key]);
+                    }
+                }
+            }
+        }
+        
+        // Process custom menu items from filter
+        foreach ($allowed_items as $item_key => $item_config) {
+            if (is_array($item_config) && isset($item_config['type']) && $item_config['type'] === 'submenu') {
+                // Custom submenu item - call the callback if provided
+                if (isset($item_config['callback']) && is_callable($item_config['callback'])) {
+                    call_user_func($item_config['callback']);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Filter parent file for proper menu highlighting
+     * 
+     * @param string $parent_file Current parent file
+     * @return string Modified parent file
+     * @since 1.0.0
+     */
+    public function filter_parent_file($parent_file) {
+        global $current_screen;
+        
+        // Only process dm_events related screens
+        if (!$current_screen || $current_screen->post_type !== 'dm_events') {
+            return $parent_file;
+        }
+        
+        // Get allowed menu items
+        $allowed_items = apply_filters('dm_events_post_type_menu_items', array(
+            'venue' => true,
+            'settings' => true
+        ));
+        
+        // If current taxonomy is not allowed, redirect to main Events page
+        if ($current_screen->taxonomy && !isset($allowed_items[$current_screen->taxonomy])) {
+            return 'edit.php?post_type=dm_events';
+        }
+        
+        return $parent_file;
+    }
+    
+    /**
+     * Filter submenu file for proper submenu highlighting
+     * 
+     * @param string $submenu_file Current submenu file
+     * @return string Modified submenu file  
+     * @since 1.0.0
+     */
+    public function filter_submenu_file($submenu_file) {
+        global $current_screen;
+        
+        // Only process dm_events related screens
+        if (!$current_screen || $current_screen->post_type !== 'dm_events') {
+            return $submenu_file;
+        }
+        
+        // Ensure proper highlighting for allowed taxonomy pages
+        if ($current_screen->taxonomy) {
+            $allowed_items = apply_filters('dm_events_post_type_menu_items', array(
+                'venue' => true,
+                'settings' => true
+            ));
+            
+            if (isset($allowed_items[$current_screen->taxonomy])) {
+                return "edit-tags.php?taxonomy={$current_screen->taxonomy}&post_type=dm_events";
+            }
+        }
+        
+        return $submenu_file;
     }
     
     /**
@@ -719,15 +870,15 @@ class Chill_Events {
             return $allowed_block_types;
         }
         
-        // If we're in chill_events post type, allow our custom blocks
-        if ($post_type === 'chill_events') {
+        // If we're in dm_events post type, allow our custom blocks
+        if ($post_type === 'dm_events') {
             // Add our custom blocks to the allowed list
-            $allowed_block_types[] = 'chill-events/event-details';
-            $allowed_block_types[] = 'chill-events/calendar';
+            $allowed_block_types[] = 'dm-events/event-details';
+            $allowed_block_types[] = 'dm-events/calendar';
         } else {
             // Remove our custom blocks from other post types
             $allowed_block_types = array_filter($allowed_block_types, function($block_type) {
-                return strpos($block_type, 'chill-events/') !== 0;
+                return strpos($block_type, 'dm-events/') !== 0;
             });
         }
         
@@ -741,13 +892,13 @@ class Chill_Events {
      */
     public function register_blocks() {
         // Register calendar block
-        $calendar_block_path = CHILL_EVENTS_PLUGIN_DIR . 'inc/blocks/calendar';
+        $calendar_block_path = DM_EVENTS_PLUGIN_DIR . 'inc/blocks/calendar';
         register_block_type($calendar_block_path, array(
             'render_callback' => array($this, 'render_calendar_block')
         ));
         
         // Register event details block
-        $event_details_block_path = CHILL_EVENTS_PLUGIN_DIR . 'inc/blocks/event-details';
+        $event_details_block_path = DM_EVENTS_PLUGIN_DIR . 'inc/blocks/event-details';
         register_block_type($event_details_block_path, array(
             'render_callback' => array($this, 'render_event_details_block'),
             'attributes' => array(
@@ -765,7 +916,7 @@ class Chill_Events {
                 'showPrice' => array('type' => 'boolean', 'default' => true),
                 'showTicketLink' => array('type' => 'boolean', 'default' => true)
             ),
-            'category' => 'chill-events',
+            'category' => 'dm-events',
             'supports' => array(
                 'html' => false,
                 'align' => array('wide', 'full')
@@ -783,7 +934,7 @@ class Chill_Events {
      */
     public function render_calendar_block($attributes, $content, $block) {
         // Include the render template directly without output buffering
-        include CHILL_EVENTS_PLUGIN_DIR . 'inc/blocks/calendar/render.php';
+        include DM_EVENTS_PLUGIN_DIR . 'inc/blocks/calendar/render.php';
     }
 
     /**
@@ -799,7 +950,7 @@ class Chill_Events {
         ob_start();
         
         // Include the render template
-        include CHILL_EVENTS_PLUGIN_DIR . 'inc/blocks/event-details/render.php';
+        include DM_EVENTS_PLUGIN_DIR . 'inc/blocks/event-details/render.php';
         
         // Return the captured content
         return ob_get_clean();
@@ -813,27 +964,27 @@ class Chill_Events {
     public function enqueue_frontend_assets() {
         // Enqueue calendar block frontend JavaScript
         wp_enqueue_script(
-            'chill-events-calendar-frontend',
-            CHILL_EVENTS_PLUGIN_URL . 'inc/blocks/calendar/build/frontend.js',
+            'dm-events-calendar-frontend',
+            DM_EVENTS_PLUGIN_URL . 'inc/blocks/calendar/build/frontend.js',
             array(),
-            CHILL_EVENTS_VERSION,
+            DM_EVENTS_VERSION,
             true
         );
         
         // Enqueue calendar block frontend CSS (includes flatpickr styles)
         wp_enqueue_style(
-            'chill-events-calendar-frontend-style',
-            CHILL_EVENTS_PLUGIN_URL . 'inc/blocks/calendar/build/frontend.css',
+            'dm-events-calendar-frontend-style',
+            DM_EVENTS_PLUGIN_URL . 'inc/blocks/calendar/build/frontend.css',
             array(),
-            CHILL_EVENTS_VERSION
+            DM_EVENTS_VERSION
         );
         
         // Enqueue calendar block styles
         wp_enqueue_style(
-            'chill-events-calendar-style',
-            CHILL_EVENTS_PLUGIN_URL . 'inc/blocks/calendar/style.css',
+            'dm-events-calendar-style',
+            DM_EVENTS_PLUGIN_URL . 'inc/blocks/calendar/style.css',
             array(),
-            CHILL_EVENTS_VERSION
+            DM_EVENTS_VERSION
         );
     }
 }
@@ -841,11 +992,11 @@ class Chill_Events {
 /**
  * Initialize the plugin
  * 
- * @return Chill_Events
+ * @return DM_Events
  */
-function chill_events() {
-    return Chill_Events::get_instance();
+function dm_events() {
+    return DM_Events::get_instance();
 }
 
 // Start the plugin
-chill_events(); 
+dm_events(); 

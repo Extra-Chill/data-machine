@@ -1,6 +1,6 @@
 <?php
 /**
- * Chill Events Calendar Block Render Template
+ * Data Machine Events Calendar Block Render Template
  * 
  * This file is included by the render_calendar_block callback
  * Variables available: $attributes, $content, $block
@@ -8,6 +8,11 @@
 
 if (!defined('ABSPATH')) {
     exit;
+}
+
+// Don't render during REST API requests to prevent header conflicts
+if (wp_is_json_request() || (defined('REST_REQUEST') && REST_REQUEST)) {
+    return '';
 }
 
 // Get block attributes
@@ -26,11 +31,11 @@ $current_page = max(1, get_query_var('paged') ? get_query_var('paged') : (get_qu
 
 // Build query arguments
 $query_args = array(
-    'post_type' => 'chill_events',
+    'post_type' => 'dm_events',
     'post_status' => 'publish',
     'posts_per_page' => $enable_pagination ? $events_per_page : $events_to_show,
     'paged' => $current_page,
-    'meta_key' => '_chill_event_start_date_utc',
+    'meta_key' => '_dm_event_start_date_utc',
     'orderby' => 'meta_value',
     'order' => 'ASC',
 );
@@ -39,7 +44,7 @@ $query_args = array(
 if (!$show_past_events) {
     $query_args['meta_query'] = array(
         array(
-            'key' => '_chill_event_start_date_utc',
+            'key' => '_dm_event_start_date_utc',
             'value' => current_time('mysql', 1), // UTC time
             'compare' => '>='
         )
@@ -51,36 +56,36 @@ $events_query = new WP_Query($query_args);
 
 // Start output
 $wrapper_attributes = get_block_wrapper_attributes(array(
-    'class' => 'chill-events-calendar chill-events-view-' . esc_attr($default_view)
+    'class' => 'dm-events-calendar dm-events-view-' . esc_attr($default_view)
 ));
 ?>
 
 <div <?php echo $wrapper_attributes; ?>>
     <?php if ($show_filters) : ?>
-        <div class="chill-events-filter-bar">
-            <div class="chill-events-filter-row">
+        <div class="dm-events-filter-bar">
+            <div class="dm-events-filter-row">
                 <?php if ($show_search) : ?>
-                    <div class="chill-events-search">
+                    <div class="dm-events-search">
                         <input type="text" 
-                               id="chill-events-search" 
+                               id="dm-events-search" 
                                placeholder="Search events..." 
-                               class="chill-events-search-input">
-                        <button type="button" class="chill-events-search-btn">
+                               class="dm-events-search-input">
+                        <button type="button" class="dm-events-search-btn">
                             <span class="dashicons dashicons-search"></span>
                         </button>
                     </div>
                 <?php endif; ?>
                 
                 <?php if ($show_date_filter) : ?>
-                    <div class="chill-events-date-filter">
-                        <div class="chill-events-date-range-wrapper">
+                    <div class="dm-events-date-filter">
+                        <div class="dm-events-date-range-wrapper">
                             <input type="text" 
-                                   id="chill-events-date-range" 
-                                   class="chill-events-date-range-input" 
+                                   id="dm-events-date-range" 
+                                   class="dm-events-date-range-input" 
                                    placeholder="Select date range..." 
                                    readonly />
                             <button type="button" 
-                                    class="chill-events-date-clear-btn" 
+                                    class="dm-events-date-clear-btn" 
                                     title="Clear date filter">
                                 ✕
                             </button>
@@ -89,18 +94,18 @@ $wrapper_attributes = get_block_wrapper_attributes(array(
                 <?php endif; ?>
                 
                 <?php if ($show_view_toggle) : ?>
-                    <div class="chill-events-view-toggle">
+                    <div class="dm-events-view-toggle">
                         <button type="button" 
-                                class="chill-events-view-btn chill-events-view-list active" 
+                                class="dm-events-view-btn dm-events-view-list active" 
                                 data-view="list">
                             <span class="dashicons dashicons-list-view"></span>
-                            <?php _e('List', 'chill-events'); ?>
+                            <?php _e('List', 'dm-events'); ?>
                         </button>
                         <button type="button" 
-                                class="chill-events-view-btn chill-events-view-grid" 
+                                class="dm-events-view-btn dm-events-view-grid" 
                                 data-view="grid">
                             <span class="dashicons dashicons-grid-view"></span>
-                            <?php _e('Grid', 'chill-events'); ?>
+                            <?php _e('Grid', 'dm-events'); ?>
                         </button>
                     </div>
                 <?php endif; ?>
@@ -108,9 +113,9 @@ $wrapper_attributes = get_block_wrapper_attributes(array(
         </div>
     <?php endif; ?>
     
-    <div class="chill-events-content">
+    <div class="dm-events-content">
         <?php if ($events_query->have_posts()) : ?>
-            <div class="chill-events-list" id="chill-events-list">
+            <div class="dm-events-list" id="dm-events-list">
                 <?php while ($events_query->have_posts()) : $events_query->the_post(); ?>
                     <?php
                     // Block-first: Parse block attributes to get event data
@@ -118,7 +123,7 @@ $wrapper_attributes = get_block_wrapper_attributes(array(
                     if (has_blocks(get_the_content())) {
                         $blocks = parse_blocks(get_the_content());
                         foreach ($blocks as $block) {
-                            if ('chill-events/event-details' === $block['blockName']) {
+                            if ('dm-events/event-details' === $block['blockName']) {
                                 $event_data = $block['attrs'];
                                 break;
                             }
@@ -142,7 +147,7 @@ $wrapper_attributes = get_block_wrapper_attributes(array(
                     $ticket_url = $event_data['ticketUrl'] ?? '';
 
                     // Get display settings from global options
-                    $settings = get_option('chill_events_settings', array());
+                    $settings = get_option('dm_events_settings', array());
                     $show_venue = !empty($settings['block_show_venue']);
                     $show_artist = !empty($settings['block_show_artist']);
                     $show_price = !empty($settings['block_show_price']);
@@ -155,49 +160,49 @@ $wrapper_attributes = get_block_wrapper_attributes(array(
                         $formatted_start_date = $start_datetime_obj->format('M j, Y g:i A');
                     }
                     ?>
-                    <div class="chill-event-item">
-                        <div class="chill-event-card">
-                            <div class="chill-event-card-body">
-                                <h3 class="chill-event-title">
+                    <div class="dm-event-item">
+                        <div class="dm-event-card">
+                            <div class="dm-event-card-body">
+                                <h3 class="dm-event-title">
                                     <a href="<?php the_permalink(); ?>"><?php the_title(); ?></a>
                                 </h3>
                                 
-                                <div class="chill-event-meta">
-                                    <div class="chill-event-date">
+                                <div class="dm-event-meta">
+                                    <div class="dm-event-date">
                                         <span class="dashicons dashicons-calendar-alt"></span>
                                         <?php echo esc_html($formatted_start_date); ?>
                                     </div>
                                     
                                     <?php if ($show_venue && !empty($venue_name)) : ?>
-                                    <div class="chill-event-venue">
+                                    <div class="dm-event-venue">
                                         <span class="dashicons dashicons-location"></span>
                                         <?php echo esc_html($venue_name); ?>
                                     </div>
                                     <?php endif; ?>
 
                                     <?php if ($show_artist && !empty($artist_name)) : ?>
-                                        <div class="chill-event-artist">
+                                        <div class="dm-event-artist">
                                             <span class="dashicons dashicons-admin-users"></span>
                                             <?php echo esc_html($artist_name); ?>
                                         </div>
                                     <?php endif; ?>
                                 </div>
                                 
-                                <div class="chill-event-excerpt">
+                                <div class="dm-event-excerpt">
                                     <?php the_excerpt(); ?>
                                 </div>
                             </div>
                             
-                            <div class="chill-event-card-footer">
-                                <a href="<?php the_permalink(); ?>" class="chill-event-details-link">
-                                    <?php _e('View Details', 'chill-events'); ?>
+                            <div class="dm-event-card-footer">
+                                <a href="<?php the_permalink(); ?>" class="dm-event-details-link">
+                                    <?php _e('View Details', 'dm-events'); ?>
                                 </a>
                                 <?php if ($show_ticket_link && !empty($ticket_url)) : ?>
                                     <a href="<?php echo esc_url($ticket_url); ?>" 
-                                       class="chill-event-ticket-link" 
+                                       class="dm-event-ticket-link" 
                                        target="_blank" 
                                        rel="noopener noreferrer">
-                                        <?php _e('Get Tickets', 'chill-events'); ?>
+                                        <?php _e('Get Tickets', 'dm-events'); ?>
                                     </a>
                                 <?php endif; ?>
                             </div>
@@ -225,15 +230,15 @@ $wrapper_attributes = get_block_wrapper_attributes(array(
                 
                 // Only output if we actually have pagination links and they're not just whitespace
                 if (!empty($pagination_links) && trim($pagination_links) !== '') : ?>
-                    <div class="chill-events-pagination">
+                    <div class="dm-events-pagination">
                         <?php echo $pagination_links; ?>
                     </div>
                 <?php endif; ?>
             <?php endif; ?>
             
         <?php else : ?>
-            <div class="chill-events-no-events">
-                <p><?php _e('No events found.', 'chill-events'); ?></p>
+            <div class="dm-events-no-events">
+                <p><?php _e('No events found.', 'dm-events'); ?></p>
             </div>
         <?php endif; ?>
     </div>

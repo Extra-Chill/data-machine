@@ -5,11 +5,11 @@
  * Defines settings fields and sanitization for Ticketmaster event import handler.
  * Part of the modular handler architecture for Data Machine integration.
  *
- * @package ChillEvents\Steps\EventImport\Handlers\Ticketmaster
+ * @package DmEvents\Steps\EventImport\Handlers\Ticketmaster
  * @since 1.0.0
  */
 
-namespace ChillEvents\Steps\EventImport\Handlers\Ticketmaster;
+namespace DmEvents\Steps\EventImport\Handlers\Ticketmaster;
 
 // Prevent direct access
 if (!defined('ABSPATH')) {
@@ -39,42 +39,69 @@ class TicketmasterSettings {
      */
     public static function get_fields(array $current_config = []): array {
         return [
-            'city' => [
+            'location' => [
                 'type' => 'text',
-                'label' => __('City', 'chill-events'),
-                'description' => __('City to search for events (e.g., Charleston, New York)', 'chill-events'),
-                'placeholder' => __('Charleston', 'chill-events'),
-            ],
-            'state_code' => [
-                'type' => 'text',
-                'label' => __('State Code', 'chill-events'),
-                'description' => __('Two-letter state code (e.g., SC, CA, NY)', 'chill-events'),
-                'placeholder' => __('SC', 'chill-events'),
-            ],
-            'country_code' => [
-                'type' => 'text',
-                'label' => __('Country Code', 'chill-events'),
-                'description' => __('Two-letter country code (e.g., US, CA, GB)', 'chill-events'),
-                'placeholder' => __('US', 'chill-events'),
+                'label' => __('Location', 'dm-events'),
+                'description' => __('Location in City, State format (e.g., Charleston, SC or New York, NY)', 'dm-events'),
+                'placeholder' => __('Charleston, SC', 'dm-events'),
             ],
             'start_date' => [
                 'type' => 'text',
-                'label' => __('Start Date', 'chill-events'),
-                'description' => __('Start date for event search in ISO format (YYYY-MM-DDTHH:mm:ssZ). Leave empty for current date.', 'chill-events'),
-                'placeholder' => __('2024-01-01T00:00:00Z', 'chill-events'),
+                'label' => __('Start Date', 'dm-events'),
+                'description' => __('Start date for event search in ISO format (YYYY-MM-DDTHH:mm:ssZ). Leave empty for current date.', 'dm-events'),
+                'placeholder' => __('2024-01-01T00:00:00Z', 'dm-events'),
             ],
             'genre' => [
                 'type' => 'text',
-                'label' => __('Genre ID', 'chill-events'),
-                'description' => __('Ticketmaster Genre ID for filtering (e.g., KnvZfZ7vAeA for Music). Leave empty for all genres.', 'chill-events'),
-                'placeholder' => __('KnvZfZ7vAeA', 'chill-events'),
+                'label' => __('Genre ID', 'dm-events'),
+                'description' => __('Ticketmaster Genre ID for filtering (e.g., KnvZfZ7vAeA for Music). Leave empty for all genres.', 'dm-events'),
+                'placeholder' => __('KnvZfZ7vAeA', 'dm-events'),
             ],
             'venue_id' => [
                 'type' => 'text',
-                'label' => __('Venue ID', 'chill-events'),
-                'description' => __('Specific Ticketmaster Venue ID to search. Leave empty to search all venues.', 'chill-events'),
-                'placeholder' => __('KovZpZAJledA', 'chill-events'),
+                'label' => __('Venue ID', 'dm-events'),
+                'description' => __('Specific Ticketmaster Venue ID to search. Leave empty to search all venues.', 'dm-events'),
+                'placeholder' => __('KovZpZAJledA', 'dm-events'),
             ]
+        ];
+    }
+    
+    /**
+     * Sanitize Ticketmaster handler settings.
+     *
+     * @param array $raw_settings Raw settings input.
+     * @return array Sanitized settings.
+     */
+    public static function sanitize(array $raw_settings): array {
+        return [
+            'location' => sanitize_text_field($raw_settings['location'] ?? ''),
+            'start_date' => sanitize_text_field($raw_settings['start_date'] ?? ''),
+            'genre' => sanitize_text_field($raw_settings['genre'] ?? ''),
+            'venue_id' => sanitize_text_field($raw_settings['venue_id'] ?? '')
+        ];
+    }
+    
+    /**
+     * Determine if authentication is required.
+     *
+     * @param array $current_config Current configuration values.
+     * @return bool True if authentication is required.
+     */
+    public static function requires_authentication(array $current_config = []): bool {
+        return true; // Ticketmaster requires API key authentication
+    }
+    
+    /**
+     * Get default values for all settings.
+     *
+     * @return array Default values.
+     */
+    public static function get_defaults(): array {
+        return [
+            'location' => 'Charleston, SC',
+            'start_date' => '',
+            'genre' => '',
+            'venue_id' => ''
         ];
     }
 }

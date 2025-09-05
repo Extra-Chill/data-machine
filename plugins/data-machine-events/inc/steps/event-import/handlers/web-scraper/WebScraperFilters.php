@@ -5,7 +5,7 @@
  * Registers the web scraper event import handler with Data Machine.
  * This handler manages all venue-specific scrapers through filter discovery.
  *
- * @package ChillEvents\Steps\EventImport\Handlers\WebScraper
+ * @package DmEvents\Steps\EventImport\Handlers\WebScraper
  * @since 1.0.0
  */
 
@@ -22,9 +22,9 @@ if (!defined('ABSPATH')) {
 add_filter('dm_handlers', function($handlers) {
     $handlers['web_scraper'] = [
         'type' => 'event_import',
-        'class' => 'ChillEvents\\Steps\\EventImport\\Handlers\\WebScraper\\WebScraper',
-        'label' => __('Web Scraper', 'chill-events'),
-        'description' => __('Import events from venue websites using web scrapers', 'chill-events')
+        'class' => 'DmEvents\\Steps\\EventImport\\Handlers\\WebScraper\\WebScraper',
+        'label' => __('Web Scraper', 'dm-events'),
+        'description' => __('Import events from venue websites using web scrapers', 'dm-events')
     ];
     
     return $handlers;
@@ -37,6 +37,6 @@ add_filter('dm_handlers', function($handlers) {
  * This enables the configuration UI for scraper source selection.
  */
 add_filter('dm_handler_settings', function($all_settings) {
-    $all_settings['web_scraper'] = new ChillEvents\Steps\EventImport\Handlers\WebScraper\WebScraperSettings();
+    $all_settings['web_scraper'] = new DmEvents\Steps\EventImport\Handlers\WebScraper\WebScraperSettings();
     return $all_settings;
 });

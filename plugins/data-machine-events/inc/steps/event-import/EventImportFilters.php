@@ -5,7 +5,7 @@
  * Registers the custom Event Import step type with Data Machine.
  * Follows the same pattern as Data Machine's core steps.
  *
- * @package ChillEvents\Steps\EventImport
+ * @package DmEvents\Steps\EventImport
  * @since 1.0.0
  */
 
@@ -21,9 +21,9 @@ if (!defined('ABSPATH')) {
  */
 add_filter('dm_steps', function($steps) {
     $steps['event_import'] = [
-        'label' => __('Event Import', 'chill-events'),
-        'description' => __('Import events from venues and ticketing platforms', 'chill-events'),
-        'class' => 'ChillEvents\\Steps\\EventImport\\EventImportStep',
+        'label' => __('Event Import', 'dm-events'),
+        'description' => __('Import events from venues and ticketing platforms', 'dm-events'),
+        'class' => 'DmEvents\\Steps\\EventImport\\EventImportStep',
         'position' => 25 // Position between fetch (20) and AI (30)
     ];
     

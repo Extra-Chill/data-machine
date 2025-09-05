@@ -11,7 +11,7 @@ import {
     ToggleControl 
 } from '@wordpress/components';
 
-registerBlockType('chill-events/calendar', {
+registerBlockType('dm-events/calendar', {
     edit: function Edit({ attributes, setAttributes }) {
         const { 
             defaultView, 
@@ -27,25 +27,25 @@ registerBlockType('chill-events/calendar', {
         } = attributes;
         
         const blockProps = useBlockProps({
-            className: 'chill-events-calendar-editor'
+            className: 'dm-events-calendar-editor'
         });
 
         return (
             <>
                 <InspectorControls>
-                    <PanelBody title={__('Display Settings', 'chill-events')}>
+                    <PanelBody title={__('Display Settings', 'dm-events')}>
                         <SelectControl
-                            label={__('Default View', 'chill-events')}
+                            label={__('Default View', 'dm-events')}
                             value={defaultView}
                             options={[
-                                { label: __('List View', 'chill-events'), value: 'list' },
-                                { label: __('Grid View', 'chill-events'), value: 'grid' }
+                                { label: __('List View', 'dm-events'), value: 'list' },
+                                { label: __('Grid View', 'dm-events'), value: 'grid' }
                             ]}
                             onChange={(value) => setAttributes({ defaultView: value })}
                         />
                         
                         <RangeControl
-                            label={__('Number of Events to Show', 'chill-events')}
+                            label={__('Number of Events to Show', 'dm-events')}
                             value={eventsToShow}
                             onChange={(value) => setAttributes({ eventsToShow: value })}
                             min={1}
@@ -53,59 +53,59 @@ registerBlockType('chill-events/calendar', {
                         />
                         
                         <ToggleControl
-                            label={__('Show Past Events', 'chill-events')}
+                            label={__('Show Past Events', 'dm-events')}
                             checked={showPastEvents}
                             onChange={(value) => setAttributes({ showPastEvents: value })}
                         />
                     </PanelBody>
 
-                    <PanelBody title={__('Filter Options', 'chill-events')} initialOpen={false}>
+                    <PanelBody title={__('Filter Options', 'dm-events')} initialOpen={false}>
                         <ToggleControl
-                            label={__('Show Filter Bar', 'chill-events')}
+                            label={__('Show Filter Bar', 'dm-events')}
                             checked={showFilters}
                             onChange={(value) => setAttributes({ showFilters: value })}
                         />
                         
                         <ToggleControl
-                            label={__('Show Search Box', 'chill-events')}
+                            label={__('Show Search Box', 'dm-events')}
                             checked={showSearch}
                             onChange={(value) => setAttributes({ showSearch: value })}
                         />
                         
                         <ToggleControl
-                            label={__('Show Date Filter', 'chill-events')}
+                            label={__('Show Date Filter', 'dm-events')}
                             checked={showDateFilter}
                             onChange={(value) => setAttributes({ showDateFilter: value })}
                         />
                         
                         <ToggleControl
-                            label={__('Show View Toggle', 'chill-events')}
+                            label={__('Show View Toggle', 'dm-events')}
                             checked={showViewToggle}
                             onChange={(value) => setAttributes({ showViewToggle: value })}
                         />
                         
                         <SelectControl
-                            label={__('Default Date Range', 'chill-events')}
+                            label={__('Default Date Range', 'dm-events')}
                             value={defaultDateRange}
                             options={[
-                                { label: __('Current Month', 'chill-events'), value: 'current' },
-                                { label: __('Next Month', 'chill-events'), value: 'next' },
-                                { label: __('Next 3 Months', 'chill-events'), value: 'next3' },
-                                { label: __('All Upcoming', 'chill-events'), value: 'upcoming' }
+                                { label: __('Current Month', 'dm-events'), value: 'current' },
+                                { label: __('Next Month', 'dm-events'), value: 'next' },
+                                { label: __('Next 3 Months', 'dm-events'), value: 'next3' },
+                                { label: __('All Upcoming', 'dm-events'), value: 'upcoming' }
                             ]}
                             onChange={(value) => setAttributes({ defaultDateRange: value })}
                         />
                     </PanelBody>
 
-                    <PanelBody title={__('Pagination', 'chill-events')} initialOpen={false}>
+                    <PanelBody title={__('Pagination', 'dm-events')} initialOpen={false}>
                         <ToggleControl
-                            label={__('Enable Pagination', 'chill-events')}
+                            label={__('Enable Pagination', 'dm-events')}
                             checked={enablePagination}
                             onChange={(value) => setAttributes({ enablePagination: value })}
                         />
                         
                         <RangeControl
-                            label={__('Events Per Page', 'chill-events')}
+                            label={__('Events Per Page', 'dm-events')}
                             value={eventsPerPage}
                             onChange={(value) => setAttributes({ eventsPerPage: value })}
                             min={6}
@@ -115,22 +115,22 @@ registerBlockType('chill-events/calendar', {
                 </InspectorControls>
 
                 <div {...blockProps}>
-                    <div className="chill-events-calendar-placeholder">
-                        <div className="chill-events-calendar-icon">
+                    <div className="dm-events-calendar-placeholder">
+                        <div className="dm-events-calendar-icon">
                             📅
                         </div>
-                        <h3>{__('Chill Events Calendar', 'chill-events')}</h3>
+                        <h3>{__('Data Machine Events Calendar', 'dm-events')}</h3>
                         <p>
-                            {__('Displaying', 'chill-events')} {eventsToShow} {__('events in', 'chill-events')} {defaultView} {__('view', 'chill-events')}
-                            {showPastEvents && __(', including past events', 'chill-events')}
+                            {__('Displaying', 'dm-events')} {eventsToShow} {__('events in', 'dm-events')} {defaultView} {__('view', 'dm-events')}
+                            {showPastEvents && __(', including past events', 'dm-events')}
                         </p>
                         {showFilters && (
-                            <div className="chill-events-calendar-filters-preview">
-                                <p><strong>{__('Filter Bar Enabled:', 'chill-events')}</strong></p>
+                            <div className="dm-events-calendar-filters-preview">
+                                <p><strong>{__('Filter Bar Enabled:', 'dm-events')}</strong></p>
                                 <ul>
-                                    {showSearch && <li>{__('Search', 'chill-events')}</li>}
-                                    {showDateFilter && <li>{__('Date Filter', 'chill-events')}</li>}
-                                    {showViewToggle && <li>{__('View Toggle', 'chill-events')}</li>}
+                                    {showSearch && <li>{__('Search', 'dm-events')}</li>}
+                                    {showDateFilter && <li>{__('Date Filter', 'dm-events')}</li>}
+                                    {showViewToggle && <li>{__('View Toggle', 'dm-events')}</li>}
                                 </ul>
                             </div>
                         )}

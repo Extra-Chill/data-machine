@@ -1,4 +1,4 @@
-=== Chill Events ===
+=== Data Machine Events ===
 Contributors: chubes
 Tags: events, calendar, ticketmaster, eventbrite, import, venues, api
 Requires at least: 6.0
@@ -8,11 +8,11 @@ Stable tag: 1.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-A comprehensive WordPress events plugin with Import Modules system, native API integrations, and universal taxonomy support.
+Frontend-focused WordPress events plugin with block-first architecture. Integrates with Data Machine plugin for automated event imports and AI-driven event publishing.
 
 == Description ==
 
-**Chill Events** is a revolutionary WordPress events plugin designed as a complete replacement for bloated event plugins like Tribe Events Calendar. Built with a **block-first architecture** and featuring the innovative Import Modules system, it provides automated event management with unprecedented flexibility.
+**Data Machine Events** is a modern WordPress events plugin built with a **block-first architecture**. It provides elegant event display and management through Gutenberg blocks while integrating seamlessly with the Data Machine plugin for automated event imports and AI-driven content creation.
 
 = Key Features =
 
@@ -21,18 +21,17 @@ A comprehensive WordPress events plugin with Import Modules system, native API i
 * **No More Meta Boxes:** This modern approach eliminates the need for cumbersome custom fields and meta boxes, creating an intuitive editing experience.
 * **Optimized for Performance:** Key data, like the event start time, is automatically synced to a meta field in the background, ensuring fast and efficient calendar queries.
 
-**🚀 Revolutionary Import Modules System**
-* Visual admin interface for configuring any data source
-* Universal taxonomy mapping - works with ANY existing site structure
-* "Set and forget" global scheduling with centralized management
-* Child theme safe - custom scrapers preserved during updates
+**🚀 Data Machine Integration**
+* Automated event imports from Ticketmaster, Dice FM, and web scrapers
+* AI-driven event creation with smart descriptions and taxonomy assignments
+* Seamless venue management with automatic term creation
+* Background processing for optimal performance
 
-**🎯 Native API Integrations** 
-* **Ticketmaster API** - First WordPress plugin with direct Live Nation integration
-* **Dice FM API** - Independent venue and event coverage  
-* **Eventbrite API** - Community and local event integration
-* **iCal Integration** - Import events from any iCalendar feed.
-* **Manual Import Tools** - CSV, JSON, direct input support
+**🎯 API Integrations (via Data Machine)** 
+* **Ticketmaster API** - Live Nation integration with API key authentication
+* **Dice FM API** - Independent venue and event coverage
+* **Web Scrapers** - Custom scrapers for specific venues
+* **Flexible Data Sources** - Extensible handler system for additional sources
 
 **⚡ Lightweight & Modern**
 * **Gutenberg-First:** All event data is managed via blocks, not custom meta boxes.
@@ -47,11 +46,12 @@ A comprehensive WordPress events plugin with Import Modules system, native API i
 * Advanced filtering and real-time search.
 * Event detail pages with schema markup.
 
-**🔧 Universal Compatibility**
-* Works with any existing taxonomy structure
-* No assumptions about venue, location, or artist taxonomies
-* Auto-creates taxonomy terms as needed
-* Flexible field mapping per import module
+**🔧 WordPress Native Integration**
+* Single `dm_events` post type with venue taxonomy
+* Comprehensive venue meta fields (10 fields: address, phone, website, capacity, coordinates, etc.)
+* REST API enabled for headless implementations
+* Block-first approach with background meta field sync for performance
+* Status detection system for Data Machine integration
 
 = Real-World Examples =
 
@@ -67,7 +67,7 @@ A comprehensive WordPress events plugin with Import Modules system, native API i
 * Universal taxonomy mapping for consistent categorization
 * Automated daily imports with comprehensive logging
 
-= Why Choose Chill Events? =
+= Why Choose Data Machine Events? =
 
 **vs. Tribe Events Calendar:**
 ✅ Lightweight architecture vs. bloated codebase
@@ -77,19 +77,21 @@ A comprehensive WordPress events plugin with Import Modules system, native API i
 ✅ Universal taxonomy support vs. rigid structure
 
 **vs. Other Event Plugins:**
-✅ First WordPress plugin with Ticketmaster API
-✅ Import Modules system - configure any data source visually
-✅ Child theme safe custom development
-✅ Global scheduling with reliable execution
-✅ Complete migration tools from other plugins
+✅ Block-first architecture (modern WordPress standards)
+✅ Data Machine integration for automated imports and AI publishing
+✅ AI-driven content creation and taxonomy management
+✅ Performance-optimized with background meta sync
+✅ Lightweight single post type approach
+✅ Integrated status detection and monitoring
+✅ PSR-4 autoloading with clean class organization
 
-= Import Modules Workflow =
+= Data Machine Events Workflow =
 
-1. **Click "Create New Module"** on Import Modules dashboard
-2. **Select Data Source** (Ticketmaster API, custom scraper, etc.)
-3. **Configure Settings** (location, filters, limits)
-4. **Map Taxonomies** (venue → venue_taxonomy, artist → artist_taxonomy)
-5. **Save & Activate** - module runs on global schedule automatically
+1. **Install Data Machine Plugin** - Required for automated imports
+2. **Configure Import Handlers** - Set up Ticketmaster API, Dice FM, or web scrapers
+3. **Set Up AI Publisher** - Configure DM Events publisher for event creation
+4. **Add Calendar Block** - Display events on any page or post
+5. **Manage Events** - Edit via Event Details blocks or add manual events
 
 = Developer Features =
 
@@ -106,25 +108,25 @@ Developed by **Chris Huber** (chubes.net) - WordPress expert specializing in cus
 
 == Installation ==
 
-1. Upload the plugin files to `/wp-content/plugins/chill-events/`
+1. Upload the plugin files to `/wp-content/plugins/dm-events/`
 2. Activate the plugin through the 'Plugins' screen in WordPress
-3. Navigate to **Chill Events > Settings** to configure global settings
-4. Visit **Chill Events > API Configuration** to add API keys
-5. Create your first Import Module from **Chill Events > Import Modules**
+3. Navigate to **Data Machine Events > Settings** to configure global settings
+4. Visit **Data Machine Events > API Configuration** to add API keys
+5. Set up Data Machine plugin for automated imports (optional)
 
 == Frequently Asked Questions ==
 
 = Is this a replacement for Tribe Events Calendar? =
 
-Yes! Chill Events is specifically designed as a modern, lightweight replacement for Tribe Events Calendar. It includes migration tools to import your existing events, venues, and settings.
+Yes! Data Machine Events is specifically designed as a modern, lightweight replacement for Tribe Events Calendar. It includes migration tools to import your existing events, venues, and settings.
 
 = Do I need coding skills to set up imports? =
 
-No! The Import Modules system provides a visual interface for configuring any data source. Simply select your data source, configure settings, and map to your site's taxonomies - no coding required.
+No! The Data Machine plugin provides a visual interface for configuring any data source. Simply select your data source, configure settings, and map to your site's taxonomies - no coding required.
 
 = Will this work with my existing taxonomies? =
 
-Absolutely! Chill Events makes no assumptions about your taxonomy structure. It detects all available taxonomies and allows flexible mapping per import module. You can use existing taxonomies or create new ones automatically.
+Absolutely! Data Machine Events makes no assumptions about your taxonomy structure. It detects all available taxonomies and allows flexible mapping per import module. You can use existing taxonomies or create new ones automatically.
 
 = What APIs are supported? =
 
@@ -136,11 +138,11 @@ Very reliable! The global scheduling system uses a single WP Cron job instead of
 
 = Can I customize the design? =
 
-Yes! Chill Events uses dedicated CSS files (no inline styles) and follows WordPress theme standards. All templates can be overridden in your theme, and comprehensive hooks allow customization.
+Yes! Data Machine Events uses dedicated CSS files (no inline styles) and follows WordPress theme standards. All templates can be overridden in your theme, and comprehensive hooks allow customization.
 
 == Screenshots ==
 
-1. **Import Modules Dashboard** - Visual interface for managing all your import sources
+1. **Data Machine Dashboard** - Visual interface for managing all your import sources
 2. **Create New Module Modal** - Step-by-step module configuration
 3. **Calendar View** - Beautiful month/week/day calendar displays  
 4. **Event Cards** - Modern, responsive event grid layout
@@ -152,7 +154,7 @@ Yes! Chill Events uses dedicated CSS files (no inline styles) and follows WordPr
 
 = 1.0.0 =
 * Initial release
-* Import Modules system with visual configuration
+* Data Machine integration with visual configuration
 * Native Ticketmaster, Dice FM, and Eventbrite API integrations
 * Universal taxonomy support and mapping
 * Global scheduling with centralized execution
@@ -166,4 +168,4 @@ Yes! Chill Events uses dedicated CSS files (no inline styles) and follows WordPr
 == Upgrade Notice ==
 
 = 1.0.0 =
-Welcome to Chill Events! This is the initial release of our revolutionary Import Modules system. Please review the setup guide after activation. 
+Welcome to Data Machine Events! This is the initial release with Data Machine plugin integration. Please review the setup guide after activation. 

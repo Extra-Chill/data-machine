@@ -2,11 +2,11 @@
 /**
  * Venue Term Meta Operations
  *
- * @package ChillEvents
+ * @package DmEvents
  * @since 1.0.0
  */
 
-namespace ChillEvents\Events\Venues;
+namespace DmEvents\Events\Venues;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -210,7 +210,7 @@ class Venue_Term_Meta {
     }
 }
 
-// Admin UI: Add custom fields to the Add Venue form
+// WordPress admin UI integration for venue term meta fields
 add_action('venue_add_form_fields', function($taxonomy) {
     $fields = [
         'address'   => 'Address',
@@ -233,7 +233,6 @@ add_action('venue_add_form_fields', function($taxonomy) {
     }
 });
 
-// Admin UI: Add custom fields to the Edit Venue form
 add_action('venue_edit_form_fields', function($term) {
     $fields = [
         'address'   => 'Address',
@@ -257,7 +256,6 @@ add_action('venue_edit_form_fields', function($term) {
     }
 });
 
-// Save custom fields when a venue is created
 add_action('created_venue', function($term_id) {
     $fields = ['address','city','state','zip','country','phone','website','capacity','coordinates','description'];
     foreach ($fields as $key) {
@@ -268,7 +266,6 @@ add_action('created_venue', function($term_id) {
     }
 });
 
-// Save custom fields when a venue is updated
 add_action('edited_venue', function($term_id) {
     $fields = ['address','city','state','zip','country','phone','website','capacity','coordinates','description'];
     foreach ($fields as $key) {

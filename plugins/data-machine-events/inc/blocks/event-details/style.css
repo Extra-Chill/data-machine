@@ -1,11 +1,11 @@
 /**
  * Event Details Block Styles
  *
- * @package ChillEvents
+ * @package DmEvents
  * @since 1.0.0
  */
 
-.chill-event-details {
+.dm-event-details {
     margin: 2rem 0;
     padding: 1.5rem;
     border: 1px solid #e1e5e9;
@@ -15,43 +15,43 @@
 }
 
 /* Editor Styles */
-.chill-event-details-editor {
+.dm-event-details-editor {
     padding: 1rem;
     background: #f8f9fa;
     border-radius: 4px;
 }
 
-.chill-event-details-editor h4 {
+.dm-event-details-editor h4 {
     margin: 0 0 1rem 0;
     color: #333;
     font-size: 1.1rem;
     font-weight: 600;
 }
 
-.chill-event-details-editor .event-dates,
-.chill-event-details-editor .event-location,
-.chill-event-details-editor .event-details {
+.dm-event-details-editor .event-dates,
+.dm-event-details-editor .event-location,
+.dm-event-details-editor .event-details {
     margin-bottom: 1.5rem;
 }
 
-.chill-event-details-editor .date-time-grid {
+.dm-event-details-editor .date-time-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
 }
 
-.chill-event-details-editor .date-time-field {
+.dm-event-details-editor .date-time-field {
     display: flex;
     flex-direction: column;
 }
 
-.chill-event-details-editor .date-time-field label {
+.dm-event-details-editor .date-time-field label {
     margin-bottom: 0.5rem;
     font-weight: 500;
     color: #555;
 }
 
-.chill-event-details-editor .date-time-field input {
+.dm-event-details-editor .date-time-field input {
     padding: 0.5rem;
     border: 1px solid #ddd;
     border-radius: 4px;
@@ -215,13 +215,13 @@
 }
 
 /* Alignment Support */
-.chill-event-details.alignwide {
+.dm-event-details.alignwide {
     max-width: 1200px;
     margin-left: auto;
     margin-right: auto;
 }
 
-.chill-event-details.alignfull {
+.dm-event-details.alignfull {
     max-width: none;
     margin-left: calc(-100vw / 2 + 100% / 2);
     margin-right: calc(-100vw / 2 + 100% / 2);
@@ -230,13 +230,13 @@
 
 /* Dark Mode Support */
 @media (prefers-color-scheme: dark) {
-    .chill-event-details {
+    .dm-event-details {
         background: #2d3748;
         border-color: #4a5568;
         color: #e2e8f0;
     }
     
-    .chill-event-details-editor {
+    .dm-event-details-editor {
         background: #1a202c;
     }
     

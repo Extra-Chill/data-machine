@@ -4,7 +4,7 @@
  * 
  * Registers the Ticketmaster event import handler with Data Machine.
  *
- * @package ChillEvents\Steps\EventImport\Handlers\Ticketmaster
+ * @package DmEvents\Steps\EventImport\Handlers\Ticketmaster
  * @since 1.0.0
  */
 
@@ -21,9 +21,9 @@ if (!defined('ABSPATH')) {
 add_filter('dm_handlers', function($handlers) {
     $handlers['ticketmaster_events'] = [
         'type' => 'event_import',
-        'class' => 'ChillEvents\\Steps\\EventImport\\Handlers\\Ticketmaster\\Ticketmaster',
-        'label' => __('Ticketmaster Events', 'chill-events'),
-        'description' => __('Import events from Ticketmaster Discovery API', 'chill-events')
+        'class' => 'DmEvents\\Steps\\EventImport\\Handlers\\Ticketmaster\\Ticketmaster',
+        'label' => __('Ticketmaster Events', 'dm-events'),
+        'description' => __('Import events from Ticketmaster Discovery API', 'dm-events')
     ];
     
     return $handlers;
@@ -36,7 +36,7 @@ add_filter('dm_handlers', function($handlers) {
  * This enables the authentication modal for API key configuration.
  */
 add_filter('dm_auth_providers', function($providers) {
-    $providers['ticketmaster_events'] = new ChillEvents\Steps\EventImport\Handlers\Ticketmaster\TicketmasterAuth();
+    $providers['ticketmaster_events'] = new DmEvents\Steps\EventImport\Handlers\Ticketmaster\TicketmasterAuth();
     return $providers;
 });
 
@@ -47,6 +47,6 @@ add_filter('dm_auth_providers', function($providers) {
  * This enables the configuration UI for handler parameters.
  */
 add_filter('dm_handler_settings', function($all_settings) {
-    $all_settings['ticketmaster_events'] = new ChillEvents\Steps\EventImport\Handlers\Ticketmaster\TicketmasterSettings();
+    $all_settings['ticketmaster_events'] = new DmEvents\Steps\EventImport\Handlers\Ticketmaster\TicketmasterSettings();
     return $all_settings;
 });

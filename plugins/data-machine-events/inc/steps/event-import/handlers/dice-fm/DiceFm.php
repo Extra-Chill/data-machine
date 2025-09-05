@@ -5,11 +5,11 @@
  * Imports events from Dice.fm API.
  * Standalone implementation for Data Machine integration.
  *
- * @package ChillEvents\Steps\EventImport\Handlers\DiceFm
+ * @package DmEvents\Steps\EventImport\Handlers\DiceFm
  * @since 1.0.0
  */
 
-namespace ChillEvents\Steps\EventImport\Handlers\DiceFm;
+namespace DmEvents\Steps\EventImport\Handlers\DiceFm;
 
 // Prevent direct access
 if (!defined('ABSPATH')) {
@@ -31,14 +31,17 @@ class DiceFm {
      * @param string|null $job_id Job ID for tracking
      * @return array Standardized data packet with processed_items
      */
-    public function get_event_data(int $pipeline_id, array $handler_config, ?string $job_id = null): array {
+    public function get_fetch_data(int $pipeline_id, array $handler_config, ?string $job_id = null): array {
         $this->log_info('Dice.fm Handler: Starting event import', [
             'pipeline_id' => $pipeline_id,
             'job_id' => $job_id
         ]);
         
+        // Extract flow_step_id from handler config for processed items tracking
+        $flow_step_id = $handler_config['flow_step_id'] ?? null;
+        
         // Get API configuration from Data Machine auth system
-        $api_config = apply_filters('dm_oauth', [], 'get_config', 'dice_fm_events');
+        $api_config = apply_filters('dm_retrieve_oauth_keys', [], 'dice_fm_events');
         if (empty($api_config['api_key'])) {
             $this->log_error('Dice.fm API key not configured');
             return ['processed_items' => []];
@@ -64,32 +67,87 @@ class DiceFm {
             return ['processed_items' => []];
         }
         
-        // Process and standardize events
-        $standardized_events = [];
-        foreach ($raw_events as $raw_event) {
-            $standardized_event = $this->convert_dice_fm_event($raw_event);
-            
-            // Filter by date range
-            $event_time = strtotime($standardized_event['startDate'] . ' ' . $standardized_event['startTime']);
-            $now = time();
-            $future = strtotime("+{$date_range} days");
-            
-            if ($event_time < $now || $event_time > $future) {
-                continue;
-            }
-            
-            if (!empty($standardized_event['title'])) {
-                $standardized_events[] = $standardized_event;
-            }
-        }
-        
-        $this->log_info('Dice.fm Handler: Event import completed', [
-            'total_fetched' => count($raw_events),
-            'total_processed' => count($standardized_events),
+        // Process events one at a time (Data Machine single-item model)
+        $this->log_info('Dice.fm Handler: Processing events for eligible item', [
+            'raw_events_available' => count($raw_events),
+            'date_range_days' => $date_range,
             'pipeline_id' => $pipeline_id
         ]);
         
-        return $this->create_data_packet($standardized_events, 'dice_fm');
+        $now = time();
+        $future = strtotime("+{$date_range} days");
+        
+        foreach ($raw_events as $raw_event) {
+            // Standardize the event
+            $standardized_event = $this->convert_dice_fm_event($raw_event);
+            
+            // Skip if no title
+            if (empty($standardized_event['title'])) {
+                continue;
+            }
+            
+            // Create unique identifier for processed items tracking
+            $event_identifier = md5($standardized_event['title'] . ($standardized_event['startDate'] ?? '') . ($standardized_event['venue'] ?? ''));
+            
+            // Check if already processed FIRST
+            $is_processed = apply_filters('dm_is_item_processed', false, $flow_step_id, 'dice_fm', $event_identifier);
+            if ($is_processed) {
+                $this->log_debug('Skipping already processed event', [
+                    'title' => $standardized_event['title'],
+                    'event_identifier' => $event_identifier
+                ]);
+                continue;
+            }
+            
+            // Apply date range filter
+            $event_time = strtotime($standardized_event['startDate'] . ' ' . $standardized_event['startTime']);
+            if ($event_time < $now || $event_time > $future) {
+                $this->log_debug('Skipping event outside date range', [
+                    'title' => $standardized_event['title'],
+                    'date' => $standardized_event['startDate'],
+                    'time' => $standardized_event['startTime']
+                ]);
+                continue;
+            }
+            
+            // Found eligible event - mark as processed and return immediately
+            if ($flow_step_id && $job_id) {
+                do_action('dm_mark_item_processed', $flow_step_id, 'dice_fm', $event_identifier, $job_id);
+            }
+            
+            $this->log_info('Dice.fm Handler: Found eligible event', [
+                'title' => $standardized_event['title'],
+                'date' => $standardized_event['startDate'],
+                'venue' => $standardized_event['venue'],
+                'pipeline_id' => $pipeline_id
+            ]);
+            
+            // Return first eligible event immediately (Data Machine pattern)
+            return [
+                'processed_items' => [[
+                    'data' => $standardized_event,
+                    'metadata' => [
+                        'source_type' => 'dice_fm',
+                        'original_title' => $standardized_event['title'] ?? '',
+                        'event_identifier' => $event_identifier,
+                        'import_timestamp' => time()
+                    ]
+                ]],
+                'metadata' => [
+                    'source_type' => 'dice_fm',
+                    'import_timestamp' => time()
+                ]
+            ];
+        }
+        
+        // No eligible events found
+        $this->log_info('Dice.fm Handler: No eligible events found', [
+            'raw_events_checked' => count($raw_events),
+            'date_range_days' => $date_range,
+            'pipeline_id' => $pipeline_id
+        ]);
+        
+        return ['processed_items' => []];
     }
     
     /**
@@ -296,34 +354,15 @@ class DiceFm {
     }
     
     /**
-     * Create standardized data packet for Data Machine
+     * Log debug message
      * 
-     * @param array $events Array of standardized event data
-     * @param string $source_type Source identifier
-     * @return array Data packet with processed_items
+     * @param string $message Debug message
+     * @param array $context Additional context
      */
-    private function create_data_packet(array $events, string $source_type): array {
-        $processed_items = [];
-        
-        foreach ($events as $event) {
-            $processed_items[] = [
-                'data' => $event,
-                'metadata' => [
-                    'source_type' => $source_type,
-                    'original_title' => $event['title'] ?? '',
-                    'import_timestamp' => time()
-                ]
-            ];
+    private function log_debug(string $message, array $context = []): void {
+        if (function_exists('do_action')) {
+            do_action('dm_log', 'debug', $message, $context);
         }
-        
-        return [
-            'processed_items' => $processed_items,
-            'metadata' => [
-                'total_events' => count($events),
-                'source_type' => $source_type,
-                'import_timestamp' => time()
-            ]
-        ];
     }
     
     /**

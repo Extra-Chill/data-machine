@@ -5,11 +5,11 @@
  * Custom step type that imports events from multiple sources using handler discovery.
  * Follows Data Machine's step architecture pattern.
  *
- * @package ChillEvents\Steps\EventImport
+ * @package DmEvents\Steps\EventImport
  * @since 1.0.0
  */
 
-namespace ChillEvents\Steps\EventImport;
+namespace DmEvents\Steps\EventImport;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -77,7 +77,7 @@ class EventImportStep {
                 'handler' => $handler,
                 'content_length' => strlen($import_entry['content']['body'] ?? '') + strlen($import_entry['content']['title'] ?? ''),
                 'source_type' => $import_entry['metadata']['source_type'] ?? '',
-                'total_items' => count($data)
+                'event_title' => $import_entry['content']['title'] ?? 'N/A'
             ]);
 
             return $data;
@@ -126,7 +126,7 @@ class EventImportStep {
             }
 
             // Execute handler - pass job_id for processed items tracking
-            $result = $handler->get_event_data($pipeline_id, $handler_settings, $job_id);
+            $result = $handler->get_fetch_data($pipeline_id, $handler_settings, $job_id);
 
             // Convert handler output to data entry for the data packet array
             $context = [
@@ -163,7 +163,7 @@ class EventImportStep {
             
             // Event Import handlers return processed_items with event data
             if (isset($result['processed_items']) && is_array($result['processed_items']) && !empty($result['processed_items'])) {
-                // Take first event for this data entry (handlers can return multiple events)
+                // Take first event for this data entry (handlers return single event per job)
                 $event_data = $result['processed_items'][0];
                 
                 // Extract event content from data

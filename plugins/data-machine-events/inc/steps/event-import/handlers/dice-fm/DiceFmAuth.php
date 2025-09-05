@@ -5,11 +5,11 @@
  * Handles authentication configuration for Dice.fm API integration
  * with Data Machine's centralized authentication system.
  *
- * @package ChillEvents\Steps\EventImport\Handlers\DiceFm
+ * @package DmEvents\Steps\EventImport\Handlers\DiceFm
  * @since 1.0.0
  */
 
-namespace ChillEvents\Steps\EventImport\Handlers\DiceFm;
+namespace DmEvents\Steps\EventImport\Handlers\DiceFm;
 
 // Prevent direct access
 if (!defined('ABSPATH')) {
@@ -32,16 +32,16 @@ class DiceFmAuth {
     public function get_config_fields(): array {
         return [
             'api_key' => [
-                'label' => __('API Key', 'chill-events'),
+                'label' => __('API Key', 'dm-events'),
                 'type' => 'password',
                 'required' => true,
-                'description' => __('Your Dice.fm API key from dice.fm developer portal', 'chill-events')
+                'description' => __('Your Dice.fm API key from dice.fm developer portal', 'dm-events')
             ],
             'partner_id' => [
-                'label' => __('Partner ID', 'chill-events'),
+                'label' => __('Partner ID', 'dm-events'),
                 'type' => 'text',
                 'required' => false,
-                'description' => __('Optional Partner ID for enhanced API access', 'chill-events')
+                'description' => __('Optional Partner ID for enhanced API access', 'dm-events')
             ]
         ];
     }
@@ -52,7 +52,7 @@ class DiceFmAuth {
      * @return bool True if API key is configured, false otherwise
      */
     public function is_configured(): bool {
-        $config = apply_filters('dm_oauth', [], 'get_config', 'dice_fm_events');
+        $config = apply_filters('dm_retrieve_oauth_keys', [], 'dice_fm_events');
         return !empty($config['api_key']);
     }
     
@@ -75,10 +75,10 @@ class DiceFmAuth {
             return null;
         }
         
-        $config = apply_filters('dm_oauth', [], 'get_config', 'dice_fm_events');
+        $config = apply_filters('dm_retrieve_oauth_keys', [], 'dice_fm_events');
         $details = [
-            'display_name' => __('Dice.fm API', 'chill-events'),
-            'type' => __('API Key Authentication', 'chill-events')
+            'display_name' => __('Dice.fm API', 'dm-events'),
+            'type' => __('API Key Authentication', 'dm-events')
         ];
         
         if (!empty($config['partner_id'])) {

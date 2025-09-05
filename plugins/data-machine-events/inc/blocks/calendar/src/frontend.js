@@ -1,5 +1,5 @@
 /**
- * Chill Events Calendar Frontend JavaScript
+ * Data Machine Events Calendar Frontend JavaScript
  * 
  * Handles search, filtering, and view toggling functionality
  */
@@ -16,13 +16,13 @@ import 'flatpickr/dist/flatpickr.css';
     });
 
     function initializeCalendarFilters() {
-        const calendars = document.querySelectorAll('.chill-events-calendar');
+        const calendars = document.querySelectorAll('.dm-events-calendar');
         
         calendars.forEach(function(calendar) {
-            const searchInput = calendar.querySelector('#chill-events-search');
-            const dateRangeInput = calendar.querySelector('#chill-events-date-range');
-            const viewButtons = calendar.querySelectorAll('.chill-events-view-btn');
-            const eventsList = calendar.querySelector('#chill-events-list');
+            const searchInput = calendar.querySelector('#dm-events-search');
+            const dateRangeInput = calendar.querySelector('#dm-events-date-range');
+            const viewButtons = calendar.querySelectorAll('.dm-events-view-btn');
+            const eventsList = calendar.querySelector('#dm-events-list');
             
             // Initialize search functionality
             if (searchInput) {
@@ -31,7 +31,7 @@ import 'flatpickr/dist/flatpickr.css';
                 });
                 
                 // Clear search button
-                const searchBtn = calendar.querySelector('.chill-events-search-btn');
+                const searchBtn = calendar.querySelector('.dm-events-search-btn');
                 if (searchBtn) {
                     searchBtn.addEventListener('click', function() {
                         searchInput.value = '';
@@ -44,7 +44,7 @@ import 'flatpickr/dist/flatpickr.css';
             // Initialize date range picker with flatpickr
             if (dateRangeInput) {
                 console.log('Initializing flatpickr for date range picker');
-                const clearBtn = calendar.querySelector('.chill-events-date-clear-btn');
+                const clearBtn = calendar.querySelector('.dm-events-date-clear-btn');
                 
                 const datePicker = flatpickr(dateRangeInput, {
                     mode: 'range',
@@ -94,7 +94,7 @@ import 'flatpickr/dist/flatpickr.css';
     }
 
     function filterEvents(calendar, searchTerm) {
-        const events = calendar.querySelectorAll('.chill-event-item');
+        const events = calendar.querySelectorAll('.dm-event-item');
         const searchLower = searchTerm.toLowerCase();
         
         events.forEach(function(event) {
@@ -118,7 +118,7 @@ import 'flatpickr/dist/flatpickr.css';
     }
 
     function filterEventsByDateRange(calendar, selectedDates) {
-        const events = calendar.querySelectorAll('.chill-event-item');
+        const events = calendar.querySelectorAll('.dm-event-item');
         
         if (!selectedDates || selectedDates.length === 0) {
             // No date filter - show all events
@@ -154,11 +154,11 @@ import 'flatpickr/dist/flatpickr.css';
     }
 
     function toggleView(calendar, view) {
-        const eventsList = calendar.querySelector('#chill-events-list');
-        const viewButtons = calendar.querySelectorAll('.chill-events-view-btn');
+        const eventsList = calendar.querySelector('#dm-events-list');
+        const viewButtons = calendar.querySelectorAll('.dm-events-view-btn');
         
         // Update calendar class
-        calendar.className = calendar.className.replace(/chill-events-view-\w+/, 'chill-events-view-' + view);
+        calendar.className = calendar.className.replace(/dm-events-view-\w+/, 'dm-events-view-' + view);
         
         // Update button states
         viewButtons.forEach(function(button) {
@@ -170,22 +170,22 @@ import 'flatpickr/dist/flatpickr.css';
         
         // Store view preference in localStorage
         try {
-            localStorage.setItem('chill-events-view', view);
+            localStorage.setItem('dm-events-view', view);
         } catch (e) {
             // Ignore localStorage errors
         }
     }
 
     function updateNoEventsMessage(calendar) {
-        const events = calendar.querySelectorAll('.chill-event-item:not(.hidden)');
-        const noEventsMessage = calendar.querySelector('.chill-events-no-events');
+        const events = calendar.querySelectorAll('.dm-event-item:not(.hidden)');
+        const noEventsMessage = calendar.querySelector('.dm-events-no-events');
         
         if (events.length === 0) {
             if (!noEventsMessage) {
                 const message = document.createElement('div');
-                message.className = 'chill-events-no-events';
+                message.className = 'dm-events-no-events';
                 message.innerHTML = '<p>No events found matching your criteria.</p>';
-                calendar.querySelector('.chill-events-content').appendChild(message);
+                calendar.querySelector('.dm-events-content').appendChild(message);
             }
         } else {
             if (noEventsMessage) {
@@ -197,9 +197,9 @@ import 'flatpickr/dist/flatpickr.css';
     // Restore view preference from localStorage
     function restoreViewPreference() {
         try {
-            const savedView = localStorage.getItem('chill-events-view');
+            const savedView = localStorage.getItem('dm-events-view');
             if (savedView) {
-                const calendars = document.querySelectorAll('.chill-events-calendar');
+                const calendars = document.querySelectorAll('.dm-events-calendar');
                 calendars.forEach(function(calendar) {
                     const viewButton = calendar.querySelector('[data-view="' + savedView + '"]');
                     if (viewButton) {

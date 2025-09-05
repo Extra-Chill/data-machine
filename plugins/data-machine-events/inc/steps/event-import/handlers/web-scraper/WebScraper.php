@@ -5,11 +5,11 @@
  * Unified handler for all web scrapers using filter-based discovery.
  * Allows selection of different venue scrapers through handler settings.
  *
- * @package ChillEvents\Steps\EventImport\Handlers\WebScraper
+ * @package DmEvents\Steps\EventImport\Handlers\WebScraper
  * @since 1.0.0
  */
 
-namespace ChillEvents\Steps\EventImport\Handlers\WebScraper;
+namespace DmEvents\Steps\EventImport\Handlers\WebScraper;
 
 // Prevent direct access
 if (!defined('ABSPATH')) {
@@ -31,12 +31,15 @@ class WebScraper {
      * @param string|null $job_id Job ID for tracking
      * @return array Standardized data packet with processed_items
      */
-    public function get_event_data(int $pipeline_id, array $handler_config, ?string $job_id = null): array {
+    public function get_fetch_data(int $pipeline_id, array $handler_config, ?string $job_id = null): array {
         $this->log_info('Web Scraper Handler: Starting event import', [
             'pipeline_id' => $pipeline_id,
             'job_id' => $job_id,
             'config' => $handler_config
         ]);
+        
+        // Extract flow_step_id from handler config for processed items tracking
+        $flow_step_id = $handler_config['flow_step_id'] ?? null;
         
         // Get selected scraper from configuration
         $selected_scraper = isset($handler_config['scraper_source']) ? $handler_config['scraper_source'] : '';
@@ -81,27 +84,69 @@ class WebScraper {
                 return ['processed_items' => []];
             }
             
-            $this->log_info('Web Scraper Handler: Events retrieved', [
+            $this->log_info('Web Scraper Handler: Processing events for eligible item', [
                 'scraper' => $selected_scraper,
-                'count' => count($events)
+                'events_available' => count($events)
             ]);
             
-            // Format for Data Machine
-            $processed_items = [];
+            // Process events one at a time (Data Machine single-item model)
             foreach ($events as $event) {
-                if (is_array($event)) {
-                    $processed_items[] = [
+                if (!is_array($event) || empty($event['title'])) {
+                    continue;
+                }
+                
+                // Create unique identifier for this event
+                $event_identifier = md5(($event['title'] ?? '') . ($event['startDate'] ?? '') . ($event['venue'] ?? '') . $selected_scraper);
+                
+                // Check if already processed FIRST
+                $is_processed = apply_filters('dm_is_item_processed', false, $flow_step_id, 'web_scraper', $event_identifier);
+                if ($is_processed) {
+                    $this->log_debug('Skipping already processed event', [
+                        'title' => $event['title'],
+                        'scraper' => $selected_scraper,
+                        'event_identifier' => $event_identifier
+                    ]);
+                    continue;
+                }
+                
+                // Found eligible event - mark as processed and return immediately
+                if ($flow_step_id && $job_id) {
+                    do_action('dm_mark_item_processed', $flow_step_id, 'web_scraper', $event_identifier, $job_id);
+                }
+                
+                $this->log_info('Web Scraper Handler: Found eligible event', [
+                    'title' => $event['title'],
+                    'scraper' => $selected_scraper,
+                    'venue' => $event['venue'] ?? 'N/A'
+                ]);
+                
+                // Return first eligible event immediately (Data Machine pattern)
+                return [
+                    'processed_items' => [[
                         'data' => $event,
                         'metadata' => [
                             'source' => $selected_scraper,
                             'imported_at' => current_time('mysql'),
-                            'scraper_class' => $scraper_class
+                            'scraper_class' => $scraper_class,
+                            'event_identifier' => $event_identifier,
+                            'source_type' => 'web_scraper'
                         ]
-                    ];
-                }
+                    ]],
+                    'metadata' => [
+                        'source_type' => 'web_scraper',
+                        'selected_scraper' => $selected_scraper,
+                        'import_timestamp' => time()
+                    ]
+                ];
             }
             
-            return ['processed_items' => $processed_items];
+            // No eligible events found
+            $this->log_info('Web Scraper Handler: No eligible events found', [
+                'scraper' => $selected_scraper,
+                'events_checked' => count($events)
+            ]);
+            
+            return ['processed_items' => []];
             
         } catch (\Exception $e) {
             $this->log_error('Scraper execution failed: ' . $e->getMessage(), [
@@ -175,6 +220,19 @@ class WebScraper {
      */
     private function log_error(string $message, array $context = []): void {
         $context_str = !empty($context) ? ' | Context: ' . wp_json_encode($context) : '';
-        error_log('Chill Events Web Scraper Error: ' . $message . $context_str);
+        error_log('Data Machine Events Web Scraper Error: ' . $message . $context_str);
+    }
+    
+    /**
+     * Log debug message
+     * 
+     * @param string $message Debug message
+     * @param array $context Additional context data
+     */
+    private function log_debug(string $message, array $context = []): void {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            $context_str = !empty($context) ? ' | Context: ' . wp_json_encode($context) : '';
+            error_log('Data Machine Events Web Scraper Debug: ' . $message . $context_str);
+        }
     }
 }

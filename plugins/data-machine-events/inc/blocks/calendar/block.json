@@ -1,13 +1,13 @@
 {
 	"$schema": "https://schemas.wp.org/trunk/block.json",
 	"apiVersion": 3,
-	"name": "chill-events/calendar",
+	"name": "dm-events/calendar",
 	"version": "1.0.0",
-	"title": "Chill Events Calendar",
+	"title": "Data Machine Events Calendar",
 	"category": "widgets",
 	"icon": "calendar-alt",
-	"description": "Display events in a calendar or list format using Chill Events.",
-	"keywords": ["events", "calendar", "chill", "chill events"],
+	"description": "Display events in a calendar or list format using Data Machine Events.",
+	"keywords": ["events", "calendar", "data machine"],
 	"supports": {
 		"html": false,
 		"align": ["wide", "full"],
@@ -58,7 +58,7 @@
 			"default": 12
 		}
 	},
-	"textdomain": "chill-events",
+	"textdomain": "dm-events",
 	"editorScript": "file:./build/index.js",
 	"editorStyle": "file:./editor.css",
 	"style": "file:./style.css",

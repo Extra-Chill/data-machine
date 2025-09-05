@@ -1,14 +1,14 @@
-/* Chill Events Admin Styles */
+/* Data Machine Events Admin Styles */
 
-/* Import Modules Dashboard */
-.chill-modules-dashboard {
+/* Data Machine Events Dashboard */
+.dm-modules-dashboard {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
     gap: 20px;
     margin-top: 20px;
 }
 
-.chill-module-card {
+.dm-module-card {
     background: #fff;
     border: 1px solid #ccd0d4;
     border-radius: 4px;
@@ -16,7 +16,7 @@
     box-shadow: 0 1px 1px rgba(0,0,0,.04);
 }
 
-.chill-module-card .module-header {
+.dm-module-card .module-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -25,7 +25,7 @@
     border-bottom: 1px solid #eee;
 }
 
-.chill-module-card h3 {
+.dm-module-card h3 {
     margin: 0;
     font-size: 16px;
 }
@@ -50,7 +50,7 @@
 }
 
 /* Modal Styles */
-.chill-modal {
+.dm-modal {
     position: fixed;
     z-index: 100000;
     left: 0;
@@ -61,7 +61,7 @@
     overflow: auto;
 }
 
-.chill-modal-content {
+.dm-modal-content {
     background-color: #fefefe;
     margin: 5% auto;
     border: none;
@@ -75,7 +75,7 @@
     flex-direction: column;
 }
 
-.chill-modal-header {
+.dm-modal-header {
     padding: 20px 25px;
     border-bottom: 1px solid #ddd;
     background: #f9f9f9;
@@ -84,12 +84,12 @@
     align-items: center;
 }
 
-.chill-modal-header h2 {
+.dm-modal-header h2 {
     margin: 0;
     font-size: 20px;
 }
 
-.chill-modal-close {
+.dm-modal-close {
     color: #aaa;
     font-size: 28px;
     font-weight: bold;
@@ -97,18 +97,18 @@
     line-height: 1;
 }
 
-.chill-modal-close:hover,
-.chill-modal-close:focus {
+.dm-modal-close:hover,
+.dm-modal-close:focus {
     color: #000;
 }
 
-.chill-modal-body {
+.dm-modal-body {
     padding: 25px;
     flex: 1;
     overflow-y: auto;
 }
 
-.chill-modal-footer {
+.dm-modal-footer {
     padding: 15px 25px;
     border-top: 1px solid #ddd;
     background: #f9f9f9;
@@ -118,11 +118,11 @@
 }
 
 /* Step Navigation */
-.chill-step {
+.dm-step {
     margin-bottom: 20px;
 }
 
-.chill-step h3 {
+.dm-step h3 {
     color: #23282d;
     margin-bottom: 15px;
     font-size: 18px;
@@ -135,16 +135,16 @@
 
 /* Responsive */
 @media (max-width: 768px) {
-    .chill-modules-dashboard {
+    .dm-modules-dashboard {
         grid-template-columns: 1fr;
     }
     
-    .chill-modal-content {
+    .dm-modal-content {
         width: 95%;
         margin: 2% auto;
     }
     
-    .chill-module-card .module-header {
+    .dm-module-card .module-header {
         flex-direction: column;
         align-items: flex-start;
         gap: 10px;
@@ -161,10 +161,8 @@
 .status-inactive { color: #72777c; }
 .status-error { color: #d63638; }
 
-.chill-header-actions {
+.dm-header-actions {
     margin-bottom: 15px;
 }
 
-/* dashicon styling removed after icon removal */
-
-/* dashicon styling removed after icon removal */ 
+ 

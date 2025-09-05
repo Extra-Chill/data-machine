@@ -5,11 +5,11 @@
  * Imports events from Ticketmaster Discovery API.
  * Handles API authentication and response mapping.
  *
- * @package ChillEvents\Steps\EventImport\Handlers\Ticketmaster
+ * @package DmEvents\Steps\EventImport\Handlers\Ticketmaster
  * @since 1.0.0
  */
 
-namespace ChillEvents\Steps\EventImport\Handlers\Ticketmaster;
+namespace DmEvents\Steps\EventImport\Handlers\Ticketmaster;
 
 
 // Prevent direct access
@@ -46,14 +46,17 @@ class Ticketmaster {
      * @param string|null $job_id Job ID for tracking
      * @return array Standardized data packet with processed_items
      */
-    public function get_event_data(int $pipeline_id, array $handler_config, ?string $job_id = null): array {
+    public function get_fetch_data(int $pipeline_id, array $handler_config, ?string $job_id = null): array {
         $this->log_info('Ticketmaster Handler: Starting event import', [
             'pipeline_id' => $pipeline_id,
             'job_id' => $job_id
         ]);
         
+        // Extract flow_step_id from handler config for processed items tracking
+        $flow_step_id = $handler_config['flow_step_id'] ?? null;
+        
         // Get API configuration from Data Machine auth system
-        $api_config = apply_filters('dm_oauth', [], 'get_config', 'ticketmaster_events');
+        $api_config = apply_filters('dm_retrieve_oauth_keys', [], 'ticketmaster_events');
         if (empty($api_config['api_key'])) {
             $this->log_error('Ticketmaster API key not configured');
             return ['processed_items' => []];
@@ -69,26 +72,80 @@ class Ticketmaster {
             return ['processed_items' => []];
         }
         
-        // Process and standardize events
-        $standardized_events = [];
-        foreach ($raw_events as $raw_event) {
-            $standardized_event = $this->map_ticketmaster_event($raw_event);
-            if (!empty($standardized_event['title'])) {
-                $standardized_events[] = $standardized_event;
-            }
-        }
-        
-        // Apply filters
-        $standardized_events = $this->filter_future_events($standardized_events);
-        $standardized_events = $this->deduplicate($standardized_events);
-        
-        $this->log_info('Ticketmaster Handler: Event import completed', [
-            'total_fetched' => count($raw_events),
-            'total_processed' => count($standardized_events),
+        // Process events one at a time (Data Machine single-item model)
+        $this->log_info('Ticketmaster Handler: Processing events for eligible item', [
+            'raw_events_available' => count($raw_events),
             'pipeline_id' => $pipeline_id
         ]);
         
-        return $this->create_data_packet($standardized_events, 'ticketmaster');
+        foreach ($raw_events as $raw_event) {
+            // Standardize the event
+            $standardized_event = $this->map_ticketmaster_event($raw_event);
+            
+            // Skip if no title
+            if (empty($standardized_event['title'])) {
+                continue;
+            }
+            
+            // Create unique identifier for processed items tracking
+            $event_identifier = md5($standardized_event['title'] . ($standardized_event['startDate'] ?? '') . ($standardized_event['venue'] ?? ''));
+            
+            // Check if already processed FIRST
+            $is_processed = apply_filters('dm_is_item_processed', false, $flow_step_id, 'ticketmaster', $event_identifier);
+            if ($is_processed) {
+                $this->log_debug('Skipping already processed event', [
+                    'title' => $standardized_event['title'],
+                    'event_identifier' => $event_identifier
+                ]);
+                continue;
+            }
+            
+            // Apply individual event filters
+            if (!$this->is_future_event($standardized_event)) {
+                $this->log_debug('Skipping past event', [
+                    'title' => $standardized_event['title'],
+                    'date' => $standardized_event['startDate']
+                ]);
+                continue;
+            }
+            
+            // Found eligible event - mark as processed and return immediately
+            if ($flow_step_id && $job_id) {
+                do_action('dm_mark_item_processed', $flow_step_id, 'ticketmaster', $event_identifier, $job_id);
+            }
+            
+            $this->log_info('Ticketmaster Handler: Found eligible event', [
+                'title' => $standardized_event['title'],
+                'date' => $standardized_event['startDate'],
+                'venue' => $standardized_event['venue'],
+                'pipeline_id' => $pipeline_id
+            ]);
+            
+            // Return first eligible event immediately (Data Machine pattern)
+            return [
+                'processed_items' => [[
+                    'data' => $standardized_event,
+                    'metadata' => [
+                        'source_type' => 'ticketmaster',
+                        'original_title' => $standardized_event['title'] ?? '',
+                        'event_identifier' => $event_identifier,
+                        'import_timestamp' => time()
+                    ]
+                ]],
+                'metadata' => [
+                    'source_type' => 'ticketmaster',
+                    'import_timestamp' => time()
+                ]
+            ];
+        }
+        
+        // No eligible events found
+        $this->log_info('Ticketmaster Handler: No eligible events found', [
+            'raw_events_checked' => count($raw_events),
+            'pipeline_id' => $pipeline_id
+        ]);
+        
+        return ['processed_items' => []];
     }
     
     /**
@@ -103,16 +160,27 @@ class Ticketmaster {
             'apikey' => $api_key
         ]);
         
-        // Add location if specified
-        if (!empty($handler_config['city'])) {
-            $params['city'] = $handler_config['city'];
+        // Parse location field (e.g., "Charleston, SC")
+        if (!empty($handler_config['location'])) {
+            $location_parts = explode(',', $handler_config['location']);
+            
+            if (count($location_parts) >= 1) {
+                $city = trim($location_parts[0]);
+                if (!empty($city)) {
+                    $params['city'] = $city;
+                }
+            }
+            
+            if (count($location_parts) >= 2) {
+                $state = trim($location_parts[1]);
+                if (!empty($state)) {
+                    $params['stateCode'] = strtoupper($state);
+                }
+            }
         }
-        if (!empty($handler_config['state_code'])) {
-            $params['stateCode'] = $handler_config['state_code'];
-        }
-        if (!empty($handler_config['country_code'])) {
-            $params['countryCode'] = $handler_config['country_code'];
-        }
+        
+        // Default to US for country code
+        $params['countryCode'] = 'US';
         
         // Add date range
         $start_date = !empty($handler_config['start_date']) 
@@ -146,7 +214,7 @@ class Ticketmaster {
             'timeout' => 30,
             'headers' => [
                 'Accept' => 'application/json',
-                'User-Agent' => 'Chill Events WordPress Plugin'
+                'User-Agent' => 'Data Machine Events WordPress Plugin'
             ]
         ]);
         
@@ -259,106 +327,31 @@ class Ticketmaster {
     }
     
     /**
-     * Create standardized data packet for Data Machine
+     * Check if event is in the future
      * 
-     * @param array $events Array of standardized event data
-     * @param string $source_type Source identifier
-     * @return array Data packet with processed_items
+     * @param array $event Event data
+     * @return bool True if event is in future
      */
-    private function create_data_packet(array $events, string $source_type): array {
-        $processed_items = [];
-        
-        foreach ($events as $event) {
-            $processed_items[] = [
-                'data' => $event,
-                'metadata' => [
-                    'source_type' => $source_type,
-                    'original_title' => $event['title'] ?? '',
-                    'import_timestamp' => time()
-                ]
-            ];
-        }
-        
-        return [
-            'processed_items' => $processed_items,
-            'metadata' => [
-                'total_events' => count($events),
-                'source_type' => $source_type,
-                'import_timestamp' => time()
-            ]
-        ];
-    }
-    
-    /**
-     * Remove duplicate events based on title and date
-     * 
-     * @param array $events Array of event data
-     * @return array Deduplicated events
-     */
-    private function deduplicate(array $events): array {
-        $unique_events = [];
-        $seen = [];
-        
-        foreach ($events as $event) {
-            // Create a unique key based on title, date, and venue
-            $key = md5(
-                strtolower(trim($event['title'] ?? '')) .
-                ($event['startDate'] ?? '') .
-                strtolower(trim($event['venue'] ?? ''))
-            );
+    private function is_future_event(array $event): bool {
+        try {
+            if (empty($event['startDate'])) {
+                return false;
+            }
             
-            if (!isset($seen[$key])) {
-                $seen[$key] = true;
-                $unique_events[] = $event;
-            } else {
-                $this->log_debug('Duplicate event removed', [
-                    'title' => $event['title'] ?? '',
-                    'date' => $event['startDate'] ?? '',
-                    'venue' => $event['venue'] ?? ''
-                ]);
-            }
+            $event_date = new \DateTime($event['startDate'] . ' ' . ($event['startTime'] ?? '23:59'));
+            $now = new \DateTime();
+            
+            return $event_date > $now;
+        } catch (\Exception $e) {
+            $this->log_error('Date validation error: ' . $e->getMessage(), [
+                'event' => $event
+            ]);
+            // Include event if date parsing fails
+            return true;
         }
-        
-        return $unique_events;
     }
     
-    /**
-     * Filter out past events
-     * 
-     * @param array $events Array of event data
-     * @return array Future events only
-     */
-    private function filter_future_events(array $events): array {
-        $future_events = [];
-        $now = new \DateTime();
-        
-        foreach ($events as $event) {
-            try {
-                if (empty($event['startDate'])) {
-                    continue;
-                }
-                
-                $event_date = new \DateTime($event['startDate'] . ' ' . ($event['startTime'] ?? '23:59'));
-                
-                if ($event_date > $now) {
-                    $future_events[] = $event;
-                } else {
-                    $this->log_debug('Past event filtered out', [
-                        'title' => $event['title'] ?? '',
-                        'date' => $event['startDate'] ?? ''
-                    ]);
-                }
-            } catch (\Exception $e) {
-                $this->log_error('Date filtering error: ' . $e->getMessage(), [
-                    'event' => $event
-                ]);
-                // Include event if date parsing fails
-                $future_events[] = $event;
-            }
-        }
-        
-        return $future_events;
-    }
+    
     
     /**
      * Sanitize text field

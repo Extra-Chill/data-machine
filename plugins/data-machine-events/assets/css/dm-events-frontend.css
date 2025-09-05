@@ -1,7 +1,7 @@
 /**
- * Chill Events - Frontend Styles
+ * Data Machine Events - Frontend Styles
  *
- * @package ChillEvents
+ * @package DmEvents
  * @author Chris Huber (https://chubes.net)
  * @since 1.0.0
  */
@@ -10,7 +10,7 @@
    Event Calendar Layout (Phase 18-19)
    ========================================================================== */
 
-.chill-events-calendar {
+.dm-events-calendar {
     max-width: 1200px;
     margin: 0 auto;
 }
@@ -404,7 +404,7 @@
    Shortcodes & Blocks (Phase 20)
    ========================================================================== */
 
-.chill-events-shortcode {
+.dm-events-shortcode {
     margin: 20px 0;
 }
 
@@ -508,7 +508,7 @@
    Loading States
    ========================================================================== */
 
-.chill-events-loading {
+.dm-events-loading {
     text-align: center;
     padding: 40px 20px;
     color: #666;

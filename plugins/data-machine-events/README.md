@@ -1,4 +1,4 @@
-# Chill Events - WordPress Events Plugin
+# Data Machine Events - WordPress Events Plugin
 
 Frontend-focused WordPress events plugin with **block-first architecture**. Integrates with Data Machine plugin for automated event imports while providing elegant event display and management through Gutenberg blocks.
 
@@ -16,7 +16,7 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Inte
 - **SEO Ready:** Archive pages and structured data
 
 ### Development
-- **PSR-4 Autoloading:** `ChillEvents\` namespace
+- **PSR-4 Autoloading:** `DmEvents\` namespace
 - **Separate Build Systems:** Calendar (webpack), Event Details (@wordpress/scripts)
 - **REST API Support:** Event metadata exposed
 - **WordPress Standards:** Native hooks and security practices
@@ -25,55 +25,69 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Inte
 **Data Flow:** Data Machine → Event Details Block → Background Sync → Calendar Display
 
 **Core Classes:**
-- `ChillEvents\Admin` - Settings interface  
-- `ChillEvents\Events\Event_Data_Manager` - Performance sync
-- `ChillEvents\Events\Venues\Venue_Term_Meta` - Venue administration
-- `ChillEvents\Events\Event_Duplicate_Checker` - Prevents duplicate imports
+- `DmEvents\Admin` - Settings interface  
+- `DmEvents\Admin\Status_Detection` - Data Machine status detection
+- `DmEvents\Events\Event_Data_Manager` - Block-to-meta sync for performance
+- `DmEvents\Events\Venues\Venue_Term_Meta` - Venue administration with full CRUD
+- `DmEvents\Steps\Publish\Handlers\DmEvents\DmEventsPublisher` - AI-driven event creation
+- `DmEvents\Steps\Publish\Handlers\DmEvents\DmEventsSettings` - Publisher configuration
+- `DmEvents\Steps\EventImport\Handlers\Ticketmaster\TicketmasterAuth` - API key authentication
 
 ## Quick Start
 
 ### Installation
 ```bash
-git clone https://github.com/yourusername/chill-events.git
-cd chill-events
+# Clone repository (replace with actual repository URL)
+git clone https://github.com/chubes4/dm-events.git
+cd dm-events
 composer install
 ```
-Upload to `/wp-content/plugins/chill-events/` and activate.
+Upload to `/wp-content/plugins/dm-events/` and activate.
 
 ### Usage
-1. **Automated Import:** Configure Data Machine plugin for Ticketmaster, Dice FM, or web scraper imports
-2. **Manual Events:** Add Event post → Insert "Event Details" block → Fill event data  
-3. **Display Events:** Add "Chill Events Calendar" block to any page/post
-4. **Manage Venues:** Events → Venues → Add venue details
+1. **Automated Import:** Configure Data Machine plugin for Ticketmaster (API key), Dice FM, or web scraper imports
+2. **AI-Driven Publishing:** Data Machine AI creates events with descriptions, venues, and taxonomy assignments
+3. **Manual Events:** Add Event post → Insert "Event Details" block → Fill event data  
+4. **Display Events:** Add "Data Machine Events Calendar" block to any page/post
+5. **Manage Venues:** Events → Venues → Add venue details (auto-populated via AI imports)
 
 ## Project Structure
 
 ```
-chill-events/
+dm-events/
+├── dm-events.php            # Main plugin file with PSR-4 autoloader
 ├── inc/
-│   ├── admin/               # Settings interface
+│   ├── admin/               # Settings interface and status detection
 │   ├── blocks/
 │   │   ├── calendar/        # Calendar block (webpack)
 │   │   └── event-details/   # Event details block (@wordpress/scripts)
-│   ├── events/              # Event data management & duplicate checking
-│   │   └── venues/          # Venue taxonomy
+│   ├── events/              # Event data management
+│   │   └── venues/          # Venue taxonomy with comprehensive term meta
 │   └── steps/               # Data Machine integration
 │       ├── event-import/    # Import handlers (Ticketmaster, Dice FM, scrapers)
-│       └── publish/         # Event publishing handlers
-├── assets/                  # Frontend CSS (blocks handle own JS)
-└── chill-events.php        # Main file with autoloader
+│       └── publish/         # AI-driven event publishing handlers
+├── assets/
+│   ├── css/                 # Admin and frontend CSS
+│   └── js/                  # Admin JavaScript
+└── composer.json            # PHP dependencies
 ```
 
 ## Development
 
-**Requirements:** WordPress 6.0+, PHP 8.0+, Composer
+**Requirements:** WordPress 6.0+, PHP 8.0+, Composer, Node.js (for blocks)
 
 **Setup:**
 ```bash
 composer install
 # Build blocks
 cd inc/blocks/calendar && npm install && npm run build
-cd ../event-details && npm install && npm run build
+cd ../event-details && npm install && wp-scripts build
+```
+
+**Production Build:**
+```bash
+# Create optimized package with versioned .zip file in /dist directory
+# VSCode tasks.json file required for development workflow
 ```
 
 **Block Development:**
@@ -84,7 +98,7 @@ npm run start    # Development watch
 
 # Event Details (@wordpress/scripts)  
 cd inc/blocks/event-details
-npm run start    # Development watch
+wp-scripts start  # Development watch
 npm run lint:js && npm run lint:css
 ```
 
@@ -102,9 +116,28 @@ npm run lint:js && npm run lint:css
 
 **Performance Sync:**
 ```php
-// Meta fields for queries only
-update_post_meta($post_id, '_chill_event_start_date_utc', $utc_date);
+// Performance meta field for calendar queries
+update_post_meta($post_id, '_dm_event_start_date_utc', $utc_date);
+
+// REST API meta fields (synced automatically)
+update_post_meta($post_id, '_dm_event_venue_name', $venue_name);
+update_post_meta($post_id, '_dm_event_artist_name', $artist_name);
 ```
+
+## AI Integration
+
+**Event Creation Flow:**
+1. Data Machine imports event data from sources (Ticketmaster, Dice FM, scrapers)
+2. AI generates event descriptions and handles taxonomy assignments
+3. DmEventsPublisher creates WordPress posts with Event Details blocks
+4. Event_Data_Manager syncs block data to meta fields for performance
+
+**AI Publisher Features:**
+- **Automatic Venue Creation:** AI creates venue taxonomy terms with comprehensive meta (10 fields: address, phone, website, etc.)
+- **Smart Descriptions:** AI generates engaging event descriptions from import data
+- **Taxonomy Management:** Configurable AI vs pre-selected term assignments
+- **Status Detection:** Integrated Data Machine status monitoring
+- **Security:** Full WordPress security compliance (nonces, capabilities, sanitization)
 
 ## Technical Details
 
@@ -119,9 +152,17 @@ register_block_type($path, array(
 ));
 ```
 
+**AI Event Creation:**
+```php
+// DmEventsPublisher handles AI tool calls
+$post_id = $this->create_event_post($parameters);
+$this->handle_taxonomy_assignments($post_id, $parameters, $tool_def);
+Event_Data_Manager::sync_event_meta($post_id);
+```
+
 **REST API:**
 ```php
-register_rest_field('chill_events', 'event_meta', array(
+register_rest_field('dm_events', 'event_meta', array(
     'get_callback' => array($this, 'get_event_meta_for_rest')
 ));
 ```
