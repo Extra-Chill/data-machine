@@ -8,24 +8,23 @@ import {
     TextControl, 
     Notice
 } from '@wordpress/components';
-import { useSelect } from '@wordpress/data';
-import { useState, useEffect } from '@wordpress/element';
 
+/**
+ * Event Details Block Registration
+ *
+ * Block-first architecture for event data storage with InnerBlocks support.
+ * Serves as single source of truth for event information.
+ */
 registerBlockType('dm-events/event-details', {
+    /**
+     * Block edit component
+     *
+     * @param {Object} props Block edit properties
+     * @param {Object} props.attributes Block attributes
+     * @param {Function} props.setAttributes Attribute setter function
+     * @param {string} props.clientId Block client ID
+     */
     edit: function Edit({ attributes, setAttributes, clientId }) {
-        // Check if we're in the correct post type
-        const { postType } = useSelect(select => ({
-            postType: select('core/editor').getCurrentPostType()
-        }), []);
-        
-        // If not in dm_events post type, show a message
-        if (postType !== 'dm_events') {
-            return (
-                <div className="dm-event-details-block-error">
-                    <p>{__('Event Details blocks can only be used in Events posts.', 'dm-events')}</p>
-                </div>
-            );
-        }
         const {
             startDate,
             endDate,
@@ -33,28 +32,42 @@ registerBlockType('dm-events/event-details', {
             endTime,
             venue,
             address,
-            artist,
             price,
             ticketUrl,
             showVenue,
-            showArtist,
             showPrice,
-            showTicketLink
+            showTicketLink,
+            performer,
+            performerType,
+            organizer,
+            organizerType,
+            organizerUrl,
+            eventStatus,
+            previousStartDate,
+            priceCurrency,
+            offerAvailability
         } = attributes;
 
         const blockProps = useBlockProps({
             className: 'dm-event-details-block'
         });
 
-        // Block-first architecture - all data is stored in block attributes
-
-        // Block-first architecture - no need to load from meta, block attributes are the primary data store
-
-        // Block-first architecture - block attributes are the primary data store
+        /**
+         * Handle attribute changes
+         *
+         * @param {string} field Field name
+         * @param {string} value Field value
+         */
         const handleAttributeChange = (field, value) => {
             setAttributes({ [field]: value });
         };
 
+        /**
+         * Handle time field changes
+         *
+         * @param {string} field Field name
+         * @param {string} value Time value
+         */
         const handleTimeChange = (field, value) => {
             setAttributes({ [field]: value });
         };
@@ -130,11 +143,6 @@ registerBlockType('dm-events/event-details', {
                         <div className="event-details">
                             <h4>{__('Event Details', 'dm-events')}</h4>
                             <TextControl
-                                label={__('Artist/Performer', 'dm-events')}
-                                value={artist}
-                                onChange={(value) => handleAttributeChange('artist', value)}
-                            />
-                            <TextControl
                                 label={__('Price', 'dm-events')}
                                 value={price}
                                 onChange={(value) => handleAttributeChange('price', value)}
@@ -147,7 +155,28 @@ registerBlockType('dm-events/event-details', {
                             />
                         </div>
 
-
+                        <div className="event-schema">
+                            <h4>{__('Schema Information', 'dm-events')}</h4>
+                            <TextControl
+                                label={__('Performer/Artist', 'dm-events')}
+                                value={performer}
+                                onChange={(value) => setAttributes({ performer: value })}
+                                help={__('Name of the performing artist or group', 'dm-events')}
+                            />
+                            <TextControl
+                                label={__('Organizer', 'dm-events')}
+                                value={organizer}
+                                onChange={(value) => setAttributes({ organizer: value })}
+                                help={__('Name of the event organizer', 'dm-events')}
+                            />
+                            <TextControl
+                                label={__('Organizer URL', 'dm-events')}
+                                value={organizerUrl}
+                                onChange={(value) => setAttributes({ organizerUrl: value })}
+                                type="url"
+                                help={__('Website of the event organizer', 'dm-events')}
+                            />
+                        </div>
 
                         <Notice status="info" isDismissible={false}>
                             {__('This block is the primary data store for event information. Changes here are automatically saved to the event.', 'dm-events')}
@@ -157,8 +186,14 @@ registerBlockType('dm-events/event-details', {
         );
     },
 
+    /**
+     * Block save component
+     */
     save: function Save() {
-        // For blocks with InnerBlocks, we need to save the InnerBlocks content
-        return <InnerBlocks.Content />;
+        return (
+            <div className="wp-block-dm-events-event-details">
+                <InnerBlocks.Content />
+            </div>
+        );
     }
 }); 

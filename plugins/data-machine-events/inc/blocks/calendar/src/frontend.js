@@ -1,7 +1,7 @@
 /**
  * Data Machine Events Calendar Frontend JavaScript
- * 
- * Handles search, filtering, and view toggling functionality
+ *
+ * Client-side interactivity for calendar blocks with search, filtering, and view toggling.
  */
 
 import flatpickr from 'flatpickr';
@@ -10,11 +10,13 @@ import 'flatpickr/dist/flatpickr.css';
 (function() {
     'use strict';
 
-    // Initialize when DOM is ready
     document.addEventListener('DOMContentLoaded', function() {
         initializeCalendarFilters();
     });
 
+    /**
+     * Initialize all calendar instances with filtering capabilities
+     */
     function initializeCalendarFilters() {
         const calendars = document.querySelectorAll('.dm-events-calendar');
         
@@ -22,15 +24,14 @@ import 'flatpickr/dist/flatpickr.css';
             const searchInput = calendar.querySelector('#dm-events-search');
             const dateRangeInput = calendar.querySelector('#dm-events-date-range');
             const viewButtons = calendar.querySelectorAll('.dm-events-view-btn');
+            const timeButtons = calendar.querySelectorAll('.dm-events-time-btn');
             const eventsList = calendar.querySelector('#dm-events-list');
             
-            // Initialize search functionality
             if (searchInput) {
                 searchInput.addEventListener('input', function() {
                     filterEvents(calendar, this.value);
                 });
                 
-                // Clear search button
                 const searchBtn = calendar.querySelector('.dm-events-search-btn');
                 if (searchBtn) {
                     searchBtn.addEventListener('click', function() {
@@ -41,9 +42,7 @@ import 'flatpickr/dist/flatpickr.css';
                 }
             }
             
-            // Initialize date range picker with flatpickr
             if (dateRangeInput) {
-                console.log('Initializing flatpickr for date range picker');
                 const clearBtn = calendar.querySelector('.dm-events-date-clear-btn');
                 
                 const datePicker = flatpickr(dateRangeInput, {
@@ -53,10 +52,8 @@ import 'flatpickr/dist/flatpickr.css';
                     allowInput: false,
                     clickOpens: true,
                     onChange: function(selectedDates, dateStr, instance) {
-                        console.log('Date range changed:', selectedDates, dateStr);
                         filterEventsByDateRange(calendar, selectedDates);
                         
-                        // Show/hide clear button based on selection
                         if (selectedDates && selectedDates.length > 0) {
                             clearBtn.classList.add('visible');
                         } else {
@@ -64,43 +61,52 @@ import 'flatpickr/dist/flatpickr.css';
                         }
                     },
                     onClear: function() {
-                        console.log('Date range cleared');
                         filterEventsByDateRange(calendar, []);
                         clearBtn.classList.remove('visible');
                     }
                 });
                 
-                // Initialize clear button functionality
                 if (clearBtn) {
                     clearBtn.addEventListener('click', function() {
                         datePicker.clear();
-                        console.log('Clear button clicked');
                     });
                 }
                 
-                console.log('Flatpickr initialized:', datePicker);
-            } else {
-                console.log('Date range input not found');
             }
             
-            // Initialize view toggle
             viewButtons.forEach(function(button) {
                 button.addEventListener('click', function() {
                     const view = this.getAttribute('data-view');
                     toggleView(calendar, view);
                 });
             });
+            
+            timeButtons.forEach(function(button) {
+                button.addEventListener('click', function() {
+                    const timeFilter = this.getAttribute('data-time');
+                    navigateToTimeView(timeFilter);
+                });
+            });
         });
     }
 
+    /**
+     * Filter events based on search term
+     *
+     * @param {Element} calendar Calendar container
+     * @param {string} searchTerm Search input
+     */
     function filterEvents(calendar, searchTerm) {
         const events = calendar.querySelectorAll('.dm-event-item');
         const searchLower = searchTerm.toLowerCase();
         
         events.forEach(function(event) {
-            const title = event.getAttribute('data-title') || '';
-            const venue = event.getAttribute('data-venue') || '';
-            const artist = event.getAttribute('data-artist') || '';
+            const title = event.getAttribute('data-title') || 
+                         event.querySelector('.dm-event-title')?.textContent || '';
+            const venue = event.getAttribute('data-venue') || 
+                         event.querySelector('.dm-event-venue')?.textContent || '';
+            const artist = event.getAttribute('data-artist') || 
+                          event.querySelector('.dm-event-artist')?.textContent || '';
             
             const matchesSearch = !searchTerm || 
                 title.toLowerCase().includes(searchLower) ||
@@ -117,30 +123,38 @@ import 'flatpickr/dist/flatpickr.css';
         updateNoEventsMessage(calendar);
     }
 
+    /**
+     * Filter events by date range
+     * 
+     * @param {Element} calendar Calendar container
+     * @param {Array} selectedDates Date objects from Flatpickr
+     */
     function filterEventsByDateRange(calendar, selectedDates) {
         const events = calendar.querySelectorAll('.dm-event-item');
         
         if (!selectedDates || selectedDates.length === 0) {
-            // No date filter - show all events
             events.forEach(event => event.classList.remove('hidden'));
             updateNoEventsMessage(calendar);
             return;
         }
         
         const startDate = selectedDates[0];
-        const endDate = selectedDates[1] || selectedDates[0]; // If only one date selected, use it as both start and end
+        const endDate = selectedDates[1] || selectedDates[0];
         
         events.forEach(function(event) {
             const eventDate = event.getAttribute('data-date');
             if (!eventDate) {
+                const dateElement = event.querySelector('.dm-event-date');
+                if (!dateElement) {
+                    event.classList.remove('hidden');
+                    return;
+                }
                 event.classList.remove('hidden');
                 return;
             }
             
             const eventDateTime = new Date(eventDate);
             const eventDateOnly = new Date(eventDateTime.getFullYear(), eventDateTime.getMonth(), eventDateTime.getDate());
-            
-            // Check if event date falls within the selected range (inclusive)
             const showEvent = eventDateOnly >= startDate && eventDateOnly <= endDate;
             
             if (showEvent) {
@@ -153,14 +167,18 @@ import 'flatpickr/dist/flatpickr.css';
         updateNoEventsMessage(calendar);
     }
 
+    /**
+     * Toggle calendar display between list and grid views
+     * 
+     * @param {Element} calendar Calendar container
+     * @param {string} view View mode ('list' or 'grid')
+     */
     function toggleView(calendar, view) {
         const eventsList = calendar.querySelector('#dm-events-list');
         const viewButtons = calendar.querySelectorAll('.dm-events-view-btn');
         
-        // Update calendar class
         calendar.className = calendar.className.replace(/dm-events-view-\w+/, 'dm-events-view-' + view);
         
-        // Update button states
         viewButtons.forEach(function(button) {
             button.classList.remove('active');
             if (button.getAttribute('data-view') === view) {
@@ -168,7 +186,6 @@ import 'flatpickr/dist/flatpickr.css';
             }
         });
         
-        // Store view preference in localStorage
         try {
             localStorage.setItem('dm-events-view', view);
         } catch (e) {
@@ -176,6 +193,11 @@ import 'flatpickr/dist/flatpickr.css';
         }
     }
 
+    /**
+     * Show or hide "no events found" message
+     * 
+     * @param {Element} calendar Calendar container
+     */
     function updateNoEventsMessage(calendar) {
         const events = calendar.querySelectorAll('.dm-event-item:not(.hidden)');
         const noEventsMessage = calendar.querySelector('.dm-events-no-events');
@@ -194,7 +216,9 @@ import 'flatpickr/dist/flatpickr.css';
         }
     }
 
-    // Restore view preference from localStorage
+    /**
+     * Restore user's preferred view mode from localStorage
+     */
     function restoreViewPreference() {
         try {
             const savedView = localStorage.getItem('dm-events-view');
@@ -212,7 +236,23 @@ import 'flatpickr/dist/flatpickr.css';
         }
     }
 
-    // Call restore function after initialization
+    /**
+     * Navigate to different time view
+     * 
+     * @param {string} timeFilter Time filter mode ('future', 'past', 'all')
+     */
+    function navigateToTimeView(timeFilter) {
+        const url = new URL(window.location);
+        if (timeFilter === 'future' && url.searchParams.get('time_filter') !== 'future') {
+            url.searchParams.delete('time_filter');
+        } else if (timeFilter !== 'future') {
+            url.searchParams.set('time_filter', timeFilter);
+        }
+        
+        url.searchParams.delete('paged');
+        window.location.href = url.toString();
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         setTimeout(restoreViewPreference, 100);
     });

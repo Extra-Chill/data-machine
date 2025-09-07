@@ -24,34 +24,47 @@ if (!defined('ABSPATH')) {
 class DiceFm {
     
     /**
-     * Get event data from Dice.fm API
+     * Execute Dice FM event import with unified parameter array
      * 
-     * @param int $pipeline_id Pipeline ID
-     * @param array $handler_config Handler configuration
-     * @param string|null $job_id Job ID for tracking
-     * @return array Standardized data packet with processed_items
+     * Implements Data Machine flat parameter architecture for native compatibility.
+     * Fetches events, processes deduplication tracking, and returns data packet array.
+     * 
+     * @param array $parameters Unified flat parameter array from Data Machine engine
+     *   - job_id: Data Machine job ID for tracking
+     *   - flow_step_id: Flow step ID for processed items tracking  
+     *   - data: Data packet array (cumulative pipeline data)
+     *   - flow_step_config: Step configuration including handler settings
+     * @return array Updated data packet array with event entry added
      */
-    public function get_fetch_data(int $pipeline_id, array $handler_config, ?string $job_id = null): array {
+    public function execute(array $parameters): array {
+        // Extract from unified flat parameter structure
+        $job_id = $parameters['job_id'];
+        $flow_step_id = $parameters['flow_step_id'];
+        $data = $parameters['data'] ?? [];
+        $flow_step_config = $parameters['flow_step_config'] ?? [];
+        
+        // Extract handler configuration
+        $handler_config = $flow_step_config['handler']['settings'] ?? [];
+        $pipeline_id = $flow_step_config['pipeline_id'] ?? null;
+        
         $this->log_info('Dice.fm Handler: Starting event import', [
             'pipeline_id' => $pipeline_id,
-            'job_id' => $job_id
+            'job_id' => $job_id,
+            'flow_step_id' => $flow_step_id
         ]);
-        
-        // Extract flow_step_id from handler config for processed items tracking
-        $flow_step_id = $handler_config['flow_step_id'] ?? null;
         
         // Get API configuration from Data Machine auth system
         $api_config = apply_filters('dm_retrieve_oauth_keys', [], 'dice_fm_events');
         if (empty($api_config['api_key'])) {
             $this->log_error('Dice.fm API key not configured');
-            return ['processed_items' => []];
+            return $data; // Return unchanged data packet array
         }
         
         // Get required city parameter
         $city = isset($handler_config['city']) ? trim($handler_config['city']) : '';
         if (empty($city)) {
             $this->log_error('No city specified for Dice.fm search', $handler_config);
-            return ['processed_items' => []];
+            return $data; // Return unchanged data packet array
         }
         
         // Build configuration
@@ -64,7 +77,7 @@ class DiceFm {
         $raw_events = $this->fetch_dice_fm_events($api_config['api_key'], $city, $page_size, $event_types, $partner_id);
         if (empty($raw_events)) {
             $this->log_info('No events found from Dice.fm API');
-            return ['processed_items' => []];
+            return $data; // Return unchanged data packet array
         }
         
         // Process events one at a time (Data Machine single-item model)
@@ -110,7 +123,7 @@ class DiceFm {
                 continue;
             }
             
-            // Found eligible event - mark as processed and return immediately
+            // Found eligible event - mark as processed and add to data packet array
             if ($flow_step_id && $job_id) {
                 do_action('dm_mark_item_processed', $flow_step_id, 'dice_fm', $event_identifier, $job_id);
             }
@@ -122,22 +135,48 @@ class DiceFm {
                 'pipeline_id' => $pipeline_id
             ]);
             
-            // Return first eligible event immediately (Data Machine pattern)
-            return [
-                'processed_items' => [[
-                    'data' => $standardized_event,
-                    'metadata' => [
-                        'source_type' => 'dice_fm',
-                        'original_title' => $standardized_event['title'] ?? '',
-                        'event_identifier' => $event_identifier,
-                        'import_timestamp' => time()
-                    ]
-                ]],
+            // Extract limited venue metadata for nested structure (Dice FM has less data than Ticketmaster)
+            $venue_metadata = [
+                'venueAddress' => $standardized_event['address'] ?? '',
+                'venueCity' => '',      // Not available in Dice FM API
+                'venueState' => '',     // Not available in Dice FM API
+                'venueZip' => '',       // Not available in Dice FM API
+                'venueCountry' => '',   // Not available in Dice FM API
+                'venuePhone' => '',     // Not available in Dice FM API
+                'venueWebsite' => '',   // Not available in Dice FM API
+                'venueCoordinates' => '' // Not available in Dice FM API
+            ];
+            
+            // Remove venue metadata from event data (move to separate structure)
+            unset($standardized_event['address']);
+            
+            // Create data packet entry following Data Machine standard
+            $event_entry = [
+                'type' => 'event_import',
+                'handler' => 'dice_fm',
+                'content' => [
+                    'title' => $standardized_event['title'],
+                    'body' => wp_json_encode([
+                        'event' => $standardized_event,
+                        'venue_metadata' => $venue_metadata,
+                        'import_source' => 'dice_fm'
+                    ], JSON_PRETTY_PRINT)
+                ],
                 'metadata' => [
                     'source_type' => 'dice_fm',
+                    'pipeline_id' => $pipeline_id,
+                    'flow_id' => $flow_step_config['flow_id'] ?? null,
+                    'original_title' => $standardized_event['title'] ?? '',
+                    'event_identifier' => $event_identifier,
                     'import_timestamp' => time()
-                ]
+                ],
+                'attachments' => [],
+                'timestamp' => time()
             ];
+            
+            // Add to front of data packet array (newest first)
+            array_unshift($data, $event_entry);
+            return $data;
         }
         
         // No eligible events found
@@ -147,7 +186,7 @@ class DiceFm {
             'pipeline_id' => $pipeline_id
         ]);
         
-        return ['processed_items' => []];
+        return $data; // Return unchanged data packet array
     }
     
     /**

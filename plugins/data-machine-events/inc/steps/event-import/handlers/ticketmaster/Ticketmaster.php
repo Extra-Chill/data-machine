@@ -2,11 +2,10 @@
 /**
  * Ticketmaster Event Import Handler
  * 
- * Imports events from Ticketmaster Discovery API.
- * Handles API authentication and response mapping.
+ * Integrates with Ticketmaster Discovery API v2 to import event data using
+ * Data Machine's single-item processing model.
  *
  * @package DmEvents\Steps\EventImport\Handlers\Ticketmaster
- * @since 1.0.0
  */
 
 namespace DmEvents\Steps\EventImport\Handlers\Ticketmaster;
@@ -18,9 +17,10 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Ticketmaster class
+ * Ticketmaster Discovery API event import handler
  * 
- * Event import handler for Ticketmaster Discovery API.
+ * Implements Data Machine handler interface for importing events from 
+ * Ticketmaster's Discovery API v2 with single-item processing model.
  */
 class Ticketmaster {
     
@@ -35,31 +35,45 @@ class Ticketmaster {
     const DEFAULT_PARAMS = [
         'size' => 50,
         'sort' => 'date,asc',
-        'classificationName' => 'Music'
+        'page' => 0
     ];
     
     /**
-     * Get event data from Ticketmaster API
+     * Execute Ticketmaster event import with unified parameter array
      * 
-     * @param int $pipeline_id Pipeline ID
-     * @param array $handler_config Handler configuration
-     * @param string|null $job_id Job ID for tracking
-     * @return array Standardized data packet with processed_items
+     * Implements Data Machine flat parameter architecture for native compatibility.
+     * Fetches events, processes deduplication tracking, and returns data packet array.
+     * 
+     * @param array $parameters Unified flat parameter array from Data Machine engine
+     *   - job_id: Data Machine job ID for tracking
+     *   - flow_step_id: Flow step ID for processed items tracking  
+     *   - data: Data packet array (cumulative pipeline data)
+     *   - flow_step_config: Step configuration including handler settings
+     * @return array Updated data packet array with event entry added
+     * @since 1.0.0
      */
-    public function get_fetch_data(int $pipeline_id, array $handler_config, ?string $job_id = null): array {
+    public function execute(array $parameters): array {
+        // Extract from unified flat parameter structure
+        $job_id = $parameters['job_id'];
+        $flow_step_id = $parameters['flow_step_id'];
+        $data = $parameters['data'] ?? [];
+        $flow_step_config = $parameters['flow_step_config'] ?? [];
+        
+        // Extract handler configuration
+        $handler_config = $flow_step_config['handler']['settings'] ?? [];
+        $pipeline_id = $flow_step_config['pipeline_id'] ?? null;
+        
         $this->log_info('Ticketmaster Handler: Starting event import', [
             'pipeline_id' => $pipeline_id,
-            'job_id' => $job_id
+            'job_id' => $job_id,
+            'flow_step_id' => $flow_step_id
         ]);
-        
-        // Extract flow_step_id from handler config for processed items tracking
-        $flow_step_id = $handler_config['flow_step_id'] ?? null;
         
         // Get API configuration from Data Machine auth system
         $api_config = apply_filters('dm_retrieve_oauth_keys', [], 'ticketmaster_events');
         if (empty($api_config['api_key'])) {
             $this->log_error('Ticketmaster API key not configured');
-            return ['processed_items' => []];
+            return $data; // Return unchanged data packet array
         }
         
         // Build search parameters
@@ -69,7 +83,7 @@ class Ticketmaster {
         $raw_events = $this->fetch_events($search_params);
         if (empty($raw_events)) {
             $this->log_info('No events found from Ticketmaster API');
-            return ['processed_items' => []];
+            return $data; // Return unchanged data packet array
         }
         
         // Process events one at a time (Data Machine single-item model)
@@ -100,16 +114,9 @@ class Ticketmaster {
                 continue;
             }
             
-            // Apply individual event filters
-            if (!$this->is_future_event($standardized_event)) {
-                $this->log_debug('Skipping past event', [
-                    'title' => $standardized_event['title'],
-                    'date' => $standardized_event['startDate']
-                ]);
-                continue;
-            }
+            // API handles future events filtering via startDateTime parameter
             
-            // Found eligible event - mark as processed and return immediately
+            // Found eligible event - mark as processed and add to data packet array
             if ($flow_step_id && $job_id) {
                 do_action('dm_mark_item_processed', $flow_step_id, 'ticketmaster', $event_identifier, $job_id);
             }
@@ -121,22 +128,51 @@ class Ticketmaster {
                 'pipeline_id' => $pipeline_id
             ]);
             
-            // Return first eligible event immediately (Data Machine pattern)
-            return [
-                'processed_items' => [[
-                    'data' => $standardized_event,
-                    'metadata' => [
-                        'source_type' => 'ticketmaster',
-                        'original_title' => $standardized_event['title'] ?? '',
-                        'event_identifier' => $event_identifier,
-                        'import_timestamp' => time()
-                    ]
-                ]],
+            // Extract venue metadata separately for nested structure
+            $venue_metadata = [
+                'venueAddress' => $standardized_event['venueAddress'],
+                'venueCity' => $standardized_event['venueCity'],
+                'venueState' => $standardized_event['venueState'],
+                'venueZip' => $standardized_event['venueZip'],
+                'venueCountry' => $standardized_event['venueCountry'],
+                'venuePhone' => $standardized_event['venuePhone'],
+                'venueWebsite' => $standardized_event['venueWebsite'],
+                'venueCoordinates' => $standardized_event['venueCoordinates']
+            ];
+            
+            // Remove venue metadata from event data (move to separate structure)
+            unset($standardized_event['venueAddress'], $standardized_event['venueCity'], 
+                  $standardized_event['venueState'], $standardized_event['venueZip'],
+                  $standardized_event['venueCountry'], $standardized_event['venuePhone'],
+                  $standardized_event['venueWebsite'], $standardized_event['venueCoordinates']);
+            
+            // Create data packet entry following Data Machine standard
+            $event_entry = [
+                'type' => 'event_import',
+                'handler' => 'ticketmaster',
+                'content' => [
+                    'title' => $standardized_event['title'],
+                    'body' => wp_json_encode([
+                        'event' => $standardized_event,
+                        'venue_metadata' => $venue_metadata,
+                        'import_source' => 'ticketmaster'
+                    ], JSON_PRETTY_PRINT)
+                ],
                 'metadata' => [
                     'source_type' => 'ticketmaster',
+                    'pipeline_id' => $pipeline_id,
+                    'flow_id' => $flow_step_config['flow_id'] ?? null,
+                    'original_title' => $standardized_event['title'] ?? '',
+                    'event_identifier' => $event_identifier,
                     'import_timestamp' => time()
-                ]
+                ],
+                'attachments' => [],
+                'timestamp' => time()
             ];
+            
+            // Add to front of data packet array (newest first)
+            array_unshift($data, $event_entry);
+            return $data;
         }
         
         // No eligible events found
@@ -145,7 +181,7 @@ class Ticketmaster {
             'pipeline_id' => $pipeline_id
         ]);
         
-        return ['processed_items' => []];
+        return $data; // Return unchanged data packet array
     }
     
     /**
@@ -160,33 +196,43 @@ class Ticketmaster {
             'apikey' => $api_key
         ]);
         
-        // Parse location field (e.g., "Charleston, SC")
-        if (!empty($handler_config['location'])) {
-            $location_parts = explode(',', $handler_config['location']);
+        // Add event type classification filter (skip if 'all' selected)
+        if (!empty($handler_config['classification_type']) && $handler_config['classification_type'] !== 'all') {
+            // Get classifications to map slug to actual name
+            $classifications = self::get_classifications($api_key);
+            $classification_slug = $handler_config['classification_type'];
             
-            if (count($location_parts) >= 1) {
-                $city = trim($location_parts[0]);
-                if (!empty($city)) {
-                    $params['city'] = $city;
-                }
-            }
-            
-            if (count($location_parts) >= 2) {
-                $state = trim($location_parts[1]);
-                if (!empty($state)) {
-                    $params['stateCode'] = strtoupper($state);
-                }
+            if (isset($classifications[$classification_slug])) {
+                $params['classificationName'] = $classifications[$classification_slug];
+                
+                do_action('dm_log', 'debug', 'Ticketmaster: Added classification filter', [
+                    'slug' => $classification_slug,
+                    'classification_name' => $classifications[$classification_slug]
+                ]);
             }
         }
         
-        // Default to US for country code
-        $params['countryCode'] = 'US';
+        // Set location coordinates (default to Charleston, SC if not specified)
+        $location = $handler_config['location'] ?? '32.7765,-79.9311'; // Charleston, SC
+        $coordinates = $this->get_coordinates($location);
+        if ($coordinates) {
+            $params['geoPoint'] = $coordinates['lat'] . ',' . $coordinates['lng'];
+            
+            // Set radius (default 50 miles if not specified)
+            $radius = !empty($handler_config['radius']) ? $handler_config['radius'] : '50';
+            $params['radius'] = $radius;
+            $params['unit'] = 'miles';
+        }
         
-        // Add date range
+        // Add date range (future events only)
         $start_date = !empty($handler_config['start_date']) 
             ? $handler_config['start_date'] 
-            : date('Y-m-d\TH:i:s\Z');
+            : date('Y-m-d\TH:i:s\Z', strtotime('+1 hour')); // Start 1 hour from now to avoid edge cases
         $params['startDateTime'] = $start_date;
+        
+        // Add pagination support
+        $page = !empty($handler_config['page']) ? intval($handler_config['page']) : 0;
+        $params['page'] = $page;
         
         // Add genre/classification filters
         if (!empty($handler_config['genre'])) {
@@ -199,6 +245,147 @@ class Ticketmaster {
         }
         
         return $params;
+    }
+    
+    /**
+     * Get classifications from Ticketmaster API with caching
+     * 
+     * Fetches event type classifications from Ticketmaster Discovery API
+     * with 24-hour caching for performance. Returns structured array
+     * suitable for dropdown population.
+     * 
+     * @param string $api_key Ticketmaster API key
+     * @return array Classifications array with slug => name mapping
+     */
+    public static function get_classifications($api_key = '') {
+        // Check cache first
+        $cache_key = 'dm_events_ticketmaster_classifications';
+        $cached_classifications = get_transient($cache_key);
+        
+        if ($cached_classifications !== false) {
+            do_action('dm_log', 'debug', 'Ticketmaster: Using cached classifications', [
+                'classification_count' => count($cached_classifications)
+            ]);
+            return $cached_classifications;
+        }
+        
+        // Get API key if not provided
+        if (empty($api_key)) {
+            $api_config = apply_filters('dm_retrieve_oauth_keys', [], 'ticketmaster_events');
+            $api_key = $api_config['api_key'] ?? '';
+        }
+        
+        // Fallback if no API key
+        if (empty($api_key)) {
+            do_action('dm_log', 'warning', 'Ticketmaster: No API key available for classifications');
+            return self::get_fallback_classifications();
+        }
+        
+        // Fetch classifications from API
+        $api_url = 'https://app.ticketmaster.com/discovery/v2/classifications.json';
+        $response = wp_remote_get($api_url . '?apikey=' . urlencode($api_key), [
+            'timeout' => 10,
+            'headers' => [
+                'Accept' => 'application/json'
+            ]
+        ]);
+        
+        // Handle API errors
+        if (is_wp_error($response)) {
+            do_action('dm_log', 'warning', 'Ticketmaster: Classifications API error', [
+                'error' => $response->get_error_message()
+            ]);
+            return self::get_fallback_classifications();
+        }
+        
+        $status_code = wp_remote_retrieve_response_code($response);
+        if ($status_code !== 200) {
+            do_action('dm_log', 'warning', 'Ticketmaster: Classifications API returned non-200', [
+                'status_code' => $status_code
+            ]);
+            return self::get_fallback_classifications();
+        }
+        
+        // Parse API response
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+        
+        if (!$data || !isset($data['_embedded']['classifications'])) {
+            do_action('dm_log', 'warning', 'Ticketmaster: Invalid classifications API response');
+            return self::get_fallback_classifications();
+        }
+        
+        // Extract segments from classifications
+        $classifications = self::parse_classifications_response($data);
+        
+        // Cache for 24 hours
+        set_transient($cache_key, $classifications, 24 * HOUR_IN_SECONDS);
+        
+        do_action('dm_log', 'debug', 'Ticketmaster: Classifications fetched and cached', [
+            'classification_count' => count($classifications)
+        ]);
+        
+        return $classifications;
+    }
+    
+    /**
+     * Parse classifications API response
+     * 
+     * @param array $api_data Raw API response data
+     * @return array Parsed classifications array
+     */
+    private static function parse_classifications_response($api_data) {
+        $classifications = ['all' => __('All Event Types', 'dm-events')];
+        $seen_segments = [];
+        
+        foreach ($api_data['_embedded']['classifications'] as $classification) {
+            if (isset($classification['segment'])) {
+                $segment = $classification['segment'];
+                $segment_name = $segment['name'] ?? '';
+                $segment_id = $segment['id'] ?? '';
+                
+                if (!empty($segment_name) && !isset($seen_segments[$segment_name])) {
+                    // Convert segment name to slug (lowercase, replace spaces/special chars)
+                    $slug = sanitize_key(strtolower($segment_name));
+                    $slug = str_replace('_', '-', $slug); // Use hyphens instead of underscores
+                    
+                    $classifications[$slug] = $segment_name;
+                    $seen_segments[$segment_name] = true;
+                }
+            }
+        }
+        
+        return $classifications;
+    }
+    
+    /**
+     * Get fallback classifications if API unavailable
+     * 
+     * @return array Basic classification options
+     */
+    private static function get_fallback_classifications() {
+        return [
+            'all' => __('All Event Types', 'dm-events'),
+            'music' => __('Music', 'dm-events'),
+            'sports' => __('Sports', 'dm-events'),
+            'arts-theatre' => __('Arts & Theatre', 'dm-events'),
+            'film' => __('Film', 'dm-events'),
+            'family' => __('Family', 'dm-events')
+        ];
+    }
+    
+    /**
+     * Get classifications formatted for settings dropdown
+     * 
+     * @param array $current_config Current configuration (for API key)
+     * @return array Classifications for dropdown
+     */
+    public static function get_classifications_for_dropdown($current_config = []) {
+        // Get API key from auth system
+        $api_config = apply_filters('dm_retrieve_oauth_keys', [], 'ticketmaster_events');
+        $api_key = $api_config['api_key'] ?? '';
+        
+        return self::get_classifications($api_key);
     }
     
     /**
@@ -244,10 +431,14 @@ class Ticketmaster {
     }
     
     /**
-     * Map Ticketmaster event to Event Details schema
+     * Map Ticketmaster event to Event Details schema with comprehensive venue data
      * 
-     * @param array $tm_event Ticketmaster event data
-     * @return array Standardized event data
+     * Extracts complete venue information from Ticketmaster API response and maps it to
+     * standardized event schema. Venue data is passed through to DmEventsPublisher for
+     * automatic venue taxonomy creation and meta population.
+     * 
+     * @param array $tm_event Ticketmaster event data from Discovery API
+     * @return array Standardized event data with detailed venue information
      */
     private function map_ticketmaster_event(array $tm_event): array {
         // Extract basic info
@@ -262,28 +453,80 @@ class Ticketmaster {
             $start_time = $tm_event['dates']['start']['localTime'] ?? '';
         }
         
-        // Extract venue info
+        // Extract comprehensive venue data for DmEventsPublisher integration
+        // These fields are automatically injected as AI parameters via inject_venue_parameters
         $venue_name = '';
-        $address = '';
+        $venue_address = '';
+        $venue_city = '';
+        $venue_state = '';
+        $venue_zip = '';
+        $venue_country = '';
+        $venue_phone = '';
+        $venue_website = '';
+        $venue_coordinates = '';
+        
         if (!empty($tm_event['_embedded']['venues'][0])) {
             $venue = $tm_event['_embedded']['venues'][0];
             $venue_name = $venue['name'] ?? '';
             
+            // Extract detailed address components for venue taxonomy meta
             if (!empty($venue['address'])) {
                 $address_parts = [];
                 if (!empty($venue['address']['line1'])) {
                     $address_parts[] = $venue['address']['line1'];
+                    $venue_address = $venue['address']['line1']; // Store street address separately
                 }
                 if (!empty($venue['address']['line2'])) {
                     $address_parts[] = $venue['address']['line2'];
+                    if (empty($venue_address)) {
+                        $venue_address = $venue['address']['line2'];
+                    } else {
+                        $venue_address .= ', ' . $venue['address']['line2'];
+                    }
                 }
-                if (!empty($venue['city']['name'])) {
-                    $address_parts[] = $venue['city']['name'];
+                if (!empty($venue['address']['line3'])) {
+                    $address_parts[] = $venue['address']['line3'];
+                    if (empty($venue_address)) {
+                        $venue_address = $venue['address']['line3'];
+                    } else {
+                        $venue_address .= ', ' . $venue['address']['line3'];
+                    }
                 }
-                if (!empty($venue['state']['stateCode'])) {
-                    $address_parts[] = $venue['state']['stateCode'];
-                }
-                $address = implode(', ', $address_parts);
+            }
+            
+            // Extract city
+            if (!empty($venue['city']['name'])) {
+                $venue_city = $venue['city']['name'];
+            }
+            
+            // Extract state
+            if (!empty($venue['state']['stateCode'])) {
+                $venue_state = $venue['state']['stateCode'];
+            }
+            
+            // Extract postal code
+            if (!empty($venue['postalCode'])) {
+                $venue_zip = $venue['postalCode'];
+            }
+            
+            // Extract country
+            if (!empty($venue['country']['countryCode'])) {
+                $venue_country = $venue['country']['countryCode'];
+            }
+            
+            // Extract phone number from box office info
+            if (!empty($venue['boxOfficeInfo']['phoneNumberDetail'])) {
+                $venue_phone = $venue['boxOfficeInfo']['phoneNumberDetail'];
+            }
+            
+            // Extract website URL
+            if (!empty($venue['url'])) {
+                $venue_website = $venue['url'];
+            }
+            
+            // Extract coordinates
+            if (!empty($venue['location']['latitude']) && !empty($venue['location']['longitude'])) {
+                $venue_coordinates = $venue['location']['latitude'] . ',' . $venue['location']['longitude'];
             }
         }
         
@@ -318,37 +561,77 @@ class Ticketmaster {
             'startTime' => $start_time,
             'endTime' => '',
             'venue' => $this->sanitize_text($venue_name),
-            'address' => $this->sanitize_text($address),
             'artist' => $this->sanitize_text($artist),
             'price' => $this->sanitize_text($price),
             'ticketUrl' => $this->sanitize_url($ticket_url),
             'description' => $this->clean_html($description),
+            // Venue meta fields - injected as AI parameters for venue taxonomy creation
+            'venueAddress' => $this->sanitize_text($venue_address),
+            'venueCity' => $this->sanitize_text($venue_city),
+            'venueState' => $this->sanitize_text($venue_state),
+            'venueZip' => $this->sanitize_text($venue_zip),
+            'venueCountry' => $this->sanitize_text($venue_country),
+            'venuePhone' => $this->sanitize_text($venue_phone),
+            'venueWebsite' => $this->sanitize_url($venue_website),
+            'venueCoordinates' => $this->sanitize_text($venue_coordinates),
         ];
     }
     
     /**
-     * Check if event is in the future
+     * Parse coordinates from location string
      * 
-     * @param array $event Event data
-     * @return bool True if event is in future
+     * @param string $location Location string in "lat,lng" format
+     * @return array|false Coordinates array or false if invalid
      */
-    private function is_future_event(array $event): bool {
-        try {
-            if (empty($event['startDate'])) {
-                return false;
-            }
-            
-            $event_date = new \DateTime($event['startDate'] . ' ' . ($event['startTime'] ?? '23:59'));
-            $now = new \DateTime();
-            
-            return $event_date > $now;
-        } catch (\Exception $e) {
-            $this->log_error('Date validation error: ' . $e->getMessage(), [
-                'event' => $event
+    private function get_coordinates(string $location) {
+        // Clean and validate coordinate format
+        $location = trim($location);
+        $coords = explode(',', $location);
+        
+        if (count($coords) !== 2) {
+            $this->log_error('Invalid coordinate format', [
+                'location' => $location,
+                'expected_format' => 'latitude,longitude'
             ]);
-            // Include event if date parsing fails
-            return true;
+            return false;
         }
+        
+        $lat = trim($coords[0]);
+        $lng = trim($coords[1]);
+        
+        // Validate latitude and longitude are numeric
+        if (!is_numeric($lat) || !is_numeric($lng)) {
+            $this->log_error('Non-numeric coordinates', [
+                'latitude' => $lat,
+                'longitude' => $lng
+            ]);
+            return false;
+        }
+        
+        // Validate coordinate ranges
+        $lat = floatval($lat);
+        $lng = floatval($lng);
+        
+        if ($lat < -90 || $lat > 90) {
+            $this->log_error('Invalid latitude range', [
+                'latitude' => $lat,
+                'valid_range' => '-90 to 90'
+            ]);
+            return false;
+        }
+        
+        if ($lng < -180 || $lng > 180) {
+            $this->log_error('Invalid longitude range', [
+                'longitude' => $lng,
+                'valid_range' => '-180 to 180'
+            ]);
+            return false;
+        }
+        
+        return [
+            'lat' => $lat,
+            'lng' => $lng
+        ];
     }
     
     

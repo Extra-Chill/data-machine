@@ -120,10 +120,34 @@ class WebScraper {
                     'venue' => $event['venue'] ?? 'N/A'
                 ]);
                 
-                // Return first eligible event immediately (Data Machine pattern)
+                // Extract venue metadata for nested structure (flexible for different scrapers)
+                $venue_metadata = [
+                    'venueAddress' => $event['venueAddress'] ?? $event['address'] ?? '',
+                    'venueCity' => $event['venueCity'] ?? $event['city'] ?? '',
+                    'venueState' => $event['venueState'] ?? $event['state'] ?? '',
+                    'venueZip' => $event['venueZip'] ?? $event['zip'] ?? '',
+                    'venueCountry' => $event['venueCountry'] ?? $event['country'] ?? '',
+                    'venuePhone' => $event['venuePhone'] ?? $event['phone'] ?? '',
+                    'venueWebsite' => $event['venueWebsite'] ?? $event['website'] ?? '',
+                    'venueCoordinates' => $event['venueCoordinates'] ?? $event['coordinates'] ?? ''
+                ];
+                
+                // Remove venue metadata from event data (move to separate structure)
+                $venue_fields = ['venueAddress', 'venueCity', 'venueState', 'venueZip', 'venueCountry', 
+                               'venuePhone', 'venueWebsite', 'venueCoordinates', 'address', 'city', 
+                               'state', 'zip', 'country', 'phone', 'website', 'coordinates'];
+                foreach ($venue_fields as $field) {
+                    unset($event[$field]);
+                }
+                
+                // Return nested structure for consistent data flow
                 return [
                     'processed_items' => [[
-                        'data' => $event,
+                        'data' => [
+                            'event' => $event,
+                            'venue_metadata' => $venue_metadata,
+                            'import_source' => $selected_scraper
+                        ],
                         'metadata' => [
                             'source' => $selected_scraper,
                             'imported_at' => current_time('mysql'),
@@ -156,7 +180,7 @@ class WebScraper {
                 'line' => $e->getLine()
             ]);
             
-            return ['processed_items' => []];
+            return $data; // Return unchanged data packet array on error
         }
     }
     

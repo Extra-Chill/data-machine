@@ -7,8 +7,6 @@
     "description": "Display and edit event details including date, time, venue, and other information.",
     "textdomain": "dm-events",
     "editorScript": "file:./build/index.js",
-    "editorStyle": "file:./build/index.css",
-    "style": "file:./build/style-index.css",
     "attributes": {
         "startDate": {
             "type": "string",
@@ -34,10 +32,6 @@
             "type": "string",
             "default": ""
         },
-        "artist": {
-            "type": "string",
-            "default": ""
-        },
         "price": {
             "type": "string",
             "default": ""
@@ -50,10 +44,6 @@
             "type": "boolean",
             "default": true
         },
-        "showArtist": {
-            "type": "boolean",
-            "default": true
-        },
         "showPrice": {
             "type": "boolean",
             "default": true
@@ -61,12 +51,77 @@
         "showTicketLink": {
             "type": "boolean",
             "default": true
+        },
+        "venuePhone": {
+            "type": "string",
+            "default": ""
+        },
+        "venueWebsite": {
+            "type": "string",
+            "default": ""
+        },
+        "venueCity": {
+            "type": "string",
+            "default": ""
+        },
+        "venueState": {
+            "type": "string",
+            "default": ""
+        },
+        "venueZip": {
+            "type": "string",
+            "default": ""
+        },
+        "venueCountry": {
+            "type": "string",
+            "default": ""
+        },
+        "venueCoordinates": {
+            "type": "string",
+            "default": ""
+        },
+        "performer": {
+            "type": "string",
+            "default": ""
+        },
+        "performerType": {
+            "type": "string",
+            "default": "PerformingGroup"
+        },
+        "organizer": {
+            "type": "string",
+            "default": ""
+        },
+        "organizerType": {
+            "type": "string",
+            "default": "Organization"
+        },
+        "organizerUrl": {
+            "type": "string",
+            "default": ""
+        },
+        "eventStatus": {
+            "type": "string",
+            "default": "EventScheduled"
+        },
+        "previousStartDate": {
+            "type": "string",
+            "default": ""
+        },
+        "priceCurrency": {
+            "type": "string",
+            "default": "USD"
+        },
+        "offerAvailability": {
+            "type": "string",
+            "default": "InStock"
         }
     },
     "supports": {
         "html": false,
         "align": ["wide", "full"]
     },
+    "render": "file:./render.php",
     "usesContext": ["postType"],
     "allowedBlocks": [],
     "parent": []

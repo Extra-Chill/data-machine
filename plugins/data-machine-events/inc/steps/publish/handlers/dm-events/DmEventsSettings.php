@@ -1,12 +1,10 @@
 <?php
 /**
- * Data Machine Events Publish Handler Settings
+ * Data Machine Events Publisher Settings
  *
- * Defines settings fields and sanitization for Data Machine Events publish handler.
- * Focuses on taxonomy configuration for AI-powered data sorting.
+ * Centralized configuration management for AI-driven event publishing.
  *
  * @package DmEvents\Steps\Publish\Handlers\DmEvents
- * @since 1.0.0
  */
 
 namespace DmEvents\Steps\Publish\Handlers\DmEvents;
@@ -15,72 +13,79 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+/**
+ * Manages publisher configuration and settings for Data Machine integration
+ * 
+ * Centralized settings management for AI-driven event creation and venue taxonomy handling.
+ */
 class DmEventsSettings {
-
+    
+    
+    
     /**
-     * Constructor.
-     * Pure filter-based architecture - no dependencies.
-     */
-    public function __construct() {
-        // No constructor dependencies - all services accessed via filters
-    }
-
-    /**
-     * Get settings fields for Data Machine Events publish handler.
+     * Get default values for all available taxonomies (excluding venue)
      *
-     * @param array $current_config Current configuration values for this handler.
-     * @return array Associative array defining the settings fields.
+     * @return array Default taxonomy selections (all set to 'skip').
      */
-    public static function get_fields(array $current_config = []): array {
-        // Check if dm_events post type exists
-        if (!post_type_exists('dm_events')) {
-            return [];
+    private static function get_taxonomy_defaults(): array {
+        $defaults = [];
+        
+        $taxonomies = get_object_taxonomies('dm_events', 'objects');
+        
+        foreach ($taxonomies as $taxonomy) {
+            if ($taxonomy->name === 'venue') {
+                continue;
+            }
+            
+            // Skip built-in formats and other non-content taxonomies
+            if (in_array($taxonomy->name, ['post_format', 'nav_menu', 'link_category']) || !$taxonomy->public) {
+                continue;
+            }
+            
+            $field_key = "taxonomy_{$taxonomy->name}_selection";
+            $defaults[$field_key] = 'skip'; // Default to skip for all taxonomies
         }
         
-        // Merge post status field, author field, and taxonomy fields
-        return array_merge(
-            self::get_post_status_field(), 
-            self::get_author_field(), 
-            self::get_taxonomy_fields()
-        );
+        return $defaults;
     }
-
+    
+    
     /**
-     * Get post status field for event publishing.
-     *
-     * @return array Post status field definition.
+     * Get settings fields for Data Machine integration
+     * 
+     * Required method for Data Machine handler settings system.
+     * Returns field definitions following WordPress publish handler pattern.
+     * 
+     * @param array $current_config Current configuration values for this handler
+     * @return array Field definitions for Data Machine settings interface
      */
-    private static function get_post_status_field(): array {
-        return [
-            'event_post_status' => [
-                'type' => 'select',
-                'label' => __('Post Status', 'dm-events'),
-                'description' => __('Choose the status for published events.', 'dm-events'),
-                'options' => [
-                    'publish' => __('Published', 'dm-events'),
-                    'draft' => __('Draft', 'dm-events'),
-                    'pending' => __('Pending Review', 'dm-events'),
-                    'private' => __('Private', 'dm-events')
-                ]
-            ]
-        ];
-    }
-
-    /**
-     * Get post author field for event publishing.
-     *
-     * @return array Author field definition.
-     */
-    private static function get_author_field(): array {
-        // Get available WordPress users for post authorship (same pattern as WordPress handler)
+    public static function get_fields(array $current_config = []): array {
+        // Get available WordPress users for post authorship
         $user_options = [];
         $users = get_users(['fields' => ['ID', 'display_name', 'user_login']]);
         foreach ($users as $user) {
             $display_name = !empty($user->display_name) ? $user->display_name : $user->user_login;
             $user_options[$user->ID] = $display_name;
         }
-
-        return [
+        
+        $fields = [
+            'post_status' => [
+                'type' => 'select',
+                'label' => __('Post Status', 'dm-events'),
+                'description' => __('Select the status for the newly created event.', 'dm-events'),
+                'options' => [
+                    'draft' => __('Draft', 'dm-events'),
+                    'publish' => __('Publish', 'dm-events'),
+                    'pending' => __('Pending Review', 'dm-events'),
+                    'private' => __('Private', 'dm-events'),
+                ],
+            ],
+            'include_images' => [
+                'type' => 'checkbox',
+                'label' => __('Include Images', 'dm-events'),
+                'description' => __('Automatically set featured images for events when image URLs are provided by import handlers.', 'dm-events'),
+                'default' => false,
+            ],
             'post_author' => [
                 'type' => 'select',
                 'label' => __('Post Author', 'dm-events'),
@@ -88,39 +93,63 @@ class DmEventsSettings {
                 'options' => $user_options,
             ],
         ];
+        
+        // Add dynamic taxonomy fields (EXCLUDING venue - handled by AI tool)
+        $taxonomy_fields = self::get_taxonomy_fields();
+        return array_merge($fields, $taxonomy_fields);
     }
-
+    
     /**
-     * Get dynamic taxonomy fields for all public taxonomies on site.
+     * Sanitize DM Events handler settings for Data Machine integration
+     *
+     * Required method for Data Machine handler settings system.
+     * Validates and sanitizes form input data.
+     *
+     * @param array $raw_settings Raw settings input from form
+     * @return array Sanitized settings
+     */
+    public static function sanitize(array $raw_settings): array {
+        $sanitized = [
+            'post_status' => sanitize_text_field($raw_settings['post_status'] ?? 'draft'),
+            'post_author' => absint($raw_settings['post_author']),
+        ];
+        
+        // Validate post status
+        $valid_statuses = ['draft', 'publish', 'pending', 'private'];
+        if (!in_array($sanitized['post_status'], $valid_statuses)) {
+            $sanitized['post_status'] = 'draft';
+        }
+        
+        // Sanitize dynamic taxonomy selections (EXCLUDING venue)
+        $sanitized = array_merge($sanitized, self::sanitize_taxonomy_selections($raw_settings));
+        
+        return $sanitized;
+    }
+    
+    /**
+     * Get dynamic taxonomy fields for all available public taxonomies (excluding venue)
      *
      * @return array Taxonomy field definitions.
      */
     private static function get_taxonomy_fields(): array {
         $taxonomy_fields = [];
         
-        // Get all public taxonomies (Data Machine pattern)
-        $taxonomies = get_taxonomies(['public' => true], 'objects');
-        
-        // Return empty array if no taxonomies found or on error
-        if (!$taxonomies || is_wp_error($taxonomies)) {
-            return [];
-        }
+        $taxonomies = get_object_taxonomies('dm_events', 'objects');
         
         foreach ($taxonomies as $taxonomy) {
-            // Skip private taxonomies
-            if (!$taxonomy->public) {
+            if ($taxonomy->name === 'venue') {
+                continue;
+            }
+            
+            // Skip built-in formats and other non-content taxonomies
+            if (in_array($taxonomy->name, ['post_format', 'nav_menu', 'link_category']) || !$taxonomy->public) {
                 continue;
             }
             
             $taxonomy_slug = $taxonomy->name;
             $taxonomy_label = $taxonomy->labels->name ?? $taxonomy->label;
             
-            // Skip venue taxonomy - handled autonomously by system
-            if ($taxonomy_slug === 'venue') {
-                continue;
-            }
-            
-            // Build options for other taxonomies
+            // Build options with skip as default
             $options = [
                 'skip' => __('Skip', 'dm-events'),
                 'ai_decides' => __('AI Decides', 'dm-events')
@@ -128,11 +157,9 @@ class DmEventsSettings {
             
             // Get terms for this taxonomy
             $terms = get_terms(['taxonomy' => $taxonomy_slug, 'hide_empty' => false]);
-            if (!is_wp_error($terms) && !empty($terms) && is_array($terms)) {
+            if (!is_wp_error($terms) && !empty($terms)) {
                 foreach ($terms as $term) {
-                    if (isset($term->term_id, $term->name)) {
-                        $options[$term->term_id] = $term->name;
-                    }
+                    $options[$term->term_id] = $term->name;
                 }
             }
             
@@ -142,8 +169,7 @@ class DmEventsSettings {
                 'type' => 'select',
                 'label' => $taxonomy_label,
                 'description' => sprintf(
-                    /* translators: %1$s: taxonomy name (lowercase), %2$s: category or term */
-                    __('Configure %1$s assignment: Skip to exclude from AI instructions, let AI choose, or select specific %2$s.', 'dm-events'),
+                    __('Configure %s assignment: Skip to exclude from AI instructions, let AI choose, or select specific %s.', 'dm-events'),
                     strtolower($taxonomy_label),
                     $taxonomy->hierarchical ? __('category', 'dm-events') : __('term', 'dm-events')
                 ),
@@ -153,38 +179,9 @@ class DmEventsSettings {
         
         return $taxonomy_fields;
     }
-
+    
     /**
-     * Sanitize Data Machine Events publish handler settings.
-     *
-     * @param array $raw_settings Raw settings input.
-     * @return array Sanitized settings.
-     */
-    public static function sanitize(array $raw_settings): array {
-        // Merge post status and taxonomy sanitization
-        return array_merge(
-            self::sanitize_post_status($raw_settings),
-            self::sanitize_taxonomy_selections($raw_settings)
-        );
-    }
-
-    /**
-     * Sanitize post status setting.
-     *
-     * @param array $raw_settings Raw settings array.
-     * @return array Sanitized post status setting.
-     */
-    private static function sanitize_post_status(array $raw_settings): array {
-        $valid_statuses = ['publish', 'draft', 'pending', 'private'];
-        $raw_status = $raw_settings['event_post_status'] ?? 'publish';
-        
-        return [
-            'event_post_status' => in_array($raw_status, $valid_statuses) ? $raw_status : 'publish'
-        ];
-    }
-
-    /**
-     * Sanitize dynamic taxonomy selection settings.
+     * Sanitize dynamic taxonomy selection settings (excluding venue)
      *
      * @param array $raw_settings Raw settings array.
      * @return array Sanitized taxonomy selections.
@@ -192,17 +189,15 @@ class DmEventsSettings {
     private static function sanitize_taxonomy_selections(array $raw_settings): array {
         $sanitized = [];
         
-        // Get all public taxonomies (Data Machine pattern)
-        $taxonomies = get_taxonomies(['public' => true], 'objects');
+        $taxonomies = get_object_taxonomies('dm_events', 'objects');
         
         foreach ($taxonomies as $taxonomy) {
-            // Skip private taxonomies
-            if (!$taxonomy->public) {
+            if ($taxonomy->name === 'venue') {
                 continue;
             }
             
-            // Skip venue taxonomy - handled autonomously by system
-            if ($taxonomy->name === 'venue') {
+            // Skip built-in formats and other non-content taxonomies
+            if (in_array($taxonomy->name, ['post_format', 'nav_menu', 'link_category']) || !$taxonomy->public) {
                 continue;
             }
             
@@ -227,144 +222,33 @@ class DmEventsSettings {
         
         return $sanitized;
     }
-
+    
     /**
-     * Get default values for all settings.
+     * Get taxonomy terms for AI context
      *
-     * @return array Default values for all settings.
+     * @param string $taxonomy_name Taxonomy name
+     * @return array Terms with name and description for AI context
      */
-    public static function get_defaults(): array {
-        // Merge post status defaults with taxonomy defaults
-        return array_merge(self::get_post_status_defaults(), self::get_taxonomy_defaults());
-    }
-
-    /**
-     * Get default post status setting.
-     *
-     * @return array Default post status setting.
-     */
-    private static function get_post_status_defaults(): array {
-        return [
-            'event_post_status' => 'publish'
-        ];
-    }
-
-    /**
-     * Get default values for all available taxonomies.
-     *
-     * @return array Default taxonomy selections (all set to 'skip').
-     */
-    private static function get_taxonomy_defaults(): array {
-        $defaults = [];
+    public static function get_taxonomy_terms_for_ai(string $taxonomy_name): array {
+        $terms = get_terms([
+            'taxonomy' => $taxonomy_name,
+            'hide_empty' => false,
+            'number' => 20 // Limit for AI context
+        ]);
         
-        // Check if post type exists
-        if (!post_type_exists('dm_events')) {
-            return $defaults;
-        }
-        
-        // Get all public taxonomies (Data Machine pattern)
-        $taxonomies = get_taxonomies(['public' => true], 'objects');
-        
-        if (!$taxonomies || is_wp_error($taxonomies)) {
-            return $defaults;
-        }
-        
-        foreach ($taxonomies as $taxonomy) {
-            // Skip private taxonomies
-            if (!$taxonomy->public) {
-                continue;
-            }
-            
-            // Skip venue taxonomy - no defaults needed (handled autonomously)
-            if ($taxonomy->name === 'venue') {
-                continue;
-            }
-            
-            $field_key = "taxonomy_{$taxonomy->name}_selection";
-            $defaults[$field_key] = 'skip';
-        }
-        
-        return $defaults;
-    }
-
-    /**
-     * Determine if authentication is required based on current configuration.
-     *
-     * @param array $current_config Current configuration values for this handler.
-     * @return bool True if authentication is required, false otherwise.
-     */
-    public static function requires_authentication(array $current_config = []): bool {
-        // Local Data Machine Events does not require authentication
-        return false;
-    }
-
-    /**
-     * Get taxonomy fields configured for AI decision making.
-     * 
-     * Used by the publisher to determine which taxonomies to expose to AI.
-     *
-     * @param array $settings Handler settings.
-     * @return array Array of taxonomy slugs that should be handled by AI.
-     */
-    public static function get_ai_taxonomy_fields(array $settings): array {
-        $ai_taxonomies = [];
-        
-        // Check if post type exists
-        if (!post_type_exists('dm_events')) {
-            return $ai_taxonomies;
-        }
-        
-        // Get all public taxonomies (Data Machine pattern)
-        $taxonomies = get_taxonomies(['public' => true], 'objects');
-        
-        if (!$taxonomies || is_wp_error($taxonomies)) {
-            return $ai_taxonomies;
-        }
-        
-        foreach ($taxonomies as $taxonomy) {
-            // Skip private taxonomies
-            if (!$taxonomy->public) {
-                continue;
-            }
-            
-            $field_key = "taxonomy_{$taxonomy->name}_selection";
-            
-            if (isset($settings[$field_key]) && $settings[$field_key] === 'ai_decides') {
-                $ai_taxonomies[] = $taxonomy->name;
-            }
-        }
-        
-        return $ai_taxonomies;
-    }
-
-    /**
-     * Get terms for a specific taxonomy as options for AI context.
-     *
-     * @param string $taxonomy_slug Taxonomy slug.
-     * @return array Array of term options for AI context.
-     */
-    public static function get_taxonomy_terms_for_ai(string $taxonomy_slug): array {
-        // Validate taxonomy exists
-        if (!taxonomy_exists($taxonomy_slug)) {
+        if (is_wp_error($terms)) {
             return [];
         }
         
-        $terms = get_terms(['taxonomy' => $taxonomy_slug, 'hide_empty' => false]);
-        $options = [];
-        
-        if (!is_wp_error($terms) && !empty($terms) && is_array($terms)) {
-            foreach ($terms as $term) {
-                if (isset($term->term_id, $term->name, $term->slug)) {
-                    $options[] = [
-                        'id' => $term->term_id,
-                        'name' => $term->name,
-                        'slug' => $term->slug,
-                        'description' => $term->description ?? ''
-                    ];
-                }
-            }
+        $ai_terms = [];
+        foreach ($terms as $term) {
+            $ai_terms[] = [
+                'name' => $term->name,
+                'description' => $term->description
+            ];
         }
         
-        return $options;
+        return $ai_terms;
     }
+    
 }

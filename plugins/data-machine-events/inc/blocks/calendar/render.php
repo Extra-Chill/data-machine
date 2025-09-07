@@ -1,21 +1,34 @@
 <?php
 /**
- * Data Machine Events Calendar Block Render Template
- * 
- * This file is included by the render_calendar_block callback
- * Variables available: $attributes, $content, $block
+ * Data Machine Events Calendar Block Server-Side Render Template
+ *
+ * Block-first architecture render template that queries events based on Event Details
+ * block attributes as the single source of truth. Supports filtering, pagination,
+ * and multiple view modes.
+ *
+ * Available context:
+ * @var array $attributes Block attributes (defaultView, eventsToShow, showFilters, etc.)
+ * @var string $content Block inner content (unused in dynamic block)
+ * @var WP_Block $block Block instance object
+ *
+ * Key features:
+ * - Time-based event filtering (future, past, all)
+ * - Search and date range filtering
+ * - View toggle (list/grid)
+ * - Pagination support
+ * - Block-first data architecture
  */
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-// Don't render during REST API requests to prevent header conflicts
+// Prevent rendering during REST API requests
 if (wp_is_json_request() || (defined('REST_REQUEST') && REST_REQUEST)) {
     return '';
 }
 
-// Get block attributes
+// Extract block configuration with defaults
 $default_view = $attributes['defaultView'] ?? 'list';
 $events_to_show = $attributes['eventsToShow'] ?? 10;
 $show_past_events = $attributes['showPastEvents'] ?? false;
@@ -26,35 +39,87 @@ $show_view_toggle = $attributes['showViewToggle'] ?? true;
 $enable_pagination = $attributes['enablePagination'] ?? true;
 $events_per_page = $attributes['eventsPerPage'] ?? 12;
 
-// Get current page for pagination
+// Determine time filter mode from URL parameter
+$view_mode = $_GET['time_filter'] ?? ($show_past_events ? 'all' : 'future');
+
+// Extract current page number for pagination
 $current_page = max(1, get_query_var('paged') ? get_query_var('paged') : (get_query_var('page') ? get_query_var('page') : 1));
 
-// Build query arguments
+// Block-first query - get all dm_events posts, filter and sort in PHP
+$current_utc = current_time('mysql', 1);
 $query_args = array(
     'post_type' => 'dm_events',
     'post_status' => 'publish',
-    'posts_per_page' => $enable_pagination ? $events_per_page : $events_to_show,
-    'paged' => $current_page,
-    'meta_key' => '_dm_event_start_date_utc',
-    'orderby' => 'meta_value',
-    'order' => 'ASC',
+    'numberposts' => -1, // Get all events for PHP filtering
+    'orderby' => 'date',
+    'order' => 'DESC'
 );
 
-// Filter by date if not showing past events
-if (!$show_past_events) {
-    $query_args['meta_query'] = array(
-        array(
-            'key' => '_dm_event_start_date_utc',
-            'value' => current_time('mysql', 1), // UTC time
-            'compare' => '>='
-        )
+// Get all events and extract block data
+$all_events = get_posts($query_args);
+$filtered_events = array();
+
+foreach ($all_events as $event_post) {
+    // Extract Event Details block attributes
+    $blocks = parse_blocks($event_post->post_content);
+    $event_data = null;
+    foreach ($blocks as $block) {
+        if ('dm-events/event-details' === $block['blockName']) {
+            $event_data = $block['attrs'];
+            break;
+        }
+    }
+
+    // Skip if no start date
+    if (empty($event_data['startDate'])) {
+        continue;
+    }
+
+    // Create DateTime objects for filtering
+    $start_time = $event_data['startTime'] ?? '00:00:00';
+    $event_datetime = new DateTime($event_data['startDate'] . ' ' . $start_time);
+    $current_datetime = new DateTime($current_utc);
+
+    // Apply time-based filtering logic
+    if ($view_mode === 'past' && $event_datetime >= $current_datetime) {
+        continue;
+    } elseif ($view_mode === 'future' && $event_datetime < $current_datetime) {
+        continue;
+    }
+    // 'all' mode includes everything with valid date
+
+    // Store event with datetime
+    $filtered_events[] = array(
+        'post' => $event_post,
+        'datetime' => $event_datetime,
+        'event_data' => $event_data
     );
 }
 
-// Query events
-$events_query = new WP_Query($query_args);
+// Sort events chronologically
+usort($filtered_events, function($a, $b) use ($view_mode) {
+    if ($view_mode === 'past') {
+        return $b['datetime'] <=> $a['datetime']; // Recent past first
+    } else {
+        return $a['datetime'] <=> $b['datetime']; // Earliest future first
+    }
+});
 
-// Start output
+// Apply pagination logic
+$total_events = count($filtered_events);
+$events_per_page_calc = $enable_pagination ? $events_per_page : $events_to_show;
+$offset = ($current_page - 1) * $events_per_page_calc;
+$paged_events = array_slice($filtered_events, $offset, $events_per_page_calc);
+
+// Create query object for pagination
+$events_query = new stdClass();
+$events_query->posts = array_column($paged_events, 'post');
+$events_query->post_count = count($paged_events);
+$events_query->found_posts = $total_events;
+$events_query->max_num_pages = $enable_pagination ? ceil($total_events / $events_per_page_calc) : 1;
+$events_query->current_post = -1;
+
+// Generate block wrapper with CSS classes
 $wrapper_attributes = get_block_wrapper_attributes(array(
     'class' => 'dm-events-calendar dm-events-view-' . esc_attr($default_view)
 ));
@@ -93,6 +158,24 @@ $wrapper_attributes = get_block_wrapper_attributes(array(
                     </div>
                 <?php endif; ?>
                 
+                <div class="dm-events-time-filter">
+                    <button type="button" 
+                            class="dm-events-time-btn <?php echo ($view_mode === 'future') ? 'active' : ''; ?>" 
+                            data-time="future">
+                        <?php _e('Upcoming Events', 'dm-events'); ?>
+                    </button>
+                    <button type="button" 
+                            class="dm-events-time-btn <?php echo ($view_mode === 'past') ? 'active' : ''; ?>" 
+                            data-time="past">
+                        <?php _e('Past Events', 'dm-events'); ?>
+                    </button>
+                    <button type="button" 
+                            class="dm-events-time-btn <?php echo ($view_mode === 'all') ? 'active' : ''; ?>" 
+                            data-time="all">
+                        <?php _e('All Events', 'dm-events'); ?>
+                    </button>
+                </div>
+                
                 <?php if ($show_view_toggle) : ?>
                     <div class="dm-events-view-toggle">
                         <button type="button" 
@@ -114,28 +197,18 @@ $wrapper_attributes = get_block_wrapper_attributes(array(
     <?php endif; ?>
     
     <div class="dm-events-content">
-        <?php if ($events_query->have_posts()) : ?>
+        <?php if (!empty($paged_events)) : ?>
             <div class="dm-events-list" id="dm-events-list">
-                <?php while ($events_query->have_posts()) : $events_query->the_post(); ?>
-                    <?php
-                    // Block-first: Parse block attributes to get event data
-                    $event_data = null;
-                    if (has_blocks(get_the_content())) {
-                        $blocks = parse_blocks(get_the_content());
-                        foreach ($blocks as $block) {
-                            if ('dm-events/event-details' === $block['blockName']) {
-                                $event_data = $block['attrs'];
-                                break;
-                            }
-                        }
-                    }
-
-                    // If we couldn't get block data, skip this event
-                    if (!$event_data) {
-                        continue;
-                    }
-
-                    // Extract data from attributes
+                <?php foreach ($paged_events as $event_item) : 
+                    $event_post = $event_item['post'];
+                    $event_data = $event_item['event_data'];
+                    
+                    // Set global post for template functions
+                    global $post;
+                    $post = $event_post;
+                    setup_postdata($post);
+                    
+                    // Map block attributes to display variables
                     $start_date = $event_data['startDate'] ?? '';
                     $start_time = $event_data['startTime'] ?? '';
                     $end_date = $event_data['endDate'] ?? '';
@@ -146,21 +219,26 @@ $wrapper_attributes = get_block_wrapper_attributes(array(
                     $price = $event_data['price'] ?? '';
                     $ticket_url = $event_data['ticketUrl'] ?? '';
 
-                    // Get display settings from global options
-                    $settings = get_option('dm_events_settings', array());
-                    $show_venue = !empty($settings['block_show_venue']);
-                    $show_artist = !empty($settings['block_show_artist']);
-                    $show_price = !empty($settings['block_show_price']);
-                    $show_ticket_link = !empty($settings['block_show_ticket_link']);
+                    // Get block-level visibility settings
+                    $show_venue = $event_data['showVenue'] ?? true;
+                    $show_artist = $event_data['showArtist'] ?? true;
+                    $show_price = $event_data['showPrice'] ?? true;
+                    $show_ticket_link = $event_data['showTicketLink'] ?? true;
                     
-                    // Format dates
+                    // Generate date formats for display and JavaScript
                     $formatted_start_date = '';
+                    $iso_start_date = '';
                     if ($start_date) {
                         $start_datetime_obj = new DateTime($start_date . ' ' . $start_time);
                         $formatted_start_date = $start_datetime_obj->format('M j, Y g:i A');
+                        $iso_start_date = $start_datetime_obj->format('c'); // ISO 8601 for JS
                     }
                     ?>
-                    <div class="dm-event-item">
+                    <div class="dm-event-item" 
+                         data-title="<?php echo esc_attr(get_the_title()); ?>"
+                         data-venue="<?php echo esc_attr($venue_name); ?>"
+                         data-artist="<?php echo esc_attr($artist_name); ?>"
+                         data-date="<?php echo esc_attr($iso_start_date); ?>">
                         <div class="dm-event-card">
                             <div class="dm-event-card-body">
                                 <h3 class="dm-event-title">
@@ -208,11 +286,11 @@ $wrapper_attributes = get_block_wrapper_attributes(array(
                             </div>
                         </div>
                     </div>
-                <?php endwhile; ?>
+                <?php endforeach; ?>
             </div>
             
             <?php 
-            // Only show pagination if enabled, there are multiple pages, and we have a valid current page
+            // Render pagination with validation
             if ($enable_pagination && $events_query->max_num_pages > 1 && $current_page > 0) : ?>
                 <?php
                 $pagination_links = paginate_links(array(
@@ -228,7 +306,7 @@ $wrapper_attributes = get_block_wrapper_attributes(array(
                     'echo' => false
                 ));
                 
-                // Only output if we actually have pagination links and they're not just whitespace
+                // Validate pagination output
                 if (!empty($pagination_links) && trim($pagination_links) !== '') : ?>
                     <div class="dm-events-pagination">
                         <?php echo $pagination_links; ?>
@@ -245,6 +323,6 @@ $wrapper_attributes = get_block_wrapper_attributes(array(
 </div>
 
 <?php
-// Reset post data
+// Reset global post data
 wp_reset_postdata();
 ?> 
