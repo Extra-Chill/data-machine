@@ -24,7 +24,66 @@ if (!defined('ABSPATH')) {
 class WebScraper {
     
     /**
-     * Get event data from selected web scraper
+     * Execute web scraper event import with unified parameter structure
+     * 
+     * Follows Data Machine's unified parameter system via dm_engine_parameters filter.
+     * 
+     * @param array $parameters Unified parameter structure from Data Machine
+     *   - execution: ['job_id' => string, 'flow_step_id' => string]
+     *   - config: ['flow_step' => array] Step configuration
+     *   - data: array Cumulative data packet from previous steps
+     *   - metadata: array Dynamic metadata from dm_engine_additional_parameters
+     * @return array Updated data packet array with event entry added
+     */
+    public function execute(array $parameters): array {
+        // Extract from unified parameter structure
+        $job_id = $parameters['execution']['job_id'];
+        $flow_step_id = $parameters['execution']['flow_step_id'];
+        $data = $parameters['data'] ?? [];
+        $flow_step_config = $parameters['config']['flow_step'] ?? [];
+        
+        // Extract handler configuration
+        $handler_config = $flow_step_config['handler']['settings'] ?? [];
+        $pipeline_id = $flow_step_config['pipeline_id'] ?? null;
+        
+        // Use legacy method for actual processing
+        $result = $this->get_fetch_data($pipeline_id, array_merge($handler_config, ['flow_step_id' => $flow_step_id]), $job_id);
+        
+        // Convert legacy format to data packet array
+        if (!empty($result['processed_items'])) {
+            $processed_item = $result['processed_items'][0];
+            $event_data = $processed_item['data'];
+            
+            // Extract venue metadata separately for nested structure
+            $venue_metadata = $event_data['venue_metadata'] ?? [];
+            
+            // Create data packet entry
+            $event_entry = [
+                'type' => 'event_import',
+                'handler' => 'web_scraper',
+                'content' => [
+                    'title' => $event_data['event']['title'] ?? '',
+                    'body' => wp_json_encode($event_data, JSON_PRETTY_PRINT)
+                ],
+                'metadata' => array_merge($processed_item['metadata'] ?? [], [
+                    'source_type' => 'web_scraper',
+                    'pipeline_id' => $pipeline_id,
+                    'flow_id' => $flow_step_config['flow_id'] ?? null,
+                    'import_timestamp' => time()
+                ]),
+                'attachments' => [],
+                'timestamp' => time()
+            ];
+            
+            // Add to front of data packet array
+            array_unshift($data, $event_entry);
+        }
+        
+        return $data;
+    }
+    
+    /**
+     * Get event data from selected web scraper (legacy interface)
      * 
      * @param int $pipeline_id Pipeline ID
      * @param array $handler_config Handler configuration

@@ -24,24 +24,23 @@ if (!defined('ABSPATH')) {
 class EventImportStep {
 
     /**
-     * Execute event import with direct handler execution
+     * Execute event import with unified parameter structure
      * 
-     * Modern flat parameter architecture - directly executes handlers with unified parameters.
-     * Eliminates adapter layer for native Data Machine compatibility.
+     * Follows Data Machine's unified parameter system via dm_engine_parameters filter.
      * 
-     * @param array $parameters Unified flat parameter array from Data Machine engine
-     *   - job_id: Data Machine job ID for tracking
-     *   - flow_step_id: Flow step ID for processed items tracking  
-     *   - data: Data packet array (cumulative pipeline data)
-     *   - flow_step_config: Step configuration including handler settings
+     * @param array $parameters Unified parameter structure from Data Machine
+     *   - execution: ['job_id' => string, 'flow_step_id' => string]
+     *   - config: ['flow_step' => array] Step configuration
+     *   - data: array Cumulative data packet from previous steps
+     *   - metadata: array Dynamic metadata from dm_engine_additional_parameters
      * @return array Updated data packet array with event data added
      */
     public function execute(array $parameters): array {
-        // Extract from flat parameter structure (Data Machine standard)
-        $job_id = $parameters['job_id'];
-        $flow_step_id = $parameters['flow_step_id'];
+        // Extract from unified parameter structure
+        $job_id = $parameters['execution']['job_id'];
+        $flow_step_id = $parameters['execution']['flow_step_id'];
         $data = $parameters['data'] ?? [];
-        $flow_step_config = $parameters['flow_step_config'] ?? [];
+        $flow_step_config = $parameters['config']['flow_step'] ?? [];
         
         try {
             do_action('dm_log', 'debug', 'Event Import Step: Starting event collection', [
@@ -101,7 +100,7 @@ class EventImportStep {
             
             $handler = new $class_name();
             
-            // Execute handler directly with flat parameters (no adapter layer)
+            // Execute handler with unified parameter structure
             $data = $handler->execute($parameters);
 
             do_action('dm_log', 'debug', 'Event Import Step: Direct handler execution completed', [

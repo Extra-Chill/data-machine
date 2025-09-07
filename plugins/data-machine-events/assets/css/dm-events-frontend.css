@@ -243,7 +243,141 @@
 }
 
 /* ==========================================================================
-   Event Detail Page (Phase 18)
+   Event Details Block (Self-Contained Styling)
+   ========================================================================== */
+
+.dm-event-details {
+    margin: 20px 0;
+    font-family: inherit;
+    line-height: inherit;
+}
+
+.dm-event-details .event-description {
+    margin-bottom: 25px;
+}
+
+.dm-event-details .event-description p {
+    margin-bottom: 1em;
+    line-height: 1.6;
+}
+
+.dm-event-details .event-info-grid {
+    display: grid;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #0073aa;
+}
+
+.dm-event-details .event-date-time,
+.dm-event-details .event-venue,
+.dm-event-details .event-price {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 5px 0;
+}
+
+.dm-event-details .event-date-time .icon,
+.dm-event-details .event-venue .icon,
+.dm-event-details .event-price .icon {
+    font-size: 18px;
+    min-width: 20px;
+    margin-top: 2px;
+}
+
+.dm-event-details .event-date-time .text,
+.dm-event-details .event-venue .text,
+.dm-event-details .event-price .text {
+    flex: 1;
+    font-size: 16px;
+    line-height: 1.4;
+}
+
+.dm-event-details .event-date-time .text small,
+.dm-event-details .event-venue .text small {
+    display: block;
+    font-size: 14px;
+    color: #666;
+    margin-top: 2px;
+}
+
+.dm-event-details .event-venue .text a {
+    color: #0073aa;
+    text-decoration: none;
+}
+
+.dm-event-details .event-venue .text a:hover {
+    text-decoration: underline;
+}
+
+.dm-event-details .event-price .text {
+    font-weight: 600;
+    color: #0073aa;
+    font-size: 18px;
+}
+
+.dm-event-details .event-tickets {
+    text-align: center;
+    margin-top: 25px;
+}
+
+.dm-event-details .ticket-button {
+    display: inline-block;
+    padding: 12px 24px;
+    background: #0073aa;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 5px;
+    font-size: 16px;
+    font-weight: 600;
+    transition: background 0.2s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.dm-event-details .ticket-button:hover,
+.dm-event-details .ticket-button:focus {
+    background: #005a87;
+    color: #fff;
+    text-decoration: none;
+}
+
+/* Single Event Page Styling */
+.dm-event-single .entry-title {
+    margin-bottom: 10px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .dm-event-details .event-info-grid {
+        padding: 15px;
+        gap: 12px;
+    }
+    
+    .dm-event-details .event-date-time .icon,
+    .dm-event-details .event-venue .icon,
+    .dm-event-details .event-price .icon {
+        font-size: 16px;
+    }
+    
+    .dm-event-details .event-date-time .text,
+    .dm-event-details .event-venue .text {
+        font-size: 15px;
+    }
+    
+    .dm-event-details .ticket-button {
+        padding: 10px 20px;
+        font-size: 15px;
+        width: 100%;
+        max-width: 280px;
+    }
+}
+
+/* ==========================================================================
+   Legacy Event Detail Styles (For Calendar Block Usage)
    ========================================================================== */
 
 .event-detail {

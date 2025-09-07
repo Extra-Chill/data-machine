@@ -2,8 +2,8 @@
 /**
  * Dice.fm Event Import Handler
  * 
- * Imports events from Dice.fm API.
- * Standalone implementation for Data Machine integration.
+ * Integrates with Dice.fm API for event imports using Data Machine's 
+ * single-item processing model with deduplication tracking.
  *
  * @package DmEvents\Steps\EventImport\Handlers\DiceFm
  * @since 1.0.0
@@ -17,31 +17,32 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * DiceFm class
+ * Dice.fm API event import handler with single-item processing
  * 
- * Event import handler for Dice.fm API.
+ * Implements Data Machine handler interface for importing events from
+ * Dice.fm API with standardized processing and venue data extraction.
  */
 class DiceFm {
     
     /**
-     * Execute Dice FM event import with unified parameter array
+     * Execute Dice FM event import with unified parameter structure
      * 
-     * Implements Data Machine flat parameter architecture for native compatibility.
+     * Follows Data Machine's unified parameter system via dm_engine_parameters filter.
      * Fetches events, processes deduplication tracking, and returns data packet array.
      * 
-     * @param array $parameters Unified flat parameter array from Data Machine engine
-     *   - job_id: Data Machine job ID for tracking
-     *   - flow_step_id: Flow step ID for processed items tracking  
-     *   - data: Data packet array (cumulative pipeline data)
-     *   - flow_step_config: Step configuration including handler settings
+     * @param array $parameters Unified parameter structure from Data Machine
+     *   - execution: ['job_id' => string, 'flow_step_id' => string]
+     *   - config: ['flow_step' => array] Step configuration
+     *   - data: array Cumulative data packet from previous steps
+     *   - metadata: array Dynamic metadata from dm_engine_additional_parameters
      * @return array Updated data packet array with event entry added
      */
     public function execute(array $parameters): array {
-        // Extract from unified flat parameter structure
-        $job_id = $parameters['job_id'];
-        $flow_step_id = $parameters['flow_step_id'];
+        // Extract from unified parameter structure
+        $job_id = $parameters['execution']['job_id'];
+        $flow_step_id = $parameters['execution']['flow_step_id'];
         $data = $parameters['data'] ?? [];
-        $flow_step_config = $parameters['flow_step_config'] ?? [];
+        $flow_step_config = $parameters['config']['flow_step'] ?? [];
         
         // Extract handler configuration
         $handler_config = $flow_step_config['handler']['settings'] ?? [];

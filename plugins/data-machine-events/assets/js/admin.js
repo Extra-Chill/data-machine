@@ -1,7 +1,11 @@
+/**
+ * Data Machine Events Admin JavaScript
+ * 
+ * Minimal admin functionality for settings page interactions.
+ * Plugin uses WordPress Settings API for configuration.
+ */
 jQuery(document).ready(function($) {
-    // Simple admin functionality for Data Machine Events
-    // This plugin is frontend-focused with basic settings management
-    
-    // No complex functionality needed - settings are handled via WordPress Settings API
+    // Simple admin initialization for Data Machine Events
+    // Settings are handled via WordPress Settings API with minimal client-side interaction
     console.log('Data Machine Events admin loaded');
 });

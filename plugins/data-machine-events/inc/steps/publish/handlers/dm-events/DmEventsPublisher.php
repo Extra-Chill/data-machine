@@ -263,11 +263,17 @@ class DmEventsPublisher {
         $block_json = wp_json_encode($block_attributes);
         $description = !empty($event_data['description']) ? wp_kses_post($event_data['description']) : '';
         
-        return '<!-- wp:dm-events/event-details ' . $block_json . ' -->
-<div class="wp-block-dm-events-event-details">
-    ' . $description . '
-</div>
-<!-- /wp:dm-events/event-details -->';
+        // Generate Event Details block with InnerBlocks for description
+        $inner_blocks = '';
+        if ($description) {
+            $inner_blocks = '<!-- wp:paragraph -->
+<p>' . $description . '</p>
+<!-- /wp:paragraph -->';
+        }
+        
+        return '<!-- wp:dm-events/event-details ' . $block_json . ' -->' . 
+               ($inner_blocks ? "\n" . $inner_blocks . "\n" : '') .
+               '<!-- /wp:dm-events/event-details -->';
     }
     
     /**
@@ -290,14 +296,23 @@ class DmEventsPublisher {
         
         $block_json = wp_json_encode($block_attributes);
         
-        return '<!-- wp:dm-events/event-details ' . $block_json . ' -->
-<div class="wp-block-dm-events-event-details">
-    <div class="dm-event-details">
-        <h3>' . esc_html($event_data['title']) . '</h3>
-        <p>Event details managed in block attributes.</p>
-    </div>
-</div>
-<!-- /wp:dm-events/event-details -->';
+        // Generate Event Details block with InnerBlocks
+        $inner_blocks = '';
+        if (!empty($event_data['title'])) {
+            $inner_blocks .= '<!-- wp:heading {"level":3} -->
+<h3 class="wp-block-heading">' . esc_html($event_data['title']) . '</h3>
+<!-- /wp:heading -->
+
+';
+        }
+        
+        $inner_blocks .= '<!-- wp:paragraph -->
+<p>Event details managed in block attributes.</p>
+<!-- /wp:paragraph -->';
+        
+        return '<!-- wp:dm-events/event-details ' . $block_json . ' -->' . 
+               "\n" . $inner_blocks . "\n" .
+               '<!-- /wp:dm-events/event-details -->';
     }
     
     

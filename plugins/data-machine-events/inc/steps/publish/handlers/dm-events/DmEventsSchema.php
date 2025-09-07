@@ -182,9 +182,12 @@ class DmEventsSchema {
             }
         }
         
-        $featured_image_url = get_post_thumbnail_url($post_id, 'large');
-        if ($featured_image_url) {
-            $schema['image'] = $featured_image_url;
+        $featured_image_id = get_post_thumbnail_id($post_id);
+        if ($featured_image_id) {
+            $featured_image_url = wp_get_attachment_image_url($featured_image_id, 'large');
+            if ($featured_image_url) {
+                $schema['image'] = $featured_image_url;
+            }
         }
         
         if (!empty($attributes['ticketUrl']) || !empty($attributes['price'])) {

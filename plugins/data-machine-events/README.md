@@ -1,14 +1,17 @@
-# Data Machine Events - WordPress Events Plugin
+# Data Machine Events
 
-Frontend-focused WordPress events plugin with **block-first architecture**. Integrates with Data Machine plugin for automated event imports while providing elegant event display and management through Gutenberg blocks.
+Frontend-focused WordPress events plugin with **block-first architecture**. Features AI-driven event creation via Data Machine integration, Event Details blocks with InnerBlocks for rich content editing, Calendar blocks for display, and comprehensive venue taxonomy management.
 
 ## Features
 
 ### Events
-- **Block-First Architecture:** Event data managed via `Event Details` block (single source of truth)
-- **Calendar Display:** Gutenberg block with filtering and search
-- **Performance Optimized:** Background sync to meta fields for efficient queries
-- **Data Machine Ready:** Works with Data Machine plugin for automated imports
+- **Block-First Architecture:** Event data managed via `Event Details` block with InnerBlocks support (single source of truth)
+- **Rich Content Editing:** InnerBlocks integration allows rich content within events
+- **Comprehensive Data Model:** 15+ event attributes including performer, organizer, pricing, and event status
+- **Calendar Display:** Gutenberg block with filtering, pagination, and search capabilities  
+- **Display Controls:** Flexible rendering with showVenue, showPrice, showTicketLink, showArtist options
+- **Performance Optimized:** Background sync to meta fields for efficient database queries
+- **Data Machine Integration:** Automated AI-driven event imports with single-item processing
 
 ### Venues
 - **Rich Taxonomy:** 9 comprehensive meta fields (address, city, state, zip, country, phone, website, capacity, coordinates)
@@ -17,14 +20,16 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Inte
 - **SEO Ready:** Archive pages and structured data
 
 ### Development
-- **PSR-4 Autoloading:** `DmEvents\` namespace
-- **Separate Build Systems:** Calendar (webpack), Event Details (@wordpress/scripts)
-- **REST API Support:** Event metadata exposed
-- **Schema Generation:** Google Event structured data for SEO enhancement
-- **WordPress Standards:** Native hooks and security practices
+- **PSR-4 Autoloading:** `DmEvents\` namespace with enhanced autoloader for Data Machine handlers
+- **Dual Build Systems:** Calendar block (webpack), Event Details block (@wordpress/scripts)
+- **Production Build:** Automated `./build.sh` script creates optimized WordPress plugin package
+- **REST API Support:** Event metadata exposed via WordPress REST API
+- **Schema Generation:** Google Event structured data with smart parameter routing for SEO enhancement
+- **WordPress Standards:** Native hooks, security practices, and comprehensive input sanitization
 
 ### Architecture
-**Data Flow:** Data Machine → Event Details Block → Background Sync → Calendar Display
+**Data Flow:** Data Machine Import → Event Details Block (InnerBlocks) → Schema Generation → Calendar Display
+**Schema Flow:** Block Attributes + Venue Taxonomy Meta → DmEventsSchema → JSON-LD Output
 
 **Core Classes:**
 - `DmEvents\Admin\Status_Detection` - Data Machine integration status monitoring
@@ -94,7 +99,7 @@ dm-events/
 
 ## Development
 
-**Requirements:** WordPress 6.0+, PHP 8.0+, Composer, Node.js (for blocks)
+**Requirements:** WordPress 6.0+, PHP 8.0+, Composer, Node.js 16+ (for block development)
 
 **WordPress Version:** Tested up to 6.4
 
@@ -108,8 +113,9 @@ cd ../event-details && npm install && npm run build
 
 **Production Build:**
 ```bash
-# Run build script to create optimized package with versioned .zip file
+# Run automated build script to create optimized WordPress plugin package
 ./build.sh
+# Creates: /dist/dm-events.zip with versioned build info and production assets
 ```
 
 **Block Development:**
@@ -126,13 +132,20 @@ npm run lint:js && npm run lint:css
 
 ### Code Examples
 
-**Block Attributes (Primary Data):**
+**Event Details Block Attributes (Single Source of Truth):**
 ```json
 {
   "startDate": "2025-09-30",
   "startTime": "19:00", 
   "venue": "The Charleston Music Hall",
-  "artist": "Mary Chapin Carpenter"
+  "performer": "Mary Chapin Carpenter",
+  "performerType": "MusicGroup",
+  "price": "45.00",
+  "priceCurrency": "USD",
+  "ticketUrl": "https://example.com/tickets",
+  "showVenue": true,
+  "showPrice": true,
+  "showTicketLink": true
 }
 ```
 
@@ -148,62 +161,69 @@ echo '<script type="application/ld+json">' . wp_json_encode($schema) . '</script
 
 ## AI Integration
 
-**Enhanced Event Creation Flow:**
-1. Data Machine import handlers extract venue data using single-item processing pattern
-2. DmEventsPublisher injects venue data via dm_engine_additional_parameters filter
-3. AI generates event descriptions and handles taxonomies configured for "ai_decides"
-4. Publisher creates Event Details blocks with proper address attribute mapping
-5. DmEventsSchema generates Google Event structured data for SEO enhancement
-6. DmEventsVenue handles centralized venue creation with comprehensive meta validation
+**AI-Driven Event Creation Pipeline:**
+1. **Import Handlers:** Extract event data from APIs (Ticketmaster, Dice FM) or web scrapers using single-item processing
+2. **Venue Data Injection:** DmEventsPublisher injects venue metadata via dm_engine_additional_parameters filter
+3. **AI Content Generation:** AI generates event descriptions while preserving structured venue data
+4. **Block Creation:** Publisher creates Event Details blocks with InnerBlocks support and proper attribute mapping
+5. **Venue Management:** DmEventsVenue handles term creation, lookup, metadata validation, and event assignment
+6. **Schema Generation:** DmEventsSchema creates Google Event structured data combining block attributes with venue taxonomy meta
 
-**Enhanced Publisher Features:**
-- **Google Event Schema:** DmEventsSchema generates comprehensive structured data from block attributes and venue taxonomy meta for enhanced SEO visibility
-- **Centralized Venue Handling:** DmEventsVenue class provides venue term creation, lookup, metadata validation, and assignment operations
+**Key Integration Features:**
 - **Smart Parameter Routing:** DmEventsSchema.engine_or_tool() intelligently routes data between system parameters and AI inference
-- **Comprehensive Venue Meta:** 9 venue meta fields (address, city, state, zip, country, phone, website, capacity, coordinates) plus native WordPress description
-- **AI-Enhanced Descriptions:** AI generates engaging event descriptions while import handlers provide structured venue data
-- **Block Content Generation:** Event Details blocks with proper address mapping and display controls (showVenue, showArtist, showPrice, showTicketLink)
-- **Single-Item Processing:** Import handlers process one event per job execution with duplicate prevention via dm_is_item_processed
-- **Venue Data Priority:** Venue taxonomy data overrides address attributes during event rendering
-- **Status Detection System:** Status_Detection class provides comprehensive red/yellow/green monitoring for Data Machine integration
-- **Security & Validation:** WordPress security compliance with comprehensive input sanitization and capability checks
-- **Error Handling:** Detailed logging and validation throughout the entire import and publishing pipeline
+- **Unified Parameter System:** Data Machine's dm_engine_parameters filter manages single parameter structure across all custom steps
+- **InnerBlocks Support:** Event Details blocks with rich content editing capabilities and proper attribute mapping
+- **Comprehensive Venue Meta:** 9 venue meta fields plus native WordPress description automatically populated from import sources
+- **Single-Item Processing:** Import handlers process one event per job execution with duplicate prevention and incremental processing
+- **Status Detection:** Red/yellow/green monitoring via Status_Detection class for all Data Machine integration components
+- **Security Compliance:** WordPress security standards with comprehensive input sanitization and capability checks
 
 ## Technical Details
 
-**Block Registration:**
-```php
-// Calendar block with comprehensive filtering and pagination
-register_block_type($path, array(
-    'render_callback' => array($this, 'render_calendar_block'),
-    'attributes' => array(
-        'defaultView' => array('type' => 'string', 'default' => 'list'),
-        'eventsToShow' => array('type' => 'number', 'default' => 10),
-        'showPastEvents' => array('type' => 'boolean', 'default' => false),
-        'showFilters' => array('type' => 'boolean', 'default' => true),
-        'enablePagination' => array('type' => 'boolean', 'default' => true)
-    )
-));
+**Event Details Block with InnerBlocks:**
+```javascript
+// Event Details block registration with InnerBlocks support
+registerBlockType('dm-events/event-details', {
+    edit: function Edit({ attributes, setAttributes }) {
+        const { startDate, venue, performer, showVenue, showPrice } = attributes;
+        
+        return (
+            <div {...useBlockProps()}>
+                <TextControl 
+                    label="Event Date" 
+                    value={startDate} 
+                    onChange={(value) => setAttributes({ startDate: value })}
+                />
+                {/* 15+ comprehensive event attributes */}
+                <InnerBlocks /> {/* Rich content editing support */}
+            </div>
+        );
+    },
+    save: () => <InnerBlocks.Content />
+});
 ```
 
-**Event Creation & Schema Generation:**
+**Data Machine Integration Pattern:**
 ```php
-// Centralized venue operations with comprehensive validation
-$venue_result = DmEventsVenue::find_or_create_venue($venue_name, $venue_data);
-$assignment = DmEventsVenue::assign_venue_to_event($post_id, $venue_name, $venue_data);
-
-// Smart parameter routing for engine vs AI decisions
-$routing = DmEventsSchema::engine_or_tool($event_data, $import_data);
-
-// Generate Google Event Schema with venue taxonomy integration
-$venue_data = Venue_Taxonomy::get_venue_data($venue_result['term_id']);
-$schema = DmEventsSchema::generate_event_schema($block_attributes, $venue_data, $post_id);
-
-// Single-item processing pattern for import handlers
-if ($flow_step_id && $job_id) {
-    do_action('dm_mark_item_processed', $flow_step_id, 'source_type', $event_identifier, $job_id);
+// Unified parameter system for all custom steps
+public function execute(array $parameters): array {
+    $job_id = $parameters['execution']['job_id'];
+    $flow_step_id = $parameters['execution']['flow_step_id'];
+    $data = $parameters['data'] ?? [];
+    $metadata = $parameters['metadata'] ?? []; // Venue data injection
+    return $data; // Always return data packet for pipeline continuity
 }
-return ['processed_items' => [['data' => $standardized_event, 'metadata' => [...]]]];
+
+// Single-item processing with duplicate prevention
+foreach ($raw_events as $raw_event) {
+    $event_identifier = md5($standardized_event['title'] . $standardized_event['startDate']);
+    $is_processed = apply_filters('dm_is_item_processed', false, $flow_step_id, 'source_type', $event_identifier);
+    if ($is_processed) continue;
+    
+    // Mark as processed and return IMMEDIATELY
+    do_action('dm_mark_item_processed', $flow_step_id, 'source_type', $event_identifier, $job_id);
+    return ['processed_items' => [['data' => $standardized_event]]];
+}
 ```
 
 **Post Type Registration & Taxonomy Integration:**

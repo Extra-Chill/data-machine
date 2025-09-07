@@ -188,12 +188,9 @@ registerBlockType('dm-events/event-details', {
 
     /**
      * Block save component
+     * Returns null for dynamic server-side rendering
      */
     save: function Save() {
-        return (
-            <div className="wp-block-dm-events-event-details">
-                <InnerBlocks.Content />
-            </div>
-        );
+        return null;
     }
 }); 

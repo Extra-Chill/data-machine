@@ -22,9 +22,14 @@ npm run lint:js && npm run lint:css    # Linting
 
 - **Production Build:** `./build.sh` creates optimized package in `/dist` directory with versioned .zip file for WordPress deployment
 - **VSCode Integration:** `.vscode/tasks.json` provides IDE task management for development workflow
-- **Asset Management:** Frontend CSS located at `assets/css/dm-events-frontend.css` (individual blocks handle own JS)
+- **Asset Management:** Frontend CSS located at `assets/css/dm-events-frontend.css` (individual blocks handle own JavaScript)
 - **Dynamic Versioning:** Admin assets use `filemtime()` for cache busting
-- **Build Steps:** Install dependencies, build blocks (Calendar + Event Details), copy files, create ZIP, restore dev dependencies
+- **Automated Build Pipeline:** 
+  1. Clean dist directory and install production composer dependencies
+  2. Build Calendar block (webpack) and Event Details block (@wordpress/scripts) 
+  3. Copy plugin files with rsync (excludes development files)
+  4. Create versioned ZIP package with build info
+  5. Restore development dependencies for continued work
 
 ## Architecture
 
@@ -66,8 +71,14 @@ npm run lint:js && npm run lint:css    # Linting
 ### Blocks & Venues
 
 **Blocks:**
-- `inc/blocks/calendar/` - Events display with filtering (webpack)
-- `inc/blocks/event-details/` - Event data storage (@wordpress/scripts)
+- `inc/blocks/calendar/` - Events display with filtering and pagination (webpack build system)
+- `inc/blocks/event-details/` - Event data storage with InnerBlocks rich content support (@wordpress/scripts build system)
+
+**Event Details Block Architecture:**
+- **InnerBlocks Integration:** Support for rich content editing within event posts
+- **15+ Event Attributes:** Comprehensive data model (startDate, endDate, startTime, endTime, venue, address, price, ticketUrl, performer, performerType, organizer, organizerType, organizerUrl, eventStatus, previousStartDate, priceCurrency, offerAvailability)
+- **Display Controls:** showVenue, showPrice, showTicketLink, showArtist for flexible rendering
+- **Block-First Data:** Single source of truth with background sync to meta fields for query efficiency
 
 **Venues:**
 - WordPress taxonomy with comprehensive term meta (9 fields: address, city, state, zip, country, phone, website, capacity, coordinates)
@@ -125,13 +136,19 @@ npm run lint:js && npm run lint:css    # Linting
 - Capability checks for admin functions
 
 ### Build Systems
-- **Calendar:** webpack (`npm run build/start`)
-- **Event Details:** @wordpress/scripts (`npm run build/start`)
-- **Production Build:** `./build.sh` creates optimized package in `/dist` directory with versioned .zip file
-- **VSCode Tasks:** `.vscode/tasks.json` provides IDE task management for development workflow
+- **Calendar Block:** webpack build system (`cd inc/blocks/calendar && npm run build/start`)
+- **Event Details Block:** @wordpress/scripts build system (`cd inc/blocks/event-details && npm run build/start`)
+- **Production Build:** `./build.sh` creates optimized package in `/dist` directory with versioned .zip file for WordPress deployment
+- **VSCode Integration:** `.vscode/tasks.json` provides IDE task management for development workflow
 - **Asset Strategy:** Individual blocks handle own JavaScript, shared frontend CSS in `assets/css/dm-events-frontend.css`
 - **Dynamic Versioning:** Admin assets use `filemtime()` for automatic cache invalidation
-- **Build Steps:** Install dependencies, build blocks (Calendar + Event Details), copy files, create ZIP, restore dev dependencies
+- **Automated Build Steps:** 
+  1. Install production composer dependencies (`composer install --no-dev --optimize-autoloader`)
+  2. Build Calendar block with webpack (`npm ci && npm run build`)
+  3. Build Event Details block with @wordpress/scripts (`npm ci && npm run build`)
+  4. Copy files with rsync (excludes node_modules, src, development files)
+  5. Create versioned ZIP file in `/dist` directory
+  6. Generate build info and restore development dependencies
 
 ### Data Machine Integration
 - **Import Handlers:** Ticketmaster Discovery API (API key auth with comprehensive validation), Dice FM, Web Scrapers in `inc/steps/event-import/handlers/`

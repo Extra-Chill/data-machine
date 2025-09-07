@@ -20,27 +20,26 @@
  * @since 1.0.0
  */
 
-// Prevent direct access
 if (!defined('ABSPATH')) {
     exit;
 }
 
-// Composer autoload (for external libraries)
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once __DIR__ . '/vendor/autoload.php';
 }
-
-// Define plugin constants
 define('DM_EVENTS_VERSION', '1.0.0');
 define('DM_EVENTS_PLUGIN_FILE', __FILE__);
 define('DM_EVENTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DM_EVENTS_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('DM_EVENTS_PLUGIN_BASENAME', plugin_basename(__FILE__));
-define('DM_EVENTS_PATH', plugin_dir_path(__FILE__)); // Alias for Data Machine integration
+define('DM_EVENTS_PATH', plugin_dir_path(__FILE__));
 
 
 /**
  * PSR-4 Autoloader for DmEvents namespace classes
+ *
+ * Handles autoloading for DmEvents namespace with special handling for 
+ * Data Machine handler classes that use different naming conventions.
  *
  * @param string $class_name The fully qualified class name
  */
@@ -53,7 +52,6 @@ function dm_events_autoloader($class_name) {
     $actual_class = end($class_parts);
     $file_name = 'class-' . strtolower(str_replace('_', '-', $actual_class)) . '.php';
     
-    // Data Machine handler classes use direct naming convention
     $dm_handlers = ['DmEventsSettings', 'DmEventsPublisher', 'DmEventsFilters', 'DmEventsVenue', 'DmEventsSchema'];
     if (in_array($actual_class, $dm_handlers)) {
         $file_name = $actual_class . '.php';
@@ -85,7 +83,6 @@ function dm_events_autoloader($class_name) {
     
 }
 
-// Register autoloader
 spl_autoload_register('dm_events_autoloader');
 
 /**
@@ -161,13 +158,18 @@ class DM_Events {
         if (class_exists('DmEvents\\Admin')) {
             new \DmEvents\Admin();
         }
+        
+        if (class_exists('DmEvents\\Admin\\Settings_Page')) {
+            new \DmEvents\Admin\Settings_Page();
+        }
     }
     
     /**
      * Initialize frontend functionality
      */
     private function init_frontend() {
-        // Frontend assets handled by individual blocks
+        add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_assets'));
+        add_filter('template_include', array($this, 'load_event_templates'));
     }
     
     /**
@@ -185,19 +187,21 @@ class DM_Events {
     
     /**
      * Initialize Data Machine integration
+     * 
+     * Loads event import handlers and publish handlers when Data Machine is available.
      */
     public function init_data_machine_integration() {
-        // Check if Data Machine is available
         if (!defined('DATA_MACHINE_VERSION')) {
             return;
         }
         
-        // Load Data Machine components directly
         $this->load_data_machine_components();
     }
     
     /**
      * Load Data Machine integration components
+     * 
+     * Loads event import step, filters, and all available handlers.
      */
     private function load_data_machine_components() {
         if (file_exists(DM_EVENTS_PLUGIN_DIR . 'inc/steps/event-import/EventImportStep.php')) {
@@ -217,6 +221,8 @@ class DM_Events {
     
     /**
      * Load event import handlers
+     * 
+     * Dynamically loads all import handlers (Ticketmaster, Dice FM, web scrapers).
      */
     private function load_event_import_handlers() {
         $handlers = ['ticketmaster', 'dice-fm', 'web-scraper'];
@@ -246,6 +252,8 @@ class DM_Events {
     
     /**
      * Load publish handlers
+     * 
+     * Loads Data Machine Events publisher and related classes.
      */
     private function load_publish_handlers() {
         $dm_events_handler_path = DM_EVENTS_PLUGIN_DIR . 'inc/steps/publish/handlers/dm-events/';
@@ -273,6 +281,8 @@ class DM_Events {
     
     /**
      * Enqueue admin assets
+     * 
+     * Loads admin CSS and JavaScript with dynamic versioning for cache busting.
      */
     public function enqueue_admin_assets($hook) {
         if (strpos($hook, 'dm-events') === false) {
@@ -303,6 +313,42 @@ class DM_Events {
     }
     
     /**
+     * Enqueue frontend assets
+     * 
+     * Loads frontend CSS for event display styling.
+     */
+    public function enqueue_frontend_assets() {
+        $css_file = DM_EVENTS_PLUGIN_DIR . 'assets/css/dm-events-frontend.css';
+        
+        if (file_exists($css_file)) {
+            wp_enqueue_style(
+                'dm-events-frontend',
+                DM_EVENTS_PLUGIN_URL . 'assets/css/dm-events-frontend.css',
+                array(),
+                filemtime($css_file)
+            );
+        }
+    }
+    
+    /**
+     * Load custom templates for dm_events post type
+     */
+    public function load_event_templates($template) {
+        global $post;
+        
+        if ($post && $post->post_type === 'dm_events') {
+            if (is_single()) {
+                $plugin_template = DM_EVENTS_PLUGIN_DIR . 'templates/single-dm_events.php';
+                if (file_exists($plugin_template)) {
+                    return $plugin_template;
+                }
+            }
+        }
+        
+        return $template;
+    }
+    
+    /**
      * Plugin activation hook
      */
     public function activate() {
@@ -318,9 +364,6 @@ class DM_Events {
         flush_rewrite_rules();
     }
     
-    // ========================================
-    // Core Plugin Methods
-    // ========================================
     
     /**
      * Register custom post types
@@ -370,7 +413,6 @@ class DM_Events {
      * Register blocks
      */
     public function register_blocks() {
-        // Register blocks from their block.json files
         register_block_type(DM_EVENTS_PLUGIN_DIR . 'inc/blocks/calendar');
         register_block_type(DM_EVENTS_PLUGIN_DIR . 'inc/blocks/event-details');
     }
