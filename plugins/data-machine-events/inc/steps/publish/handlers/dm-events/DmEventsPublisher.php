@@ -22,10 +22,10 @@ if (!defined('ABSPATH')) {
 class DmEventsPublisher {
     
     /**
-     * Initialize publisher (venue parameters now handled by engine)
+     * Initialize publisher
      */
     public function __construct() {
-        // No filter registration needed - venue parameters injected by engine
+        // Venue parameters injected by engine
     }
     
     

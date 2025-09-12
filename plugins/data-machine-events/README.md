@@ -22,6 +22,8 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 ### Development
 - **PSR-4 Autoloading:** `DmEvents\` namespace with enhanced autoloader for Data Machine handlers
 - **Dual Build Systems:** Calendar block (webpack), Event Details block (@wordpress/scripts)
+- **Visual Enhancement System:** BorderRenderer.js for day-grouped calendar visual borders with L-shape detection
+- **Centralized Design Tokens:** root.css provides unified CSS custom properties for all blocks and JavaScript
 - **Production Build:** Automated `./build.sh` script creates optimized WordPress plugin package
 - **REST API Support:** Event metadata exposed via WordPress REST API
 - **Schema Generation:** Google Event structured data with smart parameter routing for SEO enhancement
@@ -33,6 +35,7 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 
 **Core Classes:**
 - `DmEvents\Admin\Status_Detection` - Data Machine integration status monitoring
+- `DmEvents\Admin\Settings_Page` - Event settings interface for archive behavior and display preferences
 - `DmEvents\Core\Venue_Taxonomy` - Complete venue taxonomy with 9 meta fields and admin interface
 - `DmEvents\Core\Event_Post_Type` - Event post type registration with selective menu control
 - `DmEvents\Steps\Publish\Handlers\DmEvents\DmEventsSchema` - Google Event Schema JSON-LD generator for SEO enhancement
@@ -50,9 +53,9 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 - `DmEvents\Steps\EventImport\Handlers\DiceFm\DiceFmAuth` - Dice FM authentication provider
 - `DmEvents\Steps\EventImport\Handlers\DiceFm\DiceFmSettings` - Dice FM handler configuration management
 - `DmEvents\Steps\EventImport\Handlers\DiceFm\DiceFmFilters` - Dice FM event filtering system
-- `DmEvents\Steps\EventImport\Handlers\WebScraper\WebScraper` - Web scraper event extraction with validation
-- `DmEvents\Steps\EventImport\Handlers\WebScraper\WebScraperSettings` - Web scraper configuration management
-- `DmEvents\Steps\EventImport\Handlers\WebScraper\WebScraperFilters` - Web scraper filtering system
+- `DmEvents\Steps\EventImport\Handlers\WebScraper\UniversalWebScraper` - AI-powered universal web scraper with HTML section processing
+- `DmEvents\Steps\EventImport\Handlers\WebScraper\UniversalWebScraperSettings` - Universal web scraper configuration management
+- `DmEvents\Steps\EventImport\Handlers\WebScraper\UniversalWebScraperFilters` - Universal web scraper filtering system
 
 ## Quick Start
 
@@ -66,11 +69,12 @@ composer install
 Upload to `/wp-content/plugins/dm-events/` and activate.
 
 ### Usage
-1. **Automated Import:** Configure Data Machine plugin for Ticketmaster Discovery API (API key), Dice FM, or web scraper imports
-2. **AI-Driven Publishing:** Data Machine AI creates events with descriptions, comprehensive venue creation, and taxonomy assignments
-3. **Manual Events:** Add Event post → Insert "Event Details" block → Fill event data  
-4. **Display Events:** Add "Data Machine Events Calendar" block to any page/post
-5. **Manage Venues:** Events → Venues → Add comprehensive venue details with 9 meta fields (auto-populated via AI imports)
+1. **Plugin Settings:** Events → Settings → Configure archive behavior, search integration, and display preferences
+2. **Automated Import:** Configure Data Machine plugin for Ticketmaster Discovery API (API key), Dice FM, or universal web scraper imports
+3. **AI-Driven Publishing:** Data Machine AI creates events with descriptions, comprehensive venue creation, and taxonomy assignments
+4. **Manual Events:** Add Event post → Insert "Event Details" block → Fill event data  
+5. **Display Events:** Add "Data Machine Events Calendar" block to any page/post
+6. **Manage Venues:** Events → Venues → Add comprehensive venue details with 9 meta fields (auto-populated via AI imports)
 
 ## Project Structure
 
@@ -78,8 +82,9 @@ Upload to `/wp-content/plugins/dm-events/` and activate.
 dm-events/
 ├── dm-events.php            # Main plugin file with PSR-4 autoloader
 ├── inc/
-│   ├── admin/               # Status detection system
-│   │   └── class-status-detection.php
+│   ├── admin/               # Admin interface classes
+│   │   ├── class-status-detection.php
+│   │   └── class-settings-page.php
 │   ├── blocks/
 │   │   ├── calendar/        # Calendar block (webpack)
 │   │   └── event-details/   # Event details block (@wordpress/scripts)
@@ -92,8 +97,9 @@ dm-events/
 │       └── publish/         # AI-driven publishing with Schema generation
 │           └── handlers/dm-events/  # DmEventsPublisher, Schema, Venue handling
 ├── assets/
-│   ├── css/                 # Frontend styling (dm-events-frontend.css)
+│   ├── css/                 # Admin styling (admin.css)
 │   └── js/                  # Admin JavaScript
+├── inc/blocks/root.css      # Centralized design tokens and CSS custom properties
 └── composer.json            # PHP dependencies
 ```
 
@@ -162,16 +168,21 @@ echo '<script type="application/ld+json">' . wp_json_encode($schema) . '</script
 ## AI Integration
 
 **AI-Driven Event Creation Pipeline:**
-1. **Import Handlers:** Extract event data from APIs (Ticketmaster, Dice FM) or web scrapers using single-item processing
-2. **Venue Data Injection:** DmEventsPublisher injects venue metadata via dm_engine_additional_parameters filter
-3. **AI Content Generation:** AI generates event descriptions while preserving structured venue data
-4. **Block Creation:** Publisher creates Event Details blocks with InnerBlocks support and proper attribute mapping
-5. **Venue Management:** DmEventsVenue handles term creation, lookup, metadata validation, and event assignment
-6. **Schema Generation:** DmEventsSchema creates Google Event structured data combining block attributes with venue taxonomy meta
+1. **Import Handlers:** Extract event data from APIs (Ticketmaster, Dice FM) or AI-powered universal web scrapers using single-item processing
+2. **AI Web Scraping:** UniversalWebScraper uses AI to extract event data from HTML sections with automated processing
+3. **Venue Data Injection:** DmEventsPublisher injects venue metadata via dm_engine_additional_parameters filter
+4. **AI Content Generation:** AI generates event descriptions while preserving structured venue data
+5. **Block Creation:** Publisher creates Event Details blocks with InnerBlocks support and proper attribute mapping
+6. **Venue Management:** DmEventsVenue handles term creation, lookup, metadata validation, and event assignment
+7. **Schema Generation:** DmEventsSchema creates Google Event structured data combining block attributes with venue taxonomy meta
+8. **Visual Enhancement:** BorderRenderer.js creates day-grouped visual borders with intelligent L-shape detection for calendar display
 
 **Key Integration Features:**
+- **AI-Powered Web Scraping:** UniversalWebScraper uses AI to extract structured event data from any HTML page
+- **Visual Enhancement System:** BorderRenderer.js with L-shape detection for day-grouped calendar visual borders
+- **Centralized Design System:** root.css provides unified design tokens accessible from both CSS and JavaScript
 - **Smart Parameter Routing:** DmEventsSchema.engine_or_tool() intelligently routes data between system parameters and AI inference
-- **Unified Parameter System:** Data Machine's dm_engine_parameters filter manages single parameter structure across all custom steps
+- **Flat Parameter System:** Data Machine's single-level parameter structure across all custom steps for simplified integration
 - **InnerBlocks Support:** Event Details blocks with rich content editing capabilities and proper attribute mapping
 - **Comprehensive Venue Meta:** 9 venue meta fields plus native WordPress description automatically populated from import sources
 - **Single-Item Processing:** Import handlers process one event per job execution with duplicate prevention and incremental processing
@@ -205,24 +216,27 @@ registerBlockType('dm-events/event-details', {
 
 **Data Machine Integration Pattern:**
 ```php
-// Unified parameter system for all custom steps
+// Flat parameter system for all custom steps
 public function execute(array $parameters): array {
-    $job_id = $parameters['execution']['job_id'];
-    $flow_step_id = $parameters['execution']['flow_step_id'];
+    $job_id = $parameters['job_id'];
+    $flow_step_id = $parameters['flow_step_id'];
     $data = $parameters['data'] ?? [];
-    $metadata = $parameters['metadata'] ?? []; // Venue data injection
+    $flow_step_config = $parameters['flow_step_config'] ?? [];
     return $data; // Always return data packet for pipeline continuity
 }
 
 // Single-item processing with duplicate prevention
 foreach ($raw_events as $raw_event) {
+    $standardized_event = $this->map_ticketmaster_event($raw_event);
     $event_identifier = md5($standardized_event['title'] . $standardized_event['startDate']);
-    $is_processed = apply_filters('dm_is_item_processed', false, $flow_step_id, 'source_type', $event_identifier);
+    $is_processed = apply_filters('dm_is_item_processed', false, $flow_step_id, 'ticketmaster', $event_identifier);
     if ($is_processed) continue;
     
     // Mark as processed and return IMMEDIATELY
-    do_action('dm_mark_item_processed', $flow_step_id, 'source_type', $event_identifier, $job_id);
-    return ['processed_items' => [['data' => $standardized_event]]];
+    do_action('dm_mark_item_processed', $flow_step_id, 'ticketmaster', $event_identifier, $job_id);
+    // Add to data packet array and return
+    array_unshift($data, $event_entry);
+    return $data;
 }
 ```
 

@@ -2,8 +2,7 @@
 /**
  * Events Settings Page
  *
- * Provides minimal settings interface for controlling event archive behavior,
- * search integration, and display preferences.
+ * Provides settings interface for archive behavior and display preferences.
  *
  * @package DmEvents
  * @subpackage Admin
@@ -39,11 +38,12 @@ class Settings_Page {
         'include_in_search' => true,
         'use_events_page' => true,
         'default_calendar_view' => 'month',
-        'events_per_page' => 12
+        'events_per_page' => 12,
+        'main_events_page_url' => ''
     );
     
     /**
-     * Initialize the settings page
+     * Register settings hooks and filters
      */
     public function __construct() {
         add_action('admin_init', array($this, 'init_settings'));
@@ -69,7 +69,7 @@ class Settings_Page {
     }
     
     /**
-     * Add settings submenu page
+     * Add settings submenu to events menu
      */
     public function add_settings_submenu() {
         add_submenu_page(
@@ -83,7 +83,7 @@ class Settings_Page {
     }
     
     /**
-     * Initialize WordPress settings API
+     * Register settings with WordPress Settings API
      */
     public function init_settings() {
         register_setting(
@@ -97,7 +97,7 @@ class Settings_Page {
     }
     
     /**
-     * Render the settings page
+     * Render settings page template
      */
     public function render_settings_page() {
         if (!current_user_can('manage_options')) {
@@ -111,7 +111,7 @@ class Settings_Page {
     }
     
     /**
-     * Sanitize settings before saving
+     * Sanitize and validate settings input
      */
     public function sanitize_settings($input) {
         $sanitized = array();
@@ -131,11 +131,16 @@ class Settings_Page {
         // Events per page (numeric)
         $sanitized['events_per_page'] = max(1, min(100, (int) $input['events_per_page']));
         
+        // Main events page URL
+        $sanitized['main_events_page_url'] = !empty($input['main_events_page_url']) 
+            ? esc_url_raw($input['main_events_page_url']) 
+            : '';
+        
         return $sanitized;
     }
     
     /**
-     * Control archive queries based on settings
+     * Modify main queries based on settings
      */
     public function control_archive_queries($query) {
         if (is_admin() || !$query->is_main_query()) {
@@ -193,5 +198,14 @@ class Settings_Page {
         }
         
         return isset($instance->defaults[$key]) ? $instance->defaults[$key] : null;
+    }
+    
+    /**
+     * Get the main events page URL setting
+     *
+     * @return string Main events page URL or empty string if not configured
+     */
+    public static function get_main_events_page_url() {
+        return self::get_setting('main_events_page_url', '');
     }
 }

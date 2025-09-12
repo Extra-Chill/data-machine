@@ -27,6 +27,16 @@ get_header(); ?>
                     <?php the_title('<h1 class="entry-title">', '</h1>'); ?>
                 </header>
 
+                <?php 
+                $main_events_url = \DmEvents\Admin\Settings_Page::get_main_events_page_url();
+                if (!empty($main_events_url)) : ?>
+                    <nav class="dm-events-back-nav" aria-label="<?php esc_attr_e('Event Navigation', 'dm-events'); ?>">
+                        <a href="<?php echo esc_url($main_events_url); ?>" class="dm-events-back-link">
+                            <?php esc_html_e('← Back to Events', 'dm-events'); ?>
+                        </a>
+                    </nav>
+                <?php endif; ?>
+
                 <div class="entry-content">
                     <?php
                     the_content();

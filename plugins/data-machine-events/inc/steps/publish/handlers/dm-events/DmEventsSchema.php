@@ -16,14 +16,12 @@ if (!defined('ABSPATH')) {
 class DmEventsSchema {
 
     /**
-     * Route parameters between engine (system data) and tool (AI inference)
+     * Route parameters between engine and AI tool
      *
-     * Engine parameters have priority over import data for venue information.
-     *
-     * @param array $event_data Basic event data
-     * @param array $import_data Import handler data
-     * @param array $engine_parameters Engine parameters with venue data
-     * @return array Array with 'engine' and 'tool' parameter routing
+     * @param array $event_data Event data
+     * @param array $import_data Import data
+     * @param array $engine_parameters Engine parameters
+     * @return array Parameter routing array
      */
     public static function engine_or_tool($event_data, $import_data, $engine_parameters = []) {
         $engine_params = [];
@@ -75,16 +73,13 @@ class DmEventsSchema {
     }
 
     /**
-     * Generate Google Event Schema JSON-LD from block attributes with engine parameter priority
-     * 
-     * Priority chain: 1) Engine Parameters, 2) Venue Taxonomy Meta, 3) Block Attributes
-     * This ensures imported venue data takes precedence over user-entered block data.
+     * Generate Google Event Schema JSON-LD from block attributes
      *
      * @param array $attributes Event Details block attributes
-     * @param array|null $venue_data Venue taxonomy meta data
+     * @param array|null $venue_data Venue taxonomy data
      * @param int $post_id WordPress post ID
-     * @param array $engine_parameters Optional engine parameters (highest priority)
-     * @return array Event schema array ready for JSON-LD output
+     * @param array $engine_parameters Engine parameters
+     * @return array Event schema array
      */
     public static function generate_event_schema(array $attributes, ?array $venue_data, int $post_id, array $engine_parameters = []): array {
         $schema = [

@@ -1,0 +1,68 @@
+/**
+ * DM Events - Root CSS Custom Properties
+ * Centralized design tokens for all blocks and JavaScript
+ */
+
+:root {
+  /* ====================================
+   * GRID LAYOUT CONSTANTS
+   * Used by both CSS and JavaScript
+   * ==================================== */
+  --dm-grid-cell-width: 280px;
+  --dm-grid-cell-height: 180px;
+  --dm-grid-gap: 1.25rem; /* 20px */
+  --dm-border-padding: 8px;
+
+  /* ====================================
+   * DAY COLORS
+   * ==================================== */
+  --dm-day-sunday: #ff6b6b;
+  --dm-day-monday: #4ecdc4;
+  --dm-day-tuesday: #45b7d1;
+  --dm-day-wednesday: #96ceb4;
+  --dm-day-thursday: #feca57;
+  --dm-day-friday: #ff9ff3;
+  --dm-day-saturday: #54a0ff;
+
+  /* ====================================
+   * BORDER & VISUAL STYLING
+   * ==================================== */
+  --dm-border-width: 2px;
+  --dm-border-radius: 8px;
+  --dm-border-opacity: 0.8;
+
+  /* ====================================
+   * RESPONSIVE BREAKPOINTS
+   * ==================================== */
+  --dm-grid-cell-width-medium: 260px;
+  --dm-grid-cell-height-medium: 160px;
+  --dm-grid-cell-height-mobile: 140px;
+
+  /* ====================================
+   * SPACING & TYPOGRAPHY
+   * ==================================== */
+  --dm-card-padding: 1rem;
+  --dm-filter-gap: 1rem;
+  
+  /* ====================================
+   * COLORS & THEME
+   * ==================================== */
+  --dm-background-light: #f8fafc;
+  --dm-border-light: #e2e8f0;
+  --dm-text-primary: #111827;
+  --dm-text-secondary: #6b7280;
+
+  /* ====================================
+   * DAY BADGE STYLING
+   * ==================================== */
+  --dm-badge-font-size: 0.75rem;
+  --dm-badge-font-weight: 600;
+  --dm-badge-padding-x: 0.75rem;
+  --dm-badge-padding-y: 0.375rem;
+  --dm-badge-border-radius: 12px;
+  --dm-badge-offset-x: 12px;
+  --dm-badge-offset-y: -6px;
+  --dm-badge-z-index: 15;
+  --dm-badge-backdrop-blur: 4px;
+  --dm-badge-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}

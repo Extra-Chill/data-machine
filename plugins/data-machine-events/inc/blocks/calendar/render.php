@@ -1,22 +1,12 @@
 <?php
 /**
- * Data Machine Events Calendar Block Server-Side Render Template
+ * Calendar Block Server-Side Render Template
  *
- * Block-first architecture render template that queries events based on Event Details
- * block attributes as the single source of truth. Supports filtering, pagination,
- * and multiple view modes.
+ * Renders events calendar with filtering and pagination.
  *
- * Available context:
- * @var array $attributes Block attributes (defaultView, eventsToShow, showFilters, etc.)
- * @var string $content Block inner content (unused in dynamic block)
- * @var WP_Block $block Block instance object
- *
- * Key features:
- * - Time-based event filtering (future, past, all)
- * - Search and date range filtering
- * - View toggle (list/grid)
- * - Pagination support
- * - Block-first data architecture
+ * @var array $attributes Block attributes
+ * @var string $content Block inner content
+ * @var WP_Block $block Block instance
  */
 
 if (!defined('ABSPATH')) {
@@ -29,13 +19,11 @@ if (wp_is_json_request() || (defined('REST_REQUEST') && REST_REQUEST)) {
 }
 
 // Extract block configuration with defaults
-$default_view = $attributes['defaultView'] ?? 'list';
 $events_to_show = $attributes['eventsToShow'] ?? 10;
 $show_past_events = $attributes['showPastEvents'] ?? false;
 $show_filters = $attributes['showFilters'] ?? true;
 $show_search = $attributes['showSearch'] ?? true;
 $show_date_filter = $attributes['showDateFilter'] ?? true;
-$show_view_toggle = $attributes['showViewToggle'] ?? true;
 $enable_pagination = $attributes['enablePagination'] ?? true;
 $events_per_page = $attributes['eventsPerPage'] ?? 12;
 
@@ -105,23 +93,53 @@ usort($filtered_events, function($a, $b) use ($view_mode) {
     }
 });
 
-// Apply pagination logic
-$total_events = count($filtered_events);
-$events_per_page_calc = $enable_pagination ? $events_per_page : $events_to_show;
-$offset = ($current_page - 1) * $events_per_page_calc;
-$paged_events = array_slice($filtered_events, $offset, $events_per_page_calc);
+// Group events by date
+$events_by_date = array();
+foreach ($filtered_events as $event_item) {
+    $event_data = $event_item['event_data'];
+    $start_date = $event_data['startDate'] ?? '';
+    
+    if (!empty($start_date)) {
+        $start_time = $event_data['startTime'] ?? '00:00:00';
+        $start_datetime_obj = new DateTime($start_date . ' ' . $start_time);
+        $date_key = $start_datetime_obj->format('Y-m-d'); // Group by calendar date
+        
+        if (!isset($events_by_date[$date_key])) {
+            $events_by_date[$date_key] = array(
+                'date_obj' => $start_datetime_obj,
+                'events' => array()
+            );
+        }
+        
+        $events_by_date[$date_key]['events'][] = $event_item;
+    }
+}
+
+// Sort date groups chronologically
+uksort($events_by_date, function($a, $b) use ($view_mode) {
+    if ($view_mode === 'past') {
+        return strcmp($b, $a); // Recent past first
+    } else {
+        return strcmp($a, $b); // Earliest future first
+    }
+});
+
+// Apply pagination to date groups
+$total_date_groups = count($events_by_date);
+$groups_per_page = $enable_pagination ? max(1, intval($events_per_page / 3)) : $total_date_groups; // Fewer groups per page
+$offset = ($current_page - 1) * $groups_per_page;
+$paged_date_groups = array_slice($events_by_date, $offset, $groups_per_page, true);
 
 // Create query object for pagination
 $events_query = new stdClass();
-$events_query->posts = array_column($paged_events, 'post');
-$events_query->post_count = count($paged_events);
-$events_query->found_posts = $total_events;
-$events_query->max_num_pages = $enable_pagination ? ceil($total_events / $events_per_page_calc) : 1;
+$events_query->post_count = array_sum(array_map(function($group) { return count($group['events']); }, $paged_date_groups));
+$events_query->found_posts = array_sum(array_map(function($group) { return count($group['events']); }, $events_by_date));
+$events_query->max_num_pages = $enable_pagination ? ceil($total_date_groups / $groups_per_page) : 1;
 $events_query->current_post = -1;
 
 // Generate block wrapper with CSS classes
 $wrapper_attributes = get_block_wrapper_attributes(array(
-    'class' => 'dm-events-calendar dm-events-view-' . esc_attr($default_view)
+    'class' => 'dm-events-calendar dm-events-date-grouped'
 ));
 ?>
 
@@ -175,118 +193,133 @@ $wrapper_attributes = get_block_wrapper_attributes(array(
                         <?php _e('All Events', 'dm-events'); ?>
                     </button>
                 </div>
-                
-                <?php if ($show_view_toggle) : ?>
-                    <div class="dm-events-view-toggle">
-                        <button type="button" 
-                                class="dm-events-view-btn dm-events-view-list active" 
-                                data-view="list">
-                            <span class="dashicons dashicons-list-view"></span>
-                            <?php _e('List', 'dm-events'); ?>
-                        </button>
-                        <button type="button" 
-                                class="dm-events-view-btn dm-events-view-grid" 
-                                data-view="grid">
-                            <span class="dashicons dashicons-grid-view"></span>
-                            <?php _e('Grid', 'dm-events'); ?>
-                        </button>
-                    </div>
-                <?php endif; ?>
             </div>
         </div>
     <?php endif; ?>
     
     <div class="dm-events-content">
-        <?php if (!empty($paged_events)) : ?>
+        <?php if (!empty($paged_date_groups)) : ?>
+            <svg class="dm-border-overlay" xmlns="http://www.w3.org/2000/svg">
+                <!-- Day group borders rendered by JavaScript -->
+            </svg>            
             <div class="dm-events-list" id="dm-events-list">
-                <?php foreach ($paged_events as $event_item) : 
-                    $event_post = $event_item['post'];
-                    $event_data = $event_item['event_data'];
+                <?php
+                
+                foreach ($paged_date_groups as $date_key => $date_group) : 
+                    $date_obj = $date_group['date_obj'];
+                    $events_for_date = $date_group['events'];
                     
-                    // Set global post for template functions
-                    global $post;
-                    $post = $event_post;
-                    setup_postdata($post);
-                    
-                    // Map block attributes to display variables
-                    $start_date = $event_data['startDate'] ?? '';
-                    $start_time = $event_data['startTime'] ?? '';
-                    $end_date = $event_data['endDate'] ?? '';
-                    $end_time = $event_data['endTime'] ?? '';
-                    $venue_name = $event_data['venue'] ?? '';
-                    $venue_address = $event_data['address'] ?? '';
-                    $artist_name = $event_data['artist'] ?? '';
-                    $price = $event_data['price'] ?? '';
-                    $ticket_url = $event_data['ticketUrl'] ?? '';
-
-                    // Get block-level visibility settings
-                    $show_venue = $event_data['showVenue'] ?? true;
-                    $show_artist = $event_data['showArtist'] ?? true;
-                    $show_price = $event_data['showPrice'] ?? true;
-                    $show_ticket_link = $event_data['showTicketLink'] ?? true;
-                    
-                    // Generate date formats for display and JavaScript
-                    $formatted_start_date = '';
-                    $iso_start_date = '';
-                    if ($start_date) {
-                        $start_datetime_obj = new DateTime($start_date . ' ' . $start_time);
-                        $formatted_start_date = $start_datetime_obj->format('M j, Y g:i A');
-                        $iso_start_date = $start_datetime_obj->format('c'); // ISO 8601 for JS
-                    }
+                    // Calculate day of week data for each event
+                    $day_number = (int) $date_obj->format('w'); // 0 = Sunday, 6 = Saturday
+                    $day_name = $date_obj->format('l'); // Full day name
+                    $day_of_week = strtolower($day_name); // For CSS class
+                    $formatted_date_label = $date_obj->format('l, F jS'); // "Saturday, August 31st"
                     ?>
-                    <div class="dm-event-item" 
-                         data-title="<?php echo esc_attr(get_the_title()); ?>"
-                         data-venue="<?php echo esc_attr($venue_name); ?>"
-                         data-artist="<?php echo esc_attr($artist_name); ?>"
-                         data-date="<?php echo esc_attr($iso_start_date); ?>">
-                        <div class="dm-event-card">
-                            <div class="dm-event-card-body">
-                                <h3 class="dm-event-title">
-                                    <a href="<?php the_permalink(); ?>"><?php the_title(); ?></a>
-                                </h3>
-                                
-                                <div class="dm-event-meta">
-                                    <div class="dm-event-date">
-                                        <span class="dashicons dashicons-calendar-alt"></span>
-                                        <?php echo esc_html($formatted_start_date); ?>
-                                    </div>
-                                    
-                                    <?php if ($show_venue && !empty($venue_name)) : ?>
-                                    <div class="dm-event-venue">
-                                        <span class="dashicons dashicons-location"></span>
-                                        <?php echo esc_html($venue_name); ?>
-                                    </div>
-                                    <?php endif; ?>
-
-                                    <?php if ($show_artist && !empty($artist_name)) : ?>
-                                        <div class="dm-event-artist">
-                                            <span class="dashicons dashicons-admin-users"></span>
-                                            <?php echo esc_html($artist_name); ?>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                                
-                                <div class="dm-event-excerpt">
-                                    <?php the_excerpt(); ?>
-                                </div>
-                            </div>
-                            
-                            <div class="dm-event-card-footer">
-                                <a href="<?php the_permalink(); ?>" class="dm-event-details-link">
-                                    <?php _e('View Details', 'dm-events'); ?>
-                                </a>
-                                <?php if ($show_ticket_link && !empty($ticket_url)) : ?>
-                                    <a href="<?php echo esc_url($ticket_url); ?>" 
-                                       class="dm-event-ticket-link" 
-                                       target="_blank" 
-                                       rel="noopener noreferrer">
-                                        <?php _e('Get Tickets', 'dm-events'); ?>
-                                    </a>
-                                <?php endif; ?>
-                            </div>
+                    
+                    <div class="dm-date-group dm-day-<?php echo esc_attr($day_of_week); ?>" data-date="<?php echo esc_attr($date_obj->format('Y-m-d')); ?>">
+                        <div class="dm-day-badge dm-day-badge-<?php echo esc_attr($day_of_week); ?>" 
+                             data-date-label="<?php echo esc_attr($formatted_date_label); ?>" 
+                             data-day-name="<?php echo esc_attr($day_of_week); ?>">
+                            <?php echo esc_html($formatted_date_label); ?>
                         </div>
-                    </div>
-                <?php endforeach; ?>
+                    <?php
+                    
+                    foreach ($events_for_date as $event_item) : 
+                                $event_post = $event_item['post'];
+                                $event_data = $event_item['event_data'];
+                                
+                                // Set global post for template functions
+                                global $post;
+                                $post = $event_post;
+                                setup_postdata($post);
+                                
+                                // Map block attributes to display variables
+                                $start_date = $event_data['startDate'] ?? '';
+                                $start_time = $event_data['startTime'] ?? '';
+                                $end_date = $event_data['endDate'] ?? '';
+                                $end_time = $event_data['endTime'] ?? '';
+                                $venue_name = $event_data['venue'] ?? '';
+                                $venue_address = $event_data['address'] ?? '';
+                                $artist_name = $event_data['artist'] ?? '';
+                                $price = $event_data['price'] ?? '';
+                                $ticket_url = $event_data['ticketUrl'] ?? '';
+
+                                // Get block-level visibility settings
+                                $show_venue = $event_data['showVenue'] ?? true;
+                                $show_artist = $event_data['showArtist'] ?? true;
+                                $show_price = $event_data['showPrice'] ?? true;
+                                $show_ticket_link = $event_data['showTicketLink'] ?? true;
+                                
+                                // Generate date formats for display and JavaScript
+                                $formatted_start_time = '';
+                                $iso_start_date = '';
+                                if ($start_date) {
+                                    $start_datetime_obj = new DateTime($start_date . ' ' . $start_time);
+                                    $formatted_start_time = $start_datetime_obj->format('g:i A'); // Just time for individual events
+                                    $iso_start_date = $start_datetime_obj->format('c'); // ISO 8601 for JS
+                                }
+                                ?>
+                                <div class="dm-event-item" 
+                                     data-title="<?php echo esc_attr(get_the_title()); ?>"
+                                     data-venue="<?php echo esc_attr($venue_name); ?>"
+                                     data-artist="<?php echo esc_attr($artist_name); ?>"
+                                     data-date="<?php echo esc_attr($iso_start_date); ?>">
+                                    <div class="dm-event-card">
+                                        <div class="dm-event-card-body">
+                                            <h4 class="dm-event-title">
+                                                <a href="<?php the_permalink(); ?>"><?php the_title(); ?></a>
+                                            </h4>
+                                            
+                                            <div class="dm-event-meta">
+                                                <?php if (!empty($formatted_start_time)) : ?>
+                                                <div class="dm-event-time">
+                                                    <span class="dashicons dashicons-clock"></span>
+                                                    <?php echo esc_html($formatted_start_time); ?>
+                                                </div>
+                                                <?php endif; ?>
+                                                
+                                                <?php if ($show_venue && !empty($venue_name)) : ?>
+                                                <div class="dm-event-venue">
+                                                    <span class="dashicons dashicons-location"></span>
+                                                    <?php echo esc_html($venue_name); ?>
+                                                </div>
+                                                <?php endif; ?>
+
+                                                <?php if ($show_artist && !empty($artist_name)) : ?>
+                                                    <div class="dm-event-artist">
+                                                        <span class="dashicons dashicons-admin-users"></span>
+                                                        <?php echo esc_html($artist_name); ?>
+                                                    </div>
+                                                <?php endif; ?>
+                                            </div>
+                                            
+                                            <div class="dm-event-excerpt">
+                                                <?php the_excerpt(); ?>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="dm-event-card-footer">
+                                            <a href="<?php the_permalink(); ?>" class="dm-event-details-link">
+                                                <?php _e('View Details', 'dm-events'); ?>
+                                            </a>
+                                            <?php if ($show_ticket_link && !empty($ticket_url)) : ?>
+                                                <a href="<?php echo esc_url($ticket_url); ?>" 
+                                                   class="dm-event-ticket-link" 
+                                                   target="_blank" 
+                                                   rel="noopener noreferrer">
+                                                    <?php _e('Get Tickets', 'dm-events'); ?>
+                                                </a>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                    <?php 
+                    endforeach; // End events loop
+                    ?>
+                    </div><!-- .dm-date-group -->
+                    <?php
+                endforeach; // End date groups loop 
+                ?>
             </div>
             
             <?php 

@@ -17,10 +17,6 @@
 		}
 	},
 	"attributes": {
-		"defaultView": {
-			"type": "string",
-			"default": "list"
-		},
 		"eventsToShow": {
 			"type": "number",
 			"default": 10
@@ -41,10 +37,6 @@
 			"type": "boolean",
 			"default": true
 		},
-		"showViewToggle": {
-			"type": "boolean",
-			"default": true
-		},
 		"defaultDateRange": {
 			"type": "string",
 			"default": "current"
@@ -62,5 +54,7 @@
 	"editorScript": "file:./build/index.js",
 	"editorStyle": "file:./editor.css",
 	"style": "file:./style.css",
+	"viewStyle": "file:./build/frontend.css",
+	"viewScript": "file:./build/frontend.js",
 	"render": "file:./render.php"
 } 

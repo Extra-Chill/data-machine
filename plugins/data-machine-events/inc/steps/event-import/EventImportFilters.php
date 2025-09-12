@@ -54,14 +54,6 @@ add_filter('dm_handlers', function($handlers) {
         'description' => __('Import events from Dice FM API for electronic music venues', 'dm-events')
     ];
     
-    // Web scraper handler
-    $handlers['web_scraper_events'] = [
-        'type' => 'event_import',
-        'class' => 'DmEvents\\Steps\\EventImport\\Handlers\\WebScraper\\WebScraper',
-        'label' => __('Web Scraper Events', 'dm-events'),
-        'description' => __('Import events using configurable web scrapers for venue websites', 'dm-events')
-    ];
-    
     return $handlers;
 });
 

@@ -1,17 +1,25 @@
 /**
  * Data Machine Events Calendar Frontend JavaScript
  *
- * Client-side interactivity for calendar blocks with search, filtering, and view toggling.
+ * Client-side interactivity for calendar blocks with search and filtering.
  */
 
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/flatpickr.css';
+import { BorderRenderer } from './BorderRenderer.js';
+import { BadgeRenderer } from './BadgeRenderer.js';
 
 (function() {
     'use strict';
 
+    // Global renderers for each calendar instance
+    const borderRenderers = new Map();
+    const badgeRenderers = new Map();
+
     document.addEventListener('DOMContentLoaded', function() {
         initializeCalendarFilters();
+        initializeBorders();
+        initializeBadges();
     });
 
     /**
@@ -23,7 +31,6 @@ import 'flatpickr/dist/flatpickr.css';
         calendars.forEach(function(calendar) {
             const searchInput = calendar.querySelector('#dm-events-search');
             const dateRangeInput = calendar.querySelector('#dm-events-date-range');
-            const viewButtons = calendar.querySelectorAll('.dm-events-view-btn');
             const timeButtons = calendar.querySelectorAll('.dm-events-time-btn');
             const eventsList = calendar.querySelector('#dm-events-list');
             
@@ -74,13 +81,6 @@ import 'flatpickr/dist/flatpickr.css';
                 
             }
             
-            viewButtons.forEach(function(button) {
-                button.addEventListener('click', function() {
-                    const view = this.getAttribute('data-view');
-                    toggleView(calendar, view);
-                });
-            });
-            
             timeButtons.forEach(function(button) {
                 button.addEventListener('click', function() {
                     const timeFilter = this.getAttribute('data-time');
@@ -98,6 +98,7 @@ import 'flatpickr/dist/flatpickr.css';
      */
     function filterEvents(calendar, searchTerm) {
         const events = calendar.querySelectorAll('.dm-event-item');
+        const dateGroups = calendar.querySelectorAll('.dm-date-group');
         const searchLower = searchTerm.toLowerCase();
         
         events.forEach(function(event) {
@@ -120,7 +121,21 @@ import 'flatpickr/dist/flatpickr.css';
             }
         });
         
+        // Hide date groups that have no visible events
+        dateGroups.forEach(function(dateGroup) {
+            const visibleEvents = dateGroup.querySelectorAll('.dm-event-item:not(.hidden)');
+            if (visibleEvents.length === 0) {
+                dateGroup.classList.add('hidden');
+            } else {
+                dateGroup.classList.remove('hidden');
+            }
+        });
+        
         updateNoEventsMessage(calendar);
+        
+        // Refresh borders and badges after filtering
+        refreshBorders();
+        refreshBadges();
     }
 
     /**
@@ -131,9 +146,11 @@ import 'flatpickr/dist/flatpickr.css';
      */
     function filterEventsByDateRange(calendar, selectedDates) {
         const events = calendar.querySelectorAll('.dm-event-item');
+        const dateGroups = calendar.querySelectorAll('.dm-date-group');
         
         if (!selectedDates || selectedDates.length === 0) {
             events.forEach(event => event.classList.remove('hidden'));
+            dateGroups.forEach(group => group.classList.remove('hidden'));
             updateNoEventsMessage(calendar);
             return;
         }
@@ -144,11 +161,6 @@ import 'flatpickr/dist/flatpickr.css';
         events.forEach(function(event) {
             const eventDate = event.getAttribute('data-date');
             if (!eventDate) {
-                const dateElement = event.querySelector('.dm-event-date');
-                if (!dateElement) {
-                    event.classList.remove('hidden');
-                    return;
-                }
                 event.classList.remove('hidden');
                 return;
             }
@@ -164,34 +176,23 @@ import 'flatpickr/dist/flatpickr.css';
             }
         });
         
-        updateNoEventsMessage(calendar);
-    }
-
-    /**
-     * Toggle calendar display between list and grid views
-     * 
-     * @param {Element} calendar Calendar container
-     * @param {string} view View mode ('list' or 'grid')
-     */
-    function toggleView(calendar, view) {
-        const eventsList = calendar.querySelector('#dm-events-list');
-        const viewButtons = calendar.querySelectorAll('.dm-events-view-btn');
-        
-        calendar.className = calendar.className.replace(/dm-events-view-\w+/, 'dm-events-view-' + view);
-        
-        viewButtons.forEach(function(button) {
-            button.classList.remove('active');
-            if (button.getAttribute('data-view') === view) {
-                button.classList.add('active');
+        // Hide date groups that have no visible events
+        dateGroups.forEach(function(dateGroup) {
+            const visibleEvents = dateGroup.querySelectorAll('.dm-event-item:not(.hidden)');
+            if (visibleEvents.length === 0) {
+                dateGroup.classList.add('hidden');
+            } else {
+                dateGroup.classList.remove('hidden');
             }
         });
         
-        try {
-            localStorage.setItem('dm-events-view', view);
-        } catch (e) {
-            // Ignore localStorage errors
-        }
+        updateNoEventsMessage(calendar);
+        
+        // Refresh borders and badges after filtering
+        refreshBorders();
+        refreshBadges();
     }
+
 
     /**
      * Show or hide "no events found" message
@@ -217,23 +218,65 @@ import 'flatpickr/dist/flatpickr.css';
     }
 
     /**
-     * Restore user's preferred view mode from localStorage
+     * Initialize borders for all calendar instances
      */
-    function restoreViewPreference() {
-        try {
-            const savedView = localStorage.getItem('dm-events-view');
-            if (savedView) {
-                const calendars = document.querySelectorAll('.dm-events-calendar');
-                calendars.forEach(function(calendar) {
-                    const viewButton = calendar.querySelector('[data-view="' + savedView + '"]');
-                    if (viewButton) {
-                        toggleView(calendar, savedView);
-                    }
-                });
+    function initializeBorders() {
+        const calendars = document.querySelectorAll('.dm-events-calendar.dm-events-date-grouped');
+        
+        calendars.forEach(function(calendar) {
+            try {
+                console.log('Initializing borders for calendar:', calendar);
+                
+                // Create border renderer for this calendar
+                const borderRenderer = new BorderRenderer(calendar);
+                borderRenderers.set(calendar, borderRenderer);
+                
+                console.log('Borders initialized successfully');
+                
+            } catch (error) {
+                console.error('Failed to initialize borders:', error);
             }
-        } catch (e) {
-            // Ignore localStorage errors
-        }
+        });
+    }
+
+    /**
+     * Initialize badges for all calendar instances
+     */
+    function initializeBadges() {
+        const calendars = document.querySelectorAll('.dm-events-calendar.dm-events-date-grouped');
+        
+        calendars.forEach(function(calendar) {
+            try {
+                console.log('Initializing badges for calendar:', calendar);
+                
+                // Create badge renderer for this calendar
+                const badgeRenderer = new BadgeRenderer(calendar);
+                badgeRenderers.set(calendar, badgeRenderer);
+                
+                console.log('Badges initialized successfully');
+                
+            } catch (error) {
+                console.error('Failed to initialize badges:', error);
+            }
+        });
+    }
+
+    /**
+     * Refresh borders for all calendars (called after filtering)
+     */
+    function refreshBorders() {
+        borderRenderers.forEach((borderRenderer, calendar) => {
+            borderRenderer.refresh();
+        });
+    }
+
+    /**
+     * Refresh badges for all calendars (called after filtering)
+     */
+    function refreshBadges() {
+        badgeRenderers.forEach((badgeRenderer, calendar) => {
+            badgeRenderer.refresh();
+        });
     }
 
     /**
@@ -253,8 +296,19 @@ import 'flatpickr/dist/flatpickr.css';
         window.location.href = url.toString();
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
-        setTimeout(restoreViewPreference, 100);
+    /**
+     * Cleanup renderers when page unloads
+     */
+    window.addEventListener('beforeunload', function() {
+        borderRenderers.forEach(borderRenderer => {
+            borderRenderer.cleanup();
+        });
+        borderRenderers.clear();
+        
+        badgeRenderers.forEach(badgeRenderer => {
+            badgeRenderer.cleanup();
+        });
+        badgeRenderers.clear();
     });
 
 })(); 

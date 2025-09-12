@@ -2,8 +2,7 @@
 /**
  * Ticketmaster Event Import Handler
  * 
- * Integrates with Ticketmaster Discovery API v2 to import event data using
- * Data Machine's single-item processing model.
+ * Integrates with Ticketmaster Discovery API v2 for event data import.
  *
  * @package DmEvents\Steps\EventImport\Handlers\Ticketmaster
  */
@@ -18,9 +17,6 @@ if (!defined('ABSPATH')) {
 
 /**
  * Ticketmaster Discovery API event import handler
- * 
- * Implements Data Machine handler interface for importing events from 
- * Ticketmaster's Discovery API v2 with single-item processing model.
  */
 class Ticketmaster {
     
@@ -39,28 +35,20 @@ class Ticketmaster {
     ];
     
     /**
-     * Execute Ticketmaster event import with unified parameter structure
+     * Execute Ticketmaster event import
      * 
-     * Follows Data Machine's unified parameter system via dm_engine_parameters filter.
-     * Fetches events, processes deduplication tracking, and returns data packet array.
-     * 
-     * @param array $parameters Unified parameter structure from Data Machine
-     *   - execution: ['job_id' => string, 'flow_step_id' => string]
-     *   - config: ['flow_step' => array] Step configuration
-     *   - data: array Cumulative data packet from previous steps
-     *   - metadata: array Dynamic metadata from dm_engine_additional_parameters
-     * @return array Updated data packet array with event entry added
-     * @since 1.0.0
+     * @param array $parameters Flat parameter structure from Data Machine
+     * @return array Updated data packet array
      */
     public function execute(array $parameters): array {
-        // Extract from unified parameter structure
-        $job_id = $parameters['execution']['job_id'];
-        $flow_step_id = $parameters['execution']['flow_step_id'];
+        // Extract from flat parameter structure (matches PublishStep pattern)
+        $job_id = $parameters['job_id'];
+        $flow_step_id = $parameters['flow_step_id'];
         $data = $parameters['data'] ?? [];
-        $flow_step_config = $parameters['config']['flow_step'] ?? [];
+        $flow_step_config = $parameters['flow_step_config'] ?? [];
         
-        // Extract handler configuration
-        $handler_config = $flow_step_config['handler']['settings'] ?? [];
+        // Extract handler configuration from nested structure
+        $handler_config = $flow_step_config['handler']['settings']['ticketmaster_events'] ?? [];
         $pipeline_id = $flow_step_config['pipeline_id'] ?? null;
         
         $this->log_info('Ticketmaster Handler: Starting event import', [
@@ -93,6 +81,16 @@ class Ticketmaster {
         ]);
         
         foreach ($raw_events as $raw_event) {
+            // Only process actively scheduled events (skip cancelled, postponed, rescheduled)
+            $event_status = $raw_event['dates']['status']['code'] ?? '';
+            if ($event_status !== 'onsale') {
+                $this->log_debug('Skipping event with non-active status', [
+                    'event_name' => $raw_event['name'] ?? 'Unknown',
+                    'status' => $event_status
+                ]);
+                continue;
+            }
+            
             // Standardize the event
             $standardized_event = $this->map_ticketmaster_event($raw_event);
             
@@ -185,9 +183,9 @@ class Ticketmaster {
     }
     
     /**
-     * Build search parameters for Ticketmaster API
+     * Build search parameters for API request
      * 
-     * @param array $handler_config Handler configuration
+     * @param array $handler_config Handler settings
      * @param string $api_key API key
      * @return array API parameters
      */
@@ -196,21 +194,31 @@ class Ticketmaster {
             'apikey' => $api_key
         ]);
         
-        // Add event type classification filter (skip if 'all' selected)
-        if (!empty($handler_config['classification_type']) && $handler_config['classification_type'] !== 'all') {
-            // Get classifications to map slug to actual name
-            $classifications = self::get_classifications($api_key);
-            $classification_slug = $handler_config['classification_type'];
-            
-            if (isset($classifications[$classification_slug])) {
-                $params['classificationName'] = $classifications[$classification_slug];
-                
-                do_action('dm_log', 'debug', 'Ticketmaster: Added classification filter', [
-                    'slug' => $classification_slug,
-                    'classification_name' => $classifications[$classification_slug]
-                ]);
-            }
+        // Event type classification is REQUIRED - fail job if not provided
+        if (empty($handler_config['classification_type'])) {
+            $this->log_error('Ticketmaster: classification_type is required but not provided');
+            throw new \Exception('Ticketmaster handler requires classification_type setting. Job failed.');
         }
+        
+        // Get classifications to map slug to actual segment name
+        $classifications = self::get_classifications($api_key);
+        $classification_slug = $handler_config['classification_type'];
+        
+        if (!isset($classifications[$classification_slug])) {
+            $this->log_error('Ticketmaster: Invalid classification_type provided', [
+                'classification_type' => $classification_slug,
+                'available_types' => array_keys($classifications)
+            ]);
+            throw new \Exception('Invalid Ticketmaster classification_type: ' . $classification_slug);
+        }
+        
+        // Use segmentName parameter for proper event type filtering
+        $params['segmentName'] = $classifications[$classification_slug];
+        
+        $this->log_info('Ticketmaster: Added segment filter', [
+            'slug' => $classification_slug,
+            'segment_name' => $classifications[$classification_slug]
+        ]);
         
         // Set location coordinates (default to Charleston, SC if not specified)
         $location = $handler_config['location'] ?? '32.7765,-79.9311'; // Charleston, SC
@@ -248,14 +256,10 @@ class Ticketmaster {
     }
     
     /**
-     * Get classifications from Ticketmaster API with caching
+     * Get event type classifications with 24-hour caching
      * 
-     * Fetches event type classifications from Ticketmaster Discovery API
-     * with 24-hour caching for performance. Returns structured array
-     * suitable for dropdown population.
-     * 
-     * @param string $api_key Ticketmaster API key
-     * @return array Classifications array with slug => name mapping
+     * @param string $api_key API key
+     * @return array Classifications array
      */
     public static function get_classifications($api_key = '') {
         // Check cache first
@@ -329,13 +333,13 @@ class Ticketmaster {
     }
     
     /**
-     * Parse classifications API response
+     * Parse classifications from API response
      * 
-     * @param array $api_data Raw API response data
-     * @return array Parsed classifications array
+     * @param array $api_data API response data
+     * @return array Parsed classifications
      */
     private static function parse_classifications_response($api_data) {
-        $classifications = ['all' => __('All Event Types', 'dm-events')];
+        $classifications = [];
         $seen_segments = [];
         
         foreach ($api_data['_embedded']['classifications'] as $classification) {
@@ -359,13 +363,12 @@ class Ticketmaster {
     }
     
     /**
-     * Get fallback classifications if API unavailable
+     * Get fallback classifications
      * 
-     * @return array Basic classification options
+     * @return array Basic classifications
      */
     private static function get_fallback_classifications() {
         return [
-            'all' => __('All Event Types', 'dm-events'),
             'music' => __('Music', 'dm-events'),
             'sports' => __('Sports', 'dm-events'),
             'arts-theatre' => __('Arts & Theatre', 'dm-events'),
@@ -375,10 +378,10 @@ class Ticketmaster {
     }
     
     /**
-     * Get classifications formatted for settings dropdown
+     * Get classifications for settings dropdown
      * 
-     * @param array $current_config Current configuration (for API key)
-     * @return array Classifications for dropdown
+     * @param array $current_config Current configuration
+     * @return array Classifications array
      */
     public static function get_classifications_for_dropdown($current_config = []) {
         // Get API key from auth system
@@ -389,10 +392,10 @@ class Ticketmaster {
     }
     
     /**
-     * Fetch events from Ticketmaster API
+     * Fetch events from API
      * 
      * @param array $params API parameters
-     * @return array Raw event data from API
+     * @return array Raw event data
      */
     private function fetch_events(array $params): array {
         $url = self::API_BASE . 'events.json?' . http_build_query($params);
@@ -431,14 +434,10 @@ class Ticketmaster {
     }
     
     /**
-     * Map Ticketmaster event to Event Details schema with comprehensive venue data
+     * Map Ticketmaster event to standardized event schema
      * 
-     * Extracts complete venue information from Ticketmaster API response and maps it to
-     * standardized event schema. Venue data is passed through to DmEventsPublisher for
-     * automatic venue taxonomy creation and meta population.
-     * 
-     * @param array $tm_event Ticketmaster event data from Discovery API
-     * @return array Standardized event data with detailed venue information
+     * @param array $tm_event Ticketmaster event data
+     * @return array Standardized event data
      */
     private function map_ticketmaster_event(array $tm_event): array {
         // Extract basic info
@@ -557,9 +556,9 @@ class Ticketmaster {
         return [
             'title' => $this->sanitize_text($title),
             'startDate' => $start_date,
-            'endDate' => $start_date, // Ticketmaster usually doesn't provide separate end dates
+            'endDate' => '', // Only set if provided by API
             'startTime' => $start_time,
-            'endTime' => '',
+            'endTime' => '', // Only set if provided by API
             'venue' => $this->sanitize_text($venue_name),
             'artist' => $this->sanitize_text($artist),
             'price' => $this->sanitize_text($price),
@@ -580,8 +579,8 @@ class Ticketmaster {
     /**
      * Parse coordinates from location string
      * 
-     * @param string $location Location string in "lat,lng" format
-     * @return array|false Coordinates array or false if invalid
+     * @param string $location Location string
+     * @return array|false Coordinates array
      */
     private function get_coordinates(string $location) {
         // Clean and validate coordinate format

@@ -12,17 +12,13 @@ import {
 /**
  * Event Details Block Registration
  *
- * Block-first architecture for event data storage with InnerBlocks support.
- * Serves as single source of truth for event information.
+ * Block for event data storage with InnerBlocks support.
  */
 registerBlockType('dm-events/event-details', {
     /**
      * Block edit component
      *
-     * @param {Object} props Block edit properties
-     * @param {Object} props.attributes Block attributes
-     * @param {Function} props.setAttributes Attribute setter function
-     * @param {string} props.clientId Block client ID
+     * @param {Object} props Block properties
      */
     edit: function Edit({ attributes, setAttributes, clientId }) {
         const {

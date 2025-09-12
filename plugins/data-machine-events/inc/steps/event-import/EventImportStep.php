@@ -24,23 +24,17 @@ if (!defined('ABSPATH')) {
 class EventImportStep {
 
     /**
-     * Execute event import with unified parameter structure
+     * Execute event import with flat parameter structure
      * 
-     * Follows Data Machine's unified parameter system via dm_engine_parameters filter.
-     * 
-     * @param array $parameters Unified parameter structure from Data Machine
-     *   - execution: ['job_id' => string, 'flow_step_id' => string]
-     *   - config: ['flow_step' => array] Step configuration
-     *   - data: array Cumulative data packet from previous steps
-     *   - metadata: array Dynamic metadata from dm_engine_additional_parameters
+     * @param array $parameters Flat parameter structure from Data Machine
      * @return array Updated data packet array with event data added
      */
     public function execute(array $parameters): array {
-        // Extract from unified parameter structure
-        $job_id = $parameters['execution']['job_id'];
-        $flow_step_id = $parameters['execution']['flow_step_id'];
+        // Extract from flat parameter structure
+        $job_id = $parameters['job_id'];
+        $flow_step_id = $parameters['flow_step_id'];
         $data = $parameters['data'] ?? [];
-        $flow_step_config = $parameters['config']['flow_step'] ?? [];
+        $flow_step_config = $parameters['flow_step_config'] ?? [];
         
         try {
             do_action('dm_log', 'debug', 'Event Import Step: Starting event collection', [
@@ -66,7 +60,7 @@ class EventImportStep {
             
             $handler_slug = $handler_data['handler_slug'];
             
-            // Get handler object directly from unified discovery
+            // Get handler object from registry
             $all_handlers = apply_filters('dm_handlers', []);
             $handler_info = $all_handlers[$handler_slug] ?? null;
             

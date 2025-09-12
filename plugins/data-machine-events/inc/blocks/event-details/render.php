@@ -2,16 +2,11 @@
 /**
  * Event Details Block Server-Side Render Template
  *
- * Block-first architecture render that displays event information with venue taxonomy
- * integration and structured data schema generation.
+ * Displays event information with venue integration and structured data.
  *
- * Available context:
- * @var array $attributes Block attributes containing event data
- * @var string $content InnerBlocks content for event description
- * @var WP_Block $block Block instance object
- *
- * @package DmEvents\Blocks\EventDetails
- * @since 1.0.0
+ * @var array $attributes Block attributes
+ * @var string $content InnerBlocks content
+ * @var WP_Block $block Block instance
  */
 
 if (!defined('ABSPATH')) {

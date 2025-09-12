@@ -119,70 +119,78 @@
     display: block;
 }
 
-/* View Toggle Styles */
-.dm-events-view-toggle {
-    display: flex;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    overflow: hidden;
-    background: white;
-}
-
-.dm-events-view-btn {
-    padding: 0.75rem 1rem;
-    background: white;
-    border: none;
-    cursor: pointer;
-    font-size: 0.9rem;
-    color: #6b7280;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.dm-events-view-btn:not(:last-child) {
-    border-right: 1px solid #d1d5db;
-}
-
-.dm-events-view-btn:hover {
-    background: #f3f4f6;
-    color: #374151;
-}
-
-.dm-events-view-btn.active {
-    background: #3b82f6;
-    color: white;
-}
-
-.dm-events-view-btn .dashicons {
-    font-size: 1rem;
-}
 
 /* Content Area */
 .dm-events-content {
+    position: relative;
     margin-top: 1rem;
 }
 
-/* List View */
-.dm-events-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
+/* SVG Border Overlay - positioned outside events list to prevent clipping */
+.dm-border-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+    overflow: visible;
 }
 
-.dm-event-item {
-    padding: 1.5rem;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    background: white;
-    transition: all 0.2s ease;
+
+/* Clean CSS Grid Layout for All Events */
+.dm-events-calendar.dm-events-date-grouped .dm-events-list {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, var(--dm-grid-cell-width));
+    grid-auto-rows: var(--dm-grid-cell-height);
+    gap: var(--dm-grid-gap);
+    justify-content: center;
+    z-index: 2;
+}
+
+
+/* Date Groups with Day-of-Week Borders */
+.dm-date-group {
+    display: contents; /* Makes wrapper invisible to CSS Grid layout */
+    border: var(--dm-border-width) solid;
+    border-radius: var(--dm-border-radius);
     position: relative;
 }
 
+/* Day-specific border colors */
+.dm-day-sunday { border-color: var(--dm-day-sunday); }
+.dm-day-monday { border-color: var(--dm-day-monday); }
+.dm-day-tuesday { border-color: var(--dm-day-tuesday); }
+.dm-day-wednesday { border-color: var(--dm-day-wednesday); }
+.dm-day-thursday { border-color: var(--dm-day-thursday); }
+.dm-day-friday { border-color: var(--dm-day-friday); }
+.dm-day-saturday { border-color: var(--dm-day-saturday); }
+
+/* Individual Event Cards in Grid */
+.dm-event-item {
+    width: 100%;
+    height: 100%;
+    padding: var(--dm-card-padding);
+    border: 1px solid var(--dm-border-light);
+    border-radius: var(--dm-border-radius);
+    background: white;
+    transition: all 0.2s ease;
+    position: relative;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
 .dm-event-item:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    background: #f9fafb;
     border-color: #d1d5db;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
 }
 
 .dm-event-content {
@@ -193,10 +201,17 @@
 
 .dm-event-title {
     margin: 0;
-    font-size: 1.25rem;
-    font-weight: 600;
-    line-height: 1.3;
+    font-size: 1rem;
+    font-weight: bold;
+    line-height: 1.4;
     color: #111827;
+    font-family: inherit;
+}
+
+/* Event title within date groups - smaller */
+.dm-date-group .dm-event-title {
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
 }
 
 .dm-event-title a {
@@ -211,6 +226,7 @@
 
 /* Event Meta Information */
 .dm-event-date,
+.dm-event-time,
 .dm-event-artist,
 .dm-event-venue,
 .dm-event-address {
@@ -285,15 +301,47 @@
     color: white;
 }
 
-/* Grid View */
-.dm-events-view-grid .dm-events-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 1.5rem;
+/* Day Badge Styling - Exactly on Top Border */
+.dm-day-badge {
+    position: absolute;
+    top: 0;
+    left: 0;
+    font-size: var(--dm-badge-font-size);
+    font-weight: var(--dm-badge-font-weight);
+    padding: var(--dm-badge-padding-y) var(--dm-badge-padding-x);
+    border-radius: var(--dm-badge-border-radius);
+    background: none;
+    border: 2px solid;
+    z-index: var(--dm-badge-z-index);
+    white-space: nowrap;
+    opacity: 0;
+    transform: translateY(-50%);
+    transition: opacity 0.3s ease;
+    pointer-events: none;
 }
 
-.dm-events-view-grid .dm-event-item {
-    height: fit-content;
+.dm-day-badge.positioned {
+    opacity: 1;
+}
+
+/* Day-specific badge text and border colors matching border colors */
+.dm-day-badge-sunday { color: var(--dm-day-sunday); border-color: var(--dm-day-sunday); }
+.dm-day-badge-monday { color: var(--dm-day-monday); border-color: var(--dm-day-monday); }
+.dm-day-badge-tuesday { color: var(--dm-day-tuesday); border-color: var(--dm-day-tuesday); }
+.dm-day-badge-wednesday { color: var(--dm-day-wednesday); border-color: var(--dm-day-wednesday); }
+.dm-day-badge-thursday { color: var(--dm-day-thursday); border-color: var(--dm-day-thursday); }
+.dm-day-badge-friday { color: var(--dm-day-friday); border-color: var(--dm-day-friday); }
+.dm-day-badge-saturday { color: var(--dm-day-saturday); border-color: var(--dm-day-saturday); }
+
+/* Day of Week Color System */
+:root {
+    --dm-day-sunday: #FF8C42;    /* Orange - Sunday rest */
+    --dm-day-monday: #4A90E2;    /* Blue - Monday professional */
+    --dm-day-tuesday: #50C878;   /* Green - Tuesday growth */
+    --dm-day-wednesday: #20B2AA; /* Teal - Wednesday balance */
+    --dm-day-thursday: #E94B7D;  /* Pink - Thursday energy */
+    --dm-day-friday: #FFD700;    /* Gold - Friday celebration */
+    --dm-day-saturday: #9B59B6;  /* Purple - Saturday weekend */
 }
 
 /* Pagination */
@@ -348,12 +396,21 @@
     border: 1px dashed #d1d5db;
 }
 
-/* Hidden Events (for search/filter) */
-.dm-event-item.hidden {
+/* Hidden Events and Date Groups (for search/filter) */
+.dm-event-item.hidden,
+.dm-date-group.hidden {
     display: none;
 }
 
 /* Responsive Design */
+@media (max-width: 1200px) {
+    /* Medium screens: Smaller uniform grid cells */
+    .dm-events-calendar.dm-events-date-grouped .dm-events-list {
+        grid-template-columns: repeat(auto-fill, var(--dm-grid-cell-width-medium));
+        grid-auto-rows: var(--dm-grid-cell-height-medium);
+    }
+}
+
 @media (max-width: 768px) {
     .dm-events-filter-row {
         flex-direction: column;
@@ -364,20 +421,19 @@
         min-width: auto;
     }
     
-    .dm-events-view-toggle {
-        justify-content: center;
-    }
-    
     .dm-event-item {
         padding: 1rem;
     }
     
     .dm-event-title {
-        font-size: 1.1rem;
+        font-size: 0.95rem;
     }
     
-    .dm-events-view-grid .dm-events-list {
+    /* Mobile: Uniform single column grid */
+    .dm-events-calendar.dm-events-date-grouped .dm-events-list {
         grid-template-columns: 1fr;
+        grid-auto-rows: var(--dm-grid-cell-height-mobile);
+        gap: var(--dm-grid-gap);
     }
     
     .dm-event-actions {

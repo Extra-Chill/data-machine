@@ -20,14 +20,14 @@ if (!defined('ABSPATH')) {
 class Status_Detection {
     
     /**
-     * Initialize status detection filters
+     * Register status detection filters with Data Machine
      */
     public function __construct() {
         $this->register_filters();
     }
     
     /**
-     * Register status detection filters with Data Machine
+     * Register status detection filters
      */
     private function register_filters() {
         add_filter('dm_detect_status', array($this, 'detect_dm_events_handler_status'), 10, 3);
@@ -41,7 +41,7 @@ class Status_Detection {
      * @param string $default_status Current status
      * @param string $context Status context
      * @param array $data Context data
-     * @return string Status (red/yellow/green)
+     * @return string Status indicator
      */
     public function detect_dm_events_handler_status($default_status, $context, $data) {
         if ($context !== 'handler_auth') {
@@ -62,7 +62,7 @@ class Status_Detection {
      * @param string $default_status Current status
      * @param string $context Status context
      * @param array $data Context data
-     * @return string Status (red/yellow/green)
+     * @return string Status indicator
      */
     public function detect_import_handler_auth_status($default_status, $context, $data) {
         if ($context !== 'handler_auth') {
@@ -91,9 +91,9 @@ class Status_Detection {
     }
     
     /**
-     * Get comprehensive DM Events system status
+     * Get comprehensive system status
      *
-     * @return string Status (red/yellow/green)
+     * @return string Status indicator
      */
     private function get_comprehensive_status() {
         if (!class_exists('DataMachine\\Core\\DataMachine')) {
@@ -122,18 +122,18 @@ class Status_Detection {
     }
     
     /**
-     * Check if DM Events system is fully ready
+     * Check if system is fully ready
      *
-     * @return bool True if all components are green
+     * @return bool System ready status
      */
     public function is_system_ready() {
         return $this->get_comprehensive_status() === 'green';
     }
     
     /**
-     * Get system status for debugging
+     * Get detailed system status information
      *
-     * @return array Status information
+     * @return array Status data
      */
     public function get_system_status() {
         $overall_status = $this->get_comprehensive_status();

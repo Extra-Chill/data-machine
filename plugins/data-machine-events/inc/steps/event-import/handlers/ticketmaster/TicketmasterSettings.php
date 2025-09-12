@@ -115,7 +115,7 @@ class TicketmasterSettings {
      */
     public static function get_defaults(): array {
         return [
-            'classification_type' => 'all',
+            'classification_type' => '',
             'location' => '32.7765,-79.9311',
             'radius' => '50',
             'start_date' => '',

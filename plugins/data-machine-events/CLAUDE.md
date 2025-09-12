@@ -22,7 +22,7 @@ npm run lint:js && npm run lint:css    # Linting
 
 - **Production Build:** `./build.sh` creates optimized package in `/dist` directory with versioned .zip file for WordPress deployment
 - **VSCode Integration:** `.vscode/tasks.json` provides IDE task management for development workflow
-- **Asset Management:** Frontend CSS located at `assets/css/dm-events-frontend.css` (individual blocks handle own JavaScript)
+- **Asset Management:** Individual blocks handle their own CSS and JavaScript assets
 - **Dynamic Versioning:** Admin assets use `filemtime()` for cache busting
 - **Automated Build Pipeline:** 
   1. Clean dist directory and install production composer dependencies
@@ -44,6 +44,7 @@ npm run lint:js && npm run lint:css    # Linting
 
 **Core Classes:**
 - `DmEvents\Admin\Status_Detection` - Comprehensive Data Machine integration status monitoring with red/yellow/green indicators
+- `DmEvents\Admin\Settings_Page` - Minimal settings interface for controlling event archive behavior, search integration, and display preferences
 - `DmEvents\Core\Venue_Taxonomy` - Complete venue taxonomy with 9 meta fields, admin UI, and CRUD operations
 - `DmEvents\Core\Event_Post_Type` - Event post type registration with selective admin menu control and taxonomy integration
 - `DmEvents\Steps\Publish\Handlers\DmEvents\DmEventsSchema` - Google Event Schema JSON-LD generator for enhanced SEO visibility
@@ -61,9 +62,9 @@ npm run lint:js && npm run lint:css    # Linting
 - `DmEvents\Steps\EventImport\Handlers\DiceFm\DiceFmAuth` - Dice FM authentication provider
 - `DmEvents\Steps\EventImport\Handlers\DiceFm\DiceFmSettings` - Dice FM handler configuration management
 - `DmEvents\Steps\EventImport\Handlers\DiceFm\DiceFmFilters` - Dice FM event filtering system
-- `DmEvents\Steps\EventImport\Handlers\WebScraper\WebScraper` - Web scraper event extraction with validation
-- `DmEvents\Steps\EventImport\Handlers\WebScraper\WebScraperSettings` - Web scraper configuration management
-- `DmEvents\Steps\EventImport\Handlers\WebScraper\WebScraperFilters` - Web scraper filtering system
+- `DmEvents\Steps\EventImport\Handlers\WebScraper\UniversalWebScraper` - AI-powered universal web scraper with HTML section processing and tool call handling
+- `DmEvents\Steps\EventImport\Handlers\WebScraper\UniversalWebScraperSettings` - Universal web scraper configuration management
+- `DmEvents\Steps\EventImport\Handlers\WebScraper\UniversalWebScraperFilters` - Universal web scraper filtering system
 
 **Data Flow:** Data Machine Import → Event Details Block → Schema Generation → Calendar Display  
 **Schema Flow:** Block Attributes + Venue Taxonomy Meta → DmEventsSchema → JSON-LD Output
@@ -71,8 +72,9 @@ npm run lint:js && npm run lint:css    # Linting
 ### Blocks & Venues
 
 **Blocks:**
-- `inc/blocks/calendar/` - Events display with filtering and pagination (webpack build system)
+- `inc/blocks/calendar/` - Events display with filtering, pagination, and BorderRenderer.js visual enhancement system (webpack build system)
 - `inc/blocks/event-details/` - Event data storage with InnerBlocks rich content support (@wordpress/scripts build system)
+- `inc/blocks/root.css` - Centralized design tokens and CSS custom properties accessible from both CSS and JavaScript
 
 **Event Details Block Architecture:**
 - **InnerBlocks Integration:** Support for rich content editing within event posts
@@ -94,16 +96,18 @@ npm run lint:js && npm run lint:css    # Linting
 **Key Directories:**
 - `dm-events.php` - Main plugin file with PSR-4 autoloader
 - `inc/admin/class-status-detection.php` - Data Machine integration status monitoring
-- `inc/blocks/calendar/` - Events display block (webpack build system)
+- `inc/admin/class-settings-page.php` - Event settings interface for archive behavior and display preferences
+- `inc/blocks/calendar/` - Events display block with BorderRenderer.js visual enhancement system (webpack build system)
+  - `src/BorderRenderer.js` - Day-grouped visual border system with L-shape detection and responsive rendering
 - `inc/blocks/event-details/` - Event data storage block (@wordpress/scripts build system)
+- `inc/blocks/root.css` - Centralized design tokens and CSS custom properties for all blocks
 - `inc/core/class-event-post-type.php` - Event post type with selective menu control
 - `inc/core/class-venue-taxonomy.php` - Venue taxonomy with 9 meta fields and admin UI
-- `inc/steps/event-import/handlers/` - Import handlers with single-item processing (Ticketmaster, Dice FM, web scrapers)
+- `inc/steps/event-import/handlers/` - Import handlers with single-item processing (Ticketmaster, Dice FM, AI-powered web scrapers)
 - `inc/steps/publish/handlers/dm-events/` - AI-driven publishing with Schema generation and venue handling
   - `DmEventsSchema.php` - Google Event structured data generator
   - `DmEventsPublisher.php` - AI-powered event creation
   - `DmEventsVenue.php` - Centralized venue taxonomy operations
-- `assets/css/dm-events-frontend.css` - Frontend styling (blocks handle own JavaScript)
 - `assets/css/admin.css` - Admin interface styling
 - `assets/js/admin.js` - Admin JavaScript functionality
 
@@ -136,11 +140,13 @@ npm run lint:js && npm run lint:css    # Linting
 - Capability checks for admin functions
 
 ### Build Systems
-- **Calendar Block:** webpack build system (`cd inc/blocks/calendar && npm run build/start`)
+- **Calendar Block:** webpack build system with BorderRenderer.js visual enhancement (`cd inc/blocks/calendar && npm run build/start`)
 - **Event Details Block:** @wordpress/scripts build system (`cd inc/blocks/event-details && npm run build/start`)
+- **Centralized Design System:** root.css provides unified design tokens accessible from both CSS and JavaScript
+- **Visual Enhancement:** BorderRenderer.js creates day-grouped visual borders with intelligent L-shape detection
 - **Production Build:** `./build.sh` creates optimized package in `/dist` directory with versioned .zip file for WordPress deployment
 - **VSCode Integration:** `.vscode/tasks.json` provides IDE task management for development workflow
-- **Asset Strategy:** Individual blocks handle own JavaScript, shared frontend CSS in `assets/css/dm-events-frontend.css`
+- **Asset Strategy:** Individual blocks handle their own CSS and JavaScript assets independently
 - **Dynamic Versioning:** Admin assets use `filemtime()` for automatic cache invalidation
 - **Automated Build Steps:** 
   1. Install production composer dependencies (`composer install --no-dev --optimize-autoloader`)
@@ -151,7 +157,8 @@ npm run lint:js && npm run lint:css    # Linting
   6. Generate build info and restore development dependencies
 
 ### Data Machine Integration
-- **Import Handlers:** Ticketmaster Discovery API (API key auth with comprehensive validation), Dice FM, Web Scrapers in `inc/steps/event-import/handlers/`
+- **Import Handlers:** Ticketmaster Discovery API (API key auth with comprehensive validation), Dice FM, AI-powered UniversalWebScraper in `inc/steps/event-import/handlers/`
+- **AI-Powered Web Scraping:** UniversalWebScraper uses AI to extract structured event data from HTML sections with tool call handling
 - **Publishers:** Data Machine Events publisher with AI-driven event creation in `inc/steps/publish/handlers/dm-events/`
 - **Event Creation:** Data Machine processes one event per job via `Event Details` block attributes with AI-generated descriptions
 - **Duplicate Prevention:** Flow-scoped processed items tracking prevents importing duplicate events per flow
@@ -165,11 +172,14 @@ npm run lint:js && npm run lint:css    # Linting
 - **DmEventsSchema:** Core Schema generator with smart parameter routing (engine vs AI decisions) and comprehensive structured data output
 - **DmEventsPublisher:** AI-driven event creation with Event Details block generation and taxonomy handling
 - **DmEventsVenue:** Centralized venue operations including term creation, lookup, metadata validation, and assignment workflows
+- **UniversalWebScraper:** AI-powered web scraping with HTML section extraction and structured event data processing
+- **Visual Enhancement System:** BorderRenderer.js with day-grouped visual borders, L-shape detection, and responsive rendering
+- **Centralized Design System:** root.css provides unified design tokens accessible from both CSS and JavaScript components
 - **Schema Architecture:** Combines Event Details block attributes with venue taxonomy meta for complete Google Event schema
 - **Smart Parameter Routing:** DmEventsSchema.engine_or_tool() analyzes import data to route parameters between system and AI processing
 - **Venue Data Flow:** Import handlers extract venue data, DmEventsPublisher injects via dm_engine_additional_parameters filter
 - **Comprehensive Venue Meta:** 9 meta fields populated from import sources with validation and error handling
-- **AI Responsibilities:** Event descriptions, performer/organizer inference, and taxonomies configured for "ai_decides"
+- **AI Responsibilities:** Event descriptions, performer/organizer inference, web scraping extraction, and taxonomies configured for "ai_decides"
 - **Block Content Generation:** Event Details blocks with proper address attribute mapping and display controls
 - **SEO Enhancement:** Google Event structured data with location, performer, organizer, offers, and event status data
 - **Status Detection:** Comprehensive red/yellow/green monitoring via Status_Detection class for all system components
@@ -182,14 +192,11 @@ All custom steps use Data Machine's unified parameter system via dm_engine_param
 
 ```php
 public function execute(array $parameters): array {
-    // Extract from unified parameter structure
-    $job_id = $parameters['execution']['job_id'];
-    $flow_step_id = $parameters['execution']['flow_step_id'];
+    // Extract from flat parameter structure
+    $job_id = $parameters['job_id'];
+    $flow_step_id = $parameters['flow_step_id'];
     $data = $parameters['data'] ?? [];
-    $flow_step_config = $parameters['config']['flow_step'] ?? [];
-    
-    // Access dynamic metadata from engine filter
-    $metadata = $parameters['metadata'] ?? [];
+    $flow_step_config = $parameters['flow_step_config'] ?? [];
     
     // Process step logic...
     
@@ -198,17 +205,24 @@ public function execute(array $parameters): array {
 ```
 
 **Handler Implementation Pattern:**
-All import handlers follow Data Machine's single-item processing model with comprehensive validation and error handling:
+All import handlers follow Data Machine's single-item processing model with flat parameter structure:
 
 ```php
-public function get_fetch_data(int $pipeline_id, array $handler_config, ?string $job_id = null): array {
-    $flow_step_id = $handler_config['flow_step_id'] ?? null;
+public function execute(array $parameters): array {
+    // Extract from flat parameter structure (matches PublishStep pattern)
+    $job_id = $parameters['job_id'];
+    $flow_step_id = $parameters['flow_step_id'];
+    $data = $parameters['data'] ?? [];
+    $flow_step_config = $parameters['flow_step_config'] ?? [];
+    
+    // Extract handler configuration
+    $handler_config = $flow_step_config['handler']['settings'] ?? [];
     
     // Get API configuration from Data Machine auth system
     $api_config = apply_filters('dm_retrieve_oauth_keys', [], 'ticketmaster_events');
     if (empty($api_config['api_key'])) {
         $this->log_error('Ticketmaster API key not configured');
-        return ['processed_items' => []];
+        return $data; // Return unchanged data packet array
     }
     
     // Build search parameters with validation
@@ -218,40 +232,35 @@ public function get_fetch_data(int $pipeline_id, array $handler_config, ?string 
     $raw_events = $this->fetch_events($search_params);
     if (empty($raw_events)) {
         $this->log_info('No events found from Ticketmaster API');
-        return ['processed_items' => []];
+        return $data; // Return unchanged data packet array
     }
     
     // Process ONE event at a time
     foreach ($raw_events as $raw_event) {
-        $standardized_event = $this->standardize_event($raw_event);
+        $standardized_event = $this->map_ticketmaster_event($raw_event);
         
         if (empty($standardized_event['title'])) continue;
         
         $event_identifier = md5($standardized_event['title'] . $standardized_event['startDate'] . $standardized_event['venue']);
         
         // Check if already processed FIRST
-        $is_processed = apply_filters('dm_is_item_processed', false, $flow_step_id, 'source_type', $event_identifier);
+        $is_processed = apply_filters('dm_is_item_processed', false, $flow_step_id, 'ticketmaster', $event_identifier);
         if ($is_processed) continue;
         
-        // Apply individual event filters (e.g., future events only)
-        if (!$this->is_future_event($standardized_event)) {
-            $this->log_debug('Skipping past event', [
-                'title' => $standardized_event['title'],
-                'date' => $standardized_event['startDate']
-            ]);
-            continue;
-        }
+        // API handles future events filtering via startDateTime parameter
         
         // Mark as processed and return IMMEDIATELY
         if ($flow_step_id && $job_id) {
-            do_action('dm_mark_item_processed', $flow_step_id, 'source_type', $event_identifier, $job_id);
+            do_action('dm_mark_item_processed', $flow_step_id, 'ticketmaster', $event_identifier, $job_id);
         }
         
-        return ['processed_items' => [['data' => $standardized_event, 'metadata' => [...]]]];
+        // Add to data packet array and return
+        array_unshift($data, $event_entry);
+        return $data;
     }
     
     // No eligible events found
-    return ['processed_items' => []];
+    return $data; // Return unchanged data packet array
 }
 ```
 
@@ -317,41 +326,35 @@ $venue_result = DmEventsVenue::find_or_create_venue($venue_name, $venue_data);
 $assignment = DmEventsVenue::assign_venue_to_event($post_id, $venue_name, $venue_data);
 ```
 
-### Unified Data Machine Parameter System
+### Flat Data Machine Parameter System
 
-**Single Parameter Architecture:**
-Data Machine uses a unified parameter system managed by the `dm_engine_parameters` filter:
+**Flat Parameter Architecture:**
+Data Machine uses a flat parameter system managed by the `dm_engine_parameters` filter:
 
 ```php
 // All custom steps implement this simplified signature
 public function execute(array $parameters): array
 ```
 
-**Unified Parameter Structure:**
+**Flat Parameter Structure:**
 ```php
 $parameters = [
-    'execution' => [
-        'job_id' => 'unique-job-identifier',
-        'flow_step_id' => 'flow-step-uuid'
-    ],
-    'config' => [
-        'flow_step' => [] // Step configuration from pipeline builder
-    ],
+    'job_id' => 'unique-job-identifier',
+    'flow_step_id' => 'flow-step-uuid',
+    'flow_step_config' => [], // Step configuration from pipeline builder
     'data' => [], // Cumulative data packet from previous steps
-    'metadata' => [
-        // Dynamic metadata from dm_engine_additional_parameters filter
-        'venue' => 'Music Hall',
-        'venueAddress' => '123 Main St',
-        'venueCity' => 'Charleston',
-        // ... other injected venue data
-    ]
+    // Dynamic metadata from dm_engine_additional_parameters filter
+    'venue' => 'Music Hall',
+    'venueAddress' => '123 Main St',
+    'venueCity' => 'Charleston',
+    // ... other injected parameters
 ];
 ```
 
 **Benefits:**
-- **Ultimate Simplicity:** Single parameter structure for all steps
-- **Consistency:** EventImportStep, FetchStep, PublishStep, UpdateStep all identical
-- **Centralized Management:** Engine completely manages parameter assembly via filters
+- **Ultimate Simplicity:** Single flat parameter structure for all steps
+- **Consistency:** EventImportStep, FetchStep, PublishStep, UpdateStep all use identical flat structure
+- **Direct Access:** No nested parameter extraction required - all parameters available at top level
 - **Pipeline Continuity:** Data packet flows unchanged through error conditions
 - **Maintainability:** No parameter mapping complexity between steps
 - **Future-Proof:** Single point of parameter evolution for entire Data Machine ecosystem

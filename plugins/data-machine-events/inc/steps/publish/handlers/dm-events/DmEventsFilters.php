@@ -148,7 +148,7 @@ function dm_events_get_dynamic_event_tool(array $handler_config): array {
     
     foreach ($taxonomies as $taxonomy) {
         if (!$taxonomy->public || $taxonomy->name === 'venue') {
-            continue; // Skip venue - handled by AI tool parameters
+            continue; // Skip venue - handled separately based on data availability
         }
         
         $field_key = "taxonomy_{$taxonomy->name}_selection";
@@ -184,6 +184,59 @@ function dm_events_get_dynamic_event_tool(array $handler_config): array {
                 ];
             }
         }
+    }
+    
+    // Handle venue parameters conditionally based on static venue data availability
+    // Check if venue data will be available as engine parameters from import handlers
+    $has_static_venue = dm_events_check_static_venue_availability($ce_config);
+    
+    if (!$has_static_venue) {
+        // Add venue parameters to tool for AI to determine
+        $tool['parameters']['venue'] = [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'Venue name where the event takes place'
+        ];
+        $tool['parameters']['venueAddress'] = [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'Street address of the venue'
+        ];
+        $tool['parameters']['venueCity'] = [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'City where the venue is located'
+        ];
+        $tool['parameters']['venueState'] = [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'State/province where the venue is located'
+        ];
+        $tool['parameters']['venueZip'] = [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'Postal/zip code of the venue'
+        ];
+        $tool['parameters']['venueCountry'] = [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'Country where the venue is located'
+        ];
+        $tool['parameters']['venuePhone'] = [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'Phone number of the venue'
+        ];
+        $tool['parameters']['venueWebsite'] = [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'Website URL of the venue'
+        ];
+        $tool['parameters']['venueCoordinates'] = [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'GPS coordinates of the venue (latitude,longitude format)'
+        ];
     }
     
     return $tool;
@@ -278,4 +331,25 @@ function dm_events_get_dynamic_schema_parameters(array $ce_config): array {
     ];
     
     return $params;
+}
+
+/**
+ * Check if static venue data will be available from import handlers
+ * 
+ * @param array $ce_config Handler configuration
+ * @return bool True if venue data will be available as engine parameters
+ */
+function dm_events_check_static_venue_availability(array $ce_config): bool {
+    // Check for Web Scraper static venue configuration
+    if (isset($ce_config['universal_web_scraper']['venue']) && !empty($ce_config['universal_web_scraper']['venue'])) {
+        return true;
+    }
+    
+    // Ticketmaster and Dice FM always provide venue data (no need to check - they're always static)
+    // This function mainly determines if Web Scraper has static venue configured
+    
+    // Other import handlers that provide venue data would be checked here
+    // For now, we assume if we don't have explicit static venue config, then AI should handle it
+    
+    return false;
 }

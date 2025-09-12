@@ -12,22 +12,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Register Dice.fm event import handler with Data Machine
- * 
- * Adds the dice_fm_events handler to Data Machine's handler registry.
- * This handler will be available in the Event Import step configuration.
- */
-add_filter('dm_handlers', function($handlers) {
-    $handlers['dice_fm_events'] = [
-        'type' => 'event_import',
-        'class' => 'DmEvents\\Steps\\EventImport\\Handlers\\DiceFm\\DiceFm',
-        'label' => __('Dice.fm Events', 'dm-events'),
-        'description' => __('Import events from Dice.fm API', 'dm-events')
-    ];
-    
-    return $handlers;
-});
+// Handler registration is centralized in EventImportFilters.php to avoid duplicates
 
 /**
  * Register Dice.fm authentication provider with Data Machine

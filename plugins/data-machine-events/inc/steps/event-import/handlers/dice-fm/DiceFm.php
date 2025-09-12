@@ -25,24 +25,25 @@ if (!defined('ABSPATH')) {
 class DiceFm {
     
     /**
-     * Execute Dice FM event import with unified parameter structure
+     * Execute Dice FM event import with flat parameter structure
      * 
-     * Follows Data Machine's unified parameter system via dm_engine_parameters filter.
+     * Follows Data Machine's flat parameter system via dm_engine_parameters filter.
      * Fetches events, processes deduplication tracking, and returns data packet array.
      * 
-     * @param array $parameters Unified parameter structure from Data Machine
-     *   - execution: ['job_id' => string, 'flow_step_id' => string]
-     *   - config: ['flow_step' => array] Step configuration
-     *   - data: array Cumulative data packet from previous steps
-     *   - metadata: array Dynamic metadata from dm_engine_additional_parameters
+     * @param array $parameters Flat parameter structure from Data Machine
+     *   - job_id: Job execution identifier
+     *   - flow_step_id: Flow step identifier
+     *   - flow_step_config: Step configuration data
+     *   - data: Cumulative data packet from previous steps
+     *   - Additional parameters: Dynamic metadata from dm_engine_additional_parameters
      * @return array Updated data packet array with event entry added
      */
     public function execute(array $parameters): array {
-        // Extract from unified parameter structure
-        $job_id = $parameters['execution']['job_id'];
-        $flow_step_id = $parameters['execution']['flow_step_id'];
+        // Extract from flat parameter structure (matches PublishStep pattern)
+        $job_id = $parameters['job_id'];
+        $flow_step_id = $parameters['flow_step_id'];
         $data = $parameters['data'] ?? [];
-        $flow_step_config = $parameters['config']['flow_step'] ?? [];
+        $flow_step_config = $parameters['flow_step_config'] ?? [];
         
         // Extract handler configuration
         $handler_config = $flow_step_config['handler']['settings'] ?? [];
