@@ -9,7 +9,6 @@
 
 namespace DmEvents\Admin;
 
-// Prevent direct access
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -19,16 +18,10 @@ if (!defined('ABSPATH')) {
  */
 class Status_Detection {
     
-    /**
-     * Register status detection filters with Data Machine
-     */
     public function __construct() {
         $this->register_filters();
     }
     
-    /**
-     * Register status detection filters
-     */
     private function register_filters() {
         add_filter('dm_detect_status', array($this, 'detect_dm_events_handler_status'), 10, 3);
         
@@ -121,20 +114,10 @@ class Status_Detection {
         return 'green';
     }
     
-    /**
-     * Check if system is fully ready
-     *
-     * @return bool System ready status
-     */
     public function is_system_ready() {
         return $this->get_comprehensive_status() === 'green';
     }
-    
-    /**
-     * Get detailed system status information
-     *
-     * @return array Status data
-     */
+
     public function get_system_status() {
         $overall_status = $this->get_comprehensive_status();
         

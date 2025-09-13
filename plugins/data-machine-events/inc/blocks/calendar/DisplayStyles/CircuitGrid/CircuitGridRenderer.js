@@ -1,25 +1,53 @@
 /**
- * BorderRenderer - Lightweight border drawing for day-grouped events
- * Uses CSS classes to detect day groups and renders SVG borders around them
+ * CircuitGridRenderer - Circuit Grid Display Module
+ *
+ * Complete circuit grid display functionality including border rendering and badge positioning.
+ * Isolated module that handles all circuit grid specific behavior.
  */
-export class BorderRenderer {
+import { BadgeRenderer } from './BadgeRenderer.js';
+
+export class CircuitGridRenderer {
     constructor(calendarElement) {
         this.calendar = calendarElement;
         this.svgContainer = null;
         this.borders = new Map(); // Track rendered borders by day
+        this.badgeRenderer = null; // Circuit grid specific badge renderer
         this.resizeObserver = null;
         this.resizeDebounceTimer = null;
-        
+
         this.init();
     }
 
     /**
-     * Initialize the border renderer
+     * Initialize the circuit grid renderer
      */
     init() {
         this.findSVGContainer();
+        this.initializeBadgeRenderer();
         this.setupResizeObserver();
         this.renderAllBorders();
+        this.initializeGridEvents();
+    }
+
+    /**
+     * Initialize badge renderer for circuit grid
+     */
+    initializeBadgeRenderer() {
+        try {
+            this.badgeRenderer = new BadgeRenderer(this.calendar);
+        } catch (error) {
+            console.error('Failed to initialize BadgeRenderer for circuit grid:', error);
+        }
+    }
+
+    /**
+     * Initialize grid-specific event handlers
+     */
+    initializeGridEvents() {
+        // Circuit grid specific event handlers - simplified without border lighting
+        const eventCards = this.calendar.querySelectorAll('.dm-events-content .dm-event-link');
+        
+        // Additional grid-specific interactivity can be added here if needed
     }
 
     /**
@@ -29,7 +57,7 @@ export class BorderRenderer {
         this.svgContainer = this.calendar.querySelector('.dm-border-overlay');
         
         if (!this.svgContainer) {
-            console.error('BorderRenderer: SVG container not found. Expected .dm-border-overlay element in calendar.');
+            console.error('CircuitGridRenderer: SVG container not found. Expected .dm-border-overlay element in calendar.');
             return false;
         }
         
@@ -63,6 +91,7 @@ export class BorderRenderer {
         }, 300);
     }
 
+
     /**
      * Detect day groups by analyzing DOM structure and CSS classes
      * 
@@ -71,8 +100,8 @@ export class BorderRenderer {
     detectDayGroups() {
         const dayGroups = new Map();
         
-        // Find all day group containers
-        const dayGroupElements = this.calendar.querySelectorAll('.dm-date-group');
+        // Find all day group containers in circuit grid
+        const dayGroupElements = this.calendar.querySelectorAll('.dm-events-content .dm-date-group');
         
         dayGroupElements.forEach(groupElement => {
             // Extract day from class name (e.g., dm-day-saturday -> saturday)
@@ -133,6 +162,22 @@ export class BorderRenderer {
     }
 
     /**
+     * Get fill color for day background
+     */
+    getFillColor(dayName) {
+        const fillColors = {
+            'sunday': 'rgba(255, 107, 107, 0.15)',
+            'monday': 'rgba(78, 205, 196, 0.15)', 
+            'tuesday': 'rgba(69, 183, 209, 0.15)',
+            'wednesday': 'rgba(150, 206, 180, 0.15)',
+            'thursday': 'rgba(254, 202, 87, 0.15)',
+            'friday': 'rgba(255, 159, 243, 0.15)',
+            'saturday': 'rgba(84, 160, 255, 0.15)'
+        };
+        return fillColors[dayName] || 'rgba(0, 0, 0, 0.15)';
+    }
+
+    /**
      * Render SVG border element for day group using shape data
      * 
      * @param {string} dayName Day identifier (e.g., 'monday', 'tuesday')
@@ -148,30 +193,31 @@ export class BorderRenderer {
             existingBorder.remove();
         }
 
+        const fillColor = this.getFillColor(dayName);
         let element;
 
         if (shape.type === 'path') {
-            // Create SVG path element for L-shapes with arc-based rounding
+            // Create SVG path element for L-shapes with arc-based rounding AND background fill
             element = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             element.setAttribute('d', shape.path);
-            element.setAttribute('fill', 'none');
+            element.setAttribute('fill', fillColor);
             element.setAttribute('stroke', color);
-            element.setAttribute('stroke-width', '3');
-            element.setAttribute('opacity', '0.8');
+            element.setAttribute('stroke-width', '3.25');
+            element.setAttribute('stroke-opacity', '0.8');
             // No stroke-linejoin - arcs handle all corner rounding
         } else {
-            // Create single SVG rect element for simple rectangles
+            // Create single SVG rect element for simple rectangles AND background fill
             element = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
             element.setAttribute('x', shape.left);
             element.setAttribute('y', shape.top);
             element.setAttribute('width', shape.width);
             element.setAttribute('height', shape.height);
-            element.setAttribute('fill', 'none');
+            element.setAttribute('fill', fillColor);
             element.setAttribute('stroke', color);
-            element.setAttribute('stroke-width', '3');
+            element.setAttribute('stroke-width', '3.25');
             element.setAttribute('stroke-linejoin', 'round');
             element.setAttribute('stroke-linecap', 'round');
-            element.setAttribute('opacity', '0.8');
+            element.setAttribute('stroke-opacity', '0.8');
             element.setAttribute('rx', shape.borderRadius || 8); // Dynamic rounded corners
         }
 
@@ -194,7 +240,7 @@ export class BorderRenderer {
         const borderRadius = parseInt(styles.getPropertyValue('--dm-border-radius')) || 8;
         
         // Get actual container width
-        const containerWidth = this.calendar.querySelector('.dm-events-list').getBoundingClientRect().width;
+        const containerWidth = this.calendar.querySelector('.dm-events-content').getBoundingClientRect().width;
         
         // Calculate events per row using same logic as CSS grid
         const eventsPerRow = Math.floor((containerWidth + gap) / (cellWidth + gap));
@@ -508,13 +554,25 @@ export class BorderRenderer {
             curves.externalTopLeft(topBounds.left + 8, topBounds.top)
         );
         
-        // Horizontal connector line - extend far enough to overlap with the horizontal borders
-        // Since borders are curved, we need to extend beyond the corner radius to intersect the actual border lines
+        // Horizontal connector line with angled ends to run in middle of gap
+        // Connect directly to corner centers of rounded borders
         const cornerRadius = 8;
-        const overlapExtension = cornerRadius * 1.5; // Extend beyond curve to overlap horizontal borders
+        const angleOffset = 10; // How far to angle outward for middle gap positioning
+        const gapMiddleY = (topBounds.top + topBounds.height + bottomBounds.top) / 2;
+        
+        // Connect to corner centers (no overlap extension needed)
+        const topCornerX = topBounds.left + cornerRadius;
+        const bottomCornerX = bottomBounds.left + bottomBounds.width - cornerRadius;
+        
         path.push(
-            `M ${topBounds.left + overlapExtension} ${topBounds.top + topBounds.height}`,
-            `L ${bottomBounds.left + bottomBounds.width - overlapExtension} ${bottomBounds.top}`
+            // Start from bottom corner center of top group
+            `M ${topCornerX} ${topBounds.top + topBounds.height}`,
+            // Angle outward to middle of gap
+            `L ${topCornerX - angleOffset} ${gapMiddleY}`,
+            // Horizontal line across middle of gap
+            `L ${bottomCornerX + angleOffset} ${gapMiddleY}`,
+            // Angle inward to connect to top corner center of bottom group
+            `L ${bottomCornerX} ${bottomBounds.top}`
         );
         
         // Bottom group border (rounded rectangle)
@@ -680,7 +738,6 @@ export class BorderRenderer {
         };
     }
 
-
     /**
      * Render borders for all visible day groups
      */
@@ -718,6 +775,10 @@ export class BorderRenderer {
         // Small delay to allow DOM updates from filtering
         setTimeout(() => {
             this.renderAllBorders();
+            // Refresh badge renderer for circuit grid
+            if (this.badgeRenderer) {
+                this.badgeRenderer.refresh();
+            }
         }, 50);
     }
 
@@ -726,13 +787,19 @@ export class BorderRenderer {
      */
     cleanup() {
         this.clearBorders();
-        
+
+        // Cleanup badge renderer
+        if (this.badgeRenderer) {
+            this.badgeRenderer.cleanup();
+            this.badgeRenderer = null;
+        }
+
         // Disconnect ResizeObserver
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();
             this.resizeObserver = null;
         }
-        
+
         // Clear debounce timer
         clearTimeout(this.resizeDebounceTimer);
         

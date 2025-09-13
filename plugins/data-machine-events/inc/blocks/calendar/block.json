@@ -17,10 +17,6 @@
 		}
 	},
 	"attributes": {
-		"eventsToShow": {
-			"type": "number",
-			"default": 10
-		},
 		"showPastEvents": {
 			"type": "boolean",
 			"default": false
@@ -44,10 +40,6 @@
 		"enablePagination": {
 			"type": "boolean",
 			"default": true
-		},
-		"eventsPerPage": {
-			"type": "number",
-			"default": 12
 		}
 	},
 	"textdomain": "dm-events",

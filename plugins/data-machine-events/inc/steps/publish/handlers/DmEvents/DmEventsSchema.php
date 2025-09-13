@@ -2,8 +2,6 @@
 /**
  * Event Schema JSON-LD Generator
  *
- * Generates Google Event Schema from Event Details block attributes and venue taxonomy data.
- *
  * @package DmEvents\Steps\Publish\Handlers\DmEvents
  */
 
@@ -16,25 +14,19 @@ if (!defined('ABSPATH')) {
 class DmEventsSchema {
 
     /**
-     * Route parameters between engine and AI tool
-     *
-     * @param array $event_data Event data
-     * @param array $import_data Import data
-     * @param array $engine_parameters Engine parameters
-     * @return array Parameter routing array
+     * Routes parameters between engine (system) and AI processing based on data availability
      */
     public static function engine_or_tool($event_data, $import_data, $engine_parameters = []) {
         $engine_params = [];
         $tool_params = [];
         
-        // Schema parameters available for routing
         $possible_fields = [
             'startDate', 'endDate', 'startTime', 'endTime',
             'performer', 'performerType', 
             'organizer', 'organizerType', 'organizerUrl',
             'eventStatus', 'previousStartDate',
             'price', 'priceCurrency', 'ticketUrl', 'offerAvailability',
-            'description' // Always goes to tool for AI generation
+            'description'
         ];
         
         foreach ($possible_fields as $field) {
@@ -43,7 +35,6 @@ class DmEventsSchema {
                 continue;
             }
             
-            // Engine parameters take precedence over import data
             if (!empty($engine_parameters[$field])) {
                 $engine_params[$field] = $engine_parameters[$field];
             } elseif (!empty($import_data[$field])) {
@@ -53,7 +44,6 @@ class DmEventsSchema {
             }
         }
         
-        // Handle venue fields with engine parameter priority
         $venue_fields = ['venue', 'venueAddress', 'venueCity', 'venueState', 'venueZip', 
                         'venueCountry', 'venuePhone', 'venueWebsite', 'venueCoordinates'];
         foreach ($venue_fields as $field) {
@@ -63,7 +53,6 @@ class DmEventsSchema {
             } elseif (!empty($import_data[$field])) {
                 $engine_params[$field] = $import_data[$field];
             }
-            // Note: venue fields don't go to tool_params if missing - they're optional
         }
         
         return [
@@ -73,13 +62,7 @@ class DmEventsSchema {
     }
 
     /**
-     * Generate Google Event Schema JSON-LD from block attributes
-     *
-     * @param array $attributes Event Details block attributes
-     * @param array|null $venue_data Venue taxonomy data
-     * @param int $post_id WordPress post ID
-     * @param array $engine_parameters Engine parameters
-     * @return array Event schema array
+     * Generates comprehensive Google Event structured data combining block attributes with venue taxonomy meta
      */
     public static function generate_event_schema(array $attributes, ?array $venue_data, int $post_id, array $engine_parameters = []): array {
         $schema = [
@@ -98,7 +81,6 @@ class DmEventsSchema {
             $schema['endDate'] = $attributes['endDate'] . $end_time;
         }
         
-        // Generate location schema with priority: engine parameters > venue taxonomy > attributes
         $venue_name = $engine_parameters['venue'] ?? $venue_data['name'] ?? $attributes['venue'] ?? '';
         
         if (!empty($venue_name)) {
@@ -107,7 +89,6 @@ class DmEventsSchema {
                 'name' => $venue_name
             ];
             
-            // Use priority chain for address components
             $address_data = [
                 'streetAddress' => $engine_parameters['venueAddress'] ?? $venue_data['address'] ?? $attributes['address'] ?? '',
                 'addressLocality' => $engine_parameters['venueCity'] ?? $venue_data['city'] ?? $attributes['venueCity'] ?? '',
@@ -116,7 +97,6 @@ class DmEventsSchema {
                 'addressCountry' => $engine_parameters['venueCountry'] ?? $venue_data['country'] ?? $attributes['venueCountry'] ?? 'US'
             ];
             
-            // Only add address if we have at least street address or city
             if (!empty($address_data['streetAddress']) || !empty($address_data['addressLocality'])) {
                 $schema['location']['address'] = ['@type' => 'PostalAddress'];
                 
@@ -127,19 +107,16 @@ class DmEventsSchema {
                 }
             }
             
-            // Add venue phone from engine parameters (highest priority)
             $venue_phone = $engine_parameters['venuePhone'] ?? $venue_data['phone'] ?? $attributes['venuePhone'] ?? '';
             if (!empty($venue_phone)) {
                 $schema['location']['telephone'] = $venue_phone;
             }
             
-            // Add venue website from engine parameters (highest priority)
             $venue_website = $engine_parameters['venueWebsite'] ?? $venue_data['website'] ?? $attributes['venueWebsite'] ?? '';
             if (!empty($venue_website)) {
                 $schema['location']['url'] = $venue_website;
             }
             
-            // Add venue coordinates for geo schema
             $venue_coordinates = $engine_parameters['venueCoordinates'] ?? $venue_data['coordinates'] ?? $attributes['venueCoordinates'] ?? '';
             if (!empty($venue_coordinates)) {
                 $coords = explode(',', $venue_coordinates);

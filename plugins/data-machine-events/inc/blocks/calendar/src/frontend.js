@@ -6,20 +6,19 @@
 
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/flatpickr.css';
-import { BorderRenderer } from './BorderRenderer.js';
-import { BadgeRenderer } from './BadgeRenderer.js';
+import FilterManager from './FilterManager.js';
 
 (function() {
     'use strict';
 
-    // Global renderers for each calendar instance
-    const borderRenderers = new Map();
-    const badgeRenderers = new Map();
+    // Global display renderers and filter managers for each calendar instance
+    const displayRenderers = new Map();
+    const filterManagers = new Map();
 
     document.addEventListener('DOMContentLoaded', function() {
         initializeCalendarFilters();
-        initializeBorders();
-        initializeBadges();
+        initializeDisplayRenderers();
+        initializeFilterManagers();
     });
 
     /**
@@ -31,8 +30,7 @@ import { BadgeRenderer } from './BadgeRenderer.js';
         calendars.forEach(function(calendar) {
             const searchInput = calendar.querySelector('#dm-events-search');
             const dateRangeInput = calendar.querySelector('#dm-events-date-range');
-            const timeButtons = calendar.querySelectorAll('.dm-events-time-btn');
-            const eventsList = calendar.querySelector('#dm-events-list');
+            const eventsList = calendar.querySelector('.dm-events-content');
             
             if (searchInput) {
                 searchInput.addEventListener('input', function() {
@@ -78,17 +76,10 @@ import { BadgeRenderer } from './BadgeRenderer.js';
                         datePicker.clear();
                     });
                 }
-                
             }
-            
-            timeButtons.forEach(function(button) {
-                button.addEventListener('click', function() {
-                    const timeFilter = this.getAttribute('data-time');
-                    navigateToTimeView(timeFilter);
-                });
-            });
         });
     }
+
 
     /**
      * Filter events based on search term
@@ -106,13 +97,12 @@ import { BadgeRenderer } from './BadgeRenderer.js';
                          event.querySelector('.dm-event-title')?.textContent || '';
             const venue = event.getAttribute('data-venue') || 
                          event.querySelector('.dm-event-venue')?.textContent || '';
-            const artist = event.getAttribute('data-artist') || 
-                          event.querySelector('.dm-event-artist')?.textContent || '';
+            const badges = event.querySelector('.dm-taxonomy-badges')?.textContent || '';
             
             const matchesSearch = !searchTerm || 
                 title.toLowerCase().includes(searchLower) ||
                 venue.toLowerCase().includes(searchLower) ||
-                artist.toLowerCase().includes(searchLower);
+                badges.toLowerCase().includes(searchLower);
             
             if (matchesSearch) {
                 event.classList.remove('hidden');
@@ -133,9 +123,8 @@ import { BadgeRenderer } from './BadgeRenderer.js';
         
         updateNoEventsMessage(calendar);
         
-        // Refresh borders and badges after filtering
-        refreshBorders();
-        refreshBadges();
+        // Refresh display renderers after filtering
+        refreshDisplayRenderers();
     }
 
     /**
@@ -188,11 +177,9 @@ import { BadgeRenderer } from './BadgeRenderer.js';
         
         updateNoEventsMessage(calendar);
         
-        // Refresh borders and badges after filtering
-        refreshBorders();
-        refreshBadges();
+        // Refresh display renderers after filtering
+        refreshDisplayRenderers();
     }
-
 
     /**
      * Show or hide "no events found" message
@@ -218,97 +205,118 @@ import { BadgeRenderer } from './BadgeRenderer.js';
     }
 
     /**
-     * Initialize borders for all calendar instances
+     * Reliably detect carousel list mode by checking actual CSS styles
      */
-    function initializeBorders() {
+    function isCarouselListMode(calendar) {
+        // Check if date groups have horizontal flex layout (carousel characteristic)
+        const dateGroup = calendar.querySelector('.dm-date-group');
+        if (!dateGroup) return false;
+
+        const computedStyle = window.getComputedStyle(dateGroup);
+        const isHorizontalFlex = computedStyle.flexDirection === 'row';
+        const hasOverflowScroll = computedStyle.overflowX === 'scroll' || computedStyle.overflowX === 'auto';
+
+        // Additional check: carousel list CSS loaded
+        const carouselListCSS = document.querySelector('link[href*="carousel-list.css"]');
+
+        return isHorizontalFlex && hasOverflowScroll && carouselListCSS;
+    }
+
+    /**
+     * Initialize display renderers based on display type
+     */
+    function initializeDisplayRenderers() {
         const calendars = document.querySelectorAll('.dm-events-calendar.dm-events-date-grouped');
-        
+
         calendars.forEach(function(calendar) {
             try {
-                console.log('Initializing borders for calendar:', calendar);
-                
-                // Create border renderer for this calendar
-                const borderRenderer = new BorderRenderer(calendar);
-                borderRenderers.set(calendar, borderRenderer);
-                
-                console.log('Borders initialized successfully');
-                
+                // Check for explicit carousel list mode first (most reliable)
+                if (isCarouselListMode(calendar)) {
+                    console.log('Carousel List mode detected - no JavaScript renderer needed');
+                    return; // Exit early - carousel list is CSS-only
+                }
+
+                // Only initialize Circuit Grid if explicitly not in carousel mode
+                const circuitGridCSS = document.querySelector('link[href*="circuit-grid.css"]');
+                if (circuitGridCSS) {
+                    console.log('Circuit Grid mode detected - initializing renderer');
+                    initializeCircuitGrid(calendar);
+                } else {
+                    console.log('No display renderer needed');
+                }
+
             } catch (error) {
-                console.error('Failed to initialize borders:', error);
+                console.error('Failed to initialize display renderer:', error);
             }
         });
     }
 
     /**
-     * Initialize badges for all calendar instances
+     * Initialize Circuit Grid renderer for calendar
      */
-    function initializeBadges() {
-        const calendars = document.querySelectorAll('.dm-events-calendar.dm-events-date-grouped');
-        
-        calendars.forEach(function(calendar) {
-            try {
-                console.log('Initializing badges for calendar:', calendar);
-                
-                // Create badge renderer for this calendar
-                const badgeRenderer = new BadgeRenderer(calendar);
-                badgeRenderers.set(calendar, badgeRenderer);
-                
-                console.log('Badges initialized successfully');
-                
-            } catch (error) {
-                console.error('Failed to initialize badges:', error);
-            }
-        });
-    }
-
-    /**
-     * Refresh borders for all calendars (called after filtering)
-     */
-    function refreshBorders() {
-        borderRenderers.forEach((borderRenderer, calendar) => {
-            borderRenderer.refresh();
-        });
-    }
-
-    /**
-     * Refresh badges for all calendars (called after filtering)
-     */
-    function refreshBadges() {
-        badgeRenderers.forEach((badgeRenderer, calendar) => {
-            badgeRenderer.refresh();
-        });
-    }
-
-    /**
-     * Navigate to different time view
-     * 
-     * @param {string} timeFilter Time filter mode ('future', 'past', 'all')
-     */
-    function navigateToTimeView(timeFilter) {
-        const url = new URL(window.location);
-        if (timeFilter === 'future' && url.searchParams.get('time_filter') !== 'future') {
-            url.searchParams.delete('time_filter');
-        } else if (timeFilter !== 'future') {
-            url.searchParams.set('time_filter', timeFilter);
+    async function initializeCircuitGrid(calendar) {
+        try {
+            // Dynamically import Circuit Grid Renderer
+            const { CircuitGridRenderer } = await import('../DisplayStyles/CircuitGrid/CircuitGridRenderer.js');
+            
+            console.log('Initializing Circuit Grid renderer for calendar:', calendar);
+            
+            const circuitGridRenderer = new CircuitGridRenderer(calendar);
+            displayRenderers.set(calendar, circuitGridRenderer);
+            
+            console.log('Circuit Grid renderer initialized successfully');
+            
+        } catch (error) {
+            console.error('Failed to load Circuit Grid Renderer:', error);
         }
-        
-        url.searchParams.delete('paged');
-        window.location.href = url.toString();
     }
 
+
     /**
-     * Cleanup renderers when page unloads
+     * Refresh display renderers for all calendars (called after filtering)
+     */
+    function refreshDisplayRenderers() {
+        displayRenderers.forEach((displayRenderer, calendar) => {
+            displayRenderer.refresh();
+        });
+    }
+
+
+    /**
+     * Initialize filter managers for taxonomy filtering
+     */
+    function initializeFilterManagers() {
+        const calendars = document.querySelectorAll('.dm-events-calendar');
+        
+        calendars.forEach(function(calendar) {
+            const modal = calendar.querySelector('#dm-taxonomy-filter-modal');
+            
+            if (modal) {
+                const filterManager = new FilterManager(calendar);
+                filterManagers.set(calendar, filterManager);
+                
+                // Listen for filter changes to refresh display renderers
+                calendar.addEventListener('dmEventsFiltersChanged', function() {
+                    refreshDisplayRenderers();
+                });
+            }
+        });
+    }
+
+
+    /**
+     * Cleanup renderers and filter managers when page unloads
      */
     window.addEventListener('beforeunload', function() {
-        borderRenderers.forEach(borderRenderer => {
-            borderRenderer.cleanup();
+        displayRenderers.forEach(displayRenderer => {
+            displayRenderer.cleanup();
         });
-        borderRenderers.clear();
+        displayRenderers.clear();
         
-        badgeRenderers.forEach(badgeRenderer => {
-            badgeRenderer.cleanup();
+        filterManagers.forEach(filterManager => {
+            filterManager.destroy();
         });
-        badgeRenderers.clear();
+        filterManagers.clear();
     });
 
 })(); 

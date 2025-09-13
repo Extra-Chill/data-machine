@@ -8,17 +8,27 @@
 
 namespace DmEvents\Steps\Publish\Handlers\DmEvents;
 
+use DmEvents\Steps\Publish\Handlers\DmEvents\DmEventsPublisher;
+
 if (!defined('ABSPATH')) {
     exit;
 }
 
-// Register the DM Events publisher handler with Data Machine
-add_filter('dm_handlers', function($handlers) {
-    $handlers['create_event'] = [
-        'type' => 'publish',
-        'class' => 'DmEvents\\Steps\\Publish\\Handlers\\DmEvents\\DmEventsPublisher',
-        'label' => __('Publish to Events Calendar', 'dm-events'),
-        'description' => __('Create event posts in WordPress with Event Details blocks', 'dm-events')
+/**
+ * Register all DM Events publish handler component filters
+ *
+ * Complete self-registration pattern following Data Machine "plugins within plugins" architecture.
+ * Engine discovers DM Events handler capabilities purely through filter-based discovery.
+ */
+function dm_register_dm_events_filters() {
+
+    // Register the DM Events publisher handler with Data Machine
+    add_filter('dm_handlers', function($handlers) {
+        $handlers['create_event'] = [
+            'type' => 'publish',
+            'class' => DmEventsPublisher::class,
+            'label' => __('Publish to Events Calendar', 'dm-events'),
+            'description' => __('Create event posts in WordPress with Event Details blocks', 'dm-events')
     ];
     
     return $handlers;
@@ -45,15 +55,6 @@ add_filter('ai_tools', function($tools, $handler_slug = null, $handler_config = 
     return $tools;
 }, 10, 3);
 
-/**
- * Register handler directive for AI guidance
- * 
- * Provides clear instructions to AI about mandatory tool usage for event creation.
- */
-add_filter('dm_handler_directives', function($directives) {
-    $directives['create_event'] = 'You MUST create an event post using the create_event tool. Generate an engaging description based on the provided event data. Process ALL event information into a WordPress post - this action is required and not optional.';
-    return $directives;
-});
 
 /**
  * Get base event tool definition
@@ -65,7 +66,7 @@ function dm_events_get_event_base_tool(): array {
         'class' => 'DmEvents\\Steps\\Publish\\Handlers\\DmEvents\\DmEventsPublisher',
         'method' => 'handle_tool_call',
         'handler' => 'create_event',
-        'description' => 'REQUIRED: Process event data into WordPress post with Event Details block. You must use this tool to create the event.',
+        'description' => 'Create WordPress event post with Event Details block. This tool completes your pipeline task by publishing the event to WordPress.',
         'parameters' => [
             'title' => [
                 'type' => 'string',
@@ -350,6 +351,11 @@ function dm_events_check_static_venue_availability(array $ce_config): bool {
     
     // Other import handlers that provide venue data would be checked here
     // For now, we assume if we don't have explicit static venue config, then AI should handle it
-    
+
     return false;
 }
+
+}
+
+// Auto-register when file loads - achieving complete self-containment
+dm_register_dm_events_filters();

@@ -2,8 +2,6 @@
 /**
  * Data Machine Events Publisher
  *
- * AI-driven event publishing handler that creates WordPress posts with Event Details blocks.
- *
  * @package DmEvents\Steps\Publish\Handlers\DmEvents
  */
 
@@ -17,24 +15,19 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * AI-driven event creation with venue management
+ * AI-driven event creation with Event Details block generation and venue handling
  */
 class DmEventsPublisher {
     
-    /**
-     * Initialize publisher
-     */
     public function __construct() {
-        // Venue parameters injected by engine
     }
-    
-    
+
     /**
-     * Handle AI tool call for event creation
+     * Process AI tool call to create event with Event Details block
      *
-     * @param array $parameters AI tool parameters
-     * @param array $tool_def Tool definition
-     * @return array Tool execution result
+     * @param array $parameters Event data from AI tool call
+     * @param array $tool_def Tool definition configuration
+     * @return array Tool call result with success status and created post data
      */
     public function handle_tool_call(array $parameters, array $tool_def = []): array {
         if (empty($parameters['title'])) {

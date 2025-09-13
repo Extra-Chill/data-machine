@@ -1,29 +1,21 @@
 <?php
 /**
  * Venue Taxonomy Registration and Management
- * 
- * Handles venue taxonomy registration with 9 meta fields and admin UI integration.
  *
  * @package DmEvents\Core
  */
 
 namespace DmEvents\Core;
 
-// Prevent direct access
 if (!defined('ABSPATH')) {
     exit;
 }
 
 /**
- * Venue Taxonomy registration and meta field management
+ * Comprehensive venue taxonomy with 9 meta fields and admin UI
  */
 class Venue_Taxonomy {
     
-    /**
-     * Maps venue data keys to term meta field names
-     *
-     * @var array
-     */
     private static $meta_fields = [
         'address' => '_venue_address',
         'city' => '_venue_city',
@@ -36,9 +28,6 @@ class Venue_Taxonomy {
         'coordinates' => '_venue_coordinates'
     ];
     
-    /**
-     * Register venue taxonomy and initialize admin hooks
-     */
     public static function register() {
         self::register_venue_taxonomy();
         
@@ -47,9 +36,6 @@ class Venue_Taxonomy {
         self::init_admin_hooks();
     }
     
-    /**
-     * Register venue taxonomy with proper labels and settings
-     */
     private static function register_venue_taxonomy() {
         if (taxonomy_exists('venue')) {
             register_taxonomy_for_object_type('venue', 'dm_events');
@@ -78,9 +64,6 @@ class Venue_Taxonomy {
         register_taxonomy_for_object_type('venue', 'dm_events');
     }
     
-    /**
-     * Register all public taxonomies for dm_events post type
-     */
     private static function register_all_public_taxonomies() {
         $taxonomies = get_taxonomies(['public' => true], 'names');
         
@@ -119,28 +102,25 @@ class Venue_Taxonomy {
     }
     
     /**
-     * Get complete venue data including term details and meta fields
-     *
-     * @param int $term_id Venue term ID
-     * @return array Complete venue data
+     * Retrieves complete venue data with all 9 meta fields populated
      */
     public static function get_venue_data($term_id) {
         $term = get_term($term_id, 'venue');
         if (!$term || is_wp_error($term)) {
             return [];
         }
-        
+
         $venue_data = [
             'name' => $term->name,
             'term_id' => $term_id,
             'slug' => $term->slug,
             'description' => $term->description,
         ];
-        
+
         foreach (self::$meta_fields as $data_key => $meta_key) {
             $venue_data[$data_key] = get_term_meta($term_id, $meta_key, true);
         }
-        
+
         return $venue_data;
     }
     
@@ -178,35 +158,24 @@ class Venue_Taxonomy {
         return implode(', ', $address_parts);
     }
     
-    /**
-     * Get all venue terms with complete meta data
-     *
-     * @return array Array of venue data
-     */
     public static function get_all_venues() {
         $venues = get_terms([
             'taxonomy' => 'venue',
             'hide_empty' => false,
         ]);
-        
+
         if (is_wp_error($venues)) {
             return [];
         }
-        
+
         $venue_data = [];
         foreach ($venues as $venue) {
             $venue_data[] = self::get_venue_data($venue->term_id);
         }
-        
+
         return $venue_data;
     }
-    
-    /**
-     * Get venues filtered by minimum event count
-     *
-     * @param int $min_events Minimum event count (default: 1)
-     * @return array Array of venue data
-     */
+
     public static function get_venues_by_event_count($min_events = 1) {
         $venues = get_terms([
             'taxonomy' => 'venue',
@@ -228,12 +197,6 @@ class Venue_Taxonomy {
         return $venue_data;
     }
     
-    /**
-     * Extract city name from location string
-     *
-     * @param string $location_name Location string
-     * @return string City name
-     */
     private static function extract_city_from_location($location_name) {
         if (empty($location_name)) {
             return '';
@@ -243,12 +206,6 @@ class Venue_Taxonomy {
         return trim($parts[0]);
     }
     
-    /**
-     * Extract state code from location string
-     *
-     * @param string $location_name Location string
-     * @return string State code
-     */
     private static function extract_state_from_location($location_name) {
         if (empty($location_name)) {
             return '';
@@ -262,9 +219,6 @@ class Venue_Taxonomy {
         return '';
     }
     
-    /**
-     * Initialize admin hooks for venue meta field management
-     */
     private static function init_admin_hooks() {
         add_action('venue_add_form_fields', [__CLASS__, 'add_venue_form_fields']);
         
@@ -275,11 +229,6 @@ class Venue_Taxonomy {
         add_action('edited_venue', [__CLASS__, 'save_venue_meta']);
     }
     
-    /**
-     * Add venue meta fields to "Add New Venue" form
-     *
-     * @param string $taxonomy Taxonomy slug
-     */
     public static function add_venue_form_fields($taxonomy) {
         $fields = [
             'address'   => 'Address',
@@ -292,7 +241,7 @@ class Venue_Taxonomy {
             'capacity'  => 'Capacity',
             'coordinates' => 'Coordinates'
         ];
-        
+
         foreach ($fields as $key => $label) {
             $meta_key = "_venue_$key";
             echo '<div class="form-field">';
@@ -301,12 +250,7 @@ class Venue_Taxonomy {
             echo '</div>';
         }
     }
-    
-    /**
-     * Add venue meta fields to edit venue form
-     *
-     * @param WP_Term $term Term object
-     */
+
     public static function edit_venue_form_fields($term) {
         $fields = [
             'address'   => 'Address',
@@ -319,7 +263,7 @@ class Venue_Taxonomy {
             'capacity'  => 'Capacity',
             'coordinates' => 'Coordinates'
         ];
-        
+
         foreach ($fields as $key => $label) {
             $meta_key = "_venue_$key";
             $value = get_term_meta($term->term_id, $meta_key, true);
@@ -329,12 +273,7 @@ class Venue_Taxonomy {
             echo '</tr>';
         }
     }
-    
-    /**
-     * Save venue meta fields when creating or updating venue terms
-     *
-     * @param int $term_id Term ID of the venue being saved
-     */
+
     public static function save_venue_meta($term_id) {
         $fields = ['address', 'city', 'state', 'zip', 'country', 'phone', 'website', 'capacity', 'coordinates'];
         

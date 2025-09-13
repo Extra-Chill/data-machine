@@ -1,0 +1,174 @@
+<?php
+/**
+ * Taxonomy Helper
+ *
+ * @package DmEvents\Blocks\Calendar
+ */
+
+namespace DmEvents\Blocks\Calendar;
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+/**
+ * Processes taxonomy data with hierarchy building and post count calculations
+ */
+class Taxonomy_Helper {
+    
+    /**
+     * Returns structured taxonomy data excluding venue with hierarchy and event counts for filtering
+     */
+    public static function get_all_taxonomies_with_counts() {
+        $taxonomies_data = [];
+        
+        $taxonomies = get_object_taxonomies('dm_events', 'objects');
+        
+        if (!$taxonomies) {
+            return $taxonomies_data;
+        }
+        
+        foreach ($taxonomies as $taxonomy) {
+            if ($taxonomy->name === 'venue' || !$taxonomy->public) {
+                continue;
+            }
+            
+            $terms_hierarchy = self::get_taxonomy_hierarchy($taxonomy->name);
+            
+            if (!empty($terms_hierarchy)) {
+                $taxonomies_data[$taxonomy->name] = [
+                    'label' => $taxonomy->label,
+                    'name' => $taxonomy->name,
+                    'hierarchical' => $taxonomy->hierarchical,
+                    'terms' => $terms_hierarchy
+                ];
+            }
+        }
+        
+        return $taxonomies_data;
+    }
+    
+    /**
+     * Builds hierarchical term structure with event post counts for calendar filtering
+     */
+    public static function get_taxonomy_hierarchy($taxonomy_slug) {
+        $terms = get_terms([
+            'taxonomy' => $taxonomy_slug,
+            'hide_empty' => false, // Get all terms first, we'll filter by event count
+            'orderby' => 'name',
+            'order' => 'ASC'
+        ]);
+        
+        if (is_wp_error($terms) || empty($terms)) {
+            return [];
+        }
+        
+        // Filter terms to only include those with dm_events
+        $terms_with_events = [];
+        foreach ($terms as $term) {
+            $event_count = self::get_term_event_count($term->term_id);
+            if ($event_count > 0) {
+                $term->event_count = $event_count;
+                $terms_with_events[] = $term;
+            }
+        }
+        
+        if (empty($terms_with_events)) {
+            return [];
+        }
+        $taxonomy_obj = get_taxonomy($taxonomy_slug);
+        if ($taxonomy_obj && $taxonomy_obj->hierarchical) {
+            return self::build_hierarchy_tree($terms_with_events);
+        } else {
+            return array_map(function($term) {
+                return [
+                    'term_id' => $term->term_id,
+                    'name' => $term->name,
+                    'slug' => $term->slug,
+                    'event_count' => $term->event_count,
+                    'level' => 0,
+                    'children' => []
+                ];
+            }, $terms_with_events);
+        }
+    }
+    
+    /**
+     * Recursively build term hierarchy tree
+     *
+     * @param array $terms Flat array of term objects
+     * @param int $parent_id Parent term ID for current level
+     * @param int $level Current nesting level
+     * @return array Nested tree structure
+     */
+    public static function build_hierarchy_tree($terms, $parent_id = 0, $level = 0) {
+        $tree = [];
+        
+        foreach ($terms as $term) {
+            if ($term->parent == $parent_id) {
+                $term_data = [
+                    'term_id' => $term->term_id,
+                    'name' => $term->name,
+                    'slug' => $term->slug,
+                    'event_count' => $term->event_count,
+                    'level' => $level,
+                    'children' => []
+                ];
+                
+                $children = self::build_hierarchy_tree($terms, $term->term_id, $level + 1);
+                if (!empty($children)) {
+                    $term_data['children'] = $children;
+                }
+                
+                $tree[] = $term_data;
+            }
+        }
+        
+        return $tree;
+    }
+    
+    /**
+     * Count events assigned to specific term
+     *
+     * @param int $term_id Term ID to count events for
+     * @return int Number of published events with this term
+     */
+    public static function get_term_event_count($term_id) {
+        $query_args = [
+            'post_type' => 'dm_events',
+            'post_status' => 'publish',
+            'numberposts' => -1,
+            'fields' => 'ids',
+            'tax_query' => [
+                [
+                    'taxonomy' => get_term($term_id)->taxonomy,
+                    'field' => 'term_id',
+                    'terms' => $term_id
+                ]
+            ]
+        ];
+        
+        $events = get_posts($query_args);
+        return count($events);
+    }
+    
+    /**
+     * Convert nested hierarchy to flat array for processing
+     *
+     * @param array $terms_hierarchy Nested term structure
+     * @return array Flattened term array maintaining level information
+     */
+    public static function flatten_hierarchy($terms_hierarchy) {
+        $flattened = [];
+        
+        foreach ($terms_hierarchy as $term) {
+            $flattened[] = $term;
+            
+            if (!empty($term['children'])) {
+                $flattened = array_merge($flattened, self::flatten_hierarchy($term['children']));
+            }
+        }
+        
+        return $flattened;
+    }
+}

@@ -1,8 +1,6 @@
 <?php
 /**
  * Ticketmaster Event Import Handler
- * 
- * Integrates with Ticketmaster Discovery API v2 for event data import.
  *
  * @package DmEvents\Steps\EventImport\Handlers\Ticketmaster
  */
@@ -16,18 +14,12 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Ticketmaster Discovery API event import handler
+ * Single-item processing with Discovery API v2 integration
  */
 class Ticketmaster {
     
-    /**
-     * Ticketmaster API base URL
-     */
     const API_BASE = 'https://app.ticketmaster.com/discovery/v2/';
-    
-    /**
-     * Default search parameters
-     */
+
     const DEFAULT_PARAMS = [
         'size' => 50,
         'sort' => 'date,asc',
@@ -35,19 +27,14 @@ class Ticketmaster {
     ];
     
     /**
-     * Execute Ticketmaster event import
-     * 
-     * @param array $parameters Flat parameter structure from Data Machine
-     * @return array Updated data packet array
+     * Process Ticketmaster events using single-item Data Machine pattern
      */
     public function execute(array $parameters): array {
-        // Extract from flat parameter structure (matches PublishStep pattern)
         $job_id = $parameters['job_id'];
         $flow_step_id = $parameters['flow_step_id'];
         $data = $parameters['data'] ?? [];
         $flow_step_config = $parameters['flow_step_config'] ?? [];
         
-        // Extract handler configuration from nested structure
         $handler_config = $flow_step_config['handler']['settings']['ticketmaster_events'] ?? [];
         $pipeline_id = $flow_step_config['pipeline_id'] ?? null;
         
@@ -57,21 +44,18 @@ class Ticketmaster {
             'flow_step_id' => $flow_step_id
         ]);
         
-        // Get API configuration from Data Machine auth system
         $api_config = apply_filters('dm_retrieve_oauth_keys', [], 'ticketmaster_events');
         if (empty($api_config['api_key'])) {
             $this->log_error('Ticketmaster API key not configured');
-            return $data; // Return unchanged data packet array
+            return $data;
         }
         
-        // Build search parameters
         $search_params = $this->build_search_params($handler_config, $api_config['api_key']);
         
-        // Fetch events from API
         $raw_events = $this->fetch_events($search_params);
         if (empty($raw_events)) {
             $this->log_info('No events found from Ticketmaster API');
-            return $data; // Return unchanged data packet array
+            return $data;
         }
         
         // Process events one at a time (Data Machine single-item model)

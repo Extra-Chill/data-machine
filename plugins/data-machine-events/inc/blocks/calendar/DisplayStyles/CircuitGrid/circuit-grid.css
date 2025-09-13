@@ -1,0 +1,141 @@
+/* Circuit Grid Display Styles */
+
+/* Border Overlay SVG */
+.dm-border-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+    overflow: visible;
+}
+
+/* Day Border Colors */
+.dm-border-sunday,
+.dm-border-group-sunday { stroke: var(--dm-day-sunday); }
+.dm-border-monday,
+.dm-border-group-monday { stroke: var(--dm-day-monday); }
+.dm-border-tuesday,
+.dm-border-group-tuesday { stroke: var(--dm-day-tuesday); }
+.dm-border-wednesday,
+.dm-border-group-wednesday { stroke: var(--dm-day-wednesday); }
+.dm-border-thursday,
+.dm-border-group-thursday { stroke: var(--dm-day-thursday); }
+.dm-border-friday,
+.dm-border-group-friday { stroke: var(--dm-day-friday); }
+.dm-border-saturday,
+.dm-border-group-saturday { stroke: var(--dm-day-saturday); }
+
+/* Circuit Grid Layout */
+.dm-events-calendar.dm-events-date-grouped .dm-events-content {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, var(--dm-grid-cell-width));
+    grid-auto-rows: var(--dm-grid-cell-height);
+    gap: var(--dm-grid-gap);
+    justify-content: center;
+    z-index: 2;
+}
+
+/* Date Group Containers - Make invisible to grid layout */
+.dm-date-group {
+    display: contents; /* Makes wrapper invisible to CSS Grid layout */
+}
+
+/* Events Wrapper - Also make invisible to allow direct event item grid participation */
+.dm-events-wrapper {
+    display: contents; /* Makes events wrapper invisible to CSS Grid layout */
+}
+
+/* Circuit Grid Badge Positioning */
+.dm-day-badge {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: var(--dm-badge-z-index);
+    opacity: 0;
+    transform: translateY(-50%);
+    pointer-events: none;
+}
+
+.dm-day-badge.positioned {
+    opacity: 1;
+}
+
+/* Default Date Group Styling */
+.dm-date-group {
+    border-color: var(--dm-border-default);
+}
+
+/* Day-specific Date Group Border Colors */
+.dm-date-group.dm-day-sunday {
+    border-color: var(--dm-day-sunday);
+}
+
+.dm-date-group.dm-day-monday {
+    border-color: var(--dm-day-monday);
+}
+
+.dm-date-group.dm-day-tuesday {
+    border-color: var(--dm-day-tuesday);
+}
+
+.dm-date-group.dm-day-wednesday {
+    border-color: var(--dm-day-wednesday);
+}
+
+.dm-date-group.dm-day-thursday {
+    border-color: var(--dm-day-thursday);
+}
+
+.dm-date-group.dm-day-friday {
+    border-color: var(--dm-day-friday);
+}
+
+.dm-date-group.dm-day-saturday {
+    border-color: var(--dm-day-saturday);
+}
+
+
+
+/* Circuit Grid Hover States - Override universal styles for grid-specific effects */
+.dm-events-content .dm-event-item:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: var(--dm-card-hover-border);
+    box-shadow: var(--dm-card-hover-shadow);
+    transform: translateY(-1px);
+}
+
+/* Circuit Grid SVG Border Styling */
+.dm-border-overlay path {
+    stroke-width: 3.25px;
+    stroke-dasharray: none;
+}
+
+/* Hidden Date Groups */
+.dm-date-group.hidden {
+    display: none;
+}
+
+/* Responsive Circuit Grid */
+@media (min-width: 1200px) {
+    .dm-events-calendar.dm-events-date-grouped .dm-events-content {
+        grid-template-columns: repeat(auto-fill, var(--dm-grid-cell-width));
+        grid-auto-rows: var(--dm-grid-cell-height);
+        gap: var(--dm-grid-gap);
+    }
+}
+
+@media (max-width: 768px) {
+    .dm-events-calendar.dm-events-date-grouped .dm-events-content {
+        grid-template-columns: 1fr;
+        grid-auto-rows: var(--dm-grid-cell-height-mobile);
+        gap: var(--dm-grid-gap);
+    }
+    
+    .dm-date-group {
+        padding: 0;
+    }
+}

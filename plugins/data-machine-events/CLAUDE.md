@@ -12,8 +12,8 @@ composer install
 cd inc/blocks/calendar && npm install && npm run build
 npm run start          # Development watch
 
-# Event Details block (@wordpress/scripts)
-cd inc/blocks/event-details && npm install && npm run build
+# Event Details block (webpack with @wordpress/scripts base)
+cd inc/blocks/EventDetails && npm install && npm run build
 npm run start          # Development watch
 npm run lint:js && npm run lint:css    # Linting
 ```
@@ -26,7 +26,7 @@ npm run lint:js && npm run lint:css    # Linting
 - **Dynamic Versioning:** Admin assets use `filemtime()` for cache busting
 - **Automated Build Pipeline:** 
   1. Clean dist directory and install production composer dependencies
-  2. Build Calendar block (webpack) and Event Details block (@wordpress/scripts) 
+  2. Build Calendar block (webpack) and Event Details block (webpack with @wordpress/scripts base) 
   3. Copy plugin files with rsync (excludes development files)
   4. Create versioned ZIP package with build info
   5. Restore development dependencies for continued work
@@ -47,6 +47,9 @@ npm run lint:js && npm run lint:css    # Linting
 - `DmEvents\Admin\Settings_Page` - Minimal settings interface for controlling event archive behavior, search integration, and display preferences
 - `DmEvents\Core\Venue_Taxonomy` - Complete venue taxonomy with 9 meta fields, admin UI, and CRUD operations
 - `DmEvents\Core\Event_Post_Type` - Event post type registration with selective admin menu control and taxonomy integration
+- `DmEvents\Core\Taxonomy_Badges` - Dynamic taxonomy badge rendering system with automatic color generation and badge display for all non-venue taxonomies
+- `DmEvents\Blocks\Calendar\Template_Loader` - Modular template loading system with variable extraction, output buffering, and template caching for calendar block components
+- `DmEvents\Blocks\Calendar\Taxonomy_Helper` - Taxonomy data discovery, hierarchy building, and post count calculations for calendar filtering systems
 - `DmEvents\Steps\Publish\Handlers\DmEvents\DmEventsSchema` - Google Event Schema JSON-LD generator for enhanced SEO visibility
 - `DmEvents\Steps\Publish\Handlers\DmEvents\DmEventsPublisher` - AI-driven event creation with comprehensive venue handling
 - `DmEvents\Steps\Publish\Handlers\DmEvents\DmEventsSettings` - Publisher configuration management
@@ -72,14 +75,21 @@ npm run lint:js && npm run lint:css    # Linting
 ### Blocks & Venues
 
 **Blocks:**
-- `inc/blocks/calendar/` - Events display with filtering, pagination, and BorderRenderer.js visual enhancement system (webpack build system)
-- `inc/blocks/event-details/` - Event data storage with InnerBlocks rich content support (@wordpress/scripts build system)
+- `inc/blocks/calendar/` - Events display with filtering, pagination, modular template system, and DisplayStyles visual enhancement system (webpack build system)
+- `inc/blocks/EventDetails/` - Event data storage with InnerBlocks rich content support (webpack with @wordpress/scripts base)
 - `inc/blocks/root.css` - Centralized design tokens and CSS custom properties accessible from both CSS and JavaScript
+
+**Template System:**
+- **Template_Loader:** Handles loading and rendering of calendar component templates with proper variable passing and clean separation between data processing and HTML presentation
+- **Modular Templates:** 6 specialized templates including event-item, date-group, pagination, navigation, no-events, filter-bar plus modal subdirectory
+- **Modal Templates:** Dedicated modal subdirectory with taxonomy-filter.php for advanced filtering interfaces
+- **Variable Extraction:** EXTR_SKIP pattern ensures safe variable passing to template scope without conflicts
+- **Output Buffering:** Templates return content as strings for flexible rendering and caching capabilities
 
 **Event Details Block Architecture:**
 - **InnerBlocks Integration:** Support for rich content editing within event posts
 - **15+ Event Attributes:** Comprehensive data model (startDate, endDate, startTime, endTime, venue, address, price, ticketUrl, performer, performerType, organizer, organizerType, organizerUrl, eventStatus, previousStartDate, priceCurrency, offerAvailability)
-- **Display Controls:** showVenue, showPrice, showTicketLink, showArtist for flexible rendering
+- **Display Controls:** showVenue, showPrice, showTicketLink, showPerformer for flexible rendering
 - **Block-First Data:** Single source of truth with background sync to meta fields for query efficiency
 
 **Venues:**
@@ -97,14 +107,18 @@ npm run lint:js && npm run lint:css    # Linting
 - `dm-events.php` - Main plugin file with PSR-4 autoloader
 - `inc/admin/class-status-detection.php` - Data Machine integration status monitoring
 - `inc/admin/class-settings-page.php` - Event settings interface for archive behavior and display preferences
-- `inc/blocks/calendar/` - Events display block with BorderRenderer.js visual enhancement system (webpack build system)
-  - `src/BorderRenderer.js` - Day-grouped visual border system with L-shape detection and responsive rendering
-- `inc/blocks/event-details/` - Event data storage block (@wordpress/scripts build system)
+- `inc/blocks/calendar/` - Events display block with modular template system and DisplayStyles visual enhancement (webpack build system)
+  - `class-template-loader.php` - Template loading system with variable extraction and output buffering
+  - `class-taxonomy-helper.php` - Taxonomy data processing with hierarchy building and post count calculations
+  - `DisplayStyles/` - Visual enhancement components with CircuitGridRenderer.js, CarouselListRenderer.js, and BadgeRenderer.js
+  - `templates/` - 6 modular template files for calendar components plus modal subdirectory
+- `inc/blocks/EventDetails/` - Event data storage block (webpack with @wordpress/scripts base)
 - `inc/blocks/root.css` - Centralized design tokens and CSS custom properties for all blocks
 - `inc/core/class-event-post-type.php` - Event post type with selective menu control
 - `inc/core/class-venue-taxonomy.php` - Venue taxonomy with 9 meta fields and admin UI
-- `inc/steps/event-import/handlers/` - Import handlers with single-item processing (Ticketmaster, Dice FM, AI-powered web scrapers)
-- `inc/steps/publish/handlers/dm-events/` - AI-driven publishing with Schema generation and venue handling
+- `inc/core/class-taxonomy-badges.php` - Dynamic taxonomy badge rendering with automatic color generation
+- `inc/steps/EventImport/handlers/` - Import handlers with single-item processing (Ticketmaster, Dice FM, AI-powered web scrapers)
+- `inc/steps/publish/handlers/DmEvents/` - AI-driven publishing with Schema generation and venue handling
   - `DmEventsSchema.php` - Google Event structured data generator
   - `DmEventsPublisher.php` - AI-powered event creation
   - `DmEventsVenue.php` - Centralized venue taxonomy operations
@@ -120,6 +134,7 @@ npm run lint:js && npm run lint:css    # Linting
   - `_venue_country`, `_venue_phone`, `_venue_website` (contact information)
   - `_venue_capacity`, `_venue_coordinates` (venue specifications)
   - Plus native WordPress description field for venue details
+- **Taxonomy Badge System:** Dynamic rendering of taxonomy badges for all non-venue taxonomies with consistent color classes and data attributes
 - **Schema Integration:** Google Event structured data generated from block attributes and venue meta
 - **REST API:** Native WordPress REST API via show_in_rest => true
 - **Primary Data:** Block attributes (single source of truth), venue taxonomy meta for location data
@@ -133,6 +148,8 @@ npm run lint:js && npm run lint:css    # Linting
 - **Smart Parameter Routing:** DmEventsSchema.engine_or_tool() intelligently routes data between system and AI parameters
 - **Venue Data Priority:** Venue taxonomy data overrides address attributes during event rendering
 - **Single-Item Processing:** Import handlers process one event per job with duplicate prevention
+- **Taxonomy Data Processing:** Taxonomy_Helper provides hierarchy building, post count calculations, and structured taxonomy data for calendar filtering systems
+- **Template-Driven Display:** Template_Loader enables modular, cacheable template rendering with variable extraction and output buffering
 
 ### Security Standards
 - Nonce verification on all forms
@@ -140,10 +157,12 @@ npm run lint:js && npm run lint:css    # Linting
 - Capability checks for admin functions
 
 ### Build Systems
-- **Calendar Block:** webpack build system with BorderRenderer.js visual enhancement (`cd inc/blocks/calendar && npm run build/start`)
-- **Event Details Block:** @wordpress/scripts build system (`cd inc/blocks/event-details && npm run build/start`)
+- **Calendar Block:** webpack build system with modular template architecture, Template_Loader system, and DisplayStyles visual enhancement (`cd inc/blocks/calendar && npm run build/start`)
+- **Event Details Block:** webpack with @wordpress/scripts base (`cd inc/blocks/EventDetails && npm run build/start`)
 - **Centralized Design System:** root.css provides unified design tokens accessible from both CSS and JavaScript
-- **Visual Enhancement:** BorderRenderer.js creates day-grouped visual borders with intelligent L-shape detection
+- **Visual Enhancement:** DisplayStyles components including CircuitGridRenderer.js, CarouselListRenderer.js, and BadgeRenderer.js for calendar display
+- **Template Architecture:** Modular template system with 6 specialized templates plus modal subdirectory for advanced filtering interfaces
+- **Template Loading:** Template_Loader class provides get_template(), include_template(), template_exists(), and get_template_path() methods with variable extraction
 - **Production Build:** `./build.sh` creates optimized package in `/dist` directory with versioned .zip file for WordPress deployment
 - **VSCode Integration:** `.vscode/tasks.json` provides IDE task management for development workflow
 - **Asset Strategy:** Individual blocks handle their own CSS and JavaScript assets independently
@@ -151,15 +170,15 @@ npm run lint:js && npm run lint:css    # Linting
 - **Automated Build Steps:** 
   1. Install production composer dependencies (`composer install --no-dev --optimize-autoloader`)
   2. Build Calendar block with webpack (`npm ci && npm run build`)
-  3. Build Event Details block with @wordpress/scripts (`npm ci && npm run build`)
+  3. Build Event Details block with webpack using @wordpress/scripts base (`npm ci && npm run build`)
   4. Copy files with rsync (excludes node_modules, src, development files)
   5. Create versioned ZIP file in `/dist` directory
   6. Generate build info and restore development dependencies
 
 ### Data Machine Integration
-- **Import Handlers:** Ticketmaster Discovery API (API key auth with comprehensive validation), Dice FM, AI-powered UniversalWebScraper in `inc/steps/event-import/handlers/`
+- **Import Handlers:** Ticketmaster Discovery API (API key auth with comprehensive validation), Dice FM, AI-powered UniversalWebScraper in `inc/steps/EventImport/handlers/`
 - **AI-Powered Web Scraping:** UniversalWebScraper uses AI to extract structured event data from HTML sections with tool call handling
-- **Publishers:** Data Machine Events publisher with AI-driven event creation in `inc/steps/publish/handlers/dm-events/`
+- **Publishers:** Data Machine Events publisher with AI-driven event creation in `inc/steps/publish/handlers/DmEvents/`
 - **Event Creation:** Data Machine processes one event per job via `Event Details` block attributes with AI-generated descriptions
 - **Duplicate Prevention:** Flow-scoped processed items tracking prevents importing duplicate events per flow
 - **Authentication:** API key authentication for Ticketmaster Discovery API with comprehensive validation and error handling
@@ -173,7 +192,7 @@ npm run lint:js && npm run lint:css    # Linting
 - **DmEventsPublisher:** AI-driven event creation with Event Details block generation and taxonomy handling
 - **DmEventsVenue:** Centralized venue operations including term creation, lookup, metadata validation, and assignment workflows
 - **UniversalWebScraper:** AI-powered web scraping with HTML section extraction and structured event data processing
-- **Visual Enhancement System:** BorderRenderer.js with day-grouped visual borders, L-shape detection, and responsive rendering
+- **Visual Enhancement System:** DisplayStyles components with CircuitGridRenderer.js, CarouselListRenderer.js, and BadgeRenderer.js for flexible calendar display
 - **Centralized Design System:** root.css provides unified design tokens accessible from both CSS and JavaScript components
 - **Schema Architecture:** Combines Event Details block attributes with venue taxonomy meta for complete Google Event schema
 - **Smart Parameter Routing:** DmEventsSchema.engine_or_tool() analyzes import data to route parameters between system and AI processing
@@ -324,6 +343,80 @@ echo '<script type="application/ld+json">' . wp_json_encode($schema) . '</script
 // Venue operations with comprehensive validation
 $venue_result = DmEventsVenue::find_or_create_venue($venue_name, $venue_data);
 $assignment = DmEventsVenue::assign_venue_to_event($post_id, $venue_name, $venue_data);
+```
+
+### Template Architecture
+
+**Modular Template System:**
+Calendar block uses a modular template architecture with 6 specialized templates plus modal subdirectory:
+
+```php
+// Template_Loader provides clean template rendering
+Template_Loader::init(); // Initialize template path
+$content = Template_Loader::get_template('event-item', $variables);
+Template_Loader::include_template('date-group', $group_data);
+
+// Template structure
+templates/
+├── event-item.php           # Individual event display
+├── date-group.php           # Day-grouped event container
+├── pagination.php           # Event pagination controls
+├── navigation.php           # Calendar navigation
+├── no-events.php           # Empty state display
+├── filter-bar.php          # Taxonomy filtering interface
+└── modal/
+    └── taxonomy-filter.php  # Advanced filter modal
+```
+
+**Template Loading Pattern:**
+```php
+// Safe variable extraction with EXTR_SKIP
+public static function get_template($template_name, $variables = []) {
+    $template_file = self::$template_path . $template_name . '.php';
+    
+    if (!file_exists($template_file)) {
+        return '<!-- Template not found: ' . esc_html($template_name) . ' -->';
+    }
+    
+    // Extract variables into template scope
+    if (!empty($variables)) {
+        extract($variables, EXTR_SKIP);
+    }
+    
+    // Capture template output
+    ob_start();
+    include $template_file;
+    return ob_get_clean();
+}
+```
+
+**Taxonomy Data Processing:**
+```php
+// Taxonomy_Helper provides structured data for filtering
+$taxonomies = Taxonomy_Helper::get_all_taxonomies_with_counts();
+$hierarchy = Taxonomy_Helper::get_taxonomy_hierarchy($taxonomy_slug);
+$flattened = Taxonomy_Helper::flatten_hierarchy($hierarchy);
+
+// Each taxonomy includes:
+// - label, name, hierarchical status
+// - terms with event_count, level, children
+// - post count calculations for filtering
+```
+
+**Badge System Integration:**
+```php
+// Taxonomy_Badges renders consistent badge HTML
+$badges_html = Taxonomy_Badges::render_taxonomy_badges($post_id);
+$color_class = Taxonomy_Badges::get_taxonomy_color_class($taxonomy_slug);
+$used_taxonomies = Taxonomy_Badges::get_used_taxonomies();
+
+// Badge structure:
+// <div class="dm-taxonomy-badges">
+//   <span class="dm-taxonomy-badge dm-taxonomy-{slug} dm-term-{term-slug}" 
+//         data-taxonomy="{slug}" data-term="{term-slug}">
+//     {term-name}
+//   </span>
+// </div>
 ```
 
 ### Flat Data Machine Parameter System

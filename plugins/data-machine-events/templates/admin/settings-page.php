@@ -17,10 +17,8 @@ if (!defined('ABSPATH')) {
 $settings = get_option('dm_events_settings', array(
     'include_in_archives' => false,
     'include_in_search' => true,
-    'use_events_page' => true,
-    'default_calendar_view' => 'month',
-    'events_per_page' => 12,
-    'main_events_page_url' => ''
+    'main_events_page_url' => '',
+    'calendar_display_type' => 'circuit-grid'
 ));
 
 // Handle settings updates
@@ -79,19 +77,6 @@ settings_errors('dm_events_messages');
                 </tr>
                 
                 <tr>
-                    <th scope="row"><?php _e('Use Custom Events Page', 'dm-events'); ?></th>
-                    <td>
-                        <label>
-                            <input type="checkbox" 
-                                   name="dm_events_settings[use_events_page]" 
-                                   value="1" 
-                                   <?php checked(isset($settings['use_events_page']) ? $settings['use_events_page'] : true, true); ?> />
-                            <?php _e('Use a custom Events page with Calendar block instead of post type archive (recommended)', 'dm-events'); ?>
-                        </label>
-                    </td>
-                </tr>
-                
-                <tr>
                     <th scope="row"><?php _e('Main Events Page URL', 'dm-events'); ?></th>
                     <td>
                         <input type="url" 
@@ -99,7 +84,7 @@ settings_errors('dm_events_messages');
                                value="<?php echo esc_attr(isset($settings['main_events_page_url']) ? $settings['main_events_page_url'] : ''); ?>" 
                                placeholder="https://yoursite.com/events/"
                                class="regular-text" />
-                        <p class="description"><?php _e('Optional URL for the main events page. When set, a "Back to Events" link will appear on single event pages.', 'dm-events'); ?></p>
+                        <p class="description"><?php _e('URL for your custom events page with Calendar block. When set, this replaces the default events archive and adds "Back to Events" links on single event pages.', 'dm-events'); ?></p>
                     </td>
                 </tr>
             </tbody>
@@ -112,32 +97,27 @@ settings_errors('dm_events_messages');
         <table class="form-table" role="presentation">
             <tbody>
                 <tr>
-                    <th scope="row"><?php _e('Default Calendar View', 'dm-events'); ?></th>
+                    <th scope="row"><?php _e('Calendar Display Type', 'dm-events'); ?></th>
                     <td>
-                        <select name="dm_events_settings[default_calendar_view]">
-                            <option value="month" <?php selected(isset($settings['default_calendar_view']) ? $settings['default_calendar_view'] : 'month', 'month'); ?>>
-                                <?php _e('Month View', 'dm-events'); ?>
-                            </option>
-                            <option value="list" <?php selected(isset($settings['default_calendar_view']) ? $settings['default_calendar_view'] : 'month', 'list'); ?>>
-                                <?php _e('List View', 'dm-events'); ?>
-                            </option>
-                            <option value="grid" <?php selected(isset($settings['default_calendar_view']) ? $settings['default_calendar_view'] : 'month', 'grid'); ?>>
-                                <?php _e('Grid View', 'dm-events'); ?>
-                            </option>
-                        </select>
-                        <p class="description"><?php _e('Default view for Calendar blocks', 'dm-events'); ?></p>
-                    </td>
-                </tr>
-                
-                <tr>
-                    <th scope="row"><?php _e('Events Per Page', 'dm-events'); ?></th>
-                    <td>
-                        <input type="number" 
-                               name="dm_events_settings[events_per_page]" 
-                               value="<?php echo esc_attr(isset($settings['events_per_page']) ? $settings['events_per_page'] : 12); ?>" 
-                               min="1" 
-                               max="100" />
-                        <p class="description"><?php _e('Number of events to display per page in Calendar blocks', 'dm-events'); ?></p>
+                        <label>
+                            <input type="radio" 
+                                   name="dm_events_settings[calendar_display_type]" 
+                                   value="circuit-grid" 
+                                   <?php checked(isset($settings['calendar_display_type']) ? $settings['calendar_display_type'] : 'circuit-grid', 'circuit-grid'); ?> />
+                            <?php _e('Circuit Grid', 'dm-events'); ?>
+                        </label>
+                        <br><br>
+                        <label>
+                            <input type="radio" 
+                                   name="dm_events_settings[calendar_display_type]" 
+                                   value="carousel-list" 
+                                   <?php checked(isset($settings['calendar_display_type']) ? $settings['calendar_display_type'] : 'circuit-grid', 'carousel-list'); ?> />
+                            <?php _e('Carousel List', 'dm-events'); ?>
+                        </label>
+                        <p class="description">
+                            <?php _e('<strong>Circuit Grid:</strong> Circuit board style display with day-grouped events and visual borders<br>', 'dm-events'); ?>
+                            <?php _e('<strong>Carousel List:</strong> Horizontal scrolling daily rows with swipe-to-view events', 'dm-events'); ?>
+                        </p>
                     </td>
                 </tr>
             </tbody>

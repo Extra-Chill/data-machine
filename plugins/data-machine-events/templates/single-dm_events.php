@@ -9,7 +9,6 @@
  * @since 1.0.0
  */
 
-// Prevent direct access
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -24,18 +23,19 @@ get_header(); ?>
             <article id="post-<?php the_ID(); ?>" <?php post_class('dm-event-single'); ?>>
                 
                 <header class="entry-header">
+                    <?php echo \DmEvents\Core\Taxonomy_Badges::render_taxonomy_badges(get_the_ID()); ?>
                     <?php the_title('<h1 class="entry-title">', '</h1>'); ?>
                 </header>
 
-                <?php 
+                <?php
                 $main_events_url = \DmEvents\Admin\Settings_Page::get_main_events_page_url();
-                if (!empty($main_events_url)) : ?>
-                    <nav class="dm-events-back-nav" aria-label="<?php esc_attr_e('Event Navigation', 'dm-events'); ?>">
-                        <a href="<?php echo esc_url($main_events_url); ?>" class="dm-events-back-link">
-                            <?php esc_html_e('← Back to Events', 'dm-events'); ?>
-                        </a>
-                    </nav>
-                <?php endif; ?>
+                $events_url = !empty($main_events_url) ? $main_events_url : get_post_type_archive_link('dm_events');
+                ?>
+                <nav class="dm-events-back-nav" aria-label="<?php esc_attr_e('Event Navigation', 'dm-events'); ?>">
+                    <a href="<?php echo esc_url($events_url); ?>" class="dm-events-back-link">
+                        <?php esc_html_e('← Back to Events', 'dm-events'); ?>
+                    </a>
+                </nav>
 
                 <div class="entry-content">
                     <?php

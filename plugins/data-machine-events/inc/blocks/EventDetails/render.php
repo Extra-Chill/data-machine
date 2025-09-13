@@ -16,7 +16,6 @@ if (!defined('ABSPATH')) {
 use DmEvents\Core\Venue_Taxonomy;
 use DmEvents\Steps\Publish\Handlers\DmEvents\DmEventsSchema;
 
-// Extract block attributes with defaults
 $start_date = $attributes['startDate'] ?? '';
 $end_date = $attributes['endDate'] ?? '';
 $start_time = $attributes['startTime'] ?? '';
@@ -25,25 +24,21 @@ $venue = $attributes['venue'] ?? '';
 $address = $attributes['address'] ?? '';
 $price = $attributes['price'] ?? '';
 $ticket_url = $attributes['ticketUrl'] ?? '';
-// InnerBlocks content passed as $content
 $show_venue = $attributes['showVenue'] ?? true;
 $show_price = $attributes['showPrice'] ?? true;
 $show_ticket_link = $attributes['showTicketLink'] ?? true;
 
-// Block-first architecture: Block attributes are single source of truth
 $post_id = get_the_ID();
 
-// Get venue data from taxonomy term meta
 $venue_data = null;
 $venue_terms = get_the_terms($post_id, 'venue');
 if ($venue_terms && !is_wp_error($venue_terms)) {
     $venue_term = $venue_terms[0];
     $venue_data = Venue_Taxonomy::get_venue_data($venue_term->term_id);
-    $venue = $venue_data['name']; // Use venue name from term
-    $address = Venue_Taxonomy::get_formatted_address($venue_term->term_id); // Use formatted address
+    $venue = $venue_data['name'];
+    $address = Venue_Taxonomy::get_formatted_address($venue_term->term_id);
 }
 
-// Format date and time values
 $start_datetime = '';
 $end_datetime = '';
 if ($start_date) {
@@ -53,7 +48,6 @@ if ($end_date) {
     $end_datetime = $end_time ? $end_date . ' ' . $end_time : $end_date;
 }
 
-// Generate CSS classes
 $block_classes = array('dm-event-details');
 if (!empty($attributes['align'])) {
     $block_classes[] = 'align' . $attributes['align'];
@@ -61,14 +55,10 @@ if (!empty($attributes['align'])) {
 $block_class = implode(' ', $block_classes);
 
 
-// Generate structured data schema for SEO
 $event_schema = null;
 if (!empty($start_date)) {
-    // Engine parameters for enhanced schema generation
     $engine_parameters = [];
     
-    // Block rendering doesn't have direct engine parameter access
-    // Venue taxonomy data contains imported information
     $event_schema = DmEventsSchema::generate_event_schema($attributes, $venue_data, $post_id, $engine_parameters);
 }
 ?>

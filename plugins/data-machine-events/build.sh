@@ -40,7 +40,7 @@ cd ../../..
 
 # Build Event Details block (@wordpress/scripts)
 echo -e "${YELLOW}📝 Building Event Details block...${NC}"
-cd inc/blocks/event-details  
+cd inc/blocks/EventDetails  
 npm ci --silent
 npm run build --silent
 cd ../../..

@@ -15,15 +15,8 @@ registerBlockType('dm-events/calendar', {
     edit: function Edit({ attributes, setAttributes }) {
         const { 
             defaultView, 
-            eventsToShow, 
-            showPastEvents,
-            showFilters,
             showSearch,
-            showDateFilter,
-            showViewToggle,
-            defaultDateRange,
-            enablePagination,
-            eventsPerPage
+            enablePagination
         } = attributes;
         
         const blockProps = useBlockProps({
@@ -44,56 +37,10 @@ registerBlockType('dm-events/calendar', {
                             onChange={(value) => setAttributes({ defaultView: value })}
                         />
                         
-                        <RangeControl
-                            label={__('Number of Events to Show', 'dm-events')}
-                            value={eventsToShow}
-                            onChange={(value) => setAttributes({ eventsToShow: value })}
-                            min={1}
-                            max={50}
-                        />
-                        
-                        <ToggleControl
-                            label={__('Show Past Events', 'dm-events')}
-                            checked={showPastEvents}
-                            onChange={(value) => setAttributes({ showPastEvents: value })}
-                        />
-                    </PanelBody>
-
-                    <PanelBody title={__('Filter Options', 'dm-events')} initialOpen={false}>
-                        <ToggleControl
-                            label={__('Show Filter Bar', 'dm-events')}
-                            checked={showFilters}
-                            onChange={(value) => setAttributes({ showFilters: value })}
-                        />
-                        
                         <ToggleControl
                             label={__('Show Search Box', 'dm-events')}
                             checked={showSearch}
                             onChange={(value) => setAttributes({ showSearch: value })}
-                        />
-                        
-                        <ToggleControl
-                            label={__('Show Date Filter', 'dm-events')}
-                            checked={showDateFilter}
-                            onChange={(value) => setAttributes({ showDateFilter: value })}
-                        />
-                        
-                        <ToggleControl
-                            label={__('Show View Toggle', 'dm-events')}
-                            checked={showViewToggle}
-                            onChange={(value) => setAttributes({ showViewToggle: value })}
-                        />
-                        
-                        <SelectControl
-                            label={__('Default Date Range', 'dm-events')}
-                            value={defaultDateRange}
-                            options={[
-                                { label: __('Current Month', 'dm-events'), value: 'current' },
-                                { label: __('Next Month', 'dm-events'), value: 'next' },
-                                { label: __('Next 3 Months', 'dm-events'), value: 'next3' },
-                                { label: __('All Upcoming', 'dm-events'), value: 'upcoming' }
-                            ]}
-                            onChange={(value) => setAttributes({ defaultDateRange: value })}
                         />
                     </PanelBody>
 
@@ -103,14 +50,9 @@ registerBlockType('dm-events/calendar', {
                             checked={enablePagination}
                             onChange={(value) => setAttributes({ enablePagination: value })}
                         />
-                        
-                        <RangeControl
-                            label={__('Events Per Page', 'dm-events')}
-                            value={eventsPerPage}
-                            onChange={(value) => setAttributes({ eventsPerPage: value })}
-                            min={6}
-                            max={24}
-                        />
+                        <p className="description">
+                            {__('Events per page is controlled by WordPress Reading Settings (Dashboard → Settings → Reading → "Blog pages show at most").', 'dm-events')}
+                        </p>
                     </PanelBody>
                 </InspectorControls>
 
@@ -121,17 +63,11 @@ registerBlockType('dm-events/calendar', {
                         </div>
                         <h3>{__('Data Machine Events Calendar', 'dm-events')}</h3>
                         <p>
-                            {__('Displaying', 'dm-events')} {eventsToShow} {__('events in', 'dm-events')} {defaultView} {__('view', 'dm-events')}
-                            {showPastEvents && __(', including past events', 'dm-events')}
+                            {__('Displaying upcoming events in', 'dm-events')} {defaultView} {__('view with chronological pagination', 'dm-events')}
                         </p>
-                        {showFilters && (
+                        {showSearch && (
                             <div className="dm-events-calendar-filters-preview">
-                                <p><strong>{__('Filter Bar Enabled:', 'dm-events')}</strong></p>
-                                <ul>
-                                    {showSearch && <li>{__('Search', 'dm-events')}</li>}
-                                    {showDateFilter && <li>{__('Date Filter', 'dm-events')}</li>}
-                                    {showViewToggle && <li>{__('View Toggle', 'dm-events')}</li>}
-                                </ul>
+                                <p><strong>{__('Search enabled for filtering events', 'dm-events')}</strong></p>
                             </div>
                         )}
                     </div>

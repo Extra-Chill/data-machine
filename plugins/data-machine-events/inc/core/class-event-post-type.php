@@ -10,7 +10,6 @@
 
 namespace DmEvents\Core;
 
-// Prevent direct access
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -20,9 +19,6 @@ if (!defined('ABSPATH')) {
  */
 class Event_Post_Type {
     
-    /**
-     * Register the dm_events post type
-     */
     public static function register() {
         $labels = array(
             'name'                  => _x('Events', 'Post type general name', 'dm-events'),
@@ -93,9 +89,6 @@ class Event_Post_Type {
         self::setup_admin_menu_control();
     }
     
-    /**
-     * Setup selective admin menu display for taxonomies
-     */
     private static function setup_admin_menu_control() {
         add_action('admin_menu', array(__CLASS__, 'control_taxonomy_menus'), 999);
         
@@ -104,9 +97,6 @@ class Event_Post_Type {
         add_filter('submenu_file', array(__CLASS__, 'filter_submenu_file'));
     }
     
-    /**
-     * Control which taxonomy menus appear under post type
-     */
     public static function control_taxonomy_menus() {
         global $submenu;
         
@@ -140,35 +130,29 @@ class Event_Post_Type {
     }
     
     /**
-     * Filter parent file for proper menu highlighting
-     *
-     * @param string $parent_file Current parent file
-     * @return string Modified parent file
+     * Ensures proper menu highlighting by filtering parent file for disallowed taxonomies
      */
     public static function filter_parent_file($parent_file) {
         global $current_screen;
-        
+
         if (!$current_screen || $current_screen->post_type !== 'dm_events') {
             return $parent_file;
         }
-        
+
         $allowed_items = apply_filters('dm_events_post_type_menu_items', array(
             'venue' => true,
             'settings' => true
         ));
-        
+
         if ($current_screen->taxonomy && !isset($allowed_items[$current_screen->taxonomy])) {
             return 'edit.php?post_type=dm_events';
         }
-        
+
         return $parent_file;
     }
-    
+
     /**
-     * Filter submenu file for proper submenu highlighting
-     *
-     * @param string $submenu_file Current submenu file
-     * @return string Modified submenu file
+     * Ensures proper submenu highlighting for allowed taxonomies
      */
     public static function filter_submenu_file($submenu_file) {
         global $current_screen;

@@ -8,9 +8,9 @@
    * GRID LAYOUT CONSTANTS
    * Used by both CSS and JavaScript
    * ==================================== */
-  --dm-grid-cell-width: 280px;
-  --dm-grid-cell-height: 180px;
-  --dm-grid-gap: 1.25rem; /* 20px */
+  --dm-grid-cell-width: 275px; /* Increased by 5px */
+  --dm-grid-cell-height: 193px; /* Increased by 5% from 184px */
+  --dm-grid-gap: 1.5625rem; /* 25px - reduced by 5px */
   --dm-border-padding: 8px;
 
   /* ====================================
@@ -25,32 +25,50 @@
   --dm-day-saturday: #54a0ff;
 
   /* ====================================
+   * CARD INTERACTIVITY
+   * ==================================== */
+  --dm-card-hover-border: rgba(59, 130, 246, 0.3); /* Soft blue border on hover */
+  --dm-card-hover-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --dm-card-transition: all 0.2s ease;
+  --dm-card-focus-outline: 2px solid rgba(59, 130, 246, 0.5);
+  
+  /* ====================================
    * BORDER & VISUAL STYLING
    * ==================================== */
-  --dm-border-width: 2px;
+  --dm-border-width: 1px; /* Reduced from 2px */
   --dm-border-radius: 8px;
-  --dm-border-opacity: 0.8;
+  --dm-border-opacity: 0.3; /* Reduced from 0.8 */
 
   /* ====================================
    * RESPONSIVE BREAKPOINTS
    * ==================================== */
-  --dm-grid-cell-width-medium: 260px;
-  --dm-grid-cell-height-medium: 160px;
-  --dm-grid-cell-height-mobile: 140px;
+  --dm-grid-cell-width-medium: 265px; /* Increased by 5px */
+  --dm-grid-cell-height-medium: 176px; /* Increased by 5% from 168px */
+  --dm-grid-cell-height-mobile: 160px; /* Increased by 5% from 152px */
 
   /* ====================================
    * SPACING & TYPOGRAPHY
    * ==================================== */
-  --dm-card-padding: 1rem;
+  --dm-card-padding: 0.9rem;
   --dm-filter-gap: 1rem;
   
   /* ====================================
    * COLORS & THEME
    * ==================================== */
   --dm-background-light: #f8fafc;
+  --dm-background-primary: #ffffff;
+  --dm-background-secondary: #f9fafb;
+  --dm-background-hover: #f3f4f6;
   --dm-border-light: #e2e8f0;
+  --dm-border-hover: #d1d5db;
+  
+  /* Adaptive text colors for theme compatibility */
   --dm-text-primary: #111827;
   --dm-text-secondary: #6b7280;
+  --dm-text-muted: #9ca3af;
+  --dm-text-accent: #3b82f6;
+  --dm-border-default: #d1d5db;
+  --dm-border-focus: #3b82f6;
 
   /* ====================================
    * DAY BADGE STYLING
@@ -58,11 +76,62 @@
   --dm-badge-font-size: 0.75rem;
   --dm-badge-font-weight: 600;
   --dm-badge-padding-x: 0.75rem;
-  --dm-badge-padding-y: 0.375rem;
-  --dm-badge-border-radius: 12px;
+  --dm-badge-padding-y: 0.25rem;
+  --dm-badge-border-radius: 999px;
   --dm-badge-offset-x: 12px;
   --dm-badge-offset-y: -6px;
   --dm-badge-z-index: 15;
   --dm-badge-backdrop-blur: 4px;
   --dm-badge-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+  /* ====================================
+   * TAXONOMY BADGE STYLING
+   * ==================================== */
+  --dm-taxonomy-badge-font-size: 0.75rem;
+  --dm-taxonomy-badge-font-weight: 500;
+  --dm-taxonomy-badge-padding-x: 0.5rem;
+  --dm-taxonomy-badge-padding-y: 0.25rem;
+  --dm-taxonomy-badge-border-radius: 12px;
+  --dm-taxonomy-badge-gap: 0.375rem;
+  --dm-taxonomy-badge-margin-bottom: 0.5rem;
+  --dm-taxonomy-badge-background: #e5e7eb;
+  --dm-taxonomy-badge-color: #374151;
+  --dm-taxonomy-badge-hover-background: #d1d5db;
+
+  /* ====================================
+   * CAROUSEL SCROLL INDICATORS
+   * ==================================== */
+  --dm-scroll-gradient-size: 40px;
+  --dm-scroll-gradient-opacity: 0.8;
+  --dm-scroll-gradient-color: rgba(255, 255, 255, 0.95);
+  --dm-scroll-gradient-transition: opacity 0.3s ease;
+}
+
+/* Dark mode adaptations using system preference */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Adaptive text colors for dark themes */
+    --dm-text-primary: #f9fafb;
+    --dm-text-secondary: #d1d5db;
+    --dm-text-muted: #9ca3af;
+    --dm-text-accent: #60a5fa;
+    --dm-border-default: #4b5563;
+    --dm-border-focus: #60a5fa;
+    
+    /* Dark theme backgrounds */
+    --dm-background-light: #1f2937;
+    --dm-background-primary: #1f2937;
+    --dm-background-secondary: #111827;
+    --dm-background-hover: #374151;
+    --dm-border-light: #374151;
+    --dm-border-hover: #4b5563;
+    
+    /* Dark theme taxonomy badges */
+    --dm-taxonomy-badge-background: #374151;
+    --dm-taxonomy-badge-color: #d1d5db;
+    --dm-taxonomy-badge-hover-background: #4b5563;
+
+    /* Dark theme carousel scroll indicators */
+    --dm-scroll-gradient-color: rgba(31, 41, 55, 0.95);
+  }
 }

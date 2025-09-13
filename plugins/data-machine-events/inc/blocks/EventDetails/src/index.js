@@ -16,9 +16,7 @@ import {
  */
 registerBlockType('dm-events/event-details', {
     /**
-     * Block edit component
-     *
-     * @param {Object} props Block properties
+     * Block editor component with comprehensive event data fields and InnerBlocks support
      */
     edit: function Edit({ attributes, setAttributes, clientId }) {
         const {
@@ -48,22 +46,10 @@ registerBlockType('dm-events/event-details', {
             className: 'dm-event-details-block'
         });
 
-        /**
-         * Handle attribute changes
-         *
-         * @param {string} field Field name
-         * @param {string} value Field value
-         */
         const handleAttributeChange = (field, value) => {
             setAttributes({ [field]: value });
         };
 
-        /**
-         * Handle time field changes
-         *
-         * @param {string} field Field name
-         * @param {string} value Time value
-         */
         const handleTimeChange = (field, value) => {
             setAttributes({ [field]: value });
         };
