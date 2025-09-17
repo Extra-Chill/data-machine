@@ -61,24 +61,32 @@ class Taxonomy_Badges {
      */
     public static function render_taxonomy_badges($post_id) {
         $taxonomies = self::get_event_taxonomies($post_id);
-        
+
         if (empty($taxonomies)) {
             return '';
         }
-        
-        $output = '<div class="dm-taxonomy-badges">';
-        
+
+        // Allow themes to customize wrapper classes
+        $wrapper_classes = apply_filters('dm_events_badge_wrapper_classes', [
+            'dm-taxonomy-badges'
+        ], $post_id);
+
+        $output = '<div class="' . esc_attr(implode(' ', $wrapper_classes)) . '">';
+
         foreach ($taxonomies as $taxonomy_slug => $taxonomy_data) {
             $taxonomy_object = $taxonomy_data['taxonomy'];
             $terms = $taxonomy_data['terms'];
-            
+
             foreach ($terms as $term) {
                 $badge_classes = [
                     'dm-taxonomy-badge',
                     'dm-taxonomy-' . esc_attr($taxonomy_slug),
                     'dm-term-' . esc_attr($term->slug)
                 ];
-                
+
+                // Allow themes to customize badge classes
+                $badge_classes = apply_filters('dm_events_badge_classes', $badge_classes, $taxonomy_slug, $term, $post_id);
+
                 $output .= sprintf(
                     '<span class="%s" data-taxonomy="%s" data-term="%s">%s</span>',
                     esc_attr(implode(' ', $badge_classes)),
@@ -88,9 +96,9 @@ class Taxonomy_Badges {
                 );
             }
         }
-        
+
         $output .= '</div>';
-        
+
         return $output;
     }
     

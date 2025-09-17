@@ -53,6 +53,14 @@ add_filter('dm_handlers', function($handlers) {
         'label' => __('Dice FM Events', 'dm-events'),
         'description' => __('Import events from Dice FM API for electronic music venues', 'dm-events')
     ];
+
+    // Google Calendar .ics handler
+    $handlers['google_calendar'] = [
+        'type' => 'event_import',
+        'class' => 'DmEvents\\Steps\\EventImport\\Handlers\\GoogleCalendar\\GoogleCalendar',
+        'label' => __('Google Calendar', 'dm-events'),
+        'description' => __('Import events from public Google Calendar .ics feeds', 'dm-events')
+    ];
     
     return $handlers;
 });
@@ -76,7 +84,7 @@ add_filter('dm_engine_parameters', function($parameters, $data, $flow_step_confi
     $source_type = $metadata['source_type'] ?? '';
     
     // Only inject parameters for event import sources
-    if (!in_array($source_type, ['ticketmaster', 'dice_fm', 'web_scraper'])) {
+    if (!in_array($source_type, ['ticketmaster', 'dice_fm', 'web_scraper', 'google_calendar'])) {
         return $parameters;
     }
     

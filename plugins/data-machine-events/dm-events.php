@@ -188,7 +188,7 @@ class DM_Events {
     }
     
     private function load_event_import_handlers() {
-        $handlers = ['ticketmaster', 'DiceFm', 'WebScraper'];
+        $handlers = ['ticketmaster', 'DiceFm', 'WebScraper', 'GoogleCalendar'];
         
         foreach ($handlers as $handler) {
             $handler_path = DM_EVENTS_PLUGIN_DIR . "inc/steps/EventImport/handlers/{$handler}/";
@@ -331,7 +331,7 @@ class DM_Events {
     }
     
     public function enqueue_root_styles() {
-        if (has_block('dm-events/calendar') || has_block('dm-events/event-details')) {
+        if (has_block('dm-events/calendar') || has_block('dm-events/event-details') || is_singular('dm_events')) {
             wp_enqueue_style(
                 'dm-events-root',
                 DM_EVENTS_PLUGIN_URL . 'inc/blocks/root.css',

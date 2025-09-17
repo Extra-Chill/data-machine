@@ -31,8 +31,11 @@ class Settings_Page {
     public function __construct() {
         add_action('admin_init', array($this, 'init_settings'));
         add_filter('dm_events_post_type_menu_items', array($this, 'add_settings_menu_item'));
-        
+
         add_action('pre_get_posts', array($this, 'control_archive_queries'));
+
+        // Register filter for theme integration
+        add_filter('dm_events_main_page_url', array($this, 'provide_main_events_url'));
     }
     
     public function add_settings_menu_item($allowed_items) {
@@ -170,5 +173,16 @@ class Settings_Page {
      */
     public static function get_main_events_page_url() {
         return self::get_setting('main_events_page_url', '');
+    }
+
+    /**
+     * Filter callback to provide main events URL to themes
+     *
+     * @param string $url Default URL (usually post type archive)
+     * @return string Custom main events URL if configured, otherwise original URL
+     */
+    public function provide_main_events_url($url) {
+        $custom_url = self::get_main_events_page_url();
+        return !empty($custom_url) ? $custom_url : $url;
     }
 }

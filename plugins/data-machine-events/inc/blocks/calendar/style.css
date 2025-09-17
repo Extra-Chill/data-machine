@@ -365,51 +365,6 @@
 .dm-day-badge-friday { background: var(--dm-day-friday); }
 .dm-day-badge-saturday { background: var(--dm-day-saturday); }
 
-/* Taxonomy Badge Styles */
-.dm-taxonomy-badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--dm-taxonomy-badge-gap);
-    margin-bottom: var(--dm-taxonomy-badge-margin-bottom);
-}
-
-.dm-taxonomy-badge {
-    display: inline-flex;
-    align-items: center;
-    font-size: var(--dm-taxonomy-badge-font-size);
-    font-weight: var(--dm-taxonomy-badge-font-weight);
-    padding: var(--dm-taxonomy-badge-padding-y) var(--dm-taxonomy-badge-padding-x);
-    border-radius: var(--dm-taxonomy-badge-border-radius);
-    background: var(--dm-taxonomy-badge-background);
-    color: var(--dm-taxonomy-badge-color);
-    text-decoration: none;
-    transition: all 0.2s ease;
-    white-space: nowrap;
-    line-height: 1;
-}
-
-.dm-taxonomy-badge:hover {
-    background: var(--dm-taxonomy-badge-hover-background);
-    transform: translateY(-1px);
-}
-
-/* Custom badge colors for different taxonomies */
-.dm-badge-blue { background: #dbeafe; color: #1e40af; }
-.dm-badge-green { background: #dcfce7; color: #166534; }
-.dm-badge-purple { background: #f3e8ff; color: #7c3aed; }
-.dm-badge-orange { background: #fed7aa; color: #c2410c; }
-.dm-badge-red { background: #fee2e2; color: #dc2626; }
-.dm-badge-teal { background: #ccfbf1; color: #0f766e; }
-.dm-badge-pink { background: #fce7f3; color: #be185d; }
-.dm-badge-yellow { background: #fef3c7; color: #a16207; }
-.dm-badge-indigo { background: #e0e7ff; color: #4338ca; }
-.dm-badge-gray { background: #f3f4f6; color: #374151; }
-
-/* Custom taxonomy-specific styles - users can override these */
-.dm-taxonomy-category { background: #dbeafe; color: #1e40af; }
-.dm-taxonomy-post_tag { background: #dcfce7; color: #166534; }
-.dm-taxonomy-genre { background: #f3e8ff; color: #7c3aed; }
-.dm-taxonomy-artist_type { background: #fed7aa; color: #c2410c; }
 
 /* Day of Week Color System */
 :root {

@@ -20,12 +20,25 @@ get_header(); ?>
 
         <?php while (have_posts()) : the_post(); ?>
 
+            <?php echo \DmEvents\Core\Breadcrumbs::render(get_the_ID()); ?>
+
             <article id="post-<?php the_ID(); ?>" <?php post_class('dm-event-single'); ?>>
-                
+
                 <header class="entry-header">
                     <?php echo \DmEvents\Core\Taxonomy_Badges::render_taxonomy_badges(get_the_ID()); ?>
                     <?php the_title('<h1 class="entry-title">', '</h1>'); ?>
                 </header>
+
+                <div class="entry-content">
+                    <?php
+                    the_content();
+
+                    wp_link_pages(array(
+                        'before' => '<div class="page-links">' . esc_html__('Pages:', 'dm-events'),
+                        'after'  => '</div>',
+                    ));
+                    ?>
+                </div>
 
                 <?php
                 $main_events_url = \DmEvents\Admin\Settings_Page::get_main_events_page_url();
@@ -36,17 +49,6 @@ get_header(); ?>
                         <?php esc_html_e('← Back to Events', 'dm-events'); ?>
                     </a>
                 </nav>
-
-                <div class="entry-content">
-                    <?php
-                    the_content();
-                    
-                    wp_link_pages(array(
-                        'before' => '<div class="page-links">' . esc_html__('Pages:', 'dm-events'),
-                        'after'  => '</div>',
-                    ));
-                    ?>
-                </div>
 
                 <?php if (get_edit_post_link()) : ?>
                     <footer class="entry-footer">
