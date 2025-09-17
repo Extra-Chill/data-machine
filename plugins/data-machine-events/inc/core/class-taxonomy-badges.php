@@ -17,8 +17,6 @@ if (!defined('ABSPATH')) {
 class Taxonomy_Badges {
     
     /**
-     * Get all non-venue taxonomies and their terms for an event
-     *
      * @param int $post_id Event post ID
      * @return array Structured array of taxonomy objects and terms
      */

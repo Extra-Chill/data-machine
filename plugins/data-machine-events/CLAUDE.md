@@ -81,7 +81,7 @@ npm run lint:js && npm run lint:css    # Linting
 
 **Template System:**
 - **Template_Loader:** Handles loading and rendering of calendar component templates with proper variable passing and clean separation between data processing and HTML presentation
-- **Modular Templates:** 6 specialized templates including event-item, date-group, pagination, navigation, no-events, filter-bar plus modal subdirectory
+- **Modular Templates:** 7 specialized templates including event-item, date-group, pagination, navigation, no-events, filter-bar, time-gap-separator plus modal subdirectory
 - **Modal Templates:** Dedicated modal subdirectory with taxonomy-filter.php for advanced filtering interfaces
 - **Variable Extraction:** EXTR_SKIP pattern ensures safe variable passing to template scope without conflicts
 - **Output Buffering:** Templates return content as strings for flexible rendering and caching capabilities
@@ -111,7 +111,7 @@ npm run lint:js && npm run lint:css    # Linting
   - `class-template-loader.php` - Template loading system with variable extraction and output buffering
   - `class-taxonomy-helper.php` - Taxonomy data processing with hierarchy building and post count calculations
   - `DisplayStyles/` - Visual enhancement components with CircuitGridRenderer.js, CarouselListRenderer.js, and BadgeRenderer.js
-  - `templates/` - 6 modular template files for calendar components plus modal subdirectory
+  - `templates/` - 7 modular template files for calendar components plus modal subdirectory
 - `inc/blocks/EventDetails/` - Event data storage block (webpack with @wordpress/scripts base)
 - `inc/blocks/root.css` - Centralized design tokens and CSS custom properties for all blocks
 - `inc/core/class-event-post-type.php` - Event post type with selective menu control
@@ -161,7 +161,7 @@ npm run lint:js && npm run lint:css    # Linting
 - **Event Details Block:** webpack with @wordpress/scripts base (`cd inc/blocks/EventDetails && npm run build/start`)
 - **Centralized Design System:** root.css provides unified design tokens accessible from both CSS and JavaScript
 - **Visual Enhancement:** DisplayStyles components including CircuitGridRenderer.js, CarouselListRenderer.js, and BadgeRenderer.js for calendar display
-- **Template Architecture:** Modular template system with 6 specialized templates plus modal subdirectory for advanced filtering interfaces
+- **Template Architecture:** Modular template system with 7 specialized templates plus modal subdirectory for advanced filtering interfaces
 - **Template Loading:** Template_Loader class provides get_template(), include_template(), template_exists(), and get_template_path() methods with variable extraction
 - **Production Build:** `./build.sh` creates optimized package in `/dist` directory with versioned .zip file for WordPress deployment
 - **VSCode Integration:** `.vscode/tasks.json` provides IDE task management for development workflow
@@ -348,7 +348,7 @@ $assignment = DmEventsVenue::assign_venue_to_event($post_id, $venue_name, $venue
 ### Template Architecture
 
 **Modular Template System:**
-Calendar block uses a modular template architecture with 6 specialized templates plus modal subdirectory:
+Calendar block uses a modular template architecture with 7 specialized templates plus modal subdirectory:
 
 ```php
 // Template_Loader provides clean template rendering
@@ -364,6 +364,7 @@ templates/
 ├── navigation.php           # Calendar navigation
 ├── no-events.php           # Empty state display
 ├── filter-bar.php          # Taxonomy filtering interface
+├── time-gap-separator.php   # Time gap visual separator for carousel-list mode
 └── modal/
     └── taxonomy-filter.php  # Advanced filter modal
 ```

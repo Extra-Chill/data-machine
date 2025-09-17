@@ -23,8 +23,6 @@ class DmEventsPublisher {
     }
 
     /**
-     * Process AI tool call to create event with Event Details block
-     *
      * @param array $parameters Event data from AI tool call
      * @param array $tool_def Tool definition configuration
      * @return array Tool call result with success status and created post data

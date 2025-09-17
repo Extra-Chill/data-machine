@@ -1,6 +1,10 @@
 <?php
 /**
- * Template Loader for Calendar Block
+ * Modular template loading system for Calendar block
+ *
+ * Manages 7 specialized templates (event-item, date-group, time-gap-separator,
+ * pagination, navigation, no-events, filter-bar) plus modal subdirectory with
+ * variable extraction, output buffering, and template caching.
  *
  * @package DmEvents\Blocks\Calendar
  */
@@ -12,7 +16,7 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Template loading and rendering system
+ * Template loading and rendering system for 7-template modular architecture
  */
 class Template_Loader {
     
@@ -23,10 +27,10 @@ class Template_Loader {
     }
     
     /**
-     * Get template content with variable extraction and output buffering
+     * Renders template with variable extraction and output buffering
      *
      * @param string $template_name Template filename without .php extension
-     * @param array $variables Variables to extract into template scope
+     * @param array $variables Variables to extract into template scope using EXTR_SKIP
      * @return string Rendered template content
      */
     public static function get_template($template_name, $variables = []) {
@@ -48,10 +52,10 @@ class Template_Loader {
     }
     
     /**
-     * Include template directly with echo output
+     * Outputs template directly via echo
      *
      * @param string $template_name Template filename without .php extension
-     * @param array $variables Variables to extract into template scope
+     * @param array $variables Variables to extract into template scope using EXTR_SKIP
      */
     public static function include_template($template_name, $variables = []) {
         echo self::get_template($template_name, $variables);

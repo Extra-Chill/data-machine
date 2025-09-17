@@ -1,9 +1,9 @@
 <?php
 /**
- * Universal Web Scraper - AI Tool Registration
- * 
- * Registers the extract_event_from_html AI tool for Universal Web Scraper handler.
- * Integrates with Data Machine's bidirectional tool detection system.
+ * Universal Web Scraper - Handler Registration
+ *
+ * Registers the Universal Web Scraper handler and settings with Data Machine.
+ * Provides Schema.org compliant event extraction from any website.
  *
  * @package DmEvents\Steps\EventImport\Handlers\WebScraper
  * @since 1.0.0
@@ -19,16 +19,16 @@ if (!defined('ABSPATH')) {
 
 /**
  * Register Universal Web Scraper handler with Data Machine
- * 
- * Direct handler registration for AI-powered universal web scraping.
- * No dropdown complexity - just URL input and AI processing.
+ *
+ * Schema.org compliant event extraction from any website.
+ * Prioritizes structured data with intelligent HTML parsing fallbacks.
  */
 add_filter('dm_handlers', function($handlers) {
     $handlers['universal_web_scraper'] = [
         'type' => 'event_import',
         'class' => 'DmEvents\\Steps\\EventImport\\Handlers\\WebScraper\\UniversalWebScraper',
         'label' => __('Universal Web Scraper', 'dm-events'),
-        'description' => __('Use AI to extract events from any website - just provide a URL', 'dm-events')
+        'description' => __('Extract events from any website using Schema.org compliance with AI fallbacks', 'dm-events')
     ];
     
     return $handlers;

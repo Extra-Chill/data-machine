@@ -14,7 +14,11 @@ if (!defined('ABSPATH')) {
 class DmEventsSchema {
 
     /**
-     * Routes parameters between engine (system) and AI processing based on data availability
+     * Smart parameter routing for engine vs AI decisions
+     * @param array $event_data Current event data
+     * @param array $import_data Import source data
+     * @param array $engine_parameters Additional engine parameters
+     * @return array ['engine' => [...], 'tool' => [...]]
      */
     public static function engine_or_tool($event_data, $import_data, $engine_parameters = []) {
         $engine_params = [];
@@ -47,7 +51,6 @@ class DmEventsSchema {
         $venue_fields = ['venue', 'venueAddress', 'venueCity', 'venueState', 'venueZip', 
                         'venueCountry', 'venuePhone', 'venueWebsite', 'venueCoordinates'];
         foreach ($venue_fields as $field) {
-            // Engine parameters take precedence over import data for venue information
             if (!empty($engine_parameters[$field])) {
                 $engine_params[$field] = $engine_parameters[$field];
             } elseif (!empty($import_data[$field])) {
@@ -62,7 +65,11 @@ class DmEventsSchema {
     }
 
     /**
-     * Generates comprehensive Google Event structured data combining block attributes with venue taxonomy meta
+     * @param array $attributes Event Details block attributes
+     * @param array|null $venue_data Venue taxonomy meta data
+     * @param int $post_id Event post ID
+     * @param array $engine_parameters Additional venue parameters
+     * @return array Google Event schema JSON-LD
      */
     public static function generate_event_schema(array $attributes, ?array $venue_data, int $post_id, array $engine_parameters = []): array {
         $schema = [

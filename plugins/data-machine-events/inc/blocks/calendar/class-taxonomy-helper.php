@@ -1,6 +1,6 @@
 <?php
 /**
- * Taxonomy Helper
+ * Taxonomy data discovery, hierarchy building, and post count calculations for calendar filtering
  *
  * @package DmEvents\Blocks\Calendar
  */
@@ -12,12 +12,12 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Processes taxonomy data with hierarchy building and post count calculations
+ * Taxonomy data processing with hierarchy building and post count calculations
  */
 class Taxonomy_Helper {
     
     /**
-     * Returns structured taxonomy data excluding venue with hierarchy and event counts for filtering
+     * @return array Structured taxonomy data excluding venues with hierarchy and event counts
      */
     public static function get_all_taxonomies_with_counts() {
         $taxonomies_data = [];
@@ -49,12 +49,13 @@ class Taxonomy_Helper {
     }
     
     /**
-     * Builds hierarchical term structure with event post counts for calendar filtering
+     * @param string $taxonomy_slug
+     * @return array Hierarchical term structure with event counts
      */
     public static function get_taxonomy_hierarchy($taxonomy_slug) {
         $terms = get_terms([
             'taxonomy' => $taxonomy_slug,
-            'hide_empty' => false, // Get all terms first, we'll filter by event count
+            'hide_empty' => false,
             'orderby' => 'name',
             'order' => 'ASC'
         ]);
@@ -63,7 +64,6 @@ class Taxonomy_Helper {
             return [];
         }
         
-        // Filter terms to only include those with dm_events
         $terms_with_events = [];
         foreach ($terms as $term) {
             $event_count = self::get_term_event_count($term->term_id);
@@ -94,8 +94,6 @@ class Taxonomy_Helper {
     }
     
     /**
-     * Recursively build term hierarchy tree
-     *
      * @param array $terms Flat array of term objects
      * @param int $parent_id Parent term ID for current level
      * @param int $level Current nesting level
@@ -128,8 +126,6 @@ class Taxonomy_Helper {
     }
     
     /**
-     * Count events assigned to specific term
-     *
      * @param int $term_id Term ID to count events for
      * @return int Number of published events with this term
      */
@@ -153,8 +149,6 @@ class Taxonomy_Helper {
     }
     
     /**
-     * Convert nested hierarchy to flat array for processing
-     *
      * @param array $terms_hierarchy Nested term structure
      * @return array Flattened term array maintaining level information
      */

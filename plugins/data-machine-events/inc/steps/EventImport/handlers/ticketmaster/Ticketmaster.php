@@ -1,14 +1,12 @@
 <?php
 /**
- * Ticketmaster Event Import Handler
+ * Ticketmaster Discovery API integration with single-item processing
  *
  * @package DmEvents\Steps\EventImport\Handlers\Ticketmaster
  */
 
 namespace DmEvents\Steps\EventImport\Handlers\Ticketmaster;
 
-
-// Prevent direct access
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -27,7 +25,9 @@ class Ticketmaster {
     ];
     
     /**
-     * Process Ticketmaster events using single-item Data Machine pattern
+     * Data Machine flat parameter execution for single-item processing
+     * @param array $parameters Flat parameter structure from Data Machine
+     * @return array Unchanged data packet or data packet with new event
      */
     public function execute(array $parameters): array {
         $job_id = $parameters['job_id'];

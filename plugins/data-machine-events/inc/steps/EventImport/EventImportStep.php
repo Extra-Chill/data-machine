@@ -1,12 +1,8 @@
 <?php
 /**
- * Event Import Step for Data Machine
- * 
- * Custom step type that imports events from multiple sources using handler discovery.
- * Follows Data Machine's step architecture pattern.
+ * Event import step for Data Machine pipeline with handler discovery
  *
  * @package DmEvents\Steps\EventImport
- * @since 1.0.0
  */
 
 namespace DmEvents\Steps\EventImport;
@@ -16,21 +12,15 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * EventImportStep class
- * 
- * Executes event import handlers to gather events from various sources.
- * Returns standardized data packets for Data Machine pipeline processing.
+ * Event import step for Data Machine pipeline with handler discovery
  */
 class EventImportStep {
 
     /**
-     * Execute event import with flat parameter structure
-     * 
      * @param array $parameters Flat parameter structure from Data Machine
      * @return array Updated data packet array with event data added
      */
     public function execute(array $parameters): array {
-        // Extract from flat parameter structure
         $job_id = $parameters['job_id'];
         $flow_step_id = $parameters['flow_step_id'];
         $data = $parameters['data'] ?? [];

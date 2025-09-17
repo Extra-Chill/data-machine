@@ -22,7 +22,7 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 ### Development
 - **PSR-4 Autoloading:** `DmEvents\` namespace with enhanced autoloader for Data Machine handlers
 - **Dual Build Systems:** Calendar block (webpack), Event Details block (webpack with @wordpress/scripts base)
-- **Modular Template Architecture:** 6 specialized templates with Template_Loader system for flexible calendar rendering
+- **Modular Template Architecture:** 7 specialized templates with Template_Loader system for flexible calendar rendering
 - **Dynamic Taxonomy Badges:** Automatic badge generation for all taxonomies with consistent color classes and HTML structure
 - **Visual Enhancement System:** DisplayStyles components including CircuitGridRenderer.js, CarouselListRenderer.js, and BadgeRenderer.js for calendar display
 - **Centralized Design Tokens:** root.css provides unified CSS custom properties for all blocks and JavaScript
@@ -94,7 +94,7 @@ dm-events/
 │   │   ├── calendar/        # Calendar block (webpack) with modular template system
 │   │   │   ├── class-template-loader.php
 │   │   │   ├── class-taxonomy-helper.php
-│   │   │   └── templates/   # 6 specialized templates plus modal subdirectory
+│   │   │   └── templates/   # 7 specialized templates plus modal subdirectory
 │   │   └── EventDetails/    # Event details block (webpack with @wordpress/scripts base)
 │   ├── core/                # Core plugin classes
 │   │   ├── class-event-post-type.php    # Event post type with menu control
@@ -190,7 +190,7 @@ echo '<script type="application/ld+json">' . wp_json_encode($schema) . '</script
 
 **Key Integration Features:**
 - **AI-Powered Web Scraping:** UniversalWebScraper uses AI to extract structured event data from any HTML page
-- **Modular Template Architecture:** Template_Loader provides 6 specialized templates with variable extraction and output buffering
+- **Modular Template Architecture:** Template_Loader provides 7 specialized templates with variable extraction and output buffering
 - **Dynamic Taxonomy Badges:** Taxonomy_Badges system with automatic color generation and HTML structure for all non-venue taxonomies
 - **Taxonomy Data Processing:** Taxonomy_Helper with hierarchy building, post count calculations, and structured data for filtering
 - **Visual Enhancement System:** DisplayStyles components with CircuitGridRenderer.js, CarouselListRenderer.js, and BadgeRenderer.js for flexible calendar display
@@ -256,12 +256,17 @@ foreach ($raw_events as $raw_event) {
 
 **Template System & Taxonomy Integration:**
 ```php
-// Template_Loader provides modular template rendering
+// Template_Loader provides modular template rendering with 7 templates
 Template_Loader::init();
 $event_item = Template_Loader::get_template('event-item', [
     'event' => $event_data,
     'show_venue' => true,
     'show_price' => true
+]);
+
+// Time gap separator for carousel-list display mode
+$time_gap = Template_Loader::get_template('time-gap-separator', [
+    'gap_days' => $days_between_events
 ]);
 
 // Taxonomy_Badges dynamic badge generation

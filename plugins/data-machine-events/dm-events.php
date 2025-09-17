@@ -37,6 +37,7 @@ define('DM_EVENTS_PATH', plugin_dir_path(__FILE__));
 
 /**
  * PSR-4 Autoloader with special naming convention for Data Machine handlers
+ * @param string $class_name Fully qualified class name
  */
 function dm_events_autoloader($class_name) {
     if (strpos($class_name, 'DmEvents\\') !== 0) {
@@ -47,7 +48,6 @@ function dm_events_autoloader($class_name) {
     $actual_class = end($class_parts);
     $file_name = 'class-' . strtolower(str_replace('_', '-', $actual_class)) . '.php';
 
-    // Data Machine handlers use direct filename without 'class-' prefix
     $dm_handlers = ['DmEventsSettings', 'DmEventsPublisher', 'DmEventsFilters', 'DmEventsVenue', 'DmEventsSchema'];
     if (in_array($actual_class, $dm_handlers)) {
         $file_name = $actual_class . '.php';
@@ -126,6 +126,11 @@ class DM_Events {
         $this->init_frontend();
         add_action('init', array($this, 'init_data_machine_integration'), 25);
         $this->init_status_detection();
+
+        // Initialize admin bar for all logged-in users
+        if (class_exists('DmEvents\\Admin\\Admin_Bar')) {
+            new \DmEvents\Admin\Admin_Bar();
+        }
     }
     
     private function init_hooks() {
@@ -138,7 +143,7 @@ class DM_Events {
         if (class_exists('DmEvents\\Admin')) {
             new \DmEvents\Admin();
         }
-        
+
         if (class_exists('DmEvents\\Admin\\Settings_Page')) {
             new \DmEvents\Admin\Settings_Page();
         }
@@ -229,7 +234,7 @@ class DM_Events {
     
     
     /**
-     * Enqueue admin assets with filemtime() cache busting for dm-events pages
+     * @param string $hook Current admin page hook
      */
     public function enqueue_admin_assets($hook) {
         if (strpos($hook, 'dm-events') === false) {
@@ -261,7 +266,8 @@ class DM_Events {
     
     
     /**
-     * Load custom single event template when viewing dm_events posts
+     * @param string $template Current template path
+     * @return string Modified template path
      */
     public function load_event_templates($template) {
         global $post;
@@ -296,7 +302,9 @@ class DM_Events {
         \DmEvents\Core\Venue_Taxonomy::register();
     }
     /**
-     * Ensures dm-events blocks are available across all post types
+     * @param array|null $allowed_block_types Current allowed block types
+     * @param WP_Block_Editor_Context $block_editor_context Block editor context
+     * @return array|null Modified allowed block types
      */
     public function filter_allowed_block_types($allowed_block_types, $block_editor_context) {
         if (!isset($block_editor_context->post) || !isset($block_editor_context->post->post_type)) {
@@ -323,7 +331,6 @@ class DM_Events {
     }
     
     public function enqueue_root_styles() {
-        // Only enqueue if dm-events blocks are present on the page
         if (has_block('dm-events/calendar') || has_block('dm-events/event-details')) {
             wp_enqueue_style(
                 'dm-events-root',
