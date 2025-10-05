@@ -424,9 +424,7 @@
     color: var(--dm-text-secondary);
     font-style: italic;
     padding: 3rem 1rem;
-    background: #f9fafb;
     border-radius: 8px;
-    border: 1px dashed #d1d5db;
 }
 
 /* Hidden Events and Date Groups (for search/filter) */
@@ -910,7 +908,7 @@
     display: flex;
     flex-direction: column;
     border-radius: var(--dm-border-radius);
-    background: white;
+    background: var(--dm-background-primary);
     border: 1px solid var(--dm-border-light);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     transition: all 0.2s ease;

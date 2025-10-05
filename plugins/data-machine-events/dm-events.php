@@ -3,7 +3,7 @@
  * Plugin Name: Data Machine Events
  * Plugin URI: https://chubes.net/dm-events
  * Description: WordPress events plugin with block-first architecture. Features AI-driven event creation via Data Machine integration, Event Details blocks for data storage, Calendar blocks for display, and venue taxonomy management.
- * Version: 1.0.0
+ * Version: 0.1.0
  * Author: Chris Huber
  * Author URI: https://chubes.net
  * License: GPL v2 or later
@@ -13,6 +13,7 @@
  * Requires at least: 6.0
  * Tested up to: 6.4
  * Requires PHP: 8.0
+ * Requires Plugins: data-machine
  * Network: false
  *
  * @package DmEvents

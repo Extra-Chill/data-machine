@@ -26,7 +26,7 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 - **Dynamic Taxonomy Badges:** Automatic badge generation for all taxonomies with consistent color classes and HTML structure
 - **Visual Enhancement System:** DisplayStyles components including CircuitGridRenderer.js, CarouselListRenderer.js, and BadgeRenderer.js for calendar display
 - **Centralized Design Tokens:** root.css provides unified CSS custom properties for all blocks and JavaScript
-- **Production Build:** Automated `./build.sh` script creates optimized WordPress plugin package
+- **Production Build:** Automated `./build.sh` script creates optimized WordPress plugin package in `/dist` directory
 - **REST API Support:** Event metadata exposed via WordPress REST API
 - **Schema Generation:** Google Event structured data with smart parameter routing for SEO enhancement
 - **WordPress Standards:** Native hooks, security practices, and comprehensive input sanitization
@@ -130,7 +130,7 @@ cd ../EventDetails && npm install && npm run build
 ```bash
 # Run automated build script to create optimized WordPress plugin package
 ./build.sh
-# Creates: /dist/dm-events.zip with versioned build info and production assets
+# Creates: /dist/dm-events.zip with build info and production assets
 ```
 
 **Block Development:**

@@ -1,6 +1,6 @@
 <?php
 /**
- * Data Machine Events Publisher
+ * AI-driven event creation with Event Details block generation and venue handling.
  *
  * @package DmEvents\Steps\Publish\Handlers\DmEvents
  */
@@ -14,9 +14,6 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * AI-driven event creation with Event Details block generation and venue handling
- */
 class DmEventsPublisher {
     
     public function __construct() {
@@ -112,19 +109,16 @@ class DmEventsPublisher {
         
         $featured_image_result = null;
         if (!empty($handler_config['include_images'])) {
-            // Image URL available from engine parameters
             $image_url = $parameters['eventImage'] ?? $handler_config['eventImage'] ?? null;
             if ($image_url) {
                 $featured_image_result = $this->set_featured_image($post_id, $image_url);
             }
         }
         
-        // Venue handling - data automatically available from engine parameters
         $venue_result = null;
         $venue_name = $parameters['venue'] ?? '';
         
         if (!empty($venue_name)) {
-            // Extract venue metadata directly from engine parameters
             $venue_metadata = [
                 'venueAddress' => $parameters['venueAddress'] ?? '',
                 'venueCity' => $parameters['venueCity'] ?? '',

@@ -1,6 +1,7 @@
 {
     "apiVersion": 2,
     "name": "dm-events/event-details",
+    "version": "0.1.0",
     "title": "Event Details",
     "category": "dm-events",
     "icon": "calendar-alt",

@@ -2,6 +2,8 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
+**Version**: 0.1.0
+
 ## Development Commands
 
 ```bash
@@ -20,15 +22,15 @@ npm run lint:js && npm run lint:css    # Linting
 
 ## Build Process
 
-- **Production Build:** `./build.sh` creates optimized package in `/dist` directory with versioned .zip file for WordPress deployment
+- **Production Build:** `./build.sh` creates optimized package in `/dist` directory as `dm-events.zip` with accompanying `build-info.txt` for WordPress deployment
 - **VSCode Integration:** `.vscode/tasks.json` provides IDE task management for development workflow
 - **Asset Management:** Individual blocks handle their own CSS and JavaScript assets
 - **Dynamic Versioning:** Admin assets use `filemtime()` for cache busting
-- **Automated Build Pipeline:** 
-  1. Clean dist directory and install production composer dependencies
-  2. Build Calendar block (webpack) and Event Details block (webpack with @wordpress/scripts base) 
+- **Automated Build Pipeline:**
+  1. Clean build directory and install production composer dependencies
+  2. Build Calendar block (webpack) and Event Details block (webpack with @wordpress/scripts base)
   3. Copy plugin files with rsync (excludes development files)
-  4. Create versioned ZIP package with build info
+  4. Create ZIP package with build info
   5. Restore development dependencies for continued work
 
 ## Architecture
@@ -163,16 +165,16 @@ npm run lint:js && npm run lint:css    # Linting
 - **Visual Enhancement:** DisplayStyles components including CircuitGridRenderer.js, CarouselListRenderer.js, and BadgeRenderer.js for calendar display
 - **Template Architecture:** Modular template system with 7 specialized templates plus modal subdirectory for advanced filtering interfaces
 - **Template Loading:** Template_Loader class provides get_template(), include_template(), template_exists(), and get_template_path() methods with variable extraction
-- **Production Build:** `./build.sh` creates optimized package in `/dist` directory with versioned .zip file for WordPress deployment
+- **Production Build:** `./build.sh` creates optimized package in `/dist` directory with `dm-events.zip` for WordPress deployment
 - **VSCode Integration:** `.vscode/tasks.json` provides IDE task management for development workflow
 - **Asset Strategy:** Individual blocks handle their own CSS and JavaScript assets independently
 - **Dynamic Versioning:** Admin assets use `filemtime()` for automatic cache invalidation
-- **Automated Build Steps:** 
+- **Automated Build Steps:**
   1. Install production composer dependencies (`composer install --no-dev --optimize-autoloader`)
   2. Build Calendar block with webpack (`npm ci && npm run build`)
   3. Build Event Details block with webpack using @wordpress/scripts base (`npm ci && npm run build`)
   4. Copy files with rsync (excludes node_modules, src, development files)
-  5. Create versioned ZIP file in `/dist` directory
+  5. Create `dm-events.zip` file in `/dist` directory
   6. Generate build info and restore development dependencies
 
 ### Data Machine Integration
