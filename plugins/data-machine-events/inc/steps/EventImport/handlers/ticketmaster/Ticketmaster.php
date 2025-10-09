@@ -44,7 +44,7 @@ class Ticketmaster {
             'flow_step_id' => $flow_step_id
         ]);
         
-        $api_config = apply_filters('dm_retrieve_oauth_keys', [], 'ticketmaster_events');
+        $api_config = apply_filters('dm_retrieve_oauth_account', [], 'ticketmaster_events');
         if (empty($api_config['api_key'])) {
             $this->log_error('Ticketmaster API key not configured');
             return $data;
@@ -259,7 +259,7 @@ class Ticketmaster {
         
         // Get API key if not provided
         if (empty($api_key)) {
-            $api_config = apply_filters('dm_retrieve_oauth_keys', [], 'ticketmaster_events');
+            $api_config = apply_filters('dm_retrieve_oauth_account', [], 'ticketmaster_events');
             $api_key = $api_config['api_key'] ?? '';
         }
         
@@ -369,7 +369,7 @@ class Ticketmaster {
      */
     public static function get_classifications_for_dropdown($current_config = []) {
         // Get API key from auth system
-        $api_config = apply_filters('dm_retrieve_oauth_keys', [], 'ticketmaster_events');
+        $api_config = apply_filters('dm_retrieve_oauth_account', [], 'ticketmaster_events');
         $api_key = $api_config['api_key'] ?? '';
         
         return self::get_classifications($api_key);

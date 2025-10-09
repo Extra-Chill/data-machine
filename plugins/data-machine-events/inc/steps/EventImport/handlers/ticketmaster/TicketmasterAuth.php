@@ -46,10 +46,10 @@ class TicketmasterAuth {
      * @return bool True if API key is configured, false otherwise
      */
     public function is_configured(): bool {
-        $config = apply_filters('dm_retrieve_oauth_keys', [], 'ticketmaster_events');
+        $config = apply_filters('dm_retrieve_oauth_account', [], 'ticketmaster_events');
         return !empty($config['api_key']);
     }
-    
+
     /**
      * Check if Ticketmaster is authenticated (same as configured for API key auth)
      *
