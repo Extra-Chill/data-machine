@@ -8,7 +8,8 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 - **Block-First Architecture:** Event data managed via `Event Details` block with InnerBlocks support (single source of truth)
 - **Rich Content Editing:** InnerBlocks integration allows rich content within events
 - **Comprehensive Data Model:** 15+ event attributes including performer, organizer, pricing, and event status
-- **Calendar Display:** Gutenberg block with modular template system, taxonomy filtering, pagination, and search capabilities  
+- **Calendar Display:** Gutenberg block with modular template system, taxonomy filtering, pagination, and search capabilities
+- **Single Event Template:** Extensible template with action hooks for theme integration (dm_events_before_single_event, dm_events_after_event_article, dm_events_related_events, dm_events_after_single_event)
 - **Display Controls:** Flexible rendering with showVenue, showPrice, showTicketLink options
 - **Performance Optimized:** Background sync to meta fields for efficient database queries
 - **Data Machine Integration:** Automated AI-driven event imports with single-item processing
@@ -40,7 +41,8 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 - `DmEvents\Admin\Settings_Page` - Event settings interface for archive behavior and display preferences
 - `DmEvents\Core\Venue_Taxonomy` - Complete venue taxonomy with 9 meta fields and admin interface
 - `DmEvents\Core\Event_Post_Type` - Event post type registration with selective menu control
-- `DmEvents\Core\Taxonomy_Badges` - Dynamic taxonomy badge rendering system with automatic color generation and HTML output for all non-venue taxonomies
+- `DmEvents\Core\Taxonomy_Badges` - Dynamic taxonomy badge rendering system with filterable output (dm_events_badge_wrapper_classes, dm_events_badge_classes)
+- `DmEvents\Core\Breadcrumbs` - Breadcrumb generation with filterable output (dm_events_breadcrumbs) for theme integration
 - `DmEvents\Blocks\Calendar\Template_Loader` - Modular template loading system with variable extraction, output buffering, and template caching for calendar block components
 - `DmEvents\Blocks\Calendar\Taxonomy_Helper` - Taxonomy data discovery, hierarchy building, and post count calculations for calendar filtering systems
 - `DmEvents\Steps\Publish\Handlers\DmEvents\DmEventsSchema` - Google Event Schema JSON-LD generator for SEO enhancement
@@ -99,12 +101,15 @@ dm-events/
 │   ├── core/                # Core plugin classes
 │   │   ├── class-event-post-type.php    # Event post type with menu control
 │   │   ├── class-venue-taxonomy.php     # Venue taxonomy with 9 meta fields
-│   │   └── class-taxonomy-badges.php    # Dynamic taxonomy badge rendering
+│   │   ├── class-taxonomy-badges.php    # Dynamic taxonomy badge rendering with filters
+│   │   └── class-breadcrumbs.php        # Breadcrumb generation with dm_events_breadcrumbs filter
 │   └── steps/               # Data Machine integration
 │       ├── EventImport/     # Import handlers with single-item processing
 │       │   └── handlers/    # Ticketmaster, Dice FM, web scrapers
 │       └── publish/         # AI-driven publishing with Schema generation
 │           └── handlers/DmEvents/  # DmEventsPublisher, Schema, Venue handling
+├── templates/
+│   └── single-dm_events.php # Single event template with extensibility hooks
 ├── assets/
 │   ├── css/                 # Admin styling (admin.css)
 │   └── js/                  # Admin JavaScript
@@ -254,7 +259,54 @@ foreach ($raw_events as $raw_event) {
 }
 ```
 
-**Template System & Taxonomy Integration:**
+**Single Event Template Extensibility:**
+```php
+// Hook into single event template for theme integration
+add_action('dm_events_before_single_event', function() {
+    // Inject notices, alerts, or theme content after get_header()
+    do_action('extrachill_before_body_content');
+});
+
+add_action('dm_events_related_events', function($event_id) {
+    // Display related events by festival and venue taxonomies
+    if (function_exists('extrachill_display_related_posts')) {
+        extrachill_display_related_posts('festival', $event_id);
+        extrachill_display_related_posts('venue', $event_id);
+    }
+}, 10, 1);
+
+add_action('dm_events_after_single_event', function() {
+    // Inject footer content before get_footer()
+    do_action('extrachill_after_body_content');
+});
+
+// Override breadcrumbs with theme system
+add_filter('dm_events_breadcrumbs', function($breadcrumbs, $post_id) {
+    if (function_exists('display_breadcrumbs')) {
+        ob_start();
+        display_breadcrumbs();
+        return ob_get_clean();
+    }
+    return $breadcrumbs;
+}, 10, 2);
+
+// Enhance taxonomy badges with theme classes
+add_filter('dm_events_badge_wrapper_classes', function($classes, $post_id) {
+    $classes[] = 'taxonomy-badges';
+    return $classes;
+}, 10, 2);
+
+add_filter('dm_events_badge_classes', function($classes, $taxonomy, $term, $post_id) {
+    $classes[] = 'taxonomy-badge';
+    if ($taxonomy === 'festival') {
+        $classes[] = 'festival-badge';
+        $classes[] = 'festival-' . esc_attr($term->slug);
+    }
+    return $classes;
+}, 10, 4);
+```
+
+**Calendar Template System & Taxonomy Integration:**
 ```php
 // Template_Loader provides modular template rendering with 7 templates
 Template_Loader::init();

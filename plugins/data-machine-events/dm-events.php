@@ -109,6 +109,11 @@ class DM_Events {
     private function __construct() {
         add_action('init', array($this, 'init'), 0);
         add_action('plugins_loaded', array($this, 'load_textdomain'));
+
+        // Initialize settings page early to catch admin_init hook
+        if (is_admin() && class_exists('DmEvents\\Admin\\Settings_Page')) {
+            new \DmEvents\Admin\Settings_Page();
+        }
     }
     
     public function init() {
@@ -143,10 +148,6 @@ class DM_Events {
     private function init_admin() {
         if (class_exists('DmEvents\\Admin')) {
             new \DmEvents\Admin();
-        }
-
-        if (class_exists('DmEvents\\Admin\\Settings_Page')) {
-            new \DmEvents\Admin\Settings_Page();
         }
     }
     

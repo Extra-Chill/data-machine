@@ -2,8 +2,9 @@
 /**
  * Single Event Template
  *
- * Template for displaying single dm_events posts. This template inherits the theme's
- * styling and structure while providing proper display for Event Details blocks.
+ * Provides action hooks for third-party integration (dm_events_before_single_event,
+ * dm_events_after_single_event, dm_events_after_event_article, dm_events_related_events).
+ * Renders breadcrumbs and taxonomy badges via plugin classes.
  *
  * @package DmEvents
  * @since 1.0.0
@@ -13,7 +14,10 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-get_header(); ?>
+get_header();
+
+do_action('dm_events_before_single_event');
+?>
 
 <div id="primary" class="content-area">
     <main id="main" class="site-main">
@@ -40,15 +44,7 @@ get_header(); ?>
                     ?>
                 </div>
 
-                <?php
-                $main_events_url = \DmEvents\Admin\Settings_Page::get_main_events_page_url();
-                $events_url = !empty($main_events_url) ? $main_events_url : get_post_type_archive_link('dm_events');
-                ?>
-                <nav class="dm-events-back-nav" aria-label="<?php esc_attr_e('Event Navigation', 'dm-events'); ?>">
-                    <a href="<?php echo esc_url($events_url); ?>" class="dm-events-back-link">
-                        <?php esc_html_e('← Back to Events', 'dm-events'); ?>
-                    </a>
-                </nav>
+                <?php do_action('dm_events_after_event_article'); ?>
 
                 <?php if (get_edit_post_link()) : ?>
                     <footer class="entry-footer">
@@ -74,6 +70,16 @@ get_header(); ?>
 
             </article>
 
+            <aside>
+                <?php
+                if (comments_open() || get_comments_number()) {
+                    comments_template();
+                }
+
+                do_action('dm_events_related_events', get_the_ID());
+                ?>
+            </aside>
+
         <?php endwhile; ?>
 
     </main>
@@ -81,4 +87,7 @@ get_header(); ?>
 
 <?php
 get_sidebar();
+
+do_action('dm_events_after_single_event');
+
 get_footer();

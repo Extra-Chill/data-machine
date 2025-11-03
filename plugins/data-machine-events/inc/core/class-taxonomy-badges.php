@@ -2,6 +2,9 @@
 /**
  * Dynamic Taxonomy Badge System
  *
+ * Themes customize via filters: dm_events_badge_wrapper_classes, dm_events_badge_classes.
+ * Excludes venue taxonomy. Provides hash-based color classes for consistent styling.
+ *
  * @package DmEvents\Core
  */
 
@@ -11,11 +14,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Renders pill-style badges with dynamic color generation for event taxonomies
- */
 class Taxonomy_Badges {
-    
+
     /**
      * @param int $post_id Event post ID
      * @return array Structured array of taxonomy objects and terms
@@ -54,10 +54,8 @@ class Taxonomy_Badges {
     }
     
     /**
-     * Generate HTML for taxonomy badges with data attributes
-     *
      * @param int $post_id Event post ID
-     * @return string Complete badge HTML with wrapper div
+     * @return string Badge HTML with wrapper and data attributes for each term
      */
     public static function render_taxonomy_badges($post_id) {
         $taxonomies = self::get_event_taxonomies($post_id);
@@ -66,7 +64,6 @@ class Taxonomy_Badges {
             return '';
         }
 
-        // Allow themes to customize wrapper classes
         $wrapper_classes = apply_filters('dm_events_badge_wrapper_classes', [
             'dm-taxonomy-badges'
         ], $post_id);
@@ -84,7 +81,6 @@ class Taxonomy_Badges {
                     'dm-term-' . esc_attr($term->slug)
                 ];
 
-                // Allow themes to customize badge classes
                 $badge_classes = apply_filters('dm_events_badge_classes', $badge_classes, $taxonomy_slug, $term, $post_id);
 
                 $output .= sprintf(
@@ -103,8 +99,6 @@ class Taxonomy_Badges {
     }
     
     /**
-     * Get all taxonomies currently used by published events
-     *
      * @return array Taxonomies with slug and label, excluding venues
      */
     public static function get_used_taxonomies() {
@@ -142,10 +136,8 @@ class Taxonomy_Badges {
     }
     
     /**
-     * Hash-based color class generation for consistent taxonomy styling
-     *
      * @param string $taxonomy_slug
-     * @return string
+     * @return string Hash-based color class (dm-badge-{color})
      */
     public static function get_taxonomy_color_class($taxonomy_slug) {
         $hash = md5($taxonomy_slug);

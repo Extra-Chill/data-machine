@@ -2,8 +2,8 @@
 /**
  * DM Events Breadcrumb System
  *
- * Provides theme-agnostic breadcrumb functionality for DM Events single pages.
- * Themes can override the entire breadcrumb output via the 'dm_events_breadcrumbs' filter.
+ * Themes override via 'dm_events_breadcrumbs' filter (priority 10, params: null, $post_id).
+ * Default: Home › Events › Event Title using configured main events page URL.
  *
  * @package DmEvents\Core
  */
@@ -20,8 +20,6 @@ if (!defined('ABSPATH')) {
 class Breadcrumbs {
 
     /**
-     * Render breadcrumbs for an event post
-     *
      * @param int|null $post_id Event post ID (defaults to current post)
      * @return string Breadcrumb HTML output
      */
@@ -34,28 +32,23 @@ class Breadcrumbs {
             return '';
         }
 
-        // Allow themes to completely override breadcrumbs
         $custom_breadcrumbs = apply_filters('dm_events_breadcrumbs', null, $post_id);
         if ($custom_breadcrumbs !== null) {
             return $custom_breadcrumbs;
         }
 
-        // Plugin's default breadcrumb implementation
         return self::generate_default_breadcrumbs($post_id);
     }
 
     /**
-     * Generate default breadcrumb structure: Home › Events › Event Title
-     *
      * @param int $post_id Event post ID
-     * @return string Default breadcrumb HTML
+     * @return string Default breadcrumb HTML (Home › Events › Event Title)
      */
     private static function generate_default_breadcrumbs($post_id) {
         $home_url = home_url();
         $events_url = get_post_type_archive_link('dm_events');
         $event_title = get_the_title($post_id);
 
-        // Use settings page URL if configured
         $main_events_url = \DmEvents\Admin\Settings_Page::get_main_events_page_url();
         if (!empty($main_events_url)) {
             $events_url = $main_events_url;

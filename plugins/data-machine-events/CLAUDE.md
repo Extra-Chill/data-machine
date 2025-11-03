@@ -49,13 +49,14 @@ npm run lint:js && npm run lint:css    # Linting
 - `DmEvents\Admin\Settings_Page` - Minimal settings interface for controlling event archive behavior, search integration, and display preferences
 - `DmEvents\Core\Venue_Taxonomy` - Complete venue taxonomy with 9 meta fields, admin UI, and CRUD operations
 - `DmEvents\Core\Event_Post_Type` - Event post type registration with selective admin menu control and taxonomy integration
-- `DmEvents\Core\Taxonomy_Badges` - Dynamic taxonomy badge rendering system with automatic color generation and badge display for all non-venue taxonomies
+- `DmEvents\Core\Taxonomy_Badges` - Dynamic taxonomy badge rendering system with automatic color generation and badge display for all non-venue taxonomies (filterable via dm_events_badge_wrapper_classes and dm_events_badge_classes)
+- `DmEvents\Core\Breadcrumbs` - Breadcrumb generation with filterable output via dm_events_breadcrumbs filter for theme integration
 - `DmEvents\Blocks\Calendar\Template_Loader` - Modular template loading system with variable extraction, output buffering, and template caching for calendar block components
 - `DmEvents\Blocks\Calendar\Taxonomy_Helper` - Taxonomy data discovery, hierarchy building, and post count calculations for calendar filtering systems
 - `DmEvents\Steps\Publish\Handlers\DmEvents\DmEventsSchema` - Google Event Schema JSON-LD generator for enhanced SEO visibility
 - `DmEvents\Steps\Publish\Handlers\DmEvents\DmEventsPublisher` - AI-driven event creation with comprehensive venue handling
 - `DmEvents\Steps\Publish\Handlers\DmEvents\DmEventsSettings` - Publisher configuration management
-- `DmEvents\Steps\Publish\Handlers\DmEvents\DmEventsFilters` - Publisher filtering system  
+- `DmEvents\Steps\Publish\Handlers\DmEvents\DmEventsFilters` - Publisher filtering system
 - `DmEvents\Steps\Publish\Handlers\DmEvents\DmEventsVenue` - Centralized venue taxonomy operations with validation and error handling
 - `DmEvents\Steps\EventImport\EventImportStep` - Event import step for Data Machine pipeline with handler discovery
 - `DmEvents\Steps\EventImport\EventImportFilters` - Event import step registration with Data Machine
@@ -119,11 +120,13 @@ npm run lint:js && npm run lint:css    # Linting
 - `inc/core/class-event-post-type.php` - Event post type with selective menu control
 - `inc/core/class-venue-taxonomy.php` - Venue taxonomy with 9 meta fields and admin UI
 - `inc/core/class-taxonomy-badges.php` - Dynamic taxonomy badge rendering with automatic color generation
+- `inc/core/class-breadcrumbs.php` - Breadcrumb generation with filterable output for theme integration
 - `inc/steps/EventImport/handlers/` - Import handlers with single-item processing (Ticketmaster, Dice FM, AI-powered web scrapers)
 - `inc/steps/publish/handlers/DmEvents/` - AI-driven publishing with Schema generation and venue handling
   - `DmEventsSchema.php` - Google Event structured data generator
   - `DmEventsPublisher.php` - AI-powered event creation
   - `DmEventsVenue.php` - Centralized venue taxonomy operations
+- `templates/single-dm_events.php` - Single event template with extensibility hooks
 - `assets/css/admin.css` - Admin interface styling
 - `assets/js/admin.js` - Admin JavaScript functionality
 
@@ -349,7 +352,32 @@ $assignment = DmEventsVenue::assign_venue_to_event($post_id, $venue_name, $venue
 
 ### Template Architecture
 
-**Modular Template System:**
+**Single Event Template:**
+Single event template (`templates/single-dm_events.php`) provides extensibility via action hooks:
+
+```php
+// Template structure with action hooks
+get_header();
+do_action('dm_events_before_single_event');     // Theme integration point
+
+// Event article with breadcrumbs, badges, content
+do_action('dm_events_after_event_article');     // Post-content hook
+
+// Aside section for comments and related content
+do_action('dm_events_related_events', $post_id); // Related events display
+
+do_action('dm_events_after_single_event');      // Pre-footer hook
+get_footer();
+```
+
+**Template Extensibility:**
+- **dm_events_before_single_event** - Fires after get_header(), enables theme notices/alerts injection
+- **dm_events_after_event_article** - Fires after event content, before comments/aside
+- **dm_events_related_events** - Fires in aside section, enables related events by taxonomy
+- **dm_events_after_single_event** - Fires before get_footer(), enables footer content injection
+- **Standard Comments Support** - Uses WordPress comments_template() with site settings respect
+
+**Calendar Block Template System:**
 Calendar block uses a modular template architecture with 7 specialized templates plus modal subdirectory:
 
 ```php
@@ -360,6 +388,7 @@ Template_Loader::include_template('date-group', $group_data);
 
 // Template structure
 templates/
+├── single-dm_events.php      # Single event with action hooks
 ├── event-item.php           # Individual event display
 ├── date-group.php           # Day-grouped event container
 ├── pagination.php           # Event pagination controls
