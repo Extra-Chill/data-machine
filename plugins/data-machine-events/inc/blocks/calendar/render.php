@@ -33,6 +33,23 @@ $query_args = array(
     'order' => 'DESC'
 );
 
+// Auto-detect taxonomy archives and filter events
+if ( is_tax() ) {
+    $term = get_queried_object();
+    if ( $term && isset( $term->taxonomy ) && isset( $term->term_id ) ) {
+        $query_args['tax_query'] = array(
+            array(
+                'taxonomy' => $term->taxonomy,
+                'field'    => 'term_id',
+                'terms'    => $term->term_id,
+            ),
+        );
+    }
+}
+
+// Allow external filtering of query args
+$query_args = apply_filters( 'dm_events_calendar_query_args', $query_args, $attributes, $block );
+
 $all_events = get_posts($query_args);
 $filtered_events = array();
 

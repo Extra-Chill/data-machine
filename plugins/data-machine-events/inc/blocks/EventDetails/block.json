@@ -8,7 +8,8 @@
     "description": "Display and edit event details including date, time, venue, and other information.",
     "textdomain": "dm-events",
     "editorScript": "file:./build/index.js",
-    "viewStyle": "file:./style.css",
+    "editorStyle": "file:./style.css",
+    "viewStyle": "file:./build/frontend.css",
     "attributes": {
         "startDate": {
             "type": "string",
@@ -81,6 +82,10 @@
         "venueCoordinates": {
             "type": "string",
             "default": ""
+        },
+        "venueCapacity": {
+            "type": "number",
+            "default": 0
         },
         "performer": {
             "type": "string",

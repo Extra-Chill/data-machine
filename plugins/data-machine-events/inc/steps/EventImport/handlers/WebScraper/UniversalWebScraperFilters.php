@@ -23,16 +23,19 @@ if (!defined('ABSPATH')) {
  * Schema.org compliant event extraction from any website.
  * Prioritizes structured data with intelligent HTML parsing fallbacks.
  */
-add_filter('dm_handlers', function($handlers) {
-    $handlers['universal_web_scraper'] = [
-        'type' => 'event_import',
-        'class' => 'DmEvents\\Steps\\EventImport\\Handlers\\WebScraper\\UniversalWebScraper',
-        'label' => __('Universal Web Scraper', 'dm-events'),
-        'description' => __('Extract events from any website using Schema.org compliance with AI fallbacks', 'dm-events')
-    ];
-    
+add_filter('dm_handlers', function($handlers, $step_type = null) {
+    // Only register when event_import handlers are requested
+    if ($step_type === null || $step_type === 'event_import') {
+        $handlers['universal_web_scraper'] = [
+            'type' => 'event_import',
+            'class' => 'DmEvents\\Steps\\EventImport\\Handlers\\WebScraper\\UniversalWebScraper',
+            'label' => __('Universal Web Scraper', 'dm-events'),
+            'description' => __('Extract events from any website using Schema.org compliance with AI fallbacks', 'dm-events')
+        ];
+    }
+
     return $handlers;
-});
+}, 10, 2);
 
 /**
  * Register Universal Web Scraper settings

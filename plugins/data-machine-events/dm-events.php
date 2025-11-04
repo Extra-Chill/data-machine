@@ -341,6 +341,35 @@ class DM_Events {
                 filemtime(DM_EVENTS_PLUGIN_DIR . 'inc/blocks/root.css')
             );
         }
+
+        // Enqueue Leaflet map assets for Event Details block
+        if (has_block('dm-events/event-details') || is_singular('dm_events')) {
+            // Leaflet CSS
+            wp_enqueue_style(
+                'leaflet',
+                'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+                array(),
+                '1.9.4'
+            );
+
+            // Leaflet JS
+            wp_enqueue_script(
+                'leaflet',
+                'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+                array(),
+                '1.9.4',
+                true
+            );
+
+            // Custom venue map initialization
+            wp_enqueue_script(
+                'dm-events-venue-map',
+                DM_EVENTS_PLUGIN_URL . 'assets/js/venue-map.js',
+                array('leaflet'),
+                filemtime(DM_EVENTS_PLUGIN_DIR . 'assets/js/venue-map.js'),
+                true
+            );
+        }
     }
     
     public function register_block_category($block_categories, $editor_context) {

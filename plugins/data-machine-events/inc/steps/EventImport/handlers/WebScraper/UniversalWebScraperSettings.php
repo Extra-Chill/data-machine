@@ -45,60 +45,75 @@ class UniversalWebScraperSettings {
                 'placeholder' => 'The Royal American',
                 'required' => false,
             ],
-            'venueAddress' => [
+            'venue_address' => [
                 'type' => 'text',
                 'label' => __('Venue Address', 'dm-events'),
-                'description' => __('Leave blank to let AI extract venue address from page content.', 'dm-events'),
+                'description' => __('Leave blank to let AI extract venue address from page content. Start typing to see address suggestions.', 'dm-events'),
                 'placeholder' => '970 Morrison Drive',
                 'required' => false,
+                'attributes' => [
+                    'class' => 'venue-address-autocomplete',
+                    'data-city-field' => 'venue_city',
+                    'data-state-field' => 'venue_state',
+                    'data-zip-field' => 'venue_zip',
+                    'data-country-field' => 'venue_country',
+                    'data-coords-field' => 'venue_coordinates',
+                ],
             ],
-            'venueCity' => [
+            'venue_city' => [
                 'type' => 'text',
                 'label' => __('Venue City', 'dm-events'),
                 'description' => __('Leave blank to let AI extract venue city from page content.', 'dm-events'),
                 'placeholder' => 'Charleston',
                 'required' => false,
             ],
-            'venueState' => [
+            'venue_state' => [
                 'type' => 'text',
                 'label' => __('Venue State', 'dm-events'),
                 'description' => __('Leave blank to let AI extract venue state from page content.', 'dm-events'),
                 'placeholder' => 'SC',
                 'required' => false,
             ],
-            'venueZip' => [
+            'venue_zip' => [
                 'type' => 'text',
                 'label' => __('Venue Zip Code', 'dm-events'),
                 'description' => __('Leave blank to let AI extract venue zip code from page content.', 'dm-events'),
                 'placeholder' => '29403',
                 'required' => false,
             ],
-            'venueCountry' => [
+            'venue_country' => [
                 'type' => 'text',
                 'label' => __('Venue Country', 'dm-events'),
                 'description' => __('Leave blank to let AI extract venue country from page content.', 'dm-events'),
                 'placeholder' => 'US',
                 'required' => false,
             ],
-            'venuePhone' => [
+            'venue_phone' => [
                 'type' => 'text',
                 'label' => __('Venue Phone', 'dm-events'),
                 'description' => __('Leave blank to let AI extract venue phone from page content.', 'dm-events'),
                 'placeholder' => '(843) 817-6925',
                 'required' => false,
             ],
-            'venueWebsite' => [
+            'venue_website' => [
                 'type' => 'url',
                 'label' => __('Venue Website', 'dm-events'),
                 'description' => __('Leave blank to let AI extract venue website from page content.', 'dm-events'),
                 'placeholder' => 'https://www.theroyalamerican.com',
                 'required' => false,
             ],
-            'venueCoordinates' => [
+            'venue_coordinates' => [
                 'type' => 'text',
                 'label' => __('Venue Coordinates', 'dm-events'),
                 'description' => __('Leave blank to let AI extract venue coordinates from page content. Format: latitude,longitude', 'dm-events'),
                 'placeholder' => '32.7900,-79.9400',
+                'required' => false,
+            ],
+            'venue_capacity' => [
+                'type' => 'number',
+                'label' => __('Venue Capacity', 'dm-events'),
+                'description' => __('Leave blank to let AI extract venue capacity from page content.', 'dm-events'),
+                'placeholder' => '500',
                 'required' => false,
             ]
         ];
@@ -114,14 +129,15 @@ class UniversalWebScraperSettings {
         return [
             'source_url' => esc_url_raw($raw_settings['source_url'] ?? ''),
             'venue' => sanitize_text_field($raw_settings['venue'] ?? ''),
-            'venueAddress' => sanitize_text_field($raw_settings['venueAddress'] ?? ''),
-            'venueCity' => sanitize_text_field($raw_settings['venueCity'] ?? ''),
-            'venueState' => sanitize_text_field($raw_settings['venueState'] ?? ''),
-            'venueZip' => sanitize_text_field($raw_settings['venueZip'] ?? ''),
-            'venueCountry' => sanitize_text_field($raw_settings['venueCountry'] ?? ''),
-            'venuePhone' => sanitize_text_field($raw_settings['venuePhone'] ?? ''),
-            'venueWebsite' => esc_url_raw($raw_settings['venueWebsite'] ?? ''),
-            'venueCoordinates' => sanitize_text_field($raw_settings['venueCoordinates'] ?? '')
+            'venue_address' => sanitize_text_field($raw_settings['venue_address'] ?? ''),
+            'venue_city' => sanitize_text_field($raw_settings['venue_city'] ?? ''),
+            'venue_state' => sanitize_text_field($raw_settings['venue_state'] ?? ''),
+            'venue_zip' => sanitize_text_field($raw_settings['venue_zip'] ?? ''),
+            'venue_country' => sanitize_text_field($raw_settings['venue_country'] ?? ''),
+            'venue_phone' => sanitize_text_field($raw_settings['venue_phone'] ?? ''),
+            'venue_website' => esc_url_raw($raw_settings['venue_website'] ?? ''),
+            'venue_coordinates' => sanitize_text_field($raw_settings['venue_coordinates'] ?? ''),
+            'venue_capacity' => !empty($raw_settings['venue_capacity']) ? absint($raw_settings['venue_capacity']) : ''
         ];
     }
     
@@ -144,14 +160,15 @@ class UniversalWebScraperSettings {
         return [
             'source_url' => '',
             'venue' => '',
-            'venueAddress' => '',
-            'venueCity' => '',
-            'venueState' => '',
-            'venueZip' => '',
-            'venueCountry' => '',
-            'venuePhone' => '',
-            'venueWebsite' => '',
-            'venueCoordinates' => ''
+            'venue_address' => '',
+            'venue_city' => '',
+            'venue_state' => '',
+            'venue_zip' => '',
+            'venue_country' => '',
+            'venue_phone' => '',
+            'venue_website' => '',
+            'venue_coordinates' => '',
+            'venue_capacity' => ''
         ];
     }
 }

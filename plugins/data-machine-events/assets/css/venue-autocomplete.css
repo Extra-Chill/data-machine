@@ -1,0 +1,238 @@
+/**
+ * Venue Address Autocomplete Styles
+ *
+ * Styles for Nominatim-powered address autocomplete dropdown
+ * in Data Machine handler settings modals.
+ *
+ * @package DmEvents
+ * @since 1.0.0
+ */
+
+/* Container */
+.venue-autocomplete-container {
+    position: relative;
+    width: 100%;
+}
+
+/* Dropdown */
+.venue-autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 300px;
+    overflow-y: auto;
+    background: #ffffff;
+    border: 1px solid #ddd;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    z-index: 10000;
+    margin-top: -1px;
+}
+
+/* Autocomplete Items */
+.venue-autocomplete-item {
+    padding: 12px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.15s ease;
+}
+
+.venue-autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.venue-autocomplete-item:hover,
+.venue-autocomplete-item.selected {
+    background-color: #f5f5f5;
+}
+
+.venue-autocomplete-item.selected {
+    background-color: #e8f4f8;
+}
+
+/* Address Display */
+.venue-autocomplete-address {
+    font-size: 14px;
+    line-height: 1.4;
+    color: #333;
+}
+
+/* Loading State */
+.venue-autocomplete-loading {
+    padding: 15px;
+    text-align: center;
+    color: #666;
+    font-size: 14px;
+}
+
+.venue-autocomplete-loading::before {
+    content: "";
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    border: 2px solid #ddd;
+    border-top-color: #0073aa;
+    border-radius: 50%;
+    animation: venue-autocomplete-spin 0.8s linear infinite;
+    vertical-align: middle;
+}
+
+@keyframes venue-autocomplete-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Error State */
+.venue-autocomplete-error {
+    padding: 15px;
+    text-align: center;
+    color: #d63638;
+    font-size: 14px;
+    background-color: #fff0f0;
+}
+
+/* Attribution Notice */
+.venue-autocomplete-attribution {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #ddd;
+    font-size: 12px;
+    color: #666;
+    text-align: center;
+}
+
+.venue-autocomplete-attribution a {
+    color: #0073aa;
+    text-decoration: none;
+}
+
+.venue-autocomplete-attribution a:hover {
+    text-decoration: underline;
+}
+
+/* Input Field Enhancement */
+.venue-address-autocomplete {
+    position: relative;
+}
+
+.venue-address-autocomplete:focus {
+    border-color: #0073aa;
+    box-shadow: 0 0 0 1px #0073aa;
+}
+
+/* Scrollbar Styling */
+.venue-autocomplete-dropdown::-webkit-scrollbar {
+    width: 8px;
+}
+
+.venue-autocomplete-dropdown::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.venue-autocomplete-dropdown::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.venue-autocomplete-dropdown::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Mobile Responsiveness */
+@media screen and (max-width: 782px) {
+    .venue-autocomplete-dropdown {
+        max-height: 200px;
+        font-size: 16px; /* Prevent iOS zoom on focus */
+    }
+
+    .venue-autocomplete-item {
+        padding: 15px;
+    }
+
+    .venue-autocomplete-address {
+        font-size: 15px;
+    }
+}
+
+/* High DPI / Retina Displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .venue-autocomplete-dropdown {
+        border-width: 0.5px;
+    }
+}
+
+/* Dark Mode Support (if WordPress admin has dark mode) */
+@media (prefers-color-scheme: dark) {
+    .venue-autocomplete-dropdown {
+        background: #1e1e1e;
+        border-color: #3c3c3c;
+    }
+
+    .venue-autocomplete-item {
+        border-bottom-color: #3c3c3c;
+    }
+
+    .venue-autocomplete-item:hover,
+    .venue-autocomplete-item.selected {
+        background-color: #2c2c2c;
+    }
+
+    .venue-autocomplete-item.selected {
+        background-color: #004875;
+    }
+
+    .venue-autocomplete-address {
+        color: #e0e0e0;
+    }
+
+    .venue-autocomplete-loading,
+    .venue-autocomplete-attribution {
+        color: #b0b0b0;
+    }
+
+    .venue-autocomplete-error {
+        background-color: #3d1f1f;
+        color: #ff6b6b;
+    }
+}
+
+/* Focus Accessibility */
+.venue-autocomplete-item:focus {
+    outline: 2px solid #0073aa;
+    outline-offset: -2px;
+}
+
+/* Keyboard Navigation Indicator */
+.venue-autocomplete-item.selected::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background-color: #0073aa;
+}
+
+.venue-autocomplete-item {
+    position: relative;
+}
+
+/* Animation for Dropdown Appearance */
+@keyframes venue-autocomplete-fadein {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.venue-autocomplete-dropdown[style*="display: block"] {
+    animation: venue-autocomplete-fadein 0.2s ease;
+}

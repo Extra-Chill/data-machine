@@ -4,8 +4,8 @@
   "description": "Event Details block for Data Machine Events plugin",
   "main": "build/index.js",
   "scripts": {
-    "build": "wp-scripts build",
-    "start": "wp-scripts start",
+    "build": "webpack --mode=production",
+    "start": "webpack --mode=development --watch",
     "format": "wp-scripts format",
     "lint:css": "wp-scripts lint-style",
     "lint:js": "wp-scripts lint-js",
@@ -17,7 +17,9 @@
     "test:unit": "wp-scripts test-unit-js"
   },
   "devDependencies": {
-    "@wordpress/scripts": "^26.0.0"
+    "@wordpress/scripts": "^26.0.0",
+    "webpack": "^5.99.9",
+    "webpack-cli": "^5.1.4"
   },
   "dependencies": {
     "@wordpress/block-editor": "^12.0.0",

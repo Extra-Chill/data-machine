@@ -123,4 +123,42 @@ if (!empty($start_date)) {
         </div>
     <?php endif; ?>
 
+    <?php
+    // Display venue map if coordinates are available
+    if ($venue_data && !empty($venue_data['coordinates'])) {
+        $coords = explode(',', $venue_data['coordinates']);
+        if (count($coords) === 2) {
+            $lat = trim($coords[0]);
+            $lon = trim($coords[1]);
+
+            // Validate coordinates are numeric
+            if (is_numeric($lat) && is_numeric($lon)) {
+                ?>
+                <div class="dm-venue-map-section">
+                    <h3 class="venue-map-title"><?php echo esc_html__('Venue Location', 'dm-events'); ?></h3>
+                    <div
+                        id="venue-map-<?php echo esc_attr($post_id); ?>"
+                        class="dm-venue-map"
+                        data-lat="<?php echo esc_attr($lat); ?>"
+                        data-lon="<?php echo esc_attr($lon); ?>"
+                        data-venue-name="<?php echo esc_attr($venue); ?>"
+                        data-venue-address="<?php echo esc_attr($address); ?>"
+                    ></div>
+                    <div class="venue-map-attribution">
+                        <small>
+                            <?php
+                            printf(
+                                esc_html__('Map data © %s contributors', 'dm-events'),
+                                '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
+                            );
+                            ?>
+                        </small>
+                    </div>
+                </div>
+                <?php
+            }
+        }
+    }
+    ?>
+
 </div> 

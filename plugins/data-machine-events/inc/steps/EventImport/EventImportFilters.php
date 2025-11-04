@@ -33,37 +33,40 @@ add_filter('dm_steps', function($steps) {
 
 /**
  * Register Event Import handlers with Data Machine
- * 
+ *
  * Registers all available event import handlers using Data Machine's unified handler registry.
  * This enables native discovery and execution via the dm_handlers filter.
  */
-add_filter('dm_handlers', function($handlers) {
-    // Ticketmaster Discovery API handler
-    $handlers['ticketmaster_events'] = [
-        'type' => 'event_import',
-        'class' => 'DmEvents\\Steps\\EventImport\\Handlers\\Ticketmaster\\Ticketmaster',
-        'label' => __('Ticketmaster Events', 'dm-events'),
-        'description' => __('Import events from Ticketmaster Discovery API with venue data', 'dm-events')
-    ];
-    
-    // Dice FM API handler
-    $handlers['dice_fm_events'] = [
-        'type' => 'event_import',
-        'class' => 'DmEvents\\Steps\\EventImport\\Handlers\\DiceFm\\DiceFm',
-        'label' => __('Dice FM Events', 'dm-events'),
-        'description' => __('Import events from Dice FM API for electronic music venues', 'dm-events')
-    ];
+add_filter('dm_handlers', function($handlers, $step_type = null) {
+    // Only register event_import handlers when requested
+    if ($step_type === null || $step_type === 'event_import') {
+        // Ticketmaster Discovery API handler
+        $handlers['ticketmaster_events'] = [
+            'type' => 'event_import',
+            'class' => 'DmEvents\\Steps\\EventImport\\Handlers\\Ticketmaster\\Ticketmaster',
+            'label' => __('Ticketmaster Events', 'dm-events'),
+            'description' => __('Import events from Ticketmaster Discovery API with venue data', 'dm-events')
+        ];
 
-    // Google Calendar .ics handler
-    $handlers['google_calendar'] = [
-        'type' => 'event_import',
-        'class' => 'DmEvents\\Steps\\EventImport\\Handlers\\GoogleCalendar\\GoogleCalendar',
-        'label' => __('Google Calendar', 'dm-events'),
-        'description' => __('Import events from public Google Calendar .ics feeds', 'dm-events')
-    ];
-    
+        // Dice FM API handler
+        $handlers['dice_fm_events'] = [
+            'type' => 'event_import',
+            'class' => 'DmEvents\\Steps\\EventImport\\Handlers\\DiceFm\\DiceFm',
+            'label' => __('Dice FM Events', 'dm-events'),
+            'description' => __('Import events from Dice FM API for electronic music venues', 'dm-events')
+        ];
+
+        // Google Calendar .ics handler
+        $handlers['google_calendar'] = [
+            'type' => 'event_import',
+            'class' => 'DmEvents\\Steps\\EventImport\\Handlers\\GoogleCalendar\\GoogleCalendar',
+            'label' => __('Google Calendar', 'dm-events'),
+            'description' => __('Import events from public Google Calendar .ics feeds', 'dm-events')
+        ];
+    }
+
     return $handlers;
-});
+}, 10, 2);
 
 /**
  * Universal venue parameter injection via Data Machine engine
@@ -116,9 +119,10 @@ add_filter('dm_engine_parameters', function($parameters, $data, $flow_step_confi
     // Inject venue metadata if available
     if (!empty($event_data['venue_metadata']) && is_array($event_data['venue_metadata'])) {
         $venue_metadata = $event_data['venue_metadata'];
-        $venue_fields = ['venueAddress', 'venueCity', 'venueState', 'venueZip', 
-                        'venueCountry', 'venuePhone', 'venueWebsite', 'venueCoordinates'];
-        
+        $venue_fields = ['venue_address', 'venue_city', 'venue_state', 'venue_zip',
+                        'venue_country', 'venue_phone', 'venue_website', 'venue_coordinates',
+                        'venue_capacity'];
+
         foreach ($venue_fields as $field) {
             if (!empty($venue_metadata[$field])) {
                 $parameters[$field] = sanitize_text_field($venue_metadata[$field]);
@@ -141,6 +145,41 @@ add_filter('dm_engine_parameters', function($parameters, $data, $flow_step_confi
             'total_parameters' => count($parameters)
         ]);
     }
-    
+
     return $parameters;
 }, 10, 5);
+
+/**
+ * Enqueue venue autocomplete assets on Data Machine admin pages
+ *
+ * Loads Nominatim-powered address autocomplete JavaScript and CSS
+ * only on Data Machine settings pages where venue fields are displayed.
+ */
+add_action('admin_enqueue_scripts', function() {
+    // Only load on Data Machine settings pages
+    if (!is_admin()) {
+        return;
+    }
+
+    $screen = get_current_screen();
+    if (!$screen || strpos($screen->id, 'dm-') === false) {
+        return;
+    }
+
+    // Enqueue JavaScript
+    wp_enqueue_script(
+        'dm-events-venue-autocomplete',
+        DM_EVENTS_PLUGIN_URL . 'assets/js/venue-autocomplete.js',
+        array(), // No dependencies
+        filemtime(DM_EVENTS_PLUGIN_DIR . 'assets/js/venue-autocomplete.js'),
+        true
+    );
+
+    // Enqueue CSS
+    wp_enqueue_style(
+        'dm-events-venue-autocomplete',
+        DM_EVENTS_PLUGIN_URL . 'assets/css/venue-autocomplete.css',
+        array(),
+        filemtime(DM_EVENTS_PLUGIN_DIR . 'assets/css/venue-autocomplete.css')
+    );
+});

@@ -120,16 +120,17 @@ class DmEventsPublisher {
         
         if (!empty($venue_name)) {
             $venue_metadata = [
-                'venueAddress' => $parameters['venueAddress'] ?? '',
-                'venueCity' => $parameters['venueCity'] ?? '',
-                'venueState' => $parameters['venueState'] ?? '',
-                'venueZip' => $parameters['venueZip'] ?? '',
-                'venueCountry' => $parameters['venueCountry'] ?? '',
-                'venuePhone' => $parameters['venuePhone'] ?? '',
-                'venueWebsite' => $parameters['venueWebsite'] ?? '',
-                'venueCoordinates' => $parameters['venueCoordinates'] ?? ''
+                'venue_address' => $parameters['venue_address'] ?? '',
+                'venue_city' => $parameters['venue_city'] ?? '',
+                'venue_state' => $parameters['venue_state'] ?? '',
+                'venue_zip' => $parameters['venue_zip'] ?? '',
+                'venue_country' => $parameters['venue_country'] ?? '',
+                'venue_phone' => $parameters['venue_phone'] ?? '',
+                'venue_website' => $parameters['venue_website'] ?? '',
+                'venue_coordinates' => $parameters['venue_coordinates'] ?? '',
+                'venue_capacity' => $parameters['venue_capacity'] ?? ''
             ];
-            
+
             $assignment_result = DmEventsVenue::assign_venue_to_event($post_id, $venue_name, $venue_metadata);
             $venue_result = $assignment_result['venue_result'];
         }

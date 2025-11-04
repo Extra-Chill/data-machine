@@ -26,6 +26,7 @@ registerBlockType('dm-events/event-details', {
             endTime,
             venue,
             address,
+            venueCapacity,
             price,
             ticketUrl,
             showVenue,
@@ -119,6 +120,13 @@ registerBlockType('dm-events/event-details', {
                                 label={__('Address', 'dm-events')}
                                 value={address}
                                 onChange={(value) => setAttributes({ address: value })}
+                            />
+                            <TextControl
+                                label={__('Venue Capacity', 'dm-events')}
+                                value={venueCapacity}
+                                onChange={(value) => setAttributes({ venueCapacity: parseInt(value) || 0 })}
+                                type="number"
+                                help={__('Maximum capacity of the venue', 'dm-events')}
                             />
                         </div>
 
