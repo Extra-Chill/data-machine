@@ -20,32 +20,31 @@ if (!$enable_pagination || $max_pages <= 1) {
     return;
 }
 
+// Preserve all GET parameters except 'paged'
+$get_params = isset( $_GET ) ? array_map( 'sanitize_text_field', wp_unslash( $_GET ) ) : array();
+unset( $get_params['paged'] );
+
 $pagination_args = array(
-    'base' => str_replace(999999999, '%#%', esc_url(get_pagenum_link(999999999))),
-    'format' => '?paged=%#%',
-    'current' => $current_page,
-    'total' => $max_pages,
-    'prev_text' => __('&laquo; Previous'),
-    'next_text' => __('Next &raquo;'),
-    'type' => 'list',
-    'end_size' => 3,
-    'mid_size' => 3,
-    'echo' => false
+    'base'      => add_query_arg( 'paged', '%#%' ),
+    'format'    => '',
+    'current'   => $current_page,
+    'total'     => $max_pages,
+    'prev_text' => __( '« Previous', 'datamachine-events' ),
+    'next_text' => __( 'Next »', 'datamachine-events' ),
+    'type'      => 'list',
+    'end_size'  => 1,
+    'mid_size'  => 2,
+    'add_args'  => $get_params, // Preserve all filters
 );
 
-// Add past parameter if showing past events
-if ($show_past) {
-    $pagination_args['add_args'] = array('past' => '1');
-}
-
-$pagination_links = paginate_links($pagination_args);
+$pagination_links = paginate_links( $pagination_args );
 
 // Only render if pagination links were generated
-if (!empty($pagination_links) && trim($pagination_links) !== '') :
-?>
+if ( ! empty( $pagination_links ) && trim( $pagination_links ) !== '' ) :
+	?>
 
-<div class="dm-events-pagination">
-    <?php echo $pagination_links; ?>
-</div>
+<nav class="datamachine-events-pagination" aria-label="<?php esc_attr_e( 'Events pagination', 'datamachine-events' ); ?>">
+	<?php echo wp_kses_post( $pagination_links ); ?>
+</nav>
 
 <?php endif; ?>

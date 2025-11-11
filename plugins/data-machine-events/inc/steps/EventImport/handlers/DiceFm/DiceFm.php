@@ -5,11 +5,11 @@
  * Integrates with Dice.fm API for event imports using Data Machine's 
  * single-item processing model with deduplication tracking.
  *
- * @package DmEvents\Steps\EventImport\Handlers\DiceFm
+ * @package DataMachineEvents\Steps\EventImport\Handlers\DiceFm
  * @since 1.0.0
  */
 
-namespace DmEvents\Steps\EventImport\Handlers\DiceFm;
+namespace DataMachineEvents\Steps\EventImport\Handlers\DiceFm;
 
 // Prevent direct access
 if (!defined('ABSPATH')) {
@@ -46,7 +46,7 @@ class DiceFm {
         $flow_step_config = $parameters['flow_step_config'] ?? [];
         
         // Extract handler configuration
-        $handler_config = $flow_step_config['handler']['settings'] ?? [];
+        $handler_config = $flow_step_config['handler_config'] ?? [];
         $pipeline_id = $flow_step_config['pipeline_id'] ?? null;
         
         $this->log_info('Dice.fm Handler: Starting event import', [
@@ -56,7 +56,7 @@ class DiceFm {
         ]);
         
         // Get API configuration from Data Machine auth system
-        $api_config = apply_filters('dm_retrieve_oauth_keys', [], 'dice_fm_events');
+        $api_config = apply_filters('datamachine_retrieve_oauth_keys', [], 'dice_fm_events');
         if (empty($api_config['api_key'])) {
             $this->log_error('Dice.fm API key not configured');
             return $data; // Return unchanged data packet array
@@ -105,7 +105,7 @@ class DiceFm {
             $event_identifier = md5($standardized_event['title'] . ($standardized_event['startDate'] ?? '') . ($standardized_event['venue'] ?? ''));
             
             // Check if already processed FIRST
-            $is_processed = apply_filters('dm_is_item_processed', false, $flow_step_id, 'dice_fm', $event_identifier);
+            $is_processed = apply_filters('datamachine_is_item_processed', false, $flow_step_id, 'dice_fm', $event_identifier);
             if ($is_processed) {
                 $this->log_debug('Skipping already processed event', [
                     'title' => $standardized_event['title'],
@@ -127,7 +127,7 @@ class DiceFm {
             
             // Found eligible event - mark as processed and add to data packet array
             if ($flow_step_id && $job_id) {
-                do_action('dm_mark_item_processed', $flow_step_id, 'dice_fm', $event_identifier, $job_id);
+                do_action('datamachine_mark_item_processed', $flow_step_id, 'dice_fm', $event_identifier, $job_id);
             }
             
             $this->log_info('Dice.fm Handler: Found eligible event', [
@@ -402,7 +402,7 @@ class DiceFm {
      */
     private function log_debug(string $message, array $context = []): void {
         if (function_exists('do_action')) {
-            do_action('dm_log', 'debug', $message, $context);
+            do_action('datamachine_log', 'debug', $message, $context);
         }
     }
     
@@ -414,7 +414,7 @@ class DiceFm {
      */
     private function log_error(string $message, array $context = []): void {
         if (function_exists('do_action')) {
-            do_action('dm_log', 'error', $message, $context);
+            do_action('datamachine_log', 'error', $message, $context);
         }
     }
     
@@ -426,7 +426,7 @@ class DiceFm {
      */
     private function log_info(string $message, array $context = []): void {
         if (function_exists('do_action')) {
-            do_action('dm_log', 'info', $message, $context);
+            do_action('datamachine_log', 'info', $message, $context);
         }
     }
 }

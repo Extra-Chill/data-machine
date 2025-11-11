@@ -2,13 +2,13 @@
 /**
  * Event Post Type Registration
  *
- * Handles registration of the dm_events custom post type with selective taxonomy menu control.
+ * Handles registration of the datamachine_events custom post type with selective taxonomy menu control.
  *
- * @package DmEvents
+ * @package DataMachineEvents
  * @subpackage Core
  */
 
-namespace DmEvents\Core;
+namespace DataMachineEvents\Core;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -21,30 +21,30 @@ class Event_Post_Type {
     
     public static function register() {
         $labels = array(
-            'name'                  => _x('Events', 'Post type general name', 'dm-events'),
-            'singular_name'         => _x('Event', 'Post type singular name', 'dm-events'),
-            'menu_name'             => _x('Events', 'Admin Menu text', 'dm-events'),
-            'name_admin_bar'        => _x('Event', 'Add New on Toolbar', 'dm-events'),
-            'add_new'               => __('Add New', 'dm-events'),
-            'add_new_item'          => __('Add New Event', 'dm-events'),
-            'new_item'              => __('New Event', 'dm-events'),
-            'edit_item'             => __('Edit Event', 'dm-events'),
-            'view_item'             => __('View Event', 'dm-events'),
-            'all_items'             => __('All Events', 'dm-events'),
-            'search_items'          => __('Search Events', 'dm-events'),
-            'parent_item_colon'     => __('Parent Events:', 'dm-events'),
-            'not_found'             => __('No events found.', 'dm-events'),
-            'not_found_in_trash'    => __('No events found in Trash.', 'dm-events'),
-            'featured_image'        => _x('Event Image', 'Overrides the "Featured Image" phrase', 'dm-events'),
-            'set_featured_image'    => _x('Set event image', 'Overrides the "Set featured image" phrase', 'dm-events'),
-            'remove_featured_image' => _x('Remove event image', 'Overrides the "Remove featured image" phrase', 'dm-events'),
-            'use_featured_image'    => _x('Use as event image', 'Overrides the "Use as featured image" phrase', 'dm-events'),
-            'archives'              => _x('Event archives', 'The post type archive label', 'dm-events'),
-            'insert_into_item'      => _x('Insert into event', 'Overrides the "Insert into post" phrase', 'dm-events'),
-            'uploaded_to_this_item' => _x('Uploaded to this event', 'Overrides the "Uploaded to this post" phrase', 'dm-events'),
-            'filter_items_list'     => _x('Filter events list', 'Screen reader text for the filter links', 'dm-events'),
-            'items_list_navigation' => _x('Events list navigation', 'Screen reader text for the pagination', 'dm-events'),
-            'items_list'            => _x('Events list', 'Screen reader text for the items list', 'dm-events'),
+            'name'                  => _x('Events', 'Post type general name', 'datamachine-events'),
+            'singular_name'         => _x('Event', 'Post type singular name', 'datamachine-events'),
+            'menu_name'             => _x('Events', 'Admin Menu text', 'datamachine-events'),
+            'name_admin_bar'        => _x('Event', 'Add New on Toolbar', 'datamachine-events'),
+            'add_new'               => __('Add New', 'datamachine-events'),
+            'add_new_item'          => __('Add New Event', 'datamachine-events'),
+            'new_item'              => __('New Event', 'datamachine-events'),
+            'edit_item'             => __('Edit Event', 'datamachine-events'),
+            'view_item'             => __('View Event', 'datamachine-events'),
+            'all_items'             => __('All Events', 'datamachine-events'),
+            'search_items'          => __('Search Events', 'datamachine-events'),
+            'parent_item_colon'     => __('Parent Events:', 'datamachine-events'),
+            'not_found'             => __('No events found.', 'datamachine-events'),
+            'not_found_in_trash'    => __('No events found in Trash.', 'datamachine-events'),
+            'featured_image'        => _x('Event Image', 'Overrides the "Featured Image" phrase', 'datamachine-events'),
+            'set_featured_image'    => _x('Set event image', 'Overrides the "Set featured image" phrase', 'datamachine-events'),
+            'remove_featured_image' => _x('Remove event image', 'Overrides the "Remove featured image" phrase', 'datamachine-events'),
+            'use_featured_image'    => _x('Use as event image', 'Overrides the "Use as featured image" phrase', 'datamachine-events'),
+            'archives'              => _x('Event archives', 'The post type archive label', 'datamachine-events'),
+            'insert_into_item'      => _x('Insert into event', 'Overrides the "Insert into post" phrase', 'datamachine-events'),
+            'uploaded_to_this_item' => _x('Uploaded to this event', 'Overrides the "Uploaded to this post" phrase', 'datamachine-events'),
+            'filter_items_list'     => _x('Filter events list', 'Screen reader text for the filter links', 'datamachine-events'),
+            'items_list_navigation' => _x('Events list navigation', 'Screen reader text for the pagination', 'datamachine-events'),
+            'items_list'            => _x('Events list', 'Screen reader text for the items list', 'datamachine-events'),
         );
 
         $args = array(
@@ -79,12 +79,12 @@ class Event_Post_Type {
                 'align-wide',
             ),
             'show_in_rest'       => true,
-            'rest_base'          => 'dm_events',
+            'rest_base'          => 'datamachine_events',
             'rest_controller_class' => 'WP_REST_Posts_Controller',
             'taxonomies'         => array(),
         );
 
-        register_post_type('dm_events', $args);
+        register_post_type('datamachine_events', $args);
         
         self::setup_admin_menu_control();
     }
@@ -100,9 +100,9 @@ class Event_Post_Type {
     public static function control_taxonomy_menus() {
         global $submenu;
         
-        $post_type_menu = 'edit.php?post_type=dm_events';
+        $post_type_menu = 'edit.php?post_type=datamachine_events';
         
-        $allowed_items = apply_filters('dm_events_post_type_menu_items', array(
+        $allowed_items = apply_filters('datamachine_events_post_type_menu_items', array(
             'venue' => true,
             'settings' => true
         ));
@@ -135,17 +135,17 @@ class Event_Post_Type {
     public static function filter_parent_file($parent_file) {
         global $current_screen;
 
-        if (!$current_screen || $current_screen->post_type !== 'dm_events') {
+        if (!$current_screen || $current_screen->post_type !== 'datamachine_events') {
             return $parent_file;
         }
 
-        $allowed_items = apply_filters('dm_events_post_type_menu_items', array(
+        $allowed_items = apply_filters('datamachine_events_post_type_menu_items', array(
             'venue' => true,
             'settings' => true
         ));
 
         if ($current_screen->taxonomy && !isset($allowed_items[$current_screen->taxonomy])) {
-            return 'edit.php?post_type=dm_events';
+            return 'edit.php?post_type=datamachine_events';
         }
 
         return $parent_file;
@@ -157,18 +157,18 @@ class Event_Post_Type {
     public static function filter_submenu_file($submenu_file) {
         global $current_screen;
         
-        if (!$current_screen || $current_screen->post_type !== 'dm_events') {
+        if (!$current_screen || $current_screen->post_type !== 'datamachine_events') {
             return $submenu_file;
         }
         
         if ($current_screen->taxonomy) {
-            $allowed_items = apply_filters('dm_events_post_type_menu_items', array(
+            $allowed_items = apply_filters('datamachine_events_post_type_menu_items', array(
                 'venue' => true,
                 'settings' => true
             ));
             
             if (isset($allowed_items[$current_screen->taxonomy])) {
-                return "edit-tags.php?taxonomy={$current_screen->taxonomy}&post_type=dm_events";
+                return "edit-tags.php?taxonomy={$current_screen->taxonomy}&post_type=datamachine_events";
             }
         }
         

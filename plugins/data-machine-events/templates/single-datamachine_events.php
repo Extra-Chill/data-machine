@@ -6,7 +6,7 @@
  * dm_events_after_single_event, dm_events_after_event_article, dm_events_related_events).
  * Renders breadcrumbs and taxonomy badges via plugin classes.
  *
- * @package DmEvents
+ * @package DataMachineEvents
  * @since 1.0.0
  */
 
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
 
 get_header();
 
-do_action('dm_events_before_single_event');
+do_action('datamachine_events_before_single_event');
 ?>
 
 <div id="primary" class="content-area">
@@ -24,12 +24,12 @@ do_action('dm_events_before_single_event');
 
         <?php while (have_posts()) : the_post(); ?>
 
-            <?php echo \DmEvents\Core\Breadcrumbs::render(get_the_ID()); ?>
+            <?php echo \DataMachineEvents\Core\Breadcrumbs::render(get_the_ID()); ?>
 
-            <article id="post-<?php the_ID(); ?>" <?php post_class('dm-event-single'); ?>>
+            <article id="post-<?php the_ID(); ?>" <?php post_class('datamachine-event-single'); ?>>
 
                 <header class="entry-header">
-                    <?php echo \DmEvents\Core\Taxonomy_Badges::render_taxonomy_badges(get_the_ID()); ?>
+                    <?php echo \DataMachineEvents\Core\Taxonomy_Badges::render_taxonomy_badges(get_the_ID()); ?>
                     <?php the_title('<h1 class="entry-title">', '</h1>'); ?>
                 </header>
 
@@ -38,13 +38,13 @@ do_action('dm_events_before_single_event');
                     the_content();
 
                     wp_link_pages(array(
-                        'before' => '<div class="page-links">' . esc_html__('Pages:', 'dm-events'),
+                        'before' => '<div class="page-links">' . esc_html__('Pages:', 'datamachine-events'),
                         'after'  => '</div>',
                     ));
                     ?>
                 </div>
 
-                <?php do_action('dm_events_after_event_article'); ?>
+                <?php do_action('datamachine_events_after_event_article'); ?>
 
                 <?php if (get_edit_post_link()) : ?>
                     <footer class="entry-footer">
@@ -52,7 +52,7 @@ do_action('dm_events_before_single_event');
                         edit_post_link(
                             sprintf(
                                 wp_kses(
-                                    __('Edit <span class="screen-reader-text">%s</span>', 'dm-events'),
+                                    __('Edit <span class="screen-reader-text">%s</span>', 'datamachine-events'),
                                     array(
                                         'span' => array(
                                             'class' => array(),
@@ -76,7 +76,7 @@ do_action('dm_events_before_single_event');
                     comments_template();
                 }
 
-                do_action('dm_events_related_events', get_the_ID());
+                do_action('datamachine_events_related_events', get_the_ID());
                 ?>
             </aside>
 
@@ -88,6 +88,6 @@ do_action('dm_events_before_single_event');
 <?php
 get_sidebar();
 
-do_action('dm_events_after_single_event');
+do_action('datamachine_events_after_single_event');
 
 get_footer();

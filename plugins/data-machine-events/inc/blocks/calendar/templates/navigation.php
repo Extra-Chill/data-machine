@@ -10,25 +10,34 @@
  */
 
 // Prevent direct access
-if (!defined('ABSPATH')) {
-    exit;
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
 }
 
-// Show Past Events button when viewing upcoming events and past events exist
-if (!$show_past && $past_events_count > 0) : ?>
-    <div class="dm-events-past-navigation">
-        <a href="<?php echo esc_url(add_query_arg('past', '1', remove_query_arg('paged'))); ?>" class="dm-events-past-btn">
-            <?php _e('← Past Events', 'dm-events'); ?>
-        </a>
-    </div>
+// Preserve all GET parameters except 'paged' and 'past'
+$get_params = isset( $_GET ) ? array_map( 'sanitize_text_field', wp_unslash( $_GET ) ) : array();
+unset( $get_params['paged'] );
+unset( $get_params['past'] );
 
-<?php 
-// Show Upcoming Events button when viewing past events and future events exist
-elseif ($show_past && $future_events_count > 0) : ?>
-    <div class="dm-events-past-navigation">
-        <a href="<?php echo esc_url(remove_query_arg(['past', 'paged'])); ?>" class="dm-events-upcoming-btn">
-            <?php _e('Upcoming Events →', 'dm-events'); ?>
-        </a>
-    </div>
+// Show Past Events button when viewing upcoming events and past events exist
+if ( ! $show_past && $past_events_count > 0 ) :
+	$past_url = add_query_arg( array_merge( $get_params, array( 'past' => '1' ) ) );
+	?>
+	<div class="datamachine-events-past-navigation">
+		<a href="<?php echo esc_url( $past_url ); ?>" class="datamachine-events-past-btn">
+			<?php esc_html_e( '← Past Events', 'datamachine-events' ); ?>
+		</a>
+	</div>
+
+	<?php
+	// Show Upcoming Events button when viewing past events and future events exist
+elseif ( $show_past && $future_events_count > 0 ) :
+	$upcoming_url = add_query_arg( $get_params );
+	?>
+	<div class="datamachine-events-past-navigation">
+		<a href="<?php echo esc_url( $upcoming_url ); ?>" class="datamachine-events-upcoming-btn">
+			<?php esc_html_e( 'Upcoming Events →', 'datamachine-events' ); ?>
+		</a>
+	</div>
 
 <?php endif; ?>

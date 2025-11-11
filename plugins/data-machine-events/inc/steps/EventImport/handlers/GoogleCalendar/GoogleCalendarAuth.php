@@ -6,11 +6,11 @@
  * Since public calendars don't require authentication, this provider
  * mainly validates URLs and provides connection testing.
  *
- * @package DmEvents\Steps\EventImport\Handlers\GoogleCalendar
+ * @package DataMachineEvents\Steps\EventImport\Handlers\GoogleCalendar
  * @since 1.0.0
  */
 
-namespace DmEvents\Steps\EventImport\Handlers\GoogleCalendar;
+namespace DataMachineEvents\Steps\EventImport\Handlers\GoogleCalendar;
 
 // Prevent direct access
 if (!defined('ABSPATH')) {
@@ -48,8 +48,8 @@ class GoogleCalendarAuth {
         return [
             'test_url' => [
                 'type' => 'text',
-                'label' => __('Test Calendar URL', 'dm-events'),
-                'description' => __('Enter a public Google Calendar .ics URL to test the connection.', 'dm-events'),
+                'label' => __('Test Calendar URL', 'datamachine-events'),
+                'description' => __('Enter a public Google Calendar .ics URL to test the connection.', 'datamachine-events'),
                 'placeholder' => 'https://calendar.google.com/calendar/ical/example@gmail.com/public/basic.ics',
                 'value' => $current_config['test_url'] ?? '',
                 'validation' => [
@@ -74,7 +74,7 @@ class GoogleCalendarAuth {
         if (empty($test_url)) {
             return [
                 'success' => false,
-                'message' => __('Please enter a calendar URL to test.', 'dm-events')
+                'message' => __('Please enter a calendar URL to test.', 'datamachine-events')
             ];
         }
 
@@ -82,7 +82,7 @@ class GoogleCalendarAuth {
         if (!filter_var($test_url, FILTER_VALIDATE_URL)) {
             return [
                 'success' => false,
-                'message' => __('Invalid URL format.', 'dm-events')
+                'message' => __('Invalid URL format.', 'datamachine-events')
             ];
         }
 
@@ -99,7 +99,7 @@ class GoogleCalendarAuth {
             return [
                 'success' => false,
                 'message' => sprintf(
-                    __('Connection failed: %s', 'dm-events'),
+                    __('Connection failed: %s', 'datamachine-events'),
                     $response->get_error_message()
                 )
             ];
@@ -110,7 +110,7 @@ class GoogleCalendarAuth {
             return [
                 'success' => false,
                 'message' => sprintf(
-                    __('HTTP error %d: Unable to access calendar.', 'dm-events'),
+                    __('HTTP error %d: Unable to access calendar.', 'datamachine-events'),
                     $status_code
                 )
             ];
@@ -120,7 +120,7 @@ class GoogleCalendarAuth {
         if (empty($body)) {
             return [
                 'success' => false,
-                'message' => __('Calendar URL returned empty content.', 'dm-events')
+                'message' => __('Calendar URL returned empty content.', 'datamachine-events')
             ];
         }
 
@@ -128,7 +128,7 @@ class GoogleCalendarAuth {
         if (!str_contains($body, 'BEGIN:VCALENDAR')) {
             return [
                 'success' => false,
-                'message' => __('URL does not contain valid calendar data.', 'dm-events')
+                'message' => __('URL does not contain valid calendar data.', 'datamachine-events')
             ];
         }
 
@@ -143,12 +143,12 @@ class GoogleCalendarAuth {
                 return [
                     'success' => true,
                     'message' => sprintf(
-                        __('Connection successful! Found %d events in the calendar.', 'dm-events'),
+                        __('Connection successful! Found %d events in the calendar.', 'datamachine-events'),
                         $event_count
                     ),
                     'data' => [
                         'event_count' => $event_count,
-                        'calendar_name' => $ical->calendarName() ?? __('Unknown Calendar', 'dm-events')
+                        'calendar_name' => $ical->calendarName() ?? __('Unknown Calendar', 'datamachine-events')
                     ]
                 ];
             }
@@ -156,7 +156,7 @@ class GoogleCalendarAuth {
             return [
                 'success' => false,
                 'message' => sprintf(
-                    __('Calendar parsing failed: %s', 'dm-events'),
+                    __('Calendar parsing failed: %s', 'datamachine-events'),
                     $e->getMessage()
                 )
             ];
@@ -165,7 +165,7 @@ class GoogleCalendarAuth {
         // Fallback success if iCal library not available
         return [
             'success' => true,
-            'message' => __('Calendar URL is accessible and contains calendar data.', 'dm-events')
+            'message' => __('Calendar URL is accessible and contains calendar data.', 'datamachine-events')
         ];
     }
 
@@ -194,8 +194,8 @@ class GoogleCalendarAuth {
      */
     public function get_provider_info(): array {
         return [
-            'name' => __('Google Calendar (Public)', 'dm-events'),
-            'description' => __('Access public Google Calendar feeds via .ics URLs', 'dm-events'),
+            'name' => __('Google Calendar (Public)', 'datamachine-events'),
+            'description' => __('Access public Google Calendar feeds via .ics URLs', 'datamachine-events'),
             'icon' => 'calendar',
             'color' => '#4285f4',
             'auth_type' => 'url_based',

@@ -1,7 +1,7 @@
 /* Carousel List Display Styles - Targets Universal Template Classes */
 
 /* Override Circuit Grid Layout - Only when carousel is loaded */
-.dm-events-calendar.dm-events-date-grouped .dm-events-content {
+.datamachine-events-calendar.datamachine-events-date-grouped .datamachine-events-content {
     display: block; /* Remove CSS Grid layout */
     grid-template-columns: none;
     grid-auto-rows: none;
@@ -10,24 +10,24 @@
 }
 
 /* Hide Circuit Grid border overlay for carousel display */
-.dm-events-calendar .dm-border-overlay {
+.datamachine-events-calendar .datamachine-border-overlay {
     display: none;
 }
 
 /* Date Group - Non-scrolling Container with Fixed Header */
-.dm-events-calendar .dm-date-group {
+.datamachine-events-calendar .datamachine-date-group {
     /* Override circuit-grid display: contents */
     display: block;
     margin-bottom: 1.25rem;
-    border-radius: var(--dm-border-radius);
-    border: 1px solid var(--dm-border-light);
-    border-color: var(--dm-border-light);
+    border-radius: var(--datamachine-border-radius);
+    border: 1px solid var(--datamachine-border-light);
+    border-color: var(--datamachine-border-light);
     position: relative;
     padding-top: 40px; /* Space for static header that doesn't scroll */
 }
 
 /* Events Container - The actual scrolling area */
-.dm-events-calendar .dm-date-group .dm-events-wrapper {
+.datamachine-events-calendar .datamachine-date-group .datamachine-events-wrapper {
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;
@@ -42,7 +42,7 @@
 }
 
 /* Date Group Header */
-.dm-events-calendar .dm-date-group::before {
+.datamachine-events-calendar .datamachine-date-group::before {
     content: '';
     position: absolute;
     top: 0;
@@ -53,7 +53,7 @@
 }
 
 /* Day Badge Positioning for Carousel - Static in Header Area */
-.dm-events-calendar .dm-day-badge {
+.datamachine-events-calendar .datamachine-day-badge {
     /* Override circuit-grid absolute positioning */
     position: absolute;
     top: 15px;
@@ -65,17 +65,17 @@
 }
 
 /* Hide scrollbar but maintain functionality */
-.dm-events-calendar .dm-events-wrapper::-webkit-scrollbar {
+.datamachine-events-calendar .datamachine-events-wrapper::-webkit-scrollbar {
     display: none;
 }
 
-.dm-events-calendar .dm-events-wrapper {
+.datamachine-events-calendar .datamachine-events-wrapper {
     -ms-overflow-style: none;
     scrollbar-width: none;
 }
 
 /* Event Items - Horizontal Scroll Layout */
-.dm-events-calendar .dm-event-item {
+.datamachine-events-calendar .datamachine-event-item {
     flex: 0 0 auto; /* Let content determine width */
     /* Override any grid positioning from circuit-grid */
     position: static;
@@ -84,38 +84,38 @@
 
 
 /* Day-specific event item backgrounds with 0.15 opacity */
-.dm-events-calendar .dm-day-sunday .dm-event-item {
-    background: rgba(255, 107, 107, 0.15); /* --dm-day-sunday with 0.15 alpha */
+.datamachine-events-calendar .datamachine-day-sunday .datamachine-event-item {
+    background: rgba(255, 107, 107, 0.15); /* --datamachine-day-sunday with 0.15 alpha */
 }
 
-.dm-events-calendar .dm-day-monday .dm-event-item {
-    background: rgba(78, 205, 196, 0.15); /* --dm-day-monday with 0.15 alpha */
+.datamachine-events-calendar .datamachine-day-monday .datamachine-event-item {
+    background: rgba(78, 205, 196, 0.15); /* --datamachine-day-monday with 0.15 alpha */
 }
 
-.dm-events-calendar .dm-day-tuesday .dm-event-item {
-    background: rgba(69, 183, 209, 0.15); /* --dm-day-tuesday with 0.15 alpha */
+.datamachine-events-calendar .datamachine-day-tuesday .datamachine-event-item {
+    background: rgba(69, 183, 209, 0.15); /* --datamachine-day-tuesday with 0.15 alpha */
 }
 
-.dm-events-calendar .dm-day-wednesday .dm-event-item {
-    background: rgba(150, 206, 180, 0.15); /* --dm-day-wednesday with 0.15 alpha */
+.datamachine-events-calendar .datamachine-day-wednesday .datamachine-event-item {
+    background: rgba(150, 206, 180, 0.15); /* --datamachine-day-wednesday with 0.15 alpha */
 }
 
-.dm-events-calendar .dm-day-thursday .dm-event-item {
-    background: rgba(254, 202, 87, 0.15); /* --dm-day-thursday with 0.15 alpha */
+.datamachine-events-calendar .datamachine-day-thursday .datamachine-event-item {
+    background: rgba(254, 202, 87, 0.15); /* --datamachine-day-thursday with 0.15 alpha */
 }
 
-.dm-events-calendar .dm-day-friday .dm-event-item {
-    background: rgba(255, 159, 243, 0.15); /* --dm-day-friday with 0.15 alpha */
+.datamachine-events-calendar .datamachine-day-friday .datamachine-event-item {
+    background: rgba(255, 159, 243, 0.15); /* --datamachine-day-friday with 0.15 alpha */
 }
 
-.dm-events-calendar .dm-day-saturday .dm-event-item {
-    background: rgba(84, 160, 255, 0.15); /* --dm-day-saturday with 0.15 alpha */
+.datamachine-events-calendar .datamachine-day-saturday .datamachine-event-item {
+    background: rgba(84, 160, 255, 0.15); /* --datamachine-day-saturday with 0.15 alpha */
 }
 
 /* No hover/focus styling - let universal templates handle this */
 
 /* Event Card Content - Layout Only */
-.dm-events-calendar .dm-event-card-body {
+.datamachine-events-calendar .dm-event-card-body {
     flex: 1;
 }
 
@@ -124,16 +124,16 @@
 /* Day-specific styling removed - let universal templates handle day colors */
 
 /* Hidden elements */
-.dm-events-calendar .dm-date-group.hidden {
+.datamachine-events-calendar .datamachine-date-group.hidden {
     display: none;
 }
 
-.dm-events-calendar .dm-event-item.hidden {
+.datamachine-events-calendar .datamachine-event-item.hidden {
     display: none;
 }
 
 /* Scroll Indicators - Visual feedback for scrollable content */
-.dm-events-calendar .dm-date-group::after {
+.datamachine-events-calendar .datamachine-date-group::after {
     content: '';
     position: absolute;
     top: 60px; /* Below header */
@@ -145,35 +145,35 @@
     transition: opacity 0.3s ease;
     pointer-events: none;
     z-index: 3;
-    border-radius: 0 0 var(--dm-border-radius) 0;
+    border-radius: 0 0 var(--datamachine-border-radius) 0;
 }
 
-.dm-events-calendar .dm-date-group[data-scroll-right="true"]::after {
+.datamachine-events-calendar .datamachine-date-group[data-scroll-right="true"]::after {
     opacity: 1;
 }
 
 /* Left scroll indicator - using a separate pseudo element approach */
-.dm-events-calendar .dm-date-group[data-scroll-left="true"] {
+.datamachine-events-calendar .datamachine-date-group[data-scroll-left="true"] {
     position: relative;
 }
 
-.dm-events-calendar .dm-date-group[data-scroll-left="true"]::before {
+.datamachine-events-calendar .datamachine-date-group[data-scroll-left="true"]::before {
     background:
         linear-gradient(to right, rgba(0, 0, 0, 0.1) 0%, transparent 20px),
-        var(--dm-background-secondary, #f1f5f9);
+        var(--datamachine-background-secondary, #f1f5f9);
 }
 
 /* Mobile Responsive for Carousel - Layout Only */
 @media (max-width: 768px) {
-    .dm-events-calendar .dm-date-group {
+    .datamachine-events-calendar .datamachine-date-group {
         gap: 1rem;
     }
 
-    .dm-events-calendar .dm-event-item {
+    .datamachine-events-calendar .datamachine-event-item {
         /* No fixed width - let content determine */
     }
 
-    .dm-events-calendar .dm-day-badge {
+    .datamachine-events-calendar .datamachine-day-badge {
         left: 1rem;
         top: 12px;
         margin-top: 4px;
@@ -182,14 +182,14 @@
 
 /* Small Mobile Adjustments - Layout Only */
 @media (max-width: 480px) {
-    .dm-events-calendar .dm-date-group {
+    .datamachine-events-calendar .datamachine-date-group {
     }
 
-    .dm-events-calendar .dm-event-item {
+    .datamachine-events-calendar .datamachine-event-item {
         /* No fixed width - let content determine */
     }
 
-    .dm-events-calendar .dm-day-badge {
+    .datamachine-events-calendar .datamachine-day-badge {
         left: 0.75rem;
         top: 10px;
         margin-top: 4px;
@@ -201,49 +201,49 @@
    ================================ */
 
 /* Additional scroll indicator styles for carousel mode */
-.dm-events-calendar .dm-date-group[data-scroll-left="true"]::before {
+.datamachine-events-calendar .datamachine-date-group[data-scroll-left="true"]::before {
     background: linear-gradient(
         to right,
-        var(--dm-scroll-gradient-color) 0%,
+        var(--datamachine-scroll-gradient-color) 0%,
         transparent 100%
     ),
-    var(--dm-background-secondary, #f1f5f9);
-    opacity: var(--dm-scroll-gradient-opacity);
-    transition: var(--dm-scroll-gradient-transition);
+    var(--datamachine-background-secondary, #f1f5f9);
+    opacity: var(--datamachine-scroll-gradient-opacity);
+    transition: var(--datamachine-scroll-gradient-transition);
 }
 
-.dm-events-calendar .dm-date-group[data-scroll-right="true"]::after {
+.datamachine-events-calendar .datamachine-date-group[data-scroll-right="true"]::after {
     background: linear-gradient(
         to left,
-        var(--dm-scroll-gradient-color) 0%,
+        var(--datamachine-scroll-gradient-color) 0%,
         transparent 100%
     );
-    opacity: var(--dm-scroll-gradient-opacity);
-    transition: var(--dm-scroll-gradient-transition);
+    opacity: var(--datamachine-scroll-gradient-opacity);
+    transition: var(--datamachine-scroll-gradient-transition);
 }
 
 /* Smooth fade in/out when scroll indicators appear/disappear */
-.dm-events-calendar .dm-date-group[data-scroll-left="false"]::before {
+.datamachine-events-calendar .datamachine-date-group[data-scroll-left="false"]::before {
     opacity: 0;
 }
 
-.dm-events-calendar .dm-date-group[data-scroll-right="false"]::after {
+.datamachine-events-calendar .datamachine-date-group[data-scroll-right="false"]::after {
     opacity: 0;
 }
 
 /* Alternative class-based approach for better performance (optional) */
-.dm-events-calendar .dm-date-group.dm-scroll-left-active::before {
-    opacity: var(--dm-scroll-gradient-opacity);
+.datamachine-events-calendar .datamachine-date-group.dm-scroll-left-active::before {
+    opacity: var(--datamachine-scroll-gradient-opacity);
 }
 
-.dm-events-calendar .dm-date-group.dm-scroll-right-active::after {
-    opacity: var(--dm-scroll-gradient-opacity);
+.datamachine-events-calendar .datamachine-date-group.dm-scroll-right-active::after {
+    opacity: var(--datamachine-scroll-gradient-opacity);
 }
 
-.dm-events-calendar .dm-date-group:not(.dm-scroll-left-active)::before {
+.datamachine-events-calendar .datamachine-date-group:not(.dm-scroll-left-active)::before {
     opacity: 0;
 }
 
-.dm-events-calendar .dm-date-group:not(.dm-scroll-right-active)::after {
+.datamachine-events-calendar .datamachine-date-group:not(.dm-scroll-right-active)::after {
     opacity: 0;
 }

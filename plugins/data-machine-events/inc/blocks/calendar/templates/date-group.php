@@ -23,8 +23,8 @@ if (!defined('ABSPATH')) {
  * Note: The closing </div> is handled separately in the render.php loop.
  */
 ?>
-<div class="dm-date-group dm-day-<?php echo esc_attr($day_of_week); ?>" data-date="<?php echo esc_attr($date_obj->format('Y-m-d')); ?>">
-    <div class="dm-day-badge dm-day-badge-<?php echo esc_attr($day_of_week); ?>" 
+<div class="datamachine-date-group datamachine-day-<?php echo esc_attr($day_of_week); ?>" data-date="<?php echo esc_attr($date_obj->format('Y-m-d')); ?>">
+    <div class="datamachine-day-badge datamachine-day-badge-<?php echo esc_attr($day_of_week); ?>" 
          data-date-label="<?php echo esc_attr($formatted_date_label); ?>" 
          data-day-name="<?php echo esc_attr($day_of_week); ?>">
         <?php echo esc_html($formatted_date_label); ?>

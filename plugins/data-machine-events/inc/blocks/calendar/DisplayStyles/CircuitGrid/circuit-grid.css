@@ -1,7 +1,7 @@
 /* Circuit Grid Display Styles */
 
 /* Border Overlay SVG */
-.dm-border-overlay {
+.datamachine-border-overlay {
     position: absolute;
     top: 0;
     left: 0;
@@ -13,129 +13,129 @@
 }
 
 /* Day Border Colors */
-.dm-border-sunday,
-.dm-border-group-sunday { stroke: var(--dm-day-sunday); }
-.dm-border-monday,
-.dm-border-group-monday { stroke: var(--dm-day-monday); }
-.dm-border-tuesday,
-.dm-border-group-tuesday { stroke: var(--dm-day-tuesday); }
-.dm-border-wednesday,
-.dm-border-group-wednesday { stroke: var(--dm-day-wednesday); }
-.dm-border-thursday,
-.dm-border-group-thursday { stroke: var(--dm-day-thursday); }
-.dm-border-friday,
-.dm-border-group-friday { stroke: var(--dm-day-friday); }
-.dm-border-saturday,
-.dm-border-group-saturday { stroke: var(--dm-day-saturday); }
+.datamachine-border-sunday,
+.datamachine-border-group-sunday { stroke: var(--datamachine-day-sunday); }
+.datamachine-border-monday,
+.datamachine-border-group-monday { stroke: var(--datamachine-day-monday); }
+.datamachine-border-tuesday,
+.datamachine-border-group-tuesday { stroke: var(--datamachine-day-tuesday); }
+.datamachine-border-wednesday,
+.datamachine-border-group-wednesday { stroke: var(--datamachine-day-wednesday); }
+.datamachine-border-thursday,
+.datamachine-border-group-thursday { stroke: var(--datamachine-day-thursday); }
+.datamachine-border-friday,
+.datamachine-border-group-friday { stroke: var(--datamachine-day-friday); }
+.datamachine-border-saturday,
+.datamachine-border-group-saturday { stroke: var(--datamachine-day-saturday); }
 
 /* Circuit Grid Layout */
-.dm-events-calendar.dm-events-date-grouped .dm-events-content {
+.datamachine-events-calendar.datamachine-events-date-grouped .datamachine-events-content {
     position: relative;
     display: grid;
-    grid-template-columns: repeat(auto-fill, var(--dm-grid-cell-width));
-    grid-auto-rows: var(--dm-grid-cell-height);
-    gap: var(--dm-grid-gap);
+    grid-template-columns: repeat(auto-fill, var(--datamachine-grid-cell-width));
+    grid-auto-rows: var(--datamachine-grid-cell-height);
+    gap: var(--datamachine-grid-gap);
     justify-content: center;
     z-index: 2;
 }
 
 /* Date Group Containers - Make invisible to grid layout */
-.dm-date-group {
+.datamachine-date-group {
     display: contents; /* Makes wrapper invisible to CSS Grid layout */
 }
 
 /* Events Wrapper - Also make invisible to allow direct event item grid participation */
-.dm-events-wrapper {
+.datamachine-events-wrapper {
     display: contents; /* Makes events wrapper invisible to CSS Grid layout */
 }
 
 /* Circuit Grid Badge Positioning */
-.dm-day-badge {
+.datamachine-day-badge {
     position: absolute;
     top: 0;
     left: 0;
-    z-index: var(--dm-badge-z-index);
+    z-index: var(--datamachine-badge-z-index);
     opacity: 0;
     transform: translateY(-50%);
     pointer-events: none;
 }
 
-.dm-day-badge.positioned {
+.datamachine-day-badge.positioned {
     opacity: 1;
 }
 
 /* Default Date Group Styling */
-.dm-date-group {
-    border-color: var(--dm-border-default);
+.datamachine-date-group {
+    border-color: var(--datamachine-border-default);
 }
 
 /* Day-specific Date Group Border Colors */
-.dm-date-group.dm-day-sunday {
-    border-color: var(--dm-day-sunday);
+.datamachine-date-group.datamachine-day-sunday {
+    border-color: var(--datamachine-day-sunday);
 }
 
-.dm-date-group.dm-day-monday {
-    border-color: var(--dm-day-monday);
+.datamachine-date-group.datamachine-day-monday {
+    border-color: var(--datamachine-day-monday);
 }
 
-.dm-date-group.dm-day-tuesday {
-    border-color: var(--dm-day-tuesday);
+.datamachine-date-group.datamachine-day-tuesday {
+    border-color: var(--datamachine-day-tuesday);
 }
 
-.dm-date-group.dm-day-wednesday {
-    border-color: var(--dm-day-wednesday);
+.datamachine-date-group.datamachine-day-wednesday {
+    border-color: var(--datamachine-day-wednesday);
 }
 
-.dm-date-group.dm-day-thursday {
-    border-color: var(--dm-day-thursday);
+.datamachine-date-group.datamachine-day-thursday {
+    border-color: var(--datamachine-day-thursday);
 }
 
-.dm-date-group.dm-day-friday {
-    border-color: var(--dm-day-friday);
+.datamachine-date-group.datamachine-day-friday {
+    border-color: var(--datamachine-day-friday);
 }
 
-.dm-date-group.dm-day-saturday {
-    border-color: var(--dm-day-saturday);
+.datamachine-date-group.datamachine-day-saturday {
+    border-color: var(--datamachine-day-saturday);
 }
 
 
 
 /* Circuit Grid Hover States - Override universal styles for grid-specific effects */
-.dm-events-content .dm-event-item:hover {
+.datamachine-events-content .datamachine-event-item:hover {
     background: rgba(255, 255, 255, 0.2);
-    border-color: var(--dm-card-hover-border);
-    box-shadow: var(--dm-card-hover-shadow);
+    border-color: var(--datamachine-card-hover-border);
+    box-shadow: var(--datamachine-card-hover-shadow);
     transform: translateY(-1px);
 }
 
 /* Circuit Grid SVG Border Styling */
-.dm-border-overlay path {
+.datamachine-border-overlay path {
     stroke-width: 3.25px;
     stroke-dasharray: none;
 }
 
 /* Hidden Date Groups */
-.dm-date-group.hidden {
+.datamachine-date-group.hidden {
     display: none;
 }
 
 /* Responsive Circuit Grid */
 @media (min-width: 1200px) {
-    .dm-events-calendar.dm-events-date-grouped .dm-events-content {
-        grid-template-columns: repeat(auto-fill, var(--dm-grid-cell-width));
-        grid-auto-rows: var(--dm-grid-cell-height);
-        gap: var(--dm-grid-gap);
+    .datamachine-events-calendar.datamachine-events-date-grouped .datamachine-events-content {
+        grid-template-columns: repeat(auto-fill, var(--datamachine-grid-cell-width));
+        grid-auto-rows: var(--datamachine-grid-cell-height);
+        gap: var(--datamachine-grid-gap);
     }
 }
 
 @media (max-width: 768px) {
-    .dm-events-calendar.dm-events-date-grouped .dm-events-content {
+    .datamachine-events-calendar.datamachine-events-date-grouped .datamachine-events-content {
         grid-template-columns: 1fr;
-        grid-auto-rows: var(--dm-grid-cell-height-mobile);
-        gap: var(--dm-grid-gap);
+        grid-auto-rows: var(--datamachine-grid-cell-height-mobile);
+        gap: var(--datamachine-grid-gap);
     }
     
-    .dm-date-group {
+    .datamachine-date-group {
         padding: 0;
     }
 }

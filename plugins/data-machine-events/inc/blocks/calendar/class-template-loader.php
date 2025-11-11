@@ -6,10 +6,10 @@
  * pagination, navigation, no-events, filter-bar) plus modal subdirectory with
  * variable extraction, output buffering, and template caching.
  *
- * @package DmEvents\Blocks\Calendar
+ * @package DataMachineEvents\Blocks\Calendar
  */
 
-namespace DmEvents\Blocks\Calendar;
+namespace DataMachineEvents\Blocks\Calendar;
 
 if (!defined('ABSPATH')) {
     exit;

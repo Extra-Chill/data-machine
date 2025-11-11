@@ -5,11 +5,11 @@
  * Defines settings fields and sanitization for Google Calendar event import handler.
  * Part of the modular handler architecture for Data Machine integration.
  *
- * @package DmEvents\Steps\EventImport\Handlers\GoogleCalendar
+ * @package DataMachineEvents\Steps\EventImport\Handlers\GoogleCalendar
  * @since 1.0.0
  */
 
-namespace DmEvents\Steps\EventImport\Handlers\GoogleCalendar;
+namespace DataMachineEvents\Steps\EventImport\Handlers\GoogleCalendar;
 
 // Prevent direct access
 if (!defined('ABSPATH')) {
@@ -44,8 +44,8 @@ class GoogleCalendarSettings {
         return [
             'calendar_url' => [
                 'type' => 'text',
-                'label' => __('Calendar URL', 'dm-events'),
-                'description' => __('Public Google Calendar .ics feed URL (e.g., https://calendar.google.com/calendar/ical/[calendar-id]/public/basic.ics)', 'dm-events'),
+                'label' => __('Calendar URL', 'datamachine-events'),
+                'description' => __('Public Google Calendar .ics feed URL (e.g., https://calendar.google.com/calendar/ical/[calendar-id]/public/basic.ics)', 'datamachine-events'),
                 'placeholder' => 'https://calendar.google.com/calendar/ical/example@gmail.com/public/basic.ics',
                 'value' => $current_config['calendar_url'] ?? '',
                 'required' => true,
@@ -56,15 +56,15 @@ class GoogleCalendarSettings {
             ],
             'future_events_only' => [
                 'type' => 'checkbox',
-                'label' => __('Future Events Only', 'dm-events'),
-                'description' => __('Only import events that start in the future. Past events will be skipped.', 'dm-events'),
+                'label' => __('Future Events Only', 'datamachine-events'),
+                'description' => __('Only import events that start in the future. Past events will be skipped.', 'datamachine-events'),
                 'value' => $current_config['future_events_only'] ?? true,
                 'default' => true
             ],
             'event_limit' => [
                 'type' => 'number',
-                'label' => __('Event Limit', 'dm-events'),
-                'description' => __('Maximum number of events to process per execution. Leave empty for no limit.', 'dm-events'),
+                'label' => __('Event Limit', 'datamachine-events'),
+                'description' => __('Maximum number of events to process per execution. Leave empty for no limit.', 'datamachine-events'),
                 'placeholder' => '50',
                 'value' => $current_config['event_limit'] ?? 50,
                 'min' => 1,
@@ -123,17 +123,17 @@ class GoogleCalendarSettings {
 
         // Validate calendar URL
         if (empty($config['calendar_url'])) {
-            $errors['calendar_url'] = __('Calendar URL is required.', 'dm-events');
+            $errors['calendar_url'] = __('Calendar URL is required.', 'datamachine-events');
         } elseif (!filter_var($config['calendar_url'], FILTER_VALIDATE_URL)) {
-            $errors['calendar_url'] = __('Please enter a valid URL.', 'dm-events');
+            $errors['calendar_url'] = __('Please enter a valid URL.', 'datamachine-events');
         } elseif (!str_ends_with($config['calendar_url'], '.ics') && !str_contains($config['calendar_url'], 'calendar.google.com')) {
-            $errors['calendar_url'] = __('URL must be a valid .ics calendar feed or Google Calendar URL.', 'dm-events');
+            $errors['calendar_url'] = __('URL must be a valid .ics calendar feed or Google Calendar URL.', 'datamachine-events');
         }
 
         // Validate event limit
         $event_limit = intval($config['event_limit'] ?? 0);
         if ($event_limit < 1 || $event_limit > 200) {
-            $errors['event_limit'] = __('Event limit must be between 1 and 200.', 'dm-events');
+            $errors['event_limit'] = __('Event limit must be between 1 and 200.', 'datamachine-events');
         }
 
         return [
@@ -149,8 +149,8 @@ class GoogleCalendarSettings {
      */
     public function get_handler_info(): array {
         return [
-            'name' => __('Google Calendar', 'dm-events'),
-            'description' => __('Import events from public Google Calendar .ics feeds', 'dm-events'),
+            'name' => __('Google Calendar', 'datamachine-events'),
+            'description' => __('Import events from public Google Calendar .ics feeds', 'datamachine-events'),
             'icon' => 'calendar-alt',
             'color' => '#4285f4',
             'supports' => [

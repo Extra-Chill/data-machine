@@ -4,7 +4,7 @@
  * Provides address autocomplete functionality using OpenStreetMap's Nominatim API.
  * Complies with Nominatim usage policy: 1 request per second maximum.
  *
- * @package DmEvents
+ * @package DataMachineEvents
  * @since 1.0.0
  */
 
@@ -15,7 +15,7 @@
     const NOMINATIM_API = 'https://nominatim.openstreetmap.org/search';
     const USER_AGENT = 'ExtraChill-Events/1.0 (https://extrachill.com)';
     const DEBOUNCE_DELAY = 1000; // 1 second (Nominatim usage policy)
-    const CACHE_KEY = 'dm_events_venue_autocomplete_cache';
+    const CACHE_KEY = 'datamachine_events_venue_autocomplete_cache';
     const CACHE_EXPIRY = 3600000; // 1 hour in milliseconds
 
     let debounceTimer = null;
@@ -422,7 +422,7 @@
     function addAttributionNotice() {
         // Wait for modal to be present in DOM
         const checkModal = setInterval(() => {
-            const settingsContainer = document.querySelector('.dm-settings-fields');
+            const settingsContainer = document.querySelector('.datamachine-settings-fields');
 
             if (settingsContainer) {
                 clearInterval(checkModal);
@@ -462,11 +462,11 @@
     }
 
     // Re-initialize when modal opens (for dynamic content)
-    document.addEventListener('dm-core-modal-content-loaded', init);
+    document.addEventListener('datamachine-core-modal-content-loaded', init);
 
     // Also try jQuery event if available (Data Machine might use it)
     if (window.jQuery) {
-        jQuery(document).on('dm-core-modal-content-loaded', init);
+        jQuery(document).on('datamachine-core-modal-content-loaded', init);
     }
 
 })();

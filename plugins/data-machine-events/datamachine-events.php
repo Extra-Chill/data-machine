@@ -1,14 +1,14 @@
 <?php
 /**
  * Plugin Name: Data Machine Events
- * Plugin URI: https://chubes.net/dm-events
+ * Plugin URI: https://chubes.net/datamachine-events
  * Description: WordPress events plugin with block-first architecture. Features AI-driven event creation via Data Machine integration, Event Details blocks for data storage, Calendar blocks for display, and venue taxonomy management.
  * Version: 0.1.0
  * Author: Chris Huber
  * Author URI: https://chubes.net
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: dm-events
+  * Text Domain: datamachine-events
  * Domain Path: /languages
  * Requires at least: 6.0
  * Tested up to: 6.4
@@ -16,7 +16,7 @@
  * Requires Plugins: data-machine
  * Network: false
  *
- * @package DmEvents
+ * @package DatamachineEvents
  * @author Chris Huber
  * @since 1.0.0
  */
@@ -28,29 +28,35 @@ if (!defined('ABSPATH')) {
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once __DIR__ . '/vendor/autoload.php';
 }
-define('DM_EVENTS_VERSION', '1.0.0');
-define('DM_EVENTS_PLUGIN_FILE', __FILE__);
-define('DM_EVENTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
-define('DM_EVENTS_PLUGIN_URL', plugin_dir_url(__FILE__));
-define('DM_EVENTS_PLUGIN_BASENAME', plugin_basename(__FILE__));
-define('DM_EVENTS_PATH', plugin_dir_path(__FILE__));
+define('DATAMACHINE_EVENTS_VERSION', '0.1.0');
+define('DATAMACHINE_EVENTS_PLUGIN_FILE', __FILE__);
+define('DATAMACHINE_EVENTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
+define('DATAMACHINE_EVENTS_PLUGIN_URL', plugin_dir_url(__FILE__));
+define('DATAMACHINE_EVENTS_PLUGIN_BASENAME', plugin_basename(__FILE__));
+define('DATAMACHINE_EVENTS_PATH', plugin_dir_path(__FILE__));
+
+// Load core meta storage (monitors Event Details block saves)
+require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/core/meta-storage.php';
+
+// Load REST API endpoints
+require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/core/rest-api.php';
 
 
 /**
  * PSR-4 Autoloader with special naming convention for Data Machine handlers
  * @param string $class_name Fully qualified class name
  */
-function dm_events_autoloader($class_name) {
-    if (strpos($class_name, 'DmEvents\\') !== 0) {
+function datamachine_events_autoloader($class_name) {
+    if (strpos($class_name, 'DataMachineEvents\\') !== 0) {
         return;
     }
-    $class_name = str_replace('DmEvents\\', '', $class_name);
+    $class_name = str_replace('DataMachineEvents\\', '', $class_name);
     $class_parts = explode('\\', $class_name);
     $actual_class = end($class_parts);
     $file_name = 'class-' . strtolower(str_replace('_', '-', $actual_class)) . '.php';
 
-    $dm_handlers = ['DmEventsSettings', 'DmEventsPublisher', 'DmEventsFilters', 'DmEventsVenue', 'DmEventsSchema'];
-    if (in_array($actual_class, $dm_handlers)) {
+    $datamachine_handlers = ['DataMachineEventsSettings', 'DataMachineEventsPublisher', 'DataMachineEventsFilters', 'DataMachineEventsVenue', 'DataMachineEventsSchema'];
+    if (in_array($actual_class, $datamachine_handlers)) {
         $file_name = $actual_class . '.php';
     }
 
@@ -64,21 +70,21 @@ function dm_events_autoloader($class_name) {
 
     foreach ($base_directories as $base_directory) {
         if (!empty($directory_path)) {
-            $file_path = DM_EVENTS_PLUGIN_DIR . $base_directory . '/' . $directory_path . $file_name;
+            $file_path = DATAMACHINE_EVENTS_PLUGIN_DIR . $base_directory . '/' . $directory_path . $file_name;
             if (file_exists($file_path)) {
                 require_once $file_path;
                 return;
             }
 
             $lowercase_directory_path = strtolower($directory_path);
-            $file_path = DM_EVENTS_PLUGIN_DIR . $base_directory . '/' . $lowercase_directory_path . $file_name;
+            $file_path = DATAMACHINE_EVENTS_PLUGIN_DIR . $base_directory . '/' . $lowercase_directory_path . $file_name;
             if (file_exists($file_path)) {
                 require_once $file_path;
                 return;
             }
         }
 
-        $file_path = DM_EVENTS_PLUGIN_DIR . $base_directory . '/' . $file_name;
+        $file_path = DATAMACHINE_EVENTS_PLUGIN_DIR . $base_directory . '/' . $file_name;
         if (file_exists($file_path)) {
             require_once $file_path;
             return;
@@ -86,7 +92,7 @@ function dm_events_autoloader($class_name) {
     }
 }
 
-spl_autoload_register('dm_events_autoloader');
+spl_autoload_register('datamachine_events_autoloader');
 
 /**
  * Main Data Machine Events plugin class
@@ -95,7 +101,7 @@ spl_autoload_register('dm_events_autoloader');
  *
  * @since 1.0.0
  */
-class DM_Events {
+class DATAMACHINE_Events {
     
     private static $instance = null;
     
@@ -111,8 +117,8 @@ class DM_Events {
         add_action('plugins_loaded', array($this, 'load_textdomain'));
 
         // Initialize settings page early to catch admin_init hook
-        if (is_admin() && class_exists('DmEvents\\Admin\\Settings_Page')) {
-            new \DmEvents\Admin\Settings_Page();
+        if (is_admin() && class_exists('DataMachineEvents\\Admin\\Settings_Page')) {
+            new \DataMachineEvents\Admin\Settings_Page();
         }
     }
     
@@ -130,39 +136,26 @@ class DM_Events {
         }
         
         $this->init_frontend();
-        add_action('init', array($this, 'init_data_machine_integration'), 25);
-        $this->init_status_detection();
+    add_action('init', array($this, 'init_data_machine_integration'), 25);
 
         // Initialize admin bar for all logged-in users
-        if (class_exists('DmEvents\\Admin\\Admin_Bar')) {
-            new \DmEvents\Admin\Admin_Bar();
+        if (class_exists('DataMachineEvents\\Admin\\Admin_Bar')) {
+            new \DataMachineEvents\Admin\Admin_Bar();
         }
     }
     
     private function init_hooks() {
-        register_activation_hook(DM_EVENTS_PLUGIN_FILE, array($this, 'activate'));
-        register_deactivation_hook(DM_EVENTS_PLUGIN_FILE, array($this, 'deactivate'));
+        register_activation_hook(DATAMACHINE_EVENTS_PLUGIN_FILE, array($this, 'activate'));
+        register_deactivation_hook(DATAMACHINE_EVENTS_PLUGIN_FILE, array($this, 'deactivate'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
     }
     
     private function init_admin() {
-        if (class_exists('DmEvents\\Admin')) {
-            new \DmEvents\Admin();
-        }
+        // Admin components are bootstrapped individually where required.
     }
     
     private function init_frontend() {
         add_filter('template_include', array($this, 'load_event_templates'));
-    }
-    
-    private function init_status_detection() {
-        if (!function_exists('apply_filters') || !has_filter('dm_detect_status')) {
-            return;
-        }
-        
-        if (class_exists('DmEvents\\Admin\\Status_Detection')) {
-            new \DmEvents\Admin\Status_Detection();
-        }
     }
     
     public function init_data_machine_integration() {
@@ -174,18 +167,18 @@ class DM_Events {
     }
     
     private function load_data_machine_components() {
-        if (file_exists(DM_EVENTS_PLUGIN_DIR . 'inc/steps/EventImport/EventImportStep.php')) {
-            require_once DM_EVENTS_PLUGIN_DIR . 'inc/steps/EventImport/EventImportStep.php';
+        if (file_exists(DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/steps/EventImport/EventImportStep.php')) {
+            require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/steps/EventImport/EventImportStep.php';
         }
-        if (file_exists(DM_EVENTS_PLUGIN_DIR . 'inc/steps/EventImport/EventImportFilters.php')) {
-            require_once DM_EVENTS_PLUGIN_DIR . 'inc/steps/EventImport/EventImportFilters.php';
+        if (file_exists(DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/steps/EventImport/EventImportFilters.php')) {
+            require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/steps/EventImport/EventImportFilters.php';
         }
         
         $this->load_event_import_handlers();
         $this->load_publish_handlers();
         
-        if (class_exists('DmEvents\\Steps\\Publish\\Handlers\\DmEvents\\DmEventsPublisher')) {
-            new \DmEvents\Steps\Publish\Handlers\DmEvents\DmEventsPublisher();
+        if (class_exists('DataMachineEvents\\Steps\\Publish\\Handlers\\DataMachineEvents\\DataMachineEventsPublisher')) {
+            new \DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents\DataMachineEventsPublisher();
         }
     }
     
@@ -193,7 +186,7 @@ class DM_Events {
         $handlers = ['ticketmaster', 'DiceFm', 'WebScraper', 'GoogleCalendar'];
         
         foreach ($handlers as $handler) {
-            $handler_path = DM_EVENTS_PLUGIN_DIR . "inc/steps/EventImport/handlers/{$handler}/";
+            $handler_path = DATAMACHINE_EVENTS_PLUGIN_DIR . "inc/steps/EventImport/handlers/{$handler}/";
             if (is_dir($handler_path)) {
                 foreach (glob($handler_path . '*.php') as $file) {
                     if (file_exists($file)) {
@@ -216,7 +209,7 @@ class DM_Events {
     }
     
     private function load_publish_handlers() {
-        $dm_events_handler_path = DM_EVENTS_PLUGIN_DIR . 'inc/steps/publish/handlers/DmEvents/';
+        $dm_events_handler_path = DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/steps/publish/handlers/DataMachineEvents/';
         if (is_dir($dm_events_handler_path)) {
             foreach (glob($dm_events_handler_path . '*.php') as $file) {
                 if (file_exists($file)) {
@@ -228,9 +221,9 @@ class DM_Events {
 
     public function load_textdomain() {
         load_plugin_textdomain(
-            'dm-events',
+            'datamachine-events',
             false,
-            dirname(DM_EVENTS_PLUGIN_BASENAME) . '/languages'
+            dirname(DATAMACHINE_EVENTS_PLUGIN_BASENAME) . '/languages'
         );
     }
     
@@ -239,17 +232,17 @@ class DM_Events {
      * @param string $hook Current admin page hook
      */
     public function enqueue_admin_assets($hook) {
-        if (strpos($hook, 'dm-events') === false) {
+        if (strpos($hook, 'datamachine-events') === false) {
             return;
         }
 
-        $css_file = DM_EVENTS_PLUGIN_DIR . 'assets/css/admin.css';
-        $js_file = DM_EVENTS_PLUGIN_DIR . 'assets/js/admin.js';
+        $css_file = DATAMACHINE_EVENTS_PLUGIN_DIR . 'assets/css/admin.css';
+        $js_file = DATAMACHINE_EVENTS_PLUGIN_DIR . 'assets/js/admin.js';
 
         if (file_exists($css_file)) {
             wp_enqueue_style(
-                'dm-events-admin',
-                DM_EVENTS_PLUGIN_URL . 'assets/css/admin.css',
+                'datamachine-events-admin',
+                DATAMACHINE_EVENTS_PLUGIN_URL . 'assets/css/admin.css',
                 array(),
                 filemtime($css_file)
             );
@@ -257,8 +250,8 @@ class DM_Events {
 
         if (file_exists($js_file)) {
             wp_enqueue_script(
-                'dm-events-admin',
-                DM_EVENTS_PLUGIN_URL . 'assets/js/admin.js',
+                'datamachine-events-admin',
+                DATAMACHINE_EVENTS_PLUGIN_URL . 'assets/js/admin.js',
                 array('jquery', 'wp-util'),
                 filemtime($js_file),
                 true
@@ -274,9 +267,9 @@ class DM_Events {
     public function load_event_templates($template) {
         global $post;
 
-        if ($post && $post->post_type === 'dm_events') {
+        if ($post && $post->post_type === 'datamachine_events') {
             if (is_single()) {
-                $plugin_template = DM_EVENTS_PLUGIN_DIR . 'templates/single-dm_events.php';
+                $plugin_template = DATAMACHINE_EVENTS_PLUGIN_DIR . 'templates/single-datamachine_events.php';
                 if (file_exists($plugin_template)) {
                     return $plugin_template;
                 }
@@ -297,11 +290,11 @@ class DM_Events {
     }
 
     public function register_post_types() {
-        \DmEvents\Core\Event_Post_Type::register();
+        \DataMachineEvents\Core\Event_Post_Type::register();
     }
 
     public function register_taxonomies() {
-        \DmEvents\Core\Venue_Taxonomy::register();
+        \DataMachineEvents\Core\Venue_Taxonomy::register();
     }
     /**
      * @param array|null $allowed_block_types Current allowed block types
@@ -317,15 +310,15 @@ class DM_Events {
             return $allowed_block_types;
         }
 
-        $allowed_block_types[] = 'dm-events/event-details';
-        $allowed_block_types[] = 'dm-events/calendar';
+        $allowed_block_types[] = 'datamachine-events/event-details';
+        $allowed_block_types[] = 'datamachine-events/calendar';
 
         return $allowed_block_types;
     }
 
     public function register_blocks() {
-        register_block_type(DM_EVENTS_PLUGIN_DIR . 'inc/blocks/calendar');
-        register_block_type(DM_EVENTS_PLUGIN_DIR . 'inc/blocks/EventDetails');
+        register_block_type(DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/blocks/calendar');
+        register_block_type(DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/blocks/EventDetails');
         
         // Enqueue root CSS custom properties when any block is present
         add_action('wp_enqueue_scripts', array($this, 'enqueue_root_styles'));
@@ -333,17 +326,17 @@ class DM_Events {
     }
     
     public function enqueue_root_styles() {
-        if (has_block('dm-events/calendar') || has_block('dm-events/event-details') || is_singular('dm_events')) {
+        if (has_block('datamachine-events/calendar') || has_block('datamachine-events/event-details') || is_singular('datamachine_events')) {
             wp_enqueue_style(
-                'dm-events-root',
-                DM_EVENTS_PLUGIN_URL . 'inc/blocks/root.css',
+                'datamachine-events-root',
+                DATAMACHINE_EVENTS_PLUGIN_URL . 'inc/blocks/root.css',
                 array(),
-                filemtime(DM_EVENTS_PLUGIN_DIR . 'inc/blocks/root.css')
+                filemtime(DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/blocks/root.css')
             );
         }
 
         // Enqueue Leaflet map assets for Event Details block
-        if (has_block('dm-events/event-details') || is_singular('dm_events')) {
+        if (has_block('datamachine-events/event-details') || is_singular('datamachine_events')) {
             // Leaflet CSS
             wp_enqueue_style(
                 'leaflet',
@@ -363,10 +356,10 @@ class DM_Events {
 
             // Custom venue map initialization
             wp_enqueue_script(
-                'dm-events-venue-map',
-                DM_EVENTS_PLUGIN_URL . 'assets/js/venue-map.js',
+                'datamachine-events-venue-map',
+                DATAMACHINE_EVENTS_PLUGIN_URL . 'assets/js/venue-map.js',
                 array('leaflet'),
-                filemtime(DM_EVENTS_PLUGIN_DIR . 'assets/js/venue-map.js'),
+                filemtime(DATAMACHINE_EVENTS_PLUGIN_DIR . 'assets/js/venue-map.js'),
                 true
             );
         }
@@ -375,8 +368,8 @@ class DM_Events {
     public function register_block_category($block_categories, $editor_context) {
         if (!empty($editor_context->post)) {
             array_unshift($block_categories, array(
-                'slug'  => 'dm-events',
-                'title' => __('DM Events', 'dm-events'),
+                'slug'  => 'datamachine-events',
+                'title' => __('Data Machine Events', 'datamachine-events'),
                 'icon'  => 'calendar-alt',
             ));
         }
@@ -387,8 +380,8 @@ class DM_Events {
 
 }
 
-function dm_events() {
-    return DM_Events::get_instance();
+function datamachine_events() {
+    return DATAMACHINE_Events::get_instance();
 }
 
-dm_events(); 
+datamachine_events(); 

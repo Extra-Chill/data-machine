@@ -2,10 +2,10 @@
 /**
  * Ticketmaster Discovery API integration with single-item processing
  *
- * @package DmEvents\Steps\EventImport\Handlers\Ticketmaster
+ * @package DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster
  */
 
-namespace DmEvents\Steps\EventImport\Handlers\Ticketmaster;
+namespace DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -35,7 +35,7 @@ class Ticketmaster {
         $data = $parameters['data'] ?? [];
         $flow_step_config = $parameters['flow_step_config'] ?? [];
         
-        $handler_config = $flow_step_config['handler']['settings']['ticketmaster_events'] ?? [];
+        $handler_config = $flow_step_config['handler_config']['ticketmaster_events'] ?? [];
         $pipeline_id = $flow_step_config['pipeline_id'] ?? null;
         
         $this->log_info('Ticketmaster Handler: Starting event import', [
@@ -44,7 +44,7 @@ class Ticketmaster {
             'flow_step_id' => $flow_step_id
         ]);
         
-        $api_config = apply_filters('dm_retrieve_oauth_account', [], 'ticketmaster_events');
+        $api_config = apply_filters('datamachine_retrieve_oauth_account', [], 'ticketmaster_events');
         if (empty($api_config['api_key'])) {
             $this->log_error('Ticketmaster API key not configured');
             return $data;
@@ -87,7 +87,7 @@ class Ticketmaster {
             $event_identifier = md5($standardized_event['title'] . ($standardized_event['startDate'] ?? '') . ($standardized_event['venue'] ?? ''));
             
             // Check if already processed FIRST
-            $is_processed = apply_filters('dm_is_item_processed', false, $flow_step_id, 'ticketmaster', $event_identifier);
+            $is_processed = apply_filters('datamachine_is_item_processed', false, $flow_step_id, 'ticketmaster', $event_identifier);
             if ($is_processed) {
                 $this->log_debug('Skipping already processed event', [
                     'title' => $standardized_event['title'],
@@ -100,7 +100,7 @@ class Ticketmaster {
             
             // Found eligible event - mark as processed and add to data packet array
             if ($flow_step_id && $job_id) {
-                do_action('dm_mark_item_processed', $flow_step_id, 'ticketmaster', $event_identifier, $job_id);
+                do_action('datamachine_mark_item_processed', $flow_step_id, 'ticketmaster', $event_identifier, $job_id);
             }
             
             $this->log_info('Ticketmaster Handler: Found eligible event', [
@@ -251,7 +251,7 @@ class Ticketmaster {
         $cached_classifications = get_transient($cache_key);
         
         if ($cached_classifications !== false) {
-            do_action('dm_log', 'debug', 'Ticketmaster: Using cached classifications', [
+            do_action('datamachine_log', 'debug', 'Ticketmaster: Using cached classifications', [
                 'classification_count' => count($cached_classifications)
             ]);
             return $cached_classifications;
@@ -259,13 +259,13 @@ class Ticketmaster {
         
         // Get API key if not provided
         if (empty($api_key)) {
-            $api_config = apply_filters('dm_retrieve_oauth_account', [], 'ticketmaster_events');
+            $api_config = apply_filters('datamachine_retrieve_oauth_account', [], 'ticketmaster_events');
             $api_key = $api_config['api_key'] ?? '';
         }
         
         // Fallback if no API key
         if (empty($api_key)) {
-            do_action('dm_log', 'warning', 'Ticketmaster: No API key available for classifications');
+            do_action('datamachine_log', 'warning', 'Ticketmaster: No API key available for classifications');
             return self::get_fallback_classifications();
         }
         
@@ -280,7 +280,7 @@ class Ticketmaster {
         
         // Handle API errors
         if (is_wp_error($response)) {
-            do_action('dm_log', 'warning', 'Ticketmaster: Classifications API error', [
+            do_action('datamachine_log', 'warning', 'Ticketmaster: Classifications API error', [
                 'error' => $response->get_error_message()
             ]);
             return self::get_fallback_classifications();
@@ -288,7 +288,7 @@ class Ticketmaster {
         
         $status_code = wp_remote_retrieve_response_code($response);
         if ($status_code !== 200) {
-            do_action('dm_log', 'warning', 'Ticketmaster: Classifications API returned non-200', [
+            do_action('datamachine_log', 'warning', 'Ticketmaster: Classifications API returned non-200', [
                 'status_code' => $status_code
             ]);
             return self::get_fallback_classifications();
@@ -299,7 +299,7 @@ class Ticketmaster {
         $data = json_decode($body, true);
         
         if (!$data || !isset($data['_embedded']['classifications'])) {
-            do_action('dm_log', 'warning', 'Ticketmaster: Invalid classifications API response');
+            do_action('datamachine_log', 'warning', 'Ticketmaster: Invalid classifications API response');
             return self::get_fallback_classifications();
         }
         
@@ -309,7 +309,7 @@ class Ticketmaster {
         // Cache for 24 hours
         set_transient($cache_key, $classifications, 24 * HOUR_IN_SECONDS);
         
-        do_action('dm_log', 'debug', 'Ticketmaster: Classifications fetched and cached', [
+        do_action('datamachine_log', 'debug', 'Ticketmaster: Classifications fetched and cached', [
             'classification_count' => count($classifications)
         ]);
         
@@ -353,11 +353,11 @@ class Ticketmaster {
      */
     private static function get_fallback_classifications() {
         return [
-            'music' => __('Music', 'dm-events'),
-            'sports' => __('Sports', 'dm-events'),
-            'arts-theatre' => __('Arts & Theatre', 'dm-events'),
-            'film' => __('Film', 'dm-events'),
-            'family' => __('Family', 'dm-events')
+            'music' => __('Music', 'datamachine-events'),
+            'sports' => __('Sports', 'datamachine-events'),
+            'arts-theatre' => __('Arts & Theatre', 'datamachine-events'),
+            'film' => __('Film', 'datamachine-events'),
+            'family' => __('Family', 'datamachine-events')
         ];
     }
     
@@ -369,7 +369,7 @@ class Ticketmaster {
      */
     public static function get_classifications_for_dropdown($current_config = []) {
         // Get API key from auth system
-        $api_config = apply_filters('dm_retrieve_oauth_account', [], 'ticketmaster_events');
+        $api_config = apply_filters('datamachine_retrieve_oauth_account', [], 'ticketmaster_events');
         $api_key = $api_config['api_key'] ?? '';
         
         return self::get_classifications($api_key);
@@ -436,7 +436,7 @@ class Ticketmaster {
             $start_time = $tm_event['dates']['start']['localTime'] ?? '';
         }
         
-        // Extract comprehensive venue data for DmEventsPublisher integration
+        // Extract comprehensive venue data for DataMachineEventsPublisher integration
         // These fields are automatically injected as AI parameters via inject_venue_parameters
         $venue_name = '';
         $venue_address = '';
@@ -661,7 +661,7 @@ class Ticketmaster {
      */
     private function log_error(string $message, array $context = []): void {
         if (function_exists('do_action')) {
-            do_action('dm_log', 'error', $message, $context);
+            do_action('datamachine_log', 'error', $message, $context);
         }
     }
     
@@ -673,7 +673,7 @@ class Ticketmaster {
      */
     private function log_info(string $message, array $context = []): void {
         if (function_exists('do_action')) {
-            do_action('dm_log', 'info', $message, $context);
+            do_action('datamachine_log', 'info', $message, $context);
         }
     }
     
@@ -685,7 +685,7 @@ class Ticketmaster {
      */
     private function log_debug(string $message, array $context = []): void {
         if (function_exists('do_action')) {
-            do_action('dm_log', 'debug', $message, $context);
+            do_action('datamachine_log', 'debug', $message, $context);
         }
     }
 }

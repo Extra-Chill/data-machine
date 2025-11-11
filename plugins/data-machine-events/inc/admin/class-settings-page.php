@@ -2,11 +2,11 @@
 /**
  * Events Settings Page
  *
- * @package DmEvents
+ * @package DataMachineEvents
  * @subpackage Admin
  */
 
-namespace DmEvents\Admin;
+namespace DataMachineEvents\Admin;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -25,17 +25,18 @@ class Settings_Page {
         'include_in_archives' => false,
         'include_in_search' => true,
         'main_events_page_url' => '',
-        'calendar_display_type' => 'circuit-grid'
+        'calendar_display_type' => 'circuit-grid',
+        'map_display_type' => 'osm-standard'
     );
     
     public function __construct() {
         add_action('admin_init', array($this, 'init_settings'));
-        add_filter('dm_events_post_type_menu_items', array($this, 'add_settings_menu_item'));
+        add_filter('datamachine_events_post_type_menu_items', array($this, 'add_settings_menu_item'));
 
         add_action('pre_get_posts', array($this, 'control_archive_queries'));
 
         // Register filter for theme integration
-        add_filter('dm_events_main_page_url', array($this, 'provide_main_events_url'));
+        add_filter('datamachine_events_main_page_url', array($this, 'provide_main_events_url'));
     }
     
     public function add_settings_menu_item($allowed_items) {
@@ -50,8 +51,8 @@ class Settings_Page {
     public function add_settings_submenu() {
         add_submenu_page(
             'edit.php?post_type=dm_events',
-            __('Event Settings', 'dm-events'),
-            __('Settings', 'dm-events'),
+            __('Event Settings', 'datamachine-events'),
+            __('Settings', 'datamachine-events'),
             'manage_options',
             self::PAGE_SLUG,
             array($this, 'render_settings_page')
@@ -74,7 +75,7 @@ class Settings_Page {
             return;
         }
         
-        $template_path = DM_EVENTS_PLUGIN_DIR . 'templates/admin/settings-page.php';
+        $template_path = DATAMACHINE_EVENTS_PLUGIN_DIR . 'templates/admin/settings-page.php';
         if (file_exists($template_path)) {
             include $template_path;
         }
@@ -100,10 +101,16 @@ class Settings_Page {
         
         // Calendar display type
         $allowed_display_types = array('circuit-grid', 'carousel-list');
-        $sanitized['calendar_display_type'] = in_array($input['calendar_display_type'], $allowed_display_types) 
-            ? $input['calendar_display_type'] 
+        $sanitized['calendar_display_type'] = in_array($input['calendar_display_type'], $allowed_display_types)
+            ? $input['calendar_display_type']
             : 'circuit-grid';
-        
+
+        // Map display type
+        $allowed_map_types = array('osm-standard', 'carto-positron', 'carto-voyager', 'carto-dark', 'humanitarian');
+        $sanitized['map_display_type'] = in_array($input['map_display_type'], $allowed_map_types)
+            ? $input['map_display_type']
+            : 'osm-standard';
+
         return $sanitized;
     }
     
@@ -173,6 +180,15 @@ class Settings_Page {
      */
     public static function get_main_events_page_url() {
         return self::get_setting('main_events_page_url', '');
+    }
+
+    /**
+     * Get map display type setting
+     *
+     * @return string Map display type (osm-standard, carto-positron, carto-voyager, carto-dark, humanitarian)
+     */
+    public static function get_map_display_type() {
+        return self::get_setting('map_display_type', 'osm-standard');
     }
 
     /**

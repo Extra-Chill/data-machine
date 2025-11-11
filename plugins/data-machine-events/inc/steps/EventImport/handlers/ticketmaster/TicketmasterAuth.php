@@ -5,11 +5,11 @@
  * Handles authentication configuration for Ticketmaster Discovery API integration
  * with Data Machine's centralized authentication system.
  *
- * @package DmEvents\Steps\EventImport\Handlers\Ticketmaster
+ * @package DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster
  * @since 1.0.0
  */
 
-namespace DmEvents\Steps\EventImport\Handlers\Ticketmaster;
+namespace DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster;
 
 // Prevent direct access
 if (!defined('ABSPATH')) {
@@ -32,10 +32,10 @@ class TicketmasterAuth {
     public function get_config_fields(): array {
         return [
             'api_key' => [
-                'label' => __('API Key', 'dm-events'),
+                'label' => __('API Key', 'datamachine-events'),
                 'type' => 'password',
                 'required' => true,
-                'description' => __('Your Ticketmaster Discovery API Consumer Key from developer.ticketmaster.com', 'dm-events')
+                'description' => __('Your Ticketmaster Discovery API Consumer Key from developer.ticketmaster.com', 'datamachine-events')
             ]
         ];
     }
@@ -46,7 +46,7 @@ class TicketmasterAuth {
      * @return bool True if API key is configured, false otherwise
      */
     public function is_configured(): bool {
-        $config = apply_filters('dm_retrieve_oauth_account', [], 'ticketmaster_events');
+        $config = apply_filters('datamachine_retrieve_oauth_account', [], 'ticketmaster_events');
         return !empty($config['api_key']);
     }
 
@@ -70,8 +70,8 @@ class TicketmasterAuth {
         }
         
         return [
-            'display_name' => __('Ticketmaster API', 'dm-events'),
-            'type' => __('API Key Authentication', 'dm-events')
+            'display_name' => __('Ticketmaster API', 'datamachine-events'),
+            'type' => __('API Key Authentication', 'datamachine-events')
         ];
     }
 }

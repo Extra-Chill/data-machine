@@ -14,17 +14,17 @@ if (!defined('ABSPATH')) {
 
 $gap_text = '';
 if ($gap_days == 2) {
-    $gap_text = __('1 day later', 'dm-events');
+    $gap_text = __('1 day later', 'datamachine-events');
 } else {
-    $gap_text = sprintf(__('%d days later', 'dm-events'), $gap_days - 1);
+    $gap_text = sprintf(__('%d days later', 'datamachine-events'), $gap_days - 1);
 }
 ?>
 
-<div class="dm-time-gap-separator">
-    <div class="dm-gap-line"></div>
-    <div class="dm-gap-text">
-        <span class="dm-gap-indicator">• • •</span>
-        <span class="dm-gap-label"><?php echo esc_html($gap_text); ?></span>
+<div class="datamachine-time-gap-separator">
+    <div class="datamachine-gap-line"></div>
+    <div class="datamachine-gap-text">
+        <span class="datamachine-gap-indicator">• • •</span>
+        <span class="datamachine-gap-label"><?php echo esc_html($gap_text); ?></span>
     </div>
-    <div class="dm-gap-line"></div>
+    <div class="datamachine-gap-line"></div>
 </div>

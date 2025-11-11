@@ -4,10 +4,10 @@
  *
  * Centralized configuration management for AI-driven event publishing.
  *
- * @package DmEvents\Steps\Publish\Handlers\DmEvents
+ * @package DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents
  */
 
-namespace DmEvents\Steps\Publish\Handlers\DmEvents;
+namespace DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
  * 
  * Centralized settings management for AI-driven event creation and venue taxonomy handling.
  */
-class DmEventsSettings {
+class DataMachineEventsSettings {
     
     
     
@@ -37,8 +37,9 @@ class DmEventsSettings {
                 continue;
             }
             
-            // Skip built-in formats and other non-content taxonomies
-            if (in_array($taxonomy->name, ['post_format', 'nav_menu', 'link_category']) || !$taxonomy->public) {
+            // Skip built-in formats and other non-content taxonomies using centralized filter
+            $excluded = apply_filters('datamachine_wordpress_system_taxonomies', []);
+            if (in_array($taxonomy->name, $excluded) || !$taxonomy->public) {
                 continue;
             }
             
@@ -71,25 +72,25 @@ class DmEventsSettings {
         $fields = [
             'post_status' => [
                 'type' => 'select',
-                'label' => __('Post Status', 'dm-events'),
-                'description' => __('Select the status for the newly created event.', 'dm-events'),
+                'label' => __('Post Status', 'datamachine-events'),
+                'description' => __('Select the status for the newly created event.', 'datamachine-events'),
                 'options' => [
-                    'draft' => __('Draft', 'dm-events'),
-                    'publish' => __('Publish', 'dm-events'),
-                    'pending' => __('Pending Review', 'dm-events'),
-                    'private' => __('Private', 'dm-events'),
+                    'draft' => __('Draft', 'datamachine-events'),
+                    'publish' => __('Publish', 'datamachine-events'),
+                    'pending' => __('Pending Review', 'datamachine-events'),
+                    'private' => __('Private', 'datamachine-events'),
                 ],
             ],
             'include_images' => [
                 'type' => 'checkbox',
-                'label' => __('Include Images', 'dm-events'),
-                'description' => __('Automatically set featured images for events when image URLs are provided by import handlers.', 'dm-events'),
+                'label' => __('Include Images', 'datamachine-events'),
+                'description' => __('Automatically set featured images for events when image URLs are provided by import handlers.', 'datamachine-events'),
                 'default' => false,
             ],
             'post_author' => [
                 'type' => 'select',
-                'label' => __('Post Author', 'dm-events'),
-                'description' => __('Select which WordPress user to publish events under.', 'dm-events'),
+                'label' => __('Post Author', 'datamachine-events'),
+                'description' => __('Select which WordPress user to publish events under.', 'datamachine-events'),
                 'options' => $user_options,
             ],
         ];
@@ -141,8 +142,9 @@ class DmEventsSettings {
                 continue;
             }
             
-            // Skip built-in formats and other non-content taxonomies
-            if (in_array($taxonomy->name, ['post_format', 'nav_menu', 'link_category']) || !$taxonomy->public) {
+            // Skip built-in formats and other non-content taxonomies using centralized filter
+            $excluded = apply_filters('datamachine_wordpress_system_taxonomies', []);
+            if (in_array($taxonomy->name, $excluded) || !$taxonomy->public) {
                 continue;
             }
             
@@ -151,8 +153,8 @@ class DmEventsSettings {
             
             // Build options with skip as default
             $options = [
-                'skip' => __('Skip', 'dm-events'),
-                'ai_decides' => __('AI Decides', 'dm-events')
+                'skip' => __('Skip', 'datamachine-events'),
+                'ai_decides' => __('AI Decides', 'datamachine-events')
             ];
             
             // Get terms for this taxonomy
@@ -169,9 +171,9 @@ class DmEventsSettings {
                 'type' => 'select',
                 'label' => $taxonomy_label,
                 'description' => sprintf(
-                    __('Configure %s assignment: Skip to exclude from AI instructions, let AI choose, or select specific %s.', 'dm-events'),
+                    __('Configure %s assignment: Skip to exclude from AI instructions, let AI choose, or select specific %s.', 'datamachine-events'),
                     strtolower($taxonomy_label),
-                    $taxonomy->hierarchical ? __('category', 'dm-events') : __('term', 'dm-events')
+                    $taxonomy->hierarchical ? __('category', 'datamachine-events') : __('term', 'datamachine-events')
                 ),
                 'options' => $options,
             ];
@@ -196,8 +198,9 @@ class DmEventsSettings {
                 continue;
             }
             
-            // Skip built-in formats and other non-content taxonomies
-            if (in_array($taxonomy->name, ['post_format', 'nav_menu', 'link_category']) || !$taxonomy->public) {
+            // Skip built-in formats and other non-content taxonomies using centralized filter
+            $excluded = apply_filters('datamachine_wordpress_system_taxonomies', []);
+            if (in_array($taxonomy->name, $excluded) || !$taxonomy->public) {
                 continue;
             }
             

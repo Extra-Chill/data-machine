@@ -21,68 +21,68 @@ if (empty($taxonomies_data) && defined('WP_DEBUG') && WP_DEBUG) {
 }
 ?>
 
-<div class="dm-events-taxonomy-modal">
+<div class="datamachine-events-taxonomy-modal">
     <?php if (!empty($taxonomies_data)) : ?>
-        <div class="dm-taxonomy-filter-content">
+        <div class="datamachine-taxonomy-filter-content">
             <?php foreach ($taxonomies_data as $taxonomy_slug => $taxonomy_data) : ?>
-                <div class="dm-taxonomy-section" data-taxonomy="<?php echo esc_attr($taxonomy_slug); ?>">
-                    <h4 class="dm-taxonomy-label"><?php echo esc_html($taxonomy_data['label']); ?></h4>
+                <div class="datamachine-taxonomy-section" data-taxonomy="<?php echo esc_attr($taxonomy_slug); ?>">
+                    <h4 class="datamachine-taxonomy-label"><?php echo esc_html($taxonomy_data['label']); ?></h4>
                     
-                    <div class="dm-taxonomy-terms">
+                    <div class="datamachine-taxonomy-terms">
                         <?php 
                         // Flatten the hierarchy for easier template rendering
-                        $flattened_terms = \DmEvents\Blocks\Calendar\Taxonomy_Helper::flatten_hierarchy($taxonomy_data['terms']);
+                        $flattened_terms = \DataMachineEvents\Blocks\Calendar\Taxonomy_Helper::flatten_hierarchy($taxonomy_data['terms']);
                         
                         foreach ($flattened_terms as $term) : 
-                            $indent_class = $term['level'] > 0 ? 'dm-term-level-' . $term['level'] : '';
+                            $indent_class = $term['level'] > 0 ? 'datamachine-term-level-' . $term['level'] : '';
                             $indent_style = $term['level'] > 0 ? 'style="margin-left: ' . ($term['level'] * 20) . 'px;"' : '';
                         ?>
-                            <div class="dm-taxonomy-term <?php echo esc_attr($indent_class); ?>" <?php echo $indent_style; ?>>
-                                <label class="dm-term-checkbox-label">
+                            <div class="datamachine-taxonomy-term <?php echo esc_attr($indent_class); ?>" <?php echo $indent_style; ?>>
+                                <label class="datamachine-term-checkbox-label">
                                     <input type="checkbox" 
                                            name="taxonomy_filters[<?php echo esc_attr($taxonomy_slug); ?>][]" 
                                            value="<?php echo esc_attr($term['term_id']); ?>"
-                                           class="dm-term-checkbox"
+                                           class="datamachine-term-checkbox"
                                            data-taxonomy="<?php echo esc_attr($taxonomy_slug); ?>"
                                            data-term-slug="<?php echo esc_attr($term['slug']); ?>"
                                     />
-                                    <span class="dm-term-name"><?php echo esc_html($term['name']); ?></span>
-                                    <span class="dm-term-count">(<?php echo esc_html($term['event_count']); ?> <?php echo _n('event', 'events', $term['event_count'], 'dm-events'); ?>)</span>
+                                    <span class="datamachine-term-name"><?php echo esc_html($term['name']); ?></span>
+                                    <span class="datamachine-term-count">(<?php echo esc_html($term['event_count']); ?> <?php echo _n('event', 'events', $term['event_count'], 'datamachine-events'); ?>)</span>
                                 </label>
                             </div>
                         <?php endforeach; ?>
                     </div>
                     
                     <?php if ($taxonomy_slug !== array_key_last($taxonomies_data)) : ?>
-                        <hr class="dm-taxonomy-separator">
+                        <hr class="datamachine-taxonomy-separator">
                     <?php endif; ?>
                 </div>
             <?php endforeach; ?>
         </div>
         
-        <div class="dm-modal-actions">
-            <div class="dm-modal-actions-left">
-                <button type="button" class="button button-secondary dm-clear-all-filters">
-                    <?php _e('Clear All Filters', 'dm-events'); ?>
+        <div class="datamachine-modal-actions">
+            <div class="datamachine-modal-actions-left">
+                <button type="button" class="<?php echo esc_attr(implode(' ', apply_filters('datamachine_events_modal_button_classes', ['button', 'button-secondary', 'datamachine-clear-all-filters'], 'secondary'))); ?>">
+                    <?php _e('Clear All Filters', 'datamachine-events'); ?>
                 </button>
             </div>
             
-            <div class="dm-modal-actions-right">
-                <button type="button" class="button button-primary dm-apply-filters">
-                    <?php _e('Apply Filters', 'dm-events'); ?>
+            <div class="datamachine-modal-actions-right">
+                <button type="button" class="<?php echo esc_attr(implode(' ', apply_filters('datamachine_events_modal_button_classes', ['button', 'button-primary', 'datamachine-apply-filters'], 'primary'))); ?>">
+                    <?php _e('Apply Filters', 'datamachine-events'); ?>
                 </button>
-                <button type="button" class="button button-secondary dm-modal-close">
-                    <?php _e('Cancel', 'dm-events'); ?>
+                <button type="button" class="<?php echo esc_attr(implode(' ', apply_filters('datamachine_events_modal_button_classes', ['button', 'button-secondary', 'datamachine-modal-close'], 'secondary'))); ?>">
+                    <?php _e('Cancel', 'datamachine-events'); ?>
                 </button>
             </div>
         </div>
         
     <?php else : ?>
-        <div class="dm-no-taxonomies">
-            <p><?php _e('No filter options are currently available.', 'dm-events'); ?></p>
-            <div class="dm-modal-actions">
-                <button type="button" class="button button-secondary dm-modal-close">
-                    <?php _e('Close', 'dm-events'); ?>
+        <div class="datamachine-no-taxonomies">
+            <p><?php _e('No filter options are currently available.', 'datamachine-events'); ?></p>
+            <div class="datamachine-modal-actions">
+                <button type="button" class="<?php echo esc_attr(implode(' ', apply_filters('datamachine_events_modal_button_classes', ['button', 'button-secondary', 'datamachine-modal-close'], 'secondary'))); ?>">
+                    <?php _e('Close', 'datamachine-events'); ?>
                 </button>
             </div>
         </div>

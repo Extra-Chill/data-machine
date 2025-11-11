@@ -2,13 +2,13 @@
 /**
  * Dynamic Taxonomy Badge System
  *
- * Themes customize via filters: dm_events_badge_wrapper_classes, dm_events_badge_classes.
- * Excludes venue taxonomy. Provides hash-based color classes for consistent styling.
+ * Themes customize via filters: dm_events_badge_wrapper_classes, dm_events_badge_classes, dm_events_excluded_taxonomies.
+ * Provides hash-based color classes for consistent styling.
  *
- * @package DmEvents\Core
+ * @package DataMachineEvents\Core
  */
 
-namespace DmEvents\Core;
+namespace DataMachineEvents\Core;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -32,12 +32,14 @@ class Taxonomy_Badges {
         }
         
         $taxonomy_data = [];
-        
+
+        $excluded_taxonomies = apply_filters('datamachine_events_excluded_taxonomies', array());
+
         foreach ($all_taxonomies as $taxonomy_slug => $taxonomy_object) {
-            if ($taxonomy_slug === 'venue') {
+            if (in_array($taxonomy_slug, $excluded_taxonomies, true)) {
                 continue;
             }
-            
+
             $terms = get_the_terms($post_id, $taxonomy_slug);
             
             if (!$terms || is_wp_error($terms)) {
@@ -64,7 +66,7 @@ class Taxonomy_Badges {
             return '';
         }
 
-        $wrapper_classes = apply_filters('dm_events_badge_wrapper_classes', [
+        $wrapper_classes = apply_filters('datamachine_events_badge_wrapper_classes', [
             'dm-taxonomy-badges'
         ], $post_id);
 
@@ -81,7 +83,7 @@ class Taxonomy_Badges {
                     'dm-term-' . esc_attr($term->slug)
                 ];
 
-                $badge_classes = apply_filters('dm_events_badge_classes', $badge_classes, $taxonomy_slug, $term, $post_id);
+                $badge_classes = apply_filters('datamachine_events_badge_classes', $badge_classes, $taxonomy_slug, $term, $post_id);
 
                 $output .= sprintf(
                     '<span class="%s" data-taxonomy="%s" data-term="%s">%s</span>',
@@ -99,11 +101,17 @@ class Taxonomy_Badges {
     }
     
     /**
-     * @return array Taxonomies with slug and label, excluding venues
+     * @return array Taxonomies with slug and label, filtered by dm_events_excluded_taxonomies
      */
     public static function get_used_taxonomies() {
         global $wpdb;
-        
+
+        $excluded_taxonomies = apply_filters('datamachine_events_excluded_taxonomies', array());
+        $excluded_sql = '';
+        if (!empty($excluded_taxonomies)) {
+            $excluded_sql = "AND tt.taxonomy NOT IN ('" . implode("','", array_map('esc_sql', $excluded_taxonomies)) . "')";
+        }
+
         $query = "
             SELECT DISTINCT tt.taxonomy, t.name
             FROM {$wpdb->term_taxonomy} tt
@@ -112,9 +120,9 @@ class Taxonomy_Badges {
             INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
             WHERE p.post_type = 'dm_events'
             AND p.post_status = 'publish'
-            AND tt.taxonomy != 'venue'
+            {$excluded_sql}
         ";
-        
+
         $results = $wpdb->get_results($query);
         
         if (!$results) {

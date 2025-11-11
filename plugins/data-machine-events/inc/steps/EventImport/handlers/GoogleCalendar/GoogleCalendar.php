@@ -2,10 +2,10 @@
 /**
  * Google Calendar .ics integration with single-item processing
  *
- * @package DmEvents\Steps\EventImport\Handlers\GoogleCalendar
+ * @package DataMachineEvents\Steps\EventImport\Handlers\GoogleCalendar
  */
 
-namespace DmEvents\Steps\EventImport\Handlers\GoogleCalendar;
+namespace DataMachineEvents\Steps\EventImport\Handlers\GoogleCalendar;
 
 use ICal\ICal;
 
@@ -29,7 +29,7 @@ class GoogleCalendar {
         $data = $parameters['data'] ?? [];
         $flow_step_config = $parameters['flow_step_config'] ?? [];
 
-        $handler_config = $flow_step_config['handler']['settings']['google_calendar'] ?? [];
+        $handler_config = $flow_step_config['handler_config'] ?? [];
         $pipeline_id = $flow_step_config['pipeline_id'] ?? null;
 
         $this->log_info('Google Calendar Handler: Starting event import', [
@@ -71,7 +71,7 @@ class GoogleCalendar {
             $event_identifier = md5($standardized_event['title'] . $standardized_event['startDate'] . $standardized_event['venue']);
 
             // Check if already processed
-            $is_processed = apply_filters('dm_is_item_processed', false, $flow_step_id, 'google_calendar', $event_identifier);
+            $is_processed = apply_filters('datamachine_is_item_processed', false, $flow_step_id, 'google_calendar', $event_identifier);
             if ($is_processed) {
                 continue;
             }
@@ -83,7 +83,7 @@ class GoogleCalendar {
 
             // Found eligible event - mark as processed and add to data packet array
             if ($flow_step_id && $job_id) {
-                do_action('dm_mark_item_processed', $flow_step_id, 'google_calendar', $event_identifier, $job_id);
+                do_action('datamachine_mark_item_processed', $flow_step_id, 'google_calendar', $event_identifier, $job_id);
             }
 
             $this->log_info('Google Calendar Handler: Found eligible event', [
@@ -260,13 +260,13 @@ class GoogleCalendar {
      * Log info message
      */
     private function log_info(string $message, array $context = []): void {
-        do_action('dm_log', 'info', $message, $context);
+        do_action('datamachine_log', 'info', $message, $context);
     }
 
     /**
      * Log error message
      */
     private function log_error(string $message, array $context = []): void {
-        do_action('dm_log', 'error', $message, $context);
+        do_action('datamachine_log', 'error', $message, $context);
     }
 }

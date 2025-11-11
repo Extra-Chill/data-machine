@@ -25,7 +25,7 @@ $show_price = $display_vars['show_price'] ?? true;
 $show_ticket_link = $display_vars['show_ticket_link'] ?? true;
 ?>
 
-<div class="dm-event-item"
+<div class="datamachine-event-item"
      data-title="<?php echo esc_attr(get_the_title()); ?>"
      data-venue="<?php echo esc_attr($venue_name); ?>"
      data-performer="<?php echo esc_attr($performer_name); ?>"
@@ -34,32 +34,32 @@ $show_ticket_link = $display_vars['show_ticket_link'] ?? true;
      data-has-tickets="<?php echo ($show_ticket_link && !empty($ticket_url)) ? 'true' : 'false'; ?>">
 
     <a href="<?php echo esc_url(get_the_permalink()); ?>"
-       class="dm-event-link"
-       aria-label="<?php echo esc_attr(sprintf(__('View event: %s', 'dm-events'), get_the_title())); ?>">
+       class="datamachine-event-link"
+       aria-label="<?php echo esc_attr(sprintf(__('View event: %s', 'datamachine-events'), get_the_title())); ?>">
 
-        <?php echo \DmEvents\Core\Taxonomy_Badges::render_taxonomy_badges($event_post->ID); ?>
+        <?php echo \DataMachineEvents\Core\Taxonomy_Badges::render_taxonomy_badges($event_post->ID); ?>
 
-        <h4 class="dm-event-title">
+        <h4 class="datamachine-event-title">
             <?php the_title(); ?>
         </h4>
 
-        <div class="dm-event-meta">
+        <div class="datamachine-event-meta">
             <?php if (!empty($formatted_start_time)) : ?>
-                <div class="dm-event-time">
+                <div class="datamachine-event-time">
                     <span class="dashicons dashicons-clock"></span>
                     <?php echo esc_html($formatted_start_time); ?>
                 </div>
             <?php endif; ?>
 
             <?php if ($show_venue && !empty($venue_name)) : ?>
-                <div class="dm-event-venue">
+                <div class="datamachine-event-venue">
                     <span class="dashicons dashicons-location"></span>
                     <?php echo esc_html($venue_name); ?>
                 </div>
             <?php endif; ?>
 
             <?php if ($show_performer && !empty($performer_name)) : ?>
-                <div class="dm-event-performer">
+                <div class="datamachine-event-performer">
                     <span class="dashicons dashicons-admin-users"></span>
                     <?php echo esc_html($performer_name); ?>
                 </div>

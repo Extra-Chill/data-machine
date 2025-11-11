@@ -13,8 +13,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-use DmEvents\Core\Venue_Taxonomy;
-use DmEvents\Steps\Publish\Handlers\DmEvents\DmEventsSchema;
+use DataMachineEvents\Core\Venue_Taxonomy;
+use DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents\DataMachineEventsSchema;
 
 $start_date = $attributes['startDate'] ?? '';
 $end_date = $attributes['endDate'] ?? '';
@@ -48,7 +48,7 @@ if ($end_date) {
     $end_datetime = $end_time ? $end_date . ' ' . $end_time : $end_date;
 }
 
-$block_classes = array('dm-event-details');
+$block_classes = array('datamachine-event-details');
 if (!empty($attributes['align'])) {
     $block_classes[] = 'align' . $attributes['align'];
 }
@@ -59,7 +59,7 @@ $event_schema = null;
 if (!empty($start_date)) {
     $engine_parameters = [];
     
-    $event_schema = DmEventsSchema::generate_event_schema($attributes, $venue_data, $post_id, $engine_parameters);
+    $event_schema = DataMachineEventsSchema::generate_event_schema($attributes, $venue_data, $post_id, $engine_parameters);
 }
 ?>
 
@@ -98,10 +98,10 @@ if (!empty($start_date)) {
                         <br><small><?php echo esc_html($address); ?></small>
                     <?php endif; ?>
                     <?php if ($venue_data && !empty($venue_data['phone'])): ?>
-                        <br><small><?php printf(__('Phone: %s', 'dm-events'), esc_html($venue_data['phone'])); ?></small>
+                        <br><small><?php printf(__('Phone: %s', 'datamachine-events'), esc_html($venue_data['phone'])); ?></small>
                     <?php endif; ?>
                     <?php if ($venue_data && !empty($venue_data['website'])): ?>
-                        <br><small><a href="<?php echo esc_url($venue_data['website']); ?>" target="_blank" rel="noopener"><?php _e('Venue Website', 'dm-events'); ?></a></small>
+                        <br><small><a href="<?php echo esc_url($venue_data['website']); ?>" target="_blank" rel="noopener"><?php _e('Venue Website', 'datamachine-events'); ?></a></small>
                     <?php endif; ?>
                 </span>
             </div>
@@ -115,13 +115,25 @@ if (!empty($start_date)) {
         <?php endif; ?>
     </div>
 
-    <?php if ($show_ticket_link && $ticket_url): ?>
-        <div class="event-tickets">
-            <a href="<?php echo esc_url($ticket_url); ?>" class="ticket-button" target="_blank" rel="noopener">
-                <?php _e('Get Tickets', 'dm-events'); ?>
+    <div class="event-action-buttons">
+        <?php if ($show_ticket_link && $ticket_url): ?>
+            <a href="<?php echo esc_url($ticket_url); ?>" class="<?php echo esc_attr(implode(' ', apply_filters('datamachine_events_ticket_button_classes', ['ticket-button']))); ?>" target="_blank" rel="noopener">
+                <?php _e('Get Tickets', 'datamachine-events'); ?>
             </a>
-        </div>
-    <?php endif; ?>
+        <?php endif; ?>
+
+        <?php
+        /**
+         * Action hook for additional event action buttons.
+         *
+         * Allows themes and plugins to add buttons (share, RSVP, etc.) alongside the ticket button.
+         *
+         * @param int $post_id Current event post ID
+         * @param string $ticket_url Ticket URL if available (empty string if not)
+         */
+        do_action('datamachine_events_action_buttons', $post_id, $ticket_url);
+        ?>
+    </div>
 
     <?php
     // Display venue map if coordinates are available
@@ -133,22 +145,28 @@ if (!empty($start_date)) {
 
             // Validate coordinates are numeric
             if (is_numeric($lat) && is_numeric($lon)) {
+                // Get map display type from settings
+                $map_display_type = 'osm-standard';
+                if (class_exists('DataMachineEvents\\Admin\\Settings_Page')) {
+                    $map_display_type = \DataMachineEvents\Admin\Settings_Page::get_map_display_type();
+                }
                 ?>
-                <div class="dm-venue-map-section">
-                    <h3 class="venue-map-title"><?php echo esc_html__('Venue Location', 'dm-events'); ?></h3>
+                <div class="datamachine-venue-map-section">
+                    <h3 class="venue-map-title"><?php echo esc_html__('Venue Location', 'datamachine-events'); ?></h3>
                     <div
                         id="venue-map-<?php echo esc_attr($post_id); ?>"
-                        class="dm-venue-map"
+                        class="datamachine-venue-map"
                         data-lat="<?php echo esc_attr($lat); ?>"
                         data-lon="<?php echo esc_attr($lon); ?>"
                         data-venue-name="<?php echo esc_attr($venue); ?>"
                         data-venue-address="<?php echo esc_attr($address); ?>"
+                        data-map-type="<?php echo esc_attr($map_display_type); ?>"
                     ></div>
                     <div class="venue-map-attribution">
                         <small>
                             <?php
                             printf(
-                                esc_html__('Map data © %s contributors', 'dm-events'),
+                                esc_html__('Map data © %s contributors', 'datamachine-events'),
                                 '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
                             );
                             ?>

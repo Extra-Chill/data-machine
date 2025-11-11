@@ -2,13 +2,13 @@
 /**
  * Data Machine Events Handler Registration
  *
- * @package DmEvents
+ * @package DataMachineEvents
  * @since 1.0.0
  */
 
-namespace DmEvents\Steps\Publish\Handlers\DmEvents;
+namespace DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents;
 
-use DmEvents\Steps\Publish\Handlers\DmEvents\DmEventsPublisher;
+use DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents\DataMachineEventsPublisher;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -20,23 +20,23 @@ if (!defined('ABSPATH')) {
  * Complete self-registration pattern following Data Machine "plugins within plugins" architecture.
  * Engine discovers DM Events handler capabilities purely through filter-based discovery.
  */
-function dm_register_dm_events_filters() {
+function datamachine_register_dm_events_filters() {
 
     // Register the DM Events publisher handler with Data Machine
-    add_filter('dm_handlers', function($handlers) {
+    add_filter('datamachine_handlers', function($handlers) {
         $handlers['create_event'] = [
             'type' => 'publish',
-            'class' => DmEventsPublisher::class,
-            'label' => __('Publish to Events Calendar', 'dm-events'),
-            'description' => __('Create event posts in WordPress with Event Details blocks', 'dm-events')
+            'class' => DataMachineEventsPublisher::class,
+            'label' => __('Publish to Events Calendar', 'datamachine-events'),
+            'description' => __('Create event posts in WordPress with Event Details blocks', 'datamachine-events')
     ];
     
     return $handlers;
 });
 
 // Register handler settings for Data Machine settings system
-add_filter('dm_handler_settings', function($all_settings) {
-    $all_settings['create_event'] = new DmEventsSettings();
+add_filter('datamachine_handler_settings', function($all_settings) {
+    $all_settings['create_event'] = new DataMachineEventsSettings();
     return $all_settings;
 });
 
@@ -55,15 +55,92 @@ add_filter('ai_tools', function($tools, $handler_slug = null, $handler_config = 
     return $tools;
 }, 10, 3);
 
+/**
+ * Customize handler display for venue and author fields
+ *
+ * Converts venue term IDs to comprehensive venue metadata display
+ * and user IDs to display names on flow step cards.
+ */
+add_filter('datamachine_customize_handler_display', function($settings_display, $handler_slug, $current_settings, $fields, $flow_step_id) {
+    // Check if this is a DM Events handler
+    if ($handler_slug !== 'universal_web_scraper' && $handler_slug !== 'create_event') {
+        return $settings_display;
+    }
+
+    // Process each setting for venue and author customization
+    $customized_display = [];
+    foreach ($settings_display as $setting) {
+        $setting_key = $setting['key'] ?? '';
+        $setting_value = $setting['value'] ?? '';
+
+        // Handle venue term ID conversion to full metadata display
+        if ($setting_key === 'venue' && is_numeric($setting_value) && class_exists('DataMachineEvents\Core\Venue_Taxonomy')) {
+            $venue_data = \DataMachineEvents\Core\Venue_Taxonomy::get_venue_data($setting_value);
+
+            if (!empty($venue_data)) {
+                // Add venue name as primary display
+                $customized_display[] = [
+                    'key' => 'venue',
+                    'label' => 'Venue',
+                    'value' => $setting_value,
+                    'display_value' => $venue_data['name']
+                ];
+
+                // Add all venue metadata fields
+                $venue_meta_fields = [
+                    'address' => 'Address',
+                    'city' => 'City',
+                    'state' => 'State',
+                    'zip' => 'Zip',
+                    'country' => 'Country',
+                    'phone' => 'Phone',
+                    'website' => 'Website',
+                    'capacity' => 'Capacity',
+                    'coordinates' => 'Coordinates'
+                ];
+
+                foreach ($venue_meta_fields as $field_key => $field_label) {
+                    $customized_display[] = [
+                        'key' => "venue_{$field_key}",
+                        'label' => $field_label,
+                        'value' => $venue_data[$field_key] ?? '',
+                        'display_value' => $venue_data[$field_key] ?? ''
+                    ];
+                }
+
+                continue; // Skip adding the original venue setting
+            }
+        }
+
+        // Handle author user ID conversion to display name using centralized filter
+        if (($setting_key === 'post_author' || $setting_key === 'author') && is_numeric($setting_value)) {
+            $display_name = apply_filters('datamachine_wordpress_user_display_name', null, $setting_value);
+            if ($display_name) {
+                $customized_display[] = [
+                    'key' => $setting_key,
+                    'label' => $setting['label'] ?? 'Post Author',
+                    'value' => $setting_value,
+                    'display_value' => $display_name
+                ];
+                continue; // Skip adding the original author setting
+            }
+        }
+
+        // Keep all other settings as-is
+        $customized_display[] = $setting;
+    }
+
+    return $customized_display;
+}, 10, 5);
 
 /**
  * Get base event tool definition
  * 
  * @return array Base event tool configuration
  */
-function dm_events_get_event_base_tool(): array {
+function datamachine_events_get_event_base_tool(): array {
     return [
-        'class' => 'DmEvents\\Steps\\Publish\\Handlers\\DmEvents\\DmEventsPublisher',
+        'class' => 'DataMachineEvents\\Steps\\Publish\\Handlers\\DataMachineEvents\\DataMachineEventsPublisher',
         'method' => 'handle_tool_call',
         'handler' => 'create_event',
         'description' => 'Create WordPress event post with Event Details block. This tool completes your pipeline task by publishing the event to WordPress.',
@@ -118,13 +195,13 @@ function dm_events_get_event_base_tool(): array {
  * @param array $handler_config Handler configuration containing taxonomy selections
  * @return array Dynamic tool configuration with taxonomy parameters
  */
-function dm_events_get_dynamic_event_tool(array $handler_config): array {
+function datamachine_events_get_dynamic_event_tool(array $handler_config): array {
     // Extract Data Machine Events-specific config
     $ce_config = $handler_config['create_event'] ?? $handler_config;
     
     // Apply global defaults from settings if available
     if (function_exists('apply_filters')) {
-        $ce_config = apply_filters('dm_apply_global_defaults', $ce_config, 'create_event', 'publish');
+        $ce_config = apply_filters('datamachine_apply_global_defaults', $ce_config, 'create_event', 'publish');
     }
     
     // Start with base tool
@@ -160,7 +237,7 @@ function dm_events_get_dynamic_event_tool(array $handler_config): array {
             $parameter_name = $taxonomy->name;
             
             // Add existing terms as context for AI decision
-            $terms = DmEventsSettings::get_taxonomy_terms_for_ai($taxonomy->name);
+            $terms = DataMachineEventsSettings::get_taxonomy_terms_for_ai($taxonomy->name);
             $description = "Choose appropriate {$taxonomy->label} for this event";
             
             if (!empty($terms)) {
@@ -252,7 +329,7 @@ function dm_events_get_dynamic_event_tool(array $handler_config): array {
  * @param array &$tool Tool configuration to modify (passed by reference)
  * @param array $ce_config Configuration data including import context
  */
-function dm_events_apply_dynamic_parameter_requirements(array &$tool, array $ce_config): void {
+function datamachine_events_apply_dynamic_parameter_requirements(array &$tool, array $ce_config): void {
     // If no data context available, keep base requirements
     if (empty($ce_config)) {
         // Make venue optional when no data context (though venue should be system parameter)
@@ -283,7 +360,7 @@ function dm_events_apply_dynamic_parameter_requirements(array &$tool, array $ce_
  * @param array $ce_config Configuration data including import context
  * @return array Additional AI tool parameters for schema completion
  */
-function dm_events_get_dynamic_schema_parameters(array $ce_config): array {
+function datamachine_events_get_dynamic_schema_parameters(array $ce_config): array {
     $params = [];
     
     // Always include performer type inference when artist data exists
@@ -340,7 +417,7 @@ function dm_events_get_dynamic_schema_parameters(array $ce_config): array {
  * @param array $ce_config Handler configuration
  * @return bool True if venue data will be available as engine parameters
  */
-function dm_events_check_static_venue_availability(array $ce_config): bool {
+function datamachine_events_check_static_venue_availability(array $ce_config): bool {
     // Check for Web Scraper static venue configuration
     if (isset($ce_config['universal_web_scraper']['venue']) && !empty($ce_config['universal_web_scraper']['venue'])) {
         return true;
@@ -358,4 +435,4 @@ function dm_events_check_static_venue_availability(array $ce_config): bool {
 }
 
 // Auto-register when file loads - achieving complete self-containment
-dm_register_dm_events_filters();
+datamachine_register_dm_events_filters();

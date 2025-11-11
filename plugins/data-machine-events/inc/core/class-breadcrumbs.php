@@ -5,10 +5,10 @@
  * Themes override via 'dm_events_breadcrumbs' filter (priority 10, params: null, $post_id).
  * Default: Home › Events › Event Title using configured main events page URL.
  *
- * @package DmEvents\Core
+ * @package DataMachineEvents\Core
  */
 
-namespace DmEvents\Core;
+namespace DataMachineEvents\Core;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -32,7 +32,7 @@ class Breadcrumbs {
             return '';
         }
 
-        $custom_breadcrumbs = apply_filters('dm_events_breadcrumbs', null, $post_id);
+        $custom_breadcrumbs = apply_filters('datamachine_events_breadcrumbs', null, $post_id);
         if ($custom_breadcrumbs !== null) {
             return $custom_breadcrumbs;
         }
@@ -49,15 +49,15 @@ class Breadcrumbs {
         $events_url = get_post_type_archive_link('dm_events');
         $event_title = get_the_title($post_id);
 
-        $main_events_url = \DmEvents\Admin\Settings_Page::get_main_events_page_url();
+        $main_events_url = \DataMachineEvents\Admin\Settings_Page::get_main_events_page_url();
         if (!empty($main_events_url)) {
             $events_url = $main_events_url;
         }
 
-        $breadcrumb_html = '<nav class="dm-events-breadcrumbs" aria-label="' . esc_attr__('Event Breadcrumb', 'dm-events') . '">';
-        $breadcrumb_html .= '<a href="' . esc_url($home_url) . '">' . esc_html__('Home', 'dm-events') . '</a>';
+        $breadcrumb_html = '<nav class="dm-events-breadcrumbs" aria-label="' . esc_attr__('Event Breadcrumb', 'datamachine-events') . '">';
+        $breadcrumb_html .= '<a href="' . esc_url($home_url) . '">' . esc_html__('Home', 'datamachine-events') . '</a>';
         $breadcrumb_html .= ' › ';
-        $breadcrumb_html .= '<a href="' . esc_url($events_url) . '">' . esc_html__('Events', 'dm-events') . '</a>';
+        $breadcrumb_html .= '<a href="' . esc_url($events_url) . '">' . esc_html__('Events', 'datamachine-events') . '</a>';
         $breadcrumb_html .= ' › ';
         $breadcrumb_html .= '<span>' . esc_html($event_title) . '</span>';
         $breadcrumb_html .= '</nav>';

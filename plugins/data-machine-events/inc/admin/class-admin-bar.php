@@ -2,11 +2,11 @@
 /**
  * Admin Bar Events Menu
  *
- * @package DmEvents
+ * @package DataMachineEvents
  * @subpackage Admin
  */
 
-namespace DmEvents\Admin;
+namespace DataMachineEvents\Admin;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -36,7 +36,7 @@ class Admin_Bar {
 
         // Fallback to post type archive if no custom URL set
         if (empty($events_url)) {
-            $events_url = get_post_type_archive_link('dm_events');
+            $events_url = get_post_type_archive_link('datamachine_events');
         }
 
         // Don't add menu if no URL available
@@ -45,11 +45,11 @@ class Admin_Bar {
         }
 
         $wp_admin_bar->add_menu(array(
-            'id'    => 'dm-events',
-            'title' => __('View Events', 'dm-events'),
+            'id'    => 'datamachine-events',
+            'title' => __('View Events', 'datamachine-events'),
             'href'  => $events_url,
             'meta'  => array(
-                'title' => __('View Events Calendar', 'dm-events'),
+                'title' => __('View Events Calendar', 'datamachine-events'),
                 'target' => '_blank'
             )
         ));

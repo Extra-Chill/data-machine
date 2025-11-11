@@ -15,9 +15,9 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Get plugin version from main file
-VERSION=$(grep "Version:" dm-events.php | head -1 | cut -d' ' -f3)
+VERSION=$(grep "Version:" datamachine-events.php | head -1 | cut -d' ' -f3)
 DIST_DIR="dist"
-PACKAGE_NAME="dm-events"
+PACKAGE_NAME="datamachine-events"
 TEMP_DIR="${DIST_DIR}/${PACKAGE_NAME}"
 
 echo -e "${BLUE}📦 Building version: ${VERSION}${NC}"
@@ -49,7 +49,7 @@ cd ../../..
 echo -e "${YELLOW}📂 Copying plugin files...${NC}"
 
 # Copy main plugin files
-cp dm-events.php "${TEMP_DIR}/"
+cp datamachine-events.php "${TEMP_DIR}/"
 cp readme.txt "${TEMP_DIR}/"
 cp composer.json "${TEMP_DIR}/"
 
@@ -73,6 +73,10 @@ echo -e "${YELLOW}📦 Creating .zip package...${NC}"
 cd "${DIST_DIR}"
 zip -r "${PACKAGE_NAME}.zip" "${PACKAGE_NAME}" -q
 cd ..
+
+# Remove temporary build directory
+echo -e "${YELLOW}🧹 Cleaning up temporary files...${NC}"
+rm -rf "${TEMP_DIR}"
 
 # Generate build info
 echo -e "${YELLOW}📋 Generating build info...${NC}"

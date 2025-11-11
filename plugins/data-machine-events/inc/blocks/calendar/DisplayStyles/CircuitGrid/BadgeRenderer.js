@@ -53,23 +53,23 @@ export class BadgeRenderer {
         const dayGroups = new Map();
         
         // Find all day group containers
-        const dayGroupElements = this.calendar.querySelectorAll('.dm-date-group');
+        const dayGroupElements = this.calendar.querySelectorAll('.datamachine-date-group');
         
         dayGroupElements.forEach(groupElement => {
-            // Extract day from class name (e.g., dm-day-saturday -> saturday)
-            const dayClass = Array.from(groupElement.classList).find(cls => cls.startsWith('dm-day-'));
+            // Extract day from class name (e.g., datamachine-day-saturday -> saturday)
+            const dayClass = Array.from(groupElement.classList).find(cls => cls.startsWith('datamachine-day-'));
             if (!dayClass) return;
             
-            const dayName = dayClass.replace('dm-day-', '');
-            const events = groupElement.querySelectorAll('.dm-event-item:not(.hidden)'); // Only visible events
-            const badge = groupElement.querySelector('.dm-day-badge');
+            const dayName = dayClass.replace('datamachine-day-', '');
+            const events = groupElement.querySelectorAll('.datamachine-event-item:not(.hidden)'); // Only visible events
+            const badge = groupElement.querySelector('.datamachine-day-badge');
             
             if (events.length > 0 && badge) {
                 dayGroups.set(dayName, {
                     groupElement,
                     events: Array.from(events),
                     badge,
-                    color: `var(--dm-day-${dayName})`
+                    color: `var(--datamachine-day-${dayName})`
                 });
             }
         });
@@ -115,7 +115,7 @@ export class BadgeRenderer {
         if (!badge || !firstEvent) return;
 
         const styles = getComputedStyle(document.documentElement);
-        const offsetX = parseInt(styles.getPropertyValue('--dm-badge-offset-x')) || 12;
+        const offsetX = parseInt(styles.getPropertyValue('--datamachine-badge-offset-x')) || 12;
         
         // Get position of first event relative to content area
         const eventRect = firstEvent.getBoundingClientRect();
@@ -139,7 +139,7 @@ export class BadgeRenderer {
      * Clear all badge positioning
      */
     clearBadges() {
-        const badges = this.calendar.querySelectorAll('.dm-day-badge.positioned');
+        const badges = this.calendar.querySelectorAll('.datamachine-day-badge.positioned');
         badges.forEach(badge => {
             badge.classList.remove('positioned');
             badge.style.left = '';

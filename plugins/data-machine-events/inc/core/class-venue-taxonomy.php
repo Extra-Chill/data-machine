@@ -2,10 +2,10 @@
 /**
  * Venue Taxonomy Registration and Management
  *
- * @package DmEvents\Core
+ * @package DataMachineEvents\Core
  */
 
-namespace DmEvents\Core;
+namespace DataMachineEvents\Core;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -38,20 +38,20 @@ class Venue_Taxonomy {
     
     private static function register_venue_taxonomy() {
         if (taxonomy_exists('venue')) {
-            register_taxonomy_for_object_type('venue', 'dm_events');
+            register_taxonomy_for_object_type('venue', 'datamachine_events');
         } else {
-            register_taxonomy('venue', array('post', 'dm_events'), array(
+            register_taxonomy('venue', array('post', 'datamachine_events'), array(
                 'hierarchical' => false,
                 'labels' => array(
-                    'name' => _x('Venues', 'taxonomy general name', 'dm-events'),
-                    'singular_name' => _x('Venue', 'taxonomy singular name', 'dm-events'),
-                    'search_items' => __('Search Venues', 'dm-events'),
-                    'all_items' => __('All Venues', 'dm-events'),
-                    'edit_item' => __('Edit Venue', 'dm-events'),
-                    'update_item' => __('Update Venue', 'dm-events'),
-                    'add_new_item' => __('Add New Venue', 'dm-events'),
-                    'new_item_name' => __('New Venue Name', 'dm-events'),
-                    'menu_name' => __('Venues', 'dm-events'),
+                    'name' => _x('Venues', 'taxonomy general name', 'datamachine-events'),
+                    'singular_name' => _x('Venue', 'taxonomy singular name', 'datamachine-events'),
+                    'search_items' => __('Search Venues', 'datamachine-events'),
+                    'all_items' => __('All Venues', 'datamachine-events'),
+                    'edit_item' => __('Edit Venue', 'datamachine-events'),
+                    'update_item' => __('Update Venue', 'datamachine-events'),
+                    'add_new_item' => __('Add New Venue', 'datamachine-events'),
+                    'new_item_name' => __('New Venue Name', 'datamachine-events'),
+                    'menu_name' => __('Venues', 'datamachine-events'),
                 ),
                 'show_ui' => true,
                 'show_admin_column' => true,
@@ -61,7 +61,7 @@ class Venue_Taxonomy {
             ));
         }
         
-        register_taxonomy_for_object_type('venue', 'dm_events');
+        register_taxonomy_for_object_type('venue', 'datamachine_events');
     }
     
     private static function register_all_public_taxonomies() {
@@ -76,31 +76,107 @@ class Venue_Taxonomy {
                 continue;
             }
             
-            register_taxonomy_for_object_type($taxonomy_slug, 'dm_events');
+            register_taxonomy_for_object_type($taxonomy_slug, 'datamachine_events');
         }
     }
     
     /**
+     * Find or create a venue with given name and metadata
+     *
+     * @param string $venue_name Venue name
+     * @param array $venue_data Venue metadata (address, city, state, etc.)
+     * @return array Array with keys: term_id, was_created
+     */
+    public static function find_or_create_venue($venue_name, $venue_data = []) {
+        // Check if venue already exists by name
+        $existing = get_term_by('name', $venue_name, 'venue');
+
+        if ($existing) {
+            $term_id = $existing->term_id;
+
+            // Check if venue has metadata
+            $has_metadata = self::has_venue_metadata($term_id);
+
+            // If no metadata exists and we have venue data, add it
+            if (!$has_metadata && !empty($venue_data)) {
+                self::update_venue_meta($term_id, $venue_data);
+            }
+
+            return [
+                'term_id' => $term_id,
+                'was_created' => false
+            ];
+        }
+
+        // Create new venue
+        $result = wp_insert_term($venue_name, 'venue');
+
+        if (is_wp_error($result)) {
+            error_log('DM Events: Failed to create venue "' . $venue_name . '": ' . $result->get_error_message());
+            return [
+                'term_id' => null,
+                'was_created' => false
+            ];
+        }
+
+        $term_id = $result['term_id'];
+
+        // Update all metadata for new venue
+        self::update_venue_meta($term_id, $venue_data);
+
+        return [
+            'term_id' => $term_id,
+            'was_created' => true
+        ];
+    }
+
+    /**
      * Update venue term meta with venue data
      *
+     * Supports selective updates - only updates fields present in $venue_data array.
+     * This allows updating only changed fields without overwriting unchanged ones.
+     *
      * @param int $term_id Venue term ID
-     * @param array $venue_data Venue data array
+     * @param array $venue_data Venue data array (can contain subset of fields)
      * @return bool Success status
      */
     public static function update_venue_meta($term_id, $venue_data) {
         if (!$term_id || !is_array($venue_data)) {
             return false;
         }
-        
+
+        // Only update fields present in $venue_data array
         foreach (self::$meta_fields as $data_key => $meta_key) {
-            if (isset($venue_data[$data_key]) && !empty($venue_data[$data_key])) {
+            if (array_key_exists($data_key, $venue_data)) {
+                // Update even if empty (allows clearing fields)
                 update_term_meta($term_id, $meta_key, sanitize_text_field($venue_data[$data_key]));
             }
         }
-        
+
         return true;
     }
-    
+
+    /**
+     * Check if venue has any metadata populated
+     *
+     * @param int $term_id Venue term ID
+     * @return bool True if venue has at least one metadata field populated
+     */
+    private static function has_venue_metadata($term_id) {
+        if (!$term_id) {
+            return false;
+        }
+
+        foreach (self::$meta_fields as $data_key => $meta_key) {
+            $value = get_term_meta($term_id, $meta_key, true);
+            if (!empty($value)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Retrieves complete venue data with all 9 meta fields populated
      */

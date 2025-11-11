@@ -2,10 +2,10 @@
 /**
  * Event import step for Data Machine pipeline with handler discovery
  *
- * @package DmEvents\Steps\EventImport
+ * @package DataMachineEvents\Steps\EventImport
  */
 
-namespace DmEvents\Steps\EventImport;
+namespace DataMachineEvents\Steps\EventImport;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -27,20 +27,20 @@ class EventImportStep {
         $flow_step_config = $parameters['flow_step_config'] ?? [];
         
         try {
-            do_action('dm_log', 'debug', 'Event Import Step: Starting event collection', [
+            do_action('datamachine_log', 'debug', 'Event Import Step: Starting event collection', [
                 'flow_step_id' => $flow_step_id,
                 'existing_items' => count($data)
             ]);
             
             if (empty($flow_step_config)) {
-                do_action('dm_log', 'error', 'Event Import Step: No step configuration provided', ['flow_step_id' => $flow_step_id]);
+                do_action('datamachine_log', 'error', 'Event Import Step: No step configuration provided', ['flow_step_id' => $flow_step_id]);
                 return $data;
             }
 
             $handler_data = $flow_step_config['handler'] ?? null;
             
             if (!$handler_data || empty($handler_data['handler_slug'])) {
-                do_action('dm_log', 'error', 'Event Import Step: Event import step requires handler configuration', [
+                do_action('datamachine_log', 'error', 'Event Import Step: Event import step requires handler configuration', [
                     'flow_step_id' => $flow_step_id,
                     'available_flow_step_config' => array_keys($flow_step_config),
                     'handler_data' => $handler_data
@@ -51,11 +51,11 @@ class EventImportStep {
             $handler_slug = $handler_data['handler_slug'];
             
             // Get handler object from registry
-            $all_handlers = apply_filters('dm_handlers', []);
+            $all_handlers = apply_filters('datamachine_handlers', []);
             $handler_info = $all_handlers[$handler_slug] ?? null;
             
             if (!$handler_info || empty($handler_info['class'])) {
-                do_action('dm_log', 'error', 'Event Import Step: Handler not found in registry', [
+                do_action('datamachine_log', 'error', 'Event Import Step: Handler not found in registry', [
                     'handler_slug' => $handler_slug,
                     'flow_step_id' => $flow_step_id
                 ]);
@@ -64,7 +64,7 @@ class EventImportStep {
             
             // Verify handler type is event_import
             if (($handler_info['type'] ?? '') !== 'event_import') {
-                do_action('dm_log', 'error', 'Event Import Step: Invalid handler type', [
+                do_action('datamachine_log', 'error', 'Event Import Step: Invalid handler type', [
                     'handler_slug' => $handler_slug,
                     'expected_type' => 'event_import',
                     'actual_type' => $handler_info['type'] ?? 'unknown'
@@ -75,7 +75,7 @@ class EventImportStep {
             // Instantiate handler
             $class_name = $handler_info['class'];
             if (!class_exists($class_name)) {
-                do_action('dm_log', 'error', 'Event Import Step: Handler class not found', [
+                do_action('datamachine_log', 'error', 'Event Import Step: Handler class not found', [
                     'handler_slug' => $handler_slug,
                     'class_name' => $class_name
                 ]);
@@ -87,7 +87,7 @@ class EventImportStep {
             // Execute handler with unified parameter structure
             $data = $handler->execute($parameters);
 
-            do_action('dm_log', 'debug', 'Event Import Step: Direct handler execution completed', [
+            do_action('datamachine_log', 'debug', 'Event Import Step: Direct handler execution completed', [
                 'flow_step_id' => $flow_step_id,
                 'handler_slug' => $handler_slug,
                 'handler_class' => $class_name,
@@ -97,7 +97,7 @@ class EventImportStep {
             return $data;
 
         } catch (\Exception $e) {
-            do_action('dm_log', 'error', 'Event Import Step: Exception during event collection', [
+            do_action('datamachine_log', 'error', 'Event Import Step: Exception during event collection', [
                 'flow_step_id' => $flow_step_id,
                 'exception' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()

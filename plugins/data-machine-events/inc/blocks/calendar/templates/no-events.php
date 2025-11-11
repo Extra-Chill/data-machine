@@ -11,6 +11,6 @@ if (!defined('ABSPATH')) {
 }
 ?>
 
-<div class="dm-events-no-events">
-    <p><?php _e('No events found.', 'dm-events'); ?></p>
+<div class="datamachine-events-no-events">
+    <p><?php _e('No events found.', 'datamachine-events'); ?></p>
 </div>

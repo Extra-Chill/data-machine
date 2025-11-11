@@ -51,7 +51,7 @@ Frontend-focused WordPress events plugin with block-first architecture. Integrat
 * Comprehensive venue meta fields (10 fields: address, phone, website, capacity, coordinates, etc.)
 * REST API enabled for headless implementations
 * Block-first approach with background meta field sync for performance
-* Status detection system for Data Machine integration
+* Legacy status detection monitors removed (class retained as compatibility stub)
 
 = Real-World Examples =
 
@@ -82,7 +82,7 @@ Frontend-focused WordPress events plugin with block-first architecture. Integrat
 ✅ AI-driven content creation and taxonomy management
 ✅ Performance-optimized with background meta sync
 ✅ Lightweight single post type approach
-✅ Integrated status detection and monitoring
+✅ Legacy status detection removed; plugin now relies on Data Machine core health checks
 ✅ PSR-4 autoloading with clean class organization
 
 = Data Machine Events Workflow =

@@ -2,10 +2,10 @@
 /**
  * Taxonomy data discovery, hierarchy building, and post count calculations for calendar filtering
  *
- * @package DmEvents\Blocks\Calendar
+ * @package DataMachineEvents\Blocks\Calendar
  */
 
-namespace DmEvents\Blocks\Calendar;
+namespace DataMachineEvents\Blocks\Calendar;
 
 if (!defined('ABSPATH')) {
     exit;

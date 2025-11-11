@@ -5,11 +5,11 @@
  * Defines settings fields and sanitization for Ticketmaster event import handler.
  * Part of the modular handler architecture for Data Machine integration.
  *
- * @package DmEvents\Steps\EventImport\Handlers\Ticketmaster
+ * @package DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster
  * @since 1.0.0
  */
 
-namespace DmEvents\Steps\EventImport\Handlers\Ticketmaster;
+namespace DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster;
 
 // Prevent direct access
 if (!defined('ABSPATH')) {
@@ -44,39 +44,39 @@ class TicketmasterSettings {
         return [
             'classification_type' => [
                 'type' => 'select',
-                'label' => __('Event Type', 'dm-events'),
-                'description' => __('Select the type of events to import. Options are fetched dynamically from Ticketmaster API.', 'dm-events'),
+                'label' => __('Event Type', 'datamachine-events'),
+                'description' => __('Select the type of events to import. Options are fetched dynamically from Ticketmaster API.', 'datamachine-events'),
                 'options' => Ticketmaster::get_classifications_for_dropdown($current_config),
             ],
             'location' => [
                 'type' => 'text',
-                'label' => __('Location Coordinates', 'dm-events'),
-                'description' => __('Enter coordinates as "latitude,longitude" (e.g., "32.7765,-79.9311"). To get coordinates: Go to maps.google.com, find your location, right-click, and copy the numbers.', 'dm-events'),
-                'placeholder' => __('32.7765,-79.9311', 'dm-events'),
+                'label' => __('Location Coordinates', 'datamachine-events'),
+                'description' => __('Enter coordinates as "latitude,longitude" (e.g., "32.7765,-79.9311"). To get coordinates: Go to maps.google.com, find your location, right-click, and copy the numbers.', 'datamachine-events'),
+                'placeholder' => __('32.7765,-79.9311', 'datamachine-events'),
             ],
             'radius' => [
                 'type' => 'text',
-                'label' => __('Search Radius (Miles)', 'dm-events'),
-                'description' => __('Search radius in miles around the specified location. Default is 50 miles.', 'dm-events'),
-                'placeholder' => __('50', 'dm-events'),
+                'label' => __('Search Radius (Miles)', 'datamachine-events'),
+                'description' => __('Search radius in miles around the specified location. Default is 50 miles.', 'datamachine-events'),
+                'placeholder' => __('50', 'datamachine-events'),
             ],
             'start_date' => [
                 'type' => 'text',
-                'label' => __('Start Date', 'dm-events'),
-                'description' => __('Start date for event search in ISO format (YYYY-MM-DDTHH:mm:ssZ). Leave empty for current date.', 'dm-events'),
-                'placeholder' => __('2024-01-01T00:00:00Z', 'dm-events'),
+                'label' => __('Start Date', 'datamachine-events'),
+                'description' => __('Start date for event search in ISO format (YYYY-MM-DDTHH:mm:ssZ). Leave empty for current date.', 'datamachine-events'),
+                'placeholder' => __('2024-01-01T00:00:00Z', 'datamachine-events'),
             ],
             'genre' => [
                 'type' => 'text',
-                'label' => __('Genre ID (Advanced)', 'dm-events'),
-                'description' => __('Optional: Specific Ticketmaster Genre ID for sub-filtering within the selected event type (e.g., KnvZfZ7vAeA for Rock music). Leave empty for all genres within the event type.', 'dm-events'),
-                'placeholder' => __('KnvZfZ7vAeA', 'dm-events'),
+                'label' => __('Genre ID (Advanced)', 'datamachine-events'),
+                'description' => __('Optional: Specific Ticketmaster Genre ID for sub-filtering within the selected event type (e.g., KnvZfZ7vAeA for Rock music). Leave empty for all genres within the event type.', 'datamachine-events'),
+                'placeholder' => __('KnvZfZ7vAeA', 'datamachine-events'),
             ],
             'venue_id' => [
                 'type' => 'text',
-                'label' => __('Venue ID', 'dm-events'),
-                'description' => __('Specific Ticketmaster Venue ID to search. Leave empty to search all venues.', 'dm-events'),
-                'placeholder' => __('KovZpZAJledA', 'dm-events'),
+                'label' => __('Venue ID', 'datamachine-events'),
+                'description' => __('Specific Ticketmaster Venue ID to search. Leave empty to search all venues.', 'datamachine-events'),
+                'placeholder' => __('KovZpZAJledA', 'datamachine-events'),
             ]
         ];
     }

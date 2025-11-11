@@ -5,7 +5,7 @@
  * in Event Details blocks. Uses 📍 emoji marker for consistency with
  * venue card icon.
  *
- * @package DmEvents
+ * @package DataMachineEvents
  * @since 1.0.0
  */
 
@@ -16,7 +16,7 @@
      * Initialize all venue maps on the page
      */
     function initVenueMaps() {
-        const mapContainers = document.querySelectorAll('.dm-venue-map');
+        const mapContainers = document.querySelectorAll('.datamachine-venue-map');
 
         if (mapContainers.length === 0) {
             return;
@@ -42,6 +42,7 @@
         const lon = parseFloat(container.getAttribute('data-lon'));
         const venueName = container.getAttribute('data-venue-name') || 'Venue';
         const venueAddress = container.getAttribute('data-venue-address') || '';
+        const mapType = container.getAttribute('data-map-type') || 'osm-standard';
 
         // Validate coordinates
         if (isNaN(lat) || isNaN(lon)) {
@@ -59,8 +60,34 @@
             // Create the map
             const map = L.map(container.id).setView([lat, lon], 15);
 
-            // Add OpenStreetMap tile layer
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            // Get tile layer configuration based on map type
+            const tileConfigs = {
+                'osm-standard': {
+                    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    attribution: 'OpenStreetMap'
+                },
+                'carto-positron': {
+                    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+                    attribution: 'CartoDB'
+                },
+                'carto-voyager': {
+                    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+                    attribution: 'CartoDB'
+                },
+                'carto-dark': {
+                    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+                    attribution: 'CartoDB'
+                },
+                'humanitarian': {
+                    url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+                    attribution: 'Humanitarian OpenStreetMap'
+                }
+            };
+
+            const tileConfig = tileConfigs[mapType] || tileConfigs['osm-standard'];
+
+            // Add tile layer with selected configuration
+            L.tileLayer(tileConfig.url, {
                 attribution: '', // Attribution handled in template
                 maxZoom: 19,
                 minZoom: 10
@@ -115,7 +142,7 @@
      * Re-initialize maps after dynamic content loads
      */
     function reinitMaps() {
-        const uninitializedMaps = document.querySelectorAll('.dm-venue-map:not(.map-initialized)');
+        const uninitializedMaps = document.querySelectorAll('.datamachine-venue-map:not(.map-initialized)');
         if (uninitializedMaps.length > 0) {
             initVenueMaps();
         }
@@ -130,10 +157,10 @@
 
     // Re-initialize for dynamic content (AJAX-loaded events, etc.)
     if (window.jQuery) {
-        jQuery(document).on('dm-events-loaded', reinitMaps);
+        jQuery(document).on('datamachine-events-loaded', reinitMaps);
     }
 
     // Global function for manual initialization
-    window.dmEventsInitMaps = initVenueMaps;
+    window.datamachineEventsInitMaps = initVenueMaps;
 
 })();

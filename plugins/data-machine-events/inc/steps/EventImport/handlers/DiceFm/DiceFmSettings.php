@@ -5,11 +5,11 @@
  * Defines settings fields and sanitization for Dice.fm event import handler.
  * Part of the modular handler architecture for Data Machine integration.
  *
- * @package DmEvents\Steps\EventImport\Handlers\DiceFm
+ * @package DataMachineEvents\Steps\EventImport\Handlers\DiceFm
  * @since 1.0.0
  */
 
-namespace DmEvents\Steps\EventImport\Handlers\DiceFm;
+namespace DataMachineEvents\Steps\EventImport\Handlers\DiceFm;
 
 // Prevent direct access
 if (!defined('ABSPATH')) {
@@ -41,33 +41,33 @@ class DiceFmSettings {
         return [
             'city' => [
                 'type' => 'text',
-                'label' => __('City', 'dm-events'),
-                'description' => __('City name to search for events (required). This is the primary filter for Dice.fm API.', 'dm-events'),
-                'placeholder' => __('Charleston', 'dm-events'),
+                'label' => __('City', 'datamachine-events'),
+                'description' => __('City name to search for events (required). This is the primary filter for Dice.fm API.', 'datamachine-events'),
+                'placeholder' => __('Charleston', 'datamachine-events'),
                 'required' => true,
             ],
             'date_range' => [
                 'type' => 'number',
-                'label' => __('Date Range (Days)', 'dm-events'),
-                'description' => __('Number of days to look ahead for events. Default is 90 days.', 'dm-events'),
+                'label' => __('Date Range (Days)', 'datamachine-events'),
+                'description' => __('Number of days to look ahead for events. Default is 90 days.', 'datamachine-events'),
                 'default' => 90,
                 'min' => 1,
                 'max' => 365,
             ],
             'page_size' => [
                 'type' => 'number',
-                'label' => __('Page Size', 'dm-events'),
-                'description' => __('Number of events to fetch per API request. Default is 100 (maximum allowed by API).', 'dm-events'),
+                'label' => __('Page Size', 'datamachine-events'),
+                'description' => __('Number of events to fetch per API request. Default is 100 (maximum allowed by API).', 'datamachine-events'),
                 'default' => 100,
                 'min' => 1,
                 'max' => 100,
             ],
             'event_types' => [
                 'type' => 'text',
-                'label' => __('Event Types', 'dm-events'),
-                'description' => __('Comma-separated list of event types to include (linkout,event). Default includes both.', 'dm-events'),
+                'label' => __('Event Types', 'datamachine-events'),
+                'description' => __('Comma-separated list of event types to include (linkout,event). Default includes both.', 'datamachine-events'),
                 'default' => 'linkout,event',
-                'placeholder' => __('linkout,event', 'dm-events'),
+                'placeholder' => __('linkout,event', 'datamachine-events'),
             ]
         ];
     }

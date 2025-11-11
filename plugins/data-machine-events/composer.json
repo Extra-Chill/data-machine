@@ -1,5 +1,5 @@
 {
-    "name": "chubes/dm-events",
+    "name": "chubes/datamachine-events",
     "description": "Data Machine Events plugin dependencies",
     "require": {
         "php": ">=8.0",

@@ -5,11 +5,11 @@
  * Registers the Universal Web Scraper handler and settings with Data Machine.
  * Provides Schema.org compliant event extraction from any website.
  *
- * @package DmEvents\Steps\EventImport\Handlers\WebScraper
+ * @package DataMachineEvents\Steps\EventImport\Handlers\WebScraper
  * @since 1.0.0
  */
 
-namespace DmEvents\Steps\EventImport\Handlers\WebScraper;
+namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper;
 
 // Prevent direct access
 if (!defined('ABSPATH')) {
@@ -23,14 +23,14 @@ if (!defined('ABSPATH')) {
  * Schema.org compliant event extraction from any website.
  * Prioritizes structured data with intelligent HTML parsing fallbacks.
  */
-add_filter('dm_handlers', function($handlers, $step_type = null) {
+add_filter('datamachine_handlers', function($handlers, $step_type = null) {
     // Only register when event_import handlers are requested
     if ($step_type === null || $step_type === 'event_import') {
         $handlers['universal_web_scraper'] = [
             'type' => 'event_import',
-            'class' => 'DmEvents\\Steps\\EventImport\\Handlers\\WebScraper\\UniversalWebScraper',
-            'label' => __('Universal Web Scraper', 'dm-events'),
-            'description' => __('Extract events from any website using Schema.org compliance with AI fallbacks', 'dm-events')
+            'class' => 'DataMachineEvents\\Steps\\EventImport\\Handlers\\WebScraper\\UniversalWebScraper',
+            'label' => __('Universal Web Scraper', 'datamachine-events'),
+            'description' => __('Extract events from any website using Schema.org compliance with AI fallbacks', 'datamachine-events')
         ];
     }
 
@@ -42,7 +42,7 @@ add_filter('dm_handlers', function($handlers, $step_type = null) {
  * 
  * Simple settings with just URL field - no dropdown complexity.
  */
-add_filter('dm_handler_settings', function($all_settings) {
+add_filter('datamachine_handler_settings', function($all_settings) {
     $all_settings['universal_web_scraper'] = new UniversalWebScraperSettings();
     return $all_settings;
 });

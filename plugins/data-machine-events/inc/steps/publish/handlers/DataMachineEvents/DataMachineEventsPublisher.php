@@ -2,19 +2,19 @@
 /**
  * AI-driven event creation with Event Details block generation and venue handling.
  *
- * @package DmEvents\Steps\Publish\Handlers\DmEvents
+ * @package DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents
  */
 
-namespace DmEvents\Steps\Publish\Handlers\DmEvents;
+namespace DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents;
 
-use DmEvents\Steps\Publish\Handlers\DmEvents\DmEventsVenue;
-use DmEvents\Steps\Publish\Handlers\DmEvents\DmEventsSchema;
+use DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents\DataMachineEventsVenue;
+use DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents\DataMachineEventsSchema;
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-class DmEventsPublisher {
+class DataMachineEventsPublisher {
     
     public function __construct() {
     }
@@ -27,7 +27,7 @@ class DmEventsPublisher {
     public function handle_tool_call(array $parameters, array $tool_def = []): array {
         if (empty($parameters['title'])) {
             $error_msg = 'DM Events tool call missing required title parameter';
-            do_action('dm_log', 'error', $error_msg, [
+            do_action('datamachine_log', 'error', $error_msg, [
                 'provided_parameters' => array_keys($parameters),
                 'required_parameters' => ['title']
             ]);
@@ -41,9 +41,9 @@ class DmEventsPublisher {
         
         $handler_config = $tool_def['handler_config'] ?? [];
         
-        $routing = DmEventsSchema::engine_or_tool($parameters, $handler_config, $parameters);
+        $routing = DataMachineEventsSchema::engine_or_tool($parameters, $handler_config, $parameters);
         
-        do_action('dm_log', 'debug', 'DM Events Tool: Smart parameter routing', [
+        do_action('datamachine_log', 'debug', 'DM Events Tool: Smart parameter routing', [
             'engine_params' => array_keys($routing['engine']),
             'tool_params' => $routing['tool'],
             'total_ai_params' => count($parameters)
@@ -52,7 +52,7 @@ class DmEventsPublisher {
         $post_status = $handler_config['post_status'] ?? 'draft';
         $post_author = $handler_config['post_author'] ?? get_current_user_id() ?: 1;
         
-        do_action('dm_log', 'debug', 'DM Events Tool: Processing event creation', [
+        do_action('datamachine_log', 'debug', 'DM Events Tool: Processing event creation', [
             'title' => $parameters['title'],
             'has_venue' => !empty($parameters['venue']),
             'post_status' => $post_status,
@@ -95,7 +95,7 @@ class DmEventsPublisher {
         
         if (is_wp_error($post_id) || !$post_id) {
             $error_msg = 'Event post creation failed: ' . (is_wp_error($post_id) ? $post_id->get_error_message() : 'Unknown error');
-            do_action('dm_log', 'error', $error_msg, [
+            do_action('datamachine_log', 'error', $error_msg, [
                 'event_data' => $event_data,
                 'post_data' => $post_data
             ]);
@@ -117,22 +117,29 @@ class DmEventsPublisher {
         
         $venue_result = null;
         $venue_name = $parameters['venue'] ?? '';
-        
+
         if (!empty($venue_name)) {
             $venue_metadata = [
-                'venue_address' => $parameters['venue_address'] ?? '',
-                'venue_city' => $parameters['venue_city'] ?? '',
-                'venue_state' => $parameters['venue_state'] ?? '',
-                'venue_zip' => $parameters['venue_zip'] ?? '',
-                'venue_country' => $parameters['venue_country'] ?? '',
-                'venue_phone' => $parameters['venue_phone'] ?? '',
-                'venue_website' => $parameters['venue_website'] ?? '',
-                'venue_coordinates' => $parameters['venue_coordinates'] ?? '',
-                'venue_capacity' => $parameters['venue_capacity'] ?? ''
+                'address' => $parameters['venue_address'] ?? '',
+                'city' => $parameters['venue_city'] ?? '',
+                'state' => $parameters['venue_state'] ?? '',
+                'zip' => $parameters['venue_zip'] ?? '',
+                'country' => $parameters['venue_country'] ?? '',
+                'phone' => $parameters['venue_phone'] ?? '',
+                'website' => $parameters['venue_website'] ?? '',
+                'coordinates' => $parameters['venue_coordinates'] ?? '',
+                'capacity' => $parameters['venue_capacity'] ?? ''
             ];
 
-            $assignment_result = DmEventsVenue::assign_venue_to_event($post_id, $venue_name, $venue_metadata);
-            $venue_result = $assignment_result['venue_result'];
+            // Create or find venue
+            $venue_result = \DataMachineEvents\Core\Venue_Taxonomy::find_or_create_venue($venue_name, $venue_metadata);
+
+            if ($venue_result['term_id']) {
+                // Assign existing venue term_id to event
+                $assignment_result = DataMachineEventsVenue::assign_venue_to_event($post_id, [
+                    'venue' => $venue_result['term_id']
+                ]);
+            }
         }
         
         $direct_taxonomy_results = $this->process_direct_taxonomy_assignments($post_id, $handler_config);
@@ -141,7 +148,7 @@ class DmEventsPublisher {
         
         $taxonomy_results = array_merge($direct_taxonomy_results, $ai_taxonomy_results);
         
-        do_action('dm_log', 'debug', 'DM Events Tool: Event created successfully', [
+        do_action('datamachine_log', 'debug', 'DM Events Tool: Event created successfully', [
             'post_id' => $post_id,
             'post_url' => get_permalink($post_id),
             'venue_created' => $venue_result !== null,
@@ -188,7 +195,31 @@ class DmEventsPublisher {
         }
         
         if (!empty($event_data['venue'])) {
-            DmEventsVenue::assign_venue_to_event($post_id, $event_data['venue'], $event_data);
+            // Extract venue metadata
+            $venue_metadata = [
+                'address' => $event_data['venue_address'] ?? '',
+                'city' => $event_data['venue_city'] ?? '',
+                'state' => $event_data['venue_state'] ?? '',
+                'zip' => $event_data['venue_zip'] ?? '',
+                'country' => $event_data['venue_country'] ?? '',
+                'phone' => $event_data['venue_phone'] ?? '',
+                'website' => $event_data['venue_website'] ?? '',
+                'coordinates' => $event_data['venue_coordinates'] ?? '',
+                'capacity' => $event_data['venue_capacity'] ?? ''
+            ];
+
+            // Create or find venue
+            $venue_result = \DataMachineEvents\Core\Venue_Taxonomy::find_or_create_venue(
+                $event_data['venue'],
+                $venue_metadata
+            );
+
+            if ($venue_result['term_id']) {
+                // Assign existing venue term_id to event
+                DataMachineEventsVenue::assign_venue_to_event($post_id, [
+                    'venue' => $venue_result['term_id']
+                ]);
+            }
         }
         
         return $post_id;
@@ -257,9 +288,9 @@ class DmEventsPublisher {
 <!-- /wp:paragraph -->';
         }
         
-        return '<!-- wp:dm-events/event-details ' . $block_json . ' -->' . 
+        return '<!-- wp:datamachine-events/event-details ' . $block_json . ' -->' . 
                ($inner_blocks ? "\n" . $inner_blocks . "\n" : '') .
-               '<!-- /wp:dm-events/event-details -->';
+               '<!-- /wp:datamachine-events/event-details -->';
     }
     
     /**
@@ -296,9 +327,9 @@ class DmEventsPublisher {
 <p>Event details managed in block attributes.</p>
 <!-- /wp:paragraph -->';
         
-        return '<!-- wp:dm-events/event-details ' . $block_json . ' -->' . 
+        return '<!-- wp:datamachine-events/event-details ' . $block_json . ' -->' . 
                "\n" . $inner_blocks . "\n" .
-               '<!-- /wp:dm-events/event-details -->';
+               '<!-- /wp:datamachine-events/event-details -->';
     }
     
     
@@ -337,7 +368,7 @@ class DmEventsPublisher {
                             'taxonomy' => $taxonomy->name
                         ];
                         
-                        do_action('dm_log', 'debug', 'DM Events: Direct taxonomy assignment successful', [
+                        do_action('datamachine_log', 'debug', 'DM Events: Direct taxonomy assignment successful', [
                             'taxonomy' => $taxonomy->name,
                             'term_id' => $term_id,
                             'term_name' => $term->name,
@@ -352,7 +383,7 @@ class DmEventsPublisher {
                         ];
                     }
                 } else {
-                    do_action('dm_log', 'warning', 'DM Events: Invalid term ID for direct assignment', [
+                    do_action('datamachine_log', 'warning', 'DM Events: Invalid term ID for direct assignment', [
                         'taxonomy' => $taxonomy->name,
                         'term_id' => $term_id,
                         'field_key' => $field_key
@@ -501,7 +532,7 @@ class DmEventsPublisher {
             // Download image to temp file
             $temp_file = download_url($image_url);
             if (is_wp_error($temp_file)) {
-                do_action('dm_log', 'warning', 'DM Events Featured Image: Failed to download image', [
+                do_action('datamachine_log', 'warning', 'DM Events Featured Image: Failed to download image', [
                     'image_url' => $image_url,
                     'error' => $temp_file->get_error_message()
                 ]);
@@ -519,7 +550,7 @@ class DmEventsPublisher {
             
             if (is_wp_error($attachment_id)) {
                 @unlink($temp_file);
-                do_action('dm_log', 'warning', 'DM Events Featured Image: Failed to create attachment', [
+                do_action('datamachine_log', 'warning', 'DM Events Featured Image: Failed to create attachment', [
                     'image_url' => $image_url,
                     'error' => $attachment_id->get_error_message()
                 ]);
@@ -530,14 +561,14 @@ class DmEventsPublisher {
             $result = set_post_thumbnail($post_id, $attachment_id);
             
             if (!$result) {
-                do_action('dm_log', 'warning', 'DM Events Featured Image: Failed to set featured image', [
+                do_action('datamachine_log', 'warning', 'DM Events Featured Image: Failed to set featured image', [
                     'post_id' => $post_id,
                     'attachment_id' => $attachment_id
                 ]);
                 return ['success' => false, 'error' => 'Failed to set featured image'];
             }
 
-            do_action('dm_log', 'debug', 'DM Events Featured Image: Successfully set featured image', [
+            do_action('datamachine_log', 'debug', 'DM Events Featured Image: Successfully set featured image', [
                 'post_id' => $post_id,
                 'attachment_id' => $attachment_id,
                 'image_url' => $image_url
@@ -550,7 +581,7 @@ class DmEventsPublisher {
             ];
 
         } catch (Exception $e) {
-            do_action('dm_log', 'error', 'DM Events Featured Image: Exception occurred', [
+            do_action('datamachine_log', 'error', 'DM Events Featured Image: Exception occurred', [
                 'image_url' => $image_url,
                 'error' => $e->getMessage()
             ]);

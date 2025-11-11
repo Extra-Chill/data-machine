@@ -4,7 +4,7 @@
  * 
  * Registers the Ticketmaster event import handler with Data Machine.
  *
- * @package DmEvents\Steps\EventImport\Handlers\Ticketmaster
+ * @package DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster
  * @since 1.0.0
  */
 
@@ -20,8 +20,8 @@ if (!defined('ABSPATH')) {
  * Adds the Ticketmaster auth provider to Data Machine's auth system.
  * This enables the authentication modal for API key configuration.
  */
-add_filter('dm_auth_providers', function($providers) {
-    $providers['ticketmaster_events'] = new DmEvents\Steps\EventImport\Handlers\Ticketmaster\TicketmasterAuth();
+add_filter('datamachine_auth_providers', function($providers) {
+    $providers['ticketmaster_events'] = new DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster\TicketmasterAuth();
     return $providers;
 });
 
@@ -31,7 +31,7 @@ add_filter('dm_auth_providers', function($providers) {
  * Adds the Ticketmaster settings provider to Data Machine's settings system.
  * This enables the configuration UI for handler parameters.
  */
-add_filter('dm_handler_settings', function($all_settings) {
-    $all_settings['ticketmaster_events'] = new DmEvents\Steps\EventImport\Handlers\Ticketmaster\TicketmasterSettings();
+add_filter('datamachine_handler_settings', function($all_settings) {
+    $all_settings['ticketmaster_events'] = new DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster\TicketmasterSettings();
     return $all_settings;
 });

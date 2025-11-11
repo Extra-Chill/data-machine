@@ -45,7 +45,7 @@ export class CircuitGridRenderer {
      */
     initializeGridEvents() {
         // Circuit grid specific event handlers - simplified without border lighting
-        const eventCards = this.calendar.querySelectorAll('.dm-events-content .dm-event-link');
+        const eventCards = this.calendar.querySelectorAll('.datamachine-events-content .datamachine-event-link');
         
         // Additional grid-specific interactivity can be added here if needed
     }
@@ -54,10 +54,10 @@ export class CircuitGridRenderer {
      * Find existing SVG container created by PHP
      */
     findSVGContainer() {
-        this.svgContainer = this.calendar.querySelector('.dm-border-overlay');
+        this.svgContainer = this.calendar.querySelector('.datamachine-border-overlay');
         
         if (!this.svgContainer) {
-            console.error('CircuitGridRenderer: SVG container not found. Expected .dm-border-overlay element in calendar.');
+            console.error('CircuitGridRenderer: SVG container not found. Expected .datamachine-border-overlay element in calendar.');
             return false;
         }
         
@@ -101,21 +101,21 @@ export class CircuitGridRenderer {
         const dayGroups = new Map();
         
         // Find all day group containers in circuit grid
-        const dayGroupElements = this.calendar.querySelectorAll('.dm-events-content .dm-date-group');
+        const dayGroupElements = this.calendar.querySelectorAll('.datamachine-events-content .dm-date-group');
         
         dayGroupElements.forEach(groupElement => {
-            // Extract day from class name (e.g., dm-day-saturday -> saturday)
-            const dayClass = Array.from(groupElement.classList).find(cls => cls.startsWith('dm-day-'));
+            // Extract day from class name (e.g., datamachine-day-saturday -> saturday)
+            const dayClass = Array.from(groupElement.classList).find(cls => cls.startsWith('datamachine-day-'));
             if (!dayClass) return;
             
-            const dayName = dayClass.replace('dm-day-', '');
-            const events = groupElement.querySelectorAll('.dm-event-item:not(.hidden)'); // Only visible events
+            const dayName = dayClass.replace('datamachine-day-', '');
+            const events = groupElement.querySelectorAll('.datamachine-event-item:not(.hidden)'); // Only visible events
             
             if (events.length > 0) {
                 dayGroups.set(dayName, {
                     groupElement,
                     events: Array.from(events),
-                    color: `var(--dm-day-${dayName})`
+                    color: `var(--datamachine-day-${dayName})`
                 });
             }
         });
@@ -139,7 +139,7 @@ export class CircuitGridRenderer {
 
         events.forEach(event => {
             const rect = event.getBoundingClientRect();
-            const contentRect = this.calendar.querySelector('.dm-events-content').getBoundingClientRect();
+            const contentRect = this.calendar.querySelector('.datamachine-events-content').getBoundingClientRect();
             
             // Calculate relative position within the content area (where SVG overlay is positioned)
             const left = rect.left - contentRect.left;
@@ -222,7 +222,7 @@ export class CircuitGridRenderer {
         }
 
         element.setAttribute('data-day', dayName);
-        element.className.baseVal = `dm-border-${dayName}`;
+        element.className.baseVal = `datamachine-border-${dayName}`;
 
         this.svgContainer.appendChild(element);
         this.borders.set(dayName, element);
@@ -235,12 +235,12 @@ export class CircuitGridRenderer {
      */
     getActiveGridSettings() {
         const styles = getComputedStyle(document.documentElement);
-        const cellWidth = parseInt(styles.getPropertyValue('--dm-grid-cell-width'));
-        const gap = parseInt(styles.getPropertyValue('--dm-grid-gap'));
-        const borderRadius = parseInt(styles.getPropertyValue('--dm-border-radius')) || 8;
+        const cellWidth = parseInt(styles.getPropertyValue('--datamachine-grid-cell-width'));
+        const gap = parseInt(styles.getPropertyValue('--datamachine-grid-gap'));
+        const borderRadius = parseInt(styles.getPropertyValue('--datamachine-border-radius')) || 8;
         
         // Get actual container width
-        const containerWidth = this.calendar.querySelector('.dm-events-content').getBoundingClientRect().width;
+        const containerWidth = this.calendar.querySelector('.datamachine-events-content').getBoundingClientRect().width;
         
         // Calculate events per row using same logic as CSS grid
         const eventsPerRow = Math.floor((containerWidth + gap) / (cellWidth + gap));
@@ -263,7 +263,7 @@ export class CircuitGridRenderer {
      */
     calculateEventGridPosition(event, gridSettings) {
         const rect = event.getBoundingClientRect();
-        const contentRect = this.calendar.querySelector('.dm-events-content').getBoundingClientRect();
+        const contentRect = this.calendar.querySelector('.datamachine-events-content').getBoundingClientRect();
         
         // Get relative position within content area
         const relativeLeft = rect.left - contentRect.left;
@@ -343,7 +343,7 @@ export class CircuitGridRenderer {
     generateSingleEventShape(event) {
         const gridSettings = this.getActiveGridSettings();
         const rect = event.getBoundingClientRect();
-        const contentRect = this.calendar.querySelector('.dm-events-content').getBoundingClientRect();
+        const contentRect = this.calendar.querySelector('.datamachine-events-content').getBoundingClientRect();
         
         const bounds = {
             left: rect.left - contentRect.left - 8,
@@ -369,7 +369,7 @@ export class CircuitGridRenderer {
         let maxRight = -Infinity;
         let maxBottom = -Infinity;
         
-        const contentRect = this.calendar.querySelector('.dm-events-content').getBoundingClientRect();
+        const contentRect = this.calendar.querySelector('.datamachine-events-content').getBoundingClientRect();
         
         events.forEach(event => {
             const rect = event.getBoundingClientRect();
@@ -404,7 +404,7 @@ export class CircuitGridRenderer {
     createBorderPathWithGap(bounds, borderRadius = 8) {
         const curves = this.drawCurves();
         const styles = getComputedStyle(document.documentElement);
-        const offsetX = parseInt(styles.getPropertyValue('--dm-badge-offset-x')) || 12;
+        const offsetX = parseInt(styles.getPropertyValue('--datamachine-badge-offset-x')) || 12;
         const badgeGapWidth = 140; // Width of gap for badge
         const gapStart = bounds.left + offsetX;
         const gapEnd = gapStart + badgeGapWidth;

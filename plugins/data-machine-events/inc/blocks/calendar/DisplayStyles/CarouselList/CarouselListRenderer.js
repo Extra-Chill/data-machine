@@ -31,12 +31,12 @@ export class CarouselListRenderer {
     isCarouselMode() {
         // Check if carousel CSS is loaded by looking for a carousel-specific style
         const testElement = document.createElement('div');
-        testElement.className = 'dm-events-calendar';
+        testElement.className = 'datamachine-events-calendar';
         testElement.style.display = 'none';
         document.body.appendChild(testElement);
 
         const dateGroup = document.createElement('div');
-        dateGroup.className = 'dm-date-group';
+        dateGroup.className = 'datamachine-date-group';
         testElement.appendChild(dateGroup);
 
         const computedStyle = window.getComputedStyle(dateGroup);
@@ -50,7 +50,7 @@ export class CarouselListRenderer {
      * Initialize all carousel rows (universal template date groups)
      */
     initializeCarouselRows() {
-        const dateGroups = this.calendar.querySelectorAll('.dm-date-group');
+        const dateGroups = this.calendar.querySelectorAll('.datamachine-date-group');
 
         dateGroups.forEach(dateGroup => {
             this.initializeCarouselRow(dateGroup);
@@ -62,7 +62,7 @@ export class CarouselListRenderer {
      */
     initializeCarouselEvents() {
         // Enhanced hover effects for carousel cards
-        const eventCards = this.calendar.querySelectorAll('.dm-event-link');
+        const eventCards = this.calendar.querySelectorAll('.datamachine-event-link');
 
         eventCards.forEach(card => {
             card.addEventListener('mouseenter', () => {
@@ -159,8 +159,8 @@ export class CarouselListRenderer {
             eventsRow.setAttribute('data-scroll-right', hasRightScroll);
 
             // Add CSS classes for better performance
-            eventsRow.classList.toggle('dm-scroll-left-active', hasLeftScroll);
-            eventsRow.classList.toggle('dm-scroll-right-active', hasRightScroll);
+            eventsRow.classList.toggle('datamachine-scroll-left-active', hasLeftScroll);
+            eventsRow.classList.toggle('datamachine-scroll-right-active', hasRightScroll);
         };
 
         // Store the update function for external access
@@ -344,7 +344,7 @@ export class CarouselListRenderer {
 
         this.carouselRows.forEach((rowInstance, dateKey) => {
             const { eventsRow, dateGroup } = rowInstance;
-            const eventCards = eventsRow.querySelectorAll('.dm-event-item');
+            const eventCards = eventsRow.querySelectorAll('.datamachine-event-item');
 
             stats.rows.push({
                 date: dateKey,

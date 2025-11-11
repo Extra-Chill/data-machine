@@ -2,16 +2,16 @@
 /**
  * Event Schema JSON-LD Generator
  *
- * @package DmEvents\Steps\Publish\Handlers\DmEvents
+ * @package DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents
  */
 
-namespace DmEvents\Steps\Publish\Handlers\DmEvents;
+namespace DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents;
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-class DmEventsSchema {
+class DataMachineEventsSchema {
 
     /**
      * Smart parameter routing for engine vs AI decisions
