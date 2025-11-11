@@ -2,9 +2,9 @@
 /**
  * REST API Endpoints
  *
- * Central file for all dm-events REST API functionality.
+ * Central file for all datamachine-events REST API functionality.
  *
- * @package DM_Events
+ * @package DataMachineEvents
  */
 
 /**
@@ -16,7 +16,7 @@ function datamachine_events_register_rest_routes() {
 		'/calendar',
 		array(
 			'methods'             => 'GET',
-			'callback'            => 'dm_events_calendar_endpoint',
+			'callback'            => 'datamachine_events_calendar_endpoint',
 			'permission_callback' => '__return_true',
 			'args'                => array(
 				'event_search' => array(
@@ -47,7 +47,7 @@ function datamachine_events_register_rest_routes() {
 		)
 	);
 }
-add_action( 'rest_api_init', 'dm_events_register_rest_routes' );
+add_action( 'rest_api_init', 'datamachine_events_register_rest_routes' );
 
 /**
  * Calendar endpoint callback
@@ -70,7 +70,7 @@ function datamachine_events_calendar_endpoint( $request ) {
 
 	// Build WP_Query args for SQL-based pagination
 	$query_args = array(
-		'post_type'      => 'dm_events',
+		'post_type'      => 'datamachine_events',
 		'post_status'    => 'publish',
 		'posts_per_page' => $events_per_page,
 		'paged'          => $current_page,
@@ -158,7 +158,7 @@ function datamachine_events_calendar_endpoint( $request ) {
 	}
 
 	// Allow external filtering of query args
-	$query_args = apply_filters( 'dm_events_calendar_query_args', $query_args, array(), null );
+	$query_args = apply_filters( 'datamachine_events_calendar_query_args', $query_args, array(), null );
 
 	// Execute SQL-based query
 	$events_query = new WP_Query( $query_args );
@@ -172,7 +172,7 @@ function datamachine_events_calendar_endpoint( $request ) {
 	// posts_per_page = 1 for efficiency (only need found_posts count, not actual events)
 	// fields = 'ids' for performance (only fetch IDs, not full post objects)
 	$future_count_args = array(
-		'post_type'      => 'dm_events',
+		'post_type'      => 'datamachine_events',
 		'post_status'    => 'publish',
 		'fields'         => 'ids',
 		'posts_per_page' => 1,
@@ -189,7 +189,7 @@ function datamachine_events_calendar_endpoint( $request ) {
 	$future_count      = $future_query->found_posts;
 
 	$past_count_args = array(
-		'post_type'      => 'dm_events',
+		'post_type'      => 'datamachine_events',
 		'post_status'    => 'publish',
 		'fields'         => 'ids',
 		'posts_per_page' => 1,
@@ -220,7 +220,7 @@ function datamachine_events_calendar_endpoint( $request ) {
 			$blocks     = parse_blocks( $event_post->post_content );
 			$event_data = null;
 			foreach ( $blocks as $block ) {
-				if ( 'dm-events/event-details' === $block['blockName'] ) {
+				if ( 'datamachine-events/event-details' === $block['blockName'] ) {
 					$event_data = $block['attrs'];
 					break;
 				}

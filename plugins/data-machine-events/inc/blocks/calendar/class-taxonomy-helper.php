@@ -22,7 +22,7 @@ class Taxonomy_Helper {
     public static function get_all_taxonomies_with_counts() {
         $taxonomies_data = [];
         
-        $taxonomies = get_object_taxonomies('dm_events', 'objects');
+        $taxonomies = get_object_taxonomies('datamachine_events', 'objects');
         
         if (!$taxonomies) {
             return $taxonomies_data;
@@ -131,7 +131,7 @@ class Taxonomy_Helper {
      */
     public static function get_term_event_count($term_id) {
         $query_args = [
-            'post_type' => 'dm_events',
+            'post_type' => 'datamachine_events',
             'post_status' => 'publish',
             'numberposts' => -1,
             'fields' => 'ids',

@@ -2,8 +2,8 @@
 /**
  * Single Event Template
  *
- * Provides action hooks for third-party integration (dm_events_before_single_event,
- * dm_events_after_single_event, dm_events_after_event_article, dm_events_related_events).
+ * Provides action hooks for third-party integration (datamachine_events_before_single_event,
+ * datamachine_events_after_single_event, datamachine_events_after_event_article, datamachine_events_related_events).
  * Renders breadcrumbs and taxonomy badges via plugin classes.
  *
  * @package DataMachineEvents

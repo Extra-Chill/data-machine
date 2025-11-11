@@ -34,7 +34,7 @@ $tax_filters = isset($_GET['tax_filter']) ? array_map( 'sanitize_text_field', wp
 
 // Build WP_Query args for SQL-based pagination
 $query_args = array(
-    'post_type' => 'dm_events',
+    'post_type' => 'datamachine_events',
     'post_status' => 'publish',
     'posts_per_page' => $enable_pagination ? $events_per_page : -1,
     'paged' => $current_page,
@@ -122,7 +122,7 @@ if (!empty($search_query)) {
 }
 
 // Allow external filtering of query args
-$query_args = apply_filters( 'dm_events_calendar_query_args', $query_args, $attributes, $block );
+$query_args = apply_filters( 'datamachine_events_calendar_query_args', $query_args, $attributes, $block );
 
 // Execute SQL-based query
 $events_query = new WP_Query($query_args);
@@ -133,7 +133,7 @@ $max_pages = $events_query->max_num_pages;
 
 // Get counts for past/upcoming navigation (separate queries)
 $future_count_args = array(
-    'post_type' => 'dm_events',
+    'post_type' => 'datamachine_events',
     'post_status' => 'publish',
     'fields' => 'ids',
     'posts_per_page' => 1,
@@ -150,7 +150,7 @@ $future_query = new WP_Query($future_count_args);
 $future_events_count = $future_query->found_posts;
 
 $past_count_args = array(
-    'post_type' => 'dm_events',
+    'post_type' => 'datamachine_events',
     'post_status' => 'publish',
     'fields' => 'ids',
     'posts_per_page' => 1,

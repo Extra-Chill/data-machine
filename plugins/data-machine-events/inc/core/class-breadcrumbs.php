@@ -1,8 +1,8 @@
 <?php
 /**
- * DM Events Breadcrumb System
+ * Data Machine Events Breadcrumb System
  *
- * Themes override via 'dm_events_breadcrumbs' filter (priority 10, params: null, $post_id).
+ * Themes override via 'datamachine_events_breadcrumbs' filter (priority 10, params: null, $post_id).
  * Default: Home › Events › Event Title using configured main events page URL.
  *
  * @package DataMachineEvents\Core
@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Handles breadcrumb generation for DM Events pages
+ * Handles breadcrumb generation for Data Machine Events pages
  */
 class Breadcrumbs {
 
@@ -28,7 +28,7 @@ class Breadcrumbs {
             $post_id = get_the_ID();
         }
 
-        if (!$post_id || get_post_type($post_id) !== 'dm_events') {
+        if (!$post_id || get_post_type($post_id) !== 'datamachine_events') {
             return '';
         }
 
@@ -46,7 +46,7 @@ class Breadcrumbs {
      */
     private static function generate_default_breadcrumbs($post_id) {
         $home_url = home_url();
-        $events_url = get_post_type_archive_link('dm_events');
+        $events_url = get_post_type_archive_link('datamachine_events');
         $event_title = get_the_title($post_id);
 
         $main_events_url = \DataMachineEvents\Admin\Settings_Page::get_main_events_page_url();

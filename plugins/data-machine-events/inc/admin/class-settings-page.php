@@ -17,9 +17,9 @@ if (!defined('ABSPATH')) {
  */
 class Settings_Page {
     
-    const OPTION_KEY = 'dm_events_settings';
+    const OPTION_KEY = 'datamachine_events_settings';
     
-    const PAGE_SLUG = 'dm-events-settings';
+    const PAGE_SLUG = 'datamachine-events-settings';
     
     private $defaults = array(
         'include_in_archives' => false,
@@ -50,7 +50,7 @@ class Settings_Page {
     
     public function add_settings_submenu() {
         add_submenu_page(
-            'edit.php?post_type=dm_events',
+            'edit.php?post_type=datamachine_events',
             __('Event Settings', 'datamachine-events'),
             __('Settings', 'datamachine-events'),
             'manage_options',
@@ -61,7 +61,7 @@ class Settings_Page {
     
     public function init_settings() {
         register_setting(
-            'dm_events_settings_group',
+            'datamachine_events_settings_group',
             self::OPTION_KEY,
             array(
                 'sanitize_callback' => array($this, 'sanitize_settings'),
@@ -133,7 +133,7 @@ class Settings_Page {
                 $post_types = array($post_types);
             }
             
-            $post_types = array_diff($post_types, array('dm_events'));
+            $post_types = array_diff($post_types, array('datamachine_events'));
             $query->set('post_type', $post_types);
         }
         
@@ -147,7 +147,7 @@ class Settings_Page {
                     $post_types = array($post_types);
                 }
                 
-                $post_types = array_diff($post_types, array('dm_events'));
+                $post_types = array_diff($post_types, array('datamachine_events'));
                 $query->set('post_type', $post_types);
             }
         }

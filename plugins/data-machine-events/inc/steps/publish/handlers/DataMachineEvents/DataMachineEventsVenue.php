@@ -119,7 +119,7 @@ class DataMachineEventsVenue {
             FROM {$wpdb->posts} p
             INNER JOIN {$wpdb->term_relationships} tr ON p.ID = tr.object_id
             INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
-            WHERE p.post_type = 'dm_events' 
+            WHERE p.post_type = 'datamachine_events' 
             AND p.post_status = 'publish'
             AND tt.taxonomy = 'venue'
         ");

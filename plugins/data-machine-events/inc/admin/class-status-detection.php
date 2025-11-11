@@ -29,7 +29,7 @@ class Status_Detection {
     public function get_system_status() {
         return array(
             'overall_status' => 'green',
-            'dm_events_ready' => true,
+            'datamachine_events_ready' => true,
             'timestamp' => function_exists('current_time') ? current_time('mysql') : gmdate('Y-m-d H:i:s'),
         );
     }

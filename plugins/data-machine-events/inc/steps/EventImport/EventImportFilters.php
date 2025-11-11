@@ -189,8 +189,8 @@ add_action('admin_enqueue_scripts', function() {
         'ajaxUrl' => admin_url('admin-ajax.php'),
         'nonce' => wp_create_nonce('datamachine_events_venue_nonce'),
         'actions' => array(
-            'getVenueData' => 'dm_events_get_venue_data',
-            'checkDuplicate' => 'dm_events_check_duplicate_venue'
+            'getVenueData' => 'datamachine_events_get_venue_data',
+            'checkDuplicate' => 'datamachine_events_check_duplicate_venue'
         )
     ));
 
@@ -209,7 +209,7 @@ add_action('admin_enqueue_scripts', function() {
  * Retrieves complete venue data including all metadata fields for populating
  * the venue form when an existing venue is selected from the dropdown.
  */
-add_action('wp_ajax_dm_events_get_venue_data', function() {
+add_action('wp_ajax_datamachine_events_get_venue_data', function() {
     // Verify nonce
     check_ajax_referer('datamachine_events_venue_nonce', 'nonce');
 
@@ -247,7 +247,7 @@ add_action('wp_ajax_dm_events_get_venue_data', function() {
  * before allowing creation of a new venue. Prevents duplicate venues
  * while allowing user confirmation for intentional duplicates.
  */
-add_action('wp_ajax_dm_events_check_duplicate_venue', function() {
+add_action('wp_ajax_datamachine_events_check_duplicate_venue', function() {
     // Verify nonce
     check_ajax_referer('datamachine_events_venue_nonce', 'nonce');
 

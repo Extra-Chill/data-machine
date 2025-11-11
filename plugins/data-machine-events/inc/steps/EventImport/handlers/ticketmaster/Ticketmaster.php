@@ -247,7 +247,7 @@ class Ticketmaster {
      */
     public static function get_classifications($api_key = '') {
         // Check cache first
-        $cache_key = 'dm_events_ticketmaster_classifications';
+        $cache_key = 'datamachine_events_ticketmaster_classifications';
         $cached_classifications = get_transient($cache_key);
         
         if ($cached_classifications !== false) {

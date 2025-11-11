@@ -84,7 +84,7 @@ class DataMachineEventsPublisher {
         }
         
         $post_data = [
-            'post_type' => 'dm_events',
+            'post_type' => 'datamachine_events',
             'post_title' => $event_data['title'],
             'post_status' => $post_status,
             'post_author' => $post_author,
@@ -182,7 +182,7 @@ class DataMachineEventsPublisher {
         }
         
         $post_data = [
-            'post_type' => 'dm_events',
+            'post_type' => 'datamachine_events',
             'post_title' => sanitize_text_field($event_data['title']),
             'post_status' => 'publish',
             'post_content' => self::generate_event_content($event_data)
@@ -343,7 +343,7 @@ class DataMachineEventsPublisher {
     private function process_direct_taxonomy_assignments($post_id, $handler_config) {
         $results = [];
         
-        $taxonomies = get_object_taxonomies('dm_events', 'objects');
+        $taxonomies = get_object_taxonomies('datamachine_events', 'objects');
         
         foreach ($taxonomies as $taxonomy) {
             if ($taxonomy->name === 'venue' || !$taxonomy->public) {
@@ -406,7 +406,7 @@ class DataMachineEventsPublisher {
     private function assign_taxonomies_from_parameters($post_id, $ai_parameters, $handler_config) {
         $results = [];
         
-        $taxonomies = get_object_taxonomies('dm_events', 'objects');
+        $taxonomies = get_object_taxonomies('datamachine_events', 'objects');
         
         foreach ($taxonomies as $taxonomy) {
             if ($taxonomy->name === 'venue' || !$taxonomy->public) {
@@ -489,7 +489,7 @@ class DataMachineEventsPublisher {
      */
     public static function get_creation_stats() {
         return [
-            'total_events' => wp_count_posts('dm_events')->publish,
+            'total_events' => wp_count_posts('datamachine_events')->publish,
             'total_venues' => wp_count_terms(['taxonomy' => 'venue']),
             'events_with_venues' => self::count_events_with_venues()
         ];
@@ -508,7 +508,7 @@ class DataMachineEventsPublisher {
             FROM {$wpdb->posts} p
             INNER JOIN {$wpdb->term_relationships} tr ON p.ID = tr.object_id
             INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
-            WHERE p.post_type = 'dm_events' 
+            WHERE p.post_type = 'datamachine_events' 
             AND p.post_status = 'publish'
             AND tt.taxonomy = 'venue'
         ");

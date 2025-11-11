@@ -16,8 +16,8 @@
  * @param bool    $update  Whether this is an update.
  */
 function datamachine_events_sync_datetime_meta( $post_id, $post, $update ) {
-	// Only for dm_events post type.
-	if ( 'dm_events' !== $post->post_type ) {
+	// Only for datamachine_events post type.
+	if ( 'datamachine_events' !== $post->post_type ) {
 		return;
 	}
 
@@ -46,7 +46,7 @@ function datamachine_events_sync_datetime_meta( $post_id, $post, $update ) {
 		}
 	}
 }
-add_action( 'save_post', 'dm_events_sync_datetime_meta', 10, 3 );
+add_action( 'save_post', 'datamachine_events_sync_datetime_meta', 10, 3 );
 
 /**
  * Migration function to populate meta for existing events
@@ -56,7 +56,7 @@ add_action( 'save_post', 'dm_events_sync_datetime_meta', 10, 3 );
 function datamachine_events_migrate_datetime_meta() {
 	$events = get_posts(
 		array(
-			'post_type'      => 'dm_events',
+			'post_type'      => 'datamachine_events',
 			'posts_per_page' => -1,
 			'post_status'    => 'any',
 		)
@@ -64,7 +64,7 @@ function datamachine_events_migrate_datetime_meta() {
 
 	$updated = 0;
 	foreach ( $events as $event ) {
-		dm_events_sync_datetime_meta( $event->ID, $event, true );
+		datamachine_events_sync_datetime_meta( $event->ID, $event, true );
 		$updated++;
 	}
 
@@ -97,7 +97,7 @@ function datamachine_events_migration_notice() {
 	</div>
 	<?php
 }
-add_action( 'admin_notices', 'dm_events_migration_notice' );
+add_action( 'admin_notices', 'datamachine_events_migration_notice' );
 
 /**
  * Admin page for migration
@@ -108,10 +108,10 @@ function datamachine_events_migration_page() {
 		__( 'DM Events Migration', 'datamachine-events' ),
 		'manage_options',
 		'datamachine-events-migrate',
-		'dm_events_migration_page_content'
+		'datamachine_events_migration_page_content'
 	);
 }
-add_action( 'admin_menu', 'dm_events_migration_page' );
+add_action( 'admin_menu', 'datamachine_events_migration_page' );
 
 /**
  * Migration page content
@@ -121,8 +121,8 @@ function datamachine_events_migration_page_content() {
 		wp_die( esc_html__( 'Insufficient permissions', 'datamachine-events' ) );
 	}
 
-	if ( isset( $_POST['dm_events_run_migration'] ) && check_admin_referer( 'dm_events_migration' ) ) {
-		$updated = dm_events_migrate_datetime_meta();
+	if ( isset( $_POST['datamachine_events_run_migration'] ) && check_admin_referer( 'datamachine_events_migration' ) ) {
+		$updated = datamachine_events_migrate_datetime_meta();
 		update_option( 'datamachine_events_meta_migration_complete', true );
 		echo '<div class="notice notice-success"><p>' .
 			sprintf(
@@ -138,8 +138,8 @@ function datamachine_events_migration_page_content() {
 		<h1><?php esc_html_e( 'DM Events Meta Migration', 'datamachine-events' ); ?></h1>
 		<p><?php esc_html_e( 'This will populate the _dm_event_datetime meta field for all existing events, enabling efficient SQL-based pagination.', 'datamachine-events' ); ?></p>
 		<form method="post">
-			<?php wp_nonce_field( 'dm_events_migration' ); ?>
-			<input type="submit" name="dm_events_run_migration" class="button button-primary" value="<?php esc_attr_e( 'Run Migration', 'datamachine-events' ); ?>">
+			<?php wp_nonce_field( 'datamachine_events_migration' ); ?>
+			<input type="submit" name="datamachine_events_run_migration" class="button button-primary" value="<?php esc_attr_e( 'Run Migration', 'datamachine-events' ); ?>">
 		</form>
 	</div>
 	<?php

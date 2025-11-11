@@ -159,7 +159,7 @@ class DATAMACHINE_Events {
     }
     
     public function init_data_machine_integration() {
-        if (!defined('DATA_MACHINE_VERSION')) {
+        if (!defined('DATAMACHINE_VERSION')) {
             return;
         }
         
@@ -209,9 +209,9 @@ class DATAMACHINE_Events {
     }
     
     private function load_publish_handlers() {
-        $dm_events_handler_path = DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/steps/publish/handlers/DataMachineEvents/';
-        if (is_dir($dm_events_handler_path)) {
-            foreach (glob($dm_events_handler_path . '*.php') as $file) {
+        $datamachine_events_handler_path = DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/steps/publish/handlers/DataMachineEvents/';
+        if (is_dir($datamachine_events_handler_path)) {
+            foreach (glob($datamachine_events_handler_path . '*.php') as $file) {
                 if (file_exists($file)) {
                     require_once $file;
                 }

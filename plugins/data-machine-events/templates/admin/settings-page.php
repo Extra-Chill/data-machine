@@ -24,14 +24,14 @@ $settings = get_option('datamachine_events_settings', array(
 // Handle settings updates
 if (isset($_GET['settings-updated'])) {
     add_settings_error(
-        'dm_events_messages',
-        'dm_events_message',
+        'datamachine_events_messages',
+        'datamachine_events_message',
         __('Settings Saved', 'datamachine-events'),
         'updated'
     );
 }
 
-settings_errors('dm_events_messages');
+settings_errors('datamachine_events_messages');
 ?>
 
 <div class="wrap">

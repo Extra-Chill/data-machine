@@ -30,7 +30,7 @@ class DataMachineEventsSettings {
     private static function get_taxonomy_defaults(): array {
         $defaults = [];
         
-        $taxonomies = get_object_taxonomies('dm_events', 'objects');
+        $taxonomies = get_object_taxonomies('datamachine_events', 'objects');
         
         foreach ($taxonomies as $taxonomy) {
             if ($taxonomy->name === 'venue') {
@@ -135,7 +135,7 @@ class DataMachineEventsSettings {
     private static function get_taxonomy_fields(): array {
         $taxonomy_fields = [];
         
-        $taxonomies = get_object_taxonomies('dm_events', 'objects');
+        $taxonomies = get_object_taxonomies('datamachine_events', 'objects');
         
         foreach ($taxonomies as $taxonomy) {
             if ($taxonomy->name === 'venue') {
@@ -191,7 +191,7 @@ class DataMachineEventsSettings {
     private static function sanitize_taxonomy_selections(array $raw_settings): array {
         $sanitized = [];
         
-        $taxonomies = get_object_taxonomies('dm_events', 'objects');
+        $taxonomies = get_object_taxonomies('datamachine_events', 'objects');
         
         foreach ($taxonomies as $taxonomy) {
             if ($taxonomy->name === 'venue') {

@@ -20,7 +20,7 @@ if (!defined('ABSPATH')) {
  * Complete self-registration pattern following Data Machine "plugins within plugins" architecture.
  * Engine discovers DM Events handler capabilities purely through filter-based discovery.
  */
-function datamachine_register_dm_events_filters() {
+function datamachine_register_datamachine_events_filters() {
 
     // Register the DM Events publisher handler with Data Machine
     add_filter('datamachine_handlers', function($handlers) {
@@ -49,7 +49,7 @@ add_filter('datamachine_handler_settings', function($all_settings) {
 add_filter('ai_tools', function($tools, $handler_slug = null, $handler_config = []) {
     // Only register tool when create_event handler is the target
     if ($handler_slug === 'create_event') {
-        $tools['create_event'] = dm_events_get_dynamic_event_tool($handler_config);
+        $tools['create_event'] = datamachine_events_get_dynamic_event_tool($handler_config);
     }
     
     return $tools;
@@ -205,13 +205,13 @@ function datamachine_events_get_dynamic_event_tool(array $handler_config): array
     }
     
     // Start with base tool
-    $tool = dm_events_get_event_base_tool();
+    $tool = datamachine_events_get_event_base_tool();
     
     // Add dynamic parameter requirement logic based on available data
-    dm_events_apply_dynamic_parameter_requirements($tool, $ce_config);
+    datamachine_events_apply_dynamic_parameter_requirements($tool, $ce_config);
     
     // Add dynamic schema parameters based on data completeness
-    $schema_params = dm_events_get_dynamic_schema_parameters($ce_config);
+    $schema_params = datamachine_events_get_dynamic_schema_parameters($ce_config);
     $tool['parameters'] = array_merge($tool['parameters'], $schema_params);
     
     // Store resolved configuration for execution
@@ -221,8 +221,8 @@ function datamachine_events_get_dynamic_event_tool(array $handler_config): array
         return $tool;
     }
     
-    // Get taxonomies that support 'dm_events' post type (EXCLUDING venue - handled by AI tool)
-    $taxonomies = get_object_taxonomies('dm_events', 'objects');
+    // Get taxonomies that support 'datamachine_events' post type (EXCLUDING venue - handled by AI tool)
+    $taxonomies = get_object_taxonomies('datamachine_events', 'objects');
     
     foreach ($taxonomies as $taxonomy) {
         if (!$taxonomy->public || $taxonomy->name === 'venue') {
@@ -266,7 +266,7 @@ function datamachine_events_get_dynamic_event_tool(array $handler_config): array
     
     // Handle venue parameters conditionally based on static venue data availability
     // Check if venue data will be available as engine parameters from import handlers
-    $has_static_venue = dm_events_check_static_venue_availability($ce_config);
+    $has_static_venue = datamachine_events_check_static_venue_availability($ce_config);
     
     if (!$has_static_venue) {
         // Add venue parameters to tool for AI to determine
@@ -435,4 +435,4 @@ function datamachine_events_check_static_venue_availability(array $ce_config): b
 }
 
 // Auto-register when file loads - achieving complete self-containment
-datamachine_register_dm_events_filters();
+datamachine_register_datamachine_events_filters();
