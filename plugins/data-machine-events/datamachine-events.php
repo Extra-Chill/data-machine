@@ -11,9 +11,9 @@
   * Text Domain: datamachine-events
  * Domain Path: /languages
  * Requires at least: 6.0
- * Tested up to: 6.4
+  * Tested up to: 6.8
  * Requires PHP: 8.0
- * Requires Plugins: data-machine
+ * Requires Plugins: datamachine
  * Network: false
  *
  * @package DatamachineEvents

@@ -3,7 +3,7 @@
  * Event Import System Registration
  * 
  * Registers event import step type, handlers, and universal venue parameter injection.
- * Venue parameters are injected via dm_engine_parameters filter making them available
+ * Venue parameters are injected via datamachine_engine_parameters filter making them available
  * to ALL subsequent steps (AI, Publish, Update) following Data Machine's unified architecture.
  *
  * @package DataMachineEvents\Steps\EventImport
@@ -162,7 +162,7 @@ add_action('admin_enqueue_scripts', function() {
     }
 
     $screen = get_current_screen();
-    if (!$screen || strpos($screen->id, 'dm-') === false) {
+    if (!$screen || strpos($screen->id, 'datamachine') === false) {
         return;
     }
 
@@ -184,14 +184,10 @@ add_action('admin_enqueue_scripts', function() {
         true
     );
 
-    // Localize script with AJAX configuration
+    // Localize script with REST API configuration
     wp_localize_script('datamachine-events-venue-selector', 'dmEventsVenue', array(
-        'ajaxUrl' => admin_url('admin-ajax.php'),
-        'nonce' => wp_create_nonce('datamachine_events_venue_nonce'),
-        'actions' => array(
-            'getVenueData' => 'datamachine_events_get_venue_data',
-            'checkDuplicate' => 'datamachine_events_check_duplicate_venue'
-        )
+        'restUrl' => rest_url('datamachine/v1'),
+        'nonce' => wp_create_nonce('wp_rest')
     ));
 
     // Enqueue CSS
@@ -201,108 +197,4 @@ add_action('admin_enqueue_scripts', function() {
         array(),
         filemtime(DATAMACHINE_EVENTS_PLUGIN_DIR . 'assets/css/venue-autocomplete.css')
     );
-});
-
-/**
- * AJAX handler: Get venue data by term ID
- *
- * Retrieves complete venue data including all metadata fields for populating
- * the venue form when an existing venue is selected from the dropdown.
- */
-add_action('wp_ajax_datamachine_events_get_venue_data', function() {
-    // Verify nonce
-    check_ajax_referer('datamachine_events_venue_nonce', 'nonce');
-
-    $term_id = isset($_POST['term_id']) ? absint($_POST['term_id']) : 0;
-
-    if (!$term_id) {
-        wp_send_json_error(array(
-            'message' => __('Invalid venue ID', 'datamachine-events')
-        ));
-    }
-
-    // Verify term exists
-    if (!term_exists($term_id, 'venue')) {
-        wp_send_json_error(array(
-            'message' => __('Venue not found', 'datamachine-events')
-        ));
-    }
-
-    // Get venue data using Venue_Taxonomy class
-    $venue_data = \DataMachineEvents\Core\Venue_Taxonomy::get_venue_data($term_id);
-
-    if (empty($venue_data)) {
-        wp_send_json_error(array(
-            'message' => __('Failed to load venue data', 'datamachine-events')
-        ));
-    }
-
-    wp_send_json_success($venue_data);
-});
-
-/**
- * AJAX handler: Check for duplicate venue
- *
- * Checks if a venue with the given name and address already exists
- * before allowing creation of a new venue. Prevents duplicate venues
- * while allowing user confirmation for intentional duplicates.
- */
-add_action('wp_ajax_datamachine_events_check_duplicate_venue', function() {
-    // Verify nonce
-    check_ajax_referer('datamachine_events_venue_nonce', 'nonce');
-
-    $venue_name = isset($_POST['venue_name']) ? sanitize_text_field($_POST['venue_name']) : '';
-    $venue_address = isset($_POST['venue_address']) ? sanitize_text_field($_POST['venue_address']) : '';
-
-    if (empty($venue_name)) {
-        wp_send_json_success(array(
-            'is_duplicate' => false,
-            'message' => ''
-        ));
-        return;
-    }
-
-    // Check for exact name match
-    $existing = get_term_by('name', $venue_name, 'venue');
-
-    if (!$existing) {
-        wp_send_json_success(array(
-            'is_duplicate' => false,
-            'message' => ''
-        ));
-        return;
-    }
-
-    // Check if address also matches (if provided)
-    if (!empty($venue_address)) {
-        $stored_address = get_term_meta($existing->term_id, '_venue_address', true);
-
-        // Normalize for comparison
-        $stored_address_normalized = trim(strtolower($stored_address));
-        $venue_address_normalized = trim(strtolower($venue_address));
-
-        if ($stored_address_normalized === $venue_address_normalized) {
-            wp_send_json_success(array(
-                'is_duplicate' => true,
-                'existing_term_id' => $existing->term_id,
-                'existing_venue_name' => $existing->name,
-                'message' => sprintf(
-                    __('A venue named "%s" with this address already exists.', 'datamachine-events'),
-                    $existing->name
-                )
-            ));
-            return;
-        }
-    }
-
-    // Name matches but address doesn't - still warn but less severe
-    wp_send_json_success(array(
-        'is_duplicate' => true,
-        'existing_term_id' => $existing->term_id,
-        'existing_venue_name' => $existing->name,
-        'message' => sprintf(
-            __('A venue named "%s" already exists (different address). Create anyway?', 'datamachine-events'),
-            $existing->name
-        )
-    ));
 });

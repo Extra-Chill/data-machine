@@ -54,7 +54,7 @@ class Breadcrumbs {
             $events_url = $main_events_url;
         }
 
-        $breadcrumb_html = '<nav class="dm-events-breadcrumbs" aria-label="' . esc_attr__('Event Breadcrumb', 'datamachine-events') . '">';
+        $breadcrumb_html = '<nav class="datamachine-events-breadcrumbs" aria-label="' . esc_attr__('Event Breadcrumb', 'datamachine-events') . '">';
         $breadcrumb_html .= '<a href="' . esc_url($home_url) . '">' . esc_html__('Home', 'datamachine-events') . '</a>';
         $breadcrumb_html .= ' › ';
         $breadcrumb_html .= '<a href="' . esc_url($events_url) . '">' . esc_html__('Events', 'datamachine-events') . '</a>';

@@ -9,19 +9,19 @@ Technical guidance for Claude Code when working with the **Data Machine Events**
 **DM Events demonstrates completed migrations that serve as reference implementations for the Data Machine Ecosystem:**
 
 **REST API Migration:**
-- ✓ **Complete:** Calendar filtering system fully migrated from AJAX to REST API
-- Implementation: `datamachine-events/v1/calendar` endpoint with progressive enhancement
-- Status: **Production-ready reference implementation** serving as pattern for Data Machine Ecosystem
-- Architecture: SQL-based filtering, History API integration, ~831 lines of code removed
-- Impact: 51% code reduction, faster filtering, improved SEO capability, shareable filter URLs
-- Note: Venue operations (2 AJAX endpoints) remain AJAX-based deliberately for admin efficiency
+- ✅ **Complete:** ALL AJAX eliminated - calendar filtering + venue operations fully migrated to REST API
+- Implementation: Unified `datamachine/v1` namespace with `/events/*` routes
+- Endpoints: `/events/calendar` (public), `/events/venues/{id}` (admin), `/events/venues/check-duplicate` (admin)
+- Status: **100% REST API - Zero AJAX dependencies**
+- Architecture: SQL-based filtering, History API integration, ~950 lines of AJAX code removed
+- Impact: Complete REST API alignment, unified namespace across Data Machine ecosystem
 
 **Reference Implementation Status:**
 DM Events calendar migration demonstrates the gold standard AJAX → REST pattern for the entire ecosystem. See `/datamachine/docs/api-reference/rest-api-migration.md` for complete migration guide using DM Events as the reference example.
 
 **Prefix Migration:**
 - ✅ **Ready to Proceed:** Core plugin migration complete - extensions can now migrate
-- Current: Using `dm_events` post type and `dm_` prefixes
+- Current: Using `datamachine_events` post type and `datamachine_` prefixes (migrated)
 - Planned: Migrate to `datamachine_events` post type and `datamachine_` prefixes
 - Status: Follow patterns established by core plugin migration
 
@@ -43,7 +43,7 @@ npm run lint:js && npm run lint:css    # Linting
 
 ## Build Process
 
-- **Production Build:** `./build.sh` creates optimized package in `/dist` directory as `dm-events.zip` with accompanying `build-info.txt` for WordPress deployment
+- **Production Build:** `./build.sh` creates optimized package in `/dist` directory as `datamachine-events.zip` with accompanying `build-info.txt` for WordPress deployment
 - **VSCode Integration:** `.vscode/tasks.json` provides IDE task management for development workflow
 - **Asset Management:** Individual blocks handle their own CSS and JavaScript assets
 - **Dynamic Versioning:** Admin assets use `filemtime()` for cache busting
@@ -180,7 +180,7 @@ npm run lint:js && npm run lint:css    # Linting
   - Plus native WordPress description field for venue details
 - **Taxonomy Badge System:** Dynamic rendering of taxonomy badges for all non-venue taxonomies with consistent color classes and data attributes
 - **Schema Integration:** Google Event structured data generated from block attributes and venue meta
-- **REST API:** Native WordPress REST API via show_in_rest => true, plus custom `/wp-json/datamachine-events/v1/calendar` endpoint for calendar filtering (see Calendar Filtering Architecture section)
+- **REST API:** Native WordPress REST API via show_in_rest => true, plus custom unified namespace endpoints under `/wp-json/datamachine/v1/events/*` (calendar filtering + venue operations)
 - **Primary Data:** Block attributes (single source of truth), venue taxonomy meta for location data
 
 ## Technical Notes
@@ -240,7 +240,7 @@ npm run lint:js && npm run lint:css    # Linting
 - **Centralized Design System:** root.css provides unified design tokens accessible from both CSS and JavaScript components
 - **Schema Architecture:** Combines Event Details block attributes with venue taxonomy meta for complete Google Event schema
 - **Smart Parameter Routing:** DataMachineEventsSchema.engine_or_tool() analyzes import data to route parameters between system and AI processing
-- **Venue Data Flow:** Import handlers extract venue data, DataMachineEventsPublisher injects via dm_engine_additional_parameters filter
+- **Venue Data Flow:** Import handlers extract venue data, DataMachineEventsPublisher processes venue creation and assignment directly
 - **Comprehensive Venue Meta:** 9 meta fields populated from import sources with validation and error handling
 - **AI Responsibilities:** Event descriptions, performer/organizer inference, web scraping extraction, and taxonomies configured for "ai_decides"
 - **Block Content Generation:** Event Details blocks with proper address attribute mapping and display controls
@@ -251,7 +251,7 @@ npm run lint:js && npm run lint:css    # Linting
 ### Data Machine Integration Architecture
 
 **Unified Step Execution Pattern:**
-All custom steps use Data Machine's unified parameter system via dm_engine_parameters filter:
+All custom steps use Data Machine's unified parameter system via datamachine_engine_parameters filter:
 
 ```php
 public function execute(array $parameters): array {
@@ -338,7 +338,7 @@ public function execute(array $parameters): array {
 
 **Import to Publish Pipeline:**
 1. **Import Handlers:** Extract venue data (venueAddress, venueCity, venueState, venueZip, venueCountry, venuePhone, venueWebsite, venueCoordinates)
-2. **DataMachineEventsPublisher Filter:** Injects venue data via `dm_engine_additional_parameters` filter for publish steps using create_event handler
+2. **DataMachineEventsPublisher Direct Processing:** Handles venue creation and assignment directly in the publish handler
 3. **Block Content Generation:** Maps venue data to Event Details block address attribute and display controls
 4. **Rendering Priority:** Venue taxonomy data overrides address attributes when available
 
@@ -483,7 +483,7 @@ $used_taxonomies = Taxonomy_Badges::get_used_taxonomies();
 
 // Badge structure:
 // <div class="dm-taxonomy-badges">
-//   <span class="dm-taxonomy-badge dm-taxonomy-{slug} dm-term-{term-slug}" 
+//   <span class="datamachine-taxonomy-badge datamachine-taxonomy-{slug} datamachine-term-{term-slug}" 
 //         data-taxonomy="{slug}" data-term="{term-slug}">
 //     {term-name}
 //   </span>
@@ -493,7 +493,7 @@ $used_taxonomies = Taxonomy_Badges::get_used_taxonomies();
 ### Flat Data Machine Parameter System
 
 **Flat Parameter Architecture:**
-Data Machine uses a flat parameter system managed by the `dm_engine_parameters` filter:
+Data Machine uses a flat parameter system managed by the `datamachine_engine_parameters` filter:
 
 ```php
 // All custom steps implement this simplified signature
@@ -507,7 +507,7 @@ $parameters = [
     'flow_step_id' => 'flow-step-uuid',
     'flow_step_config' => [], // Step configuration from pipeline builder
     'data' => [], // Cumulative data packet from previous steps
-    // Dynamic metadata from dm_engine_additional_parameters filter
+    // Venue metadata processed directly in publisher
     'venue' => 'Music Hall',
     'venueAddress' => '123 Main St',
     'venueCity' => 'Charleston',
@@ -525,11 +525,13 @@ $parameters = [
 
 ### Calendar Filtering Architecture
 
-**REST API Endpoint:**
-- **Route:** `/wp-json/datamachine-events/v1/calendar`
-- **Method:** GET
+**REST API Endpoints:**
+- **Calendar Route:** `/wp-json/datamachine/v1/events/calendar`
+- **Venue Data Route:** `/wp-json/datamachine/v1/events/venues/{id}`
+- **Duplicate Check Route:** `/wp-json/datamachine/v1/events/venues/check-duplicate`
+- **Method:** GET (all endpoints)
 - **File:** `/inc/core/rest-api.php`
-- **Namespace:** `datamachine-events` (gradual prefix migration from dm-events)
+- **Namespace:** `datamachine/v1` (unified namespace across Data Machine ecosystem)
 
 **Query Parameters:**
 - `event_search` (string) - Search events by title, venue, or taxonomy terms
@@ -583,17 +585,21 @@ $parameters = [
 - Display renderers (Circuit Grid, Carousel List) work seamlessly with REST API responses
 - Loading states (`.loading` class) and error handling for failed requests
 
-**Code Removed** (~831 lines total):
+**Code Removed** (~950 lines total):
 - `/inc/blocks/calendar/ajax-handler.php` - Custom AJAX handler deleted (replaced with REST API)
 - `/inc/blocks/calendar/src/FilterManager.js` - 431 lines of client-side filtering logic deleted
 - Client-side filtering functions removed from `frontend.js` (~400 lines)
+- Venue AJAX handlers removed from `EventImportFilters.php` (~120 lines)
 
 **Architecture Migration Benefits:**
 
-**Note:** These benefits represent the completed REST API calendar migration in DM Events, serving as a reference implementation for broader ecosystem migration currently in early stages.
+**Complete REST API Migration - Zero AJAX Dependencies:**
 
+- **Unified Namespace:** All endpoints under `datamachine/v1/events/*` for ecosystem consistency
 - **Scalable:** SQL queries filter at database level before sending to browser
 - **Performant:** Only current page events loaded (~10 events vs. 500+ in memory)
-- **Maintainable:** ~831 lines of code removed while improving functionality
-- **REST API Aligned:** Matches platform-wide migration strategy from custom AJAX to REST API
+- **Maintainable:** ~950 lines of AJAX code removed while improving functionality
+- **Admin + Public:** Both calendar (public) and venue operations (admin) use REST API
+- **REST API Aligned:** 100% compliance with Data Machine ecosystem REST API strategy
 - **Progressive Enhancement:** Works with/without JavaScript for accessibility and SEO
+- **Future-Proof:** Ready for Data Machine Theme frontend integration

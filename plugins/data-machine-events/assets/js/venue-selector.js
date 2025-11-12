@@ -107,17 +107,12 @@
         // Show loading state
         const loadingIndicator = showLoadingState();
 
-        // Make AJAX request
-        fetch(dmEventsVenue.ajaxUrl, {
-            method: 'POST',
+        // Make REST API request
+        fetch(dmEventsVenue.restUrl + '/events/venues/' + termId, {
+            method: 'GET',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: new URLSearchParams({
-                action: dmEventsVenue.actions.getVenueData,
-                term_id: termId,
-                nonce: dmEventsVenue.nonce
-            })
+                'X-WP-Nonce': dmEventsVenue.nonce
+            }
         })
         .then(function(response) {
             return response.json();
@@ -240,17 +235,17 @@
             return Promise.resolve(true);
         }
 
-        return fetch(dmEventsVenue.ajaxUrl, {
-            method: 'POST',
+        // Build query params
+        const params = new URLSearchParams({
+            name: venueName,
+            address: venueAddress || ''
+        });
+
+        return fetch(dmEventsVenue.restUrl + '/events/venues/check-duplicate?' + params.toString(), {
+            method: 'GET',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: new URLSearchParams({
-                action: dmEventsVenue.actions.checkDuplicate,
-                venue_name: venueName,
-                venue_address: venueAddress || '',
-                nonce: dmEventsVenue.nonce
-            })
+                'X-WP-Nonce': dmEventsVenue.nonce
+            }
         })
         .then(function(response) {
             return response.json();

@@ -12,8 +12,8 @@
  */
 function datamachine_events_register_rest_routes() {
 	register_rest_route(
-		'datamachine-events/v1',
-		'/calendar',
+		'datamachine/v1',
+		'/events/calendar',
 		array(
 			'methods'             => 'GET',
 			'callback'            => 'datamachine_events_calendar_endpoint',
@@ -41,6 +41,49 @@ function datamachine_events_register_rest_routes() {
 				),
 				'past'         => array(
 					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+			),
+		)
+	);
+
+	// Get venue data endpoint
+	register_rest_route(
+		'datamachine/v1',
+		'/events/venues/(?P<id>\d+)',
+		array(
+			'methods'             => 'GET',
+			'callback'            => 'datamachine_events_get_venue_endpoint',
+			'permission_callback' => function() {
+				return current_user_can( 'manage_options' );
+			},
+			'args'                => array(
+				'id' => array(
+					'validate_callback' => function( $param ) {
+						return is_numeric( $param );
+					},
+					'sanitize_callback' => 'absint',
+				),
+			),
+		)
+	);
+
+	// Check duplicate venue endpoint
+	register_rest_route(
+		'datamachine/v1',
+		'/events/venues/check-duplicate',
+		array(
+			'methods'             => 'GET',
+			'callback'            => 'datamachine_events_check_duplicate_endpoint',
+			'permission_callback' => function() {
+				return current_user_can( 'manage_options' );
+			},
+			'args'                => array(
+				'name'    => array(
+					'required'          => true,
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'address' => array(
 					'sanitize_callback' => 'sanitize_text_field',
 				),
 			),
@@ -74,7 +117,7 @@ function datamachine_events_calendar_endpoint( $request ) {
 		'post_status'    => 'publish',
 		'posts_per_page' => $events_per_page,
 		'paged'          => $current_page,
-		'meta_key'       => '_dm_event_datetime',
+		'meta_key'       => '_datamachine_event_datetime',
 		'orderby'        => 'meta_value',
 		'order'          => $show_past ? 'DESC' : 'ASC',
 	);
@@ -86,14 +129,14 @@ function datamachine_events_calendar_endpoint( $request ) {
 	$current_datetime = current_time( 'mysql' );
 	if ( $show_past ) {
 		$meta_query[] = array(
-			'key'     => '_dm_event_datetime',
+			'key'     => '_datamachine_event_datetime',
 			'value'   => $current_datetime,
 			'compare' => '<',
 			'type'    => 'DATETIME',
 		);
 	} else {
 		$meta_query[] = array(
-			'key'     => '_dm_event_datetime',
+			'key'     => '_datamachine_event_datetime',
 			'value'   => $current_datetime,
 			'compare' => '>=',
 			'type'    => 'DATETIME',
@@ -103,7 +146,7 @@ function datamachine_events_calendar_endpoint( $request ) {
 	// Date range filters
 	if ( ! empty( $date_start ) ) {
 		$meta_query[] = array(
-			'key'     => '_dm_event_datetime',
+			'key'     => '_datamachine_event_datetime',
 			'value'   => $date_start . ' 00:00:00',
 			'compare' => '>=',
 			'type'    => 'DATETIME',
@@ -111,7 +154,7 @@ function datamachine_events_calendar_endpoint( $request ) {
 	}
 	if ( ! empty( $date_end ) ) {
 		$meta_query[] = array(
-			'key'     => '_dm_event_datetime',
+			'key'     => '_datamachine_event_datetime',
 			'value'   => $date_end . ' 23:59:59',
 			'compare' => '<=',
 			'type'    => 'DATETIME',
@@ -178,7 +221,7 @@ function datamachine_events_calendar_endpoint( $request ) {
 		'posts_per_page' => 1,
 		'meta_query'     => array(
 			array(
-				'key'     => '_dm_event_datetime',
+				'key'     => '_datamachine_event_datetime',
 				'value'   => $current_datetime,
 				'compare' => '>=',
 				'type'    => 'DATETIME',
@@ -195,7 +238,7 @@ function datamachine_events_calendar_endpoint( $request ) {
 		'posts_per_page' => 1,
 		'meta_query'     => array(
 			array(
-				'key'     => '_dm_event_datetime',
+				'key'     => '_datamachine_event_datetime',
 				'value'   => $current_datetime,
 				'compare' => '<',
 				'type'    => 'DATETIME',
@@ -295,7 +338,7 @@ function datamachine_events_calendar_endpoint( $request ) {
 			);
 			?>
 
-			<div class="dm-events-wrapper">
+			<div class="datamachine-events-wrapper">
 				<?php
 				foreach ( $events_for_date as $event_item ) :
 					$event_post = $event_item['post'];
@@ -339,10 +382,10 @@ function datamachine_events_calendar_endpoint( $request ) {
 					);
 					endforeach;
 				?>
-			</div><!-- .dm-events-wrapper -->
+			</div><!-- .datamachine-events-wrapper -->
 			<?php
 
-			echo '</div><!-- .dm-date-group -->';
+			echo '</div><!-- .datamachine-date-group -->';
 
 			endforeach;
 	} else {
@@ -405,6 +448,126 @@ function datamachine_events_calendar_endpoint( $request ) {
 				'past_count'   => $past_count,
 				'future_count' => $future_count,
 				'show_past'    => $show_past,
+			),
+		)
+	);
+}
+
+/**
+ * Get venue data endpoint callback
+ *
+ * Returns complete venue data including all meta fields.
+ *
+ * @param WP_REST_Request $request The REST API request.
+ * @return WP_REST_Response|WP_Error
+ */
+function datamachine_events_get_venue_endpoint( $request ) {
+	$term_id = $request->get_param( 'id' );
+
+	if ( empty( $term_id ) ) {
+		return new WP_Error(
+			'missing_term_id',
+			__( 'Venue ID is required', 'datamachine-events' ),
+			array( 'status' => 400 )
+		);
+	}
+
+	// Use existing Venue_Taxonomy method
+	$venue_data = \DataMachineEvents\Core\Venue_Taxonomy::get_venue_data( $term_id );
+
+	if ( empty( $venue_data ) ) {
+		return new WP_Error(
+			'venue_not_found',
+			__( 'Venue not found', 'datamachine-events' ),
+			array( 'status' => 404 )
+		);
+	}
+
+	return rest_ensure_response(
+		array(
+			'success' => true,
+			'data'    => $venue_data,
+		)
+	);
+}
+
+/**
+ * Check duplicate venue endpoint callback
+ *
+ * Checks if a venue with the same name and address already exists.
+ *
+ * @param WP_REST_Request $request The REST API request.
+ * @return WP_REST_Response|WP_Error
+ */
+function datamachine_events_check_duplicate_endpoint( $request ) {
+	$venue_name    = $request->get_param( 'name' );
+	$venue_address = $request->get_param( 'address' );
+
+	if ( empty( $venue_name ) ) {
+		return new WP_Error(
+			'missing_venue_name',
+			__( 'Venue name is required', 'datamachine-events' ),
+			array( 'status' => 400 )
+		);
+	}
+
+	// Check for existing venue by name
+	$existing_term = get_term_by( 'name', $venue_name, 'venue' );
+
+	if ( ! $existing_term ) {
+		// No duplicate found
+		return rest_ensure_response(
+			array(
+				'success'      => true,
+				'data'         => array(
+					'is_duplicate' => false,
+					'message'      => '',
+				),
+			)
+		);
+	}
+
+	// If address is provided, compare addresses
+	if ( ! empty( $venue_address ) ) {
+		$existing_address = get_term_meta( $existing_term->term_id, '_venue_address', true );
+
+		// Normalize addresses for comparison
+		$normalized_new      = strtolower( trim( $venue_address ) );
+		$normalized_existing = strtolower( trim( $existing_address ) );
+
+		if ( $normalized_new === $normalized_existing ) {
+			// Exact match (name + address)
+			return rest_ensure_response(
+				array(
+					'success'      => true,
+					'data'         => array(
+						'is_duplicate'        => true,
+						'existing_term_id'    => $existing_term->term_id,
+						'existing_venue_name' => $existing_term->name,
+						'message'             => sprintf(
+							// translators: %s: venue name
+							__( 'A venue named "%s" with this address already exists.', 'datamachine-events' ),
+							esc_html( $existing_term->name )
+						),
+					),
+				)
+			);
+		}
+	}
+
+	// Name matches but different/missing address
+	return rest_ensure_response(
+		array(
+			'success'      => true,
+			'data'         => array(
+				'is_duplicate'        => true,
+				'existing_term_id'    => $existing_term->term_id,
+				'existing_venue_name' => $existing_term->name,
+				'message'             => sprintf(
+					// translators: %s: venue name
+					__( 'A venue named "%s" already exists. Consider using a more specific name or check if this is the same venue.', 'datamachine-events' ),
+					esc_html( $existing_term->name )
+				),
 			),
 		)
 	);

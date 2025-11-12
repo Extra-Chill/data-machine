@@ -119,7 +119,7 @@ export class BadgeRenderer {
         
         // Get position of first event relative to content area
         const eventRect = firstEvent.getBoundingClientRect();
-        const contentRect = this.calendar.querySelector('.dm-events-content').getBoundingClientRect();
+        const contentRect = this.calendar.querySelector('.datamachine-events-content').getBoundingClientRect();
         
         const eventLeft = eventRect.left - contentRect.left;
         const eventTop = eventRect.top - contentRect.top;

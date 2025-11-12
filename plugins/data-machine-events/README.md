@@ -14,9 +14,8 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 - Note: Venue operations (2 AJAX endpoints) deliberately remain AJAX-based for admin efficiency
 
 **Prefix Migration:**
-- 🔄 **Pending:** Core plugin migration complete, extension migration ready to proceed
-- Current: Using `dm_events` post type and `dm_` prefixes
-- Planned: Migrate to `datamachine_events` post type and `datamachine_` prefixes following core patterns
+- ✅ **Complete:** Extension fully migrated to `datamachine_events` post type and `datamachine_` prefixes
+- Status: Production-ready with WordPress repository compliance
 
 ## Features
 
@@ -57,8 +56,8 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 - `DataMachineEvents\Admin\Settings_Page` - Event settings interface for archive behavior and display preferences
 - `DataMachineEvents\Core\Venue_Taxonomy` - Complete venue taxonomy with 9 meta fields and admin interface
 - `DataMachineEvents\Core\Event_Post_Type` - Event post type registration with selective menu control
-- `DataMachineEvents\Core\Taxonomy_Badges` - Dynamic taxonomy badge rendering system with filterable output (dm_events_badge_wrapper_classes, dm_events_badge_classes)
-- `DataMachineEvents\Core\Breadcrumbs` - Breadcrumb generation with filterable output (dm_events_breadcrumbs) for theme integration
+- `DataMachineEvents\Core\Taxonomy_Badges` - Dynamic taxonomy badge rendering system with filterable output (datamachine_events_badge_wrapper_classes, datamachine_events_badge_classes)
+- `DataMachineEvents\Core\Breadcrumbs` - Breadcrumb generation with filterable output (datamachine_events_breadcrumbs) for theme integration
 - `DataMachineEvents\Blocks\Calendar\Template_Loader` - Modular template loading system with variable extraction, output buffering, and template caching for calendar block components
 - `DataMachineEvents\Blocks\Calendar\Taxonomy_Helper` - Taxonomy data discovery, hierarchy building, and post count calculations for calendar filtering systems
 - `DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents\DataMachineEventsSchema` - Google Event Schema JSON-LD generator for SEO enhancement
@@ -118,14 +117,14 @@ dm-events/
 │   │   ├── class-event-post-type.php    # Event post type with menu control
 │   │   ├── class-venue-taxonomy.php     # Venue taxonomy with 9 meta fields
 │   │   ├── class-taxonomy-badges.php    # Dynamic taxonomy badge rendering with filters
-│   │   └── class-breadcrumbs.php        # Breadcrumb generation with dm_events_breadcrumbs filter
+│   │   └── class-breadcrumbs.php        # Breadcrumb generation with datamachine_events_breadcrumbs filter
 │   └── steps/               # Data Machine integration
 │       ├── EventImport/     # Import handlers with single-item processing
 │       │   └── handlers/    # Ticketmaster, Dice FM, web scrapers
 │       └── publish/         # AI-driven publishing with Schema generation
 │           └── handlers/DataMachineEvents/  # DataMachineEventsPublisher, Schema, Venue handling
 ├── templates/
-│   └── single-dm_events.php # Single event template with extensibility hooks
+│   └── single-datamachine_events.php # Single event template with extensibility hooks
 ├── assets/
 │   ├── css/                 # Admin styling (admin.css)
 │   └── js/                  # Admin JavaScript
@@ -137,7 +136,7 @@ dm-events/
 
 **Requirements:** WordPress 6.0+, PHP 8.0+, Composer, Node.js 16+ (for block development)
 
-**WordPress Version:** Tested up to 6.4
+**WordPress Version:** Tested up to 6.8
 
 **Setup:**
 ```bash
@@ -151,7 +150,7 @@ cd ../EventDetails && npm install && npm run build
 ```bash
 # Run automated build script to create optimized WordPress plugin package
 ./build.sh
-# Creates: /dist/dm-events.zip with build info and production assets
+# Creates: /dist/datamachine-events.zip with build info and production assets
 ```
 
 **Block Development:**
@@ -200,7 +199,7 @@ echo '<script type="application/ld+json">' . wp_json_encode($schema) . '</script
 **AI-Driven Event Creation Pipeline:**
 1. **Import Handlers:** Extract event data from APIs (Ticketmaster, Dice FM) or AI-powered universal web scrapers using single-item processing
 2. **AI Web Scraping:** UniversalWebScraper uses AI to extract event data from HTML sections with automated processing
-3. **Venue Data Injection:** DataMachineEventsPublisher injects venue metadata via dm_engine_additional_parameters filter
+3. **Venue Data Processing:** DataMachineEventsPublisher processes venue creation and assignment directly
 4. **AI Content Generation:** AI generates event descriptions while preserving structured venue data
 5. **Block Creation:** Publisher creates Event Details blocks with InnerBlocks support and proper attribute mapping
 6. **Venue Management:** DataMachineEventsVenue handles term creation, lookup, metadata validation, and event assignment
@@ -236,7 +235,7 @@ past=1                       # Show past events ("1" for past, omit for upcoming
 **Performance Benefits:**
 - **SQL-Based Queries:** Filter at database level before sending to browser
 - **Optimized Loading:** Only current page events loaded (~10 events per page vs. all 500+ events)
-- **Efficient Meta Queries:** Uses indexed `_dm_event_datetime` meta field for fast date filtering
+- **Efficient Meta Queries:** Uses indexed `_datamachine_event_datetime` meta field for fast date filtering
 - **Scalable Architecture:** Handles large event datasets (500+ events) without performance degradation
 
 **User Experience Features:**
@@ -266,7 +265,7 @@ past=1                       # Show past events ("1" for past, omit for upcoming
 **Event Details Block with InnerBlocks:**
 ```javascript
 // Event Details block registration with InnerBlocks support
-registerBlockType('dm-events/event-details', {
+registerBlockType('datamachine-events/event-details', {
     edit: function Edit({ attributes, setAttributes }) {
         const { startDate, venue, performer, showVenue, showPrice } = attributes;
         
@@ -388,8 +387,8 @@ Event_Post_Type::register();
 // Venue taxonomy with comprehensive meta fields and admin UI
 Venue_Taxonomy::register();
 
-// All public taxonomies automatically registered for dm_events
-register_taxonomy_for_object_type($taxonomy_slug, 'dm_events');
+// All public taxonomies automatically registered for datamachine_events
+register_taxonomy_for_object_type($taxonomy_slug, 'datamachine_events');
 
 // Venue data retrieval with complete meta integration
 $venue_data = Venue_Taxonomy::get_venue_data($term_id);

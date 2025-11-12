@@ -67,7 +67,7 @@ class Taxonomy_Badges {
         }
 
         $wrapper_classes = apply_filters('datamachine_events_badge_wrapper_classes', [
-            'dm-taxonomy-badges'
+            'datamachine-taxonomy-badges'
         ], $post_id);
 
         $output = '<div class="' . esc_attr(implode(' ', $wrapper_classes)) . '">';
@@ -78,9 +78,9 @@ class Taxonomy_Badges {
 
             foreach ($terms as $term) {
                 $badge_classes = [
-                    'dm-taxonomy-badge',
-                    'dm-taxonomy-' . esc_attr($taxonomy_slug),
-                    'dm-term-' . esc_attr($term->slug)
+                    'datamachine-taxonomy-badge',
+                    'datamachine-taxonomy-' . esc_attr($taxonomy_slug),
+                    'datamachine-term-' . esc_attr($term->slug)
                 ];
 
                 $badge_classes = apply_filters('datamachine_events_badge_classes', $badge_classes, $taxonomy_slug, $term, $post_id);
@@ -100,9 +100,9 @@ class Taxonomy_Badges {
         return $output;
     }
     
-    /**
-     * @return array Taxonomies with slug and label, filtered by dm_events_excluded_taxonomies
-     */
+     /**
+      * @return array Taxonomies with slug and label, filtered by datamachine_events_excluded_taxonomies
+      */
     public static function get_used_taxonomies() {
         global $wpdb;
 
@@ -143,25 +143,25 @@ class Taxonomy_Badges {
         return $used_taxonomies;
     }
     
-    /**
-     * @param string $taxonomy_slug
-     * @return string Hash-based color class (dm-badge-{color})
-     */
+     /**
+      * @param string $taxonomy_slug
+      * @return string Hash-based color class (datamachine-badge-{color})
+      */
     public static function get_taxonomy_color_class($taxonomy_slug) {
         $hash = md5($taxonomy_slug);
         $color_index = hexdec(substr($hash, 0, 1)) % 10;
         
         $color_classes = [
-            'dm-badge-blue',
-            'dm-badge-green', 
-            'dm-badge-purple',
-            'dm-badge-orange',
-            'dm-badge-red',
-            'dm-badge-teal',
-            'dm-badge-pink',
-            'dm-badge-yellow',
-            'dm-badge-indigo',
-            'dm-badge-gray'
+            'datamachine-badge-blue',
+            'datamachine-badge-green',
+            'datamachine-badge-purple',
+            'datamachine-badge-orange',
+            'datamachine-badge-red',
+            'datamachine-badge-teal',
+            'datamachine-badge-pink',
+            'datamachine-badge-yellow',
+            'datamachine-badge-indigo',
+            'datamachine-badge-gray'
         ];
         
         return $color_classes[$color_index];

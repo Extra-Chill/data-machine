@@ -115,7 +115,7 @@
 /* No hover/focus styling - let universal templates handle this */
 
 /* Event Card Content - Layout Only */
-.datamachine-events-calendar .dm-event-card-body {
+.datamachine-events-calendar .datamachine-event-card-body {
     flex: 1;
 }
 
@@ -232,18 +232,18 @@
 }
 
 /* Alternative class-based approach for better performance (optional) */
-.datamachine-events-calendar .datamachine-date-group.dm-scroll-left-active::before {
+.datamachine-events-calendar .datamachine-date-group.datamachine-scroll-left-active::before {
     opacity: var(--datamachine-scroll-gradient-opacity);
 }
 
-.datamachine-events-calendar .datamachine-date-group.dm-scroll-right-active::after {
+.datamachine-events-calendar .datamachine-date-group.datamachine-scroll-right-active::after {
     opacity: var(--datamachine-scroll-gradient-opacity);
 }
 
-.datamachine-events-calendar .datamachine-date-group:not(.dm-scroll-left-active)::before {
+.datamachine-events-calendar .datamachine-date-group:not(.datamachine-scroll-left-active)::before {
     opacity: 0;
 }
 
-.datamachine-events-calendar .datamachine-date-group:not(.dm-scroll-right-active)::after {
+.datamachine-events-calendar .datamachine-date-group:not(.datamachine-scroll-right-active)::after {
     opacity: 0;
 }

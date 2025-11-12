@@ -258,7 +258,7 @@ import 'flatpickr/dist/flatpickr.css';
 
         try {
             // Build REST API URL
-            const apiUrl = `/wp-json/datamachine-events/v1/calendar?${params.toString()}`;
+            const apiUrl = `/wp-json/datamachine/v1/events/calendar?${params.toString()}`;
 
             const response = await fetch(apiUrl, {
                 method: 'GET',

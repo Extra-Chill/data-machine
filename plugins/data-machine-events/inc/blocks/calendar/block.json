@@ -1,7 +1,7 @@
 {
 	"$schema": "https://schemas.wp.org/trunk/block.json",
 	"apiVersion": 3,
-	"name": "dm-events/calendar",
+	"name": "datamachine-events/calendar",
 	"version": "0.1.0",
 	"title": "Data Machine Events Calendar",
 	"category": "widgets",
@@ -42,7 +42,7 @@
 			"default": true
 		}
 	},
-	"textdomain": "dm-events",
+	"textdomain": "datamachine-events",
 	"editorScript": "file:./build/index.js",
 	"editorStyle": "file:./editor.css",
 	"style": "file:./style.css",

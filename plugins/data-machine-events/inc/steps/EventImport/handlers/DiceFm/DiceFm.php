@@ -27,7 +27,7 @@ class DiceFm {
     /**
      * Execute Dice FM event import with flat parameter structure
      * 
-     * Follows Data Machine's flat parameter system via dm_engine_parameters filter.
+      * Follows Data Machine's flat parameter system via datamachine_engine_parameters filter.
      * Fetches events, processes deduplication tracking, and returns data packet array.
      * 
      * @param array $parameters Flat parameter structure from Data Machine
@@ -35,7 +35,7 @@ class DiceFm {
      *   - flow_step_id: Flow step identifier
      *   - flow_step_config: Step configuration data
      *   - data: Cumulative data packet from previous steps
-     *   - Additional parameters: Dynamic metadata from dm_engine_additional_parameters
+      *   - Additional parameters: Dynamic metadata from datamachine_engine_parameters
      * @return array Updated data packet array with event entry added
      */
     public function execute(array $parameters): array {

@@ -9,43 +9,43 @@
  */
 
 /* Editor Styles */
-.dm-event-details-editor {
+.datamachine-event-details-editor {
     padding: 1rem;
     background: #f8f9fa;
     border-radius: 4px;
 }
 
-.dm-event-details-editor h4 {
+.datamachine-event-details-editor h4 {
     margin: 0 0 1rem 0;
     color: #333;
     font-size: 1.1rem;
     font-weight: 600;
 }
 
-.dm-event-details-editor .event-dates,
-.dm-event-details-editor .event-location,
-.dm-event-details-editor .event-details {
+.datamachine-event-details-editor .event-dates,
+.datamachine-event-details-editor .event-location,
+.datamachine-event-details-editor .event-details {
     margin-bottom: 1.5rem;
 }
 
-.dm-event-details-editor .date-time-grid {
+.datamachine-event-details-editor .date-time-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
 }
 
-.dm-event-details-editor .date-time-field {
+.datamachine-event-details-editor .date-time-field {
     display: flex;
     flex-direction: column;
 }
 
-.dm-event-details-editor .date-time-field label {
+.datamachine-event-details-editor .date-time-field label {
     margin-bottom: 0.5rem;
     font-weight: 500;
     color: #555;
 }
 
-.dm-event-details-editor .date-time-field input {
+.datamachine-event-details-editor .date-time-field input {
     padding: 0.5rem;
     border: 1px solid #ddd;
     border-radius: 4px;
@@ -54,7 +54,7 @@
 
 /* Dark Mode Support for Editor */
 @media (prefers-color-scheme: dark) {
-    .dm-event-details-editor {
+    .datamachine-event-details-editor {
         background: #1a202c;
     }
 }

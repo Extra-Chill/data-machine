@@ -38,7 +38,7 @@ $query_args = array(
     'post_status' => 'publish',
     'posts_per_page' => $enable_pagination ? $events_per_page : -1,
     'paged' => $current_page,
-    'meta_key' => '_dm_event_datetime',
+    'meta_key' => '_datamachine_event_datetime',
     'orderby' => 'meta_value',
     'order' => $show_past ? 'DESC' : 'ASC',
 );
@@ -50,14 +50,14 @@ $meta_query = array('relation' => 'AND');
 $current_datetime = current_time('mysql');
 if ($show_past) {
     $meta_query[] = array(
-        'key' => '_dm_event_datetime',
+        'key' => '_datamachine_event_datetime',
         'value' => $current_datetime,
         'compare' => '<',
         'type' => 'DATETIME'
     );
 } else {
     $meta_query[] = array(
-        'key' => '_dm_event_datetime',
+        'key' => '_datamachine_event_datetime',
         'value' => $current_datetime,
         'compare' => '>=',
         'type' => 'DATETIME'
@@ -67,7 +67,7 @@ if ($show_past) {
 // Date range filters
 if (!empty($date_start)) {
     $meta_query[] = array(
-        'key' => '_dm_event_datetime',
+        'key' => '_datamachine_event_datetime',
         'value' => $date_start . ' 00:00:00',
         'compare' => '>=',
         'type' => 'DATETIME'
@@ -75,7 +75,7 @@ if (!empty($date_start)) {
 }
 if (!empty($date_end)) {
     $meta_query[] = array(
-        'key' => '_dm_event_datetime',
+        'key' => '_datamachine_event_datetime',
         'value' => $date_end . ' 23:59:59',
         'compare' => '<=',
         'type' => 'DATETIME'
@@ -139,7 +139,7 @@ $future_count_args = array(
     'posts_per_page' => 1,
     'meta_query' => array(
         array(
-            'key' => '_dm_event_datetime',
+            'key' => '_datamachine_event_datetime',
             'value' => $current_datetime,
             'compare' => '>=',
             'type' => 'DATETIME'
@@ -156,7 +156,7 @@ $past_count_args = array(
     'posts_per_page' => 1,
     'meta_query' => array(
         array(
-            'key' => '_dm_event_datetime',
+            'key' => '_datamachine_event_datetime',
             'value' => $current_datetime,
             'compare' => '<',
             'type' => 'DATETIME'
@@ -175,11 +175,11 @@ if ($events_query->have_posts()) {
 
         // Parse blocks to extract event data (only for current page events)
         // Event Details block stores date/time in block attributes
-        // Meta field (_dm_event_datetime) used for SQL queries, blocks used for display data
+        // Meta field (_datamachine_event_datetime) used for SQL queries, blocks used for display data
         $blocks = parse_blocks($event_post->post_content);
         $event_data = null;
         foreach ($blocks as $block) {
-            if ('dm-events/event-details' === $block['blockName']) {
+            if ('datamachine-events/event-details' === $block['blockName']) {
                 $event_data = $block['attrs'];
                 break; // Only one Event Details block per event
             }
@@ -274,14 +274,14 @@ $wrapper_attributes = get_block_wrapper_attributes(array(
             <?php 
             if ($display_type === 'carousel-list') {
                 wp_enqueue_style(
-                    'dm-events-carousel-list',
+                    'datamachine-events-carousel-list',
                     plugin_dir_url(__FILE__) . 'DisplayStyles/CarouselList/carousel-list.css',
                     [],
                     filemtime(plugin_dir_path(__FILE__) . 'DisplayStyles/CarouselList/carousel-list.css')
                 );
             } else {
                 wp_enqueue_style(
-                    'dm-events-circuit-grid',
+                    'datamachine-events-circuit-grid',
                     plugin_dir_url(__FILE__) . 'DisplayStyles/CircuitGrid/circuit-grid.css',
                     [],
                     filemtime(plugin_dir_path(__FILE__) . 'DisplayStyles/CircuitGrid/circuit-grid.css')

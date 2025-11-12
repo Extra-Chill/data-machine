@@ -37,10 +37,10 @@ function datamachine_events_sync_datetime_meta( $post_id, $post, $update ) {
 			if ( $start_date ) {
 				// Combine into MySQL DATETIME format: "2024-12-25 14:30:00".
 				$datetime = $start_date . ' ' . $start_time;
-				update_post_meta( $post_id, '_dm_event_datetime', $datetime );
+				update_post_meta( $post_id, '_datamachine_event_datetime', $datetime );
 			} else {
 				// No date found, delete meta if it exists.
-				delete_post_meta( $post_id, '_dm_event_datetime' );
+				delete_post_meta( $post_id, '_datamachine_event_datetime' );
 			}
 			break;
 		}
@@ -136,7 +136,7 @@ function datamachine_events_migration_page_content() {
 	?>
 	<div class="wrap">
 		<h1><?php esc_html_e( 'DM Events Meta Migration', 'datamachine-events' ); ?></h1>
-		<p><?php esc_html_e( 'This will populate the _dm_event_datetime meta field for all existing events, enabling efficient SQL-based pagination.', 'datamachine-events' ); ?></p>
+		<p><?php esc_html_e( 'This will populate the _datamachine_event_datetime meta field for all existing events, enabling efficient SQL-based pagination.', 'datamachine-events' ); ?></p>
 		<form method="post">
 			<?php wp_nonce_field( 'datamachine_events_migration' ); ?>
 			<input type="submit" name="datamachine_events_run_migration" class="button button-primary" value="<?php esc_attr_e( 'Run Migration', 'datamachine-events' ); ?>">

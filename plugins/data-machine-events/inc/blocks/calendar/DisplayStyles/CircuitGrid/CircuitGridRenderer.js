@@ -101,7 +101,7 @@ export class CircuitGridRenderer {
         const dayGroups = new Map();
         
         // Find all day group containers in circuit grid
-        const dayGroupElements = this.calendar.querySelectorAll('.datamachine-events-content .dm-date-group');
+        const dayGroupElements = this.calendar.querySelectorAll('.datamachine-events-content .datamachine-date-group');
         
         dayGroupElements.forEach(groupElement => {
             // Extract day from class name (e.g., datamachine-day-saturday -> saturday)

@@ -35,7 +35,7 @@ if (!$show_search) {
         <div class="datamachine-events-date-filter">
             <div class="datamachine-events-date-range-wrapper">
                 <input type="text" 
-                       id="dm-events-date-range" 
+                        id="datamachine-events-date-range"
                        class="datamachine-events-date-range-input" 
                        placeholder="<?php _e('Select date range...', 'datamachine-events'); ?>" 
                        readonly />
@@ -56,7 +56,7 @@ if (!$show_search) {
     </div>
     
     <!-- Taxonomy Filter Modal -->
-    <div id="dm-taxonomy-filter-modal" class="datamachine-taxonomy-modal">
+    <div id="datamachine-taxonomy-filter-modal" class="datamachine-taxonomy-modal">
         <div class="datamachine-taxonomy-modal-overlay"></div>
         <div class="datamachine-taxonomy-modal-container">
             <div class="datamachine-taxonomy-modal-header">

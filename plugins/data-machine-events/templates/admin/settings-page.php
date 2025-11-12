@@ -187,7 +187,7 @@ settings_errors('datamachine_events_messages');
     </form>
     
     <!-- Events Page Setup Instructions -->
-    <div class="dm-events-settings-info" style="margin-top: 30px; padding: 20px; background: #f9f9f9; border-left: 4px solid #0073aa;">
+    <div class="datamachine-events-settings-info" style="margin-top: 30px; padding: 20px; background: #f9f9f9; border-left: 4px solid #0073aa;">
         <h3><?php _e('Events Page Setup', 'datamachine-events'); ?></h3>
         <p><?php _e('To create a custom Events page:', 'datamachine-events'); ?></p>
         <ol>
