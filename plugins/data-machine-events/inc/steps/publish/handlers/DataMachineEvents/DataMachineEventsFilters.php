@@ -46,7 +46,7 @@ add_filter('datamachine_handler_settings', function($all_settings) {
  * Registers the create_event AI tool when create_event handler is used.
  * Dynamically includes taxonomy parameters based on settings.
  */
-add_filter('ai_tools', function($tools, $handler_slug = null, $handler_config = []) {
+add_filter('chubes_ai_tools', function($tools, $handler_slug = null, $handler_config = []) {
     // Only register tool when create_event handler is the target
     if ($handler_slug === 'create_event') {
         $tools['create_event'] = datamachine_events_get_dynamic_event_tool($handler_config);

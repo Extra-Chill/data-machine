@@ -5,7 +5,7 @@
  * Core plugin feature that stores event datetime in post meta for efficient SQL queries.
  * Monitors Event Details block changes and syncs to post meta automatically.
  *
- * @package DM_Events
+ * @package DataMachine_Events
  */
 
 /**

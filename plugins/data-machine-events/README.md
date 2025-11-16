@@ -7,11 +7,11 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 **DM Events demonstrates completed migrations serving as reference implementations for the Data Machine Ecosystem:**
 
 **REST API Migration:**
-- ✓ **Complete:** Calendar filtering system fully migrated from AJAX to REST API
-- Implementation: `datamachine-events/v1/calendar` endpoint with progressive enhancement
-- Status: Production-ready reference implementation serving as pattern for core plugin migration
-- Architecture: SQL-based filtering, History API integration, ~831 lines of code removed
-- Note: Venue operations (2 AJAX endpoints) deliberately remain AJAX-based for admin efficiency
+- ✅ **Complete:** ALL AJAX eliminated - calendar filtering + venue operations fully migrated to REST API
+- Implementation: Unified `datamachine/v1` namespace with `/events/*` routes
+- Endpoints: `/events/calendar` (public), `/events/venues/{id}` (admin), `/events/venues/check-duplicate` (admin)
+- Status: **100% REST API - Zero AJAX dependencies**
+- Architecture: SQL-based filtering, History API integration, ~950 lines of AJAX code removed
 
 **Prefix Migration:**
 - ✅ **Complete:** Extension fully migrated to `datamachine_events` post type and `datamachine_` prefixes

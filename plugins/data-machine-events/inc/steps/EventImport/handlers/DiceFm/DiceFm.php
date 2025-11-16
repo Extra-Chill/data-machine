@@ -38,12 +38,14 @@ class DiceFm {
       *   - Additional parameters: Dynamic metadata from datamachine_engine_parameters
      * @return array Updated data packet array with event entry added
      */
-    public function execute(array $parameters): array {
-        // Extract from flat parameter structure (matches PublishStep pattern)
-        $job_id = $parameters['job_id'];
-        $flow_step_id = $parameters['flow_step_id'];
-        $data = $parameters['data'] ?? [];
-        $flow_step_config = $parameters['flow_step_config'] ?? [];
+    public function execute(array $payload): array {
+        $job_id = $payload['job_id'] ?? 0;
+        $flow_step_id = $payload['flow_step_id'] ?? '';
+        $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+
+        $engine_data = $payload['engine_data'] ?? apply_filters('datamachine_engine_data', [], $job_id);
+        $flow_config = $engine_data['flow_config'] ?? [];
+        $flow_step_config = $payload['flow_step_config'] ?? ($flow_config[$flow_step_id] ?? []);
         
         // Extract handler configuration
         $handler_config = $flow_step_config['handler_config'] ?? [];

@@ -29,11 +29,14 @@ class Ticketmaster {
      * @param array $parameters Flat parameter structure from Data Machine
      * @return array Unchanged data packet or data packet with new event
      */
-    public function execute(array $parameters): array {
-        $job_id = $parameters['job_id'];
-        $flow_step_id = $parameters['flow_step_id'];
-        $data = $parameters['data'] ?? [];
-        $flow_step_config = $parameters['flow_step_config'] ?? [];
+    public function execute(array $payload): array {
+        $job_id = $payload['job_id'] ?? 0;
+        $flow_step_id = $payload['flow_step_id'] ?? '';
+        $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+
+        $engine_data = $payload['engine_data'] ?? apply_filters('datamachine_engine_data', [], $job_id);
+        $flow_config = $engine_data['flow_config'] ?? [];
+        $flow_step_config = $payload['flow_step_config'] ?? ($flow_config[$flow_step_id] ?? []);
         
         $handler_config = $flow_step_config['handler_config']['ticketmaster_events'] ?? [];
         $pipeline_id = $flow_step_config['pipeline_id'] ?? null;

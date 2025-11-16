@@ -47,7 +47,7 @@ Frontend-focused WordPress events plugin with block-first architecture. Integrat
 * Event detail pages with schema markup.
 
 **🔧 WordPress Native Integration**
-* Single `dm_events` post type with venue taxonomy
+* Single `datamachine_events` post type with venue taxonomy
 * Comprehensive venue meta fields (10 fields: address, phone, website, capacity, coordinates, etc.)
 * REST API enabled for headless implementations
 * Block-first approach with background meta field sync for performance

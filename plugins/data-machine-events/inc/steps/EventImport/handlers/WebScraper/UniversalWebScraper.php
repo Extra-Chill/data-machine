@@ -34,17 +34,18 @@ class UniversalWebScraper {
      * @param array $parameters Flat parameter structure from Data Machine
      * @return array Updated data packet array
      */
-    public function execute(array $parameters): array {
-        // Extract from flat parameter structure (matches Data Machine pattern)
-        $job_id = $parameters['job_id'];
-        $flow_step_id = $parameters['flow_step_id'];
-        $data = $parameters['data'] ?? [];
-        $flow_step_config = $parameters['flow_step_config'] ?? [];
+    public function execute(array $payload): array {
+        $job_id = $payload['job_id'] ?? 0;
+        $flow_step_id = $payload['flow_step_id'] ?? '';
+        $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+
+        $engine_data = $payload['engine_data'] ?? apply_filters('datamachine_engine_data', [], $job_id);
+        $flow_config = $engine_data['flow_config'] ?? [];
+        $flow_step_config = $payload['flow_step_config'] ?? ($flow_config[$flow_step_id] ?? []);
         
-        do_action('datamachine_log', 'debug', 'Universal Web Scraper: All parameters received', [
-            'parameter_keys' => array_keys($parameters),
+        do_action('datamachine_log', 'debug', 'Universal Web Scraper: Payload received', [
             'flow_step_config_keys' => array_keys($flow_step_config),
-            'parameters_debug' => $parameters
+            'data_entries' => count($data)
         ]);
         
         // Extract handler configuration
@@ -367,18 +368,36 @@ class UniversalWebScraper {
 
         $start_date = $xpath->query(".//*[@itemprop='startDate']", $event_element);
         if ($start_date->length > 0) {
-            $datetime = $start_date->item(0)->getAttribute('datetime') ?: $start_date->item(0)->textContent;
-            $parsed_date = date('Y-m-d', strtotime($datetime));
-            $parsed_time = date('H:i', strtotime($datetime));
-            $event_data['startDate'] = $parsed_date;
-            $event_data['startTime'] = $parsed_time !== '00:00' ? $parsed_time : '';
+            $start_node = $start_date->item(0);
+            $datetime = '';
+            if ($start_node instanceof \DOMElement) {
+                $datetime = $start_node->getAttribute('datetime') ?: $start_node->textContent;
+            } elseif ($start_node) {
+                $datetime = $start_node->textContent;
+            }
+
+            if (!empty($datetime)) {
+                $parsed_date = date('Y-m-d', strtotime($datetime));
+                $parsed_time = date('H:i', strtotime($datetime));
+                $event_data['startDate'] = $parsed_date;
+                $event_data['startTime'] = $parsed_time !== '00:00' ? $parsed_time : '';
+            }
         }
 
         $end_date = $xpath->query(".//*[@itemprop='endDate']", $event_element);
         if ($end_date->length > 0) {
-            $datetime = $end_date->item(0)->getAttribute('datetime') ?: $end_date->item(0)->textContent;
-            $event_data['endDate'] = date('Y-m-d', strtotime($datetime));
-            $event_data['endTime'] = date('H:i', strtotime($datetime));
+            $end_node = $end_date->item(0);
+            $datetime = '';
+            if ($end_node instanceof \DOMElement) {
+                $datetime = $end_node->getAttribute('datetime') ?: $end_node->textContent;
+            } elseif ($end_node) {
+                $datetime = $end_node->textContent;
+            }
+
+            if (!empty($datetime)) {
+                $event_data['endDate'] = date('Y-m-d', strtotime($datetime));
+                $event_data['endTime'] = date('H:i', strtotime($datetime));
+            }
         }
 
         $description = $xpath->query(".//*[@itemprop='description']", $event_element);
@@ -459,7 +478,17 @@ class UniversalWebScraper {
             // Venue website
             $url = $xpath->query(".//*[@itemprop='url']", $location_element);
             if ($url->length > 0) {
-                $event_data['venueWebsite'] = trim($url->item(0)->getAttribute('href') ?: $url->item(0)->textContent);
+                $url_node = $url->item(0);
+                $website = '';
+                if ($url_node instanceof \DOMElement) {
+                    $website = $url_node->getAttribute('href') ?: $url_node->textContent;
+                } elseif ($url_node) {
+                    $website = $url_node->textContent;
+                }
+
+                if (!empty($website)) {
+                    $event_data['venueWebsite'] = trim($website);
+                }
             }
 
             // Geo coordinates
@@ -488,14 +517,34 @@ class UniversalWebScraper {
 
             $ticket_url = $xpath->query(".//*[@itemprop='url']", $offers_element);
             if ($ticket_url->length > 0) {
-                $event_data['ticketUrl'] = trim($ticket_url->item(0)->getAttribute('href') ?: $ticket_url->item(0)->textContent);
+                $ticket_node = $ticket_url->item(0);
+                $candidate_url = '';
+                if ($ticket_node instanceof \DOMElement) {
+                    $candidate_url = $ticket_node->getAttribute('href') ?: $ticket_node->textContent;
+                } elseif ($ticket_node) {
+                    $candidate_url = $ticket_node->textContent;
+                }
+
+                if (!empty($candidate_url)) {
+                    $event_data['ticketUrl'] = trim($candidate_url);
+                }
             }
         }
 
         // Extract image
         $image = $xpath->query(".//*[@itemprop='image']", $event_element);
         if ($image->length > 0) {
-            $event_data['image'] = trim($image->item(0)->getAttribute('src') ?: $image->item(0)->getAttribute('href') ?: $image->item(0)->textContent);
+            $image_node = $image->item(0);
+            $image_value = '';
+            if ($image_node instanceof \DOMElement) {
+                $image_value = $image_node->getAttribute('src') ?: $image_node->getAttribute('href') ?: $image_node->textContent;
+            } elseif ($image_node) {
+                $image_value = $image_node->textContent;
+            }
+
+            if (!empty($image_value)) {
+                $event_data['image'] = trim($image_value);
+            }
         }
 
         // Require at least title and startDate for valid event

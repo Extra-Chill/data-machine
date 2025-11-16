@@ -17,14 +17,16 @@ if (!defined('ABSPATH')) {
 class EventImportStep {
 
     /**
-     * @param array $parameters Flat parameter structure from Data Machine
+     * Execute event import step.
+     *
+     * @param array $payload Unified step payload
      * @return array Updated data packet array with event data added
      */
-    public function execute(array $parameters): array {
-        $job_id = $parameters['job_id'];
-        $flow_step_id = $parameters['flow_step_id'];
-        $data = $parameters['data'] ?? [];
-        $flow_step_config = $parameters['flow_step_config'] ?? [];
+    public function execute(array $payload): array {
+        $job_id = $payload['job_id'] ?? 0;
+        $flow_step_id = $payload['flow_step_id'] ?? '';
+        $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+        $flow_step_config = $payload['flow_step_config'] ?? [];
         
         try {
             do_action('datamachine_log', 'debug', 'Event Import Step: Starting event collection', [
@@ -84,8 +86,18 @@ class EventImportStep {
             
             $handler = new $class_name();
             
-            // Execute handler with unified parameter structure
-            $data = $handler->execute($parameters);
+            $handler_payload = $payload;
+            $handler_payload['data'] = $data;
+            $data = $handler->execute($handler_payload);
+
+            if (!is_array($data)) {
+                do_action('datamachine_log', 'error', 'Event Import Step: Handler returned invalid payload', [
+                    'flow_step_id' => $flow_step_id,
+                    'handler_slug' => $handler_slug,
+                    'result_type' => gettype($data)
+                ]);
+                return is_array($payload['data'] ?? null) ? $payload['data'] : [];
+            }
 
             do_action('datamachine_log', 'debug', 'Event Import Step: Direct handler execution completed', [
                 'flow_step_id' => $flow_step_id,
