@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
 }
 
 use DataMachineEvents\Core\Venue_Taxonomy;
-use DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents\DataMachineEventsSchema;
+use DataMachineEvents\Steps\Publish\Events\Schema;
 
 $start_date = $attributes['startDate'] ?? '';
 $end_date = $attributes['endDate'] ?? '';
@@ -59,7 +59,7 @@ $event_schema = null;
 if (!empty($start_date)) {
     $engine_parameters = [];
     
-    $event_schema = DataMachineEventsSchema::generate_event_schema($attributes, $venue_data, $post_id, $engine_parameters);
+    $event_schema = Schema::generate_event_schema($attributes, $venue_data, $post_id, $engine_parameters);
 }
 ?>
 

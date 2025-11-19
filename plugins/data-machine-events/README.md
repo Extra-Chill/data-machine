@@ -60,11 +60,11 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 - `DataMachineEvents\Core\Breadcrumbs` - Breadcrumb generation with filterable output (datamachine_events_breadcrumbs) for theme integration
 - `DataMachineEvents\Blocks\Calendar\Template_Loader` - Modular template loading system with variable extraction, output buffering, and template caching for calendar block components
 - `DataMachineEvents\Blocks\Calendar\Taxonomy_Helper` - Taxonomy data discovery, hierarchy building, and post count calculations for calendar filtering systems
-- `DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents\DataMachineEventsSchema` - Google Event Schema JSON-LD generator for SEO enhancement
-- `DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents\DataMachineEventsPublisher` - AI-driven event creation with comprehensive venue handling
-- `DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents\DataMachineEventsSettings` - Publisher configuration management
-- `DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents\DataMachineEventsVenue` - Centralized venue taxonomy operations with validation
-- `DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents\DataMachineEventsFilters` - Publisher filtering system
+- `DataMachineEvents\Steps\Publish\Events\Schema` - Google Event Schema JSON-LD generator for SEO enhancement
+- `DataMachineEvents\Steps\Publish\Events\Publisher` - AI-driven event creation with comprehensive venue handling
+- `DataMachineEvents\Steps\Publish\Events\Settings` - Publisher configuration management
+- `DataMachineEvents\Steps\Publish\Events\Venue` - Centralized venue taxonomy operations with validation
+- `DataMachineEvents\Steps\Publish\Events\Filters` - Publisher filtering system
 - `DataMachineEvents\Steps\EventImport\EventImportStep` - Event import step for Data Machine pipeline with handler discovery
 - `DataMachineEvents\Steps\EventImport\EventImportFilters` - Event import step registration with Data Machine
 - `DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster\Ticketmaster` - Discovery API integration with comprehensive error handling
@@ -122,7 +122,7 @@ dm-events/
 │       ├── EventImport/     # Import handlers with single-item processing
 │       │   └── handlers/    # Ticketmaster, Dice FM, web scrapers
 │       └── publish/         # AI-driven publishing with Schema generation
-│           └── handlers/DataMachineEvents/  # DataMachineEventsPublisher, Schema, Venue handling
+│           └── handlers/Events/  # Publisher, Schema, Venue handling
 ├── templates/
 │   └── single-datamachine_events.php # Single event template with extensibility hooks
 ├── assets/
@@ -186,8 +186,8 @@ npm run lint:js && npm run lint:css
 
 **Google Event Schema Generation:**
 ```php
-// DataMachineEventsSchema generates comprehensive structured data from block attributes
-$schema = DataMachineEventsSchema::generate_event_schema($block_attributes, $venue_data, $post_id);
+// Schema generates comprehensive structured data from block attributes
+$schema = Schema::generate_event_schema($block_attributes, $venue_data, $post_id);
 echo '<script type="application/ld+json">' . wp_json_encode($schema) . '</script>';
 
 // Combines block data with venue taxonomy meta for complete SEO markup
@@ -198,15 +198,16 @@ echo '<script type="application/ld+json">' . wp_json_encode($schema) . '</script
 
 **AI-Driven Event Creation Pipeline:**
 1. **Import Handlers:** Extract event data from APIs (Ticketmaster, Dice FM) or AI-powered universal web scrapers using single-item processing
-2. **AI Web Scraping:** UniversalWebScraper uses AI to extract event data from HTML sections with automated processing
-3. **Venue Data Processing:** DataMachineEventsPublisher processes venue creation and assignment directly
-4. **AI Content Generation:** AI generates event descriptions while preserving structured venue data
-5. **Block Creation:** Publisher creates Event Details blocks with InnerBlocks support and proper attribute mapping
-6. **Venue Management:** DataMachineEventsVenue handles term creation, lookup, metadata validation, and event assignment
-7. **Schema Generation:** DataMachineEventsSchema creates Google Event structured data combining block attributes with venue taxonomy meta
-8. **Template Rendering:** Template_Loader system provides modular, cacheable template rendering with variable extraction
-9. **Taxonomy Display:** Taxonomy_Badges generates dynamic badge HTML for all non-venue taxonomies with consistent styling
-10. **Visual Enhancement:** BadgeRenderer.js creates taxonomy badge rendering with CircuitGridRenderer.js and CarouselListRenderer.js for flexible calendar display modes
+2. **Engine Data Persistence:** Event import handlers store venue/location/contact fields in engine data so AI and publish steps can access them without adapters
+3. **AI Web Scraping:** UniversalWebScraper uses AI to extract event data from HTML sections with automated processing
+4. **Venue Data Processing:** Publisher processes venue creation and assignment directly
+5. **AI Content Generation:** AI generates event descriptions while preserving structured venue data
+6. **Block Creation:** Publisher creates Event Details blocks with InnerBlocks support and proper attribute mapping
+7. **Venue Management:** Venue handles term creation, lookup, metadata validation, and event assignment
+8. **Schema Generation:** Schema creates Google Event structured data combining block attributes with venue taxonomy meta
+9. **Template Rendering:** Template_Loader system provides modular, cacheable template rendering with variable extraction
+10. **Taxonomy Display:** Taxonomy_Badges generates dynamic badge HTML for all non-venue taxonomies with consistent styling
+11. **Visual Enhancement:** BadgeRenderer.js creates taxonomy badge rendering with CircuitGridRenderer.js and CarouselListRenderer.js for flexible calendar display modes
 
 ## Calendar Filtering Architecture
 
@@ -252,7 +253,7 @@ past=1                       # Show past events ("1" for past, omit for upcoming
 - **Taxonomy Data Processing:** Taxonomy_Helper with hierarchy building, post count calculations, and structured data for filtering
 - **Visual Enhancement System:** DisplayStyles components with CircuitGridRenderer.js, CarouselListRenderer.js, and BadgeRenderer.js for flexible calendar display
 - **Centralized Design System:** root.css provides unified design tokens accessible from both CSS and JavaScript
-- **Smart Parameter Routing:** DataMachineEventsSchema.engine_or_tool() intelligently routes data between system parameters and AI inference
+- **Smart Parameter Routing:** Schema.engine_or_tool() intelligently routes data between system parameters and AI inference
 - **Flat Parameter System:** Data Machine's single-level parameter structure across all custom steps for simplified integration
 - **InnerBlocks Support:** Event Details blocks with rich content editing capabilities and proper attribute mapping
 - **Comprehensive Venue Meta:** 9 venue meta fields plus native WordPress description automatically populated from import sources

@@ -36,63 +36,10 @@ define('DATAMACHINE_EVENTS_PLUGIN_BASENAME', plugin_basename(__FILE__));
 define('DATAMACHINE_EVENTS_PATH', plugin_dir_path(__FILE__));
 
 // Load core meta storage (monitors Event Details block saves)
-require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/core/meta-storage.php';
+require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/meta-storage.php';
 
 // Load REST API endpoints
-require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/core/rest-api.php';
-
-
-/**
- * PSR-4 Autoloader with special naming convention for Data Machine handlers
- * @param string $class_name Fully qualified class name
- */
-function datamachine_events_autoloader($class_name) {
-    if (strpos($class_name, 'DataMachineEvents\\') !== 0) {
-        return;
-    }
-    $class_name = str_replace('DataMachineEvents\\', '', $class_name);
-    $class_parts = explode('\\', $class_name);
-    $actual_class = end($class_parts);
-    $file_name = 'class-' . strtolower(str_replace('_', '-', $actual_class)) . '.php';
-
-    $datamachine_handlers = ['DataMachineEventsSettings', 'DataMachineEventsPublisher', 'DataMachineEventsFilters', 'DataMachineEventsVenue', 'DataMachineEventsSchema'];
-    if (in_array($actual_class, $datamachine_handlers)) {
-        $file_name = $actual_class . '.php';
-    }
-
-    $namespace_dirs = array_slice($class_parts, 0, -1);
-    $directory_path = '';
-    if (!empty($namespace_dirs)) {
-        $directory_path = implode('/', $namespace_dirs) . '/';
-    }
-
-    $base_directories = array('inc', 'inc/admin', 'inc/events', 'inc/core', 'inc/steps', 'inc/blocks/calendar');
-
-    foreach ($base_directories as $base_directory) {
-        if (!empty($directory_path)) {
-            $file_path = DATAMACHINE_EVENTS_PLUGIN_DIR . $base_directory . '/' . $directory_path . $file_name;
-            if (file_exists($file_path)) {
-                require_once $file_path;
-                return;
-            }
-
-            $lowercase_directory_path = strtolower($directory_path);
-            $file_path = DATAMACHINE_EVENTS_PLUGIN_DIR . $base_directory . '/' . $lowercase_directory_path . $file_name;
-            if (file_exists($file_path)) {
-                require_once $file_path;
-                return;
-            }
-        }
-
-        $file_path = DATAMACHINE_EVENTS_PLUGIN_DIR . $base_directory . '/' . $file_name;
-        if (file_exists($file_path)) {
-            require_once $file_path;
-            return;
-        }
-    }
-}
-
-spl_autoload_register('datamachine_events_autoloader');
+require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/rest-api.php';
 
 /**
  * Main Data Machine Events plugin class
@@ -167,33 +114,43 @@ class DATAMACHINE_Events {
     }
     
     private function load_data_machine_components() {
-        if (file_exists(DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/steps/EventImport/EventImportStep.php')) {
-            require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/steps/EventImport/EventImportStep.php';
-        }
-        if (file_exists(DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/steps/EventImport/EventImportFilters.php')) {
-            require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/steps/EventImport/EventImportFilters.php';
+        // EventImportStep is autoloaded
+        
+        if (file_exists(DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Steps/EventImport/EventImportFilters.php')) {
+            require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Steps/EventImport/EventImportFilters.php';
         }
         
         $this->load_event_import_handlers();
         $this->load_publish_handlers();
         
-        if (class_exists('DataMachineEvents\\Steps\\Publish\\Handlers\\DataMachineEvents\\DataMachineEventsPublisher')) {
-            new \DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents\DataMachineEventsPublisher();
+        // Publisher is autoloaded, but we instantiate it to register hooks if it has any in constructor?
+        // Actually, PublishHandler usually registers itself via filters. 
+        // But the code was: new \DataMachineEvents\Steps\Publish\Events\Publisher();
+        // If it has hooks in constructor, we need to instantiate it.
+        if (class_exists('DataMachineEvents\\Steps\\Publish\\Events\\Publisher')) {
+            new \DataMachineEvents\Steps\Publish\Events\Publisher();
         }
     }
     
     private function load_event_import_handlers() {
-        $handlers = ['ticketmaster', 'DiceFm', 'WebScraper', 'GoogleCalendar'];
+        // We only need to load non-class files (like Filters) manually.
+        // Classes are autoloaded.
+        $handlers = ['Ticketmaster', 'DiceFm', 'WebScraper', 'GoogleCalendar'];
         
         foreach ($handlers as $handler) {
-            $handler_path = DATAMACHINE_EVENTS_PLUGIN_DIR . "inc/steps/EventImport/handlers/{$handler}/";
+            $handler_path = DATAMACHINE_EVENTS_PLUGIN_DIR . "inc/Steps/EventImport/Handlers/{$handler}/";
             if (is_dir($handler_path)) {
-                foreach (glob($handler_path . '*.php') as $file) {
+                // Load *Filters.php files
+                foreach (glob($handler_path . '*Filters.php') as $file) {
                     if (file_exists($file)) {
                         require_once $file;
                     }
                 }
                 
+                // Load *Auth.php files if they contain hooks (usually they are classes used by filters)
+                // If Auth is a class, it's autoloaded.
+                
+                // WebScraper scrapers might need loading if they are not PSR-4 or if they register themselves
                 if ($handler === 'WebScraper') {
                     $scrapers_path = $handler_path . 'scrapers/';
                     if (is_dir($scrapers_path)) {
@@ -209,9 +166,10 @@ class DATAMACHINE_Events {
     }
     
     private function load_publish_handlers() {
-        $datamachine_events_handler_path = DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/steps/publish/handlers/DataMachineEvents/';
+        $datamachine_events_handler_path = DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Steps/Publish/Events/';
         if (is_dir($datamachine_events_handler_path)) {
-            foreach (glob($datamachine_events_handler_path . '*.php') as $file) {
+            // Load Filters
+             foreach (glob($datamachine_events_handler_path . '*Filters.php') as $file) {
                 if (file_exists($file)) {
                     require_once $file;
                 }

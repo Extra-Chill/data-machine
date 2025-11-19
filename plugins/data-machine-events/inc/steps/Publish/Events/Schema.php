@@ -2,25 +2,25 @@
 /**
  * Event Schema JSON-LD Generator
  *
- * @package DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents
+ * @package DataMachineEvents\Steps\Publish\Events
  */
 
-namespace DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents;
+namespace DataMachineEvents\Steps\Publish\Events;
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-class DataMachineEventsSchema {
+class Schema {
 
     /**
      * Smart parameter routing for engine vs AI decisions
      * @param array $event_data Current event data
      * @param array $import_data Import source data
-     * @param array $engine_parameters Additional engine parameters
+     * @param array $engine_data Engine data injected by Data Machine
      * @return array ['engine' => [...], 'tool' => [...]]
      */
-    public static function engine_or_tool($event_data, $import_data, $engine_parameters = []) {
+    public static function engine_or_tool($event_data, $import_data, $engine_data = []) {
         $engine_params = [];
         $tool_params = [];
         
@@ -39,8 +39,8 @@ class DataMachineEventsSchema {
                 continue;
             }
             
-            if (!empty($engine_parameters[$field])) {
-                $engine_params[$field] = $engine_parameters[$field];
+            if (!empty($engine_data[$field])) {
+                $engine_params[$field] = $engine_data[$field];
             } elseif (!empty($import_data[$field])) {
                 $engine_params[$field] = $import_data[$field];
             } else {
@@ -51,8 +51,8 @@ class DataMachineEventsSchema {
         $venue_fields = ['venue', 'venueAddress', 'venueCity', 'venueState', 'venueZip', 
                         'venueCountry', 'venuePhone', 'venueWebsite', 'venueCoordinates'];
         foreach ($venue_fields as $field) {
-            if (!empty($engine_parameters[$field])) {
-                $engine_params[$field] = $engine_parameters[$field];
+            if (!empty($engine_data[$field])) {
+                $engine_params[$field] = $engine_data[$field];
             } elseif (!empty($import_data[$field])) {
                 $engine_params[$field] = $import_data[$field];
             }
@@ -68,10 +68,10 @@ class DataMachineEventsSchema {
      * @param array $attributes Event Details block attributes
      * @param array|null $venue_data Venue taxonomy meta data
      * @param int $post_id Event post ID
-     * @param array $engine_parameters Additional venue parameters
+    * @param array $engine_data Engine data for venue context
      * @return array Google Event schema JSON-LD
      */
-    public static function generate_event_schema(array $attributes, ?array $venue_data, int $post_id, array $engine_parameters = []): array {
+    public static function generate_event_schema(array $attributes, ?array $venue_data, int $post_id, array $engine_data = []): array {
         $schema = [
             '@context' => 'https://schema.org',
             '@type' => 'Event',
@@ -88,7 +88,7 @@ class DataMachineEventsSchema {
             $schema['endDate'] = $attributes['endDate'] . $end_time;
         }
         
-        $venue_name = $engine_parameters['venue'] ?? $venue_data['name'] ?? $attributes['venue'] ?? '';
+        $venue_name = $engine_data['venue'] ?? $venue_data['name'] ?? $attributes['venue'] ?? '';
         
         if (!empty($venue_name)) {
             $schema['location'] = [
@@ -97,11 +97,11 @@ class DataMachineEventsSchema {
             ];
             
             $address_data = [
-                'streetAddress' => $engine_parameters['venueAddress'] ?? $venue_data['address'] ?? $attributes['address'] ?? '',
-                'addressLocality' => $engine_parameters['venueCity'] ?? $venue_data['city'] ?? $attributes['venueCity'] ?? '',
-                'addressRegion' => $engine_parameters['venueState'] ?? $venue_data['state'] ?? $attributes['venueState'] ?? '',
-                'postalCode' => $engine_parameters['venueZip'] ?? $venue_data['zip'] ?? $attributes['venueZip'] ?? '',
-                'addressCountry' => $engine_parameters['venueCountry'] ?? $venue_data['country'] ?? $attributes['venueCountry'] ?? 'US'
+                'streetAddress' => $engine_data['venueAddress'] ?? $venue_data['address'] ?? $attributes['address'] ?? '',
+                'addressLocality' => $engine_data['venueCity'] ?? $venue_data['city'] ?? $attributes['venueCity'] ?? '',
+                'addressRegion' => $engine_data['venueState'] ?? $venue_data['state'] ?? $attributes['venueState'] ?? '',
+                'postalCode' => $engine_data['venueZip'] ?? $venue_data['zip'] ?? $attributes['venueZip'] ?? '',
+                'addressCountry' => $engine_data['venueCountry'] ?? $venue_data['country'] ?? $attributes['venueCountry'] ?? 'US'
             ];
             
             if (!empty($address_data['streetAddress']) || !empty($address_data['addressLocality'])) {
@@ -114,17 +114,17 @@ class DataMachineEventsSchema {
                 }
             }
             
-            $venue_phone = $engine_parameters['venuePhone'] ?? $venue_data['phone'] ?? $attributes['venuePhone'] ?? '';
+            $venue_phone = $engine_data['venuePhone'] ?? $venue_data['phone'] ?? $attributes['venuePhone'] ?? '';
             if (!empty($venue_phone)) {
                 $schema['location']['telephone'] = $venue_phone;
             }
             
-            $venue_website = $engine_parameters['venueWebsite'] ?? $venue_data['website'] ?? $attributes['venueWebsite'] ?? '';
+            $venue_website = $engine_data['venueWebsite'] ?? $venue_data['website'] ?? $attributes['venueWebsite'] ?? '';
             if (!empty($venue_website)) {
                 $schema['location']['url'] = $venue_website;
             }
             
-            $venue_coordinates = $engine_parameters['venueCoordinates'] ?? $venue_data['coordinates'] ?? $attributes['venueCoordinates'] ?? '';
+            $venue_coordinates = $engine_data['venueCoordinates'] ?? $venue_data['coordinates'] ?? $attributes['venueCoordinates'] ?? '';
             if (!empty($venue_coordinates)) {
                 $coords = explode(',', $venue_coordinates);
                 if (count($coords) === 2) {

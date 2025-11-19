@@ -8,6 +8,9 @@
 namespace DataMachineEvents\Steps\EventImport\Handlers\GoogleCalendar;
 
 use ICal\ICal;
+use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
+use DataMachineEvents\Steps\EventImport\EventEngineData;
+use DataMachine\Core\DataPacket;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -16,66 +19,56 @@ if (!defined('ABSPATH')) {
 /**
  * Single-item processing with Google Calendar .ics integration
  */
-class GoogleCalendar {
+class GoogleCalendar extends EventImportHandler {
+
+    public function __construct() {
+        parent::__construct('google_calendar');
+    }
 
     /**
-     * Data Machine flat parameter execution for single-item processing
-     * @param array $parameters Flat parameter structure from Data Machine
-     * @return array Unchanged data packet or data packet with new event
+     * Execute fetch logic
      */
-    public function execute(array $payload): array {
-        $job_id = $payload['job_id'] ?? 0;
-        $flow_step_id = $payload['flow_step_id'] ?? '';
-        $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
-
-        $engine_data = $payload['engine_data'] ?? apply_filters('datamachine_engine_data', [], $job_id);
-        $flow_config = $engine_data['flow_config'] ?? [];
-        $flow_step_config = $payload['flow_step_config'] ?? ($flow_config[$flow_step_id] ?? []);
-
-        $handler_config = $flow_step_config['handler_config'] ?? [];
-        $pipeline_id = $flow_step_config['pipeline_id'] ?? null;
-
-        $this->log_info('Google Calendar Handler: Starting event import', [
+    protected function executeFetch(int $pipeline_id, array $config, ?string $flow_step_id, int $flow_id, ?string $job_id): array {
+        $this->log('info', 'Starting event import', [
             'pipeline_id' => $pipeline_id,
             'job_id' => $job_id,
             'flow_step_id' => $flow_step_id
         ]);
 
         // Get calendar URL from handler configuration
-        $calendar_url = $handler_config['calendar_url'] ?? '';
+        $calendar_url = $config['calendar_url'] ?? '';
         if (empty($calendar_url)) {
-            $this->log_error('Google Calendar URL not configured');
-            return $data;
+            $this->log('error', 'Google Calendar URL not configured');
+            return $this->emptyResponse() ?? [];
         }
 
         // Validate URL format
         if (!filter_var($calendar_url, FILTER_VALIDATE_URL)) {
-            $this->log_error('Invalid Google Calendar URL format', ['url' => $calendar_url]);
-            return $data;
+            $this->log('error', 'Invalid Google Calendar URL format', ['url' => $calendar_url]);
+            return $this->emptyResponse() ?? [];
         }
 
         // Fetch and parse .ics feed
-        $events = $this->fetch_calendar_events($calendar_url, $handler_config);
+        $events = $this->fetch_calendar_events($calendar_url, $config);
         if (empty($events)) {
-            $this->log_info('No events found in Google Calendar feed');
-            return $data;
+            $this->log('info', 'No events found in Google Calendar feed');
+            return $this->emptyResponse() ?? [];
         }
 
         // Process single event (Data Machine single-item model)
         foreach ($events as $ical_event) {
             // Extract and standardize event data
-            $standardized_event = $this->map_ical_event($ical_event, $handler_config);
+            $standardized_event = $this->map_ical_event($ical_event, $config);
 
             if (empty($standardized_event['title'])) {
                 continue;
             }
 
             // Create unique identifier for processed items tracking
-            $event_identifier = md5($standardized_event['title'] . $standardized_event['startDate'] . $standardized_event['venue']);
+            $event_identifier = md5($standardized_event['title'] . ($standardized_event['startDate'] ?? '') . ($standardized_event['venue'] ?? ''));
 
             // Check if already processed
-            $is_processed = apply_filters('datamachine_is_item_processed', false, $flow_step_id, 'google_calendar', $event_identifier);
-            if ($is_processed) {
+            if ($this->isItemProcessed($event_identifier, $flow_step_id)) {
                 continue;
             }
 
@@ -84,12 +77,10 @@ class GoogleCalendar {
                 continue;
             }
 
-            // Found eligible event - mark as processed and add to data packet array
-            if ($flow_step_id && $job_id) {
-                do_action('datamachine_mark_item_processed', $flow_step_id, 'google_calendar', $event_identifier, $job_id);
-            }
+            // Found eligible event - mark as processed
+            $this->markItemProcessed($event_identifier, $flow_step_id, $job_id);
 
-            $this->log_info('Google Calendar Handler: Found eligible event', [
+            $this->log('info', 'Found eligible event', [
                 'title' => $standardized_event['title'],
                 'date' => $standardized_event['startDate'],
                 'venue' => $standardized_event['venue'],
@@ -108,17 +99,41 @@ class GoogleCalendar {
                 'venueCoordinates' => $standardized_event['venueCoordinates'] ?? ''
             ];
 
+            EventEngineData::storeVenueContext($job_id, $standardized_event, $venue_metadata);
+
             // Remove venue metadata from event data (move to separate structure)
             unset($standardized_event['venueAddress'], $standardized_event['venueCity'],
                   $standardized_event['venueState'], $standardized_event['venueZip'],
                   $standardized_event['venueCountry'], $standardized_event['venuePhone'],
                   $standardized_event['venueWebsite'], $standardized_event['venueCoordinates']);
 
-            // Create data packet entry following Data Machine standard
-            $event_entry = [
+            // Create DataPacket
+            $dataPacket = new DataPacket(
+                [
+                    'title' => $standardized_event['title'],
+                    'body' => wp_json_encode([
+                        'event' => $standardized_event,
+                        'venue_metadata' => $venue_metadata,
+                        'import_source' => 'google_calendar'
+                    ], JSON_PRETTY_PRINT)
+                ],
+                [
+                    'source_type' => 'google_calendar',
+                    'pipeline_id' => $pipeline_id,
+                    'flow_id' => $flow_id,
+                    'original_title' => $standardized_event['title'] ?? '',
+                    'event_identifier' => $event_identifier,
+                    'import_timestamp' => time()
+                ],
+                'event_import'
+            );
+
+            // Return single item
+            // Manually construct array since DataPacket doesn't have toArray()
+            $packet_array = [
                 'type' => 'event_import',
-                'handler' => 'google_calendar',
-                'content' => [
+                'timestamp' => time(),
+                'data' => [
                     'title' => $standardized_event['title'],
                     'body' => wp_json_encode([
                         'event' => $standardized_event,
@@ -129,22 +144,18 @@ class GoogleCalendar {
                 'metadata' => [
                     'source_type' => 'google_calendar',
                     'pipeline_id' => $pipeline_id,
-                    'flow_id' => $flow_step_config['flow_id'] ?? null,
+                    'flow_id' => $flow_id,
                     'original_title' => $standardized_event['title'] ?? '',
                     'event_identifier' => $event_identifier,
                     'import_timestamp' => time()
-                ],
-                'attachments' => [],
-                'timestamp' => time()
+                ]
             ];
 
-            // Add to front of data packet array (newest first)
-            array_unshift($data, $event_entry);
-            return $data;
+            return $this->successResponse([$packet_array]);
         }
 
         // No eligible events found
-        return $data;
+        return $this->emptyResponse() ?? [];
     }
 
     /**
@@ -253,6 +264,10 @@ class GoogleCalendar {
                 $standardized_event['address'] = sanitize_text_field(trim($location_parts[1]));
             } else {
                 $standardized_event['address'] = sanitize_text_field($location);
+            }
+
+            if (!empty($standardized_event['address'])) {
+                $standardized_event['venueAddress'] = $standardized_event['address'];
             }
         }
 

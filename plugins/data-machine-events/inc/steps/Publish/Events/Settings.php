@@ -4,10 +4,10 @@
  *
  * Centralized configuration management for AI-driven event publishing.
  *
- * @package DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents
+ * @package DataMachineEvents\Steps\Publish\Events
  */
 
-namespace DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents;
+namespace DataMachineEvents\Steps\Publish\Events;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
  * 
  * Centralized settings management for AI-driven event creation and venue taxonomy handling.
  */
-class DataMachineEventsSettings {
+class Settings {
     
     
     

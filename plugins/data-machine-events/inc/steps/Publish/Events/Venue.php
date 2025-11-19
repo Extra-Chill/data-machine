@@ -4,12 +4,13 @@
  *
  * Centralized venue taxonomy handling for Data Machine Events.
  *
- * @package DataMachineEvents
+ * @package DataMachineEvents\Steps\Publish\Events
  */
 
-namespace DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents;
+namespace DataMachineEvents\Steps\Publish\Events;
 
 use DataMachineEvents\Core\Venue_Taxonomy;
+use DataMachineEvents\Core\VenueService;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -21,7 +22,7 @@ if (!defined('ABSPATH')) {
  * Assigns existing venue terms to events. Venue creation/update now happens
  * in handler settings (UniversalWebScraperSettings::save_settings()).
  */
-class DataMachineEventsVenue {
+class Venue {
 
     /**
      * Assign pre-existing venue to event
@@ -41,7 +42,18 @@ class DataMachineEventsVenue {
             ];
         }
 
+        // Check if we have a specific venue ID from settings (manual override)
         $venue_term_id = $settings['venue'] ?? null;
+
+        // If no manual venue, check if we have dynamic venue data from Engine
+        // This allows the AI/Import step to pass venue info dynamically
+        if (!$venue_term_id && !empty($settings['venue_data'])) {
+             $venue_data = VenueService::normalize_venue_data($settings['venue_data']);
+             $result = VenueService::get_or_create_venue($venue_data);
+             if (!is_wp_error($result)) {
+                 $venue_term_id = $result;
+             }
+        }
 
         if (!$venue_term_id) {
             do_action('datamachine_log', 'debug', 'No venue term_id in settings, skipping venue assignment', [

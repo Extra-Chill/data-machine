@@ -11,6 +11,10 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\DiceFm;
 
+use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
+use DataMachineEvents\Steps\EventImport\EventEngineData;
+use DataMachine\Core\DataPacket;
+
 // Prevent direct access
 if (!defined('ABSPATH')) {
     exit;
@@ -22,36 +26,27 @@ if (!defined('ABSPATH')) {
  * Implements Data Machine handler interface for importing events from
  * Dice.fm API with standardized processing and venue data extraction.
  */
-class DiceFm {
+class DiceFm extends EventImportHandler {
+
+    public function __construct() {
+        parent::__construct('dice_fm');
+    }
     
     /**
-     * Execute Dice FM event import with flat parameter structure
-     * 
-      * Follows Data Machine's flat parameter system via datamachine_engine_parameters filter.
+    * Execute Dice FM event import with flat parameter structure
+    * 
+     * Stores venue context in engine data for downstream steps.
      * Fetches events, processes deduplication tracking, and returns data packet array.
      * 
-     * @param array $parameters Flat parameter structure from Data Machine
-     *   - job_id: Job execution identifier
-     *   - flow_step_id: Flow step identifier
-     *   - flow_step_config: Step configuration data
-     *   - data: Cumulative data packet from previous steps
-      *   - Additional parameters: Dynamic metadata from datamachine_engine_parameters
-     * @return array Updated data packet array with event entry added
+     * @param int $pipeline_id Pipeline ID
+     * @param array $config Handler configuration
+     * @param string|null $flow_step_id Flow step ID
+     * @param int $flow_id Flow ID
+     * @param string|null $job_id Job ID
+     * @return array Processed items array
      */
-    public function execute(array $payload): array {
-        $job_id = $payload['job_id'] ?? 0;
-        $flow_step_id = $payload['flow_step_id'] ?? '';
-        $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
-
-        $engine_data = $payload['engine_data'] ?? apply_filters('datamachine_engine_data', [], $job_id);
-        $flow_config = $engine_data['flow_config'] ?? [];
-        $flow_step_config = $payload['flow_step_config'] ?? ($flow_config[$flow_step_id] ?? []);
-        
-        // Extract handler configuration
-        $handler_config = $flow_step_config['handler_config'] ?? [];
-        $pipeline_id = $flow_step_config['pipeline_id'] ?? null;
-        
-        $this->log_info('Dice.fm Handler: Starting event import', [
+    protected function executeFetch(int $pipeline_id, array $config, ?string $flow_step_id, int $flow_id, ?string $job_id): array {
+        $this->log('info', 'Starting event import', [
             'pipeline_id' => $pipeline_id,
             'job_id' => $job_id,
             'flow_step_id' => $flow_step_id
@@ -60,32 +55,32 @@ class DiceFm {
         // Get API configuration from Data Machine auth system
         $api_config = apply_filters('datamachine_retrieve_oauth_keys', [], 'dice_fm_events');
         if (empty($api_config['api_key'])) {
-            $this->log_error('Dice.fm API key not configured');
-            return $data; // Return unchanged data packet array
+            $this->log('error', 'Dice.fm API key not configured');
+            return $this->emptyResponse() ?? [];
         }
         
         // Get required city parameter
-        $city = isset($handler_config['city']) ? trim($handler_config['city']) : '';
+        $city = isset($config['city']) ? trim($config['city']) : '';
         if (empty($city)) {
-            $this->log_error('No city specified for Dice.fm search', $handler_config);
-            return $data; // Return unchanged data packet array
+            $this->log('error', 'No city specified for Dice.fm search', $config);
+            return $this->emptyResponse() ?? [];
         }
         
         // Build configuration
-        $date_range = isset($handler_config['date_range']) ? intval($handler_config['date_range']) : 90;
-        $page_size = isset($handler_config['page_size']) ? intval($handler_config['page_size']) : 100;
-        $event_types = isset($handler_config['event_types']) ? $handler_config['event_types'] : 'linkout,event';
+        $date_range = isset($config['date_range']) ? intval($config['date_range']) : 90;
+        $page_size = isset($config['page_size']) ? intval($config['page_size']) : 100;
+        $event_types = isset($config['event_types']) ? $config['event_types'] : 'linkout,event';
         $partner_id = !empty($api_config['partner_id']) ? trim($api_config['partner_id']) : '';
         
         // Fetch events from API
         $raw_events = $this->fetch_dice_fm_events($api_config['api_key'], $city, $page_size, $event_types, $partner_id);
         if (empty($raw_events)) {
-            $this->log_info('No events found from Dice.fm API');
-            return $data; // Return unchanged data packet array
+            $this->log('info', 'No events found from Dice.fm API');
+            return $this->emptyResponse() ?? [];
         }
         
         // Process events one at a time (Data Machine single-item model)
-        $this->log_info('Dice.fm Handler: Processing events for eligible item', [
+        $this->log('info', 'Processing events for eligible item', [
             'raw_events_available' => count($raw_events),
             'date_range_days' => $date_range,
             'pipeline_id' => $pipeline_id
@@ -107,9 +102,8 @@ class DiceFm {
             $event_identifier = md5($standardized_event['title'] . ($standardized_event['startDate'] ?? '') . ($standardized_event['venue'] ?? ''));
             
             // Check if already processed FIRST
-            $is_processed = apply_filters('datamachine_is_item_processed', false, $flow_step_id, 'dice_fm', $event_identifier);
-            if ($is_processed) {
-                $this->log_debug('Skipping already processed event', [
+            if ($this->isItemProcessed($event_identifier, $flow_step_id)) {
+                $this->log('debug', 'Skipping already processed event', [
                     'title' => $standardized_event['title'],
                     'event_identifier' => $event_identifier
                 ]);
@@ -119,7 +113,7 @@ class DiceFm {
             // Apply date range filter
             $event_time = strtotime($standardized_event['startDate'] . ' ' . $standardized_event['startTime']);
             if ($event_time < $now || $event_time > $future) {
-                $this->log_debug('Skipping event outside date range', [
+                $this->log('debug', 'Skipping event outside date range', [
                     'title' => $standardized_event['title'],
                     'date' => $standardized_event['startDate'],
                     'time' => $standardized_event['startTime']
@@ -127,12 +121,10 @@ class DiceFm {
                 continue;
             }
             
-            // Found eligible event - mark as processed and add to data packet array
-            if ($flow_step_id && $job_id) {
-                do_action('datamachine_mark_item_processed', $flow_step_id, 'dice_fm', $event_identifier, $job_id);
-            }
+            // Found eligible event - mark as processed
+            $this->markItemProcessed($event_identifier, $flow_step_id, $job_id);
             
-            $this->log_info('Dice.fm Handler: Found eligible event', [
+            $this->log('info', 'Found eligible event', [
                 'title' => $standardized_event['title'],
                 'date' => $standardized_event['startDate'],
                 'venue' => $standardized_event['venue'],
@@ -151,14 +143,38 @@ class DiceFm {
                 'venueCoordinates' => '' // Not available in Dice FM API
             ];
             
+            EventEngineData::storeVenueContext($job_id, $standardized_event, $venue_metadata);
+
             // Remove venue metadata from event data (move to separate structure)
             unset($standardized_event['address']);
             
-            // Create data packet entry following Data Machine standard
-            $event_entry = [
+            // Create DataPacket
+            $dataPacket = new DataPacket(
+                [
+                    'title' => $standardized_event['title'],
+                    'body' => wp_json_encode([
+                        'event' => $standardized_event,
+                        'venue_metadata' => $venue_metadata,
+                        'import_source' => 'dice_fm'
+                    ], JSON_PRETTY_PRINT)
+                ],
+                [
+                    'source_type' => 'dice_fm',
+                    'pipeline_id' => $pipeline_id,
+                    'flow_id' => $flow_id,
+                    'original_title' => $standardized_event['title'] ?? '',
+                    'event_identifier' => $event_identifier,
+                    'import_timestamp' => time()
+                ],
+                'event_import'
+            );
+            
+            // Return single item
+            // Manually construct array since DataPacket doesn't have toArray()
+            $packet_array = [
                 'type' => 'event_import',
-                'handler' => 'dice_fm',
-                'content' => [
+                'timestamp' => time(),
+                'data' => [
                     'title' => $standardized_event['title'],
                     'body' => wp_json_encode([
                         'event' => $standardized_event,
@@ -169,28 +185,24 @@ class DiceFm {
                 'metadata' => [
                     'source_type' => 'dice_fm',
                     'pipeline_id' => $pipeline_id,
-                    'flow_id' => $flow_step_config['flow_id'] ?? null,
+                    'flow_id' => $flow_id,
                     'original_title' => $standardized_event['title'] ?? '',
                     'event_identifier' => $event_identifier,
                     'import_timestamp' => time()
-                ],
-                'attachments' => [],
-                'timestamp' => time()
+                ]
             ];
-            
-            // Add to front of data packet array (newest first)
-            array_unshift($data, $event_entry);
-            return $data;
+
+            return $this->successResponse([$packet_array]);
         }
         
         // No eligible events found
-        $this->log_info('Dice.fm Handler: No eligible events found', [
+        $this->log('info', 'No eligible events found', [
             'raw_events_checked' => count($raw_events),
             'date_range_days' => $date_range,
             'pipeline_id' => $pipeline_id
         ]);
         
-        return $data; // Return unchanged data packet array
+        return $this->emptyResponse() ?? [];
     }
     
     /**

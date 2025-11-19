@@ -2,57 +2,78 @@
 /**
  * AI-driven event creation with Event Details block generation and venue handling.
  *
- * @package DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents
+ * @package DataMachineEvents\Steps\Publish\Events
  */
 
-namespace DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents;
+namespace DataMachineEvents\Steps\Publish\Events;
 
-use DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents\DataMachineEventsVenue;
-use DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents\DataMachineEventsSchema;
+use DataMachineEvents\Steps\Publish\Events\Venue;
+use DataMachineEvents\Steps\Publish\Events\Schema;
+use DataMachine\Core\Steps\Publish\Handlers\PublishHandler;
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-class DataMachineEventsPublisher {
-    
+class Publisher extends PublishHandler {
+
     public function __construct() {
+        parent::__construct('datamachine_events');
     }
 
     /**
+     * Execute event publishing.
+     *
+     * @param array $parameters Event data from AI tool call
+     * @param array $handler_config Handler configuration
+     * @return array Tool call result
+     */
+    protected function executePublish(array $parameters, array $handler_config): array {
+        return $this->handle_tool_call_legacy($parameters, ['handler_config' => $handler_config]);
+    }
+
+    /**
+     * Legacy method maintained for backward compatibility.
+     * Routes to new structure via executePublish().
+     *
      * @param array $parameters Event data from AI tool call
      * @param array $tool_def Tool definition configuration
      * @return array Tool call result with success status and created post data
      */
-    public function handle_tool_call(array $parameters, array $tool_def = []): array {
+    private function handle_tool_call_legacy(array $parameters, array $tool_def = []): array {
         if (empty($parameters['title'])) {
-            $error_msg = 'DM Events tool call missing required title parameter';
-            do_action('datamachine_log', 'error', $error_msg, [
+            return $this->errorResponse('DM Events tool call missing required title parameter', [
                 'provided_parameters' => array_keys($parameters),
                 'required_parameters' => ['title']
             ]);
-            
-            return [
-                'success' => false,
-                'error' => $error_msg,
-                'tool_name' => 'create_event'
-            ];
         }
         
+        $job_id = $parameters['job_id'] ?? null;
+        $engine_data = $this->getEngineData($job_id);
+
+        $engine_parameters = $this->extract_event_engine_parameters($engine_data);
+        $parameters = array_merge($engine_parameters, $parameters);
+
+        if (!empty($engine_parameters)) {
+            $this->log('debug', 'DM Events Tool: Loaded engine venue context', [
+                'fields' => array_keys($engine_parameters)
+            ]);
+        }
+
         $handler_config = $tool_def['handler_config'] ?? [];
         
-        $routing = DataMachineEventsSchema::engine_or_tool($parameters, $handler_config, $parameters);
-        
-        do_action('datamachine_log', 'debug', 'DM Events Tool: Smart parameter routing', [
+        $routing = Schema::engine_or_tool($parameters, $handler_config, $engine_parameters);
+
+        $this->log('debug', 'DM Events Tool: Smart parameter routing', [
             'engine_params' => array_keys($routing['engine']),
             'tool_params' => $routing['tool'],
             'total_ai_params' => count($parameters)
         ]);
-        
+
         $post_status = $handler_config['post_status'] ?? 'draft';
         $post_author = $handler_config['post_author'] ?? get_current_user_id() ?: 1;
-        
-        do_action('datamachine_log', 'debug', 'DM Events Tool: Processing event creation', [
+
+        $this->log('debug', 'DM Events Tool: Processing event creation', [
             'title' => $parameters['title'],
             'has_venue' => !empty($parameters['venue']),
             'post_status' => $post_status,
@@ -92,19 +113,13 @@ class DataMachineEventsPublisher {
         ];
         
         $post_id = wp_insert_post($post_data);
-        
+
         if (is_wp_error($post_id) || !$post_id) {
             $error_msg = 'Event post creation failed: ' . (is_wp_error($post_id) ? $post_id->get_error_message() : 'Unknown error');
-            do_action('datamachine_log', 'error', $error_msg, [
+            return $this->errorResponse($error_msg, [
                 'event_data' => $event_data,
                 'post_data' => $post_data
             ]);
-            
-            return [
-                'success' => false,
-                'error' => $error_msg,
-                'tool_name' => 'create_event'
-            ];
         }
         
         $featured_image_result = null;
@@ -120,15 +135,15 @@ class DataMachineEventsPublisher {
 
         if (!empty($venue_name)) {
             $venue_metadata = [
-                'address' => $parameters['venue_address'] ?? '',
-                'city' => $parameters['venue_city'] ?? '',
-                'state' => $parameters['venue_state'] ?? '',
-                'zip' => $parameters['venue_zip'] ?? '',
-                'country' => $parameters['venue_country'] ?? '',
-                'phone' => $parameters['venue_phone'] ?? '',
-                'website' => $parameters['venue_website'] ?? '',
-                'coordinates' => $parameters['venue_coordinates'] ?? '',
-                'capacity' => $parameters['venue_capacity'] ?? ''
+                'address' => $this->getParameterValue($parameters, 'venueAddress', 'venue_address'),
+                'city' => $this->getParameterValue($parameters, 'venueCity', 'venue_city'),
+                'state' => $this->getParameterValue($parameters, 'venueState', 'venue_state'),
+                'zip' => $this->getParameterValue($parameters, 'venueZip', 'venue_zip'),
+                'country' => $this->getParameterValue($parameters, 'venueCountry', 'venue_country'),
+                'phone' => $this->getParameterValue($parameters, 'venuePhone', 'venue_phone'),
+                'website' => $this->getParameterValue($parameters, 'venueWebsite', 'venue_website'),
+                'coordinates' => $this->getParameterValue($parameters, 'venueCoordinates', 'venue_coordinates'),
+                'capacity' => $this->getParameterValue($parameters, 'venueCapacity', 'venue_capacity')
             ];
 
             // Create or find venue
@@ -136,37 +151,27 @@ class DataMachineEventsPublisher {
 
             if ($venue_result['term_id']) {
                 // Assign existing venue term_id to event
-                $assignment_result = DataMachineEventsVenue::assign_venue_to_event($post_id, [
+                $assignment_result = Venue::assign_venue_to_event($post_id, [
                     'venue' => $venue_result['term_id']
                 ]);
             }
         }
         
-        $direct_taxonomy_results = $this->process_direct_taxonomy_assignments($post_id, $handler_config);
-        
-        $ai_taxonomy_results = $this->assign_taxonomies_from_parameters($post_id, $parameters, $handler_config);
-        
-        $taxonomy_results = array_merge($direct_taxonomy_results, $ai_taxonomy_results);
-        
-        do_action('datamachine_log', 'debug', 'DM Events Tool: Event created successfully', [
+        $taxonomy_results = $this->process_event_taxonomies($post_id, $parameters, $handler_config);
+
+        $this->log('debug', 'DM Events Tool: Event created successfully', [
             'post_id' => $post_id,
             'post_url' => get_permalink($post_id),
             'venue_created' => $venue_result !== null,
-            'direct_taxonomy_assignments' => count($direct_taxonomy_results),
-            'ai_taxonomy_assignments' => count($ai_taxonomy_results),
             'total_taxonomy_assignments' => count($taxonomy_results)
         ]);
-        
-        return [
-            'success' => true,
-            'data' => [
-                'post_id' => $post_id,
-                'post_url' => get_permalink($post_id),
-                'venue_result' => $venue_result,
-                'taxonomy_results' => $taxonomy_results
-            ],
-            'tool_name' => 'create_event'
-        ];
+
+        return $this->successResponse([
+            'post_id' => $post_id,
+            'post_url' => get_permalink($post_id),
+            'venue_result' => $venue_result,
+            'taxonomy_results' => $taxonomy_results
+        ]);
     }
     
     /**
@@ -216,7 +221,7 @@ class DataMachineEventsPublisher {
 
             if ($venue_result['term_id']) {
                 // Assign existing venue term_id to event
-                DataMachineEventsVenue::assign_venue_to_event($post_id, [
+                Venue::assign_venue_to_event($post_id, [
                     'venue' => $venue_result['term_id']
                 ]);
             }
@@ -231,7 +236,7 @@ class DataMachineEventsPublisher {
      * Venue data automatically available in $parameters array from engine.
      *
      * @param array $event_data Event data
-     * @param array $parameters Engine parameters (includes venue data)
+    * @param array $parameters Engine data context (includes venue data)
      * @return string Block content
      */
     private function generate_event_block_content($event_data, $parameters = []) {
@@ -292,6 +297,170 @@ class DataMachineEventsPublisher {
                ($inner_blocks ? "\n" . $inner_blocks . "\n" : '') .
                '<!-- /wp:datamachine-events/event-details -->';
     }
+
+    /**
+     * Extract event-specific parameters from engine data.
+     *
+     * @param array $engine_data Full engine data array
+     * @return array Event-specific parameters
+     */
+    private function extract_event_engine_parameters(array $engine_data): array {
+        $fields = [
+            'venue',
+            'venueAddress',
+            'venueCity',
+            'venueState',
+            'venueZip',
+            'venueCountry',
+            'venuePhone',
+            'venueWebsite',
+            'venueCoordinates',
+            'venueCapacity',
+            'eventImage'
+        ];
+
+        $resolved = [];
+        foreach ($fields as $field) {
+            if (!empty($engine_data[$field])) {
+                $resolved[$field] = $engine_data[$field];
+            }
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * Process event taxonomies using unified approach.
+     *
+     * Combines direct assignments and AI-decided taxonomies, excluding venue taxonomy.
+     *
+     * @param int $post_id Event post ID
+     * @param array $parameters AI parameters
+     * @param array $handler_config Handler configuration
+     * @return array Taxonomy assignment results
+     */
+    private function process_event_taxonomies(int $post_id, array $parameters, array $handler_config): array {
+        $results = [];
+
+        $taxonomies = get_object_taxonomies('datamachine_events', 'objects');
+
+        foreach ($taxonomies as $taxonomy) {
+            if ($taxonomy->name === 'venue' || !$taxonomy->public) {
+                continue;
+            }
+
+            $field_key = "taxonomy_{$taxonomy->name}_selection";
+            $selection = $handler_config[$field_key] ?? 'skip';
+
+            if ($selection === 'skip') {
+                continue;
+            } elseif (is_numeric($selection) && $selection > 0) {
+                $result = $this->assign_pre_selected_taxonomy($post_id, $taxonomy->name, (int) $selection);
+                if ($result) {
+                    $results[$taxonomy->name] = $result;
+                }
+            } elseif ($selection === 'ai_decides' && !empty($parameters[$taxonomy->name])) {
+                $result = $this->assign_ai_decided_taxonomy($post_id, $taxonomy->name, $parameters[$taxonomy->name]);
+                if ($result) {
+                    $results[$taxonomy->name] = $result;
+                }
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * Assign pre-selected taxonomy term.
+     *
+     * @param int $post_id Post ID
+     * @param string $taxonomy_name Taxonomy name
+     * @param int $term_id Term ID
+     * @return array|null Assignment result
+     */
+    private function assign_pre_selected_taxonomy(int $post_id, string $taxonomy_name, int $term_id): ?array {
+        $term = get_term($term_id, $taxonomy_name);
+
+        if ($term && !is_wp_error($term)) {
+            $result = wp_set_post_terms($post_id, [$term_id], $taxonomy_name);
+            if (!is_wp_error($result)) {
+                $this->log('debug', 'DM Events: Direct taxonomy assignment successful', [
+                    'taxonomy' => $taxonomy_name,
+                    'term_id' => $term_id,
+                    'term_name' => $term->name,
+                    'post_id' => $post_id
+                ]);
+
+                return [
+                    'success' => true,
+                    'source' => 'direct_assignment',
+                    'term_id' => $term_id,
+                    'term_name' => $term->name,
+                    'taxonomy' => $taxonomy_name
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'source' => 'direct_assignment',
+                    'error' => $result->get_error_message(),
+                    'taxonomy' => $taxonomy_name
+                ];
+            }
+        } else {
+            $this->log('warning', 'DM Events: Invalid term ID for direct assignment', [
+                'taxonomy' => $taxonomy_name,
+                'term_id' => $term_id
+            ]);
+        }
+
+        return null;
+    }
+
+    /**
+     * Assign AI-decided taxonomy terms.
+     *
+     * @param int $post_id Post ID
+     * @param string $taxonomy_name Taxonomy name
+     * @param string|array $term_value Term value(s)
+     * @return array Assignment result
+     */
+    private function assign_ai_decided_taxonomy(int $post_id, string $taxonomy_name, $term_value): array {
+        if (is_array($term_value)) {
+            $terms = array_map('sanitize_text_field', $term_value);
+        } else {
+            $terms = [sanitize_text_field($term_value)];
+        }
+
+        $result = wp_set_post_terms($post_id, $terms, $taxonomy_name);
+
+        if (is_wp_error($result)) {
+            return [
+                'success' => false,
+                'error' => $result->get_error_message()
+            ];
+        }
+
+        return [
+            'success' => true,
+            'terms' => $terms,
+            'taxonomy' => $taxonomy_name
+        ];
+    }
+
+    /**
+     * Helper to read camelCase or snake_case parameter variants.
+     */
+    private function getParameterValue(array $parameters, string $camelKey, string $snakeKey = ''): string {
+        if (!empty($parameters[$camelKey])) {
+            return $parameters[$camelKey];
+        }
+
+        if ($snakeKey && !empty($parameters[$snakeKey])) {
+            return $parameters[$snakeKey];
+        }
+
+        return '';
+    }
     
     /**
      * Generate Event Details block content (legacy method)
@@ -331,133 +500,6 @@ class DataMachineEventsPublisher {
                "\n" . $inner_blocks . "\n" .
                '<!-- /wp:datamachine-events/event-details -->';
     }
-    
-    
-    /**
-     * Process direct taxonomy assignments from handler configuration
-     *
-     * @param int $post_id Event post ID
-     * @param array $handler_config Handler configuration
-     * @return array Assignment results
-     */
-    private function process_direct_taxonomy_assignments($post_id, $handler_config) {
-        $results = [];
-        
-        $taxonomies = get_object_taxonomies('datamachine_events', 'objects');
-        
-        foreach ($taxonomies as $taxonomy) {
-            if ($taxonomy->name === 'venue' || !$taxonomy->public) {
-                continue;
-            }
-            
-            $field_key = "taxonomy_{$taxonomy->name}_selection";
-            $selection = $handler_config[$field_key] ?? 'skip';
-            
-            if (is_numeric($selection) && $selection > 0) {
-                $term_id = (int) $selection;
-                $term = get_term($term_id, $taxonomy->name);
-                
-                if ($term && !is_wp_error($term)) {
-                    $result = wp_set_post_terms($post_id, [$term_id], $taxonomy->name);
-                    if (!is_wp_error($result)) {
-                        $results[$taxonomy->name] = [
-                            'success' => true,
-                            'source' => 'direct_assignment',
-                            'term_id' => $term_id,
-                            'term_name' => $term->name,
-                            'taxonomy' => $taxonomy->name
-                        ];
-                        
-                        do_action('datamachine_log', 'debug', 'DM Events: Direct taxonomy assignment successful', [
-                            'taxonomy' => $taxonomy->name,
-                            'term_id' => $term_id,
-                            'term_name' => $term->name,
-                            'post_id' => $post_id
-                        ]);
-                    } else {
-                        $results[$taxonomy->name] = [
-                            'success' => false,
-                            'source' => 'direct_assignment',
-                            'error' => $result->get_error_message(),
-                            'taxonomy' => $taxonomy->name
-                        ];
-                    }
-                } else {
-                    do_action('datamachine_log', 'warning', 'DM Events: Invalid term ID for direct assignment', [
-                        'taxonomy' => $taxonomy->name,
-                        'term_id' => $term_id,
-                        'field_key' => $field_key
-                    ]);
-                }
-            }
-        }
-        
-        return $results;
-    }
-    
-    /**
-     * Assign taxonomies from AI parameters
-     *
-     * @param int $post_id Event post ID
-     * @param array $ai_parameters AI parameters
-     * @param array $handler_config Handler configuration
-     * @return array Assignment results
-     */
-    private function assign_taxonomies_from_parameters($post_id, $ai_parameters, $handler_config) {
-        $results = [];
-        
-        $taxonomies = get_object_taxonomies('datamachine_events', 'objects');
-        
-        foreach ($taxonomies as $taxonomy) {
-            if ($taxonomy->name === 'venue' || !$taxonomy->public) {
-                continue;
-            }
-            
-            $field_key = "taxonomy_{$taxonomy->name}_selection";
-            $selection = $handler_config[$field_key] ?? 'skip';
-            
-            if ($selection === 'ai_decides' && !empty($ai_parameters[$taxonomy->name])) {
-                $term_value = $ai_parameters[$taxonomy->name];
-                $result = $this->assign_taxonomy_term($post_id, $taxonomy->name, $term_value);
-                $results[$taxonomy->name] = $result;
-            }
-        }
-        
-        return $results;
-    }
-    
-    /**
-     * Assign single taxonomy term
-     *
-     * @param int $post_id Post ID
-     * @param string $taxonomy Taxonomy name
-     * @param string|array $term_value Term value(s)
-     * @return array Assignment result
-     */
-    private function assign_taxonomy_term($post_id, $taxonomy, $term_value) {
-        if (is_array($term_value)) {
-            $terms = array_map('sanitize_text_field', $term_value);
-        } else {
-            $terms = [sanitize_text_field($term_value)];
-        }
-        
-        $result = wp_set_post_terms($post_id, $terms, $taxonomy);
-        
-        if (is_wp_error($result)) {
-            return [
-                'success' => false,
-                'error' => $result->get_error_message()
-            ];
-        }
-        
-        return [
-            'success' => true,
-            'terms' => $terms,
-            'taxonomy' => $taxonomy
-        ];
-    }
-    
-    
     
     
     /**
@@ -517,11 +559,13 @@ class DataMachineEventsPublisher {
     }
     
     /**
-     * Set featured image for post from image URL
+     * Set featured image for post from image URL.
+     *
+     * Downloads image from URL and attaches as featured image to post.
      *
      * @param int    $post_id   Post ID
      * @param string $image_url Image URL
-     * @return array|null Result
+     * @return array|null Result with success status and attachment details
      */
     private function set_featured_image(int $post_id, string $image_url): ?array {
         require_once(ABSPATH . 'wp-admin/includes/media.php');
@@ -529,46 +573,42 @@ class DataMachineEventsPublisher {
         require_once(ABSPATH . 'wp-admin/includes/image.php');
 
         try {
-            // Download image to temp file
             $temp_file = download_url($image_url);
             if (is_wp_error($temp_file)) {
-                do_action('datamachine_log', 'warning', 'DM Events Featured Image: Failed to download image', [
+                $this->log('warning', 'DM Events Featured Image: Failed to download image', [
                     'image_url' => $image_url,
                     'error' => $temp_file->get_error_message()
                 ]);
                 return ['success' => false, 'error' => 'Failed to download image'];
             }
 
-            // Get image info and validate
             $file_array = [
                 'name' => basename($image_url),
                 'tmp_name' => $temp_file
             ];
 
-            // Upload to media library
             $attachment_id = media_handle_sideload($file_array, $post_id);
-            
+
             if (is_wp_error($attachment_id)) {
                 @unlink($temp_file);
-                do_action('datamachine_log', 'warning', 'DM Events Featured Image: Failed to create attachment', [
+                $this->log('warning', 'DM Events Featured Image: Failed to create attachment', [
                     'image_url' => $image_url,
                     'error' => $attachment_id->get_error_message()
                 ]);
                 return ['success' => false, 'error' => 'Failed to create media attachment'];
             }
 
-            // Set as featured image
             $result = set_post_thumbnail($post_id, $attachment_id);
-            
+
             if (!$result) {
-                do_action('datamachine_log', 'warning', 'DM Events Featured Image: Failed to set featured image', [
+                $this->log('warning', 'DM Events Featured Image: Failed to set featured image', [
                     'post_id' => $post_id,
                     'attachment_id' => $attachment_id
                 ]);
                 return ['success' => false, 'error' => 'Failed to set featured image'];
             }
 
-            do_action('datamachine_log', 'debug', 'DM Events Featured Image: Successfully set featured image', [
+            $this->log('debug', 'DM Events Featured Image: Successfully set featured image', [
                 'post_id' => $post_id,
                 'attachment_id' => $attachment_id,
                 'image_url' => $image_url
@@ -580,8 +620,8 @@ class DataMachineEventsPublisher {
                 'image_url' => $image_url
             ];
 
-        } catch (Exception $e) {
-            do_action('datamachine_log', 'error', 'DM Events Featured Image: Exception occurred', [
+        } catch (\Exception $e) {
+            $this->log('error', 'DM Events Featured Image: Exception occurred', [
                 'image_url' => $image_url,
                 'error' => $e->getMessage()
             ]);

@@ -15,6 +15,10 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper;
 
+use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
+use DataMachineEvents\Steps\EventImport\EventEngineData;
+use DataMachine\Core\DataPacket;
+
 // Prevent direct access
 if (!defined('ABSPATH')) {
     exit;
@@ -26,43 +30,37 @@ if (!defined('ABSPATH')) {
  * Extracts event data using Schema.org standards with intelligent fallbacks.
  * Fully compatible with DataMachineEventsSchema for proper JSON-LD output generation.
  */
-class UniversalWebScraper {
+class UniversalWebScraper extends EventImportHandler {
+
+    public function __construct() {
+        parent::__construct('universal_web_scraper');
+    }
 
     /**
      * Execute web scraper with AI event extraction
      * 
-     * @param array $parameters Flat parameter structure from Data Machine
-     * @return array Updated data packet array
+     * @param int $pipeline_id Pipeline ID
+     * @param array $config Handler configuration
+     * @param string|null $flow_step_id Flow step ID
+     * @param int $flow_id Flow ID
+     * @param string|null $job_id Job ID
+     * @return array Processed items array
      */
-    public function execute(array $payload): array {
-        $job_id = $payload['job_id'] ?? 0;
-        $flow_step_id = $payload['flow_step_id'] ?? '';
-        $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
-
-        $engine_data = $payload['engine_data'] ?? apply_filters('datamachine_engine_data', [], $job_id);
-        $flow_config = $engine_data['flow_config'] ?? [];
-        $flow_step_config = $payload['flow_step_config'] ?? ($flow_config[$flow_step_id] ?? []);
-        
-        do_action('datamachine_log', 'debug', 'Universal Web Scraper: Payload received', [
-            'flow_step_config_keys' => array_keys($flow_step_config),
-            'data_entries' => count($data)
+    protected function executeFetch(int $pipeline_id, array $config, ?string $flow_step_id, int $flow_id, ?string $job_id): array {
+        $this->log('debug', 'Universal Web Scraper: Payload received', [
+            'config_keys' => array_keys($config)
         ]);
         
-        // Extract handler configuration
-        $handler_settings = $flow_step_config['handler']['settings'] ?? [];
-        $config = $handler_settings['universal_web_scraper'] ?? [];
-        
-        $pipeline_id = $flow_step_config['pipeline_id'] ?? null;
         $url = $config['source_url'] ?? '';
         
         if (empty($url)) {
-            do_action('datamachine_log', 'error', 'Universal Web Scraper: No URL configured', [
+            $this->log('error', 'Universal Web Scraper: No URL configured', [
                 'config' => $config
             ]);
-            return $data;
+            return $this->emptyResponse() ?? [];
         }
         
-        do_action('datamachine_log', 'info', 'Universal Web Scraper: Starting event extraction', [
+        $this->log('info', 'Universal Web Scraper: Starting event extraction', [
             'url' => $url,
             'flow_step_id' => $flow_step_id
         ]);
@@ -70,21 +68,21 @@ class UniversalWebScraper {
         // Fetch HTML content
         $html_content = $this->fetch_html($url);
         if (empty($html_content)) {
-            return $data;
+            return $this->emptyResponse() ?? [];
         }
         
         // Find first potential event section
         $event_section = $this->extract_event_sections($html_content, $url, $flow_step_id);
         if (empty($event_section)) {
-            do_action('datamachine_log', 'info', 'Universal Web Scraper: No event sections found', [
+            $this->log('info', 'Universal Web Scraper: No event sections found', [
                 'url' => $url,
                 'content_length' => strlen($html_content)
             ]);
-            return $data;
+            return $this->emptyResponse() ?? [];
         }
 
         // Process single event section (Data Machine single-item model)
-        do_action('datamachine_log', 'info', 'Universal Web Scraper: Processing single event section for eligible item', [
+        $this->log('info', 'Universal Web Scraper: Processing single event section for eligible item', [
             'section_identifier' => $event_section['identifier'],
             'pipeline_id' => $pipeline_id
         ]);
@@ -94,25 +92,46 @@ class UniversalWebScraper {
 
         // Skip if no valid HTML data extracted
         if (!$raw_html_data) {
-            return $data;
+            return $this->emptyResponse() ?? [];
         }
 
         // Mark as processed and return immediately (single event processing)
-        if ($flow_step_id && $job_id) {
-            do_action('datamachine_mark_item_processed', $flow_step_id, 'web_scraper', $event_section['identifier'], $job_id);
-        }
+        $this->markItemProcessed($event_section['identifier'], $flow_step_id, $job_id);
 
-        do_action('datamachine_log', 'info', 'Universal Web Scraper: Found eligible HTML section', [
+        $this->log('info', 'Universal Web Scraper: Found eligible HTML section', [
             'source_url' => $url,
             'section_identifier' => $event_section['identifier'],
             'pipeline_id' => $pipeline_id
         ]);
 
-        // Create data packet entry following Data Machine standard (same as Ticketmaster)
-        $event_entry = [
+        // Create DataPacket
+        $dataPacket = new DataPacket(
+            [
+                'title' => 'Raw HTML Event Section',
+                'body' => wp_json_encode([
+                    'raw_html' => $raw_html_data,
+                    'source_url' => $url,
+                    'import_source' => 'universal_web_scraper',
+                    'section_identifier' => $event_section['identifier']
+                ], JSON_PRETTY_PRINT)
+            ],
+            [
+                'source_type' => 'universal_web_scraper',
+                'pipeline_id' => $pipeline_id,
+                'flow_id' => $flow_id,
+                'original_title' => 'HTML Section from ' . parse_url($url, PHP_URL_HOST),
+                'event_identifier' => $event_section['identifier'],
+                'import_timestamp' => time()
+            ],
+            'event_import'
+        );
+
+        // Return single item
+        // Manually construct array since DataPacket doesn't have toArray()
+        $packet_array = [
             'type' => 'event_import',
-            'handler' => 'universal_web_scraper',
-            'content' => [
+            'timestamp' => time(),
+            'data' => [
                 'title' => 'Raw HTML Event Section',
                 'body' => wp_json_encode([
                     'raw_html' => $raw_html_data,
@@ -124,18 +143,14 @@ class UniversalWebScraper {
             'metadata' => [
                 'source_type' => 'universal_web_scraper',
                 'pipeline_id' => $pipeline_id,
-                'flow_id' => $flow_step_config['flow_id'] ?? null,
+                'flow_id' => $flow_id,
                 'original_title' => 'HTML Section from ' . parse_url($url, PHP_URL_HOST),
                 'event_identifier' => $event_section['identifier'],
                 'import_timestamp' => time()
-            ],
-            'attachments' => [],
-            'timestamp' => time()
+            ]
         ];
 
-        // Add to front of data packet array (newest first)
-        array_unshift($data, $event_entry);
-        return $data;
+        return $this->successResponse([$packet_array]);
     }
     
     /**
@@ -153,7 +168,7 @@ class UniversalWebScraper {
         ]);
         
         if (is_wp_error($response)) {
-            do_action('datamachine_log', 'error', 'Universal AI Scraper: Failed to fetch URL', [
+            $this->log('error', 'Universal AI Scraper: Failed to fetch URL', [
                 'url' => $url,
                 'error' => $response->get_error_message()
             ]);
@@ -162,7 +177,7 @@ class UniversalWebScraper {
         
         $status_code = wp_remote_retrieve_response_code($response);
         if ($status_code !== 200) {
-            do_action('datamachine_log', 'error', 'Universal AI Scraper: HTTP error when fetching URL', [
+            $this->log('error', 'Universal AI Scraper: HTTP error when fetching URL', [
                 'url' => $url,
                 'status_code' => $status_code
             ]);
@@ -171,7 +186,7 @@ class UniversalWebScraper {
         
         $body = wp_remote_retrieve_body($response);
         if (empty($body)) {
-            do_action('datamachine_log', 'error', 'Universal AI Scraper: Empty response body', [
+            $this->log('error', 'Universal AI Scraper: Empty response body', [
                 'url' => $url
             ]);
             return '';
@@ -250,8 +265,7 @@ class UniversalWebScraper {
                 $event_identifier = md5($url . $content_hash);
 
                 // Check if already processed
-                $is_processed = apply_filters('datamachine_is_item_processed', false, $flow_step_id, 'web_scraper', $event_identifier);
-                if ($is_processed) {
+                if ($this->isItemProcessed($event_identifier, $flow_step_id)) {
                     continue;
                 }
 
@@ -310,7 +324,7 @@ class UniversalWebScraper {
      * @return string|null Cleaned HTML data or null if processing failed
      */
     private function extract_raw_html_section(string $section_html, string $source_url, array $config = []): ?string {
-        do_action('datamachine_log', 'debug', 'Universal Web Scraper: Preparing raw HTML for pipeline processing', [
+        $this->log('debug', 'Universal Web Scraper: Preparing raw HTML for pipeline processing', [
             'source_url' => $source_url,
             'section_length' => strlen($section_html)
         ]);
@@ -319,11 +333,11 @@ class UniversalWebScraper {
         $cleaned_html = $this->clean_html_for_ai($section_html);
 
         if (empty($cleaned_html) || strlen($cleaned_html) < 30) {
-            do_action('datamachine_log', 'debug', 'Universal Web Scraper: HTML section too short after cleaning');
+            $this->log('debug', 'Universal Web Scraper: HTML section too short after cleaning');
             return null;
         }
 
-        do_action('datamachine_log', 'info', 'Universal Web Scraper: Successfully prepared HTML section', [
+        $this->log('info', 'Universal Web Scraper: Successfully prepared HTML section', [
             'source_url' => $source_url,
             'cleaned_length' => strlen($cleaned_html)
         ]);
@@ -549,7 +563,7 @@ class UniversalWebScraper {
 
         // Require at least title and startDate for valid event
         if (empty($event_data['title']) || empty($event_data['startDate'])) {
-            do_action('datamachine_log', 'debug', 'Universal Web Scraper: Invalid Schema.org microdata - missing title or startDate', [
+            $this->log('debug', 'Universal Web Scraper: Invalid Schema.org microdata - missing title or startDate', [
                 'source_url' => $source_url,
                 'has_title' => !empty($event_data['title']),
                 'has_start_date' => !empty($event_data['startDate'])
@@ -557,7 +571,7 @@ class UniversalWebScraper {
             return null;
         }
 
-        do_action('datamachine_log', 'info', 'Universal Web Scraper: Successfully extracted Schema.org microdata', [
+        $this->log('info', 'Universal Web Scraper: Successfully extracted Schema.org microdata', [
             'source_url' => $source_url,
             'title' => $event_data['title'],
             'start_date' => $event_data['startDate'],
@@ -723,7 +737,7 @@ class UniversalWebScraper {
 
         // Require at least title and startDate for valid event
         if (empty($parsed_event['title']) || empty($parsed_event['startDate'])) {
-            do_action('datamachine_log', 'debug', 'Universal Web Scraper: Invalid JSON-LD Event - missing title or startDate', [
+            $this->log('debug', 'Universal Web Scraper: Invalid JSON-LD Event - missing title or startDate', [
                 'source_url' => $source_url,
                 'has_title' => !empty($parsed_event['title']),
                 'has_start_date' => !empty($parsed_event['startDate'])
@@ -731,7 +745,7 @@ class UniversalWebScraper {
             return null;
         }
 
-        do_action('datamachine_log', 'info', 'Universal Web Scraper: Successfully extracted JSON-LD Event', [
+        $this->log('info', 'Universal Web Scraper: Successfully extracted JSON-LD Event', [
             'source_url' => $source_url,
             'title' => $parsed_event['title'],
             'start_date' => $parsed_event['startDate'],
@@ -752,7 +766,7 @@ class UniversalWebScraper {
     private function extract_structured_event_data(array $parameters, string $source_url, array $handler_config = []): ?array {
         // Validate required fields
         if (empty($parameters['title'])) {
-            do_action('datamachine_log', 'debug', 'Universal AI Scraper: Missing required title field', [
+            $this->log('debug', 'Universal AI Scraper: Missing required title field', [
                 'source_url' => $source_url,
                 'parameter_keys' => array_keys($parameters)
             ]);
@@ -762,7 +776,7 @@ class UniversalWebScraper {
         // Check for future date requirement
         $start_date = $parameters['startDate'] ?? '';
         if (!empty($start_date) && strtotime($start_date) < strtotime('today')) {
-            do_action('datamachine_log', 'debug', 'Universal AI Scraper: Skipping past event', [
+            $this->log('debug', 'Universal AI Scraper: Skipping past event', [
                 'source_url' => $source_url,
                 'title' => $parameters['title'],
                 'start_date' => $start_date

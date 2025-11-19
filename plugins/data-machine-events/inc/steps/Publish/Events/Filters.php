@@ -2,13 +2,13 @@
 /**
  * Data Machine Events Handler Registration
  *
- * @package DataMachineEvents
+ * @package DataMachineEvents\Steps\Publish\Events
  * @since 1.0.0
  */
 
-namespace DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents;
+namespace DataMachineEvents\Steps\Publish\Events;
 
-use DataMachineEvents\Steps\Publish\Handlers\DataMachineEvents\DataMachineEventsPublisher;
+use DataMachineEvents\Steps\Publish\Events\Publisher;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -20,13 +20,13 @@ if (!defined('ABSPATH')) {
  * Complete self-registration pattern following Data Machine "plugins within plugins" architecture.
  * Engine discovers DM Events handler capabilities purely through filter-based discovery.
  */
-function datamachine_register_datamachine_events_filters() {
+function datamachine_register_events_filters() {
 
     // Register the DM Events publisher handler with Data Machine
     add_filter('datamachine_handlers', function($handlers) {
         $handlers['create_event'] = [
             'type' => 'publish',
-            'class' => DataMachineEventsPublisher::class,
+            'class' => Publisher::class,
             'label' => __('Publish to Events Calendar', 'datamachine-events'),
             'description' => __('Create event posts in WordPress with Event Details blocks', 'datamachine-events')
     ];
@@ -36,7 +36,7 @@ function datamachine_register_datamachine_events_filters() {
 
 // Register handler settings for Data Machine settings system
 add_filter('datamachine_handler_settings', function($all_settings) {
-    $all_settings['create_event'] = new DataMachineEventsSettings();
+    $all_settings['create_event'] = new Settings();
     return $all_settings;
 });
 
@@ -138,9 +138,9 @@ add_filter('datamachine_customize_handler_display', function($settings_display, 
  * 
  * @return array Base event tool configuration
  */
-function datamachine_events_get_event_base_tool(): array {
+function datamachine_events_get_base_tool(): array {
     return [
-        'class' => 'DataMachineEvents\\Steps\\Publish\\Handlers\\DataMachineEvents\\DataMachineEventsPublisher',
+        'class' => 'DataMachineEvents\\Steps\\Publish\\Events\\Publisher',
         'method' => 'handle_tool_call',
         'handler' => 'create_event',
         'description' => 'Create WordPress event post with Event Details block. This tool completes your pipeline task by publishing the event to WordPress.',
@@ -205,7 +205,7 @@ function datamachine_events_get_dynamic_event_tool(array $handler_config): array
     }
     
     // Start with base tool
-    $tool = datamachine_events_get_event_base_tool();
+    $tool = datamachine_events_get_base_tool();
     
     // Add dynamic parameter requirement logic based on available data
     datamachine_events_apply_dynamic_parameter_requirements($tool, $ce_config);
@@ -237,7 +237,7 @@ function datamachine_events_get_dynamic_event_tool(array $handler_config): array
             $parameter_name = $taxonomy->name;
             
             // Add existing terms as context for AI decision
-            $terms = DataMachineEventsSettings::get_taxonomy_terms_for_ai($taxonomy->name);
+            $terms = Settings::get_taxonomy_terms_for_ai($taxonomy->name);
             $description = "Choose appropriate {$taxonomy->label} for this event";
             
             if (!empty($terms)) {
@@ -265,7 +265,7 @@ function datamachine_events_get_dynamic_event_tool(array $handler_config): array
     }
     
     // Handle venue parameters conditionally based on static venue data availability
-    // Check if venue data will be available as engine parameters from import handlers
+    // Check if venue data will be available via engine data from import handlers
     $has_static_venue = datamachine_events_check_static_venue_availability($ce_config);
     
     if (!$has_static_venue) {
@@ -415,7 +415,7 @@ function datamachine_events_get_dynamic_schema_parameters(array $ce_config): arr
  * Check if static venue data will be available from import handlers
  * 
  * @param array $ce_config Handler configuration
- * @return bool True if venue data will be available as engine parameters
+ * @return bool True if venue data will be available via engine data
  */
 function datamachine_events_check_static_venue_availability(array $ce_config): bool {
     // Check for Web Scraper static venue configuration
@@ -435,4 +435,4 @@ function datamachine_events_check_static_venue_availability(array $ce_config): b
 }
 
 // Auto-register when file loads - achieving complete self-containment
-datamachine_register_datamachine_events_filters();
+datamachine_register_events_filters();

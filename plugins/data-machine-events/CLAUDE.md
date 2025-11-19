@@ -46,9 +46,9 @@ npm run lint:js && npm run lint:css             # Linting
 - `Core\Breadcrumbs` - Breadcrumb generation (filterable via datamachine_events_breadcrumbs)
 - `Blocks\Calendar\Template_Loader` - Modular template system with 7 specialized templates
 - `Blocks\Calendar\Taxonomy_Helper` - Taxonomy data processing for filtering systems
-- `Steps\Publish\Handlers\DataMachineEvents\DataMachineEventsPublisher` - AI-driven event creation
-- `Steps\Publish\Handlers\DataMachineEvents\DataMachineEventsVenue` - Centralized venue operations
-- `Steps\Publish\Handlers\DataMachineEvents\DataMachineEventsSchema` - Google Event JSON-LD generator
+- `Steps\Publish\Events\Publisher` - AI-driven event creation
+- `Steps\Publish\Events\Venue` - Centralized venue operations
+- `Steps\Publish\Events\Schema` - Google Event JSON-LD generator
 - `Steps\EventImport\EventImportStep` - Event import step for Data Machine pipelines
 - `Steps\EventImport\Handlers\Ticketmaster\Ticketmaster` - Discovery API integration
 - `Steps\EventImport\Handlers\DiceFm\DiceFm` - Dice FM event integration
@@ -56,7 +56,7 @@ npm run lint:js && npm run lint:css             # Linting
 
 **Data Flow**: Data Machine Import → Event Details Block → Schema Generation → Calendar Display
 
-**Schema Flow**: Block Attributes + Venue Taxonomy Meta → DataMachineEventsSchema → JSON-LD Output
+**Schema Flow**: Block Attributes + Venue Taxonomy Meta → Schema → JSON-LD Output
 
 ### Blocks & Venues
 
@@ -78,7 +78,7 @@ npm run lint:js && npm run lint:css             # Linting
 - WordPress taxonomy with 9 meta fields: address, city, state, zip, country, phone, website, capacity, coordinates
 - Native WordPress description field for venue descriptions
 - Admin interface via Venue_Taxonomy class with full CRUD operations
-- Centralized venue handling via DataMachineEventsVenue class
+- Centralized venue handling via Venue class
 
 **Map Display Types** (5 free Leaflet.js tile layers, no API keys):
 - OpenStreetMap Standard (default), CartoDB Positron, CartoDB Voyager, CartoDB Dark Matter, Humanitarian OpenStreetMap
@@ -109,7 +109,7 @@ datamachine-events/
 │   │   └── rest-api.php                       # REST endpoints
 │   └── steps/
 │       ├── EventImport/handlers/              # Import handlers (Ticketmaster, DiceFm, WebScraper)
-│       └── publish/handlers/DataMachineEvents/ # Publisher + Schema + Venue
+│       └── publish/Events/                    # Publisher + Schema + Venue
 ├── templates/single-datamachine_events.php    # Single event template
 └── assets/                                    # CSS and JavaScript
 ```
@@ -186,8 +186,8 @@ public function handle_tool_call(array $parameters, array $tool_def = []): array
     $post_id = $this->create_event_post($title, $content, $block_attributes);
 
     // Venue handling
-    $venue_result = DataMachineEventsVenue::find_or_create_venue($venue_name, $venue_data);
-    DataMachineEventsVenue::assign_venue_to_event($post_id, $venue_name, $venue_data);
+    $venue_result = Venue::find_or_create_venue($venue_name, $venue_data);
+    Venue::assign_venue_to_event($post_id, $venue_name, $venue_data);
 
     return ['success' => true, 'data' => ['id' => $post_id, 'url' => $permalink]];
 }
@@ -196,11 +196,11 @@ public function handle_tool_call(array $parameters, array $tool_def = []): array
 ### Schema Generation
 ```php
 // Smart parameter routing for engine vs AI decisions
-$routing = DataMachineEventsSchema::engine_or_tool($event_data, $import_data);
+$routing = Schema::engine_or_tool($event_data, $import_data);
 // engine: ['startDate', 'venue', 'venueAddress'] - system parameters
 // tool: ['description', 'performer', 'organizer'] - AI inference parameters
 
-$schema = DataMachineEventsSchema::generate_event_schema($block_attributes, $venue_data, $post_id);
+$schema = Schema::generate_event_schema($block_attributes, $venue_data, $post_id);
 ```
 
 ### Unified Step Execution

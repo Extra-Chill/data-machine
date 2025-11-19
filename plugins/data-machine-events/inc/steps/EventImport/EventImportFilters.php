@@ -3,7 +3,7 @@
  * Event Import System Registration
  * 
  * Registers event import step type, handlers, and universal venue parameter injection.
- * Venue parameters are injected via datamachine_engine_parameters filter making them available
+ * Venue parameters are persisted via engine data making them available
  * to ALL subsequent steps (AI, Publish, Update) following Data Machine's unified architecture.
  *
  * @package DataMachineEvents\Steps\EventImport
@@ -67,87 +67,6 @@ add_filter('datamachine_handlers', function($handlers, $step_type = null) {
 
     return $handlers;
 }, 10, 2);
-
-/**
- * Universal venue parameter injection via Data Machine engine
- * 
- * Extracts venue data from event import sources and injects as engine parameters.
- * This makes venue data universally available to ALL subsequent steps (AI, Publish, Update)
- * following the same pattern as WordPress Local handler's source_url injection.
- */
-add_filter('datamachine_engine_parameters', function($parameters, $data, $flow_step_config, $step_type, $flow_step_id) {
-    // Only process if we have data from previous steps
-    if (empty($data) || !is_array($data)) {
-        return $parameters;
-    }
-    
-    // Get the most recent data entry (event imports add to front of array)
-    $latest_entry = $data[0] ?? [];
-    $metadata = $latest_entry['metadata'] ?? [];
-    $source_type = $metadata['source_type'] ?? '';
-    
-    // Only inject parameters for event import sources
-    if (!in_array($source_type, ['ticketmaster', 'dice_fm', 'web_scraper', 'google_calendar'])) {
-        return $parameters;
-    }
-    
-    do_action('datamachine_log', 'debug', 'DataMachineEvents: Injecting venue parameters from event import', [
-        'source_type' => $source_type,
-        'step_type' => $step_type,
-        'flow_step_id' => $flow_step_id
-    ]);
-    
-    // Parse event data from content body
-    $content_body = $latest_entry['content']['body'] ?? '';
-    if (empty($content_body)) {
-        return $parameters;
-    }
-    
-    $event_data = json_decode($content_body, true);
-    if (!$event_data || !is_array($event_data)) {
-        return $parameters;
-    }
-    
-    $injected_fields = [];
-    
-    // Inject venue name from event data
-    if (!empty($event_data['event']['venue'])) {
-        $parameters['venue'] = sanitize_text_field($event_data['event']['venue']);
-        $injected_fields['venue'] = $event_data['event']['venue'];
-    }
-    
-    // Inject venue metadata if available
-    if (!empty($event_data['venue_metadata']) && is_array($event_data['venue_metadata'])) {
-        $venue_metadata = $event_data['venue_metadata'];
-        $venue_fields = ['venue_address', 'venue_city', 'venue_state', 'venue_zip',
-                        'venue_country', 'venue_phone', 'venue_website', 'venue_coordinates',
-                        'venue_capacity'];
-
-        foreach ($venue_fields as $field) {
-            if (!empty($venue_metadata[$field])) {
-                $parameters[$field] = sanitize_text_field($venue_metadata[$field]);
-                $injected_fields[$field] = $venue_metadata[$field];
-            }
-        }
-    }
-    
-    // Inject event image if available
-    if (!empty($event_data['event']['image'])) {
-        $parameters['eventImage'] = esc_url_raw($event_data['event']['image']);
-        $injected_fields['eventImage'] = $event_data['event']['image'];
-    }
-    
-    if (!empty($injected_fields)) {
-        do_action('datamachine_log', 'debug', 'DataMachineEvents: Venue parameters injected successfully', [
-            'source_type' => $source_type,
-            'injected_fields' => array_keys($injected_fields),
-            'venue_name' => $injected_fields['venue'] ?? 'N/A',
-            'total_parameters' => count($parameters)
-        ]);
-    }
-
-    return $parameters;
-}, 10, 5);
 
 /**
  * Enqueue venue autocomplete and selector assets on Data Machine admin pages

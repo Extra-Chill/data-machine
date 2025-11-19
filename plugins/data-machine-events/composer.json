@@ -5,6 +5,11 @@
         "php": ">=8.0",
         "johngrogg/ics-parser": "^3.0"
     },
+    "autoload": {
+        "psr-4": {
+            "DataMachineEvents\\": "inc/"
+        }
+    },
     "authors": [
         {
             "name": "Chris Huber",
