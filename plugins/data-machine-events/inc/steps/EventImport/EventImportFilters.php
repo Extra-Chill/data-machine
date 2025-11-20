@@ -31,42 +31,8 @@ add_filter('datamachine_step_types', function($steps) {
     return $steps;
 });
 
-/**
- * Register Event Import handlers with Data Machine
- *
- * Registers all available event import handlers using Data Machine's unified handler registry.
- * This enables native discovery and execution via the datamachine_handlers filter.
- */
-add_filter('datamachine_handlers', function($handlers, $step_type = null) {
-    // Only register event_import handlers when requested
-    if ($step_type === null || $step_type === 'event_import') {
-        // Ticketmaster Discovery API handler
-        $handlers['ticketmaster_events'] = [
-            'type' => 'event_import',
-            'class' => 'DataMachineEvents\\Steps\\EventImport\\Handlers\\Ticketmaster\\Ticketmaster',
-            'label' => __('Ticketmaster Events', 'datamachine-events'),
-            'description' => __('Import events from Ticketmaster Discovery API with venue data', 'datamachine-events')
-        ];
-
-        // Dice FM API handler
-        $handlers['dice_fm_events'] = [
-            'type' => 'event_import',
-            'class' => 'DataMachineEvents\\Steps\\EventImport\\Handlers\\DiceFm\\DiceFm',
-            'label' => __('Dice FM Events', 'datamachine-events'),
-            'description' => __('Import events from Dice FM API for electronic music venues', 'datamachine-events')
-        ];
-
-        // Google Calendar .ics handler
-        $handlers['google_calendar'] = [
-            'type' => 'event_import',
-            'class' => 'DataMachineEvents\\Steps\\EventImport\\Handlers\\GoogleCalendar\\GoogleCalendar',
-            'label' => __('Google Calendar', 'datamachine-events'),
-            'description' => __('Import events from public Google Calendar .ics feeds', 'datamachine-events')
-        ];
-    }
-
-    return $handlers;
-}, 10, 2);
+// Handler registration is now decentralized to individual handler filters
+// using the HandlerRegistrationTrait for standardization.
 
 /**
  * Enqueue venue autocomplete and selector assets on Data Machine admin pages

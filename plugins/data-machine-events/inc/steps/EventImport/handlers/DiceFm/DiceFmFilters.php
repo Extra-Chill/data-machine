@@ -8,30 +8,43 @@
  * @since 1.0.0
  */
 
+namespace DataMachineEvents\Steps\EventImport\Handlers\DiceFm;
+
+use DataMachine\Core\Steps\HandlerRegistrationTrait;
+
 if (!defined('ABSPATH')) {
     exit;
 }
 
-// Handler registration is centralized in EventImportFilters.php to avoid duplicates
+/**
+ * Dice.fm handler registration and configuration.
+ */
+class DiceFmFilters {
+    use HandlerRegistrationTrait;
+
+    /**
+     * Register Dice.fm handler with all required filters.
+     */
+    public static function register(): void {
+        self::registerHandler(
+            'dice_fm_events',
+            'event_import',
+            DiceFm::class,
+            __('Dice FM Events', 'datamachine-events'),
+            __('Import events from Dice FM API for electronic music venues', 'datamachine-events'),
+            true,
+            DiceFmAuth::class,
+            DiceFmSettings::class,
+            null
+        );
+    }
+}
 
 /**
- * Register Dice.fm authentication provider with Data Machine
- * 
- * Adds the Dice.fm auth provider to Data Machine's auth system.
- * This enables the authentication modal for API key configuration.
+ * Register Dice.fm handler filters.
  */
-add_filter('datamachine_auth_providers', function($providers) {
-    $providers['dice_fm_events'] = new DataMachineEvents\Steps\EventImport\Handlers\DiceFm\DiceFmAuth();
-    return $providers;
-});
+function datamachine_events_register_dice_fm_filters() {
+    DiceFmFilters::register();
+}
 
-/**
- * Register Dice.fm settings provider with Data Machine
- * 
- * Adds the Dice.fm settings provider to Data Machine's settings system.
- * This enables the configuration UI for handler parameters.
- */
-add_filter('datamachine_handler_settings', function($all_settings) {
-    $all_settings['dice_fm_events'] = new DataMachineEvents\Steps\EventImport\Handlers\DiceFm\DiceFmSettings();
-    return $all_settings;
-});
+datamachine_events_register_dice_fm_filters();

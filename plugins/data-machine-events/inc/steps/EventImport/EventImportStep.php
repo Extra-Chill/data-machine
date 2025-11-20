@@ -32,7 +32,7 @@ class EventImportStep extends Step {
         $handler_slug = $this->getHandlerSlug();
         
         // Get handler object from registry
-        $all_handlers = apply_filters('datamachine_handlers', []);
+        $all_handlers = apply_filters('datamachine_handlers', [], 'event_import');
         $handler_info = $all_handlers[$handler_slug] ?? null;
         
         if (!$handler_info || empty($handler_info['class'])) {
@@ -76,8 +76,13 @@ class EventImportStep extends Step {
             $result = $handler->get_fetch_data($pipeline_id, $handler_config, (string)$this->job_id);
             
             if (isset($result['processed_items']) && is_array($result['processed_items'])) {
-                // Add new items to the beginning of the data packets
-                return array_merge($result['processed_items'], $this->dataPackets);
+                // Process items (DataPacket objects only)
+                foreach ($result['processed_items'] as $item) {
+                    if ($item instanceof \DataMachine\Core\DataPacket) {
+                        $this->dataPackets = $item->addTo($this->dataPackets);
+                    }
+                }
+                return $this->dataPackets;
             }
             
             return $this->dataPackets;

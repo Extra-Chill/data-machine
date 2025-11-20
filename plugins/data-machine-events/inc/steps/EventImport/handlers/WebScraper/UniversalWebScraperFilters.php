@@ -11,39 +11,42 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper;
 
+use DataMachine\Core\Steps\HandlerRegistrationTrait;
+
 // Prevent direct access
 if (!defined('ABSPATH')) {
     exit;
 }
 
-
 /**
- * Register Universal Web Scraper handler with Data Machine
- *
- * Schema.org compliant event extraction from any website.
- * Prioritizes structured data with intelligent HTML parsing fallbacks.
+ * Universal Web Scraper handler registration and configuration.
  */
-add_filter('datamachine_handlers', function($handlers, $step_type = null) {
-    // Only register when event_import handlers are requested
-    if ($step_type === null || $step_type === 'event_import') {
-        $handlers['universal_web_scraper'] = [
-            'type' => 'event_import',
-            'class' => 'DataMachineEvents\\Steps\\EventImport\\Handlers\\WebScraper\\UniversalWebScraper',
-            'label' => __('Universal Web Scraper', 'datamachine-events'),
-            'description' => __('Extract events from any website using Schema.org compliance with AI fallbacks', 'datamachine-events')
-        ];
+class UniversalWebScraperFilters {
+    use HandlerRegistrationTrait;
+
+    /**
+     * Register Universal Web Scraper handler with all required filters.
+     */
+    public static function register(): void {
+        self::registerHandler(
+            'universal_web_scraper',
+            'event_import',
+            UniversalWebScraper::class,
+            __('Universal Web Scraper', 'datamachine-events'),
+            __('Extract events from any website using Schema.org compliance with AI fallbacks', 'datamachine-events'),
+            false,
+            null,
+            UniversalWebScraperSettings::class,
+            null
+        );
     }
-
-    return $handlers;
-}, 10, 2);
+}
 
 /**
- * Register Universal Web Scraper settings
- * 
- * Simple settings with just URL field - no dropdown complexity.
+ * Register Universal Web Scraper handler filters.
  */
-add_filter('datamachine_handler_settings', function($all_settings) {
-    $all_settings['universal_web_scraper'] = new UniversalWebScraperSettings();
-    return $all_settings;
-});
+function datamachine_events_register_web_scraper_filters() {
+    UniversalWebScraperFilters::register();
+}
 
+datamachine_events_register_web_scraper_filters();

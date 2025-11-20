@@ -135,30 +135,7 @@ class Ticketmaster extends EventImportHandler {
                 'event_import'
             );
             
-            // Return single item
-            // Manually construct array since DataPacket doesn't have toArray()
-            $packet_array = [
-                'type' => 'event_import',
-                'timestamp' => time(),
-                'data' => [
-                    'title' => $standardized_event['title'],
-                    'body' => wp_json_encode([
-                        'event' => $standardized_event,
-                        'venue_metadata' => $venue_metadata,
-                        'import_source' => 'ticketmaster'
-                    ], JSON_PRETTY_PRINT)
-                ],
-                'metadata' => [
-                    'source_type' => 'ticketmaster',
-                    'pipeline_id' => $pipeline_id,
-                    'flow_id' => $flow_id,
-                    'original_title' => $standardized_event['title'] ?? '',
-                    'event_identifier' => $event_identifier,
-                    'import_timestamp' => time()
-                ]
-            ];
-
-            return $this->successResponse([$packet_array]);
+            return $this->successResponse([$dataPacket]);
         }
         
         $this->log('info', 'No eligible events found');

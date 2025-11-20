@@ -8,30 +8,43 @@
  * @since 1.0.0
  */
 
+namespace DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster;
+
+use DataMachine\Core\Steps\HandlerRegistrationTrait;
+
 if (!defined('ABSPATH')) {
     exit;
 }
 
-// Handler registration is centralized in EventImportFilters.php to avoid duplicates
+/**
+ * Ticketmaster handler registration and configuration.
+ */
+class TicketmasterFilters {
+    use HandlerRegistrationTrait;
+
+    /**
+     * Register Ticketmaster handler with all required filters.
+     */
+    public static function register(): void {
+        self::registerHandler(
+            'ticketmaster_events',
+            'event_import',
+            Ticketmaster::class,
+            __('Ticketmaster Events', 'datamachine-events'),
+            __('Import events from Ticketmaster Discovery API with venue data', 'datamachine-events'),
+            true,
+            TicketmasterAuth::class,
+            TicketmasterSettings::class,
+            null
+        );
+    }
+}
 
 /**
- * Register Ticketmaster authentication provider with Data Machine
- * 
- * Adds the Ticketmaster auth provider to Data Machine's auth system.
- * This enables the authentication modal for API key configuration.
+ * Register Ticketmaster handler filters.
  */
-add_filter('datamachine_auth_providers', function($providers) {
-    $providers['ticketmaster_events'] = new DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster\TicketmasterAuth();
-    return $providers;
-});
+function datamachine_events_register_ticketmaster_filters() {
+    TicketmasterFilters::register();
+}
 
-/**
- * Register Ticketmaster settings provider with Data Machine
- * 
- * Adds the Ticketmaster settings provider to Data Machine's settings system.
- * This enables the configuration UI for handler parameters.
- */
-add_filter('datamachine_handler_settings', function($all_settings) {
-    $all_settings['ticketmaster_events'] = new DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster\TicketmasterSettings();
-    return $all_settings;
-});
+datamachine_events_register_ticketmaster_filters();

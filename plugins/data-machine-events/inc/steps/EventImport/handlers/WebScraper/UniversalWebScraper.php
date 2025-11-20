@@ -126,31 +126,7 @@ class UniversalWebScraper extends EventImportHandler {
             'event_import'
         );
 
-        // Return single item
-        // Manually construct array since DataPacket doesn't have toArray()
-        $packet_array = [
-            'type' => 'event_import',
-            'timestamp' => time(),
-            'data' => [
-                'title' => 'Raw HTML Event Section',
-                'body' => wp_json_encode([
-                    'raw_html' => $raw_html_data,
-                    'source_url' => $url,
-                    'import_source' => 'universal_web_scraper',
-                    'section_identifier' => $event_section['identifier']
-                ], JSON_PRETTY_PRINT)
-            ],
-            'metadata' => [
-                'source_type' => 'universal_web_scraper',
-                'pipeline_id' => $pipeline_id,
-                'flow_id' => $flow_id,
-                'original_title' => 'HTML Section from ' . parse_url($url, PHP_URL_HOST),
-                'event_identifier' => $event_section['identifier'],
-                'import_timestamp' => time()
-            ]
-        ];
-
-        return $this->successResponse([$packet_array]);
+        return $this->successResponse([$dataPacket]);
     }
     
     /**
