@@ -97,30 +97,35 @@ export class CircuitGridRenderer {
      * 
      * @returns {Map<string, Object>} Map of day names to group data with events and colors
      */
+    /**
+     * Detect day groups by analyzing DOM structure and CSS classes
+     *
+     * @returns {Array<Object>} Array of group data objects { dayName, groupElement, events, color, index }
+     */
     detectDayGroups() {
-        const dayGroups = new Map();
-        
-        // Find all day group containers in circuit grid
+        const groups = [];
         const dayGroupElements = this.calendar.querySelectorAll('.datamachine-events-content .datamachine-date-group');
-        
+
+        let groupIndex = 0;
         dayGroupElements.forEach(groupElement => {
-            // Extract day from class name (e.g., datamachine-day-saturday -> saturday)
             const dayClass = Array.from(groupElement.classList).find(cls => cls.startsWith('datamachine-day-'));
             if (!dayClass) return;
-            
+
             const dayName = dayClass.replace('datamachine-day-', '');
             const events = groupElement.querySelectorAll('.datamachine-event-item:not(.hidden)'); // Only visible events
-            
+
             if (events.length > 0) {
-                dayGroups.set(dayName, {
+                groups.push({
+                    dayName,
                     groupElement,
                     events: Array.from(events),
-                    color: `var(--datamachine-day-${dayName})`
+                    color: `var(--datamachine-day-${dayName})`,
+                    index: groupIndex++
                 });
             }
         });
-        
-        return dayGroups;
+
+        return groups;
     }
 
     /**
@@ -184,11 +189,22 @@ export class CircuitGridRenderer {
      * @param {Object} shape Shape definition with type, dimensions, and path data
      * @param {string} color CSS color value for border stroke
      */
-    renderGroupBorder(dayName, shape, color) {
+    /**
+     * Render SVG border element for day group using shape data
+     * 
+     * @param {string} dayName Day identifier (e.g., 'monday', 'tuesday')
+     * @param {Object} shape Shape definition with type, dimensions, and path data
+     * @param {string} color CSS color value for border stroke
+     * @param {number} groupIndex Unique index for this group occurrence
+     */
+    renderGroupBorder(dayName, shape, color, groupIndex = 0) {
         if (!shape || !this.svgContainer) return;
 
-        // Remove existing border for this day
-        const existingBorder = this.svgContainer.querySelector(`[data-day="${dayName}"]`);
+        // Use a unique data-day value to avoid overwriting other same-day groups
+        const dataDayAttr = `${dayName}-${groupIndex}`;
+
+        // Remove existing border for this specific day-group if present
+        const existingBorder = this.svgContainer.querySelector(`[data-day="${dataDayAttr}"]`);
         if (existingBorder) {
             existingBorder.remove();
         }
@@ -197,16 +213,13 @@ export class CircuitGridRenderer {
         let element;
 
         if (shape.type === 'path') {
-            // Create SVG path element for L-shapes with arc-based rounding AND background fill
             element = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             element.setAttribute('d', shape.path);
             element.setAttribute('fill', fillColor);
             element.setAttribute('stroke', color);
             element.setAttribute('stroke-width', '3.25');
             element.setAttribute('stroke-opacity', '0.8');
-            // No stroke-linejoin - arcs handle all corner rounding
         } else {
-            // Create single SVG rect element for simple rectangles AND background fill
             element = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
             element.setAttribute('x', shape.left);
             element.setAttribute('y', shape.top);
@@ -218,14 +231,19 @@ export class CircuitGridRenderer {
             element.setAttribute('stroke-linejoin', 'round');
             element.setAttribute('stroke-linecap', 'round');
             element.setAttribute('stroke-opacity', '0.8');
-            element.setAttribute('rx', shape.borderRadius || 8); // Dynamic rounded corners
+            element.setAttribute('rx', shape.borderRadius || 8);
         }
 
-        element.setAttribute('data-day', dayName);
-        element.className.baseVal = `datamachine-border-${dayName}`;
+        element.setAttribute('data-day', dataDayAttr);
+
+        // apply both day-specific and group-specific classes so existing CSS still matches
+        // e.g., datamachine-border-monday datamachine-border-group-monday
+        element.className.baseVal = `datamachine-border-${dayName} datamachine-border-group-${dayName}`;
 
         this.svgContainer.appendChild(element);
-        this.borders.set(dayName, element);
+
+        // Store border keyed by unique dataDayAttr
+        this.borders.set(dataDayAttr, element);
     }
 
     /**
@@ -749,11 +767,13 @@ export class CircuitGridRenderer {
 
         // Detect day groups and render borders
         const dayGroups = this.detectDayGroups();
-        
-        dayGroups.forEach((groupData, dayName) => {
+
+        // dayGroups is an array of groupData objects
+        dayGroups.forEach((groupData) => {
             const shape = this.generateShapeForEvents(groupData.events);
             if (shape) {
-                this.renderGroupBorder(dayName, shape, groupData.color);
+                // Pass dayName and index so renderGroupBorder can make unique element ids
+                this.renderGroupBorder(groupData.dayName, shape, groupData.color, groupData.index);
             }
         });
     }
