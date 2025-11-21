@@ -47,14 +47,15 @@ export class BadgeRenderer {
     /**
      * Detect day groups and their badges
      * 
-     * @returns {Map<string, Object>} Map of day names to group data with badges
+     * @returns {Array<Object>} Array of group data objects { dayName, groupElement, events, badge, color, index }
      */
     detectDayGroups() {
-        const dayGroups = new Map();
+        const groups = [];
         
         // Find all day group containers
         const dayGroupElements = this.calendar.querySelectorAll('.datamachine-date-group');
         
+        let groupIndex = 0;
         dayGroupElements.forEach(groupElement => {
             // Extract day from class name (e.g., datamachine-day-saturday -> saturday)
             const dayClass = Array.from(groupElement.classList).find(cls => cls.startsWith('datamachine-day-'));
@@ -65,16 +66,18 @@ export class BadgeRenderer {
             const badge = groupElement.querySelector('.datamachine-day-badge');
             
             if (events.length > 0 && badge) {
-                dayGroups.set(dayName, {
+                groups.push({
+                    dayName,
                     groupElement,
                     events: Array.from(events),
                     badge,
-                    color: `var(--datamachine-day-${dayName})`
+                    color: `var(--datamachine-day-${dayName})`,
+                    index: groupIndex++
                 });
             }
         });
         
-        return dayGroups;
+        return groups;
     }
 
     /**
@@ -158,10 +161,13 @@ export class BadgeRenderer {
         // Detect day groups and position badges
         const dayGroups = this.detectDayGroups();
         
-        dayGroups.forEach((groupData, dayName) => {
+        // dayGroups is an array of groupData objects
+        dayGroups.forEach((groupData) => {
             const firstEvent = this.findFirstChronologicalEvent(groupData.events);
             if (firstEvent) {
-                this.positionDayBadge(groupData.badge, firstEvent, dayName);
+                // Use a unique key per group (dayName-index) so multiple same-day groups are tracked separately
+                const groupKey = `${groupData.dayName}-${groupData.index}`;
+                this.positionDayBadge(groupData.badge, firstEvent, groupKey);
             }
         });
     }
