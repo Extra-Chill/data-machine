@@ -109,8 +109,8 @@ dm-events/
 │   │   └── class-settings-page.php
 │   ├── blocks/
 │   │   ├── calendar/        # Calendar block (webpack) with modular template system
-│   │   │   ├── class-template-loader.php
-│   │   │   ├── class-taxonomy-helper.php
+│   │   │   ├── Template_Loader.php
+│   │   │   ├── Taxonomy_Helper.php
 │   │   │   └── templates/   # 7 specialized templates plus modal subdirectory
 │   │   └── EventDetails/    # Event details block (webpack with @wordpress/scripts base)
 │   ├── core/                # Core plugin classes
@@ -128,7 +128,7 @@ dm-events/
 ├── assets/
 │   ├── css/                 # Admin styling (admin.css)
 │   └── js/                  # Admin JavaScript
-├── inc/blocks/root.css      # Centralized design tokens and CSS custom properties
+├── inc/Blocks/root.css      # Centralized design tokens and CSS custom properties
 └── composer.json            # PHP dependencies
 ```
 
@@ -142,7 +142,7 @@ dm-events/
 ```bash
 composer install
 # Build blocks
-cd inc/blocks/calendar && npm install && npm run build
+cd inc/Blocks/Calendar && npm install && npm run build
 cd ../EventDetails && npm install && npm run build
 ```
 
@@ -156,11 +156,11 @@ cd ../EventDetails && npm install && npm run build
 **Block Development:**
 ```bash
 # Calendar (webpack)
-cd inc/blocks/calendar
+cd inc/Blocks/Calendar
 npm run start    # Development watch
 
 # Event Details (webpack with @wordpress/scripts base)
-cd inc/blocks/EventDetails
+cd inc/Blocks/EventDetails
 npm run start  # Development watch
 npm run lint:js && npm run lint:css
 ```

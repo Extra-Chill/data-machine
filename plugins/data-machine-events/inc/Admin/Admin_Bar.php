@@ -32,7 +32,9 @@ class Admin_Bar {
         }
 
         // Get events page URL from settings
-        $events_url = Settings_Page::get_main_events_page_url();
+        $events_url = class_exists('DataMachineEvents\Admin\Settings_Page')
+            ? Settings_Page::get_main_events_page_url()
+            : '';
 
         // Fallback to post type archive if no custom URL set
         if (empty($events_url)) {

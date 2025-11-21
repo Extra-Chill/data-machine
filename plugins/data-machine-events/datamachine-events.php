@@ -3,7 +3,7 @@
  * Plugin Name: Data Machine Events
  * Plugin URI: https://chubes.net/datamachine-events
  * Description: WordPress events plugin with block-first architecture. Features AI-driven event creation via Data Machine integration, Event Details blocks for data storage, Calendar blocks for display, and venue taxonomy management.
- * Version: 0.1.0
+ * Version: 0.1.1
  * Author: Chris Huber
  * Author URI: https://chubes.net
  * License: GPL v2 or later
@@ -18,7 +18,7 @@
  *
  * @package DatamachineEvents
  * @author Chris Huber
- * @since 1.0.0
+ * @since 0.1.0
  */
 
 if (!defined('ABSPATH')) {
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once __DIR__ . '/vendor/autoload.php';
 }
-define('DATAMACHINE_EVENTS_VERSION', '0.1.0');
+define('DATAMACHINE_EVENTS_VERSION', '0.1.1');
 define('DATAMACHINE_EVENTS_PLUGIN_FILE', __FILE__);
 define('DATAMACHINE_EVENTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DATAMACHINE_EVENTS_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -46,7 +46,7 @@ require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/rest-api.php';
  *
  * Handles plugin initialization, component loading, and hook registration.
  *
- * @since 1.0.0
+ * @since 0.1.0
  */
 class DATAMACHINE_Events {
     
@@ -275,9 +275,9 @@ class DATAMACHINE_Events {
     }
 
     public function register_blocks() {
-        register_block_type(DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/blocks/calendar');
-        register_block_type(DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/blocks/EventDetails');
-        
+        register_block_type(DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/Calendar');
+        register_block_type(DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/EventDetails');
+
         // Enqueue root CSS custom properties when any block is present
         add_action('wp_enqueue_scripts', array($this, 'enqueue_root_styles'));
         add_action('enqueue_block_assets', array($this, 'enqueue_root_styles'));
@@ -287,9 +287,9 @@ class DATAMACHINE_Events {
         if (has_block('datamachine-events/calendar') || has_block('datamachine-events/event-details') || is_singular('datamachine_events')) {
             wp_enqueue_style(
                 'datamachine-events-root',
-                DATAMACHINE_EVENTS_PLUGIN_URL . 'inc/blocks/root.css',
+                DATAMACHINE_EVENTS_PLUGIN_URL . 'inc/Blocks/root.css',
                 array(),
-                filemtime(DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/blocks/root.css')
+                filemtime(DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/root.css')
             );
         }
 

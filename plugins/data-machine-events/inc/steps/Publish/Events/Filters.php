@@ -176,6 +176,11 @@ class Filters {
                     'type' => 'string',
                     'description' => 'Generate an engaging, informative description for this event based on the provided details (venue, artist, dates, etc.). Make it compelling and informative for potential attendees.',
                     'required' => true
+                ],
+                'job_id' => [
+                    'type' => 'string',
+                    'required' => true,
+                    'description' => 'Job ID for tracking workflow execution'
                 ]
             ]
         ];

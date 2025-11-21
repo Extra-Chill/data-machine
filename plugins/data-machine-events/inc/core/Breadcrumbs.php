@@ -49,7 +49,9 @@ class Breadcrumbs {
         $events_url = get_post_type_archive_link('datamachine_events');
         $event_title = get_the_title($post_id);
 
-        $main_events_url = \DataMachineEvents\Admin\Settings_Page::get_main_events_page_url();
+        $main_events_url = class_exists('DataMachineEvents\Admin\Settings_Page')
+            ? \DataMachineEvents\Admin\Settings_Page::get_main_events_page_url()
+            : '';
         if (!empty($main_events_url)) {
             $events_url = $main_events_url;
         }

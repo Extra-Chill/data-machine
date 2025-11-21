@@ -10,15 +10,20 @@ namespace DataMachineEvents\Steps\Publish\Events;
 use DataMachineEvents\Steps\Publish\Events\Venue;
 use DataMachineEvents\Steps\Publish\Events\Schema;
 use DataMachine\Core\Steps\Publish\Handlers\PublishHandler;
+use DataMachine\Core\WordPress\WordPressSharedTrait;
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
 class Publisher extends PublishHandler {
+    use WordPressSharedTrait;
 
     public function __construct() {
         parent::__construct('datamachine_events');
+        $this->initWordPressHelpers();
+        // Register a custom handler for the 'venue' taxonomy
+        \DataMachine\Core\WordPress\TaxonomyHandler::addCustomHandler('venue', [$this, 'assignVenueTaxonomy']);
     }
 
     /**
@@ -41,18 +46,22 @@ class Publisher extends PublishHandler {
      * @return array Tool call result with success status and created post data
      */
     private function handle_tool_call_legacy(array $parameters, array $tool_def = []): array {
+        $job_id = $parameters['job_id'] ?? null;
+        if (!$job_id) {
+            return $this->errorResponse('job_id parameter is required for event publishing');
+        }
+
         if (empty($parameters['title'])) {
             return $this->errorResponse('DM Events tool call missing required title parameter', [
                 'provided_parameters' => array_keys($parameters),
-                'required_parameters' => ['title']
+                'required_parameters' => ['title', 'job_id']
             ]);
         }
-        
-        $job_id = $parameters['job_id'] ?? null;
         $engine_data = $this->getEngineData($job_id);
-
         $engine_parameters = $this->extract_event_engine_parameters($engine_data);
-        $parameters = array_merge($engine_parameters, $parameters);
+        // Do NOT merge engine data into AI parameters — engine data is separate
+        // and should not be accessible to AI. Use engine_data explicitly when
+        // calling shared helpers such as applyTaxonomies and featured image processing.
 
         if (!empty($engine_parameters)) {
             $this->log('debug', 'DM Events Tool: Loaded engine venue context', [
@@ -124,9 +133,10 @@ class Publisher extends PublishHandler {
         
         $featured_image_result = null;
         if (!empty($handler_config['include_images'])) {
-            $image_url = $parameters['eventImage'] ?? $handler_config['eventImage'] ?? null;
-            if ($image_url) {
-                $featured_image_result = $this->set_featured_image($post_id, $image_url);
+            // Prefer engine_data.image_file_path (repository) before falling back to handler config
+            $image_file_path = $engine_data['image_file_path'] ?? $handler_config['eventImage'] ?? null;
+            if ($image_file_path) {
+                $featured_image_result = $this->processFeaturedImage($post_id, ['image_file_path' => $image_file_path], $handler_config);
             }
         }
         
@@ -135,15 +145,15 @@ class Publisher extends PublishHandler {
 
         if (!empty($venue_name)) {
             $venue_metadata = [
-                'address' => $this->getParameterValue($parameters, 'venueAddress', 'venue_address'),
-                'city' => $this->getParameterValue($parameters, 'venueCity', 'venue_city'),
-                'state' => $this->getParameterValue($parameters, 'venueState', 'venue_state'),
-                'zip' => $this->getParameterValue($parameters, 'venueZip', 'venue_zip'),
-                'country' => $this->getParameterValue($parameters, 'venueCountry', 'venue_country'),
-                'phone' => $this->getParameterValue($parameters, 'venuePhone', 'venue_phone'),
-                'website' => $this->getParameterValue($parameters, 'venueWebsite', 'venue_website'),
-                'coordinates' => $this->getParameterValue($parameters, 'venueCoordinates', 'venue_coordinates'),
-                'capacity' => $this->getParameterValue($parameters, 'venueCapacity', 'venue_capacity')
+                    'address' => $this->getParameterValue($parameters, 'venueAddress'),
+                    'city' => $this->getParameterValue($parameters, 'venueCity'),
+                    'state' => $this->getParameterValue($parameters, 'venueState'),
+                    'zip' => $this->getParameterValue($parameters, 'venueZip'),
+                    'country' => $this->getParameterValue($parameters, 'venueCountry'),
+                    'phone' => $this->getParameterValue($parameters, 'venuePhone'),
+                    'website' => $this->getParameterValue($parameters, 'venueWebsite'),
+                    'coordinates' => $this->getParameterValue($parameters, 'venueCoordinates'),
+                    'capacity' => $this->getParameterValue($parameters, 'venueCapacity')
             ];
 
             // Create or find venue
@@ -157,7 +167,18 @@ class Publisher extends PublishHandler {
             }
         }
         
-        $taxonomy_results = $this->process_event_taxonomies($post_id, $parameters, $handler_config);
+        // Use shared taxonomy processing for standard public taxonomies but preserve 'venue' handling
+        $handler_config_for_tax = $handler_config;
+        $handler_config_for_tax['taxonomy_venue_selection'] = 'skip';
+        // No legacy alias mapping: TaxonomyHandler expects canonical parameter names (category, tags)
+        // Centralized taxonomy assignments (non-venue handled by TaxonomyHandler; venue handled by custom handler)
+        $taxonomy_results = $this->applyTaxonomies($post_id, $parameters, $handler_config_for_tax, $engine_data);
+
+        // Store event_id in engine data for downstream handlers
+        apply_filters('datamachine_engine_data', null, $job_id, [
+            'event_id' => $post_id,
+            'event_url' => get_permalink($post_id)
+        ]);
 
         $this->log('debug', 'DM Events Tool: Event created successfully', [
             'post_id' => $post_id,
@@ -339,126 +360,73 @@ class Publisher extends PublishHandler {
      * @param array $handler_config Handler configuration
      * @return array Taxonomy assignment results
      */
-    private function process_event_taxonomies(int $post_id, array $parameters, array $handler_config): array {
-        $results = [];
-
-        $taxonomies = get_object_taxonomies('datamachine_events', 'objects');
-
-        foreach ($taxonomies as $taxonomy) {
-            if ($taxonomy->name === 'venue' || !$taxonomy->public) {
-                continue;
-            }
-
-            $field_key = "taxonomy_{$taxonomy->name}_selection";
-            $selection = $handler_config[$field_key] ?? 'skip';
-
-            if ($selection === 'skip') {
-                continue;
-            } elseif (is_numeric($selection) && $selection > 0) {
-                $result = $this->assign_pre_selected_taxonomy($post_id, $taxonomy->name, (int) $selection);
-                if ($result) {
-                    $results[$taxonomy->name] = $result;
-                }
-            } elseif ($selection === 'ai_decides' && !empty($parameters[$taxonomy->name])) {
-                $result = $this->assign_ai_decided_taxonomy($post_id, $taxonomy->name, $parameters[$taxonomy->name]);
-                if ($result) {
-                    $results[$taxonomy->name] = $result;
-                }
-            }
-        }
-
-        return $results;
-    }
+    // Event-specific taxonomy logic removed in favor of shared TaxonomyHandler.
 
     /**
-     * Assign pre-selected taxonomy term.
+     * Custom taxonomy handler for 'venue' that integrates venue term creation and assignment.
+     * This allows TaxonomyHandler to delegate 'venue' handling to the Events plugin.
      *
-     * @param int $post_id Post ID
-     * @param string $taxonomy_name Taxonomy name
-     * @param int $term_id Term ID
-     * @return array|null Assignment result
+     * @param int $post_id
+     * @param array $parameters
+     * @param array $handler_config
+     * @param array $engine_data
+     * @return array|null
      */
-    private function assign_pre_selected_taxonomy(int $post_id, string $taxonomy_name, int $term_id): ?array {
-        $term = get_term($term_id, $taxonomy_name);
+    public function assignVenueTaxonomy(int $post_id, array $parameters, array $handler_config, array $engine_data = []): ?array {
+        $taxonomy_name = 'venue';
 
-        if ($term && !is_wp_error($term)) {
-            $result = wp_set_post_terms($post_id, [$term_id], $taxonomy_name);
-            if (!is_wp_error($result)) {
-                $this->log('debug', 'DM Events: Direct taxonomy assignment successful', [
-                    'taxonomy' => $taxonomy_name,
-                    'term_id' => $term_id,
-                    'term_name' => $term->name,
-                    'post_id' => $post_id
-                ]);
+        // Parameter name for the venue may be 'venue' in parameters or engine_data
+        $venue_name = $parameters['venue'] ?? ($engine_data['venue'] ?? '');
 
+        if (empty($venue_name)) {
+            return null; // Nothing to assign via venue handler
+        }
+
+            $venue_metadata = [
+                'address' => $this->getParameterValue($parameters, 'venueAddress'),
+                'city' => $this->getParameterValue($parameters, 'venueCity'),
+                'state' => $this->getParameterValue($parameters, 'venueState'),
+                'zip' => $this->getParameterValue($parameters, 'venueZip'),
+                'country' => $this->getParameterValue($parameters, 'venueCountry'),
+                'phone' => $this->getParameterValue($parameters, 'venuePhone'),
+                'website' => $this->getParameterValue($parameters, 'venueWebsite'),
+                'coordinates' => $this->getParameterValue($parameters, 'venueCoordinates'),
+                'capacity' => $this->getParameterValue($parameters, 'venueCapacity')
+            ];
+
+        $venue_result = \DataMachineEvents\Core\Venue_Taxonomy::find_or_create_venue($venue_name, $venue_metadata);
+        if (!empty($venue_result['term_id'])) {
+            $assignment_result = Venue::assign_venue_to_event($post_id, ['venue' => $venue_result['term_id']]);
+            if (!empty($assignment_result)) {
                 return [
                     'success' => true,
-                    'source' => 'direct_assignment',
-                    'term_id' => $term_id,
-                    'term_name' => $term->name,
-                    'taxonomy' => $taxonomy_name
-                ];
-            } else {
-                return [
-                    'success' => false,
-                    'source' => 'direct_assignment',
-                    'error' => $result->get_error_message(),
-                    'taxonomy' => $taxonomy_name
+                    'taxonomy' => $taxonomy_name,
+                    'term_id' => $venue_result['term_id'],
+                    'term_name' => $venue_name,
+                    'source' => 'event_venue_handler'
                 ];
             }
-        } else {
-            $this->log('warning', 'DM Events: Invalid term ID for direct assignment', [
-                'taxonomy' => $taxonomy_name,
-                'term_id' => $term_id
-            ]);
+            return ['success' => false, 'error' => 'Failed to assign venue term'];
         }
 
-        return null;
+        return ['success' => false, 'error' => 'Failed to create or find venue'];
     }
 
-    /**
-     * Assign AI-decided taxonomy terms.
-     *
-     * @param int $post_id Post ID
-     * @param string $taxonomy_name Taxonomy name
-     * @param string|array $term_value Term value(s)
-     * @return array Assignment result
-     */
-    private function assign_ai_decided_taxonomy(int $post_id, string $taxonomy_name, $term_value): array {
-        if (is_array($term_value)) {
-            $terms = array_map('sanitize_text_field', $term_value);
-        } else {
-            $terms = [sanitize_text_field($term_value)];
-        }
+    // Pre-selected taxonomy assignment now handled centrally by TaxonomyHandler.
 
-        $result = wp_set_post_terms($post_id, $terms, $taxonomy_name);
-
-        if (is_wp_error($result)) {
-            return [
-                'success' => false,
-                'error' => $result->get_error_message()
-            ];
-        }
-
-        return [
-            'success' => true,
-            'terms' => $terms,
-            'taxonomy' => $taxonomy_name
-        ];
-    }
+    // AI-decided taxonomy assignment now handled centrally by TaxonomyHandler.
 
     /**
      * Helper to read camelCase or snake_case parameter variants.
      */
-    private function getParameterValue(array $parameters, string $camelKey, string $snakeKey = ''): string {
+    /**
+     * Read canonical AI parameter values only (no legacy aliasing).
+     * Accepts camelCase parameter keys only.
+     */
+    private function getParameterValue(array $parameters, string $camelKey): string {
         if (!empty($parameters[$camelKey])) {
-            return $parameters[$camelKey];
+            return (string) $parameters[$camelKey];
         }
-
-        if ($snakeKey && !empty($parameters[$snakeKey])) {
-            return $parameters[$snakeKey];
-        }
-
         return '';
     }
     
@@ -558,74 +526,5 @@ class Publisher extends PublishHandler {
         return (int) $count;
     }
     
-    /**
-     * Set featured image for post from image URL.
-     *
-     * Downloads image from URL and attaches as featured image to post.
-     *
-     * @param int    $post_id   Post ID
-     * @param string $image_url Image URL
-     * @return array|null Result with success status and attachment details
-     */
-    private function set_featured_image(int $post_id, string $image_url): ?array {
-        require_once(ABSPATH . 'wp-admin/includes/media.php');
-        require_once(ABSPATH . 'wp-admin/includes/file.php');
-        require_once(ABSPATH . 'wp-admin/includes/image.php');
-
-        try {
-            $temp_file = download_url($image_url);
-            if (is_wp_error($temp_file)) {
-                $this->log('warning', 'DM Events Featured Image: Failed to download image', [
-                    'image_url' => $image_url,
-                    'error' => $temp_file->get_error_message()
-                ]);
-                return ['success' => false, 'error' => 'Failed to download image'];
-            }
-
-            $file_array = [
-                'name' => basename($image_url),
-                'tmp_name' => $temp_file
-            ];
-
-            $attachment_id = media_handle_sideload($file_array, $post_id);
-
-            if (is_wp_error($attachment_id)) {
-                @unlink($temp_file);
-                $this->log('warning', 'DM Events Featured Image: Failed to create attachment', [
-                    'image_url' => $image_url,
-                    'error' => $attachment_id->get_error_message()
-                ]);
-                return ['success' => false, 'error' => 'Failed to create media attachment'];
-            }
-
-            $result = set_post_thumbnail($post_id, $attachment_id);
-
-            if (!$result) {
-                $this->log('warning', 'DM Events Featured Image: Failed to set featured image', [
-                    'post_id' => $post_id,
-                    'attachment_id' => $attachment_id
-                ]);
-                return ['success' => false, 'error' => 'Failed to set featured image'];
-            }
-
-            $this->log('debug', 'DM Events Featured Image: Successfully set featured image', [
-                'post_id' => $post_id,
-                'attachment_id' => $attachment_id,
-                'image_url' => $image_url
-            ]);
-
-            return [
-                'success' => true,
-                'attachment_id' => $attachment_id,
-                'image_url' => $image_url
-            ];
-
-        } catch (\Exception $e) {
-            $this->log('error', 'DM Events Featured Image: Exception occurred', [
-                'image_url' => $image_url,
-                'error' => $e->getMessage()
-            ]);
-            return ['success' => false, 'error' => 'Exception: ' . $e->getMessage()];
-        }
-    }
+    // Featured image processing is handled by the centralized FeaturedImageHandler via WordPressSharedTrait::processFeaturedImage()
 }

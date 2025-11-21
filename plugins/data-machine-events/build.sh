@@ -33,14 +33,14 @@ composer install --no-dev --optimize-autoloader
 
 # Build Calendar block (webpack)
 echo -e "${YELLOW}🗓️ Building Calendar block...${NC}"
-cd inc/blocks/calendar
+cd inc/Blocks/Calendar
 npm ci --silent
 npm run build --silent
 cd ../../..
 
 # Build Event Details block (@wordpress/scripts)
 echo -e "${YELLOW}📝 Building Event Details block...${NC}"
-cd inc/blocks/EventDetails  
+cd inc/Blocks/EventDetails
 npm ci --silent
 npm run build --silent
 cd ../../..
@@ -63,10 +63,10 @@ mkdir -p "${TEMP_DIR}/languages"
 
 # Remove development files from blocks
 echo -e "${YELLOW}🧹 Removing development files...${NC}"
-find "${TEMP_DIR}/inc/blocks" -name "src" -type d -exec rm -rf {} + 2>/dev/null || true
-find "${TEMP_DIR}/inc/blocks" -name "node_modules" -type d -exec rm -rf {} + 2>/dev/null || true
-find "${TEMP_DIR}/inc/blocks" -name "package*.json" -exec rm -f {} + 2>/dev/null || true
-find "${TEMP_DIR}/inc/blocks" -name "webpack.config.js" -exec rm -f {} + 2>/dev/null || true
+find "${TEMP_DIR}/inc/Blocks" -name "src" -type d -exec rm -rf {} + 2>/dev/null || true
+find "${TEMP_DIR}/inc/Blocks" -name "node_modules" -type d -exec rm -rf {} + 2>/dev/null || true
+find "${TEMP_DIR}/inc/Blocks" -name "package*.json" -exec rm -f {} + 2>/dev/null || true
+find "${TEMP_DIR}/inc/Blocks" -name "webpack.config.js" -exec rm -f {} + 2>/dev/null || true
 
 # Create .zip file
 echo -e "${YELLOW}📦 Creating .zip package...${NC}"

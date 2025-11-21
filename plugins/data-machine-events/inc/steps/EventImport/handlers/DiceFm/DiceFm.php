@@ -56,14 +56,14 @@ class DiceFm extends EventImportHandler {
         $api_config = apply_filters('datamachine_retrieve_oauth_keys', [], 'dice_fm_events');
         if (empty($api_config['api_key'])) {
             $this->log('error', 'Dice.fm API key not configured');
-            return $this->emptyResponse() ?? [];
+            return $this->emptyResponse();
         }
         
         // Get required city parameter
         $city = isset($config['city']) ? trim($config['city']) : '';
         if (empty($city)) {
             $this->log('error', 'No city specified for Dice.fm search', $config);
-            return $this->emptyResponse() ?? [];
+            return $this->emptyResponse();
         }
         
         // Build configuration
@@ -76,7 +76,7 @@ class DiceFm extends EventImportHandler {
         $raw_events = $this->fetch_dice_fm_events($api_config['api_key'], $city, $page_size, $event_types, $partner_id);
         if (empty($raw_events)) {
             $this->log('info', 'No events found from Dice.fm API');
-            return $this->emptyResponse() ?? [];
+            return $this->emptyResponse();
         }
         
         // Process events one at a time (Data Machine single-item model)
@@ -179,7 +179,7 @@ class DiceFm extends EventImportHandler {
             'pipeline_id' => $pipeline_id
         ]);
         
-        return $this->emptyResponse() ?? [];
+        return $this->emptyResponse();
     }
     
     /**

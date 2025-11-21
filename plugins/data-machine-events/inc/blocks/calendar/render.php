@@ -232,7 +232,9 @@ uksort($paged_date_groups, function($a, $b) use ($show_past) {
 $can_go_previous = $current_page > 1;
 $can_go_next = $current_page < $max_pages;
 
-$display_type = \DataMachineEvents\Admin\Settings_Page::get_setting('calendar_display_type', 'circuit-grid');
+$display_type = class_exists('DataMachineEvents\Admin\Settings_Page')
+    ? \DataMachineEvents\Admin\Settings_Page::get_setting('calendar_display_type', 'circuit-grid')
+    : 'circuit-grid';
 
 // Gap detection for carousel-list mode only
 // Shows visual separator when events are 2+ days apart

@@ -16,11 +16,11 @@ Technical guidance for Claude Code when working with the **Data Machine Events**
 composer install                                 # PHP dependencies
 
 # Calendar block (webpack)
-cd inc/blocks/calendar && npm install && npm run build
+cd inc/Blocks/Calendar && npm install && npm run build
 npm run start                                    # Development watch
 
 # Event Details block (webpack with @wordpress/scripts base)
-cd inc/blocks/EventDetails && npm install && npm run build
+cd inc/Blocks/EventDetails && npm install && npm run build
 npm run start                                    # Development watch
 npm run lint:js && npm run lint:css             # Linting
 
@@ -95,8 +95,8 @@ datamachine-events/
 │   ├── admin/class-settings-page.php          # Event settings interface
 │   ├── blocks/
 │   │   ├── calendar/                          # Events display (webpack)
-│   │   │   ├── class-template-loader.php      # Template loading system
-│   │   │   ├── class-taxonomy-helper.php      # Taxonomy data processing
+│   │   │   ├── Template_Loader.php            # Template loading system
+│   │   │   ├── Taxonomy_Helper.php            # Taxonomy data processing
 │   │   │   ├── DisplayStyles/                 # Visual enhancement components
 │   │   │   └── templates/                     # 7 modular templates + modal/
 │   │   ├── EventDetails/                      # Event data storage (webpack + @wordpress/scripts)
