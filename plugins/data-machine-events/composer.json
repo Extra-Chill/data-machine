@@ -15,5 +15,8 @@
             "name": "Chris Huber",
             "email": "chris@chubes.net"
         }
-    ]
+    ],
+    "require-dev": {
+        "phpunit/phpunit": "^9"
+    }
 }

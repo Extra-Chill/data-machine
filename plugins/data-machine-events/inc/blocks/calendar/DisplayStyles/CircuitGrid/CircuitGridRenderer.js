@@ -100,32 +100,74 @@ export class CircuitGridRenderer {
     /**
      * Detect day groups by analyzing DOM structure and CSS classes
      *
-     * @returns {Array<Object>} Array of group data objects { dayName, groupElement, events, color, index }
+     * @returns {Array<Object>} Array of group data objects { dateKey, dayName, events, color }
      */
     detectDayGroups() {
-        const groups = [];
+        const groupsMap = new Map();
         const dayGroupElements = this.calendar.querySelectorAll('.datamachine-events-content .datamachine-date-group');
 
-        let groupIndex = 0;
         dayGroupElements.forEach(groupElement => {
+            // Prefer explicit data-date attribute on group container
+            let dateKey = groupElement.getAttribute('data-date');
+
+            // If group container lacks data-date, attempt to read from first event
+            if (!dateKey) {
+                const firstEvent = groupElement.querySelector('.datamachine-event-item:not(.hidden)');
+                if (firstEvent) {
+                    dateKey = firstEvent.getAttribute('data-date') || null;
+                }
+            }
+
+            // Fallback: derive dayName from class for color only (not for uniqueness)
             const dayClass = Array.from(groupElement.classList).find(cls => cls.startsWith('datamachine-day-'));
-            if (!dayClass) return;
+            const dayName = dayClass ? dayClass.replace('datamachine-day-', '') : 'day';
 
-            const dayName = dayClass.replace('datamachine-day-', '');
-            const events = groupElement.querySelectorAll('.datamachine-event-item:not(.hidden)'); // Only visible events
+            // Find visible events in this group instance
+            const events = Array.from(groupElement.querySelectorAll('.datamachine-event-item:not(.hidden)'));
 
-            if (events.length > 0) {
-                groups.push({
+            if (!dateKey || events.length === 0) {
+                // Skip groups without date or events
+                return;
+            }
+
+            // Initialize aggregator for this dateKey if needed
+            if (!groupsMap.has(dateKey)) {
+                groupsMap.set(dateKey, {
+                    dateKey,
                     dayName,
-                    groupElement,
-                    events: Array.from(events),
-                    color: `var(--datamachine-day-${dayName})`,
-                    index: groupIndex++
+                    events: [],
+                    color: `var(--datamachine-day-${dayName})`
                 });
             }
+
+            const agg = groupsMap.get(dateKey);
+            agg.events.push(...events);
         });
 
-        return groups;
+        // Convert map values to array. Ensure events array is unique and deterministic.
+        return Array.from(groupsMap.values()).map(group => {
+            // Remove duplicate event elements (same DOM node may be present in multiple groupElements)
+            const uniqueEvents = Array.from(new Set(group.events));
+            // Sort by data-date (ISO) and then by DOM position to keep deterministic order
+            uniqueEvents.sort((a, b) => {
+                const aDate = a.getAttribute('data-date') || '';
+                const bDate = b.getAttribute('data-date') || '';
+                if (aDate !== bDate) return aDate.localeCompare(bDate);
+                
+                // fallback to compare offsetTop/Left for stable ordering
+                const aRect = a.getBoundingClientRect();
+                const bRect = b.getBoundingClientRect();
+                if (aRect.top !== bRect.top) return aRect.top - bRect.top;
+                return aRect.left - bRect.left;
+            });
+
+            return {
+                dateKey: group.dateKey,
+                dayName: group.dayName,
+                events: uniqueEvents,
+                color: group.color
+            };
+        });
     }
 
     /**
@@ -197,11 +239,14 @@ export class CircuitGridRenderer {
      * @param {string} color CSS color value for border stroke
      * @param {number} groupIndex Unique index for this group occurrence
      */
-    renderGroupBorder(dayName, shape, color, groupIndex = 0) {
+    renderGroupBorder(dayName, shape, color, groupKey = '') {
         if (!shape || !this.svgContainer) return;
 
+        // Normalize groupKey into a safe identifier for use in data attributes
+        const safeKey = String(groupKey).replace(/[^a-z0-9-_]/gi, '-');
+
         // Use a unique data-day value to avoid overwriting other same-day groups
-        const dataDayAttr = `${dayName}-${groupIndex}`;
+        const dataDayAttr = `${dayName}-${safeKey}`;
 
         // Remove existing border for this specific day-group if present
         const existingBorder = this.svgContainer.querySelector(`[data-day="${dataDayAttr}"]`);
@@ -772,8 +817,8 @@ export class CircuitGridRenderer {
         dayGroups.forEach((groupData) => {
             const shape = this.generateShapeForEvents(groupData.events);
             if (shape) {
-                // Pass dayName and index so renderGroupBorder can make unique element ids
-                this.renderGroupBorder(groupData.dayName, shape, groupData.color, groupData.index);
+                // Pass dayName and stable dateKey so renderGroupBorder creates one border per date
+                this.renderGroupBorder(groupData.dayName, shape, groupData.color, groupData.dateKey);
             }
         });
     }

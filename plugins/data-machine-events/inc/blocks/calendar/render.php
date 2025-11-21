@@ -367,34 +367,32 @@ $wrapper_attributes = get_block_wrapper_attributes(array(
                 endforeach;
                 ?>
             
-            <?php
-            // Include results counter
-            \DataMachineEvents\Blocks\Calendar\Template_Loader::include_template('results-counter', [
-                'current_page' => $current_page,
-                'total_events' => $total_events,
-                'events_per_page' => $events_per_page
-            ]);
-
-            \DataMachineEvents\Blocks\Calendar\Template_Loader::include_template('pagination', [
-                'current_page' => $current_page,
-                'max_pages' => $max_pages,
-                'show_past' => $show_past,
-                'enable_pagination' => $enable_pagination
-            ]);
-            ?>
-
-            <?php
-            \DataMachineEvents\Blocks\Calendar\Template_Loader::include_template('navigation', [
-                'show_past' => $show_past,
-                'past_events_count' => $past_events_count,
-                'future_events_count' => $future_events_count
-            ]);
-            ?>
-            
         <?php else : ?>
             <?php \DataMachineEvents\Blocks\Calendar\Template_Loader::include_template('no-events'); ?>
         <?php endif; ?>
     </div>
+
+    <?php
+    // Moved results counter, pagination and navigation outside of the grid container
+    \DataMachineEvents\Blocks\Calendar\Template_Loader::include_template('results-counter', [
+        'current_page' => $current_page,
+        'total_events' => $total_events,
+        'events_per_page' => $events_per_page
+    ]);
+
+    \DataMachineEvents\Blocks\Calendar\Template_Loader::include_template('pagination', [
+        'current_page' => $current_page,
+        'max_pages' => $max_pages,
+        'show_past' => $show_past,
+        'enable_pagination' => $enable_pagination
+    ]);
+
+    \DataMachineEvents\Blocks\Calendar\Template_Loader::include_template('navigation', [
+        'show_past' => $show_past,
+        'past_events_count' => $past_events_count,
+        'future_events_count' => $future_events_count
+    ]);
+    ?>
 </div>
 
 <?php

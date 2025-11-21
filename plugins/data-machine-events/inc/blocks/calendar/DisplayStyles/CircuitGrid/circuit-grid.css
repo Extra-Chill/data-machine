@@ -139,3 +139,15 @@
         padding: 0;
     }
 }
+
+/* Pagination safeguard: ensure pagination spans full grid when rendered inside grid */
+.datamachine-events-content > .datamachine-events-pagination,
+.datamachine-events-content > .datamachine-events-results-counter {
+    grid-column: 1 / -1;
+    justify-self: center;
+    align-self: end;
+    width: 100%;
+    margin-top: 2rem;
+    display: block;
+    text-align: center;
+}

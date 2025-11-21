@@ -9,7 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **CHANGELOG.md**: Introduced changelog documentation for version tracking
-- **Version bump**: Updated from 0.1.0 to 0.1.1 to mark changelog introduction
+- **Major OOP Refactoring**: Complete alignment with Data Machine core's new architecture patterns
+- **New Base Classes**: PublishHandler, FetchHandler, Step, and EventImportHandler for standardized operations
+- **WordPressSharedTrait Integration**: Shared WordPress utilities across all handlers
+- **TaxonomyHandler Integration**: Centralized taxonomy management with custom venue handler support
+- **Handler Discovery System**: Registry-based handler loading with automatic instantiation and execution
+- **Dual Architecture Support**: Backward compatibility with legacy handlers while supporting new FetchHandler pattern
+- **Version bump**: Updated from 0.1.0 to 0.1.1 to mark major architectural improvements
 
 ## [0.1.0] - 2025-11-XX
 

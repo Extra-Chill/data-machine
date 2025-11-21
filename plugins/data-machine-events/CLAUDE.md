@@ -2,13 +2,36 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.1.0
+**Version**: 0.1.1
 
 ## Migration Status
 
 **REST API**: ✅ Complete - All AJAX eliminated (~950 lines removed), endpoints under `datamachine/v1/events/*`
 
 **Prefix Migration**: ✅ Complete - Fully migrated to `datamachine_events` post type and `datamachine_` prefixes
+
+## New OOP Architecture (v0.1.1)
+
+**Major Refactoring**: Complete alignment with Data Machine core's new OOP patterns and base classes.
+
+### Base Classes
+- **`PublishHandler`** - Base class for all publishing operations (used by `Publisher.php`)
+- **`FetchHandler`** - Base class for all data fetching operations (used by `EventImportHandler`)
+- **`Step`** - Base class for all pipeline steps (used by `EventImportStep`)
+- **`EventImportHandler`** - Abstract base class for all import handlers (extends `FetchHandler`)
+
+### Shared Utilities
+- **`WordPressSharedTrait`** - Provides shared WordPress utilities across all handlers
+- **`TaxonomyHandler`** - Centralized taxonomy management with custom venue handler integration
+
+### Handler Discovery System
+- **Registry-based Loading**: Handlers registered via `datamachine_handlers` filter
+- **Automatic Instantiation**: Framework handles handler creation and execution
+- **Dual Architecture Support**: Supports both new FetchHandler-based and legacy execute-based handlers
+
+### Venue Taxonomy Integration
+- **Custom TaxonomyHandler**: Specialized venue taxonomy processing
+- **Centralized Operations**: Venue creation, lookup, and assignment through unified interface
 
 ## Development Commands
 
@@ -38,6 +61,12 @@ npm run lint:js && npm run lint:css             # Linting
 
 ### Key Components
 
+**Base Classes**:
+- `DataMachine\Core\Steps\Publish\Handlers\PublishHandler` - Base for all publishing operations
+- `DataMachine\Core\Steps\Fetch\Handlers\FetchHandler` - Base for all data fetching operations
+- `DataMachine\Core\Steps\Step` - Base for all pipeline steps
+- `Steps\EventImport\EventImportHandler` - Abstract base for all import handlers
+
 **Core Classes**:
 - `Admin\Settings_Page` - Event archive behavior, search integration, display preferences, map display type (5 free tile layer options)
 - `Core\Event_Post_Type` - Post type registration with selective admin menu control
@@ -46,13 +75,18 @@ npm run lint:js && npm run lint:css             # Linting
 - `Core\Breadcrumbs` - Breadcrumb generation (filterable via datamachine_events_breadcrumbs)
 - `Blocks\Calendar\Template_Loader` - Modular template system with 7 specialized templates
 - `Blocks\Calendar\Taxonomy_Helper` - Taxonomy data processing for filtering systems
-- `Steps\Publish\Events\Publisher` - AI-driven event creation
+- `Steps\Publish\Events\Publisher` - AI-driven event creation (extends PublishHandler)
 - `Steps\Publish\Events\Venue` - Centralized venue operations
 - `Steps\Publish\Events\Schema` - Google Event JSON-LD generator
-- `Steps\EventImport\EventImportStep` - Event import step for Data Machine pipelines
+- `Steps\EventImport\EventImportStep` - Event import step for Data Machine pipelines (extends Step)
+- `Steps\EventImport\EventImportHandler` - Abstract base for import handlers (extends FetchHandler)
 - `Steps\EventImport\Handlers\Ticketmaster\Ticketmaster` - Discovery API integration
 - `Steps\EventImport\Handlers\DiceFm\DiceFm` - Dice FM event integration
 - `Steps\EventImport\Handlers\WebScraper\UniversalWebScraper` - AI-powered web scraping
+
+**Shared Utilities**:
+- `DataMachine\Core\WordPress\WordPressSharedTrait` - Shared WordPress utilities
+- `DataMachine\Core\WordPress\TaxonomyHandler` - Centralized taxonomy management
 
 **Data Flow**: Data Machine Import → Event Details Block → Schema Generation → Calendar Display
 
@@ -157,6 +191,11 @@ datamachine-events/
 
 ## Data Machine Integration
 
+### Handler Discovery System
+- **Registry-based Loading**: Handlers registered via `datamachine_handlers` filter
+- **Automatic Instantiation**: Framework handles handler creation and execution
+- **Dual Architecture Support**: Supports both FetchHandler-based and legacy execute-based handlers
+
 ### Import Handlers
 - **Ticketmaster**: Discovery API with API key authentication, comprehensive validation
 - **Dice FM**: Event integration with standardized processing
@@ -204,17 +243,35 @@ $schema = Schema::generate_event_schema($block_attributes, $venue_data, $post_id
 ```
 
 ### Unified Step Execution
-All steps use Data Machine's flat parameter structure:
+All steps extend base Step class and use Data Machine's flat parameter structure:
 ```php
-public function execute(array $parameters): array {
-    $job_id = $parameters['job_id'];
-    $flow_step_id = $parameters['flow_step_id'];
-    $data = $parameters['data'] ?? [];
-    $flow_step_config = $parameters['flow_step_config'] ?? [];
+class EventImportStep extends Step {
+    protected function executeStep(): array {
+        // Handler discovery and execution logic
+        $handler = $this->getHandlerFromRegistry();
+        if ($handler instanceof FetchHandler) {
+            return $handler->get_fetch_data($pipeline_id, $config, $job_id);
+        }
+        // Legacy handler support
+        return $handler->execute($legacy_payload);
+    }
+}
+```
 
-    // Process step logic...
+### Publisher Architecture
+Publisher extends PublishHandler with WordPressSharedTrait:
+```php
+class Publisher extends PublishHandler {
+    use WordPressSharedTrait;
 
-    return $data; // Always return data packet array
+    protected function executePublish(array $parameters, array $handler_config): array {
+        // AI-driven event creation with venue handling
+        $post_id = $this->create_event_post($parameters);
+        $venue_id = Venue::find_or_create_venue($venue_data);
+        TaxonomyHandler::addCustomHandler('venue', [$this, 'assignVenueTaxonomy']);
+
+        return ['success' => true, 'data' => ['id' => $post_id]];
+    }
 }
 ```
 
@@ -272,5 +329,5 @@ Template_Loader::include_template('date-group', $group_data);
 
 ---
 
-**Version**: 0.1.0
+**Version**: 0.1.1
 **For ecosystem architecture, see root CLAUDE.md**

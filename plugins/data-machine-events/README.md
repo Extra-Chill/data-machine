@@ -2,6 +2,8 @@
 
 Frontend-focused WordPress events plugin with **block-first architecture**. Features AI-driven event creation via Data Machine integration, Event Details blocks with InnerBlocks for rich content editing, Calendar blocks for display, and comprehensive venue taxonomy management.
 
+**Version**: 0.1.1
+
 ## Migration Showcase
 
 **DM Events demonstrates completed migrations serving as reference implementations for the Data Machine Ecosystem:**
@@ -37,6 +39,8 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 
 ### Development
 - **PSR-4 Autoloading:** `DatamachineEvents\` namespace with enhanced autoloader for Data Machine handlers
+- **New OOP Architecture:** Base classes (PublishHandler, FetchHandler, Step) with WordPressSharedTrait and TaxonomyHandler integration
+- **Handler Discovery System:** Registry-based handler loading with automatic instantiation and execution
 - **Dual Build Systems:** Calendar block (webpack), Event Details block (webpack with @wordpress/scripts base)
 - **Modular Template Architecture:** 7 specialized templates with Template_Loader system for flexible calendar rendering
 - **Dynamic Taxonomy Badges:** Automatic badge generation for all taxonomies with consistent color classes and HTML structure
@@ -51,6 +55,12 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 **Data Flow:** Data Machine Import → Event Details Block (InnerBlocks) → Schema Generation → Calendar Display
 **Schema Flow:** Block Attributes + Venue Taxonomy Meta → DataMachineEventsSchema → JSON-LD Output
 
+**Base Classes:**
+- `DataMachine\Core\Steps\Publish\Handlers\PublishHandler` - Base class for all publishing operations
+- `DataMachine\Core\Steps\Fetch\Handlers\FetchHandler` - Base class for all data fetching operations
+- `DataMachine\Core\Steps\Step` - Base class for all pipeline steps
+- `DataMachineEvents\Steps\EventImport\EventImportHandler` - Abstract base class for all import handlers
+
 **Core Classes:**
 - `DataMachineEvents\Admin\Status_Detection` - Legacy stub retained for backwards compatibility (status detection removed)
 - `DataMachineEvents\Admin\Settings_Page` - Event settings interface for archive behavior and display preferences
@@ -61,12 +71,13 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 - `DataMachineEvents\Blocks\Calendar\Template_Loader` - Modular template loading system with variable extraction, output buffering, and template caching for calendar block components
 - `DataMachineEvents\Blocks\Calendar\Taxonomy_Helper` - Taxonomy data discovery, hierarchy building, and post count calculations for calendar filtering systems
 - `DataMachineEvents\Steps\Publish\Events\Schema` - Google Event Schema JSON-LD generator for SEO enhancement
-- `DataMachineEvents\Steps\Publish\Events\Publisher` - AI-driven event creation with comprehensive venue handling
+- `DataMachineEvents\Steps\Publish\Events\Publisher` - AI-driven event creation with comprehensive venue handling (extends PublishHandler)
 - `DataMachineEvents\Steps\Publish\Events\Settings` - Publisher configuration management
 - `DataMachineEvents\Steps\Publish\Events\Venue` - Centralized venue taxonomy operations with validation
 - `DataMachineEvents\Steps\Publish\Events\Filters` - Publisher filtering system
-- `DataMachineEvents\Steps\EventImport\EventImportStep` - Event import step for Data Machine pipeline with handler discovery
+- `DataMachineEvents\Steps\EventImport\EventImportStep` - Event import step for Data Machine pipeline with handler discovery (extends Step)
 - `DataMachineEvents\Steps\EventImport\EventImportFilters` - Event import step registration with Data Machine
+- `DataMachineEvents\Steps\EventImport\EventImportHandler` - Abstract base class for import handlers (extends FetchHandler)
 - `DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster\Ticketmaster` - Discovery API integration with comprehensive error handling
 - `DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster\TicketmasterAuth` - API key authentication provider
 - `DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster\TicketmasterSettings` - Handler configuration management
@@ -78,6 +89,10 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 - `DataMachineEvents\Steps\EventImport\Handlers\WebScraper\UniversalWebScraper` - AI-powered universal web scraper with HTML section processing
 - `DataMachineEvents\Steps\EventImport\Handlers\WebScraper\UniversalWebScraperSettings` - Universal web scraper configuration management
 - `DataMachineEvents\Steps\EventImport\Handlers\WebScraper\UniversalWebScraperFilters` - Universal web scraper filtering system
+
+**Shared Utilities:**
+- `DataMachine\Core\WordPress\WordPressSharedTrait` - Shared WordPress utilities across handlers
+- `DataMachine\Core\WordPress\TaxonomyHandler` - Centralized taxonomy management with custom venue handler
 
 ## Quick Start
 
