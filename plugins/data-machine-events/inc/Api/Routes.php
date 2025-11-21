@@ -3,6 +3,20 @@ namespace DataMachineEvents\Api;
 
 defined( 'ABSPATH' ) || exit;
 
+// Ensure controllers are loaded when composer autoloader is not present
+if ( defined( 'DATAMACHINE_EVENTS_PLUGIN_DIR' ) ) {
+	$controllers = array(
+		DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Calendar.php',
+		DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Venues.php',
+		DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Events.php',
+	);
+	foreach ( $controllers as $file ) {
+		if ( file_exists( $file ) ) {
+			require_once $file;
+		}
+	}
+}
+
 use DataMachineEvents\Api\Controllers\Calendar;
 use DataMachineEvents\Api\Controllers\Venues;
 
