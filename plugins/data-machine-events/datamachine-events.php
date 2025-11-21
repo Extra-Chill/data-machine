@@ -38,8 +38,10 @@ define('DATAMACHINE_EVENTS_PATH', plugin_dir_path(__FILE__));
 // Load core meta storage (monitors Event Details block saves)
 require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/meta-storage.php';
 
-// Load REST API endpoints
-require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/rest-api.php';
+// Load REST API routes (modular)
+if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php' ) ) {
+	require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php';
+}
 
 /**
  * Main Data Machine Events plugin class
