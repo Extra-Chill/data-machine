@@ -2,6 +2,8 @@
  * BadgeRenderer - Day badge positioning and management for event groups
  * Handles day label badges that integrate with border system
  */
+import { ColorManager } from '../ColorManager.js';
+
 export class BadgeRenderer {
     constructor(calendarElement) {
         this.calendar = calendarElement;
@@ -80,8 +82,7 @@ export class BadgeRenderer {
                     dateKey,
                     dayName,
                     events: [],
-                    badge: badge || null,
-                    color: `var(--datamachine-day-${dayName})`
+                    badge: badge || null
                 });
             }
 
@@ -108,8 +109,7 @@ export class BadgeRenderer {
                 dateKey: group.dateKey,
                 dayName: group.dayName,
                 events: uniqueEvents,
-                badge: group.badge,
-                color: group.color
+                badge: group.badge
             };
         });
     }
@@ -204,6 +204,14 @@ export class BadgeRenderer {
                 // Use stable dateKey as groupKey so badges are unique per logical date
                 const groupKey = groupData.dateKey || `${groupData.dayName}`;
                 this.positionDayBadge(groupData.badge, firstEvent, groupKey);
+
+                // Apply color styling for badge using ColorManager (use var refs so root.css remains single source)
+                if (groupData.badge) {
+                    // Set background using the rgba var and text color from computed contrast fallback
+                    groupData.badge.style.setProperty('background', ColorManager.getFillVar(groupData.dayName));
+                    // For badge text/stroke, use the solid color var and let CSS handle contrast; provide fallback
+                    groupData.badge.style.setProperty('color', ColorManager.getStrokeVar(groupData.dayName));
+                }
             }
         });
     }

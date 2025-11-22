@@ -2,7 +2,7 @@
 
 .datamachine-events-calendar {
     margin: 2rem 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
     color-scheme: light dark; /* Enable automatic system color adaptation */
 }
 
@@ -40,7 +40,7 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), inset 0 0 0 1px var(--datamachine-border-light);
     margin: 0;
     line-height: normal;
-    font-family: inherit;
+
 }
 
 .datamachine-events-calendar .datamachine-events-filter-bar .datamachine-events-search input.datamachine-events-search-input:focus {
@@ -96,7 +96,7 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), inset 0 0 0 1px var(--datamachine-border-light);
     margin: 0;
     line-height: normal;
-    font-family: inherit;
+
 }
 
 .datamachine-events-calendar .datamachine-events-filter-bar .datamachine-events-date-filter input.datamachine-events-date-range-input:focus {
@@ -246,7 +246,7 @@
     font-weight: bold;
     line-height: 1.4;
     color: var(--datamachine-text-primary);
-    font-family: inherit;
+
 }
 
 /* Event title within date groups - smaller */
@@ -368,13 +368,9 @@
 
 /* Day of Week Color System */
 :root {
-    --datamachine-day-sunday: #FF8C42;    /* Orange - Sunday rest */
-    --datamachine-day-monday: #4A90E2;    /* Blue - Monday professional */
-    --datamachine-day-tuesday: #50C878;   /* Green - Tuesday growth */
-    --datamachine-day-wednesday: #20B2AA; /* Teal - Wednesday balance */
-    --datamachine-day-thursday: #E94B7D;  /* Pink - Thursday energy */
-    --datamachine-day-friday: #FFD700;    /* Gold - Friday celebration */
-    --datamachine-day-saturday: #9B59B6;  /* Purple - Saturday weekend */
+    /* Removed duplicated day vars - centralize in root.css */
+    /* Day colors are expected to be set via inc/Blocks/root.css */
+    /* --datamachine-day-* variables are provided by root.css */
 }
 
 /* Pagination */
@@ -498,7 +494,7 @@
 
 /* Flatpickr styling overrides */
 .flatpickr-calendar {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
     border-radius: 8px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
     border: 1px solid #e5e7eb;

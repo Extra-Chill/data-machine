@@ -196,7 +196,7 @@
 
     .venue-autocomplete-error {
         background-color: #3d1f1f;
-        color: #ff6b6b;
+        color: var(--datamachine-day-sunday);
     }
 }
 

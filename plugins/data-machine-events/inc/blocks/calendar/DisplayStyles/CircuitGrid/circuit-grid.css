@@ -24,7 +24,7 @@
 .datamachine-border-thursday,
 .datamachine-border-group-thursday { stroke: var(--datamachine-day-thursday); }
 .datamachine-border-friday,
-.datamachine-border-group-friday { stroke: var(--datamachine-day-friday); }
+.datamachine-border-group-friday { stroke: var(--datamachine-day-friday); } /* color from root.css */
 .datamachine-border-saturday,
 .datamachine-border-group-saturday { stroke: var(--datamachine-day-saturday); }
 

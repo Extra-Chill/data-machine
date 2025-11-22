@@ -1,5 +1,5 @@
 {
-  "name": "dm-events-calendar-block",
+  "name": "datamachine-events-calendar-block",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {

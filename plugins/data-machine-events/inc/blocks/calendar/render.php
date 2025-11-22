@@ -30,7 +30,24 @@ $show_past = isset($_GET['past']) && $_GET['past'] === '1';
 $search_query = isset($_GET['event_search']) ? sanitize_text_field( wp_unslash( $_GET['event_search'] ) ) : '';
 $date_start = isset($_GET['date_start']) ? sanitize_text_field( wp_unslash( $_GET['date_start'] ) ) : '';
 $date_end = isset($_GET['date_end']) ? sanitize_text_field( wp_unslash( $_GET['date_end'] ) ) : '';
-$tax_filters = isset($_GET['tax_filter']) ? array_map( 'sanitize_text_field', wp_unslash( (array) $_GET['tax_filter'] ) ) : array();
+$tax_filters_raw = isset($_GET['tax_filter']) ? wp_unslash( $_GET['tax_filter'] ) : array();
+$tax_filters = array();
+if (is_array($tax_filters_raw)) {
+    foreach ($tax_filters_raw as $taxonomy_slug => $term_ids) {
+        $taxonomy_slug = sanitize_key($taxonomy_slug);
+        $term_ids = (array) $term_ids;
+        $clean_ids = array();
+        foreach ($term_ids as $term_id) {
+            $term_id = absint($term_id);
+            if ($term_id > 0) {
+                $clean_ids[] = $term_id;
+            }
+        }
+        if (!empty($clean_ids)) {
+            $tax_filters[$taxonomy_slug] = $clean_ids;
+        }
+    }
+}
 
 // Build WP_Query args for SQL-based pagination
 $query_args = array(
@@ -258,16 +275,28 @@ if ($display_type === 'carousel-list' && !empty($paged_date_groups)) {
 
 \DataMachineEvents\Blocks\Calendar\Template_Loader::init();
 
+$block_id = isset($block) && isset($block->clientId) ? (string) $block->clientId : uniqid('dm', true);
+$instance_id = 'datamachine-calendar-' . substr( preg_replace( '/[^a-z0-9]/', '', strtolower( $block_id ) ), 0, 12 );
 $wrapper_attributes = get_block_wrapper_attributes(array(
     'class' => 'datamachine-events-calendar datamachine-events-date-grouped'
 ));
 ?>
 
-<div <?php echo $wrapper_attributes; ?>>
+<div data-instance-id="<?php echo esc_attr($instance_id); ?>" <?php echo $wrapper_attributes; ?>>
     <?php 
-    \DataMachineEvents\Blocks\Calendar\Template_Loader::include_template('filter-bar', [
+    $taxonomies_data = \DataMachineEvents\Blocks\Calendar\Taxonomy_Helper::get_all_taxonomies_with_counts();
+$filter_count = !empty($tax_filters) ? array_sum(array_map('count', $tax_filters)) : 0;
+
+\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template('filter-bar', [
         'attributes' => $attributes,
-        'used_taxonomies' => []
+        'used_taxonomies' => [],
+        'instance_id' => $instance_id,
+        'tax_filters' => $tax_filters,
+        'search_query' => $search_query,
+        'date_start' => $date_start,
+        'date_end' => $date_end,
+        'taxonomies_data' => $taxonomies_data,
+        'filter_count' => $filter_count
     ]);
     ?>
     
@@ -278,14 +307,14 @@ $wrapper_attributes = get_block_wrapper_attributes(array(
                 wp_enqueue_style(
                     'datamachine-events-carousel-list',
                     plugin_dir_url(__FILE__) . 'DisplayStyles/CarouselList/carousel-list.css',
-                    [],
+                    array('datamachine-events-root'),
                     filemtime(plugin_dir_path(__FILE__) . 'DisplayStyles/CarouselList/carousel-list.css')
                 );
             } else {
                 wp_enqueue_style(
                     'datamachine-events-circuit-grid',
                     plugin_dir_url(__FILE__) . 'DisplayStyles/CircuitGrid/circuit-grid.css',
-                    [],
+                    array('datamachine-events-root'),
                     filemtime(plugin_dir_path(__FILE__) . 'DisplayStyles/CircuitGrid/circuit-grid.css')
                 );
             }

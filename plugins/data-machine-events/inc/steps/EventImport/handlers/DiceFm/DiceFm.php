@@ -99,7 +99,11 @@ class DiceFm extends EventImportHandler {
             }
             
             // Create unique identifier for processed items tracking
-            $event_identifier = md5($standardized_event['title'] . ($standardized_event['startDate'] ?? '') . ($standardized_event['venue'] ?? ''));
+            $event_identifier = \DataMachineEvents\Utilities\EventIdentifierGenerator::generate(
+                $standardized_event['title'],
+                $standardized_event['startDate'] ?? '',
+                $standardized_event['venue'] ?? ''
+            );
             
             // Check if already processed FIRST
             if ($this->isItemProcessed($event_identifier, $flow_step_id)) {

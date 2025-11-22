@@ -5,6 +5,7 @@
  * Isolated module that handles all circuit grid specific behavior.
  */
 import { BadgeRenderer } from './BadgeRenderer.js';
+import { ColorManager } from '../ColorManager.js';
 
 export class CircuitGridRenderer {
     constructor(calendarElement) {
@@ -55,15 +56,15 @@ export class CircuitGridRenderer {
      */
     findSVGContainer() {
         this.svgContainer = this.calendar.querySelector('.datamachine-border-overlay');
-        
+
         if (!this.svgContainer) {
             console.error('CircuitGridRenderer: SVG container not found. Expected .datamachine-border-overlay element in calendar.');
             return false;
         }
-        
+
         // Clear any existing borders
         this.svgContainer.innerHTML = '';
-        
+
         return true;
     }
 
@@ -118,7 +119,7 @@ export class CircuitGridRenderer {
                 }
             }
 
-            // Fallback: derive dayName from class for color only (not for uniqueness)
+            // Fallback: derive dayName from class for grouping
             const dayClass = Array.from(groupElement.classList).find(cls => cls.startsWith('datamachine-day-'));
             const dayName = dayClass ? dayClass.replace('datamachine-day-', '') : 'day';
 
@@ -135,8 +136,7 @@ export class CircuitGridRenderer {
                 groupsMap.set(dateKey, {
                     dateKey,
                     dayName,
-                    events: [],
-                    color: `var(--datamachine-day-${dayName})`
+                    events: []
                 });
             }
 
@@ -164,8 +164,7 @@ export class CircuitGridRenderer {
             return {
                 dateKey: group.dateKey,
                 dayName: group.dayName,
-                events: uniqueEvents,
-                color: group.color
+                events: uniqueEvents
             };
         });
     }
@@ -208,21 +207,6 @@ export class CircuitGridRenderer {
         };
     }
 
-    /**
-     * Get fill color for day background
-     */
-    getFillColor(dayName) {
-        const fillColors = {
-            'sunday': 'rgba(255, 107, 107, 0.15)',
-            'monday': 'rgba(78, 205, 196, 0.15)', 
-            'tuesday': 'rgba(69, 183, 209, 0.15)',
-            'wednesday': 'rgba(150, 206, 180, 0.15)',
-            'thursday': 'rgba(254, 202, 87, 0.15)',
-            'friday': 'rgba(255, 159, 243, 0.15)',
-            'saturday': 'rgba(84, 160, 255, 0.15)'
-        };
-        return fillColors[dayName] || 'rgba(0, 0, 0, 0.15)';
-    }
 
     /**
      * Render SVG border element for day group using shape data
@@ -239,7 +223,7 @@ export class CircuitGridRenderer {
      * @param {string} color CSS color value for border stroke
      * @param {number} groupIndex Unique index for this group occurrence
      */
-    renderGroupBorder(dayName, shape, color, groupKey = '') {
+    renderGroupBorder(dayName, shape, groupKey = '') {
         if (!shape || !this.svgContainer) return;
 
         // Normalize groupKey into a safe identifier for use in data attributes
@@ -254,29 +238,29 @@ export class CircuitGridRenderer {
             existingBorder.remove();
         }
 
-        const fillColor = this.getFillColor(dayName);
+        // Use ColorManager to set fill/stroke via CSS custom property references
         let element;
 
         if (shape.type === 'path') {
             element = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             element.setAttribute('d', shape.path);
-            element.setAttribute('fill', fillColor);
-            element.setAttribute('stroke', color);
+            element.setAttribute('fill', 'none');
             element.setAttribute('stroke-width', '3.25');
             element.setAttribute('stroke-opacity', '0.8');
+            ColorManager.applyToElement(element, dayName, { useVar: true });
         } else {
             element = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
             element.setAttribute('x', shape.left);
             element.setAttribute('y', shape.top);
             element.setAttribute('width', shape.width);
             element.setAttribute('height', shape.height);
-            element.setAttribute('fill', fillColor);
-            element.setAttribute('stroke', color);
+            element.setAttribute('fill', 'none');
             element.setAttribute('stroke-width', '3.25');
             element.setAttribute('stroke-linejoin', 'round');
             element.setAttribute('stroke-linecap', 'round');
             element.setAttribute('stroke-opacity', '0.8');
             element.setAttribute('rx', shape.borderRadius || 8);
+            ColorManager.applyToElement(element, dayName, { useVar: true });
         }
 
         element.setAttribute('data-day', dataDayAttr);
@@ -818,7 +802,7 @@ export class CircuitGridRenderer {
             const shape = this.generateShapeForEvents(groupData.events);
             if (shape) {
                 // Pass dayName and stable dateKey so renderGroupBorder creates one border per date
-                this.renderGroupBorder(groupData.dayName, shape, groupData.color, groupData.dateKey);
+                this.renderGroupBorder(groupData.dayName, shape, groupData.dateKey);
             }
         });
     }

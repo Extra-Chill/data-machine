@@ -39,7 +39,7 @@ if (empty($taxonomies_data) && defined('WP_DEBUG') && WP_DEBUG) {
                         ?>
                             <div class="datamachine-taxonomy-term <?php echo esc_attr($indent_class); ?>" <?php echo $indent_style; ?>>
                                 <label class="datamachine-term-checkbox-label">
-                                    <input type="checkbox" 
+                                    <input type="checkbox" <?php if (!empty($tax_filters) && isset($tax_filters[$taxonomy_slug]) && in_array($term['term_id'], $tax_filters[$taxonomy_slug], true)) { echo 'checked="checked"'; } ?> 
                                            name="taxonomy_filters[<?php echo esc_attr($taxonomy_slug); ?>][]" 
                                            value="<?php echo esc_attr($term['term_id']); ?>"
                                            class="datamachine-term-checkbox"
