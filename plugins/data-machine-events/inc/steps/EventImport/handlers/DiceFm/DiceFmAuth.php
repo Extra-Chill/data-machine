@@ -11,6 +11,8 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\DiceFm;
 
+use DataMachine\Core\OAuth\BaseAuthProvider;
+
 // Prevent direct access
 if (!defined('ABSPATH')) {
     exit;
@@ -18,11 +20,13 @@ if (!defined('ABSPATH')) {
 
 /**
  * DiceFmAuth class
- * 
+ *
  * Authentication provider for Dice.fm API.
  * Integrates with Data Machine's unified authentication system.
  */
-class DiceFmAuth {
+class DiceFmAuth extends BaseAuthProvider {    public function __construct() {
+        parent::__construct('dice_fm_events');
+    }
     
     /**
      * Get configuration fields required for Dice.fm authentication
@@ -52,7 +56,7 @@ class DiceFmAuth {
      * @return bool True if API key is configured, false otherwise
      */
     public function is_configured(): bool {
-        $config = apply_filters('datamachine_retrieve_oauth_keys', [], 'dice_fm_events');
+        $config = $this->get_account();
         return !empty($config['api_key']);
     }
     
@@ -75,7 +79,7 @@ class DiceFmAuth {
             return null;
         }
         
-        $config = apply_filters('datamachine_retrieve_oauth_keys', [], 'dice_fm_events');
+        $config = $this->get_account();
         $details = [
             'display_name' => __('Dice.fm API', 'datamachine-events'),
             'type' => __('API Key Authentication', 'datamachine-events')

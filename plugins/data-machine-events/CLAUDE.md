@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.1.1
+**Version**: 0.2.0
 
 ## Migration Status
 
@@ -10,12 +10,12 @@ Technical guidance for Claude Code when working with the **Data Machine Events**
 
 **Prefix Migration**: ✅ Complete - Fully migrated to `datamachine_events` post type and `datamachine_` prefixes
 
-## New OOP Architecture (v0.1.1)
+## OOP Architecture (v0.2.0)
 
-**Major Refactoring**: Complete alignment with Data Machine core's new OOP patterns and base classes.
+**Major Refactoring**: Complete alignment with Data Machine core's OOP patterns featuring intelligent event upsert operations.
 
 ### Base Classes
-- **`PublishHandler`** - Base class for all publishing operations (used by `Publisher.php`)
+- **`UpdateHandler`** - Base class for event upsert operations (used by `EventUpsert.php`)
 - **`FetchHandler`** - Base class for all data fetching operations (used by `EventImportHandler`)
 - **`Step`** - Base class for all pipeline steps (used by `EventImportStep`)
 - **`EventImportHandler`** - Abstract base class for all import handlers (extends `FetchHandler`)
@@ -62,7 +62,7 @@ npm run lint:js && npm run lint:css             # Linting
 ### Key Components
 
 **Base Classes**:
-- `DataMachine\Core\Steps\Publish\Handlers\PublishHandler` - Base for all publishing operations
+- `DataMachine\Core\Steps\Update\Handlers\UpdateHandler` - Base for event upsert operations
 - `DataMachine\Core\Steps\Fetch\Handlers\FetchHandler` - Base for all data fetching operations
 - `DataMachine\Core\Steps\Step` - Base for all pipeline steps
 - `Steps\EventImport\EventImportHandler` - Abstract base for all import handlers
@@ -75,7 +75,9 @@ npm run lint:js && npm run lint:css             # Linting
 - `Core\Breadcrumbs` - Breadcrumb generation (filterable via datamachine_events_breadcrumbs)
 - `Blocks\Calendar\Template_Loader` - Modular template system with 7 specialized templates
 - `Blocks\Calendar\Taxonomy_Helper` - Taxonomy data processing for filtering systems
-- `Steps\Publish\Events\Publisher` - AI-driven event creation (extends PublishHandler)
+- `Blocks\Calendar\DisplayStyles\ColorManager` - Centralized color CSS custom properties helper
+- `Blocks\Calendar\DisplayStyles\CircuitGrid\BadgeRenderer` - Day badge positioning with ColorManager integration
+- `Steps\Upsert\Events\EventUpsert` - Intelligent create-or-update handler (extends UpdateHandler)
 - `Steps\Publish\Events\Venue` - Centralized venue operations
 - `Steps\Publish\Events\Schema` - Google Event JSON-LD generator
 - `Steps\EventImport\EventImportStep` - Event import step for Data Machine pipelines (extends Step)
@@ -83,6 +85,10 @@ npm run lint:js && npm run lint:css             # Linting
 - `Steps\EventImport\Handlers\Ticketmaster\Ticketmaster` - Discovery API integration
 - `Steps\EventImport\Handlers\DiceFm\DiceFm` - Dice FM event integration
 - `Steps\EventImport\Handlers\WebScraper\UniversalWebScraper` - AI-powered web scraping
+- `Utilities\EventIdentifierGenerator` - Shared event identifier normalization utility
+- `Api\Controllers\Calendar` - Calendar REST endpoint controller
+- `Api\Controllers\Venues` - Venues REST endpoint controller
+- `Api\Controllers\Events` - Events REST endpoint controller
 
 **Shared Utilities**:
 - `DataMachine\Core\WordPress\WordPressSharedTrait` - Shared WordPress utilities
@@ -104,7 +110,10 @@ npm run lint:js && npm run lint:css             # Linting
 
 **Calendar Block**:
 - Webpack build system with modular templates (event-item, date-group, pagination, navigation, no-events, filter-bar, time-gap-separator, modal/taxonomy-filter)
-- DisplayStyles visual enhancement (CircuitGridRenderer, CarouselListRenderer, BadgeRenderer)
+- DisplayStyles visual enhancement:
+  - `ColorManager.js` - Centralized CSS custom properties helper for fill/stroke var references
+  - `CircuitGrid/BadgeRenderer.js` - Day badge positioning with multi-group support and ColorManager integration
+  - `CarouselListRenderer.js` - Carousel list display mode
 - Template_Loader provides get_template(), include_template(), template_exists(), get_template_path()
 - Taxonomy_Helper provides structured data with hierarchy building and post count calculations
 
@@ -126,24 +135,31 @@ npm run lint:js && npm run lint:css             # Linting
 datamachine-events/
 ├── datamachine-events.php                      # Main plugin file with PSR-4 autoloader
 ├── inc/
-│   ├── admin/class-settings-page.php          # Event settings interface
-│   ├── blocks/
-│   │   ├── calendar/                          # Events display (webpack)
+│   ├── Admin/class-settings-page.php          # Event settings interface
+│   ├── Api/                                   # REST API controllers and routes
+│   │   ├── Routes.php                         # API route registration
+│   │   └── Controllers/                       # Calendar, Venues, Events controllers
+│   ├── Blocks/
+│   │   ├── Calendar/                          # Events display (webpack)
 │   │   │   ├── Template_Loader.php            # Template loading system
 │   │   │   ├── Taxonomy_Helper.php            # Taxonomy data processing
 │   │   │   ├── DisplayStyles/                 # Visual enhancement components
+│   │   │   │   ├── ColorManager.js            # Centralized color helper
+│   │   │   │   └── CircuitGrid/               # CircuitGrid display mode
+│   │   │   │       └── BadgeRenderer.js       # Day badge positioning
 │   │   │   └── templates/                     # 7 modular templates + modal/
 │   │   ├── EventDetails/                      # Event data storage (webpack + @wordpress/scripts)
 │   │   └── root.css                           # Centralized design tokens
-│   ├── core/
+│   ├── Core/
 │   │   ├── class-event-post-type.php          # Post type registration
 │   │   ├── class-venue-taxonomy.php           # Venue taxonomy + 9 meta fields
 │   │   ├── class-taxonomy-badges.php          # Dynamic badge rendering
-│   │   ├── class-breadcrumbs.php              # Breadcrumb generation
-│   │   └── rest-api.php                       # REST endpoints
-│   └── steps/
-│       ├── EventImport/handlers/              # Import handlers (Ticketmaster, DiceFm, WebScraper)
-│       └── publish/Events/                    # Publisher + Schema + Venue
+│   │   └── class-breadcrumbs.php              # Breadcrumb generation
+│   ├── steps/
+│   │   ├── EventImport/handlers/              # Import handlers (Ticketmaster, DiceFm, WebScraper)
+│   │   └── Upsert/Events/                     # EventUpsert handler for create/update operations
+│   └── Utilities/                             # Shared utilities
+│       └── EventIdentifierGenerator.php       # Event identifier normalization
 ├── templates/single-datamachine_events.php    # Single event template
 └── assets/                                    # CSS and JavaScript
 ```
@@ -197,9 +213,9 @@ datamachine-events/
 - **Dual Architecture Support**: Supports both FetchHandler-based and legacy execute-based handlers
 
 ### Import Handlers
-- **Ticketmaster**: Discovery API with API key authentication, comprehensive validation
-- **Dice FM**: Event integration with standardized processing
-- **UniversalWebScraper**: AI-powered HTML section extraction
+- **Ticketmaster**: Discovery API with API key authentication, uses EventIdentifierGenerator for consistent event identity
+- **Dice FM**: Event integration with EventIdentifierGenerator normalization
+- **UniversalWebScraper**: AI-powered HTML section extraction with HTML hash tracking (ProcessedItems)
 
 **Handler Pattern**: Single-item processing - return first eligible event immediately
 ```php
@@ -218,17 +234,24 @@ foreach ($raw_events as $raw_event) {
 }
 ```
 
-### Publisher Pattern
+### EventUpsert Pattern
 ```php
-public function handle_tool_call(array $parameters, array $tool_def = []): array {
-    // AI-driven event creation
-    $post_id = $this->create_event_post($title, $content, $block_attributes);
+public function executeUpdate(array $parameters, array $handler_config): array {
+    // Intelligent create-or-update based on event identity
+    $existing_post_id = $this->findExistingEvent($title, $venue, $startDate);
 
-    // Venue handling
-    $venue_result = Venue::find_or_create_venue($venue_name, $venue_data);
-    Venue::assign_venue_to_event($post_id, $venue_name, $venue_data);
+    if ($existing_post_id) {
+        // Check if data changed
+        if ($this->hasDataChanged($existing_data, $parameters)) {
+            $this->updateEventPost($existing_post_id, $parameters, ...);
+            return ['action' => 'updated', 'post_id' => $existing_post_id];
+        }
+        return ['action' => 'no_change', 'post_id' => $existing_post_id];
+    }
 
-    return ['success' => true, 'data' => ['id' => $post_id, 'url' => $permalink]];
+    // Create new event
+    $post_id = $this->createEventPost($parameters, ...);
+    return ['action' => 'created', 'post_id' => $post_id];
 }
 ```
 
@@ -240,6 +263,18 @@ $routing = Schema::engine_or_tool($event_data, $import_data);
 // tool: ['description', 'performer', 'organizer'] - AI inference parameters
 
 $schema = Schema::generate_event_schema($block_attributes, $venue_data, $post_id);
+```
+
+### Event Identifier Normalization
+All import handlers use EventIdentifierGenerator for consistent event identity:
+```php
+use DataMachineEvents\Utilities\EventIdentifierGenerator;
+
+// Generate normalized identifier
+$event_identifier = EventIdentifierGenerator::generate($title, $startDate, $venue);
+
+// Handles variations like "The Blue Note" vs "Blue Note"
+// Normalization: lowercase, trim, collapse whitespace, remove articles
 ```
 
 ### Unified Step Execution
@@ -258,19 +293,45 @@ class EventImportStep extends Step {
 }
 ```
 
-### Publisher Architecture
-Publisher extends PublishHandler with WordPressSharedTrait:
+### EventUpsert Architecture
+EventUpsert extends UpdateHandler with WordPressSharedTrait:
 ```php
-class Publisher extends PublishHandler {
+class EventUpsert extends UpdateHandler {
     use WordPressSharedTrait;
 
-    protected function executePublish(array $parameters, array $handler_config): array {
-        // AI-driven event creation with venue handling
-        $post_id = $this->create_event_post($parameters);
-        $venue_id = Venue::find_or_create_venue($venue_data);
+    protected function executeUpdate(array $parameters, array $handler_config): array {
+        // Search for existing event by (title, venue, startDate)
+        $existing_post_id = $this->findExistingEvent($title, $venue, $startDate);
+
+        // Field-by-field change detection prevents unnecessary updates
+        if ($existing_post_id && !$this->hasDataChanged($existing_data, $parameters)) {
+            return ['action' => 'no_change'];
+        }
+
+        // Intelligent venue handling with find-or-create
+        $venue_result = Venue_Taxonomy::find_or_create_venue($venue_name, $venue_data);
         TaxonomyHandler::addCustomHandler('venue', [$this, 'assignVenueTaxonomy']);
 
-        return ['success' => true, 'data' => ['id' => $post_id]];
+        return ['success' => true, 'action' => 'created|updated|no_change'];
+    }
+}
+```
+
+### REST API Controllers Architecture
+Modular controller-based REST API with unified namespace:
+```php
+// inc/Api/Routes.php - Route registration
+register_rest_route('datamachine/v1', '/events/calendar', [
+    'methods' => 'GET',
+    'callback' => [new Calendar(), 'calendar'],
+    'permission_callback' => '__return_true'
+]);
+
+// inc/Api/Controllers/Calendar.php - Calendar endpoint logic
+class Calendar {
+    public function calendar(WP_REST_Request $request) {
+        // SQL-based filtering, pagination, template rendering
+        return rest_ensure_response(['success' => true, 'html' => $events_html]);
     }
 }
 ```
@@ -329,5 +390,5 @@ Template_Loader::include_template('date-group', $group_data);
 
 ---
 
-**Version**: 0.1.1
+**Version**: 0.2.0
 **For ecosystem architecture, see root CLAUDE.md**

@@ -365,14 +365,6 @@
 .datamachine-day-badge-friday { background: var(--datamachine-day-friday); }
 .datamachine-day-badge-saturday { background: var(--datamachine-day-saturday); }
 
-
-/* Day of Week Color System */
-:root {
-    /* Removed duplicated day vars - centralize in root.css */
-    /* Day colors are expected to be set via inc/Blocks/root.css */
-    /* --datamachine-day-* variables are provided by root.css */
-}
-
 /* Pagination */
 .datamachine-events-pagination {
     margin-top: 2rem;
@@ -438,43 +430,61 @@
     }
 }
 
+/* Tablet Breakpoint - 2-3 events per row */
+@media (max-width: 1199px) and (min-width: 769px) {
+    .datamachine-event-item {
+        width: var(--datamachine-grid-cell-width-tablet);
+    }
+
+    .datamachine-events-calendar.datamachine-events-date-grouped .datamachine-events-content {
+        grid-template-columns: repeat(auto-fill, var(--datamachine-grid-cell-width-tablet));
+    }
+}
+
+/* Mobile Breakpoint - Single column, full width cards */
 @media (max-width: 768px) {
     .datamachine-events-filter-row {
         grid-template-columns: 1fr;
         gap: 1rem;
         align-items: stretch;
     }
-    
+
     .datamachine-events-date-filter {
         width: 100%;
     }
-    
+
     .datamachine-events-time-filter {
         justify-content: center;
         flex-wrap: wrap;
     }
-    
+
     .datamachine-events-time-btn {
         flex: 1;
         min-width: 0;
         text-align: center;
     }
-    
+
     .datamachine-event-item {
+        width: 100%;
+        max-width: 400px;
+        height: auto;
+        min-height: 160px;
         padding: 1rem;
+        margin: 0 auto;
     }
-    
+
     .datamachine-event-title {
         font-size: 0.95rem;
     }
-    
+
     /* Mobile: Uniform single column grid */
     .datamachine-events-calendar.datamachine-events-date-grouped .datamachine-events-content {
         grid-template-columns: 1fr;
-        grid-auto-rows: var(--datamachine-grid-cell-height-mobile);
-        gap: var(--datamachine-grid-gap);
+        grid-auto-rows: auto;
+        gap: 1rem;
+        padding: 0 1rem;
     }
-    
+
 }
 
 @media (max-width: 480px) {

@@ -31,6 +31,24 @@ export class CircuitGridRenderer {
     }
 
     /**
+     * Check if current viewport is mobile (≤768px)
+     *
+     * @returns {boolean} True if mobile viewport
+     */
+    isMobileView() {
+        return window.innerWidth <= 768;
+    }
+
+    /**
+     * Check if current viewport is tablet (769px-1199px)
+     *
+     * @returns {boolean} True if tablet viewport
+     */
+    isTabletView() {
+        return window.innerWidth > 768 && window.innerWidth <= 1199;
+    }
+
+    /**
      * Initialize badge renderer for circuit grid
      */
     initializeBadgeRenderer() {
@@ -277,27 +295,47 @@ export class CircuitGridRenderer {
 
     /**
      * Extract grid configuration from CSS custom properties and calculate responsive layout
-     * 
+     *
      * @returns {Object} Grid settings with cellWidth, gap, eventsPerRow, borderRadius
      */
     getActiveGridSettings() {
         const styles = getComputedStyle(document.documentElement);
-        const cellWidth = parseInt(styles.getPropertyValue('--datamachine-grid-cell-width'));
-        const gap = parseInt(styles.getPropertyValue('--datamachine-grid-gap'));
         const borderRadius = parseInt(styles.getPropertyValue('--datamachine-border-radius')) || 8;
-        
+
         // Get actual container width
         const containerWidth = this.calendar.querySelector('.datamachine-events-content').getBoundingClientRect().width;
-        
+
+        // Determine which CSS variables to use based on viewport
+        let cellWidth, gap;
+
+        if (this.isMobileView()) {
+            // Mobile: single column, full width
+            cellWidth = containerWidth;
+            gap = 16; // 1rem
+        } else if (this.isTabletView()) {
+            // Tablet: use tablet-specific variables
+            cellWidth = parseInt(styles.getPropertyValue('--datamachine-grid-cell-width-tablet')) || 240;
+            gap = parseInt(styles.getPropertyValue('--datamachine-grid-gap-tablet')) || 20;
+        } else {
+            // Desktop: use default variables
+            cellWidth = parseInt(styles.getPropertyValue('--datamachine-grid-cell-width'));
+            gap = parseInt(styles.getPropertyValue('--datamachine-grid-gap'));
+        }
+
         // Calculate events per row using same logic as CSS grid
         const eventsPerRow = Math.floor((containerWidth + gap) / (cellWidth + gap));
-        
+
+        // Calculate safe padding to prevent border overlap
+        // Ensure at least 4px total space between borders (2px per side)
+        const padding = Math.min(8, Math.max(2, (gap / 2) - 2));
+
         return {
             cellWidth,
             gap,
             containerWidth,
             eventsPerRow: Math.max(1, eventsPerRow), // Ensure at least 1
-            borderRadius
+            borderRadius,
+            padding
         };
     }
 
@@ -389,14 +427,15 @@ export class CircuitGridRenderer {
      */
     generateSingleEventShape(event) {
         const gridSettings = this.getActiveGridSettings();
+        const padding = gridSettings.padding;
         const rect = event.getBoundingClientRect();
         const contentRect = this.calendar.querySelector('.datamachine-events-content').getBoundingClientRect();
         
         const bounds = {
-            left: rect.left - contentRect.left - 8,
-            top: rect.top - contentRect.top - 8,
-            width: rect.width + 16,
-            height: rect.height + 16
+            left: rect.left - contentRect.left - padding,
+            top: rect.top - contentRect.top - padding,
+            width: rect.width + (padding * 2),
+            height: rect.height + (padding * 2)
         };
         
         return this.createBorderPathWithGap(bounds, gridSettings.borderRadius);
@@ -406,11 +445,12 @@ export class CircuitGridRenderer {
      * Generate path with gap for badge on top border
      * 
      * @param {HTMLElement[]} events Array of event elements in horizontal line
-     * @param {number} padding Border padding in pixels
+     * @param {number} padding Border padding in pixels (unused, uses gridSettings)
      * @returns {Object} Path shape definition with badge gap
      */
-    drawHorizontalLines(events, padding = 8) {
+    drawHorizontalLines(events) {
         const gridSettings = this.getActiveGridSettings();
+        const padding = gridSettings.padding;
         let minLeft = Infinity;
         let minTop = Infinity;
         let maxRight = -Infinity;
@@ -546,11 +586,12 @@ export class CircuitGridRenderer {
      * 
      * @param {HTMLElement[]} events Array of split event elements
      * @param {number} eventsPerRow Maximum events per row from grid calculation
-     * @param {number} padding Border padding in pixels
+     * @param {number} padding Border padding in pixels (unused, uses gridSettings)
      * @returns {Object} Path shape definition with connector line
      */
-    drawSplitGroups(events, eventsPerRow, padding = 8) {
+    drawSplitGroups(events, eventsPerRow) {
         const gridSettings = this.getActiveGridSettings();
+        const padding = gridSettings.padding;
         const eventPositions = events.map(event => this.calculateEventGridPosition(event, gridSettings));
         const curves = this.drawCurves();
         
@@ -590,15 +631,15 @@ export class CircuitGridRenderer {
         
         // Top group border (rounded rectangle)
         path.push(
-            `M ${topBounds.left + 8} ${topBounds.top}`,
-            `L ${topBounds.left + topBounds.width - 8} ${topBounds.top}`,
-            curves.externalTopRight(topBounds.left + topBounds.width, topBounds.top + 8),
-            `L ${topBounds.left + topBounds.width} ${topBounds.top + topBounds.height - 8}`,
-            curves.externalBottomRight(topBounds.left + topBounds.width - 8, topBounds.top + topBounds.height),
-            `L ${topBounds.left + 8} ${topBounds.top + topBounds.height}`,
-            curves.externalBottomLeft(topBounds.left, topBounds.top + topBounds.height - 8),
-            `L ${topBounds.left} ${topBounds.top + 8}`,
-            curves.externalTopLeft(topBounds.left + 8, topBounds.top)
+            `M ${topBounds.left + padding} ${topBounds.top}`,
+            `L ${topBounds.left + topBounds.width - padding} ${topBounds.top}`,
+            curves.externalTopRight(topBounds.left + topBounds.width, topBounds.top + padding),
+            `L ${topBounds.left + topBounds.width} ${topBounds.top + topBounds.height - padding}`,
+            curves.externalBottomRight(topBounds.left + topBounds.width - padding, topBounds.top + topBounds.height),
+            `L ${topBounds.left + padding} ${topBounds.top + topBounds.height}`,
+            curves.externalBottomLeft(topBounds.left, topBounds.top + topBounds.height - padding),
+            `L ${topBounds.left} ${topBounds.top + padding}`,
+            curves.externalTopLeft(topBounds.left + padding, topBounds.top)
         );
         
         // Horizontal connector line with angled ends to run in middle of gap
@@ -624,15 +665,15 @@ export class CircuitGridRenderer {
         
         // Bottom group border (rounded rectangle)
         path.push(
-            `M ${bottomBounds.left + 8} ${bottomBounds.top}`,
-            `L ${bottomBounds.left + bottomBounds.width - 8} ${bottomBounds.top}`,
-            curves.externalTopRight(bottomBounds.left + bottomBounds.width, bottomBounds.top + 8),
-            `L ${bottomBounds.left + bottomBounds.width} ${bottomBounds.top + bottomBounds.height - 8}`,
-            curves.externalBottomRight(bottomBounds.left + bottomBounds.width - 8, bottomBounds.top + bottomBounds.height),
-            `L ${bottomBounds.left + 8} ${bottomBounds.top + bottomBounds.height}`,
-            curves.externalBottomLeft(bottomBounds.left, bottomBounds.top + bottomBounds.height - 8),
-            `L ${bottomBounds.left} ${bottomBounds.top + 8}`,
-            curves.externalTopLeft(bottomBounds.left + 8, bottomBounds.top)
+            `M ${bottomBounds.left + padding} ${bottomBounds.top}`,
+            `L ${bottomBounds.left + bottomBounds.width - padding} ${bottomBounds.top}`,
+            curves.externalTopRight(bottomBounds.left + bottomBounds.width, bottomBounds.top + padding),
+            `L ${bottomBounds.left + bottomBounds.width} ${bottomBounds.top + bottomBounds.height - padding}`,
+            curves.externalBottomRight(bottomBounds.left + bottomBounds.width - padding, bottomBounds.top + bottomBounds.height),
+            `L ${bottomBounds.left + padding} ${bottomBounds.top + bottomBounds.height}`,
+            curves.externalBottomLeft(bottomBounds.left, bottomBounds.top + bottomBounds.height - padding),
+            `L ${bottomBounds.left} ${bottomBounds.top + padding}`,
+            curves.externalTopLeft(bottomBounds.left + padding, bottomBounds.top)
         );
         
         return {
@@ -655,11 +696,12 @@ export class CircuitGridRenderer {
      * 
      * @param {HTMLElement[]} events Event elements to encompass
      * @param {number} eventsPerRow Maximum events per row from grid calculation
-     * @param {number} padding Border padding in pixels
+     * @param {number} padding Border padding in pixels (unused, uses gridSettings)
      * @returns {Object} Path shape definition with SVG path string and bounds
      */
-    drawCutouts(events, eventsPerRow, padding = 8) {
+    drawCutouts(events, eventsPerRow) {
         const gridSettings = this.getActiveGridSettings();
+        const padding = gridSettings.padding;
         const eventPositions = events.map(event => this.calculateEventGridPosition(event, gridSettings));
         const curves = this.drawCurves();
         
@@ -743,6 +785,7 @@ export class CircuitGridRenderer {
      */
     generateRectangleShape(events, eventsPerRow) {
         const gridSettings = this.getActiveGridSettings();
+        const padding = gridSettings.padding;
         const eventPositions = events.map(event => this.calculateEventGridPosition(event, gridSettings));
         
         // Find the bounds of all events
@@ -751,7 +794,6 @@ export class CircuitGridRenderer {
         const top = Math.min(...eventPositions.map(pos => pos.top));
         const bottom = Math.max(...eventPositions.map(pos => pos.top + pos.height));
         
-        const padding = 8;
         const bounds = {
             left: left - padding,
             top: top - padding,

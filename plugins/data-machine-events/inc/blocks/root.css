@@ -56,8 +56,15 @@
   /* ====================================
    * RESPONSIVE BREAKPOINTS
    * ==================================== */
+  /* Tablet (769px-1199px) - 2-3 events per row */
+  --datamachine-grid-cell-width-tablet: 240px;
+  --datamachine-grid-gap-tablet: 20px;
+
+  /* Medium screens */
   --datamachine-grid-cell-width-medium: 265px; /* Increased by 5px */
   --datamachine-grid-cell-height-medium: 176px; /* Increased by 5% from 168px */
+
+  /* Mobile (≤768px) - Single column */
   --datamachine-grid-cell-height-mobile: 160px; /* Increased by 5% from 152px */
 
   /* ====================================

@@ -2,6 +2,9 @@
 /**
  * Event Engine Data Helper
  *
+ * Persists venue metadata via datamachine_merge_engine_data so EngineData snapshots remain
+ * the single source of truth for downstream handlers.
+ *
  * @package DataMachineEvents\Steps\EventImport
  */
 
@@ -24,21 +27,54 @@ class EventEngineData {
      * @param array $venue_metadata Venue metadata
      */
     public static function storeVenueContext(string $job_id, array $event_data, array $venue_metadata): void {
-        if (empty($job_id)) {
+        $job_id = (int) $job_id;
+
+        if ($job_id <= 0 || !function_exists('datamachine_merge_engine_data')) {
             return;
         }
 
-        $context_data = [
-            'venue_context' => [
-                'name' => $event_data['venue'] ?? '',
-                'address' => $venue_metadata['venueAddress'] ?? '',
-                'city' => $venue_metadata['venueCity'] ?? '',
-                'state' => $venue_metadata['venueState'] ?? '',
-                'zip' => $venue_metadata['venueZip'] ?? '',
-                'coordinates' => $venue_metadata['venueCoordinates'] ?? ''
-            ]
+        $flattened = [
+            'venue' => $event_data['venue'] ?? '',
+            'venueAddress' => $venue_metadata['venueAddress'] ?? '',
+            'venueCity' => $venue_metadata['venueCity'] ?? '',
+            'venueState' => $venue_metadata['venueState'] ?? '',
+            'venueZip' => $venue_metadata['venueZip'] ?? '',
+            'venueCountry' => $venue_metadata['venueCountry'] ?? '',
+            'venuePhone' => $venue_metadata['venuePhone'] ?? '',
+            'venueWebsite' => $venue_metadata['venueWebsite'] ?? '',
+            'venueCoordinates' => $venue_metadata['venueCoordinates'] ?? '',
+            'venueCapacity' => $venue_metadata['venueCapacity'] ?? ''
         ];
 
-        apply_filters('datamachine_engine_data', null, $job_id, $context_data);
+        $metadata = [
+            'name' => $flattened['venue'] ?? '',
+            'address' => $flattened['venueAddress'] ?? '',
+            'city' => $flattened['venueCity'] ?? '',
+            'state' => $flattened['venueState'] ?? '',
+            'zip' => $flattened['venueZip'] ?? '',
+            'country' => $flattened['venueCountry'] ?? '',
+            'phone' => $flattened['venuePhone'] ?? '',
+            'website' => $flattened['venueWebsite'] ?? '',
+            'coordinates' => $flattened['venueCoordinates'] ?? '',
+            'capacity' => $flattened['venueCapacity'] ?? ''
+        ];
+
+        $payload = array_filter($flattened, static function($value) {
+            return $value !== '' && $value !== null;
+        });
+
+        $metadata_clean = array_filter($metadata, static function($value) {
+            return $value !== '' && $value !== null;
+        });
+
+        if (!empty($metadata_clean)) {
+            $payload['venue_context'] = $metadata_clean;
+        }
+
+        if (empty($payload)) {
+            return;
+        }
+
+        datamachine_merge_engine_data($job_id, $payload);
     }
 }

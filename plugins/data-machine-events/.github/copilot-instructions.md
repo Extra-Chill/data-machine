@@ -7,14 +7,15 @@
 - Root design tokens in `inc/blocks/root.css` are consumed by both CSS and JS (circuit grid sizing, badge colors) so update variables there before tweaking individual block styles.
 
 ## Data Machine Integration
-- Custom pipeline pieces register via filters in `inc/Steps/EventImport/EventImportFilters.php` (`datamachine_step_types`, `datamachine_handlers`); follow that pattern when adding handlers or step types.
-- Import handlers (e.g., `Steps/EventImport/Handlers/Ticketmaster/Ticketmaster.php`) must single-item process, call `isItemProcessed`/`markItemProcessed`, store venue context with `EventEngineData::storeVenueContext`, and return a DataPacket array.
-- Publisher logic lives in `Steps/Publish/Events/Publisher.php`: it extends the core `PublishHandler`, generates Event Details block markup, syncs venues via `Core\Venue_Taxonomy::find_or_create_venue`, and routes schema fields through `Steps/Publish/Events/Schema::engine_or_tool()`.
+- Custom pipeline pieces register via filters in `inc/Steps/EventImport/EventImportFilters.php` and `inc/Steps/Upsert/Events/EventUpsertFilters.php` (`datamachine_step_types`, `datamachine_handlers`); follow that pattern when adding handlers or step types.
+- Import handlers (e.g., `Steps/EventImport/Handlers/Ticketmaster/Ticketmaster.php`) must single-item process, use `EventIdentifierGenerator::generate()` for consistent event identity, call `isItemProcessed`/`markItemProcessed`, and return a DataPacket array.
+- EventUpsert logic lives in `Steps/Upsert/Events/EventUpsert.php`: it extends the core `UpdateHandler`, searches for existing events by (title, venue, startDate), performs field-by-field change detection, generates Event Details block markup, and syncs venues via `Core\Venue_Taxonomy::find_or_create_venue`.
+- Event identity normalization uses `Utilities\EventIdentifierGenerator::generate($title, $startDate, $venue)` across all import handlers for consistent duplicate detection (lowercase, trim, collapse whitespace, remove articles).
 - `Schema::generate_event_schema()` combines block attributes, venue taxonomy meta, and engine data—reuse it instead of rebuilding JSON-LD.
 - Hooks/actions exposed to themes include `datamachine_events_before_single_event`, `datamachine_events_after_event_article`, `datamachine_events_related_events`, and badge/breadcrumb filters; prefer these when integrating rather than editing templates.
 
 ## REST + Frontend Behavior
-- Public endpoints live in `inc/Core/rest-api.php` under the unified `datamachine/v1` namespace: `/events/calendar`, `/events/venues/{id}`, `/events/venues/check-duplicate`. Keep new endpoints in this namespace and reuse existing arg sanitizers.
+- Public endpoints live in `inc/Api/Routes.php` and `inc/Api/Controllers/` under the unified `datamachine/v1` namespace: `/events/calendar`, `/events/venues/{id}`, `/events/venues/check-duplicate`. Keep new endpoints in this namespace and reuse existing arg sanitizers.
 - Calendar frontend (`inc/blocks/calendar/src/frontend.js`) progressively enhances server-rendered markup: debounced search, flatpickr date ranges, taxonomy modal, History API updates, and rehydrates DisplayStyles (CircuitGrid/Carousel). Any new UI must update both the server template + JS refresh path.
 - Event Details block view (`inc/blocks/EventDetails/render.php`) is server-rendered; JS enhancements such as Leaflet maps live in `assets/js/venue-map.js` and respect `Settings_Page::get_map_display_type()` (five free tile layers, 📍 emoji marker). Trigger `jQuery(document).trigger('datamachine-events-loaded')` after injecting events so maps re-init.
 
@@ -32,6 +33,6 @@
 ## Practical Tips
 - Keep hooks/functions prefixed `datamachine_`/`datamachine_events` to honor the completed prefix migration.
 - When touching REST responses, remember the calendar endpoint returns rendered HTML chunks (`html`, `pagination`, `navigation`, `counter`); update both PHP templates and corresponding DOM swap logic.
-- Use `assets/js/venue-autocomplete.js` + `venue-selector.js` (enqueued via `admin_enqueue_scripts` in `EventImportFilters.php`) for admin UX; don’t reinvent venue lookup widgets.
-- If you add new visual modes, drop CSS into `inc/blocks/calendar/style.css` or a `DisplayStyles/*Renderer.js` so the existing renderer import system can lazy-load it.
-- Always sanitize AI/tool input through the helpers in `Publisher` and core WordPress APIs; Schema + REST rely on sanitized dates/times to keep pagination accurate.
+- Use `assets/js/venue-autocomplete.js` + `venue-selector.js` (enqueued via `admin_enqueue_scripts` in `EventImportFilters.php`) for admin UX; don't reinvent venue lookup widgets.
+- If you add new visual modes, drop CSS into `inc/blocks/calendar/style.css` or a `DisplayStyles/*Renderer.js` (integrate with ColorManager for consistent color handling) so the existing renderer import system can lazy-load it.
+- Always sanitize AI/tool input through the helpers in `EventUpsert` and core WordPress APIs; Schema + REST rely on sanitized dates/times to keep pagination accurate.

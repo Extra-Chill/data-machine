@@ -14,6 +14,7 @@
 
 namespace DataMachineEvents\Steps\Upsert\Events;
 
+use DataMachine\Core\EngineData;
 use DataMachineEvents\Steps\Publish\Events\Venue;
 use DataMachineEvents\Steps\Publish\Events\Schema;
 use DataMachine\Core\Steps\Update\Handlers\UpdateHandler;
@@ -27,7 +28,6 @@ class EventUpsert extends UpdateHandler {
     use WordPressSharedTrait;
 
     public function __construct() {
-        parent::__construct('datamachine_events');
         $this->initWordPressHelpers();
         // Register custom handler for venue taxonomy
         \DataMachine\Core\WordPress\TaxonomyHandler::addCustomHandler('venue', [$this, 'assignVenueTaxonomy']);
@@ -47,9 +47,14 @@ class EventUpsert extends UpdateHandler {
             ]);
         }
 
-        $job_id = $parameters['job_id'] ?? null;
-        $engine_data = $job_id ? $this->getEngineData($job_id) : [];
-        $engine_parameters = $this->extract_event_engine_parameters($engine_data);
+        $job_id = (int) ($parameters['job_id'] ?? 0);
+        $engine = $parameters['engine'] ?? null;
+        if (!$engine instanceof EngineData) {
+            $engine_snapshot = $job_id ? $this->getEngineData($job_id) : [];
+            $engine = new EngineData($engine_snapshot, $job_id);
+        }
+
+        $engine_parameters = $this->extract_event_engine_parameters($engine);
 
         // Extract event identity fields
         $title = sanitize_text_field($parameters['title']);
@@ -71,7 +76,7 @@ class EventUpsert extends UpdateHandler {
 
             if ($this->hasDataChanged($existing_data, $parameters)) {
                 // UPDATE existing event
-                $this->updateEventPost($existing_post_id, $parameters, $handler_config, $engine_data, $engine_parameters);
+                $this->updateEventPost($existing_post_id, $parameters, $handler_config, $engine, $engine_parameters);
 
                 $this->log('info', 'Event Upsert: Updated existing event', [
                     'post_id' => $existing_post_id,
@@ -98,7 +103,7 @@ class EventUpsert extends UpdateHandler {
             }
         } else {
             // CREATE new event
-            $post_id = $this->createEventPost($parameters, $handler_config, $engine_data, $engine_parameters);
+            $post_id = $this->createEventPost($parameters, $handler_config, $engine, $engine_parameters);
 
             if (is_wp_error($post_id) || !$post_id) {
                 return $this->errorResponse('Event post creation failed', [
@@ -243,14 +248,14 @@ class EventUpsert extends UpdateHandler {
      *
      * @param array $parameters Event parameters
      * @param array $handler_config Handler configuration
-     * @param array $engine_data Engine data
+     * @param EngineData $engine Engine snapshot helper
      * @param array $engine_parameters Extracted engine parameters
      * @return int|WP_Error Post ID on success
      */
-    private function createEventPost(array $parameters, array $handler_config, array $engine_data, array $engine_parameters): int|\WP_Error {
-        $job_id = $parameters['job_id'] ?? null;
-        $post_status = $handler_config['post_status'] ?? 'draft';
-        $post_author = $handler_config['post_author'] ?? get_current_user_id() ?: 1;
+    private function createEventPost(array $parameters, array $handler_config, EngineData $engine, array $engine_parameters): int|\WP_Error {
+        $job_id = (int) ($parameters['job_id'] ?? 0);
+        $post_status = $this->getEffectivePostStatus($handler_config);
+        $post_author = $this->getEffectivePostAuthor($handler_config);
 
         $routing = Schema::engine_or_tool($parameters, $handler_config, $engine_parameters);
 
@@ -293,12 +298,7 @@ class EventUpsert extends UpdateHandler {
         }
 
         // Process featured image
-        if (!empty($handler_config['include_images'])) {
-            $image_file_path = $engine_data['image_file_path'] ?? $handler_config['eventImage'] ?? null;
-            if ($image_file_path) {
-                $this->processFeaturedImage($post_id, ['image_file_path' => $image_file_path], $handler_config);
-            }
-        }
+        $this->processEventFeaturedImage($post_id, $handler_config, $engine);
 
         // Process venue
         $this->processVenue($post_id, $parameters);
@@ -306,11 +306,11 @@ class EventUpsert extends UpdateHandler {
         // Process taxonomies
         $handler_config_for_tax = $handler_config;
         $handler_config_for_tax['taxonomy_venue_selection'] = 'skip';
-        $this->applyTaxonomies($post_id, $parameters, $handler_config_for_tax, $engine_data);
+        $this->applyTaxonomies($post_id, $parameters, $handler_config_for_tax, $engine);
 
         // Store event_id in engine data
         if ($job_id) {
-            apply_filters('datamachine_engine_data', null, $job_id, [
+            datamachine_merge_engine_data($job_id, [
                 'event_id' => $post_id,
                 'event_url' => get_permalink($post_id)
             ]);
@@ -325,10 +325,10 @@ class EventUpsert extends UpdateHandler {
      * @param int $post_id Existing post ID
      * @param array $parameters Event parameters
      * @param array $handler_config Handler configuration
-     * @param array $engine_data Engine data
+     * @param EngineData $engine Engine snapshot helper
      * @param array $engine_parameters Extracted engine parameters
      */
-    private function updateEventPost(int $post_id, array $parameters, array $handler_config, array $engine_data, array $engine_parameters): void {
+    private function updateEventPost(int $post_id, array $parameters, array $handler_config, EngineData $engine, array $engine_parameters): void {
         $routing = Schema::engine_or_tool($parameters, $handler_config, $engine_parameters);
 
         $event_data = [
@@ -363,12 +363,7 @@ class EventUpsert extends UpdateHandler {
         ]);
 
         // Update featured image
-        if (!empty($handler_config['include_images'])) {
-            $image_file_path = $engine_data['image_file_path'] ?? $handler_config['eventImage'] ?? null;
-            if ($image_file_path) {
-                $this->processFeaturedImage($post_id, ['image_file_path' => $image_file_path], $handler_config);
-            }
-        }
+        $this->processEventFeaturedImage($post_id, $handler_config, $engine);
 
         // Update venue
         $this->processVenue($post_id, $parameters);
@@ -376,7 +371,7 @@ class EventUpsert extends UpdateHandler {
         // Update taxonomies
         $handler_config_for_tax = $handler_config;
         $handler_config_for_tax['taxonomy_venue_selection'] = 'skip';
-        $this->applyTaxonomies($post_id, $parameters, $handler_config_for_tax, $engine_data);
+        $this->applyTaxonomies($post_id, $parameters, $handler_config_for_tax, $engine);
     }
 
     /**
@@ -409,6 +404,33 @@ class EventUpsert extends UpdateHandler {
                 ]);
             }
         }
+    }
+
+    /**
+     * Process featured image with EngineData context and handler fallbacks.
+     */
+    private function processEventFeaturedImage(int $post_id, array $handler_config, EngineData $engine): void {
+        if (empty($handler_config['include_images'])) {
+            return;
+        }
+
+        $image_context = null;
+        $image_path = $engine->getImagePath();
+
+        if (!empty($image_path)) {
+            $image_context = $engine;
+        } elseif (!empty($handler_config['eventImage'])) {
+            $image_context = ['image_file_path' => $handler_config['eventImage']];
+        }
+
+        if (!$image_context) {
+            return;
+        }
+
+        $image_config = $handler_config;
+        $image_config['enable_images'] = true;
+
+        $this->processFeaturedImage($post_id, $image_context, $image_config);
     }
 
     /**
@@ -478,10 +500,10 @@ class EventUpsert extends UpdateHandler {
     /**
      * Extract event-specific parameters from engine data
      *
-     * @param array $engine_data Full engine data array
+     * @param EngineData $engine Engine snapshot helper
      * @return array Event-specific parameters
      */
-    private function extract_event_engine_parameters(array $engine_data): array {
+    private function extract_event_engine_parameters(EngineData $engine): array {
         $fields = [
             'venue', 'venueAddress', 'venueCity', 'venueState', 'venueZip',
             'venueCountry', 'venuePhone', 'venueWebsite', 'venueCoordinates',
@@ -490,8 +512,32 @@ class EventUpsert extends UpdateHandler {
 
         $resolved = [];
         foreach ($fields as $field) {
-            if (!empty($engine_data[$field])) {
-                $resolved[$field] = $engine_data[$field];
+            $value = $engine->get($field);
+            if ($value !== null && $value !== '') {
+                $resolved[$field] = $value;
+            }
+        }
+
+        $legacy_context = $engine->get('venue_context');
+        if (is_array($legacy_context)) {
+            $mapping = [
+                'name' => 'venue',
+                'address' => 'venueAddress',
+                'city' => 'venueCity',
+                'state' => 'venueState',
+                'zip' => 'venueZip',
+                'country' => 'venueCountry',
+                'phone' => 'venuePhone',
+                'website' => 'venueWebsite',
+                'coordinates' => 'venueCoordinates',
+                'capacity' => 'venueCapacity'
+            ];
+
+            foreach ($mapping as $source_key => $target_key) {
+                $value = $legacy_context[$source_key] ?? null;
+                if ($value !== null && $value !== '' && empty($resolved[$target_key])) {
+                    $resolved[$target_key] = $value;
+                }
             }
         }
 
@@ -504,26 +550,28 @@ class EventUpsert extends UpdateHandler {
      * @param int $post_id Post ID
      * @param array $parameters Event parameters
      * @param array $handler_config Handler configuration
-     * @param array $engine_data Engine data
+     * @param mixed $engine_context Engine context (EngineData|array|null)
      * @return array|null Assignment result
      */
-    public function assignVenueTaxonomy(int $post_id, array $parameters, array $handler_config, array $engine_data = []): ?array {
-        $venue_name = $parameters['venue'] ?? ($engine_data['venue'] ?? '');
+    public function assignVenueTaxonomy(int $post_id, array $parameters, array $handler_config, $engine_context = null): ?array {
+        $engine = $this->resolveEngineContext($engine_context, $parameters);
+        $engine_parameters = $this->extract_event_engine_parameters($engine);
+        $venue_name = $parameters['venue'] ?? ($engine_parameters['venue'] ?? '');
 
         if (empty($venue_name)) {
             return null;
         }
 
         $venue_metadata = [
-            'address' => $this->getParameterValue($parameters, 'venueAddress'),
-            'city' => $this->getParameterValue($parameters, 'venueCity'),
-            'state' => $this->getParameterValue($parameters, 'venueState'),
-            'zip' => $this->getParameterValue($parameters, 'venueZip'),
-            'country' => $this->getParameterValue($parameters, 'venueCountry'),
-            'phone' => $this->getParameterValue($parameters, 'venuePhone'),
-            'website' => $this->getParameterValue($parameters, 'venueWebsite'),
-            'coordinates' => $this->getParameterValue($parameters, 'venueCoordinates'),
-            'capacity' => $this->getParameterValue($parameters, 'venueCapacity')
+            'address' => $this->getParameterValue($parameters, 'venueAddress') ?: ($engine_parameters['venueAddress'] ?? ''),
+            'city' => $this->getParameterValue($parameters, 'venueCity') ?: ($engine_parameters['venueCity'] ?? ''),
+            'state' => $this->getParameterValue($parameters, 'venueState') ?: ($engine_parameters['venueState'] ?? ''),
+            'zip' => $this->getParameterValue($parameters, 'venueZip') ?: ($engine_parameters['venueZip'] ?? ''),
+            'country' => $this->getParameterValue($parameters, 'venueCountry') ?: ($engine_parameters['venueCountry'] ?? ''),
+            'phone' => $this->getParameterValue($parameters, 'venuePhone') ?: ($engine_parameters['venuePhone'] ?? ''),
+            'website' => $this->getParameterValue($parameters, 'venueWebsite') ?: ($engine_parameters['venueWebsite'] ?? ''),
+            'coordinates' => $this->getParameterValue($parameters, 'venueCoordinates') ?: ($engine_parameters['venueCoordinates'] ?? ''),
+            'capacity' => $this->getParameterValue($parameters, 'venueCapacity') ?: ($engine_parameters['venueCapacity'] ?? '')
         ];
 
         $venue_result = \DataMachineEvents\Core\Venue_Taxonomy::find_or_create_venue($venue_name, $venue_metadata);
@@ -559,5 +607,23 @@ class EventUpsert extends UpdateHandler {
             return (string) $parameters[$camelKey];
         }
         return '';
+    }
+
+    /**
+     * Log wrapper
+     */
+    protected function log(string $level, string $message, array $context = []): void {
+        $this->dmLog($level, $message, $context);
+    }
+
+    /**
+     * Success response wrapper
+     */
+    protected function successResponse(array $data): array {
+        return [
+            'success' => true,
+            'data' => $data,
+            'tool_name' => 'datamachine_events'
+        ];
     }
 }

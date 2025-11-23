@@ -23,6 +23,15 @@ export class BadgeRenderer {
     }
 
     /**
+     * Check if current viewport is mobile (≤768px)
+     *
+     * @returns {boolean} True if mobile viewport
+     */
+    isMobileView() {
+        return window.innerWidth <= 768;
+    }
+
+    /**
      * Setup ResizeObserver for viewport changes
      */
     setupResizeObserver() {
@@ -143,7 +152,7 @@ export class BadgeRenderer {
 
     /**
      * Position day badge exactly on the top border of the first chronological event
-     * 
+     *
      * @param {HTMLElement} badge Day badge DOM element
      * @param {HTMLElement} firstEvent First chronological event element
      * @param {string} dayName Day identifier for positioning logic
@@ -151,24 +160,30 @@ export class BadgeRenderer {
     positionDayBadge(badge, firstEvent, groupKey) {
         if (!badge || !firstEvent) return;
 
+        // Skip absolute positioning on mobile - CSS handles static positioning
+        if (this.isMobileView()) {
+            badge.classList.add('positioned'); // Still mark as visible
+            return;
+        }
+
         const styles = getComputedStyle(document.documentElement);
         const offsetX = parseInt(styles.getPropertyValue('--datamachine-badge-offset-x')) || 12;
-        
+
         // Get position of first event relative to content area
         const eventRect = firstEvent.getBoundingClientRect();
         const contentRect = this.calendar.querySelector('.datamachine-events-content').getBoundingClientRect();
-        
+
         const eventLeft = eventRect.left - contentRect.left;
         const eventTop = eventRect.top - contentRect.top;
-        
+
         // Position badge on top border of first event with padding and offset
         const badgeLeft = eventLeft + offsetX - 8; // Account for event padding
         const badgeTop = eventTop - 8; // Account for event padding
-        
+
         badge.style.left = `${badgeLeft}px`;
         badge.style.top = `${badgeTop}px`;
         badge.classList.add('positioned');
-        
+
         // Use stable groupKey (dateKey) to track badges per logical date
         const safeKey = String(groupKey || '').replace(/[^a-z0-9-_]/gi, '-');
         this.badges.set(safeKey, badge);
@@ -207,10 +222,10 @@ export class BadgeRenderer {
 
                 // Apply color styling for badge using ColorManager (use var refs so root.css remains single source)
                 if (groupData.badge) {
-                    // Set background using the rgba var and text color from computed contrast fallback
-                    groupData.badge.style.setProperty('background', ColorManager.getFillVar(groupData.dayName));
-                    // For badge text/stroke, use the solid color var and let CSS handle contrast; provide fallback
-                    groupData.badge.style.setProperty('color', ColorManager.getStrokeVar(groupData.dayName));
+                    // Set background using the solid color var to match border
+                    groupData.badge.style.setProperty('background', ColorManager.getStrokeVar(groupData.dayName));
+                    // Use white text for contrast against solid background
+                    groupData.badge.style.setProperty('color', 'white');
                 }
             }
         });

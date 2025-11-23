@@ -204,7 +204,7 @@ if ($events_query->have_posts()) {
 
         if ($event_data && !empty($event_data['startDate'])) {
             $start_time = $event_data['startTime'] ?? '00:00:00';
-            $event_datetime = new DateTime($event_data['startDate'] . ' ' . $start_time);
+            $event_datetime = new DateTime($event_data['startDate'] . ' ' . $start_time, wp_timezone());
 
             $paged_events[] = array(
                 'post' => $event_post,
@@ -223,7 +223,7 @@ foreach ($paged_events as $event_item) {
     
     if (!empty($start_date)) {
         $start_time = $event_data['startTime'] ?? '00:00:00';
-        $start_datetime_obj = new DateTime($start_date . ' ' . $start_time);
+        $start_datetime_obj = new DateTime($start_date . ' ' . $start_time, wp_timezone());
         $date_key = $start_datetime_obj->format('Y-m-d');
         
         if (!isset($paged_date_groups[$date_key])) {
@@ -261,7 +261,7 @@ if ($display_type === 'carousel-list' && !empty($paged_date_groups)) {
     $previous_date = null;
     foreach ($paged_date_groups as $date_key => $date_group) {
         if ($previous_date !== null) {
-            $current_date = new DateTime($date_key);
+            $current_date = new DateTime($date_key, wp_timezone());
             $days_diff = $current_date->diff($previous_date)->days;
 
             // Mark gaps of 2 or more days for visual separator
@@ -269,7 +269,7 @@ if ($display_type === 'carousel-list' && !empty($paged_date_groups)) {
                 $gaps_detected[$date_key] = $days_diff;
             }
         }
-        $previous_date = new DateTime($date_key);
+        $previous_date = new DateTime($date_key, wp_timezone());
     }
 }
 
@@ -365,7 +365,7 @@ $filter_count = !empty($tax_filters) ? array_sum(array_map('count', $tax_filters
                         $formatted_start_time = '';
                         $iso_start_date = '';
                         if ($start_date) {
-                            $start_datetime_obj = new DateTime($start_date . ' ' . $start_time);
+                            $start_datetime_obj = new DateTime($start_date . ' ' . $start_time, wp_timezone());
                             $formatted_start_time = $start_datetime_obj->format('g:i A');
                             $iso_start_date = $start_datetime_obj->format('c');
                         }

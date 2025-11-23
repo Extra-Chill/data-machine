@@ -53,7 +53,13 @@ class DiceFm extends EventImportHandler {
         ]);
         
         // Get API configuration from Data Machine auth system
-        $api_config = apply_filters('datamachine_retrieve_oauth_keys', [], 'dice_fm_events');
+        $auth = $this->getAuthProvider('dice_fm_events');
+        if (!$auth) {
+            $this->log('error', 'Dice.fm authentication provider not found');
+            return $this->emptyResponse();
+        }
+
+        $api_config = $auth->get_account();
         if (empty($api_config['api_key'])) {
             $this->log('error', 'Dice.fm API key not configured');
             return $this->emptyResponse();

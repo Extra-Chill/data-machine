@@ -42,7 +42,13 @@ class Ticketmaster extends EventImportHandler {
             'flow_step_id' => $flow_step_id
         ]);
         
-        $api_config = apply_filters('datamachine_retrieve_oauth_account', [], 'ticketmaster_events');
+        $auth = $this->getAuthProvider('ticketmaster_events');
+        if (!$auth) {
+            $this->log('error', 'Ticketmaster authentication provider not found');
+            return $this->emptyResponse() ?? [];
+        }
+
+        $api_config = $auth->get_account();
         if (empty($api_config['api_key'])) {
             $this->log('error', 'API key not configured');
             return $this->emptyResponse() ?? [];
@@ -212,7 +218,13 @@ class Ticketmaster extends EventImportHandler {
         }
         
         if (empty($api_key)) {
-            $api_config = apply_filters('datamachine_retrieve_oauth_account', [], 'ticketmaster_events');
+            // We can't easily access the auth provider statically here without dependency injection or a service locator.
+            // However, since we are moving away from global filters, we should rely on the caller passing the key.
+            // If no key is passed, we can try to instantiate the auth class directly as a fallback, 
+            // or just return fallback classifications.
+            // Given the architecture, instantiating the auth class is safe since it's a simple provider.
+            $auth = new TicketmasterAuth();
+            $api_config = $auth->get_account();
             $api_key = $api_config['api_key'] ?? '';
         }
         
@@ -278,7 +290,8 @@ class Ticketmaster extends EventImportHandler {
     }
     
     public static function get_classifications_for_dropdown($current_config = []) {
-        $api_config = apply_filters('datamachine_retrieve_oauth_account', [], 'ticketmaster_events');
+        $auth = new TicketmasterAuth();
+        $api_config = $auth->get_account();
         $api_key = $api_config['api_key'] ?? '';
         return self::get_classifications($api_key);
     }

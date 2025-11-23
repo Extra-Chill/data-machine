@@ -11,7 +11,7 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster;
 
-use DataMachine\Core\OAuth\SimpleAuthHandler;
+use DataMachine\Core\OAuth\BaseAuthProvider;
 
 // Prevent direct access
 if (!defined('ABSPATH')) {
@@ -24,7 +24,11 @@ if (!defined('ABSPATH')) {
  * Authentication provider for Ticketmaster Discovery API.
  * Integrates with Data Machine's unified authentication system.
  */
-class TicketmasterAuth extends SimpleAuthHandler {
+class TicketmasterAuth extends BaseAuthProvider {
+
+    public function __construct() {
+        parent::__construct('ticketmaster_events');
+    }
 
     /**
      * Get configuration fields required for Ticketmaster authentication
@@ -48,7 +52,7 @@ class TicketmasterAuth extends SimpleAuthHandler {
      * @return bool True if API key is present, false otherwise
      */
     public function is_authenticated(): bool {
-        $credentials = $this->get_stored_credentials('ticketmaster_events');
+        $credentials = $this->get_account();
         return !empty($credentials['api_key']);
     }
 
