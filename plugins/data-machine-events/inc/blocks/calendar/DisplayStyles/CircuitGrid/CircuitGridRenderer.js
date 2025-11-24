@@ -482,32 +482,21 @@ export class CircuitGridRenderer {
     }
 
     /**
-     * Create border path with horizontal gap on top border for badge
+     * Create border path without gap (badge sits on top)
      * 
      * @param {Object} bounds Bounding box with left, top, width, height
      * @param {number} borderRadius Corner radius for rounded corners
-     * @returns {Object} Path shape definition with badge gap
+     * @returns {Object} Path shape definition
      */
     createBorderPathWithGap(bounds, borderRadius = 8) {
         const curves = this.drawCurves();
-        const styles = getComputedStyle(document.documentElement);
-        const offsetX = parseInt(styles.getPropertyValue('--datamachine-badge-offset-x')) || 12;
-        const badgeGapWidth = 140; // Width of gap for badge
-        const gapStart = bounds.left + offsetX;
-        const gapEnd = gapStart + badgeGapWidth;
         
-        // Create path with gap in top border for badge
+        // Create continuous path (badge will sit on top of border)
         const path = [
             // Start at top-left corner (after radius)
             `M ${bounds.left + borderRadius} ${bounds.top}`,
             
-            // Top border left side (up to gap)
-            `L ${gapStart} ${bounds.top}`,
-            
-            // Move to right side of gap (skip the gap where badge sits)
-            `M ${gapEnd} ${bounds.top}`,
-            
-            // Top border right side (from gap to corner)
+            // Top border (continuous)
             `L ${bounds.left + bounds.width - borderRadius} ${bounds.top}`,
             curves.externalTopRight(bounds.left + bounds.width, bounds.top + borderRadius),
             

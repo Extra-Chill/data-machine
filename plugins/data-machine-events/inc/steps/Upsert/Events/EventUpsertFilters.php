@@ -12,7 +12,7 @@
 namespace DataMachineEvents\Steps\Upsert\Events;
 
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
-use DataMachineEvents\Steps\Publish\Events\Settings;
+use DataMachineEvents\Steps\Upsert\Events\EventUpsertSettings;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -36,7 +36,7 @@ class EventUpsertFilters {
             __('Create or update event posts with intelligent change detection', 'datamachine-events'),
             false,
             null,
-            Settings::class, // Reuse Publisher settings
+            EventUpsertSettings::class,
             [self::class, 'registerAITools']
         );
     }

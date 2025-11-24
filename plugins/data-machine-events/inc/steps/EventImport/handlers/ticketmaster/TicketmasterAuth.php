@@ -27,7 +27,7 @@ if (!defined('ABSPATH')) {
 class TicketmasterAuth extends BaseAuthProvider {
 
     public function __construct() {
-        parent::__construct('ticketmaster_events');
+        parent::__construct('ticketmaster');
     }
 
     /**

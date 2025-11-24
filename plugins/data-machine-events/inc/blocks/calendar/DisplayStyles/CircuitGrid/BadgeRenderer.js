@@ -160,12 +160,6 @@ export class BadgeRenderer {
     positionDayBadge(badge, firstEvent, groupKey) {
         if (!badge || !firstEvent) return;
 
-        // Skip absolute positioning on mobile - CSS handles static positioning
-        if (this.isMobileView()) {
-            badge.classList.add('positioned'); // Still mark as visible
-            return;
-        }
-
         const styles = getComputedStyle(document.documentElement);
         const offsetX = parseInt(styles.getPropertyValue('--datamachine-badge-offset-x')) || 12;
 
@@ -177,8 +171,21 @@ export class BadgeRenderer {
         const eventTop = eventRect.top - contentRect.top;
 
         // Position badge on top border of first event with padding and offset
-        const badgeLeft = eventLeft + offsetX - 8; // Account for event padding
-        const badgeTop = eventTop - 8; // Account for event padding
+        // Use dynamic padding from CircuitGridRenderer logic if possible, but here we assume standard padding
+        // Since we want it inline with border, we position it exactly where the border top is
+        // The border is drawn at top - padding.
+        // We need to know the padding used by CircuitGridRenderer.
+        // For now, we'll calculate it similarly: Math.min(8, Math.max(2, (gap / 2) - 2))
+        // But we don't have gap here easily. Let's assume standard 8px for desktop/tablet
+        // and calculate for mobile if needed.
+        
+        // Actually, we can just read the computed gap from the grid container
+        const gridStyle = getComputedStyle(this.calendar.querySelector('.datamachine-events-content'));
+        const gap = parseInt(gridStyle.gap) || 25;
+        const padding = Math.min(8, Math.max(2, (gap / 2) - 2));
+
+        const badgeLeft = eventLeft + offsetX - padding; 
+        const badgeTop = eventTop - padding; 
 
         badge.style.left = `${badgeLeft}px`;
         badge.style.top = `${badgeTop}px`;

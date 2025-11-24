@@ -37,7 +37,7 @@ $show_ticket_link = $display_vars['show_ticket_link'] ?? true;
        class="datamachine-event-link"
        aria-label="<?php echo esc_attr(sprintf(__('View event: %s', 'datamachine-events'), get_the_title())); ?>">
 
-        <?php echo \DataMachineEvents\Core\Taxonomy_Badges::render_taxonomy_badges($event_post->ID); ?>
+        <?php echo \DataMachineEvents\Blocks\Calendar\Taxonomy_Badges::render_taxonomy_badges($event_post->ID); ?>
 
         <h4 class="datamachine-event-title">
             <?php the_title(); ?>
