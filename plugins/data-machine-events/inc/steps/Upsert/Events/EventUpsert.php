@@ -20,6 +20,7 @@ use DataMachineEvents\Steps\Upsert\Events\Schema;
 use DataMachine\Core\Steps\Update\Handlers\UpdateHandler;
 use DataMachine\Core\WordPress\TaxonomyHandler;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
+use DataMachine\Core\WordPress\WordPressPublishHelper;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -420,10 +421,9 @@ class EventUpsert extends UpdateHandler {
         $image_path = $engine->getImagePath();
 
         if (!empty($image_path)) {
-            $engine->attachImageToPost($post_id, $handler_config);
+            WordPressPublishHelper::attachImageToPost($post_id, $image_path, $handler_config);
         } elseif (!empty($handler_config['eventImage'])) {
-            $fallback_engine = new EngineData(['image_file_path' => $handler_config['eventImage']], null);
-            $fallback_engine->attachImageToPost($post_id, $handler_config);
+            WordPressPublishHelper::attachImageToPost($post_id, $handler_config['eventImage'], $handler_config);
         }
     }
 

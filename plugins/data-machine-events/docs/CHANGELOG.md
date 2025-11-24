@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2025-11-24
+
+### Fixed
+- **Compatibility with Data Machine v0.2.7** - Migrated to WordPressPublishHelper for image operations
+  - Updated EventUpsert handler to use `WordPressPublishHelper::attachImageToPost()` instead of deprecated `EngineData::attachImageToPost()`
+  - Refactored image processing to use static helper methods following platform-agnostic architecture
+
+### Requirements
+- **Requires Data Machine v0.2.7+** - Due to EngineData API changes and WordPressPublishHelper introduction
+
 ## [0.3.1] - 2025-11-23
 
 ### Fixed
