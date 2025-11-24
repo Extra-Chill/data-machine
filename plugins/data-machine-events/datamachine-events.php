@@ -3,7 +3,7 @@
  * Plugin Name: Data Machine Events
  * Plugin URI: https://chubes.net/datamachine-events
  * Description: WordPress events plugin with block-first architecture. Features AI-driven event creation via Data Machine integration, Event Details blocks for data storage, Calendar blocks for display, and venue taxonomy management.
- * Version: 0.1.1
+ * Version: 0.2.2
  * Author: Chris Huber
  * Author URI: https://chubes.net
  * License: GPL v2 or later
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once __DIR__ . '/vendor/autoload.php';
 }
-define('DATAMACHINE_EVENTS_VERSION', '0.1.1');
+define('DATAMACHINE_EVENTS_VERSION', '0.2.2');
 define('DATAMACHINE_EVENTS_PLUGIN_FILE', __FILE__);
 define('DATAMACHINE_EVENTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DATAMACHINE_EVENTS_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -38,8 +38,10 @@ define('DATAMACHINE_EVENTS_PATH', plugin_dir_path(__FILE__));
 // Load core meta storage (monitors Event Details block saves)
 require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/meta-storage.php';
 
-// Load REST API endpoints
-require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/rest-api.php';
+// Load REST API routes (modular)
+if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php' ) ) {
+	require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php';
+}
 
 /**
  * Main Data Machine Events plugin class
@@ -62,11 +64,6 @@ class DATAMACHINE_Events {
     private function __construct() {
         add_action('init', array($this, 'init'), 0);
         add_action('plugins_loaded', array($this, 'load_textdomain'));
-
-        // Initialize settings page early to catch admin_init hook
-        if (is_admin() && class_exists('DataMachineEvents\\Admin\\Settings_Page')) {
-            new \DataMachineEvents\Admin\Settings_Page();
-        }
     }
     
     public function init() {
@@ -80,11 +77,16 @@ class DATAMACHINE_Events {
         
         if (is_admin()) {
             $this->init_admin();
+            
+            // Instantiate Settings_Page to register its hooks
+            if (class_exists('DataMachineEvents\\Admin\\Settings_Page')) {
+                new \DataMachineEvents\Admin\Settings_Page();
+            }
         }
         
         $this->init_frontend();
     add_action('init', array($this, 'init_data_machine_integration'), 25);
-
+ 
         // Initialize admin bar for all logged-in users
         if (class_exists('DataMachineEvents\\Admin\\Admin_Bar')) {
             new \DataMachineEvents\Admin\Admin_Bar();
@@ -115,20 +117,17 @@ class DATAMACHINE_Events {
     
     private function load_data_machine_components() {
         // EventImportStep is autoloaded
-        
+
         if (file_exists(DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Steps/EventImport/EventImportFilters.php')) {
             require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Steps/EventImport/EventImportFilters.php';
         }
-        
+
         $this->load_event_import_handlers();
-        $this->load_publish_handlers();
-        
-        // Publisher is autoloaded, but we instantiate it to register hooks if it has any in constructor?
-        // Actually, PublishHandler usually registers itself via filters. 
-        // But the code was: new \DataMachineEvents\Steps\Publish\Events\Publisher();
-        // If it has hooks in constructor, we need to instantiate it.
-        if (class_exists('DataMachineEvents\\Steps\\Publish\\Events\\Publisher')) {
-            new \DataMachineEvents\Steps\Publish\Events\Publisher();
+        $this->load_upsert_handlers();
+
+        // Instantiate EventUpsert handler
+        if (class_exists('DataMachineEvents\\Steps\\Upsert\\Events\\EventUpsert')) {
+            new \DataMachineEvents\Steps\Upsert\Events\EventUpsert();
         }
     }
     
@@ -165,11 +164,11 @@ class DATAMACHINE_Events {
         }
     }
     
-    private function load_publish_handlers() {
-        $datamachine_events_handler_path = DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Steps/Publish/Events/';
-        if (is_dir($datamachine_events_handler_path)) {
+    private function load_upsert_handlers() {
+        $upsert_handler_path = DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Steps/Upsert/Events/';
+        if (is_dir($upsert_handler_path)) {
             // Load Filters
-             foreach (glob($datamachine_events_handler_path . '*Filters.php') as $file) {
+            foreach (glob($upsert_handler_path . '*Filters.php') as $file) {
                 if (file_exists($file)) {
                     require_once $file;
                 }

@@ -24,7 +24,7 @@
 .datamachine-border-thursday,
 .datamachine-border-group-thursday { stroke: var(--datamachine-day-thursday); }
 .datamachine-border-friday,
-.datamachine-border-group-friday { stroke: var(--datamachine-day-friday); }
+.datamachine-border-group-friday { stroke: var(--datamachine-day-friday); } /* color from root.css */
 .datamachine-border-saturday,
 .datamachine-border-group-saturday { stroke: var(--datamachine-day-saturday); }
 
@@ -128,14 +128,59 @@
     }
 }
 
+/* Tablet Breakpoint - 2-3 events per row */
+@media (max-width: 1199px) and (min-width: 769px) {
+    .datamachine-events-calendar.datamachine-events-date-grouped .datamachine-events-content {
+        grid-template-columns: repeat(auto-fill, var(--datamachine-grid-cell-width-tablet));
+        grid-auto-rows: var(--datamachine-grid-cell-height);
+        gap: var(--datamachine-grid-gap-tablet);
+    }
+
+    .datamachine-event-item {
+        width: var(--datamachine-grid-cell-width-tablet);
+    }
+}
+
+/* Mobile Breakpoint - Single column, full width cards */
 @media (max-width: 768px) {
     .datamachine-events-calendar.datamachine-events-date-grouped .datamachine-events-content {
         grid-template-columns: 1fr;
-        grid-auto-rows: var(--datamachine-grid-cell-height-mobile);
-        gap: var(--datamachine-grid-gap);
+        grid-auto-rows: auto;
+        gap: 1rem;
+        padding: 0 1rem;
     }
-    
+
+    .datamachine-event-item {
+        width: 100%;
+        max-width: 400px;
+        height: auto;
+        min-height: 160px;
+        margin: 0 auto;
+    }
+
     .datamachine-date-group {
         padding: 0;
+        width: 100%;
     }
+
+    /* Static badge positioning for mobile */
+    .datamachine-day-badge {
+        position: static;
+        transform: none;
+        margin-bottom: 0.5rem;
+        display: block;
+        opacity: 1;
+    }
+}
+
+/* Pagination safeguard: ensure pagination spans full grid when rendered inside grid */
+.datamachine-events-content > .datamachine-events-pagination,
+.datamachine-events-content > .datamachine-events-results-counter {
+    grid-column: 1 / -1;
+    justify-self: center;
+    align-self: end;
+    width: 100%;
+    margin-top: 2rem;
+    display: block;
+    text-align: center;
 }

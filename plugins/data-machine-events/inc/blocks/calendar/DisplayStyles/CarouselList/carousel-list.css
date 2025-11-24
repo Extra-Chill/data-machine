@@ -85,31 +85,31 @@
 
 /* Day-specific event item backgrounds with 0.15 opacity */
 .datamachine-events-calendar .datamachine-day-sunday .datamachine-event-item {
-    background: rgba(255, 107, 107, 0.15); /* --datamachine-day-sunday with 0.15 alpha */
+    background: var(--datamachine-day-sunday-rgba); /* --datamachine-day-sunday with 0.15 alpha */
 }
 
 .datamachine-events-calendar .datamachine-day-monday .datamachine-event-item {
-    background: rgba(78, 205, 196, 0.15); /* --datamachine-day-monday with 0.15 alpha */
+    background: var(--datamachine-day-monday-rgba); /* --datamachine-day-monday with 0.15 alpha */
 }
 
 .datamachine-events-calendar .datamachine-day-tuesday .datamachine-event-item {
-    background: rgba(69, 183, 209, 0.15); /* --datamachine-day-tuesday with 0.15 alpha */
+    background: var(--datamachine-day-tuesday-rgba); /* --datamachine-day-tuesday with 0.15 alpha */
 }
 
 .datamachine-events-calendar .datamachine-day-wednesday .datamachine-event-item {
-    background: rgba(150, 206, 180, 0.15); /* --datamachine-day-wednesday with 0.15 alpha */
+    background: var(--datamachine-day-wednesday-rgba); /* --datamachine-day-wednesday with 0.15 alpha */
 }
 
 .datamachine-events-calendar .datamachine-day-thursday .datamachine-event-item {
-    background: rgba(254, 202, 87, 0.15); /* --datamachine-day-thursday with 0.15 alpha */
+    background: var(--datamachine-day-thursday-rgba); /* --datamachine-day-thursday with 0.15 alpha */
 }
 
 .datamachine-events-calendar .datamachine-day-friday .datamachine-event-item {
-    background: rgba(255, 159, 243, 0.15); /* --datamachine-day-friday with 0.15 alpha */
+    background: var(--datamachine-day-friday-rgba); /* --datamachine-day-friday with 0.15 alpha */
 }
 
 .datamachine-events-calendar .datamachine-day-saturday .datamachine-event-item {
-    background: rgba(84, 160, 255, 0.15); /* --datamachine-day-saturday with 0.15 alpha */
+    background: var(--datamachine-day-saturday-rgba); /* --datamachine-day-saturday with 0.15 alpha */
 }
 
 /* No hover/focus styling - let universal templates handle this */

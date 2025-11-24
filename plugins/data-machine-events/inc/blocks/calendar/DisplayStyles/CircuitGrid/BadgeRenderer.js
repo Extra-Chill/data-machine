@@ -2,6 +2,8 @@
  * BadgeRenderer - Day badge positioning and management for event groups
  * Handles day label badges that integrate with border system
  */
+import { ColorManager } from '../ColorManager.js';
+
 export class BadgeRenderer {
     constructor(calendarElement) {
         this.calendar = calendarElement;
@@ -18,6 +20,15 @@ export class BadgeRenderer {
     init() {
         this.setupResizeObserver();
         this.renderAllBadges();
+    }
+
+    /**
+     * Check if current viewport is mobile (≤768px)
+     *
+     * @returns {boolean} True if mobile viewport
+     */
+    isMobileView() {
+        return window.innerWidth <= 768;
     }
 
     /**
@@ -47,34 +58,69 @@ export class BadgeRenderer {
     /**
      * Detect day groups and their badges
      * 
-     * @returns {Map<string, Object>} Map of day names to group data with badges
+     * @returns {Array<Object>} Array of group data objects { dayName, groupElement, events, badge, color, index }
      */
     detectDayGroups() {
-        const dayGroups = new Map();
-        
-        // Find all day group containers
+        // Aggregate badges by dateKey (data-date) so only one badge per logical date
+        const groupsMap = new Map();
         const dayGroupElements = this.calendar.querySelectorAll('.datamachine-date-group');
-        
+
         dayGroupElements.forEach(groupElement => {
-            // Extract day from class name (e.g., datamachine-day-saturday -> saturday)
+            // Prefer explicit data-date attribute on group container
+            let dateKey = groupElement.getAttribute('data-date');
+
+            // If group container lacks data-date, attempt to read from first event
+            if (!dateKey) {
+                const firstEvent = groupElement.querySelector('.datamachine-event-item:not(.hidden)');
+                if (firstEvent) {
+                    dateKey = firstEvent.getAttribute('data-date') || null;
+                }
+            }
+
+            // Extract dayName for color fallback
             const dayClass = Array.from(groupElement.classList).find(cls => cls.startsWith('datamachine-day-'));
-            if (!dayClass) return;
-            
-            const dayName = dayClass.replace('datamachine-day-', '');
-            const events = groupElement.querySelectorAll('.datamachine-event-item:not(.hidden)'); // Only visible events
+            const dayName = dayClass ? dayClass.replace('datamachine-day-', '') : 'day';
+
+            const events = Array.from(groupElement.querySelectorAll('.datamachine-event-item:not(.hidden)'));
             const badge = groupElement.querySelector('.datamachine-day-badge');
-            
-            if (events.length > 0 && badge) {
-                dayGroups.set(dayName, {
-                    groupElement,
-                    events: Array.from(events),
-                    badge,
-                    color: `var(--datamachine-day-${dayName})`
+
+            if (!dateKey || events.length === 0) return;
+
+            if (!groupsMap.has(dateKey)) {
+                groupsMap.set(dateKey, {
+                    dateKey,
+                    dayName,
+                    events: [],
+                    badge: badge || null
                 });
             }
+
+            const agg = groupsMap.get(dateKey);
+            // Append events; keep first non-null badge as representative
+            agg.events.push(...events);
+            if (!agg.badge && badge) agg.badge = badge;
         });
-        
-        return dayGroups;
+
+        // Build array and deduplicate events
+        return Array.from(groupsMap.values()).map(group => {
+            const uniqueEvents = Array.from(new Set(group.events));
+            uniqueEvents.sort((a, b) => {
+                const aDate = a.getAttribute('data-date') || '';
+                const bDate = b.getAttribute('data-date') || '';
+                if (aDate !== bDate) return aDate.localeCompare(bDate);
+                const aRect = a.getBoundingClientRect();
+                const bRect = b.getBoundingClientRect();
+                if (aRect.top !== bRect.top) return aRect.top - bRect.top;
+                return aRect.left - bRect.left;
+            });
+
+            return {
+                dateKey: group.dateKey,
+                dayName: group.dayName,
+                events: uniqueEvents,
+                badge: group.badge
+            };
+        });
     }
 
     /**
@@ -106,33 +152,41 @@ export class BadgeRenderer {
 
     /**
      * Position day badge exactly on the top border of the first chronological event
-     * 
+     *
      * @param {HTMLElement} badge Day badge DOM element
      * @param {HTMLElement} firstEvent First chronological event element
      * @param {string} dayName Day identifier for positioning logic
      */
-    positionDayBadge(badge, firstEvent, dayName) {
+    positionDayBadge(badge, firstEvent, groupKey) {
         if (!badge || !firstEvent) return;
+
+        // Skip absolute positioning on mobile - CSS handles static positioning
+        if (this.isMobileView()) {
+            badge.classList.add('positioned'); // Still mark as visible
+            return;
+        }
 
         const styles = getComputedStyle(document.documentElement);
         const offsetX = parseInt(styles.getPropertyValue('--datamachine-badge-offset-x')) || 12;
-        
+
         // Get position of first event relative to content area
         const eventRect = firstEvent.getBoundingClientRect();
         const contentRect = this.calendar.querySelector('.datamachine-events-content').getBoundingClientRect();
-        
+
         const eventLeft = eventRect.left - contentRect.left;
         const eventTop = eventRect.top - contentRect.top;
-        
+
         // Position badge on top border of first event with padding and offset
         const badgeLeft = eventLeft + offsetX - 8; // Account for event padding
         const badgeTop = eventTop - 8; // Account for event padding
-        
+
         badge.style.left = `${badgeLeft}px`;
         badge.style.top = `${badgeTop}px`;
         badge.classList.add('positioned');
-        
-        this.badges.set(dayName, badge);
+
+        // Use stable groupKey (dateKey) to track badges per logical date
+        const safeKey = String(groupKey || '').replace(/[^a-z0-9-_]/gi, '-');
+        this.badges.set(safeKey, badge);
     }
 
     /**
@@ -158,10 +212,21 @@ export class BadgeRenderer {
         // Detect day groups and position badges
         const dayGroups = this.detectDayGroups();
         
-        dayGroups.forEach((groupData, dayName) => {
+        // dayGroups is an array of groupData objects
+        dayGroups.forEach((groupData) => {
             const firstEvent = this.findFirstChronologicalEvent(groupData.events);
             if (firstEvent) {
-                this.positionDayBadge(groupData.badge, firstEvent, dayName);
+                // Use stable dateKey as groupKey so badges are unique per logical date
+                const groupKey = groupData.dateKey || `${groupData.dayName}`;
+                this.positionDayBadge(groupData.badge, firstEvent, groupKey);
+
+                // Apply color styling for badge using ColorManager (use var refs so root.css remains single source)
+                if (groupData.badge) {
+                    // Set background using the solid color var to match border
+                    groupData.badge.style.setProperty('background', ColorManager.getStrokeVar(groupData.dayName));
+                    // Use white text for contrast against solid background
+                    groupData.badge.style.setProperty('color', 'white');
+                }
             }
         });
     }

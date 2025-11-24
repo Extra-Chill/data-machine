@@ -56,6 +56,7 @@ cp composer.json "${TEMP_DIR}/"
 # Copy directories (excluding development files)
 rsync -av --exclude='node_modules' --exclude='src' --exclude='webpack.config.js' --exclude='package*.json' --exclude='.git*' --exclude='docs' inc/ "${TEMP_DIR}/inc/"
 rsync -av assets/ "${TEMP_DIR}/assets/"
+rsync -av templates/ "${TEMP_DIR}/templates/"
 rsync -av vendor/ "${TEMP_DIR}/vendor/"
 
 # Create languages directory (even if empty)

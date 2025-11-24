@@ -49,12 +49,20 @@ class GoogleCalendarAuth {
             'test_url' => [
                 'type' => 'text',
                 'label' => __('Test Calendar URL', 'datamachine-events'),
-                'description' => __('Enter a public Google Calendar .ics URL to test the connection.', 'datamachine-events'),
+                'description' => __('Enter a public Google Calendar .ics URL to test the connection. If you prefer, provide a Calendar ID below.', 'datamachine-events'),
                 'placeholder' => 'https://calendar.google.com/calendar/ical/example@gmail.com/public/basic.ics',
                 'value' => $current_config['test_url'] ?? '',
                 'validation' => [
                     'url' => true
                 ]
+            ],
+            'test_calendar_id' => [
+                'type' => 'text',
+                'label' => __('Test Calendar ID', 'datamachine-events'),
+                'description' => __('Optionally enter a Google Calendar ID (e.g., example@gmail.com) to test the connection; it will be converted to a .ics feed URL if needed.', 'datamachine-events'),
+                'placeholder' => 'example@gmail.com',
+                'value' => $current_config['test_calendar_id'] ?? '',
+                'validation' => []
             ]
         ];
     }
@@ -70,12 +78,22 @@ class GoogleCalendarAuth {
      */
     public function test_connection(array $config): array {
         $test_url = trim($config['test_url'] ?? '');
+        $test_calendar_id = trim($config['test_calendar_id'] ?? '');
 
-        if (empty($test_url)) {
+        if (empty($test_url) && empty($test_calendar_id)) {
             return [
                 'success' => false,
-                'message' => __('Please enter a calendar URL to test.', 'datamachine-events')
+                'message' => __('Please enter a calendar URL or Calendar ID to test.', 'datamachine-events')
             ];
+        }
+
+        // Resolve final test URL - prefer explicit URL
+        if (empty($test_url) && !empty($test_calendar_id)) {
+            if (GoogleCalendarUtils::is_calendar_url_like($test_calendar_id) && preg_match('/^https?:\/\//i', $test_calendar_id)) {
+                $test_url = $test_calendar_id;
+            } else {
+                $test_url = GoogleCalendarUtils::generate_ics_url_from_calendar_id($test_calendar_id);
+            }
         }
 
         // Validate URL format
@@ -184,6 +202,19 @@ class GoogleCalendarAuth {
             $sanitized['test_url'] = esc_url_raw($test_url);
         }
 
+        // Sanitize test calendar id
+        $test_calendar_id = trim($config['test_calendar_id'] ?? '');
+        if (!empty($test_calendar_id)) {
+            $sanitized['test_calendar_id'] = sanitize_text_field($test_calendar_id);
+            if (empty($sanitized['test_url'])) {
+                if (GoogleCalendarUtils::is_calendar_url_like($sanitized['test_calendar_id']) && preg_match('/^https?:\/\//i', $sanitized['test_calendar_id'])) {
+                    $sanitized['test_url'] = esc_url_raw($sanitized['test_calendar_id']);
+                } else {
+                    $sanitized['test_url'] = GoogleCalendarUtils::generate_ics_url_from_calendar_id($sanitized['test_calendar_id']);
+                }
+            }
+        }
+
         return $sanitized;
     }
 
@@ -195,7 +226,7 @@ class GoogleCalendarAuth {
     public function get_provider_info(): array {
         return [
             'name' => __('Google Calendar (Public)', 'datamachine-events'),
-            'description' => __('Access public Google Calendar feeds via .ics URLs', 'datamachine-events'),
+            'description' => __('Access public Google Calendar feeds via .ics URLs or Calendar ID (the ID will be converted to an .ics feed URL).', 'datamachine-events'),
             'icon' => 'calendar',
             'color' => '#4285f4',
             'auth_type' => 'url_based',

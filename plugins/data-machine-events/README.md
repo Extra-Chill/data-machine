@@ -2,6 +2,8 @@
 
 Frontend-focused WordPress events plugin with **block-first architecture**. Features AI-driven event creation via Data Machine integration, Event Details blocks with InnerBlocks for rich content editing, Calendar blocks for display, and comprehensive venue taxonomy management.
 
+**Version**: 0.2.0
+
 ## Migration Showcase
 
 **DM Events demonstrates completed migrations serving as reference implementations for the Data Machine Ecosystem:**
@@ -37,19 +39,27 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 
 ### Development
 - **PSR-4 Autoloading:** `DatamachineEvents\` namespace with enhanced autoloader for Data Machine handlers
+- **OOP Architecture (v0.2.0):** Base classes (UpdateHandler, FetchHandler, Step) with WordPressSharedTrait and TaxonomyHandler integration
+- **Handler Discovery System:** Registry-based handler loading with automatic instantiation and execution
 - **Dual Build Systems:** Calendar block (webpack), Event Details block (webpack with @wordpress/scripts base)
 - **Modular Template Architecture:** 7 specialized templates with Template_Loader system for flexible calendar rendering
 - **Dynamic Taxonomy Badges:** Automatic badge generation for all taxonomies with consistent color classes and HTML structure
-- **Visual Enhancement System:** DisplayStyles components including CircuitGridRenderer.js, CarouselListRenderer.js, and BadgeRenderer.js for calendar display
+- **Visual Enhancement System:** DisplayStyles components including ColorManager.js, CircuitGridRenderer.js, CarouselListRenderer.js, and BadgeRenderer.js for calendar display
 - **Centralized Design Tokens:** root.css provides unified CSS custom properties for all blocks and JavaScript
 - **Production Build:** Automated `./build.sh` script creates optimized WordPress plugin package in `/dist` directory
-- **REST API Support:** Event metadata exposed via WordPress REST API
+- **REST API Support:** Event metadata exposed via WordPress REST API with modular controller architecture
 - **Schema Generation:** Google Event structured data with smart parameter routing for SEO enhancement
 - **WordPress Standards:** Native hooks, security practices, and comprehensive input sanitization
 
 ### Architecture
 **Data Flow:** Data Machine Import → Event Details Block (InnerBlocks) → Schema Generation → Calendar Display
 **Schema Flow:** Block Attributes + Venue Taxonomy Meta → DataMachineEventsSchema → JSON-LD Output
+
+**Base Classes:**
+- `DataMachine\Core\Steps\Update\Handlers\UpdateHandler` - Base class for event upsert operations
+- `DataMachine\Core\Steps\Fetch\Handlers\FetchHandler` - Base class for all data fetching operations
+- `DataMachine\Core\Steps\Step` - Base class for all pipeline steps
+- `DataMachineEvents\Steps\EventImport\EventImportHandler` - Abstract base class for all import handlers
 
 **Core Classes:**
 - `DataMachineEvents\Admin\Status_Detection` - Legacy stub retained for backwards compatibility (status detection removed)
@@ -60,24 +70,35 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 - `DataMachineEvents\Core\Breadcrumbs` - Breadcrumb generation with filterable output (datamachine_events_breadcrumbs) for theme integration
 - `DataMachineEvents\Blocks\Calendar\Template_Loader` - Modular template loading system with variable extraction, output buffering, and template caching for calendar block components
 - `DataMachineEvents\Blocks\Calendar\Taxonomy_Helper` - Taxonomy data discovery, hierarchy building, and post count calculations for calendar filtering systems
+- `DataMachineEvents\Blocks\Calendar\DisplayStyles\ColorManager` - Centralized color CSS custom properties helper for fill/stroke var references
+- `DataMachineEvents\Blocks\Calendar\DisplayStyles\CircuitGrid\BadgeRenderer` - Day badge positioning with multi-group support and ColorManager integration
 - `DataMachineEvents\Steps\Publish\Events\Schema` - Google Event Schema JSON-LD generator for SEO enhancement
-- `DataMachineEvents\Steps\Publish\Events\Publisher` - AI-driven event creation with comprehensive venue handling
-- `DataMachineEvents\Steps\Publish\Events\Settings` - Publisher configuration management
 - `DataMachineEvents\Steps\Publish\Events\Venue` - Centralized venue taxonomy operations with validation
-- `DataMachineEvents\Steps\Publish\Events\Filters` - Publisher filtering system
-- `DataMachineEvents\Steps\EventImport\EventImportStep` - Event import step for Data Machine pipeline with handler discovery
+- `DataMachineEvents\Steps\Upsert\Events\EventUpsert` - Intelligent create-or-update handler with change detection (extends UpdateHandler)
+- `DataMachineEvents\Steps\Upsert\Events\EventUpsertFilters` - EventUpsert handler registration with Data Machine
+- `DataMachineEvents\Steps\EventImport\EventImportStep` - Event import step for Data Machine pipeline with handler discovery (extends Step)
 - `DataMachineEvents\Steps\EventImport\EventImportFilters` - Event import step registration with Data Machine
-- `DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster\Ticketmaster` - Discovery API integration with comprehensive error handling
+- `DataMachineEvents\Steps\EventImport\EventImportHandler` - Abstract base class for import handlers (extends FetchHandler)
+- `DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster\Ticketmaster` - Discovery API integration with EventIdentifierGenerator normalization
 - `DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster\TicketmasterAuth` - API key authentication provider
 - `DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster\TicketmasterSettings` - Handler configuration management
 - `DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster\TicketmasterFilters` - Event filtering system
-- `DataMachineEvents\Steps\EventImport\Handlers\DiceFm\DiceFm` - Dice FM event integration with standardized processing
+- `DataMachineEvents\Steps\EventImport\Handlers\DiceFm\DiceFm` - Dice FM event integration with EventIdentifierGenerator normalization
 - `DataMachineEvents\Steps\EventImport\Handlers\DiceFm\DiceFmAuth` - Dice FM authentication provider
 - `DataMachineEvents\Steps\EventImport\Handlers\DiceFm\DiceFmSettings` - Dice FM handler configuration management
 - `DataMachineEvents\Steps\EventImport\Handlers\DiceFm\DiceFmFilters` - Dice FM event filtering system
 - `DataMachineEvents\Steps\EventImport\Handlers\WebScraper\UniversalWebScraper` - AI-powered universal web scraper with HTML section processing
 - `DataMachineEvents\Steps\EventImport\Handlers\WebScraper\UniversalWebScraperSettings` - Universal web scraper configuration management
 - `DataMachineEvents\Steps\EventImport\Handlers\WebScraper\UniversalWebScraperFilters` - Universal web scraper filtering system
+- `DataMachineEvents\Utilities\EventIdentifierGenerator` - Shared event identifier normalization utility
+- `DataMachineEvents\Api\Routes` - REST API route registration for unified namespace
+- `DataMachineEvents\Api\Controllers\Calendar` - Calendar REST endpoint controller with SQL-based filtering
+- `DataMachineEvents\Api\Controllers\Venues` - Venues REST endpoint controller with admin CRUD operations
+- `DataMachineEvents\Api\Controllers\Events` - Events REST endpoint controller
+
+**Shared Utilities:**
+- `DataMachine\Core\WordPress\WordPressSharedTrait` - Shared WordPress utilities across handlers
+- `DataMachine\Core\WordPress\TaxonomyHandler` - Centralized taxonomy management with custom venue handler
 
 ## Quick Start
 
@@ -101,34 +122,43 @@ Upload to `/wp-content/plugins/dm-events/` and activate.
 ## Project Structure
 
 ```
-dm-events/
-├── dm-events.php            # Main plugin file with PSR-4 autoloader
+datamachine-events/
+├── datamachine-events.php   # Main plugin file with PSR-4 autoloader
 ├── inc/
-│   ├── admin/               # Admin interface classes (includes legacy status detection stub)
-│   │   ├── class-status-detection.php
-│   │   └── class-settings-page.php
-│   ├── blocks/
-│   │   ├── calendar/        # Calendar block (webpack) with modular template system
+│   ├── Admin/               # Admin interface classes
+│   │   ├── class-status-detection.php    # Legacy stub for backwards compatibility
+│   │   └── class-settings-page.php       # Event settings interface
+│   ├── Api/                 # REST API controllers and routes
+│   │   ├── Routes.php       # API route registration
+│   │   └── Controllers/     # Calendar, Venues, Events controllers
+│   ├── Blocks/
+│   │   ├── Calendar/        # Calendar block (webpack) with modular template system
 │   │   │   ├── Template_Loader.php
 │   │   │   ├── Taxonomy_Helper.php
+│   │   │   ├── DisplayStyles/           # Visual enhancement components
+│   │   │   │   ├── ColorManager.js       # Centralized color helper
+│   │   │   │   └── CircuitGrid/          # CircuitGrid display mode
+│   │   │   │       └── BadgeRenderer.js  # Day badge positioning
 │   │   │   └── templates/   # 7 specialized templates plus modal subdirectory
-│   │   └── EventDetails/    # Event details block (webpack with @wordpress/scripts base)
-│   ├── core/                # Core plugin classes
+│   │   ├── EventDetails/    # Event details block (webpack with @wordpress/scripts base)
+│   │   └── root.css         # Centralized design tokens and CSS custom properties
+│   ├── Core/                # Core plugin classes
 │   │   ├── class-event-post-type.php    # Event post type with menu control
 │   │   ├── class-venue-taxonomy.php     # Venue taxonomy with 9 meta fields
 │   │   ├── class-taxonomy-badges.php    # Dynamic taxonomy badge rendering with filters
 │   │   └── class-breadcrumbs.php        # Breadcrumb generation with datamachine_events_breadcrumbs filter
-│   └── steps/               # Data Machine integration
-│       ├── EventImport/     # Import handlers with single-item processing
-│       │   └── handlers/    # Ticketmaster, Dice FM, web scrapers
-│       └── publish/         # AI-driven publishing with Schema generation
-│           └── handlers/Events/  # Publisher, Schema, Venue handling
+│   ├── steps/               # Data Machine integration
+│   │   ├── EventImport/     # Import handlers with single-item processing
+│   │   │   └── handlers/    # Ticketmaster, Dice FM, web scrapers
+│   │   ├── Publish/Events/  # Schema and Venue handling
+│   │   └── Upsert/Events/   # EventUpsert handler for create/update operations
+│   └── Utilities/           # Shared utilities
+│       └── EventIdentifierGenerator.php  # Event identifier normalization
 ├── templates/
 │   └── single-datamachine_events.php # Single event template with extensibility hooks
 ├── assets/
 │   ├── css/                 # Admin styling (admin.css)
 │   └── js/                  # Admin JavaScript
-├── inc/Blocks/root.css      # Centralized design tokens and CSS custom properties
 └── composer.json            # PHP dependencies
 ```
 
@@ -198,16 +228,18 @@ echo '<script type="application/ld+json">' . wp_json_encode($schema) . '</script
 
 **AI-Driven Event Creation Pipeline:**
 1. **Import Handlers:** Extract event data from APIs (Ticketmaster, Dice FM) or AI-powered universal web scrapers using single-item processing
-2. **Engine Data Persistence:** Event import handlers store venue/location/contact fields in engine data so AI and publish steps can access them without adapters
-3. **AI Web Scraping:** UniversalWebScraper uses AI to extract event data from HTML sections with automated processing
-4. **Venue Data Processing:** Publisher processes venue creation and assignment directly
-5. **AI Content Generation:** AI generates event descriptions while preserving structured venue data
-6. **Block Creation:** Publisher creates Event Details blocks with InnerBlocks support and proper attribute mapping
-7. **Venue Management:** Venue handles term creation, lookup, metadata validation, and event assignment
-8. **Schema Generation:** Schema creates Google Event structured data combining block attributes with venue taxonomy meta
-9. **Template Rendering:** Template_Loader system provides modular, cacheable template rendering with variable extraction
-10. **Taxonomy Display:** Taxonomy_Badges generates dynamic badge HTML for all non-venue taxonomies with consistent styling
-11. **Visual Enhancement:** BadgeRenderer.js creates taxonomy badge rendering with CircuitGridRenderer.js and CarouselListRenderer.js for flexible calendar display modes
+2. **Event Identifier Normalization:** EventIdentifierGenerator creates consistent identifiers from (title, startDate, venue) for duplicate detection
+3. **Engine Data Persistence:** Event import handlers store venue/location/contact fields in engine data for downstream access
+4. **AI Web Scraping:** UniversalWebScraper uses AI to extract event data from HTML sections with automated processing
+5. **Intelligent Event Upsert:** EventUpsert handler searches for existing events by identity, performs field-by-field change detection
+6. **Venue Data Processing:** Venue_Taxonomy handles find-or-create operations with metadata validation
+7. **AI Content Generation:** AI generates event descriptions while preserving structured venue data
+8. **Block Creation:** EventUpsert creates/updates Event Details blocks with InnerBlocks support and proper attribute mapping
+9. **Venue Management:** Venue handles term creation, lookup, metadata validation, and event assignment
+10. **Schema Generation:** Schema creates Google Event structured data combining block attributes with venue taxonomy meta
+11. **Template Rendering:** Template_Loader system provides modular, cacheable template rendering with variable extraction
+12. **Taxonomy Display:** Taxonomy_Badges generates dynamic badge HTML for all non-venue taxonomies with consistent styling
+13. **Visual Enhancement:** BadgeRenderer.js with ColorManager integration creates multi-group badge rendering with CircuitGridRenderer.js and CarouselListRenderer.js for flexible calendar display modes
 
 ## Calendar Filtering Architecture
 
@@ -247,6 +279,11 @@ past=1                       # Show past events ("1" for past, omit for upcoming
 - **Smooth Transitions:** Loading states prevent jarring content switches
 
 **Key Integration Features:**
+- **Intelligent Event Upsert:** EventUpsert handler with identity-based search, field-by-field change detection, prevents unnecessary updates
+- **Event Identifier Normalization:** EventIdentifierGenerator ensures consistent event identity across all import handlers
+- **REST API Controllers:** Modular controller architecture with unified namespace for Calendar, Venues, and Events endpoints
+- **ColorManager Integration:** Centralized CSS custom properties helper for visual consistency across display modes
+- **BadgeRenderer Multi-Group Support:** Enhanced day badge positioning with ColorManager integration for CircuitGrid display
 - **AI-Powered Web Scraping:** UniversalWebScraper uses AI to extract structured event data from any HTML page
 - **Modular Template Architecture:** Template_Loader provides 7 specialized templates with variable extraction and output buffering
 - **Dynamic Taxonomy Badges:** Taxonomy_Badges system with automatic color generation and HTML structure for all non-venue taxonomies
@@ -288,25 +325,45 @@ registerBlockType('datamachine-events/event-details', {
 
 **Data Machine Integration Pattern:**
 ```php
-// Flat parameter system for all custom steps
-public function execute(array $parameters): array {
-    $job_id = $parameters['job_id'];
-    $flow_step_id = $parameters['flow_step_id'];
-    $data = $parameters['data'] ?? [];
-    $flow_step_config = $parameters['flow_step_config'] ?? [];
-    return $data; // Always return data packet for pipeline continuity
+// EventIdentifierGenerator for consistent event identity
+use DataMachineEvents\Utilities\EventIdentifierGenerator;
+
+$event_identifier = EventIdentifierGenerator::generate($title, $startDate, $venue);
+// Normalization: lowercase, trim, collapse whitespace, remove articles
+
+// EventUpsert handler - intelligent create-or-update
+public function executeUpdate(array $parameters, array $handler_config): array {
+    // Search for existing event by (title, venue, startDate)
+    $existing_post_id = $this->findExistingEvent($title, $venue, $startDate);
+
+    if ($existing_post_id) {
+        // Field-by-field change detection
+        if (!$this->hasDataChanged($existing_data, $parameters)) {
+            return ['action' => 'no_change', 'post_id' => $existing_post_id];
+        }
+        // Update only changed fields
+        $this->updateEventPost($existing_post_id, $parameters);
+        return ['action' => 'updated', 'post_id' => $existing_post_id];
+    }
+
+    // Create new event
+    $post_id = $this->createEventPost($parameters);
+    return ['action' => 'created', 'post_id' => $post_id];
 }
 
-// Single-item processing with duplicate prevention
+// Single-item processing with EventIdentifierGenerator
 foreach ($raw_events as $raw_event) {
     $standardized_event = $this->map_ticketmaster_event($raw_event);
-    $event_identifier = md5($standardized_event['title'] . $standardized_event['startDate']);
+    $event_identifier = EventIdentifierGenerator::generate(
+        $standardized_event['title'],
+        $standardized_event['startDate'],
+        $standardized_event['venue']
+    );
     $is_processed = apply_filters('datamachine_is_item_processed', false, $flow_step_id, 'ticketmaster', $event_identifier);
     if ($is_processed) continue;
-    
+
     // Mark as processed and return IMMEDIATELY
     do_action('datamachine_mark_item_processed', $flow_step_id, 'ticketmaster', $event_identifier, $job_id);
-    // Add to data packet array and return
     array_unshift($data, $event_entry);
     return $data;
 }

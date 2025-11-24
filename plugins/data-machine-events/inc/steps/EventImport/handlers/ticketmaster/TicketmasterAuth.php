@@ -1,7 +1,7 @@
 <?php
 /**
  * Ticketmaster Authentication Provider
- * 
+ *
  * Handles authentication configuration for Ticketmaster Discovery API integration
  * with Data Machine's centralized authentication system.
  *
@@ -11,6 +11,8 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster;
 
+use DataMachine\Core\OAuth\BaseAuthProvider;
+
 // Prevent direct access
 if (!defined('ABSPATH')) {
     exit;
@@ -18,12 +20,16 @@ if (!defined('ABSPATH')) {
 
 /**
  * TicketmasterAuth class
- * 
+ *
  * Authentication provider for Ticketmaster Discovery API.
  * Integrates with Data Machine's unified authentication system.
  */
-class TicketmasterAuth {
-    
+class TicketmasterAuth extends BaseAuthProvider {
+
+    public function __construct() {
+        parent::__construct('ticketmaster_events');
+    }
+
     /**
      * Get configuration fields required for Ticketmaster authentication
      *
@@ -39,16 +45,6 @@ class TicketmasterAuth {
             ]
         ];
     }
-    
-    /**
-     * Check if Ticketmaster authentication is properly configured
-     *
-     * @return bool True if API key is configured, false otherwise
-     */
-    public function is_configured(): bool {
-        $config = apply_filters('datamachine_retrieve_oauth_account', [], 'ticketmaster_events');
-        return !empty($config['api_key']);
-    }
 
     /**
      * Check if Ticketmaster is authenticated (same as configured for API key auth)
@@ -56,9 +52,10 @@ class TicketmasterAuth {
      * @return bool True if API key is present, false otherwise
      */
     public function is_authenticated(): bool {
-        return $this->is_configured();
+        $credentials = $this->get_account();
+        return !empty($credentials['api_key']);
     }
-    
+
     /**
      * Get account details for display (API key type doesn't have account info)
      *
@@ -68,7 +65,7 @@ class TicketmasterAuth {
         if (!$this->is_authenticated()) {
             return null;
         }
-        
+
         return [
             'display_name' => __('Ticketmaster API', 'datamachine-events'),
             'type' => __('API Key Authentication', 'datamachine-events')

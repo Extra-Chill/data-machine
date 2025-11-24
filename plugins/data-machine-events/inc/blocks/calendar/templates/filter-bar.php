@@ -18,13 +18,20 @@ $show_search = $attributes['showSearch'] ?? true;
 if (!$show_search) {
     return;
 }
+
+$instance_id = $instance_id ?? uniqid('datamachine-calendar-');
+$search_id = 'datamachine-events-search-' . $instance_id;
+$search_value = isset($search_query) ? $search_query : '';
+$date_range_id = 'datamachine-events-date-range-' . $instance_id;
+$modal_id = 'datamachine-taxonomy-filter-modal-' . $instance_id;
 ?>
 
 <div class="datamachine-events-filter-bar">
     <div class="datamachine-events-filter-row">
         <div class="datamachine-events-search">
             <input type="text" 
-                   id="datamachine-events-search" 
+                   id="<?php echo esc_attr($search_id); ?>" 
+                   value="<?php echo esc_attr($search_value); ?>"
                    placeholder="<?php _e('Search events...', 'datamachine-events'); ?>" 
                    class="datamachine-events-search-input">
             <button type="button" class="datamachine-events-search-btn">
@@ -35,8 +42,8 @@ if (!$show_search) {
         <div class="datamachine-events-date-filter">
             <div class="datamachine-events-date-range-wrapper">
                 <input type="text" 
-                        id="datamachine-events-date-range"
-                       class="datamachine-events-date-range-input" 
+                        id="<?php echo esc_attr($date_range_id); ?>"
+                        class="datamachine-events-date-range-input" data-date-start="<?php echo esc_attr($date_start); ?>" data-date-end="<?php echo esc_attr($date_end); ?>" 
                        placeholder="<?php _e('Select date range...', 'datamachine-events'); ?>" 
                        readonly />
                 <button type="button" 
@@ -48,7 +55,8 @@ if (!$show_search) {
         </div>
         
         <div class="datamachine-events-taxonomy-filter">
-            <button type="button" class="datamachine-events-filter-btn datamachine-taxonomy-modal-trigger">
+            <button type="button" class="datamachine-events-filter-btn datamachine-taxonomy-modal-trigger<?php echo (!empty($tax_filters) ? ' datamachine-filters-active' : ''); ?>" data-modal-id="<?php echo esc_attr($modal_id); ?>" aria-controls="<?php echo esc_attr($modal_id); ?>" aria-expanded="<?php echo (!empty($tax_filters) ? 'true' : 'false'); ?>">
+                <span class="datamachine-filter-count" aria-hidden="true"><?php echo (!empty($tax_filters) ? array_sum(array_map('count', $tax_filters)) : ''); ?></span>
                 <span class="dashicons dashicons-filter"></span>
                 <?php _e('Filter', 'datamachine-events'); ?>
             </button>
@@ -56,11 +64,11 @@ if (!$show_search) {
     </div>
     
     <!-- Taxonomy Filter Modal -->
-    <div id="datamachine-taxonomy-filter-modal" class="datamachine-taxonomy-modal">
+    <div id="<?php echo esc_attr($modal_id); ?>" class="datamachine-taxonomy-modal" aria-labelledby="<?php echo esc_attr($modal_id . '-title'); ?>">
         <div class="datamachine-taxonomy-modal-overlay"></div>
         <div class="datamachine-taxonomy-modal-container">
             <div class="datamachine-taxonomy-modal-header">
-                <h2 class="datamachine-taxonomy-modal-title"><?php _e('Event Display Filters', 'datamachine-events'); ?></h2>
+                <h2 id="<?php echo esc_attr($modal_id . '-title'); ?>" class="datamachine-taxonomy-modal-title"><?php _e('Event Display Filters', 'datamachine-events'); ?></h2>
                 <button type="button" class="datamachine-taxonomy-modal-close" aria-label="<?php esc_attr_e('Close', 'datamachine-events'); ?>">
                     <span aria-hidden="true">&times;</span>
                 </button>
@@ -68,9 +76,7 @@ if (!$show_search) {
             <div class="datamachine-taxonomy-modal-body">
                 <?php
                 // Include the taxonomy filter template directly
-                $taxonomies_data = \DataMachineEvents\Blocks\Calendar\Taxonomy_Helper::get_all_taxonomies_with_counts();
-                
-                
+                $taxonomies_data = $taxonomies_data ?? $used_taxonomies ?? \DataMachineEvents\Blocks\Calendar\Taxonomy_Helper::get_all_taxonomies_with_counts();
                 include __DIR__ . '/modal/taxonomy-filter.php';
                 ?>
             </div>

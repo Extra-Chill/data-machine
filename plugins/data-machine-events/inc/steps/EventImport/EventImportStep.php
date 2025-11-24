@@ -100,7 +100,7 @@ class EventImportStep extends Step {
                 'flow_step_id' => $this->flow_step_id,
                 'data' => $this->dataPackets,
                 'flow_step_config' => $this->flow_step_config,
-                'engine_data' => $this->engine_data
+                'engine' => $this->engine
             ];
             
             $result = $handler->execute($legacy_payload);

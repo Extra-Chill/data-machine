@@ -72,13 +72,19 @@ class Settings_Page {
     
     public function render_settings_page() {
         if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.', 'datamachine-events'));
+        }
+
+        $template_path = DATAMACHINE_EVENTS_PLUGIN_DIR . 'templates/admin/settings-page.php';
+
+        if (!file_exists($template_path)) {
+            echo '<div class="notice notice-error"><p>';
+            echo esc_html(sprintf(__('Settings template not found: %s', 'datamachine-events'), $template_path));
+            echo '</p></div>';
             return;
         }
-        
-        $template_path = DATAMACHINE_EVENTS_PLUGIN_DIR . 'templates/admin/settings-page.php';
-        if (file_exists($template_path)) {
-            include $template_path;
-        }
+
+        include $template_path;
     }
     
     /**

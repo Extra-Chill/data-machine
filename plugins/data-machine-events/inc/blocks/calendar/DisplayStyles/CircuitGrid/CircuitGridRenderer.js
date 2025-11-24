@@ -5,6 +5,7 @@
  * Isolated module that handles all circuit grid specific behavior.
  */
 import { BadgeRenderer } from './BadgeRenderer.js';
+import { ColorManager } from '../ColorManager.js';
 
 export class CircuitGridRenderer {
     constructor(calendarElement) {
@@ -27,6 +28,24 @@ export class CircuitGridRenderer {
         this.setupResizeObserver();
         this.renderAllBorders();
         this.initializeGridEvents();
+    }
+
+    /**
+     * Check if current viewport is mobile (≤768px)
+     *
+     * @returns {boolean} True if mobile viewport
+     */
+    isMobileView() {
+        return window.innerWidth <= 768;
+    }
+
+    /**
+     * Check if current viewport is tablet (769px-1199px)
+     *
+     * @returns {boolean} True if tablet viewport
+     */
+    isTabletView() {
+        return window.innerWidth > 768 && window.innerWidth <= 1199;
     }
 
     /**
@@ -55,15 +74,15 @@ export class CircuitGridRenderer {
      */
     findSVGContainer() {
         this.svgContainer = this.calendar.querySelector('.datamachine-border-overlay');
-        
+
         if (!this.svgContainer) {
             console.error('CircuitGridRenderer: SVG container not found. Expected .datamachine-border-overlay element in calendar.');
             return false;
         }
-        
+
         // Clear any existing borders
         this.svgContainer.innerHTML = '';
-        
+
         return true;
     }
 
@@ -97,30 +116,75 @@ export class CircuitGridRenderer {
      * 
      * @returns {Map<string, Object>} Map of day names to group data with events and colors
      */
+    /**
+     * Detect day groups by analyzing DOM structure and CSS classes
+     *
+     * @returns {Array<Object>} Array of group data objects { dateKey, dayName, events, color }
+     */
     detectDayGroups() {
-        const dayGroups = new Map();
-        
-        // Find all day group containers in circuit grid
+        const groupsMap = new Map();
         const dayGroupElements = this.calendar.querySelectorAll('.datamachine-events-content .datamachine-date-group');
-        
+
         dayGroupElements.forEach(groupElement => {
-            // Extract day from class name (e.g., datamachine-day-saturday -> saturday)
+            // Prefer explicit data-date attribute on group container
+            let dateKey = groupElement.getAttribute('data-date');
+
+            // If group container lacks data-date, attempt to read from first event
+            if (!dateKey) {
+                const firstEvent = groupElement.querySelector('.datamachine-event-item:not(.hidden)');
+                if (firstEvent) {
+                    dateKey = firstEvent.getAttribute('data-date') || null;
+                }
+            }
+
+            // Fallback: derive dayName from class for grouping
             const dayClass = Array.from(groupElement.classList).find(cls => cls.startsWith('datamachine-day-'));
-            if (!dayClass) return;
-            
-            const dayName = dayClass.replace('datamachine-day-', '');
-            const events = groupElement.querySelectorAll('.datamachine-event-item:not(.hidden)'); // Only visible events
-            
-            if (events.length > 0) {
-                dayGroups.set(dayName, {
-                    groupElement,
-                    events: Array.from(events),
-                    color: `var(--datamachine-day-${dayName})`
+            const dayName = dayClass ? dayClass.replace('datamachine-day-', '') : 'day';
+
+            // Find visible events in this group instance
+            const events = Array.from(groupElement.querySelectorAll('.datamachine-event-item:not(.hidden)'));
+
+            if (!dateKey || events.length === 0) {
+                // Skip groups without date or events
+                return;
+            }
+
+            // Initialize aggregator for this dateKey if needed
+            if (!groupsMap.has(dateKey)) {
+                groupsMap.set(dateKey, {
+                    dateKey,
+                    dayName,
+                    events: []
                 });
             }
+
+            const agg = groupsMap.get(dateKey);
+            agg.events.push(...events);
         });
-        
-        return dayGroups;
+
+        // Convert map values to array. Ensure events array is unique and deterministic.
+        return Array.from(groupsMap.values()).map(group => {
+            // Remove duplicate event elements (same DOM node may be present in multiple groupElements)
+            const uniqueEvents = Array.from(new Set(group.events));
+            // Sort by data-date (ISO) and then by DOM position to keep deterministic order
+            uniqueEvents.sort((a, b) => {
+                const aDate = a.getAttribute('data-date') || '';
+                const bDate = b.getAttribute('data-date') || '';
+                if (aDate !== bDate) return aDate.localeCompare(bDate);
+                
+                // fallback to compare offsetTop/Left for stable ordering
+                const aRect = a.getBoundingClientRect();
+                const bRect = b.getBoundingClientRect();
+                if (aRect.top !== bRect.top) return aRect.top - bRect.top;
+                return aRect.left - bRect.left;
+            });
+
+            return {
+                dateKey: group.dateKey,
+                dayName: group.dayName,
+                events: uniqueEvents
+            };
+        });
     }
 
     /**
@@ -161,21 +225,6 @@ export class CircuitGridRenderer {
         };
     }
 
-    /**
-     * Get fill color for day background
-     */
-    getFillColor(dayName) {
-        const fillColors = {
-            'sunday': 'rgba(255, 107, 107, 0.15)',
-            'monday': 'rgba(78, 205, 196, 0.15)', 
-            'tuesday': 'rgba(69, 183, 209, 0.15)',
-            'wednesday': 'rgba(150, 206, 180, 0.15)',
-            'thursday': 'rgba(254, 202, 87, 0.15)',
-            'friday': 'rgba(255, 159, 243, 0.15)',
-            'saturday': 'rgba(84, 160, 255, 0.15)'
-        };
-        return fillColors[dayName] || 'rgba(0, 0, 0, 0.15)';
-    }
 
     /**
      * Render SVG border element for day group using shape data
@@ -184,73 +233,109 @@ export class CircuitGridRenderer {
      * @param {Object} shape Shape definition with type, dimensions, and path data
      * @param {string} color CSS color value for border stroke
      */
-    renderGroupBorder(dayName, shape, color) {
+    /**
+     * Render SVG border element for day group using shape data
+     * 
+     * @param {string} dayName Day identifier (e.g., 'monday', 'tuesday')
+     * @param {Object} shape Shape definition with type, dimensions, and path data
+     * @param {string} color CSS color value for border stroke
+     * @param {number} groupIndex Unique index for this group occurrence
+     */
+    renderGroupBorder(dayName, shape, groupKey = '') {
         if (!shape || !this.svgContainer) return;
 
-        // Remove existing border for this day
-        const existingBorder = this.svgContainer.querySelector(`[data-day="${dayName}"]`);
+        // Normalize groupKey into a safe identifier for use in data attributes
+        const safeKey = String(groupKey).replace(/[^a-z0-9-_]/gi, '-');
+
+        // Use a unique data-day value to avoid overwriting other same-day groups
+        const dataDayAttr = `${dayName}-${safeKey}`;
+
+        // Remove existing border for this specific day-group if present
+        const existingBorder = this.svgContainer.querySelector(`[data-day="${dataDayAttr}"]`);
         if (existingBorder) {
             existingBorder.remove();
         }
 
-        const fillColor = this.getFillColor(dayName);
+        // Use ColorManager to set fill/stroke via CSS custom property references
         let element;
 
         if (shape.type === 'path') {
-            // Create SVG path element for L-shapes with arc-based rounding AND background fill
             element = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             element.setAttribute('d', shape.path);
-            element.setAttribute('fill', fillColor);
-            element.setAttribute('stroke', color);
+            element.setAttribute('fill', 'none');
             element.setAttribute('stroke-width', '3.25');
             element.setAttribute('stroke-opacity', '0.8');
-            // No stroke-linejoin - arcs handle all corner rounding
+            ColorManager.applyToElement(element, dayName, { useVar: true });
         } else {
-            // Create single SVG rect element for simple rectangles AND background fill
             element = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
             element.setAttribute('x', shape.left);
             element.setAttribute('y', shape.top);
             element.setAttribute('width', shape.width);
             element.setAttribute('height', shape.height);
-            element.setAttribute('fill', fillColor);
-            element.setAttribute('stroke', color);
+            element.setAttribute('fill', 'none');
             element.setAttribute('stroke-width', '3.25');
             element.setAttribute('stroke-linejoin', 'round');
             element.setAttribute('stroke-linecap', 'round');
             element.setAttribute('stroke-opacity', '0.8');
-            element.setAttribute('rx', shape.borderRadius || 8); // Dynamic rounded corners
+            element.setAttribute('rx', shape.borderRadius || 8);
+            ColorManager.applyToElement(element, dayName, { useVar: true });
         }
 
-        element.setAttribute('data-day', dayName);
-        element.className.baseVal = `datamachine-border-${dayName}`;
+        element.setAttribute('data-day', dataDayAttr);
+
+        // apply both day-specific and group-specific classes so existing CSS still matches
+        // e.g., datamachine-border-monday datamachine-border-group-monday
+        element.className.baseVal = `datamachine-border-${dayName} datamachine-border-group-${dayName}`;
 
         this.svgContainer.appendChild(element);
-        this.borders.set(dayName, element);
+
+        // Store border keyed by unique dataDayAttr
+        this.borders.set(dataDayAttr, element);
     }
 
     /**
      * Extract grid configuration from CSS custom properties and calculate responsive layout
-     * 
+     *
      * @returns {Object} Grid settings with cellWidth, gap, eventsPerRow, borderRadius
      */
     getActiveGridSettings() {
         const styles = getComputedStyle(document.documentElement);
-        const cellWidth = parseInt(styles.getPropertyValue('--datamachine-grid-cell-width'));
-        const gap = parseInt(styles.getPropertyValue('--datamachine-grid-gap'));
         const borderRadius = parseInt(styles.getPropertyValue('--datamachine-border-radius')) || 8;
-        
+
         // Get actual container width
         const containerWidth = this.calendar.querySelector('.datamachine-events-content').getBoundingClientRect().width;
-        
+
+        // Determine which CSS variables to use based on viewport
+        let cellWidth, gap;
+
+        if (this.isMobileView()) {
+            // Mobile: single column, full width
+            cellWidth = containerWidth;
+            gap = 16; // 1rem
+        } else if (this.isTabletView()) {
+            // Tablet: use tablet-specific variables
+            cellWidth = parseInt(styles.getPropertyValue('--datamachine-grid-cell-width-tablet')) || 240;
+            gap = parseInt(styles.getPropertyValue('--datamachine-grid-gap-tablet')) || 20;
+        } else {
+            // Desktop: use default variables
+            cellWidth = parseInt(styles.getPropertyValue('--datamachine-grid-cell-width'));
+            gap = parseInt(styles.getPropertyValue('--datamachine-grid-gap'));
+        }
+
         // Calculate events per row using same logic as CSS grid
         const eventsPerRow = Math.floor((containerWidth + gap) / (cellWidth + gap));
-        
+
+        // Calculate safe padding to prevent border overlap
+        // Ensure at least 4px total space between borders (2px per side)
+        const padding = Math.min(8, Math.max(2, (gap / 2) - 2));
+
         return {
             cellWidth,
             gap,
             containerWidth,
             eventsPerRow: Math.max(1, eventsPerRow), // Ensure at least 1
-            borderRadius
+            borderRadius,
+            padding
         };
     }
 
@@ -342,14 +427,15 @@ export class CircuitGridRenderer {
      */
     generateSingleEventShape(event) {
         const gridSettings = this.getActiveGridSettings();
+        const padding = gridSettings.padding;
         const rect = event.getBoundingClientRect();
         const contentRect = this.calendar.querySelector('.datamachine-events-content').getBoundingClientRect();
         
         const bounds = {
-            left: rect.left - contentRect.left - 8,
-            top: rect.top - contentRect.top - 8,
-            width: rect.width + 16,
-            height: rect.height + 16
+            left: rect.left - contentRect.left - padding,
+            top: rect.top - contentRect.top - padding,
+            width: rect.width + (padding * 2),
+            height: rect.height + (padding * 2)
         };
         
         return this.createBorderPathWithGap(bounds, gridSettings.borderRadius);
@@ -359,11 +445,12 @@ export class CircuitGridRenderer {
      * Generate path with gap for badge on top border
      * 
      * @param {HTMLElement[]} events Array of event elements in horizontal line
-     * @param {number} padding Border padding in pixels
+     * @param {number} padding Border padding in pixels (unused, uses gridSettings)
      * @returns {Object} Path shape definition with badge gap
      */
-    drawHorizontalLines(events, padding = 8) {
+    drawHorizontalLines(events) {
         const gridSettings = this.getActiveGridSettings();
+        const padding = gridSettings.padding;
         let minLeft = Infinity;
         let minTop = Infinity;
         let maxRight = -Infinity;
@@ -499,11 +586,12 @@ export class CircuitGridRenderer {
      * 
      * @param {HTMLElement[]} events Array of split event elements
      * @param {number} eventsPerRow Maximum events per row from grid calculation
-     * @param {number} padding Border padding in pixels
+     * @param {number} padding Border padding in pixels (unused, uses gridSettings)
      * @returns {Object} Path shape definition with connector line
      */
-    drawSplitGroups(events, eventsPerRow, padding = 8) {
+    drawSplitGroups(events, eventsPerRow) {
         const gridSettings = this.getActiveGridSettings();
+        const padding = gridSettings.padding;
         const eventPositions = events.map(event => this.calculateEventGridPosition(event, gridSettings));
         const curves = this.drawCurves();
         
@@ -543,15 +631,15 @@ export class CircuitGridRenderer {
         
         // Top group border (rounded rectangle)
         path.push(
-            `M ${topBounds.left + 8} ${topBounds.top}`,
-            `L ${topBounds.left + topBounds.width - 8} ${topBounds.top}`,
-            curves.externalTopRight(topBounds.left + topBounds.width, topBounds.top + 8),
-            `L ${topBounds.left + topBounds.width} ${topBounds.top + topBounds.height - 8}`,
-            curves.externalBottomRight(topBounds.left + topBounds.width - 8, topBounds.top + topBounds.height),
-            `L ${topBounds.left + 8} ${topBounds.top + topBounds.height}`,
-            curves.externalBottomLeft(topBounds.left, topBounds.top + topBounds.height - 8),
-            `L ${topBounds.left} ${topBounds.top + 8}`,
-            curves.externalTopLeft(topBounds.left + 8, topBounds.top)
+            `M ${topBounds.left + padding} ${topBounds.top}`,
+            `L ${topBounds.left + topBounds.width - padding} ${topBounds.top}`,
+            curves.externalTopRight(topBounds.left + topBounds.width, topBounds.top + padding),
+            `L ${topBounds.left + topBounds.width} ${topBounds.top + topBounds.height - padding}`,
+            curves.externalBottomRight(topBounds.left + topBounds.width - padding, topBounds.top + topBounds.height),
+            `L ${topBounds.left + padding} ${topBounds.top + topBounds.height}`,
+            curves.externalBottomLeft(topBounds.left, topBounds.top + topBounds.height - padding),
+            `L ${topBounds.left} ${topBounds.top + padding}`,
+            curves.externalTopLeft(topBounds.left + padding, topBounds.top)
         );
         
         // Horizontal connector line with angled ends to run in middle of gap
@@ -577,15 +665,15 @@ export class CircuitGridRenderer {
         
         // Bottom group border (rounded rectangle)
         path.push(
-            `M ${bottomBounds.left + 8} ${bottomBounds.top}`,
-            `L ${bottomBounds.left + bottomBounds.width - 8} ${bottomBounds.top}`,
-            curves.externalTopRight(bottomBounds.left + bottomBounds.width, bottomBounds.top + 8),
-            `L ${bottomBounds.left + bottomBounds.width} ${bottomBounds.top + bottomBounds.height - 8}`,
-            curves.externalBottomRight(bottomBounds.left + bottomBounds.width - 8, bottomBounds.top + bottomBounds.height),
-            `L ${bottomBounds.left + 8} ${bottomBounds.top + bottomBounds.height}`,
-            curves.externalBottomLeft(bottomBounds.left, bottomBounds.top + bottomBounds.height - 8),
-            `L ${bottomBounds.left} ${bottomBounds.top + 8}`,
-            curves.externalTopLeft(bottomBounds.left + 8, bottomBounds.top)
+            `M ${bottomBounds.left + padding} ${bottomBounds.top}`,
+            `L ${bottomBounds.left + bottomBounds.width - padding} ${bottomBounds.top}`,
+            curves.externalTopRight(bottomBounds.left + bottomBounds.width, bottomBounds.top + padding),
+            `L ${bottomBounds.left + bottomBounds.width} ${bottomBounds.top + bottomBounds.height - padding}`,
+            curves.externalBottomRight(bottomBounds.left + bottomBounds.width - padding, bottomBounds.top + bottomBounds.height),
+            `L ${bottomBounds.left + padding} ${bottomBounds.top + bottomBounds.height}`,
+            curves.externalBottomLeft(bottomBounds.left, bottomBounds.top + bottomBounds.height - padding),
+            `L ${bottomBounds.left} ${bottomBounds.top + padding}`,
+            curves.externalTopLeft(bottomBounds.left + padding, bottomBounds.top)
         );
         
         return {
@@ -608,11 +696,12 @@ export class CircuitGridRenderer {
      * 
      * @param {HTMLElement[]} events Event elements to encompass
      * @param {number} eventsPerRow Maximum events per row from grid calculation
-     * @param {number} padding Border padding in pixels
+     * @param {number} padding Border padding in pixels (unused, uses gridSettings)
      * @returns {Object} Path shape definition with SVG path string and bounds
      */
-    drawCutouts(events, eventsPerRow, padding = 8) {
+    drawCutouts(events, eventsPerRow) {
         const gridSettings = this.getActiveGridSettings();
+        const padding = gridSettings.padding;
         const eventPositions = events.map(event => this.calculateEventGridPosition(event, gridSettings));
         const curves = this.drawCurves();
         
@@ -696,6 +785,7 @@ export class CircuitGridRenderer {
      */
     generateRectangleShape(events, eventsPerRow) {
         const gridSettings = this.getActiveGridSettings();
+        const padding = gridSettings.padding;
         const eventPositions = events.map(event => this.calculateEventGridPosition(event, gridSettings));
         
         // Find the bounds of all events
@@ -704,7 +794,6 @@ export class CircuitGridRenderer {
         const top = Math.min(...eventPositions.map(pos => pos.top));
         const bottom = Math.max(...eventPositions.map(pos => pos.top + pos.height));
         
-        const padding = 8;
         const bounds = {
             left: left - padding,
             top: top - padding,
@@ -749,11 +838,13 @@ export class CircuitGridRenderer {
 
         // Detect day groups and render borders
         const dayGroups = this.detectDayGroups();
-        
-        dayGroups.forEach((groupData, dayName) => {
+
+        // dayGroups is an array of groupData objects
+        dayGroups.forEach((groupData) => {
             const shape = this.generateShapeForEvents(groupData.events);
             if (shape) {
-                this.renderGroupBorder(dayName, shape, groupData.color);
+                // Pass dayName and stable dateKey so renderGroupBorder creates one border per date
+                this.renderGroupBorder(groupData.dayName, shape, groupData.dateKey);
             }
         });
     }

@@ -17,12 +17,26 @@
    * DAY COLORS
    * ==================================== */
   --datamachine-day-sunday: #ff6b6b;
+  --datamachine-day-sunday-rgb: 255, 107, 107;
+  --datamachine-day-sunday-rgba: rgba(255, 107, 107, 0.15);
   --datamachine-day-monday: #4ecdc4;
+  --datamachine-day-monday-rgb: 78, 205, 196;
+  --datamachine-day-monday-rgba: rgba(78, 205, 196, 0.15);
   --datamachine-day-tuesday: #45b7d1;
+  --datamachine-day-tuesday-rgb: 69, 183, 209;
+  --datamachine-day-tuesday-rgba: rgba(69, 183, 209, 0.15);
   --datamachine-day-wednesday: #96ceb4;
+  --datamachine-day-wednesday-rgb: 150, 206, 180;
+  --datamachine-day-wednesday-rgba: rgba(150, 206, 180, 0.15);
   --datamachine-day-thursday: #feca57;
-  --datamachine-day-friday: #ff9ff3;
+  --datamachine-day-thursday-rgb: 254, 202, 87;
+  --datamachine-day-thursday-rgba: rgba(254, 202, 87, 0.15);
+  --datamachine-day-friday: #d63384;
+  --datamachine-day-friday-rgb: 214, 51, 132;
+  --datamachine-day-friday-rgba: rgba(214, 51, 132, 0.15);
   --datamachine-day-saturday: #54a0ff;
+  --datamachine-day-saturday-rgb: 84, 160, 255;
+  --datamachine-day-saturday-rgba: rgba(84, 160, 255, 0.15);
 
   /* ====================================
    * CARD INTERACTIVITY
@@ -42,8 +56,15 @@
   /* ====================================
    * RESPONSIVE BREAKPOINTS
    * ==================================== */
+  /* Tablet (769px-1199px) - 2-3 events per row */
+  --datamachine-grid-cell-width-tablet: 240px;
+  --datamachine-grid-gap-tablet: 20px;
+
+  /* Medium screens */
   --datamachine-grid-cell-width-medium: 265px; /* Increased by 5px */
   --datamachine-grid-cell-height-medium: 176px; /* Increased by 5% from 168px */
+
+  /* Mobile (≤768px) - Single column */
   --datamachine-grid-cell-height-mobile: 160px; /* Increased by 5% from 152px */
 
   /* ====================================

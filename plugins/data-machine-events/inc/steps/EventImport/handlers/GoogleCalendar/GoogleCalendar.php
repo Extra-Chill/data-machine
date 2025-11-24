@@ -11,6 +11,7 @@ use ICal\ICal;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachine\Core\DataPacket;
+use DataMachineEvents\Steps\EventImport\Handlers\GoogleCalendar\GoogleCalendarUtils;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -35,16 +36,26 @@ class GoogleCalendar extends EventImportHandler {
             'flow_step_id' => $flow_step_id
         ]);
 
-        // Get calendar URL from handler configuration
-        $calendar_url = $config['calendar_url'] ?? '';
+        // Resolve calendar from handler configuration (support calendar_url or calendar_id; prefer URL)
+        $calendar_url = trim($config['calendar_url'] ?? '');
+        $calendar_id = trim($config['calendar_id'] ?? '');
+
+        if (empty($calendar_url) && !empty($calendar_id)) {
+            if (GoogleCalendarUtils::is_calendar_url_like($calendar_id) && preg_match('/^https?:\/\//i', $calendar_id)) {
+                $calendar_url = $calendar_id;
+            } else {
+                $calendar_url = GoogleCalendarUtils::generate_ics_url_from_calendar_id($calendar_id);
+            }
+        }
+
         if (empty($calendar_url)) {
-            $this->log('error', 'Google Calendar URL not configured');
+            $this->log('error', 'Google Calendar URL or ID not configured', ['calendar_id' => $calendar_id]);
             return $this->emptyResponse() ?? [];
         }
 
         // Validate URL format
         if (!filter_var($calendar_url, FILTER_VALIDATE_URL)) {
-            $this->log('error', 'Invalid Google Calendar URL format', ['url' => $calendar_url]);
+            $this->log('error', 'Invalid Google Calendar URL format', ['url' => $calendar_url, 'calendar_id' => $calendar_id]);
             return $this->emptyResponse() ?? [];
         }
 
@@ -65,7 +76,11 @@ class GoogleCalendar extends EventImportHandler {
             }
 
             // Create unique identifier for processed items tracking
-            $event_identifier = md5($standardized_event['title'] . ($standardized_event['startDate'] ?? '') . ($standardized_event['venue'] ?? ''));
+            $event_identifier = \DataMachineEvents\Utilities\EventIdentifierGenerator::generate(
+                $standardized_event['title'],
+                $standardized_event['startDate'] ?? '',
+                $standardized_event['venue'] ?? ''
+            );
 
             // Check if already processed
             if ($this->isItemProcessed($event_identifier, $flow_step_id)) {
