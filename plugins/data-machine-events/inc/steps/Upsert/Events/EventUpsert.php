@@ -18,19 +18,20 @@ use DataMachine\Core\EngineData;
 use DataMachineEvents\Steps\Upsert\Events\Venue;
 use DataMachineEvents\Steps\Upsert\Events\Schema;
 use DataMachine\Core\Steps\Update\Handlers\UpdateHandler;
-use DataMachine\Core\WordPress\WordPressSharedTrait;
+use DataMachine\Core\WordPress\TaxonomyHandler;
+use DataMachine\Core\WordPress\WordPressSettingsResolver;
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
 class EventUpsert extends UpdateHandler {
-    use WordPressSharedTrait;
+    protected $taxonomy_handler;
 
     public function __construct() {
-        $this->initWordPressHelpers();
+        $this->taxonomy_handler = new TaxonomyHandler();
         // Register custom handler for venue taxonomy
-        \DataMachine\Core\WordPress\TaxonomyHandler::addCustomHandler('venue', [$this, 'assignVenueTaxonomy']);
+        TaxonomyHandler::addCustomHandler('venue', [$this, 'assignVenueTaxonomy']);
     }
 
     /**
@@ -254,8 +255,8 @@ class EventUpsert extends UpdateHandler {
      */
     private function createEventPost(array $parameters, array $handler_config, EngineData $engine, array $engine_parameters): int|\WP_Error {
         $job_id = (int) ($parameters['job_id'] ?? 0);
-        $post_status = $this->getEffectivePostStatus($handler_config);
-        $post_author = $this->getEffectivePostAuthor($handler_config);
+        $post_status = WordPressSettingsResolver::getPostStatus($handler_config);
+        $post_author = WordPressSettingsResolver::getPostAuthor($handler_config);
 
         $routing = Schema::engine_or_tool($parameters, $handler_config, $engine_parameters);
 
@@ -306,7 +307,8 @@ class EventUpsert extends UpdateHandler {
         // Process taxonomies
         $handler_config_for_tax = $handler_config;
         $handler_config_for_tax['taxonomy_venue_selection'] = 'skip';
-        $this->applyTaxonomies($post_id, $parameters, $handler_config_for_tax, $engine);
+        $engine_data_array = $engine instanceof EngineData ? $engine->all() : [];
+        $this->taxonomy_handler->processTaxonomies($post_id, $parameters, $handler_config_for_tax, $engine_data_array);
 
         // Store event_id in engine data
         if ($job_id) {
@@ -371,7 +373,8 @@ class EventUpsert extends UpdateHandler {
         // Update taxonomies
         $handler_config_for_tax = $handler_config;
         $handler_config_for_tax['taxonomy_venue_selection'] = 'skip';
-        $this->applyTaxonomies($post_id, $parameters, $handler_config_for_tax, $engine);
+        $engine_data_array = $engine instanceof EngineData ? $engine->all() : [];
+        $this->taxonomy_handler->processTaxonomies($post_id, $parameters, $handler_config_for_tax, $engine_data_array);
     }
 
     /**
@@ -414,23 +417,14 @@ class EventUpsert extends UpdateHandler {
             return;
         }
 
-        $image_context = null;
         $image_path = $engine->getImagePath();
 
         if (!empty($image_path)) {
-            $image_context = $engine;
+            $engine->attachImageToPost($post_id, $handler_config);
         } elseif (!empty($handler_config['eventImage'])) {
-            $image_context = ['image_file_path' => $handler_config['eventImage']];
+            $fallback_engine = new EngineData(['image_file_path' => $handler_config['eventImage']], null);
+            $fallback_engine->attachImageToPost($post_id, $handler_config);
         }
-
-        if (!$image_context) {
-            return;
-        }
-
-        $image_config = $handler_config;
-        $image_config['enable_images'] = true;
-
-        $this->processFeaturedImage($post_id, $image_context, $image_config);
     }
 
     /**
@@ -625,5 +619,45 @@ class EventUpsert extends UpdateHandler {
             'data' => $data,
             'tool_name' => 'datamachine_events'
         ];
+    }
+
+    /**
+     * Normalize arbitrary engine context input into an EngineData instance.
+     *
+     * @param mixed $engine_context Engine context (EngineData|array|null)
+     * @param array $parameters Parameters array
+     * @return EngineData EngineData instance
+     */
+    private function resolveEngineContext($engine_context = null, array $parameters = []): EngineData {
+        if ($engine_context instanceof EngineData) {
+            return $engine_context;
+        }
+
+        $job_id = (int) ($parameters['job_id'] ?? null);
+
+        if ($engine_context === null) {
+            $engine_context = $parameters['engine'] ?? ($parameters['engine_data'] ?? []);
+        }
+
+        if ($engine_context instanceof EngineData) {
+            return $engine_context;
+        }
+
+        if (!is_array($engine_context)) {
+            $engine_context = is_string($engine_context) ? ['image_url' => $engine_context] : [];
+        }
+
+        return new EngineData($engine_context, $job_id);
+    }
+
+    /**
+     * Logging wrapper for Data Machine logging system.
+     *
+     * @param string $level Log level (debug, info, warning, error)
+     * @param string $message Log message
+     * @param array $context Additional context data
+     */
+    private function dmLog(string $level, string $message, array $context = []): void {
+        do_action('datamachine_log', $level, $message, $context);
     }
 }

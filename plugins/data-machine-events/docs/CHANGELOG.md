@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2025-11-23
+
+### Fixed
+- **Compatibility with Data Machine v0.2.7** - Removed dependency on WordPressSharedTrait (breaking change in core)
+  - Migrated EventUpsert handler to direct EngineData instantiation pattern
+  - Migrated to WordPressSettingsResolver for WordPress settings (post status, post author)
+  - Added private helper methods for EngineData context resolution
+  - Direct TaxonomyHandler usage for taxonomy processing
+
+### Changed
+- **EventUpsert Handler Architecture** - Refactored to use direct EngineData pattern for single source of truth data access
+- **Code Deduplication** - Eliminated duplicated WordPress settings logic by using centralized WordPressSettingsResolver
+
+### Requirements
+- **Requires Data Machine v0.2.7+** - Due to WordPressSharedTrait removal and WordPressSettingsResolver introduction
+
 ## [0.3.0] - 2024-11-23
 
 ### BREAKING CHANGES
