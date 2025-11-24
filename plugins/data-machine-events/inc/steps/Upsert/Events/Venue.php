@@ -4,10 +4,10 @@
  *
  * Centralized venue taxonomy handling for Data Machine Events.
  *
- * @package DataMachineEvents\Steps\Publish\Events
+ * @package DataMachineEvents\Steps\Upsert\Events
  */
 
-namespace DataMachineEvents\Steps\Publish\Events;
+namespace DataMachineEvents\Steps\Upsert\Events;
 
 use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Core\VenueService;

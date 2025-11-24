@@ -1,14 +1,16 @@
 <?php
 /**
- * Dynamic Taxonomy Badge System
+ * Calendar Block Taxonomy Badge System
  *
- * Themes customize via filters: datamachine_events_badge_wrapper_classes, datamachine_events_badge_classes, datamachine_events_excluded_taxonomies.
- * Provides hash-based color classes for consistent styling.
+ * Self-contained badge rendering for Calendar block event items. Provides extensibility
+ * filters for themes/plugins (datamachine_events_badge_wrapper_classes, datamachine_events_badge_classes,
+ * datamachine_events_excluded_taxonomies) while keeping badge logic within Calendar block.
+ * Supports hash-based color classes for consistent styling.
  *
- * @package DataMachineEvents\Core
+ * @package DataMachineEvents\Blocks\Calendar
  */
 
-namespace DataMachineEvents\Core;
+namespace DataMachineEvents\Blocks\Calendar;
 
 if (!defined('ABSPATH')) {
     exit;

@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
 }
 
 use DataMachineEvents\Core\Venue_Taxonomy;
-use DataMachineEvents\Steps\Publish\Events\Schema;
+use DataMachineEvents\Steps\Upsert\Events\Schema;
 
 $start_date = $attributes['startDate'] ?? '';
 $end_date = $attributes['endDate'] ?? '';

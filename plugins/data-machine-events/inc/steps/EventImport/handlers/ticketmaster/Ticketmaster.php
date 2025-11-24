@@ -42,7 +42,7 @@ class Ticketmaster extends EventImportHandler {
             'flow_step_id' => $flow_step_id
         ]);
         
-        $auth = $this->getAuthProvider('ticketmaster_events');
+        $auth = $this->getAuthProvider('ticketmaster');
         if (!$auth) {
             $this->log('error', 'Ticketmaster authentication provider not found');
             return $this->emptyResponse() ?? [];

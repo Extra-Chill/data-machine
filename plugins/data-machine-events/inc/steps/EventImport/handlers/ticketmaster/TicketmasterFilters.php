@@ -27,7 +27,7 @@ class TicketmasterFilters {
      */
     public static function register(): void {
         self::registerHandler(
-            'ticketmaster_events',
+            'ticketmaster',
             'event_import',
             Ticketmaster::class,
             __('Ticketmaster Events', 'datamachine-events'),

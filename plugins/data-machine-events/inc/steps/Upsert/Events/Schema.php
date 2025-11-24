@@ -2,10 +2,10 @@
 /**
  * Event Schema JSON-LD Generator
  *
- * @package DataMachineEvents\Steps\Publish\Events
+ * @package DataMachineEvents\Steps\Upsert\Events
  */
 
-namespace DataMachineEvents\Steps\Publish\Events;
+namespace DataMachineEvents\Steps\Upsert\Events;
 
 if (!defined('ABSPATH')) {
     exit;

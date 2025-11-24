@@ -5,6 +5,95 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.3.0] - 2024-11-23
+
+### BREAKING CHANGES
+
+**Single Event Template Removed**
+- Event posts now use theme's `single.php` template instead of custom plugin template
+- Themes have full control over event presentation layout
+- Event Details block remains self-contained and provides all event data rendering
+
+**Removed Action Hooks** (previously in `templates/single-datamachine_events.php`):
+- `datamachine_events_before_single_event` - Use theme's `single.php` or template parts
+- `datamachine_events_after_single_event` - Use theme's `single.php` or template parts
+- `datamachine_events_related_events` - Implement in theme's `single.php` for `datamachine_events` post type
+- `datamachine_events_after_event_article` - Use theme's `single.php` or template parts
+
+**Removed Filter Hook**:
+- `datamachine_events_breadcrumbs` - Use theme's breadcrumb system (Yoast, Rank Math, custom theme breadcrumbs)
+
+**Taxonomy_Badges Namespace Change**:
+- Moved from `DataMachineEvents\Core\Taxonomy_Badges` to `DataMachineEvents\Blocks\Calendar\Taxonomy_Badges`
+- Plugins/themes using `class_exists('DataMachineEvents\Core\Taxonomy_Badges')` must update to new namespace
+- All filter hooks preserved and unchanged (`datamachine_events_badge_wrapper_classes`, `datamachine_events_badge_classes`, `datamachine_events_excluded_taxonomies`)
+
+### Changed
+- **Taxonomy_Badges**: Moved from `inc/Core/` to `inc/Blocks/Calendar/` for self-contained block architecture
+  - Namespace changed from `DataMachineEvents\Core` to `DataMachineEvents\Blocks\Calendar`
+  - All extensibility filter hooks preserved for theme/plugin compatibility
+  - Used exclusively by Calendar block event-item template
+  - Location: `inc/Blocks/Calendar/Taxonomy_Badges.php`
+
+### Removed
+- **Single Post Template**: Deleted `templates/single-datamachine_events.php` (93 lines)
+  - Events now use theme's default `single.php` template
+  - Allows themes full control over event presentation
+  - Aligns with WordPress block-first architecture (blocks provide data, themes provide presentation)
+  - Event Details block handles all event data rendering with structured data, venue maps, and action buttons
+- **Breadcrumbs Class**: Deleted `inc/Core/Breadcrumbs.php` (69 lines)
+  - Only used in removed single post template
+  - Themes should use their own breadcrumb systems
+  - Reduces plugin maintenance burden and complexity
+- **Frontend Template Override**: Removed `template_include` filter and `load_event_templates()` method
+  - Simplifies plugin by eliminating theme override logic
+  - Removed `init_frontend()` method
+
+### Architectural Benefits
+- **Simplified Plugin**: 162 lines removed, cleaner separation of concerns
+- **Self-Contained Calendar Block**: All taxonomy badge logic lives with the block that uses it
+- **Theme Flexibility**: Full control over single event post layout and presentation
+- **Extensibility**: Themes/plugins can build custom features on solid foundation
+- **KISS Principle**: Each component has singular purpose with clear boundaries
+
+### Added
+- **EventUpsertSettings**: New dedicated settings class for Event Upsert handler
+  - Includes comprehensive venue handling explanation in handler configuration UI
+  - Informational field shows users which venue metadata fields are automatically populated (name, address, city, state, zip, country, phone, website, coordinates, capacity)
+  - Makes automatic venue metadata population from import handlers (Ticketmaster, Dice FM, Web Scraper, Google Calendar) transparent to users
+
+### Changed
+- **Directory Structure**: Completed Publisher → Upsert migration
+  - Moved `Schema.php` from `inc/Steps/Publish/Events/` to `inc/Steps/Upsert/Events/`
+  - Moved `Venue.php` from `inc/Steps/Publish/Events/` to `inc/Steps/Upsert/Events/`
+  - Updated all namespaces from `DataMachineEvents\Steps\Publish\Events` to `DataMachineEvents\Steps\Upsert\Events`
+  - Updated imports in `EventUpsert.php` and `EventDetails/render.php` to use new Upsert namespace
+- **EventUpsertFilters**: Now uses `EventUpsertSettings::class` instead of deprecated Publisher Settings
+
+### Removed
+- **Deprecated Publisher Directory**: Deleted entire `inc/Steps/Publish/` directory
+  - Publisher handler was replaced by EventUpsert in v0.2.0 but directory structure lingered
+  - All functionality properly migrated to Upsert directory
+
+## [0.2.4] - 2025-11-23
+
+### Fixed
+- **Mobile Layout**: Reverted mobile padding changes to restore correct vertical spacing
+  - Restored side padding (1rem) on mobile grid container
+  - Restored max-width (400px) and auto margins on event cards
+  - Maintained unified absolute badge positioning from 0.2.3
+
+## [0.2.3] - 2025-11-23
+
+### Fixed
+- **Circuit Grid Badges**: Unified badge rendering logic for all viewports
+  - Removed complex gap detection system; badges now sit on top of borders
+  - Fixed mobile badge positioning to align with border (matching desktop behavior)
+  - Removed extraneous side padding on mobile for better screen utilization
+  - Simplified border path generation logic for better performance
+
 ## [0.2.2] - 2025-11-23
 
 ### Fixed

@@ -15,8 +15,8 @@
 namespace DataMachineEvents\Steps\Upsert\Events;
 
 use DataMachine\Core\EngineData;
-use DataMachineEvents\Steps\Publish\Events\Venue;
-use DataMachineEvents\Steps\Publish\Events\Schema;
+use DataMachineEvents\Steps\Upsert\Events\Venue;
+use DataMachineEvents\Steps\Upsert\Events\Schema;
 use DataMachine\Core\Steps\Update\Handlers\UpdateHandler;
 use DataMachine\Core\WordPress\WordPressSharedTrait;
 

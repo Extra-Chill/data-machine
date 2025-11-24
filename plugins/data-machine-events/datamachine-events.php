@@ -3,7 +3,7 @@
  * Plugin Name: Data Machine Events
  * Plugin URI: https://chubes.net/datamachine-events
  * Description: WordPress events plugin with block-first architecture. Features AI-driven event creation via Data Machine integration, Event Details blocks for data storage, Calendar blocks for display, and venue taxonomy management.
- * Version: 0.2.2
+ * Version: 0.3.0
  * Author: Chris Huber
  * Author URI: https://chubes.net
  * License: GPL v2 or later
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once __DIR__ . '/vendor/autoload.php';
 }
-define('DATAMACHINE_EVENTS_VERSION', '0.2.2');
+define('DATAMACHINE_EVENTS_VERSION', '0.3.0');
 define('DATAMACHINE_EVENTS_PLUGIN_FILE', __FILE__);
 define('DATAMACHINE_EVENTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DATAMACHINE_EVENTS_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -84,7 +84,6 @@ class DATAMACHINE_Events {
             }
         }
         
-        $this->init_frontend();
     add_action('init', array($this, 'init_data_machine_integration'), 25);
  
         // Initialize admin bar for all logged-in users
@@ -101,10 +100,6 @@ class DATAMACHINE_Events {
     
     private function init_admin() {
         // Admin components are bootstrapped individually where required.
-    }
-    
-    private function init_frontend() {
-        add_filter('template_include', array($this, 'load_event_templates'));
     }
     
     public function init_data_machine_integration() {
@@ -217,24 +212,7 @@ class DATAMACHINE_Events {
     }
     
     
-    /**
-     * @param string $template Current template path
-     * @return string Modified template path
-     */
-    public function load_event_templates($template) {
-        global $post;
 
-        if ($post && $post->post_type === 'datamachine_events') {
-            if (is_single()) {
-                $plugin_template = DATAMACHINE_EVENTS_PLUGIN_DIR . 'templates/single-datamachine_events.php';
-                if (file_exists($plugin_template)) {
-                    return $plugin_template;
-                }
-            }
-        }
-
-        return $template;
-    }
     
     public function activate() {
         $this->register_post_types();
