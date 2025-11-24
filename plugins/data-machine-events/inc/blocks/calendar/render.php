@@ -14,6 +14,7 @@ if (!defined('ABSPATH')) {
 }
 
 use DataMachineEvents\Blocks\Calendar\DisplayStyles\CircuitGrid\CircuitGridRenderer;
+use DataMachineEvents\Blocks\Calendar\Pagination;
 // Early exit for REST API requests - prevent duplicate rendering
 // REST API endpoint handles its own rendering via rest-api.php
 if (wp_is_json_request() || (defined('REST_REQUEST') && REST_REQUEST)) {
@@ -409,12 +410,7 @@ $filter_count = !empty($tax_filters) ? array_sum(array_map('count', $tax_filters
         'events_per_page' => $events_per_page
     ]);
 
-    \DataMachineEvents\Blocks\Calendar\Template_Loader::include_template('pagination', [
-        'current_page' => $current_page,
-        'max_pages' => $max_pages,
-        'show_past' => $show_past,
-        'enable_pagination' => $enable_pagination
-    ]);
+    echo Pagination::render_pagination($current_page, $max_pages, $show_past, $enable_pagination);
 
     \DataMachineEvents\Blocks\Calendar\Template_Loader::include_template('navigation', [
         'show_past' => $show_past,

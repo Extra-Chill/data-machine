@@ -46,7 +46,10 @@ class TicketmasterSettings {
                 'type' => 'select',
                 'label' => __('Event Type', 'datamachine-events'),
                 'description' => __('Select the type of events to import. Options are fetched dynamically from Ticketmaster API.', 'datamachine-events'),
-                'options' => Ticketmaster::get_classifications_for_dropdown($current_config),
+                'options' => array_merge(
+                    ['' => __('Select an event type...', 'datamachine-events')],
+                    Ticketmaster::get_classifications_for_dropdown($current_config)
+                ),
             ],
             'location' => [
                 'type' => 'text',
@@ -115,7 +118,7 @@ class TicketmasterSettings {
      */
     public static function get_defaults(): array {
         return [
-            'classification_type' => '',
+            'classification_type' => 'music',
             'location' => '32.7765,-79.9311',
             'radius' => '50',
             'start_date' => '',
