@@ -19,7 +19,6 @@ $price = $display_vars['price'] ?? '';
 $ticket_url = $display_vars['ticket_url'] ?? '';
 $iso_start_date = $display_vars['iso_start_date'] ?? '';
 
-$show_venue = $display_vars['show_venue'] ?? true;
 $show_performer = $display_vars['show_performer'] ?? true;
 $show_price = $display_vars['show_price'] ?? true;
 $show_ticket_link = $display_vars['show_ticket_link'] ?? true;
@@ -33,14 +32,14 @@ $show_ticket_link = $display_vars['show_ticket_link'] ?? true;
      data-ticket-url="<?php echo esc_url($ticket_url); ?>"
      data-has-tickets="<?php echo ($show_ticket_link && !empty($ticket_url)) ? 'true' : 'false'; ?>">
 
-    <a href="<?php echo esc_url(get_the_permalink()); ?>"
-       class="datamachine-event-link"
-       aria-label="<?php echo esc_attr(sprintf(__('View event: %s', 'datamachine-events'), get_the_title())); ?>">
+    <div class="datamachine-event-link">
 
         <?php echo \DataMachineEvents\Blocks\Calendar\Taxonomy_Badges::render_taxonomy_badges($event_post->ID); ?>
 
         <h4 class="datamachine-event-title">
-            <?php the_title(); ?>
+            <a href="<?php echo esc_url(get_the_permalink()); ?>">
+                <?php the_title(); ?>
+            </a>
         </h4>
 
         <div class="datamachine-event-meta">
@@ -51,15 +50,18 @@ $show_ticket_link = $display_vars['show_ticket_link'] ?? true;
                 </div>
             <?php endif; ?>
 
-            
-
             <?php if ($show_performer && !empty($performer_name)) : ?>
                 <div class="datamachine-event-performer">
                     <span class="dashicons dashicons-admin-users"></span>
                     <?php echo esc_html($performer_name); ?>
                 </div>
             <?php endif; ?>
+
+            <a href="<?php echo esc_url(get_the_permalink()); ?>" 
+               class="<?php echo esc_attr(implode(' ', apply_filters('datamachine_events_more_info_button_classes', ['datamachine-more-info-button']))); ?>">
+                <?php esc_html_e('More Info', 'datamachine-events'); ?>
+            </a>
         </div>
 
-    </a>
+    </div>
 </div>

@@ -7,6 +7,10 @@
  * datamachine_events_excluded_taxonomies) while keeping badge logic within Calendar block.
  * Supports hash-based color classes for consistent styling.
  *
+ * Filter: datamachine_events_excluded_taxonomies
+ * @param array  $excluded Array of taxonomy slugs to exclude
+ * @param string $context  Context identifier: 'badge', 'modal', or empty for all contexts
+ *
  * @package DataMachineEvents\Blocks\Calendar
  */
 
@@ -35,7 +39,7 @@ class Taxonomy_Badges {
         
         $taxonomy_data = [];
 
-        $excluded_taxonomies = apply_filters('datamachine_events_excluded_taxonomies', array());
+        $excluded_taxonomies = apply_filters('datamachine_events_excluded_taxonomies', array(), 'badge');
 
         foreach ($all_taxonomies as $taxonomy_slug => $taxonomy_object) {
             if (in_array($taxonomy_slug, $excluded_taxonomies, true)) {
@@ -87,13 +91,26 @@ class Taxonomy_Badges {
 
                 $badge_classes = apply_filters('datamachine_events_badge_classes', $badge_classes, $taxonomy_slug, $term, $post_id);
 
-                $output .= sprintf(
-                    '<span class="%s" data-taxonomy="%s" data-term="%s">%s</span>',
-                    esc_attr(implode(' ', $badge_classes)),
-                    esc_attr($taxonomy_slug),
-                    esc_attr($term->slug),
-                    esc_html($term->name)
-                );
+                $term_link = get_term_link($term, $taxonomy_slug);
+
+                if (is_wp_error($term_link)) {
+                    $output .= sprintf(
+                        '<span class="%s" data-taxonomy="%s" data-term="%s">%s</span>',
+                        esc_attr(implode(' ', $badge_classes)),
+                        esc_attr($taxonomy_slug),
+                        esc_attr($term->slug),
+                        esc_html($term->name)
+                    );
+                } else {
+                    $output .= sprintf(
+                        '<a href="%s" class="%s" data-taxonomy="%s" data-term="%s">%s</a>',
+                        esc_url($term_link),
+                        esc_attr(implode(' ', $badge_classes)),
+                        esc_attr($taxonomy_slug),
+                        esc_attr($term->slug),
+                        esc_html($term->name)
+                    );
+                }
             }
         }
 
@@ -108,7 +125,7 @@ class Taxonomy_Badges {
     public static function get_used_taxonomies() {
         global $wpdb;
 
-        $excluded_taxonomies = apply_filters('datamachine_events_excluded_taxonomies', array());
+        $excluded_taxonomies = apply_filters('datamachine_events_excluded_taxonomies', array(), 'badge');
         $excluded_sql = '';
         if (!empty($excluded_taxonomies)) {
             $excluded_sql = "AND tt.taxonomy NOT IN ('" . implode("','", array_map('esc_sql', $excluded_taxonomies)) . "')";

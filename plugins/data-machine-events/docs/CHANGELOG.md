@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.3] - 2025-11-25
+
+### Changed
+- **Taxonomy Exclusion Filter Enhancement** - Added `$context` parameter to `datamachine_events_excluded_taxonomies` filter
+  - Filter now passes context identifier: `'badge'` for taxonomy badges, `'modal'` for filter modal
+  - Callbacks can exclude taxonomies from specific contexts or all contexts (no context check = exclude from all)
+  - Removed hardcoded venue exclusion from `Taxonomy_Helper::get_all_taxonomies_with_counts()`
+  - Centralized taxonomy visibility control through single filter for both badges and modal
+- **Event Card Link Structure** - Refactored event item template for better accessibility and UX
+  - Changed from full-card link wrapper to individual links for title and "More Info" button
+  - Added `datamachine_events_more_info_button_classes` filter for button customization
+  - Taxonomy badges now render as clickable links to term archive pages
+- **EventUpsertSettings Cleanup** - Simplified user options retrieval using `WordPressSettingsHandler::get_user_options()`
+
 ## [0.3.2] - 2025-11-24
 
 ### Fixed

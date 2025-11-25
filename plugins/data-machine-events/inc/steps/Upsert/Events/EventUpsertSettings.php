@@ -35,12 +35,7 @@ class EventUpsertSettings {
      */
     public static function get_fields(array $current_config = []): array {
         // Get available WordPress users for post authorship
-        $user_options = [];
-        $users = get_users(['fields' => ['ID', 'display_name', 'user_login']]);
-        foreach ($users as $user) {
-            $display_name = !empty($user->display_name) ? $user->display_name : $user->user_login;
-            $user_options[$user->ID] = $display_name;
-        }
+        $user_options = WordPressSettingsHandler::get_user_options();
         
         $fields = [
             'venue_info' => [
