@@ -3,6 +3,8 @@ namespace DataMachineEvents\Api;
 
 defined( 'ABSPATH' ) || exit;
 
+const API_NAMESPACE = 'datamachine/v1';
+
 // Ensure controllers are loaded when composer autoloader is not present
 if ( defined( 'DATAMACHINE_EVENTS_PLUGIN_DIR' ) ) {
 	$controllers = array(
@@ -28,7 +30,7 @@ function register_routes() {
 	$venues   = new Venues();
 
 	register_rest_route(
-		'datamachine/v1',
+		API_NAMESPACE,
 		'/events/calendar',
 		array(
 			'methods'             => 'GET',
@@ -64,7 +66,7 @@ function register_routes() {
 	);
 
 	register_rest_route(
-		'datamachine/v1',
+		API_NAMESPACE,
 		'/events/venues/(?P<id>\d+)',
 		array(
 			'methods'             => 'GET',
@@ -84,7 +86,7 @@ function register_routes() {
 	);
 
 	register_rest_route(
-		'datamachine/v1',
+		API_NAMESPACE,
 		'/events/venues/check-duplicate',
 		array(
 			'methods'             => 'GET',

@@ -8,10 +8,9 @@
    * GRID LAYOUT CONSTANTS
    * Used by both CSS and JavaScript
    * ==================================== */
-  --datamachine-grid-cell-width: 275px; /* Increased by 5px */
-  --datamachine-grid-cell-height: 193px; /* Increased by 5% from 184px */
-  --datamachine-grid-gap: 1.5625rem; /* 25px - reduced by 5px */
-  --datamachine-border-padding: 8px;
+  --datamachine-grid-cell-width: 316px;
+  --datamachine-grid-cell-height: 222px;
+  --datamachine-grid-gap: 1.5rem;
 
   /* ====================================
    * DAY COLORS
@@ -52,20 +51,6 @@
   --datamachine-border-width: 1px; /* Reduced from 2px */
   --datamachine-border-radius: 8px;
   --datamachine-border-opacity: 0.3; /* Reduced from 0.8 */
-
-  /* ====================================
-   * RESPONSIVE BREAKPOINTS
-   * ==================================== */
-  /* Tablet (769px-1199px) - 2-3 events per row */
-  --datamachine-grid-cell-width-tablet: 240px;
-  --datamachine-grid-gap-tablet: 20px;
-
-  /* Medium screens */
-  --datamachine-grid-cell-width-medium: 265px; /* Increased by 5px */
-  --datamachine-grid-cell-height-medium: 176px; /* Increased by 5% from 168px */
-
-  /* Mobile (≤768px) - Single column */
-  --datamachine-grid-cell-height-mobile: 160px; /* Increased by 5% from 152px */
 
   /* ====================================
    * SPACING & TYPOGRAPHY

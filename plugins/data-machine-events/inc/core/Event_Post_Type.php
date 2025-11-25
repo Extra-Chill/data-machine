@@ -19,6 +19,8 @@ if (!defined('ABSPATH')) {
  */
 class Event_Post_Type {
     
+    const POST_TYPE = 'datamachine_events';
+    
     public static function register() {
         $labels = array(
             'name'                  => _x('Events', 'Post type general name', 'datamachine-events'),
@@ -84,7 +86,7 @@ class Event_Post_Type {
             'taxonomies'         => array(),
         );
 
-        register_post_type('datamachine_events', $args);
+        register_post_type(self::POST_TYPE, $args);
         
         self::setup_admin_menu_control();
     }
@@ -100,7 +102,7 @@ class Event_Post_Type {
     public static function control_taxonomy_menus() {
         global $submenu;
         
-        $post_type_menu = 'edit.php?post_type=datamachine_events';
+        $post_type_menu = 'edit.php?post_type=' . self::POST_TYPE;
         
         $allowed_items = apply_filters('datamachine_events_post_type_menu_items', array(
             'venue' => true,
@@ -135,7 +137,7 @@ class Event_Post_Type {
     public static function filter_parent_file($parent_file) {
         global $current_screen;
 
-        if (!$current_screen || $current_screen->post_type !== 'datamachine_events') {
+        if (!$current_screen || $current_screen->post_type !== self::POST_TYPE) {
             return $parent_file;
         }
 
@@ -145,7 +147,7 @@ class Event_Post_Type {
         ));
 
         if ($current_screen->taxonomy && !isset($allowed_items[$current_screen->taxonomy])) {
-            return 'edit.php?post_type=datamachine_events';
+            return 'edit.php?post_type=' . self::POST_TYPE;
         }
 
         return $parent_file;
@@ -157,7 +159,7 @@ class Event_Post_Type {
     public static function filter_submenu_file($submenu_file) {
         global $current_screen;
         
-        if (!$current_screen || $current_screen->post_type !== 'datamachine_events') {
+        if (!$current_screen || $current_screen->post_type !== self::POST_TYPE) {
             return $submenu_file;
         }
         
@@ -168,7 +170,7 @@ class Event_Post_Type {
             ));
             
             if (isset($allowed_items[$current_screen->taxonomy])) {
-                return "edit-tags.php?taxonomy={$current_screen->taxonomy}&post_type=datamachine_events";
+                return "edit-tags.php?taxonomy={$current_screen->taxonomy}&post_type=" . self::POST_TYPE;
             }
         }
         

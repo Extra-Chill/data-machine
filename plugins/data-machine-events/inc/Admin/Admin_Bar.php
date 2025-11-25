@@ -8,6 +8,8 @@
 
 namespace DataMachineEvents\Admin;
 
+use DataMachineEvents\Core\Event_Post_Type;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -38,7 +40,7 @@ class Admin_Bar {
 
         // Fallback to post type archive if no custom URL set
         if (empty($events_url)) {
-            $events_url = get_post_type_archive_link('datamachine_events');
+            $events_url = get_post_type_archive_link(Event_Post_Type::POST_TYPE);
         }
 
         // Don't add menu if no URL available

@@ -17,6 +17,8 @@ namespace DataMachineEvents\Steps\Upsert\Events;
 use DataMachine\Core\EngineData;
 use DataMachineEvents\Steps\Upsert\Events\Venue;
 use DataMachineEvents\Steps\Upsert\Events\Schema;
+use DataMachineEvents\Core\Event_Post_Type;
+use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
 use DataMachine\Core\Steps\Update\Handlers\UpdateHandler;
 use DataMachine\Core\WordPress\TaxonomyHandler;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
@@ -139,7 +141,7 @@ class EventUpsert extends UpdateHandler {
 
         // Query by exact title match
         $args = [
-            'post_type' => 'datamachine_events',
+            'post_type' => Event_Post_Type::POST_TYPE,
             'post_title' => $title,
             'posts_per_page' => 1,
             'post_status' => ['publish', 'draft', 'pending'],
@@ -150,7 +152,7 @@ class EventUpsert extends UpdateHandler {
         if (!empty($startDate)) {
             $args['meta_query'] = [
                 [
-                    'key' => '_datamachine_event_datetime',
+                    'key' => EVENT_DATETIME_META_KEY,
                     'value' => $startDate,
                     'compare' => 'LIKE'
                 ]
@@ -286,7 +288,7 @@ class EventUpsert extends UpdateHandler {
         }
 
         $post_data = [
-            'post_type' => 'datamachine_events',
+            'post_type' => Event_Post_Type::POST_TYPE,
             'post_title' => $event_data['title'],
             'post_status' => $post_status,
             'post_author' => $post_author,
@@ -471,14 +473,6 @@ class EventUpsert extends UpdateHandler {
             'previousStartDate' => $event_data['previousStartDate'] ?? '',
             'priceCurrency' => $event_data['priceCurrency'] ?? 'USD',
             'offerAvailability' => $event_data['offerAvailability'] ?? 'InStock',
-
-            'venuePhone' => $parameters['venuePhone'] ?? '',
-            'venueWebsite' => $parameters['venueWebsite'] ?? '',
-            'venueCity' => $parameters['venueCity'] ?? '',
-            'venueState' => $parameters['venueState'] ?? '',
-            'venueZip' => $parameters['venueZip'] ?? '',
-            'venueCountry' => $parameters['venueCountry'] ?? '',
-            'venueCoordinates' => $parameters['venueCoordinates'] ?? '',
 
             'showVenue' => true,
             'showPrice' => true,

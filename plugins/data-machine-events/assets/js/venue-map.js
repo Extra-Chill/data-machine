@@ -155,10 +155,8 @@
         initVenueMaps();
     }
 
-    // Re-initialize for dynamic content (AJAX-loaded events, etc.)
-    if (window.jQuery) {
-        jQuery(document).on('datamachine-events-loaded', reinitMaps);
-    }
+    // Re-initialize for dynamic content
+    document.addEventListener('datamachine-events-loaded', reinitMaps);
 
     // Global function for manual initialization
     window.datamachineEventsInitMaps = initVenueMaps;

@@ -3,7 +3,7 @@
  * Plugin Name: Data Machine Events
  * Plugin URI: https://chubes.net/datamachine-events
  * Description: WordPress events plugin with block-first architecture. Features AI-driven event creation via Data Machine integration, Event Details blocks for data storage, Calendar blocks for display, and venue taxonomy management.
- * Version: 0.3.3
+ * Version: 0.3.6
  * Author: Chris Huber
  * Author URI: https://chubes.net
  * License: GPL v2 or later
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once __DIR__ . '/vendor/autoload.php';
 }
-define('DATAMACHINE_EVENTS_VERSION', '0.3.3');
+define('DATAMACHINE_EVENTS_VERSION', '0.3.6');
 define('DATAMACHINE_EVENTS_PLUGIN_FILE', __FILE__);
 define('DATAMACHINE_EVENTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DATAMACHINE_EVENTS_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -189,7 +189,6 @@ class DATAMACHINE_Events {
         }
 
         $css_file = DATAMACHINE_EVENTS_PLUGIN_DIR . 'assets/css/admin.css';
-        $js_file = DATAMACHINE_EVENTS_PLUGIN_DIR . 'assets/js/admin.js';
 
         if (file_exists($css_file)) {
             wp_enqueue_style(
@@ -197,16 +196,6 @@ class DATAMACHINE_Events {
                 DATAMACHINE_EVENTS_PLUGIN_URL . 'assets/css/admin.css',
                 array(),
                 filemtime($css_file)
-            );
-        }
-
-        if (file_exists($js_file)) {
-            wp_enqueue_script(
-                'datamachine-events-admin',
-                DATAMACHINE_EVENTS_PLUGIN_URL . 'assets/js/admin.js',
-                array('jquery', 'wp-util'),
-                filemtime($js_file),
-                true
             );
         }
     }
@@ -261,7 +250,7 @@ class DATAMACHINE_Events {
     }
     
     public function enqueue_root_styles() {
-        if (has_block('datamachine-events/calendar') || has_block('datamachine-events/event-details') || is_singular('datamachine_events')) {
+        if (has_block('datamachine-events/calendar') || has_block('datamachine-events/event-details') || is_singular(\DataMachineEvents\Core\Event_Post_Type::POST_TYPE)) {
             wp_enqueue_style(
                 'datamachine-events-root',
                 DATAMACHINE_EVENTS_PLUGIN_URL . 'inc/Blocks/root.css',
@@ -271,7 +260,7 @@ class DATAMACHINE_Events {
         }
 
         // Enqueue Leaflet map assets for Event Details block
-        if (has_block('datamachine-events/event-details') || is_singular('datamachine_events')) {
+        if (has_block('datamachine-events/event-details') || is_singular(\DataMachineEvents\Core\Event_Post_Type::POST_TYPE)) {
             // Leaflet CSS
             wp_enqueue_style(
                 'leaflet',

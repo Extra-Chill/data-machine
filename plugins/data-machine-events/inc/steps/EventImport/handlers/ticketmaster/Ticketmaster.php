@@ -389,40 +389,20 @@ class Ticketmaster extends EventImportHandler {
             }
         }
         
-        $ticket_url = $tm_event['url'] ?? '';
-
-        // Construct clean URL from ID if possible
+        // Always construct ticket URL from event ID to avoid malformed API URLs
         if (!empty($tm_event['id'])) {
-            $clean_url = 'https://www.ticketmaster.com/event/' . $tm_event['id'];
+            $ticket_url = 'https://www.ticketmaster.com/event/' . $tm_event['id'];
         } else {
-            $clean_url = $ticket_url;
+            $ticket_url = $tm_event['url'] ?? '';
         }
 
         // Apply affiliate link if configured
-        if (!empty($affiliate_id)) {
-            // Use standard Impact Radius format for Ticketmaster
-            // https://ticketmaster.evyy.net/c/{affiliate_id}/264167/4272?u={encoded_url}
+        if (!empty($affiliate_id) && !empty($ticket_url)) {
             $ticket_url = sprintf(
-                'https://ticketmaster.evyy.net/c/%s/264167/4272?u=%s&utm_medium=affiliate',
+                'https://ticketmaster.evyy.net/c/%s/264167/4272?u=%s',
                 $affiliate_id,
-                urlencode($clean_url)
+                urlencode($ticket_url)
             );
-        } elseif (strpos($ticket_url, 'ticketmaster.evyy.net') !== false) {
-             // If URL is already an affiliate link but broken (contains httpswww), try to fix it using clean URL
-             if (strpos($ticket_url, 'httpswww') !== false && !empty($tm_event['id'])) {
-                 // Extract affiliate ID if possible, or just use the clean URL if we can't save the affiliate part
-                 if (preg_match('/\/c\/(\d+)\//', $ticket_url, $matches)) {
-                     $extracted_affiliate_id = $matches[1];
-                     $ticket_url = sprintf(
-                        'https://ticketmaster.evyy.net/c/%s/264167/4272?u=%s&utm_medium=affiliate',
-                        $extracted_affiliate_id,
-                        urlencode($clean_url)
-                    );
-                 } else {
-                     // Can't parse affiliate ID, fallback to clean URL to avoid 404
-                     $ticket_url = $clean_url;
-                 }
-             }
         }
         
         return [

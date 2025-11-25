@@ -464,9 +464,4 @@
     // Re-initialize when modal opens (for dynamic content)
     document.addEventListener('datamachine-core-modal-content-loaded', init);
 
-    // Also try jQuery event if available (Data Machine might use it)
-    if (window.jQuery) {
-        jQuery(document).on('datamachine-core-modal-content-loaded', init);
-    }
-
 })();

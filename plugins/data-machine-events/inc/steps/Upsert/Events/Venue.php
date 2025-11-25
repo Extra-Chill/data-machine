@@ -11,6 +11,7 @@ namespace DataMachineEvents\Steps\Upsert\Events;
 
 use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Core\VenueService;
+use DataMachineEvents\Core\Event_Post_Type;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -131,7 +132,7 @@ class Venue {
             FROM {$wpdb->posts} p
             INNER JOIN {$wpdb->term_relationships} tr ON p.ID = tr.object_id
             INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
-            WHERE p.post_type = 'datamachine_events' 
+            WHERE p.post_type = '" . esc_sql(Event_Post_Type::POST_TYPE) . "' 
             AND p.post_status = 'publish'
             AND tt.taxonomy = 'venue'
         ");

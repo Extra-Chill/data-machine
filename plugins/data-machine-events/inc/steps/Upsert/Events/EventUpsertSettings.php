@@ -11,6 +11,7 @@
 namespace DataMachineEvents\Steps\Upsert\Events;
 
 use DataMachine\Core\WordPress\WordPressSettingsHandler;
+use DataMachineEvents\Core\Event_Post_Type;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -71,7 +72,7 @@ class EventUpsertSettings {
         // Add dynamic taxonomy fields using core WordPressSettingsHandler
         // Venue is excluded because it has a custom handler registered in EventUpsert.php
         $taxonomy_fields = WordPressSettingsHandler::get_taxonomy_fields([
-            'post_type' => 'datamachine_events',
+            'post_type' => Event_Post_Type::POST_TYPE,
             'exclude_taxonomies' => ['venue'],
             'field_suffix' => '_selection',
             'first_options' => [
@@ -109,7 +110,7 @@ class EventUpsertSettings {
         // Sanitize dynamic taxonomy selections using core WordPressSettingsHandler
         // Venue is excluded because it has a custom handler registered in EventUpsert.php
         $sanitized = array_merge($sanitized, WordPressSettingsHandler::sanitize_taxonomy_fields($raw_settings, [
-            'post_type' => 'datamachine_events',
+            'post_type' => Event_Post_Type::POST_TYPE,
             'exclude_taxonomies' => ['venue'],
             'field_suffix' => '_selection',
             'allowed_values' => ['skip', 'ai_decides'],

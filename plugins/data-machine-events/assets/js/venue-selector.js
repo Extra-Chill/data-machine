@@ -1,14 +1,14 @@
 /**
  * Venue Selector for Data Machine Events
  *
- * Handles venue dropdown selection, AJAX data loading, field population,
+ * Handles venue dropdown selection, REST API data loading, field population,
  * change tracking, and duplicate prevention for the Universal Web Scraper modal.
  *
  * @package DataMachineEvents
  * @since 1.0.0
  */
 
-(function($) {
+(function() {
     'use strict';
 
     // Store original venue values for change detection
@@ -95,12 +95,12 @@
     }
 
     /**
-     * Load venue data via AJAX and populate fields
+     * Load venue data via REST API and populate fields
      *
      * @param {number} termId Venue term ID
      */
     function loadVenueData(termId) {
-        if (!termId || !dmEventsVenue) {
+        if (!termId || typeof dmEventsVenue === 'undefined') {
             return;
         }
 
@@ -129,7 +129,7 @@
         })
         .catch(function(error) {
             hideLoadingState(loadingIndicator);
-            console.error('DM Events: AJAX error loading venue data', error);
+            console.error('DM Events: Error loading venue data', error);
             alert('Error loading venue data. Please check your connection and try again.');
         });
     }
@@ -137,7 +137,7 @@
     /**
      * Populate venue fields with data and store original values
      *
-     * @param {Object} venueData Venue data from AJAX response
+     * @param {Object} venueData Venue data from REST API response
      */
     function populateVenueFields(venueData) {
         originalValues = {};
@@ -231,7 +231,7 @@
      * @return {Promise} Promise resolving to true if can proceed, false if duplicate
      */
     function checkDuplicateVenue(venueName, venueAddress) {
-        if (!venueName || !dmEventsVenue) {
+        if (!venueName || typeof dmEventsVenue === 'undefined') {
             return Promise.resolve(true);
         }
 
@@ -267,17 +267,15 @@
         });
     }
 
-    /**
-     * Initialize on DOM ready and modal content loaded
-     */
-    $(document).ready(function() {
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
         init();
+    }
 
-        // Re-initialize when modal content is loaded (for Data Machine modals)
-        $(document).on('datamachine-core-modal-content-loaded', function() {
-            init();
-        });
-    });
+    // Re-initialize when modal content is loaded (for Data Machine modals)
+    document.addEventListener('datamachine-core-modal-content-loaded', init);
 
     // Expose functions for potential external use
     window.dmEventsVenueSelector = {
@@ -285,4 +283,4 @@
         checkDuplicateVenue: checkDuplicateVenue
     };
 
-})(jQuery);
+})();

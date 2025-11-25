@@ -10,11 +10,13 @@ The Event Details block serves as the single source of truth for all event data 
 
 ### Rich Event Data Model
 - **Dates & Times**: startDate, endDate, startTime, endTime
-- **Venue Information**: venue, address, venueCity, venueState, venueZip, venueCountry, venueCoordinates, venueCapacity, venuePhone, venueWebsite
+- **Venue Reference**: venue (name), address (display fallback)
 - **Pricing**: price, priceCurrency, offerAvailability
 - **People**: performer, performerType, organizer, organizerType, organizerUrl
 - **Event Status**: eventStatus, previousStartDate
 - **Display Controls**: showVenue, showPrice, showTicketLink
+
+> **Note**: Venue metadata (city, state, zip, phone, website, coordinates, capacity) is stored in the **Venue Taxonomy**, not block attributes. The venue taxonomy is the single source of truth for all venue details.
 
 ### InnerBlocks Support
 - Add rich content, images, galleries, and custom layouts within events
@@ -62,16 +64,10 @@ The block provides flexible display controls:
 - `endTime`: Event end time (HH:MM format)
 
 ### Venue Attributes
-- `venue`: Venue name
-- `address`: Full venue address
-- `venueCity`: Venue city
-- `venueState`: Venue state/province
-- `venueZip`: Venue postal code
-- `venueCountry`: Venue country
-- `venueCoordinates`: GPS coordinates (lat,lng)
-- `venueCapacity`: Venue capacity
-- `venuePhone`: Venue phone number
-- `venueWebsite`: Venue website URL
+- `venue`: Venue name (links to venue taxonomy term)
+- `address`: Full venue address (display fallback)
+
+> **Venue Taxonomy Fields**: All other venue metadata (city, state, zip, country, coordinates, capacity, phone, website) is stored in the venue taxonomy term meta. Edit venue details via **Events → Venues** in the WordPress admin.
 
 ### Pricing Attributes
 - `price`: Ticket price
@@ -97,9 +93,12 @@ The block provides flexible display controls:
 ## Developer Notes
 
 The Event Details block integrates with:
-- **Venue Taxonomy**: Automatic venue creation and assignment
-- **Schema Generator**: JSON-LD structured data output
-- **Meta Storage**: Background sync for performance
+- **Venue Taxonomy**: Single source of truth for all venue metadata (city, state, zip, phone, website, coordinates, capacity)
+- **Schema Generator**: JSON-LD structured data combining block attributes with venue taxonomy data
+- **Meta Storage**: Background sync for performance (`_datamachine_event_datetime`)
 - **REST API**: Event data available via endpoints
 
-All event data is stored as block attributes and synchronized to post meta for efficient querying and calendar display.
+### Data Architecture
+- **Block Attributes**: Event-specific data (dates, times, price, performer, organizer, etc.)
+- **Venue Taxonomy**: Shared venue data (address details, contact info, coordinates) - editable via taxonomy term management
+- **Post Meta**: `_datamachine_event_datetime` synced from block for SQL query performance

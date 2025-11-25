@@ -13,13 +13,16 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Get current settings
-$settings = get_option('datamachine_events_settings', array(
-    'include_in_archives' => false,
-    'include_in_search' => true,
-    'main_events_page_url' => '',
-    'calendar_display_type' => 'circuit-grid'
-));
+use DataMachineEvents\Admin\Settings_Page;
+
+// Get current settings using centralized defaults from Settings_Page
+$settings = [
+    'include_in_archives' => Settings_Page::get_setting('include_in_archives'),
+    'include_in_search' => Settings_Page::get_setting('include_in_search'),
+    'main_events_page_url' => Settings_Page::get_setting('main_events_page_url'),
+    'calendar_display_type' => Settings_Page::get_setting('calendar_display_type'),
+    'map_display_type' => Settings_Page::get_setting('map_display_type'),
+];
 
 // Handle settings updates
 if (isset($_GET['settings-updated'])) {

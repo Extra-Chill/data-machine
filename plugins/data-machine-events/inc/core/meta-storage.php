@@ -8,6 +8,10 @@
  * @package DataMachine_Events
  */
 
+namespace DataMachineEvents\Core;
+
+const EVENT_DATETIME_META_KEY = '_datamachine_event_datetime';
+
 /**
  * Sync event datetime to post meta on save
  *
@@ -17,7 +21,7 @@
  */
 function datamachine_events_sync_datetime_meta( $post_id, $post, $update ) {
 	// Only for datamachine_events post type.
-	if ( 'datamachine_events' !== $post->post_type ) {
+	if ( Event_Post_Type::POST_TYPE !== $post->post_type ) {
 		return;
 	}
 
@@ -37,13 +41,13 @@ function datamachine_events_sync_datetime_meta( $post_id, $post, $update ) {
 			if ( $start_date ) {
 				// Combine into MySQL DATETIME format: "2024-12-25 14:30:00".
 				$datetime = $start_date . ' ' . $start_time;
-				update_post_meta( $post_id, '_datamachine_event_datetime', $datetime );
+				update_post_meta( $post_id, EVENT_DATETIME_META_KEY, $datetime );
 			} else {
 				// No date found, delete meta if it exists.
-				delete_post_meta( $post_id, '_datamachine_event_datetime' );
+				delete_post_meta( $post_id, EVENT_DATETIME_META_KEY );
 			}
 			break;
 		}
 	}
 }
-add_action( 'save_post', 'datamachine_events_sync_datetime_meta', 10, 3 );
+add_action( 'save_post', __NAMESPACE__ . '\\datamachine_events_sync_datetime_meta', 10, 3 );

@@ -13,6 +13,7 @@ namespace DataMachineEvents\Steps\Upsert\Events;
 
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 use DataMachineEvents\Steps\Upsert\Events\EventUpsertSettings;
+use DataMachineEvents\Core\Event_Post_Type;
 use DataMachine\Core\WordPress\TaxonomyHandler;
 
 if (!defined('ABSPATH')) {
@@ -129,7 +130,7 @@ class EventUpsertFilters {
         $tool['parameters'] = array_merge($tool['parameters'], $schema_params);
 
         // Add dynamic taxonomy parameters
-        $taxonomy_params = TaxonomyHandler::getTaxonomyToolParameters($ue_config, 'datamachine_events');
+        $taxonomy_params = TaxonomyHandler::getTaxonomyToolParameters($ue_config, Event_Post_Type::POST_TYPE);
         $tool['parameters'] = array_merge($tool['parameters'], $taxonomy_params);
 
         // Store resolved configuration

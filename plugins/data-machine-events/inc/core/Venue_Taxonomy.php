@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
  */
 class Venue_Taxonomy {
     
-    private static $meta_fields = [
+    public static $meta_fields = [
         'address' => '_venue_address',
         'city' => '_venue_city',
         'state' => '_venue_state',
@@ -26,6 +26,18 @@ class Venue_Taxonomy {
         'website' => '_venue_website',
         'capacity' => '_venue_capacity',
         'coordinates' => '_venue_coordinates'
+    ];
+    
+    private static $field_labels = [
+        'address' => 'Address',
+        'city' => 'City',
+        'state' => 'State',
+        'zip' => 'Postal Code',
+        'country' => 'Country',
+        'phone' => 'Phone',
+        'website' => 'Website',
+        'capacity' => 'Capacity',
+        'coordinates' => 'Coordinates'
     ];
     
     public static function register() {
@@ -38,9 +50,9 @@ class Venue_Taxonomy {
     
     private static function register_venue_taxonomy() {
         if (taxonomy_exists('venue')) {
-            register_taxonomy_for_object_type('venue', 'datamachine_events');
+            register_taxonomy_for_object_type('venue', Event_Post_Type::POST_TYPE);
         } else {
-            register_taxonomy('venue', array('post', 'datamachine_events'), array(
+            register_taxonomy('venue', array('post', Event_Post_Type::POST_TYPE), array(
                 'hierarchical' => false,
                 'labels' => array(
                     'name' => _x('Venues', 'taxonomy general name', 'datamachine-events'),
@@ -61,7 +73,7 @@ class Venue_Taxonomy {
             ));
         }
         
-        register_taxonomy_for_object_type('venue', 'datamachine_events');
+        register_taxonomy_for_object_type('venue', Event_Post_Type::POST_TYPE);
     }
     
     private static function register_all_public_taxonomies() {
@@ -76,7 +88,7 @@ class Venue_Taxonomy {
                 continue;
             }
             
-            register_taxonomy_for_object_type($taxonomy_slug, 'datamachine_events');
+            register_taxonomy_for_object_type($taxonomy_slug, Event_Post_Type::POST_TYPE);
         }
     }
     
@@ -346,20 +358,8 @@ class Venue_Taxonomy {
     }
     
     public static function add_venue_form_fields($taxonomy) {
-        $fields = [
-            'address'   => 'Address',
-            'city'      => 'City',
-            'state'     => 'State',
-            'zip'       => 'Postal Code',
-            'country'   => 'Country',
-            'phone'     => 'Phone',
-            'website'   => 'Website',
-            'capacity'  => 'Capacity',
-            'coordinates' => 'Coordinates'
-        ];
-
-        foreach ($fields as $key => $label) {
-            $meta_key = "_venue_$key";
+        foreach (self::$meta_fields as $key => $meta_key) {
+            $label = self::$field_labels[$key] ?? ucfirst($key);
             echo '<div class="form-field">';
             echo "<label for='$meta_key'>$label</label>";
             echo "<input type='text' name='$meta_key' id='$meta_key' value='' class='regular-text' />";
@@ -368,20 +368,8 @@ class Venue_Taxonomy {
     }
 
     public static function edit_venue_form_fields($term) {
-        $fields = [
-            'address'   => 'Address',
-            'city'      => 'City',
-            'state'     => 'State',
-            'zip'       => 'Postal Code',
-            'country'   => 'Country',
-            'phone'     => 'Phone',
-            'website'   => 'Website',
-            'capacity'  => 'Capacity',
-            'coordinates' => 'Coordinates'
-        ];
-
-        foreach ($fields as $key => $label) {
-            $meta_key = "_venue_$key";
+        foreach (self::$meta_fields as $key => $meta_key) {
+            $label = self::$field_labels[$key] ?? ucfirst($key);
             $value = get_term_meta($term->term_id, $meta_key, true);
             echo '<tr class="form-field">';
             echo "<th scope='row'><label for='$meta_key'>$label</label></th>";
@@ -391,10 +379,7 @@ class Venue_Taxonomy {
     }
 
     public static function save_venue_meta($term_id) {
-        $fields = ['address', 'city', 'state', 'zip', 'country', 'phone', 'website', 'capacity', 'coordinates'];
-        
-        foreach ($fields as $key) {
-            $meta_key = "_venue_$key";
+        foreach (self::$meta_fields as $key => $meta_key) {
             if (isset($_POST[$meta_key])) {
                 update_term_meta($term_id, $meta_key, sanitize_text_field($_POST[$meta_key]));
             }

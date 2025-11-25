@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Event Details Block Description** - Fixed InnerBlocks content being stripped when saving
+  - Changed `save()` function from returning `null` to returning `<InnerBlocks.Content />` wrapped in block props
+  - Description content with formatting (line breaks, headings, lists, etc.) now persists correctly through save/edit cycles
+  - Expanded allowed blocks to include: paragraph, heading, image, list, quote, gallery, video, audio, embed, separator, spacer, columns, column, group, freeform, and html blocks
+
+### Added
+- **Documentation Alignment** - Comprehensive documentation updates for v0.3.5
+  - Added Google Calendar integration documentation with calendar ID/URL utilities
+  - Added ColorManager system documentation with CSS custom properties integration
+  - Added EventIdentifierGenerator utility documentation with normalization examples
+  - Updated file structure documentation to reflect current architecture
+  - Fixed outdated class names and file paths throughout documentation
+  - Added missing components like results-counter template and CarouselList display mode
+  - Updated README.md with jQuery dependency elimination information
+
+## [0.3.5] - 2025-11-25
+
+### Removed
+- **jQuery Dependency Elimination** - Completely removed all jQuery and AJAX references from the plugin
+  - Deleted `assets/js/admin.js` (no-op jQuery wrapper)
+  - Removed jQuery/wp-util script enqueue from `enqueue_admin_assets()`
+  - Converted `venue-selector.js` from jQuery IIFE to vanilla JavaScript
+  - Removed jQuery conditionals from `venue-map.js` and `venue-autocomplete.js`
+- **CarouselListRenderer.js** - Deleted 386-line JavaScript renderer; Carousel List mode is now CSS-only
+- **Unused CSS** - Removed ~200 lines of dead carousel card styles, responsive breakpoint variables, and unused grid medium/tablet/mobile variables from `style.css` and `root.css`
+
+### Fixed
+- **Calendar Pagination** - Fixed pagination not working on block pages (e.g., `?paged=2` showing page 1 content)
+  - Now checks `$_GET['paged']` first for block pages where `get_query_var('paged')` doesn't work
+  - Falls back to `get_query_var('paged')` for taxonomy archive pages
+
+### Changed
+- **Carousel List CSS** - Simplified from 249 lines to 82 lines with cleaner structure
+- **Grid Variables** - Consolidated to single set of grid dimensions (removed tablet/medium/mobile variants)
+  - `--datamachine-grid-cell-width: 316px`
+  - `--datamachine-grid-cell-height: 222px`
+  - `--datamachine-grid-gap: 1.5rem`
+
+## [0.3.4] - 2025-11-25
+
+### Changed
+- **Grid Dimensions** - Adjusted grid cell dimensions and gap spacing
+  - Cell width: 275px → 316px
+  - Cell height: 193px → 222px  
+  - Grid gap: 1.5625rem → 1.5rem
+- **Block Version Sync** - Updated Calendar block.json version to match plugin version
+
 ## [0.3.3] - 2025-11-25
 
 ### Changed

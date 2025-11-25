@@ -98,10 +98,10 @@ class Schema {
             
             $address_data = [
                 'streetAddress' => $engine_data['venueAddress'] ?? $venue_data['address'] ?? $attributes['address'] ?? '',
-                'addressLocality' => $engine_data['venueCity'] ?? $venue_data['city'] ?? $attributes['venueCity'] ?? '',
-                'addressRegion' => $engine_data['venueState'] ?? $venue_data['state'] ?? $attributes['venueState'] ?? '',
-                'postalCode' => $engine_data['venueZip'] ?? $venue_data['zip'] ?? $attributes['venueZip'] ?? '',
-                'addressCountry' => $engine_data['venueCountry'] ?? $venue_data['country'] ?? $attributes['venueCountry'] ?? 'US'
+                'addressLocality' => $engine_data['venueCity'] ?? $venue_data['city'] ?? '',
+                'addressRegion' => $engine_data['venueState'] ?? $venue_data['state'] ?? '',
+                'postalCode' => $engine_data['venueZip'] ?? $venue_data['zip'] ?? '',
+                'addressCountry' => $engine_data['venueCountry'] ?? $venue_data['country'] ?? 'US'
             ];
             
             if (!empty($address_data['streetAddress']) || !empty($address_data['addressLocality'])) {
@@ -114,17 +114,17 @@ class Schema {
                 }
             }
             
-            $venue_phone = $engine_data['venuePhone'] ?? $venue_data['phone'] ?? $attributes['venuePhone'] ?? '';
+            $venue_phone = $engine_data['venuePhone'] ?? $venue_data['phone'] ?? '';
             if (!empty($venue_phone)) {
                 $schema['location']['telephone'] = $venue_phone;
             }
             
-            $venue_website = $engine_data['venueWebsite'] ?? $venue_data['website'] ?? $attributes['venueWebsite'] ?? '';
+            $venue_website = $engine_data['venueWebsite'] ?? $venue_data['website'] ?? '';
             if (!empty($venue_website)) {
                 $schema['location']['url'] = $venue_website;
             }
             
-            $venue_coordinates = $engine_data['venueCoordinates'] ?? $venue_data['coordinates'] ?? $attributes['venueCoordinates'] ?? '';
+            $venue_coordinates = $engine_data['venueCoordinates'] ?? $venue_data['coordinates'] ?? '';
             if (!empty($venue_coordinates)) {
                 $coords = explode(',', $venue_coordinates);
                 if (count($coords) === 2) {

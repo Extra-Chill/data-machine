@@ -9,6 +9,29 @@ import {
     Notice
 } from '@wordpress/components';
 
+const ALLOWED_BLOCKS = [
+    'core/paragraph',
+    'core/heading',
+    'core/image',
+    'core/list',
+    'core/quote',
+    'core/gallery',
+    'core/video',
+    'core/audio',
+    'core/embed',
+    'core/separator',
+    'core/spacer',
+    'core/columns',
+    'core/column',
+    'core/group',
+    'core/freeform',
+    'core/html'
+];
+
+const DESCRIPTION_TEMPLATE = [
+    ['core/paragraph', { placeholder: __('Add event description...', 'datamachine-events') }]
+];
+
 /**
  * Event Details Block Registration
  *
@@ -26,7 +49,6 @@ registerBlockType('datamachine-events/event-details', {
             endTime,
             venue,
             address,
-            venueCapacity,
             price,
             ticketUrl,
             showVenue,
@@ -62,10 +84,8 @@ registerBlockType('datamachine-events/event-details', {
                             <h4>{__('Event Description', 'datamachine-events')}</h4>
                             <div className="event-description-inner">
                                 <InnerBlocks
-                                    allowedBlocks={['core/paragraph', 'core/heading', 'core/image', 'core/list', 'core/quote']}
-                                    template={[
-                                        ['core/paragraph', { placeholder: __('Add event description...', 'datamachine-events') }]
-                                    ]}
+                                    allowedBlocks={ALLOWED_BLOCKS}
+                                    template={DESCRIPTION_TEMPLATE}
                                     templateLock={false}
                                 />
                             </div>
@@ -121,13 +141,6 @@ registerBlockType('datamachine-events/event-details', {
                                 value={address}
                                 onChange={(value) => setAttributes({ address: value })}
                             />
-                            <TextControl
-                                label={__('Venue Capacity', 'datamachine-events')}
-                                value={venueCapacity}
-                                onChange={(value) => setAttributes({ venueCapacity: parseInt(value) || 0 })}
-                                type="number"
-                                help={__('Maximum capacity of the venue', 'datamachine-events')}
-                            />
                         </div>
 
                         <div className="event-details">
@@ -178,9 +191,14 @@ registerBlockType('datamachine-events/event-details', {
 
     /**
      * Block save component
-     * Returns null for dynamic server-side rendering
+     * Returns InnerBlocks.Content for persistence with server-side rendering
      */
     save: function Save() {
-        return null;
+        const blockProps = useBlockProps.save();
+        return (
+            <div {...blockProps}>
+                <InnerBlocks.Content />
+            </div>
+        );
     }
 }); 

@@ -8,6 +8,8 @@
 
 namespace DataMachineEvents\Admin;
 
+use DataMachineEvents\Core\Event_Post_Type;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -50,7 +52,7 @@ class Settings_Page {
     
     public function add_settings_submenu() {
         add_submenu_page(
-            'edit.php?post_type=datamachine_events',
+            'edit.php?post_type=' . Event_Post_Type::POST_TYPE,
             __('Event Settings', 'datamachine-events'),
             __('Settings', 'datamachine-events'),
             'manage_options',
@@ -139,7 +141,7 @@ class Settings_Page {
                 $post_types = array($post_types);
             }
             
-            $post_types = array_diff($post_types, array('datamachine_events'));
+            $post_types = array_diff($post_types, array(Event_Post_Type::POST_TYPE));
             $query->set('post_type', $post_types);
         }
         
@@ -153,7 +155,7 @@ class Settings_Page {
                     $post_types = array($post_types);
                 }
                 
-                $post_types = array_diff($post_types, array('datamachine_events'));
+                $post_types = array_diff($post_types, array(Event_Post_Type::POST_TYPE));
                 $query->set('post_type', $post_types);
             }
         }

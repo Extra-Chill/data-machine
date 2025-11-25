@@ -14,6 +14,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+use const DataMachineEvents\Api\API_NAMESPACE;
+
 /**
  * Register Event Import step type with Data Machine
  * 
@@ -71,7 +73,7 @@ add_action('admin_enqueue_scripts', function() {
 
     // Localize script with REST API configuration
     wp_localize_script('datamachine-events-venue-selector', 'dmEventsVenue', array(
-        'restUrl' => rest_url('datamachine/v1'),
+        'restUrl' => rest_url(API_NAMESPACE),
         'nonce' => wp_create_nonce('wp_rest')
     ));
 

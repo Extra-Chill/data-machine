@@ -24,17 +24,16 @@ class VenueService {
      * @return array Normalized venue data
      */
     public static function normalize_venue_data(array $raw_data): array {
-        return [
-            'name' => sanitize_text_field($raw_data['name'] ?? ''),
-            'address' => sanitize_text_field($raw_data['address'] ?? ''),
-            'city' => sanitize_text_field($raw_data['city'] ?? ''),
-            'state' => sanitize_text_field($raw_data['state'] ?? ''),
-            'zip' => sanitize_text_field($raw_data['zip'] ?? ''),
-            'country' => sanitize_text_field($raw_data['country'] ?? ''),
-            'phone' => sanitize_text_field($raw_data['phone'] ?? ''),
-            'website' => esc_url_raw($raw_data['website'] ?? ''),
-            'coordinates' => sanitize_text_field($raw_data['coordinates'] ?? '')
+        $normalized = [
+            'name' => sanitize_text_field($raw_data['name'] ?? '')
         ];
+        
+        foreach (array_keys(Venue_Taxonomy::$meta_fields) as $field_key) {
+            $sanitizer = ($field_key === 'website') ? 'esc_url_raw' : 'sanitize_text_field';
+            $normalized[$field_key] = $sanitizer($raw_data[$field_key] ?? '');
+        }
+        
+        return $normalized;
     }
 
     /**
@@ -78,18 +77,7 @@ class VenueService {
      * @param array $data Venue data
      */
     private static function save_venue_meta(int $term_id, array $data): void {
-        $meta_map = [
-            'address' => '_venue_address',
-            'city' => '_venue_city',
-            'state' => '_venue_state',
-            'zip' => '_venue_zip',
-            'country' => '_venue_country',
-            'phone' => '_venue_phone',
-            'website' => '_venue_website',
-            'coordinates' => '_venue_coordinates'
-        ];
-
-        foreach ($meta_map as $data_key => $meta_key) {
+        foreach (Venue_Taxonomy::$meta_fields as $data_key => $meta_key) {
             if (!empty($data[$data_key])) {
                 update_term_meta($term_id, $meta_key, $data[$data_key]);
             }

@@ -77,6 +77,7 @@ Traditional chronological display:
 - **navigation.php**: Calendar navigation controls
 - **no-events.php**: Empty state display
 - **filter-bar.php**: Filtering interface
+- **results-counter.php**: Results counter display
 - **time-gap-separator.php**: Date gap visualization
 - **modal/taxonomy-filter.php**: Advanced taxonomy filter modal
 

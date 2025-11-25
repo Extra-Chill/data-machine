@@ -16,6 +16,8 @@
 
 namespace DataMachineEvents\Blocks\Calendar;
 
+use DataMachineEvents\Core\Event_Post_Type;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -31,7 +33,7 @@ class Taxonomy_Badges {
             return [];
         }
         
-        $all_taxonomies = get_object_taxonomies('datamachine_events', 'objects');
+        $all_taxonomies = get_object_taxonomies(Event_Post_Type::POST_TYPE, 'objects');
         
         if (empty($all_taxonomies)) {
             return [];
@@ -137,7 +139,7 @@ class Taxonomy_Badges {
             INNER JOIN {$wpdb->term_relationships} tr ON tt.term_taxonomy_id = tr.term_taxonomy_id
             INNER JOIN {$wpdb->posts} p ON tr.object_id = p.ID
             INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
-            WHERE p.post_type = 'datamachine_events'
+            WHERE p.post_type = '" . esc_sql(Event_Post_Type::POST_TYPE) . "'
             AND p.post_status = 'publish'
             {$excluded_sql}
         ";

@@ -2,7 +2,7 @@
 
 Frontend-focused WordPress events plugin with **block-first architecture**. Features AI-driven event creation via Data Machine integration, Event Details blocks with InnerBlocks for rich content editing, Calendar blocks for display, and comprehensive venue taxonomy management.
 
-**Version**: 0.3.2
+**Version**: 0.3.5
 
 ## Migration Showcase
 
@@ -24,6 +24,12 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 - ✅ **Block-first approach:** Event Details block provides all data rendering
 - ✅ **Theme flexibility:** Full control over event presentation layout
 - ✅ **Simplified architecture:** 162 lines removed, cleaner separation of concerns
+
+**jQuery Dependency Elimination (v0.3.5):**
+- ✅ **Complete:** All jQuery and AJAX references removed from plugin
+- ✅ **Vanilla JavaScript:** Converted all admin JavaScript to vanilla JS
+- ✅ **Code Reduction:** Removed ~200 lines of unused CSS and 386 lines of JavaScript renderer
+- ✅ **Performance Optimized:** Carousel List mode now CSS-only
 
 ## Features
 
@@ -59,33 +65,45 @@ datamachine-events/
 ├── datamachine-events.php   # Main plugin file with PSR-4 autoloader
 ├── inc/
 │   ├── Admin/               # Admin interface classes
-│   │   ├── class-admin-bar.php           # Events navigation menu in admin bar
-│   │   ├── class-status-detection.php    # Legacy stub for backwards compatibility
-│   │   └── class-settings-page.php       # Event settings interface
+│   │   ├── Admin_Bar.php                       # Events navigation menu in admin bar
+│   │   ├── Settings_Page.php                   # Event settings interface
+│   │   └── Status_Detection.php                # Legacy status detection stub
 │   ├── Api/                 # REST API controllers and routes
 │   │   ├── Routes.php       # API route registration
 │   │   └── Controllers/     # Calendar, Venues, Events controllers
 │   ├── Blocks/
 │   │   ├── Calendar/        # Calendar block (webpack) with modular template system
-│   │   │   ├── Template_Loader.php
-│   │   │   ├── Taxonomy_Helper.php
 │   │   │   ├── DisplayStyles/           # Visual enhancement components
-│   │   │   │   ├── ColorManager.js       # Centralized color helper
-│   │   │   │   └── CircuitGrid/          # CircuitGrid display mode
-│   │   │   │       └── BadgeRenderer.js  # Day badge positioning
+│   │   │   │   ├── CarouselList/         # Carousel List display mode (CSS-only)
+│   │   │   │   │   └── carousel-list.css # Carousel List styles
+│   │   │   │   ├── CircuitGrid/          # CircuitGrid display mode
+│   │   │   │   │   ├── BadgeRenderer.js  # Day badge positioning
+│   │   │   │   │   ├── CircuitGridRenderer.js # Circuit grid rendering
+│   │   │   │   │   └── circuit-grid.css  # Circuit Grid styles
+│   │   │   │   └── ColorManager.js       # Centralized color helper
+│   │   │   ├── Taxonomy_Badges.php       # Dynamic badge rendering
+│   │   │   ├── Taxonomy_Helper.php       # Taxonomy data processing
+│   │   │   ├── Template_Loader.php       # Template loading system
+│   │   │   ├── Pagination.php            # Calendar pagination logic
 │   │   │   └── templates/   # 7 specialized templates plus modal subdirectory
 │   │   ├── EventDetails/    # Event details block (webpack with @wordpress/scripts base)
 │   │   └── root.css         # Centralized design tokens and CSS custom properties
 │   ├── Core/                # Core plugin classes
-│   │   ├── class-event-post-type.php    # Event post type with menu control
-│   │   ├── class-venue-taxonomy.php     # Venue taxonomy with 9 meta fields
-│   │   ├── class-venue-service.php      # Centralized venue operations
-│   │   ├── class-taxonomy-badges.php    # Dynamic taxonomy badge rendering with filters
-│   │   └── meta-storage.php             # Event metadata sync and management
+│   │   ├── Event_Post_Type.php                 # Event post type with menu control
+│   │   ├── Venue_Taxonomy.php                  # Venue taxonomy with 9 meta fields
+│   │   ├── VenueService.php                    # Centralized venue operations
+│   │   └── meta-storage.php                    # Event metadata sync and management
 │   ├── steps/               # Data Machine integration
 │   │   ├── EventImport/     # Import handlers with single-item processing
-│   │   │   └── handlers/    # Ticketmaster, Dice FM, web scrapers
-│   │   ├── Publish/Events/  # Schema and Venue handling
+│   │   │   ├── Handlers/    # Import handlers (Ticketmaster, DiceFm, GoogleCalendar, WebScraper)
+│   │   │   │   ├── Ticketmaster/               # Ticketmaster Discovery API
+│   │   │   │   ├── DiceFm/                     # Dice FM integration
+│   │   │   │   ├── GoogleCalendar/              # Google Calendar integration
+│   │   │   │   │   ├── GoogleCalendarUtils.php  # Calendar ID/URL utilities
+│   │   │   │   │   └── GoogleCalendarAuth.php   # Authentication handling
+│   │   │   │   └── WebScraper/                 # AI-powered web scraping
+│   │   │   ├── EventImportStep.php              # Pipeline step with handler discovery
+│   │   │   └── EventImportHandler.php          # Abstract base for import handlers
 │   │   └── Upsert/Events/   # EventUpsert handler for create/update operations
 │   │       ├── EventUpsert.php
 │   │       ├── EventUpsertFilters.php
@@ -99,7 +117,13 @@ datamachine-events/
 │       └── settings-page.php # Admin settings template
 ├── assets/
 │   ├── css/                 # Admin styling (admin.css)
+│   │   ├── admin.css
+│   │   ├── venue-autocomplete.css
+│   │   └── venue-map.css
 │   └── js/                  # Admin JavaScript
+│       ├── venue-autocomplete.js
+│       ├── venue-map.js
+│       └── venue-selector.js
 └── composer.json            # PHP dependencies
 ```
 
@@ -183,7 +207,7 @@ echo '<script type="application/ld+json">' . wp_json_encode($schema) . '</script
 10. **Schema Generation:** Schema creates Google Event structured data combining block attributes with venue taxonomy meta
 11. **Template Rendering:** Template_Loader system provides modular, cacheable template rendering with variable extraction
 12. **Taxonomy Display:** Taxonomy_Badges generates dynamic badge HTML for all non-venue taxonomies with consistent styling
-13. **Visual Enhancement:** BadgeRenderer.js with ColorManager integration creates multi-group badge rendering with CircuitGridRenderer.js and CarouselListRenderer.js for flexible calendar display modes
+13. **Visual Enhancement:** BadgeRenderer.js with ColorManager integration creates multi-group badge rendering with CircuitGridRenderer.js for Circuit Grid display (Carousel List is CSS-only)
 
 ## Calendar Filtering Architecture
 
@@ -197,7 +221,7 @@ The calendar block uses a progressive enhancement pattern with REST API filterin
 
 **REST API Endpoint:**
 ```bash
-GET /wp-json/datamachine-events/v1/calendar
+GET /wp-json/datamachine/v1/events/calendar
 
 # Query Parameters
 event_search=keyword          # Search events by title, venue, or taxonomy terms
@@ -232,7 +256,7 @@ past=1                       # Show past events ("1" for past, omit for upcoming
 - **Modular Template Architecture:** Template_Loader provides 7 specialized templates with variable extraction and output buffering
 - **Dynamic Taxonomy Badges:** Taxonomy_Badges system with automatic color generation and HTML structure for all non-venue taxonomies
 - **Taxonomy Data Processing:** Taxonomy_Helper with hierarchy building, post count calculations, and structured data for filtering
-- **Visual Enhancement System:** DisplayStyles components with CircuitGridRenderer.js, CarouselListRenderer.js, and BadgeRenderer.js for flexible calendar display
+- **Visual Enhancement System:** DisplayStyles components with CircuitGridRenderer.js and BadgeRenderer.js for Circuit Grid display (Carousel List is CSS-only)
 - **Centralized Design System:** root.css provides unified design tokens accessible from both CSS and JavaScript
 - **Smart Parameter Routing:** Schema.engine_or_tool() intelligently routes data between system parameters and AI inference
 - **Flat Parameter System:** Data Machine's single-level parameter structure across all custom steps for simplified integration

@@ -155,19 +155,19 @@
 }
 
 .datamachine-events-time-btn:hover {
-    background: var(--dm-border-light);
+    background: var(--datamachine-border-light);
     color: var(--datamachine-text-primary);
     transform: translateY(-1px);
 }
 
 .datamachine-events-time-btn.active {
-    background: var(--dm-text-accent);
+    background: var(--datamachine-text-accent);
     color: white;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .datamachine-events-time-btn.active:hover {
-    background: var(--dm-text-accent);
+    background: var(--datamachine-text-accent);
     color: white;
     transform: translateY(-1px);
 }
@@ -190,7 +190,7 @@
     width: var(--datamachine-grid-cell-width);
     height: var(--datamachine-grid-cell-height);
     padding: var(--datamachine-card-padding);
-    border: 1px solid var(--dm-border-light);
+    border: 1px solid var(--datamachine-border-light);
     border-radius: var(--datamachine-border-radius);
     background: transparent;
     transition: var(--datamachine-card-transition);
@@ -338,14 +338,14 @@
 .datamachine-button:not(.datamachine-button-primary):hover {
     background: #e5e7eb;
     color: var(--datamachine-text-primary);
-    border-color: var(--dm-text-muted);
+    border-color: var(--datamachine-text-muted);
 }
 
 /* Primary Button (Tickets) */
 .datamachine-button-primary {
     background: #3b82f6;
     color: white;
-    border-color: var(--dm-border-focus);
+    border-color: var(--datamachine-border-focus);
 }
 
 .datamachine-button-primary:hover {
@@ -408,13 +408,13 @@
 
 .datamachine-events-pagination .page-numbers a:hover {
     background: #f3f4f6;
-    border-color: var(--dm-text-muted);
+    border-color: var(--datamachine-text-muted);
 }
 
 .datamachine-events-pagination .page-numbers .current {
     background: #3b82f6;
     color: white;
-    border-color: var(--dm-border-focus);
+    border-color: var(--datamachine-border-focus);
 }
 
 /* No Events */
@@ -432,27 +432,7 @@
     display: none;
 }
 
-/* Responsive Design */
-@media (max-width: 1200px) {
-    /* Medium screens: Smaller uniform grid cells */
-    .datamachine-events-calendar.datamachine-events-date-grouped .datamachine-events-content {
-        grid-template-columns: repeat(auto-fill, var(--datamachine-grid-cell-width-medium));
-        grid-auto-rows: var(--datamachine-grid-cell-height-medium);
-    }
-}
-
-/* Tablet Breakpoint - 2-3 events per row */
-@media (max-width: 1199px) and (min-width: 769px) {
-    .datamachine-event-item {
-        width: var(--datamachine-grid-cell-width-tablet);
-    }
-
-    .datamachine-events-calendar.datamachine-events-date-grouped .datamachine-events-content {
-        grid-template-columns: repeat(auto-fill, var(--datamachine-grid-cell-width-tablet));
-    }
-}
-
-/* Mobile Breakpoint - Single column, full width cards */
+/* Mobile Breakpoint */
 @media (max-width: 768px) {
     .datamachine-events-filter-row {
         grid-template-columns: 1fr;
@@ -477,11 +457,7 @@
 
     .datamachine-event-item {
         width: 100%;
-        max-width: 400px;
-        height: auto;
-        min-height: 160px;
-        padding: 1rem;
-        margin: 0 auto;
+        max-width: var(--datamachine-grid-cell-width);
     }
 
     .datamachine-event-title {
@@ -523,7 +499,7 @@
 
 .flatpickr-day.selected {
     background: #3b82f6;
-    border-color: var(--dm-border-focus);
+    border-color: var(--datamachine-border-focus);
 }
 
 .flatpickr-day.inRange {
@@ -533,12 +509,12 @@
 
 .flatpickr-day.startRange {
     background: #3b82f6;
-    border-color: var(--dm-border-focus);
+    border-color: var(--datamachine-border-focus);
 }
 
 .flatpickr-day.endRange {
     background: #3b82f6;
-    border-color: var(--dm-border-focus);
+    border-color: var(--datamachine-border-focus);
 }
 
 .flatpickr-day:hover {
@@ -565,7 +541,7 @@
     font-size: 0.95rem;
     border-radius: var(--datamachine-border-radius);
     background: var(--datamachine-background-light);
-    border: 1px solid var(--dm-border-light);
+    border: 1px solid var(--datamachine-border-light);
     color: var(--datamachine-text-primary);
     cursor: pointer;
     transition: all 0.2s ease;
@@ -582,13 +558,13 @@
 
 .datamachine-events-filter-btn:focus {
     outline: none;
-    box-shadow: 0 0 0 2px var(--dm-border-focus);
+    box-shadow: 0 0 0 2px var(--datamachine-border-focus);
 }
 
 .datamachine-events-filter-btn.datamachine-filters-active {
     background: #3b82f6;
     color: white;
-    border-color: var(--dm-border-focus);
+    border-color: var(--datamachine-border-focus);
 }
 
 .datamachine-events-filter-btn.datamachine-filters-active:hover {
@@ -646,7 +622,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 1.5rem;
-    border-bottom: 1px solid var(--dm-border-light);
+    border-bottom: 1px solid var(--datamachine-border-light);
     background: var(--datamachine-background-secondary);
 }
 
@@ -703,7 +679,7 @@
     font-size: 1.1rem;
     font-weight: 600;
     color: var(--datamachine-text-primary);
-    border-bottom: 1px solid var(--dm-border-light);
+    border-bottom: 1px solid var(--datamachine-border-light);
     padding-bottom: 0.5rem;
 }
 
@@ -760,7 +736,7 @@
 .datamachine-taxonomy-separator {
     margin: 1.5rem 0;
     border: none;
-    border-top: 1px solid var(--dm-border-light);
+    border-top: 1px solid var(--datamachine-border-light);
 }
 
 /* Modal Actions */
@@ -769,7 +745,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 1.5rem;
-    border-top: 1px solid var(--dm-border-light);
+    border-top: 1px solid var(--datamachine-border-light);
     background: var(--datamachine-background-secondary);
     margin: 0;
 }
@@ -825,7 +801,7 @@
     margin-bottom: 2.5rem;
     border-radius: var(--datamachine-border-radius);
     background: var(--datamachine-background-light);
-    border: 1px solid var(--dm-border-light);
+    border: 1px solid var(--datamachine-border-light);
     overflow: hidden;
 }
 
@@ -835,7 +811,7 @@
     justify-content: space-between;
     padding: 1rem 1.5rem;
     background: var(--datamachine-background-secondary);
-    border-bottom: 1px solid var(--dm-border-light);
+    border-bottom: 1px solid var(--datamachine-border-light);
 }
 
 .datamachine-carousel-date-header .datamachine-day-badge {
@@ -868,7 +844,7 @@
 }
 
 .datamachine-carousel-btn:hover {
-    background: var(--dm-text-accent);
+    background: var(--datamachine-text-accent);
     color: white;
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -894,7 +870,7 @@
 
 .datamachine-carousel-events-row {
     display: flex;
-    gap: 1.5rem;
+    gap: var(--datamachine-grid-gap);
     padding: 1.5rem;
     overflow-x: auto;
     scroll-behavior: smooth;
@@ -910,68 +886,6 @@
 .datamachine-carousel-events-row {
     -ms-overflow-style: none;
     scrollbar-width: none;
-}
-
-/* Carousel Event Cards */
-.datamachine-carousel-event-wrapper {
-    flex: 0 0 280px;
-    scroll-snap-align: start;
-}
-
-.datamachine-carousel-event-card {
-    width: 100%;
-    height: 100%;
-    min-height: 200px;
-    display: flex;
-    flex-direction: column;
-    border-radius: var(--datamachine-border-radius);
-    background: var(--datamachine-background-primary);
-    border: 1px solid var(--dm-border-light);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    transition: all 0.2s ease;
-    cursor: pointer;
-}
-
-.datamachine-carousel-event-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-    border-color: var(--dm-border-focus);
-}
-
-.datamachine-carousel-event-card .datamachine-event-card-body {
-    padding: 1.25rem;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.datamachine-carousel-event-card .datamachine-event-title {
-    font-size: 1rem;
-    font-weight: 600;
-    margin: 0 0 1rem 0;
-    line-height: 1.4;
-    color: var(--datamachine-text-primary);
-}
-
-.datamachine-carousel-event-card .datamachine-event-meta {
-    margin-top: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.datamachine-carousel-event-card .datamachine-event-meta > div {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.875rem;
-    color: var(--datamachine-text-secondary);
-}
-
-.datamachine-carousel-event-card .datamachine-event-meta .dashicons {
-    font-size: 16px;
-    width: 16px;
-    height: 16px;
 }
 
 /* Mobile Responsive for Carousel */
@@ -990,37 +904,6 @@
     .datamachine-carousel-events-row {
         padding: 1rem;
         gap: 1rem;
-    }
-    
-    .datamachine-carousel-event-wrapper {
-        flex: 0 0 240px;
-    }
-    
-    .datamachine-carousel-event-card {
-        min-height: 180px;
-    }
-    
-    .datamachine-carousel-event-card .datamachine-event-card-body {
-        padding: 1rem;
-    }
-    
-    .datamachine-carousel-event-card .datamachine-event-title {
-        font-size: 0.95rem;
-    }
-}
-
-/* Small Mobile Adjustments */
-@media (max-width: 480px) {
-    .datamachine-carousel-events-row {
-        padding: 0.75rem;
-    }
-
-    .datamachine-carousel-event-wrapper {
-        flex: 0 0 200px;
-    }
-
-    .datamachine-carousel-event-card {
-        min-height: 160px;
     }
 }
 
@@ -1043,8 +926,8 @@
     background: linear-gradient(
         to right,
         transparent 0%,
-        var(--dm-border-light) 20%,
-        var(--dm-border-light) 80%,
+        var(--datamachine-border-light) 20%,
+        var(--datamachine-border-light) 80%,
         transparent 100%
     );
 }
@@ -1142,7 +1025,7 @@
     border-radius: var(--datamachine-border-radius);
     background: var(--datamachine-background-light);
     color: var(--datamachine-text-primary);
-    border: 1px solid var(--dm-border-light);
+    border: 1px solid var(--datamachine-border-light);
     font-size: 0.95rem;
     font-weight: 500;
     text-decoration: none;
@@ -1151,17 +1034,17 @@
 }
 
 .datamachine-events-pagination a.page-numbers:hover {
-    background: var(--dm-text-accent);
+    background: var(--datamachine-text-accent);
     color: white;
-    border-color: var(--dm-text-accent);
+    border-color: var(--datamachine-text-accent);
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .datamachine-events-pagination span.page-numbers.current {
-    background: var(--dm-text-accent);
+    background: var(--datamachine-text-accent);
     color: white;
-    border-color: var(--dm-text-accent);
+    border-color: var(--datamachine-text-accent);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
@@ -1215,7 +1098,7 @@
     border-radius: var(--datamachine-border-radius);
     background: var(--datamachine-background-light);
     color: var(--datamachine-text-primary);
-    border: 1px solid var(--dm-border-light);
+    border: 1px solid var(--datamachine-border-light);
     font-size: 0.95rem;
     font-weight: 600;
     text-decoration: none;
@@ -1225,9 +1108,9 @@
 
 .datamachine-events-past-btn:hover,
 .datamachine-events-upcoming-btn:hover {
-    background: var(--dm-text-accent);
+    background: var(--datamachine-text-accent);
     color: white;
-    border-color: var(--dm-text-accent);
+    border-color: var(--datamachine-text-accent);
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
@@ -1251,8 +1134,8 @@
     transform: translate(-50%, -50%);
     width: 40px;
     height: 40px;
-    border: 3px solid var(--dm-border-light);
-    border-top-color: var(--dm-text-accent);
+    border: 3px solid var(--datamachine-border-light);
+    border-top-color: var(--datamachine-text-accent);
     border-radius: 50%;
     animation: dm-spinner 0.8s linear infinite;
     z-index: 10;
@@ -1271,7 +1154,7 @@
     padding: 3rem 1.5rem;
     text-align: center;
     background: var(--datamachine-background-light);
-    border: 1px solid var(--dm-border-light);
+    border: 1px solid var(--datamachine-border-light);
     border-radius: var(--datamachine-border-radius);
     margin: 2rem 0;
 }
@@ -1290,7 +1173,7 @@
     padding: 3rem 1.5rem;
     text-align: center;
     background: var(--datamachine-background-light);
-    border: 1px solid var(--dm-border-light);
+    border: 1px solid var(--datamachine-border-light);
     border-radius: var(--datamachine-border-radius);
     margin: 2rem 0;
 }

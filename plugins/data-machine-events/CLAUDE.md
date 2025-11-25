@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.3.2
+**Version**: 0.3.6
 
 ## Migration Status
 
@@ -77,7 +77,7 @@ npm run lint:js && npm run lint:css             # Linting
 - `Core\meta-storage` - Event metadata synchronization and management
 - `Blocks\Calendar\Template_Loader` - Modular template system with 7 specialized templates
 - `Blocks\Calendar\Taxonomy_Helper` - Taxonomy data processing for filtering systems
-- `Blocks\Calendar\Taxonomy_Badges` - Dynamic badge rendering with automatic color generation and taxonomy term links
+- `Blocks\Calendar\Taxonomy_Badges` - Dynamic badge rendering with automatic color generation and taxonomy term links (moved from Core namespace in v0.3.0)
 - `Blocks\Calendar\DisplayStyles\ColorManager` - Centralized color CSS custom properties helper
 - `Blocks\Calendar\DisplayStyles\CircuitGrid\BadgeRenderer` - Day badge positioning with ColorManager integration
 - `Steps\Upsert\Events\Schema` - Google Event JSON-LD generator
@@ -89,6 +89,7 @@ npm run lint:js && npm run lint:css             # Linting
 - `Steps\EventImport\Handlers\Ticketmaster\Ticketmaster` - Discovery API integration
 - `Steps\EventImport\Handlers\DiceFm\DiceFm` - Dice FM event integration
 - `Steps\EventImport\Handlers\GoogleCalendar\GoogleCalendar` - Google Calendar integration
+- `Steps\EventImport\Handlers\GoogleCalendar\GoogleCalendarUtils` - Calendar ID/URL utilities and ICS generation
 - `Steps\EventImport\Handlers\WebScraper\UniversalWebScraper` - AI-powered web scraping
 - `Steps\Upsert\Events\EventUpsertSettings` - Configuration management for Event Upsert handler (v0.2.5+)
 - `Utilities\EventIdentifierGenerator` - Shared event identifier normalization utility
@@ -121,7 +122,7 @@ npm run lint:js && npm run lint:css             # Linting
 - DisplayStyles visual enhancement:
   - `ColorManager.js` - Centralized CSS custom properties helper for fill/stroke var references
   - `CircuitGrid/BadgeRenderer.js` - Day badge positioning with multi-group support and ColorManager integration
-  - `CarouselListRenderer.js` - Carousel list display mode
+  - Carousel List mode is CSS-only (no JavaScript renderer needed)
 - Template_Loader provides get_template(), include_template(), template_exists(), get_template_path()
 - Taxonomy_Helper provides structured data with hierarchy building and post count calculations
 
@@ -144,7 +145,9 @@ datamachine-events/
 ├── datamachine-events.php                      # Main plugin file with PSR-4 autoloader
 ├── inc/
 │   ├── Admin/                                  # Admin interface classes
-│   │   └── class-settings-page.php            # Event settings interface
+│   │   ├── Admin_Bar.php                       # Events navigation menu in admin bar
+│   │   ├── Settings_Page.php                   # Event settings interface
+│   │   └── Status_Detection.php                # Legacy status detection stub
 │   ├── Api/                                    # REST API controllers and routes
 │   │   ├── Routes.php                          # API route registration
 │   │   └── Controllers/                        # Calendar, Venues, Events controllers
@@ -153,23 +156,56 @@ datamachine-events/
 │   │   │   ├── Template_Loader.php             # Template loading system
 │   │   │   ├── Taxonomy_Helper.php             # Taxonomy data processing
 │   │   │   ├── DisplayStyles/                  # Visual enhancement components
-│   │   │   │   ├── ColorManager.js             # Centralized color helper
-│   │   │   │   └── CircuitGrid/                # CircuitGrid display mode
-│   │   │   │       └── BadgeRenderer.js        # Day badge positioning
-│   │   │   └── templates/                      # 7 modular templates + modal subdirectory
+│   │   │   │   ├── CarouselList/                # Carousel List display mode (CSS-only)
+│   │   │   │   │   └── carousel-list.css       # Carousel List styles
+│   │   │   │   ├── CircuitGrid/                # CircuitGrid display mode
+│   │   │   │   │   ├── BadgeRenderer.js        # Day badge positioning
+│   │   │   │   │   ├── CircuitGridRenderer.js  # Circuit grid rendering
+│   │   │   │   │   └── circuit-grid.css        # Circuit Grid styles
+│   │   │   │   └── ColorManager.js             # Centralized color helper
+│   │   │   ├── Taxonomy_Badges.php             # Dynamic badge rendering
+│   │   │   ├── Taxonomy_Helper.php             # Taxonomy data processing
+│   │   │   ├── Template_Loader.php             # Template loading system
+│   │   │   ├── Pagination.php                  # Calendar pagination logic
+│   │   │   └── templates/                      # 7 specialized templates + modal subdirectory
 │   │   ├── EventDetails/                       # Event data storage (webpack + @wordpress/scripts)
 │   │   └── root.css                            # Centralized design tokens
 │   ├── Core/
-│   │   ├── class-event-post-type.php           # Post type registration
-│   │   ├── class-venue-taxonomy.php            # Venue taxonomy + 9 meta fields
-│   │   ├── class-taxonomy-badges.php           # Dynamic badge rendering
+│   │   ├── Event_Post_Type.php                 # Post type registration
+│   │   ├── Venue_Taxonomy.php                  # Venue taxonomy + 9 meta fields
+│   │   ├── VenueService.php                    # Centralized venue operations
 │   │   └── meta-storage.php                    # Event metadata sync
 │   ├── steps/
-│   │   ├── EventImport/handlers/               # Import handlers (Ticketmaster, DiceFm, WebScraper)
+│   │   ├── EventImport/                        # Event import step and handlers
+│   │   │   ├── Handlers/                       # Import handlers (Ticketmaster, DiceFm, GoogleCalendar, WebScraper)
+│   │   │   │   ├── Ticketmaster/               # Ticketmaster Discovery API
+│   │   │   │   ├── DiceFm/                     # Dice FM integration
+│   │   │   │   ├── GoogleCalendar/              # Google Calendar integration
+│   │   │   │   │   ├── GoogleCalendarUtils.php  # Calendar ID/URL utilities
+│   │   │   │   │   └── GoogleCalendarAuth.php   # Authentication handling
+│   │   │   │   └── WebScraper/                 # AI-powered web scraping
+│   │   │   ├── EventImportStep.php              # Pipeline step with handler discovery
+│   │   │   └── EventImportHandler.php          # Abstract base for import handlers
 │   │   └── Upsert/Events/                      # EventUpsert handler for create/update operations
+│   │       ├── EventUpsert.php                 # Intelligent create/update handler
+│   │       ├── EventUpsertFilters.php          # Handler registration
+│   │       ├── EventUpsertSettings.php         # Configuration management
+│   │       ├── Schema.php                      # Google Event JSON-LD generator
+│   │       └── Venue.php                        # Venue taxonomy operations
 │   └── Utilities/                              # Shared utilities
 │       └── EventIdentifierGenerator.php        # Event identifier normalization
+├── templates/
+│   └── admin/
+│       └── settings-page.php                   # Admin settings template
 └── assets/                                     # CSS and JavaScript
+    ├── css/                                     # Admin styling (admin.css)
+    │   ├── admin.css
+    │   ├── venue-autocomplete.css
+    │   └── venue-map.css
+    └── js/                                      # Admin JavaScript
+        ├── venue-autocomplete.js
+        ├── venue-map.js
+        └── venue-selector.js
 ```
 
 ## WordPress Integration
@@ -431,5 +467,5 @@ Template_Loader::include_template('date-group', $group_data);
 
 ---
 
-**Version**: 0.3.2
+**Version**: 0.3.6
 **For ecosystem architecture, see root CLAUDE.md file**

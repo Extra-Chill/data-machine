@@ -7,6 +7,8 @@
 
 namespace DataMachineEvents\Blocks\Calendar;
 
+use DataMachineEvents\Core\Event_Post_Type;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -22,7 +24,7 @@ class Taxonomy_Helper {
     public static function get_all_taxonomies_with_counts() {
         $taxonomies_data = [];
         
-        $taxonomies = get_object_taxonomies('datamachine_events', 'objects');
+        $taxonomies = get_object_taxonomies(Event_Post_Type::POST_TYPE, 'objects');
         
         if (!$taxonomies) {
             return $taxonomies_data;
@@ -133,7 +135,7 @@ class Taxonomy_Helper {
      */
     public static function get_term_event_count($term_id) {
         $query_args = [
-            'post_type' => 'datamachine_events',
+            'post_type' => Event_Post_Type::POST_TYPE,
             'post_status' => 'publish',
             'numberposts' => -1,
             'fields' => 'ids',
