@@ -124,3 +124,6 @@ wp-content/plugins/hello.php
 # Plugin specific
 *.zip
 *.tar.gz 
+
+# Docs tooling
+docs/.docs-sync.json
