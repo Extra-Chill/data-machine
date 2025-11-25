@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.2.0
+**Version**: 0.3.2
 
 ## Migration Status
 
@@ -21,8 +21,8 @@ Technical guidance for Claude Code when working with the **Data Machine Events**
 - **`EventImportHandler`** - Abstract base class for all import handlers (extends `FetchHandler`)
 
 ### Shared Utilities
-- **`WordPressSharedTrait`** - Provides shared WordPress utilities across all handlers
 - **`TaxonomyHandler`** - Centralized taxonomy management with custom venue handler integration
+- **`WordPressPublishHelper`** - Image attachment and publishing utilities (v0.2.7+)
 
 ### Handler Discovery System
 - **Registry-based Loading**: Handlers registered via `datamachine_handlers` filter
@@ -71,28 +71,31 @@ npm run lint:js && npm run lint:css             # Linting
 - `Admin\Settings_Page` - Event archive behavior, search integration, display preferences, map display type (5 free tile layer options)
 - `Core\Event_Post_Type` - Post type registration with selective admin menu control
 - `Core\Venue_Taxonomy` - Venue taxonomy with 9 meta fields, admin UI, CRUD operations
-- `Core\Taxonomy_Badges` - Dynamic badge rendering with automatic color generation
-- `Core\Breadcrumbs` - Breadcrumb generation (filterable via datamachine_events_breadcrumbs)
+- `Core\VenueService` - Venue operations and data management service
+- `Core\meta-storage` - Event metadata synchronization and management
 - `Blocks\Calendar\Template_Loader` - Modular template system with 7 specialized templates
 - `Blocks\Calendar\Taxonomy_Helper` - Taxonomy data processing for filtering systems
+- `Core\Taxonomy_Badges` - Dynamic badge rendering with automatic color generation (moved to Core as of v0.3.2)
 - `Blocks\Calendar\DisplayStyles\ColorManager` - Centralized color CSS custom properties helper
 - `Blocks\Calendar\DisplayStyles\CircuitGrid\BadgeRenderer` - Day badge positioning with ColorManager integration
-- `Steps\Upsert\Events\EventUpsert` - Intelligent create-or-update handler (extends UpdateHandler)
-- `Steps\Publish\Events\Venue` - Centralized venue operations
-- `Steps\Publish\Events\Schema` - Google Event JSON-LD generator
-- `Steps\EventImport\EventImportStep` - Event import step for Data Machine pipelines (extends Step)
-- `Steps\EventImport\EventImportHandler` - Abstract base for import handlers (extends FetchHandler)
+- `Steps\Upsert\Events\Schema` - Google Event JSON-LD generator
+- `Steps\Upsert\Events\Venue` - Centralized venue taxonomy operations
+- `Steps\Upsert\Events\EventUpsert` - Intelligent create-or-update handler (extends UpdateHandler, requires Data Machine v0.2.7+)
+- `Steps\Upsert\Events\EventUpsertFilters` - EventUpsert handler registration with Data Machine
+- `Steps\EventImport\EventImportStep` - Event import step for Data Machine pipeline with handler discovery (extends Step)
+- `Steps\EventImport\EventImportHandler` - Abstract base class for import handlers (extends FetchHandler)
 - `Steps\EventImport\Handlers\Ticketmaster\Ticketmaster` - Discovery API integration
 - `Steps\EventImport\Handlers\DiceFm\DiceFm` - Dice FM event integration
+- `Steps\EventImport\Handlers\GoogleCalendar\GoogleCalendar` - Google Calendar integration
 - `Steps\EventImport\Handlers\WebScraper\UniversalWebScraper` - AI-powered web scraping
 - `Utilities\EventIdentifierGenerator` - Shared event identifier normalization utility
 - `Api\Controllers\Calendar` - Calendar REST endpoint controller
 - `Api\Controllers\Venues` - Venues REST endpoint controller
 - `Api\Controllers\Events` - Events REST endpoint controller
 
-**Shared Utilities**:
-- `DataMachine\Core\WordPress\WordPressSharedTrait` - Shared WordPress utilities
+**Shared Utilities** (from Data Machine core):
 - `DataMachine\Core\WordPress\TaxonomyHandler` - Centralized taxonomy management
+- `DataMachine\Core\WordPress\WordPressPublishHelper` - Image attachment and publishing utilities
 
 **Data Flow**: Data Machine Import → Event Details Block → Schema Generation → Calendar Display
 
@@ -135,33 +138,33 @@ npm run lint:js && npm run lint:css             # Linting
 datamachine-events/
 ├── datamachine-events.php                      # Main plugin file with PSR-4 autoloader
 ├── inc/
-│   ├── Admin/class-settings-page.php          # Event settings interface
-│   ├── Api/                                   # REST API controllers and routes
-│   │   ├── Routes.php                         # API route registration
-│   │   └── Controllers/                       # Calendar, Venues, Events controllers
+│   ├── Admin/                                  # Admin interface classes
+│   │   └── class-settings-page.php            # Event settings interface
+│   ├── Api/                                    # REST API controllers and routes
+│   │   ├── Routes.php                          # API route registration
+│   │   └── Controllers/                        # Calendar, Venues, Events controllers
 │   ├── Blocks/
-│   │   ├── Calendar/                          # Events display (webpack)
-│   │   │   ├── Template_Loader.php            # Template loading system
-│   │   │   ├── Taxonomy_Helper.php            # Taxonomy data processing
-│   │   │   ├── DisplayStyles/                 # Visual enhancement components
-│   │   │   │   ├── ColorManager.js            # Centralized color helper
-│   │   │   │   └── CircuitGrid/               # CircuitGrid display mode
-│   │   │   │       └── BadgeRenderer.js       # Day badge positioning
-│   │   │   └── templates/                     # 7 modular templates + modal/
-│   │   ├── EventDetails/                      # Event data storage (webpack + @wordpress/scripts)
-│   │   └── root.css                           # Centralized design tokens
+│   │   ├── Calendar/                           # Events display (webpack)
+│   │   │   ├── Template_Loader.php             # Template loading system
+│   │   │   ├── Taxonomy_Helper.php             # Taxonomy data processing
+│   │   │   ├── DisplayStyles/                  # Visual enhancement components
+│   │   │   │   ├── ColorManager.js             # Centralized color helper
+│   │   │   │   └── CircuitGrid/                # CircuitGrid display mode
+│   │   │   │       └── BadgeRenderer.js        # Day badge positioning
+│   │   │   └── templates/                      # 7 modular templates + modal subdirectory
+│   │   ├── EventDetails/                       # Event data storage (webpack + @wordpress/scripts)
+│   │   └── root.css                            # Centralized design tokens
 │   ├── Core/
-│   │   ├── class-event-post-type.php          # Post type registration
-│   │   ├── class-venue-taxonomy.php           # Venue taxonomy + 9 meta fields
-│   │   ├── class-taxonomy-badges.php          # Dynamic badge rendering
-│   │   └── class-breadcrumbs.php              # Breadcrumb generation
+│   │   ├── class-event-post-type.php           # Post type registration
+│   │   ├── class-venue-taxonomy.php            # Venue taxonomy + 9 meta fields
+│   │   ├── class-taxonomy-badges.php           # Dynamic badge rendering
+│   │   └── meta-storage.php                    # Event metadata sync
 │   ├── steps/
-│   │   ├── EventImport/handlers/              # Import handlers (Ticketmaster, DiceFm, WebScraper)
-│   │   └── Upsert/Events/                     # EventUpsert handler for create/update operations
-│   └── Utilities/                             # Shared utilities
-│       └── EventIdentifierGenerator.php       # Event identifier normalization
-├── templates/single-datamachine_events.php    # Single event template
-└── assets/                                    # CSS and JavaScript
+│   │   ├── EventImport/handlers/               # Import handlers (Ticketmaster, DiceFm, WebScraper)
+│   │   └── Upsert/Events/                      # EventUpsert handler for create/update operations
+│   └── Utilities/                              # Shared utilities
+│       └── EventIdentifierGenerator.php        # Event identifier normalization
+└── assets/                                     # CSS and JavaScript
 ```
 
 ## WordPress Integration
@@ -390,5 +393,5 @@ Template_Loader::include_template('date-group', $group_data);
 
 ---
 
-**Version**: 0.2.0
-**For ecosystem architecture, see root CLAUDE.md**
+**Version**: 0.3.2
+**For ecosystem architecture, see root CLAUDE.md file**

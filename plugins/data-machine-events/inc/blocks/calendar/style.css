@@ -269,7 +269,6 @@
 .datamachine-event-date,
 .datamachine-event-time,
 .datamachine-event-artist,
-.datamachine-event-venue,
 .datamachine-event-address {
     display: flex;
     align-items: center;
@@ -281,7 +280,6 @@
 
 .datamachine-event-date-icon,
 .datamachine-event-artist-icon,
-.datamachine-event-venue-icon,
 .datamachine-event-address-icon {
     font-size: 1rem;
     flex-shrink: 0;

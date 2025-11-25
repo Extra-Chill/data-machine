@@ -16,13 +16,17 @@ if (!defined('ABSPATH')) {
 use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Steps\Upsert\Events\Schema;
 
+$decode_unicode = function($str) {
+    return html_entity_decode(preg_replace('/\\\\u([0-9a-fA-F]{4})/', '&#x$1;', $str), ENT_NOQUOTES, 'UTF-8');
+};
+
 $start_date = $attributes['startDate'] ?? '';
 $end_date = $attributes['endDate'] ?? '';
 $start_time = $attributes['startTime'] ?? '';
 $end_time = $attributes['endTime'] ?? '';
-$venue = $attributes['venue'] ?? '';
-$address = $attributes['address'] ?? '';
-$price = $attributes['price'] ?? '';
+$venue = $decode_unicode($attributes['venue'] ?? '');
+$address = $decode_unicode($attributes['address'] ?? '');
+$price = $decode_unicode($attributes['price'] ?? '');
 $ticket_url = $attributes['ticketUrl'] ?? '';
 $show_venue = $attributes['showVenue'] ?? true;
 $show_price = $attributes['showPrice'] ?? true;

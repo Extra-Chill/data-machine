@@ -1,7 +1,7 @@
 # Data Machine Events Copilot Instructions
 
 ## Architecture Snapshot
-- Block-first data flow lives in `datamachine-events.php`: Event Details block → `_datamachine_event_datetime` meta (`inc/Core/meta-storage.php`) → Calendar templates (`inc/Blocks/Calendar/templates`) → single template hooks in `templates/single-datamachine_events.php`.
+- Block-first data flow lives in `datamachine-events.php`: Event Details block → `_datamachine_event_datetime` meta (`inc/Core/meta-storage.php`) → Calendar templates (`inc/Blocks/Calendar/templates`) → theme's `single.php` template.
 - All PHP classes sit under the `DataMachineEvents\` namespace with Composer PSR-4 autoloading; never require class files manually unless they are non-class helpers (see handler `*Filters.php`).
 - Calendar rendering is centralized through `DataMachineEvents\Blocks\Calendar\Template_Loader`; extend output by adding/including templates there instead of echoing HTML inline.
 - Root design tokens in `inc/blocks/root.css` are consumed by both CSS and JS (circuit grid sizing, badge colors) so update variables there before tweaking individual block styles.
@@ -12,7 +12,6 @@
 - EventUpsert logic lives in `Steps/Upsert/Events/EventUpsert.php`: it extends the core `UpdateHandler`, searches for existing events by (title, venue, startDate), performs field-by-field change detection, generates Event Details block markup, and syncs venues via `Core\Venue_Taxonomy::find_or_create_venue`.
 - Event identity normalization uses `Utilities\EventIdentifierGenerator::generate($title, $startDate, $venue)` across all import handlers for consistent duplicate detection (lowercase, trim, collapse whitespace, remove articles).
 - `Schema::generate_event_schema()` combines block attributes, venue taxonomy meta, and engine data—reuse it instead of rebuilding JSON-LD.
-- Hooks/actions exposed to themes include `datamachine_events_before_single_event`, `datamachine_events_after_event_article`, `datamachine_events_related_events`, and badge/breadcrumb filters; prefer these when integrating rather than editing templates.
 
 ## REST + Frontend Behavior
 - Public endpoints live in `inc/Api/Routes.php` and `inc/Api/Controllers/` under the unified `datamachine/v1` namespace: `/events/calendar`, `/events/venues/{id}`, `/events/venues/check-duplicate`. Keep new endpoints in this namespace and reuse existing arg sanitizers.
@@ -20,10 +19,10 @@
 - Event Details block view (`inc/blocks/EventDetails/render.php`) is server-rendered; JS enhancements such as Leaflet maps live in `assets/js/venue-map.js` and respect `Settings_Page::get_map_display_type()` (five free tile layers, 📍 emoji marker). Trigger `jQuery(document).trigger('datamachine-events-loaded')` after injecting events so maps re-init.
 
 ## WordPress Conventions
-- Post type `datamachine_events` and venue taxonomy registration reside in `inc/Core/class-event-post-type.php` and `inc/Core/class-venue-taxonomy.php`; add meta fields through the taxonomy class so admin CRUD + REST meta stay in sync.
+- Post type `datamachine_events` and venue taxonomy registration reside in `inc/Core/Event_Post_Type.php` and `inc/Core/Venue_Taxonomy.php`; add meta fields through the taxonomy class so admin CRUD + REST meta stay in sync.
 - `_datamachine_event_datetime` meta powers SQL pagination; whenever block attributes change outside Gutenberg, run `datamachine_events_sync_datetime_meta()` or the migration helper in `inc/Core/meta-storage.php`.
-- Settings UI (`inc/Admin/class-settings-page.php`) controls archive/search inclusion, display mode, and map tiles. Use `Settings_Page::get_setting()` helpers instead of re-reading `get_option`.
-- Taxonomy badge markup is centralized in `Core\Taxonomy_Badges`; extend styling via filters `datamachine_events_badge_wrapper_classes` and `datamachine_events_badge_classes`, not by editing templates.
+- Settings UI (`inc/Admin/Settings_Page.php`) controls archive/search inclusion, display mode, and map tiles. Use `Settings_Page::get_setting()` helpers instead of re-reading `get_option`.
+- Taxonomy badge markup is centralized in `Blocks\Calendar\Taxonomy_Badges`; extend styling via filters `datamachine_events_badge_wrapper_classes` and `datamachine_events_badge_classes`, not by editing templates.
 
 ## Build & Dev Workflow
 - Install dependencies with `composer install`, then run `npm install && npm run build` (or `npm run start`) separately in `inc/blocks/calendar` and `inc/blocks/EventDetails`.

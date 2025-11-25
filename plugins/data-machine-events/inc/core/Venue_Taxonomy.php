@@ -88,18 +88,34 @@ class Venue_Taxonomy {
      * @return array Array with keys: term_id, was_created
      */
     public static function find_or_create_venue($venue_name, $venue_data = []) {
+        // Allow normalization of venue name (e.g. aliases, corrections)
+        $venue_name = apply_filters('datamachine_events_normalize_venue_name', $venue_name);
+
         // Check if venue already exists by name
         $existing = get_term_by('name', $venue_name, 'venue');
+
+        // Smart Lookup: If exact match fails, try variations with/without "The"
+        if (!$existing) {
+            $alt_name = '';
+            if (stripos($venue_name, 'The ') === 0) {
+                // Remove "The " prefix
+                $alt_name = substr($venue_name, 4);
+            } else {
+                // Add "The " prefix
+                $alt_name = 'The ' . $venue_name;
+            }
+            
+            if (!empty($alt_name)) {
+                $existing = get_term_by('name', $alt_name, 'venue');
+            }
+        }
 
         if ($existing) {
             $term_id = $existing->term_id;
 
-            // Check if venue has metadata
-            $has_metadata = self::has_venue_metadata($term_id);
-
-            // If no metadata exists and we have venue data, add it
-            if (!$has_metadata && !empty($venue_data)) {
-                self::update_venue_meta($term_id, $venue_data);
+            // Smart Merge: Fill in any missing metadata fields
+            if (!empty($venue_data)) {
+                self::smart_merge_venue_meta($term_id, $venue_data);
             }
 
             return [
@@ -128,6 +144,30 @@ class Venue_Taxonomy {
             'term_id' => $term_id,
             'was_created' => true
         ];
+    }
+
+    /**
+     * Smartly merge new venue data into existing venue
+     * Only updates fields that are currently empty in the database
+     *
+     * @param int $term_id Venue term ID
+     * @param array $venue_data New venue data
+     */
+    private static function smart_merge_venue_meta($term_id, $venue_data) {
+        foreach (self::$meta_fields as $data_key => $meta_key) {
+            // Skip if we don't have new data for this field
+            if (empty($venue_data[$data_key])) {
+                continue;
+            }
+
+            // Check existing value
+            $existing_value = get_term_meta($term_id, $meta_key, true);
+
+            // Only update if existing value is empty
+            if (empty($existing_value)) {
+                update_term_meta($term_id, $meta_key, sanitize_text_field($venue_data[$data_key]));
+            }
+        }
     }
 
     /**

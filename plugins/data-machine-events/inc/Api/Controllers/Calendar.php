@@ -279,7 +279,7 @@ class Calendar {
 								'venue_name'           => $venue_name,
 								'performer_name'       => $performer_name,
 								'iso_start_date'       => $iso_start_date,
-								'show_venue'           => $event_data['showVenue'] ?? true,
+								
 								'show_performer'       => $event_data['showPerformer'] ?? true,
 								'show_price'           => $event_data['showPrice'] ?? true,
 								'show_ticket_link'     => $event_data['showTicketLink'] ?? true,

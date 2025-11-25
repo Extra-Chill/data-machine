@@ -42,6 +42,13 @@ class TicketmasterAuth extends BaseAuthProvider {
                 'type' => 'password',
                 'required' => true,
                 'description' => __('Your Ticketmaster Discovery API Consumer Key from developer.ticketmaster.com', 'datamachine-events')
+            ],
+            'affiliate_id' => [
+                'label' => __('Impact Radius ID', 'datamachine-events'),
+                'type' => 'text',
+                'required' => false,
+                'description' => __('Your Impact Radius Media Partner ID (e.g., 1191134). If provided, ticket links will be converted to affiliate links.', 'datamachine-events'),
+                'placeholder' => '1191134'
             ]
         ];
     }

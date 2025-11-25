@@ -51,12 +51,7 @@ $show_ticket_link = $display_vars['show_ticket_link'] ?? true;
                 </div>
             <?php endif; ?>
 
-            <?php if ($show_venue && !empty($venue_name)) : ?>
-                <div class="datamachine-event-venue">
-                    <span class="dashicons dashicons-location"></span>
-                    <?php echo esc_html($venue_name); ?>
-                </div>
-            <?php endif; ?>
+            
 
             <?php if ($show_performer && !empty($performer_name)) : ?>
                 <div class="datamachine-event-performer">

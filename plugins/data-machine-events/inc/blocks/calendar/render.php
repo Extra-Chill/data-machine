@@ -15,6 +15,11 @@ if (!defined('ABSPATH')) {
 
 use DataMachineEvents\Blocks\Calendar\DisplayStyles\CircuitGrid\CircuitGridRenderer;
 use DataMachineEvents\Blocks\Calendar\Pagination;
+
+$decode_unicode = function($str) {
+    return html_entity_decode(preg_replace('/\\\\u([0-9a-fA-F]{4})/', '&#x$1;', $str), ENT_NOQUOTES, 'UTF-8');
+};
+
 // Early exit for REST API requests - prevent duplicate rendering
 // REST API endpoint handles its own rendering via rest-api.php
 if (wp_is_json_request() || (defined('REST_REQUEST') && REST_REQUEST)) {
@@ -360,8 +365,8 @@ $filter_count = !empty($tax_filters) ? array_sum(array_map('count', $tax_filters
                         
                         $start_date = $event_data['startDate'] ?? '';
                         $start_time = $event_data['startTime'] ?? '';
-                        $venue_name = $event_data['venue'] ?? '';
-                        $performer_name = $event_data['performer'] ?? '';
+                        $venue_name = $decode_unicode($event_data['venue'] ?? '');
+                        $performer_name = $decode_unicode($event_data['performer'] ?? '');
                         
                         $formatted_start_time = '';
                         $iso_start_date = '';
@@ -376,7 +381,7 @@ $filter_count = !empty($tax_filters) ? array_sum(array_map('count', $tax_filters
                             'venue_name' => $venue_name,
                             'performer_name' => $performer_name,
                             'iso_start_date' => $iso_start_date,
-                            'show_venue' => $event_data['showVenue'] ?? true,
+                            
                             'show_performer' => $event_data['showPerformer'] ?? true,
                             'show_price' => $event_data['showPrice'] ?? true,
                             'show_ticket_link' => $event_data['showTicketLink'] ?? true

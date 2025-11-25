@@ -305,9 +305,21 @@ class EventUpsert extends UpdateHandler {
         // Process venue
         $this->processVenue($post_id, $parameters);
 
+        // Map schema fields to taxonomies if not explicitly provided
+        if (empty($parameters['artist']) && !empty($event_data['performer'])) {
+            $parameters['artist'] = $event_data['performer'];
+        }
+
         // Process taxonomies
         $handler_config_for_tax = $handler_config;
         $handler_config_for_tax['taxonomy_venue_selection'] = 'skip';
+
+        // Map schema fields to taxonomies if not explicitly provided
+        // This ensures 'performer' (Schema) maps to 'artist' (Taxonomy) if the AI only provided one
+        if (empty($parameters['artist']) && !empty($event_data['performer'])) {
+            $parameters['artist'] = $event_data['performer'];
+        }
+
         $engine_data_array = $engine instanceof EngineData ? $engine->all() : [];
         $this->taxonomy_handler->processTaxonomies($post_id, $parameters, $handler_config_for_tax, $engine_data_array);
 
@@ -370,6 +382,11 @@ class EventUpsert extends UpdateHandler {
 
         // Update venue
         $this->processVenue($post_id, $parameters);
+
+        // Map schema fields to taxonomies if not explicitly provided
+        if (empty($parameters['artist']) && !empty($event_data['performer'])) {
+            $parameters['artist'] = $event_data['performer'];
+        }
 
         // Update taxonomies
         $handler_config_for_tax = $handler_config;

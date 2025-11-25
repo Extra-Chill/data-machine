@@ -72,6 +72,9 @@ class Ticketmaster extends EventImportHandler {
             'pipeline_id' => $pipeline_id
         ]);
         
+        // Pass affiliate ID from auth config to mapper
+        $affiliate_id = $api_config['affiliate_id'] ?? '';
+
         foreach ($raw_events as $raw_event) {
             // Only process actively scheduled events
             $event_status = $raw_event['dates']['status']['code'] ?? '';
@@ -79,7 +82,7 @@ class Ticketmaster extends EventImportHandler {
                 continue;
             }
             
-            $standardized_event = $this->map_ticketmaster_event($raw_event);
+            $standardized_event = $this->map_ticketmaster_event($raw_event, $affiliate_id);
             
             if (empty($standardized_event['title'])) {
                 continue;
@@ -322,7 +325,7 @@ class Ticketmaster extends EventImportHandler {
         return $data['_embedded']['events'];
     }
     
-    private function map_ticketmaster_event(array $tm_event): array {
+    private function map_ticketmaster_event(array $tm_event, string $affiliate_id = ''): array {
         $title = $tm_event['name'] ?? '';
         $description = $tm_event['info'] ?? $tm_event['pleaseNote'] ?? '';
         
@@ -387,6 +390,40 @@ class Ticketmaster extends EventImportHandler {
         }
         
         $ticket_url = $tm_event['url'] ?? '';
+
+        // Construct clean URL from ID if possible
+        if (!empty($tm_event['id'])) {
+            $clean_url = 'https://www.ticketmaster.com/event/' . $tm_event['id'];
+        } else {
+            $clean_url = $ticket_url;
+        }
+
+        // Apply affiliate link if configured
+        if (!empty($affiliate_id)) {
+            // Use standard Impact Radius format for Ticketmaster
+            // https://ticketmaster.evyy.net/c/{affiliate_id}/264167/4272?u={encoded_url}
+            $ticket_url = sprintf(
+                'https://ticketmaster.evyy.net/c/%s/264167/4272?u=%s&utm_medium=affiliate',
+                $affiliate_id,
+                urlencode($clean_url)
+            );
+        } elseif (strpos($ticket_url, 'ticketmaster.evyy.net') !== false) {
+             // If URL is already an affiliate link but broken (contains httpswww), try to fix it using clean URL
+             if (strpos($ticket_url, 'httpswww') !== false && !empty($tm_event['id'])) {
+                 // Extract affiliate ID if possible, or just use the clean URL if we can't save the affiliate part
+                 if (preg_match('/\/c\/(\d+)\//', $ticket_url, $matches)) {
+                     $extracted_affiliate_id = $matches[1];
+                     $ticket_url = sprintf(
+                        'https://ticketmaster.evyy.net/c/%s/264167/4272?u=%s&utm_medium=affiliate',
+                        $extracted_affiliate_id,
+                        urlencode($clean_url)
+                    );
+                 } else {
+                     // Can't parse affiliate ID, fallback to clean URL to avoid 404
+                     $ticket_url = $clean_url;
+                 }
+             }
+        }
         
         return [
             'title' => $this->sanitize_text($title),
