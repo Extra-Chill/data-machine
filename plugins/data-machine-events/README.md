@@ -43,37 +43,14 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 - **Auto-Population:** AI-driven venue creation with complete metadata from import sources
 - **SEO Ready:** Archive pages and structured data
 
-### Development
-
-**Requirements:** WordPress 6.0+, PHP 8.0+, Composer, Node.js 16+ (for block development)
-
-**WordPress Version:** Tested up to 6.8
-
-**Data Machine Requirement:** Data Machine v0.2.7+ required for EventUpsert compatibility
-
-**Setup:**
-```bash
-composer install
-# Build blocks
-cd inc/Blocks/Calendar && npm install && npm run build
-cd ../EventDetails && npm install && npm run build
-```
-
-**Production Build:**
-```bash
-# Run automated build script to create optimized WordPress plugin package
-./build.sh
-# Creates: /dist/datamachine-events.zip with build info and production assets
-```
-Upload to `/wp-content/plugins/datamachine-events/` and activate.
-
 ### Usage
 1. **Plugin Settings:** Events → Settings → Configure archive behavior, search integration, and display preferences
-2. **Automated Import:** Configure Data Machine plugin for Ticketmaster Discovery API (API key), Dice FM, or universal web scraper imports
-3. **AI-Driven Publishing:** Data Machine AI creates events with descriptions, comprehensive venue creation, and taxonomy assignments
-4. **Manual Events:** Add Event post → Insert "Event Details" block → Fill event data  
-5. **Display Events:** Add "Data Machine Events Calendar" block to any page/post
-6. **Manage Venues:** Events → Venues → Add comprehensive venue details with 9 meta fields (auto-populated via AI imports)
+2. **Admin Navigation:** Events menu in WordPress admin bar for quick access to event management
+3. **Automated Import:** Configure Data Machine plugin for Ticketmaster Discovery API (API key), Dice FM, or universal web scraper imports
+4. **AI-Driven Publishing:** Data Machine AI creates events with descriptions, comprehensive venue creation, and taxonomy assignments
+5. **Manual Events:** Add Event post → Insert "Event Details" block → Fill event data
+6. **Display Events:** Add "Data Machine Events Calendar" block to any page/post
+7. **Manage Venues:** Events → Venues → Add comprehensive venue details with 9 meta fields (auto-populated via AI imports)
 
 ## Project Structure
 
@@ -82,6 +59,7 @@ datamachine-events/
 ├── datamachine-events.php   # Main plugin file with PSR-4 autoloader
 ├── inc/
 │   ├── Admin/               # Admin interface classes
+│   │   ├── class-admin-bar.php           # Events navigation menu in admin bar
 │   │   ├── class-status-detection.php    # Legacy stub for backwards compatibility
 │   │   └── class-settings-page.php       # Event settings interface
 │   ├── Api/                 # REST API controllers and routes
@@ -101,6 +79,7 @@ datamachine-events/
 │   ├── Core/                # Core plugin classes
 │   │   ├── class-event-post-type.php    # Event post type with menu control
 │   │   ├── class-venue-taxonomy.php     # Venue taxonomy with 9 meta fields
+│   │   ├── class-venue-service.php      # Centralized venue operations
 │   │   ├── class-taxonomy-badges.php    # Dynamic taxonomy badge rendering with filters
 │   │   └── meta-storage.php             # Event metadata sync and management
 │   ├── steps/               # Data Machine integration
@@ -108,6 +87,11 @@ datamachine-events/
 │   │   │   └── handlers/    # Ticketmaster, Dice FM, web scrapers
 │   │   ├── Publish/Events/  # Schema and Venue handling
 │   │   └── Upsert/Events/   # EventUpsert handler for create/update operations
+│   │       ├── EventUpsert.php
+│   │       ├── EventUpsertFilters.php
+│   │       ├── EventUpsertSettings.php  # Configuration management
+│   │       ├── Schema.php
+│   │       └── Venue.php
 │   └── Utilities/           # Shared utilities
 │       └── EventIdentifierGenerator.php  # Event identifier normalization
 ├── templates/
@@ -125,6 +109,8 @@ datamachine-events/
 
 **WordPress Version:** Tested up to 6.8
 
+**Data Machine Requirement:** Data Machine v0.2.7+ required for WordPressPublishHelper compatibility and EngineData architecture changes
+
 **Setup:**
 ```bash
 composer install
@@ -139,6 +125,7 @@ cd ../EventDetails && npm install && npm run build
 ./build.sh
 # Creates: /dist/datamachine-events.zip with build info and production assets
 ```
+Upload to `/wp-content/plugins/datamachine-events/` and activate.
 
 **Block Development:**
 ```bash

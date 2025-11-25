@@ -85,6 +85,11 @@ Traditional chronological display:
 - **Output Buffering**: Efficient template rendering
 - **Caching Support**: Performance optimization
 - **Modular Design**: Easy template customization
+- **More Info Button**: Direct link to event details with customizable styling
+
+### Taxonomy Integration
+- **Taxonomy_Badges**: Dynamic badge rendering with automatic color generation and taxonomy term links
+- **Taxonomy_Helper**: Structured taxonomy data processing with hierarchy building and post count calculations
 
 ## REST API Integration
 

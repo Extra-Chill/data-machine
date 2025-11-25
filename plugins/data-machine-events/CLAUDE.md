@@ -69,13 +69,15 @@ npm run lint:js && npm run lint:css             # Linting
 
 **Core Classes**:
 - `Admin\Settings_Page` - Event archive behavior, search integration, display preferences, map display type (5 free tile layer options)
+- `Admin\Admin_Bar` - Events navigation menu in WordPress admin bar
+- `Admin\Status_Detection` - Legacy status detection stub for backwards compatibility
 - `Core\Event_Post_Type` - Post type registration with selective admin menu control
 - `Core\Venue_Taxonomy` - Venue taxonomy with 9 meta fields, admin UI, CRUD operations
-- `Core\VenueService` - Venue operations and data management service
+- `Core\VenueService` - Centralized venue operations: normalization, finding existing venues, creating new venue terms
 - `Core\meta-storage` - Event metadata synchronization and management
 - `Blocks\Calendar\Template_Loader` - Modular template system with 7 specialized templates
 - `Blocks\Calendar\Taxonomy_Helper` - Taxonomy data processing for filtering systems
-- `Core\Taxonomy_Badges` - Dynamic badge rendering with automatic color generation (moved to Core as of v0.3.2)
+- `Blocks\Calendar\Taxonomy_Badges` - Dynamic badge rendering with automatic color generation and taxonomy term links
 - `Blocks\Calendar\DisplayStyles\ColorManager` - Centralized color CSS custom properties helper
 - `Blocks\Calendar\DisplayStyles\CircuitGrid\BadgeRenderer` - Day badge positioning with ColorManager integration
 - `Steps\Upsert\Events\Schema` - Google Event JSON-LD generator
@@ -88,6 +90,7 @@ npm run lint:js && npm run lint:css             # Linting
 - `Steps\EventImport\Handlers\DiceFm\DiceFm` - Dice FM event integration
 - `Steps\EventImport\Handlers\GoogleCalendar\GoogleCalendar` - Google Calendar integration
 - `Steps\EventImport\Handlers\WebScraper\UniversalWebScraper` - AI-powered web scraping
+- `Steps\Upsert\Events\EventUpsertSettings` - Configuration management for Event Upsert handler (v0.2.5+)
 - `Utilities\EventIdentifierGenerator` - Shared event identifier normalization utility
 - `Api\Controllers\Calendar` - Calendar REST endpoint controller
 - `Api\Controllers\Venues` - Venues REST endpoint controller
@@ -95,7 +98,9 @@ npm run lint:js && npm run lint:css             # Linting
 
 **Shared Utilities** (from Data Machine core):
 - `DataMachine\Core\WordPress\TaxonomyHandler` - Centralized taxonomy management
-- `DataMachine\Core\WordPress\WordPressPublishHelper` - Image attachment and publishing utilities
+- `DataMachine\Core\WordPress\WordPressPublishHelper` - Image attachment and publishing utilities (v0.2.7+)
+- `DataMachine\Core\WordPress\WordPressSettingsResolver` - Settings resolution with system defaults override (v0.2.7+)
+- `DataMachine\Core\WordPress\WordPressSettingsHandler` - Settings field generation and sanitization (v0.2.7+)
 
 **Data Flow**: Data Machine Import → Event Details Block → Schema Generation → Calendar Display
 
@@ -297,12 +302,13 @@ class EventImportStep extends Step {
 ```
 
 ### EventUpsert Architecture
-EventUpsert extends UpdateHandler with WordPressSharedTrait:
+EventUpsert extends UpdateHandler using direct EngineData, WordPressPublishHelper, and WordPressSettingsResolver (v0.2.7+ pattern):
 ```php
 class EventUpsert extends UpdateHandler {
-    use WordPressSharedTrait;
-
     protected function executeUpdate(array $parameters, array $handler_config): array {
+        // Direct EngineData usage for data access
+        $engine = new EngineData($parameters['engine_data'] ?? [], $parameters['job_id'] ?? null);
+
         // Search for existing event by (title, venue, startDate)
         $existing_post_id = $this->findExistingEvent($title, $venue, $startDate);
 
@@ -316,6 +322,23 @@ class EventUpsert extends UpdateHandler {
         TaxonomyHandler::addCustomHandler('venue', [$this, 'assignVenueTaxonomy']);
 
         return ['success' => true, 'action' => 'created|updated|no_change'];
+    }
+}
+```
+
+### EventUpsertSettings Architecture
+EventUpsertSettings provides configuration management for the Event Upsert handler:
+```php
+class EventUpsertSettings {
+    public static function get_fields(array $current_config = []): array {
+        // Returns field definitions for Data Machine settings interface
+        // Includes automatic venue handling explanation
+        // Provides post status, image inclusion, and taxonomy assignment options
+    }
+
+    public static function sanitize(array $raw_settings): array {
+        // Validates and sanitizes form input data
+        // Uses WordPressSettingsHandler for taxonomy field sanitization
     }
 }
 ```
@@ -381,6 +404,21 @@ Template_Loader::include_template('date-group', $group_data);
 - Input sanitization with `wp_unslash()` before `sanitize_text_field()`
 - Capability checks for admin functions
 - WordPress application password or cookie authentication for REST API
+
+## Key Filters and Hooks
+
+### Taxonomy Filters
+- `datamachine_events_excluded_taxonomies` - Exclude taxonomies from badge/modal display
+  - Parameters: `$excluded_taxonomies` (array), `$context` ('badge', 'modal', or empty)
+  - Return: Modified array of excluded taxonomy slugs
+
+### Badge Customization
+- `datamachine_events_badge_wrapper_classes` - Customize badge wrapper classes
+- `datamachine_events_badge_classes` - Customize individual badge classes
+- `datamachine_events_more_info_button_classes` - Customize "More Info" button classes
+
+### Calendar Query
+- `datamachine_events_calendar_query_args` - Modify calendar WP_Query arguments
 
 ## Key Development Principles
 

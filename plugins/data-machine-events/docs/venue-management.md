@@ -102,8 +102,14 @@ $venue_data = Venue_Taxonomy::get_venue_data($term_id);
 // Get formatted address
 $address = Venue_Taxonomy::get_formatted_address($term_id);
 
-// Find or create venue
-$venue_result = Venue_Taxonomy::find_or_create_venue($venue_name, $venue_data);
+// Find or create venue (Venue_Taxonomy method)
+$venue_result = Venue_Taxonomy::find_or_create_venue($venue_name, $venue_metadata);
+
+// Normalize venue data (VenueService method)
+$normalized_data = VenueService::normalize_venue_data($raw_data);
+
+// Get or create venue with normalized data (VenueService method)
+$venue_id = VenueService::get_or_create_venue($normalized_data);
 ```
 
 ### Custom Meta Fields
