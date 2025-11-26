@@ -8,10 +8,8 @@ The Calendar block provides flexible event display with progressive enhancement,
 
 ## Features
 
-### Display Modes
-- **Circuit Grid**: Visual grid layout with day badges and borders
-- **Carousel List**: Sequential list with time gap separators
-- **Standard List**: Traditional chronological event listing
+### Display Mode
+- **Carousel List**: Horizontal scrolling layout with day grouping and time gap separators
 
 ### Filtering System
 - **Search**: Real-time event search by title, venue, or taxonomy terms
@@ -29,26 +27,14 @@ The Calendar block provides flexible event display with progressive enhancement,
 - **JavaScript Enhanced**: Seamless filtering without page reloads
 - **History API**: Shareable filter states via URL
 
-## Display Modes
+## Display Mode
 
-### Circuit Grid
-Visual calendar-style grid with enhanced features:
-- **Day Badges**: Color-coded date indicators
-- **Border System**: SVG-based grid lines and connectors
-- **Responsive Design**: Mobile, tablet, and desktop layouts
-- **Color Manager**: Centralized color theming system
-
-### Carousel List
-Sequential event display optimized for browsing:
-- **Time Gaps**: Visual separators between date groups
-- **Smooth Scrolling**: Continuous event browsing
-- **Compact Layout**: Space-efficient event presentation
-
-### Standard List
-Traditional chronological display:
-- **Simple Layout**: Clean, readable event listing
-- **Performance**: Fast rendering for large event sets
-- **Accessibility**: Screen reader and keyboard navigation
+Carousel List provides sequential event display optimized for browsing:
+- **Time Gaps**: Visual separators between date groups using time-gap-separator template
+- **Horizontal Scroll**: CSS-only continuous event browsing with native touch/trackpad support
+- **Compact Layout**: Space-efficient event presentation with day grouping
+- **Performance**: CSS-only rendering requires no JavaScript for display
+- **Accessibility**: Screen reader and keyboard navigation support
 
 ## Filtering Features
 
@@ -144,9 +130,9 @@ Traditional chronological display:
 
 ### Styling Integration
 - **Design Tokens**: CSS custom properties from root.css
-- **Color Manager**: Dynamic color theming
-- **Responsive Grid**: Mobile-first design approach
-- **Badge System**: Automatic color generation
+- **Responsive Carousel**: Mobile-first horizontal scroll design
+- **Day Colors**: Automatic color generation for date badges
+- **Badge System**: Dynamic badge rendering with taxonomy colors
 
 ## Developer Integration
 

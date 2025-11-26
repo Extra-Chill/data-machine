@@ -2,7 +2,7 @@
 
 Frontend-focused WordPress events plugin with **block-first architecture**. Features AI-driven event creation via Data Machine integration, Event Details blocks with InnerBlocks for rich content editing, Calendar blocks for display, and comprehensive venue taxonomy management.
 
-**Version**: 0.3.5
+**Version**: 0.4.0
 
 ## Migration Showcase
 
@@ -25,11 +25,11 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 - ✅ **Theme flexibility:** Full control over event presentation layout
 - ✅ **Simplified architecture:** 162 lines removed, cleaner separation of concerns
 
-**jQuery Dependency Elimination (v0.3.5):**
-- ✅ **Complete:** All jQuery and AJAX references removed from plugin
-- ✅ **Vanilla JavaScript:** Converted all admin JavaScript to vanilla JS
-- ✅ **Code Reduction:** Removed ~200 lines of unused CSS and 386 lines of JavaScript renderer
-- ✅ **Performance Optimized:** Carousel List mode now CSS-only
+**Circuit Grid Removal (v0.4.0):**
+- ✅ **Complete:** Circuit Grid display mode removed - Carousel List is now the single display mode
+- ✅ **Codebase Simplified:** Removed ~1,300 lines of SVG border rendering, shape calculation, and badge positioning code
+- ✅ **Single Display Path:** One proven display mode eliminates branching logic and maintenance burden
+- ✅ **Performance Optimized:** Carousel List CSS-only implementation provides modern horizontal scroll UX
 
 ## Features
 
@@ -247,10 +247,10 @@ past=1                       # Show past events ("1" for past, omit for upcoming
 - **REST API Controllers:** Modular controller architecture with unified namespace for Calendar, Venues, and Events endpoints
 
 - **AI-Powered Web Scraping:** UniversalWebScraper uses AI to extract structured event data from any HTML page
-- **Modular Template Architecture:** Template_Loader provides 7 specialized templates with variable extraction and output buffering
-- **Dynamic Taxonomy Badges:** Taxonomy_Badges system with automatic color generation and HTML structure for all non-venue taxonomies
+- **Modular Template Architecture:** Template_Loader provides 7 specialized templates plus modal with variable extraction and output buffering
+- **Dynamic Taxonomy Badges:** Taxonomy_Badges system with automatic color generation and HTML structure for all non-venue taxonomies  
 - **Taxonomy Data Processing:** Taxonomy_Helper with hierarchy building, post count calculations, and structured data for filtering
-- **Visual Enhancement System:** Carousel List display with CSS-only horizontal scrolling
+- **Visual Enhancement System:** Carousel List display with CSS-only horizontal scrolling and time-gap separators
 - **Centralized Design System:** root.css provides unified design tokens accessible from both CSS and JavaScript
 - **Smart Parameter Routing:** Schema.engine_or_tool() intelligently routes data between system parameters and AI inference
 - **Flat Parameter System:** Data Machine's single-level parameter structure across all custom steps for simplified integration
