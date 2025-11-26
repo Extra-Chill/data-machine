@@ -469,7 +469,6 @@
         grid-template-columns: 1fr;
         grid-auto-rows: auto;
         gap: 1rem;
-        padding: 0 1rem;
     }
 
 }

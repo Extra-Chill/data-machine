@@ -29,7 +29,7 @@ class SpotHopperFilters {
             SpotHopper::class,
             __('SpotHopper Events', 'datamachine-events'),
             __('Import events from SpotHopper venue platform (no API key required)', 'datamachine-events'),
-            true,
+            false,
             null,
             SpotHopperSettings::class,
             null

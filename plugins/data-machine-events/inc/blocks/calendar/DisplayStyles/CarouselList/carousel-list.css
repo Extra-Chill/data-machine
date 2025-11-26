@@ -22,7 +22,6 @@
     padding: 1.5rem;
     overflow-x: auto;
     scroll-behavior: smooth;
-    scroll-snap-type: x proximity;
     -webkit-overflow-scrolling: touch;
     align-items: stretch;
     -ms-overflow-style: none;
@@ -44,7 +43,34 @@
 /* Event Items in Carousel */
 .datamachine-events-calendar .datamachine-event-item {
     flex: 0 0 auto;
-    scroll-snap-align: start;
+}
+
+/* Overflow "More" Indicator */
+.datamachine-events-calendar .datamachine-date-group::after {
+    content: 'More';
+    position: absolute;
+    right: 0;
+    top: 40px;
+    bottom: 0;
+    width: 60px;
+    background: linear-gradient(to right, transparent, var(--datamachine-scroll-gradient-color) 70%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--datamachine-text-muted);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.datamachine-events-calendar .datamachine-date-group.has-overflow::after {
+    opacity: 1;
 }
 
 /* Day-specific backgrounds */
@@ -72,5 +98,10 @@
     .datamachine-events-calendar .datamachine-day-badge {
         left: 1rem;
         top: 10px;
+    }
+
+    .datamachine-events-calendar .datamachine-date-group::after {
+        top: 36px;
+        width: 50px;
     }
 }

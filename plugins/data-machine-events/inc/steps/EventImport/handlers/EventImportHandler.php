@@ -26,6 +26,11 @@ abstract class EventImportHandler extends FetchHandler {
 
     protected function sanitizeUrl(string $url): string {
         $url = trim($url);
+        
+        if (!empty($url) && !preg_match('#^https?://#i', $url)) {
+            $url = 'https://' . $url;
+        }
+        
         return filter_var($url, FILTER_VALIDATE_URL) ? $url : '';
     }
 

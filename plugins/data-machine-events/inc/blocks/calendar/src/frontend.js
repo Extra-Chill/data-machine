@@ -14,7 +14,30 @@ import 'flatpickr/dist/flatpickr.css';
 
     document.addEventListener('DOMContentLoaded', function() {
         initializeCalendarFilters();
+        initializeCarouselOverflow();
     });
+
+    function initializeCarouselOverflow() {
+        const groups = document.querySelectorAll('.datamachine-date-group');
+
+        groups.forEach(function(group) {
+            const wrapper = group.querySelector('.datamachine-events-wrapper');
+            if (!wrapper) return;
+
+            const checkOverflow = function() {
+                const hasOverflow = wrapper.scrollWidth > wrapper.clientWidth;
+                const atEnd = wrapper.scrollLeft + wrapper.clientWidth >= wrapper.scrollWidth - 5;
+                group.classList.toggle('has-overflow', hasOverflow && !atEnd);
+            };
+
+            checkOverflow();
+            wrapper.addEventListener('scroll', checkOverflow);
+
+            if (typeof ResizeObserver !== 'undefined') {
+                new ResizeObserver(checkOverflow).observe(wrapper);
+            }
+        });
+    }
 
     /**
      * Initialize all calendar instances with REST API filtering
@@ -461,6 +484,7 @@ import 'flatpickr/dist/flatpickr.css';
 
                 // Re-run initialization to reattach listeners & reinitialize UI within the calendar element
                 initializeCalendarFilters();
+                initializeCarouselOverflow();
             }
 
         } catch (error) {
@@ -523,6 +547,7 @@ import 'flatpickr/dist/flatpickr.css';
                 }
 
                 initializeCalendarFilters();
+                initializeCarouselOverflow();
             }
 
         } catch (error) {

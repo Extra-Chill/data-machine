@@ -5,6 +5,17 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2025-11-26
+
+### Added
+- **Carousel Overflow UI** - Added "More" indicator with gradient fade for overflowing content in Carousel List view.
+- **Frontend Logic** - Added `initializeCarouselOverflow()` in `frontend.js` with `ResizeObserver` support to detect and style overflowing date groups.
+- **SpotHopper Filtering** - Added keyword search and exclude keyword support to `SpotHopper` import handler.
+
+### Changed
+- **Carousel Styling** - Removed scroll snap behavior from `carousel-list.css` for smoother scrolling.
+- **SpotHopper Handler** - Implemented `applyKeywordSearch` and `applyExcludeKeywords` in import logic.
+
 ## [0.4.1] - 2025-11-26
 
 ### Added

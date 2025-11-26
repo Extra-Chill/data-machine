@@ -66,6 +66,22 @@ class SpotHopper extends EventImportHandler {
                 continue;
             }
 
+            $search_text = $standardized_event['title'] . ' ' . ($standardized_event['description'] ?? '');
+
+            if (!$this->applyKeywordSearch($search_text, $config['search'] ?? '')) {
+                $this->log('debug', 'Skipping event (include keywords)', [
+                    'title' => $standardized_event['title']
+                ]);
+                continue;
+            }
+
+            if ($this->applyExcludeKeywords($search_text, $config['exclude_keywords'] ?? '')) {
+                $this->log('debug', 'Skipping event (exclude keywords)', [
+                    'title' => $standardized_event['title']
+                ]);
+                continue;
+            }
+
             $event_identifier = EventIdentifierGenerator::generate(
                 $standardized_event['title'],
                 $standardized_event['startDate'] ?? '',

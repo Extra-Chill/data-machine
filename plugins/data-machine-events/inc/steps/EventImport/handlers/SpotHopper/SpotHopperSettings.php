@@ -40,6 +40,20 @@ class SpotHopperSettings {
                 'description' => __('Optional: Use a custom venue name instead of the SpotHopper spot name. Useful for sub-venues like "The Rickhouse @ Cannon Distillery".', 'datamachine-events'),
                 'placeholder' => __('The Rickhouse', 'datamachine-events'),
                 'required' => false
+            ],
+            'search' => [
+                'type' => 'text',
+                'label' => __('Include Keywords', 'datamachine-events'),
+                'description' => __('Only import events containing any of these keywords (comma-separated). Leave empty to import all.', 'datamachine-events'),
+                'placeholder' => __('concert, live music, band', 'datamachine-events'),
+                'required' => false
+            ],
+            'exclude_keywords' => [
+                'type' => 'text',
+                'label' => __('Exclude Keywords', 'datamachine-events'),
+                'description' => __('Skip events containing any of these keywords (comma-separated).', 'datamachine-events'),
+                'placeholder' => __('cornhole, trivia, karaoke', 'datamachine-events'),
+                'required' => false
             ]
         ];
     }
@@ -53,7 +67,9 @@ class SpotHopperSettings {
     public static function sanitize(array $raw_settings): array {
         return [
             'spot_id' => sanitize_text_field($raw_settings['spot_id'] ?? ''),
-            'venue_name_override' => sanitize_text_field($raw_settings['venue_name_override'] ?? '')
+            'venue_name_override' => sanitize_text_field($raw_settings['venue_name_override'] ?? ''),
+            'search' => sanitize_text_field($raw_settings['search'] ?? ''),
+            'exclude_keywords' => sanitize_text_field($raw_settings['exclude_keywords'] ?? '')
         ];
     }
 
@@ -75,7 +91,9 @@ class SpotHopperSettings {
     public static function get_defaults(): array {
         return [
             'spot_id' => '',
-            'venue_name_override' => ''
+            'venue_name_override' => '',
+            'search' => '',
+            'exclude_keywords' => ''
         ];
     }
 }
