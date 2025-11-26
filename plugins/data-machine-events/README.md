@@ -2,7 +2,7 @@
 
 Frontend-focused WordPress events plugin with **block-first architecture**. Features AI-driven event creation via Data Machine integration, Event Details blocks with InnerBlocks for rich content editing, Calendar blocks for display, and comprehensive venue taxonomy management.
 
-**Version**: 0.4.0
+**Version**: 0.4.1
 
 ## Migration Showcase
 
@@ -128,7 +128,7 @@ datamachine-events/
 
 **WordPress Version:** Tested up to 6.8
 
-**Data Machine Requirement:** Data Machine v0.2.7+ required for WordPressPublishHelper compatibility and EngineData architecture changes
+**Data Machine Requirement:** Data Machine v0.2.10+ required for WordPressPublishHelper compatibility and EngineData architecture changes
 
 **Setup:**
 ```bash

@@ -59,13 +59,17 @@ Carousel List provides sequential event display optimized for browsing:
 ### Available Templates
 - **event-item.php**: Individual event display
 - **date-group.php**: Day-grouped event container
-- **pagination.php**: Event navigation controls
 - **navigation.php**: Calendar navigation controls
 - **no-events.php**: Empty state display
 - **filter-bar.php**: Filtering interface
 - **results-counter.php**: Results counter display
 - **time-gap-separator.php**: Date gap visualization
 - **modal/taxonomy-filter.php**: Advanced taxonomy filter modal
+
+### Pagination System
+Pagination is rendered by the `Pagination` class (`Pagination.php`) with extensibility filters:
+- **datamachine_events_pagination_wrapper_classes**: Modify CSS classes on pagination wrapper
+- **datamachine_events_pagination_args**: Customize `paginate_links()` arguments
 
 ### Template Features
 - **Variable Sanitization**: Automatic data cleaning and escaping

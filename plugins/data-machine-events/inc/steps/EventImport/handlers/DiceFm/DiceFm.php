@@ -231,7 +231,7 @@ class DiceFm extends EventImportHandler {
         ));
         
         if (is_wp_error($response)) {
-            $this->log_error('Dice.fm API request failed: ' . $response->get_error_message());
+            $this->log('error', 'Dice.fm API request failed: ' . $response->get_error_message());
             return array();
         }
         
@@ -239,19 +239,19 @@ class DiceFm extends EventImportHandler {
         $body = wp_remote_retrieve_body($response);
         
         if ($response_code !== 200) {
-            $this->log_error("Dice.fm API returned status {$response_code}: {$body}");
+            $this->log('error', "Dice.fm API returned status {$response_code}: {$body}");
             return array();
         }
         
         $data = json_decode($body, true);
         
         if (json_last_error() !== JSON_ERROR_NONE) {
-            $this->log_error('Invalid JSON response from Dice.fm API');
+            $this->log('error', 'Invalid JSON response from Dice.fm API');
             return array();
         }
         
         if (!isset($data['data']) || !is_array($data['data'])) {
-            $this->log_error('No events data in Dice.fm response');
+            $this->log('error', 'No events data in Dice.fm response');
             return array();
         }
         
@@ -346,8 +346,8 @@ class DiceFm extends EventImportHandler {
             $date->setTimezone(new \DateTimeZone('America/Chicago'));
             return $date->format('Y-m-d H:i:s');
         } catch (\Exception $e) {
-            $this->log_error('Failed to parse Dice.fm date: ' . $date_string);
-            return $date_string; // Return original if parsing fails
+            $this->log('error', 'Failed to parse Dice.fm date: ' . $date_string);
+            return $date_string;
         }
     }
     
@@ -366,7 +366,7 @@ class DiceFm extends EventImportHandler {
             $date = new \DateTime($datetime);
             return $date->format('Y-m-d');
         } catch (\Exception $e) {
-            $this->log_error('Date extraction failed: ' . $e->getMessage(), [
+            $this->log('error', 'Date extraction failed: ' . $e->getMessage(), [
                 'datetime' => $datetime
             ]);
             return '';
@@ -388,46 +388,10 @@ class DiceFm extends EventImportHandler {
             $date = new \DateTime($datetime);
             return $date->format('H:i');
         } catch (\Exception $e) {
-            $this->log_error('Time extraction failed: ' . $e->getMessage(), [
+            $this->log('error', 'Time extraction failed: ' . $e->getMessage(), [
                 'datetime' => $datetime
             ]);
             return '';
-        }
-    }
-    
-    /**
-     * Log debug message
-     * 
-     * @param string $message Debug message
-     * @param array $context Additional context
-     */
-    private function log_debug(string $message, array $context = []): void {
-        if (function_exists('do_action')) {
-            do_action('datamachine_log', 'debug', $message, $context);
-        }
-    }
-    
-    /**
-     * Log error message
-     * 
-     * @param string $message Error message
-     * @param array $context Additional context
-     */
-    private function log_error(string $message, array $context = []): void {
-        if (function_exists('do_action')) {
-            do_action('datamachine_log', 'error', $message, $context);
-        }
-    }
-    
-    /**
-     * Log info message
-     * 
-     * @param string $message Info message
-     * @param array $context Additional context
-     */
-    private function log_info(string $message, array $context = []): void {
-        if (function_exists('do_action')) {
-            do_action('datamachine_log', 'info', $message, $context);
         }
     }
 }

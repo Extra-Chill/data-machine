@@ -5,6 +5,16 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2025-11-26
+
+### Added
+- **SpotHopper Event Import Handler**: New handler for venues using SpotHopper platform
+  - Public JSON API integration (no authentication required)
+  - Configuration: `spot_id` (required), `venue_name_override` (optional for sub-venues like "The Rickhouse")
+  - Full venue metadata extraction including address, city, state, zip, coordinates for map display
+  - Event image support from SpotHopper CDN
+  - Single-item processing with EventIdentifierGenerator for deduplication
+
 ## [0.4.0] - 2025-11-26
 
 ### BREAKING CHANGES

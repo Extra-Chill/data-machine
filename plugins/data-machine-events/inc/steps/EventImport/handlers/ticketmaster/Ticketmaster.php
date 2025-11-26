@@ -104,25 +104,11 @@ class Ticketmaster extends EventImportHandler {
                 'venue' => $standardized_event['venue']
             ]);
             
-            // Extract venue metadata
-            $venue_metadata = [
-                'venueAddress' => $standardized_event['venueAddress'],
-                'venueCity' => $standardized_event['venueCity'],
-                'venueState' => $standardized_event['venueState'],
-                'venueZip' => $standardized_event['venueZip'],
-                'venueCountry' => $standardized_event['venueCountry'],
-                'venuePhone' => $standardized_event['venuePhone'],
-                'venueWebsite' => $standardized_event['venueWebsite'],
-                'venueCoordinates' => $standardized_event['venueCoordinates']
-            ];
+            $venue_metadata = $this->extractVenueMetadata($standardized_event);
             
             EventEngineData::storeVenueContext($job_id, $standardized_event, $venue_metadata);
 
-            // Remove venue metadata from event data
-            unset($standardized_event['venueAddress'], $standardized_event['venueCity'], 
-                  $standardized_event['venueState'], $standardized_event['venueZip'],
-                  $standardized_event['venueCountry'], $standardized_event['venuePhone'],
-                  $standardized_event['venueWebsite'], $standardized_event['venueCoordinates']);
+            $this->stripVenueMetadataFromEvent($standardized_event);
             
             // Create DataPacket
             $dataPacket = new DataPacket(
@@ -179,7 +165,7 @@ class Ticketmaster extends EventImportHandler {
         ]);
         
         $location = $handler_config['location'] ?? '32.7765,-79.9311'; // Charleston, SC
-        $coordinates = $this->get_coordinates($location);
+        $coordinates = $this->parseCoordinates($location);
         if ($coordinates) {
             $params['geoPoint'] = $coordinates['lat'] . ',' . $coordinates['lng'];
             $radius = !empty($handler_config['radius']) ? $handler_config['radius'] : '50';
@@ -389,68 +375,24 @@ class Ticketmaster extends EventImportHandler {
         $ticket_url = $tm_event['url'] ?? '';
         
         return [
-            'title' => $this->sanitize_text($title),
+            'title' => $this->sanitizeText($title),
             'startDate' => $start_date,
             'endDate' => '',
             'startTime' => $start_time,
             'endTime' => '',
-            'venue' => $this->sanitize_text($venue_name),
-            'artist' => $this->sanitize_text($artist),
-            'price' => $this->sanitize_text($price),
-            'ticketUrl' => $this->sanitize_url($ticket_url),
-            'description' => $this->clean_html($description),
-            'venueAddress' => $this->sanitize_text($venue_address),
-            'venueCity' => $this->sanitize_text($venue_city),
-            'venueState' => $this->sanitize_text($venue_state),
-            'venueZip' => $this->sanitize_text($venue_zip),
-            'venueCountry' => $this->sanitize_text($venue_country),
-            'venuePhone' => $this->sanitize_text($venue_phone),
-            'venueWebsite' => $this->sanitize_url($venue_website),
-            'venueCoordinates' => $this->sanitize_text($venue_coordinates),
+            'venue' => $this->sanitizeText($venue_name),
+            'artist' => $this->sanitizeText($artist),
+            'price' => $this->sanitizeText($price),
+            'ticketUrl' => $this->sanitizeUrl($ticket_url),
+            'description' => $this->cleanHtml($description),
+            'venueAddress' => $this->sanitizeText($venue_address),
+            'venueCity' => $this->sanitizeText($venue_city),
+            'venueState' => $this->sanitizeText($venue_state),
+            'venueZip' => $this->sanitizeText($venue_zip),
+            'venueCountry' => $this->sanitizeText($venue_country),
+            'venuePhone' => $this->sanitizeText($venue_phone),
+            'venueWebsite' => $this->sanitizeUrl($venue_website),
+            'venueCoordinates' => $this->sanitizeText($venue_coordinates),
         ];
-    }
-    
-    private function get_coordinates(string $location) {
-        $location = trim($location);
-        $coords = explode(',', $location);
-        
-        if (count($coords) !== 2) {
-            return false;
-        }
-        
-        $lat = trim($coords[0]);
-        $lng = trim($coords[1]);
-        
-        if (!is_numeric($lat) || !is_numeric($lng)) {
-            return false;
-        }
-        
-        $lat = floatval($lat);
-        $lng = floatval($lng);
-        
-        if ($lat < -90 || $lat > 90 || $lng < -180 || $lng > 180) {
-            return false;
-        }
-        
-        return [
-            'lat' => $lat,
-            'lng' => $lng
-        ];
-    }
-    
-    private function sanitize_text(string $text): string {
-        return sanitize_text_field(trim($text));
-    }
-    
-    private function sanitize_url(string $url): string {
-        $url = trim($url);
-        return filter_var($url, FILTER_VALIDATE_URL) ? $url : '';
-    }
-    
-    private function clean_html(string $html): string {
-        if (empty($html)) {
-            return '';
-        }
-        return html_entity_decode(strip_tags($html, '<a><br><p>'));
     }
 }

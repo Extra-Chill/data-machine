@@ -102,25 +102,11 @@ class GoogleCalendar extends EventImportHandler {
                 'pipeline_id' => $pipeline_id
             ]);
 
-            // Extract venue metadata separately for nested structure
-            $venue_metadata = [
-                'venueAddress' => $standardized_event['venueAddress'] ?? '',
-                'venueCity' => $standardized_event['venueCity'] ?? '',
-                'venueState' => $standardized_event['venueState'] ?? '',
-                'venueZip' => $standardized_event['venueZip'] ?? '',
-                'venueCountry' => $standardized_event['venueCountry'] ?? '',
-                'venuePhone' => $standardized_event['venuePhone'] ?? '',
-                'venueWebsite' => $standardized_event['venueWebsite'] ?? '',
-                'venueCoordinates' => $standardized_event['venueCoordinates'] ?? ''
-            ];
+            $venue_metadata = $this->extractVenueMetadata($standardized_event);
 
             EventEngineData::storeVenueContext($job_id, $standardized_event, $venue_metadata);
 
-            // Remove venue metadata from event data (move to separate structure)
-            unset($standardized_event['venueAddress'], $standardized_event['venueCity'],
-                  $standardized_event['venueState'], $standardized_event['venueZip'],
-                  $standardized_event['venueCountry'], $standardized_event['venuePhone'],
-                  $standardized_event['venueWebsite'], $standardized_event['venueCoordinates']);
+            $this->stripVenueMetadataFromEvent($standardized_event);
 
             // Create DataPacket
             $dataPacket = new DataPacket(
@@ -175,7 +161,7 @@ class GoogleCalendar extends EventImportHandler {
                 $events = array_slice($events, 0, $event_limit);
             }
 
-            $this->log_info('Google Calendar: Successfully fetched events', [
+            $this->log('info', 'Google Calendar: Successfully fetched events', [
                 'total_events' => count($events),
                 'calendar_url' => $calendar_url
             ]);
@@ -183,7 +169,7 @@ class GoogleCalendar extends EventImportHandler {
             return $events;
 
         } catch (\Exception $e) {
-            $this->log_error('Google Calendar: Failed to fetch or parse calendar', [
+            $this->log('error', 'Google Calendar: Failed to fetch or parse calendar', [
                 'calendar_url' => $calendar_url,
                 'error' => $e->getMessage()
             ]);
@@ -264,19 +250,5 @@ class GoogleCalendar extends EventImportHandler {
         }
 
         return $standardized_event;
-    }
-
-    /**
-     * Log info message
-     */
-    private function log_info(string $message, array $context = []): void {
-        do_action('datamachine_log', 'info', $message, $context);
-    }
-
-    /**
-     * Log error message
-     */
-    private function log_error(string $message, array $context = []): void {
-        do_action('datamachine_log', 'error', $message, $context);
     }
 }
