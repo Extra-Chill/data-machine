@@ -1,13 +1,7 @@
 /* Carousel List Display Styles */
 
-/* Override Circuit Grid Layout */
 .datamachine-events-calendar.datamachine-events-date-grouped .datamachine-events-content {
     display: block;
-}
-
-/* Hide Circuit Grid border overlay */
-.datamachine-events-calendar .datamachine-border-overlay {
-    display: none;
 }
 
 /* Date Group Container */

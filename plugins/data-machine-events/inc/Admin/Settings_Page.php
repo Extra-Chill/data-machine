@@ -27,7 +27,6 @@ class Settings_Page {
         'include_in_archives' => false,
         'include_in_search' => true,
         'main_events_page_url' => '',
-        'calendar_display_type' => 'circuit-grid',
         'map_display_type' => 'osm-standard'
     );
     
@@ -106,12 +105,6 @@ class Settings_Page {
         $sanitized['main_events_page_url'] = !empty($input['main_events_page_url']) 
             ? esc_url_raw($input['main_events_page_url']) 
             : '';
-        
-        // Calendar display type
-        $allowed_display_types = array('circuit-grid', 'carousel-list');
-        $sanitized['calendar_display_type'] = in_array($input['calendar_display_type'], $allowed_display_types)
-            ? $input['calendar_display_type']
-            : 'circuit-grid';
 
         // Map display type
         $allowed_map_types = array('osm-standard', 'carto-positron', 'carto-voyager', 'carto-dark', 'humanitarian');

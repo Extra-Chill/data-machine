@@ -3,7 +3,7 @@
  * Plugin Name: Data Machine Events
  * Plugin URI: https://chubes.net/datamachine-events
  * Description: WordPress events plugin with block-first architecture. Features AI-driven event creation via Data Machine integration, Event Details blocks for data storage, Calendar blocks for display, and venue taxonomy management.
- * Version: 0.3.6
+ * Version: 0.4.0
  * Author: Chris Huber
  * Author URI: https://chubes.net
  * License: GPL v2 or later
@@ -257,6 +257,8 @@ class DATAMACHINE_Events {
                 array(),
                 filemtime(DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/root.css')
             );
+            
+            wp_enqueue_style('dashicons');
         }
 
         // Enqueue Leaflet map assets for Event Details block

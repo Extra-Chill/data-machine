@@ -7,6 +7,7 @@ use WP_Query;
 use WP_REST_Request;
 use DataMachineEvents\Blocks\Calendar\Calendar_Query;
 use DataMachineEvents\Blocks\Calendar\Pagination;
+use DataMachineEvents\Blocks\Calendar\Template_Loader;
 
 /**
  * Calendar API controller
@@ -20,6 +21,8 @@ class Calendar {
 	 * @return \WP_REST_Response
 	 */
 	public function calendar(WP_REST_Request $request) {
+		Template_Loader::init();
+
 		$events_per_page = get_option('posts_per_page', 10);
 		$current_page = max(1, $request->get_param('paged'));
 		$show_past = '1' === $request->get_param('past');

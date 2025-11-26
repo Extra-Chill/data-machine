@@ -344,12 +344,8 @@ class CalendarPagination {
 ```php
 // Customize pagination behavior
 add_filter('datamachine_events_pagination_args', function($args, $attributes) {
-    // Custom posts per page based on display mode
-    if ($attributes['displayMode'] === 'circuit-grid') {
-        $args['posts_per_page'] = 12; // 3x4 grid
-    } else {
-        $args['posts_per_page'] = 10; // List view
-    }
+    // Custom posts per page
+    $args['posts_per_page'] = 12;
     
     return $args;
 }, 10, 2);

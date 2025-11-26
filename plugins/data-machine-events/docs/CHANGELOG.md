@@ -5,6 +5,47 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-11-26
+
+### BREAKING CHANGES
+
+**Circuit Grid Display Mode Removed**
+- Calendar block now uses Carousel List as the only display style
+- `calendar_display_type` setting removed from Settings Page
+- Sites using Circuit Grid will automatically use Carousel List after update
+
+**Removed Files** (~1,300 lines):
+- `inc/Blocks/Calendar/DisplayStyles/CircuitGrid/` (entire directory)
+  - `CircuitGridRenderer.js` (890 lines) - SVG border rendering, shape calculations
+  - `BadgeRenderer.js` (266 lines) - Badge positioning for circuit grid
+  - `circuit-grid.css` (~150 lines) - Circuit grid-specific styling
+- `inc/Blocks/Calendar/DisplayStyles/ColorManager.js` (76 lines) - Color helper (only used by circuit grid)
+
+### Removed
+- **Circuit Grid Display Mode**: Experimental SVG-based display with dynamic borders
+  - Complex shape generation (L-shaped cutouts, split groups, connectors)
+  - JavaScript-based badge positioning
+  - ResizeObserver-based responsive recalculation
+  - Grid position calculations and shape generation algorithms
+- **Display Type Setting**: `calendar_display_type` removed from admin settings and Settings_Page defaults
+- **ColorManager**: CSS custom property helper (only used by Circuit Grid)
+- **Display Renderer System**: `displayRenderers` Map and initialization logic in frontend.js
+
+### Changed
+- **Carousel List**: Now the single, default calendar display mode
+  - CSS-only implementation (82 lines vs ~1,300 lines for Circuit Grid)
+  - Horizontal scroll with native touch/trackpad support
+  - No JavaScript required for display rendering
+- **Simplified render.php**: Removed display type conditionals and SVG overlay element
+- **Simplified frontend.js**: Removed ~100 lines of renderer initialization code
+
+### Architectural Benefits
+- **~1,300 lines removed**: Significant reduction in codebase complexity
+- **Zero JavaScript display rendering**: Carousel List is pure CSS
+- **Single source of truth**: One display path, no branching logic
+- **Better maintainability**: Future changes only affect one display mode
+- **Modern UX**: Horizontal scroll aligns with contemporary touch interfaces
+
 ## [Unreleased]
 
 ### Fixed

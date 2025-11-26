@@ -73,14 +73,9 @@ datamachine-events/
 │   │   └── Controllers/     # Calendar, Venues, Events controllers
 │   ├── Blocks/
 │   │   ├── Calendar/        # Calendar block (webpack) with modular template system
-│   │   │   ├── DisplayStyles/           # Visual enhancement components
-│   │   │   │   ├── CarouselList/         # Carousel List display mode (CSS-only)
-│   │   │   │   │   └── carousel-list.css # Carousel List styles
-│   │   │   │   ├── CircuitGrid/          # CircuitGrid display mode
-│   │   │   │   │   ├── BadgeRenderer.js  # Day badge positioning
-│   │   │   │   │   ├── CircuitGridRenderer.js # Circuit grid rendering
-│   │   │   │   │   └── circuit-grid.css  # Circuit Grid styles
-│   │   │   │   └── ColorManager.js       # Centralized color helper
+│   │   │   ├── DisplayStyles/           # Display styling
+│   │   │   │   └── CarouselList/         # Carousel List display (CSS-only)
+│   │   │   │       └── carousel-list.css # Horizontal scroll styles
 │   │   │   ├── Taxonomy_Badges.php       # Dynamic badge rendering
 │   │   │   ├── Taxonomy_Helper.php       # Taxonomy data processing
 │   │   │   ├── Template_Loader.php       # Template loading system
@@ -207,7 +202,7 @@ echo '<script type="application/ld+json">' . wp_json_encode($schema) . '</script
 10. **Schema Generation:** Schema creates Google Event structured data combining block attributes with venue taxonomy meta
 11. **Template Rendering:** Template_Loader system provides modular, cacheable template rendering with variable extraction
 12. **Taxonomy Display:** Taxonomy_Badges generates dynamic badge HTML for all non-venue taxonomies with consistent styling
-13. **Visual Enhancement:** BadgeRenderer.js with ColorManager integration creates multi-group badge rendering with CircuitGridRenderer.js for Circuit Grid display (Carousel List is CSS-only)
+13. **Visual Enhancement:** Carousel List display with CSS-only horizontal scrolling and day-grouped events
 
 ## Calendar Filtering Architecture
 
@@ -250,13 +245,12 @@ past=1                       # Show past events ("1" for past, omit for upcoming
 - **Intelligent Event Upsert:** EventUpsert handler with identity-based search, field-by-field change detection, prevents unnecessary updates
 - **Event Identifier Normalization:** EventIdentifierGenerator ensures consistent event identity across all import handlers
 - **REST API Controllers:** Modular controller architecture with unified namespace for Calendar, Venues, and Events endpoints
-- **ColorManager Integration:** Centralized CSS custom properties helper for visual consistency across display modes
-- **BadgeRenderer Multi-Group Support:** Enhanced day badge positioning with ColorManager integration for CircuitGrid display
+
 - **AI-Powered Web Scraping:** UniversalWebScraper uses AI to extract structured event data from any HTML page
 - **Modular Template Architecture:** Template_Loader provides 7 specialized templates with variable extraction and output buffering
 - **Dynamic Taxonomy Badges:** Taxonomy_Badges system with automatic color generation and HTML structure for all non-venue taxonomies
 - **Taxonomy Data Processing:** Taxonomy_Helper with hierarchy building, post count calculations, and structured data for filtering
-- **Visual Enhancement System:** DisplayStyles components with CircuitGridRenderer.js and BadgeRenderer.js for Circuit Grid display (Carousel List is CSS-only)
+- **Visual Enhancement System:** Carousel List display with CSS-only horizontal scrolling
 - **Centralized Design System:** root.css provides unified design tokens accessible from both CSS and JavaScript
 - **Smart Parameter Routing:** Schema.engine_or_tool() intelligently routes data between system parameters and AI inference
 - **Flat Parameter System:** Data Machine's single-level parameter structure across all custom steps for simplified integration

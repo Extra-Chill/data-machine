@@ -20,7 +20,6 @@ $settings = [
     'include_in_archives' => Settings_Page::get_setting('include_in_archives'),
     'include_in_search' => Settings_Page::get_setting('include_in_search'),
     'main_events_page_url' => Settings_Page::get_setting('main_events_page_url'),
-    'calendar_display_type' => Settings_Page::get_setting('calendar_display_type'),
     'map_display_type' => Settings_Page::get_setting('map_display_type'),
 ];
 
@@ -88,39 +87,6 @@ settings_errors('datamachine_events_messages');
                                placeholder="https://yoursite.com/events/"
                                class="regular-text" />
                         <p class="description"><?php _e('URL for your custom events page with Calendar block. When set, this replaces the default events archive and adds "Back to Events" links on single event pages.', 'datamachine-events'); ?></p>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-        
-        <!-- Calendar Display Defaults -->
-        <h2><?php _e('Calendar Display Defaults', 'datamachine-events'); ?></h2>
-        <p class="description"><?php _e('Default settings for Calendar blocks when first added to pages.', 'datamachine-events'); ?></p>
-        
-        <table class="form-table" role="presentation">
-            <tbody>
-                <tr>
-                    <th scope="row"><?php _e('Calendar Display Type', 'datamachine-events'); ?></th>
-                    <td>
-                        <label>
-                            <input type="radio" 
-                                   name="datamachine_events_settings[calendar_display_type]" 
-                                   value="circuit-grid" 
-                                   <?php checked(isset($settings['calendar_display_type']) ? $settings['calendar_display_type'] : 'circuit-grid', 'circuit-grid'); ?> />
-                            <?php _e('Circuit Grid', 'datamachine-events'); ?>
-                        </label>
-                        <br><br>
-                        <label>
-                            <input type="radio" 
-                                   name="datamachine_events_settings[calendar_display_type]" 
-                                   value="carousel-list" 
-                                   <?php checked(isset($settings['calendar_display_type']) ? $settings['calendar_display_type'] : 'circuit-grid', 'carousel-list'); ?> />
-                            <?php _e('Carousel List', 'datamachine-events'); ?>
-                        </label>
-                        <p class="description">
-                            <?php _e('<strong>Circuit Grid:</strong> Circuit board style display with day-grouped events and visual borders<br>', 'datamachine-events'); ?>
-                            <?php _e('<strong>Carousel List:</strong> Horizontal scrolling daily rows with swipe-to-view events', 'datamachine-events'); ?>
-                        </p>
                     </td>
                 </tr>
             </tbody>

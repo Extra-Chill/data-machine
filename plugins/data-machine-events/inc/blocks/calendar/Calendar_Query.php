@@ -55,14 +55,14 @@ class Calendar_Query {
         $current_datetime = current_time('mysql');
         $has_date_range = !empty($params['date_start']) || !empty($params['date_end']);
 
-        if ($params['show_past']) {
+        if ($params['show_past'] && !$has_date_range) {
             $meta_query[] = [
                 'key' => EVENT_DATETIME_META_KEY,
                 'value' => $current_datetime,
                 'compare' => '<',
                 'type' => 'DATETIME',
             ];
-        } elseif (!$has_date_range) {
+        } elseif (!$params['show_past'] && !$has_date_range) {
             $meta_query[] = [
                 'key' => EVENT_DATETIME_META_KEY,
                 'value' => $current_datetime,

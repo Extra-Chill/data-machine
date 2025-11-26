@@ -49,9 +49,20 @@ function register_routes() {
 					'type'              => 'string',
 					'sanitize_callback' => 'sanitize_text_field',
 				),
-				'tax_filter' => array(
-					'type' => 'object',
-				),
+			'tax_filter' => array(
+				'type' => 'object',
+				'sanitize_callback' => function( $value ) {
+					if ( ! is_array( $value ) ) {
+						return array();
+					}
+					$sanitized = array();
+					foreach ( $value as $taxonomy => $term_ids ) {
+						$taxonomy = sanitize_key( $taxonomy );
+						$sanitized[ $taxonomy ] = array_map( 'absint', (array) $term_ids );
+					}
+					return $sanitized;
+				},
+			),
 				'paged' => array(
 					'type'              => 'integer',
 					'default'           => 1,

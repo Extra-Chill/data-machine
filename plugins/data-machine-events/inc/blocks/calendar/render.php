@@ -97,14 +97,9 @@ $paged_date_groups = Calendar_Query::group_events_by_date($paged_events, $show_p
 $can_go_previous = $current_page > 1;
 $can_go_next = $current_page < $max_pages;
 
-$display_type = class_exists('DataMachineEvents\Admin\Settings_Page')
-    ? \DataMachineEvents\Admin\Settings_Page::get_setting('calendar_display_type', 'circuit-grid')
-    : 'circuit-grid';
-
-$gaps_detected = [];
-if ($display_type === 'carousel-list' && !empty($paged_date_groups)) {
-    $gaps_detected = Calendar_Query::detect_time_gaps($paged_date_groups);
-}
+$gaps_detected = !empty($paged_date_groups) 
+    ? Calendar_Query::detect_time_gaps($paged_date_groups) 
+    : [];
 
 \DataMachineEvents\Blocks\Calendar\Template_Loader::init();
 
@@ -136,31 +131,19 @@ $wrapper_attributes = get_block_wrapper_attributes([
     <div class="datamachine-events-content">
         <?php if (!empty($paged_date_groups)) : ?>
             <?php 
-            if ($display_type === 'carousel-list') {
-                wp_enqueue_style(
-                    'datamachine-events-carousel-list',
-                    plugin_dir_url(__FILE__) . 'DisplayStyles/CarouselList/carousel-list.css',
-                    ['datamachine-events-root'],
-                    filemtime(plugin_dir_path(__FILE__) . 'DisplayStyles/CarouselList/carousel-list.css')
-                );
-            } else {
-                wp_enqueue_style(
-                    'datamachine-events-circuit-grid',
-                    plugin_dir_url(__FILE__) . 'DisplayStyles/CircuitGrid/circuit-grid.css',
-                    ['datamachine-events-root'],
-                    filemtime(plugin_dir_path(__FILE__) . 'DisplayStyles/CircuitGrid/circuit-grid.css')
-                );
-            }
+            wp_enqueue_style(
+                'datamachine-events-carousel-list',
+                plugin_dir_url(__FILE__) . 'DisplayStyles/CarouselList/carousel-list.css',
+                ['datamachine-events-root'],
+                filemtime(plugin_dir_path(__FILE__) . 'DisplayStyles/CarouselList/carousel-list.css')
+            );
             ?>
-            
-            <svg class="datamachine-border-overlay" xmlns="http://www.w3.org/2000/svg">
-            </svg>
             <?php
             foreach ($paged_date_groups as $date_key => $date_group) :
                 $date_obj = $date_group['date_obj'];
                 $events_for_date = $date_group['events'];
 
-                if ($display_type === 'carousel-list' && isset($gaps_detected[$date_key])) {
+                if (isset($gaps_detected[$date_key])) {
                     \DataMachineEvents\Blocks\Calendar\Template_Loader::include_template('time-gap-separator', [
                         'gap_days' => $gaps_detected[$date_key]
                     ]);

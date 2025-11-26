@@ -72,9 +72,6 @@ class Ticketmaster extends EventImportHandler {
             'pipeline_id' => $pipeline_id
         ]);
         
-        // Pass affiliate ID from auth config to mapper
-        $affiliate_id = $api_config['affiliate_id'] ?? '';
-
         foreach ($raw_events as $raw_event) {
             // Only process actively scheduled events
             $event_status = $raw_event['dates']['status']['code'] ?? '';
@@ -82,7 +79,7 @@ class Ticketmaster extends EventImportHandler {
                 continue;
             }
             
-            $standardized_event = $this->map_ticketmaster_event($raw_event, $affiliate_id);
+            $standardized_event = $this->map_ticketmaster_event($raw_event);
             
             if (empty($standardized_event['title'])) {
                 continue;
@@ -325,7 +322,7 @@ class Ticketmaster extends EventImportHandler {
         return $data['_embedded']['events'];
     }
     
-    private function map_ticketmaster_event(array $tm_event, string $affiliate_id = ''): array {
+    private function map_ticketmaster_event(array $tm_event): array {
         $title = $tm_event['name'] ?? '';
         $description = $tm_event['info'] ?? $tm_event['pleaseNote'] ?? '';
         
@@ -367,7 +364,7 @@ class Ticketmaster extends EventImportHandler {
             $venue_zip = $venue['postalCode'] ?? '';
             $venue_country = $venue['country']['countryCode'] ?? '';
             $venue_phone = $venue['boxOfficeInfo']['phoneNumberDetail'] ?? '';
-            $venue_website = $venue['url'] ?? '';
+            $venue_website = '';
             
             if (!empty($venue['location']['latitude']) && !empty($venue['location']['longitude'])) {
                 $venue_coordinates = $venue['location']['latitude'] . ',' . $venue['location']['longitude'];
@@ -389,21 +386,7 @@ class Ticketmaster extends EventImportHandler {
             }
         }
         
-        // Always construct ticket URL from event ID to avoid malformed API URLs
-        if (!empty($tm_event['id'])) {
-            $ticket_url = 'https://www.ticketmaster.com/event/' . $tm_event['id'];
-        } else {
-            $ticket_url = $tm_event['url'] ?? '';
-        }
-
-        // Apply affiliate link if configured
-        if (!empty($affiliate_id) && !empty($ticket_url)) {
-            $ticket_url = sprintf(
-                'https://ticketmaster.evyy.net/c/%s/264167/4272?u=%s',
-                $affiliate_id,
-                urlencode($ticket_url)
-            );
-        }
+        $ticket_url = $tm_event['url'] ?? '';
         
         return [
             'title' => $this->sanitize_text($title),
@@ -460,7 +443,8 @@ class Ticketmaster extends EventImportHandler {
     }
     
     private function sanitize_url(string $url): string {
-        return esc_url_raw(trim($url));
+        $url = trim($url);
+        return filter_var($url, FILTER_VALIDATE_URL) ? $url : '';
     }
     
     private function clean_html(string $html): string {

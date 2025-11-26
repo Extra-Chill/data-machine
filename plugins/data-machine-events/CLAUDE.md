@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.3.6
+**Version**: 0.4.0
 
 ## Migration Status
 
@@ -68,7 +68,7 @@ npm run lint:js && npm run lint:css             # Linting
 - `Steps\EventImport\EventImportHandler` - Abstract base for all import handlers
 
 **Core Classes**:
-- `Admin\Settings_Page` - Event archive behavior, search integration, display preferences, map display type (5 free tile layer options)
+- `Admin\Settings_Page` - Event archive behavior, search integration, map display type (5 free tile layer options)
 - `Admin\Admin_Bar` - Events navigation menu in WordPress admin bar
 - `Admin\Status_Detection` - Legacy status detection stub for backwards compatibility
 - `Core\Event_Post_Type` - Post type registration with selective admin menu control
@@ -78,8 +78,6 @@ npm run lint:js && npm run lint:css             # Linting
 - `Blocks\Calendar\Template_Loader` - Modular template system with 7 specialized templates
 - `Blocks\Calendar\Taxonomy_Helper` - Taxonomy data processing for filtering systems
 - `Blocks\Calendar\Taxonomy_Badges` - Dynamic badge rendering with automatic color generation and taxonomy term links (moved from Core namespace in v0.3.0)
-- `Blocks\Calendar\DisplayStyles\ColorManager` - Centralized color CSS custom properties helper
-- `Blocks\Calendar\DisplayStyles\CircuitGrid\BadgeRenderer` - Day badge positioning with ColorManager integration
 - `Steps\Upsert\Events\Schema` - Google Event JSON-LD generator
 - `Steps\Upsert\Events\Venue` - Centralized venue taxonomy operations
 - `Steps\Upsert\Events\EventUpsert` - Intelligent create-or-update handler (extends UpdateHandler, requires Data Machine v0.2.7+)
@@ -119,10 +117,7 @@ npm run lint:js && npm run lint:css             # Linting
 
 **Calendar Block**:
 - Webpack build system with modular templates (event-item, date-group, pagination, navigation, no-events, filter-bar, time-gap-separator, modal/taxonomy-filter)
-- DisplayStyles visual enhancement:
-  - `ColorManager.js` - Centralized CSS custom properties helper for fill/stroke var references
-  - `CircuitGrid/BadgeRenderer.js` - Day badge positioning with multi-group support and ColorManager integration
-  - Carousel List mode is CSS-only (no JavaScript renderer needed)
+- Carousel List display: CSS-only horizontal scrolling with day-grouped events (no JavaScript renderer needed)
 - Template_Loader provides get_template(), include_template(), template_exists(), get_template_path()
 - Taxonomy_Helper provides structured data with hierarchy building and post count calculations
 
@@ -155,14 +150,9 @@ datamachine-events/
 │   │   ├── Calendar/                           # Events display (webpack)
 │   │   │   ├── Template_Loader.php             # Template loading system
 │   │   │   ├── Taxonomy_Helper.php             # Taxonomy data processing
-│   │   │   ├── DisplayStyles/                  # Visual enhancement components
-│   │   │   │   ├── CarouselList/                # Carousel List display mode (CSS-only)
-│   │   │   │   │   └── carousel-list.css       # Carousel List styles
-│   │   │   │   ├── CircuitGrid/                # CircuitGrid display mode
-│   │   │   │   │   ├── BadgeRenderer.js        # Day badge positioning
-│   │   │   │   │   ├── CircuitGridRenderer.js  # Circuit grid rendering
-│   │   │   │   │   └── circuit-grid.css        # Circuit Grid styles
-│   │   │   │   └── ColorManager.js             # Centralized color helper
+│   │   │   ├── DisplayStyles/                  # Display styling
+│   │   │   │   └── CarouselList/               # Carousel List display (CSS-only)
+│   │   │   │       └── carousel-list.css       # Horizontal scroll styles
 │   │   │   ├── Taxonomy_Badges.php             # Dynamic badge rendering
 │   │   │   ├── Taxonomy_Helper.php             # Taxonomy data processing
 │   │   │   ├── Template_Loader.php             # Template loading system
@@ -415,7 +405,7 @@ Extensibility via action hooks in `templates/single-datamachine_events.php`:
 - `navigation.php` - Calendar navigation
 - `no-events.php` - Empty state
 - `filter-bar.php` - Filtering interface
-- `time-gap-separator.php` - Time gap separator for carousel-list mode
+- `time-gap-separator.php` - Time gap separator between non-consecutive dates
 - `modal/taxonomy-filter.php` - Advanced filter modal
 
 **Template Loading**:
@@ -467,5 +457,5 @@ Template_Loader::include_template('date-group', $group_data);
 
 ---
 
-**Version**: 0.3.6
+**Version**: 0.4.0
 **For ecosystem architecture, see root CLAUDE.md file**

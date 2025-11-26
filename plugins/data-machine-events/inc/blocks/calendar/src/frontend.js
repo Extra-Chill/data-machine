@@ -10,13 +10,10 @@ import 'flatpickr/dist/flatpickr.css';
 (function() {
     'use strict';
 
-    // Global display renderers for each calendar instance
-    const displayRenderers = new Map();
     const datePickers = new Map();
 
     document.addEventListener('DOMContentLoaded', function() {
         initializeCalendarFilters();
-        initializeDisplayRenderers();
     });
 
     /**
@@ -133,6 +130,62 @@ import 'flatpickr/dist/flatpickr.css';
             if (filterBtn) {
                 initializeFilterModal(calendar);
             }
+
+            // Navigation buttons (Past/Upcoming) - intercept for REST API calls
+            initializeNavigationButtons(calendar);
+
+            // Pagination links - intercept for REST API calls
+            initializePaginationLinks(calendar);
+        });
+    }
+
+    /**
+     * Initialize navigation button click handlers for REST API filtering
+     */
+    function initializeNavigationButtons(calendar) {
+        const navContainer = calendar.querySelector('.datamachine-events-past-navigation');
+        if (!navContainer) return;
+
+        navContainer.addEventListener('click', function(e) {
+            const pastBtn = e.target.closest('.datamachine-events-past-btn');
+            const upcomingBtn = e.target.closest('.datamachine-events-upcoming-btn');
+
+            if (pastBtn || upcomingBtn) {
+                e.preventDefault();
+
+                const params = new URLSearchParams(window.location.search);
+                params.delete('paged');
+
+                if (pastBtn) {
+                    params.set('past', '1');
+                } else {
+                    params.delete('past');
+                }
+
+                window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`);
+                applyFiltersWithParams(calendar, params);
+            }
+        });
+    }
+
+    /**
+     * Initialize pagination link click handlers for REST API filtering
+     */
+    function initializePaginationLinks(calendar) {
+        const paginationContainer = calendar.querySelector('.datamachine-events-pagination');
+        if (!paginationContainer) return;
+
+        paginationContainer.addEventListener('click', function(e) {
+            const link = e.target.closest('a');
+            if (!link) return;
+
+            e.preventDefault();
+
+            const url = new URL(link.href);
+            const params = new URLSearchParams(url.search);
+
+            window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`);
+            applyFiltersWithParams(calendar, params);
         });
     }
 
@@ -406,16 +459,12 @@ import 'flatpickr/dist/flatpickr.css';
                 const newUrl = `${window.location.pathname}?${params.toString()}`;
                 window.history.pushState({}, '', newUrl);
 
-                // Refresh display renderers
-                refreshDisplayRenderers();
-
                 // Re-run initialization to reattach listeners & reinitialize UI within the calendar element
                 initializeCalendarFilters();
             }
 
         } catch (error) {
             console.error('Error fetching filtered events:', error);
-            // Show error message
             content.innerHTML = '<div class="datamachine-events-error"><p>Error loading events. Please try again.</p></div>';
         } finally {
             content.classList.remove('loading');
@@ -423,102 +472,71 @@ import 'flatpickr/dist/flatpickr.css';
     }
 
     /**
-     * Reliably detect carousel list mode by checking actual CSS styles
-     *
-     * Carousel detection requires checking computed CSS properties rather than
-     * class names because CSS is loaded dynamically based on display settings.
-     * Circuit Grid uses vertical flex layout, Carousel List uses horizontal scrolling.
-     *
-     * @param {HTMLElement} calendar - Calendar container element
-     * @returns {boolean} True if carousel list mode is active
+     * Apply filters with explicit URLSearchParams (for navigation/pagination)
      */
-    function isCarouselListMode(calendar) {
-        // Check if date groups have horizontal flex layout (carousel characteristic)
-        const dateGroup = calendar.querySelector('.datamachine-date-group');
-        if (!dateGroup) return false;
+    async function applyFiltersWithParams(calendar, params) {
+        const content = calendar.querySelector('.datamachine-events-content');
+        content.classList.add('loading');
 
-        const computedStyle = window.getComputedStyle(dateGroup);
-        const isHorizontalFlex = computedStyle.flexDirection === 'row';
-        const hasOverflowScroll = computedStyle.overflowX === 'scroll' || computedStyle.overflowX === 'auto';
-
-        // Additional check: carousel list CSS loaded
-        const carouselListCSS = document.querySelector('link[href*="carousel-list.css"]');
-
-        return isHorizontalFlex && hasOverflowScroll && carouselListCSS;
-    }
-
-    /**
-     * Initialize display renderers based on display type
-     */
-    function initializeDisplayRenderers() {
-        const calendars = document.querySelectorAll('.datamachine-events-calendar.datamachine-events-date-grouped');
-
-        calendars.forEach(function(calendar) {
-            // Avoid double-initialization if already initialized for this DOM node
-            if (calendar.dataset.dmRenderersInitialized === 'true') return;
-            calendar.dataset.dmRenderersInitialized = 'true';
-            try {
-                // Check for explicit carousel list mode first (most reliable)
-                if (isCarouselListMode(calendar)) {
-                    console.log('Carousel List mode detected - no JavaScript renderer needed');
-                    return; // Exit early - carousel list is CSS-only
-                }
-
-                // Only initialize Circuit Grid if explicitly not in carousel mode
-                const circuitGridCSS = document.querySelector('link[href*="circuit-grid.css"]');
-                if (circuitGridCSS) {
-                    console.log('Circuit Grid mode detected - initializing renderer');
-                    initializeCircuitGrid(calendar);
-                } else {
-                    console.log('No display renderer needed');
-                }
-
-            } catch (error) {
-                console.error('Failed to initialize display renderer:', error);
-            }
-        });
-    }
-
-    /**
-     * Initialize Circuit Grid renderer for calendar
-     */
-    async function initializeCircuitGrid(calendar) {
         try {
-            // Dynamically import Circuit Grid Renderer
-            const { CircuitGridRenderer } = await import('../DisplayStyles/CircuitGrid/CircuitGridRenderer.js');
+            const apiUrl = `/wp-json/datamachine/v1/events/calendar?${params.toString()}`;
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
 
-            console.log('Initializing Circuit Grid renderer for calendar:', calendar);
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
 
-            const circuitGridRenderer = new CircuitGridRenderer(calendar);
-            displayRenderers.set(calendar, circuitGridRenderer);
+            const data = await response.json();
 
-            console.log('Circuit Grid renderer initialized successfully');
+            if (data.success) {
+                const existingDatePicker = datePickers.get(calendar);
+                if (existingDatePicker) {
+                    try { existingDatePicker.destroy(); } catch (e) { /* ignore */ }
+                    datePickers.delete(calendar);
+                }
+                try { delete calendar.dataset.dmFiltersInitialized; } catch (e) { calendar.dataset.dmFiltersInitialized = 'false'; }
+
+                content.innerHTML = data.html;
+
+                const paginationContainer = calendar.querySelector('.datamachine-events-pagination');
+                if (paginationContainer && data.pagination.html) {
+                    paginationContainer.outerHTML = data.pagination.html;
+                } else if (!paginationContainer && data.pagination.html) {
+                    content.insertAdjacentHTML('afterend', data.pagination.html);
+                }
+
+                const counterContainer = calendar.querySelector('.datamachine-events-results-counter');
+                if (counterContainer && data.counter) {
+                    counterContainer.outerHTML = data.counter;
+                } else if (!counterContainer && data.counter) {
+                    content.insertAdjacentHTML('afterend', data.counter);
+                }
+
+                const navigationContainer = calendar.querySelector('.datamachine-events-past-navigation');
+                if (navigationContainer && data.navigation.html) {
+                    navigationContainer.outerHTML = data.navigation.html;
+                } else if (!navigationContainer && data.navigation.html) {
+                    calendar.insertAdjacentHTML('beforeend', data.navigation.html);
+                }
+
+                initializeCalendarFilters();
+            }
 
         } catch (error) {
-            console.error('Failed to load Circuit Grid Renderer:', error);
+            console.error('Error fetching filtered events:', error);
+            content.innerHTML = '<div class="datamachine-events-error"><p>Error loading events. Please try again.</p></div>';
+        } finally {
+            content.classList.remove('loading');
         }
     }
 
-
     /**
-     * Refresh display renderers for all calendars (called after filtering)
-     */
-    function refreshDisplayRenderers() {
-        displayRenderers.forEach((displayRenderer, calendar) => {
-            displayRenderer.refresh();
-        });
-    }
-
-
-    /**
-     * Cleanup renderers when page unloads
+     * Cleanup date pickers when page unloads
      */
     window.addEventListener('beforeunload', function() {
-        displayRenderers.forEach(displayRenderer => {
-            displayRenderer.cleanup();
-        });
-        displayRenderers.clear();
-
         datePickers.forEach(datePicker => {
             datePicker.destroy();
         });

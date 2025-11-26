@@ -279,7 +279,11 @@ class EventUpsert extends UpdateHandler {
 
         foreach ($ai_schema_fields as $field) {
             if (!isset($event_data[$field]) && !empty($parameters[$field])) {
-                $event_data[$field] = sanitize_text_field($parameters[$field]);
+                if ($field === 'ticketUrl') {
+                    $event_data[$field] = trim($parameters[$field]);
+                } else {
+                    $event_data[$field] = sanitize_text_field($parameters[$field]);
+                }
             }
         }
 
@@ -364,7 +368,11 @@ class EventUpsert extends UpdateHandler {
 
         foreach ($ai_schema_fields as $field) {
             if (!isset($event_data[$field]) && !empty($parameters[$field])) {
-                $event_data[$field] = sanitize_text_field($parameters[$field]);
+                if ($field === 'ticketUrl') {
+                    $event_data[$field] = trim($parameters[$field]);
+                } else {
+                    $event_data[$field] = sanitize_text_field($parameters[$field]);
+                }
             }
         }
 
