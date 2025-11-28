@@ -80,6 +80,23 @@ $modal_id = 'datamachine-taxonomy-filter-modal-' . $instance_id;
                 include __DIR__ . '/modal/taxonomy-filter.php';
                 ?>
             </div>
+            <div class="datamachine-taxonomy-modal-footer">
+                <div class="datamachine-modal-actions">
+                    <div class="datamachine-modal-actions-left">
+                        <button type="button" class="<?php echo esc_attr(implode(' ', apply_filters('datamachine_events_modal_button_classes', ['button', 'button-secondary', 'datamachine-clear-all-filters'], 'secondary'))); ?>">
+                            <?php _e('Clear All Filters', 'datamachine-events'); ?>
+                        </button>
+                    </div>
+                    <div class="datamachine-modal-actions-right">
+                        <button type="button" class="<?php echo esc_attr(implode(' ', apply_filters('datamachine_events_modal_button_classes', ['button', 'button-primary', 'datamachine-apply-filters'], 'primary'))); ?>">
+                            <?php _e('Apply Filters', 'datamachine-events'); ?>
+                        </button>
+                        <button type="button" class="<?php echo esc_attr(implode(' ', apply_filters('datamachine_events_modal_button_classes', ['button', 'button-secondary', 'datamachine-modal-close'], 'secondary'))); ?>">
+                            <?php _e('Cancel', 'datamachine-events'); ?>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

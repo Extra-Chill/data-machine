@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.4.1
+**Version**: 0.4.3
 
 ## Migration Status
 
@@ -457,5 +457,5 @@ Template_Loader::include_template('date-group', $group_data);
 
 ---
 
-**Version**: 0.4.1
+**Version**: 0.4.3
 **For ecosystem architecture, see root CLAUDE.md file**

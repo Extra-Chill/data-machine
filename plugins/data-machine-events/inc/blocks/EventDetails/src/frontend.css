@@ -3,6 +3,8 @@
  *
  * These styles are loaded on the frontend only via webpack build process.
  * Imported by frontend.js and extracted to build/frontend.css
+ * 
+ * Uses CSS custom properties from root.css for theme consistency.
  *
  * @package DataMachineEvents
  * @since 1.0.0
@@ -37,7 +39,7 @@
 }
 
 .event-info-grid .text small {
-    color: #666;
+    color: var(--datamachine-text-secondary);
     font-size: 0.85rem;
 }
 
@@ -45,66 +47,22 @@
 .ticket-button {
     display: inline-block;
     padding: 0.75rem 1.5rem;
-    background: #0073aa;
+    background: var(--datamachine-text-accent);
     color: #fff;
     text-decoration: none;
-    border-radius: 4px;
+    border-radius: var(--datamachine-border-radius);
     font-weight: 500;
     transition: background-color 0.2s;
 }
 
 .ticket-button:hover {
-    background: #005a87;
+    background: var(--datamachine-border-focus);
     color: #fff;
 }
 
-/* Compact Layout */
-.event-details-compact .event-info-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 1.5rem;
-}
-
-.event-details-compact .event-date-time,
-.event-details-compact .event-venue,
-.event-details-compact .event-artist,
-.event-details-compact .event-price {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.event-details-compact .icon {
-    font-size: 1.2rem;
-    flex-shrink: 0;
-    margin-top: 0.1rem;
-}
-
-.event-details-compact .text {
-    flex: 1;
-    line-height: 1.4;
-}
-
-.event-details-compact .text small {
-    color: #666;
-    font-size: 0.85rem;
-}
-
-.event-details-compact .ticket-button {
-    display: inline-block;
-    padding: 0.75rem 1.5rem;
-    background: #0073aa;
-    color: #fff;
-    text-decoration: none;
-    border-radius: 4px;
-    font-weight: 500;
-    transition: background-color 0.2s;
-}
-
-.event-details-compact .ticket-button:hover {
-    background: #005a87;
-    color: #fff;
+/* Compact Layout - inherits base styles, minimal overrides */
+.event-details-compact {
+    /* Base styles from .event-info-grid apply automatically */
 }
 
 /* Detailed Layout */
@@ -115,10 +73,10 @@
 
 .event-details-detailed h3 {
     margin: 0 0 1rem 0;
-    color: #333;
+    color: var(--datamachine-text-primary);
     font-size: 1.2rem;
     font-weight: 600;
-    border-bottom: 2px solid #0073aa;
+    border-bottom: 2px solid var(--datamachine-text-accent);
     padding-bottom: 0.5rem;
 }
 
@@ -130,25 +88,25 @@
 .event-details-detailed .start-datetime,
 .event-details-detailed .end-datetime {
     padding: 0.75rem;
-    background: #f8f9fa;
-    border-radius: 4px;
-    border-left: 3px solid #0073aa;
+    background: var(--datamachine-background-light);
+    border-radius: var(--datamachine-border-radius);
+    border-left: 3px solid var(--datamachine-text-accent);
 }
 
 .event-details-detailed .venue-name {
     font-weight: 600;
-    color: #333;
+    color: var(--datamachine-text-primary);
     margin-bottom: 0.5rem;
 }
 
 .event-details-detailed .venue-address {
-    color: #666;
+    color: var(--datamachine-text-secondary);
     font-size: 0.9rem;
 }
 
 .event-details-detailed .artist-name {
     font-weight: 600;
-    color: #333;
+    color: var(--datamachine-text-primary);
 }
 
 .event-details-detailed .price-amount {
@@ -163,7 +121,7 @@
     background: #28a745;
     color: #fff;
     text-decoration: none;
-    border-radius: 6px;
+    border-radius: var(--datamachine-border-radius);
     font-weight: 600;
     text-align: center;
     transition: background-color 0.2s;
@@ -184,11 +142,11 @@
 
 .event-details-minimal .event-date {
     font-weight: 600;
-    color: #333;
+    color: var(--datamachine-text-primary);
 }
 
 .event-details-minimal .event-venue {
-    color: #666;
+    color: var(--datamachine-text-secondary);
     text-align: right;
 }
 
@@ -238,13 +196,13 @@
     font-size: 18px;
     font-weight: 600;
     margin-bottom: 15px;
-    color: #333;
+    color: var(--datamachine-text-primary);
 }
 
 .datamachine-venue-map {
     width: 100%;
     height: 400px;
-    border-radius: 8px;
+    border-radius: var(--datamachine-border-radius);
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -261,11 +219,11 @@
     margin-top: 10px;
     text-align: right;
     font-size: 12px;
-    color: #666;
+    color: var(--datamachine-text-secondary);
 }
 
 .venue-map-attribution a {
-    color: #0073aa;
+    color: var(--datamachine-text-accent);
     text-decoration: none;
 }
 
@@ -302,26 +260,10 @@
     }
 }
 
-/* Dark Mode Support */
+/* Dark Mode Support - inherits from root.css :root dark mode overrides */
 @media (prefers-color-scheme: dark) {
-    .event-details-detailed h3 {
-        color: #e2e8f0;
-    }
-
     .event-details-detailed .start-datetime,
     .event-details-detailed .end-datetime {
-        background: #4a5568;
-    }
-
-    .event-details-compact .text small {
-        color: #a0aec0;
-    }
-
-    .venue-map-title {
-        color: #e2e8f0;
-    }
-
-    .venue-map-attribution {
-        color: #a0aec0;
+        background: var(--datamachine-background-secondary);
     }
 }

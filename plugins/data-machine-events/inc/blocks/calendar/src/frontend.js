@@ -1,571 +1,93 @@
 /**
- * Data Machine Events Calendar Frontend JavaScript
+ * Data Machine Events Calendar Frontend
  *
- * Progressive enhancement for calendar blocks with REST API filtering.
+ * Module orchestration for calendar blocks with REST API filtering.
  */
 
-import flatpickr from 'flatpickr';
-import 'flatpickr/dist/flatpickr.css';
+import './flatpickr-theme.css';
 
-(function() {
-    'use strict';
+import { initCarousel, destroyCarousel } from './modules/carousel.js';
+import { initDatePicker, destroyDatePicker, getDatePicker } from './modules/date-picker.js';
+import { initFilterModal } from './modules/filter-modal.js';
+import { initNavigation } from './modules/navigation.js';
+import { fetchCalendarEvents } from './modules/api-client.js';
+import { buildQueryParams, updateUrl } from './modules/state.js';
 
-    const datePickers = new Map();
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.datamachine-events-calendar').forEach(initCalendarInstance);
+});
 
-    document.addEventListener('DOMContentLoaded', function() {
-        initializeCalendarFilters();
-        initializeCarouselOverflow();
+function initCalendarInstance(calendar) {
+    if (calendar.dataset.dmInitialized === 'true') return;
+    calendar.dataset.dmInitialized = 'true';
+
+    initCarousel(calendar);
+
+    initDatePicker(calendar, function() {
+        handleFilterChange(calendar);
     });
 
-    function initializeCarouselOverflow() {
-        const groups = document.querySelectorAll('.datamachine-date-group');
-
-        groups.forEach(function(group) {
-            const wrapper = group.querySelector('.datamachine-events-wrapper');
-            if (!wrapper) return;
-
-            const checkOverflow = function() {
-                const hasOverflow = wrapper.scrollWidth > wrapper.clientWidth;
-                const atEnd = wrapper.scrollLeft + wrapper.clientWidth >= wrapper.scrollWidth - 5;
-                group.classList.toggle('has-overflow', hasOverflow && !atEnd);
-            };
-
-            checkOverflow();
-            wrapper.addEventListener('scroll', checkOverflow);
-
-            if (typeof ResizeObserver !== 'undefined') {
-                new ResizeObserver(checkOverflow).observe(wrapper);
-            }
-        });
-    }
-
-    /**
-     * Initialize all calendar instances with REST API filtering
-     */
-    function initializeCalendarFilters() {
-        const calendars = document.querySelectorAll('.datamachine-events-calendar');
-
-        calendars.forEach(function(calendar) {
-            // Avoid double-initialization if already initialized for this DOM node
-            if (calendar.dataset.dmFiltersInitialized === 'true') return;
-            calendar.dataset.dmFiltersInitialized = 'true';
-            let searchInput = calendar.querySelector('.datamachine-events-search-input');
-            const searchId = calendar.querySelector('[id^="datamachine-events-search-"]');
-            if (searchId) {
-                searchInput = searchId;
-            }
-
-            let dateRangeInput = calendar.querySelector('.datamachine-events-date-range-input');
-            const dateRangeId = calendar.querySelector('[id^="datamachine-events-date-range-"]');
-            if (dateRangeId) {
-                dateRangeInput = dateRangeId;
-            }
-
-            const filterBtn = calendar.querySelector('.datamachine-events-filter-btn, .datamachine-taxonomy-modal-trigger');
-            // Read modal id for this calendar from the DOM (button attribute or matching modal)
-            const btnModalId = filterBtn ? filterBtn.getAttribute('data-modal-id') : null;
-            const modalIdFromDom = calendar.querySelector('.datamachine-taxonomy-modal') ? calendar.querySelector('.datamachine-taxonomy-modal').id : null;
-            const modalIdResolved = btnModalId || modalIdFromDom;
-            if (filterBtn) {
-                // Toggle aria and controls for accessibility
-                filterBtn.setAttribute('aria-controls', modalIdResolved || '');
-                filterBtn.setAttribute('aria-expanded', 'false');
-            }
-            if (filterBtn) {
-                // Toggle aria and controls for accessibility
-                filterBtn.setAttribute('aria-controls', calendar.querySelector('.datamachine-taxonomy-modal') ? calendar.querySelector('.datamachine-taxonomy-modal').id : '');
-                filterBtn.setAttribute('aria-expanded', 'false');
-            }
-
-            // Search input - debounced REST API call
-            // 500ms debounce balances responsiveness with server load
-            if (searchInput) {
-                let searchTimeout;
-                searchInput.addEventListener('input', function() {
-                    clearTimeout(searchTimeout);
-                    searchTimeout = setTimeout(() => {
-                        applyFilters(calendar);
-                    }, 500); // 500ms delay prevents excessive API requests while typing
-                });
-
-                const searchBtn = calendar.querySelector('.datamachine-events-search-btn');
-                if (searchBtn) {
-                    searchBtn.addEventListener('click', function() {
-                        // Trigger filter using current search value instead of clearing (UX expectation)
-                        applyFilters(calendar);
-                        searchInput.focus();
-                    });
-                }
-            }
-
-            // Date range picker
-            if (dateRangeInput) {
-                const clearBtn = calendar.querySelector('.datamachine-events-date-clear-btn');
-
-                // Allow the server to inject the initial date start/end via data attributes
-                const initialStart = dateRangeInput.getAttribute('data-date-start');
-                const initialEnd = dateRangeInput.getAttribute('data-date-end');
-                let defaultDate = undefined;
-                if (initialStart) {
-                    if (initialEnd) {
-                        defaultDate = [initialStart, initialEnd];
-                    } else {
-                        defaultDate = initialStart;
-                    }
-                }
-
-                const datePicker = flatpickr(dateRangeInput, {
-                    mode: 'range',
-                    dateFormat: 'Y-m-d',
-                    placeholder: 'Select date range...',
-                    allowInput: false,
-                    clickOpens: true,
-                    defaultDate: defaultDate,
-                    onChange: function(selectedDates, dateStr, instance) {
-                        applyFilters(calendar);
-
-                        if (selectedDates && selectedDates.length > 0) {
-                            clearBtn.classList.add('visible');
-                        } else {
-                            clearBtn.classList.remove('visible');
-                        }
-                    },
-                    onClear: function() {
-                        applyFilters(calendar);
-                        clearBtn.classList.remove('visible');
-                    }
-                });
-
-                datePickers.set(calendar, datePicker);
-
-                if (datePicker && datePicker.selectedDates && datePicker.selectedDates.length > 0) {
-                    if (clearBtn) clearBtn.classList.add('visible');
-                }
-
-                if (clearBtn) {
-                    clearBtn.addEventListener('click', function() {
-                        datePicker.clear();
-                    });
-                }
-            }
-
-            // Taxonomy filter modal
-            if (filterBtn) {
-                initializeFilterModal(calendar);
-            }
-
-            // Navigation buttons (Past/Upcoming) - intercept for REST API calls
-            initializeNavigationButtons(calendar);
-
-            // Pagination links - intercept for REST API calls
-            initializePaginationLinks(calendar);
-        });
-    }
-
-    /**
-     * Initialize navigation button click handlers for REST API filtering
-     */
-    function initializeNavigationButtons(calendar) {
-        const navContainer = calendar.querySelector('.datamachine-events-past-navigation');
-        if (!navContainer) return;
-
-        navContainer.addEventListener('click', function(e) {
-            const pastBtn = e.target.closest('.datamachine-events-past-btn');
-            const upcomingBtn = e.target.closest('.datamachine-events-upcoming-btn');
-
-            if (pastBtn || upcomingBtn) {
-                e.preventDefault();
-
-                const params = new URLSearchParams(window.location.search);
-                params.delete('paged');
-
-                if (pastBtn) {
-                    params.set('past', '1');
-                } else {
-                    params.delete('past');
-                }
-
-                window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`);
-                applyFiltersWithParams(calendar, params);
-            }
-        });
-    }
-
-    /**
-     * Initialize pagination link click handlers for REST API filtering
-     */
-    function initializePaginationLinks(calendar) {
-        const paginationContainer = calendar.querySelector('.datamachine-events-pagination');
-        if (!paginationContainer) return;
-
-        paginationContainer.addEventListener('click', function(e) {
-            const link = e.target.closest('a');
-            if (!link) return;
-
-            e.preventDefault();
-
-            const url = new URL(link.href);
-            const params = new URLSearchParams(url.search);
-
-            window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`);
-            applyFiltersWithParams(calendar, params);
-        });
-    }
-
-    /**
-     * Initialize taxonomy filter modal
-     */
-    function initializeFilterModal(calendar) {
-        const modal = calendar.querySelector('.datamachine-taxonomy-modal');
-        if (!modal) return;
-
-        // Accessibility: ensure modal container has dialog role and is labelled
-        const modalContainer = modal.querySelector('.datamachine-taxonomy-modal-container');
-        if (modalContainer) {
-            modalContainer.setAttribute('role', 'dialog');
-            modalContainer.setAttribute('aria-modal', 'true');
-        }
-
-        const filterBtn = calendar.querySelector('.datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .datamachine-events-filter-btn');
-        const closeBtn = modal.querySelector('.datamachine-modal-close, .datamachine-taxonomy-modal-close');
-        const applyBtn = modal.querySelector('.datamachine-apply-filters');
-        const resetBtn = modal.querySelector('.datamachine-clear-all-filters, .datamachine-reset-filters');
-
-        // Open modal
-        if (filterBtn) {
-            filterBtn.addEventListener('click', function() {
-                modal.classList.add('datamachine-modal-active');
-                document.body.classList.add('datamachine-modal-active');
-                filterBtn.setAttribute('aria-expanded', 'true');
-            });
-        }
-
-        // Close modal
-        if (closeBtn) {
-            closeBtn.addEventListener('click', function() {
-                modal.classList.remove('datamachine-modal-active');
-                document.body.classList.remove('datamachine-modal-active');
-                if (filterBtn) { filterBtn.focus(); filterBtn.setAttribute('aria-expanded', 'false'); }
-            });
-        }
-
-        // Close on backdrop click
-        if (modal) {
-            modal.addEventListener('click', function(e) {
-                if (e.target === modal || e.target.classList.contains('datamachine-taxonomy-modal-overlay')) {
-                    modal.classList.remove('datamachine-modal-active');
-                    document.body.classList.remove('datamachine-modal-active');
-                    if (filterBtn) { filterBtn.focus(); filterBtn.setAttribute('aria-expanded', 'false'); }
-                }
-            });
-        }
-
-        // Close on Escape key and restore focus
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' || e.key === 'Esc') {
-                if (modal.classList.contains('datamachine-modal-active')) {
-                    modal.classList.remove('datamachine-modal-active');
-                    document.body.classList.remove('datamachine-modal-active');
-                    if (filterBtn) { filterBtn.focus(); filterBtn.setAttribute('aria-expanded', 'false'); }
-                }
-            }
-        });
-
-        // Apply filters button - calls REST API
-        if (applyBtn) {
-            applyBtn.addEventListener('click', function() {
-                applyFilters(calendar);
-                modal.classList.remove('datamachine-modal-active');
-                document.body.classList.remove('datamachine-modal-active');
-
-                // Toggle filter button active state after applying
-                updateFilterCount(calendar);
-            });
-        }
-
-        // Reset filters button
-        if (resetBtn) {
-            resetBtn.addEventListener('click', function() {
-                // Clear all checkboxes
-                const checkboxes = modal.querySelectorAll('input[type="checkbox"]');
-                checkboxes.forEach(cb => cb.checked = false);
-
-                // Update filter count
-                updateFilterCount(calendar);
-
-                // Apply filters (will clear taxonomy filters)
-                applyFilters(calendar);
-
-                modal.classList.remove('datamachine-modal-active');
-                document.body.classList.remove('datamachine-modal-active');
-            });
-        }
-
-        // Update filter count on checkbox change
-        const checkboxes = modal.querySelectorAll('input[type="checkbox"]');
-        checkboxes.forEach(function(checkbox) {
-            checkbox.addEventListener('change', function() {
-                updateFilterCount(calendar);
-            });
-        });
-
-        // Run initial update to display any pre-selected count
-        updateFilterCount(calendar);
-    }
-
-    /**
-     * Update filter count badge
-     */
-    function updateFilterCount(calendar) {
-        const modal = calendar.querySelector('.datamachine-taxonomy-modal');
-        if (!modal) return;
-
-        const checkboxes = modal.querySelectorAll('input[type="checkbox"]:checked');
-        const filterBtn = calendar.querySelector('.datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .datamachine-events-filter-btn');
-        const countBadge = filterBtn ? filterBtn.querySelector('.datamachine-filter-count') : null;
-
-        if (!countBadge) return; // Guard if template doesn't have a count badge
-
-        if (checkboxes.length > 0) {
-            countBadge.textContent = checkboxes.length;
-            countBadge.classList.add('visible');
-            if (filterBtn) filterBtn.classList.add('datamachine-filters-active');
-            if (filterBtn) filterBtn.setAttribute('aria-expanded', 'true');
-        } else {
-            countBadge.classList.remove('visible');
-            if (filterBtn) filterBtn.classList.remove('datamachine-filters-active');
-            if (filterBtn) filterBtn.setAttribute('aria-expanded', 'false');
-        }
-    }
-
-    /**
-     * Build query parameters from current filter state
-     */
-    function buildQueryParams(calendar) {
-        const params = new URLSearchParams(window.location.search);
-
-        // Remove pagination (always start at page 1 when filtering)
-        params.delete('paged');
-
-        // Search query
-        const searchInput = calendar.querySelector('.datamachine-events-search-input');
-        if (searchInput && searchInput.value) {
-            params.set('event_search', searchInput.value);
-        } else {
-            params.delete('event_search');
-        }
-
-        // Date range
-        const dateRangeInput = calendar.querySelector('.datamachine-events-date-range-input');
-        if (dateRangeInput) {
-            const datePicker = datePickers.get(calendar);
-                if (datePicker && datePicker.selectedDates.length > 0) {
-                    const startDate = datePicker.selectedDates[0];
-                    const endDate = datePicker.selectedDates[1] || startDate;
-
-                    params.set('date_start', formatDate(startDate));
-                    params.set('date_end', formatDate(endDate));
-
-                    // If the date range is entirely in the past, set the past param to 1 so server understands desired direction
-                    const now = new Date();
-                    const endOfRange = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59);
-                    if (endOfRange < now) {
-                        params.set('past', '1');
-                    } else {
-                        params.delete('past');
-                    }
-                } else {
-                    params.delete('date_start');
-                    params.delete('date_end');
-                    // No date range -> clear 'past' param so server uses default upcoming unless explicitly set
-                    params.delete('past');
-                }
-        }
-
-        // Taxonomy filters
-        params.delete('tax_filter');
-        const modal = calendar.querySelector('.datamachine-taxonomy-modal');
-        if (modal) {
-            const checkboxes = modal.querySelectorAll('input[type="checkbox"]:checked');
-            const taxFilters = {};
-
-            checkboxes.forEach(function(checkbox) {
-                const taxonomy = checkbox.getAttribute('data-taxonomy');
-                const termId = checkbox.value;
-
-                if (!taxFilters[taxonomy]) {
-                    taxFilters[taxonomy] = [];
-                }
-                taxFilters[taxonomy].push(termId);
-            });
-
-            // Add taxonomy filters to params
-            Object.keys(taxFilters).forEach(function(taxonomy) {
-                taxFilters[taxonomy].forEach(function(termId) {
-                    params.append(`tax_filter[${taxonomy}][]`, termId);
-                });
-            });
-        }
-
-        return params;
-    }
-
-    /**
-     * Format date for URL parameters (YYYY-MM-DD)
-     */
-    function formatDate(date) {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    }
-
-    /**
-     * Apply filters by calling REST API
-     */
-    async function applyFilters(calendar) {
-        const params = buildQueryParams(calendar);
-        const content = calendar.querySelector('.datamachine-events-content');
-
-        // Show loading state
-        content.classList.add('loading');
-
-        try {
-            // Build REST API URL
-            const apiUrl = `/wp-json/datamachine/v1/events/calendar?${params.toString()}`;
-
-            const response = await fetch(apiUrl, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-
-            const data = await response.json();
-
-            if (data.success) {
-                // Destroy existing datePicker instances for this calendar (if any) to avoid duplication
-                const existingDatePicker = datePickers.get(calendar);
-                if (existingDatePicker) {
-                    try { existingDatePicker.destroy(); } catch (e) { /* ignore */ }
-                    datePickers.delete(calendar);
-                }
-                // Reset initialization marker so initializeCalendarFilters can re-run on this calendar
-                try { delete calendar.dataset.dmFiltersInitialized; } catch (e) { calendar.dataset.dmFiltersInitialized = 'false'; }
-                // Update calendar content
-                content.innerHTML = data.html;
-
-                // Update pagination
-                const paginationContainer = calendar.querySelector('.datamachine-events-pagination');
-                if (paginationContainer && data.pagination.html) {
-                    paginationContainer.outerHTML = data.pagination.html;
-                }
-
-                // Update results counter
-                const counterContainer = calendar.querySelector('.datamachine-events-results-counter');
-                if (counterContainer && data.counter) {
-                    counterContainer.outerHTML = data.counter;
-                }
-
-                // Update navigation
-                const navigationContainer = calendar.querySelector('.datamachine-events-past-navigation');
-                if (navigationContainer && data.navigation.html) {
-                    navigationContainer.outerHTML = data.navigation.html;
-                }
-
-                // Update URL with History API for shareable filter states
-                // pushState enables back/forward browser navigation without page reload
-                const newUrl = `${window.location.pathname}?${params.toString()}`;
-                window.history.pushState({}, '', newUrl);
-
-                // Re-run initialization to reattach listeners & reinitialize UI within the calendar element
-                initializeCalendarFilters();
-                initializeCarouselOverflow();
-            }
-
-        } catch (error) {
-            console.error('Error fetching filtered events:', error);
-            content.innerHTML = '<div class="datamachine-events-error"><p>Error loading events. Please try again.</p></div>';
-        } finally {
-            content.classList.remove('loading');
-        }
-    }
-
-    /**
-     * Apply filters with explicit URLSearchParams (for navigation/pagination)
-     */
-    async function applyFiltersWithParams(calendar, params) {
-        const content = calendar.querySelector('.datamachine-events-content');
-        content.classList.add('loading');
-
-        try {
-            const apiUrl = `/wp-json/datamachine/v1/events/calendar?${params.toString()}`;
-            const response = await fetch(apiUrl, {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' }
-            });
-
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-
-            const data = await response.json();
-
-            if (data.success) {
-                const existingDatePicker = datePickers.get(calendar);
-                if (existingDatePicker) {
-                    try { existingDatePicker.destroy(); } catch (e) { /* ignore */ }
-                    datePickers.delete(calendar);
-                }
-                try { delete calendar.dataset.dmFiltersInitialized; } catch (e) { calendar.dataset.dmFiltersInitialized = 'false'; }
-
-                content.innerHTML = data.html;
-
-                const paginationContainer = calendar.querySelector('.datamachine-events-pagination');
-                if (paginationContainer && data.pagination.html) {
-                    paginationContainer.outerHTML = data.pagination.html;
-                } else if (!paginationContainer && data.pagination.html) {
-                    content.insertAdjacentHTML('afterend', data.pagination.html);
-                }
-
-                const counterContainer = calendar.querySelector('.datamachine-events-results-counter');
-                if (counterContainer && data.counter) {
-                    counterContainer.outerHTML = data.counter;
-                } else if (!counterContainer && data.counter) {
-                    content.insertAdjacentHTML('afterend', data.counter);
-                }
-
-                const navigationContainer = calendar.querySelector('.datamachine-events-past-navigation');
-                if (navigationContainer && data.navigation.html) {
-                    navigationContainer.outerHTML = data.navigation.html;
-                } else if (!navigationContainer && data.navigation.html) {
-                    calendar.insertAdjacentHTML('beforeend', data.navigation.html);
-                }
-
-                initializeCalendarFilters();
-                initializeCarouselOverflow();
-            }
-
-        } catch (error) {
-            console.error('Error fetching filtered events:', error);
-            content.innerHTML = '<div class="datamachine-events-error"><p>Error loading events. Please try again.</p></div>';
-        } finally {
-            content.classList.remove('loading');
-        }
-    }
-
-    /**
-     * Cleanup date pickers when page unloads
-     */
-    window.addEventListener('beforeunload', function() {
-        datePickers.forEach(datePicker => {
-            datePicker.destroy();
-        });
-        datePickers.clear();
+    initFilterModal(
+        calendar,
+        function() { handleFilterChange(calendar); },
+        function() { handleFilterChange(calendar); }
+    );
+
+    initNavigation(calendar, function(params) {
+        handleNavigation(calendar, params);
     });
 
-})();
+    initSearchInput(calendar);
+}
+
+function initSearchInput(calendar) {
+    const searchInput = calendar.querySelector('.datamachine-events-search-input') 
+        || calendar.querySelector('[id^="datamachine-events-search-"]');
+    
+    if (!searchInput) return;
+
+    let searchTimeout;
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+            handleFilterChange(calendar);
+        }, 500);
+    });
+
+    const searchBtn = calendar.querySelector('.datamachine-events-search-btn');
+    if (searchBtn) {
+        searchBtn.addEventListener('click', function() {
+            handleFilterChange(calendar);
+            searchInput.focus();
+        });
+    }
+}
+
+async function handleFilterChange(calendar) {
+    const datePicker = getDatePicker(calendar);
+    const params = buildQueryParams(calendar, datePicker);
+    updateUrl(params);
+    await refreshCalendar(calendar, params);
+}
+
+async function handleNavigation(calendar, params) {
+    updateUrl(params);
+    await refreshCalendar(calendar, params);
+}
+
+async function refreshCalendar(calendar, params) {
+    destroyCarousel(calendar);
+    destroyDatePicker(calendar);
+
+    await fetchCalendarEvents(calendar, params);
+
+    calendar.dataset.dmInitialized = 'false';
+    initCalendarInstance(calendar);
+}
+
+window.addEventListener('beforeunload', function() {
+    document.querySelectorAll('.datamachine-events-calendar').forEach(function(calendar) {
+        destroyDatePicker(calendar);
+        destroyCarousel(calendar);
+    });
+});

@@ -498,16 +498,41 @@ class EventUpsert extends UpdateHandler {
         $block_json = wp_json_encode($block_attributes);
         $description = !empty($event_data['description']) ? wp_kses_post($event_data['description']) : '';
 
-        $inner_blocks = '';
-        if ($description) {
-            $inner_blocks = '<!-- wp:paragraph -->
-<p>' . $description . '</p>
-<!-- /wp:paragraph -->';
+        $inner_blocks = $this->generate_description_blocks($description);
+
+        return '<!-- wp:datamachine-events/event-details ' . $block_json . ' -->' . "\n" .
+               '<div class="wp-block-datamachine-events-event-details">' .
+               ($inner_blocks ? "\n" . $inner_blocks . "\n" : '') .
+               '</div>' . "\n" .
+               '<!-- /wp:datamachine-events/event-details -->';
+    }
+
+    /**
+     * Generate paragraph blocks from HTML description
+     *
+     * @param string $description HTML description content
+     * @return string InnerBlocks content with proper paragraph blocks
+     */
+    private function generate_description_blocks(string $description): string {
+        if (empty($description)) {
+            return '';
         }
 
-        return '<!-- wp:datamachine-events/event-details ' . $block_json . ' -->' .
-               ($inner_blocks ? "\n" . $inner_blocks . "\n" : '') .
-               '<!-- /wp:datamachine-events/event-details -->';
+        // Split on closing/opening p tags or double line breaks
+        $paragraphs = preg_split('/<\/p>\s*<p[^>]*>|<\/p>\s*<p>|\n\n+/', $description);
+
+        $blocks = [];
+        foreach ($paragraphs as $para) {
+            // Strip outer p tags but keep inline formatting
+            $para = preg_replace('/^<p[^>]*>|<\/p>$/', '', trim($para));
+            $para = trim($para);
+
+            if (!empty($para)) {
+                $blocks[] = '<!-- wp:paragraph -->' . "\n" . '<p>' . $para . '</p>' . "\n" . '<!-- /wp:paragraph -->';
+            }
+        }
+
+        return implode("\n", $blocks);
     }
 
     /**

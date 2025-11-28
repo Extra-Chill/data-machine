@@ -102,7 +102,7 @@ class EventUpsertFilters {
                 ],
                 'description' => [
                     'type' => 'string',
-                    'description' => 'Generate an engaging, informative description for this event based on the provided details (venue, artist, dates, etc.). Make it compelling and informative for potential attendees.',
+                    'description' => 'Generate an engaging, informative HTML description for this event. Use multiple <p> tags for separate paragraphs. Use <strong> for emphasis and <ul>/<li> for lists when appropriate. Focus on what makes this event unique, the atmosphere, and what attendees can expect. Do NOT include: dates, times, venue name, address, ticket prices, or ticket purchase links - these are displayed separately in the event details section.',
                     'required' => true
                 ]
             ]

@@ -330,27 +330,27 @@
 
 /* Secondary Button (Details) */
 .datamachine-button:not(.datamachine-button-primary) {
-    background: #f3f4f6;
+    background: var(--datamachine-background-hover);
     color: var(--datamachine-text-primary);
     border-color: var(--datamachine-border-default);
 }
 
 .datamachine-button:not(.datamachine-button-primary):hover {
-    background: #e5e7eb;
+    background: var(--datamachine-border-hover);
     color: var(--datamachine-text-primary);
     border-color: var(--datamachine-text-muted);
 }
 
 /* Primary Button (Tickets) */
 .datamachine-button-primary {
-    background: #3b82f6;
+    background: var(--datamachine-text-accent);
     color: white;
     border-color: var(--datamachine-border-focus);
 }
 
 .datamachine-button-primary:hover {
-    background: #2563eb;
-    border-color: #2563eb;
+    background: var(--datamachine-border-focus);
+    border-color: var(--datamachine-border-focus);
     color: white;
 }
 
@@ -398,7 +398,7 @@
 .datamachine-events-pagination .page-numbers span {
     display: inline-block;
     padding: 0.5rem 0.75rem;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--datamachine-border-default);
     border-radius: 4px;
     text-decoration: none;
     color: var(--datamachine-text-primary);
@@ -407,12 +407,12 @@
 }
 
 .datamachine-events-pagination .page-numbers a:hover {
-    background: #f3f4f6;
+    background: var(--datamachine-background-hover);
     border-color: var(--datamachine-text-muted);
 }
 
 .datamachine-events-pagination .page-numbers .current {
-    background: #3b82f6;
+    background: var(--datamachine-text-accent);
     color: white;
     border-color: var(--datamachine-border-focus);
 }
@@ -474,9 +474,6 @@
 }
 
 @media (max-width: 480px) {
-    .datamachine-events-filter-bar {
-        padding: 1rem;
-    }
     
     .datamachine-events-view-btn {
         padding: 0.5rem 0.75rem;
@@ -486,42 +483,6 @@
     .datamachine-events-view-btn .dashicons {
         display: none;
     }
-}
-
-/* Flatpickr styling overrides */
-.flatpickr-calendar {
-
-    border-radius: 8px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-    border: 1px solid #e5e7eb;
-}
-
-.flatpickr-day.selected {
-    background: #3b82f6;
-    border-color: var(--datamachine-border-focus);
-}
-
-.flatpickr-day.inRange {
-    background: rgba(59, 130, 246, 0.1);
-    border-color: rgba(59, 130, 246, 0.2);
-}
-
-.flatpickr-day.startRange {
-    background: #3b82f6;
-    border-color: var(--datamachine-border-focus);
-}
-
-.flatpickr-day.endRange {
-    background: #3b82f6;
-    border-color: var(--datamachine-border-focus);
-}
-
-.flatpickr-day:hover {
-    background: #f3f4f6;
-}
-
-.flatpickr-day.selected:hover {
-    background: #2563eb;
 }
 
 /* ========== Taxonomy Filter Modal Styles ========== */
@@ -561,13 +522,13 @@
 }
 
 .datamachine-events-filter-btn.datamachine-filters-active {
-    background: #3b82f6;
+    background: var(--datamachine-text-accent);
     color: white;
     border-color: var(--datamachine-border-focus);
 }
 
 .datamachine-events-filter-btn.datamachine-filters-active:hover {
-    background: #2563eb;
+    background: var(--datamachine-border-focus);
     color: white;
 }
 
@@ -606,6 +567,8 @@
 
 .datamachine-taxonomy-modal-container {
     position: relative;
+    display: flex;
+    flex-direction: column;
     background: var(--datamachine-background-primary);
     border-radius: var(--datamachine-border-radius);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
@@ -623,6 +586,7 @@
     padding: 1.5rem;
     border-bottom: 1px solid var(--datamachine-border-light);
     background: var(--datamachine-background-secondary);
+    flex-shrink: 0;
 }
 
 .datamachine-taxonomy-modal-title {
@@ -652,13 +616,16 @@
 }
 
 .datamachine-taxonomy-modal-body {
-    max-height: calc(80vh - 120px);
+    flex: 1 1 auto;
     overflow-y: auto;
+    min-height: 0;
+    max-height: calc(80vh - 160px);
 }
 
-/* Modal Content Wrapper */
-.datamachine-events-taxonomy-modal {
-    padding: 0;
+.datamachine-taxonomy-modal-footer {
+    flex-shrink: 0;
+    background: var(--datamachine-background-secondary);
+    border-top: 1px solid var(--datamachine-border-light);
 }
 
 .datamachine-taxonomy-filter-content {
@@ -744,9 +711,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 1.5rem;
-    border-top: 1px solid var(--datamachine-border-light);
     background: var(--datamachine-background-secondary);
-    margin: 0;
 }
 
 .datamachine-modal-actions-left,
@@ -763,7 +728,7 @@
 }
 
 .datamachine-no-taxonomies p {
-    margin-bottom: 1.5rem;
+    margin: 0;
     color: var(--datamachine-text-secondary);
     font-size: 0.95rem;
 }

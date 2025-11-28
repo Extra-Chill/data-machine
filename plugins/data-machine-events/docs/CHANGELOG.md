@@ -5,6 +5,36 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] - 2025-11-28
+
+### Added
+- **JavaScript Module Architecture** - Refactored 571-line monolithic `frontend.js` into 6 focused ES modules for improved maintainability:
+  - `modules/api-client.js` (74 lines) - REST API communication and calendar DOM updates
+  - `modules/carousel.js` (129 lines) - Carousel overflow detection, dot indicators, and chevron navigation
+  - `modules/date-picker.js` (80 lines) - Flatpickr date range picker integration
+  - `modules/filter-modal.js` (111 lines) - Taxonomy filter modal UI and accessibility
+  - `modules/navigation.js` (51 lines) - Past/upcoming navigation and pagination link handling
+  - `modules/state.js` (80 lines) - URL state management and query parameter building
+- **Carousel Navigation UI** - Added dot indicators showing visible events and chevron buttons (`‹`/`›`) for horizontal scrolling
+- **Flatpickr Theme CSS** - New `flatpickr-theme.css` (219 lines) with comprehensive design system integration and dark mode support
+- **AI Description Formatting** - Enhanced EventUpsertFilters description prompt to request HTML formatting with multiple `<p>` tags, `<strong>` emphasis, and `<ul>/<li>` lists
+
+### Changed
+- **CSS Design System Migration** - Replaced ~40 hardcoded hex colors with CSS custom properties throughout:
+  - `style.css`: Buttons (`--datamachine-text-accent`), pagination, filter active states
+  - `frontend.css` (EventDetails): Text colors, backgrounds, borders, ticket button styles
+- **Modal Layout Architecture** - Taxonomy filter modal refactored with flexbox and sticky footer:
+  - Modal footer moved from `taxonomy-filter.php` to `filter-bar.php` for proper sticky positioning
+  - Body section uses `flex: 1 1 auto` with `overflow-y: auto` for scrollable content while footer stays fixed
+- **EventUpsert Block Generation** - `generate_block_content()` now properly wraps InnerBlocks in `<div class="wp-block-datamachine-events-event-details">` and generates separate paragraph blocks for multi-paragraph HTML descriptions via new `generate_description_blocks()` method
+- **Compact Layout CSS** - Removed 44 lines of duplicated compact layout styles (now inherits from base `.event-info-grid` styles)
+- **Dark Mode CSS** - Reduced EventDetails dark mode overrides from 18 lines to 4 lines (inherits from root.css CSS custom properties)
+
+### Removed
+- **Carousel List Separate CSS** - Deleted `DisplayStyles/CarouselList/carousel-list.css` (107 lines) - styles consolidated into main `style.css`
+- **Flatpickr Inline Overrides** - Removed 36 lines of flatpickr CSS from `style.css` (moved to dedicated theme file imported by webpack)
+- **Monolithic Frontend JavaScript** - Replaced 571-line IIFE with 93-line orchestration file + modular imports
+
 ## [0.4.2] - 2025-11-26
 
 ### Added
