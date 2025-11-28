@@ -757,117 +757,185 @@
 }
 
 /* ================================
-   CAROUSEL LIST DISPLAY STYLES
+   DATE GROUP CAROUSEL STYLES
    ================================ */
 
-/* Carousel Date Group */
-.datamachine-carousel-date-group {
-    margin-bottom: 2.5rem;
+.datamachine-events-calendar.datamachine-events-date-grouped .datamachine-events-content {
+    display: block;
+}
+
+/* Date Group Container */
+.datamachine-events-calendar .datamachine-date-group {
+    display: block;
+    margin-bottom: 1.25rem;
     border-radius: var(--datamachine-border-radius);
-    background: var(--datamachine-background-light);
     border: 1px solid var(--datamachine-border-light);
-    overflow: hidden;
-}
-
-.datamachine-carousel-date-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1rem 1.5rem;
-    background: var(--datamachine-background-secondary);
-    border-bottom: 1px solid var(--datamachine-border-light);
-}
-
-.datamachine-carousel-date-header .datamachine-day-badge {
-    margin: 0;
-    font-size: 1.1rem;
-    font-weight: 600;
-}
-
-/* Carousel Navigation Buttons */
-.datamachine-carousel-nav {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.datamachine-carousel-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    border: none;
-    border-radius: 50%;
-    background: var(--datamachine-background-light);
-    color: var(--datamachine-text-secondary);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    font-size: 1.2rem;
-    line-height: 1;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.datamachine-carousel-btn:hover {
-    background: var(--datamachine-text-accent);
-    color: white;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
-.datamachine-carousel-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.datamachine-carousel-btn:disabled:hover {
-    background: var(--datamachine-background-light);
-    color: var(--datamachine-text-secondary);
-}
-
-/* Carousel Events Container */
-.datamachine-carousel-events-container {
     position: relative;
-    overflow: hidden;
+    padding-top: 40px;
+    padding-bottom: 2.5rem;
 }
 
-.datamachine-carousel-events-row {
+/* Events Wrapper - Horizontal Scroll */
+.datamachine-events-calendar .datamachine-date-group .datamachine-events-wrapper {
     display: flex;
+    flex-wrap: nowrap;
     gap: var(--datamachine-grid-gap);
     padding: 1.5rem;
     overflow-x: auto;
     scroll-behavior: smooth;
-    scroll-snap-type: x proximity;
     -webkit-overflow-scrolling: touch;
-}
-
-/* Hide scrollbar but maintain functionality */
-.datamachine-carousel-events-row::-webkit-scrollbar {
-    display: none;
-}
-
-.datamachine-carousel-events-row {
+    align-items: stretch;
     -ms-overflow-style: none;
     scrollbar-width: none;
 }
 
-/* Mobile Responsive for Carousel */
+.datamachine-events-calendar .datamachine-events-wrapper::-webkit-scrollbar {
+    display: none;
+}
+
+/* Day Badge Position */
+.datamachine-events-calendar .datamachine-day-badge {
+    position: absolute;
+    top: 12px;
+    left: 1.5rem;
+    z-index: 2;
+}
+
+/* Event Items in Carousel */
+.datamachine-events-calendar .datamachine-event-item {
+    flex: 0 0 auto;
+}
+
+/* Overflow "More" Indicator */
+.datamachine-events-calendar .datamachine-date-group::after {
+    content: 'More';
+    position: absolute;
+    right: 0;
+    top: 40px;
+    bottom: 0;
+    width: 60px;
+    background: linear-gradient(to right, transparent, var(--datamachine-scroll-gradient-color) 70%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--datamachine-text-muted);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.datamachine-events-calendar .datamachine-date-group.has-overflow::after {
+    opacity: 1;
+}
+
+/* Day-specific backgrounds */
+.datamachine-events-calendar .datamachine-day-sunday .datamachine-event-item { background: var(--datamachine-day-sunday-rgba); }
+.datamachine-events-calendar .datamachine-day-monday .datamachine-event-item { background: var(--datamachine-day-monday-rgba); }
+.datamachine-events-calendar .datamachine-day-tuesday .datamachine-event-item { background: var(--datamachine-day-tuesday-rgba); }
+.datamachine-events-calendar .datamachine-day-wednesday .datamachine-event-item { background: var(--datamachine-day-wednesday-rgba); }
+.datamachine-events-calendar .datamachine-day-thursday .datamachine-event-item { background: var(--datamachine-day-thursday-rgba); }
+.datamachine-events-calendar .datamachine-day-friday .datamachine-event-item { background: var(--datamachine-day-friday-rgba); }
+.datamachine-events-calendar .datamachine-day-saturday .datamachine-event-item { background: var(--datamachine-day-saturday-rgba); }
+
+/* Mobile */
 @media (max-width: 768px) {
-    .datamachine-carousel-date-header {
-        padding: 1rem;
-        flex-direction: column;
-        gap: 1rem;
-        align-items: flex-start;
-    }
-    
-    .datamachine-carousel-nav {
-        align-self: flex-end;
-    }
-    
-    .datamachine-carousel-events-row {
+    .datamachine-events-calendar .datamachine-date-group .datamachine-events-wrapper {
         padding: 1rem;
         gap: 1rem;
+    }
+
+    .datamachine-events-calendar .datamachine-day-badge {
+        left: 1rem;
+        top: 10px;
+    }
+
+    .datamachine-events-calendar .datamachine-date-group::after {
+        top: 36px;
+        width: 50px;
+    }
+}
+
+/* ================================
+   CAROUSEL INDICATORS & CHEVRONS
+   ================================ */
+
+/* Instagram-style dot indicators */
+.datamachine-carousel-indicators {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 0;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
+.datamachine-carousel-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--datamachine-border-light);
+    transition: all 0.2s ease;
+}
+
+.datamachine-carousel-dot.active {
+    background: var(--datamachine-text-accent);
+    transform: scale(1.2);
+}
+
+/* Chevron navigation arrows */
+.datamachine-carousel-chevron {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--datamachine-background-light);
+    border: 1px solid var(--datamachine-border-light);
+    border-radius: 50%;
+    font-size: 1.5rem;
+    color: var(--datamachine-text-secondary);
+    pointer-events: none;
+    transition: all 0.2s ease;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.datamachine-carousel-chevron-left {
+    left: -1rem;
+}
+
+.datamachine-carousel-chevron-right {
+    right: -1rem;
+}
+
+.datamachine-carousel-chevron.hidden {
+    opacity: 0;
+}
+
+@media (max-width: 768px) {
+    .datamachine-carousel-chevron {
+        width: 2rem;
+        height: 2rem;
+        font-size: 1.25rem;
+    }
+    
+    .datamachine-carousel-chevron-left {
+        left: -0.5rem;
+    }
+    
+    .datamachine-carousel-chevron-right {
+        right: -0.5rem;
     }
 }
 

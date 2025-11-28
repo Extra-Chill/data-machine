@@ -130,14 +130,6 @@ $wrapper_attributes = get_block_wrapper_attributes([
     
     <div class="datamachine-events-content">
         <?php if (!empty($paged_date_groups)) : ?>
-            <?php 
-            wp_enqueue_style(
-                'datamachine-events-carousel-list',
-                plugin_dir_url(__FILE__) . 'DisplayStyles/CarouselList/carousel-list.css',
-                ['datamachine-events-root'],
-                filemtime(plugin_dir_path(__FILE__) . 'DisplayStyles/CarouselList/carousel-list.css')
-            );
-            ?>
             <?php
             foreach ($paged_date_groups as $date_key => $date_group) :
                 $date_obj = $date_group['date_obj'];
