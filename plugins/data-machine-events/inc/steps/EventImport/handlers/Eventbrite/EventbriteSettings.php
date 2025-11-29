@@ -36,12 +36,6 @@ class EventbriteSettings {
                 'description' => __('Enter the full Eventbrite organizer page URL (e.g., https://www.eventbrite.com/o/lo-fi-brewing-14959647606). Events are extracted from the public page - no API key required.', 'datamachine-events'),
                 'placeholder' => __('https://www.eventbrite.com/o/organizer-name-12345678', 'datamachine-events'),
             ],
-            'date_range' => [
-                'type' => 'text',
-                'label' => __('Date Range (Days)', 'datamachine-events'),
-                'description' => __('Number of days into the future to import events. Default is 90 days.', 'datamachine-events'),
-                'placeholder' => __('90', 'datamachine-events'),
-            ]
         ];
     }
     
@@ -60,7 +54,6 @@ class EventbriteSettings {
         
         return [
             'organizer_url' => $organizer_url,
-            'date_range' => absint($raw_settings['date_range'] ?? 90) ?: 90
         ];
     }
     
@@ -82,7 +75,6 @@ class EventbriteSettings {
     public static function get_defaults(): array {
         return [
             'organizer_url' => '',
-            'date_range' => 90
         ];
     }
 }

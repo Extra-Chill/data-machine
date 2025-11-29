@@ -107,6 +107,14 @@ class SpotHopper extends EventImportHandler {
                 continue;
             }
 
+            if ($this->isPastEvent($standardized_event['startDate'] ?? '')) {
+                $this->log('debug', 'Skipping past event', [
+                    'title' => $standardized_event['title'],
+                    'date' => $standardized_event['startDate']
+                ]);
+                continue;
+            }
+
             $this->markItemProcessed($event_identifier, $flow_step_id, $job_id);
 
             $this->log('info', 'Found eligible SpotHopper event', [

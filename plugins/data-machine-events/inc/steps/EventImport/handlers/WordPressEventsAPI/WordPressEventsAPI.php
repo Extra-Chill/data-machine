@@ -111,6 +111,14 @@ class WordPressEventsAPI extends EventImportHandler {
                 continue;
             }
 
+            if ($this->isPastEvent($standardized_event['startDate'] ?? '')) {
+                $this->log('debug', 'Skipping past event', [
+                    'title' => $standardized_event['title'],
+                    'date' => $standardized_event['startDate']
+                ]);
+                continue;
+            }
+
             $this->markItemProcessed($event_identifier, $flow_step_id, $job_id);
 
             $this->log('info', 'Found eligible WordPress Events API event', [
@@ -158,19 +166,9 @@ class WordPressEventsAPI extends EventImportHandler {
     }
 
     private function fetch_events(string $endpoint_url, array $config): array {
-        $per_page = absint($config['per_page'] ?? 50);
-        if ($per_page < 1 || $per_page > 100) {
-            $per_page = 50;
-        }
-
         $query_params = [
-            'per_page' => $per_page,
+            'per_page' => 100,
         ];
-
-        $categories = trim($config['categories'] ?? '');
-        if (!empty($categories)) {
-            $query_params['categories'] = $categories;
-        }
 
         $url = add_query_arg($query_params, $endpoint_url);
 

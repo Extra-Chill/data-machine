@@ -102,8 +102,7 @@ class GoogleCalendar extends EventImportHandler {
                 continue;
             }
 
-            // Apply future date filter
-            if (!empty($standardized_event['startDate']) && strtotime($standardized_event['startDate']) < strtotime('today')) {
+            if ($this->isPastEvent($standardized_event['startDate'] ?? '')) {
                 continue;
             }
 

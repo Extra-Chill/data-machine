@@ -143,7 +143,7 @@ class EventUpsert extends UpdateHandler {
         // Query by exact title match
         $args = [
             'post_type' => Event_Post_Type::POST_TYPE,
-            'post_title' => $title,
+            'title' => $title,
             'posts_per_page' => 1,
             'post_status' => ['publish', 'draft', 'pending'],
             'fields' => 'ids'

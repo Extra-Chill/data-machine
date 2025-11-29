@@ -764,13 +764,11 @@ class UniversalWebScraper extends EventImportHandler {
             return null;
         }
         
-        // Check for future date requirement
-        $start_date = $parameters['startDate'] ?? '';
-        if (!empty($start_date) && strtotime($start_date) < strtotime('today')) {
+        if ($this->isPastEvent($parameters['startDate'] ?? '')) {
             $this->log('debug', 'Universal AI Scraper: Skipping past event', [
                 'source_url' => $source_url,
                 'title' => $parameters['title'],
-                'start_date' => $start_date
+                'start_date' => $parameters['startDate'] ?? ''
             ]);
             return null;
         }

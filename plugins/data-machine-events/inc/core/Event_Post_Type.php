@@ -2,7 +2,8 @@
 /**
  * Event Post Type Registration
  *
- * Handles registration of the datamachine_events custom post type with selective taxonomy menu control.
+ * Handles registration of the datamachine_events custom post type with selective taxonomy menu control
+ * and custom admin columns for event date display and sorting.
  *
  * @package DataMachineEvents
  * @subpackage Core
@@ -20,6 +21,7 @@ if (!defined('ABSPATH')) {
 class Event_Post_Type {
     
     const POST_TYPE = 'datamachine_events';
+    const EVENT_DATE_META_KEY = '_datamachine_event_datetime';
     
     public static function register() {
         $labels = array(
@@ -97,6 +99,79 @@ class Event_Post_Type {
         add_filter('parent_file', array(__CLASS__, 'filter_parent_file'));
         
         add_filter('submenu_file', array(__CLASS__, 'filter_submenu_file'));
+        
+        self::setup_admin_columns();
+    }
+    
+    private static function setup_admin_columns() {
+        add_filter('manage_' . self::POST_TYPE . '_posts_columns', array(__CLASS__, 'add_event_date_column'));
+        add_action('manage_' . self::POST_TYPE . '_posts_custom_column', array(__CLASS__, 'render_event_date_column'), 10, 2);
+        add_filter('manage_edit-' . self::POST_TYPE . '_sortable_columns', array(__CLASS__, 'sortable_event_date_column'));
+        add_action('pre_get_posts', array(__CLASS__, 'sort_by_event_date'));
+    }
+    
+    public static function add_event_date_column($columns) {
+        $new_columns = array();
+        
+        foreach ($columns as $key => $value) {
+            $new_columns[$key] = $value;
+            
+            if ($key === 'title') {
+                $new_columns['event_date'] = __('Event Date', 'datamachine-events');
+            }
+        }
+        
+        return $new_columns;
+    }
+    
+    public static function render_event_date_column($column, $post_id) {
+        if ($column !== 'event_date') {
+            return;
+        }
+        
+        $event_datetime = get_post_meta($post_id, self::EVENT_DATE_META_KEY, true);
+        
+        if (!$event_datetime) {
+            echo '<span class="datamachine-no-date">' . esc_html__('No date set', 'datamachine-events') . '</span>';
+            return;
+        }
+        
+        try {
+            $date = new \DateTime($event_datetime);
+            $formatted_date = $date->format('M j, Y');
+            $formatted_time = $date->format('g:i a');
+            
+            printf(
+                '<span class="datamachine-event-date"><strong>%s</strong><br>%s</span>',
+                esc_html($formatted_date),
+                esc_html($formatted_time)
+            );
+        } catch (\Exception $e) {
+            echo '<span class="datamachine-invalid-date">' . esc_html__('Invalid date', 'datamachine-events') . '</span>';
+        }
+    }
+    
+    public static function sortable_event_date_column($columns) {
+        $columns['event_date'] = 'event_date';
+        return $columns;
+    }
+    
+    public static function sort_by_event_date($query) {
+        if (!is_admin() || !$query->is_main_query()) {
+            return;
+        }
+        
+        $screen = get_current_screen();
+        if (!$screen || $screen->post_type !== self::POST_TYPE) {
+            return;
+        }
+        
+        $orderby = $query->get('orderby');
+        
+        if ($orderby === 'event_date') {
+            $query->set('meta_key', self::EVENT_DATE_META_KEY);
+            $query->set('orderby', 'meta_value');
+        }
     }
     
     public static function control_taxonomy_menus() {

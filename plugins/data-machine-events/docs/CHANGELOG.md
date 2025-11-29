@@ -5,6 +5,27 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.6] - 2025-11-29
+
+### Added
+- **WordPress Events API Handler** - Import events from external WordPress sites running Tribe Events or similar plugins
+- **WordPress Events API Settings** - Configuration for external WordPress API imports with venue override and keyword filtering
+- **Enhanced Calendar CSS** - Modern filter bar styling with improved search input and focus states
+- **Venue Override Feature** - Consolidate multiple venue stages under one venue name for better map display
+
+### Changed
+- **Event Import Handler Base Class** - Integrated VenueParameterProvider for cleaner venue metadata extraction
+- **Eventbrite Handler** - Improved JSON-LD extraction from public organizer pages
+- **Google Calendar Handler** - Enhanced .ics integration with better event parsing
+- **SpotHopper API Integration** - Performance and reliability improvements
+- **Universal Web Scraper** - Better Schema.org compliance and fallback handling
+- **Event Upsert Architecture** - Refinements for better create/update logic
+- **Event Post Type Registration** - Updates for improved admin interface
+
+### Fixed
+- Various handler stability improvements and edge case handling
+- Calendar styling consistency across different themes
+
 ## [0.4.5] - 2025-11-28
 
 ### Added

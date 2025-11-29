@@ -74,10 +74,6 @@ class Eventbrite extends EventImportHandler {
             'pipeline_id' => $pipeline_id
         ]);
         
-        $date_range = isset($config['date_range']) ? intval($config['date_range']) : 90;
-        $now = time();
-        $future = strtotime("+{$date_range} days");
-        
         foreach ($raw_events as $raw_event) {
             $standardized_event = $this->map_eventbrite_event($raw_event);
             
@@ -99,9 +95,8 @@ class Eventbrite extends EventImportHandler {
                 continue;
             }
             
-            $event_time = strtotime($standardized_event['startDate'] . ' ' . ($standardized_event['startTime'] ?? '00:00'));
-            if ($event_time < $now || $event_time > $future) {
-                $this->log('debug', 'Skipping event outside date range', [
+            if ($this->isPastEvent($standardized_event['startDate'] ?? '')) {
+                $this->log('debug', 'Skipping past event', [
                     'title' => $standardized_event['title'],
                     'date' => $standardized_event['startDate']
                 ]);
@@ -201,7 +196,12 @@ class Eventbrite extends EventImportHandler {
             
             if (isset($data['@type']) && $data['@type'] === 'ItemList' && isset($data['itemListElement'])) {
                 foreach ($data['itemListElement'] as $item) {
-                    if (isset($item['@type']) && $item['@type'] === 'Event') {
+                    if (isset($item['@type']) && $item['@type'] === 'ListItem' && isset($item['item'])) {
+                        $nested = $item['item'];
+                        if (isset($nested['@type']) && $nested['@type'] === 'Event') {
+                            $events[] = $nested;
+                        }
+                    } elseif (isset($item['@type']) && $item['@type'] === 'Event') {
                         $events[] = $item;
                     }
                 }

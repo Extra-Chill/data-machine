@@ -237,7 +237,6 @@
 
 /* Event title within date groups - smaller */
 .datamachine-date-group .datamachine-event-title {
-    font-size: 0.95rem;
     margin-bottom: 0.5rem;
 }
 
@@ -458,10 +457,6 @@
     .datamachine-event-item {
         width: 100%;
         max-width: var(--datamachine-grid-cell-width);
-    }
-
-    .datamachine-event-title {
-        font-size: 0.95rem;
     }
 
     /* Mobile: Uniform single column grid */

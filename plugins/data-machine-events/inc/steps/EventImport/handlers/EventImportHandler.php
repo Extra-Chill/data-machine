@@ -54,6 +54,19 @@ abstract class EventImportHandler extends FetchHandler {
     }
 
     /**
+     * Check if event start date is in the past
+     *
+     * @param string $start_date Event start date (Y-m-d format expected)
+     * @return bool True if event is in the past, false otherwise
+     */
+    protected function isPastEvent(string $start_date): bool {
+        if (empty($start_date)) {
+            return false;
+        }
+        return strtotime($start_date) < strtotime('today');
+    }
+
+    /**
      * @return array{lat: float, lng: float}|false
      */
     protected function parseCoordinates(string $location): array|false {
