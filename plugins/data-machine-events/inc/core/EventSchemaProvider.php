@@ -1,0 +1,491 @@
+<?php
+/**
+ * Centralized event schema provider for AI tools and Schema.org JSON-LD.
+ *
+ * Single source of truth for all event field definitions, mapping between
+ * AI tool parameters and Schema.org properties for Google Event rich results.
+ *
+ * @package DataMachineEvents\Core
+ */
+
+namespace DataMachineEvents\Core;
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+class EventSchemaProvider {
+
+    public const EVENT_TYPES = [
+        'Event',
+        'MusicEvent',
+        'Festival',
+        'ComedyEvent',
+        'DanceEvent',
+        'TheaterEvent',
+        'SportsEvent',
+        'ExhibitionEvent'
+    ];
+
+    public const EVENT_STATUSES = [
+        'EventScheduled',
+        'EventPostponed',
+        'EventCancelled',
+        'EventRescheduled'
+    ];
+
+    public const PERFORMER_TYPES = [
+        'Person',
+        'PerformingGroup',
+        'MusicGroup'
+    ];
+
+    public const ORGANIZER_TYPES = [
+        'Person',
+        'Organization'
+    ];
+
+    public const OFFER_AVAILABILITY = [
+        'InStock',
+        'SoldOut',
+        'PreOrder'
+    ];
+
+    private const CORE_FIELDS = [
+        'title' => [
+            'type' => 'string',
+            'required' => true,
+            'description' => 'Event title should be direct and descriptive (event name, performer) but exclude dates',
+            'schema_property' => 'name'
+        ],
+        'startDate' => [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'Event start date (YYYY-MM-DD format)',
+            'schema_property' => 'startDate'
+        ],
+        'endDate' => [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'Event end date (YYYY-MM-DD format)',
+            'schema_property' => 'endDate'
+        ],
+        'startTime' => [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'Event start time (HH:MM 24-hour format)',
+            'schema_property' => null
+        ],
+        'endTime' => [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'Event end time (HH:MM 24-hour format)',
+            'schema_property' => null
+        ],
+        'description' => [
+            'type' => 'string',
+            'required' => true,
+            'description' => 'Generate an engaging, informative HTML description. Use <p> tags for paragraphs, <strong> for emphasis. Focus on what makes this event unique and what attendees can expect.',
+            'schema_property' => 'description'
+        ]
+    ];
+
+    private const OFFER_FIELDS = [
+        'price' => [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'Ticket price (e.g., "$25" or "$20 adv / $25 door")',
+            'schema_property' => 'offers.price'
+        ],
+        'priceCurrency' => [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'ISO 4217 currency code (USD, EUR, GBP, etc.)',
+            'schema_property' => 'offers.priceCurrency',
+            'default' => 'USD'
+        ],
+        'ticketUrl' => [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'URL to purchase tickets',
+            'schema_property' => 'offers.url'
+        ],
+        'offerAvailability' => [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'Ticket availability status',
+            'schema_property' => 'offers.availability',
+            'enum' => ['InStock', 'SoldOut', 'PreOrder'],
+            'default' => 'InStock'
+        ],
+        'validFrom' => [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'Date and time when tickets go on sale (ISO-8601 format)',
+            'schema_property' => 'offers.validFrom'
+        ]
+    ];
+
+    private const PERFORMER_FIELDS = [
+        'performer' => [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'Name of the performing artist, band, comedian, or group',
+            'schema_property' => 'performer.name'
+        ],
+        'performerType' => [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'Type of performer: Person for solo artists, PerformingGroup for bands',
+            'schema_property' => 'performer.@type',
+            'enum' => ['Person', 'PerformingGroup', 'MusicGroup'],
+            'default' => 'PerformingGroup'
+        ]
+    ];
+
+    private const ORGANIZER_FIELDS = [
+        'organizer' => [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'Name of the event organizer or promoter',
+            'schema_property' => 'organizer.name'
+        ],
+        'organizerType' => [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'Type of organizer: Person or Organization',
+            'schema_property' => 'organizer.@type',
+            'enum' => ['Person', 'Organization'],
+            'default' => 'Organization'
+        ],
+        'organizerUrl' => [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'Website URL of the event organizer',
+            'schema_property' => 'organizer.url'
+        ]
+    ];
+
+    private const STATUS_FIELDS = [
+        'eventStatus' => [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'Event status for scheduling changes',
+            'schema_property' => 'eventStatus',
+            'enum' => ['EventScheduled', 'EventPostponed', 'EventCancelled', 'EventRescheduled'],
+            'default' => 'EventScheduled'
+        ],
+        'previousStartDate' => [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'Original start date if event was rescheduled (YYYY-MM-DD format)',
+            'schema_property' => 'previousStartDate'
+        ]
+    ];
+
+    private const TYPE_FIELDS = [
+        'eventType' => [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'Type of event for rich result categorization (MusicEvent, Festival, ComedyEvent, etc.)',
+            'schema_property' => '@type',
+            'enum' => ['Event', 'MusicEvent', 'Festival', 'ComedyEvent', 'DanceEvent', 'TheaterEvent', 'SportsEvent', 'ExhibitionEvent'],
+            'default' => 'Event'
+        ]
+    ];
+
+    public static function getAllFields(): array {
+        return array_merge(
+            self::CORE_FIELDS,
+            self::OFFER_FIELDS,
+            self::PERFORMER_FIELDS,
+            self::ORGANIZER_FIELDS,
+            self::STATUS_FIELDS,
+            self::TYPE_FIELDS
+        );
+    }
+
+    public static function getCoreToolParameters(): array {
+        return self::fieldsToToolParameters(self::CORE_FIELDS);
+    }
+
+    public static function getSchemaToolParameters(): array {
+        $schema_fields = array_merge(
+            self::OFFER_FIELDS,
+            self::PERFORMER_FIELDS,
+            self::ORGANIZER_FIELDS,
+            self::STATUS_FIELDS,
+            self::TYPE_FIELDS
+        );
+        return self::fieldsToToolParameters($schema_fields);
+    }
+
+    public static function getAllToolParameters(): array {
+        return self::fieldsToToolParameters(self::getAllFields());
+    }
+
+    public static function getFieldKeys(string $category = 'all'): array {
+        return match($category) {
+            'core' => array_keys(self::CORE_FIELDS),
+            'offer' => array_keys(self::OFFER_FIELDS),
+            'performer' => array_keys(self::PERFORMER_FIELDS),
+            'organizer' => array_keys(self::ORGANIZER_FIELDS),
+            'status' => array_keys(self::STATUS_FIELDS),
+            'type' => array_keys(self::TYPE_FIELDS),
+            default => array_keys(self::getAllFields())
+        };
+    }
+
+    public static function getDefaults(): array {
+        $defaults = [];
+        foreach (self::getAllFields() as $key => $field) {
+            $defaults[$key] = $field['default'] ?? '';
+        }
+        return $defaults;
+    }
+
+    public static function getSchemaPropertyMap(): array {
+        $map = [];
+        foreach (self::getAllFields() as $key => $field) {
+            if (!empty($field['schema_property'])) {
+                $map[$key] = $field['schema_property'];
+            }
+        }
+        return $map;
+    }
+
+    public static function extractFromParameters(array $parameters): array {
+        $event_data = [];
+        $field_keys = self::getFieldKeys();
+
+        foreach ($field_keys as $key) {
+            if (isset($parameters[$key])) {
+                $event_data[$key] = $parameters[$key];
+            }
+        }
+
+        return $event_data;
+    }
+
+    public static function engineOrTool(array $parameters, array $handler_config, array $engine_data = []): array {
+        $engine_params = [];
+        $tool_params = [];
+
+        $event_fields = self::getFieldKeys();
+        $venue_fields = VenueParameterProvider::getParameterKeys();
+
+        foreach ($event_fields as $field) {
+            if ($field === 'description') {
+                $tool_params[] = $field;
+                continue;
+            }
+
+            if (!empty($engine_data[$field])) {
+                $engine_params[$field] = $engine_data[$field];
+            } elseif (!empty($handler_config[$field])) {
+                $engine_params[$field] = $handler_config[$field];
+            } else {
+                $tool_params[] = $field;
+            }
+        }
+
+        foreach ($venue_fields as $field) {
+            if (!empty($engine_data[$field])) {
+                $engine_params[$field] = $engine_data[$field];
+            } elseif (!empty($handler_config[$field])) {
+                $engine_params[$field] = $handler_config[$field];
+            }
+        }
+
+        return [
+            'engine' => $engine_params,
+            'tool' => $tool_params
+        ];
+    }
+
+    private static function fieldsToToolParameters(array $fields): array {
+        $params = [];
+
+        foreach ($fields as $key => $field) {
+            $param = [
+                'type' => $field['type'],
+                'required' => $field['required'] ?? false,
+                'description' => $field['description']
+            ];
+
+            if (!empty($field['enum'])) {
+                $param['enum'] = $field['enum'];
+            }
+
+            $params[$key] = $param;
+        }
+
+        return $params;
+    }
+
+    public static function generateSchemaOrg(array $event_data, array $venue_data, int $post_id): array {
+        $event_type = $event_data['eventType'] ?? 'Event';
+
+        $schema = [
+            '@context' => 'https://schema.org',
+            '@type' => $event_type,
+            'name' => get_the_title($post_id),
+        ];
+
+        if (!empty($event_data['startDate'])) {
+            $start_time = !empty($event_data['startTime']) ? 'T' . $event_data['startTime'] : '';
+            $schema['startDate'] = $event_data['startDate'] . $start_time;
+        }
+
+        if (!empty($event_data['endDate'])) {
+            $end_time = !empty($event_data['endTime']) ? 'T' . $event_data['endTime'] : '';
+            $schema['endDate'] = $event_data['endDate'] . $end_time;
+        }
+
+        if (!empty($event_data['description'])) {
+            $schema['description'] = wp_strip_all_tags($event_data['description']);
+        }
+
+        $location = self::buildLocationSchema($venue_data, $event_data);
+        if (!empty($location)) {
+            $schema['location'] = $location;
+        }
+
+        if (!empty($event_data['performer'])) {
+            $schema['performer'] = [
+                '@type' => $event_data['performerType'] ?? 'PerformingGroup',
+                'name' => $event_data['performer']
+            ];
+        }
+
+        if (!empty($event_data['organizer'])) {
+            $schema['organizer'] = [
+                '@type' => $event_data['organizerType'] ?? 'Organization',
+                'name' => $event_data['organizer']
+            ];
+            if (!empty($event_data['organizerUrl'])) {
+                $schema['organizer']['url'] = $event_data['organizerUrl'];
+            }
+        }
+
+        $images = self::buildImageArray($post_id);
+        if (!empty($images)) {
+            $schema['image'] = $images;
+        }
+
+        if (!empty($event_data['ticketUrl']) || !empty($event_data['price'])) {
+            $schema['offers'] = self::buildOffersSchema($event_data);
+        }
+
+        $status = $event_data['eventStatus'] ?? 'EventScheduled';
+        $schema['eventStatus'] = 'https://schema.org/' . $status;
+
+        if ($status === 'EventRescheduled' && !empty($event_data['previousStartDate'])) {
+            $schema['previousStartDate'] = $event_data['previousStartDate'];
+        }
+
+        return $schema;
+    }
+
+    private static function buildLocationSchema(array $venue_data, array $event_data): array {
+        $venue_name = $venue_data['name'] ?? $event_data['venue'] ?? '';
+
+        if (empty($venue_name)) {
+            return [];
+        }
+
+        $location = [
+            '@type' => 'Place',
+            'name' => $venue_name
+        ];
+
+        $address = ['@type' => 'PostalAddress'];
+        $address_fields = [
+            'streetAddress' => $venue_data['address'] ?? $event_data['venueAddress'] ?? '',
+            'addressLocality' => $venue_data['city'] ?? $event_data['venueCity'] ?? '',
+            'addressRegion' => $venue_data['state'] ?? $event_data['venueState'] ?? '',
+            'postalCode' => $venue_data['zip'] ?? $event_data['venueZip'] ?? '',
+            'addressCountry' => $venue_data['country'] ?? $event_data['venueCountry'] ?? 'US'
+        ];
+
+        $has_address = false;
+        foreach ($address_fields as $key => $value) {
+            if (!empty($value)) {
+                $address[$key] = $value;
+                $has_address = true;
+            }
+        }
+
+        if ($has_address) {
+            $location['address'] = $address;
+        }
+
+        $phone = $venue_data['phone'] ?? $event_data['venuePhone'] ?? '';
+        if (!empty($phone)) {
+            $location['telephone'] = $phone;
+        }
+
+        $website = $venue_data['website'] ?? $event_data['venueWebsite'] ?? '';
+        if (!empty($website)) {
+            $location['url'] = $website;
+        }
+
+        $coordinates = $venue_data['coordinates'] ?? $event_data['venueCoordinates'] ?? '';
+        if (!empty($coordinates)) {
+            $coords = explode(',', $coordinates);
+            if (count($coords) === 2) {
+                $location['geo'] = [
+                    '@type' => 'GeoCoordinates',
+                    'latitude' => trim($coords[0]),
+                    'longitude' => trim($coords[1])
+                ];
+            }
+        }
+
+        return $location;
+    }
+
+    private static function buildOffersSchema(array $event_data): array {
+        $offers = ['@type' => 'Offer'];
+
+        if (!empty($event_data['ticketUrl'])) {
+            $offers['url'] = $event_data['ticketUrl'];
+        }
+
+        $availability = $event_data['offerAvailability'] ?? 'InStock';
+        $offers['availability'] = 'https://schema.org/' . $availability;
+
+        if (!empty($event_data['price'])) {
+            $numeric_price = preg_replace('/[^0-9.]/', '', $event_data['price']);
+            if ($numeric_price) {
+                $offers['price'] = floatval($numeric_price);
+                $offers['priceCurrency'] = $event_data['priceCurrency'] ?? 'USD';
+            }
+        }
+
+        if (!empty($event_data['validFrom'])) {
+            $offers['validFrom'] = $event_data['validFrom'];
+        }
+
+        return $offers;
+    }
+
+    private static function buildImageArray(int $post_id): array {
+        $images = [];
+        $featured_image_id = get_post_thumbnail_id($post_id);
+
+        if (!$featured_image_id) {
+            return $images;
+        }
+
+        $sizes = ['full', 'large', 'medium_large'];
+        foreach ($sizes as $size) {
+            $url = wp_get_attachment_image_url($featured_image_id, $size);
+            if ($url && !in_array($url, $images)) {
+                $images[] = $url;
+            }
+        }
+
+        return $images;
+    }
+}

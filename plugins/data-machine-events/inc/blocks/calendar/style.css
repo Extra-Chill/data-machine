@@ -190,12 +190,12 @@
     width: var(--datamachine-grid-cell-width);
     height: var(--datamachine-grid-cell-height);
     padding: var(--datamachine-card-padding);
-    border: 1px solid var(--datamachine-border-light);
+    border: 2px solid var(--datamachine-border-default);
     border-radius: var(--datamachine-border-radius);
     background: transparent;
     transition: var(--datamachine-card-transition);
     position: relative;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     display: flex;
     flex-direction: column;
     justify-content: space-between;

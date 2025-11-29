@@ -5,6 +5,68 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.5] - 2025-11-28
+
+### Added
+- **EventSchemaProvider** - Centralized event schema provider for AI tools and Schema.org JSON-LD
+  - Comprehensive field definitions for all event properties (core, offer, performer, organizer, status, type)
+  - Smart parameter routing between engine data and AI tool parameters
+  - Schema.org JSON-LD generation with venue integration
+  - Single source of truth for event field schemas
+
+- **VenueParameterProvider** - Dynamic venue parameter generation for AI tool definitions
+  - Provides venue field parameters when no static venue is configured
+  - Maps tool parameters to Venue_Taxonomy meta field keys
+  - Extracts venue data from AI tool parameters and event data
+
+- **Pipeline Components JavaScript** - Custom React field components for Data Machine pipeline modals
+  - Venue autocomplete with OpenStreetMap Nominatim integration
+  - Pipeline hooks for extending core React behavior
+  - Native WordPress hooks pattern in JavaScript
+
+- **Geocoding Integration** - Automatic venue coordinate lookup using OpenStreetMap Nominatim
+  - Triggers on venue address updates
+  - Stores latitude/longitude for map display
+  - Uses proper user agent for API requests
+
+### Changed
+- **Event Upsert Architecture** - Refactored to use centralized schema and venue providers
+  - EventUpsert.php now imports EventSchemaProvider and VenueParameterProvider
+  - Cleaner separation between event data and venue data handling
+  - Improved parameter routing with engineOrTool() method
+
+- **Event Import Handler** - Simplified venue metadata extraction using VenueParameterProvider
+  - Removed hardcoded venue field arrays
+  - Uses VenueParameterProvider::extractFromEventData() and stripFromEventData()
+  - More maintainable and consistent venue handling across all handlers
+
+- **Event DateTime Storage** - Enhanced end datetime calculation and storage
+  - Added EVENT_END_DATETIME_META_KEY constant
+  - Calculates end datetime: explicit end date/time, or start + 3 hours default
+  - Stores both start and end datetime meta for better event filtering
+
+- **Calendar Query Logic** - Updated to use end datetime for accurate event filtering
+  - Past/upcoming queries now use EVENT_END_DATETIME_META_KEY
+  - Better handling of multi-day events and event duration
+  - More accurate "show past events" and date range filtering
+
+- **Venue Taxonomy** - Added smart geocoding on address updates
+  - Automatically looks up coordinates when address fields are populated
+  - Only geocodes when address components change
+  - Integrates with existing venue creation/update workflow
+
+### Removed
+- **Legacy Schema Class** - Deleted Schema.php from Upsert/Events directory
+  - Functionality replaced by comprehensive EventSchemaProvider
+  - Removed engine_or_tool() method in favor of EventSchemaProvider::engineOrTool()
+  - Cleaner architecture with single schema provider
+
+### Technical Improvements
+- **Code Deduplication** - Eliminated repeated venue field definitions
+- **Better Separation of Concerns** - Schema, venue, and event logic properly separated
+- **Enhanced AI Integration** - More sophisticated parameter routing for AI tools
+- **Improved Event Filtering** - Better handling of event duration and end times
+
 ## [0.4.4] - 2025-11-28
 
 ### Added

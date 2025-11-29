@@ -69,12 +69,12 @@
         field.autocompleteContainer = container;
 
         // Get dependent field names from data attributes
+        // Note: coords no longer used - geocoding handled on backend
         field.dependentFields = {
             city: field.getAttribute('data-city-field'),
             state: field.getAttribute('data-state-field'),
             zip: field.getAttribute('data-zip-field'),
-            country: field.getAttribute('data-country-field'),
-            coords: field.getAttribute('data-coords-field')
+            country: field.getAttribute('data-country-field')
         };
 
         // Add event listeners
@@ -288,11 +288,7 @@
             setFieldValue(deps.country, countryValue);
         }
 
-        // Populate coordinates
-        if (deps.coords) {
-            const coordsValue = place.lat && place.lon ? `${place.lat},${place.lon}` : '';
-            setFieldValue(deps.coords, coordsValue);
-        }
+        // Note: Coordinates are handled via backend geocoding when venue is saved
 
         closeDropdown();
     }

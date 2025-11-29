@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.4.4
+**Version**: 0.4.5
 
 ## Migration Status
 
@@ -25,9 +25,9 @@ Technical guidance for Claude Code when working with the **Data Machine Events**
 - **`WordPressPublishHelper`** - Image attachment and publishing utilities (v0.2.7+)
 
 ### Handler Discovery System
-- **Registry-based Loading**: Handlers registered via `datamachine_handlers` filter
+- **Registry-based Loading**: Handlers register via `HandlerRegistrationTrait::registerHandler()` in constructors
 - **Automatic Instantiation**: Framework handles handler creation and execution
-- **Dual Architecture Support**: Supports both new FetchHandler-based and legacy execute-based handlers
+- **Trait-based Registration**: All handlers use `HandlerRegistrationTrait` for self-registration
 
 ### Venue Taxonomy Integration
 - **Custom TaxonomyHandler**: Specialized venue taxonomy processing
@@ -90,8 +90,9 @@ npm run lint:js && npm run lint:css             # Linting
 - `Steps\EventImport\Handlers\GoogleCalendar\GoogleCalendarUtils` - Calendar ID/URL utilities and ICS generation
 - `Steps\EventImport\Handlers\SpotHopper\SpotHopper` - SpotHopper venue events integration
 - `Steps\EventImport\Handlers\WebScraper\UniversalWebScraper` - AI-powered web scraping
-- `Steps\EventImport\Handlers\WordPressEventsAPI\WordPressEventsAPI` - External WordPress events via REST API (Tribe Events, etc.)
-- `Steps\EventImport\Handlers\EventFlyer\EventFlyer` - AI vision extraction from flyer/poster images
+- `Steps\EventImport\Handlers\WordPressEventsAPI\WordPressEventsAPI` - External WordPress events via REST API with auto-format detection (Tribe Events v1, Tribe WP REST, generic WordPress)
+- `Steps\EventImport\Handlers\EventFlyer\EventFlyer` - AI vision extraction from flyer/poster images with "fill OR AI extracts" field pattern
+- `Steps\EventImport\Handlers\Eventbrite\Eventbrite` - Eventbrite organizer page JSON-LD parsing (no API key required)
 - `Steps\Upsert\Events\EventUpsertSettings` - Configuration management for Event Upsert handler (v0.2.5+)
 - `Utilities\EventIdentifierGenerator` - Shared event identifier normalization utility
 - `Api\Controllers\Calendar` - Calendar REST endpoint controller
@@ -151,14 +152,19 @@ datamachine-events/
 │   │   └── Controllers/                        # Calendar, Venues, Events controllers
 │   ├── Blocks/
 │   │   ├── Calendar/                           # Events display (webpack)
+│   │   │   ├── src/
+│   │   │   │   ├── modules/                    # ES modules for frontend
+│   │   │   │   │   ├── api-client.js           # REST API communication
+│   │   │   │   │   ├── carousel.js             # Carousel overflow, dots, chevrons
+│   │   │   │   │   ├── date-picker.js          # Flatpickr integration
+│   │   │   │   │   ├── filter-modal.js         # Taxonomy filter modal
+│   │   │   │   │   ├── navigation.js           # Past/upcoming navigation
+│   │   │   │   │   └── state.js                # URL state management
+│   │   │   │   ├── flatpickr-theme.css         # Date picker theming
+│   │   │   │   └── frontend.js                 # Module orchestration (93 lines)
 │   │   │   ├── Template_Loader.php             # Template loading system
 │   │   │   ├── Taxonomy_Helper.php             # Taxonomy data processing
-│   │   │   ├── DisplayStyles/                  # Display styling
-│   │   │   │   └── CarouselList/               # Carousel List display (CSS-only)
-│   │   │   │       └── carousel-list.css       # Horizontal scroll styles
 │   │   │   ├── Taxonomy_Badges.php             # Dynamic badge rendering
-│   │   │   ├── Taxonomy_Helper.php             # Taxonomy data processing
-│   │   │   ├── Template_Loader.php             # Template loading system
 │   │   │   ├── Pagination.php                  # Calendar pagination logic
 │   │   │   └── templates/                      # 7 specialized templates + modal subdirectory
 │   │   ├── EventDetails/                       # Event data storage (webpack + @wordpress/scripts)
@@ -170,17 +176,18 @@ datamachine-events/
 │   │   └── meta-storage.php                    # Event metadata sync
 │   ├── steps/
 │   │   ├── EventImport/                        # Event import step and handlers
-│   │   │   ├── Handlers/                       # Import handlers (Ticketmaster, DiceFm, GoogleCalendar, WebScraper)
+│   │   │   ├── Handlers/                       # Import handlers (8 total)
 │   │   │   │   ├── Ticketmaster/               # Ticketmaster Discovery API
 │   │   │   │   ├── DiceFm/                     # Dice FM integration
-│   │   │   │   ├── GoogleCalendar/              # Google Calendar integration
-│   │   │   │   │   ├── GoogleCalendarUtils.php  # Calendar ID/URL utilities
-│   │   │   │   │   └── GoogleCalendarAuth.php   # Authentication handling
+│   │   │   │   ├── GoogleCalendar/             # Google Calendar integration
+│   │   │   │   │   ├── GoogleCalendarUtils.php # Calendar ID/URL utilities
+│   │   │   │   │   └── GoogleCalendarAuth.php  # Authentication handling
 │   │   │   │   ├── SpotHopper/                 # SpotHopper venue events
 │   │   │   │   ├── WebScraper/                 # AI-powered web scraping
-│   │   │   │   ├── WordPressEventsAPI/         # External WordPress events (Tribe Events, etc.)
-│   │   │   │   └── EventFlyer/                 # AI vision extraction from flyer images
-│   │   │   ├── EventImportStep.php              # Pipeline step with handler discovery
+│   │   │   │   ├── WordPressEventsAPI/         # External WordPress events (auto-format detection)
+│   │   │   │   ├── EventFlyer/                 # AI vision extraction from flyer images
+│   │   │   │   └── Eventbrite/                 # Eventbrite JSON-LD parsing
+│   │   │   ├── EventImportStep.php             # Pipeline step with handler discovery
 │   │   │   └── EventImportHandler.php          # Abstract base for import handlers
 │   │   └── Upsert/Events/                      # EventUpsert handler for create/update operations
 │   │       ├── EventUpsert.php                 # Intelligent create/update handler
@@ -248,17 +255,19 @@ datamachine-events/
 ## Data Machine Integration
 
 ### Handler Discovery System
-- **Registry-based Loading**: Handlers registered via `datamachine_handlers` filter
+- **Registry-based Loading**: Handlers register via `HandlerRegistrationTrait::registerHandler()` in constructors
 - **Automatic Instantiation**: Framework handles handler creation and execution
-- **Dual Architecture Support**: Supports both FetchHandler-based and legacy execute-based handlers
+- **Trait-based Registration**: All handlers use `HandlerRegistrationTrait` for self-registration
 
-### Import Handlers
+### Import Handlers (8 Total)
 - **Ticketmaster**: Discovery API with API key authentication, uses EventIdentifierGenerator for consistent event identity
 - **Dice FM**: Event integration with EventIdentifierGenerator normalization
 - **SpotHopper**: SpotHopper venue events with full venue metadata extraction
 - **UniversalWebScraper**: AI-powered HTML section extraction with HTML hash tracking (ProcessedItems)
-- **WordPressEventsAPI**: External WordPress events via REST API with Tribe Events Calendar support and auto-format detection
+- **WordPressEventsAPI**: External WordPress events via REST API with auto-format detection (Tribe Events v1, Tribe WP REST, generic WordPress)
 - **EventFlyer**: AI vision extraction from flyer/poster images with "fill OR AI extracts" field pattern
+- **Eventbrite**: Schema.org JSON-LD parsing from public organizer pages (no API key required)
+- **GoogleCalendar**: Google Calendar API integration with calendar ID/URL resolution
 
 **Handler Pattern**: Single-item processing - return first eligible event immediately
 ```php
@@ -300,12 +309,14 @@ public function executeUpdate(array $parameters, array $handler_config): array {
 
 ### Schema Generation
 ```php
+use DataMachineEvents\Core\EventSchemaProvider;
+
 // Smart parameter routing for engine vs AI decisions
-$routing = Schema::engine_or_tool($event_data, $import_data);
+$routing = EventSchemaProvider::engineOrTool($parameters, $handler_config, $engine_data);
 // engine: ['startDate', 'venue', 'venueAddress'] - system parameters
 // tool: ['description', 'performer', 'organizer'] - AI inference parameters
 
-$schema = Schema::generate_event_schema($block_attributes, $venue_data, $post_id);
+$schema = EventSchemaProvider::generateSchemaOrg($event_data, $venue_data, $post_id);
 ```
 
 ### Event Identifier Normalization
@@ -466,5 +477,5 @@ Template_Loader::include_template('date-group', $group_data);
 
 ---
 
-**Version**: 0.4.4
+**Version**: 0.4.5
 **For ecosystem architecture, see root CLAUDE.md file**

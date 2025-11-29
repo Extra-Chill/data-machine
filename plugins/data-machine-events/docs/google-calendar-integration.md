@@ -75,10 +75,9 @@ $resolved_url = GoogleCalendarUtils::resolve_calendar_url($config);
 ## Integration Architecture
 
 ### Handler Structure
-- **GoogleCalendar.php**: Main import handler with event processing logic
+- **GoogleCalendar.php**: Main import handler with event processing logic and self-registration via `HandlerRegistrationTrait`
 - **GoogleCalendarAuth.php**: OAuth2 authentication and token management
 - **GoogleCalendarUtils.php**: Calendar ID/URL utilities and ICS generation
-- **GoogleCalendarFilters.php**: Handler registration and configuration
 - **GoogleCalendarSettings.php**: Admin interface and configuration forms
 
 ### Data Flow

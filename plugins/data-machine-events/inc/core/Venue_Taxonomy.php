@@ -15,6 +15,9 @@ if (!defined('ABSPATH')) {
  * Comprehensive venue taxonomy with 9 meta fields and admin UI
  */
 class Venue_Taxonomy {
+
+    private const NOMINATIM_API = 'https://nominatim.openstreetmap.org/search';
+    private const NOMINATIM_USER_AGENT = 'DataMachineEvents/1.0 (https://extrachill.com)';
     
     public static $meta_fields = [
         'address' => '_venue_address',
@@ -166,19 +169,27 @@ class Venue_Taxonomy {
      * @param array $venue_data New venue data
      */
     private static function smart_merge_venue_meta($term_id, $venue_data) {
+        $address_fields = ['address', 'city', 'state', 'zip', 'country'];
+        $address_updated = false;
+
         foreach (self::$meta_fields as $data_key => $meta_key) {
-            // Skip if we don't have new data for this field
             if (empty($venue_data[$data_key])) {
                 continue;
             }
 
-            // Check existing value
             $existing_value = get_term_meta($term_id, $meta_key, true);
 
-            // Only update if existing value is empty
             if (empty($existing_value)) {
                 update_term_meta($term_id, $meta_key, sanitize_text_field($venue_data[$data_key]));
+                
+                if (in_array($data_key, $address_fields, true)) {
+                    $address_updated = true;
+                }
             }
+        }
+
+        if ($address_updated) {
+            self::maybe_geocode_venue($term_id);
         }
     }
 
@@ -187,6 +198,7 @@ class Venue_Taxonomy {
      *
      * Supports selective updates - only updates fields present in $venue_data array.
      * This allows updating only changed fields without overwriting unchanged ones.
+     * Automatically geocodes address to coordinates if address fields are updated.
      *
      * @param int $term_id Venue term ID
      * @param array $venue_data Venue data array (can contain subset of fields)
@@ -200,12 +212,111 @@ class Venue_Taxonomy {
         // Only update fields present in $venue_data array
         foreach (self::$meta_fields as $data_key => $meta_key) {
             if (array_key_exists($data_key, $venue_data)) {
-                // Update even if empty (allows clearing fields)
                 update_term_meta($term_id, $meta_key, sanitize_text_field($venue_data[$data_key]));
             }
         }
 
+        // Geocode if address fields were updated and coordinates are empty
+        $address_fields = ['address', 'city', 'state', 'zip', 'country'];
+        $address_updated = !empty(array_intersect($address_fields, array_keys($venue_data)));
+        
+        if ($address_updated) {
+            self::maybe_geocode_venue($term_id);
+        }
+
         return true;
+    }
+
+    /**
+     * Geocode venue address if coordinates are missing
+     *
+     * @param int $term_id Venue term ID
+     * @return bool True if geocoding was performed, false otherwise
+     */
+    public static function maybe_geocode_venue($term_id) {
+        if (!$term_id) {
+            return false;
+        }
+
+        $existing_coords = get_term_meta($term_id, '_venue_coordinates', true);
+        if (!empty($existing_coords)) {
+            return false;
+        }
+
+        $venue_data = self::get_venue_data($term_id);
+        $coordinates = self::geocode_address($venue_data);
+
+        if ($coordinates) {
+            update_term_meta($term_id, '_venue_coordinates', $coordinates);
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Geocode an address using Nominatim API
+     *
+     * @param array $venue_data Venue data with address fields
+     * @return string|null Coordinates as "lat,lng" or null on failure
+     */
+    public static function geocode_address($venue_data) {
+        $query_parts = [];
+
+        if (!empty($venue_data['address'])) {
+            $query_parts[] = $venue_data['address'];
+        }
+        if (!empty($venue_data['city'])) {
+            $query_parts[] = $venue_data['city'];
+        }
+        if (!empty($venue_data['state'])) {
+            $query_parts[] = $venue_data['state'];
+        }
+        if (!empty($venue_data['zip'])) {
+            $query_parts[] = $venue_data['zip'];
+        }
+        if (!empty($venue_data['country'])) {
+            $query_parts[] = $venue_data['country'];
+        }
+
+        if (empty($query_parts)) {
+            return null;
+        }
+
+        $query = implode(', ', $query_parts);
+
+        $url = add_query_arg([
+            'format' => 'json',
+            'limit' => 1,
+            'q' => $query
+        ], self::NOMINATIM_API);
+
+        $response = wp_remote_get($url, [
+            'timeout' => 10,
+            'headers' => [
+                'User-Agent' => self::NOMINATIM_USER_AGENT
+            ]
+        ]);
+
+        if (is_wp_error($response)) {
+            error_log('DM Events Geocoding Error: ' . $response->get_error_message());
+            return null;
+        }
+
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+
+        if (empty($data) || !is_array($data) || empty($data[0])) {
+            return null;
+        }
+
+        $result = $data[0];
+
+        if (isset($result['lat']) && isset($result['lon'])) {
+            return $result['lat'] . ',' . $result['lon'];
+        }
+
+        return null;
     }
 
     /**

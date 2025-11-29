@@ -25,7 +25,7 @@
             return;
         }
 
-        // Define all venue metadata fields
+        // Define all venue metadata fields (coordinates handled via backend geocoding)
         venueFields = [
             'venue_name',
             'venue_address',
@@ -35,7 +35,6 @@
             'venue_country',
             'venue_phone',
             'venue_website',
-            'venue_coordinates',
             'venue_capacity'
         ];
 
@@ -142,7 +141,7 @@
     function populateVenueFields(venueData) {
         originalValues = {};
 
-        // Map of field names to data keys
+        // Map of field names to data keys (coordinates handled via backend geocoding)
         const fieldMapping = {
             'venue_name': 'name',
             'venue_address': 'address',
@@ -152,7 +151,6 @@
             'venue_country': 'country',
             'venue_phone': 'phone',
             'venue_website': 'website',
-            'venue_coordinates': 'coordinates',
             'venue_capacity': 'capacity'
         };
 

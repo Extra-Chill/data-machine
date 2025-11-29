@@ -2,7 +2,7 @@
 
 Frontend-focused WordPress events plugin with **block-first architecture**. Features AI-driven event creation via Data Machine integration, Event Details blocks with InnerBlocks for rich content editing, Calendar blocks for display, and comprehensive venue taxonomy management.
 
-**Version**: 0.4.1
+**Version**: 0.4.5
 
 ## Migration Showcase
 
@@ -52,7 +52,7 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 ### Usage
 1. **Plugin Settings:** Events → Settings → Configure archive behavior, search integration, and display preferences
 2. **Admin Navigation:** Events menu in WordPress admin bar for quick access to event management
-3. **Automated Import:** Configure Data Machine plugin for Ticketmaster Discovery API (API key), Dice FM, or universal web scraper imports
+3. **Automated Import:** Configure Data Machine plugin for Ticketmaster Discovery API, Dice FM, Eventbrite, WordPress Events API, Event Flyer, or universal web scraper imports
 4. **AI-Driven Publishing:** Data Machine AI creates events with descriptions, comprehensive venue creation, and taxonomy assignments
 5. **Manual Events:** Add Event post → Insert "Event Details" block → Fill event data
 6. **Display Events:** Add "Data Machine Events Calendar" block to any page/post
@@ -73,9 +73,16 @@ datamachine-events/
 │   │   └── Controllers/     # Calendar, Venues, Events controllers
 │   ├── Blocks/
 │   │   ├── Calendar/        # Calendar block (webpack) with modular template system
-│   │   │   ├── DisplayStyles/           # Display styling
-│   │   │   │   └── CarouselList/         # Carousel List display (CSS-only)
-│   │   │   │       └── carousel-list.css # Horizontal scroll styles
+│   │   │   ├── src/
+│   │   │   │   ├── modules/              # ES modules for frontend
+│   │   │   │   │   ├── api-client.js     # REST API communication
+│   │   │   │   │   ├── carousel.js       # Carousel overflow, dots, chevrons
+│   │   │   │   │   ├── date-picker.js    # Flatpickr integration
+│   │   │   │   │   ├── filter-modal.js   # Taxonomy filter modal
+│   │   │   │   │   ├── navigation.js     # Past/upcoming navigation
+│   │   │   │   │   └── state.js          # URL state management
+│   │   │   │   ├── flatpickr-theme.css   # Date picker theming
+│   │   │   │   └── frontend.js           # Module orchestration
 │   │   │   ├── Taxonomy_Badges.php       # Dynamic badge rendering
 │   │   │   ├── Taxonomy_Helper.php       # Taxonomy data processing
 │   │   │   ├── Template_Loader.php       # Template loading system
@@ -90,14 +97,18 @@ datamachine-events/
 │   │   └── meta-storage.php                    # Event metadata sync and management
 │   ├── steps/               # Data Machine integration
 │   │   ├── EventImport/     # Import handlers with single-item processing
-│   │   │   ├── Handlers/    # Import handlers (Ticketmaster, DiceFm, GoogleCalendar, WebScraper)
+│   │   │   ├── Handlers/    # Import handlers (8 total)
 │   │   │   │   ├── Ticketmaster/               # Ticketmaster Discovery API
 │   │   │   │   ├── DiceFm/                     # Dice FM integration
-│   │   │   │   ├── GoogleCalendar/              # Google Calendar integration
-│   │   │   │   │   ├── GoogleCalendarUtils.php  # Calendar ID/URL utilities
-│   │   │   │   │   └── GoogleCalendarAuth.php   # Authentication handling
-│   │   │   │   └── WebScraper/                 # AI-powered web scraping
-│   │   │   ├── EventImportStep.php              # Pipeline step with handler discovery
+│   │   │   │   ├── GoogleCalendar/             # Google Calendar integration
+│   │   │   │   │   ├── GoogleCalendarUtils.php # Calendar ID/URL utilities
+│   │   │   │   │   └── GoogleCalendarAuth.php  # Authentication handling
+│   │   │   │   ├── SpotHopper/                 # SpotHopper venue events
+│   │   │   │   ├── WebScraper/                 # AI-powered web scraping
+│   │   │   │   ├── WordPressEventsAPI/         # External WordPress events (auto-format detection)
+│   │   │   │   ├── EventFlyer/                 # AI vision extraction from flyer images
+│   │   │   │   └── Eventbrite/                 # Eventbrite JSON-LD parsing
+│   │   │   ├── EventImportStep.php             # Pipeline step with handler discovery
 │   │   │   └── EventImportHandler.php          # Abstract base for import handlers
 │   │   └── Upsert/Events/   # EventUpsert handler for create/update operations
 │   │       ├── EventUpsert.php
@@ -128,7 +139,7 @@ datamachine-events/
 
 **WordPress Version:** Tested up to 6.8
 
-**Data Machine Requirement:** Data Machine v0.2.10+ required for WordPressPublishHelper compatibility and EngineData architecture changes
+**Data Machine Requirement:** Data Machine v0.2.7+ required for WordPressPublishHelper compatibility and EngineData architecture changes
 
 **Setup:**
 ```bash
@@ -179,8 +190,10 @@ npm run lint:js && npm run lint:css
 
 **Google Event Schema Generation:**
 ```php
+use DataMachineEvents\Core\EventSchemaProvider;
+
 // Schema generates comprehensive structured data from block attributes
-$schema = Schema::generate_event_schema($block_attributes, $venue_data, $post_id);
+$schema = EventSchemaProvider::generateSchemaOrg($event_data, $venue_data, $post_id);
 echo '<script type="application/ld+json">' . wp_json_encode($schema) . '</script>';
 
 // Combines block data with venue taxonomy meta for complete SEO markup
@@ -190,10 +203,13 @@ echo '<script type="application/ld+json">' . wp_json_encode($schema) . '</script
 ## AI Integration
 
 **AI-Driven Event Creation Pipeline:**
-1. **Import Handlers:** Extract event data from APIs (Ticketmaster, Dice FM) or AI-powered universal web scrapers using single-item processing
+1. **Import Handlers:** Extract event data from 8 sources (Ticketmaster, Dice FM, Google Calendar, SpotHopper, Eventbrite, WordPress Events API, Event Flyer, Universal Web Scraper) using single-item processing
 2. **Event Identifier Normalization:** EventIdentifierGenerator creates consistent identifiers from (title, startDate, venue) for duplicate detection
 3. **Engine Data Persistence:** Event import handlers store venue/location/contact fields in engine data for downstream access
 4. **AI Web Scraping:** UniversalWebScraper uses AI to extract event data from HTML sections with automated processing
+5. **AI Vision Extraction:** EventFlyer uses vision AI to extract event details from promotional flyer/poster images with "fill OR AI extracts" pattern
+6. **Eventbrite Integration:** Schema.org JSON-LD parsing from public organizer pages (no API key required)
+7. **WordPress Integration:** WordPressEventsAPI imports events from external WordPress sites with auto-format detection (Tribe Events v1, Tribe WP REST, generic WordPress)
 5. **Intelligent Event Upsert:** EventUpsert handler searches for existing events by identity, performs field-by-field change detection
 6. **Venue Data Processing:** Venue_Taxonomy handles find-or-create operations with metadata validation
 7. **AI Content Generation:** AI generates event descriptions while preserving structured venue data

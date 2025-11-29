@@ -90,6 +90,14 @@
         "offerAvailability": {
             "type": "string",
             "default": "InStock"
+        },
+        "validFrom": {
+            "type": "string",
+            "default": ""
+        },
+        "eventType": {
+            "type": "string",
+            "default": "Event"
         }
     },
     "supports": {

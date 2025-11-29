@@ -16,8 +16,9 @@ namespace DataMachineEvents\Steps\Upsert\Events;
 
 use DataMachine\Core\EngineData;
 use DataMachineEvents\Steps\Upsert\Events\Venue;
-use DataMachineEvents\Steps\Upsert\Events\Schema;
 use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\VenueParameterProvider;
+use DataMachineEvents\Core\EventSchemaProvider;
 use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
 use DataMachine\Core\Steps\Update\Handlers\UpdateHandler;
 use DataMachine\Core\WordPress\TaxonomyHandler;
@@ -261,7 +262,7 @@ class EventUpsert extends UpdateHandler {
         $post_status = WordPressSettingsResolver::getPostStatus($handler_config);
         $post_author = WordPressSettingsResolver::getPostAuthor($handler_config);
 
-        $routing = Schema::engine_or_tool($parameters, $handler_config, $engine_parameters);
+        $routing = EventSchemaProvider::engineOrTool($parameters, $handler_config, $engine_parameters);
 
         $event_data = [
             'title' => sanitize_text_field($parameters['title']),
@@ -350,7 +351,7 @@ class EventUpsert extends UpdateHandler {
      * @param array $engine_parameters Extracted engine parameters
      */
     private function updateEventPost(int $post_id, array $parameters, array $handler_config, EngineData $engine, array $engine_parameters): void {
-        $routing = Schema::engine_or_tool($parameters, $handler_config, $engine_parameters);
+        $routing = EventSchemaProvider::engineOrTool($parameters, $handler_config, $engine_parameters);
 
         $event_data = [
             'title' => sanitize_text_field($parameters['title']),
@@ -415,17 +416,7 @@ class EventUpsert extends UpdateHandler {
         $venue_name = $parameters['venue'] ?? '';
 
         if (!empty($venue_name)) {
-            $venue_metadata = [
-                'address' => $this->getParameterValue($parameters, 'venueAddress'),
-                'city' => $this->getParameterValue($parameters, 'venueCity'),
-                'state' => $this->getParameterValue($parameters, 'venueState'),
-                'zip' => $this->getParameterValue($parameters, 'venueZip'),
-                'country' => $this->getParameterValue($parameters, 'venueCountry'),
-                'phone' => $this->getParameterValue($parameters, 'venuePhone'),
-                'website' => $this->getParameterValue($parameters, 'venueWebsite'),
-                'coordinates' => $this->getParameterValue($parameters, 'venueCoordinates'),
-                'capacity' => $this->getParameterValue($parameters, 'venueCapacity')
-            ];
+            $venue_metadata = VenueParameterProvider::extractFromParameters($parameters);
 
             $venue_result = \DataMachineEvents\Core\Venue_Taxonomy::find_or_create_venue($venue_name, $venue_metadata);
 

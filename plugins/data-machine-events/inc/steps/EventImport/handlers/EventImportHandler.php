@@ -9,6 +9,7 @@
 namespace DataMachineEvents\Steps\EventImport\Handlers;
 
 use DataMachine\Core\Steps\Fetch\Handlers\FetchHandler;
+use DataMachineEvents\Core\VenueParameterProvider;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -42,32 +43,14 @@ abstract class EventImportHandler extends FetchHandler {
     }
 
     /**
-     * @return array{venueAddress: string, venueCity: string, venueState: string, venueZip: string, venueCountry: string, venuePhone: string, venueWebsite: string, venueCoordinates: string}
+     * @return array Venue metadata extracted from event data
      */
     protected function extractVenueMetadata(array $event): array {
-        return [
-            'venueAddress' => $event['venueAddress'] ?? '',
-            'venueCity' => $event['venueCity'] ?? '',
-            'venueState' => $event['venueState'] ?? '',
-            'venueZip' => $event['venueZip'] ?? '',
-            'venueCountry' => $event['venueCountry'] ?? '',
-            'venuePhone' => $event['venuePhone'] ?? '',
-            'venueWebsite' => $event['venueWebsite'] ?? '',
-            'venueCoordinates' => $event['venueCoordinates'] ?? ''
-        ];
+        return VenueParameterProvider::extractFromEventData($event);
     }
 
     protected function stripVenueMetadataFromEvent(array &$event): void {
-        unset(
-            $event['venueAddress'],
-            $event['venueCity'],
-            $event['venueState'],
-            $event['venueZip'],
-            $event['venueCountry'],
-            $event['venuePhone'],
-            $event['venueWebsite'],
-            $event['venueCoordinates']
-        );
+        VenueParameterProvider::stripFromEventData($event);
     }
 
     /**

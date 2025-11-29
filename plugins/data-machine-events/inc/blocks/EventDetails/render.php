@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
 }
 
 use DataMachineEvents\Core\Venue_Taxonomy;
-use DataMachineEvents\Steps\Upsert\Events\Schema;
+use DataMachineEvents\Core\EventSchemaProvider;
 
 $decode_unicode = function($str) {
     return html_entity_decode(preg_replace('/\\\\u([0-9a-fA-F]{4})/', '&#x$1;', $str), ENT_NOQUOTES, 'UTF-8');
@@ -61,9 +61,8 @@ $block_class = implode(' ', $block_classes);
 
 $event_schema = null;
 if (!empty($start_date)) {
-    $engine_parameters = [];
-    
-    $event_schema = Schema::generate_event_schema($attributes, $venue_data, $post_id, $engine_parameters);
+    $event_data = array_merge($attributes, []);
+    $event_schema = EventSchemaProvider::generateSchemaOrg($event_data, $venue_data ?? [], $post_id);
 }
 ?>
 

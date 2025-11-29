@@ -4,7 +4,7 @@ Advanced event display with multiple view modes, filtering, and template system.
 
 ## Overview
 
-The Calendar block provides flexible event display with progressive enhancement, supporting both server-side rendering and JavaScript-enhanced filtering. Features multiple display styles and comprehensive taxonomy integration.
+The Calendar block provides flexible event display with progressive enhancement, supporting both server-side rendering and JavaScript-enhanced filtering. Features comprehensive taxonomy integration and a modular ES module architecture for frontend interactivity.
 
 ## Features
 
@@ -137,6 +137,38 @@ Pagination is rendered by the `Pagination` class (`Pagination.php`) with extensi
 - **Responsive Carousel**: Mobile-first horizontal scroll design
 - **Day Colors**: Automatic color generation for date badges
 - **Badge System**: Dynamic badge rendering with taxonomy colors
+
+## JavaScript Module Architecture
+
+The frontend JavaScript is organized into 6 focused ES modules for maintainability:
+
+### Module Structure
+- **frontend.js** (93 lines): Module orchestration and calendar initialization
+- **modules/api-client.js**: REST API communication and calendar DOM updates
+- **modules/carousel.js**: Carousel overflow detection, dot indicators, and chevron navigation
+- **modules/date-picker.js**: Flatpickr date range picker integration
+- **modules/filter-modal.js**: Taxonomy filter modal UI and accessibility
+- **modules/navigation.js**: Past/upcoming navigation and pagination link handling
+- **modules/state.js**: URL state management and query parameter building
+
+### Initialization Flow
+```javascript
+// frontend.js orchestrates module initialization
+document.querySelectorAll('.datamachine-events-calendar').forEach(initCalendarInstance);
+
+function initCalendarInstance(calendar) {
+    initCarousel(calendar);
+    initDatePicker(calendar, handleFilterChange);
+    initFilterModal(calendar, handleFilterChange, handleFilterChange);
+    initNavigation(calendar, handleNavigation);
+    initSearchInput(calendar);
+}
+```
+
+### CSS Theme Integration
+- **flatpickr-theme.css**: Date picker theming with design system integration
+- CSS custom properties from `root.css` for consistent styling
+- Dark mode support via CSS custom properties
 
 ## Developer Integration
 

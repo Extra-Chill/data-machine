@@ -71,19 +71,11 @@ class UniversalWebScraperSettings {
                 'required' => false,
             ],
             'venue_address' => [
-                'type' => 'text',
+                'type' => 'address-autocomplete',
                 'label' => __('Venue Address', 'datamachine-events'),
-                'description' => __('Leave blank to let AI extract venue address from page content. Start typing to see address suggestions.', 'datamachine-events'),
+                'description' => __('Type to search addresses. Selecting populates city, state, zip, and country.', 'datamachine-events'),
                 'placeholder' => '970 Morrison Drive',
                 'required' => false,
-                'attributes' => [
-                    'class' => 'venue-address-autocomplete',
-                    'data-city-field' => 'venue_city',
-                    'data-state-field' => 'venue_state',
-                    'data-zip-field' => 'venue_zip',
-                    'data-country-field' => 'venue_country',
-                    'data-coords-field' => 'venue_coordinates',
-                ],
             ],
             'venue_city' => [
                 'type' => 'text',
@@ -127,13 +119,6 @@ class UniversalWebScraperSettings {
                 'placeholder' => 'https://www.theroyalamerican.com',
                 'required' => false,
             ],
-            'venue_coordinates' => [
-                'type' => 'text',
-                'label' => __('Venue Coordinates', 'datamachine-events'),
-                'description' => __('Leave blank to let AI extract venue coordinates from page content. Format: latitude,longitude', 'datamachine-events'),
-                'placeholder' => '32.7900,-79.9400',
-                'required' => false,
-            ],
             'venue_capacity' => [
                 'type' => 'number',
                 'label' => __('Venue Capacity', 'datamachine-events'),
@@ -166,7 +151,6 @@ class UniversalWebScraperSettings {
             'venue_country' => sanitize_text_field($raw_settings['venue_country'] ?? ''),
             'venue_phone' => sanitize_text_field($raw_settings['venue_phone'] ?? ''),
             'venue_website' => esc_url_raw($raw_settings['venue_website'] ?? ''),
-            'venue_coordinates' => sanitize_text_field($raw_settings['venue_coordinates'] ?? ''),
             'venue_capacity' => !empty($raw_settings['venue_capacity']) ? absint($raw_settings['venue_capacity']) : ''
         ];
 
@@ -186,7 +170,7 @@ class UniversalWebScraperSettings {
     public static function save_settings(array $settings): array {
         $venue_term_id = $settings['venue'] ?? '';
 
-        // Collect venue metadata from form
+        // Collect venue metadata from form (coordinates handled via backend geocoding)
         $submitted_data = [
             'address' => $settings['venue_address'] ?? '',
             'city' => $settings['venue_city'] ?? '',
@@ -195,7 +179,6 @@ class UniversalWebScraperSettings {
             'country' => $settings['venue_country'] ?? '',
             'phone' => $settings['venue_phone'] ?? '',
             'website' => $settings['venue_website'] ?? '',
-            'coordinates' => $settings['venue_coordinates'] ?? '',
             'capacity' => $settings['venue_capacity'] ?? ''
         ];
 
@@ -238,7 +221,6 @@ class UniversalWebScraperSettings {
             $settings['venue_country'],
             $settings['venue_phone'],
             $settings['venue_website'],
-            $settings['venue_coordinates'],
             $settings['venue_capacity']
         );
 
@@ -272,7 +254,6 @@ class UniversalWebScraperSettings {
             'venue_country' => '',
             'venue_phone' => '',
             'venue_website' => '',
-            'venue_coordinates' => '',
             'venue_capacity' => ''
         ];
     }

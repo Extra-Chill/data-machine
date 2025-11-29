@@ -84,4 +84,22 @@ add_action('admin_enqueue_scripts', function() {
         array(),
         filemtime(DATAMACHINE_EVENTS_PLUGIN_DIR . 'assets/css/venue-autocomplete.css')
     );
+
+    // Enqueue pipeline hooks JavaScript (extends core React via @wordpress/hooks)
+    wp_enqueue_script(
+        'datamachine-events-pipeline-hooks',
+        DATAMACHINE_EVENTS_PLUGIN_URL . 'assets/js/pipeline-hooks.js',
+        array('datamachine-pipelines-react', 'wp-hooks', 'wp-api-fetch'),
+        filemtime(DATAMACHINE_EVENTS_PLUGIN_DIR . 'assets/js/pipeline-hooks.js'),
+        true
+    );
+
+    // Enqueue pipeline React components (custom field types like address-autocomplete)
+    wp_enqueue_script(
+        'datamachine-events-pipeline-components',
+        DATAMACHINE_EVENTS_PLUGIN_URL . 'assets/js/pipeline-components.js',
+        array('datamachine-pipelines-react', 'wp-element', 'wp-components', 'wp-hooks', 'wp-i18n'),
+        filemtime(DATAMACHINE_EVENTS_PLUGIN_DIR . 'assets/js/pipeline-components.js'),
+        true
+    );
 });

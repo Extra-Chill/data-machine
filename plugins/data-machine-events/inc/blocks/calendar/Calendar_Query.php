@@ -14,6 +14,7 @@ use WP_Query;
 use DateTime;
 use DataMachineEvents\Core\Event_Post_Type;
 use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
+use const DataMachineEvents\Core\EVENT_END_DATETIME_META_KEY;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -57,14 +58,14 @@ class Calendar_Query {
 
         if ($params['show_past'] && !$has_date_range) {
             $meta_query[] = [
-                'key' => EVENT_DATETIME_META_KEY,
+                'key' => EVENT_END_DATETIME_META_KEY,
                 'value' => $current_datetime,
                 'compare' => '<',
                 'type' => 'DATETIME',
             ];
         } elseif (!$params['show_past'] && !$has_date_range) {
             $meta_query[] = [
-                'key' => EVENT_DATETIME_META_KEY,
+                'key' => EVENT_END_DATETIME_META_KEY,
                 'value' => $current_datetime,
                 'compare' => '>=',
                 'type' => 'DATETIME',
@@ -134,7 +135,7 @@ class Calendar_Query {
             'posts_per_page' => 1,
             'meta_query' => [
                 [
-                    'key' => EVENT_DATETIME_META_KEY,
+                    'key' => EVENT_END_DATETIME_META_KEY,
                     'value' => $current_datetime,
                     'compare' => '>=',
                     'type' => 'DATETIME',
@@ -149,7 +150,7 @@ class Calendar_Query {
             'posts_per_page' => 1,
             'meta_query' => [
                 [
-                    'key' => EVENT_DATETIME_META_KEY,
+                    'key' => EVENT_END_DATETIME_META_KEY,
                     'value' => $current_datetime,
                     'compare' => '<',
                     'type' => 'DATETIME',
@@ -295,7 +296,7 @@ class Calendar_Query {
             'venue_name' => self::decode_unicode($event_data['venue'] ?? ''),
             'performer_name' => self::decode_unicode($event_data['performer'] ?? ''),
             'iso_start_date' => $iso_start_date,
-            'show_performer' => $event_data['showPerformer'] ?? true,
+            'show_performer' => false, // Always hide performer in calendar display
             'show_price' => $event_data['showPrice'] ?? true,
             'show_ticket_link' => $event_data['showTicketLink'] ?? true,
         ];

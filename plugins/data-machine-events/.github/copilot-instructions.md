@@ -2,12 +2,13 @@
 
 ## Architecture Snapshot
 - Block-first data flow lives in `datamachine-events.php`: Event Details block → `_datamachine_event_datetime` meta (`inc/Core/meta-storage.php`) → Calendar templates (`inc/Blocks/Calendar/templates`) → theme's `single.php` template.
-- All PHP classes sit under the `DataMachineEvents\` namespace with Composer PSR-4 autoloading; never require class files manually unless they are non-class helpers (see handler `*Filters.php`).
+- All PHP classes sit under the `DataMachineEvents\` namespace with Composer PSR-4 autoloading; never require class files manually.
 - Calendar rendering is centralized through `DataMachineEvents\Blocks\Calendar\Template_Loader`; extend output by adding/including templates there instead of echoing HTML inline.
-- Root design tokens in `inc/blocks/root.css` are consumed by both CSS and JS (circuit grid sizing, badge colors) so update variables there before tweaking individual block styles.
+- Root design tokens in `inc/blocks/root.css` are consumed by both CSS and JS (grid sizing, badge colors) so update variables there before tweaking individual block styles.
 
 ## Data Machine Integration
-- Custom pipeline pieces register via filters in `inc/Steps/EventImport/EventImportFilters.php` and `inc/Steps/Upsert/Events/EventUpsertFilters.php` (`datamachine_step_types`, `datamachine_handlers`); follow that pattern when adding handlers or step types.
+- Import handlers use `HandlerRegistrationTrait` for self-registration via `registerHandler()` in constructors (no separate `*Filters.php` files needed).
+- Handler registration happens in `inc/Steps/Upsert/Events/EventUpsertFilters.php` for EventUpsert and directly in each handler constructor for import handlers.
 - Import handlers (e.g., `Steps/EventImport/Handlers/Ticketmaster/Ticketmaster.php`) must single-item process, use `EventIdentifierGenerator::generate()` for consistent event identity, call `isItemProcessed`/`markItemProcessed`, and return a DataPacket array.
 - EventUpsert logic lives in `Steps/Upsert/Events/EventUpsert.php`: it extends the core `UpdateHandler`, searches for existing events by (title, venue, startDate), performs field-by-field change detection, generates Event Details block markup, and syncs venues via `Core\Venue_Taxonomy::find_or_create_venue`.
 - Event identity normalization uses `Utilities\EventIdentifierGenerator::generate($title, $startDate, $venue)` across all import handlers for consistent duplicate detection (lowercase, trim, collapse whitespace, remove articles).
@@ -15,7 +16,7 @@
 
 ## REST + Frontend Behavior
 - Public endpoints live in `inc/Api/Routes.php` and `inc/Api/Controllers/` under the unified `datamachine/v1` namespace: `/events/calendar`, `/events/venues/{id}`, `/events/venues/check-duplicate`. Keep new endpoints in this namespace and reuse existing arg sanitizers.
-- Calendar frontend (`inc/blocks/calendar/src/frontend.js`) progressively enhances server-rendered markup: debounced search, flatpickr date ranges, taxonomy modal, History API updates, and rehydrates DisplayStyles (CircuitGrid/Carousel). Any new UI must update both the server template + JS refresh path.
+- Calendar frontend uses modular ES architecture with 6 focused modules in `inc/Blocks/Calendar/src/modules/`: `api-client.js` (REST API communication), `carousel.js` (overflow, dots, chevrons), `date-picker.js` (Flatpickr integration), `filter-modal.js` (taxonomy filter modal), `navigation.js` (past/upcoming navigation), `state.js` (URL state management). The orchestration file `frontend.js` (93 lines) ties them together. Any new UI must update both the server template + JS refresh path.
 - Event Details block view (`inc/blocks/EventDetails/render.php`) is server-rendered; JS enhancements such as Leaflet maps live in `assets/js/venue-map.js` and respect `Settings_Page::get_map_display_type()` (five free tile layers, 📍 emoji marker). Trigger `jQuery(document).trigger('datamachine-events-loaded')` after injecting events so maps re-init.
 
 ## WordPress Conventions
@@ -32,6 +33,6 @@
 ## Practical Tips
 - Keep hooks/functions prefixed `datamachine_`/`datamachine_events` to honor the completed prefix migration.
 - When touching REST responses, remember the calendar endpoint returns rendered HTML chunks (`html`, `pagination`, `navigation`, `counter`); update both PHP templates and corresponding DOM swap logic.
-- Use `assets/js/venue-autocomplete.js` + `venue-selector.js` (enqueued via `admin_enqueue_scripts` in `EventImportFilters.php`) for admin UX; don't reinvent venue lookup widgets.
-- If you add new visual modes, drop CSS into `inc/blocks/calendar/style.css` or a `DisplayStyles/*Renderer.js` (integrate with ColorManager for consistent color handling) so the existing renderer import system can lazy-load it.
+- Use `assets/js/venue-autocomplete.js` + `venue-selector.js` for admin UX; don't reinvent venue lookup widgets.
+- If you add new visual modes, drop CSS into `inc/blocks/calendar/style.css` for consistent styling integration.
 - Always sanitize AI/tool input through the helpers in `EventUpsert` and core WordPress APIs; Schema + REST rely on sanitized dates/times to keep pagination accurate.
