@@ -5,6 +5,35 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.7] - 2025-11-29
+
+### Added
+- **Comprehensive Documentation** - Added 4 new detailed documentation files:
+  - `event-schema-provider.md` - Complete EventSchemaProvider API reference with examples
+  - `geocoding-integration.md` - OpenStreetMap Nominatim geocoding implementation guide
+  - `pipeline-components-js.md` - React field components for Data Machine pipeline modals
+  - `venue-parameter-provider.md` - Dynamic venue parameter generation documentation
+
+### Changed
+- **VenueParameterProvider Enhancement** - Improved engine data integration
+  - `getToolParameters()` now accepts engine data to avoid duplicate parameters
+  - Added `hasVenueData()` method to check both handler config and engine data
+  - Added `filterByEngineData()` to exclude parameters already present in engine data
+  - Deprecated `hasStaticVenue()` in favor of more comprehensive `hasVenueData()`
+
+- **EventUpsert Engine Data Precedence** - Engine data now takes priority over AI-provided values
+  - Event identity extraction (title, venue, startDate) uses engine data first
+  - Venue processing merges engine parameters with AI parameters (engine takes precedence)
+  - Improved parameter consistency between engine and AI data sources
+
+- **EventUpsertFilters Dynamic Tool Generation** - Enhanced AI tool registration
+  - `registerAITools()` now receives engine data snapshot for dynamic filtering
+  - Venue parameters are excluded from AI tool when already present in engine data
+  - More efficient AI tool generation with reduced parameter redundancy
+
+- **Admin Screen Detection Fix** - Corrected pipeline admin screen detection
+  - Changed from `datamachine` to `datamachine-pipelines` for accurate script loading
+
 ## [0.4.6] - 2025-11-29
 
 ### Added

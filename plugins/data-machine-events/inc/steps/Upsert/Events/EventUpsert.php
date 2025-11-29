@@ -61,10 +61,10 @@ class EventUpsert extends UpdateHandler {
 
         $engine_parameters = $this->extract_event_engine_parameters($engine);
 
-        // Extract event identity fields
+        // Extract event identity fields (engine data takes precedence over AI-provided values)
         $title = sanitize_text_field($parameters['title']);
-        $venue = $parameters['venue'] ?? '';
-        $startDate = $parameters['startDate'] ?? '';
+        $venue = $engine_parameters['venue'] ?? $parameters['venue'] ?? '';
+        $startDate = $engine_parameters['startDate'] ?? $parameters['startDate'] ?? '';
 
         $this->log('debug', 'Event Upsert: Processing event', [
             'title' => $title,
@@ -309,8 +309,8 @@ class EventUpsert extends UpdateHandler {
         // Process featured image
         $this->processEventFeaturedImage($post_id, $handler_config, $engine);
 
-        // Process venue
-        $this->processVenue($post_id, $parameters);
+        // Process venue (engine data takes precedence)
+        $this->processVenue($post_id, $parameters, $engine_parameters);
 
         // Map schema fields to taxonomies if not explicitly provided
         if (empty($parameters['artist']) && !empty($event_data['performer'])) {
@@ -391,8 +391,8 @@ class EventUpsert extends UpdateHandler {
         // Update featured image
         $this->processEventFeaturedImage($post_id, $handler_config, $engine);
 
-        // Update venue
-        $this->processVenue($post_id, $parameters);
+        // Update venue (engine data takes precedence)
+        $this->processVenue($post_id, $parameters, $engine_parameters);
 
         // Map schema fields to taxonomies if not explicitly provided
         if (empty($parameters['artist']) && !empty($event_data['performer'])) {
@@ -407,16 +407,20 @@ class EventUpsert extends UpdateHandler {
     }
 
     /**
-     * Process venue assignment
+     * Process venue taxonomy assignment.
+     * Engine data takes precedence over AI-provided values.
      *
      * @param int $post_id Post ID
      * @param array $parameters Event parameters
+     * @param array $engine_parameters Engine data parameters
      */
-    private function processVenue(int $post_id, array $parameters): void {
-        $venue_name = $parameters['venue'] ?? '';
+    private function processVenue(int $post_id, array $parameters, array $engine_parameters = []): void {
+        $venue_name = $engine_parameters['venue'] ?? $parameters['venue'] ?? '';
 
         if (!empty($venue_name)) {
-            $venue_metadata = VenueParameterProvider::extractFromParameters($parameters);
+            // Merge engine parameters with AI parameters (engine takes precedence)
+            $merged_params = array_merge($parameters, $engine_parameters);
+            $venue_metadata = VenueParameterProvider::extractFromParameters($merged_params);
 
             $venue_result = \DataMachineEvents\Core\Venue_Taxonomy::find_or_create_venue($venue_name, $venue_metadata);
 
@@ -458,8 +462,8 @@ class EventUpsert extends UpdateHandler {
             'startTime' => $event_data['startTime'] ?? '',
             'endDate' => $event_data['endDate'] ?? '',
             'endTime' => $event_data['endTime'] ?? '',
-            'venue' => $parameters['venue'] ?? $event_data['venue'] ?? '',
-            'address' => $parameters['venueAddress'] ?? $event_data['venueAddress'] ?? '',
+            'venue' => $event_data['venue'] ?? $parameters['venue'] ?? '',
+            'address' => $event_data['venueAddress'] ?? $parameters['venueAddress'] ?? '',
             'price' => $event_data['price'] ?? '',
             'ticketUrl' => $event_data['ticketUrl'] ?? '',
 

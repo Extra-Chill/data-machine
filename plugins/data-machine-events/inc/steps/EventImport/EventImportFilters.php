@@ -49,7 +49,7 @@ add_action('admin_enqueue_scripts', function() {
     }
 
     $screen = get_current_screen();
-    if (!$screen || strpos($screen->id, 'datamachine') === false) {
+    if (!$screen || strpos($screen->id, 'datamachine-pipelines') === false) {
         return;
     }
 

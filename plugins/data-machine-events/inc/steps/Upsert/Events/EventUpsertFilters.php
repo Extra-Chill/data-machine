@@ -47,11 +47,17 @@ class EventUpsertFilters {
 
     /**
      * Register AI tool for event upsert
+     *
+     * @param array $tools Registered tools
+     * @param string|null $handler_slug Handler slug
+     * @param array $handler_config Handler configuration
+     * @param array $engine_data Engine data snapshot for dynamic tool generation
+     * @return array Modified tools array
      */
-    public static function registerAITools($tools, $handler_slug = null, $handler_config = []) {
+    public static function registerAITools($tools, $handler_slug = null, $handler_config = [], $engine_data = []) {
         // Only register tool when upsert_event handler is the target
         if ($handler_slug === 'upsert_event') {
-            $tools['upsert_event'] = self::getDynamicEventTool($handler_config);
+            $tools['upsert_event'] = self::getDynamicEventTool($handler_config, $engine_data);
         }
 
         return $tools;
@@ -71,14 +77,14 @@ class EventUpsertFilters {
     }
 
     /**
-     * Generate dynamic event tool based on taxonomy and venue settings
+     * Generate dynamic event tool based on taxonomy, venue settings, and engine data
+     *
+     * @param array $handler_config Handler configuration
+     * @param array $engine_data Engine data snapshot
+     * @return array Tool definition
      */
-    private static function getDynamicEventTool(array $handler_config): array {
+    private static function getDynamicEventTool(array $handler_config, array $engine_data = []): array {
         $ue_config = $handler_config['upsert_event'] ?? $handler_config;
-
-        if (function_exists('apply_filters')) {
-            $ue_config = apply_filters('datamachine_apply_global_defaults', $ue_config, 'upsert_event', 'update');
-        }
 
         $tool = self::getBaseTool();
 
@@ -90,8 +96,8 @@ class EventUpsertFilters {
         $taxonomy_params = TaxonomyHandler::getTaxonomyToolParameters($ue_config, Event_Post_Type::POST_TYPE);
         $tool['parameters'] = array_merge($tool['parameters'], $taxonomy_params);
 
-        // Add dynamic venue parameters
-        $venue_params = VenueParameterProvider::getToolParameters($ue_config);
+        // Add dynamic venue parameters (excludes params that exist in engine data)
+        $venue_params = VenueParameterProvider::getToolParameters($ue_config, $engine_data);
         $tool['parameters'] = array_merge($tool['parameters'], $venue_params);
 
         $tool['handler_config'] = $ue_config;

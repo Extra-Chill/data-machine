@@ -85,24 +85,31 @@ class VenueParameterProvider {
 
     /**
      * Get AI tool parameters for venue fields when AI should decide.
+     * Excludes parameters that already have values in engine data.
      *
      * @param array $handler_config Handler configuration
-     * @return array Tool parameter definitions (empty if static venue configured)
+     * @param array $engine_data Engine data snapshot
+     * @return array Tool parameter definitions (empty if venue data exists)
      */
-    public static function getToolParameters(array $handler_config): array {
-        if (self::hasStaticVenue($handler_config)) {
+    public static function getToolParameters(array $handler_config, array $engine_data = []): array {
+        if (self::hasVenueData($handler_config, $engine_data)) {
             return [];
         }
-        return self::TOOL_PARAMETERS;
+        return self::filterByEngineData(self::TOOL_PARAMETERS, $engine_data);
     }
 
     /**
-     * Check if static venue data is configured.
+     * Check if venue data is available from any source.
      *
      * @param array $handler_config Handler configuration
-     * @return bool True if static venue is available
+     * @param array $engine_data Engine data snapshot
+     * @return bool True if venue data is available
      */
-    public static function hasStaticVenue(array $handler_config): bool {
+    public static function hasVenueData(array $handler_config, array $engine_data = []): bool {
+        if (!empty($engine_data['venue'])) {
+            return true;
+        }
+
         if (!empty($handler_config['universal_web_scraper']['venue'])) {
             return true;
         }
@@ -112,6 +119,39 @@ class VenueParameterProvider {
         }
 
         return false;
+    }
+
+    /**
+     * Filter parameters based on engine data presence.
+     *
+     * @param array $parameters All available parameters
+     * @param array $engine_data Engine data snapshot
+     * @return array Filtered parameters
+     */
+    private static function filterByEngineData(array $parameters, array $engine_data): array {
+        if (empty($engine_data)) {
+            return $parameters;
+        }
+
+        $filtered = [];
+        foreach ($parameters as $key => $definition) {
+            if (empty($engine_data[$key])) {
+                $filtered[$key] = $definition;
+            }
+        }
+
+        return $filtered;
+    }
+
+    /**
+     * Check if static venue data is configured (legacy method).
+     *
+     * @param array $handler_config Handler configuration
+     * @return bool True if static venue is available
+     * @deprecated Use hasVenueData() instead
+     */
+    public static function hasStaticVenue(array $handler_config): bool {
+        return self::hasVenueData($handler_config, []);
     }
 
     /**
