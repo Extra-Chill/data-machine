@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.4.5
+**Version**: 0.4.6
 
 ## Migration Status
 
@@ -72,7 +72,9 @@ npm run lint:js && npm run lint:css             # Linting
 - `Admin\Admin_Bar` - Events navigation menu in WordPress admin bar
 - `Admin\Status_Detection` - Legacy status detection stub for backwards compatibility
 - `Core\Event_Post_Type` - Post type registration with selective admin menu control
+- `Core\EventSchemaProvider` - Centralized event schema provider for AI tools and Schema.org JSON-LD
 - `Core\Venue_Taxonomy` - Venue taxonomy with 9 meta fields, admin UI, CRUD operations
+- `Core\VenueParameterProvider` - Dynamic venue parameter generation for AI tool definitions
 - `Core\VenueService` - Centralized venue operations: normalization, finding existing venues, creating new venue terms
 - `Core\meta-storage` - Event metadata synchronization and management
 - `Blocks\Calendar\Template_Loader` - Modular template system with 7 specialized templates
@@ -130,6 +132,7 @@ npm run lint:js && npm run lint:css             # Linting
 - Native WordPress description field for venue descriptions
 - Admin interface via Venue_Taxonomy class with full CRUD operations
 - Centralized venue handling via Venue class
+- Automatic geocoding integration using OpenStreetMap Nominatim API for coordinate lookup
 
 **Map Display Types** (5 free Leaflet.js tile layers, no API keys):
 - OpenStreetMap Standard (default), CartoDB Positron, CartoDB Voyager, CartoDB Dark Matter, Humanitarian OpenStreetMap
@@ -206,6 +209,8 @@ datamachine-events/
     │   ├── venue-autocomplete.css
     │   └── venue-map.css
     └── js/                                      # Admin JavaScript
+        ├── pipeline-components.js                # React field components for Data Machine pipeline modals
+        ├── pipeline-hooks.js                     # WordPress hooks for extending core pipeline behavior
         ├── venue-autocomplete.js
         ├── venue-map.js
         └── venue-selector.js
@@ -477,5 +482,5 @@ Template_Loader::include_template('date-group', $group_data);
 
 ---
 
-**Version**: 0.4.5
+**Version**: 0.4.6
 **For ecosystem architecture, see root CLAUDE.md file**

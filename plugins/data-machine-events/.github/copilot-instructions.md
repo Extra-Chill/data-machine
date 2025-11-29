@@ -3,6 +3,8 @@
 ## Architecture Snapshot
 - Block-first data flow lives in `datamachine-events.php`: Event Details block → `_datamachine_event_datetime` meta (`inc/Core/meta-storage.php`) → Calendar templates (`inc/Blocks/Calendar/templates`) → theme's `single.php` template.
 - All PHP classes sit under the `DataMachineEvents\` namespace with Composer PSR-4 autoloading; never require class files manually.
+- Schema management centralized in `EventSchemaProvider` for field definitions and Schema.org JSON-LD generation.
+- Venue parameter handling via `VenueParameterProvider` for dynamic AI tool parameter generation.
 - Calendar rendering is centralized through `DataMachineEvents\Blocks\Calendar\Template_Loader`; extend output by adding/including templates there instead of echoing HTML inline.
 - Root design tokens in `inc/blocks/root.css` are consumed by both CSS and JS (grid sizing, badge colors) so update variables there before tweaking individual block styles.
 
@@ -10,9 +12,10 @@
 - Import handlers use `HandlerRegistrationTrait` for self-registration via `registerHandler()` in constructors (no separate `*Filters.php` files needed).
 - Handler registration happens in `inc/Steps/Upsert/Events/EventUpsertFilters.php` for EventUpsert and directly in each handler constructor for import handlers.
 - Import handlers (e.g., `Steps/EventImport/Handlers/Ticketmaster/Ticketmaster.php`) must single-item process, use `EventIdentifierGenerator::generate()` for consistent event identity, call `isItemProcessed`/`markItemProcessed`, and return a DataPacket array.
+- WordPress Events API handler (`WordPressEventsAPI.php`) auto-detects API format (Tribe Events v1, Tribe WP REST, generic WordPress) and imports events from external WordPress sites.
 - EventUpsert logic lives in `Steps/Upsert/Events/EventUpsert.php`: it extends the core `UpdateHandler`, searches for existing events by (title, venue, startDate), performs field-by-field change detection, generates Event Details block markup, and syncs venues via `Core\Venue_Taxonomy::find_or_create_venue`.
 - Event identity normalization uses `Utilities\EventIdentifierGenerator::generate($title, $startDate, $venue)` across all import handlers for consistent duplicate detection (lowercase, trim, collapse whitespace, remove articles).
-- `Schema::generate_event_schema()` combines block attributes, venue taxonomy meta, and engine data—reuse it instead of rebuilding JSON-LD.
+- `EventSchemaProvider::generateSchemaOrg()` combines block attributes, venue taxonomy meta, and engine data—reuse it instead of rebuilding JSON-LD.
 
 ## REST + Frontend Behavior
 - Public endpoints live in `inc/Api/Routes.php` and `inc/Api/Controllers/` under the unified `datamachine/v1` namespace: `/events/calendar`, `/events/venues/{id}`, `/events/venues/check-duplicate`. Keep new endpoints in this namespace and reuse existing arg sanitizers.

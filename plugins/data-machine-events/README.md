@@ -2,7 +2,7 @@
 
 Frontend-focused WordPress events plugin with **block-first architecture**. Features AI-driven event creation via Data Machine integration, Event Details blocks with InnerBlocks for rich content editing, Calendar blocks for display, and comprehensive venue taxonomy management.
 
-**Version**: 0.4.5
+**Version**: 0.4.6
 
 ## Migration Showcase
 
@@ -52,7 +52,7 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 ### Usage
 1. **Plugin Settings:** Events → Settings → Configure archive behavior, search integration, and display preferences
 2. **Admin Navigation:** Events menu in WordPress admin bar for quick access to event management
-3. **Automated Import:** Configure Data Machine plugin for Ticketmaster Discovery API, Dice FM, Eventbrite, WordPress Events API, Event Flyer, or universal web scraper imports
+3. **Automated Import:** Configure Data Machine plugin for Ticketmaster Discovery API, Dice FM, Google Calendar, SpotHopper, Eventbrite, WordPress Events API, Event Flyer, or universal web scraper imports
 4. **AI-Driven Publishing:** Data Machine AI creates events with descriptions, comprehensive venue creation, and taxonomy assignments
 5. **Manual Events:** Add Event post → Insert "Event Details" block → Fill event data
 6. **Display Events:** Add "Data Machine Events Calendar" block to any page/post
@@ -207,18 +207,20 @@ echo '<script type="application/ld+json">' . wp_json_encode($schema) . '</script
 2. **Event Identifier Normalization:** EventIdentifierGenerator creates consistent identifiers from (title, startDate, venue) for duplicate detection
 3. **Engine Data Persistence:** Event import handlers store venue/location/contact fields in engine data for downstream access
 4. **AI Web Scraping:** UniversalWebScraper uses AI to extract event data from HTML sections with automated processing
-5. **AI Vision Extraction:** EventFlyer uses vision AI to extract event details from promotional flyer/poster images with "fill OR AI extracts" pattern
+5. **AI Vision Extraction:** EventFlyer uses vision AI to extract event details from promotional flyer/poster images with "fill OR AI extracts" field pattern
 6. **Eventbrite Integration:** Schema.org JSON-LD parsing from public organizer pages (no API key required)
 7. **WordPress Integration:** WordPressEventsAPI imports events from external WordPress sites with auto-format detection (Tribe Events v1, Tribe WP REST, generic WordPress)
-5. **Intelligent Event Upsert:** EventUpsert handler searches for existing events by identity, performs field-by-field change detection
-6. **Venue Data Processing:** Venue_Taxonomy handles find-or-create operations with metadata validation
-7. **AI Content Generation:** AI generates event descriptions while preserving structured venue data
-8. **Block Creation:** EventUpsert creates/updates Event Details blocks with InnerBlocks support and proper attribute mapping
-9. **Venue Management:** Venue handles term creation, lookup, metadata validation, and event assignment
-10. **Schema Generation:** Schema creates Google Event structured data combining block attributes with venue taxonomy meta
-11. **Template Rendering:** Template_Loader system provides modular, cacheable template rendering with variable extraction
-12. **Taxonomy Display:** Taxonomy_Badges generates dynamic badge HTML for all non-venue taxonomies with consistent styling
-13. **Visual Enhancement:** Carousel List display with CSS-only horizontal scrolling and day-grouped events
+8. **Schema Management:** EventSchemaProvider centralizes field definitions and Schema.org JSON-LD generation
+9. **Venue Parameter Handling:** VenueParameterProvider manages dynamic venue parameter generation for AI tools
+10. **Intelligent Event Upsert:** EventUpsert handler searches for existing events by identity, performs field-by-field change detection
+11. **Venue Data Processing:** Venue_Taxonomy handles find-or-create operations with metadata validation
+12. **AI Content Generation:** AI generates event descriptions while preserving structured venue data
+13. **Block Creation:** EventUpsert creates/updates Event Details blocks with InnerBlocks support and proper attribute mapping
+14. **Venue Management:** Venue handles term creation, lookup, metadata validation, and event assignment
+15. **Schema Generation:** Schema creates Google Event structured data combining block attributes with venue taxonomy meta
+16. **Template Rendering:** Template_Loader system provides modular, cacheable template rendering with variable extraction
+17. **Taxonomy Display:** Taxonomy_Badges generates dynamic badge HTML for all non-venue taxonomies with consistent styling
+18. **Visual Enhancement:** Carousel List display with CSS-only horizontal scrolling and day-grouped events
 
 ## Calendar Filtering Architecture
 
