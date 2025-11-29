@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.4.3
+**Version**: 0.4.4
 
 ## Migration Status
 
@@ -88,7 +88,10 @@ npm run lint:js && npm run lint:css             # Linting
 - `Steps\EventImport\Handlers\DiceFm\DiceFm` - Dice FM event integration
 - `Steps\EventImport\Handlers\GoogleCalendar\GoogleCalendar` - Google Calendar integration
 - `Steps\EventImport\Handlers\GoogleCalendar\GoogleCalendarUtils` - Calendar ID/URL utilities and ICS generation
+- `Steps\EventImport\Handlers\SpotHopper\SpotHopper` - SpotHopper venue events integration
 - `Steps\EventImport\Handlers\WebScraper\UniversalWebScraper` - AI-powered web scraping
+- `Steps\EventImport\Handlers\WordPressEventsAPI\WordPressEventsAPI` - External WordPress events via REST API (Tribe Events, etc.)
+- `Steps\EventImport\Handlers\EventFlyer\EventFlyer` - AI vision extraction from flyer/poster images
 - `Steps\Upsert\Events\EventUpsertSettings` - Configuration management for Event Upsert handler (v0.2.5+)
 - `Utilities\EventIdentifierGenerator` - Shared event identifier normalization utility
 - `Api\Controllers\Calendar` - Calendar REST endpoint controller
@@ -173,7 +176,10 @@ datamachine-events/
 │   │   │   │   ├── GoogleCalendar/              # Google Calendar integration
 │   │   │   │   │   ├── GoogleCalendarUtils.php  # Calendar ID/URL utilities
 │   │   │   │   │   └── GoogleCalendarAuth.php   # Authentication handling
-│   │   │   │   └── WebScraper/                 # AI-powered web scraping
+│   │   │   │   ├── SpotHopper/                 # SpotHopper venue events
+│   │   │   │   ├── WebScraper/                 # AI-powered web scraping
+│   │   │   │   ├── WordPressEventsAPI/         # External WordPress events (Tribe Events, etc.)
+│   │   │   │   └── EventFlyer/                 # AI vision extraction from flyer images
 │   │   │   ├── EventImportStep.php              # Pipeline step with handler discovery
 │   │   │   └── EventImportHandler.php          # Abstract base for import handlers
 │   │   └── Upsert/Events/                      # EventUpsert handler for create/update operations
@@ -249,7 +255,10 @@ datamachine-events/
 ### Import Handlers
 - **Ticketmaster**: Discovery API with API key authentication, uses EventIdentifierGenerator for consistent event identity
 - **Dice FM**: Event integration with EventIdentifierGenerator normalization
+- **SpotHopper**: SpotHopper venue events with full venue metadata extraction
 - **UniversalWebScraper**: AI-powered HTML section extraction with HTML hash tracking (ProcessedItems)
+- **WordPressEventsAPI**: External WordPress events via REST API with Tribe Events Calendar support and auto-format detection
+- **EventFlyer**: AI vision extraction from flyer/poster images with "fill OR AI extracts" field pattern
 
 **Handler Pattern**: Single-item processing - return first eligible event immediately
 ```php
@@ -457,5 +466,5 @@ Template_Loader::include_template('date-group', $group_data);
 
 ---
 
-**Version**: 0.4.3
+**Version**: 0.4.4
 **For ecosystem architecture, see root CLAUDE.md file**

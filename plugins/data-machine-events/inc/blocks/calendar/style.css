@@ -721,6 +721,14 @@
     gap: 0.75rem;
 }
 
+/* Modal Button Sizing */
+.datamachine-modal-actions .datamachine-button {
+    padding: 0.625rem 1.25rem;
+    font-size: 0.9rem;
+    min-height: 2.5rem;
+    cursor: pointer;
+}
+
 /* No Taxonomies State */
 .datamachine-no-taxonomies {
     padding: 2rem;

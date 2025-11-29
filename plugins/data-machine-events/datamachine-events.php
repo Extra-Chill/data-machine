@@ -3,7 +3,7 @@
  * Plugin Name: Data Machine Events
  * Plugin URI: https://chubes.net/datamachine-events
  * Description: WordPress events plugin with block-first architecture. Features AI-driven event creation via Data Machine integration, Event Details blocks for data storage, Calendar blocks for display, and venue taxonomy management.
- * Version: 0.4.3
+ * Version: 0.4.4
  * Author: Chris Huber
  * Author URI: https://chubes.net
  * License: GPL v2 or later
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once __DIR__ . '/vendor/autoload.php';
 }
-define('DATAMACHINE_EVENTS_VERSION', '0.4.3');
+define('DATAMACHINE_EVENTS_VERSION', '0.4.4');
 define('DATAMACHINE_EVENTS_PLUGIN_FILE', __FILE__);
 define('DATAMACHINE_EVENTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DATAMACHINE_EVENTS_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -127,34 +127,19 @@ class DATAMACHINE_Events {
     }
     
     private function load_event_import_handlers() {
-        // We only need to load non-class files (like Filters) manually.
-        // Classes are autoloaded.
-        $handlers = ['Ticketmaster', 'DiceFm', 'WebScraper', 'GoogleCalendar', 'SpotHopper'];
+        $handlers = [
+            'DataMachineEvents\\Steps\\EventImport\\Handlers\\Ticketmaster\\Ticketmaster',
+            'DataMachineEvents\\Steps\\EventImport\\Handlers\\DiceFm\\DiceFm',
+            'DataMachineEvents\\Steps\\EventImport\\Handlers\\GoogleCalendar\\GoogleCalendar',
+            'DataMachineEvents\\Steps\\EventImport\\Handlers\\SpotHopper\\SpotHopper',
+            'DataMachineEvents\\Steps\\EventImport\\Handlers\\WebScraper\\UniversalWebScraper',
+            'DataMachineEvents\\Steps\\EventImport\\Handlers\\WordPressEventsAPI\\WordPressEventsAPI',
+            'DataMachineEvents\\Steps\\EventImport\\Handlers\\Eventbrite\\Eventbrite',
+        ];
         
-        foreach ($handlers as $handler) {
-            $handler_path = DATAMACHINE_EVENTS_PLUGIN_DIR . "inc/Steps/EventImport/Handlers/{$handler}/";
-            if (is_dir($handler_path)) {
-                // Load *Filters.php files
-                foreach (glob($handler_path . '*Filters.php') as $file) {
-                    if (file_exists($file)) {
-                        require_once $file;
-                    }
-                }
-                
-                // Load *Auth.php files if they contain hooks (usually they are classes used by filters)
-                // If Auth is a class, it's autoloaded.
-                
-                // WebScraper scrapers might need loading if they are not PSR-4 or if they register themselves
-                if ($handler === 'WebScraper') {
-                    $scrapers_path = $handler_path . 'scrapers/';
-                    if (is_dir($scrapers_path)) {
-                        foreach (glob($scrapers_path . '*.php') as $scraper_file) {
-                            if (file_exists($scraper_file)) {
-                                require_once $scraper_file;
-                            }
-                        }
-                    }
-                }
+        foreach ($handlers as $handler_class) {
+            if (class_exists($handler_class)) {
+                new $handler_class();
             }
         }
     }

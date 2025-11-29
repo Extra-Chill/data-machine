@@ -13,7 +13,7 @@ export function initFilterModal(calendar, onApply, onReset) {
     }
 
     const filterBtn = calendar.querySelector('.datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .datamachine-events-filter-btn');
-    const closeBtn = modal.querySelector('.datamachine-modal-close, .datamachine-taxonomy-modal-close');
+    const closeBtns = modal.querySelectorAll('.datamachine-modal-close, .datamachine-taxonomy-modal-close');
     const applyBtn = modal.querySelector('.datamachine-apply-filters');
     const resetBtn = modal.querySelector('.datamachine-clear-all-filters, .datamachine-reset-filters');
 
@@ -38,9 +38,9 @@ export function initFilterModal(calendar, onApply, onReset) {
         }
     };
 
-    if (closeBtn) {
-        closeBtn.addEventListener('click', closeModal);
-    }
+    closeBtns.forEach(function(btn) {
+        btn.addEventListener('click', closeModal);
+    });
 
     modal.addEventListener('click', function(e) {
         if (e.target === modal || e.target.classList.contains('datamachine-taxonomy-modal-overlay')) {

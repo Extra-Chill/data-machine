@@ -10,6 +10,7 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachine\Core\DataPacket;
+use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -19,6 +20,8 @@ if (!defined('ABSPATH')) {
  * Single-item processing with Discovery API v2 integration
  */
 class Ticketmaster extends EventImportHandler {
+
+    use HandlerRegistrationTrait;
     
     const API_BASE = 'https://app.ticketmaster.com/discovery/v2/';
 
@@ -30,6 +33,18 @@ class Ticketmaster extends EventImportHandler {
 
     public function __construct() {
         parent::__construct('ticketmaster');
+
+        self::registerHandler(
+            'ticketmaster',
+            'event_import',
+            self::class,
+            __('Ticketmaster Events', 'datamachine-events'),
+            __('Import events from Ticketmaster Discovery API with venue data', 'datamachine-events'),
+            true,
+            TicketmasterAuth::class,
+            TicketmasterSettings::class,
+            null
+        );
     }
     
     /**

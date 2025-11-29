@@ -14,6 +14,7 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\DiceFm;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachine\Core\DataPacket;
+use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
 // Prevent direct access
 if (!defined('ABSPATH')) {
@@ -28,8 +29,22 @@ if (!defined('ABSPATH')) {
  */
 class DiceFm extends EventImportHandler {
 
+    use HandlerRegistrationTrait;
+
     public function __construct() {
         parent::__construct('dice_fm');
+
+        self::registerHandler(
+            'dice_fm',
+            'event_import',
+            self::class,
+            __('Dice.fm Events', 'datamachine-events'),
+            __('Import events from Dice.fm API with venue data', 'datamachine-events'),
+            true,
+            DiceFmAuth::class,
+            DiceFmSettings::class,
+            null
+        );
     }
     
     /**

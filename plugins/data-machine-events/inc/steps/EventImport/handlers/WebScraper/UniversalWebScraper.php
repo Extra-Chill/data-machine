@@ -18,6 +18,7 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachine\Core\DataPacket;
+use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
 // Prevent direct access
 if (!defined('ABSPATH')) {
@@ -32,8 +33,22 @@ if (!defined('ABSPATH')) {
  */
 class UniversalWebScraper extends EventImportHandler {
 
+    use HandlerRegistrationTrait;
+
     public function __construct() {
         parent::__construct('universal_web_scraper');
+
+        self::registerHandler(
+            'universal_web_scraper',
+            'event_import',
+            self::class,
+            __('Universal Web Scraper', 'datamachine-events'),
+            __('AI-powered web scraping with Schema.org JSON-LD extraction', 'datamachine-events'),
+            false,
+            null,
+            UniversalWebScraperSettings::class,
+            null
+        );
     }
 
     /**

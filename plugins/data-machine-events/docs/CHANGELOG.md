@@ -5,6 +5,45 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.4] - 2025-11-28
+
+### Added
+- **Eventbrite Import Handler** - New handler for importing events from public Eventbrite organizer pages
+  - Parses Schema.org JSON-LD structured data from Eventbrite HTML pages
+  - Extracts venue metadata, ticket pricing, performer information
+  - Supports date range filtering and EventIdentifierGenerator for deduplication
+- **Event Flyer Import Handler** - New handler for AI-powered event extraction from promotional images
+  - Processes flyer/poster images using vision model capabilities
+  - "Fill OR AI extracts" pattern for configurable field handling
+  - Integrates with Data Machine Files handler for image storage
+- **WordPress Events API Handler** - New handler for importing events from external WordPress sites
+  - Auto-detects API format (Tribe Events v1, Tribe WP REST, generic WordPress)
+  - Full venue metadata extraction with venue name override support
+  - Keyword search and exclude keywords filtering
+- **Modal Button Styling** - Added consistent button sizing for taxonomy filter modal actions
+
+### Changed
+- **Handler Registration Architecture** - Migrated all import handlers to `HandlerRegistrationTrait` pattern
+  - Eliminated 5 separate `*Filters.php` files (~246 lines removed)
+  - Handler registration now embedded in handler constructors via `self::registerHandler()`
+  - Affected handlers: Ticketmaster, DiceFm, GoogleCalendar, SpotHopper, UniversalWebScraper
+- **Handler Loading** - Simplified `load_event_import_handlers()` to instantiate handler classes directly
+  - Removed file-based Filters loading and WebScraper scrapers directory loading
+  - Clean array-based handler instantiation with `class_exists()` check
+- **Filter Modal JavaScript** - Updated close button handling to support multiple close buttons via `querySelectorAll()`
+- **Modal Button Classes** - Changed from WordPress admin `button` classes to `datamachine-button` classes for frontend consistency
+- **WordPressEventsAPI Settings** - Removed `api_format` select field (auto-detection handles format identification)
+  - Simplified settings to: endpoint URL, venue override, pagination, categories, search, and exclude keywords
+- **AI Description Prompt** - Simplified EventUpsert AI description generation prompt
+
+### Removed
+- **Handler Filter Files** (~246 lines total):
+  - `inc/Steps/EventImport/Handlers/Ticketmaster/TicketmasterFilters.php` (50 lines)
+  - `inc/Steps/EventImport/Handlers/DiceFm/DiceFmFilters.php` (50 lines)
+  - `inc/Steps/EventImport/Handlers/GoogleCalendar/GoogleCalendarFilters.php` (50 lines)
+  - `inc/Steps/EventImport/Handlers/SpotHopper/SpotHopperFilters.php` (44 lines)
+  - `inc/Steps/EventImport/Handlers/WebScraper/UniversalWebScraperFilters.php` (52 lines)
+
 ## [0.4.3] - 2025-11-28
 
 ### Added

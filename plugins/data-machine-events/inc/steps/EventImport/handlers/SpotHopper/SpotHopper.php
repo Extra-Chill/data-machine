@@ -14,6 +14,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
 use DataMachine\Core\DataPacket;
+use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -21,10 +22,24 @@ if (!defined('ABSPATH')) {
 
 class SpotHopper extends EventImportHandler {
 
+    use HandlerRegistrationTrait;
+
     const API_BASE = 'https://www.spothopperapp.com/api/spots/';
 
     public function __construct() {
         parent::__construct('spothopper');
+
+        self::registerHandler(
+            'spothopper',
+            'event_import',
+            self::class,
+            __('SpotHopper Events', 'datamachine-events'),
+            __('Import events from SpotHopper venue platform (no API key required)', 'datamachine-events'),
+            false,
+            null,
+            SpotHopperSettings::class,
+            null
+        );
     }
 
     protected function executeFetch(int $pipeline_id, array $config, ?string $flow_step_id, int $flow_id, ?string $job_id): array {

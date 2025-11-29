@@ -11,6 +11,7 @@ use ICal\ICal;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachine\Core\DataPacket;
+use DataMachine\Core\Steps\HandlerRegistrationTrait;
 use DataMachineEvents\Steps\EventImport\Handlers\GoogleCalendar\GoogleCalendarUtils;
 
 if (!defined('ABSPATH')) {
@@ -22,8 +23,22 @@ if (!defined('ABSPATH')) {
  */
 class GoogleCalendar extends EventImportHandler {
 
+    use HandlerRegistrationTrait;
+
     public function __construct() {
         parent::__construct('google_calendar');
+
+        self::registerHandler(
+            'google_calendar',
+            'event_import',
+            self::class,
+            __('Google Calendar Events', 'datamachine-events'),
+            __('Import events from Google Calendar via public .ics feed', 'datamachine-events'),
+            true,
+            GoogleCalendarAuth::class,
+            GoogleCalendarSettings::class,
+            null
+        );
     }
 
     /**

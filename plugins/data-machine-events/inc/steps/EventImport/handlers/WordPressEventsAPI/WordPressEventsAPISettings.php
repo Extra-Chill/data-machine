@@ -25,22 +25,11 @@ class WordPressEventsAPISettings {
                 'placeholder' => __('https://example.com/wp-json/tribe/events/v1/events', 'datamachine-events'),
                 'required' => true,
             ],
-            'api_format' => [
-                'type' => 'select',
-                'label' => __('API Format', 'datamachine-events'),
-                'description' => __('Select the event calendar API format. Auto-detect works for most sites.', 'datamachine-events'),
-                'options' => [
-                    'auto' => __('Auto-detect', 'datamachine-events'),
-                    'tribe_v1' => __('Tribe Events Calendar (v1 API)', 'datamachine-events'),
-                    'tribe_wp' => __('Tribe Events (WP REST endpoint)', 'datamachine-events'),
-                    'generic_wp' => __('Generic WordPress Events', 'datamachine-events'),
-                ],
-            ],
             'venue_name_override' => [
                 'type' => 'text',
                 'label' => __('Venue Name Override', 'datamachine-events'),
-                'description' => __('Optional: Override the venue name for all imported events. Useful for single-venue event sources.', 'datamachine-events'),
-                'placeholder' => __('The Blue Note', 'datamachine-events'),
+                'description' => __('Consolidate all events under one venue name. Useful when a venue has multiple stages (e.g., "Main Stage", "Deck Stage") but you want one map pin.', 'datamachine-events'),
+                'placeholder' => __('Charleston Pour House', 'datamachine-events'),
             ],
             'per_page' => [
                 'type' => 'text',
@@ -70,7 +59,6 @@ class WordPressEventsAPISettings {
     public static function sanitize(array $raw_settings): array {
         $sanitized = [
             'endpoint_url' => esc_url_raw(trim($raw_settings['endpoint_url'] ?? '')),
-            'api_format' => sanitize_text_field($raw_settings['api_format'] ?? 'auto'),
             'venue_name_override' => sanitize_text_field($raw_settings['venue_name_override'] ?? ''),
             'per_page' => absint($raw_settings['per_page'] ?? 50),
             'categories' => sanitize_text_field($raw_settings['categories'] ?? ''),
@@ -86,11 +74,6 @@ class WordPressEventsAPISettings {
             $sanitized['per_page'] = 50;
         }
 
-        $valid_formats = ['auto', 'tribe_v1', 'tribe_wp', 'generic_wp'];
-        if (!in_array($sanitized['api_format'], $valid_formats, true)) {
-            $sanitized['api_format'] = 'auto';
-        }
-
         return $sanitized;
     }
 
@@ -101,7 +84,6 @@ class WordPressEventsAPISettings {
     public static function get_defaults(): array {
         return [
             'endpoint_url' => '',
-            'api_format' => 'auto',
             'venue_name_override' => '',
             'per_page' => 50,
             'categories' => '',
