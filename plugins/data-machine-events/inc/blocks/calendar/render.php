@@ -112,18 +112,15 @@ $wrapper_attributes = get_block_wrapper_attributes([
 
 <div data-instance-id="<?php echo esc_attr($instance_id); ?>" <?php echo $wrapper_attributes; ?>>
     <?php 
-    $taxonomies_data = \DataMachineEvents\Blocks\Calendar\Taxonomy_Helper::get_all_taxonomies_with_counts();
     $filter_count = !empty($tax_filters) ? array_sum(array_map('count', $tax_filters)) : 0;
 
     \DataMachineEvents\Blocks\Calendar\Template_Loader::include_template('filter-bar', [
         'attributes' => $attributes,
-        'used_taxonomies' => [],
         'instance_id' => $instance_id,
         'tax_filters' => $tax_filters,
         'search_query' => $search_query,
         'date_start' => $date_start,
         'date_end' => $date_end,
-        'taxonomies_data' => $taxonomies_data,
         'filter_count' => $filter_count
     ]);
     ?>
@@ -147,7 +144,8 @@ $wrapper_attributes = get_block_wrapper_attributes([
                 \DataMachineEvents\Blocks\Calendar\Template_Loader::include_template('date-group', [
                     'date_obj' => $date_obj,
                     'day_of_week' => $day_of_week,
-                    'formatted_date_label' => $formatted_date_label
+                    'formatted_date_label' => $formatted_date_label,
+                    'events_count' => count($events_for_date)
                 ]);
                 ?>
 

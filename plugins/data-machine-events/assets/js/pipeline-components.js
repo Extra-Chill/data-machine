@@ -15,9 +15,9 @@
 	const { TextControl, Spinner } = wp.components;
 	const { __ } = wp.i18n;
 	const { addFilter } = wp.hooks;
+	const apiFetch = wp.apiFetch;
 
-	const NOMINATIM_API = 'https://nominatim.openstreetmap.org/search';
-	const USER_AGENT = 'ExtraChill-Events/1.0 (https://extrachill.com)';
+	const GEOCODE_ENDPOINT = '/datamachine/v1/events/geocode/search';
 	const DEBOUNCE_DELAY = 1000;
 
 	function AddressAutocompleteField( props ) {
@@ -32,7 +32,6 @@
 
 		const containerRef = useRef( null );
 		const debounceRef = useRef( null );
-		const lastRequestRef = useRef( 0 );
 		const cacheRef = useRef( {} );
 
 		useEffect( function() {
@@ -60,39 +59,20 @@
 				return;
 			}
 
-			const now = Date.now();
-			const timeSinceLastRequest = now - lastRequestRef.current;
-
-			if ( timeSinceLastRequest < 1000 ) {
-				setTimeout( function() {
-					searchAddress( query );
-				}, 1000 - timeSinceLastRequest );
-				return;
-			}
-
-			lastRequestRef.current = Date.now();
-
-			const params = new URLSearchParams( {
-				format: 'json',
-				addressdetails: '1',
-				limit: '5',
-				q: query,
-			} );
-
-			fetch( NOMINATIM_API + '?' + params.toString(), {
-				headers: { 'User-Agent': USER_AGENT },
+			apiFetch( {
+				path: GEOCODE_ENDPOINT,
+				method: 'POST',
+				data: { query: query },
 			} )
 				.then( function( response ) {
-					if ( ! response.ok ) {
-						throw new Error( 'Nominatim API request failed' );
+					if ( response.success && response.results ) {
+						cacheRef.current[ query ] = response.results;
+						setSuggestions( response.results );
+						setShowDropdown( true );
+						setError( null );
+					} else {
+						setSuggestions( [] );
 					}
-					return response.json();
-				} )
-				.then( function( data ) {
-					cacheRef.current[ query ] = data;
-					setSuggestions( data );
-					setShowDropdown( true );
-					setError( null );
 					setIsLoading( false );
 				} )
 				.catch( function() {

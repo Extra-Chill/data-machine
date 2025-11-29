@@ -75,8 +75,6 @@ $modal_id = 'datamachine-taxonomy-filter-modal-' . $instance_id;
             </div>
             <div class="datamachine-taxonomy-modal-body">
                 <?php
-                // Include the taxonomy filter template directly
-                $taxonomies_data = $taxonomies_data ?? $used_taxonomies ?? \DataMachineEvents\Blocks\Calendar\Taxonomy_Helper::get_all_taxonomies_with_counts();
                 include __DIR__ . '/modal/taxonomy-filter.php';
                 ?>
             </div>

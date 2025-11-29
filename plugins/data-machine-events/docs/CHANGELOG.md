@@ -5,9 +5,78 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.8] - 2025-11-29
+
+### Added
+- **ICS Calendar Feed Handler** - New dedicated import handler for generic ICS/iCal feeds
+  - Supports any ICS feed URL (Tockify, Outlook, Apple Calendar, etc.)
+  - Automatic `webcal://` to `https://` protocol conversion
+  - Venue name and address override options for consistent venue assignment
+  - Include/exclude keyword filtering to filter out non-relevant events
+  - Uses existing `johngrogg/ics-parser` library for reliable parsing
+  - Single-item processing pattern with EventIdentifierGenerator for deduplication
+
+- **Filters API Controller** - New REST endpoint for dynamic taxonomy filter options
+  - `/datamachine/v1/events/filters` endpoint with active filter support
+  - Taxonomy dependency handling for hierarchical filtering
+  - Context-aware filter generation (modal vs other contexts)
+  - Sanitized input handling with proper array validation
+
+- **Geocoding API Controller** - Server-side proxy for OpenStreetMap Nominatim API
+  - `/datamachine/v1/events/geocode/search` endpoint for address search
+  - CORS-compliant server-side proxy to avoid browser restrictions
+  - Proper user agent identification and error handling
+  - Admin-only access with capability checks
+
+- **Enhanced Filter Modal** - Dynamic filter loading with REST API integration
+  - Real-time filter options loading via Filters API
+  - Support for taxonomy dependencies and conditional filtering
+  - Improved performance with on-demand filter data
+  - Enhanced accessibility and keyboard navigation
+
+- **Taxonomy Dependencies System** - Support for dependent taxonomy relationships
+  - Child taxonomies only show terms relevant to parent selections
+  - Configurable dependency mappings via `datamachine_events_taxonomy_dependencies` filter
+  - Automatic dependency resolution in filter modal and API responses
+
+- **Enhanced Taxonomy Helper** - Improved taxonomy data processing with filter support
+  - `get_all_taxonomies_with_counts()` now accepts active filters and dependencies
+  - Dependent term filtering for hierarchical taxonomy relationships
+  - Better performance with selective term loading
+  - Support for filtered taxonomy counts
+
+### Changed
+- **Filter Modal Architecture** - Migrated from static HTML to dynamic REST API loading
+  - Removed static taxonomy rendering from template
+  - Added `loadFilters()` function for dynamic content
+  - Enhanced error handling and loading states
+  - Improved accessibility with ARIA attributes
+
+- **API Client Integration** - Enhanced calendar API client with filter support
+  - Added `fetchFilters()` function for filter data retrieval
+  - Improved error handling and response validation
+  - Better integration with calendar state management
+
+- **Taxonomy Helper Performance** - Optimized taxonomy queries with selective loading
+  - Only load dependent terms when parent filters are active
+  - Reduced database queries for large taxonomy sets
+  - Better caching and query optimization
+
+- **Google Calendar Handler** - Removed unused configuration options
+  - Simplified settings interface for better usability
+  - Streamlined handler configuration
+
 ## [0.4.7] - 2025-11-29
 
 ### Added
+- **ICS Calendar Feed Handler** - New dedicated import handler for generic ICS/iCal feeds
+  - Supports any ICS feed URL (Tockify, Outlook, Apple Calendar, etc.)
+  - Automatic `webcal://` to `https://` protocol conversion
+  - Venue name and address override options for consistent venue assignment
+  - Include/exclude keyword filtering to filter out non-relevant events
+  - Uses existing `johngrogg/ics-parser` library for reliable parsing
+  - Single-item processing pattern with EventIdentifierGenerator deduplication
+
 - **Comprehensive Documentation** - Added 4 new detailed documentation files:
   - `event-schema-provider.md` - Complete EventSchemaProvider API reference with examples
   - `geocoding-integration.md` - OpenStreetMap Nominatim geocoding implementation guide

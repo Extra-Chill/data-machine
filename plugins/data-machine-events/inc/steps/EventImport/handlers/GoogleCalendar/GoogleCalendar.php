@@ -169,12 +169,6 @@ class GoogleCalendar extends EventImportHandler {
 
             $events = $ical->events();
 
-            // Apply event limit if configured
-            $event_limit = intval($config['event_limit'] ?? 50);
-            if ($event_limit > 0 && count($events) > $event_limit) {
-                $events = array_slice($events, 0, $event_limit);
-            }
-
             $this->log('info', 'Google Calendar: Successfully fetched events', [
                 'total_events' => count($events),
                 'calendar_url' => $calendar_url

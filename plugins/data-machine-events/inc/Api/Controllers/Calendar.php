@@ -80,14 +80,15 @@ class Calendar {
 				$day_of_week = strtolower($date_obj->format('l'));
 				$formatted_date_label = $date_obj->format('l, F jS');
 
-				\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template(
-					'date-group',
-					[
-						'date_obj' => $date_obj,
-						'day_of_week' => $day_of_week,
-						'formatted_date_label' => $formatted_date_label,
-					]
-				);
+			\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template(
+				'date-group',
+				[
+					'date_obj' => $date_obj,
+					'day_of_week' => $day_of_week,
+					'formatted_date_label' => $formatted_date_label,
+					'events_count' => count($events_for_date),
+				]
+			);
 				?>
 				<div class="datamachine-events-wrapper">
 					<?php

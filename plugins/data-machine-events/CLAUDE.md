@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.4.7
+**Version**: 0.4.8
 
 ## Migration Status
 
@@ -90,6 +90,7 @@ npm run lint:js && npm run lint:css             # Linting
 - `Steps\EventImport\Handlers\DiceFm\DiceFm` - Dice FM event integration
 - `Steps\EventImport\Handlers\GoogleCalendar\GoogleCalendar` - Google Calendar integration
 - `Steps\EventImport\Handlers\GoogleCalendar\GoogleCalendarUtils` - Calendar ID/URL utilities and ICS generation
+- `Steps\EventImport\Handlers\IcsCalendar\IcsCalendar` - Generic ICS/iCal feed integration (Tockify, Outlook, Apple Calendar, etc.)
 - `Steps\EventImport\Handlers\SpotHopper\SpotHopper` - SpotHopper venue events integration
 - `Steps\EventImport\Handlers\WebScraper\UniversalWebScraper` - AI-powered web scraping
 - `Steps\EventImport\Handlers\WordPressEventsAPI\WordPressEventsAPI` - External WordPress events via REST API with auto-format detection (Tribe Events v1, Tribe WP REST, generic WordPress)
@@ -179,12 +180,13 @@ datamachine-events/
 │   │   └── meta-storage.php                    # Event metadata sync
 │   ├── steps/
 │   │   ├── EventImport/                        # Event import step and handlers
-│   │   │   ├── Handlers/                       # Import handlers (8 total)
+│   │   │   ├── Handlers/                       # Import handlers (9 total)
 │   │   │   │   ├── Ticketmaster/               # Ticketmaster Discovery API
 │   │   │   │   ├── DiceFm/                     # Dice FM integration
 │   │   │   │   ├── GoogleCalendar/             # Google Calendar integration
 │   │   │   │   │   ├── GoogleCalendarUtils.php # Calendar ID/URL utilities
 │   │   │   │   │   └── GoogleCalendarAuth.php  # Authentication handling
+│   │   │   │   ├── IcsCalendar/                # Generic ICS/iCal feed integration
 │   │   │   │   ├── SpotHopper/                 # SpotHopper venue events
 │   │   │   │   ├── WebScraper/                 # AI-powered web scraping
 │   │   │   │   ├── WordPressEventsAPI/         # External WordPress events (auto-format detection)
@@ -264,7 +266,7 @@ datamachine-events/
 - **Automatic Instantiation**: Framework handles handler creation and execution
 - **Trait-based Registration**: All handlers use `HandlerRegistrationTrait` for self-registration
 
-### Import Handlers (8 Total)
+### Import Handlers (9 Total)
 - **Ticketmaster**: Discovery API with API key authentication, uses EventIdentifierGenerator for consistent event identity
 - **Dice FM**: Event integration with EventIdentifierGenerator normalization
 - **SpotHopper**: SpotHopper venue events with full venue metadata extraction
@@ -273,6 +275,7 @@ datamachine-events/
 - **EventFlyer**: AI vision extraction from flyer/poster images with "fill OR AI extracts" field pattern
 - **Eventbrite**: Schema.org JSON-LD parsing from public organizer pages (no API key required)
 - **GoogleCalendar**: Google Calendar API integration with calendar ID/URL resolution
+- **IcsCalendar**: Generic ICS/iCal feed integration (Tockify, Outlook, Apple Calendar, etc.) with venue overrides and keyword filtering
 
 **Handler Pattern**: Single-item processing - return first eligible event immediately
 ```php
@@ -482,5 +485,5 @@ Template_Loader::include_template('date-group', $group_data);
 
 ---
 
-**Version**: 0.4.7
+**Version**: 0.4.8
 **For ecosystem architecture, see root CLAUDE.md file**

@@ -627,6 +627,35 @@
     padding: 1.5rem;
 }
 
+/* Filter Loading State */
+.datamachine-filter-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 3rem 1.5rem;
+    color: var(--datamachine-text-secondary);
+}
+
+.datamachine-filter-loading .datamachine-filter-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--datamachine-border-light);
+    border-top-color: var(--datamachine-accent);
+    border-radius: 50%;
+    animation: datamachine-spin 0.8s linear infinite;
+}
+
+@keyframes datamachine-spin {
+    to { transform: rotate(360deg); }
+}
+
+.datamachine-filter-error {
+    padding: 2rem 1.5rem;
+    text-align: center;
+    color: var(--datamachine-text-secondary);
+}
+
 .datamachine-taxonomy-section {
     margin-bottom: 2rem;
 }
@@ -797,11 +826,24 @@
 }
 
 /* Day Badge Position */
-.datamachine-events-calendar .datamachine-day-badge {
+.datamachine-events-calendar .datamachine-day-header {
     position: absolute;
     top: 12px;
     left: 1.5rem;
     z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.datamachine-events-calendar .datamachine-day-header .datamachine-day-badge {
+    position: static;
+}
+
+.datamachine-day-event-count {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--datamachine-text-secondary);
 }
 
 /* Event Items in Carousel */
@@ -853,7 +895,7 @@
         gap: 1rem;
     }
 
-    .datamachine-events-calendar .datamachine-day-badge {
+    .datamachine-events-calendar .datamachine-day-header {
         left: 1rem;
         top: 10px;
     }

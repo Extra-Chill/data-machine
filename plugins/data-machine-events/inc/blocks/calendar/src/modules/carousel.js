@@ -24,12 +24,25 @@ export function initCarousel(calendar) {
 
             const wrapperRect = wrapper.getBoundingClientRect();
             const dots = indicators.querySelectorAll('.datamachine-carousel-dot');
+            
+            let maxVisibleIndex = 0;
+            let maxVisibleArea = 0;
 
             events.forEach(function(event, index) {
                 const eventRect = event.getBoundingClientRect();
-                const isVisible = eventRect.left >= wrapperRect.left - 10 
-                    && eventRect.right <= wrapperRect.right + 10;
-                dots[index].classList.toggle('active', isVisible);
+                
+                const visibleLeft = Math.max(eventRect.left, wrapperRect.left);
+                const visibleRight = Math.min(eventRect.right, wrapperRect.right);
+                const visibleWidth = Math.max(0, visibleRight - visibleLeft);
+                
+                if (visibleWidth > maxVisibleArea) {
+                    maxVisibleArea = visibleWidth;
+                    maxVisibleIndex = index;
+                }
+            });
+
+            dots.forEach(function(dot, index) {
+                dot.classList.toggle('active', index === maxVisibleIndex);
             });
 
             const atStart = wrapper.scrollLeft <= 5;

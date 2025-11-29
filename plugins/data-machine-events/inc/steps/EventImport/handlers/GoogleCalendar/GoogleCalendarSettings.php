@@ -20,7 +20,7 @@ if (!defined('ABSPATH')) {
  * GoogleCalendarSettings class
  *
  * Provides configuration fields for Google Calendar .ics integration
- * including calendar URL, event filtering, and import limits.
+ * including calendar URL and event filtering.
  *
  * @since 1.0.0
  */
@@ -72,16 +72,6 @@ class GoogleCalendarSettings {
                 'description' => __('Only import events that start in the future. Past events will be skipped.', 'datamachine-events'),
                 'value' => $current_config['future_events_only'] ?? true,
                 'default' => true
-            ],
-            'event_limit' => [
-                'type' => 'number',
-                'label' => __('Event Limit', 'datamachine-events'),
-                'description' => __('Maximum number of events to process per execution. Leave empty for no limit.', 'datamachine-events'),
-                'placeholder' => '50',
-                'value' => $current_config['event_limit'] ?? 50,
-                'min' => 1,
-                'max' => 200,
-                'step' => 1
             ]
         ];
     }
@@ -132,10 +122,6 @@ class GoogleCalendarSettings {
         // Sanitize future events only checkbox
         $sanitized['future_events_only'] = !empty($config['future_events_only']);
 
-        // Sanitize event limit
-        $event_limit = intval($config['event_limit'] ?? 50);
-        $sanitized['event_limit'] = max(1, min(200, $event_limit));
-
         return $sanitized;
     }
 
@@ -173,12 +159,6 @@ class GoogleCalendarSettings {
                     $errors['calendar_id'] = __('Calendar ID is too long.', 'datamachine-events');
                 }
             }
-        }
-
-        // Validate event limit
-        $event_limit = intval($config['event_limit'] ?? 0);
-        if ($event_limit < 1 || $event_limit > 200) {
-            $errors['event_limit'] = __('Event limit must be between 1 and 200.', 'datamachine-events');
         }
 
         return [

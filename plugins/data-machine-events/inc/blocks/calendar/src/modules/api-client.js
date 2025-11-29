@@ -41,6 +41,39 @@ export async function fetchCalendarEvents(calendar, params) {
     }
 }
 
+/**
+ * Fetch filter options from REST API with optional active filter context
+ * 
+ * @param {Object} activeFilters Current filter selections keyed by taxonomy slug
+ * @returns {Promise<Object>} Filter data with taxonomies, dependencies, and meta
+ */
+export async function fetchFilters(activeFilters = {}) {
+    const params = new URLSearchParams();
+    
+    Object.entries(activeFilters).forEach(([taxonomy, termIds]) => {
+        if (Array.isArray(termIds) && termIds.length > 0) {
+            termIds.forEach(id => {
+                params.append(`active[${taxonomy}][]`, id);
+            });
+        }
+    });
+
+    const apiUrl = `/wp-json/datamachine/v1/events/filters?${params.toString()}`;
+
+    const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to fetch filters');
+    }
+
+    return response.json();
+}
+
 function updatePagination(calendar, pagination) {
     const paginationContainer = calendar.querySelector('.datamachine-events-pagination');
     

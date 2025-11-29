@@ -11,6 +11,8 @@ if ( defined( 'DATAMACHINE_EVENTS_PLUGIN_DIR' ) ) {
 		DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Calendar.php',
 		DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Venues.php',
 		DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Events.php',
+		DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Filters.php',
+		DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Geocoding.php',
 	);
 	foreach ( $controllers as $file ) {
 		if ( file_exists( $file ) ) {
@@ -21,6 +23,8 @@ if ( defined( 'DATAMACHINE_EVENTS_PLUGIN_DIR' ) ) {
 
 use DataMachineEvents\Api\Controllers\Calendar;
 use DataMachineEvents\Api\Controllers\Venues;
+use DataMachineEvents\Api\Controllers\Filters;
+use DataMachineEvents\Api\Controllers\Geocoding;
 
 /**
  * Register REST API routes for Data Machine Events
@@ -111,6 +115,61 @@ function register_routes() {
 					'sanitize_callback' => 'sanitize_text_field',
 				),
 				'address' => array(
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+			),
+		)
+	);
+
+	$filters = new Filters();
+
+	register_rest_route(
+		API_NAMESPACE,
+		'/events/filters',
+		array(
+			'methods'             => 'GET',
+			'callback'            => array( $filters, 'get' ),
+			'permission_callback' => '__return_true',
+			'args'                => array(
+				'active'  => array(
+					'type'              => 'object',
+					'default'           => array(),
+					'sanitize_callback' => function( $value ) {
+						if ( ! is_array( $value ) ) {
+							return array();
+						}
+						$sanitized = array();
+						foreach ( $value as $taxonomy => $term_ids ) {
+							$taxonomy              = sanitize_key( $taxonomy );
+							$sanitized[ $taxonomy ] = array_map( 'absint', (array) $term_ids );
+						}
+						return $sanitized;
+					},
+				),
+				'context' => array(
+					'type'              => 'string',
+					'default'           => 'modal',
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+			),
+		)
+	);
+
+	$geocoding = new Geocoding();
+
+	register_rest_route(
+		API_NAMESPACE,
+		'/events/geocode/search',
+		array(
+			'methods'             => 'POST',
+			'callback'            => array( $geocoding, 'search' ),
+			'permission_callback' => function() {
+				return current_user_can( 'manage_options' );
+			},
+			'args'                => array(
+				'query' => array(
+					'required'          => true,
+					'type'              => 'string',
 					'sanitize_callback' => 'sanitize_text_field',
 				),
 			),
