@@ -63,12 +63,6 @@ class TicketmasterSettings {
                 'description' => __('Search radius in miles around the specified location. Default is 50 miles.', 'datamachine-events'),
                 'placeholder' => __('50', 'datamachine-events'),
             ],
-            'start_date' => [
-                'type' => 'text',
-                'label' => __('Start Date', 'datamachine-events'),
-                'description' => __('Start date for event search in ISO format (YYYY-MM-DDTHH:mm:ssZ). Leave empty for current date.', 'datamachine-events'),
-                'placeholder' => __('2024-01-01T00:00:00Z', 'datamachine-events'),
-            ],
             'genre' => [
                 'type' => 'text',
                 'label' => __('Genre ID (Advanced)', 'datamachine-events'),
@@ -95,7 +89,6 @@ class TicketmasterSettings {
             'classification_type' => sanitize_text_field($raw_settings['classification_type'] ?? ''),
             'location' => sanitize_text_field($raw_settings['location'] ?? ''),
             'radius' => sanitize_text_field($raw_settings['radius'] ?? '50'),
-            'start_date' => sanitize_text_field($raw_settings['start_date'] ?? ''),
             'genre' => sanitize_text_field($raw_settings['genre'] ?? ''),
             'venue_id' => sanitize_text_field($raw_settings['venue_id'] ?? '')
         ];
@@ -121,7 +114,6 @@ class TicketmasterSettings {
             'classification_type' => 'music',
             'location' => '32.7765,-79.9311',
             'radius' => '50',
-            'start_date' => '',
             'genre' => '',
             'venue_id' => ''
         ];

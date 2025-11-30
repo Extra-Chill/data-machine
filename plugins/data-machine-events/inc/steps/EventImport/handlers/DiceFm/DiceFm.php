@@ -88,13 +88,10 @@ class DiceFm extends EventImportHandler {
         }
         
         // Build configuration
-        $date_range = isset($config['date_range']) ? intval($config['date_range']) : 90;
-        $page_size = isset($config['page_size']) ? intval($config['page_size']) : 100;
-        $event_types = isset($config['event_types']) ? $config['event_types'] : 'linkout,event';
         $partner_id = !empty($api_config['partner_id']) ? trim($api_config['partner_id']) : '';
         
         // Fetch events from API
-        $raw_events = $this->fetch_dice_fm_events($api_config['api_key'], $city, $page_size, $event_types, $partner_id);
+        $raw_events = $this->fetch_dice_fm_events($api_config['api_key'], $city, $partner_id);
         if (empty($raw_events)) {
             $this->log('info', 'No events found from Dice.fm API');
             return $this->emptyResponse();
@@ -103,12 +100,8 @@ class DiceFm extends EventImportHandler {
         // Process events one at a time (Data Machine single-item model)
         $this->log('info', 'Processing events for eligible item', [
             'raw_events_available' => count($raw_events),
-            'date_range_days' => $date_range,
             'pipeline_id' => $pipeline_id
         ]);
-        
-        $now = time();
-        $future = strtotime("+{$date_range} days");
         
         foreach ($raw_events as $raw_event) {
             // Standardize the event
@@ -131,17 +124,6 @@ class DiceFm extends EventImportHandler {
                 $this->log('debug', 'Skipping already processed event', [
                     'title' => $standardized_event['title'],
                     'event_identifier' => $event_identifier
-                ]);
-                continue;
-            }
-            
-            // Apply date range filter
-            $event_time = strtotime($standardized_event['startDate'] . ' ' . $standardized_event['startTime']);
-            if ($event_time < $now || $event_time > $future) {
-                $this->log('debug', 'Skipping event outside date range', [
-                    'title' => $standardized_event['title'],
-                    'date' => $standardized_event['startDate'],
-                    'time' => $standardized_event['startTime']
                 ]);
                 continue;
             }
@@ -200,7 +182,6 @@ class DiceFm extends EventImportHandler {
         // No eligible events found
         $this->log('info', 'No eligible events found', [
             'raw_events_checked' => count($raw_events),
-            'date_range_days' => $date_range,
             'pipeline_id' => $pipeline_id
         ]);
         
@@ -212,18 +193,16 @@ class DiceFm extends EventImportHandler {
      *
      * @param string $api_key API key
      * @param string $city City name
-     * @param int $page_size Number of events per page
-     * @param string $event_types Event types to fetch
      * @param string $partner_id Partner ID (optional)
      * @return array Raw event data from API
      */
-    private function fetch_dice_fm_events($api_key, $city, $page_size = 100, $event_types = 'linkout,event', $partner_id = '') {
+    private function fetch_dice_fm_events($api_key, $city, $partner_id = '') {
         $base_url = 'https://partners-endpoint.dice.fm/api/v2/events';
         
         // Build query parameters
         $params = array(
-            'page[size]' => $page_size,
-            'types' => $event_types,
+            'page[size]' => 100,
+            'types' => 'linkout,event',
             'filter[cities][]' => $city,
         );
         

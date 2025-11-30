@@ -188,13 +188,10 @@ class Ticketmaster extends EventImportHandler {
             $params['unit'] = 'miles';
         }
         
-        $start_date = !empty($handler_config['start_date']) 
-            ? $handler_config['start_date'] 
-            : date('Y-m-d\TH:i:s\Z', strtotime('+1 hour'));
-        $params['startDateTime'] = $start_date;
-        
         $page = !empty($handler_config['page']) ? intval($handler_config['page']) : 0;
         $params['page'] = $page;
+        
+        $params['startDateTime'] = gmdate('Y-m-d\TH:i:s\Z', strtotime('+1 hour'));
         
         if (!empty($handler_config['genre'])) {
             $params['genreId'] = $handler_config['genre'];

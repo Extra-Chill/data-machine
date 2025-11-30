@@ -5,6 +5,25 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.13] - 2025-11-30
+
+### Changed
+- **Carousel Dot Styling** - Refined visual feedback for carousel navigation
+  - Reduced dot size from 8px to 7px for cleaner appearance
+  - Adjusted active dot scale from 1.2 to 1.08 for subtler interaction feedback
+  - Improved visual hierarchy in carousel navigation
+
+- **DiceFm Handler Simplification** - Streamlined configuration and processing
+  - Removed configurable date_range, page_size, and event_types parameters
+  - Hardcoded API parameters for consistent behavior (page_size: 100, types: 'linkout,event')
+  - Eliminated client-side date range filtering to reduce complexity
+  - Simplified settings interface and data sanitization
+
+- **Ticketmaster Handler Simplification** - Enhanced reliability with fixed parameters
+  - Removed configurable start_date parameter to prevent timezone issues
+  - Hardcoded start time to +1 hour from current time for consistent API behavior
+  - Simplified API parameter building and request handling
+
 ## [0.4.12] - 2025-11-30
 
 ### Added

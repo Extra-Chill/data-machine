@@ -959,8 +959,8 @@
 }
 
 .datamachine-carousel-dot {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     background: var(--datamachine-border-light);
     transition: all 0.2s ease;
@@ -968,7 +968,7 @@
 
 .datamachine-carousel-dot.active {
     background: var(--datamachine-text-secondary);
-    transform: scale(1.2);
+    transform: scale(1.08);
 }
 
 /* Chevron navigation arrows */
