@@ -5,6 +5,17 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.14] - 2025-11-30
+
+### Fixed
+- **Filter Modal Memory Leaks**: Added proper cleanup functions to prevent duplicate event listeners and memory leaks during calendar refreshes
+- **State Storage Optimization**: Enhanced localStorage filtering to only persist taxonomy filters, preventing storage bloat from other URL parameters
+
+### Changed
+- **Dice FM Authentication**: Corrected authentication provider identifier from 'dice_fm_events' to 'dice_fm' for proper API integration
+- **Web Scraper Selectors**: Added new XPath selector for better event content detection on various venue websites
+- **EventUpsert Settings**: Removed redundant venue information field from handler configuration UI
+
 ## [0.4.13] - 2025-11-30
 
 ### Changed
