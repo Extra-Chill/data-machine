@@ -95,6 +95,68 @@ Admin endpoint for checking duplicate venues before creation.
 }
 ```
 
+### Filters Endpoint
+**URL**: `GET /wp-json/datamachine/v1/events/filters`
+
+Public endpoint for dynamic taxonomy filter options with active filter support.
+
+#### Query Parameters
+- `active_filters[taxonomy][]`: Currently active taxonomy term IDs
+- `date_start`: Start date for date-aware filtering (YYYY-MM-DD)
+- `date_end`: End date for date-aware filtering (YYYY-MM-DD)
+- `past`: Show past events when "1"
+
+#### Response Format
+```json
+{
+  "success": true,
+  "filters": {
+    "taxonomy_slug": {
+      "name": "Taxonomy Name",
+      "terms": [
+        {
+          "id": 123,
+          "name": "Term Name",
+          "count": 5,
+          "parent": 0
+        }
+      ]
+    }
+  }
+}
+```
+
+### Geocoding Endpoint
+**URL**: `GET /wp-json/datamachine/v1/events/geocode/search`
+
+Admin endpoint for address geocoding using OpenStreetMap Nominatim API.
+
+#### Query Parameters
+- `q`: Address query string to geocode
+
+#### Response Format
+```json
+{
+  "success": true,
+  "results": [
+    {
+      "place_id": 123456,
+      "display_name": "123 Main St, City, State 12345, USA",
+      "lat": "32.7836",
+      "lon": "-79.9372",
+      "address": {
+        "house_number": "123",
+        "road": "Main St",
+        "city": "City",
+        "state": "State",
+        "postcode": "12345",
+        "country": "USA"
+      }
+    }
+  ]
+}
+```
+
 ### Events Endpoint
 **URL**: `GET /wp-json/datamachine/v1/events/events`
 

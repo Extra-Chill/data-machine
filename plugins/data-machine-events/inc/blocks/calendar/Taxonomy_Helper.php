@@ -8,6 +8,7 @@
 namespace DataMachineEvents\Blocks\Calendar;
 
 use DataMachineEvents\Core\Event_Post_Type;
+use const DataMachineEvents\Core\EVENT_END_DATETIME_META_KEY;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -197,14 +198,16 @@ class Taxonomy_Helper {
         $where_clauses = '';
         $params = [ $taxonomy_slug, $post_type ];
         
-        // Date context filtering
+        // Date context filtering - uses EVENT_END_DATETIME to match Calendar_Query behavior
         if ( ! empty( $date_context ) ) {
             $joins .= " INNER JOIN {$wpdb->postmeta} pm_date ON p.ID = pm_date.post_id";
-            $where_clauses .= " AND pm_date.meta_key = '_datamachine_event_datetime'";
+            $where_clauses .= ' AND pm_date.meta_key = %s';
+            $params[] = EVENT_END_DATETIME_META_KEY;
             
             $date_start = $date_context['date_start'] ?? '';
             $date_end = $date_context['date_end'] ?? '';
             $show_past = ! empty( $date_context['past'] ) && '1' === $date_context['past'];
+            $current_datetime = current_time( 'mysql' );
             
             if ( ! empty( $date_start ) && ! empty( $date_end ) ) {
                 // Explicit date range from date picker
@@ -212,13 +215,13 @@ class Taxonomy_Helper {
                 $params[] = $date_start . ' 00:00:00';
                 $params[] = $date_end . ' 23:59:59';
             } elseif ( $show_past ) {
-                // Past events only (before today)
+                // Past events only (end time before current datetime)
                 $where_clauses .= " AND pm_date.meta_value < %s";
-                $params[] = current_time( 'Y-m-d' ) . ' 00:00:00';
+                $params[] = $current_datetime;
             } else {
-                // Default: future events only (today and forward)
+                // Default: future events only (end time >= current datetime)
                 $where_clauses .= " AND pm_date.meta_value >= %s";
-                $params[] = current_time( 'Y-m-d' ) . ' 00:00:00';
+                $params[] = $current_datetime;
             }
         }
         

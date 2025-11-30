@@ -82,16 +82,10 @@ class IcsCalendar extends EventImportHandler {
             $search_text = $standardized_event['title'] . ' ' . ($standardized_event['description'] ?? '');
 
             if (!$this->applyKeywordSearch($search_text, $config['search'] ?? '')) {
-                $this->log('debug', 'Skipping event (include keywords)', [
-                    'title' => $standardized_event['title']
-                ]);
                 continue;
             }
 
             if ($this->applyExcludeKeywords($search_text, $config['exclude_keywords'] ?? '')) {
-                $this->log('debug', 'Skipping event (exclude keywords)', [
-                    'title' => $standardized_event['title']
-                ]);
                 continue;
             }
 
@@ -106,10 +100,6 @@ class IcsCalendar extends EventImportHandler {
             }
 
             if ($this->isPastEvent($standardized_event['startDate'] ?? '')) {
-                $this->log('debug', 'Skipping past event', [
-                    'title' => $standardized_event['title'],
-                    'date' => $standardized_event['startDate']
-                ]);
                 continue;
             }
 
@@ -178,6 +168,7 @@ class IcsCalendar extends EventImportHandler {
                 'defaultWeekStart' => 'MO',
                 'skipRecurrence' => false,
                 'useTimeZoneWithRRules' => false,
+                'filterDaysBefore' => 1,
             ]);
 
             $events = $ical->events();
@@ -201,10 +192,10 @@ class IcsCalendar extends EventImportHandler {
     /**
      * Map iCal event to standardized event format
      */
-    private function map_ical_event(array $ical_event, array $config): array {
+    private function map_ical_event($ical_event, array $config): array {
         $standardized_event = [
-            'title' => sanitize_text_field($ical_event['SUMMARY'] ?? ''),
-            'description' => sanitize_textarea_field($ical_event['DESCRIPTION'] ?? ''),
+            'title' => sanitize_text_field($ical_event->summary ?? ''),
+            'description' => sanitize_textarea_field($ical_event->description ?? ''),
             'startDate' => '',
             'endDate' => '',
             'startTime' => '',
@@ -215,16 +206,16 @@ class IcsCalendar extends EventImportHandler {
             'venueState' => '',
             'venueZip' => '',
             'venueCountry' => '',
-            'ticketUrl' => esc_url_raw($ical_event['URL'] ?? ''),
+            'ticketUrl' => esc_url_raw($ical_event->url ?? ''),
             'image' => '',
             'price' => '',
             'performer' => '',
-            'organizer' => sanitize_text_field($ical_event['ORGANIZER'] ?? ''),
-            'source_url' => esc_url_raw($ical_event['URL'] ?? '')
+            'organizer' => sanitize_text_field($ical_event->organizer ?? ''),
+            'source_url' => esc_url_raw($ical_event->url ?? '')
         ];
 
-        if (!empty($ical_event['DTSTART'])) {
-            $start_datetime = $ical_event['DTSTART'];
+        if (!empty($ical_event->dtstart)) {
+            $start_datetime = $ical_event->dtstart;
             if ($start_datetime instanceof \DateTime) {
                 $standardized_event['startDate'] = $start_datetime->format('Y-m-d');
                 $standardized_event['startTime'] = $start_datetime->format('H:i');
@@ -237,8 +228,8 @@ class IcsCalendar extends EventImportHandler {
             }
         }
 
-        if (!empty($ical_event['DTEND'])) {
-            $end_datetime = $ical_event['DTEND'];
+        if (!empty($ical_event->dtend)) {
+            $end_datetime = $ical_event->dtend;
             if ($end_datetime instanceof \DateTime) {
                 $standardized_event['endDate'] = $end_datetime->format('Y-m-d');
                 $standardized_event['endTime'] = $end_datetime->format('H:i');
@@ -251,7 +242,7 @@ class IcsCalendar extends EventImportHandler {
             }
         }
 
-        $location = $ical_event['LOCATION'] ?? '';
+        $location = $ical_event->location ?? '';
         if (!empty($location)) {
             $location_parts = explode(',', $location, 2);
             $standardized_event['venue'] = sanitize_text_field(trim($location_parts[0]));

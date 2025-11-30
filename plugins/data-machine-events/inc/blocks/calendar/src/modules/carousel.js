@@ -50,15 +50,18 @@ export function initCarousel(calendar) {
                     dot.classList.toggle('active', index === maxVisibleIndex);
                 });
             } else {
-                // Desktop: activate dot for each card >50% visible
-                events.forEach(function(event, index) {
-                    const eventRect = event.getBoundingClientRect();
-                    const visibleLeft = Math.max(eventRect.left, wrapperRect.left);
-                    const visibleRight = Math.min(eventRect.right, wrapperRect.right);
-                    const visibleWidth = Math.max(0, visibleRight - visibleLeft);
-                    const visibilityRatio = visibleWidth / eventRect.width;
-                    
-                    dots[index].classList.toggle('active', visibilityRatio > 0.5);
+                // Desktop: use scroll position to determine active dot range
+                const maxScroll = wrapper.scrollWidth - wrapper.clientWidth;
+                const scrollProgress = maxScroll > 0 ? wrapper.scrollLeft / maxScroll : 0;
+                const visibleCards = Math.floor(wrapperRect.width / firstEventWidth);
+                const totalCards = events.length;
+                const scrollableCards = totalCards - visibleCards;
+
+                const firstActiveIndex = Math.round(scrollProgress * scrollableCards);
+
+                dots.forEach(function(dot, index) {
+                    const isInVisibleRange = index >= firstActiveIndex && index < firstActiveIndex + visibleCards;
+                    dot.classList.toggle('active', isInVisibleRange);
                 });
             }
 
@@ -116,6 +119,56 @@ export function initCarousel(calendar) {
                 chevronRight.textContent = '›';
                 group.appendChild(chevronRight);
             }
+
+            // Chevron click/hold navigation
+            const firstEventWidth = events[0]?.getBoundingClientRect().width || 300;
+            let holdInterval = null;
+
+            const scrollByCard = function(direction) {
+                wrapper.scrollBy({ left: firstEventWidth * direction, behavior: 'smooth' });
+            };
+
+            const startHold = function(direction) {
+                scrollByCard(direction);
+                holdInterval = setInterval(function() {
+                    scrollByCard(direction);
+                }, 300);
+            };
+
+            const stopHold = function() {
+                if (holdInterval) {
+                    clearInterval(holdInterval);
+                    holdInterval = null;
+                }
+            };
+
+            // Click handlers
+            chevronLeft.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (!holdInterval) scrollByCard(-1);
+            });
+            chevronRight.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (!holdInterval) scrollByCard(1);
+            });
+
+            // Hold handlers (mouse)
+            chevronLeft.addEventListener('mousedown', function() { startHold(-1); });
+            chevronRight.addEventListener('mousedown', function() { startHold(1); });
+
+            // Hold handlers (touch)
+            chevronLeft.addEventListener('touchstart', function(e) { e.preventDefault(); startHold(-1); }, { passive: false });
+            chevronRight.addEventListener('touchstart', function(e) { e.preventDefault(); startHold(1); }, { passive: false });
+
+            // Stop handlers
+            ['mouseup', 'mouseleave'].forEach(function(event) {
+                chevronLeft.addEventListener(event, stopHold);
+                chevronRight.addEventListener(event, stopHold);
+            });
+            ['touchend', 'touchcancel'].forEach(function(event) {
+                chevronLeft.addEventListener(event, stopHold);
+                chevronRight.addEventListener(event, stopHold);
+            });
 
             if (!scrollHandler) {
                 scrollHandler = updateIndicators;

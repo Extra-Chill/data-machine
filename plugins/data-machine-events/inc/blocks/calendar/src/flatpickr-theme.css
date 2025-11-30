@@ -73,9 +73,9 @@
     background: var(--datamachine-background-secondary);
 }
 
-.flatpickr-weekday {
+span.flatpickr-weekday {
     background: transparent;
-    color: var(--datamachine-text-secondary);
+    color: var(--datamachine-text-primary);
     font-weight: 600;
     font-size: 0.85rem;
 }

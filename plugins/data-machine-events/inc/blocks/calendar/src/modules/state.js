@@ -14,7 +14,10 @@ export function getUrlParams() {
 }
 
 export function updateUrl(params) {
-    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    const queryString = params.toString();
+    const newUrl = queryString 
+        ? `${window.location.pathname}?${queryString}` 
+        : window.location.pathname;
     window.history.pushState({}, '', newUrl);
     saveStateToStorage(params);
 }

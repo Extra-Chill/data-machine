@@ -22,6 +22,7 @@ The Event Details block serves as the single source of truth for all event data 
 - Add rich content, images, galleries, and custom layouts within events
 - Full WordPress block editor compatibility
 - Content renders on frontend with proper styling
+- Fixed content persistence through save/edit cycles
 
 ### Schema Generation
 - Automatic Google Event JSON-LD structured data

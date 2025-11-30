@@ -13,9 +13,11 @@ The Calendar block provides flexible event display with progressive enhancement,
 
 ### Filtering System
 - **Search**: Real-time event search by title, venue, or taxonomy terms
-- **Date Range**: Flexible date filtering with start/end date pickers
-- **Taxonomy Filters**: Multi-taxonomy filtering with modal interface
+- **Date Range**: Flexible date filtering with start/end date pickers and date context awareness
+- **Taxonomy Filters**: Multi-taxonomy filtering with modal interface and dynamic filter loading
 - **Past Events**: Toggle between upcoming and past events
+- **State Persistence**: Filter selections saved and restored using localStorage
+- **Date Context Filtering**: Taxonomy filters respect selected date ranges for accurate term counts
 
 ### Template System
 - **7 Specialized Templates**: Modular, cacheable template rendering

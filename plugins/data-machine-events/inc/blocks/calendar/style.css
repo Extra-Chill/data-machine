@@ -807,6 +807,15 @@
     padding-bottom: 2.5rem;
 }
 
+/* Day-specific border colors for date groups */
+.datamachine-date-group.datamachine-day-sunday { border-color: var(--datamachine-day-sunday-rgba); }
+.datamachine-date-group.datamachine-day-monday { border-color: var(--datamachine-day-monday-rgba); }
+.datamachine-date-group.datamachine-day-tuesday { border-color: var(--datamachine-day-tuesday-rgba); }
+.datamachine-date-group.datamachine-day-wednesday { border-color: var(--datamachine-day-wednesday-rgba); }
+.datamachine-date-group.datamachine-day-thursday { border-color: var(--datamachine-day-thursday-rgba); }
+.datamachine-date-group.datamachine-day-friday { border-color: var(--datamachine-day-friday-rgba); }
+.datamachine-date-group.datamachine-day-saturday { border-color: var(--datamachine-day-saturday-rgba); }
+
 /* Events Wrapper - Horizontal Scroll */
 .datamachine-events-calendar .datamachine-date-group .datamachine-events-wrapper {
     display: flex;
@@ -950,10 +959,22 @@
     border-radius: 50%;
     font-size: 1.5rem;
     color: var(--datamachine-text-secondary);
-    pointer-events: none;
+    cursor: pointer;
+    user-select: none;
     transition: all 0.2s ease;
     z-index: 10;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.datamachine-carousel-chevron:hover {
+    background: var(--datamachine-background-hover);
+    border-color: var(--datamachine-border-hover);
+    color: var(--datamachine-text-primary);
+}
+
+.datamachine-carousel-chevron:active {
+    transform: translateY(-50%) scale(0.95);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 }
 
 .datamachine-carousel-chevron-left {

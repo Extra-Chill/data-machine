@@ -5,6 +5,69 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.10] - 2025-11-30
+
+### Added
+- **Enhanced Carousel Navigation** - Advanced chevron controls with click and hold functionality
+  - Click for single card navigation, hold for continuous scrolling
+  - Touch-friendly with proper event handling for mobile devices
+  - Smooth scroll behavior with visual feedback (hover/active states)
+  - Improved active dot detection using scroll position calculation
+
+- **Day-Specific Border Styling** - Visual date grouping with color-coded borders
+  - Each day of week gets unique border color using existing design tokens
+  - Sunday through Saturday border colors match day color scheme
+  - Enhanced visual separation between different date groups
+
+- **Handler Documentation** - Comprehensive documentation for 4 import handlers
+  - `dice-fm-handler.md` - Complete Dice FM API integration guide
+  - `ics-calendar-handler.md` - Generic ICS feed handler documentation  
+  - `ticketmaster-handler.md` - Ticketmaster Discovery API reference
+  - `universal-web-scraper-handler.md` - AI-powered web scraping guide
+
+### Changed
+- **Enhanced Carousel Dot Detection** - Improved active dot calculation algorithm
+  - Desktop: Uses scroll position to determine visible card range instead of visibility percentage
+  - More accurate dot highlighting based on actual scroll progress
+  - Better handling of different screen sizes and card widths
+
+- **Improved URL State Management** - Clean URL handling for empty filter states
+  - Removes query string when all filters are cleared
+  - Cleaner URLs with no trailing `?` characters
+  - Better browser history management
+
+- **ICS Calendar Handler Refactoring** - Improved parser integration and data mapping
+  - Updated to use object property access instead of array notation for iCal parser
+  - Added `filterDaysBefore` configuration to filter old events
+  - Removed redundant debug logging for cleaner output
+  - Better error handling and data type consistency
+
+- **Taxonomy Helper Date Filtering** - Enhanced date context filtering accuracy
+  - Now uses `EVENT_END_DATETIME_META_KEY` to match Calendar_Query behavior
+  - More precise past/future event filtering using end datetime
+  - Consistent date filtering across taxonomy and calendar queries
+
+- **Flatpickr Theme Enhancement** - Improved weekday styling
+  - Changed weekday text color from secondary to primary for better readability
+  - More specific CSS selector (`span.flatpickr-weekday`) for targeted styling
+
+- **Documentation Updates** - Comprehensive documentation alignment
+  - Updated calendar-block.md with latest carousel navigation features
+  - Enhanced event-details-block.md with current attribute documentation
+  - Improved rest-api.md with endpoint usage examples
+  - Updated venue-management.md with geocoding integration details
+
+### Fixed
+- **Carousel Chevron Interactivity** - Fixed chevron buttons being non-interactive
+  - Changed from `pointer-events: none` to `pointer-events: auto`
+  - Added proper cursor styling and user interaction feedback
+  - Implemented hover and active states for better UX
+
+- **ICS Parser Compatibility** - Fixed property access for updated iCal parser library
+  - Changed from array access (`$ical_event['SUMMARY']`) to object access (`$ical_event->summary`)
+  - Ensures compatibility with latest johngrogg/ics-parser version
+  - More robust data extraction with proper null checking
+
 ## [0.4.9] - 2025-11-29
 
 ### Added

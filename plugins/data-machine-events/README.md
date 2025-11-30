@@ -2,7 +2,7 @@
 
 Frontend-focused WordPress events plugin with **block-first architecture**. Features AI-driven event creation via Data Machine integration, Event Details blocks with InnerBlocks for rich content editing, Calendar blocks for display, and comprehensive venue taxonomy management.
 
-**Version**: 0.4.9
+**Version**: 0.4.10
 
 ## Migration Showcase
 
@@ -38,10 +38,11 @@ Frontend-focused WordPress events plugin with **block-first architecture**. Feat
 - **Rich Content Editing:** InnerBlocks integration allows rich content within events
 - **Comprehensive Data Model:** 15+ event attributes including performer, organizer, pricing, and event status
 - **Calendar Display:** Gutenberg block with modular template system, taxonomy filtering, pagination, and search capabilities
+- **Advanced Filtering:** Date context filtering, taxonomy dependencies, and localStorage state persistence
 - **Theme Integration:** Events use theme's `single.php` template with Event Details block providing all data rendering
 - **Display Controls:** Flexible rendering with showVenue, showPrice, showTicketLink options
 - **Performance Optimized:** Background sync to meta fields for efficient database queries
-- **Data Machine Integration:** Automated AI-driven event imports with single-item processing
+- **Data Machine Integration:** Automated AI-driven event imports with 9 import handlers including ICS Calendar support
 
 ### Venues
 - **Rich Taxonomy:** 9 comprehensive meta fields (address, city, state, zip, country, phone, website, capacity, coordinates)
@@ -203,7 +204,7 @@ echo '<script type="application/ld+json">' . wp_json_encode($schema) . '</script
 ## AI Integration
 
 **AI-Driven Event Creation Pipeline:**
-1. **Import Handlers:** Extract event data from 8 sources (Ticketmaster, Dice FM, Google Calendar, SpotHopper, Eventbrite, WordPress Events API, Event Flyer, Universal Web Scraper) using single-item processing
+1. **Import Handlers:** Extract event data from 9 sources (Ticketmaster, Dice FM, Google Calendar, ICS Calendar, SpotHopper, Eventbrite, WordPress Events API, Event Flyer, Universal Web Scraper) using single-item processing
 2. **Event Identifier Normalization:** EventIdentifierGenerator creates consistent identifiers from (title, startDate, venue) for duplicate detection
 3. **Engine Data Persistence:** Event import handlers store venue/location/contact fields in engine data for downstream access
 4. **AI Web Scraping:** UniversalWebScraper uses AI to extract event data from HTML sections with automated processing

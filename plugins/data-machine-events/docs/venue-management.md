@@ -34,6 +34,12 @@ Venues include 9 comprehensive metadata fields:
 
 ### Integration Features
 
+### Geocoding Integration
+- **Automatic Coordinate Lookup**: Uses OpenStreetMap Nominatim API for venue coordinates
+- **Address-Based Geocoding**: Triggers when venue address fields are populated
+- **Coordinate Storage**: Stores latitude/longitude in venue meta for map display
+- **Proper User Agent**: Uses appropriate user agent for API requests
+
 ### Event Assignment
 - **Automatic Assignment**: Venues automatically linked to events
 - **Duplicate Detection**: Prevents duplicate venue creation

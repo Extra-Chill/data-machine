@@ -2,7 +2,7 @@
 	"$schema": "https://schemas.wp.org/trunk/block.json",
 	"apiVersion": 3,
 	"name": "datamachine-events/calendar",
-	"version": "0.4.9",
+	"version": "0.4.10",
 	"title": "Data Machine Events Calendar",
 	"category": "widgets",
 	"icon": "calendar-alt",
