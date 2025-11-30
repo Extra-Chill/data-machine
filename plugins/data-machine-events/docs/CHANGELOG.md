@@ -5,6 +5,19 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.11] - 2025-11-30
+
+### Added
+- **Enhanced Day-Specific Styling** - Comprehensive color theming for calendar navigation elements
+  - Day-specific hover border colors for all 7 days of week
+  - Day-specific carousel dot colors with inactive (rgba) and active (solid) states
+  - Day-specific chevron background colors matching day color scheme
+  - Improved visual hierarchy and user feedback for interactive elements
+
+### Changed
+- **Day Header Positioning** - Adjusted day header positioning from 12px to 14px for better visual alignment
+- **Color Consistency** - All interactive calendar elements now use consistent day-specific theming
+
 ## [0.4.10] - 2025-11-30
 
 ### Added
