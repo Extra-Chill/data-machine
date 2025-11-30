@@ -5,6 +5,25 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.12] - 2025-11-30
+
+### Added
+- **Enhanced Interactive Styling** - Day-specific hover colors for event titles and "More Info" buttons
+  - Event title links now use day-specific colors on hover matching the day's color scheme
+  - "More Info" buttons display day-specific border colors on hover for visual consistency
+  - Improved user feedback and interactive element visibility
+
+### Changed
+- **Carousel Dot Styling** - Simplified active dot color to use secondary text color
+  - Removed complex day-specific carousel dot colors for cleaner visual hierarchy
+  - Active dots now use consistent `--datamachine-text-secondary` color
+  - Maintains clear visual feedback while reducing CSS complexity
+
+- **Carousel Chevron Styling** - Removed day-specific chevron background colors
+  - Simplified chevron styling for better visual consistency
+  - Chevrons now use default styling without day-specific background colors
+  - Cleaner appearance while maintaining functional navigation
+
 ## [0.4.11] - 2025-11-30
 
 ### Added

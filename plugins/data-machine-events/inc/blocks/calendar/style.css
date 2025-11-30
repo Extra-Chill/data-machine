@@ -906,6 +906,24 @@
 .datamachine-events-calendar .datamachine-day-friday .datamachine-event-item:hover { border-color: var(--datamachine-day-friday); }
 .datamachine-events-calendar .datamachine-day-saturday .datamachine-event-item:hover { border-color: var(--datamachine-day-saturday); }
 
+/* Day-specific event title hover colors */
+.datamachine-events-calendar .datamachine-day-sunday .datamachine-event-title a:hover { color: var(--datamachine-day-sunday); }
+.datamachine-events-calendar .datamachine-day-monday .datamachine-event-title a:hover { color: var(--datamachine-day-monday); }
+.datamachine-events-calendar .datamachine-day-tuesday .datamachine-event-title a:hover { color: var(--datamachine-day-tuesday); }
+.datamachine-events-calendar .datamachine-day-wednesday .datamachine-event-title a:hover { color: var(--datamachine-day-wednesday); }
+.datamachine-events-calendar .datamachine-day-thursday .datamachine-event-title a:hover { color: var(--datamachine-day-thursday); }
+.datamachine-events-calendar .datamachine-day-friday .datamachine-event-title a:hover { color: var(--datamachine-day-friday); }
+.datamachine-events-calendar .datamachine-day-saturday .datamachine-event-title a:hover { color: var(--datamachine-day-saturday); }
+
+/* Day-specific More Info button hover border */
+.datamachine-events-calendar .datamachine-day-sunday .datamachine-more-info-button:hover { border-color: var(--datamachine-day-sunday); }
+.datamachine-events-calendar .datamachine-day-monday .datamachine-more-info-button:hover { border-color: var(--datamachine-day-monday); }
+.datamachine-events-calendar .datamachine-day-tuesday .datamachine-more-info-button:hover { border-color: var(--datamachine-day-tuesday); }
+.datamachine-events-calendar .datamachine-day-wednesday .datamachine-more-info-button:hover { border-color: var(--datamachine-day-wednesday); }
+.datamachine-events-calendar .datamachine-day-thursday .datamachine-more-info-button:hover { border-color: var(--datamachine-day-thursday); }
+.datamachine-events-calendar .datamachine-day-friday .datamachine-more-info-button:hover { border-color: var(--datamachine-day-friday); }
+.datamachine-events-calendar .datamachine-day-saturday .datamachine-more-info-button:hover { border-color: var(--datamachine-day-saturday); }
+
 /* Mobile */
 @media (max-width: 768px) {
     .datamachine-events-calendar .datamachine-date-group .datamachine-events-wrapper {
@@ -949,34 +967,9 @@
 }
 
 .datamachine-carousel-dot.active {
-    background: var(--datamachine-text-accent);
+    background: var(--datamachine-text-secondary);
     transform: scale(1.2);
 }
-
-/* Day-specific carousel dot colors - inactive (rgba) and active (solid) */
-.datamachine-day-sunday .datamachine-carousel-dot { background: var(--datamachine-day-sunday-rgba); }
-.datamachine-day-sunday .datamachine-carousel-dot.active { background: var(--datamachine-day-sunday); }
-.datamachine-day-monday .datamachine-carousel-dot { background: var(--datamachine-day-monday-rgba); }
-.datamachine-day-monday .datamachine-carousel-dot.active { background: var(--datamachine-day-monday); }
-.datamachine-day-tuesday .datamachine-carousel-dot { background: var(--datamachine-day-tuesday-rgba); }
-.datamachine-day-tuesday .datamachine-carousel-dot.active { background: var(--datamachine-day-tuesday); }
-.datamachine-day-wednesday .datamachine-carousel-dot { background: var(--datamachine-day-wednesday-rgba); }
-.datamachine-day-wednesday .datamachine-carousel-dot.active { background: var(--datamachine-day-wednesday); }
-.datamachine-day-thursday .datamachine-carousel-dot { background: var(--datamachine-day-thursday-rgba); }
-.datamachine-day-thursday .datamachine-carousel-dot.active { background: var(--datamachine-day-thursday); }
-.datamachine-day-friday .datamachine-carousel-dot { background: var(--datamachine-day-friday-rgba); }
-.datamachine-day-friday .datamachine-carousel-dot.active { background: var(--datamachine-day-friday); }
-.datamachine-day-saturday .datamachine-carousel-dot { background: var(--datamachine-day-saturday-rgba); }
-.datamachine-day-saturday .datamachine-carousel-dot.active { background: var(--datamachine-day-saturday); }
-
-/* Day-specific chevron backgrounds */
-.datamachine-day-sunday .datamachine-carousel-chevron { background: var(--datamachine-day-sunday-rgba); }
-.datamachine-day-monday .datamachine-carousel-chevron { background: var(--datamachine-day-monday-rgba); }
-.datamachine-day-tuesday .datamachine-carousel-chevron { background: var(--datamachine-day-tuesday-rgba); }
-.datamachine-day-wednesday .datamachine-carousel-chevron { background: var(--datamachine-day-wednesday-rgba); }
-.datamachine-day-thursday .datamachine-carousel-chevron { background: var(--datamachine-day-thursday-rgba); }
-.datamachine-day-friday .datamachine-carousel-chevron { background: var(--datamachine-day-friday-rgba); }
-.datamachine-day-saturday .datamachine-carousel-chevron { background: var(--datamachine-day-saturday-rgba); }
 
 /* Chevron navigation arrows */
 .datamachine-carousel-chevron {
