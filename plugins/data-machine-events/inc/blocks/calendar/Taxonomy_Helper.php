@@ -19,13 +19,14 @@ if (!defined('ABSPATH')) {
 class Taxonomy_Helper {
     
     /**
-     * Get all taxonomies with event counts, respecting active filters and dependencies
+     * Get all taxonomies with event counts, respecting active filters, dependencies, and date context
      *
      * @param array $active_filters Active filter selections keyed by taxonomy slug.
      * @param array $dependencies Taxonomy dependency mappings.
+     * @param array $date_context Optional date filtering context (date_start, date_end, past).
      * @return array Structured taxonomy data with hierarchy and event counts.
      */
-    public static function get_all_taxonomies_with_counts( $active_filters = [], $dependencies = [] ) {
+    public static function get_all_taxonomies_with_counts( $active_filters = [], $dependencies = [], $date_context = [] ) {
         $taxonomies_data = [];
         
         $taxonomies = get_object_taxonomies( Event_Post_Type::POST_TYPE, 'objects' );
@@ -53,7 +54,7 @@ class Taxonomy_Helper {
                 }
             }
             
-            $terms_hierarchy = self::get_taxonomy_hierarchy( $taxonomy->name, $allowed_term_ids );
+            $terms_hierarchy = self::get_taxonomy_hierarchy( $taxonomy->name, $allowed_term_ids, $date_context, $active_filters );
             
             if ( ! empty( $terms_hierarchy ) ) {
                 $taxonomies_data[ $taxonomy->name ] = [
@@ -73,9 +74,11 @@ class Taxonomy_Helper {
      *
      * @param string     $taxonomy_slug Taxonomy to get terms for.
      * @param array|null $allowed_term_ids Limit to these term IDs, or null for all.
+     * @param array      $date_context Optional date filtering context.
+     * @param array      $active_filters Optional active taxonomy filters for cross-filtering.
      * @return array Hierarchical term structure with event counts.
      */
-    public static function get_taxonomy_hierarchy( $taxonomy_slug, $allowed_term_ids = null ) {
+    public static function get_taxonomy_hierarchy( $taxonomy_slug, $allowed_term_ids = null, $date_context = [], $active_filters = [] ) {
         $terms = get_terms([
             'taxonomy'   => $taxonomy_slug,
             'hide_empty' => false,
@@ -91,7 +94,7 @@ class Taxonomy_Helper {
             return [];
         }
         
-        $term_counts = self::get_batch_term_counts( $taxonomy_slug );
+        $term_counts = self::get_batch_term_counts( $taxonomy_slug, $date_context, $active_filters );
         
         $terms_with_events = [];
         foreach ( $terms as $term ) {
@@ -181,13 +184,70 @@ class Taxonomy_Helper {
      * Get event counts for all terms in a taxonomy with a single query
      *
      * @param string $taxonomy_slug Taxonomy to count events for.
+     * @param array  $date_context  Optional date filtering context.
+     * @param array  $active_filters Optional active taxonomy filters for cross-filtering.
      * @return array Term ID => event count mapping.
      */
-    public static function get_batch_term_counts( $taxonomy_slug ) {
+    public static function get_batch_term_counts( $taxonomy_slug, $date_context = [], $active_filters = [] ) {
         global $wpdb;
         
         $post_type = Event_Post_Type::POST_TYPE;
         
+        $joins = '';
+        $where_clauses = '';
+        $params = [ $taxonomy_slug, $post_type ];
+        
+        // Date context filtering
+        if ( ! empty( $date_context ) ) {
+            $joins .= " INNER JOIN {$wpdb->postmeta} pm_date ON p.ID = pm_date.post_id";
+            $where_clauses .= " AND pm_date.meta_key = '_datamachine_event_datetime'";
+            
+            $date_start = $date_context['date_start'] ?? '';
+            $date_end = $date_context['date_end'] ?? '';
+            $show_past = ! empty( $date_context['past'] ) && '1' === $date_context['past'];
+            
+            if ( ! empty( $date_start ) && ! empty( $date_end ) ) {
+                // Explicit date range from date picker
+                $where_clauses .= " AND pm_date.meta_value >= %s AND pm_date.meta_value <= %s";
+                $params[] = $date_start . ' 00:00:00';
+                $params[] = $date_end . ' 23:59:59';
+            } elseif ( $show_past ) {
+                // Past events only (before today)
+                $where_clauses .= " AND pm_date.meta_value < %s";
+                $params[] = current_time( 'Y-m-d' ) . ' 00:00:00';
+            } else {
+                // Default: future events only (today and forward)
+                $where_clauses .= " AND pm_date.meta_value >= %s";
+                $params[] = current_time( 'Y-m-d' ) . ' 00:00:00';
+            }
+        }
+        
+        // Cross-taxonomy filtering (exclude current taxonomy from cross-filter)
+        $cross_filters = array_diff_key( $active_filters, [ $taxonomy_slug => true ] );
+        $join_index = 0;
+        foreach ( $cross_filters as $filter_taxonomy => $term_ids ) {
+            if ( empty( $term_ids ) ) {
+                continue;
+            }
+            
+            $term_ids = array_map( 'intval', (array) $term_ids );
+            $placeholders = implode( ',', array_fill( 0, count( $term_ids ), '%d' ) );
+            
+            $alias_tr = "cross_tr_{$join_index}";
+            $alias_tt = "cross_tt_{$join_index}";
+            
+            $joins .= " INNER JOIN {$wpdb->term_relationships} {$alias_tr} ON p.ID = {$alias_tr}.object_id";
+            $joins .= " INNER JOIN {$wpdb->term_taxonomy} {$alias_tt} ON {$alias_tr}.term_taxonomy_id = {$alias_tt}.term_taxonomy_id";
+            
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $where_clauses .= " AND {$alias_tt}.taxonomy = %s AND {$alias_tt}.term_id IN ($placeholders)";
+            $params[] = $filter_taxonomy;
+            $params = array_merge( $params, $term_ids );
+            
+            $join_index++;
+        }
+        
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $query = $wpdb->prepare(
             "SELECT tt.term_id, COUNT(DISTINCT tr.object_id) as event_count
             FROM {$wpdb->term_relationships} tr
@@ -195,12 +255,13 @@ class Taxonomy_Helper {
                 ON tr.term_taxonomy_id = tt.term_taxonomy_id
             INNER JOIN {$wpdb->posts} p 
                 ON tr.object_id = p.ID
+            {$joins}
             WHERE tt.taxonomy = %s
             AND p.post_type = %s
             AND p.post_status = 'publish'
+            {$where_clauses}
             GROUP BY tt.term_id",
-            $taxonomy_slug,
-            $post_type
+            $params
         );
         
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared

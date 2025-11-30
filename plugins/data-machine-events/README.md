@@ -2,7 +2,7 @@
 
 Frontend-focused WordPress events plugin with **block-first architecture**. Features AI-driven event creation via Data Machine integration, Event Details blocks with InnerBlocks for rich content editing, Calendar blocks for display, and comprehensive venue taxonomy management.
 
-**Version**: 0.4.6
+**Version**: 0.4.9
 
 ## Migration Showcase
 

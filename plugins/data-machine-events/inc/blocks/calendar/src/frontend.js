@@ -4,6 +4,7 @@
  * Module orchestration for calendar blocks with REST API filtering.
  */
 
+import 'flatpickr/dist/flatpickr.css';
 import './flatpickr-theme.css';
 
 import { initCarousel, destroyCarousel } from './modules/carousel.js';
@@ -11,7 +12,7 @@ import { initDatePicker, destroyDatePicker, getDatePicker } from './modules/date
 import { initFilterModal } from './modules/filter-modal.js';
 import { initNavigation } from './modules/navigation.js';
 import { fetchCalendarEvents } from './modules/api-client.js';
-import { buildQueryParams, updateUrl } from './modules/state.js';
+import { buildQueryParams, updateUrl, loadStateFromStorage } from './modules/state.js';
 
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.datamachine-events-calendar').forEach(initCalendarInstance);
@@ -38,6 +39,16 @@ function initCalendarInstance(calendar) {
     });
 
     initSearchInput(calendar);
+
+    // Restore state if URL is clean (no params)
+    if (window.location.search === '') {
+        const storedParams = loadStateFromStorage();
+        if (storedParams && storedParams.toString() !== '') {
+            const newUrl = `${window.location.pathname}?${storedParams.toString()}`;
+            window.history.replaceState({ path: newUrl }, '', newUrl);
+            refreshCalendar(calendar, storedParams);
+        }
+    }
 }
 
 function initSearchInput(calendar) {

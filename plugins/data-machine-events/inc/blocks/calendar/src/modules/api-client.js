@@ -42,12 +42,13 @@ export async function fetchCalendarEvents(calendar, params) {
 }
 
 /**
- * Fetch filter options from REST API with optional active filter context
+ * Fetch filter options from REST API with active filters and date context
  * 
  * @param {Object} activeFilters Current filter selections keyed by taxonomy slug
+ * @param {Object} dateContext Date filtering context (date_start, date_end, past)
  * @returns {Promise<Object>} Filter data with taxonomies, dependencies, and meta
  */
-export async function fetchFilters(activeFilters = {}) {
+export async function fetchFilters(activeFilters = {}, dateContext = {}) {
     const params = new URLSearchParams();
     
     Object.entries(activeFilters).forEach(([taxonomy, termIds]) => {
@@ -57,6 +58,16 @@ export async function fetchFilters(activeFilters = {}) {
             });
         }
     });
+
+    if (dateContext.date_start) {
+        params.set('date_start', dateContext.date_start);
+    }
+    if (dateContext.date_end) {
+        params.set('date_end', dateContext.date_end);
+    }
+    if (dateContext.past) {
+        params.set('past', dateContext.past);
+    }
 
     const apiUrl = `/wp-json/datamachine/v1/events/filters?${params.toString()}`;
 

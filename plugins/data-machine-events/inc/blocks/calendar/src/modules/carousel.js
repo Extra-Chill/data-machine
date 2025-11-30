@@ -25,25 +25,42 @@ export function initCarousel(calendar) {
             const wrapperRect = wrapper.getBoundingClientRect();
             const dots = indicators.querySelectorAll('.datamachine-carousel-dot');
             
-            let maxVisibleIndex = 0;
-            let maxVisibleArea = 0;
+            // Detect single-card mode (mobile) vs multi-card mode (desktop)
+            const firstEventWidth = events[0]?.getBoundingClientRect().width || 0;
+            const isSingleCardMode = firstEventWidth > 0 && (wrapperRect.width / firstEventWidth) < 1.5;
 
-            events.forEach(function(event, index) {
-                const eventRect = event.getBoundingClientRect();
-                
-                const visibleLeft = Math.max(eventRect.left, wrapperRect.left);
-                const visibleRight = Math.min(eventRect.right, wrapperRect.right);
-                const visibleWidth = Math.max(0, visibleRight - visibleLeft);
-                
-                if (visibleWidth > maxVisibleArea) {
-                    maxVisibleArea = visibleWidth;
-                    maxVisibleIndex = index;
-                }
-            });
+            if (isSingleCardMode) {
+                // Mobile: "most visible card wins" - only one dot active
+                let maxVisibleIndex = 0;
+                let maxVisibleArea = 0;
 
-            dots.forEach(function(dot, index) {
-                dot.classList.toggle('active', index === maxVisibleIndex);
-            });
+                events.forEach(function(event, index) {
+                    const eventRect = event.getBoundingClientRect();
+                    const visibleLeft = Math.max(eventRect.left, wrapperRect.left);
+                    const visibleRight = Math.min(eventRect.right, wrapperRect.right);
+                    const visibleWidth = Math.max(0, visibleRight - visibleLeft);
+                    
+                    if (visibleWidth > maxVisibleArea) {
+                        maxVisibleArea = visibleWidth;
+                        maxVisibleIndex = index;
+                    }
+                });
+
+                dots.forEach(function(dot, index) {
+                    dot.classList.toggle('active', index === maxVisibleIndex);
+                });
+            } else {
+                // Desktop: activate dot for each card >50% visible
+                events.forEach(function(event, index) {
+                    const eventRect = event.getBoundingClientRect();
+                    const visibleLeft = Math.max(eventRect.left, wrapperRect.left);
+                    const visibleRight = Math.min(eventRect.right, wrapperRect.right);
+                    const visibleWidth = Math.max(0, visibleRight - visibleLeft);
+                    const visibilityRatio = visibleWidth / eventRect.width;
+                    
+                    dots[index].classList.toggle('active', visibilityRatio > 0.5);
+                });
+            }
 
             const atStart = wrapper.scrollLeft <= 5;
             const atEnd = wrapper.scrollLeft + wrapper.clientWidth >= wrapper.scrollWidth - 5;

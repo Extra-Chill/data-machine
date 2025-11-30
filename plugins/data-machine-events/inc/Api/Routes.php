@@ -131,7 +131,7 @@ function register_routes() {
 			'callback'            => array( $filters, 'get' ),
 			'permission_callback' => '__return_true',
 			'args'                => array(
-				'active'  => array(
+				'active'     => array(
 					'type'              => 'object',
 					'default'           => array(),
 					'sanitize_callback' => function( $value ) {
@@ -146,9 +146,21 @@ function register_routes() {
 						return $sanitized;
 					},
 				),
-				'context' => array(
+				'context'    => array(
 					'type'              => 'string',
 					'default'           => 'modal',
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'date_start' => array(
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'date_end'   => array(
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'past'       => array(
+					'type'              => 'string',
 					'sanitize_callback' => 'sanitize_text_field',
 				),
 			),

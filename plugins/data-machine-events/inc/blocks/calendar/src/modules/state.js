@@ -16,6 +16,7 @@ export function getUrlParams() {
 export function updateUrl(params) {
     const newUrl = `${window.location.pathname}?${params.toString()}`;
     window.history.pushState({}, '', newUrl);
+    saveStateToStorage(params);
 }
 
 export function buildQueryParams(calendar, datePicker = null) {
@@ -76,4 +77,58 @@ export function buildQueryParams(calendar, datePicker = null) {
     }
 
     return params;
+}
+
+/**
+ * Storage Key for Calendar State
+ */
+const STORAGE_KEY = 'datamachine_events_calendar_state';
+
+/**
+ * Save current filters to local storage
+ * @param {URLSearchParams} params 
+ */
+function saveStateToStorage(params) {
+    try {
+        const state = {};
+        for (const [key, value] of params.entries()) {
+            if (Object.prototype.hasOwnProperty.call(state, key)) {
+                if (!Array.isArray(state[key])) {
+                    state[key] = [state[key]];
+                }
+                state[key].push(value);
+            } else {
+                state[key] = value;
+            }
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+        console.warn('Failed to save calendar state:', e);
+    }
+}
+
+/**
+ * Load filters from local storage
+ * @returns {URLSearchParams|null}
+ */
+export function loadStateFromStorage() {
+    try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (!stored) return null;
+
+        const state = JSON.parse(stored);
+        const params = new URLSearchParams();
+
+        Object.entries(state).forEach(([key, value]) => {
+            if (Array.isArray(value)) {
+                value.forEach(v => params.append(key, v));
+            } else {
+                params.append(key, value);
+            }
+        });
+
+        return params;
+    } catch (e) {
+        return null;
+    }
 }

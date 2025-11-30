@@ -32,7 +32,7 @@ export function initFilterModal(calendar, onApply, onReset) {
             document.body.classList.add('datamachine-modal-active');
             filterBtn.setAttribute('aria-expanded', 'true');
             
-            await loadFilters(modal, getActiveFiltersFromUrl());
+            await loadFilters(modal, getActiveFiltersFromUrl(), getDateContextFromUrl());
         });
     }
 
@@ -73,7 +73,7 @@ export function initFilterModal(calendar, onApply, onReset) {
     if (resetBtn) {
         resetBtn.addEventListener('click', async function() {
             currentFilters = {};
-            await loadFilters(modal, {});
+            await loadFilters(modal, {}, getDateContextFromUrl());
             updateFilterCount(calendar);
             if (onReset) onReset();
             closeModal();
@@ -101,7 +101,16 @@ function getActiveFiltersFromUrl() {
     return filters;
 }
 
-async function loadFilters(modal, activeFilters = {}) {
+function getDateContextFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+        date_start: params.get('date_start') || '',
+        date_end: params.get('date_end') || '',
+        past: params.get('past') || ''
+    };
+}
+
+async function loadFilters(modal, activeFilters = {}, dateContext = {}) {
     const container = modal.querySelector('.datamachine-filter-taxonomies');
     const loading = modal.querySelector('.datamachine-filter-loading');
     
@@ -111,7 +120,7 @@ async function loadFilters(modal, activeFilters = {}) {
     container.innerHTML = '';
     
     try {
-        const data = await fetchFilters(activeFilters);
+        const data = await fetchFilters(activeFilters, dateContext);
         
         if (!data.success) {
             throw new Error('API returned unsuccessful response');
@@ -121,7 +130,7 @@ async function loadFilters(modal, activeFilters = {}) {
         currentFilters = activeFilters;
         
         renderTaxonomies(container, data.taxonomies, activeFilters);
-        attachParentChangeListeners(modal);
+        attachParentChangeListeners(modal, dateContext);
         
     } catch (error) {
         console.error('Error loading filters:', error);
@@ -216,7 +225,7 @@ function flattenHierarchy(terms, level = 0) {
     return flat;
 }
 
-function attachParentChangeListeners(modal) {
+function attachParentChangeListeners(modal, dateContext = {}) {
     const parentTaxonomies = new Set(Object.values(dependencies));
     
     parentTaxonomies.forEach(parentSlug => {
@@ -227,7 +236,7 @@ function attachParentChangeListeners(modal) {
         checkboxes.forEach(checkbox => {
             checkbox.addEventListener('change', async () => {
                 const activeFilters = getCheckedFilters(modal);
-                await loadFilters(modal, activeFilters);
+                await loadFilters(modal, activeFilters, dateContext);
             });
         });
     });

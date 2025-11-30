@@ -9,7 +9,8 @@
  */
 
 /* Container */
-.venue-autocomplete-container {
+.venue-autocomplete-container,
+.address-autocomplete-container {
     position: relative;
     width: 100%;
 }

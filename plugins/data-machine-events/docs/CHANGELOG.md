@@ -5,6 +5,39 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.9] - 2025-11-29
+
+### Added
+- **Date Context Filtering** - Enhanced Filters API with date parameter support
+  - `/datamachine/v1/events/filters` endpoint now accepts `date_start`, `date_end`, and `past` parameters
+  - Contextual taxonomy filtering based on selected date ranges
+  - Improved filter accuracy with date-aware term counts
+
+- **Local Storage State Persistence** - Calendar filter state is now saved and restored
+  - Filter selections persist across page reloads using localStorage
+  - Automatic state restoration when returning to clean URLs
+  - Enhanced user experience with maintained filter context
+
+- **Address Autocomplete CSS** - Extended venue autocomplete styles
+  - Added `.address-autocomplete-container` class support
+  - Consistent styling for address field autocomplete functionality
+
+### Changed
+- **Enhanced Carousel Dot Detection** - Improved active dot calculation for carousel navigation
+  - Better detection of single-card vs multi-card display modes
+  - More accurate dot highlighting based on visible event cards
+  - Responsive behavior across different screen sizes
+
+- **Date Picker Clear Button** - Added clear functionality to date range picker
+  - Clear button appears when dates are selected
+  - Improved date picker usability with easy reset option
+  - Better visual feedback for date picker state
+
+- **Taxonomy Helper Date Context** - Enhanced taxonomy processing with date filtering
+  - `get_all_taxonomies_with_counts()` now accepts optional date context
+  - Date-aware taxonomy term counts and filtering
+  - More accurate filter options based on selected date ranges
+
 ## [0.4.8] - 2025-11-29
 
 ### Added

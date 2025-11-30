@@ -3,7 +3,6 @@
  */
 
 import flatpickr from 'flatpickr';
-import 'flatpickr/dist/flatpickr.css';
 
 const datePickers = new Map();
 
@@ -47,33 +46,44 @@ export function initDatePicker(calendar, onChange) {
         }
     });
 
-    datePickers.set(calendar, picker);
+    const clearHandler = function() {
+        picker.clear();
+    };
+
+    datePickers.set(calendar, { picker, clearBtn, clearHandler });
 
     if (picker.selectedDates && picker.selectedDates.length > 0 && clearBtn) {
         clearBtn.classList.add('visible');
     }
 
     if (clearBtn) {
-        clearBtn.addEventListener('click', function() {
-            picker.clear();
-        });
+        clearBtn.addEventListener('click', clearHandler);
     }
 
     return picker;
 }
 
 export function destroyDatePicker(calendar) {
-    const picker = datePickers.get(calendar);
-    if (picker) {
-        try {
-            picker.destroy();
-        } catch (e) {
-            // Ignore destruction errors
+    const data = datePickers.get(calendar);
+    if (data) {
+        const { picker, clearBtn, clearHandler } = data;
+        
+        if (clearBtn && clearHandler) {
+            clearBtn.removeEventListener('click', clearHandler);
+        }
+
+        if (picker) {
+            try {
+                picker.destroy();
+            } catch (e) {
+                // Ignore destruction errors
+            }
         }
         datePickers.delete(calendar);
     }
 }
 
 export function getDatePicker(calendar) {
-    return datePickers.get(calendar) || null;
+    const data = datePickers.get(calendar);
+    return data ? data.picker : null;
 }
