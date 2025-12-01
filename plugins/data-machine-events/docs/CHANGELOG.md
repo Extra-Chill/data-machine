@@ -5,6 +5,36 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.16] - 2025-12-01
+
+### Added
+- **DoStuffMediaApi Import Handler**: New handler for DoStuff Media JSON feeds with comprehensive venue metadata extraction
+  - Supports venues like Waterloo Records using DoStuff Media platform
+  - Extracts complete event data including venue coordinates, pricing, and artist information
+  - Single-item processing with EventIdentifierGenerator for duplicate prevention
+  - Keyword filtering (include/exclude) for selective event imports
+- **Address-Based Venue Matching**: Enhanced Venue_Taxonomy with smart address normalization and duplicate prevention
+  - Normalizes addresses for consistent matching (street abbreviations, case insensitivity)
+  - Finds existing venues by address + city combination before name matching
+  - Smart metadata merging when venues are matched by address
+- **DiceFm Keyword Filtering**: Include/exclude keyword options for better event selection control
+  - Filter events by keywords in title and description
+  - Comma-separated keyword lists for flexible filtering
+
+### Enhanced
+- **Calendar Filter Reset**: Complete state clearing with localStorage and URL parameter reset
+  - Clears localStorage calendar state and URL parameters
+  - Resets filter count badge to zero for accurate visual feedback
+  - Improved reliability of filter reset functionality
+- **Venue Taxonomy**: Smart merging of venue metadata when matching by address
+- **Handler Documentation**: Comprehensive docs for DoStuffMediaApi and updated DiceFm/Ticketmaster guides
+
+### Changed
+- **DiceFm Handler**: Simplified configuration with hardcoded API parameters for consistency
+  - Hardcoded page_size: 100 and types: 'linkout,event' for reliable behavior
+  - Removed configurable date_range and page_size parameters
+- **Venue Processing**: Address-first matching strategy for improved venue deduplication
+
 ## [0.4.15] - 2025-11-30
 
 ### Enhanced

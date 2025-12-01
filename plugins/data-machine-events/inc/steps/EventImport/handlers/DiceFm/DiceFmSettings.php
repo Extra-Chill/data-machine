@@ -45,6 +45,20 @@ class DiceFmSettings {
                 'description' => __('City name to search for events (required). This is the primary filter for Dice.fm API.', 'datamachine-events'),
                 'placeholder' => __('Charleston', 'datamachine-events'),
                 'required' => true,
+            ],
+            'search' => [
+                'type' => 'text',
+                'label' => __('Include Keywords', 'datamachine-events'),
+                'description' => __('Only import events containing any of these keywords (comma-separated). Leave empty to import all.', 'datamachine-events'),
+                'placeholder' => __('concert, live music, band', 'datamachine-events'),
+                'required' => false
+            ],
+            'exclude_keywords' => [
+                'type' => 'text',
+                'label' => __('Exclude Keywords', 'datamachine-events'),
+                'description' => __('Skip events containing any of these keywords (comma-separated).', 'datamachine-events'),
+                'placeholder' => __('trivia, karaoke, brunch, bingo', 'datamachine-events'),
+                'required' => false
             ]
         ];
     }
@@ -57,7 +71,9 @@ class DiceFmSettings {
      */
     public static function sanitize(array $raw_settings): array {
         return [
-            'city' => sanitize_text_field($raw_settings['city'] ?? '')
+            'city' => sanitize_text_field($raw_settings['city'] ?? ''),
+            'search' => sanitize_text_field($raw_settings['search'] ?? ''),
+            'exclude_keywords' => sanitize_text_field($raw_settings['exclude_keywords'] ?? '')
         ];
     }
     
@@ -78,7 +94,9 @@ class DiceFmSettings {
      */
     public static function get_defaults(): array {
         return [
-            'city' => ''
+            'city' => '',
+            'search' => '',
+            'exclude_keywords' => ''
         ];
     }
 }

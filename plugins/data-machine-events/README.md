@@ -2,7 +2,7 @@
 
 Frontend-focused WordPress events plugin with **block-first architecture**. Features AI-driven event creation via Data Machine integration, Event Details blocks with InnerBlocks for rich content editing, Calendar blocks for display, and comprehensive venue taxonomy management.
 
-**Version**: 0.4.14
+**Version**: 0.4.16
 
 ## Migration Showcase
 
@@ -98,7 +98,7 @@ datamachine-events/
 │   │   └── meta-storage.php                    # Event metadata sync and management
 │   ├── steps/               # Data Machine integration
 │   │   ├── EventImport/     # Import handlers with single-item processing
-│   │   │   ├── Handlers/    # Import handlers (8 total)
+│   │   │   ├── Handlers/    # Import handlers (10 total)
 │   │   │   │   ├── Ticketmaster/               # Ticketmaster Discovery API
 │   │   │   │   ├── DiceFm/                     # Dice FM integration
 │   │   │   │   ├── GoogleCalendar/             # Google Calendar integration

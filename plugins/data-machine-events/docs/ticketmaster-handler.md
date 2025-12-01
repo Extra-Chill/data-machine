@@ -6,6 +6,8 @@ Ticketmaster Discovery API integration for importing events with comprehensive v
 
 The Ticketmaster handler provides complete integration with Ticketmaster's Discovery API, extracting event data with full venue details, pricing, and availability. Features single-item processing and EventIdentifierGenerator for consistent duplicate detection across all import sources.
 
+**Note**: The handler uses a hardcoded start time of +1 hour from the current time for consistent API behavior and timezone consistency across all imports.
+
 ## Features
 
 ### Event Data Extraction
@@ -20,6 +22,7 @@ The Ticketmaster handler provides complete integration with Ticketmaster's Disco
 - **Event Identity Normalization**: Uses EventIdentifierGenerator for consistent duplicate detection
 - **Processed Items Tracking**: Prevents duplicate imports using Data Machine's tracking system
 - **API Rate Limiting**: Respects Ticketmaster API quotas and implements backoff strategies
+- **Fixed Start Time**: Hardcoded +1 hour from current time for consistent API behavior and timezone consistency
 
 ## Configuration
 
@@ -29,9 +32,9 @@ The Ticketmaster handler provides complete integration with Ticketmaster's Disco
 
 ### Optional Settings
 - **Search Radius**: Geographic search radius in miles/kilometers
-- **Date Range**: Import window (default: upcoming events)
 - **Event Classification**: Filter by event categories or genres
-- **Venue Override**: Override venue assignment for consistency
+- **Genre ID**: Specific Ticketmaster Genre ID for sub-filtering within the selected event type
+- **Venue ID**: Specific Ticketmaster Venue ID to search
 
 ## Usage Examples
 
@@ -39,7 +42,8 @@ The Ticketmaster handler provides complete integration with Ticketmaster's Disco
 ```php
 $config = [
     'api_key' => 'your_ticketmaster_api_key',
-    'location' => 'Charleston, SC',
+    'classification_type' => 'music',
+    'location' => '32.7765,-79.9311', // Charleston, SC coordinates
     'radius' => 50
 ];
 ```
@@ -49,9 +53,10 @@ $config = [
 $config = [
     'api_key' => 'your_ticketmaster_api_key',
     'location' => '39.9526,-75.1652', // Philadelphia coordinates
-    'classification_name' => 'music',
-    'start_date_time' => '2025-01-01T00:00:00Z',
-    'end_date_time' => '2025-12-31T23:59:59Z'
+    'classification_type' => 'music',
+    'radius' => 25,
+    'genre' => 'KnvZfZ7vAeA', // Rock music genre ID
+    'venue_id' => 'KovZpZAJledA' // Specific venue ID
 ];
 ```
 

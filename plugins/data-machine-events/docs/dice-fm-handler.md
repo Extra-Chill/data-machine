@@ -1,16 +1,16 @@
 # Dice FM Handler
 
-Dice FM event integration for importing events from Dice FM platform with comprehensive venue metadata extraction.
+Dice FM event integration for importing events from Dice FM platform with venue metadata extraction.
 
 ## Overview
 
-The Dice FM handler provides seamless integration with Dice FM's event platform, extracting event data with full venue information including coordinates for accurate map display. Features single-item processing and EventIdentifierGenerator for consistent duplicate detection.
+The Dice FM handler provides seamless integration with Dice FM's event platform, extracting event data with venue information for location-based display. Features single-item processing and EventIdentifierGenerator for consistent duplicate detection.
 
 ## Features
 
 ### Event Data Extraction
-- **Comprehensive Event Data**: Extracts title, dates, times, descriptions, and pricing
-- **Venue Metadata**: Complete venue information including address, city, state, coordinates
+- **Comprehensive Event Data**: Extracts title, dates, times, descriptions, and ticket URLs
+- **Venue Metadata**: Venue name and address information (coordinates not provided by Dice FM API)
 - **Image Support**: Event images and promotional materials
 - **Pricing Information**: Ticket pricing and availability data
 
@@ -23,31 +23,32 @@ The Dice FM handler provides seamless integration with Dice FM's event platform,
 
 ### Required Settings
 - **API Key**: Dice FM API authentication key
-- **Location/City**: Target location for event discovery
+- **City**: Target city for event discovery (required)
 
 ### Optional Settings
-- **Date Range**: Import window (default: upcoming events)
-- **Categories**: Event category filtering
-- **Venue Override**: Override venue assignment for consistency
+- **Include Keywords**: Only import events containing specified keywords (comma-separated)
+- **Exclude Keywords**: Skip events containing specified keywords (comma-separated)
+
+### Hardcoded Parameters
+For consistent behavior and API optimization, the following parameters are hardcoded:
+- **Page Size**: 100 events per API request
+- **Event Types**: 'linkout,event' (includes both promoted and regular events)
 
 ## Usage Examples
 
 ### Basic Configuration
 ```php
 $config = [
-    'api_key' => 'your_dice_fm_api_key',
-    'location' => 'Charleston, SC',
-    'days_ahead' => 30
+    'city' => 'Charleston, SC'
 ];
 ```
 
 ### Filtered Import
 ```php
 $config = [
-    'api_key' => 'your_dice_fm_api_key',
-    'location' => 'New York, NY',
-    'categories' => 'music,arts',
-    'venue_override' => 'Custom Venue Name'
+    'city' => 'New York, NY',
+    'search' => 'concert, live music, band',
+    'exclude_keywords' => 'trivia, karaoke, brunch'
 ];
 ```
 
@@ -57,7 +58,7 @@ $config = [
 - **Title**: Event name from Dice FM API
 - **Start/End Dates**: Event timing information
 - **Description**: Event description and details
-- **Venue**: Complete venue data with address and coordinates
+- **Venue**: Venue name and address information
 - **Pricing**: Ticket information and pricing
 - **Images**: Event promotional images
 
@@ -98,7 +99,7 @@ do_action('datamachine_mark_item_processed', $flow_step_id, 'dice_fm', $event_id
 ### Dice FM API
 - **Events Endpoint**: Location-based event discovery
 - **Event Details**: Comprehensive event information
-- **Venue Data**: Complete venue metadata including coordinates
+- **Venue Data**: Venue name and address information
 - **Image Assets**: Event promotional materials
 
 ### Rate Limiting
@@ -141,4 +142,4 @@ do_action('datamachine_mark_item_processed', $flow_step_id, 'dice_fm', $event_id
 - **Event Processing**: Step-by-step processing information
 - **Venue Assignment**: Venue data extraction verification
 
-The Dice FM handler provides reliable event import from Dice FM with comprehensive venue data and efficient duplicate prevention.
+The Dice FM handler provides reliable event import from Dice FM with venue data and efficient duplicate prevention.

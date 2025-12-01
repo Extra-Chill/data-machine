@@ -103,6 +103,22 @@ class Venue_Taxonomy {
      * @return array Array with keys: term_id, was_created
      */
     public static function find_or_create_venue($venue_name, $venue_data = []) {
+        // Address-based matching (source of truth)
+        $address = $venue_data['address'] ?? '';
+        $city = $venue_data['city'] ?? '';
+        
+        $address_match = self::find_venue_by_address($address, $city);
+        if ($address_match) {
+            if (!empty($venue_data)) {
+                self::smart_merge_venue_meta($address_match, $venue_data);
+            }
+            
+            return [
+                'term_id' => $address_match,
+                'was_created' => false
+            ];
+        }
+
         // Allow normalization of venue name (e.g. aliases, corrections)
         $venue_name = apply_filters('datamachine_events_normalize_venue_name', $venue_name);
 
@@ -316,6 +332,89 @@ class Venue_Taxonomy {
             return $result['lat'] . ',' . $result['lon'];
         }
 
+        return null;
+    }
+
+    /**
+     * Normalize address string for consistent comparison
+     *
+     * @param string $address Raw address string
+     * @return string Normalized address for matching
+     */
+    private static function normalize_address_for_matching(string $address): string {
+        $address = strtolower(trim($address));
+        
+        $replacements = [
+            '/\bstreet\b/' => 'st',
+            '/\bavenue\b/' => 'ave',
+            '/\bboulevard\b/' => 'blvd',
+            '/\bdrive\b/' => 'dr',
+            '/\broad\b/' => 'rd',
+            '/\blane\b/' => 'ln',
+            '/\bcourt\b/' => 'ct',
+            '/\bsuite\b/' => 'ste',
+            '/\bapartment\b/' => 'apt',
+            '/\bhighway\b/' => 'hwy',
+            '/\bparkway\b/' => 'pkwy',
+            '/\bplace\b/' => 'pl',
+            '/\bcircle\b/' => 'cir',
+            '/[.,#]/' => '',
+        ];
+        
+        foreach ($replacements as $pattern => $replacement) {
+            $address = preg_replace($pattern, $replacement, $address);
+        }
+        
+        return preg_replace('/\s+/', ' ', trim($address));
+    }
+
+    /**
+     * Find existing venue by address and city
+     *
+     * @param string $address Street address
+     * @param string $city City name
+     * @return int|null Term ID if found, null otherwise
+     */
+    public static function find_venue_by_address(string $address, string $city): ?int {
+        if (empty($address) || empty($city)) {
+            return null;
+        }
+        
+        $normalized_address = self::normalize_address_for_matching($address);
+        $normalized_city = strtolower(trim($city));
+        
+        $venues = get_terms([
+            'taxonomy' => 'venue',
+            'hide_empty' => false,
+            'meta_query' => [
+                [
+                    'key' => '_venue_city',
+                    'compare' => 'EXISTS'
+                ]
+            ]
+        ]);
+        
+        if (is_wp_error($venues) || empty($venues)) {
+            return null;
+        }
+        
+        foreach ($venues as $venue) {
+            $venue_address = get_term_meta($venue->term_id, '_venue_address', true);
+            $venue_city = get_term_meta($venue->term_id, '_venue_city', true);
+            
+            if (empty($venue_address) || empty($venue_city)) {
+                continue;
+            }
+            
+            $venue_normalized_address = self::normalize_address_for_matching($venue_address);
+            $venue_normalized_city = strtolower(trim($venue_city));
+            
+            if ($venue_normalized_address === $normalized_address && 
+                $venue_normalized_city === $normalized_city) {
+                return $venue->term_id;
+            }
+        }
+        
         return null;
     }
 

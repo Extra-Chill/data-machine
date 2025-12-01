@@ -38,6 +38,12 @@ Carousel List provides sequential event display optimized for browsing:
 - **Performance**: CSS-only rendering requires no JavaScript for display
 - **Accessibility**: Screen reader and keyboard navigation support
 
+### Enhanced Carousel Navigation (v0.4.10)
+- **Click and Hold**: Chevron controls support continuous scrolling while pressed
+- **Touch-Friendly**: Optimized event handling for mobile devices with improved touch responsiveness
+- **Smooth Scroll**: Enhanced scroll behavior with visual feedback and momentum
+- **Active Dot Detection**: Improved dot indicator highlighting using precise scroll position calculation
+
 ## Filtering Features
 
 ### Search Functionality
@@ -55,6 +61,13 @@ Carousel List provides sequential event display optimized for browsing:
 - **Hierarchical Support**: Category and sub-category filtering
 - **Multi-select**: Multiple taxonomy terms per filter
 - **Active State**: Visual filter count indicators
+
+### Filter Reset (v0.4.15)
+- **Complete State Clearing**: Resets all active filters when reset button is clicked
+- **localStorage Clearing**: Removes saved calendar state from browser storage
+- **URL Parameter Reset**: Clears all filter parameters from the URL for clean sharing
+- **Badge Reset**: Resets filter count badge to zero for accurate visual feedback
+- **Enhanced Reliability**: Improved reset functionality ensures consistent state management
 
 ## Template Architecture
 
@@ -147,7 +160,7 @@ The frontend JavaScript is organized into 6 focused ES modules for maintainabili
 ### Module Structure
 - **frontend.js** (93 lines): Module orchestration and calendar initialization
 - **modules/api-client.js**: REST API communication and calendar DOM updates
-- **modules/carousel.js**: Carousel overflow detection, dot indicators, and chevron navigation
+- **modules/carousel.js**: Enhanced carousel overflow detection, dot indicators, chevron navigation with click-and-hold functionality, and smooth scroll behavior
 - **modules/date-picker.js**: Flatpickr date range picker integration
 - **modules/filter-modal.js**: Taxonomy filter modal UI and accessibility
 - **modules/navigation.js**: Past/upcoming navigation and pagination link handling

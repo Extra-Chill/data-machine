@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.4.15
+**Version**: 0.4.16
 
 ## Migration Status
 
@@ -180,9 +180,10 @@ datamachine-events/
 │   │   └── meta-storage.php                    # Event metadata sync
 │   ├── steps/
 │   │   ├── EventImport/                        # Event import step and handlers
-│   │   │   ├── Handlers/                       # Import handlers (9 total)
+│   │   │   ├── Handlers/                       # Import handlers (10 total)
 │   │   │   │   ├── Ticketmaster/               # Ticketmaster Discovery API
 │   │   │   │   ├── DiceFm/                     # Dice FM integration
+│   │   │   │   ├── DoStuffMediaApi/            # DoStuff Media API integration
 │   │   │   │   ├── GoogleCalendar/             # Google Calendar integration
 │   │   │   │   │   ├── GoogleCalendarUtils.php # Calendar ID/URL utilities
 │   │   │   │   │   └── GoogleCalendarAuth.php  # Authentication handling
@@ -266,9 +267,10 @@ datamachine-events/
 - **Automatic Instantiation**: Framework handles handler creation and execution
 - **Trait-based Registration**: All handlers use `HandlerRegistrationTrait` for self-registration
 
-### Import Handlers (9 Total)
+### Import Handlers (10 Total)
 - **Ticketmaster**: Discovery API with API key authentication, uses EventIdentifierGenerator for consistent event identity
 - **Dice FM**: Event integration with EventIdentifierGenerator normalization
+- **DoStuffMediaApi**: DoStuff Media API integration for event data
 - **SpotHopper**: SpotHopper venue events with full venue metadata extraction
 - **UniversalWebScraper**: AI-powered HTML section extraction with HTML hash tracking (ProcessedItems)
 - **WordPressEventsAPI**: External WordPress events via REST API with auto-format detection (Tribe Events v1, Tribe WP REST, generic WordPress)
@@ -482,8 +484,3 @@ Template_Loader::include_template('date-group', $group_data);
 - **Modular Templates**: Clean separation between data processing and HTML presentation
 - **REST API Aligned**: 100% compliance with Data Machine ecosystem strategy
 - **Zero AJAX**: Complete REST API migration with ~950 lines removed
-
----
-
-**Version**: 0.4.9
-**For ecosystem architecture, see root CLAUDE.md file**
