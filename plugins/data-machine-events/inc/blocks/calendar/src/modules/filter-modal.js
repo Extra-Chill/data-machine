@@ -66,7 +66,9 @@ export function initFilterModal(calendar, onApply, onReset) {
     const resetHandler = function() {
         localStorage.removeItem('datamachine_events_calendar_state');
         window.history.pushState({}, '', window.location.pathname);
-        
+
+        updateFilterCount(calendar);
+
         if (onReset) onReset(new URLSearchParams());
         closeModal();
     };
