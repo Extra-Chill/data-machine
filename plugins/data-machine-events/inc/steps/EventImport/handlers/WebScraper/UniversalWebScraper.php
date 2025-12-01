@@ -220,6 +220,7 @@ class UniversalWebScraper extends EventImportHandler {
             '//article[contains(@class, "concert")]',
 
             // Common event class patterns
+            '//*[contains(@class, "event-content-row")]',
             '//*[contains(@class, "event-item")]',
             '//*[contains(@class, "show-item")]',
             '//*[contains(@class, "concert-item")]',

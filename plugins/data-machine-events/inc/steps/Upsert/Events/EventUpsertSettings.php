@@ -39,11 +39,6 @@ class EventUpsertSettings {
         $user_options = WordPressSettingsHandler::get_user_options();
         
         $fields = [
-            'venue_info' => [
-                'type' => 'info',
-                'label' => __('Automatic Venue Handling', 'datamachine-events'),
-                'description' => __('Venues are automatically populated from import handlers (Ticketmaster, Dice FM, Web Scraper, Google Calendar). When available, the following venue metadata is automatically extracted and used to create or update venue taxonomy terms: <strong>Name, Address, City, State, Zip, Country, Phone, Website, GPS Coordinates, Capacity</strong>. The AI will use this data when creating event posts, and venues will be automatically assigned to events.', 'datamachine-events'),
-            ],
             'post_status' => [
                 'type' => 'select',
                 'label' => __('Post Status', 'datamachine-events'),

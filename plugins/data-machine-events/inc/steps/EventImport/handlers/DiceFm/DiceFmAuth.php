@@ -24,8 +24,9 @@ if (!defined('ABSPATH')) {
  * Authentication provider for Dice.fm API.
  * Integrates with Data Machine's unified authentication system.
  */
-class DiceFmAuth extends BaseAuthProvider {    public function __construct() {
-        parent::__construct('dice_fm_events');
+class DiceFmAuth extends BaseAuthProvider {
+    public function __construct() {
+        parent::__construct('dice_fm');
     }
     
     /**

@@ -95,6 +95,8 @@ function saveStateToStorage(params) {
     try {
         const state = {};
         for (const [key, value] of params.entries()) {
+            if (!key.startsWith('tax_filter')) continue;
+
             if (Object.prototype.hasOwnProperty.call(state, key)) {
                 if (!Array.isArray(state[key])) {
                     state[key] = [state[key]];
@@ -123,6 +125,8 @@ export function loadStateFromStorage() {
         const params = new URLSearchParams();
 
         Object.entries(state).forEach(([key, value]) => {
+            if (!key.startsWith('tax_filter')) return;
+
             if (Array.isArray(value)) {
                 value.forEach(v => params.append(key, v));
             } else {

@@ -9,7 +9,7 @@ import './flatpickr-theme.css';
 
 import { initCarousel, destroyCarousel } from './modules/carousel.js';
 import { initDatePicker, destroyDatePicker, getDatePicker } from './modules/date-picker.js';
-import { initFilterModal } from './modules/filter-modal.js';
+import { initFilterModal, destroyFilterModal } from './modules/filter-modal.js';
 import { initNavigation } from './modules/navigation.js';
 import { fetchCalendarEvents } from './modules/api-client.js';
 import { buildQueryParams, updateUrl, loadStateFromStorage } from './modules/state.js';
@@ -31,7 +31,7 @@ function initCalendarInstance(calendar) {
     initFilterModal(
         calendar,
         function() { handleFilterChange(calendar); },
-        function() { handleFilterChange(calendar); }
+        function(params) { handleFilterReset(calendar, params); }
     );
 
     initNavigation(calendar, function(params) {
@@ -81,6 +81,10 @@ async function handleFilterChange(calendar) {
     await refreshCalendar(calendar, params);
 }
 
+async function handleFilterReset(calendar, params) {
+    await refreshCalendar(calendar, params);
+}
+
 async function handleNavigation(calendar, params) {
     updateUrl(params);
     await refreshCalendar(calendar, params);
@@ -89,6 +93,7 @@ async function handleNavigation(calendar, params) {
 async function refreshCalendar(calendar, params) {
     destroyCarousel(calendar);
     destroyDatePicker(calendar);
+    destroyFilterModal(calendar);
 
     await fetchCalendarEvents(calendar, params);
 

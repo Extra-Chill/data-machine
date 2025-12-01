@@ -5,11 +5,13 @@
 import { fetchFilters } from './api-client.js';
 
 let dependencies = {};
-let currentFilters = {};
 
 export function initFilterModal(calendar, onApply, onReset) {
     const modal = calendar.querySelector('.datamachine-taxonomy-modal');
     if (!modal) return;
+
+    if (modal.dataset.dmListenersAttached === 'true') return;
+    modal.dataset.dmListenersAttached = 'true';
 
     const modalContainer = modal.querySelector('.datamachine-taxonomy-modal-container');
     if (modalContainer) {
@@ -22,20 +24,6 @@ export function initFilterModal(calendar, onApply, onReset) {
     const applyBtn = modal.querySelector('.datamachine-apply-filters');
     const resetBtn = modal.querySelector('.datamachine-clear-all-filters, .datamachine-reset-filters');
 
-    if (filterBtn) {
-        const modalId = modal.id || '';
-        filterBtn.setAttribute('aria-controls', modalId);
-        filterBtn.setAttribute('aria-expanded', 'false');
-
-        filterBtn.addEventListener('click', async function() {
-            modal.classList.add('datamachine-modal-active');
-            document.body.classList.add('datamachine-modal-active');
-            filterBtn.setAttribute('aria-expanded', 'true');
-            
-            await loadFilters(modal, getActiveFiltersFromUrl(), getDateContextFromUrl());
-        });
-    }
-
     const closeModal = function() {
         modal.classList.remove('datamachine-modal-active');
         document.body.classList.remove('datamachine-modal-active');
@@ -45,42 +33,124 @@ export function initFilterModal(calendar, onApply, onReset) {
         }
     };
 
-    closeBtns.forEach(function(btn) {
-        btn.addEventListener('click', closeModal);
-    });
+    const openModalHandler = async function() {
+        modal.classList.add('datamachine-modal-active');
+        document.body.classList.add('datamachine-modal-active');
+        filterBtn.setAttribute('aria-expanded', 'true');
+        
+        await loadFilters(modal, getActiveFiltersFromUrl(), getDateContextFromUrl());
+    };
 
-    modal.addEventListener('click', function(e) {
+    const closeModalHandler = function() {
+        closeModal();
+    };
+
+    const overlayClickHandler = function(e) {
         if (e.target === modal || e.target.classList.contains('datamachine-taxonomy-modal-overlay')) {
             closeModal();
         }
-    });
+    };
 
     const escapeHandler = function(e) {
         if ((e.key === 'Escape' || e.key === 'Esc') && modal.classList.contains('datamachine-modal-active')) {
             closeModal();
         }
     };
+
+    const applyHandler = function() {
+        if (onApply) onApply();
+        closeModal();
+        updateFilterCount(calendar);
+    };
+
+    const resetHandler = function() {
+        localStorage.removeItem('datamachine_events_calendar_state');
+        window.history.pushState({}, '', window.location.pathname);
+        
+        if (onReset) onReset(new URLSearchParams());
+        closeModal();
+    };
+
+    if (filterBtn) {
+        const modalId = modal.id || '';
+        filterBtn.setAttribute('aria-controls', modalId);
+        filterBtn.setAttribute('aria-expanded', 'false');
+        filterBtn.addEventListener('click', openModalHandler);
+        modal._openModalHandler = openModalHandler;
+    }
+
+    closeBtns.forEach(function(btn) {
+        btn.addEventListener('click', closeModalHandler);
+    });
+    modal._closeModalHandler = closeModalHandler;
+    modal._closeBtns = closeBtns;
+
+    modal.addEventListener('click', overlayClickHandler);
+    modal._overlayClickHandler = overlayClickHandler;
+
     document.addEventListener('keydown', escapeHandler);
+    modal._escapeHandler = escapeHandler;
 
     if (applyBtn) {
-        applyBtn.addEventListener('click', function() {
-            if (onApply) onApply();
-            closeModal();
-            updateFilterCount(calendar);
-        });
+        applyBtn.addEventListener('click', applyHandler);
+        modal._applyHandler = applyHandler;
+        modal._applyBtn = applyBtn;
     }
 
     if (resetBtn) {
-        resetBtn.addEventListener('click', async function() {
-            currentFilters = {};
-            await loadFilters(modal, {}, getDateContextFromUrl());
-            updateFilterCount(calendar);
-            if (onReset) onReset();
-            closeModal();
-        });
+        resetBtn.addEventListener('click', resetHandler);
+        modal._resetHandler = resetHandler;
+        modal._resetBtn = resetBtn;
     }
 
     updateFilterCount(calendar);
+}
+
+export function destroyFilterModal(calendar) {
+    const modal = calendar.querySelector('.datamachine-taxonomy-modal');
+    if (!modal) return;
+
+    if (modal.dataset.dmListenersAttached !== 'true') return;
+
+    const filterBtn = calendar.querySelector('.datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .datamachine-events-filter-btn');
+
+    if (filterBtn && modal._openModalHandler) {
+        filterBtn.removeEventListener('click', modal._openModalHandler);
+    }
+
+    if (modal._closeBtns && modal._closeModalHandler) {
+        modal._closeBtns.forEach(function(btn) {
+            btn.removeEventListener('click', modal._closeModalHandler);
+        });
+    }
+
+    if (modal._overlayClickHandler) {
+        modal.removeEventListener('click', modal._overlayClickHandler);
+    }
+
+    if (modal._escapeHandler) {
+        document.removeEventListener('keydown', modal._escapeHandler);
+    }
+
+    if (modal._applyBtn && modal._applyHandler) {
+        modal._applyBtn.removeEventListener('click', modal._applyHandler);
+    }
+
+    if (modal._resetBtn && modal._resetHandler) {
+        modal._resetBtn.removeEventListener('click', modal._resetHandler);
+    }
+
+    delete modal._openModalHandler;
+    delete modal._closeModalHandler;
+    delete modal._closeBtns;
+    delete modal._overlayClickHandler;
+    delete modal._escapeHandler;
+    delete modal._applyHandler;
+    delete modal._applyBtn;
+    delete modal._resetHandler;
+    delete modal._resetBtn;
+
+    modal.dataset.dmListenersAttached = 'false';
 }
 
 function getActiveFiltersFromUrl() {
@@ -127,7 +197,6 @@ async function loadFilters(modal, activeFilters = {}, dateContext = {}) {
         }
         
         dependencies = data.dependencies || {};
-        currentFilters = activeFilters;
         
         renderTaxonomies(container, data.taxonomies, activeFilters);
         attachParentChangeListeners(modal, dateContext);
