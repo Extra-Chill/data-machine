@@ -12,6 +12,8 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\GoogleCalendar;
 
+use DataMachine\Core\HttpClient;
+
 // Prevent direct access
 if (!defined('ABSPATH')) {
     exit;
@@ -105,25 +107,26 @@ class GoogleCalendarAuth {
         }
 
         // Test if URL is accessible
-        $response = wp_remote_get($test_url, [
+        $result = HttpClient::get($test_url, [
             'timeout' => 30,
-            'user-agent' => 'Data Machine Events/1.0 (WordPress)',
             'headers' => [
-                'Accept' => 'text/calendar,text/plain,*/*'
-            ]
+                'Accept' => 'text/calendar,text/plain,*/*',
+            ],
+            'browser_mode' => true,
+            'context' => 'Google Calendar Connection Test',
         ]);
 
-        if (is_wp_error($response)) {
+        if (!$result['success']) {
             return [
                 'success' => false,
                 'message' => sprintf(
                     __('Connection failed: %s', 'datamachine-events'),
-                    $response->get_error_message()
+                    $result['error'] ?? 'Unknown error'
                 )
             ];
         }
 
-        $status_code = wp_remote_retrieve_response_code($response);
+        $status_code = $result['status_code'];
         if ($status_code !== 200) {
             return [
                 'success' => false,
@@ -134,7 +137,7 @@ class GoogleCalendarAuth {
             ];
         }
 
-        $body = wp_remote_retrieve_body($response);
+        $body = $result['data'];
         if (empty($body)) {
             return [
                 'success' => false,

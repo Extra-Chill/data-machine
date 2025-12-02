@@ -164,26 +164,25 @@ class SpotHopper extends EventImportHandler {
     private function fetch_events(string $spot_id): array {
         $url = self::API_BASE . urlencode($spot_id) . '/events';
 
-        $response = wp_remote_get($url, [
+        $result = $this->httpGet($url, [
             'timeout' => 30,
             'headers' => [
                 'Accept' => 'application/json',
-                'User-Agent' => 'Data Machine Events WordPress Plugin'
-            ]
+            ],
         ]);
 
-        if (is_wp_error($response)) {
-            $this->log('error', 'SpotHopper API request failed: ' . $response->get_error_message());
+        if (!$result['success']) {
+            $this->log('error', 'SpotHopper API request failed: ' . ($result['error'] ?? 'Unknown error'));
             return [];
         }
 
-        $status_code = wp_remote_retrieve_response_code($response);
+        $status_code = $result['status_code'];
         if ($status_code !== 200) {
             $this->log('error', 'SpotHopper API returned non-200 status', ['status' => $status_code]);
             return [];
         }
 
-        $body = wp_remote_retrieve_body($response);
+        $body = $result['data'];
         $data = json_decode($body, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {

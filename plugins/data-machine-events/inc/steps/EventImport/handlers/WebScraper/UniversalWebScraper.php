@@ -149,36 +149,36 @@ class UniversalWebScraper extends EventImportHandler {
      * @return string HTML content or empty string on failure
      */
     private function fetch_html(string $url): string {
-        $response = wp_remote_get($url, [
+        $result = $this->httpGet($url, [
             'timeout' => 30,
-            'user-agent' => 'Mozilla/5.0 (compatible; WordPress Event Scraper)',
             'headers' => [
                 'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language' => 'en-US,en;q=0.9'
-            ]
+                'Accept-Language' => 'en-US,en;q=0.9',
+            ],
+            'browser_mode' => true,
         ]);
         
-        if (is_wp_error($response)) {
+        if (!$result['success']) {
             $this->log('error', 'Universal AI Scraper: Failed to fetch URL', [
                 'url' => $url,
-                'error' => $response->get_error_message()
+                'error' => $result['error'] ?? 'Unknown error',
             ]);
             return '';
         }
         
-        $status_code = wp_remote_retrieve_response_code($response);
+        $status_code = $result['status_code'];
         if ($status_code !== 200) {
             $this->log('error', 'Universal AI Scraper: HTTP error when fetching URL', [
                 'url' => $url,
-                'status_code' => $status_code
+                'status_code' => $status_code,
             ]);
             return '';
         }
         
-        $body = wp_remote_retrieve_body($response);
+        $body = $result['data'];
         if (empty($body)) {
             $this->log('error', 'Universal AI Scraper: Empty response body', [
-                'url' => $url
+                'url' => $url,
             ]);
             return '';
         }

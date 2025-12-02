@@ -152,32 +152,32 @@ class DoStuffMediaApi extends EventImportHandler {
      * Fetch events from DoStuff Media JSON feed
      */
     private function fetch_events(string $feed_url): array {
-        $response = wp_remote_get($feed_url, [
+        $result = $this->httpGet($feed_url, [
             'timeout' => 30,
             'headers' => [
                 'Accept' => 'application/json',
-                'User-Agent' => 'Data Machine Events WordPress Plugin'
-            ]
+            ],
+            'browser_mode' => true,
         ]);
 
-        if (is_wp_error($response)) {
+        if (!$result['success']) {
             $this->log('error', 'DoStuff Media API request failed', [
                 'url' => $feed_url,
-                'error' => $response->get_error_message()
+                'error' => $result['error'] ?? 'Unknown error',
             ]);
             return [];
         }
 
-        $status_code = wp_remote_retrieve_response_code($response);
+        $status_code = $result['status_code'];
         if ($status_code !== 200) {
             $this->log('error', 'DoStuff Media API HTTP error', [
                 'url' => $feed_url,
-                'status_code' => $status_code
+                'status_code' => $status_code,
             ]);
             return [];
         }
 
-        $body = wp_remote_retrieve_body($response);
+        $body = $result['data'];
         $data = json_decode($body, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {

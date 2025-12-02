@@ -7,6 +7,8 @@
 
 namespace DataMachineEvents\Core;
 
+use DataMachine\Core\HttpClient;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -307,19 +309,20 @@ class Venue_Taxonomy {
             'q' => $query
         ], self::NOMINATIM_API);
 
-        $response = wp_remote_get($url, [
+        $result = HttpClient::get($url, [
             'timeout' => 10,
             'headers' => [
-                'User-Agent' => self::NOMINATIM_USER_AGENT
-            ]
+                'User-Agent' => self::NOMINATIM_USER_AGENT,
+            ],
+            'context' => 'Venue Geocoding',
         ]);
 
-        if (is_wp_error($response)) {
-            error_log('DM Events Geocoding Error: ' . $response->get_error_message());
+        if (!$result['success']) {
+            error_log('DM Events Geocoding Error: ' . ($result['error'] ?? 'Unknown error'));
             return null;
         }
 
-        $body = wp_remote_retrieve_body($response);
+        $body = $result['data'];
         $data = json_decode($body, true);
 
         if (empty($data) || !is_array($data) || empty($data[0])) {

@@ -230,19 +230,20 @@ class Ticketmaster extends EventImportHandler {
             return self::get_fallback_classifications();
         }
         
-        $api_url = 'https://app.ticketmaster.com/discovery/v2/classifications.json';
-        $response = wp_remote_get($api_url . '?apikey=' . urlencode($api_key), [
+        $api_url = 'https://app.ticketmaster.com/discovery/v2/classifications.json?apikey=' . urlencode($api_key);
+        $result = \DataMachine\Core\HttpClient::get($api_url, [
             'timeout' => 10,
             'headers' => [
-                'Accept' => 'application/json'
-            ]
+                'Accept' => 'application/json',
+            ],
+            'context' => 'Ticketmaster Classifications',
         ]);
         
-        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+        if (!$result['success'] || $result['status_code'] !== 200) {
             return self::get_fallback_classifications();
         }
         
-        $body = wp_remote_retrieve_body($response);
+        $body = $result['data'];
         $data = json_decode($body, true);
         
         if (!$data || !isset($data['_embedded']['classifications'])) {
@@ -297,20 +298,19 @@ class Ticketmaster extends EventImportHandler {
     private function fetch_events(array $params): array {
         $url = self::API_BASE . 'events.json?' . http_build_query($params);
         
-        $response = wp_remote_get($url, [
+        $result = $this->httpGet($url, [
             'timeout' => 30,
             'headers' => [
                 'Accept' => 'application/json',
-                'User-Agent' => 'Data Machine Events WordPress Plugin'
-            ]
+            ],
         ]);
         
-        if (is_wp_error($response)) {
-            $this->log('error', 'API request failed: ' . $response->get_error_message());
+        if (!$result['success']) {
+            $this->log('error', 'API request failed: ' . ($result['error'] ?? 'Unknown error'));
             return [];
         }
         
-        $body = wp_remote_retrieve_body($response);
+        $body = $result['data'];
         $data = json_decode($body, true);
         
         if (empty($data['_embedded']['events'])) {

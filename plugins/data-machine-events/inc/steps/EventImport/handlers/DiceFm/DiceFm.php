@@ -226,44 +226,44 @@ class DiceFm extends EventImportHandler {
         $url = add_query_arg($params, $base_url);
         
         // Prepare headers
-        $headers = array(
+        $headers = [
             'Accept' => 'application/json',
             'x-api-key' => $api_key,
-        );
+        ];
         
         if (!empty($partner_id)) {
             $headers['X-Partner-Id'] = trim($partner_id);
         }
         
         // Make API request
-        $response = wp_remote_get($url, array(
+        $result = $this->httpGet($url, [
             'headers' => $headers,
             'timeout' => 30,
-        ));
+        ]);
         
-        if (is_wp_error($response)) {
-            $this->log('error', 'Dice.fm API request failed: ' . $response->get_error_message());
-            return array();
+        if (!$result['success']) {
+            $this->log('error', 'Dice.fm API request failed: ' . ($result['error'] ?? 'Unknown error'));
+            return [];
         }
         
-        $response_code = wp_remote_retrieve_response_code($response);
-        $body = wp_remote_retrieve_body($response);
+        $response_code = $result['status_code'];
+        $body = $result['data'];
         
         if ($response_code !== 200) {
             $this->log('error', "Dice.fm API returned status {$response_code}: {$body}");
-            return array();
+            return [];
         }
         
         $data = json_decode($body, true);
         
         if (json_last_error() !== JSON_ERROR_NONE) {
             $this->log('error', 'Invalid JSON response from Dice.fm API');
-            return array();
+            return [];
         }
         
         if (!isset($data['data']) || !is_array($data['data'])) {
             $this->log('error', 'No events data in Dice.fm response');
-            return array();
+            return [];
         }
         
         return $data['data'];

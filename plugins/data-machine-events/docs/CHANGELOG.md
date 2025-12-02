@@ -5,6 +5,16 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.17] - 2025-12-01
+
+### Changed
+- **HTTP Client Modernization**: Comprehensive refactoring to use DataMachine HttpClient across all import handlers and core components
+  - Replaced `wp_remote_get()` with `DataMachine\Core\HttpClient::get()` for consistent HTTP handling
+  - Updated error handling patterns from WordPress remote API functions to HttpClient response format
+  - Added context parameters for improved logging and debugging capabilities
+  - Affected components: Geocoding API, Venue Taxonomy, and all 8 import handlers (DiceFm, DoStuffMediaApi, Eventbrite, GoogleCalendar, SpotHopper, UniversalWebScraper, WordPressEventsAPI, Ticketmaster)
+  - Improved code consistency and maintainability across the entire HTTP request layer
+
 ## [0.4.16] - 2025-12-01
 
 ### Added

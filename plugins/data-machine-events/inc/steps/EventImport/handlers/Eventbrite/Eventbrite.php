@@ -148,26 +148,26 @@ class Eventbrite extends EventImportHandler {
      * Fetch and parse events from Eventbrite organizer page
      */
     private function fetch_events_from_page(string $url): array {
-        $response = wp_remote_get($url, [
+        $result = $this->httpGet($url, [
             'timeout' => 30,
             'headers' => [
                 'Accept' => 'text/html,application/xhtml+xml',
-                'User-Agent' => 'Mozilla/5.0 (compatible; DataMachine/1.0)'
-            ]
+            ],
+            'browser_mode' => true,
         ]);
         
-        if (is_wp_error($response)) {
-            $this->log('error', 'Failed to fetch Eventbrite page: ' . $response->get_error_message());
+        if (!$result['success']) {
+            $this->log('error', 'Failed to fetch Eventbrite page: ' . ($result['error'] ?? 'Unknown error'));
             return [];
         }
         
-        $status_code = wp_remote_retrieve_response_code($response);
+        $status_code = $result['status_code'];
         if ($status_code !== 200) {
             $this->log('error', 'Eventbrite page returned status ' . $status_code);
             return [];
         }
         
-        $html = wp_remote_retrieve_body($response);
+        $html = $result['data'];
         
         return $this->extract_json_ld_events($html);
     }

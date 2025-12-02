@@ -12,6 +12,7 @@ namespace DataMachineEvents\Api\Controllers;
 defined( 'ABSPATH' ) || exit;
 
 use WP_REST_Request;
+use DataMachine\Core\HttpClient;
 
 class Geocoding {
 
@@ -45,34 +46,35 @@ class Geocoding {
 			self::NOMINATIM_API
 		);
 
-		$response = wp_remote_get(
+		$result = HttpClient::get(
 			$url,
-			array(
+			[
 				'timeout' => 10,
-				'headers' => array(
+				'headers' => [
 					'User-Agent' => self::USER_AGENT,
-				),
-			)
+				],
+				'context' => 'Geocoding API',
+			]
 		);
 
-		if ( is_wp_error( $response ) ) {
+		if ( ! $result['success'] ) {
 			return new \WP_Error(
 				'geocoding_failed',
 				__( 'Geocoding request failed', 'datamachine-events' ),
-				array( 'status' => 500 )
+				[ 'status' => 500 ]
 			);
 		}
 
-		$status_code = wp_remote_retrieve_response_code( $response );
+		$status_code = $result['status_code'];
 		if ( $status_code !== 200 ) {
 			return new \WP_Error(
 				'geocoding_error',
 				__( 'Geocoding service returned an error', 'datamachine-events' ),
-				array( 'status' => $status_code )
+				[ 'status' => $status_code ]
 			);
 		}
 
-		$body = wp_remote_retrieve_body( $response );
+		$body = $result['data'];
 		$data = json_decode( $body, true );
 
 		if ( ! is_array( $data ) ) {
