@@ -321,10 +321,10 @@ public function executeUpdate(array $parameters, array $handler_config): array {
 ```php
 use DataMachineEvents\Core\EventSchemaProvider;
 
-// Smart parameter routing for engine vs AI decisions
-$routing = EventSchemaProvider::engineOrTool($parameters, $handler_config, $engine_data);
-// engine: ['startDate', 'venue', 'venueAddress'] - system parameters
-// tool: ['description', 'performer', 'organizer'] - AI inference parameters
+// Tool parameters filtered at definition time - AI only sees what it needs to provide
+$core_params = EventSchemaProvider::getCoreToolParameters($engine_data);
+$schema_params = EventSchemaProvider::getSchemaToolParameters($engine_data);
+// If startDate exists in engine_data, it's excluded from core_params
 
 $schema = EventSchemaProvider::generateSchemaOrg($event_data, $venue_data, $post_id);
 ```

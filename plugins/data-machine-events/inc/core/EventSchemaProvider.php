@@ -15,6 +15,7 @@ if (!defined('ABSPATH')) {
 }
 
 class EventSchemaProvider {
+    use DynamicToolParametersTrait;
 
     public const EVENT_TYPES = [
         'Event',
@@ -205,11 +206,44 @@ class EventSchemaProvider {
         );
     }
 
-    public static function getCoreToolParameters(): array {
-        return self::fieldsToToolParameters(self::CORE_FIELDS);
+    /**
+     * Get all possible tool parameters (trait implementation).
+     *
+     * @return array Complete parameter definitions
+     */
+    protected static function getAllParameters(): array {
+        return self::fieldsToToolParameters(self::getAllFields());
     }
 
-    public static function getSchemaToolParameters(): array {
+    /**
+     * Get parameter keys that should check engine data (trait implementation).
+     * Excludes 'description' which AI should always generate.
+     *
+     * @return array List of parameter keys that are engine-aware
+     */
+    protected static function getEngineAwareKeys(): array {
+        $all_keys = array_keys(self::getAllFields());
+        return array_filter($all_keys, fn($key) => $key !== 'description');
+    }
+
+    /**
+     * Get core event tool parameters, filtered by engine data.
+     *
+     * @param array $engine_data Engine data snapshot
+     * @return array Filtered core parameter definitions
+     */
+    public static function getCoreToolParameters(array $engine_data = []): array {
+        $params = self::fieldsToToolParameters(self::CORE_FIELDS);
+        return static::filterByEngineData($params, $engine_data);
+    }
+
+    /**
+     * Get schema enrichment tool parameters, filtered by engine data.
+     *
+     * @param array $engine_data Engine data snapshot
+     * @return array Filtered schema parameter definitions
+     */
+    public static function getSchemaToolParameters(array $engine_data = []): array {
         $schema_fields = array_merge(
             self::OFFER_FIELDS,
             self::PERFORMER_FIELDS,
@@ -217,11 +251,19 @@ class EventSchemaProvider {
             self::STATUS_FIELDS,
             self::TYPE_FIELDS
         );
-        return self::fieldsToToolParameters($schema_fields);
+        $params = self::fieldsToToolParameters($schema_fields);
+        return static::filterByEngineData($params, $engine_data);
     }
 
-    public static function getAllToolParameters(): array {
-        return self::fieldsToToolParameters(self::getAllFields());
+    /**
+     * Get all tool parameters, filtered by engine data.
+     *
+     * @param array $engine_data Engine data snapshot
+     * @return array Filtered parameter definitions
+     */
+    public static function getAllToolParameters(array $engine_data = []): array {
+        $params = self::fieldsToToolParameters(self::getAllFields());
+        return static::filterByEngineData($params, $engine_data);
     }
 
     public static function getFieldKeys(string $category = 'all'): array {
@@ -265,42 +307,6 @@ class EventSchemaProvider {
         }
 
         return $event_data;
-    }
-
-    public static function engineOrTool(array $parameters, array $handler_config, array $engine_data = []): array {
-        $engine_params = [];
-        $tool_params = [];
-
-        $event_fields = self::getFieldKeys();
-        $venue_fields = VenueParameterProvider::getParameterKeys();
-
-        foreach ($event_fields as $field) {
-            if ($field === 'description') {
-                $tool_params[] = $field;
-                continue;
-            }
-
-            if (!empty($engine_data[$field])) {
-                $engine_params[$field] = $engine_data[$field];
-            } elseif (!empty($handler_config[$field])) {
-                $engine_params[$field] = $handler_config[$field];
-            } else {
-                $tool_params[] = $field;
-            }
-        }
-
-        foreach ($venue_fields as $field) {
-            if (!empty($engine_data[$field])) {
-                $engine_params[$field] = $engine_data[$field];
-            } elseif (!empty($handler_config[$field])) {
-                $engine_params[$field] = $handler_config[$field];
-            }
-        }
-
-        return [
-            'engine' => $engine_params,
-            'tool' => $tool_params
-        ];
     }
 
     private static function fieldsToToolParameters(array $fields): array {

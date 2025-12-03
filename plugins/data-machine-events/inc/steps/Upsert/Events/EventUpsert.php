@@ -251,7 +251,7 @@ class EventUpsert extends UpdateHandler {
     /**
      * Create new event post
      *
-     * @param array $parameters Event parameters
+     * @param array $parameters Event parameters (AI-provided, already filtered at definition time)
      * @param array $handler_config Handler configuration
      * @param EngineData $engine Engine snapshot helper
      * @param array $engine_parameters Extracted engine parameters
@@ -262,35 +262,8 @@ class EventUpsert extends UpdateHandler {
         $post_status = WordPressSettingsResolver::getPostStatus($handler_config);
         $post_author = WordPressSettingsResolver::getPostAuthor($handler_config);
 
-        $routing = EventSchemaProvider::engineOrTool($parameters, $handler_config, $engine_parameters);
-
-        $event_data = [
-            'title' => sanitize_text_field($parameters['title']),
-            'description' => $parameters['description'] ?? ''
-        ];
-
-        foreach ($routing['engine'] as $field => $value) {
-            $event_data[$field] = $value;
-        }
-
-        $ai_schema_fields = ['startDate', 'endDate', 'startTime', 'endTime', 'performer',
-                           'performerType', 'organizer', 'organizerType', 'organizerUrl',
-                           'eventStatus', 'previousStartDate', 'price',
-                           'priceCurrency', 'ticketUrl', 'offerAvailability'];
-
-        foreach ($ai_schema_fields as $field) {
-            if (!isset($event_data[$field]) && !empty($parameters[$field])) {
-                if ($field === 'ticketUrl') {
-                    $event_data[$field] = trim($parameters[$field]);
-                } else {
-                    $event_data[$field] = sanitize_text_field($parameters[$field]);
-                }
-            }
-        }
-
-        if (!empty($handler_config['venue'])) {
-            $event_data['venue'] = $handler_config['venue'];
-        }
+        // Build event data: engine params take precedence, then AI params
+        $event_data = $this->buildEventData($parameters, $handler_config, $engine_parameters);
 
         $post_data = [
             'post_type' => Event_Post_Type::POST_TYPE,
@@ -306,31 +279,19 @@ class EventUpsert extends UpdateHandler {
             return $post_id;
         }
 
-        // Process featured image
         $this->processEventFeaturedImage($post_id, $handler_config, $engine);
-
-        // Process venue (engine data takes precedence)
         $this->processVenue($post_id, $parameters, $engine_parameters);
 
-        // Map schema fields to taxonomies if not explicitly provided
+        // Map performer to artist taxonomy if not explicitly provided
         if (empty($parameters['artist']) && !empty($event_data['performer'])) {
             $parameters['artist'] = $event_data['performer'];
         }
 
-        // Process taxonomies
         $handler_config_for_tax = $handler_config;
         $handler_config_for_tax['taxonomy_venue_selection'] = 'skip';
-
-        // Map schema fields to taxonomies if not explicitly provided
-        // This ensures 'performer' (Schema) maps to 'artist' (Taxonomy) if the AI only provided one
-        if (empty($parameters['artist']) && !empty($event_data['performer'])) {
-            $parameters['artist'] = $event_data['performer'];
-        }
-
         $engine_data_array = $engine instanceof EngineData ? $engine->all() : [];
         $this->taxonomy_handler->processTaxonomies($post_id, $parameters, $handler_config_for_tax, $engine_data_array);
 
-        // Store event_id in engine data
         if ($job_id) {
             datamachine_merge_engine_data($job_id, [
                 'event_id' => $post_id,
@@ -345,29 +306,62 @@ class EventUpsert extends UpdateHandler {
      * Update existing event post
      *
      * @param int $post_id Existing post ID
-     * @param array $parameters Event parameters
+     * @param array $parameters Event parameters (AI-provided, already filtered at definition time)
      * @param array $handler_config Handler configuration
      * @param EngineData $engine Engine snapshot helper
      * @param array $engine_parameters Extracted engine parameters
      */
     private function updateEventPost(int $post_id, array $parameters, array $handler_config, EngineData $engine, array $engine_parameters): void {
-        $routing = EventSchemaProvider::engineOrTool($parameters, $handler_config, $engine_parameters);
+        // Build event data: engine params take precedence, then AI params
+        $event_data = $this->buildEventData($parameters, $handler_config, $engine_parameters);
 
+        wp_update_post([
+            'ID' => $post_id,
+            'post_title' => $event_data['title'],
+            'post_content' => $this->generate_event_block_content($event_data, $parameters)
+        ]);
+
+        $this->processEventFeaturedImage($post_id, $handler_config, $engine);
+        $this->processVenue($post_id, $parameters, $engine_parameters);
+
+        // Map performer to artist taxonomy if not explicitly provided
+        if (empty($parameters['artist']) && !empty($event_data['performer'])) {
+            $parameters['artist'] = $event_data['performer'];
+        }
+
+        $handler_config_for_tax = $handler_config;
+        $handler_config_for_tax['taxonomy_venue_selection'] = 'skip';
+        $engine_data_array = $engine instanceof EngineData ? $engine->all() : [];
+        $this->taxonomy_handler->processTaxonomies($post_id, $parameters, $handler_config_for_tax, $engine_data_array);
+    }
+
+    /**
+     * Build event data by merging engine parameters with AI parameters.
+     *
+     * Engine parameters take precedence since AI only received parameters
+     * for fields not already in engine data (filtered at definition time).
+     *
+     * @param array $parameters AI-provided parameters
+     * @param array $handler_config Handler configuration
+     * @param array $engine_parameters Engine data parameters
+     * @return array Merged event data
+     */
+    private function buildEventData(array $parameters, array $handler_config, array $engine_parameters): array {
         $event_data = [
             'title' => sanitize_text_field($parameters['title']),
             'description' => $parameters['description'] ?? ''
         ];
 
-        foreach ($routing['engine'] as $field => $value) {
-            $event_data[$field] = $value;
+        // Engine parameters take precedence
+        foreach ($engine_parameters as $field => $value) {
+            if (!empty($value)) {
+                $event_data[$field] = $value;
+            }
         }
 
-        $ai_schema_fields = ['startDate', 'endDate', 'startTime', 'endTime', 'performer',
-                           'performerType', 'organizer', 'organizerType', 'organizerUrl',
-                           'eventStatus', 'previousStartDate', 'price',
-                           'priceCurrency', 'ticketUrl', 'offerAvailability'];
-
-        foreach ($ai_schema_fields as $field) {
+        // AI parameters fill in remaining fields
+        $schema_fields = EventSchemaProvider::getFieldKeys();
+        foreach ($schema_fields as $field) {
             if (!isset($event_data[$field]) && !empty($parameters[$field])) {
                 if ($field === 'ticketUrl') {
                     $event_data[$field] = trim($parameters[$field]);
@@ -377,33 +371,12 @@ class EventUpsert extends UpdateHandler {
             }
         }
 
+        // Handler config venue override
         if (!empty($handler_config['venue'])) {
             $event_data['venue'] = $handler_config['venue'];
         }
 
-        // Update post
-        wp_update_post([
-            'ID' => $post_id,
-            'post_title' => $event_data['title'],
-            'post_content' => $this->generate_event_block_content($event_data, $parameters)
-        ]);
-
-        // Update featured image
-        $this->processEventFeaturedImage($post_id, $handler_config, $engine);
-
-        // Update venue (engine data takes precedence)
-        $this->processVenue($post_id, $parameters, $engine_parameters);
-
-        // Map schema fields to taxonomies if not explicitly provided
-        if (empty($parameters['artist']) && !empty($event_data['performer'])) {
-            $parameters['artist'] = $event_data['performer'];
-        }
-
-        // Update taxonomies
-        $handler_config_for_tax = $handler_config;
-        $handler_config_for_tax['taxonomy_venue_selection'] = 'skip';
-        $engine_data_array = $engine instanceof EngineData ? $engine->all() : [];
-        $this->taxonomy_handler->processTaxonomies($post_id, $parameters, $handler_config_for_tax, $engine_data_array);
+        return $event_data;
     }
 
     /**

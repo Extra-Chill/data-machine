@@ -16,6 +16,7 @@ if (!defined('ABSPATH')) {
 }
 
 class VenueParameterProvider {
+    use DynamicToolParametersTrait;
 
     private const TOOL_PARAMETERS = [
         'venue' => [
@@ -84,8 +85,28 @@ class VenueParameterProvider {
     ];
 
     /**
+     * Get all possible venue tool parameters.
+     *
+     * @return array Complete parameter definitions
+     */
+    protected static function getAllParameters(): array {
+        return self::TOOL_PARAMETERS;
+    }
+
+    /**
+     * Get parameter keys that should check engine data.
+     *
+     * @return array List of parameter keys that are engine-aware
+     */
+    protected static function getEngineAwareKeys(): array {
+        return array_keys(self::TOOL_PARAMETERS);
+    }
+
+    /**
      * Get AI tool parameters for venue fields when AI should decide.
      * Excludes parameters that already have values in engine data.
+     *
+     * Overrides trait method to add early-exit when venue is pre-configured.
      *
      * @param array $handler_config Handler configuration
      * @param array $engine_data Engine data snapshot
@@ -95,7 +116,7 @@ class VenueParameterProvider {
         if (self::hasVenueData($handler_config, $engine_data)) {
             return [];
         }
-        return self::filterByEngineData(self::TOOL_PARAMETERS, $engine_data);
+        return static::filterByEngineData(self::TOOL_PARAMETERS, $engine_data);
     }
 
     /**
@@ -119,39 +140,6 @@ class VenueParameterProvider {
         }
 
         return false;
-    }
-
-    /**
-     * Filter parameters based on engine data presence.
-     *
-     * @param array $parameters All available parameters
-     * @param array $engine_data Engine data snapshot
-     * @return array Filtered parameters
-     */
-    private static function filterByEngineData(array $parameters, array $engine_data): array {
-        if (empty($engine_data)) {
-            return $parameters;
-        }
-
-        $filtered = [];
-        foreach ($parameters as $key => $definition) {
-            if (empty($engine_data[$key])) {
-                $filtered[$key] = $definition;
-            }
-        }
-
-        return $filtered;
-    }
-
-    /**
-     * Check if static venue data is configured (legacy method).
-     *
-     * @param array $handler_config Handler configuration
-     * @return bool True if static venue is available
-     * @deprecated Use hasVenueData() instead
-     */
-    public static function hasStaticVenue(array $handler_config): bool {
-        return self::hasVenueData($handler_config, []);
     }
 
     /**

@@ -4,6 +4,9 @@
  * Registers WordPress hooks to extend core pipeline React behavior.
  * Uses @wordpress/hooks for native WordPress filter/action pattern in JavaScript.
  *
+ * Provides handler-agnostic venue enrichment for any handler that uses VenueFieldsTrait.
+ * When a modal opens with a venue term_id, fetches venue data and populates form fields.
+ *
  * @package DataMachineEvents
  * @since 1.0.0
  */
@@ -16,6 +19,7 @@
 
 	/**
 	 * Venue field keys for clearing/populating
+	 * Maps form field names (snake_case) to venue data keys
 	 * Note: coordinates are handled via backend geocoding, not shown in UI
 	 */
 	const VENUE_FIELDS = {
@@ -29,6 +33,16 @@
 		venue_website: 'website',
 		venue_capacity: 'capacity',
 	};
+
+	/**
+	 * Check if a value is a valid venue term ID (numeric string or number)
+	 */
+	function isValidVenueTermId( value ) {
+		if ( ! value ) {
+			return false;
+		}
+		return /^\d+$/.test( String( value ) );
+	}
 
 	/**
 	 * Fetch venue data from REST API and map to form fields
@@ -61,10 +75,11 @@
 	}
 
 	/**
-	 * Enrich Universal Web Scraper settings with venue data on modal open.
+	 * Enrich handler settings with venue data on modal open.
 	 *
-	 * When a venue is selected (term_id saved), fetches the venue's term meta
-	 * and populates the venue detail fields in the settings form.
+	 * Works for any handler that has a 'venue' field containing a term_id.
+	 * When a venue is selected, fetches the venue's term meta and populates
+	 * the venue detail fields in the settings form.
 	 */
 	addFilter(
 		'datamachine.handlerSettings.init',
@@ -72,7 +87,7 @@
 		async function( settingsPromise, handlerSlug, fieldsSchema ) {
 			const settings = await settingsPromise;
 
-			if ( handlerSlug !== 'universal-web-scraper' || ! settings.venue ) {
+			if ( ! isValidVenueTermId( settings.venue ) ) {
 				return settings;
 			}
 
@@ -90,8 +105,9 @@
 	);
 
 	/**
-	 * Handle venue dropdown changes in Universal Web Scraper settings.
+	 * Handle venue dropdown changes in handler settings.
 	 *
+	 * Works for any handler that has a 'venue' field.
 	 * When user selects a different venue, fetches that venue's data.
 	 * When user selects "Create New Venue", clears all venue fields.
 	 */
@@ -101,11 +117,11 @@
 		async function( changesPromise, fieldKey, value, handlerSlug, currentData ) {
 			const changes = await changesPromise;
 
-			if ( handlerSlug !== 'universal-web-scraper' || fieldKey !== 'venue' ) {
+			if ( fieldKey !== 'venue' ) {
 				return changes;
 			}
 
-			if ( value ) {
+			if ( isValidVenueTermId( value ) ) {
 				try {
 					const venueData = await fetchVenueData( value );
 					if ( venueData ) {

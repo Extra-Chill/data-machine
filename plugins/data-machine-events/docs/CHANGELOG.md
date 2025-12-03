@@ -5,6 +5,31 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.18] - 2025-12-02
+
+### Added
+- **DynamicToolParametersTrait**: Centralized trait for engine-aware AI tool parameter filtering
+  - Filters tool parameters at definition time based on engine data presence
+  - If a parameter value exists in engine data, it's excluded from tool definition
+  - AI only sees parameters it needs to provide, preventing conflicts
+
+### Changed
+- **EventSchemaProvider**: Refactored to use `DynamicToolParametersTrait`
+  - `getCoreToolParameters()`, `getSchemaToolParameters()`, `getAllToolParameters()` now accept optional `$engine_data` parameter
+  - Removed `engineOrTool()` method - filtering now happens at definition time, not execution time
+- **VenueParameterProvider**: Refactored to use `DynamicToolParametersTrait`
+  - Removed duplicate `filterByEngineData()` implementation
+  - Maintains `hasVenueData()` early-exit optimization
+- **EventUpsert**: Simplified parameter handling
+  - Replaced `engineOrTool()` routing with simple `buildEventData()` merge
+  - Engine parameters take precedence, AI fills in remaining fields
+- **EventUpsertFilters**: Updated `getDynamicEventTool()` to pass `$engine_data` to all parameter methods
+
+### Technical Details
+- **Definition-Time Filtering**: Parameters are filtered when tool definition is built, not during execution
+- **Single Responsibility**: Trait handles parameter filtering, providers define their parameters
+- **Cleaner Execution**: No routing needed at execution time since AI only provided necessary parameters
+
 ## [0.4.17] - 2025-12-01
 
 ### Changed

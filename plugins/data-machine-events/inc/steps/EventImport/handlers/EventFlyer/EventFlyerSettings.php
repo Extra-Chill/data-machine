@@ -5,11 +5,14 @@
  * Configuration fields for extracting event data from flyer images.
  * All fields follow the "fill OR AI extracts" pattern - if a field is
  * populated, that value is used; if blank, AI extracts from the image.
+ * Uses VenueFieldsTrait for standardized venue configuration.
  *
  * @package DataMachineEvents\Steps\EventImport\Handlers\EventFlyer
  */
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\EventFlyer;
+
+use DataMachineEvents\Steps\EventImport\Handlers\VenueFieldsTrait;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -17,38 +20,21 @@ if (!defined('ABSPATH')) {
 
 class EventFlyerSettings {
 
+    use VenueFieldsTrait;
+
     public static function get_fields(array $current_config = []): array {
-        return [
+        $event_fields = [
             'title' => [
                 'type' => 'text',
                 'label' => __('Event Title', 'datamachine-events'),
                 'description' => __('Leave blank for AI to extract from flyer.', 'datamachine-events'),
                 'placeholder' => __('AI extracts from flyer', 'datamachine-events'),
             ],
-            'venue' => [
-                'type' => 'text',
-                'label' => __('Venue', 'datamachine-events'),
-                'description' => __('Leave blank for AI to extract from flyer.', 'datamachine-events'),
-                'placeholder' => __('AI extracts from flyer', 'datamachine-events'),
-            ],
-            'venueAddress' => [
-                'type' => 'text',
-                'label' => __('Venue Address', 'datamachine-events'),
-                'description' => __('Leave blank for AI to extract from flyer.', 'datamachine-events'),
-                'placeholder' => __('AI extracts from flyer', 'datamachine-events'),
-            ],
-            'city' => [
-                'type' => 'text',
-                'label' => __('City', 'datamachine-events'),
-                'description' => __('Leave blank for AI to extract from flyer.', 'datamachine-events'),
-                'placeholder' => __('AI extracts from flyer', 'datamachine-events'),
-            ],
-            'state' => [
-                'type' => 'text',
-                'label' => __('State', 'datamachine-events'),
-                'description' => __('Leave blank for AI to extract from flyer.', 'datamachine-events'),
-                'placeholder' => __('AI extracts from flyer', 'datamachine-events'),
-            ],
+        ];
+
+        $venue_fields = self::get_venue_fields();
+
+        $time_fields = [
             'startDate' => [
                 'type' => 'text',
                 'label' => __('Start Date', 'datamachine-events'),
@@ -86,15 +72,13 @@ class EventFlyerSettings {
                 'placeholder' => __('AI extracts from flyer', 'datamachine-events'),
             ],
         ];
+
+        return array_merge($event_fields, $venue_fields, $time_fields);
     }
 
     public static function sanitize(array $raw_settings): array {
-        return [
+        $event_settings = [
             'title' => sanitize_text_field($raw_settings['title'] ?? ''),
-            'venue' => sanitize_text_field($raw_settings['venue'] ?? ''),
-            'venueAddress' => sanitize_text_field($raw_settings['venueAddress'] ?? ''),
-            'city' => sanitize_text_field($raw_settings['city'] ?? ''),
-            'state' => sanitize_text_field($raw_settings['state'] ?? ''),
             'startDate' => sanitize_text_field($raw_settings['startDate'] ?? ''),
             'startTime' => sanitize_text_field($raw_settings['startTime'] ?? ''),
             'endTime' => sanitize_text_field($raw_settings['endTime'] ?? ''),
@@ -102,6 +86,12 @@ class EventFlyerSettings {
             'ticketUrl' => esc_url_raw($raw_settings['ticketUrl'] ?? ''),
             'performer' => sanitize_text_field($raw_settings['performer'] ?? ''),
         ];
+
+        $venue_settings = self::sanitize_venue_fields($raw_settings);
+
+        $settings = array_merge($event_settings, $venue_settings);
+
+        return self::save_venue_on_settings_save($settings);
     }
 
     public static function requires_authentication(array $current_config = []): bool {
@@ -109,12 +99,8 @@ class EventFlyerSettings {
     }
 
     public static function get_defaults(): array {
-        return [
+        $event_defaults = [
             'title' => '',
-            'venue' => '',
-            'venueAddress' => '',
-            'city' => '',
-            'state' => '',
             'startDate' => '',
             'startTime' => '',
             'endTime' => '',
@@ -122,15 +108,31 @@ class EventFlyerSettings {
             'ticketUrl' => '',
             'performer' => '',
         ];
+
+        $venue_defaults = self::get_venue_field_defaults();
+
+        return array_merge($event_defaults, $venue_defaults);
     }
 
+    /**
+     * Get AI extraction field definitions.
+     *
+     * Returns camelCase keys for AI tool parameter format.
+     * Maps to VenueParameterProvider conventions.
+     *
+     * @return array Field descriptions for AI extraction
+     */
     public static function get_ai_extraction_fields(): array {
         return [
             'title' => 'Event title or headliner name (usually the largest text on the flyer)',
             'venue' => 'Venue name where the event takes place',
             'venueAddress' => 'Street address of the venue',
-            'city' => 'City name',
-            'state' => 'State or province abbreviation (e.g., SC, NY, CA)',
+            'venueCity' => 'City name',
+            'venueState' => 'State or province abbreviation (e.g., SC, NY, CA)',
+            'venueZip' => 'Postal/zip code',
+            'venueCountry' => 'Country (two-letter code preferred)',
+            'venuePhone' => 'Venue phone number',
+            'venueWebsite' => 'Venue website URL',
             'startDate' => 'Event date in YYYY-MM-DD format',
             'startTime' => 'Event start time in HH:MM 24-hour format',
             'endTime' => 'Event end time in HH:MM 24-hour format (if visible)',

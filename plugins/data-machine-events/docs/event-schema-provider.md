@@ -89,28 +89,21 @@ echo '<script type="application/ld+json">' . wp_json_encode($schema) . '</script
 
 ### Get AI Tool Parameters
 
-```php
-// Get all tool parameters for AI inference
-$all_params = EventSchemaProvider::getAllToolParameters();
-
-// Get only core parameters (title, dates, description)
-$core_params = EventSchemaProvider::getCoreToolParameters();
-
-// Get schema-specific parameters (offers, performer, organizer, etc.)
-$schema_params = EventSchemaProvider::getSchemaToolParameters();
-```
-
-### Smart Parameter Routing
+All parameter methods accept optional `$engine_data` to filter out parameters that already have values in engine data. This ensures the AI only sees parameters it needs to provide.
 
 ```php
-// Route parameters between engine data and AI tools
-$routing = EventSchemaProvider::engineOrTool($parameters, $handler_config, $engine_data);
+// Get all tool parameters, filtered by engine data
+$all_params = EventSchemaProvider::getAllToolParameters($engine_data);
 
-// Returns:
-// [
-//     'engine' => ['startDate' => '2025-07-15', 'venue' => 'Central Park'],
-//     'tool' => ['description', 'performer', 'price']
-// ]
+// Get core parameters (title, dates, description), filtered by engine data
+$core_params = EventSchemaProvider::getCoreToolParameters($engine_data);
+
+// Get schema-specific parameters (offers, performer, organizer, etc.), filtered by engine data
+$schema_params = EventSchemaProvider::getSchemaToolParameters($engine_data);
+
+// Example: If engine_data contains ['startDate' => '2025-07-15', 'venue' => 'Central Park']
+// Then getCoreToolParameters($engine_data) will NOT include 'startDate' in the returned parameters
+// The AI will never see or provide a value for 'startDate' since it already exists
 ```
 
 ### Field Validation and Defaults

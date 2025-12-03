@@ -12,6 +12,7 @@
 namespace DataMachineEvents\Steps\EventImport\Handlers\EventFlyer;
 
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
+use DataMachineEvents\Steps\EventImport\Handlers\VenueFieldsTrait;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
 use DataMachine\Core\DataPacket;
@@ -24,6 +25,7 @@ if (!defined('ABSPATH')) {
 class EventFlyer extends EventImportHandler {
 
     use HandlerRegistrationTrait;
+    use VenueFieldsTrait;
 
     public function __construct() {
         parent::__construct('event_flyer');
@@ -166,12 +168,32 @@ class EventFlyer extends EventImportHandler {
         return $file_info['type'] ?? 'application/octet-stream';
     }
 
+    /**
+     * Build AI extraction fields for parameters the AI should extract.
+     *
+     * AI extraction fields use camelCase (venueAddress) for tool parameter format.
+     * Config uses snake_case (venue_address) for form fields.
+     * This method maps between them when checking if a field is pre-filled.
+     */
     private function buildAIExtractionFields(array $config): array {
         $all_fields = EventFlyerSettings::get_ai_extraction_fields();
         $ai_fields = [];
 
+        $camel_to_snake_map = [
+            'venue' => 'venue_name',
+            'venueAddress' => 'venue_address',
+            'venueCity' => 'venue_city',
+            'venueState' => 'venue_state',
+            'venueZip' => 'venue_zip',
+            'venueCountry' => 'venue_country',
+            'venuePhone' => 'venue_phone',
+            'venueWebsite' => 'venue_website',
+        ];
+
         foreach ($all_fields as $field => $description) {
-            if (empty($config[$field])) {
+            $config_key = $camel_to_snake_map[$field] ?? $field;
+
+            if (empty($config[$config_key])) {
                 $ai_fields[$field] = [
                     'type' => 'string',
                     'description' => $description,
@@ -182,6 +204,11 @@ class EventFlyer extends EventImportHandler {
         return $ai_fields;
     }
 
+    /**
+     * Merge config with defaults and convert venue fields to camelCase event data format.
+     *
+     * Handler config uses snake_case (venue_address), but event data uses camelCase (venueAddress).
+     */
     private function mergeConfigWithDefaults(array $config): array {
         $defaults = EventFlyerSettings::get_defaults();
 
@@ -189,6 +216,9 @@ class EventFlyer extends EventImportHandler {
         foreach ($defaults as $field => $default) {
             $event_data[$field] = !empty($config[$field]) ? $config[$field] : $default;
         }
+
+        $venue_event_data = self::map_venue_config_to_event_data($config);
+        $event_data = array_merge($event_data, $venue_event_data);
 
         return $event_data;
     }

@@ -94,14 +94,19 @@ private const PARAMETER_TO_META_MAP = [
 
 ## Integration with EventSchemaProvider
 
-Works seamlessly with `EventSchemaProvider` for parameter routing:
+Both `VenueParameterProvider` and `EventSchemaProvider` use the `DynamicToolParametersTrait` to filter parameters by engine data at definition time:
 
 ```php
-// Smart parameter routing between engine data and AI tools
-$routing = EventSchemaProvider::engineOrTool($parameters, $handler_config, $engine_data);
+// Venue parameters filtered by engine data - excludes params that already have values
+$venue_params = VenueParameterProvider::getToolParameters($handler_config, $engine_data);
 
-// Venue parameters are handled separately from event parameters
-$venue_params = VenueParameterProvider::getToolParameters($handler_config);
+// Event parameters also filtered by engine data
+$event_params = EventSchemaProvider::getCoreToolParameters($engine_data);
+$schema_params = EventSchemaProvider::getSchemaToolParameters($engine_data);
+
+// If engine_data contains ['venue' => 'Central Park', 'startDate' => '2025-07-15']
+// then 'venue' is excluded from venue_params and 'startDate' is excluded from event_params
+// The AI only sees parameters it needs to provide
 ```
 
 ## Architecture Benefits

@@ -4,18 +4,22 @@
  *
  * Defines settings fields and sanitization for ICS calendar feed import handler.
  * No authentication required - works with any public ICS/iCal feed URL.
- * Includes address-autocomplete for venue configuration with batch field population.
+ * Uses VenueFieldsTrait for standardized venue configuration with address autocomplete.
  *
  * @package DataMachineEvents\Steps\EventImport\Handlers\IcsCalendar
  */
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\IcsCalendar;
 
+use DataMachineEvents\Steps\EventImport\Handlers\VenueFieldsTrait;
+
 if (!defined('ABSPATH')) {
     exit;
 }
 
 class IcsCalendarSettings {
+
+    use VenueFieldsTrait;
 
     public function __construct() {
     }
@@ -27,7 +31,7 @@ class IcsCalendarSettings {
      * @return array Associative array defining the settings fields
      */
     public static function get_fields(array $current_config = []): array {
-        return [
+        $handler_fields = [
             'feed_url' => [
                 'type' => 'text',
                 'label' => __('Feed URL', 'datamachine-events'),
@@ -35,48 +39,11 @@ class IcsCalendarSettings {
                 'placeholder' => __('https://tockify.com/api/feeds/ics/calendar-name', 'datamachine-events'),
                 'required' => true
             ],
-            'venue_name' => [
-                'type' => 'text',
-                'label' => __('Venue Name', 'datamachine-events'),
-                'description' => __('Override venue name for all events from this feed.', 'datamachine-events'),
-                'placeholder' => __('Tin Roof Charleston', 'datamachine-events'),
-                'required' => false
-            ],
-            'venue_address' => [
-                'type' => 'address-autocomplete',
-                'label' => __('Venue Address', 'datamachine-events'),
-                'description' => __('Start typing to search. Auto-fills city, state, zip, country.', 'datamachine-events'),
-                'placeholder' => __('Search address...', 'datamachine-events'),
-                'required' => false
-            ],
-            'venue_city' => [
-                'type' => 'text',
-                'label' => __('City', 'datamachine-events'),
-                'description' => __('Auto-filled from address selection.', 'datamachine-events'),
-                'placeholder' => __('Charleston', 'datamachine-events'),
-                'required' => false
-            ],
-            'venue_state' => [
-                'type' => 'text',
-                'label' => __('State', 'datamachine-events'),
-                'description' => __('Auto-filled from address selection.', 'datamachine-events'),
-                'placeholder' => __('South Carolina', 'datamachine-events'),
-                'required' => false
-            ],
-            'venue_zip' => [
-                'type' => 'text',
-                'label' => __('ZIP Code', 'datamachine-events'),
-                'description' => __('Auto-filled from address selection.', 'datamachine-events'),
-                'placeholder' => __('29407', 'datamachine-events'),
-                'required' => false
-            ],
-            'venue_country' => [
-                'type' => 'text',
-                'label' => __('Country', 'datamachine-events'),
-                'description' => __('Auto-filled from address selection. Two-letter country code.', 'datamachine-events'),
-                'placeholder' => __('US', 'datamachine-events'),
-                'required' => false
-            ],
+        ];
+
+        $venue_fields = self::get_venue_fields();
+
+        $filter_fields = [
             'search' => [
                 'type' => 'text',
                 'label' => __('Include Keywords', 'datamachine-events'),
@@ -92,6 +59,8 @@ class IcsCalendarSettings {
                 'required' => false
             ]
         ];
+
+        return array_merge($handler_fields, $venue_fields, $filter_fields);
     }
 
     /**
@@ -107,17 +76,17 @@ class IcsCalendarSettings {
             $feed_url = 'https://' . substr($feed_url, 9);
         }
 
-        return [
+        $handler_settings = [
             'feed_url' => esc_url_raw($feed_url),
-            'venue_name' => sanitize_text_field($raw_settings['venue_name'] ?? ''),
-            'venue_address' => sanitize_text_field($raw_settings['venue_address'] ?? ''),
-            'venue_city' => sanitize_text_field($raw_settings['venue_city'] ?? ''),
-            'venue_state' => sanitize_text_field($raw_settings['venue_state'] ?? ''),
-            'venue_zip' => sanitize_text_field($raw_settings['venue_zip'] ?? ''),
-            'venue_country' => sanitize_text_field($raw_settings['venue_country'] ?? ''),
             'search' => sanitize_text_field($raw_settings['search'] ?? ''),
             'exclude_keywords' => sanitize_text_field($raw_settings['exclude_keywords'] ?? '')
         ];
+
+        $venue_settings = self::sanitize_venue_fields($raw_settings);
+
+        $settings = array_merge($handler_settings, $venue_settings);
+
+        return self::save_venue_on_settings_save($settings);
     }
 
     /**
@@ -136,16 +105,14 @@ class IcsCalendarSettings {
      * @return array Default values
      */
     public static function get_defaults(): array {
-        return [
+        $handler_defaults = [
             'feed_url' => '',
-            'venue_name' => '',
-            'venue_address' => '',
-            'venue_city' => '',
-            'venue_state' => '',
-            'venue_zip' => '',
-            'venue_country' => '',
             'search' => '',
             'exclude_keywords' => ''
         ];
+
+        $venue_defaults = self::get_venue_field_defaults();
+
+        return array_merge($handler_defaults, $venue_defaults);
     }
 }

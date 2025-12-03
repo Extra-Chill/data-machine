@@ -64,20 +64,10 @@ class EventUpsertFilters {
     }
 
     /**
-     * Get base event upsert tool definition
-     */
-    private static function getBaseTool(): array {
-        return [
-            'class' => EventUpsert::class,
-            'method' => 'handle_tool_call',
-            'handler' => 'upsert_event',
-            'description' => 'Create or update WordPress event post. Automatically finds existing events by title, venue, and date. Updates if data changed, skips if unchanged, creates if new.',
-            'parameters' => EventSchemaProvider::getCoreToolParameters()
-        ];
-    }
-
-    /**
-     * Generate dynamic event tool based on taxonomy, venue settings, and engine data
+     * Generate dynamic event tool based on taxonomy, venue settings, and engine data.
+     *
+     * All parameter methods filter by engine data - if a value exists in engine data,
+     * the parameter is excluded from the tool definition so the AI doesn't see it.
      *
      * @param array $handler_config Handler configuration
      * @param array $engine_data Engine data snapshot
@@ -86,17 +76,27 @@ class EventUpsertFilters {
     private static function getDynamicEventTool(array $handler_config, array $engine_data = []): array {
         $ue_config = $handler_config['upsert_event'] ?? $handler_config;
 
-        $tool = self::getBaseTool();
+        $tool = [
+            'class' => EventUpsert::class,
+            'method' => 'handle_tool_call',
+            'handler' => 'upsert_event',
+            'description' => 'Create or update WordPress event post. Automatically finds existing events by title, venue, and date. Updates if data changed, skips if unchanged, creates if new.',
+            'parameters' => []
+        ];
 
-        // Add schema enrichment parameters (performer, organizer, status, etc.)
-        $schema_params = EventSchemaProvider::getSchemaToolParameters();
+        // Core event parameters (title, dates, description) - filtered by engine data
+        $core_params = EventSchemaProvider::getCoreToolParameters($engine_data);
+        $tool['parameters'] = array_merge($tool['parameters'], $core_params);
+
+        // Schema enrichment parameters (performer, organizer, status, etc.) - filtered by engine data
+        $schema_params = EventSchemaProvider::getSchemaToolParameters($engine_data);
         $tool['parameters'] = array_merge($tool['parameters'], $schema_params);
 
-        // Add dynamic taxonomy parameters
+        // Taxonomy parameters - config-driven (ai_decides vs skip vs preselected)
         $taxonomy_params = TaxonomyHandler::getTaxonomyToolParameters($ue_config, Event_Post_Type::POST_TYPE);
         $tool['parameters'] = array_merge($tool['parameters'], $taxonomy_params);
 
-        // Add dynamic venue parameters (excludes params that exist in engine data)
+        // Venue parameters - filtered by engine data
         $venue_params = VenueParameterProvider::getToolParameters($ue_config, $engine_data);
         $tool['parameters'] = array_merge($tool['parameters'], $venue_params);
 
