@@ -15,14 +15,13 @@ if (!defined('ABSPATH')) {
 
 use DataMachineEvents\Blocks\Calendar\Calendar_Query;
 use DataMachineEvents\Blocks\Calendar\Pagination;
+use const DataMachineEvents\Blocks\Calendar\DAYS_PER_PAGE;
 
 if (wp_is_json_request() || (defined('REST_REQUEST') && REST_REQUEST)) {
     return '';
 }
 
 $show_search = $attributes['showSearch'] ?? true;
-$enable_pagination = $attributes['enablePagination'] ?? true;
-$events_per_page = get_option('posts_per_page', 10);
 
 $current_page = 1;
 if (isset($_GET['paged']) && absint($_GET['paged']) > 0) {
@@ -70,22 +69,38 @@ if (is_tax()) {
     }
 }
 
-$query_params = [
-    'paged' => $current_page,
-    'posts_per_page' => $enable_pagination ? $events_per_page : -1,
+$user_date_start = $date_start;
+$user_date_end = $date_end;
+
+$base_params = [
     'show_past' => $show_past,
     'search_query' => $search_query,
-    'date_start' => $date_start,
-    'date_end' => $date_end,
+    'date_start' => $user_date_start,
+    'date_end' => $user_date_end,
     'tax_filters' => $tax_filters,
     'tax_query_override' => $tax_query_override,
 ];
 
+$unique_dates = Calendar_Query::get_unique_event_dates($base_params);
+$date_boundaries = Calendar_Query::get_date_boundaries_for_page($unique_dates, $current_page);
+
+$max_pages = $date_boundaries['max_pages'];
+$current_page = max(1, min($current_page, max(1, $max_pages)));
+
+$query_params = $base_params;
+if (!empty($date_boundaries['start_date']) && !empty($date_boundaries['end_date'])) {
+    if (empty($user_date_start)) {
+        $query_params['date_start'] = $date_boundaries['start_date'];
+    }
+    if (empty($user_date_end)) {
+        $query_params['date_end'] = $date_boundaries['end_date'];
+    }
+}
+
 $query_args = Calendar_Query::build_query_args($query_params);
 $events_query = new WP_Query($query_args);
 
-$total_events = $events_query->found_posts;
-$max_pages = $events_query->max_num_pages;
+$total_events = count($unique_dates);
 
 $event_counts = Calendar_Query::get_event_counts();
 $past_events_count = $event_counts['past'];
@@ -183,10 +198,10 @@ $wrapper_attributes = get_block_wrapper_attributes([
     \DataMachineEvents\Blocks\Calendar\Template_Loader::include_template('results-counter', [
         'current_page' => $current_page,
         'total_events' => $total_events,
-        'events_per_page' => $events_per_page
+        'events_per_page' => DAYS_PER_PAGE
     ]);
 
-    echo Pagination::render_pagination($current_page, $max_pages, $show_past, $enable_pagination);
+    echo Pagination::render_pagination($current_page, $max_pages, $show_past);
 
     \DataMachineEvents\Blocks\Calendar\Template_Loader::include_template('navigation', [
         'show_past' => $show_past,

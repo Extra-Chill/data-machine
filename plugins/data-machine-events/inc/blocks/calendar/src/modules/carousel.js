@@ -11,8 +11,10 @@ export function initCarousel(calendar) {
         const wrapper = group.querySelector('.datamachine-events-wrapper');
         if (!wrapper) return;
 
+        const eventCount = parseInt(group.dataset.eventCount, 10) || 0;
+        if (eventCount <= 1) return;
+
         const events = wrapper.querySelectorAll('.datamachine-event-item');
-        if (events.length <= 1) return;
 
         let indicators = null;
         let chevronLeft = null;
@@ -99,12 +101,12 @@ export function initCarousel(calendar) {
             }
             indicators.innerHTML = '';
 
-            events.forEach(function(_, index) {
+            for (let i = 0; i < eventCount; i++) {
                 const dot = document.createElement('span');
                 dot.className = 'datamachine-carousel-dot';
-                dot.dataset.index = index;
+                dot.dataset.index = i;
                 indicators.appendChild(dot);
-            });
+            }
 
             if (!chevronLeft) {
                 chevronLeft = document.createElement('span');

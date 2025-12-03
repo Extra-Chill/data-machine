@@ -4,7 +4,6 @@
  *
  * Defines settings fields and sanitization for ICS calendar feed import handler.
  * No authentication required - works with any public ICS/iCal feed URL.
- * Uses VenueFieldsTrait for standardized venue configuration with address autocomplete.
  *
  * @package DataMachineEvents\Steps\EventImport\Handlers\IcsCalendar
  */

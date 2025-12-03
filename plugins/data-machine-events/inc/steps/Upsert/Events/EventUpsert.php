@@ -16,8 +16,10 @@ namespace DataMachineEvents\Steps\Upsert\Events;
 
 use DataMachine\Core\EngineData;
 use DataMachineEvents\Steps\Upsert\Events\Venue;
+use DataMachineEvents\Steps\Upsert\Events\Promoter;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\VenueParameterProvider;
+use DataMachineEvents\Core\Promoter_Taxonomy;
 use DataMachineEvents\Core\EventSchemaProvider;
 use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
 use DataMachine\Core\Steps\Update\Handlers\UpdateHandler;
@@ -36,6 +38,8 @@ class EventUpsert extends UpdateHandler {
         $this->taxonomy_handler = new TaxonomyHandler();
         // Register custom handler for venue taxonomy
         TaxonomyHandler::addCustomHandler('venue', [$this, 'assignVenueTaxonomy']);
+        // Register custom handler for promoter taxonomy
+        TaxonomyHandler::addCustomHandler('promoter', [$this, 'assignPromoterTaxonomy']);
     }
 
     /**
@@ -281,6 +285,7 @@ class EventUpsert extends UpdateHandler {
 
         $this->processEventFeaturedImage($post_id, $handler_config, $engine);
         $this->processVenue($post_id, $parameters, $engine_parameters);
+        $this->processPromoter($post_id, $parameters, $engine_parameters);
 
         // Map performer to artist taxonomy if not explicitly provided
         if (empty($parameters['artist']) && !empty($event_data['performer'])) {
@@ -289,6 +294,7 @@ class EventUpsert extends UpdateHandler {
 
         $handler_config_for_tax = $handler_config;
         $handler_config_for_tax['taxonomy_venue_selection'] = 'skip';
+        $handler_config_for_tax['taxonomy_promoter_selection'] = 'skip';
         $engine_data_array = $engine instanceof EngineData ? $engine->all() : [];
         $this->taxonomy_handler->processTaxonomies($post_id, $parameters, $handler_config_for_tax, $engine_data_array);
 
@@ -323,6 +329,7 @@ class EventUpsert extends UpdateHandler {
 
         $this->processEventFeaturedImage($post_id, $handler_config, $engine);
         $this->processVenue($post_id, $parameters, $engine_parameters);
+        $this->processPromoter($post_id, $parameters, $engine_parameters);
 
         // Map performer to artist taxonomy if not explicitly provided
         if (empty($parameters['artist']) && !empty($event_data['performer'])) {
@@ -331,6 +338,7 @@ class EventUpsert extends UpdateHandler {
 
         $handler_config_for_tax = $handler_config;
         $handler_config_for_tax['taxonomy_venue_selection'] = 'skip';
+        $handler_config_for_tax['taxonomy_promoter_selection'] = 'skip';
         $engine_data_array = $engine instanceof EngineData ? $engine->all() : [];
         $this->taxonomy_handler->processTaxonomies($post_id, $parameters, $handler_config_for_tax, $engine_data_array);
     }
@@ -400,6 +408,35 @@ class EventUpsert extends UpdateHandler {
             if ($venue_result['term_id']) {
                 Venue::assign_venue_to_event($post_id, [
                     'venue' => $venue_result['term_id']
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Process promoter taxonomy assignment.
+     * Engine data takes precedence over AI-provided values.
+     * Maps to Schema.org "organizer" property.
+     *
+     * @param int $post_id Post ID
+     * @param array $parameters Event parameters
+     * @param array $engine_parameters Engine data parameters
+     */
+    private function processPromoter(int $post_id, array $parameters, array $engine_parameters = []): void {
+        // Organizer field name maps to promoter taxonomy
+        $promoter_name = $engine_parameters['organizer'] ?? $parameters['organizer'] ?? '';
+
+        if (!empty($promoter_name)) {
+            $promoter_metadata = [
+                'url' => $engine_parameters['organizerUrl'] ?? $parameters['organizerUrl'] ?? '',
+                'type' => $engine_parameters['organizerType'] ?? $parameters['organizerType'] ?? 'Organization'
+            ];
+
+            $promoter_result = Promoter_Taxonomy::find_or_create_promoter($promoter_name, $promoter_metadata);
+
+            if ($promoter_result['term_id']) {
+                Promoter::assign_promoter_to_event($post_id, [
+                    'promoter' => $promoter_result['term_id']
                 ]);
             }
         }
@@ -513,7 +550,8 @@ class EventUpsert extends UpdateHandler {
         $fields = [
             'venue', 'venueAddress', 'venueCity', 'venueState', 'venueZip',
             'venueCountry', 'venuePhone', 'venueWebsite', 'venueCoordinates',
-            'venueCapacity', 'eventImage'
+            'venueCapacity', 'eventImage',
+            'organizer', 'organizerUrl', 'organizerType'
         ];
 
         $resolved = [];
@@ -599,6 +637,52 @@ class EventUpsert extends UpdateHandler {
         }
 
         return ['success' => false, 'error' => 'Failed to create or find venue'];
+    }
+
+    /**
+     * Custom taxonomy handler for promoter
+     * Maps Schema.org "organizer" field to promoter taxonomy
+     *
+     * @param int $post_id Post ID
+     * @param array $parameters Event parameters
+     * @param array $handler_config Handler configuration
+     * @param mixed $engine_context Engine context (EngineData|array|null)
+     * @return array|null Assignment result
+     */
+    public function assignPromoterTaxonomy(int $post_id, array $parameters, array $handler_config, $engine_context = null): ?array {
+        $engine = $this->resolveEngineContext($engine_context, $parameters);
+        $engine_parameters = $this->extract_event_engine_parameters($engine);
+        // Organizer field name maps to promoter taxonomy
+        $promoter_name = $parameters['organizer'] ?? ($engine_parameters['organizer'] ?? '');
+
+        if (empty($promoter_name)) {
+            return null;
+        }
+
+        $promoter_metadata = [
+            'url' => $this->getParameterValue($parameters, 'organizerUrl') ?: ($engine_parameters['organizerUrl'] ?? ''),
+            'type' => $this->getParameterValue($parameters, 'organizerType') ?: ($engine_parameters['organizerType'] ?? 'Organization')
+        ];
+
+        $promoter_result = Promoter_Taxonomy::find_or_create_promoter($promoter_name, $promoter_metadata);
+
+        if (!empty($promoter_result['term_id'])) {
+            $assignment_result = Promoter::assign_promoter_to_event($post_id, ['promoter' => $promoter_result['term_id']]);
+
+            if (!empty($assignment_result)) {
+                return [
+                    'success' => true,
+                    'taxonomy' => 'promoter',
+                    'term_id' => $promoter_result['term_id'],
+                    'term_name' => $promoter_name,
+                    'source' => 'event_promoter_handler'
+                ];
+            }
+
+            return ['success' => false, 'error' => 'Failed to assign promoter term'];
+        }
+
+        return ['success' => false, 'error' => 'Failed to create or find promoter'];
     }
 
     /**

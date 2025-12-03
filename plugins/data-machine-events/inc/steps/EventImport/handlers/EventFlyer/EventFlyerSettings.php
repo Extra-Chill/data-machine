@@ -5,7 +5,6 @@
  * Configuration fields for extracting event data from flyer images.
  * All fields follow the "fill OR AI extracts" pattern - if a field is
  * populated, that value is used; if blank, AI extracts from the image.
- * Uses VenueFieldsTrait for standardized venue configuration.
  *
  * @package DataMachineEvents\Steps\EventImport\Handlers\EventFlyer
  */

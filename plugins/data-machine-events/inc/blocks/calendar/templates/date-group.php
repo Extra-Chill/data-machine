@@ -26,7 +26,7 @@ $events_count = $events_count ?? 0;
  * Note: The closing </div> is handled separately in the render.php loop.
  */
 ?>
-<div class="datamachine-date-group datamachine-day-<?php echo esc_attr($day_of_week); ?>" data-date="<?php echo esc_attr($date_obj->format('Y-m-d')); ?>">
+<div class="datamachine-date-group datamachine-day-<?php echo esc_attr($day_of_week); ?>" data-date="<?php echo esc_attr($date_obj->format('Y-m-d')); ?>" data-event-count="<?php echo esc_attr($events_count); ?>">
     <div class="datamachine-day-header">
         <div class="datamachine-day-badge datamachine-day-badge-<?php echo esc_attr($day_of_week); ?>" 
              data-date-label="<?php echo esc_attr($formatted_date_label); ?>" 

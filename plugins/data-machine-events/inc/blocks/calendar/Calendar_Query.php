@@ -20,6 +20,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+const DAYS_PER_PAGE = 5;
+
 class Calendar_Query {
 
     /**
@@ -30,8 +32,6 @@ class Calendar_Query {
      */
     public static function build_query_args(array $params): array {
         $defaults = [
-            'paged' => 1,
-            'posts_per_page' => get_option('posts_per_page', 10),
             'show_past' => false,
             'search_query' => '',
             'date_start' => '',
@@ -45,8 +45,7 @@ class Calendar_Query {
         $query_args = [
             'post_type' => Event_Post_Type::POST_TYPE,
             'post_status' => 'publish',
-            'posts_per_page' => $params['posts_per_page'],
-            'paged' => $params['paged'],
+            'posts_per_page' => -1,
             'meta_key' => EVENT_DATETIME_META_KEY,
             'orderby' => 'meta_value',
             'order' => $params['show_past'] ? 'DESC' : 'ASC',
@@ -339,5 +338,70 @@ class Calendar_Query {
         }
 
         return $gaps;
+    }
+
+    /**
+     * Get unique event dates for pagination calculations
+     *
+     * @param array $params Query parameters (show_past, search_query, tax_filters, etc.)
+     * @return array Ordered array of unique date strings (Y-m-d)
+     */
+    public static function get_unique_event_dates(array $params): array {
+        $query_args = self::build_query_args($params);
+        $query_args['fields'] = 'ids';
+
+        $query = new WP_Query($query_args);
+        $dates = [];
+
+        if ($query->have_posts()) {
+            foreach ($query->posts as $post_id) {
+                $datetime = get_post_meta($post_id, EVENT_DATETIME_META_KEY, true);
+                if ($datetime) {
+                    $date = date('Y-m-d', strtotime($datetime));
+                    if (!in_array($date, $dates, true)) {
+                        $dates[] = $date;
+                    }
+                }
+            }
+        }
+
+        if ($params['show_past'] ?? false) {
+            rsort($dates);
+        } else {
+            sort($dates);
+        }
+
+        return $dates;
+    }
+
+    /**
+     * Get date boundaries for a specific page
+     *
+     * @param array $unique_dates Ordered array of unique dates
+     * @param int $page Page number (1-based)
+     * @return array ['start_date' => 'Y-m-d', 'end_date' => 'Y-m-d', 'max_pages' => int]
+     */
+    public static function get_date_boundaries_for_page(array $unique_dates, int $page): array {
+        $total_days = count($unique_dates);
+
+        if ($total_days === 0) {
+            return [
+                'start_date' => '',
+                'end_date' => '',
+                'max_pages' => 0,
+            ];
+        }
+
+        $max_pages = (int) ceil($total_days / DAYS_PER_PAGE);
+        $page = max(1, min($page, $max_pages));
+
+        $start_index = ($page - 1) * DAYS_PER_PAGE;
+        $end_index = min($start_index + DAYS_PER_PAGE - 1, $total_days - 1);
+
+        return [
+            'start_date' => $unique_dates[$start_index],
+            'end_date' => $unique_dates[$end_index],
+            'max_pages' => $max_pages,
+        ];
     }
 }

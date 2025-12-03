@@ -370,6 +370,13 @@ class Ticketmaster extends EventImportHandler {
         }
         
         $artist = $tm_event['_embedded']['attractions'][0]['name'] ?? '';
+
+        $organizer = '';
+        if (!empty($tm_event['promoter']['name'])) {
+            $organizer = $tm_event['promoter']['name'];
+        } elseif (!empty($tm_event['promoters'][0]['name'])) {
+            $organizer = $tm_event['promoters'][0]['name'];
+        }
         
         $price = '';
         if (!empty($tm_event['priceRanges'][0])) {
@@ -394,6 +401,7 @@ class Ticketmaster extends EventImportHandler {
             'endTime' => '',
             'venue' => $this->sanitizeText($venue_name),
             'artist' => $this->sanitizeText($artist),
+            'organizer' => $this->sanitizeText($organizer),
             'price' => $this->sanitizeText($price),
             'ticketUrl' => $this->sanitizeUrl($ticket_url),
             'description' => $this->cleanHtml($description),

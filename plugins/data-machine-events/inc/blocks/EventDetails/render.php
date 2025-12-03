@@ -14,6 +14,7 @@ if (!defined('ABSPATH')) {
 }
 
 use DataMachineEvents\Core\Venue_Taxonomy;
+use DataMachineEvents\Core\Promoter_Taxonomy;
 use DataMachineEvents\Core\EventSchemaProvider;
 
 $decode_unicode = function($str) {
@@ -43,6 +44,14 @@ if ($venue_terms && !is_wp_error($venue_terms)) {
     $address = Venue_Taxonomy::get_formatted_address($venue_term->term_id);
 }
 
+// Promoter taxonomy maps to Schema.org organizer property
+$organizer_data = null;
+$promoter_terms = get_the_terms($post_id, 'promoter');
+if ($promoter_terms && !is_wp_error($promoter_terms)) {
+    $promoter_term = $promoter_terms[0];
+    $organizer_data = Promoter_Taxonomy::get_promoter_data($promoter_term->term_id);
+}
+
 $start_datetime = '';
 $end_datetime = '';
 if ($start_date) {
@@ -62,7 +71,7 @@ $block_class = implode(' ', $block_classes);
 $event_schema = null;
 if (!empty($start_date)) {
     $event_data = array_merge($attributes, []);
-    $event_schema = EventSchemaProvider::generateSchemaOrg($event_data, $venue_data ?? [], $post_id);
+    $event_schema = EventSchemaProvider::generateSchemaOrg($event_data, $venue_data ?? [], $organizer_data ?? [], $post_id);
 }
 ?>
 

@@ -11,27 +11,13 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\GoogleCalendar;
 
-// Prevent direct access
 if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * GoogleCalendarSettings class
- *
- * Provides configuration fields for Google Calendar .ics integration
- * including calendar URL and event filtering.
- *
- * @since 1.0.0
- */
 class GoogleCalendarSettings {
 
-    /**
-     * Constructor
-     * Pure filter-based architecture - no dependencies.
-     */
     public function __construct() {
-        // No constructor dependencies - all services accessed via filters
     }
 
     /**
@@ -40,8 +26,8 @@ class GoogleCalendarSettings {
      * @param array $current_config Current configuration values for this handler
      * @return array Settings fields configuration
      */
-    public function get_fields(array $current_config = []): array {
-        return [
+    public static function get_fields(array $current_config = []): array {
+        $handler_fields = [
             'calendar_url' => [
                 'type' => 'text',
                 'label' => __('Calendar URL', 'datamachine-events'),
@@ -74,6 +60,8 @@ class GoogleCalendarSettings {
                 'default' => true
             ]
         ];
+
+        return $handler_fields;
     }
 
     /**
@@ -82,34 +70,28 @@ class GoogleCalendarSettings {
      * @param array $config Raw configuration from form submission
      * @return array Sanitized and validated configuration
      */
-    public function sanitize_config(array $config): array {
+    public static function sanitize_config(array $config): array {
         $sanitized = [];
 
-        // Sanitize calendar URL
         $calendar_url = trim($config['calendar_url'] ?? '');
         if (!empty($calendar_url)) {
             $sanitized['calendar_url'] = esc_url_raw($calendar_url);
 
-            // Validate URL format
             if (!filter_var($sanitized['calendar_url'], FILTER_VALIDATE_URL)) {
                 $sanitized['calendar_url'] = '';
             }
 
-            // Validate .ics extension
             if (!empty($sanitized['calendar_url']) && !str_ends_with($sanitized['calendar_url'], '.ics')) {
-                // Allow Google Calendar URLs that might not end in .ics
                 if (!str_contains($sanitized['calendar_url'], 'calendar.google.com')) {
                     $sanitized['calendar_url'] = '';
                 }
             }
         }
 
-        // Sanitize calendar ID
         $calendar_id = trim($config['calendar_id'] ?? '');
         if (!empty($calendar_id)) {
             $sanitized['calendar_id'] = sanitize_text_field($calendar_id);
 
-            // If there's no explicit calendar_url, try to derive one from the calendar ID
             if (empty($sanitized['calendar_url'])) {
                 if (GoogleCalendarUtils::is_calendar_url_like($sanitized['calendar_id']) && preg_match('/^https?:\/\//i', $sanitized['calendar_id'])) {
                     $sanitized['calendar_url'] = esc_url_raw($sanitized['calendar_id']);
@@ -119,7 +101,6 @@ class GoogleCalendarSettings {
             }
         }
 
-        // Sanitize future events only checkbox
         $sanitized['future_events_only'] = !empty($config['future_events_only']);
 
         return $sanitized;
@@ -131,7 +112,7 @@ class GoogleCalendarSettings {
      * @param array $config Configuration to validate
      * @return array Validation result with 'valid' boolean and 'errors' array
      */
-    public function validate_config(array $config): array {
+    public static function validate_config(array $config): array {
         $errors = [];
 
         // Validate calendar URL or calendar ID (at least one required)
@@ -172,7 +153,7 @@ class GoogleCalendarSettings {
      *
      * @return array Handler metadata for UI display
      */
-    public function get_handler_info(): array {
+    public static function get_handler_info(): array {
         return [
             'name' => __('Google Calendar', 'datamachine-events'),
             'description' => __('Import events from public Google Calendar .ics feeds – accepts either a public .ics URL or a calendar ID, which will be converted to an .ics feed URL.', 'datamachine-events'),
@@ -184,6 +165,19 @@ class GoogleCalendarSettings {
                 'timezone_handling' => true,
                 'future_filtering' => true
             ]
+        ];
+    }
+
+    /**
+     * Get default values for all settings.
+     *
+     * @return array Default values.
+     */
+    public static function get_defaults(): array {
+        return [
+            'calendar_url' => '',
+            'calendar_id' => '',
+            'future_events_only' => true
         ];
     }
 }

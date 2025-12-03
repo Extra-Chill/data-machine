@@ -28,12 +28,10 @@ class Pagination {
      * @param int $current_page Current page number
      * @param int $max_pages Total number of pages
      * @param bool $show_past Whether currently showing past events
-     * @param bool $enable_pagination Whether pagination is enabled
      * @return string Pagination HTML or empty string if not needed
      */
-    public static function render_pagination($current_page, $max_pages, $show_past = false, $enable_pagination = true) {
-        // Don't render if pagination disabled or only one page
-        if (!$enable_pagination || $max_pages <= 1) {
+    public static function render_pagination($current_page, $max_pages, $show_past = false) {
+        if ($max_pages <= 1) {
             return '';
         }
 

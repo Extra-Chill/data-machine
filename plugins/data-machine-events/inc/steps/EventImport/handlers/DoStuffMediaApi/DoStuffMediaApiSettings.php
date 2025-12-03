@@ -26,7 +26,7 @@ class DoStuffMediaApiSettings {
      * @return array Associative array defining the settings fields
      */
     public static function get_fields(array $current_config = []): array {
-        return [
+        $handler_fields = [
             'feed_url' => [
                 'type' => 'text',
                 'label' => __('Feed URL', 'datamachine-events'),
@@ -34,6 +34,9 @@ class DoStuffMediaApiSettings {
                 'placeholder' => __('http://events.venue-name.com/events.json', 'datamachine-events'),
                 'required' => true
             ],
+        ];
+
+        $filter_fields = [
             'search' => [
                 'type' => 'text',
                 'label' => __('Include Keywords', 'datamachine-events'),
@@ -49,6 +52,8 @@ class DoStuffMediaApiSettings {
                 'required' => false
             ]
         ];
+
+        return array_merge($handler_fields, $filter_fields);
     }
 
     /**

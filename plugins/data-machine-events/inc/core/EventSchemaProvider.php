@@ -329,7 +329,7 @@ class EventSchemaProvider {
         return $params;
     }
 
-    public static function generateSchemaOrg(array $event_data, array $venue_data, int $post_id): array {
+    public static function generateSchemaOrg(array $event_data, array $venue_data, array $organizer_data = [], int $post_id = 0): array {
         $event_type = $event_data['eventType'] ?? 'Event';
 
         $schema = [
@@ -364,14 +364,9 @@ class EventSchemaProvider {
             ];
         }
 
-        if (!empty($event_data['organizer'])) {
-            $schema['organizer'] = [
-                '@type' => $event_data['organizerType'] ?? 'Organization',
-                'name' => $event_data['organizer']
-            ];
-            if (!empty($event_data['organizerUrl'])) {
-                $schema['organizer']['url'] = $event_data['organizerUrl'];
-            }
+        $organizer_schema = self::buildOrganizerSchema($organizer_data, $event_data);
+        if (!empty($organizer_schema)) {
+            $schema['organizer'] = $organizer_schema;
         }
 
         $images = self::buildImageArray($post_id);
@@ -449,6 +444,33 @@ class EventSchemaProvider {
         }
 
         return $location;
+    }
+
+    /**
+     * Build organizer schema from taxonomy data or event data fallback.
+     *
+     * @param array $organizer_data Organizer taxonomy data (name, url, type)
+     * @param array $event_data Event data with organizer fields as fallback
+     * @return array Organizer schema or empty array
+     */
+    private static function buildOrganizerSchema(array $organizer_data, array $event_data): array {
+        $organizer_name = $organizer_data['name'] ?? $event_data['organizer'] ?? '';
+
+        if (empty($organizer_name)) {
+            return [];
+        }
+
+        $organizer = [
+            '@type' => $organizer_data['type'] ?? $event_data['organizerType'] ?? 'Organization',
+            'name' => $organizer_name
+        ];
+
+        $organizer_url = $organizer_data['url'] ?? $event_data['organizerUrl'] ?? '';
+        if (!empty($organizer_url)) {
+            $organizer['url'] = $organizer_url;
+        }
+
+        return $organizer;
     }
 
     private static function buildOffersSchema(array $event_data): array {

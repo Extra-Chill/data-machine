@@ -82,7 +82,7 @@ Carousel List provides sequential event display optimized for browsing:
 - **modal/taxonomy-filter.php**: Advanced taxonomy filter modal
 
 ### Pagination System
-Pagination is rendered by the `Pagination` class (`Pagination.php`) with extensibility filters:
+Day-based pagination showing 5 complete days per page. Pagination is rendered by the `Pagination` class (`Pagination.php`) with extensibility filters:
 - **datamachine_events_pagination_wrapper_classes**: Modify CSS classes on pagination wrapper
 - **datamachine_events_pagination_args**: Customize `paginate_links()` arguments
 
@@ -129,7 +129,7 @@ Pagination is rendered by the `Pagination` class (`Pagination.php`) with extensi
 - **Database-Level**: Filter events at SQL query level
 - **Meta Queries**: Efficient date-based filtering
 - **Taxonomy Queries**: Optimized taxonomy filtering
-- **Pagination**: Server-side pagination (~10 events per page)
+- **Day-Based Pagination**: Server-side pagination showing 5 complete days per page
 
 ### Progressive Enhancement
 - **No JavaScript**: Full functionality without JavaScript
@@ -145,7 +145,6 @@ Pagination is rendered by the `Pagination` class (`Pagination.php`) with extensi
 - `showSearch`: Show/hide search functionality
 - `showDateFilter`: Enable/disable date filtering
 - `defaultDateRange`: Default date range (current, today, week, month)
-- `enablePagination`: Enable/disable pagination
 
 ### Styling Integration
 - **Design Tokens**: CSS custom properties from root.css

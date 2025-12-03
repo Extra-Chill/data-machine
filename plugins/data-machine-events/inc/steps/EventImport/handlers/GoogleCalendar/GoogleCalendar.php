@@ -257,6 +257,17 @@ class GoogleCalendar extends EventImportHandler {
             }
         }
 
+        // Organizer config overrides (fallback when iCal ORGANIZER is empty)
+        if (!empty($config['organizer_name'])) {
+            $standardized_event['organizer'] = sanitize_text_field($config['organizer_name']);
+        }
+        if (!empty($config['organizer_url'])) {
+            $standardized_event['organizerUrl'] = esc_url_raw($config['organizer_url']);
+        }
+        if (!empty($config['organizer_type'])) {
+            $standardized_event['organizerType'] = sanitize_text_field($config['organizer_type']);
+        }
+
         return $standardized_event;
     }
 }

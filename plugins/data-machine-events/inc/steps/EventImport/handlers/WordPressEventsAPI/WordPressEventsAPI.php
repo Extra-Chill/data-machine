@@ -281,6 +281,7 @@ class WordPressEventsAPI extends EventImportHandler {
         }
 
         $venue_data = $this->extract_tribe_venue($event);
+        $organizer_data = $this->extract_tribe_organizer($event);
 
         if (!empty($config['venue_name_override'])) {
             $venue_data['venue'] = $config['venue_name_override'];
@@ -310,6 +311,8 @@ class WordPressEventsAPI extends EventImportHandler {
             'venuePhone' => $this->sanitizeText($venue_data['venuePhone']),
             'venueWebsite' => $this->sanitizeUrl($venue_data['venueWebsite']),
             'venueCoordinates' => $this->sanitizeText($venue_data['venueCoordinates']),
+            'organizer' => $this->sanitizeText($organizer_data['organizer']),
+            'organizerUrl' => $this->sanitizeUrl($organizer_data['organizerUrl']),
             'price' => $this->sanitizeText($price),
             'ticketUrl' => $this->sanitizeUrl($ticket_url),
             'image' => $image_url,
@@ -354,6 +357,32 @@ class WordPressEventsAPI extends EventImportHandler {
             'venuePhone' => $venue_phone,
             'venueWebsite' => $venue_website,
             'venueCoordinates' => $venue_coordinates,
+        ];
+    }
+
+    private function extract_tribe_organizer(array $event): array {
+        $organizer = $event['organizer'] ?? [];
+
+        $organizer_name = '';
+        $organizer_url = '';
+        $organizer_phone = '';
+        $organizer_email = '';
+
+        if (!empty($organizer)) {
+            if (isset($organizer[0])) {
+                $organizer = $organizer[0];
+            }
+            $organizer_name = $organizer['organizer'] ?? '';
+            $organizer_url = $organizer['website'] ?? $organizer['url'] ?? '';
+            $organizer_phone = $organizer['phone'] ?? '';
+            $organizer_email = $organizer['email'] ?? '';
+        }
+
+        return [
+            'organizer' => $organizer_name,
+            'organizerUrl' => $organizer_url,
+            'organizerPhone' => $organizer_phone,
+            'organizerEmail' => $organizer_email,
         ];
     }
 

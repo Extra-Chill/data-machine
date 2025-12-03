@@ -26,7 +26,7 @@ class SpotHopperSettings {
      * @return array Associative array defining the settings fields
      */
     public static function get_fields(array $current_config = []): array {
-        return [
+        $handler_fields = [
             'spot_id' => [
                 'type' => 'text',
                 'label' => __('Spot ID', 'datamachine-events'),
@@ -41,6 +41,9 @@ class SpotHopperSettings {
                 'placeholder' => __('The Rickhouse', 'datamachine-events'),
                 'required' => false
             ],
+        ];
+
+        $filter_fields = [
             'search' => [
                 'type' => 'text',
                 'label' => __('Include Keywords', 'datamachine-events'),
@@ -56,6 +59,8 @@ class SpotHopperSettings {
                 'required' => false
             ]
         ];
+
+        return array_merge($handler_fields, $filter_fields);
     }
 
     /**

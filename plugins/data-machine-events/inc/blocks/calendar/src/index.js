@@ -7,7 +7,6 @@ import {
 import { 
     PanelBody, 
     SelectControl, 
-    RangeControl, 
     ToggleControl 
 } from '@wordpress/components';
 
@@ -15,8 +14,7 @@ registerBlockType('datamachine-events/calendar', {
     edit: function Edit({ attributes, setAttributes }) {
         const { 
             defaultView, 
-            showSearch,
-            enablePagination
+            showSearch
         } = attributes;
         
         const blockProps = useBlockProps({
@@ -42,17 +40,6 @@ registerBlockType('datamachine-events/calendar', {
                             checked={showSearch}
                             onChange={(value) => setAttributes({ showSearch: value })}
                         />
-                    </PanelBody>
-
-                    <PanelBody title={__('Pagination', 'datamachine-events')} initialOpen={false}>
-                        <ToggleControl
-                            label={__('Enable Pagination', 'datamachine-events')}
-                            checked={enablePagination}
-                            onChange={(value) => setAttributes({ enablePagination: value })}
-                        />
-                        <p className="description">
-                            {__('Events per page is controlled by WordPress Reading Settings (Dashboard → Settings → Reading → "Blog pages show at most").', 'datamachine-events')}
-                        </p>
                     </PanelBody>
                 </InspectorControls>
 

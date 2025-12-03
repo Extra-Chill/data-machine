@@ -11,26 +11,15 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\DiceFm;
 
-// Prevent direct access
 if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * DiceFmSettings class
- * 
- * Configuration fields for Dice.fm API event import.
- */
 class DiceFmSettings {
-    
-    /**
-     * Constructor
-     * Pure filter-based architecture - no dependencies.
-     */
+
     public function __construct() {
-        // No constructor dependencies - all services accessed via filters
     }
-    
+
     /**
      * Get settings fields for Dice.fm event import handler
      *
@@ -38,7 +27,7 @@ class DiceFmSettings {
      * @return array Associative array defining the settings fields
      */
     public static function get_fields(array $current_config = []): array {
-        return [
+        $handler_fields = [
             'city' => [
                 'type' => 'text',
                 'label' => __('City', 'datamachine-events'),
@@ -46,6 +35,9 @@ class DiceFmSettings {
                 'placeholder' => __('Charleston', 'datamachine-events'),
                 'required' => true,
             ],
+        ];
+
+        $filter_fields = [
             'search' => [
                 'type' => 'text',
                 'label' => __('Include Keywords', 'datamachine-events'),
@@ -61,8 +53,10 @@ class DiceFmSettings {
                 'required' => false
             ]
         ];
+
+        return array_merge($handler_fields, $filter_fields);
     }
-    
+
     /**
      * Sanitize Dice.fm handler settings.
      *
@@ -76,7 +70,7 @@ class DiceFmSettings {
             'exclude_keywords' => sanitize_text_field($raw_settings['exclude_keywords'] ?? '')
         ];
     }
-    
+
     /**
      * Determine if authentication is required.
      *
@@ -84,9 +78,9 @@ class DiceFmSettings {
      * @return bool True if authentication is required.
      */
     public static function requires_authentication(array $current_config = []): bool {
-        return true; // Dice.fm requires API key authentication
+        return true;
     }
-    
+
     /**
      * Get default values for all settings.
      *

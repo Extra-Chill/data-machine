@@ -297,6 +297,14 @@ class Eventbrite extends EventImportHandler {
             $performer = is_array($performers) && isset($performers[0]) ? $performers[0] : $performers;
             $artist = $performer['name'] ?? '';
         }
+
+        $organizer = '';
+        $organizer_url = '';
+        $eb_organizer = $eb_event['organizer'] ?? [];
+        if (!empty($eb_organizer)) {
+            $organizer = $eb_organizer['name'] ?? '';
+            $organizer_url = $eb_organizer['url'] ?? '';
+        }
         
         $image_url = '';
         if (!empty($eb_event['image'])) {
@@ -311,6 +319,8 @@ class Eventbrite extends EventImportHandler {
             'endTime' => $end_time,
             'venue' => $this->sanitizeText($venue_name),
             'artist' => $this->sanitizeText($artist),
+            'organizer' => $this->sanitizeText($organizer),
+            'organizerUrl' => $this->sanitizeUrl($organizer_url),
             'price' => $this->sanitizeText($price),
             'ticketUrl' => $this->sanitizeUrl($ticket_url),
             'description' => $this->cleanHtml($description),
