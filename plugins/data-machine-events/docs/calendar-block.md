@@ -1,215 +1,46 @@
 # Calendar Block
 
-Advanced event display with multiple view modes, filtering, and template system.
+The Calendar block renders a Carousel List of events with progressive enhancement powered by REST routes and modular templates. It pairs server-rendered HTML with scoped JavaScript so filtering, pagination, and navigation stay fast and accessible.
 
-## Overview
+## Carousel List Display
 
-The Calendar block provides flexible event display with progressive enhancement, supporting both server-side rendering and JavaScript-enhanced filtering. Features comprehensive taxonomy integration and a modular ES module architecture for frontend interactivity.
+- **Day grouping**: Events are grouped by date using `date-group.php` so each brochure of upcoming or past days remains obvious.
+- **Time gap separators**: `time-gap-separator.php` inserts visual dividers when there are large gaps between event start times.
+- **Horizontal scroll**: CSS delivers native touch/trackpad scrolling with chevrons, dots, and active state indicators handled by the carousel module.
+- **Compact cards**: `event-item.php` renders each event summary with taxonomy badges, time, and CTA buttons linked to more details.
 
-## Features
+## Server Templates & Helpers
 
-### Display Mode
-- **Carousel List**: Horizontal scrolling layout with day grouping and time gap separators
+- `event-item.php`, `date-group.php`, `navigation.php`, `pagination.php`, `results-counter.php`, `no-events.php`, `filter-bar.php`, `time-gap-separator.php`, and `modal/taxonomy-filter.php` live under `inc/Blocks/Calendar/templates` and are orchestrated by `inc/Core/Template_Loader`.
+- `inc/Core/Taxonomy_Helper` builds hierarchical term data and counts for each template, while `Taxonomy_Badges` renders badge markup that respects `datamachine_events_badge_wrapper_classes`, `datamachine_events_badge_classes`, and `datamachine_events_more_info_button_classes` filters.
+- The filter modal uses taxonomy helpers to surface dynamic dependencies, counts, and active state indicators before handing control to the filter modal module.
 
-### Filtering System
-- **Search**: Real-time event search by title, venue, or taxonomy terms
-- **Date Range**: Flexible date filtering with start/end date pickers and date context awareness
-- **Taxonomy Filters**: Multi-taxonomy filtering with modal interface and dynamic filter loading
-- **Past Events**: Toggle between upcoming and past events
-- **State Persistence**: Filter selections saved and restored using localStorage
-- **Date Context Filtering**: Taxonomy filters respect selected date ranges for accurate term counts
+## REST API Support
 
-### Template System
-- **7 Specialized Templates**: Modular, cacheable template rendering
-- **Variable Extraction**: Automatic data sanitization and extraction
-- **Output Buffering**: Efficient template processing
+- `GET /wp-json/datamachine/v1/events/calendar`: Calendar controller returns `html`, `pagination`, `navigation`, `counter`, and `success` fragments. It accepts `event_search`, `date_start`, `date_end`, `tax_filter[taxonomy][]`, `paged`, and `past`, sanitizes inputs, builds SQL-aware WP_Query args, and caches taxonomy counts for pagination.
+- `GET /wp-json/datamachine/v1/events/filters`: Filters controller lists taxonomy terms with counts, dependency hints, and hierarchy metadata; accepts `active`, `context`, `date_start`, `date_end`, and `past` so the modal shows accurate controls that respect the current date logic.
+- Progressive enhancement: server-rendered HTML works without JavaScript; when scripts run they fetch these routes for instant filtering while preserving their shareable URL state.
 
-### Progressive Enhancement
-- **Server-First**: Works without JavaScript for SEO and accessibility
-- **JavaScript Enhanced**: Seamless filtering without page reloads
-- **History API**: Shareable filter states via URL
+## JavaScript Modules
 
-## Display Mode
+- `src/frontend.js` bootstraps each `.datamachine-events-calendar`, wiring the following modules:
+  - `modules/api-client.js` handles REST requests and swaps fragments.
+  - `modules/carousel.js` detects overflow, updates dots, and powers chevrons (with click-and-hold support).
+  - `modules/date-picker.js` integrates Flatpickr for date range filters.
+  - `modules/filter-modal.js` keeps the taxonomy modal accessible and debounced when filters change.
+  - `modules/navigation.js` powers past/upcoming toggles, calendar navigation, and pagination link handling.
+  - `modules/state.js` serializes query parameters, manages history state, and debounces search input.
 
-Carousel List provides sequential event display optimized for browsing:
-- **Time Gaps**: Visual separators between date groups using time-gap-separator template
-- **Horizontal Scroll**: CSS-only continuous event browsing with native touch/trackpad support
-- **Compact Layout**: Space-efficient event presentation with day grouping
-- **Performance**: CSS-only rendering requires no JavaScript for display
-- **Accessibility**: Screen reader and keyboard navigation support
+## Filter Modal & Taxonomy Helpers
 
-### Enhanced Carousel Navigation (v0.4.10)
-- **Click and Hold**: Chevron controls support continuous scrolling while pressed
-- **Touch-Friendly**: Optimized event handling for mobile devices with improved touch responsiveness
-- **Smooth Scroll**: Enhanced scroll behavior with visual feedback and momentum
-- **Active Dot Detection**: Improved dot indicator highlighting using precise scroll position calculation
+The modal is populated via `Taxonomy_Helper`, which computes term hierarchies, counts, and `datamachine_events_excluded_taxonomies` filters, ensuring the modal only shows the taxonomies the block exposes. When filters change, the modal calls the API client to refresh fragments without reloading the page.
 
-## Filtering Features
+## Pagination
 
-### Search Functionality
-- **Real-time Search**: 500ms debounced input
-- **Multi-field Search**: Title, venue, and taxonomy terms
-- **URL Preservation**: Search terms maintained in shareable URLs
+- Day-based pagination lives in `inc/Blocks/Calendar/Pagination.php` and produces five full days per page.
+- Filters `datamachine_events_pagination_wrapper_classes` and `datamachine_events_pagination_args` allow theme or plugin code to modify wrapper classes or pass additional `paginate_links` arguments.
+- Pagination fragments come from the REST calendar response so the JavaScript can replace controls while keeping server-rendered markup for non-JS contexts.
 
-### Date Filtering
-- **Date Range Picker**: Flatpickr integration
-- **Quick Presets**: Today, This Week, This Month
-- **Timezone Aware**: Uses WordPress timezone settings
+## Progressive Enhancement
 
-### Taxonomy Filtering
-- **Modal Interface**: Advanced filter selection
-- **Hierarchical Support**: Category and sub-category filtering
-- **Multi-select**: Multiple taxonomy terms per filter
-- **Active State**: Visual filter count indicators
-
-### Filter Reset (v0.4.15)
-- **Complete State Clearing**: Resets all active filters when reset button is clicked
-- **localStorage Clearing**: Removes saved calendar state from browser storage
-- **URL Parameter Reset**: Clears all filter parameters from the URL for clean sharing
-- **Badge Reset**: Resets filter count badge to zero for accurate visual feedback
-- **Enhanced Reliability**: Improved reset functionality ensures consistent state management
-
-## Template Architecture
-
-### Available Templates
-- **event-item.php**: Individual event display
-- **date-group.php**: Day-grouped event container
-- **navigation.php**: Calendar navigation controls
-- **no-events.php**: Empty state display
-- **filter-bar.php**: Filtering interface
-- **results-counter.php**: Results counter display
-- **time-gap-separator.php**: Date gap visualization
-- **modal/taxonomy-filter.php**: Advanced taxonomy filter modal
-
-### Pagination System
-Day-based pagination showing 5 complete days per page. Pagination is rendered by the `Pagination` class (`Pagination.php`) with extensibility filters:
-- **datamachine_events_pagination_wrapper_classes**: Modify CSS classes on pagination wrapper
-- **datamachine_events_pagination_args**: Customize `paginate_links()` arguments
-
-### Template Features
-- **Variable Sanitization**: Automatic data cleaning and escaping
-- **Output Buffering**: Efficient template rendering
-- **Caching Support**: Performance optimization
-- **Modular Design**: Easy template customization
-- **More Info Button**: Direct link to event details with customizable styling
-
-### Taxonomy Integration
-- **Taxonomy_Badges**: Dynamic badge rendering with automatic color generation and taxonomy term links
-- **Taxonomy_Helper**: Structured taxonomy data processing with hierarchy building and post count calculations
-
-## REST API Integration
-
-### Calendar Endpoint
-- **URL**: `/wp-json/datamachine/v1/events/calendar`
-- **Method**: GET request with query parameters
-- **Response**: Rendered HTML with pagination data
-
-### Query Parameters
-- `event_search`: Search events by title, venue, or terms
-- `date_start`: Filter events from start date (YYYY-MM-DD)
-- `date_end`: Filter events to end date (YYYY-MM-DD)
-- `tax_filter[taxonomy][]`: Filter by taxonomy term IDs
-- `paged`: Pagination page number
-- `past`: Show past events when "1"
-
-### Response Data
-```json
-{
-  "success": true,
-  "html": "Rendered events HTML",
-  "pagination": "Pagination controls HTML",
-  "navigation": "Calendar navigation HTML", 
-  "counter": "Results counter HTML"
-}
-```
-
-## Performance Features
-
-### SQL-Based Filtering
-- **Database-Level**: Filter events at SQL query level
-- **Meta Queries**: Efficient date-based filtering
-- **Taxonomy Queries**: Optimized taxonomy filtering
-- **Day-Based Pagination**: Server-side pagination showing 5 complete days per page
-
-### Progressive Enhancement
-- **No JavaScript**: Full functionality without JavaScript
-- **Enhanced Experience**: JavaScript adds seamless filtering
-- **SEO Friendly**: Server-rendered content for search engines
-- **Accessibility**: WCAG compliant markup and navigation
-
-## Customization
-
-### Block Attributes
-- `showPastEvents`: Display past events toggle
-- `showFilters`: Enable/disable filtering interface
-- `showSearch`: Show/hide search functionality
-- `showDateFilter`: Enable/disable date filtering
-- `defaultDateRange`: Default date range (current, today, week, month)
-
-### Styling Integration
-- **Design Tokens**: CSS custom properties from root.css
-- **Responsive Carousel**: Mobile-first horizontal scroll design
-- **Day Colors**: Automatic color generation for date badges
-- **Badge System**: Dynamic badge rendering with taxonomy colors
-
-## JavaScript Module Architecture
-
-The frontend JavaScript is organized into 6 focused ES modules for maintainability:
-
-### Module Structure
-- **frontend.js** (93 lines): Module orchestration and calendar initialization
-- **modules/api-client.js**: REST API communication and calendar DOM updates
-- **modules/carousel.js**: Enhanced carousel overflow detection, dot indicators, chevron navigation with click-and-hold functionality, and smooth scroll behavior
-- **modules/date-picker.js**: Flatpickr date range picker integration
-- **modules/filter-modal.js**: Taxonomy filter modal UI and accessibility
-- **modules/navigation.js**: Past/upcoming navigation and pagination link handling
-- **modules/state.js**: URL state management and query parameter building
-
-### Initialization Flow
-```javascript
-// frontend.js orchestrates module initialization
-document.querySelectorAll('.datamachine-events-calendar').forEach(initCalendarInstance);
-
-function initCalendarInstance(calendar) {
-    initCarousel(calendar);
-    initDatePicker(calendar, handleFilterChange);
-    initFilterModal(calendar, handleFilterChange, handleFilterChange);
-    initNavigation(calendar, handleNavigation);
-    initSearchInput(calendar);
-}
-```
-
-### CSS Theme Integration
-- **flatpickr-theme.css**: Date picker theming with design system integration
-- CSS custom properties from `root.css` for consistent styling
-- Dark mode support via CSS custom properties
-
-## Developer Integration
-
-### Template Customization
-```php
-// Custom event item template
-$content = Template_Loader::get_template('event-item', [
-    'event' => $event_data,
-    'custom_var' => $custom_value
-]);
-```
-
-### Filter Integration
-```php
-// Custom taxonomy filtering
-add_filter('datamachine_events_calendar_query_args', function($args, $attributes) {
-    // Modify query arguments
-    return $args;
-}, 10, 2);
-```
-
-### JavaScript Hooks
-```javascript
-// Custom calendar initialization
-document.addEventListener('datamachine-calendar-initialized', function(e) {
-    // Custom initialization logic
-});
-```
-
-The Calendar block provides comprehensive event display with flexible customization options while maintaining performance and accessibility standards.
+Calendar rendering works without any JavaScript; templates are server-rendered during the initial request, making the block SEO-friendly and accessible. JavaScript hooks into the REST API for smoother filtering, search debouncing (500ms), history support, and full control over pagination without forcing reloads.

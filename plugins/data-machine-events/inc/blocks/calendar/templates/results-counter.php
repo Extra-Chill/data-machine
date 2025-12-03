@@ -2,46 +2,45 @@
 /**
  * Results Counter Template
  *
- * Displays "Viewing days X-Y of Z total" counter for day-based pagination.
+ * Displays date range and event count for current page: "Viewing Dec 3 - Dec 7 (47 Events)"
  *
- * @var int $current_page Current page number
- * @var int $total_events Total number of unique days (renamed for backward compatibility)
- * @var int $events_per_page Days per page (DAYS_PER_PAGE constant value)
+ * @var string $page_start_date Start date of current page (Y-m-d format)
+ * @var string $page_end_date End date of current page (Y-m-d format)
+ * @var int $event_count Number of events on current page
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-if ( ! $total_events ) {
+if ( empty( $page_start_date ) || empty( $page_end_date ) || ! $event_count ) {
 	return;
 }
 
-$total_days = $total_events;
-$days_per_page = $events_per_page;
-
-$start = ( ( $current_page - 1 ) * $days_per_page ) + 1;
-$end   = min( $current_page * $days_per_page, $total_days );
+$formatted_start = date_i18n( 'M j', strtotime( $page_start_date ) );
+$formatted_end = date_i18n( 'M j', strtotime( $page_end_date ) );
+$is_same_day = $page_start_date === $page_end_date;
+$event_label = 1 === $event_count ? __( 'Event', 'datamachine-events' ) : __( 'Events', 'datamachine-events' );
 ?>
 
 <div class="datamachine-events-results-counter">
 	<?php
-	if ( 1 === $total_days ) {
-		esc_html_e( 'Viewing 1 day', 'datamachine-events' );
-	} elseif ( $start === $end ) {
+	if ( $is_same_day ) {
 		printf(
-			/* translators: 1: current day number, 2: total days */
-			esc_html__( 'Viewing day %1$d of %2$d', 'datamachine-events' ),
-			(int) $start,
-			(int) $total_days
+			/* translators: 1: formatted date, 2: event count, 3: "Event" or "Events" */
+			esc_html__( 'Viewing %1$s (%2$d %3$s)', 'datamachine-events' ),
+			esc_html( $formatted_start ),
+			(int) $event_count,
+			esc_html( $event_label )
 		);
 	} else {
 		printf(
-			/* translators: 1: start day number, 2: end day number, 3: total days */
-			esc_html__( 'Viewing days %1$d-%2$d of %3$d total', 'datamachine-events' ),
-			(int) $start,
-			(int) $end,
-			(int) $total_days
+			/* translators: 1: start date, 2: end date, 3: event count, 4: "Event" or "Events" */
+			esc_html__( 'Viewing %1$s - %2$s (%3$d %4$s)', 'datamachine-events' ),
+			esc_html( $formatted_start ),
+			esc_html( $formatted_end ),
+			(int) $event_count,
+			esc_html( $event_label )
 		);
 	}
 	?>

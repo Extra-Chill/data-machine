@@ -1,268 +1,68 @@
 # REST API
 
-Comprehensive REST API for event and venue data with progressive enhancement support.
-
-## Overview
-
-Data Machine Events provides a complete REST API system under the unified `datamachine/v1` namespace. Features modular controller architecture with SQL-based filtering and progressive enhancement for optimal performance.
+Data Machine Events exposes a focused REST surface under the `datamachine/v1` namespace. Each route is registered in `inc/Api/Routes.php` and handled by the controllers in `inc/Api/Controllers` so the Calendar and Event Details blocks plus admin UI stay synchronized with SQL-powered filtering.
 
 ## Architecture
 
-### Unified Namespace
 - **Base URL**: `/wp-json/datamachine/v1/`
-- **Route Registration**: Centralized in `inc/Api/Routes.php`
-- **Modular Controllers**: Separate controllers for each resource type
-- **Progressive Enhancement**: Works with and without JavaScript
-
-### Controller Structure
-- **Calendar Controller**: Event filtering and display
-- **Venues Controller**: Venue CRUD operations
-- **Events Controller**: General event operations
+- **Route registration**: `inc/Api/Routes.php` maps resources to `Calendar`, `Filters`, `Venues`, and `Geocoding` controllers.
+- **Controller responsibilities**:
+  - `Calendar` handles event queries, HTML fragment rendering, pagination, and counter updates used by the Calendar block and JS modules.
+  - `Filters` builds taxonomy hierarchies, counts, and dependency hints for the filter modal.
+  - `Venues` surfaces venue metadata (and duplicate checks) to admin flows.
+  - `Geocoding` proxies OpenStreetMap Nominatim lookups for venue creation.
+- **Security & sanitization**: Every route sanitizes inputs using `sanitize_text_field`, `absint`, `sanitize_key`, or custom callbacks, enforces capability checks where required, and returns standardized JSON responses.
+- **Progressive enhancement**: Calendar block falls back to server-rendered templates; REST responses simply replace fragments when JavaScript is active.
 
 ## Endpoints
 
-### Calendar Endpoint
-**URL**: `GET /wp-json/datamachine/v1/events/calendar`
+### GET `/wp-json/datamachine/v1/events/calendar`
+- **Purpose**: Supplies calendar HTML fragments (`html`, `pagination`, `navigation`, `counter`) for the Calendar block while keeping server-side pagination/accounting.
+- **Controller**: `Calendar::calendar()`.
+- **Arguments**:
+  - `event_search` (string): Searches titles, venue names, and taxonomy badges.
+  - `date_start` / `date_end` (YYYY-MM-DD): Bound the query range for day grouping.
+  - `tax_filter[taxonomy][]` (array): Term IDs per taxonomy.
+  - `paged` (int): Pagination page number (5 days per page enforced by `inc/Blocks/Calendar/Pagination.php`).
+  - `past` (0/1): Toggle past events.
+- **Behavior**: Sanitizes every argument, builds SQL-based WP_Query filters (dates, `_datamachine_event_datetime`, taxonomies), caches taxonomy counts via helper classes, and returns success + fragments for frontend replacement.
 
-Public endpoint for event filtering and display with progressive enhancement.
+### GET `/wp-json/datamachine/v1/events/filters`
+- **Purpose**: Provides taxonomy term data (counts, parents, dependencies) for the Calendar filter modal.
+- **Controller**: `Filters::filters()`.
+- **Arguments**:
+  - `active` or `active_filters[taxonomy][]`: Currently selected term IDs.
+  - `context` (string): Optional block context (e.g., `calendar`).
+  - `date_start` / `date_end`: Date window to keep counts accurate.
+  - `past` (0/1): Past event mode influence.
+- **Behavior**: Sanitizes keys/values, streams SQL queries to compute term counts, respects `datamachine_events_excluded_taxonomies`, and responds with structured metadata used by `modules/filter-modal.js`.
 
-#### Query Parameters
-- `event_search`: Search events by title, venue, or taxonomy terms
-- `date_start`: Filter events from start date (YYYY-MM-DD format)
-- `date_end`: Filter events to end date (YYYY-MM-DD format)
-- `tax_filter[taxonomy][]`: Filter by taxonomy term IDs (multiple values supported)
-- `paged`: Current page number for pagination
-- `past`: Show past events when set to "1"
+### GET `/wp-json/datamachine/v1/events/venues/{id}`
+- **Purpose**: Returns venue description plus nine meta fields for admin editors and pipeline components.
+- **Controller**: `Venues::venue()`.
+- **Permissions**: `current_user_can('manage_options')`.
+- **Arguments**:
+  - `id` (term ID): Sanitized through `absint`.
+- **Behavior**: Loads term via `get_term_by()`, calls `Venue_Taxonomy::get_venue_data()` for address/city/state/zip/country/phone/website/capacity/coordinates, and returns JSON with `venue` object.
 
-#### Response Format
-```json
-{
-  "success": true,
-  "html": "Rendered events HTML",
-  "pagination": "Pagination controls HTML",
-  "navigation": "Calendar navigation HTML",
-  "counter": "Results counter HTML"
-}
-```
+### GET `/wp-json/datamachine/v1/events/venues/check-duplicate`
+- **Purpose**: Helps admins detect duplicate venues during creation.
+- **Controller**: `Venues::check_duplicate()`.
+- **Permissions**: `manage_options`.
+- **Arguments**:
+  - `name` (string) and optional `address` (string): Sanitized via `sanitize_text_field`.
+- **Behavior**: Performs duplicate logic across `venue` terms, normalizes inputs, returns `is_duplicate`, `existing_venue_id`, and user-friendly descriptions so UI can suggest existing venues rather than creating duplicates.
 
-### Venues Endpoint
-**URL**: `GET /wp-json/datamachine/v1/events/venues/{id}`
+### POST `/wp-json/datamachine/v1/events/geocode/search`
+- **Purpose**: Admin-facing OpenStreetMap Nominatim proxy for venue autocompletion.
+- **Controller**: `Geocoding::search()`.
+- **Permissions**: `manage_options`.
+- **Arguments**:
+  - `query` (string): Sanitized with `sanitize_text_field`.
+- **Behavior**: Calls Nominatim (with `DataMachine\Core\HttpClient`), handles rate limiting, returns `display_name`, `lat`, `lon`, and address parts, and surfaces errors when remote services fail.
 
-Admin endpoint for venue data retrieval and management.
-
-#### Path Parameters
-- `id`: Venue taxonomy term ID
-
-#### Response Format
-```json
-{
-  "success": true,
-  "venue": {
-    "id": 123,
-    "name": "Venue Name",
-    "description": "Venue description",
-    "meta": {
-      "address": "123 Main St",
-      "city": "Charleston",
-      "state": "SC",
-      "zip": "29401",
-      "country": "US",
-      "phone": "(555) 123-4567",
-      "website": "https://venue.com",
-      "capacity": 500,
-      "coordinates": "32.7836,-79.9372"
-    }
-  }
-}
-```
-
-### Duplicate Check Endpoint
-**URL**: `GET /wp-json/datamachine/v1/events/venues/check-duplicate`
-
-Admin endpoint for checking duplicate venues before creation.
-
-#### Query Parameters
-- `name`: Venue name to check
-- `address`: Venue address to check
-
-#### Response Format
-```json
-{
-  "success": true,
-  "is_duplicate": false,
-  "existing_venue_id": null,
-  "message": "No duplicate venue found"
-}
-```
-
-### Filters Endpoint
-**URL**: `GET /wp-json/datamachine/v1/events/filters`
-
-Public endpoint for dynamic taxonomy filter options with active filter support.
-
-#### Query Parameters
-- `active_filters[taxonomy][]`: Currently active taxonomy term IDs
-- `date_start`: Start date for date-aware filtering (YYYY-MM-DD)
-- `date_end`: End date for date-aware filtering (YYYY-MM-DD)
-- `past`: Show past events when "1"
-
-#### Response Format
-```json
-{
-  "success": true,
-  "filters": {
-    "taxonomy_slug": {
-      "name": "Taxonomy Name",
-      "terms": [
-        {
-          "id": 123,
-          "name": "Term Name",
-          "count": 5,
-          "parent": 0
-        }
-      ]
-    }
-  }
-}
-```
-
-### Geocoding Endpoint
-**URL**: `GET /wp-json/datamachine/v1/events/geocode/search`
-
-Admin endpoint for address geocoding using OpenStreetMap Nominatim API.
-
-#### Query Parameters
-- `q`: Address query string to geocode
-
-#### Response Format
-```json
-{
-  "success": true,
-  "results": [
-    {
-      "place_id": 123456,
-      "display_name": "123 Main St, City, State 12345, USA",
-      "lat": "32.7836",
-      "lon": "-79.9372",
-      "address": {
-        "house_number": "123",
-        "road": "Main St",
-        "city": "City",
-        "state": "State",
-        "postcode": "12345",
-        "country": "USA"
-      }
-    }
-  ]
-}
-```
-
-### Events Endpoint
-**URL**: `GET /wp-json/datamachine/v1/events/events`
-
-General event operations endpoint.
-
-#### Response Format
-```json
-{
-  "success": true,
-  "events": [
-    {
-      "id": 456,
-      "title": "Event Title",
-      "content": "Event content",
-      "meta": {
-        "event_datetime": "2025-12-31 19:00:00"
-      }
-    }
-  ]
-}
-```
-
-## Features
-
-### Progressive Enhancement
-- **Server-First**: Full functionality without JavaScript
-- **JavaScript Enhanced**: Seamless filtering without page reloads
-- **History API**: Shareable filter states via URL parameters
-- **Debounced Search**: 500ms delay for performance optimization
-
-### Performance Optimization
-- **SQL-Based Filtering**: Database-level filtering before rendering
-- **Efficient Pagination**: ~10 events per page vs. loading all events
-- **Meta Queries**: Optimized date filtering using `_datamachine_event_datetime` meta field
-- **Scalable Architecture**: Handles large event datasets (500+ events)
-
-### Security
-- **Capability Checks**: Admin endpoints require proper permissions
-- **Input Sanitization**: All parameters properly sanitized
-- **Nonce Verification**: WordPress nonce protection on sensitive operations
-
-### Error Handling
-- **Standardized Responses**: Consistent JSON response format
-- **HTTP Status Codes**: Proper REST status code usage
-- **Error Messages**: User-friendly error descriptions
-- **Graceful Degradation**: Server-side rendering when JavaScript fails
-
-## Usage Examples
-
-### Calendar Filtering
-```javascript
-// JavaScript-enhanced filtering
-fetch('/wp-json/datamachine/v1/events/calendar?' + new URLSearchParams({
-    event_search: 'jazz',
-    date_start: '2025-01-01',
-    date_end: '2025-12-31',
-    'tax_filter[festival][]': '5',
-    paged: '2'
-}))
-.then(response => response.json())
-.then(data => {
-    // Update calendar HTML
-    document.querySelector('.datamachine-calendar').innerHTML = data.html;
-});
-```
-
-### Venue Management
-```javascript
-// Check for duplicate venue
-fetch('/wp-json/datamachine/v1/events/venues/check-duplicate?' + new URLSearchParams({
-    name: 'Charleston Music Hall',
-    address: '37 John St, Charleston, SC'
-}))
-.then(response => response.json())
-.then(data => {
-    if (data.is_duplicate) {
-        // Show existing venue option
-        console.log('Existing venue ID:', data.existing_venue_id);
-    }
-});
-```
-
-### Server-Side Rendering
-```php
-// Direct PHP usage (no JavaScript required)
-$request = new WP_REST_Request('GET', '/datamachine/v1/events/calendar');
-$controller = new Calendar();
-$result = $controller->calendar($request);
-echo $result['html']; // Rendered calendar HTML
-```
-
-## Integration
-
-### WordPress REST API
-- **Native Integration**: Built on WordPress REST API framework
-- **Standard Endpoints**: Follows WordPress REST conventions
-- **Authentication**: Uses WordPress authentication system
-
-### Block Integration
-- **Calendar Block**: Uses REST API for progressive enhancement
-- **Event Details Block**: Event data available via REST endpoints
-- **Admin Interface**: Venue management via REST calls
-
-### Theme Integration
-- **Template Compatibility**: Works with any WordPress theme
-- **SEO Friendly**: Server-rendered content for search engines
-- **Accessible**: WCAG compliant markup and navigation
-
-The REST API provides comprehensive data access with optimal performance and full WordPress integration.
+## Shared Features
+- **SQL-powered queries**: Calendar queries rely on `_datamachine_event_datetime` meta and taxonomy joins, ensuring pagination/filter fragments return accurate, performant results.
+- **Caching**: REST responses reuse taxonomy counts computed via helpers to avoid redundant queries when the Calendar block changes filters rapidly.
+- **Standard JSON structure**: Controllers always return `success` plus payload/`data`, making the JS modules and admin hooks predictable.
+- **Graceful degradation**: The Calendar block renders identical templates on the server side so REST failures simply fall back to PHP rendering.

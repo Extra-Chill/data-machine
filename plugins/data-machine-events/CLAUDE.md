@@ -2,81 +2,100 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.5.0
+**Version**: 0.5.1
 
 ## Plugin Bootstrap
 
-- **Main file**: `datamachine-events.php` defines core constants, loads `inc/Core/meta-storage.php`, and requires `inc/Api/Routes.php` once REST API routing is available.
-- **DATAMACHINE_Events class**: Singleton that registers post types, taxonomies, blocks (`Calendar` and `EventDetails`), block assets (`root.css`, Leaflet map scripts/styles), REST API routes, and conditional admin components (settings page, admin bar).
-- **Block registration**: `register_block_type()` loads block.json definitions, enqueues root CSS for any datamachine events block or singular event post, and enqueues Leaflet assets plus the venue map helper when the Event Details block or event post is present.
-- **Data Machine bootstrap**: `init_data_machine_integration()` runs during `init`, loads `EventImportFilters`, instantiates `EventImportStep` handlers, and registers `EventUpsert` plus its filters.
+- **Entry point**: `datamachine-events.php` defines constants (`DATAMACHINE_EVENTS_VERSION`, plugin paths), loads `inc/Core/meta-storage.php`, and requires `inc/Api/Routes.php` when the file exists.
+- **`DATAMACHINE_Events` class**: Singleton bootstrapped via `init`, it registers the `datamachine_events` post type, `venue`/`promoter` taxonomies, enqueues admin assets, and registers Calendar/Event Details blocks. It also adds root styles, Leaflet assets, and the venue map script whenever a block or singular event is rendered.
+- **Block registration**: `register_block_type()` reads `inc/Blocks/Calendar/block.json` and `inc/Blocks/EventDetails/block.json`, enqueues shared `inc/Blocks/root.css`, and hooks `enqueue_root_styles()` to `wp_enqueue_scripts`/`enqueue_block_assets`. Leaflet CSS/JS plus `assets/js/venue-map.js` are enqueued only when the Event Details block or a `datamachine_events` post is present.
 
-## Data Machine Import Pipeline
+## Data Machine Integration
 
-- **EventImportStep** extends `DataMachine\Core\Steps\Step`, discovers handlers via registration traits, and delegates to `FetchHandler` implementations.
-- **Handlers**:
-  - `DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster\Ticketmaster`
-  - `...DiceFm\DiceFm`
-  - `...GoogleCalendar\GoogleCalendar` (with `GoogleCalendarUtils` for ID/URL resolution)
-  - `...IcsCalendar\IcsCalendar`
-  - `...SpotHopper\SpotHopper`
-  - `...WebScraper\UniversalWebScraper`
-  - `...WordPressEventsAPI\WordPressEventsAPI`
-  - `...EventFlyer\EventFlyer`
-  - `...Eventbrite\Eventbrite`
-  - `...DoStuffMediaApi\DoStuffMediaApi`
-- Each handler performs single-item processing, checks `datamachine_is_item_processed`, marks processed items, maps raw payloads to the shared schema, and returns immediately once a valid event is found.
-- **EventUpsert** (`Steps\Upsert\Events\EventUpsert`) extends `UpdateHandler`, finds existing events by title/venue/startDate, performs field-by-field change detection, uses `Venue_Taxonomy`/`VenueService` to find-or-create venues, and routes final data into Event Details blocks and venue taxonomy fields.
-- **EventUpsertSettings** exposes Data Machine configuration fields (post status, image handling, taxonomy overrides) and sanitizes inputs through `WordPressSettingsHandler`.
+- **`init_data_machine_integration()`**: Runs at priority 25 on `init`. After verifying `DATAMACHINE_VERSION`, it loads `EventImportFilters`, instantiates all import handlers, loads EventUpsert filters, and registers the EventUpsert handler from `inc/Steps/Upsert/Events/EventUpsert.php`.
+- **Event import handlers**: `load_event_import_handlers()` instantiates the following `FetchHandler` implementations (all located under `inc/Steps/EventImport/Handlers`):
+  - `Ticketmaster\Ticketmaster`
+  - `DiceFm\DiceFm`
+  - `GoogleCalendar\GoogleCalendar` (with `GoogleCalendarUtils` for ID/URL resolution)
+  - `IcsCalendar\IcsCalendar`
+  - `SpotHopper\SpotHopper`
+  - `WebScraper\UniversalWebScraper`
+  - `WordPressEventsAPI\WordPressEventsAPI`
+  - `EventFlyer\EventFlyer`
+  - `Eventbrite\Eventbrite`
+  - `DoStuffMediaApi\DoStuffMediaApi`
+- **Handler discovery**: `EventImportStep` (extends `DataMachine\Core\Steps\Step`) reads the configured handler slug, looks it up via `datamachine_handlers`, instantiates the class, and delegates to `get_fetch_data()` on `FetchHandler` (or falls back to legacy `execute()`). It merges returned `DataPacket` results into the pipeline and logs configuration issues.
+- **Single-item processing**: Each handler normalizes `(title, startDate, venue)` through `EventIdentifierGenerator::generate()`, checks `datamachine_is_item_processed`, marks the identifier via `datamachine_mark_item_processed`, and returns immediately after pushing a valid event to maintain incremental imports.
+- **EventUpsert**: `Steps\Upsert\Events\EventUpsert` extends `DataMachine\Core\Steps\Update\Handlers\UpdateHandler`. It registers custom taxonomy handlers for `venue` and `promoter`, merges `EngineData` snapshots with AI parameters, identifies existing events (title + venue + start date), runs field-by-field change detection, updates or creates events, processes featured images via `WordPressPublishHelper`, and keeps `_datamachine_event_datetime` synced for calendar queries.
+- **EventUpsertSettings**: Exposes configuration fields (post status, author fallback, taxonomy handling, image download toggles) using `WordPressSettingsHandler`, while `WordPressSettingsResolver` sanitizes runtime values.
+- **Venue services**: `Venue_Taxonomy`, `VenueService`, and `VenueParameterProvider` centralize venue term creation, metadata management, and AI parameter generation. Venue metadata (address, city, state, zip, country, phone, website, capacity, coordinates) flows through REST endpoints and the Event Details block.
 
-## Shared Utilities & Schema
+## Shared Utilities
 
-- `DataMachine\Core\WordPress\TaxonomyHandler` centralizes taxonomy assignments and exposes custom handlers for venue taxonomies.
-- `VenueService` normalizes venue data, finds existing terms, and creates new ones with full meta support.
-- `WordPressPublishHelper` handles image downloads, attachment creation, and publishing workflow required by EventUpsert.
-- `EventIdentifierGenerator` normalizes title/date/venue, removes articles, collapses whitespace, and hashes the combination to keep all handlers aligned.
-- `EventSchemaProvider` exposes `getCoreToolParameters()`, `getSchemaToolParameters()`, and `generateSchemaOrg()` so Schema.org JSON-LD derives from block attributes + venue meta.
-- `Template_Loader` orchestrates template rendering, `Taxonomy_Helper` calculates term hierarchies/post counts for filters, and `Taxonomy_Badges` renders consistent badge HTML with adjusters for colors and classes.
+- `DataMachine\Core\WordPress\TaxonomyHandler`: Coordinates taxonomy assignment. EventUpsert registers custom handlers to ensure AI-provided venue/promoter data writes the correct term meta.
+- `WordPressPublishHelper`: Downloads images, creates attachments, and respects handler settings such as `include_image`.
+- `EventIdentifierGenerator`: Normalizes event identity by lowercasing, trimming, collapsing whitespace, removing articles, and hashing `(title, startDate, venue)` to prevent duplicates.
+- `EventSchemaProvider`: Defines `getCoreToolParameters()`, `getSchemaToolParameters()`, `getFieldKeys()`, and `generateSchemaOrg()` so Schema.org JSON-LD merges block attributes, venue meta, and taxonomy data.
+- `Template_Loader`: Offers helpers for the Calendar templates (`get_template()`, `include_template()`, `template_exists()`, `get_template_path()`).
+- `Taxonomy_Helper` and `Taxonomy_Badges`: Build hierarchical filter data, term counts, and render badge HTML. Filters such as `datamachine_events_badge_wrapper_classes`, `datamachine_events_badge_classes`, and `datamachine_events_more_info_button_classes` customize badge markup and CTA styling.
 
-## Blocks & Assets
+## Blocks & Frontend
 
-- **Calendar block** (`inc/Blocks/Calendar`): Carousel List display via CSS-only horizontal scrolling, progressive enhancement filtering, and modular templates (`event-item`, `date-group`, `pagination`, `navigation`, `results-counter`, `no-events`, `filter-bar`, `time-gap-separator`, `modal/taxonomy-filter`).
-- **Calendar JS modules**: `src/frontend.js` wires up calendar instances and initializes `modules/api-client.js`, `modules/carousel.js`, `modules/date-picker.js`, `modules/filter-modal.js`, `modules/navigation.js`, and `modules/state.js`.
-- **Event Details block** (`inc/Blocks/EventDetails`): 15+ attributes (dates, venue, pricing, performer/organizer meta, status, display toggles) with InnerBlocks support, Leaflet-driven venue map (Leaflet CSS/JS + `assets/js/venue-map.js`), and `_datamachine_event_datetime` meta synced for performant queries.
-- **Root styles**: `inc/Blocks/root.css` provides shared design tokens consumed by both blocks and enqueued whenever a datamachine block or event post is present.
+- **Calendar block** (`inc/Blocks/Calendar`): CSS-driven Carousel List with day grouping, time-gap separators, pagination, and server-rendered HTML. Templates include `event-item`, `date-group`, `navigation`, `results-counter`, `pagination`, `no-events`, `filter-bar`, `time-gap-separator`, and `modal/taxonomy-filter`.
+- **JavaScript modules**: `src/frontend.js` bootstraps `.datamachine-events-calendar` instances and wires `modules/api-client.js`, `modules/carousel.js`, `modules/date-picker.js`, `modules/filter-modal.js`, `modules/navigation.js`, and `modules/state.js` for REST calls, carousel scrolling, Flatpickr integration, modal accessibility, navigation updates, and History API-aware state management (including 500ms debounced search).
+- **Progressive enhancement**: Server-rendered fragments allow the block to work without JavaScript, while REST API responses enrich filtering, pagination, search, and URL state when scripts are active.
+- **Event Details block** (`inc/Blocks/EventDetails`): 15+ attributes (dates/times, venue, address, price, priceCurrency, offerAvailability, ticketUrl, performer, performerType, organizer, organizerType, organizerUrl, eventStatus, previousStartDate, showVenue, showPrice, showTicketLink) plus InnerBlocks for rich content. Attributes persist to the block and sync `_datamachine_event_datetime` via `inc/Core/meta-storage.php` for performant queries.
+- **Schema & maps**: `enqueue_root_styles()` loads `leaflet.css`, `leaflet.js`, and `assets/js/venue-map.js` when Event Details or `datamachine_events` posts are present so Leaflet maps render with consistent markers and controls.
 
-## REST API Overview
+## REST API
 
-Routes are registered via `inc/Api/Routes.php`, which loads controllers from `inc/Api/Controllers/{Calendar,Venues,Filters,Geocoding}`.
+Routes in `inc/Api/Routes.php` register controllers from `inc/Api/Controllers/{Calendar,Venues,Filters,Geocoding}` under the `datamachine/v1` namespace.
 
-- `GET /wp-json/datamachine/v1/events/calendar`: Public calendar filtering; accepts `event_search`, `date_start`, `date_end`, mapped `tax_filter[taxonomy][]`, `paged`, and `past`. Returns rendered HTML plus pagination/navigation/counter fragments for progressive enhancement.
-- `GET /wp-json/datamachine/v1/events/venues/{id}`: Admin-only (`manage_options`) venue retrieval, returns venue meta (address, city, state, zip, country, phone, website, capacity, coordinates) plus description.
-- `GET /wp-json/datamachine/v1/events/venues/check-duplicate`: Admin-only duplicate check using `name`/`address`; responds with `is_duplicate`, `existing_venue_id`, and context message.
-- `GET /wp-json/datamachine/v1/events/filters`: Public taxonomy filters; supports `active` filters, `context`, `date_start`, `date_end`, and `past`, returning term lists with counts and hierarchy metadata.
-- `POST /wp-json/datamachine/v1/events/geocode/search`: Admin-only OpenStreetMap Nominatim lookup accepting `query` and returning place details (lat/lon, display_name, structured address).
-- Controllers expose permission callbacks, sanitize arguments, and rely on `Calendar`, `Venues`, `Filters`, and `Geocoding` classes for SQL-based filtering, taxonomy processing, and remote lookups.
+- `GET /wp-json/datamachine/v1/events/calendar`: Public endpoint powering Calendar block filtering. Accepts `event_search`, `date_start`, `date_end`, `tax_filter[taxonomy][]`, `paged`, and `past`, sanitizes inputs, runs SQL-based WP_Query filtering, and returns `success`, `html`, `pagination`, `navigation`, and `counter` fragments.
+- `GET /wp-json/datamachine/v1/events/venues/{id}`: Admin-only (`manage_options`). Returns venue description plus metadata (address, city, state, zip, country, phone, website, capacity, coordinates via `Venue_Taxonomy::get_venue_data`).
+- `GET /wp-json/datamachine/v1/events/venues/check-duplicate`: Admin-only duplicate check requiring `name` (and optional `address`), sanitizes input, and responds with `is_duplicate`, `existing_venue_id`, and contextual messaging.
+- `GET /wp-json/datamachine/v1/events/filters`: Public taxonomy filters powered by `Filters` controller. Accepts `active`, `context`, `date_start`, `date_end`, `past`, and returns taxonomy term metadata with counts, parent relationships, and dependency hints.
+- `POST /wp-json/datamachine/v1/events/geocode/search`: Admin-accessed `Geocoding::search()` calling OpenStreetMap Nominatim with sanitized `query`, returning `display_name`, `lat`, `lon`, and structured address segments.
 
-**Removed features** such as AJAX calendar handlers, client-side FilterManager, and legacy status detection are fully retired; references are historical notes only when discussing past migrations.
+**Security**: Admin endpoints check `current_user_can('manage_options')`. All args sanitize via `sanitize_text_field`, `absint`, `sanitize_key`, or callback sanitizers. The controllers log and respond with consistent JSON structures.
 
-## Template & Venue Details
+## Templates & Rendering
 
-- `Template_Loader` provides `get_template()`, `include_template()`, `template_exists()`, and variable hygiene for Carousel templates.
-- `Taxonomy_Badges` renders badges for non-venue taxonomies with dynamic color assignments and exposes filters for wrapper/classes.
-- Venue taxonomy includes 9 meta fields (address, city, state, zip, country, phone, website, capacity, coordinates) and uses `Venue_Taxonomy`, `VenueService`, and `VenueParameterProvider` for admin UI, AI parameter generation, and REST integrations.
-- Leaflet map assets are enqueued with `enqueue_root_styles()`, ensuring the Event Details block and singular events load `leaflet.css`, `leaflet.js`, and `assets/js/venue-map.js`.
+- `Template_Loader` renders the eight modular Calendar templates and ensures variable hygiene.
+- `Taxonomy_Helper` builds taxonomy hierarchies and counts; `Taxonomy_Badges` renders badges with consistent color classes.
+- Pagination (five days per page) lives in `inc/Blocks/Calendar/Pagination.php` and respects `datamachine_events_pagination_wrapper_classes` and `datamachine_events_pagination_args` filters.
+
+## Geocoding & Maps
+
+- `assets/js/venue-map.js` initializes Leaflet maps using coordinates from venue term meta, ensuring consistent markers and popups.
+- Leaflet CSS/JS assets load via CDN (Leaflet 1.9.4) when needed.
+- `Geocoding::search()` provides admin geocoding via OpenStreetMap, powering venue creation/edit interfaces.
 
 ## Filters & Hooks
 
-- `datamachine_events_calendar_query_args`: Alter calendar WP_Query before rendering.
-- `datamachine_events_ticket_button_classes`, `datamachine_events_action_buttons`: Filter action button classes and insert hooks around ticket buttons.
-- `datamachine_events_excluded_taxonomies`: Remove taxonomies from badge/modal displays.
-- `datamachine_events_badge_wrapper_classes`, `datamachine_events_badge_classes`, `datamachine_events_more_info_button_classes`: Customize badge markup.
-- `datamachine_events_pagination_wrapper_classes`, `datamachine_events_pagination_args`: Customize pagination output.
+- `datamachine_events_calendar_query_args`: Modify calendar WP_Query arguments before template rendering.
+- `datamachine_events_excluded_taxonomies`: Control taxonomies excluded from badge lists or filter modals.
+- Badge/action filters: `datamachine_events_badge_wrapper_classes`, `datamachine_events_badge_classes`, `datamachine_events_more_info_button_classes`, `datamachine_events_ticket_button_classes`, and `datamachine_events_action_buttons` customize badge/CTA markup.
+- Pagination filters: `datamachine_events_pagination_wrapper_classes`, `datamachine_events_pagination_args` customize pagination markup.
 
-## Security & Standards
+## Build Commands
 
-- Capability checks guard admin routes (venues, geocoding).
-- Inputs are sanitized via `sanitize_text_field`, `absint`, and custom callbacks (e.g., `sanitize_key` for taxonomies).
-- Nonce verification and standard WordPress authentication apply to form submissions and API requests.
-- Build commands rely on Composer (PHP dependencies) plus npm for Calendar/EventDetails (`npm run build`, `npm run start`, `npm run lint:js`, `npm run lint:css`), and `./build.sh` produces `/dist/datamachine-events.zip` with production assets.
+```bash
+composer install --no-dev          # PHP dependencies
+cd inc/Blocks/Calendar && npm install && npm run build
+cd ../EventDetails && npm install && npm run build
+npm run start                      # Block watchers (Calendar + Event Details)
+npm run lint:js && npm run lint:css  # Event Details linting
+./build.sh                         # Creates /dist/datamachine-events.zip with production assets
+```
 
+## Removed Features (Completed)
+
+- **Circuit Grid/past-grid modes** were removed in favor of the Carousel List; no branching logic remains.
+- **Legacy status detection** (`Admin/Status_Detection.php`) is retained only for backwards compatibility logging and no longer influences scheduling.
+- **AJAX calendar filtering/FilterManager** have been replaced entirely by REST endpoints.
+
+## Observability Notes
+
+- `inc/Core/meta-storage.php` keeps `_datamachine_event_datetime` synced for SQL queries.
+- EventUpsert logs debug/info messages for creation/update skip paths. 

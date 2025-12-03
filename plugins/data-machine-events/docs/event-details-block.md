@@ -1,105 +1,30 @@
 # Event Details Block
 
-Comprehensive event data management with block-first architecture for WordPress events.
+The Event Details block is the single source of truth for Data Machine Events. It stores every attribute that matters for a datamachine event, keeps venue and promoter taxonomies in sync, and ships metadata to progressive calendars, REST endpoints, and structured data feeds.
 
-## Overview
+## Data Model & Attributes
 
-The Event Details block serves as the single source of truth for all event data in Data Machine Events. It provides 15+ attributes for complete event information management and supports InnerBlocks for rich content editing.
+- **Dates & Times**: `startDate`, `endDate`, `startTime`, `endTime`, `previousStartDate`, and `eventStatus` capture timeline and rescheduling states.
+- **Venue & Location**: `venue`, `venueAddress`, `venueCity`, `venueState`, `venueZip`, `venueCountry`, and `venueCoordinates` map directly to venue taxonomy terms; `venue`/`promoter` taxonomies auto-sync through EventUpsert and `VenueService`.
+- **Pricing & Tickets**: `price`, `priceCurrency`, `offerAvailability`, `ticketUrl`, and `ticketButtonText` cover ticket data, availability, and CTA control.
+- **People & Organizers**: `performer`, `performerType`, `organizer`, `organizerType`, and `organizerUrl` describe talent and organizers.
+- **Display Controls**: `showVenue`, `showPrice`, `showTicketLink`, and InnerBlocks support let editors control what appears on the frontend.
 
-## Features
+The block exposes 15+ attributes (dates, venue, price, performer/organizer metadata, display toggles) plus InnerBlocks for rich editor content, ensuring every event detail flows through a single block-based pipeline.
 
-### Rich Event Data Model
-- **Dates & Times**: startDate, endDate, startTime, endTime
-- **Venue Reference**: venue (name), address (display fallback)
-- **Pricing**: price, priceCurrency, offerAvailability
-- **People**: performer, performerType, organizer, organizerType, organizerUrl
-- **Event Status**: eventStatus, previousStartDate
-- **Display Controls**: showVenue, showPrice, showTicketLink
+## InnerBlocks & Rendering
 
-> **Note**: Venue metadata (city, state, zip, phone, website, coordinates, capacity) is stored in the **Venue Taxonomy**, not block attributes. The venue taxonomy is the single source of truth for all venue details.
+- InnerBlocks allow editors to drop Gutenberg content such as rich text, galleries, or reusable patterns inside the Event Details block while preserving schema data.
+- Event content renders using block markup plus shared root CSS tokens from `inc/Blocks/root.css`, guaranteeing consistent spacing, typography, and color tokens across Calendar and Event Details blocks.
 
-### InnerBlocks Support
-- Add rich content, images, galleries, and custom layouts within events
-- Full WordPress block editor compatibility
-- Content renders on frontend with proper styling
-- Fixed content persistence through save/edit cycles
+## Structured Data & Maps
 
-### Schema Generation
-- Automatic Google Event JSON-LD structured data
-- SEO-friendly markup for search engines
-- Combines block attributes with venue taxonomy data
+- `EventSchemaProvider` merges block attributes with venue metadata to generate Schema.org JSON-LD that accompanies block rendering and REST responses.
+- `_datamachine_event_datetime` meta is synced in `inc/Core/meta-storage.php`, keeping calendar queries performant and enabling day-based pagination and REST filtering.
+- Leaflet assets (`leaflet.css`, `leaflet.js`, `assets/js/venue-map.js`) load on event detail views via `enqueue_root_styles()` whenever the block or a `datamachine_events` post renders, so venue maps always display with consistent markers.
 
-## Usage
+## Venue & Taxonomy Integration
 
-1. **Create Event**: Add new Event post → Insert "Event Details" block
-2. **Fill Event Data**: Complete all relevant attributes in block sidebar
-3. **Add Rich Content**: Use InnerBlocks to add descriptions, images, and details
-4. **Configure Display**: Toggle venue, price, and ticket link visibility
-5. **Publish**: Event automatically generates structured data and venue maps
-
-## Display Options
-
-The block provides flexible display controls:
-- **Show Venue**: Display venue information and map
-- **Show Price**: Show ticket pricing information  
-- **Show Ticket Link**: Display purchase ticket button
-
-## Integration
-
-### Theme Compatibility
-- Uses theme's `single.php` template for event pages
-- Block handles all data rendering and presentation
-- Themes control layout while block provides content
-
-### Structured Data
-- Google Event schema automatically generated
-- Venue data combined with event attributes
-- Enhanced SEO and search appearance
-
-## Attributes Reference
-
-### Date & Time Attributes
-- `startDate`: Event start date (YYYY-MM-DD format)
-- `endDate`: Event end date (YYYY-MM-DD format) 
-- `startTime`: Event start time (HH:MM format)
-- `endTime`: Event end time (HH:MM format)
-
-### Venue Attributes
-- `venue`: Venue name (links to venue taxonomy term)
-- `address`: Full venue address (display fallback)
-
-> **Venue Taxonomy Fields**: All other venue metadata (city, state, zip, country, coordinates, capacity, phone, website) is stored in the venue taxonomy term meta. Edit venue details via **Events → Venues** in the WordPress admin.
-
-### Pricing Attributes
-- `price`: Ticket price
-- `priceCurrency`: Currency code (USD, EUR, etc.)
-- `offerAvailability`: Availability status (InStock, SoldOut, etc.)
-
-### People Attributes
-- `performer`: Performer name
-- `performerType`: Performer type (MusicGroup, Person, etc.)
-- `organizer`: Event organizer name
-- `organizerType`: Organizer type (Organization, Person, etc.)
-- `organizerUrl`: Organizer website URL
-
-### Status Attributes
-- `eventStatus`: Event status (EventScheduled, EventCancelled, etc.)
-- `previousStartDate`: Original date for rescheduled events
-
-### Display Control Attributes
-- `showVenue`: Boolean to show/hide venue info
-- `showPrice`: Boolean to show/hide pricing
-- `showTicketLink`: Boolean to show/hide ticket button
-
-## Developer Notes
-
-The Event Details block integrates with:
-- **Venue Taxonomy**: Single source of truth for all venue metadata (city, state, zip, phone, website, coordinates, capacity)
-- **Schema Generator**: JSON-LD structured data combining block attributes with venue taxonomy data
-- **Meta Storage**: Background sync for performance (`_datamachine_event_datetime`)
-- **REST API**: Event data available via endpoints
-
-### Data Architecture
-- **Block Attributes**: Event-specific data (dates, times, price, performer, organizer, etc.)
-- **Venue Taxonomy**: Shared venue data (address details, contact info, coordinates) - editable via taxonomy term management
-- **Post Meta**: `_datamachine_event_datetime` synced from block for SQL query performance
+- Venue metadata lives in the `venue` taxonomy (address, city, state, zip, country, phone, website, capacity, coordinates) and surfaces across the REST API and Event Details block; `Venue_Taxonomy` and `VenueService` ensure find-or-create workflows keep term meta complete.
+- `venue` and `promoter` relationships auto-sync from block attributes to taxonomy terms during imports and manual edits, so lists, filters, and badges always reflect the latest data.
+- Additional metadata is exposed via REST endpoints for venue editors, and shared design tokens from `root.css` keep the block visually consistent with the Calendar block.

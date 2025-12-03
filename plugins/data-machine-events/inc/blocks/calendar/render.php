@@ -15,7 +15,6 @@ if (!defined('ABSPATH')) {
 
 use DataMachineEvents\Blocks\Calendar\Calendar_Query;
 use DataMachineEvents\Blocks\Calendar\Pagination;
-use const DataMachineEvents\Blocks\Calendar\DAYS_PER_PAGE;
 
 if (wp_is_json_request() || (defined('REST_REQUEST') && REST_REQUEST)) {
     return '';
@@ -196,9 +195,9 @@ $wrapper_attributes = get_block_wrapper_attributes([
 
     <?php
     \DataMachineEvents\Blocks\Calendar\Template_Loader::include_template('results-counter', [
-        'current_page' => $current_page,
-        'total_events' => $total_events,
-        'events_per_page' => DAYS_PER_PAGE
+        'page_start_date' => $date_boundaries['start_date'],
+        'page_end_date' => $date_boundaries['end_date'],
+        'event_count' => $events_query->post_count,
     ]);
 
     echo Pagination::render_pagination($current_page, $max_pages, $show_past);

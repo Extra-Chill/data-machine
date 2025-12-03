@@ -8,7 +8,6 @@ use WP_REST_Request;
 use DataMachineEvents\Blocks\Calendar\Calendar_Query;
 use DataMachineEvents\Blocks\Calendar\Pagination;
 use DataMachineEvents\Blocks\Calendar\Template_Loader;
-use const DataMachineEvents\Blocks\Calendar\DAYS_PER_PAGE;
 
 /**
  * Calendar API controller
@@ -141,9 +140,9 @@ class Calendar {
 		\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template(
 			'results-counter',
 			[
-				'current_page' => $current_page,
-				'total_events' => $total_events,
-				'events_per_page' => DAYS_PER_PAGE,
+				'page_start_date' => $date_boundaries['start_date'],
+				'page_end_date' => $date_boundaries['end_date'],
+				'event_count' => $events_query->post_count,
 			]
 		);
 		$counter_html = ob_get_clean();
