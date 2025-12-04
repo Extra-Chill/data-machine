@@ -74,6 +74,9 @@ class Taxonomy_Badges {
             return '';
         }
 
+        $venue_terms = get_the_terms($post_id, 'venue');
+        $venue_name = ($venue_terms && !is_wp_error($venue_terms)) ? $venue_terms[0]->name : '';
+
         $wrapper_classes = apply_filters('datamachine_events_badge_wrapper_classes', [
             'datamachine-taxonomy-badges'
         ], $post_id);
@@ -85,6 +88,10 @@ class Taxonomy_Badges {
             $terms = $taxonomy_data['terms'];
 
             foreach ($terms as $term) {
+                if ($taxonomy_slug === 'promoter' && $venue_name !== '' && strcasecmp(trim($term->name), trim($venue_name)) === 0) {
+                    continue;
+                }
+
                 $badge_classes = [
                     'datamachine-taxonomy-badge',
                     'datamachine-taxonomy-' . esc_attr($taxonomy_slug),

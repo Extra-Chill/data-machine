@@ -18,9 +18,9 @@ use DataMachineEvents\Blocks\Calendar\Taxonomy_Helper;
 class Filters {
 
 	/**
-	 * Get filter options with taxonomy dependencies and contextual date filtering
+	 * Get filter options with real-time cross-filtering and archive context support
 	 *
-	 * @param WP_REST_Request $request Request object with optional active filters, context, and date params.
+	 * @param WP_REST_Request $request Request object with optional active filters, date context, and archive context.
 	 * @return \WP_REST_Response
 	 */
 	public function get( WP_REST_Request $request ) {
@@ -33,33 +33,34 @@ class Filters {
 			'past'       => $request->get_param( 'past' ) ?? '',
 		];
 
-		$dependencies = apply_filters( 'datamachine_events_taxonomy_dependencies', [] );
+		$archive_taxonomy = sanitize_key( $request->get_param( 'archive_taxonomy' ) ?? '' );
+		$archive_term_id  = absint( $request->get_param( 'archive_term_id' ) ?? 0 );
 
-		$taxonomies_data = Taxonomy_Helper::get_all_taxonomies_with_counts( $active_filters, $dependencies, $date_context );
-
-		$filtered_taxonomies = [];
-		foreach ( $taxonomies_data as $taxonomy_slug => $taxonomy_info ) {
-			$is_filtered = false;
-
-			if ( isset( $dependencies[ $taxonomy_slug ] ) ) {
-				$parent_taxonomy = $dependencies[ $taxonomy_slug ];
-				if ( ! empty( $active_filters[ $parent_taxonomy ] ) ) {
-					$is_filtered = true;
-				}
+		$archive_context = [];
+		if ( $archive_taxonomy && $archive_term_id ) {
+			if ( ! isset( $active_filters[ $archive_taxonomy ] ) ) {
+				$active_filters[ $archive_taxonomy ] = [];
+			}
+			if ( ! in_array( $archive_term_id, $active_filters[ $archive_taxonomy ], true ) ) {
+				$active_filters[ $archive_taxonomy ][] = $archive_term_id;
 			}
 
-			$filtered_taxonomies[ $taxonomy_slug ] = array_merge(
-				$taxonomy_info,
-				[ 'filtered' => $is_filtered ]
-			);
+			$term = get_term( $archive_term_id, $archive_taxonomy );
+			$archive_context = [
+				'taxonomy' => $archive_taxonomy,
+				'term_id'  => $archive_term_id,
+				'term_name' => $term && ! is_wp_error( $term ) ? $term->name : '',
+			];
 		}
+
+		$taxonomies_data = Taxonomy_Helper::get_all_taxonomies_with_counts( $active_filters, $date_context );
 
 		return rest_ensure_response(
 			[
-				'success'      => true,
-				'taxonomies'   => $filtered_taxonomies,
-				'dependencies' => $dependencies,
-				'meta'         => [
+				'success'         => true,
+				'taxonomies'      => $taxonomies_data,
+				'archive_context' => $archive_context,
+				'meta'            => [
 					'context'        => $context,
 					'active_filters' => $active_filters,
 					'date_context'   => $date_context,

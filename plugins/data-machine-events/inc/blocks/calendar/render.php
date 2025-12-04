@@ -55,6 +55,12 @@ if (is_array($tax_filters_raw)) {
 }
 
 $tax_query_override = null;
+$archive_context = [
+    'taxonomy' => '',
+    'term_id' => 0,
+    'term_name' => '',
+];
+
 if (is_tax()) {
     $term = get_queried_object();
     if ($term && isset($term->taxonomy) && isset($term->term_id)) {
@@ -64,6 +70,11 @@ if (is_tax()) {
                 'field' => 'term_id',
                 'terms' => $term->term_id,
             ],
+        ];
+        $archive_context = [
+            'taxonomy' => $term->taxonomy,
+            'term_id' => $term->term_id,
+            'term_name' => $term->name,
         ];
     }
 }
@@ -122,9 +133,19 @@ $instance_id = 'datamachine-calendar-' . substr(preg_replace('/[^a-z0-9]/', '', 
 $wrapper_attributes = get_block_wrapper_attributes([
     'class' => 'datamachine-events-calendar datamachine-events-date-grouped'
 ]);
+
+$archive_data_attrs = '';
+if (!empty($archive_context['taxonomy'])) {
+    $archive_data_attrs = sprintf(
+        ' data-archive-taxonomy="%s" data-archive-term-id="%d" data-archive-term-name="%s"',
+        esc_attr($archive_context['taxonomy']),
+        esc_attr($archive_context['term_id']),
+        esc_attr($archive_context['term_name'])
+    );
+}
 ?>
 
-<div data-instance-id="<?php echo esc_attr($instance_id); ?>" <?php echo $wrapper_attributes; ?>>
+<div data-instance-id="<?php echo esc_attr($instance_id); ?>"<?php echo $archive_data_attrs; ?> <?php echo $wrapper_attributes; ?>>
     <?php 
     $filter_count = !empty($tax_filters) ? array_sum(array_map('count', $tax_filters)) : 0;
 
@@ -135,7 +156,8 @@ $wrapper_attributes = get_block_wrapper_attributes([
         'search_query' => $search_query,
         'date_start' => $date_start,
         'date_end' => $date_end,
-        'filter_count' => $filter_count
+        'filter_count' => $filter_count,
+        'archive_context' => $archive_context,
     ]);
     ?>
     

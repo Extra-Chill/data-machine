@@ -17,10 +17,10 @@ The `EventSchemaProvider` class serves as the single source of truth for all eve
 Essential event information that forms the foundation of every event:
 
 - `title` - Event title (required)
-- `startDate` - Start date (YYYY-MM-DD format)
-- `endDate` - End date (YYYY-MM-DD format)
-- `startTime` - Start time (HH:MM 24-hour format)
-- `endTime` - End time (HH:MM 24-hour format)
+- `startDate` - Start date (YYYY-MM-DD format). Falls back to `_datamachine_event_datetime` meta when attributes are empty so Schema.org output always has a start timestamp.
+- `endDate` - End date (YYYY-MM-DD format). Falls back to `_datamachine_event_end_datetime` meta or synthetic +3h window to satisfy Google requirements.
+- `startTime` - Start time (HH:MM 24-hour format) with the same meta fallback as `startDate`.
+- `endTime` - End time (HH:MM 24-hour format) with the same meta fallback as `endDate`.
 - `description` - Rich HTML description (required)
 
 ### Offer Fields

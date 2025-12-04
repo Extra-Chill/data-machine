@@ -56,7 +56,14 @@ export function buildQueryParams(calendar, datePicker = null) {
         params.delete('past');
     }
 
-    params.delete('tax_filter');
+    const keysToDelete = [];
+    params.forEach((value, key) => {
+        if (key.startsWith('tax_filter[')) {
+            keysToDelete.push(key);
+        }
+    });
+    keysToDelete.forEach(key => params.delete(key));
+
     const modal = calendar.querySelector('.datamachine-taxonomy-modal');
     if (modal) {
         const checkboxes = modal.querySelectorAll('input[type="checkbox"]:checked');

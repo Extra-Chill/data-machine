@@ -4,8 +4,6 @@
 
 import { fetchFilters } from './api-client.js';
 
-let dependencies = {};
-
 export function initFilterModal(calendar, onApply, onReset) {
     const modal = calendar.querySelector('.datamachine-taxonomy-modal');
     if (!modal) return;
@@ -33,12 +31,14 @@ export function initFilterModal(calendar, onApply, onReset) {
         }
     };
 
+    const archiveContext = getArchiveContextFromModal(modal);
+
     const openModalHandler = async function() {
         modal.classList.add('datamachine-modal-active');
         document.body.classList.add('datamachine-modal-active');
         filterBtn.setAttribute('aria-expanded', 'true');
         
-        await loadFilters(modal, getActiveFiltersFromUrl(), getDateContextFromUrl());
+        await loadFilters(modal, getActiveFiltersFromUrl(), getDateContextFromUrl(), archiveContext);
     };
 
     const closeModalHandler = function() {
@@ -66,6 +66,11 @@ export function initFilterModal(calendar, onApply, onReset) {
     const resetHandler = function() {
         localStorage.removeItem('datamachine_events_calendar_state');
         window.history.pushState({}, '', window.location.pathname);
+
+        const checkboxes = modal.querySelectorAll('input[type="checkbox"]:checked');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = false;
+        });
 
         updateFilterCount(calendar);
 
@@ -182,7 +187,18 @@ function getDateContextFromUrl() {
     };
 }
 
-async function loadFilters(modal, activeFilters = {}, dateContext = {}) {
+function getArchiveContextFromModal(modal) {
+    const taxonomy = modal.dataset.archiveTaxonomy || '';
+    const termId = parseInt(modal.dataset.archiveTermId, 10) || 0;
+    const termName = modal.dataset.archiveTermName || '';
+    
+    if (taxonomy && termId) {
+        return { taxonomy, term_id: termId, term_name: termName };
+    }
+    return {};
+}
+
+async function loadFilters(modal, activeFilters = {}, dateContext = {}, archiveContext = {}) {
     const container = modal.querySelector('.datamachine-filter-taxonomies');
     const loading = modal.querySelector('.datamachine-filter-loading');
     
@@ -192,16 +208,14 @@ async function loadFilters(modal, activeFilters = {}, dateContext = {}) {
     container.innerHTML = '';
     
     try {
-        const data = await fetchFilters(activeFilters, dateContext);
+        const data = await fetchFilters(activeFilters, dateContext, archiveContext);
         
         if (!data.success) {
             throw new Error('API returned unsuccessful response');
         }
         
-        dependencies = data.dependencies || {};
-        
-        renderTaxonomies(container, data.taxonomies, activeFilters);
-        attachParentChangeListeners(modal, dateContext);
+        renderTaxonomies(container, data.taxonomies, activeFilters, data.archive_context || {});
+        attachFilterChangeListeners(modal, dateContext, archiveContext);
         
     } catch (error) {
         console.error('Error loading filters:', error);
@@ -211,19 +225,17 @@ async function loadFilters(modal, activeFilters = {}, dateContext = {}) {
     }
 }
 
-function renderTaxonomies(container, taxonomies, activeFilters) {
+function renderTaxonomies(container, taxonomies, activeFilters, archiveContext = {}) {
     const taxonomyKeys = Object.keys(taxonomies);
+    const isLockedTerm = (slug, termId) => {
+        return archiveContext.taxonomy === slug && archiveContext.term_id === termId;
+    };
     
     taxonomyKeys.forEach((slug, index) => {
         const taxonomy = taxonomies[slug];
         const section = document.createElement('div');
         section.className = 'datamachine-taxonomy-section';
         section.dataset.taxonomy = slug;
-        
-        const isParent = Object.values(dependencies).includes(slug);
-        if (isParent) {
-            section.dataset.isParent = 'true';
-        }
         
         const label = document.createElement('h4');
         label.className = 'datamachine-taxonomy-label';
@@ -239,6 +251,12 @@ function renderTaxonomies(container, taxonomies, activeFilters) {
         flatTerms.forEach(term => {
             const termDiv = document.createElement('div');
             termDiv.className = 'datamachine-taxonomy-term';
+            
+            const isLocked = isLockedTerm(slug, term.term_id);
+            if (isLocked) {
+                termDiv.classList.add('datamachine-term-locked');
+            }
+            
             if (term.level > 0) {
                 termDiv.classList.add(`datamachine-term-level-${term.level}`);
                 termDiv.style.marginLeft = `${term.level * 20}px`;
@@ -254,7 +272,12 @@ function renderTaxonomies(container, taxonomies, activeFilters) {
             checkbox.value = term.term_id;
             checkbox.dataset.taxonomy = slug;
             checkbox.dataset.termSlug = term.slug;
-            checkbox.checked = selectedTerms.includes(term.term_id);
+            checkbox.checked = isLocked || selectedTerms.includes(term.term_id);
+            
+            if (isLocked) {
+                checkbox.disabled = true;
+                checkbox.dataset.locked = 'true';
+            }
             
             const nameSpan = document.createElement('span');
             nameSpan.className = 'datamachine-term-name';
@@ -296,19 +319,13 @@ function flattenHierarchy(terms, level = 0) {
     return flat;
 }
 
-function attachParentChangeListeners(modal, dateContext = {}) {
-    const parentTaxonomies = new Set(Object.values(dependencies));
+function attachFilterChangeListeners(modal, dateContext = {}, archiveContext = {}) {
+    const checkboxes = modal.querySelectorAll('input[type="checkbox"]:not([data-locked="true"])');
     
-    parentTaxonomies.forEach(parentSlug => {
-        const section = modal.querySelector(`[data-taxonomy="${parentSlug}"]`);
-        if (!section) return;
-        
-        const checkboxes = section.querySelectorAll('input[type="checkbox"]');
-        checkboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', async () => {
-                const activeFilters = getCheckedFilters(modal);
-                await loadFilters(modal, activeFilters, dateContext);
-            });
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', async () => {
+            const activeFilters = getCheckedFilters(modal);
+            await loadFilters(modal, activeFilters, dateContext, archiveContext);
         });
     });
 }

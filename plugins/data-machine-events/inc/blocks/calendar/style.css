@@ -716,6 +716,32 @@
     font-weight: normal;
 }
 
+/* Locked Term (Archive Context Constraint) */
+.datamachine-term-locked {
+    opacity: 0.7;
+}
+
+.datamachine-term-locked .datamachine-term-checkbox-label {
+    cursor: default;
+    background: var(--datamachine-background-hover);
+}
+
+.datamachine-term-locked .datamachine-term-checkbox-label:hover {
+    background: var(--datamachine-background-hover);
+}
+
+.datamachine-term-locked .datamachine-term-checkbox {
+    cursor: not-allowed;
+}
+
+.datamachine-term-locked .datamachine-term-name::after {
+    content: ' (current page)';
+    font-size: 0.8em;
+    font-weight: normal;
+    color: var(--datamachine-text-muted);
+    font-style: italic;
+}
+
 /* Hierarchy Indentation */
 .datamachine-term-level-1 { margin-left: 20px; }
 .datamachine-term-level-2 { margin-left: 40px; }

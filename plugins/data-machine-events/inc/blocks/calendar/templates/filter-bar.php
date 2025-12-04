@@ -24,6 +24,9 @@ $search_id = 'datamachine-events-search-' . $instance_id;
 $search_value = isset($search_query) ? $search_query : '';
 $date_range_id = 'datamachine-events-date-range-' . $instance_id;
 $modal_id = 'datamachine-taxonomy-filter-modal-' . $instance_id;
+
+$archive_context = $archive_context ?? ['taxonomy' => '', 'term_id' => 0, 'term_name' => ''];
+$has_archive_context = !empty($archive_context['taxonomy']) && !empty($archive_context['term_id']);
 ?>
 
 <div class="datamachine-events-filter-bar">
@@ -64,7 +67,7 @@ $modal_id = 'datamachine-taxonomy-filter-modal-' . $instance_id;
     </div>
     
     <!-- Taxonomy Filter Modal -->
-    <div id="<?php echo esc_attr($modal_id); ?>" class="datamachine-taxonomy-modal" aria-labelledby="<?php echo esc_attr($modal_id . '-title'); ?>">
+    <div id="<?php echo esc_attr($modal_id); ?>" class="datamachine-taxonomy-modal" aria-labelledby="<?php echo esc_attr($modal_id . '-title'); ?>"<?php if ($has_archive_context) : ?> data-archive-taxonomy="<?php echo esc_attr($archive_context['taxonomy']); ?>" data-archive-term-id="<?php echo esc_attr($archive_context['term_id']); ?>" data-archive-term-name="<?php echo esc_attr($archive_context['term_name']); ?>"<?php endif; ?>>
         <div class="datamachine-taxonomy-modal-overlay"></div>
         <div class="datamachine-taxonomy-modal-container">
             <div class="datamachine-taxonomy-modal-header">

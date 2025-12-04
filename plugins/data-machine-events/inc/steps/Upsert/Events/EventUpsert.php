@@ -22,6 +22,7 @@ use DataMachineEvents\Core\VenueParameterProvider;
 use DataMachineEvents\Core\Promoter_Taxonomy;
 use DataMachineEvents\Core\EventSchemaProvider;
 use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
+use const DataMachineEvents\Core\EVENT_END_DATETIME_META_KEY;
 use DataMachine\Core\Steps\Update\Handlers\UpdateHandler;
 use DataMachine\Core\WordPress\TaxonomyHandler;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
@@ -285,7 +286,7 @@ class EventUpsert extends UpdateHandler {
 
         $this->processEventFeaturedImage($post_id, $handler_config, $engine);
         $this->processVenue($post_id, $parameters, $engine_parameters);
-        $this->processPromoter($post_id, $parameters, $engine_parameters);
+        $this->processPromoter($post_id, $parameters, $engine_parameters, $handler_config);
 
         // Map performer to artist taxonomy if not explicitly provided
         if (empty($parameters['artist']) && !empty($event_data['performer'])) {
@@ -329,7 +330,7 @@ class EventUpsert extends UpdateHandler {
 
         $this->processEventFeaturedImage($post_id, $handler_config, $engine);
         $this->processVenue($post_id, $parameters, $engine_parameters);
-        $this->processPromoter($post_id, $parameters, $engine_parameters);
+        $this->processPromoter($post_id, $parameters, $engine_parameters, $handler_config);
 
         // Map performer to artist taxonomy if not explicitly provided
         if (empty($parameters['artist']) && !empty($event_data['performer'])) {
@@ -384,7 +385,62 @@ class EventUpsert extends UpdateHandler {
             $event_data['venue'] = $handler_config['venue'];
         }
 
+        // Persist datetime values from meta as system-level fallbacks
+        $resolved_post_id = $engine_parameters['post_id'] ?? ($parameters['post_id'] ?? 0);
+        if (!empty($resolved_post_id)) {
+            $this->hydrateStartDateFromMeta((int) $resolved_post_id, $event_data);
+            $this->hydrateEndDateFromMeta((int) $resolved_post_id, $event_data);
+        }
+
         return $event_data;
+    }
+
+    private function hydrateStartDateFromMeta(int $post_id, array &$event_data): void {
+        if (!empty($event_data['startDate']) && !empty($event_data['startTime'])) {
+            return;
+        }
+
+        $start_datetime = get_post_meta($post_id, EVENT_DATETIME_META_KEY, true);
+        if (empty($start_datetime)) {
+            return;
+        }
+
+        $date_obj = date_create($start_datetime);
+        if (!$date_obj) {
+            return;
+        }
+
+        if (empty($event_data['startDate'])) {
+            $event_data['startDate'] = $date_obj->format('Y-m-d');
+        }
+
+        if (empty($event_data['startTime'])) {
+            $event_data['startTime'] = $date_obj->format('H:i:s');
+        }
+    }
+
+    private function hydrateEndDateFromMeta(int $post_id, array &$event_data): void {
+        if (!empty($event_data['endDate']) && !empty($event_data['endTime'])) {
+            return;
+        }
+
+        $end_datetime = get_post_meta($post_id, EVENT_END_DATETIME_META_KEY, true);
+        if (empty($end_datetime)) {
+            return;
+        }
+
+        $date_obj = date_create($end_datetime);
+        if (!$date_obj) {
+            return;
+        }
+
+        if (empty($event_data['endDate'])) {
+            $event_data['endDate'] = $date_obj->format('Y-m-d');
+        }
+
+        if (empty($event_data['endTime'])) {
+            $event_data['endTime'] = $date_obj->format('H:i:s');
+        }
     }
 
     /**

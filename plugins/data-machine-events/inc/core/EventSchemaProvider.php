@@ -10,6 +10,9 @@
 
 namespace DataMachineEvents\Core;
 
+use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
+use const DataMachineEvents\Core\EVENT_END_DATETIME_META_KEY;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -338,14 +341,16 @@ class EventSchemaProvider {
             'name' => get_the_title($post_id),
         ];
 
-        if (!empty($event_data['startDate'])) {
-            $start_time = !empty($event_data['startTime']) ? 'T' . $event_data['startTime'] : '';
-            $schema['startDate'] = $event_data['startDate'] . $start_time;
+        [$resolved_start_date, $resolved_start_time] = self::resolveStartDate($event_data, $post_id);
+        if (!empty($resolved_start_date)) {
+            $start_time = !empty($resolved_start_time) ? 'T' . $resolved_start_time : '';
+            $schema['startDate'] = $resolved_start_date . $start_time;
         }
 
-        if (!empty($event_data['endDate'])) {
-            $end_time = !empty($event_data['endTime']) ? 'T' . $event_data['endTime'] : '';
-            $schema['endDate'] = $event_data['endDate'] . $end_time;
+        [$resolved_end_date, $resolved_end_time] = self::resolveEndDate($event_data, $post_id);
+        if (!empty($resolved_end_date)) {
+            $end_time = !empty($resolved_end_time) ? 'T' . $resolved_end_time : '';
+            $schema['endDate'] = $resolved_end_date . $end_time;
         }
 
         if (!empty($event_data['description'])) {
@@ -386,6 +391,62 @@ class EventSchemaProvider {
         }
 
         return $schema;
+    }
+
+    private static function resolveStartDate(array $event_data, int $post_id): array {
+        $start_date = $event_data['startDate'] ?? '';
+        $start_time = $event_data['startTime'] ?? '';
+
+        if (!empty($start_date)) {
+            return [$start_date, $start_time];
+        }
+
+        if (!$post_id) {
+            return ['', ''];
+        }
+
+        $start_datetime = get_post_meta($post_id, EVENT_DATETIME_META_KEY, true);
+        if (empty($start_datetime)) {
+            return ['', ''];
+        }
+
+        $date_obj = date_create($start_datetime);
+        if (!$date_obj) {
+            return ['', ''];
+        }
+
+        return [
+            $date_obj->format('Y-m-d'),
+            $start_time ?: $date_obj->format('H:i:s'),
+        ];
+    }
+
+    private static function resolveEndDate(array $event_data, int $post_id): array {
+        $end_date = $event_data['endDate'] ?? '';
+        $end_time = $event_data['endTime'] ?? '';
+
+        if (!empty($end_date)) {
+            return [$end_date, $end_time];
+        }
+
+        if (!$post_id) {
+            return ['', ''];
+        }
+
+        $end_datetime = get_post_meta($post_id, EVENT_END_DATETIME_META_KEY, true);
+        if (empty($end_datetime)) {
+            return ['', ''];
+        }
+
+        $date_obj = date_create($end_datetime);
+        if (!$date_obj) {
+            return ['', ''];
+        }
+
+        return [
+            $date_obj->format('Y-m-d'),
+            $end_time ?: $date_obj->format('H:i:s'),
+        ];
     }
 
     private static function buildLocationSchema(array $venue_data, array $event_data): array {

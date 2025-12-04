@@ -20,14 +20,13 @@ if (!defined('ABSPATH')) {
 class Taxonomy_Helper {
     
     /**
-     * Get all taxonomies with event counts, respecting active filters, dependencies, and date context
+     * Get all taxonomies with event counts using real-time cross-filtering
      *
      * @param array $active_filters Active filter selections keyed by taxonomy slug.
-     * @param array $dependencies Taxonomy dependency mappings.
      * @param array $date_context Optional date filtering context (date_start, date_end, past).
      * @return array Structured taxonomy data with hierarchy and event counts.
      */
-    public static function get_all_taxonomies_with_counts( $active_filters = [], $dependencies = [], $date_context = [] ) {
+    public static function get_all_taxonomies_with_counts( $active_filters = [], $date_context = [] ) {
         $taxonomies_data = [];
         
         $taxonomies = get_object_taxonomies( Event_Post_Type::POST_TYPE, 'objects' );
@@ -43,19 +42,7 @@ class Taxonomy_Helper {
                 continue;
             }
             
-            $allowed_term_ids = null;
-            if ( isset( $dependencies[ $taxonomy->name ] ) ) {
-                $parent_taxonomy = $dependencies[ $taxonomy->name ];
-                if ( ! empty( $active_filters[ $parent_taxonomy ] ) ) {
-                    $allowed_term_ids = self::get_dependent_terms(
-                        $taxonomy->name,
-                        $parent_taxonomy,
-                        $active_filters[ $parent_taxonomy ]
-                    );
-                }
-            }
-            
-            $terms_hierarchy = self::get_taxonomy_hierarchy( $taxonomy->name, $allowed_term_ids, $date_context, $active_filters );
+            $terms_hierarchy = self::get_taxonomy_hierarchy( $taxonomy->name, null, $date_context, $active_filters );
             
             if ( ! empty( $terms_hierarchy ) ) {
                 $taxonomies_data[ $taxonomy->name ] = [
@@ -129,56 +116,6 @@ class Taxonomy_Helper {
                 'children'    => [],
             ];
         }, $terms_with_events );
-    }
-    
-    /**
-     * Get term IDs in child taxonomy that share events with parent taxonomy terms (OR logic)
-     *
-     * @param string $child_taxonomy Child taxonomy slug.
-     * @param string $parent_taxonomy Parent taxonomy slug.
-     * @param array  $parent_term_ids Selected parent term IDs.
-     * @return array Child term IDs that have events with any of the parent terms.
-     */
-    public static function get_dependent_terms( $child_taxonomy, $parent_taxonomy, $parent_term_ids ) {
-        global $wpdb;
-        
-        if ( empty( $parent_term_ids ) ) {
-            return [];
-        }
-        
-        $parent_term_ids = array_map( 'intval', $parent_term_ids );
-        $placeholders    = implode( ',', array_fill( 0, count( $parent_term_ids ), '%d' ) );
-        
-        $post_type = Event_Post_Type::POST_TYPE;
-        
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-        $query = $wpdb->prepare(
-            "SELECT DISTINCT child_terms.term_id
-            FROM {$wpdb->term_relationships} parent_tr
-            INNER JOIN {$wpdb->term_taxonomy} parent_tt 
-                ON parent_tr.term_taxonomy_id = parent_tt.term_taxonomy_id
-            INNER JOIN {$wpdb->posts} p 
-                ON parent_tr.object_id = p.ID
-            INNER JOIN {$wpdb->term_relationships} child_tr 
-                ON parent_tr.object_id = child_tr.object_id
-            INNER JOIN {$wpdb->term_taxonomy} child_tt 
-                ON child_tr.term_taxonomy_id = child_tt.term_taxonomy_id
-            INNER JOIN {$wpdb->terms} child_terms 
-                ON child_tt.term_id = child_terms.term_id
-            WHERE parent_tt.taxonomy = %s 
-            AND parent_tt.term_id IN ($placeholders)
-            AND child_tt.taxonomy = %s
-            AND p.post_type = %s
-            AND p.post_status = 'publish'",
-            array_merge(
-                [ $parent_taxonomy ],
-                $parent_term_ids,
-                [ $child_taxonomy, $post_type ]
-            )
-        );
-        
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-        return array_map( 'intval', $wpdb->get_col( $query ) );
     }
     
     /**

@@ -69,10 +69,8 @@ $block_class = implode(' ', $block_classes);
 
 
 $event_schema = null;
-if (!empty($start_date)) {
-    $event_data = array_merge($attributes, []);
-    $event_schema = EventSchemaProvider::generateSchemaOrg($event_data, $venue_data ?? [], $organizer_data ?? [], $post_id);
-}
+$event_data = array_merge($attributes, []);
+$event_schema = EventSchemaProvider::generateSchemaOrg($event_data, $venue_data ?? [], $organizer_data ?? [], $post_id);
 ?>
 
 <?php if ($event_schema): ?>

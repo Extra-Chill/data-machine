@@ -5,6 +5,25 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2025-12-04
+
+### Added
+- **Schema Meta Fallbacks**: EventSchemaProvider now always injects start/end timestamps using `_datamachine_event_datetime` meta so Google Search Console no longer flags missing `endDate`.
+- **Event Upsert Hardening**: `buildEventData()` hydrates start/end dates and times from meta before generating block content, ensuring schema data stays consistent across imports and manual edits.
+- **Filters API Controller**: New REST endpoint `/datamachine/v1/events/filters` for dynamic taxonomy filter options with active filter support, date context, and archive context support.
+
+### Changed
+- **Event Details Block**: Server-side render always emits Schema.org JSON-LD and relies on EventSchemaProvider's meta fallbacks for complete structured data.
+- **Calendar Controller**: Enhanced pagination logic and parameter handling for better performance.
+- **Results Counter**: Improved date formatting and event count display for better user experience.
+- **Taxonomy Helper**: Enhanced taxonomy processing with filter support and date context filtering for more accurate taxonomy counts.
+- **API Client**: Enhanced calendar API client with filter support and improved error handling.
+- **Filter Modal**: Updated close button handling to support multiple close buttons and improved accessibility.
+- **State Management**: Improved URL state management and query parameter building for better browser history support.
+- **Calendar Styles**: Modern filter bar styling with improved search input and focus states.
+- **Filter Bar Template**: Instance-specific IDs and enhanced UI for multi-calendar support.
+- **Documentation**: `docs/event-schema-provider.md` and `docs/event-details-block.md` now describe how datetime meta feeds schema fallbacks.
+
 ## [0.5.1] - 2025-12-03
 
 ### Changed
