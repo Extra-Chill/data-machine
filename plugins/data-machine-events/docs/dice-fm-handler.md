@@ -1,145 +1,27 @@
 # Dice FM Handler
 
-Dice FM event integration for importing events from Dice FM platform with venue metadata extraction.
-
-## Overview
-
-The Dice FM handler provides seamless integration with Dice FM's event platform, extracting event data with venue information for location-based display. Features single-item processing and EventIdentifierGenerator for consistent duplicate detection.
-
-## Features
-
-### Event Data Extraction
-- **Comprehensive Event Data**: Extracts title, dates, times, descriptions, and ticket URLs
-- **Venue Metadata**: Venue name and address information (coordinates not provided by Dice FM API)
-- **Image Support**: Event images and promotional materials
-- **Pricing Information**: Ticket pricing and availability data
-
-### Technical Features
-- **Single-Item Processing**: Processes one event per job execution
-- **Event Identity Normalization**: Uses EventIdentifierGenerator for consistent duplicate detection
-- **Processed Items Tracking**: Prevents duplicate imports using Data Machine's tracking system
+The Dice FM handler (`inc/Steps/EventImport/Handlers/DiceFm/DiceFm.php`, `DiceFmSettings`) registers itself via `HandlerRegistrationTrait` and is discovered by `EventImportStep` when you select it in a pipeline. Each run follows Data Machine’s single-item loop: it normalizes title/date/venue through `Utilities/EventIdentifierGenerator::generate($title, $startDate, $venue)`, checks whether the identifier was already processed via `datamachine_is_item_processed`, marks it, and immediately returns the first eligible `DataPacket` so imports stay incremental.
 
 ## Configuration
 
-### Required Settings
-- **API Key**: Dice FM API authentication key
-- **City**: Target city for event discovery (required)
+- **City** (`city`): Required Dice FM market.
+- **API Key** (`api_key`): Dice FM authentication token.
+- **Include Keywords** (`include_keywords`): Comma-separated keywords to restrict imported events.
+- **Exclude Keywords** (`exclude_keywords`): Skip events containing these terms.
+- **Date Range** (`date_range`): Controls how far ahead the handler scans.
 
-### Optional Settings
-- **Include Keywords**: Only import events containing specified keywords (comma-separated)
-- **Exclude Keywords**: Skip events containing specified keywords (comma-separated)
+## Data Mapping
 
-### Hardcoded Parameters
-For consistent behavior and API optimization, the following parameters are hardcoded:
-- **Page Size**: 100 events per API request
-- **Event Types**: 'linkout,event' (includes both promoted and regular events)
+- **Event Details**: Maps title, description, start/end dates, times, and search-friendly fields to Event Details block attributes.
+- **Venue Metadata**: Name, street address, city/state/zip/country, and phone/website populate the venue taxonomy via `VenueService`/`Venue_Taxonomy`, keeping term meta synced for REST endpoints and blocks.
+- **Pricing & Tickets**: Ticket URLs, pricing, and availability feed the block’s pricing and offer fields.
+- **Images & Media**: Banner/cover images travel through `EventEngineData` and are downloaded later by `WordPressPublishHelper` when the handler config enables `include_image`.
+- **Taxonomies**: Categories/genres become taxonomy terms through `TaxonomyHandler` so badges, filters, and the Event Details block reflect the Dice FM classifications.
 
-## Usage Examples
+## Unique Capabilities
 
-### Basic Configuration
-```php
-$config = [
-    'city' => 'Charleston, SC'
-];
-```
+Dice FM delivers curated gig data with keyword filtering, city-specific scopes, and classification support straight from the public JSON API. The handler is optimized for large result sets by requesting 100 events per page yet still stopping after the first suitable event to avoid timeouts.
 
-### Filtered Import
-```php
-$config = [
-    'city' => 'New York, NY',
-    'search' => 'concert, live music, band',
-    'exclude_keywords' => 'trivia, karaoke, brunch'
-];
-```
+## Event Handoff
 
-## Event Processing
-
-### Data Mapping
-- **Title**: Event name from Dice FM API
-- **Start/End Dates**: Event timing information
-- **Description**: Event description and details
-- **Venue**: Venue name and address information
-- **Pricing**: Ticket information and pricing
-- **Images**: Event promotional images
-
-### Duplicate Prevention
-```php
-use DataMachineEvents\Utilities\EventIdentifierGenerator;
-
-// Generate normalized identifier
-$event_identifier = EventIdentifierGenerator::generate($title, $startDate, $venue);
-
-// Check processing status
-if (apply_filters('datamachine_is_item_processed', false, $flow_step_id, 'dice_fm', $event_identifier)) {
-    continue;
-}
-
-// Mark as processed
-do_action('datamachine_mark_item_processed', $flow_step_id, 'dice_fm', $event_identifier, $job_id);
-```
-
-## Integration Architecture
-
-### Handler Structure
-- **DiceFm.php**: Main import handler with API integration
-- **DiceFmAuth.php**: Authentication and API key management
-- **DiceFmSettings.php**: Admin configuration interface
-
-### Data Flow
-1. **API Authentication**: Validates Dice FM API credentials
-2. **Location Search**: Queries events for specified location
-3. **Event Retrieval**: Fetches detailed event information
-4. **Venue Processing**: Extracts and normalizes venue data
-5. **Event Mapping**: Converts to Data Machine event structure
-6. **Duplicate Check**: Uses EventIdentifierGenerator for identity verification
-7. **Event Upsert**: Creates/updates events using EventUpsert handler
-
-## API Integration
-
-### Dice FM API
-- **Events Endpoint**: Location-based event discovery
-- **Event Details**: Comprehensive event information
-- **Venue Data**: Venue name and address information
-- **Image Assets**: Event promotional materials
-
-### Rate Limiting
-- **API Quotas**: Respects Dice FM API rate limits
-- **Batch Processing**: Efficient event retrieval
-- **Error Recovery**: Automatic retry with backoff
-
-## Error Handling
-
-### Authentication Errors
-- **Invalid API Key**: Clear error messages for authentication failures
-- **Expired Credentials**: Token refresh and re-authentication prompts
-
-### Data Errors
-- **Missing Events**: Graceful handling of empty result sets
-- **Malformed Data**: Event validation and error logging
-- **Venue Issues**: Fallback handling for incomplete venue data
-
-## Performance Features
-
-### Efficient Processing
-- **Single-Item Pattern**: Prevents timeout on large imports
-- **Incremental Sync**: Only processes new events
-- **Memory Optimization**: Efficient data processing
-
-### Caching
-- **API Response Caching**: Reduces redundant API calls
-- **Venue Data Caching**: Optimizes venue lookups
-- **Event Identity Caching**: Fast duplicate detection
-
-## Troubleshooting
-
-### Common Issues
-- **API Key Problems**: Verify Dice FM API credentials
-- **Location Mismatch**: Check location formatting and availability
-- **Rate Limiting**: Implement appropriate delays between imports
-
-### Debug Information
-- **API Response Logging**: Detailed API interaction logs
-- **Event Processing**: Step-by-step processing information
-- **Venue Assignment**: Venue data extraction verification
-
-The Dice FM handler provides reliable event import from Dice FM with venue data and efficient duplicate prevention.
+After extraction, `EventEngineData` stores the structured payload. `EventUpsert` merges engine data with AI parameters, runs change detection across every field, assigns venue/promoter terms via `TaxonomyHandler` using `VenueService`/`Venue_Taxonomy`, syncs `_datamachine_event_datetime`, and optionally downloads featured images through `WordPressPublishHelper`. This keeps Event Details, REST responses, and Calendar pagination consistent across imports.

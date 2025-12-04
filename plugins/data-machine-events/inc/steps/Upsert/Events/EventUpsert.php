@@ -294,6 +294,7 @@ class EventUpsert extends UpdateHandler {
         }
 
         $handler_config_for_tax = $handler_config;
+
         $handler_config_for_tax['taxonomy_venue_selection'] = 'skip';
         $handler_config_for_tax['taxonomy_promoter_selection'] = 'skip';
         $engine_data_array = $engine instanceof EngineData ? $engine->all() : [];
@@ -338,6 +339,7 @@ class EventUpsert extends UpdateHandler {
         }
 
         $handler_config_for_tax = $handler_config;
+
         $handler_config_for_tax['taxonomy_venue_selection'] = 'skip';
         $handler_config_for_tax['taxonomy_promoter_selection'] = 'skip';
         $engine_data_array = $engine instanceof EngineData ? $engine->all() : [];
@@ -477,24 +479,42 @@ class EventUpsert extends UpdateHandler {
      * @param int $post_id Post ID
      * @param array $parameters Event parameters
      * @param array $engine_parameters Engine data parameters
+     * @param array $handler_config Handler configuration
      */
-    private function processPromoter(int $post_id, array $parameters, array $engine_parameters = []): void {
+    private function processPromoter(int $post_id, array $parameters, array $engine_parameters = [], array $handler_config = []): void {
+        $selection = $this->getPromoterSelection($handler_config);
+
+        if ($selection === 'skip') {
+            return;
+        }
+
+        if ($this->isPromoterTermSelection($selection)) {
+            $this->assignConfiguredPromoter($post_id, (int) $selection);
+            return;
+        }
+
+        if (!$this->isPromoterAiSelection($selection)) {
+            return;
+        }
+
         // Organizer field name maps to promoter taxonomy
         $promoter_name = $engine_parameters['organizer'] ?? $parameters['organizer'] ?? '';
 
-        if (!empty($promoter_name)) {
-            $promoter_metadata = [
-                'url' => $engine_parameters['organizerUrl'] ?? $parameters['organizerUrl'] ?? '',
-                'type' => $engine_parameters['organizerType'] ?? $parameters['organizerType'] ?? 'Organization'
-            ];
+        if (empty($promoter_name)) {
+            return;
+        }
 
-            $promoter_result = Promoter_Taxonomy::find_or_create_promoter($promoter_name, $promoter_metadata);
+        $promoter_metadata = [
+            'url' => $engine_parameters['organizerUrl'] ?? $parameters['organizerUrl'] ?? '',
+            'type' => $engine_parameters['organizerType'] ?? $parameters['organizerType'] ?? 'Organization'
+        ];
 
-            if ($promoter_result['term_id']) {
-                Promoter::assign_promoter_to_event($post_id, [
-                    'promoter' => $promoter_result['term_id']
-                ]);
-            }
+        $promoter_result = Promoter_Taxonomy::find_or_create_promoter($promoter_name, $promoter_metadata);
+
+        if ($promoter_result['term_id']) {
+            Promoter::assign_promoter_to_event($post_id, [
+                'promoter' => $promoter_result['term_id']
+            ]);
         }
     }
 
@@ -706,9 +726,26 @@ class EventUpsert extends UpdateHandler {
      * @return array|null Assignment result
      */
     public function assignPromoterTaxonomy(int $post_id, array $parameters, array $handler_config, $engine_context = null): ?array {
+        $selection = $this->getPromoterSelection($handler_config);
+
+        if ($selection === 'skip') {
+            return null;
+        }
+
+        if ($this->isPromoterTermSelection($selection)) {
+            $result = $this->assignConfiguredPromoter($post_id, (int) $selection);
+            if ($result) {
+                return $result;
+            }
+            return ['success' => false, 'error' => 'Failed to assign configured promoter'];
+        }
+
+        if (!$this->isPromoterAiSelection($selection)) {
+            return null;
+        }
+
         $engine = $this->resolveEngineContext($engine_context, $parameters);
         $engine_parameters = $this->extract_event_engine_parameters($engine);
-        // Organizer field name maps to promoter taxonomy
         $promoter_name = $parameters['organizer'] ?? ($engine_parameters['organizer'] ?? '');
 
         if (empty($promoter_name)) {
@@ -739,6 +776,49 @@ class EventUpsert extends UpdateHandler {
         }
 
         return ['success' => false, 'error' => 'Failed to create or find promoter'];
+    }
+
+    private function getPromoterSelection(array $handler_config): string {
+        $selection = $handler_config['taxonomy_promoter_selection'] ?? 'skip';
+        if (is_numeric($selection)) {
+            return (string) absint($selection);
+        }
+        return $selection;
+    }
+
+    private function isPromoterTermSelection(string $selection): bool {
+        return is_numeric($selection) && (int) $selection > 0;
+    }
+
+    private function isPromoterAiSelection(string $selection): bool {
+        return $selection === 'ai_decides';
+    }
+
+    private function assignConfiguredPromoter(int $post_id, int $term_id): ?array {
+        if ($term_id <= 0) {
+            return null;
+        }
+
+        if (!term_exists($term_id, 'promoter')) {
+            return null;
+        }
+
+        $assignment_result = Promoter::assign_promoter_to_event($post_id, ['promoter' => $term_id]);
+
+        if (!empty($assignment_result)) {
+            $term = get_term($term_id, 'promoter');
+            $term_name = (!is_wp_error($term) && $term) ? $term->name : '';
+
+            return [
+                'success' => true,
+                'taxonomy' => 'promoter',
+                'term_id' => $term_id,
+                'term_name' => $term_name,
+                'source' => 'event_promoter_handler'
+            ];
+        }
+
+        return null;
     }
 
     /**

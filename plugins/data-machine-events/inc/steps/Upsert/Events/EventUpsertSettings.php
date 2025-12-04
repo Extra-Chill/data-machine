@@ -77,6 +77,12 @@ class EventUpsertSettings {
             'description_template' => __('Configure %1$s assignment: Skip to exclude from AI instructions, let AI choose, or select specific %2$s.', 'datamachine-events'),
             'default' => 'skip'
         ]);
+
+        // Ensure promoter taxonomy follows the same selection behavior as other taxonomies
+        if (isset($taxonomy_fields['taxonomy_promoter_selection'])) {
+            $taxonomy_fields['taxonomy_promoter_selection']['description'] = __('Configure promoter assignment: Skip to exclude, let AI choose based on organizer data, or select a specific promoter term.', 'datamachine-events');
+        }
+
         return array_merge($fields, $taxonomy_fields);
     }
     
@@ -111,6 +117,10 @@ class EventUpsertSettings {
             'allowed_values' => ['skip', 'ai_decides'],
             'default_value' => 'skip'
         ]));
+
+        if (isset($sanitized['taxonomy_promoter_selection']) && is_numeric($sanitized['taxonomy_promoter_selection'])) {
+            $sanitized['taxonomy_promoter_selection'] = absint($sanitized['taxonomy_promoter_selection']);
+        }
         
         return $sanitized;
     }

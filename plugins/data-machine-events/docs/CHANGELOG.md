@@ -5,6 +5,18 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] - 2025-12-04
+
+### Changed
+- **Event Upsert Promoter Handling**: Promoter taxonomy now respects handler configuration, only creating or assigning terms when `taxonomy_promoter_selection` is set to AI or a specific term; existing pipelines default to `skip` so no unintended promoter terms are attached.
+- **Handler Documentation**: Streamlined Dice FM, DoStuff Media API, and Ticketmaster handler documentation for improved clarity and conciseness.
+
+## [0.5.3] - 2025-12-04
+
+### Changed
+- **Event Upsert Promoter Handling**: Promoter taxonomy now respects handler configuration, only creating or assigning terms when `taxonomy_promoter_selection` is set to AI or a specific term; existing pipelines default to `skip` so no unintended promoter terms are attached.
+- **Handler Documentation**: Streamlined Dice FM, DoStuff Media API, and Ticketmaster handler documentation for improved clarity and conciseness.
+
 ## [0.5.2] - 2025-12-04
 
 ### Added
@@ -22,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **State Management**: Improved URL state management and query parameter building for better browser history support.
 - **Calendar Styles**: Modern filter bar styling with improved search input and focus states.
 - **Filter Bar Template**: Instance-specific IDs and enhanced UI for multi-calendar support.
+- **Event Upsert Promoter Handling**: Promoter taxonomy now respects handler configuration, only creating or assigning terms when `taxonomy_promoter_selection` is set to AI or a specific term; existing pipelines default to `skip` so no unintended promoter terms are attached.
 - **Documentation**: `docs/event-schema-provider.md` and `docs/event-details-block.md` now describe how datetime meta feeds schema fallbacks.
 
 ## [0.5.1] - 2025-12-03
