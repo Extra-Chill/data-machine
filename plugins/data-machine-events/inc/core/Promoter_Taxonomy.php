@@ -50,6 +50,7 @@ class Promoter_Taxonomy {
                     'menu_name' => __('Promoters', 'datamachine-events'),
                 ],
                 'show_ui' => true,
+                'show_in_menu' => true,
                 'show_admin_column' => true,
                 'query_var' => true,
                 'rewrite' => ['slug' => 'promoter'],

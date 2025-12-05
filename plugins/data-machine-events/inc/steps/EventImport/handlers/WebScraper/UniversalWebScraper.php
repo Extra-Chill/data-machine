@@ -210,6 +210,10 @@ class UniversalWebScraper extends EventImportHandler {
             // Schema.org microdata (HIGHEST PRIORITY)
             '//*[contains(@itemtype, "Event")]',
 
+            // SeeTickets widget patterns (used by Resound Presents, etc.)
+            '//*[contains(@class, "seetickets-list-event-container")]',
+            '//*[contains(@class, "seetickets-calendar-event")]',
+
             // Specific event listing patterns (HIGH PRIORITY)
             '//*[contains(@class, "eventlist-event")]',
             '//article[contains(@class, "eventlist-event")]',

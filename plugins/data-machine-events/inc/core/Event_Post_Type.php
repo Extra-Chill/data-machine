@@ -181,6 +181,7 @@ class Event_Post_Type {
         
         $allowed_items = apply_filters('datamachine_events_post_type_menu_items', array(
             'venue' => true,
+            'promoter' => true,
             'settings' => true
         ));
         
@@ -218,6 +219,7 @@ class Event_Post_Type {
 
         $allowed_items = apply_filters('datamachine_events_post_type_menu_items', array(
             'venue' => true,
+            'promoter' => true,
             'settings' => true
         ));
 
@@ -241,6 +243,7 @@ class Event_Post_Type {
         if ($current_screen->taxonomy) {
             $allowed_items = apply_filters('datamachine_events_post_type_menu_items', array(
                 'venue' => true,
+                'promoter' => true,
                 'settings' => true
             ));
             

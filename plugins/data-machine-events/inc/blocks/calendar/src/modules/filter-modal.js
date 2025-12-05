@@ -346,27 +346,27 @@ function getCheckedFilters(modal) {
 }
 
 export function updateFilterCount(calendar) {
-    const modal = calendar.querySelector('.datamachine-taxonomy-modal');
-    if (!modal) return;
-
-    const checkboxes = modal.querySelectorAll('input[type="checkbox"]:checked');
     const filterBtn = calendar.querySelector('.datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .datamachine-events-filter-btn');
     const countBadge = filterBtn ? filterBtn.querySelector('.datamachine-filter-count') : null;
 
-    if (!countBadge) return;
+    if (!countBadge || !filterBtn) return;
 
-    if (checkboxes.length > 0) {
-        countBadge.textContent = checkboxes.length;
+    const params = new URLSearchParams(window.location.search);
+    let filterCount = 0;
+    
+    params.forEach((value, key) => {
+        if (key.match(/^tax_filter\[([^\]]+)\]\[\]$/)) {
+            filterCount++;
+        }
+    });
+
+    if (filterCount > 0) {
+        countBadge.textContent = filterCount;
         countBadge.classList.add('visible');
-        if (filterBtn) {
-            filterBtn.classList.add('datamachine-filters-active');
-            filterBtn.setAttribute('aria-expanded', 'true');
-        }
+        filterBtn.classList.add('datamachine-filters-active');
     } else {
+        countBadge.textContent = '';
         countBadge.classList.remove('visible');
-        if (filterBtn) {
-            filterBtn.classList.remove('datamachine-filters-active');
-            filterBtn.setAttribute('aria-expanded', 'false');
-        }
+        filterBtn.classList.remove('datamachine-filters-active');
     }
 }
