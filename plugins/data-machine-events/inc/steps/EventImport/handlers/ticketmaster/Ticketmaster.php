@@ -31,6 +31,8 @@ class Ticketmaster extends EventImportHandler {
         'page' => 0
     ];
 
+    const MAX_PAGE = 19;
+
     public function __construct() {
         parent::__construct('ticketmaster');
 
@@ -76,80 +78,105 @@ class Ticketmaster extends EventImportHandler {
             return $this->emptyResponse() ?? [];
         }
         
-        $raw_events = $this->fetch_events($search_params);
-        if (empty($raw_events)) {
-            $this->log('info', 'No events found from Ticketmaster API');
-            return $this->emptyResponse() ?? [];
-        }
+        $current_page = 0;
         
-        $this->log('info', 'Processing events for eligible item', [
-            'raw_events_available' => count($raw_events),
-            'pipeline_id' => $pipeline_id
-        ]);
-        
-        foreach ($raw_events as $raw_event) {
-            // Only process actively scheduled events
-            $event_status = $raw_event['dates']['status']['code'] ?? '';
-            if ($event_status !== 'onsale') {
-                continue;
+        do {
+            $search_params['page'] = $current_page;
+            $result = $this->fetch_events($search_params);
+            $raw_events = $result['events'];
+            $page_info = $result['page'];
+            
+            if (empty($raw_events)) {
+                if ($current_page === 0) {
+                    $this->log('info', 'No events found from Ticketmaster API');
+                }
+                break;
             }
             
-            $standardized_event = $this->map_ticketmaster_event($raw_event);
-            
-            if (empty($standardized_event['title'])) {
-                continue;
-            }
-            
-            $event_identifier = \DataMachineEvents\Utilities\EventIdentifierGenerator::generate(
-                $standardized_event['title'],
-                $standardized_event['startDate'] ?? '',
-                $standardized_event['venue'] ?? ''
-            );
-            
-            if ($this->isItemProcessed($event_identifier, $flow_step_id)) {
-                continue;
-            }
-            
-            // Found eligible event
-            $this->markItemProcessed($event_identifier, $flow_step_id, $job_id);
-            
-            $this->log('info', 'Found eligible event', [
-                'title' => $standardized_event['title'],
-                'date' => $standardized_event['startDate'],
-                'venue' => $standardized_event['venue']
+            $this->log('info', 'Processing events for eligible item', [
+                'page' => $current_page,
+                'events_on_page' => count($raw_events),
+                'total_pages' => $page_info['totalPages'],
+                'pipeline_id' => $pipeline_id
             ]);
             
-            $venue_metadata = $this->extractVenueMetadata($standardized_event);
-            
-            EventEngineData::storeVenueContext($job_id, $standardized_event, $venue_metadata);
-
-            $this->stripVenueMetadataFromEvent($standardized_event);
-            
-            // Create DataPacket
-            $dataPacket = new DataPacket(
-                [
+            foreach ($raw_events as $raw_event) {
+                $event_status = $raw_event['dates']['status']['code'] ?? '';
+                if ($event_status !== 'onsale') {
+                    continue;
+                }
+                
+                $standardized_event = $this->map_ticketmaster_event($raw_event);
+                
+                if (empty($standardized_event['title'])) {
+                    continue;
+                }
+                
+                $event_identifier = \DataMachineEvents\Utilities\EventIdentifierGenerator::generate(
+                    $standardized_event['title'],
+                    $standardized_event['startDate'] ?? '',
+                    $standardized_event['venue'] ?? ''
+                );
+                
+                if ($this->isItemProcessed($event_identifier, $flow_step_id)) {
+                    continue;
+                }
+                
+                $this->markItemProcessed($event_identifier, $flow_step_id, $job_id);
+                
+                $this->log('info', 'Found eligible event', [
                     'title' => $standardized_event['title'],
-                    'body' => wp_json_encode([
-                        'event' => $standardized_event,
-                        'venue_metadata' => $venue_metadata,
-                        'import_source' => 'ticketmaster'
-                    ], JSON_PRETTY_PRINT)
-                ],
-                [
-                    'source_type' => 'ticketmaster',
-                    'pipeline_id' => $pipeline_id,
-                    'flow_id' => $flow_id,
-                    'original_title' => $standardized_event['title'] ?? '',
-                    'event_identifier' => $event_identifier,
-                    'import_timestamp' => time()
-                ],
-                'event_import'
-            );
+                    'date' => $standardized_event['startDate'],
+                    'venue' => $standardized_event['venue'],
+                    'page' => $current_page
+                ]);
+                
+                $venue_metadata = $this->extractVenueMetadata($standardized_event);
+                
+                EventEngineData::storeVenueContext($job_id, $standardized_event, $venue_metadata);
+
+                $this->stripVenueMetadataFromEvent($standardized_event);
+                
+                $dataPacket = new DataPacket(
+                    [
+                        'title' => $standardized_event['title'],
+                        'body' => wp_json_encode([
+                            'event' => $standardized_event,
+                            'venue_metadata' => $venue_metadata,
+                            'import_source' => 'ticketmaster'
+                        ], JSON_PRETTY_PRINT)
+                    ],
+                    [
+                        'source_type' => 'ticketmaster',
+                        'pipeline_id' => $pipeline_id,
+                        'flow_id' => $flow_id,
+                        'original_title' => $standardized_event['title'] ?? '',
+                        'event_identifier' => $event_identifier,
+                        'import_timestamp' => time()
+                    ],
+                    'event_import'
+                );
+                
+                return $this->successResponse([$dataPacket]);
+            }
             
-            return $this->successResponse([$dataPacket]);
-        }
+            $has_more_pages = $page_info['number'] < ($page_info['totalPages'] - 1)
+                              && $current_page < self::MAX_PAGE;
+            
+            if ($has_more_pages) {
+                $this->log('info', 'No eligible events on page, fetching next', [
+                    'current_page' => $current_page,
+                    'total_pages' => $page_info['totalPages']
+                ]);
+            }
+            
+            $current_page++;
+            
+        } while ($has_more_pages);
         
-        $this->log('info', 'No eligible events found');
+        $this->log('info', 'No eligible events found', [
+            'pages_searched' => $current_page
+        ]);
         return $this->emptyResponse() ?? [];
     }
     
@@ -307,17 +334,19 @@ class Ticketmaster extends EventImportHandler {
         
         if (!$result['success']) {
             $this->log('error', 'API request failed: ' . ($result['error'] ?? 'Unknown error'));
-            return [];
+            return [
+                'events' => [],
+                'page' => ['number' => 0, 'totalPages' => 1]
+            ];
         }
         
         $body = $result['data'];
         $data = json_decode($body, true);
         
-        if (empty($data['_embedded']['events'])) {
-            return [];
-        }
-        
-        return $data['_embedded']['events'];
+        return [
+            'events' => $data['_embedded']['events'] ?? [],
+            'page' => $data['page'] ?? ['number' => 0, 'totalPages' => 1]
+        ];
     }
     
     private function map_ticketmaster_event(array $tm_event): array {

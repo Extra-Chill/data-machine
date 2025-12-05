@@ -5,6 +5,23 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.6] - 2025-12-05
+
+### Added
+- **Universal Web Scraper Pagination**: Automatic traversal of paginated event listings
+  - Follows "next page" links using standard HTML5 `rel="next"`, SEO link elements, and common pagination patterns
+  - `MAX_PAGES` constant (20) prevents infinite loops
+  - Visited URL tracking prevents re-scraping same pages
+  - Supports relative URLs, protocol-relative URLs, and same-domain validation
+- **Ticketmaster API Pagination**: Automatic traversal through API result pages
+  - `MAX_PAGE` constant (19) respects Ticketmaster API limits
+  - Enhanced logging with page number context
+  - Fetches next pages when all events on current page are already processed
+
+### Changed
+- **UniversalWebScraper Handler**: Refactored `get_fetch_data()` to loop through pages until finding an unprocessed event or reaching max pages
+- **Ticketmaster Handler**: Refactored `fetch_events()` to return page metadata; `get_fetch_data()` now uses do-while pagination loop
+
 ## [0.5.5] - 2025-12-05
 
 ### Changed

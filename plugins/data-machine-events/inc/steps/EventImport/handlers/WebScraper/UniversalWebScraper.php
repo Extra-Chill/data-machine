@@ -35,6 +35,8 @@ class UniversalWebScraper extends EventImportHandler {
 
     use HandlerRegistrationTrait;
 
+    const MAX_PAGES = 20;
+
     public function __construct() {
         parent::__construct('universal_web_scraper');
 
@@ -52,7 +54,10 @@ class UniversalWebScraper extends EventImportHandler {
     }
 
     /**
-     * Execute web scraper with AI event extraction
+     * Execute web scraper with AI event extraction and automatic pagination
+     * 
+     * Traverses multiple pages of event listings until an eligible event is found
+     * or the maximum page limit is reached.
      * 
      * @param int $pipeline_id Pipeline ID
      * @param array $config Handler configuration
@@ -79,69 +84,118 @@ class UniversalWebScraper extends EventImportHandler {
             'url' => $url,
             'flow_step_id' => $flow_step_id
         ]);
-        
-        // Fetch HTML content
-        $html_content = $this->fetch_html($url);
-        if (empty($html_content)) {
-            return $this->emptyResponse() ?? [];
-        }
-        
-        // Find first potential event section
-        $event_section = $this->extract_event_sections($html_content, $url, $flow_step_id);
-        if (empty($event_section)) {
-            $this->log('info', 'Universal Web Scraper: No event sections found', [
-                'url' => $url,
-                'content_length' => strlen($html_content)
+
+        $current_url = $url;
+        $current_page = 1;
+        $visited_urls = [];
+
+        while ($current_page <= self::MAX_PAGES) {
+            // Prevent infinite loops by tracking visited URLs
+            $url_hash = md5($current_url);
+            if (isset($visited_urls[$url_hash])) {
+                $this->log('debug', 'Universal Web Scraper: Already visited URL, ending pagination', [
+                    'url' => $current_url
+                ]);
+                break;
+            }
+            $visited_urls[$url_hash] = true;
+
+            // Fetch HTML content for current page
+            $html_content = $this->fetch_html($current_url);
+            if (empty($html_content)) {
+                if ($current_page === 1) {
+                    return $this->emptyResponse() ?? [];
+                }
+                break;
+            }
+            
+            // Find first potential event section on this page
+            $event_section = $this->extract_event_sections($html_content, $current_url, $flow_step_id);
+            
+            if (!empty($event_section)) {
+                // Found an unprocessed event section - process it
+                $this->log('info', 'Universal Web Scraper: Processing event section', [
+                    'section_identifier' => $event_section['identifier'],
+                    'page' => $current_page,
+                    'pipeline_id' => $pipeline_id
+                ]);
+
+                // Process HTML section to prepare raw data for AI step
+                $raw_html_data = $this->extract_raw_html_section($event_section['html'], $current_url, $config);
+
+                if ($raw_html_data) {
+                    // Mark as processed and return immediately (single event processing)
+                    $this->markItemProcessed($event_section['identifier'], $flow_step_id, $job_id);
+
+                    $this->log('info', 'Universal Web Scraper: Found eligible HTML section', [
+                        'source_url' => $current_url,
+                        'section_identifier' => $event_section['identifier'],
+                        'page' => $current_page,
+                        'pipeline_id' => $pipeline_id
+                    ]);
+
+                    // Create DataPacket
+                    $dataPacket = new DataPacket(
+                        [
+                            'title' => 'Raw HTML Event Section',
+                            'body' => wp_json_encode([
+                                'raw_html' => $raw_html_data,
+                                'source_url' => $current_url,
+                                'import_source' => 'universal_web_scraper',
+                                'section_identifier' => $event_section['identifier']
+                            ], JSON_PRETTY_PRINT)
+                        ],
+                        [
+                            'source_type' => 'universal_web_scraper',
+                            'pipeline_id' => $pipeline_id,
+                            'flow_id' => $flow_id,
+                            'original_title' => 'HTML Section from ' . parse_url($current_url, PHP_URL_HOST),
+                            'event_identifier' => $event_section['identifier'],
+                            'import_timestamp' => time()
+                        ],
+                        'event_import'
+                    );
+
+                    return $this->successResponse([$dataPacket]);
+                }
+            }
+
+            // No eligible events on this page - look for next page
+            $this->log('info', 'Universal Web Scraper: No unprocessed events on page, checking for next page', [
+                'page' => $current_page,
+                'url' => $current_url
             ]);
-            return $this->emptyResponse() ?? [];
+
+            $next_url = $this->find_next_page_url($html_content, $current_url);
+            
+            if (empty($next_url)) {
+                $this->log('info', 'Universal Web Scraper: No pagination link found, ending search', [
+                    'pages_searched' => $current_page
+                ]);
+                break;
+            }
+
+            $this->log('info', 'Universal Web Scraper: Found next page URL', [
+                'next_url' => $next_url,
+                'page' => $current_page + 1
+            ]);
+
+            $current_url = $next_url;
+            $current_page++;
         }
 
-        // Process single event section (Data Machine single-item model)
-        $this->log('info', 'Universal Web Scraper: Processing single event section for eligible item', [
-            'section_identifier' => $event_section['identifier'],
+        if ($current_page > self::MAX_PAGES) {
+            $this->log('info', 'Universal Web Scraper: Reached max pages limit', [
+                'max_pages' => self::MAX_PAGES
+            ]);
+        }
+
+        $this->log('info', 'Universal Web Scraper: No eligible events found', [
+            'pages_searched' => $current_page,
             'pipeline_id' => $pipeline_id
         ]);
 
-        // Process HTML section to prepare raw data for AI step
-        $raw_html_data = $this->extract_raw_html_section($event_section['html'], $url, $config);
-
-        // Skip if no valid HTML data extracted
-        if (!$raw_html_data) {
-            return $this->emptyResponse() ?? [];
-        }
-
-        // Mark as processed and return immediately (single event processing)
-        $this->markItemProcessed($event_section['identifier'], $flow_step_id, $job_id);
-
-        $this->log('info', 'Universal Web Scraper: Found eligible HTML section', [
-            'source_url' => $url,
-            'section_identifier' => $event_section['identifier'],
-            'pipeline_id' => $pipeline_id
-        ]);
-
-        // Create DataPacket
-        $dataPacket = new DataPacket(
-            [
-                'title' => 'Raw HTML Event Section',
-                'body' => wp_json_encode([
-                    'raw_html' => $raw_html_data,
-                    'source_url' => $url,
-                    'import_source' => 'universal_web_scraper',
-                    'section_identifier' => $event_section['identifier']
-                ], JSON_PRETTY_PRINT)
-            ],
-            [
-                'source_type' => 'universal_web_scraper',
-                'pipeline_id' => $pipeline_id,
-                'flow_id' => $flow_id,
-                'original_title' => 'HTML Section from ' . parse_url($url, PHP_URL_HOST),
-                'event_identifier' => $event_section['identifier'],
-                'import_timestamp' => time()
-            ],
-            'event_import'
-        );
-
-        return $this->successResponse([$dataPacket]);
+        return $this->emptyResponse() ?? [];
     }
     
     /**
@@ -306,7 +360,181 @@ class UniversalWebScraper extends EventImportHandler {
         
         return trim($html);
     }
-    
+
+    /**
+     * Find next page URL from pagination links in HTML
+     *
+     * Detects common pagination patterns and returns the next page URL.
+     * Only follows same-domain links to prevent security issues.
+     *
+     * @param string $html HTML content to search for pagination
+     * @param string $current_url Current page URL for domain validation
+     * @return string|null Next page URL or null if not found
+     */
+    private function find_next_page_url(string $html, string $current_url): ?string {
+        $current_host = parse_url($current_url, PHP_URL_HOST);
+        if (empty($current_host)) {
+            return null;
+        }
+
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+
+        $xpath = new \DOMXPath($dom);
+
+        // Priority 1: Standard HTML5 rel="next" on links
+        $next_links = $xpath->query('//a[@rel="next"]');
+        if ($next_links->length > 0) {
+            $href = $this->extract_valid_href($next_links->item(0), $current_url, $current_host);
+            if ($href) {
+                return $href;
+            }
+        }
+
+        // Priority 2: Link element with rel="next" (SEO pagination)
+        $link_next = $xpath->query('//link[@rel="next"]');
+        if ($link_next->length > 0) {
+            $node = $link_next->item(0);
+            if ($node instanceof \DOMElement) {
+                $href = $node->getAttribute('href');
+                $resolved = $this->resolve_url($href, $current_url, $current_host);
+                if ($resolved) {
+                    return $resolved;
+                }
+            }
+        }
+
+        // Priority 3: Links with "next" in class name
+        $next_class_patterns = [
+            '//a[contains(@class, "next")]',
+            '//a[contains(@class, "pagination-next")]',
+            '//a[contains(@class, "page-next")]',
+        ];
+
+        foreach ($next_class_patterns as $pattern) {
+            $nodes = $xpath->query($pattern);
+            foreach ($nodes as $node) {
+                $href = $this->extract_valid_href($node, $current_url, $current_host);
+                if ($href) {
+                    return $href;
+                }
+            }
+        }
+
+        // Priority 4: Links within pagination containers
+        $pagination_containers = [
+            '//*[contains(@class, "pagination")]//a',
+            '//*[contains(@class, "pager")]//a',
+            '//nav[@aria-label="pagination"]//a',
+            '//*[@role="navigation"]//a',
+        ];
+
+        foreach ($pagination_containers as $container_pattern) {
+            $nodes = $xpath->query($container_pattern);
+            foreach ($nodes as $node) {
+                if (!($node instanceof \DOMElement)) {
+                    continue;
+                }
+
+                $text = strtolower(trim($node->textContent));
+                $class = strtolower($node->getAttribute('class'));
+                $aria_label = strtolower($node->getAttribute('aria-label'));
+
+                // Look for "next" indicators
+                if (
+                    strpos($text, 'next') !== false ||
+                    strpos($class, 'next') !== false ||
+                    strpos($aria_label, 'next') !== false ||
+                    $text === '>' ||
+                    $text === '>>' ||
+                    $text === '→'
+                ) {
+                    $href = $this->extract_valid_href($node, $current_url, $current_host);
+                    if ($href) {
+                        return $href;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract and validate href from a DOM node
+     *
+     * @param \DOMNode $node DOM node to extract href from
+     * @param string $current_url Current page URL for resolving relative URLs
+     * @param string $current_host Current host for domain validation
+     * @return string|null Valid absolute URL or null
+     */
+    private function extract_valid_href(\DOMNode $node, string $current_url, string $current_host): ?string {
+        if (!($node instanceof \DOMElement)) {
+            return null;
+        }
+
+        $href = $node->getAttribute('href');
+        if (empty($href)) {
+            return null;
+        }
+
+        return $this->resolve_url($href, $current_url, $current_host);
+    }
+
+    /**
+     * Resolve and validate a URL
+     *
+     * Converts relative URLs to absolute and validates same-domain requirement.
+     *
+     * @param string $href URL or path to resolve
+     * @param string $current_url Current page URL for resolving relative URLs
+     * @param string $current_host Current host for domain validation
+     * @return string|null Valid absolute URL or null
+     */
+    private function resolve_url(string $href, string $current_url, string $current_host): ?string {
+        $href = trim($href);
+
+        // Skip invalid href values
+        if (
+            empty($href) ||
+            $href === '#' ||
+            strpos($href, 'javascript:') === 0 ||
+            strpos($href, 'mailto:') === 0
+        ) {
+            return null;
+        }
+
+        // Handle protocol-relative URLs
+        if (strpos($href, '//') === 0) {
+            $href = parse_url($current_url, PHP_URL_SCHEME) . ':' . $href;
+        }
+        // Handle relative URLs
+        elseif (strpos($href, '/') === 0) {
+            $scheme = parse_url($current_url, PHP_URL_SCHEME);
+            $href = $scheme . '://' . $current_host . $href;
+        }
+        // Handle relative paths without leading slash
+        elseif (strpos($href, 'http') !== 0) {
+            $base_path = dirname(parse_url($current_url, PHP_URL_PATH));
+            $scheme = parse_url($current_url, PHP_URL_SCHEME);
+            $href = $scheme . '://' . $current_host . $base_path . '/' . $href;
+        }
+
+        // Validate same domain
+        $href_host = parse_url($href, PHP_URL_HOST);
+        if ($href_host !== $current_host) {
+            return null;
+        }
+
+        // Validate URL format
+        if (!filter_var($href, FILTER_VALIDATE_URL)) {
+            return null;
+        }
+
+        return $href;
+    }
     
     /**
      * Extract raw HTML section for AI processing in subsequent pipeline steps
