@@ -3,6 +3,7 @@
  */
 
 import { fetchFilters } from './api-client.js';
+import { getFilterState } from './filter-state.js';
 
 export function initFilterModal(calendar, onApply, onReset) {
     const modal = calendar.querySelector('.datamachine-taxonomy-modal');
@@ -10,6 +11,8 @@ export function initFilterModal(calendar, onApply, onReset) {
 
     if (modal.dataset.dmListenersAttached === 'true') return;
     modal.dataset.dmListenersAttached = 'true';
+
+    const filterState = getFilterState(calendar);
 
     const modalContainer = modal.querySelector('.datamachine-taxonomy-modal-container');
     if (modalContainer) {
@@ -38,7 +41,12 @@ export function initFilterModal(calendar, onApply, onReset) {
         document.body.classList.add('datamachine-modal-active');
         filterBtn.setAttribute('aria-expanded', 'true');
         
-        await loadFilters(modal, getActiveFiltersFromUrl(), getDateContextFromUrl(), archiveContext);
+        await loadFilters(
+            modal, 
+            filterState.getTaxFilters(), 
+            filterState.getDateContext(), 
+            archiveContext
+        );
     };
 
     const closeModalHandler = function() {
@@ -60,11 +68,11 @@ export function initFilterModal(calendar, onApply, onReset) {
     const applyHandler = function() {
         if (onApply) onApply();
         closeModal();
-        updateFilterCount(calendar);
+        filterState.updateFilterCountBadge();
     };
 
     const resetHandler = function() {
-        localStorage.removeItem('datamachine_events_calendar_state');
+        filterState.clearStorage();
         window.history.pushState({}, '', window.location.pathname);
 
         const checkboxes = modal.querySelectorAll('input[type="checkbox"]:checked');
@@ -72,7 +80,7 @@ export function initFilterModal(calendar, onApply, onReset) {
             checkbox.checked = false;
         });
 
-        updateFilterCount(calendar);
+        filterState.updateFilterCountBadge();
 
         if (onReset) onReset(new URLSearchParams());
         closeModal();
@@ -110,7 +118,7 @@ export function initFilterModal(calendar, onApply, onReset) {
         modal._resetBtn = resetBtn;
     }
 
-    updateFilterCount(calendar);
+    filterState.updateFilterCountBadge();
 }
 
 export function destroyFilterModal(calendar) {
@@ -160,33 +168,6 @@ export function destroyFilterModal(calendar) {
     modal.dataset.dmListenersAttached = 'false';
 }
 
-function getActiveFiltersFromUrl() {
-    const params = new URLSearchParams(window.location.search);
-    const filters = {};
-    
-    params.forEach((value, key) => {
-        const match = key.match(/^tax_filter\[([^\]]+)\]\[\]$/);
-        if (match) {
-            const taxonomy = match[1];
-            if (!filters[taxonomy]) {
-                filters[taxonomy] = [];
-            }
-            filters[taxonomy].push(parseInt(value, 10));
-        }
-    });
-    
-    return filters;
-}
-
-function getDateContextFromUrl() {
-    const params = new URLSearchParams(window.location.search);
-    return {
-        date_start: params.get('date_start') || '',
-        date_end: params.get('date_end') || '',
-        past: params.get('past') || ''
-    };
-}
-
 function getArchiveContextFromModal(modal) {
     const taxonomy = modal.dataset.archiveTaxonomy || '';
     const termId = parseInt(modal.dataset.archiveTermId, 10) || 0;
@@ -218,7 +199,6 @@ async function loadFilters(modal, activeFilters = {}, dateContext = {}, archiveC
         attachFilterChangeListeners(modal, dateContext, archiveContext);
         
     } catch (error) {
-        console.error('Error loading filters:', error);
         container.innerHTML = '<div class="datamachine-filter-error"><p>Error loading filters. Please try again.</p></div>';
     } finally {
         if (loading) loading.style.display = 'none';
@@ -343,30 +323,4 @@ function getCheckedFilters(modal) {
     });
     
     return filters;
-}
-
-export function updateFilterCount(calendar) {
-    const filterBtn = calendar.querySelector('.datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .datamachine-events-filter-btn');
-    const countBadge = filterBtn ? filterBtn.querySelector('.datamachine-filter-count') : null;
-
-    if (!countBadge || !filterBtn) return;
-
-    const params = new URLSearchParams(window.location.search);
-    let filterCount = 0;
-    
-    params.forEach((value, key) => {
-        if (key.match(/^tax_filter\[([^\]]+)\]\[\]$/)) {
-            filterCount++;
-        }
-    });
-
-    if (filterCount > 0) {
-        countBadge.textContent = filterCount;
-        countBadge.classList.add('visible');
-        filterBtn.classList.add('datamachine-filters-active');
-    } else {
-        countBadge.textContent = '';
-        countBadge.classList.remove('visible');
-        filterBtn.classList.remove('datamachine-filters-active');
-    }
 }

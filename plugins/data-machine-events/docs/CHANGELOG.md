@@ -5,18 +5,31 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.5] - 2025-12-05
+
+### Changed
+- **Filter State Management Refactoring**: Centralized calendar filter state logic into dedicated `FilterStateManager` class
+  - New `inc/Blocks/Calendar/src/modules/filter-state.js` module for unified state management
+  - Improved separation of concerns between URL handling, localStorage persistence, and UI updates
+  - Enhanced filter count badge accuracy and state restoration reliability
+- **Frontend JavaScript Architecture**: Refactored calendar modules for better maintainability
+  - Updated `frontend.js` to use new FilterStateManager instance pattern
+  - Simplified `filter-modal.js` with cleaner state integration
+  - Streamlined `state.js` by removing duplicated functionality
+- **Documentation Expansion**: Added comprehensive documentation for core components
+  - `docs/dynamic-tool-parameters-trait.md` - Dynamic AI tool parameter filtering
+  - `docs/event-post-type.md` - Event post type architecture
+  - `docs/event-upsert-system.md` - Event upsert handler documentation
+  - `docs/meta-storage.md` - Meta field storage system
+  - `docs/promoter-taxonomy.md` - Promoter taxonomy implementation
+  - `docs/venue-service.md` - Venue service architecture
+
 ## [0.5.4] - 2025-12-04
 
 ### Changed
 - **Filter Modal Enhancement**: Updated filter count logic to count URL parameters instead of checked checkboxes for more accurate badge display
 - **Promoter Taxonomy UI**: Added promoter taxonomy to admin menu for better taxonomy management visibility
 - **Web Scraper Enhancement**: Added XPath selectors for SeeTickets widget patterns to improve event scraping from additional venue websites
-
-## [0.5.3] - 2025-12-04
-
-### Changed
-- **Event Upsert Promoter Handling**: Promoter taxonomy now respects handler configuration, only creating or assigning terms when `taxonomy_promoter_selection` is set to AI or a specific term; existing pipelines default to `skip` so no unintended promoter terms are attached.
-- **Handler Documentation**: Streamlined Dice FM, DoStuff Media API, and Ticketmaster handler documentation for improved clarity and conciseness.
 
 ## [0.5.3] - 2025-12-04
 

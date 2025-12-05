@@ -12,7 +12,7 @@ import { initDatePicker, destroyDatePicker, getDatePicker } from './modules/date
 import { initFilterModal, destroyFilterModal } from './modules/filter-modal.js';
 import { initNavigation } from './modules/navigation.js';
 import { fetchCalendarEvents } from './modules/api-client.js';
-import { buildQueryParams, updateUrl, loadStateFromStorage } from './modules/state.js';
+import { getFilterState, destroyFilterState } from './modules/filter-state.js';
 
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.datamachine-events-calendar').forEach(initCalendarInstance);
@@ -21,6 +21,10 @@ document.addEventListener('DOMContentLoaded', function() {
 function initCalendarInstance(calendar) {
     if (calendar.dataset.dmInitialized === 'true') return;
     calendar.dataset.dmInitialized = 'true';
+
+    const filterState = getFilterState(calendar);
+    
+    const restored = filterState.restoreFromStorage();
 
     initCarousel(calendar);
 
@@ -40,15 +44,12 @@ function initCalendarInstance(calendar) {
 
     initSearchInput(calendar);
 
-    // Restore state if URL is clean (no params)
-    if (window.location.search === '') {
-        const storedParams = loadStateFromStorage();
-        if (storedParams && storedParams.toString() !== '') {
-            const newUrl = `${window.location.pathname}?${storedParams.toString()}`;
-            window.history.replaceState({ path: newUrl }, '', newUrl);
-            refreshCalendar(calendar, storedParams);
-        }
+    if (restored) {
+        const params = new URLSearchParams(window.location.search);
+        refreshCalendar(calendar, params);
     }
+
+    filterState.updateFilterCountBadge();
 }
 
 function initSearchInput(calendar) {
@@ -75,9 +76,10 @@ function initSearchInput(calendar) {
 }
 
 async function handleFilterChange(calendar) {
+    const filterState = getFilterState(calendar);
     const datePicker = getDatePicker(calendar);
-    const params = buildQueryParams(calendar, datePicker);
-    updateUrl(params);
+    const params = filterState.buildParams(datePicker);
+    filterState.updateUrl(params);
     await refreshCalendar(calendar, params);
 }
 
@@ -86,7 +88,8 @@ async function handleFilterReset(calendar, params) {
 }
 
 async function handleNavigation(calendar, params) {
-    updateUrl(params);
+    const filterState = getFilterState(calendar);
+    filterState.updateUrl(params);
     await refreshCalendar(calendar, params);
 }
 
@@ -105,5 +108,6 @@ window.addEventListener('beforeunload', function() {
     document.querySelectorAll('.datamachine-events-calendar').forEach(function(calendar) {
         destroyDatePicker(calendar);
         destroyCarousel(calendar);
+        destroyFilterState(calendar);
     });
 });
