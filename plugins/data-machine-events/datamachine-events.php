@@ -3,7 +3,7 @@
  * Plugin Name: Data Machine Events
  * Plugin URI: https://chubes.net
  * Description: WordPress events plugin with block-first architecture. Features AI-driven event creation via Data Machine integration, Event Details blocks for data storage, Calendar blocks for display, and venue taxonomy management.
- * Version: 0.5.7
+ * Version: 0.5.8
  * Author: Chris Huber
  * Author URI: https://chubes.net
  * License: GPL v2 or later
@@ -28,12 +28,28 @@ if (!defined('ABSPATH')) {
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once __DIR__ . '/vendor/autoload.php';
 }
-define('DATAMACHINE_EVENTS_VERSION', '0.5.7');
+define('DATAMACHINE_EVENTS_VERSION', '0.5.8');
 define('DATAMACHINE_EVENTS_PLUGIN_FILE', __FILE__);
 define('DATAMACHINE_EVENTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DATAMACHINE_EVENTS_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('DATAMACHINE_EVENTS_PLUGIN_BASENAME', plugin_basename(__FILE__));
 define('DATAMACHINE_EVENTS_PATH', plugin_dir_path(__FILE__));
+
+if (!function_exists('datamachine_events_sanitize_query_params')) {
+    /**
+     * Recursively sanitize query parameters while preserving nested structure
+     *
+     * @param mixed $value
+     * @return mixed
+     */
+    function datamachine_events_sanitize_query_params($value) {
+        if (is_array($value)) {
+            return array_map('datamachine_events_sanitize_query_params', $value);
+        }
+
+        return is_scalar($value) ? sanitize_text_field($value) : $value;
+    }
+}
 
 // Load core meta storage (monitors Event Details block saves)
 require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/meta-storage.php';
@@ -299,4 +315,4 @@ function datamachine_events() {
     return DATAMACHINE_Events::get_instance();
 }
 
-datamachine_events(); 
+datamachine_events();

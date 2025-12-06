@@ -5,7 +5,36 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.7] - 2025-12-05
+## [0.5.8] - 2025-12-05
+
+### Fixed
+- **Query Parameter Sanitization**: Improved nested array sanitization to properly handle multi-dimensional query parameters
+  - New `datamachine_events_sanitize_query_params()` global function for recursive sanitization
+  - Updated `Pagination::sanitize_query_params()` to use same recursive logic
+  - Preserves array structure while sanitizing all scalar values
+  - Fixes taxonomy filter parameters with indexed arrays (e.g., `tax_filter[genre][0]`)
+
+### Changed
+- **Event Details Block Description**: Now extracts plain text from block content for Schema.org `description` field
+  - Uses `wp_strip_all_tags()` to preserve description data in schema without HTML markup
+  - Improves structured data quality for search engines
+  - Description flows from InnerBlocks content through to JSON-LD schema
+
+- **Filter State Regex**: Enhanced filter parameter parsing to support both indexed and non-indexed array syntax
+  - Regex pattern now matches `tax_filter[taxonomy][0]` and `tax_filter[taxonomy][]` formats
+  - Better compatibility with different WordPress filter parameter conventions
+  - Fixes filter restoration on pagination with indexed array parameters
+
+- **Universal Web Scraper Table Support**: Improved table-based event pattern detection
+  - Moved table XPath selectors to higher priority (before generic list patterns)
+  - Added patterns for common table structures: `.calendar`, `.events`, `.schedule` classes
+  - Prevents false matches from navigation lists when tables are present
+  - Better support for venue websites using tabular event calendars
+
+### Technical Details
+- **Pagination Refactoring**: Removed scalar value iteration from `Pagination.php`, using recursive function instead
+- **Navigation Template**: Updated to use global `datamachine_events_sanitize_query_params()` function
+- **Code Quality**: Minor whitespace cleanup for consistency
 
 ### Changed
 - **Universal Web Scraper Enhancement**: Added support for table-based event patterns

@@ -37,7 +37,7 @@ class FilterStateManager {
         const filters = {};
         
         params.forEach((value, key) => {
-            const match = key.match(/^tax_filter\[([^\]]+)\]\[\]$/);
+            const match = key.match(/^tax_filter\[([^\]]+)\]\[(?:\d+)?\]$/);
             if (match) {
                 const taxonomy = match[1];
                 if (!filters[taxonomy]) {

@@ -36,9 +36,8 @@ class Pagination {
         }
 
         // Preserve all GET parameters except 'paged'
-        $get_params = isset($_GET) ? array_map('sanitize_text_field', wp_unslash($_GET)) : array();
+        $get_params = isset($_GET) ? self::sanitize_query_params(wp_unslash($_GET)) : array();
         unset($get_params['paged']);
-
         // Build default pagination arguments
         $pagination_args = array(
             'base'      => add_query_arg('paged', '%#%'),
@@ -99,5 +98,19 @@ class Pagination {
         );
 
         return $output;
+    }
+
+    /**
+     * Recursively sanitize query parameters to preserve nested arrays
+     *
+     * @param mixed $value
+     * @return mixed
+     */
+    protected static function sanitize_query_params($value) {
+        if (is_array($value)) {
+            return array_map([self::class, 'sanitize_query_params'], $value);
+        }
+
+        return is_scalar($value) ? sanitize_text_field($value) : $value;
     }
 }

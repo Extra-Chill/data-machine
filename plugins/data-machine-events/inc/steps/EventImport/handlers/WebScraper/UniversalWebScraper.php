@@ -268,6 +268,11 @@ class UniversalWebScraper extends EventImportHandler {
             '//*[contains(@class, "seetickets-list-event-container")]',
             '//*[contains(@class, "seetickets-calendar-event")]',
 
+            // Table-based event patterns (venue calendars often use tables)
+            '//tr[.//td[contains(@class, "event-date") or contains(@class, "event-name") or contains(@class, "event")]]',
+            '//table[contains(@class, "calendar") or contains(@class, "events") or contains(@class, "schedule")]//tbody//tr',
+            '//section[contains(@class, "calendar")]//table//tbody//tr',
+
             // Specific event listing patterns (HIGH PRIORITY)
             '//*[contains(@class, "eventlist-event")]',
             '//article[contains(@class, "eventlist-event")]',
@@ -287,15 +292,10 @@ class UniversalWebScraper extends EventImportHandler {
             '//*[contains(@class, "event-entry")]',
             '//*[contains(@class, "event-listing")]',
 
-            // List items within event containers
+            // List items within event containers (lower priority - can match navigation)
             '//*[contains(@class, "events")]//li',
             '//*[contains(@class, "shows")]//li',
-            '//*[contains(@class, "calendar")]//li',
-
-            // Table-based event patterns (venue calendars often use tables)
-            '//tr[.//td[contains(@class, "event-date") or contains(@class, "event-name") or contains(@class, "event")]]',
-            '//table[contains(@class, "calendar") or contains(@class, "events") or contains(@class, "schedule")]//tbody//tr',
-            '//section[contains(@class, "calendar")]//table//tbody//tr'
+            '//*[contains(@class, "calendar")]//li'
         ];
 
         foreach ($selectors as $selector) {

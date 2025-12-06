@@ -69,7 +69,10 @@ $block_class = implode(' ', $block_classes);
 
 
 $event_schema = null;
-$event_data = array_merge($attributes, []);
+$description_text = !empty($content) ? wp_strip_all_tags($content) : '';
+$event_data = array_merge($attributes, [
+    'description' => $description_text
+]);
 $event_schema = EventSchemaProvider::generateSchemaOrg($event_data, $venue_data ?? [], $organizer_data ?? [], $post_id);
 ?>
 
