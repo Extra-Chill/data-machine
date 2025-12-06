@@ -290,7 +290,12 @@ class UniversalWebScraper extends EventImportHandler {
             // List items within event containers
             '//*[contains(@class, "events")]//li',
             '//*[contains(@class, "shows")]//li',
-            '//*[contains(@class, "calendar")]//li'
+            '//*[contains(@class, "calendar")]//li',
+
+            // Table-based event patterns (venue calendars often use tables)
+            '//tr[.//td[contains(@class, "event-date") or contains(@class, "event-name") or contains(@class, "event")]]',
+            '//table[contains(@class, "calendar") or contains(@class, "events") or contains(@class, "schedule")]//tbody//tr',
+            '//section[contains(@class, "calendar")]//table//tbody//tr'
         ];
 
         foreach ($selectors as $selector) {
@@ -301,6 +306,15 @@ class UniversalWebScraper extends EventImportHandler {
                 $tag_name = strtolower($node->nodeName);
                 if (in_array($tag_name, ['body', 'header', 'footer', 'nav', 'aside', 'main'])) {
                     continue;
+                }
+
+                // Skip table header rows (tr containing only th elements)
+                if ($tag_name === 'tr') {
+                    $th_count = $xpath->query('.//th', $node)->length;
+                    $td_count = $xpath->query('.//td', $node)->length;
+                    if ($th_count > 0 && $td_count === 0) {
+                        continue;
+                    }
                 }
 
                 $raw_html = $dom->saveHTML($node);
