@@ -59,8 +59,6 @@ export function initCarousel(calendar) {
                 });
 
                 if (useCollapsed) {
-                    indicators.classList.add('collapsed');
-                    
                     const halfWindow = Math.floor(MAX_VISIBLE_DOTS / 2);
                     const dotUnit = DOT_WIDTH + DOT_GAP;
                     const totalDotsWidth = totalEvents * DOT_WIDTH + (totalEvents - 1) * DOT_GAP;
@@ -79,11 +77,9 @@ export function initCarousel(calendar) {
                     
                     track.style.transform = 'translateX(-' + shift + 'px)';
                 } else {
-                    indicators.classList.remove('collapsed');
                     track.style.transform = '';
                 }
             } else {
-                indicators.classList.remove('collapsed');
                 track.style.transform = '';
                 
                 const maxScroll = wrapper.scrollWidth - wrapper.clientWidth;
@@ -134,9 +130,19 @@ export function initCarousel(calendar) {
             }
             indicators.innerHTML = '';
 
+            const useViewport = eventCount > MAX_VISIBLE_DOTS;
+            
+            let trackParent = indicators;
+            if (useViewport) {
+                const viewport = document.createElement('div');
+                viewport.className = 'datamachine-carousel-viewport';
+                indicators.appendChild(viewport);
+                trackParent = viewport;
+            }
+
             const track = document.createElement('div');
             track.className = 'datamachine-carousel-dots-track';
-            indicators.appendChild(track);
+            trackParent.appendChild(track);
 
             for (let i = 0; i < eventCount; i++) {
                 const dot = document.createElement('span');

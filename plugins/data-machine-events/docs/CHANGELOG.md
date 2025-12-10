@@ -5,6 +5,13 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.13] - 2025-12-09
+
+### Changed
+- **Carousel Navigation Improvements**: Enhanced mobile dot indicators with viewport-based overflow handling for better navigation with many events
+- **CSS Optimization**: Simplified carousel indicators styling by removing class-based collapsed states
+- **Documentation**: Renamed CLAUDE.md to AGENTS.md for consistency
+
 ## [0.5.12] - 2025-12-09
 
 ### Fixed
@@ -25,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.5.9] - 2025-12-09
 
 ### Changed
-- **Documentation Updates**: Comprehensive alignment of CLAUDE.md, calendar-block.md, event-details-block.md, ticketmaster-handler.md, and universal-web-scraper-handler.md for improved clarity and current architecture reflection
+- **Documentation Updates**: Comprehensive alignment of AGENTS.md, calendar-block.md, event-details-block.md, ticketmaster-handler.md, and universal-web-scraper-handler.md for improved clarity and current architecture reflection
 - **Carousel Enhancements**: Added collapsed dots functionality for mobile navigation with small/medium/active dot states and improved touch interaction
 - **Filter Bar Styling**: Modernized search input and filter bar styles with improved focus states, transitions, and responsive design
 - **Version Synchronization**: Corrected composer.json version from 0.5.7 to match current version
@@ -143,7 +150,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.5.1] - 2025-12-03
 
 ### Changed
-- **Documentation Updates**: Comprehensive documentation alignment across CLAUDE.md, README.md, and all docs/ files to reflect current architecture
+- **Documentation Updates**: Comprehensive documentation alignment across AGENTS.md, README.md, and all docs/ files to reflect current architecture
 - **Calendar Controller**: Enhanced pagination logic and parameter handling
 - **Results Counter**: Improved date formatting and event count display for better user experience
 

@@ -2,7 +2,7 @@
 
 Frontend-focused WordPress events plugin with a **block-first architecture** that ties Event Details data storage to Calendar block progressive enhancement and REST API-driven filtering.
 
-**Version**: 0.5.12
+**Version**: 0.5.13
 
 ## Architecture Overview
 

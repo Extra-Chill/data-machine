@@ -1,7 +1,7 @@
 {
     "name": "chubes/datamachine-events",
     "description": "Data Machine Events plugin dependencies",
-    "version": "0.5.12",
+    "version": "0.5.13",
     "require": {
         "php": ">=8.0",
         "johngrogg/ics-parser": "^3.0"
