@@ -985,6 +985,12 @@
 
 .datamachine-carousel-indicators.collapsed {
     overflow: hidden;
+    width: 172px; /* 12 dots (7px) + 11 gaps (8px) */
+    max-width: 100%;
+}
+
+.datamachine-carousel-indicators.collapsed .datamachine-carousel-dots-track {
+    justify-content: flex-start;
 }
 
 .datamachine-carousel-dots-track {
