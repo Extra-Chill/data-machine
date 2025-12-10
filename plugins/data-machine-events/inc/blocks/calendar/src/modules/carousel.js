@@ -60,12 +60,22 @@ export function initCarousel(calendar) {
 
                 if (useCollapsed) {
                     indicators.classList.add('collapsed');
+                    
+                    const halfWindow = Math.floor(MAX_VISIBLE_DOTS / 2);
+                    const dotUnit = DOT_WIDTH + DOT_GAP;
                     const totalDotsWidth = totalEvents * DOT_WIDTH + (totalEvents - 1) * DOT_GAP;
                     const visibleWidth = MAX_VISIBLE_DOTS * DOT_WIDTH + (MAX_VISIBLE_DOTS - 1) * DOT_GAP;
                     const maxShift = totalDotsWidth - visibleWidth;
                     
-                    const scrollProgress = activeIndex / (totalEvents - 1);
-                    const shift = Math.round(scrollProgress * maxShift);
+                    let shift;
+                    
+                    if (activeIndex <= halfWindow) {
+                        shift = 0;
+                    } else if (activeIndex >= totalEvents - halfWindow) {
+                        shift = maxShift;
+                    } else {
+                        shift = (activeIndex - halfWindow) * dotUnit;
+                    }
                     
                     track.style.transform = 'translateX(-' + shift + 'px)';
                 } else {
