@@ -15,6 +15,7 @@ The block exposes 15+ attributes (dates, venue, price, performer/organizer metad
 ## InnerBlocks & Rendering
 
 - InnerBlocks allow editors to drop Gutenberg content such as rich text, galleries, or reusable patterns inside the Event Details block while preserving schema data.
+- InnerBlocks content extracts to plain text for Schema.org `description` field via `wp_strip_all_tags()`, ensuring HTML markup doesn't contaminate structured data while preserving the description text for search engines.
 - Event content renders using block markup plus shared root CSS tokens from `inc/Blocks/root.css`, guaranteeing consistent spacing, typography, and color tokens across Calendar and Event Details blocks.
 
 ## Structured Data & Maps

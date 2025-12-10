@@ -5,6 +5,18 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.9] - 2025-12-09
+
+### Changed
+- **Documentation Updates**: Comprehensive alignment of CLAUDE.md, calendar-block.md, event-details-block.md, ticketmaster-handler.md, and universal-web-scraper-handler.md for improved clarity and current architecture reflection
+- **Carousel Enhancements**: Added collapsed dots functionality for mobile navigation with small/medium/active dot states and improved touch interaction
+- **Filter Bar Styling**: Modernized search input and filter bar styles with improved focus states, transitions, and responsive design
+- **Version Synchronization**: Corrected composer.json version from 0.5.7 to match current version
+
+### Technical Details
+- **Mobile UX**: Enhanced carousel dot navigation with MAX_MOBILE_DOTS limit and sliding window for better mobile experience
+- **CSS Modernization**: Updated filter bar styles with CSS custom properties and improved accessibility
+
 ## [0.5.8] - 2025-12-05
 
 ### Fixed

@@ -1,6 +1,6 @@
 # Ticketmaster Handler
 
-The Ticketmaster handler (`inc/Steps/EventImport/Handlers/Ticketmaster/Ticketmaster.php`, `TicketmasterSettings`) plugs into `EventImportStep` through `HandlerRegistrationTrait` so it can be selected inside a Data Machine pipeline. Each execution follows the single-item pattern: it normalizes the incoming title/date/venue via `Utilities/EventIdentifierGenerator::generate($title, $startDate, $venue)`, checks `datamachine_is_item_processed`, marks the identifier, and immediately returns the first eligible `DataPacket` so the pipeline stays incremental.
+The Ticketmaster handler (`inc/Steps/EventImport/Handlers/Ticketmaster/Ticketmaster.php`, `TicketmasterSettings`) plugs into `EventImportStep` through `HandlerRegistrationTrait` so it can be selected inside a Data Machine pipeline. Each execution follows the single-item pattern with automatic pagination: it fetches events from the Ticketmaster API (paginating through results up to MAX_PAGE=19), normalizes the incoming title/date/venue via `Utilities/EventIdentifierGenerator::generate($title, $startDate, $venue)`, checks `datamachine_is_item_processed`, marks the identifier, and immediately returns the first eligible `DataPacket` so the pipeline stays incremental.
 
 ## Configuration & Authentication
 
@@ -19,7 +19,21 @@ The Ticketmaster handler (`inc/Steps/EventImport/Handlers/Ticketmaster/Ticketmas
 
 ## Unique Capabilities
 
-Ticketmaster handles genre/classification IDs, automatically offsets the API time window, and respects Ticketmaster’s rate limits. It also surfaces `promoter` data when available so `Venue_Taxonomy` or `promoter` taxonomy terms stay complete.
+Ticketmaster handles genre/classification IDs, automatically offsets the API time window, respects Ticketmaster's rate limits, and automatically paginates through API results (up to MAX_PAGE=19 pages) to discover new events. When a page contains only already-processed events, the handler advances to the next page to search for new content. It also surfaces `promoter` data when available so `Venue_Taxonomy` or `promoter` taxonomy terms stay complete.
+
+## Pagination
+
+The handler automatically discovers and fetches paginated results from the Ticketmaster Discovery API:
+
+```php
+// Respects MAX_PAGE = 19 for API pagination
+// Tracks current page and total pages available
+// Continues to next page if all events on current page are already processed
+// Returns immediately after finding first unprocessed event
+// Logs pagination context (current page, total pages) for transparency
+```
+
+This ensures that incremental imports continue pulling new events from the API even when multiple pages of results are available.
 
 ## Event Flow
 

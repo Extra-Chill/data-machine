@@ -3,6 +3,45 @@
  */
 
 const observers = new Map();
+const MAX_MOBILE_DOTS = 12;
+
+function updateCollapsedDots(dots, activeIndex, totalEvents) {
+    const visibleDots = MAX_MOBILE_DOTS;
+    const halfWindow = Math.floor(visibleDots / 2);
+    
+    let windowStart = activeIndex - halfWindow;
+    let windowEnd = activeIndex + halfWindow;
+    
+    if (windowStart < 0) {
+        windowStart = 0;
+        windowEnd = visibleDots - 1;
+    }
+    if (windowEnd >= totalEvents) {
+        windowEnd = totalEvents - 1;
+        windowStart = Math.max(0, totalEvents - visibleDots);
+    }
+    
+    dots.forEach(function(dot, dotIndex) {
+        if (dotIndex >= visibleDots) {
+            dot.style.display = 'none';
+            return;
+        }
+        
+        dot.style.display = '';
+        const eventIndex = windowStart + dotIndex;
+        const distanceFromActive = Math.abs(eventIndex - activeIndex);
+        
+        dot.classList.remove('active', 'dot-small', 'dot-medium');
+        
+        if (distanceFromActive === 0) {
+            dot.classList.add('active');
+        } else if (distanceFromActive === 1) {
+            dot.classList.add('dot-medium');
+        } else {
+            dot.classList.add('dot-small');
+        }
+    });
+}
 
 export function initCarousel(calendar) {
     const groups = calendar.querySelectorAll('.datamachine-date-group');
@@ -32,8 +71,10 @@ export function initCarousel(calendar) {
             const isSingleCardMode = firstEventWidth > 0 && (wrapperRect.width / firstEventWidth) < 1.5;
 
             if (isSingleCardMode) {
-                // Mobile: "most visible card wins" - only one dot active
-                let maxVisibleIndex = 0;
+                const totalEvents = events.length;
+                const useCollapsed = totalEvents > MAX_MOBILE_DOTS;
+                
+                let activeIndex = 0;
                 let maxVisibleArea = 0;
 
                 events.forEach(function(event, index) {
@@ -44,13 +85,19 @@ export function initCarousel(calendar) {
                     
                     if (visibleWidth > maxVisibleArea) {
                         maxVisibleArea = visibleWidth;
-                        maxVisibleIndex = index;
+                        activeIndex = index;
                     }
                 });
 
-                dots.forEach(function(dot, index) {
-                    dot.classList.toggle('active', index === maxVisibleIndex);
-                });
+                if (useCollapsed) {
+                    updateCollapsedDots(dots, activeIndex, totalEvents);
+                } else {
+                    dots.forEach(function(dot, index) {
+                        dot.style.display = '';
+                        dot.classList.remove('dot-small', 'dot-medium');
+                        dot.classList.toggle('active', index === activeIndex);
+                    });
+                }
             } else {
                 // Desktop: use scroll position to determine active dot range
                 const maxScroll = wrapper.scrollWidth - wrapper.clientWidth;

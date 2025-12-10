@@ -28,6 +28,7 @@ The Calendar block renders a Carousel List of events with progressive enhancemen
   - `modules/carousel.js` detects overflow, updates dots, and powers chevrons (with click-and-hold support).
   - `modules/date-picker.js` integrates Flatpickr for date range filters.
   - `modules/filter-modal.js` keeps the taxonomy modal accessible and debounced when filters change.
+  - `modules/filter-state.js` centralizes filter state management across URL params, localStorage, and DOM with regex support for both indexed (`tax_filter[taxonomy][0]`) and non-indexed (`tax_filter[taxonomy][]`) array syntax.
   - `modules/navigation.js` powers past/upcoming toggles, calendar navigation, and pagination link handling.
   - `modules/state.js` serializes query parameters, manages history state, and debounces search input.
 

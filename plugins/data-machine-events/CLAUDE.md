@@ -2,24 +2,25 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.5.7
+**Version**: 0.5.9
 
 ## Plugin Bootstrap
 
 - **Entry point**: `datamachine-events.php` defines constants (`DATAMACHINE_EVENTS_VERSION`, plugin paths), loads `inc/Core/meta-storage.php`, and requires `inc/Api/Routes.php` when the file exists.
 - **`DATAMACHINE_Events` class**: Singleton bootstrapped via `init`, it registers the `datamachine_events` post type, `venue`/`promoter` taxonomies, enqueues admin assets, and registers Calendar/Event Details blocks. It also adds root styles, Leaflet assets, and the venue map script whenever a block or singular event is rendered.
 - **Block registration**: `register_block_type()` reads `inc/Blocks/Calendar/block.json` and `inc/Blocks/EventDetails/block.json`, enqueues shared `inc/Blocks/root.css`, and hooks `enqueue_root_styles()` to `wp_enqueue_scripts`/`enqueue_block_assets`. Leaflet CSS/JS plus `assets/js/venue-map.js` are enqueued only when the Event Details block or a `datamachine_events` post is present.
+- **Query Parameter Sanitization**: `datamachine_events_sanitize_query_params()` recursively sanitizes nested query arrays while preserving structure, enabling safe handling of multi-dimensional filter parameters (e.g., `tax_filter[genre][0]`). Used in `Pagination::sanitize_query_params()` and the navigation template.
 
 ## Data Machine Integration
 
 - **`init_data_machine_integration()`**: Runs at priority 25 on `init`. After verifying `DATAMACHINE_VERSION`, it loads `EventImportFilters`, instantiates all import handlers, loads EventUpsert filters, and registers the EventUpsert handler from `inc/Steps/Upsert/Events/EventUpsert.php`.
 - **Event import handlers**: `load_event_import_handlers()` instantiates the following `FetchHandler` implementations (all located under `inc/Steps/EventImport/Handlers`):
-  - `Ticketmaster\Ticketmaster`
+  - `Ticketmaster\Ticketmaster` (with automatic API pagination up to MAX_PAGE=19)
   - `DiceFm\DiceFm`
   - `GoogleCalendar\GoogleCalendar` (with `GoogleCalendarUtils` for ID/URL resolution)
   - `IcsCalendar\IcsCalendar`
   - `SpotHopper\SpotHopper`
-  - `WebScraper\UniversalWebScraper`
+  - `WebScraper\UniversalWebScraper` (with automatic pagination up to MAX_PAGES=20, XPath-based table pattern detection, and header row skipping)
   - `WordPressEventsAPI\WordPressEventsAPI`
   - `EventFlyer\EventFlyer`
   - `Eventbrite\Eventbrite`
@@ -42,9 +43,9 @@ Technical guidance for Claude Code when working with the **Data Machine Events**
 ## Blocks & Frontend
 
 - **Calendar block** (`inc/Blocks/Calendar`): CSS-driven Carousel List with day grouping, time-gap separators, pagination, and server-rendered HTML. Templates include `event-item`, `date-group`, `navigation`, `results-counter`, `pagination`, `no-events`, `filter-bar`, `time-gap-separator`, and `modal/taxonomy-filter`.
-- **JavaScript modules**: `src/frontend.js` bootstraps `.datamachine-events-calendar` instances and wires `modules/api-client.js`, `modules/carousel.js`, `modules/date-picker.js`, `modules/filter-modal.js`, `modules/navigation.js`, and `modules/state.js` for REST calls, carousel scrolling, Flatpickr integration, modal accessibility, navigation updates, and History API-aware state management (including 500ms debounced search).
+- **JavaScript modules**: `src/frontend.js` bootstraps `.datamachine-events-calendar` instances and wires `modules/api-client.js`, `modules/carousel.js`, `modules/date-picker.js`, `modules/filter-modal.js`, `modules/filter-state.js`, `modules/navigation.js`, and `modules/state.js` for REST calls, carousel scrolling, Flatpickr integration, modal accessibility, filter state management, navigation updates, and History API-aware state management (including 500ms debounced search). `FilterStateManager` centralizes URL, localStorage, and DOM-based state with regex support for both indexed (`tax_filter[taxonomy][0]`) and non-indexed (`tax_filter[taxonomy][]`) array syntax.
 - **Progressive enhancement**: Server-rendered fragments allow the block to work without JavaScript, while REST API responses enrich filtering, pagination, search, and URL state when scripts are active.
-- **Event Details block** (`inc/Blocks/EventDetails`): 15+ attributes (dates/times, venue, address, price, priceCurrency, offerAvailability, ticketUrl, performer, performerType, organizer, organizerType, organizerUrl, eventStatus, previousStartDate, showVenue, showPrice, showTicketLink) plus InnerBlocks for rich content. Attributes persist to the block and sync `_datamachine_event_datetime` via `inc/Core/meta-storage.php` for performant queries.
+- **Event Details block** (`inc/Blocks/EventDetails`): 15+ attributes (dates/times, venue, address, price, priceCurrency, offerAvailability, ticketUrl, performer, performerType, organizer, organizerType, organizerUrl, eventStatus, previousStartDate, showVenue, showPrice, showTicketLink) plus InnerBlocks for rich content. Attributes persist to the block and sync `_datamachine_event_datetime` via `inc/Core/meta-storage.php` for performant queries. InnerBlocks content extracts to plain text for Schema.org `description` field via `wp_strip_all_tags()`, improving structured data quality.
 - **Schema & maps**: `enqueue_root_styles()` loads `leaflet.css`, `leaflet.js`, and `assets/js/venue-map.js` when Event Details or `datamachine_events` posts are present so Leaflet maps render with consistent markers and controls.
 
 ## REST API
