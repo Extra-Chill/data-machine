@@ -5,6 +5,13 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.10] - 2025-12-XX
+
+### Fixed
+- **Carousel Dot Indicators**: Improved collapsed state handling for better mobile navigation with sliding window functionality
+- **Chevron Navigation**: Enhanced positioning and styling for carousel navigation arrows
+- **Filter Bar Styling**: Refined CSS for search inputs, date filters, and responsive design consistency
+
 ## [0.5.9] - 2025-12-09
 
 ### Changed

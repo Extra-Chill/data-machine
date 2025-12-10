@@ -976,7 +976,6 @@
 .datamachine-carousel-indicators {
     display: flex;
     justify-content: center;
-    gap: 0.5rem;
     padding: 0.75rem 0;
     position: absolute;
     bottom: 0;
@@ -984,30 +983,28 @@
     right: 0;
 }
 
+.datamachine-carousel-indicators.collapsed {
+    overflow: hidden;
+}
+
+.datamachine-carousel-dots-track {
+    display: flex;
+    gap: 0.5rem;
+    transition: transform 0.15s ease-out;
+}
+
 .datamachine-carousel-dot {
     width: 7px;
     height: 7px;
     border-radius: 50%;
     background: var(--datamachine-border-light);
-    transition: all 0.2s ease;
+    transition: background 0.2s ease, transform 0.2s ease;
+    flex-shrink: 0;
 }
 
 .datamachine-carousel-dot.active {
     background: var(--datamachine-text-secondary);
     transform: scale(1.08);
-}
-
-/* Collapsed dot indicator sizes (mobile) */
-.datamachine-carousel-dot.dot-small {
-    width: 4px;
-    height: 4px;
-    opacity: 0.5;
-}
-
-.datamachine-carousel-dot.dot-medium {
-    width: 5px;
-    height: 5px;
-    opacity: 0.7;
 }
 
 /* Chevron navigation arrows */

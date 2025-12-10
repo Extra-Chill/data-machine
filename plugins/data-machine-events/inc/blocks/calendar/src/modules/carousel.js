@@ -3,45 +3,9 @@
  */
 
 const observers = new Map();
-const MAX_MOBILE_DOTS = 12;
-
-function updateCollapsedDots(dots, activeIndex, totalEvents) {
-    const visibleDots = MAX_MOBILE_DOTS;
-    const halfWindow = Math.floor(visibleDots / 2);
-    
-    let windowStart = activeIndex - halfWindow;
-    let windowEnd = activeIndex + halfWindow;
-    
-    if (windowStart < 0) {
-        windowStart = 0;
-        windowEnd = visibleDots - 1;
-    }
-    if (windowEnd >= totalEvents) {
-        windowEnd = totalEvents - 1;
-        windowStart = Math.max(0, totalEvents - visibleDots);
-    }
-    
-    dots.forEach(function(dot, dotIndex) {
-        if (dotIndex >= visibleDots) {
-            dot.style.display = 'none';
-            return;
-        }
-        
-        dot.style.display = '';
-        const eventIndex = windowStart + dotIndex;
-        const distanceFromActive = Math.abs(eventIndex - activeIndex);
-        
-        dot.classList.remove('active', 'dot-small', 'dot-medium');
-        
-        if (distanceFromActive === 0) {
-            dot.classList.add('active');
-        } else if (distanceFromActive === 1) {
-            dot.classList.add('dot-medium');
-        } else {
-            dot.classList.add('dot-small');
-        }
-    });
-}
+const MAX_VISIBLE_DOTS = 12;
+const DOT_WIDTH = 7;
+const DOT_GAP = 8;
 
 export function initCarousel(calendar) {
     const groups = calendar.querySelectorAll('.datamachine-date-group');
@@ -63,16 +27,17 @@ export function initCarousel(calendar) {
         const updateIndicators = function() {
             if (!indicators) return;
 
+            const track = indicators.querySelector('.datamachine-carousel-dots-track');
+            const dots = track ? track.querySelectorAll('.datamachine-carousel-dot') : [];
+            if (!track || dots.length === 0) return;
+
             const wrapperRect = wrapper.getBoundingClientRect();
-            const dots = indicators.querySelectorAll('.datamachine-carousel-dot');
-            
-            // Detect single-card mode (mobile) vs multi-card mode (desktop)
             const firstEventWidth = events[0]?.getBoundingClientRect().width || 0;
             const isSingleCardMode = firstEventWidth > 0 && (wrapperRect.width / firstEventWidth) < 1.5;
 
             if (isSingleCardMode) {
                 const totalEvents = events.length;
-                const useCollapsed = totalEvents > MAX_MOBILE_DOTS;
+                const useCollapsed = totalEvents > MAX_VISIBLE_DOTS;
                 
                 let activeIndex = 0;
                 let maxVisibleArea = 0;
@@ -89,17 +54,28 @@ export function initCarousel(calendar) {
                     }
                 });
 
+                dots.forEach(function(dot, index) {
+                    dot.classList.toggle('active', index === activeIndex);
+                });
+
                 if (useCollapsed) {
-                    updateCollapsedDots(dots, activeIndex, totalEvents);
+                    indicators.classList.add('collapsed');
+                    const totalDotsWidth = totalEvents * DOT_WIDTH + (totalEvents - 1) * DOT_GAP;
+                    const visibleWidth = MAX_VISIBLE_DOTS * DOT_WIDTH + (MAX_VISIBLE_DOTS - 1) * DOT_GAP;
+                    const maxShift = totalDotsWidth - visibleWidth;
+                    
+                    const scrollProgress = activeIndex / (totalEvents - 1);
+                    const shift = Math.round(scrollProgress * maxShift);
+                    
+                    track.style.transform = 'translateX(-' + shift + 'px)';
                 } else {
-                    dots.forEach(function(dot, index) {
-                        dot.style.display = '';
-                        dot.classList.remove('dot-small', 'dot-medium');
-                        dot.classList.toggle('active', index === activeIndex);
-                    });
+                    indicators.classList.remove('collapsed');
+                    track.style.transform = '';
                 }
             } else {
-                // Desktop: use scroll position to determine active dot range
+                indicators.classList.remove('collapsed');
+                track.style.transform = '';
+                
                 const maxScroll = wrapper.scrollWidth - wrapper.clientWidth;
                 const scrollProgress = maxScroll > 0 ? wrapper.scrollLeft / maxScroll : 0;
                 const visibleCards = Math.floor(wrapperRect.width / firstEventWidth);
@@ -148,11 +124,15 @@ export function initCarousel(calendar) {
             }
             indicators.innerHTML = '';
 
+            const track = document.createElement('div');
+            track.className = 'datamachine-carousel-dots-track';
+            indicators.appendChild(track);
+
             for (let i = 0; i < eventCount; i++) {
                 const dot = document.createElement('span');
                 dot.className = 'datamachine-carousel-dot';
                 dot.dataset.index = i;
-                indicators.appendChild(dot);
+                track.appendChild(dot);
             }
 
             if (!chevronLeft) {
