@@ -252,105 +252,21 @@ class UniversalWebScraper extends EventImportHandler {
      * @return array|null Single event section or null if none found
      */
     private function extract_event_sections(string $html_content, string $url, string $flow_step_id): ?array {
-        $dom = new \DOMDocument();
-        libxml_use_internal_errors(true);
-        $dom->loadHTML($html_content, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-        libxml_clear_errors();
+        $finder = new EventSectionFinder(
+            fn (string $identifier, string $step_id): bool => $this->isItemProcessed($identifier, $step_id),
+            fn (string $html): string => $this->clean_html_for_ai($html),
+            fn (string $ymd): bool => $this->isPastEvent($ymd)
+        );
 
-        $xpath = new \DOMXPath($dom);
-
-        // Universal CSS selectors for event detection - no configuration needed
-        $selectors = [
-            // Schema.org microdata (HIGHEST PRIORITY)
-            '//*[contains(@itemtype, "Event")]',
-
-            // SeeTickets widget patterns (used by Resound Presents, etc.)
-            '//*[contains(@class, "seetickets-list-event-container")]',
-            '//*[contains(@class, "seetickets-calendar-event")]',
-
-            // Table-based event patterns (venue calendars often use tables)
-            '//tr[.//td[contains(@class, "event-date") or contains(@class, "event-name") or contains(@class, "event")]]',
-            '//table[contains(@class, "calendar") or contains(@class, "events") or contains(@class, "schedule")]//tbody//tr',
-            '//section[contains(@class, "calendar")]//table//tbody//tr',
-
-            // Specific event listing patterns (HIGH PRIORITY)
-            '//*[contains(@class, "eventlist-event")]',
-            '//article[contains(@class, "eventlist-event")]',
-
-            // Article elements with event-related classes
-            '//article[contains(@class, "event")]',
-            '//article[contains(@class, "show")]',
-            '//article[contains(@class, "concert")]',
-
-            // Common event class patterns
-            '//*[contains(@class, "event-content-row")]',
-            '//*[contains(@class, "event-item")]',
-            '//*[contains(@class, "show-item")]',
-            '//*[contains(@class, "concert-item")]',
-            '//*[contains(@class, "calendar-event")]',
-            '//*[contains(@class, "event-card")]',
-            '//*[contains(@class, "event-entry")]',
-            '//*[contains(@class, "event-listing")]',
-
-            // List items within event containers (lower priority - can match navigation)
-            '//*[contains(@class, "events")]//li',
-            '//*[contains(@class, "shows")]//li',
-            '//*[contains(@class, "calendar")]//li'
-        ];
-
-        foreach ($selectors as $selector) {
-            $nodes = $xpath->query($selector);
-
-            foreach ($nodes as $node) {
-                // Skip structural elements (body, header, footer, nav)
-                $tag_name = strtolower($node->nodeName);
-                if (in_array($tag_name, ['body', 'header', 'footer', 'nav', 'aside', 'main'])) {
-                    continue;
-                }
-
-                // Skip table header rows (tr containing only th elements)
-                if ($tag_name === 'tr') {
-                    $th_count = $xpath->query('.//th', $node)->length;
-                    $td_count = $xpath->query('.//td', $node)->length;
-                    if ($th_count > 0 && $td_count === 0) {
-                        continue;
-                    }
-                }
-
-                $raw_html = $dom->saveHTML($node);
-
-                // Skip if too short or empty
-                if (strlen($raw_html) < 50) {
-                    continue;
-                }
-
-                // Create unique identifier for this event
-                $content_hash = md5($raw_html);
-                $event_identifier = md5($url . $content_hash);
-
-                // Check if already processed
-                if ($this->isItemProcessed($event_identifier, $flow_step_id)) {
-                    continue;
-                }
-
-                // Clean HTML for AI processing
-                $cleaned_html = $this->clean_html_for_ai($raw_html);
-                if (empty($cleaned_html) || strlen($cleaned_html) < 30) {
-                    continue;
-                }
-
-                // Return first eligible event immediately
-                return [
-                    'html' => $cleaned_html,
-                    'raw_html' => $raw_html,
-                    'identifier' => $event_identifier,
-                    'selector' => $selector,
-                    'url' => $url
-                ];
-            }
+        $event_section = $finder->find_first_eligible_section($html_content, $url, $flow_step_id);
+        if ($event_section !== null) {
+            $this->log('debug', 'Universal Web Scraper: Matched event section selector', [
+                'selector' => $event_section['selector'] ?? '',
+                'url' => $url,
+            ]);
         }
 
-        return null; // No unprocessed events found
+        return $event_section;
     }
     
     /**
