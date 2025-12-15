@@ -5,6 +5,18 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.19] - 2025-12-15
+
+### Changed
+- **Universal Web Scraper Enhancement**: Added XPath selector for "recspec-events--event" class pattern to improve website compatibility
+
+### Documentation
+- **Universal Web Scraper Handler**: Updated documentation to clarify Schema.org JSON-LD and microdata priority over AI processing
+- **BandzoogleCalendar Handler**: Added comprehensive documentation for the Bandzoogle calendar import handler
+- **Prekindle Handler**: Added complete documentation for the Prekindle widget import handler
+- **AGENTS.md**: Updated to include BandzoogleCalendar and Prekindle handlers
+- **README.md**: Updated import pipeline section to reflect all 12 handlers
+
 ## [0.5.18] - 2025-12-15
 
 ### Added

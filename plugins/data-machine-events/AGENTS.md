@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.5.18
+**Version**: 0.5.19
 
 ## Plugin Bootstrap
 
@@ -20,11 +20,13 @@ Technical guidance for Claude Code when working with the **Data Machine Events**
   - `GoogleCalendar\GoogleCalendar` (with `GoogleCalendarUtils` for ID/URL resolution)
   - `IcsCalendar\IcsCalendar`
   - `SpotHopper\SpotHopper`
-  - `WebScraper\UniversalWebScraper` (with automatic pagination up to MAX_PAGES=20, XPath-based table pattern detection, and header row skipping)
+  - `WebScraper\UniversalWebScraper` (with Schema.org JSON-LD/microdata priority, XPath selector rules, EventSectionFinder/EventSectionSelectors classes, and automatic pagination up to MAX_PAGES=20)
   - `WordPressEventsAPI\WordPressEventsAPI`
   - `EventFlyer\EventFlyer`
   - `Eventbrite\Eventbrite`
   - `DoStuffMediaApi\DoStuffMediaApi`
+  - `BandzoogleCalendar\BandzoogleCalendar` (forward-only calendar crawling with popup HTML parsing)
+  - `Prekindle\Prekindle` (JSON-LD + HTML time extraction from organizer widgets)
 - **Handler discovery**: `EventImportStep` (extends `DataMachine\Core\Steps\Step`) reads the configured handler slug, looks it up via `datamachine_handlers`, instantiates the class, and delegates to `get_fetch_data()` on `FetchHandler` (or falls back to legacy `execute()`). It merges returned `DataPacket` results into the pipeline and logs configuration issues.
 - **Single-item processing**: Each handler normalizes `(title, startDate, venue)` through `EventIdentifierGenerator::generate()`, checks `datamachine_is_item_processed`, marks the identifier via `datamachine_mark_item_processed`, and returns immediately after pushing a valid event to maintain incremental imports.
 - **EventUpsert**: `Steps\Upsert\Events\EventUpsert` extends `DataMachine\Core\Steps\Update\Handlers\UpdateHandler`. It registers custom taxonomy handlers for `venue` and `promoter`, merges `EngineData` snapshots with AI parameters, identifies existing events (title + venue + start date), runs field-by-field change detection, updates or creates events, processes featured images via `WordPressPublishHelper`, and keeps `_datamachine_event_datetime` synced for calendar queries.

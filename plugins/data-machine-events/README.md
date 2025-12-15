@@ -13,7 +13,7 @@ Frontend-focused WordPress events plugin with a **block-first architecture** tha
 ## Import Pipeline
 
 1. `EventImportStep` discovers handlers that register themselves via `HandlerRegistrationTrait` and exposes configuration through handler settings classes.
-2. **Handlers**: Ticketmaster, Dice FM, Google Calendar (with `GoogleCalendarUtils` for ID/URL resolution), ICS Calendar, SpotHopper, Universal WebScraper, WordPress Events API, EventFlyer, Eventbrite, and DoStuff Media API.
+2. **Handlers**: Ticketmaster, Dice FM, Google Calendar (with `GoogleCalendarUtils` for ID/URL resolution), ICS Calendar, SpotHopper, Universal WebScraper, WordPress Events API, EventFlyer, Eventbrite, DoStuff Media API, Bandzoogle Calendar, and Prekindle.
 3. Each handler applies `EventIdentifierGenerator::generate($title, $startDate, $venue)` to deduplicate, merges venue metadata into `EventEngineData`, and forwards standardized payloads to `EventUpsert`.
 4. `VenueService`/`Venue_Taxonomy` find or create venue terms and store nine meta fields (address, city, state, zip, country, phone, website, capacity, coordinates) for use in blocks and REST endpoints.
 5. `EventUpsertSettings` exposes status, author, taxonomy, and image download toggles via `WordPressSettingsHandler` so runtime behavior remains configurable.

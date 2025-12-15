@@ -66,6 +66,10 @@ final class EventSectionSelectors {
 
             // Specific event listing patterns (HIGH PRIORITY)
             [
+                'xpath' => '//*[contains(concat(" ", normalize-space(@class), " "), " recspec-events--event ")]',
+                'enable_table_row_date_filter' => false,
+            ],
+            [
                 'xpath' => '//*[contains(@class, "eventlist-event")]',
                 'enable_table_row_date_filter' => false,
             ],
