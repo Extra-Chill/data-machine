@@ -1,9 +1,9 @@
 <?php
 /**
- * Prekindle Organizer Page Import
+ * Prekindle Widget Import
  *
- * Imports events from a Prekindle organizer URL by combining JSON-LD event data
- * with start times extracted from the organizer page HTML listing.
+ * Imports events from the Prekindle organizer widget page derived from an org_id.
+ * Combines JSON-LD event data with start times extracted from the HTML listing.
  *
  * @package DataMachineEvents\Steps\EventImport\Handlers\Prekindle
  */
@@ -32,7 +32,7 @@ class Prekindle extends EventImportHandler {
             'event_import',
             self::class,
             __('Prekindle', 'datamachine-events'),
-            __('Import events from a Prekindle organizer page (JSON-LD + listing times)', 'datamachine-events'),
+            __('Import events from a Prekindle org widget page (JSON-LD + listing times)', 'datamachine-events'),
             false,
             null,
             PrekindleSettings::class,
@@ -47,13 +47,15 @@ class Prekindle extends EventImportHandler {
             'flow_step_id' => $flow_step_id,
         ]);
 
-        $organizer_url = trim($config['organizer_url'] ?? '');
-        if (empty($organizer_url)) {
-            $this->log('error', 'Prekindle handler requires organizer_url configuration');
+        $org_id = trim($config['org_id'] ?? '');
+        if (empty($org_id)) {
+            $this->log('error', 'Prekindle handler requires org_id configuration');
             return $this->emptyResponse() ?? [];
         }
 
-        $result = $this->httpGet($organizer_url, [
+        $widget_url = 'https://www.prekindle.com/organizer-grid-widget-main/id/' . urlencode($org_id) . '/?fp=false&thumbs=false&style=null';
+
+        $result = $this->httpGet($widget_url, [
             'timeout' => 30,
             'headers' => [
                 'Accept' => 'text/html',
