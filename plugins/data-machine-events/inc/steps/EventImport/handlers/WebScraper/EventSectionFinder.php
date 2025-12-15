@@ -72,6 +72,42 @@ final class EventSectionFinder {
                     continue;
                 }
 
+                // Handle base64-encoded calendar events (Google Calendar widgets)
+                if (!empty($rule['extract_base64_event'])) {
+                    $event_data = $this->extract_base64_calendar_event($node);
+                    if ($event_data === null) {
+                        continue;
+                    }
+
+                    // Skip "Closed" entries - definitively not events
+                    $summary = $event_data['summary'] ?? '';
+                    if (strtolower(trim($summary)) === 'closed') {
+                        continue;
+                    }
+
+                    // Parse and validate date - skip past events
+                    $start_date = $this->parse_calendar_event_date($event_data['start'] ?? '');
+                    if ($start_date && call_user_func($this->is_past_event, $start_date)) {
+                        continue;
+                    }
+
+                    // Build stable identifier from decoded data
+                    $event_identifier = md5($url . $summary . ($event_data['start'] ?? ''));
+
+                    if (call_user_func($this->is_item_processed, $event_identifier, $flow_step_id)) {
+                        continue;
+                    }
+
+                    // Return JSON as "html" field - AI will process the structured data
+                    return [
+                        'html' => wp_json_encode($event_data, JSON_PRETTY_PRINT),
+                        'raw_html' => $dom->saveHTML($node),
+                        'identifier' => $event_identifier,
+                        'selector' => $selector,
+                        'url' => $url,
+                    ];
+                }
+
                 if ($tag_name === 'tr') {
                     if ($this->is_table_header_row($xpath, $node)) {
                         continue;
@@ -176,6 +212,66 @@ final class EventSectionFinder {
         }
 
         $timestamp = strtotime($date_text);
+        if (!$timestamp) {
+            return null;
+        }
+
+        return date('Y-m-d', $timestamp);
+    }
+
+    /**
+     * Extract event data from base64-encoded data-calendar-event attribute.
+     *
+     * @param \DOMNode $node DOM node with data-calendar-event attribute
+     * @return array|null Decoded event data or null if invalid
+     */
+    private function extract_base64_calendar_event(\DOMNode $node): ?array {
+        if (!($node instanceof \DOMElement)) {
+            return null;
+        }
+
+        $base64_data = $node->getAttribute('data-calendar-event');
+        if (empty($base64_data)) {
+            return null;
+        }
+
+        $decoded = base64_decode($base64_data, true);
+        if ($decoded === false) {
+            return null;
+        }
+
+        $event_data = json_decode($decoded, true);
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($event_data)) {
+            return null;
+        }
+
+        if (empty($event_data['summary']) || empty($event_data['start'])) {
+            return null;
+        }
+
+        return $event_data;
+    }
+
+    /**
+     * Parse date string from Google Calendar widget format.
+     * Handles formats like "Wed, December 3, 9:00pm"
+     *
+     * @param string $date_string Raw date string
+     * @return string|null Y-m-d format or null
+     */
+    private function parse_calendar_event_date(string $date_string): ?string {
+        $date_string = trim($date_string);
+        if (empty($date_string)) {
+            return null;
+        }
+
+        $date_string = preg_replace('/^[A-Za-z]+,\s*/', '', $date_string);
+
+        if (!preg_match('/\b\d{4}\b/', $date_string)) {
+            $date_string .= ' ' . date('Y');
+        }
+
+        $timestamp = strtotime($date_string);
         if (!$timestamp) {
             return null;
         }

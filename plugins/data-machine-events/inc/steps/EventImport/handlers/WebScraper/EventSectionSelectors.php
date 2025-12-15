@@ -27,6 +27,13 @@ final class EventSectionSelectors {
                 'enable_table_row_date_filter' => false,
             ],
 
+            // Base64-encoded Google Calendar widget events (Starlight Motor Inn, etc.)
+            [
+                'xpath' => '//*[@data-calendar-event]',
+                'enable_table_row_date_filter' => false,
+                'extract_base64_event' => true,
+            ],
+
             // SeeTickets widget patterns (used by Resound Presents, etc.)
             [
                 'xpath' => '//*[contains(@class, "seetickets-list-event-container")]',

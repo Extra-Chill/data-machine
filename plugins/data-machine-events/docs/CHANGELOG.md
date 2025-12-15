@@ -5,6 +5,19 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.15] - 2025-12-14
+
+### Added
+- **Prekindle Handler**: New event import handler for Prekindle organizer pages, combining JSON-LD data with HTML-extracted start times
+
+### Changed
+- **Build Process**: Enhanced production build script with colored output, error handling, and build information generation
+- **Block Builds**: Updated to use @wordpress/scripts 30.19.0 and removed custom webpack configurations
+
+### Fixed
+- **Mobile Pagination**: Improved responsive CSS with 480px breakpoint and better flex wrapping for small screens
+- **Web Scraper**: Continued refinements to EventSectionFinder and EventSectionSelectors classes
+
 ## [0.5.14] - 2025-12-12
 
 ### Changed

@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Data Machine Events - Production Build Script
-# Creates optimized package in /dist directory with versioned .zip file
+# Creates optimized package in /dist directory.
 
-set -e
+set -euo pipefail
 
 echo "🚀 Starting Data Machine Events build process..."
 
@@ -14,36 +14,42 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Get plugin version from main file
-VERSION=$(grep "Version:" datamachine-events.php | head -1 | cut -d' ' -f3)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "${SCRIPT_DIR}"
+
+VERSION="$(awk -F': *' '/^[[:space:]]*\*[[:space:]]*Version:/ { print $2; exit }' datamachine-events.php | tr -d '\r')"
 DIST_DIR="dist"
 PACKAGE_NAME="datamachine-events"
 TEMP_DIR="${DIST_DIR}/${PACKAGE_NAME}"
 
+if [[ -z "${VERSION}" ]]; then
+  echo -e "${RED}Error: Could not determine plugin version.${NC}"
+  exit 1
+fi
+
 echo -e "${BLUE}📦 Building version: ${VERSION}${NC}"
+
+build_block() {
+  local block_dir="$1"
+  local block_label="$2"
+
+  echo -e "${YELLOW}${block_label}${NC}"
+  (cd "${block_dir}" && npm ci --no-audit --no-fund && npm run build)
+}
 
 # Clean and create dist directory
 echo -e "${YELLOW}🧹 Cleaning dist directory...${NC}"
 rm -rf "${DIST_DIR}"
 mkdir -p "${TEMP_DIR}"
 
+rm -rf "inc/Blocks/Calendar/node_modules" "inc/Blocks/EventDetails/node_modules"
+
 # Install composer dependencies (production only)
 echo -e "${YELLOW}📚 Installing composer dependencies...${NC}"
-composer install --no-dev --optimize-autoloader
+composer install --no-dev --optimize-autoloader --no-interaction
 
-# Build Calendar block (webpack)
-echo -e "${YELLOW}🗓️ Building Calendar block...${NC}"
-cd inc/Blocks/Calendar
-npm ci --silent
-npm run build --silent
-cd ../../..
-
-# Build Event Details block (@wordpress/scripts)
-echo -e "${YELLOW}📝 Building Event Details block...${NC}"
-cd inc/Blocks/EventDetails
-npm ci --silent
-npm run build --silent
-cd ../../..
+build_block "inc/Blocks/Calendar" "🗓️ Building Calendar block..."
+build_block "inc/Blocks/EventDetails" "📝 Building Event Details block..."
 
 # Copy plugin files to temp directory
 echo -e "${YELLOW}📂 Copying plugin files...${NC}"
@@ -52,6 +58,7 @@ echo -e "${YELLOW}📂 Copying plugin files...${NC}"
 cp datamachine-events.php "${TEMP_DIR}/"
 cp readme.txt "${TEMP_DIR}/"
 cp composer.json "${TEMP_DIR}/"
+cp composer.lock "${TEMP_DIR}/"
 
 # Copy directories (excluding development files)
 rsync -av --exclude='node_modules' --exclude='src' --exclude='webpack.config.js' --exclude='package*.json' --exclude='.git*' --exclude='docs' inc/ "${TEMP_DIR}/inc/"
@@ -71,13 +78,10 @@ find "${TEMP_DIR}/inc/Blocks" -name "webpack.config.js" -exec rm -f {} + 2>/dev/
 
 # Create .zip file
 echo -e "${YELLOW}📦 Creating .zip package...${NC}"
-cd "${DIST_DIR}"
-zip -r "${PACKAGE_NAME}.zip" "${PACKAGE_NAME}" -q
-cd ..
-
-# Remove temporary build directory
-echo -e "${YELLOW}🧹 Cleaning up temporary files...${NC}"
-rm -rf "${TEMP_DIR}"
+(
+  cd "${DIST_DIR}"
+  zip -r "${PACKAGE_NAME}.zip" "${PACKAGE_NAME}" -q
+)
 
 # Generate build info
 echo -e "${YELLOW}📋 Generating build info...${NC}"
@@ -103,23 +107,17 @@ Installation:
 EOF
 
 # Calculate file sizes
-FOLDER_SIZE=$(du -sh "${TEMP_DIR}" | cut -f1)
 ZIP_SIZE=$(du -sh "${DIST_DIR}/${PACKAGE_NAME}.zip" | cut -f1)
+
+# Remove temporary build directory
+echo -e "${YELLOW}🧹 Cleaning up temporary files...${NC}"
+rm -rf "${TEMP_DIR}"
 
 echo ""
 echo -e "${GREEN}✅ Build completed successfully!${NC}"
 echo ""
 echo -e "${BLUE}📊 Build Summary:${NC}"
-echo -e "  Package folder: ${FOLDER_SIZE}"
 echo -e "  ZIP file: ${ZIP_SIZE}"
 echo -e "  Location: ${DIST_DIR}/${PACKAGE_NAME}.zip"
 echo ""
 echo -e "${GREEN}🎉 Ready for production deployment!${NC}"
-
-# Restore dev dependencies
-echo -e "${YELLOW}🔄 Restoring development dependencies...${NC}"
-composer install --quiet
-
-echo ""
-echo -e "${BLUE}📁 Dist directory contents:${NC}"
-ls -la "${DIST_DIR}/"
