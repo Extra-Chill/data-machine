@@ -5,6 +5,14 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.17] - 2025-12-15
+
+### Changed
+- **Prekindle Handler Refactoring**: Improved time extraction reliability by switching from URL-based to title-based matching for event times, ensuring more consistent data extraction from Prekindle widget pages.
+
+### Fixed
+- **Prekindle Handler**: Added missing `normalizeTitleKey()` method to complete the title-based extraction refactoring.
+
 ## [0.5.16] - 2025-12-14
 
 ### Changed

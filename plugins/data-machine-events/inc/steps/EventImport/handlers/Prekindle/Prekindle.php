@@ -83,10 +83,10 @@ class Prekindle extends EventImportHandler {
             return $this->emptyResponse() ?? [];
         }
 
-        $times_by_event_url = $this->extractEventTimesByUrl($html);
+        $times_by_event_title = $this->extractEventTimesByTitle($html);
 
         foreach ($events as $raw_event) {
-            $standardized_event = $this->mapPrekindleEvent($raw_event, $times_by_event_url, $config);
+            $standardized_event = $this->mapPrekindleEvent($raw_event, $times_by_event_title, $config);
 
             if (empty($standardized_event['title'])) {
                 continue;
@@ -178,7 +178,7 @@ class Prekindle extends EventImportHandler {
         return [];
     }
 
-    private function extractEventTimesByUrl(string $html): array {
+    private function extractEventTimesByTitle(string $html): array {
         $map = [];
 
         if (!preg_match_all('#<div[^>]+name=["\']pk-eachevent["\'][^>]*>#i', $html, $starts, PREG_OFFSET_CAPTURE)) {
@@ -194,28 +194,32 @@ class Prekindle extends EventImportHandler {
 
             $block_html = substr($html, $start_offset, $end_offset - $start_offset);
 
-            if (!preg_match('#href=["\'](https?://[^"\']+/event/[^"\']+)["\']#i', $block_html, $url_match)) {
+            if (!preg_match('#<div[^>]*class=["\']pk-headline["\'][^>]*>(.*?)</div>#is', $block_html, $title_match)) {
                 continue;
             }
 
-            $url = $url_match[1];
+            $title = trim(wp_strip_all_tags(html_entity_decode($title_match[1], ENT_QUOTES | ENT_HTML5)));
+            if (empty($title)) {
+                continue;
+            }
 
             if (!preg_match('#<div[^>]*class=["\']pk-times["\'][^>]*>\s*<div[^>]*>(.*?)</div>#is', $block_html, $time_match)) {
                 continue;
             }
 
-            $time_text = trim(wp_strip_all_tags($time_match[1]));
+            $time_text = trim(wp_strip_all_tags(html_entity_decode($time_match[1], ENT_QUOTES | ENT_HTML5)));
             if (empty($time_text)) {
                 continue;
             }
 
-            $map[$this->normalizeUrlKey($url)] = $time_text;
+            $map[$this->normalizeTitleKey($title)] = $time_text;
         }
 
         return $map;
     }
 
-    private function mapPrekindleEvent(array $raw_event, array $times_by_event_url, array $config): array {
+
+    private function mapPrekindleEvent(array $raw_event, array $times_by_event_title, array $config): array {
         $event_url = $this->sanitizeUrl((string)($raw_event['url'] ?? ''));
 
         $start_date = $this->sanitizeText((string)($raw_event['startDate'] ?? ''));
@@ -223,10 +227,13 @@ class Prekindle extends EventImportHandler {
 
         $start_time = '';
         $time_text = '';
-        if (!empty($event_url)) {
-            $time_text = $times_by_event_url[$this->normalizeUrlKey($event_url)] ?? '';
+
+        $title_key = $this->normalizeTitleKey((string)($raw_event['name'] ?? ''));
+        if (!empty($title_key)) {
+            $time_text = $times_by_event_title[$title_key] ?? '';
             $start_time = $this->parseStartTime($time_text);
         }
+
 
         $location = $raw_event['location'] ?? [];
         $address = is_array($location) ? ($location['address'] ?? []) : [];
@@ -325,12 +332,6 @@ class Prekindle extends EventImportHandler {
         return '';
     }
 
-    private function normalizeUrlKey(string $url): string {
-        $url = trim($url);
-        $url = preg_replace('#^http://#i', 'https://', $url);
-        return rtrim(strtolower($url), '/');
-    }
-
     private function storeImageInEngine(?string $job_id, string $image_url): void {
         if (empty($job_id) || empty($image_url)) {
             return;
@@ -344,5 +345,13 @@ class Prekindle extends EventImportHandler {
         datamachine_merge_engine_data($job_id, [
             'image_url' => $image_url,
         ]);
+    }
+
+    private function normalizeTitleKey(string $title): string {
+        $title = trim($title);
+        $title = strtolower($title);
+        // Remove extra whitespace
+        $title = preg_replace('/\s+/', ' ', $title);
+        return $title;
     }
 }
