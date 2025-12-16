@@ -52,18 +52,18 @@ class DoStuffMediaApi extends EventImportHandler {
 
         if (empty($feed_url)) {
             $this->log('error', 'DoStuff Media API feed URL not configured');
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         if (!filter_var($feed_url, FILTER_VALIDATE_URL)) {
             $this->log('error', 'Invalid DoStuff Media API feed URL format', ['url' => $feed_url]);
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         $raw_events = $this->fetch_events($feed_url);
         if (empty($raw_events)) {
             $this->log('info', 'No events found from DoStuff Media API');
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         $this->log('info', 'Processing DoStuff Media events', [
@@ -141,11 +141,11 @@ class DoStuffMediaApi extends EventImportHandler {
                 'event_import'
             );
 
-            return $this->successResponse([$dataPacket]);
+            return [$dataPacket];
         }
 
         $this->log('info', 'No eligible DoStuff Media events found');
-        return $this->emptyResponse() ?? [];
+        return [];
     }
 
     /**

@@ -5,6 +5,13 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.20] - 2025-12-16
+
+### Changed
+- **Import Handler Response Standardization**: Refactored all 12 import handlers to return DataPacket arrays directly instead of using wrapper methods (`emptyResponse()`/`successResponse()`)
+- **EventImportStep Compatibility**: Updated to handle both legacy `processed_items` format and new direct DataPacket array format from FetchHandlers
+- **Version Synchronization**: Updated composer.json version to match current release
+
 ## [0.5.19] - 2025-12-15
 
 ### Changed

@@ -77,7 +77,7 @@ class UniversalWebScraper extends EventImportHandler {
             $this->log('error', 'Universal Web Scraper: No URL configured', [
                 'config' => $config
             ]);
-            return $this->emptyResponse() ?? [];
+            return [];
         }
         
         $this->log('info', 'Universal Web Scraper: Starting event extraction', [
@@ -104,7 +104,7 @@ class UniversalWebScraper extends EventImportHandler {
             $html_content = $this->fetch_html($current_url);
             if (empty($html_content)) {
                 if ($current_page === 1) {
-                    return $this->emptyResponse() ?? [];
+                    return [];
                 }
                 break;
             }
@@ -156,7 +156,7 @@ class UniversalWebScraper extends EventImportHandler {
                         'event_import'
                     );
 
-                    return $this->successResponse([$dataPacket]);
+                    return [$dataPacket];
                 }
             }
 
@@ -195,7 +195,7 @@ class UniversalWebScraper extends EventImportHandler {
             'pipeline_id' => $pipeline_id
         ]);
 
-        return $this->emptyResponse() ?? [];
+        return [];
     }
     
     /**

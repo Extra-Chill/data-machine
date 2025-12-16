@@ -62,20 +62,20 @@ class Ticketmaster extends EventImportHandler {
         $auth = $this->getAuthProvider('ticketmaster');
         if (!$auth) {
             $this->log('error', 'Ticketmaster authentication provider not found');
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         $api_config = $auth->get_account();
         if (empty($api_config['api_key'])) {
             $this->log('error', 'API key not configured');
-            return $this->emptyResponse() ?? [];
+            return [];
         }
         
         try {
             $search_params = $this->build_search_params($config, $api_config['api_key']);
         } catch (\Exception $e) {
             $this->log('error', $e->getMessage());
-            return $this->emptyResponse() ?? [];
+            return [];
         }
         
         $current_page = 0;
@@ -157,7 +157,7 @@ class Ticketmaster extends EventImportHandler {
                     'event_import'
                 );
                 
-                return $this->successResponse([$dataPacket]);
+                return [$dataPacket];
             }
             
             $has_more_pages = $page_info['number'] < ($page_info['totalPages'] - 1)
@@ -177,7 +177,7 @@ class Ticketmaster extends EventImportHandler {
         $this->log('info', 'No eligible events found', [
             'pages_searched' => $current_page
         ]);
-        return $this->emptyResponse() ?? [];
+        return [];
     }
     
     /**

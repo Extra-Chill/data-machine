@@ -54,12 +54,12 @@ class EventFlyer extends EventImportHandler {
 
         if (!$image_file) {
             $this->log('info', 'No unprocessed flyer images available');
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         if (!file_exists($image_file['persistent_path'])) {
             $this->log('error', 'Flyer image file not found', ['path' => $image_file['persistent_path']]);
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         $this->log('info', 'Processing flyer image', [
@@ -117,7 +117,7 @@ class EventFlyer extends EventImportHandler {
             'event_import'
         );
 
-        return $this->successResponse([$dataPacket]);
+        return [$dataPacket];
     }
 
     private function getNextUnprocessedImage(int $pipeline_id, int $flow_id, ?string $flow_step_id, ?string $job_id): ?array {

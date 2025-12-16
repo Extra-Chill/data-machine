@@ -71,20 +71,20 @@ class DiceFm extends EventImportHandler {
         $auth = $this->getAuthProvider('dice_fm');
         if (!$auth) {
             $this->log('error', 'Dice.fm authentication provider not found');
-            return $this->emptyResponse();
+            return [];
         }
 
         $api_config = $auth->get_account();
         if (empty($api_config['api_key'])) {
             $this->log('error', 'Dice.fm API key not configured');
-            return $this->emptyResponse();
+            return [];
         }
         
         // Get required city parameter
         $city = isset($config['city']) ? trim($config['city']) : '';
         if (empty($city)) {
             $this->log('error', 'No city specified for Dice.fm search', $config);
-            return $this->emptyResponse();
+            return [];
         }
         
         // Build configuration
@@ -94,7 +94,7 @@ class DiceFm extends EventImportHandler {
         $raw_events = $this->fetch_dice_fm_events($api_config['api_key'], $city, $partner_id);
         if (empty($raw_events)) {
             $this->log('info', 'No events found from Dice.fm API');
-            return $this->emptyResponse();
+            return [];
         }
         
         // Process events one at a time (Data Machine single-item model)
@@ -193,7 +193,7 @@ class DiceFm extends EventImportHandler {
                 'event_import'
             );
             
-            return $this->successResponse([$dataPacket]);
+            return [$dataPacket];
         }
         
         // No eligible events found
@@ -202,7 +202,7 @@ class DiceFm extends EventImportHandler {
             'pipeline_id' => $pipeline_id
         ]);
         
-        return $this->emptyResponse();
+        return [];
     }
     
     /**

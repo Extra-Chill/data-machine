@@ -65,20 +65,20 @@ class GoogleCalendar extends EventImportHandler {
 
         if (empty($calendar_url)) {
             $this->log('error', 'Google Calendar URL or ID not configured', ['calendar_id' => $calendar_id]);
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         // Validate URL format
         if (!filter_var($calendar_url, FILTER_VALIDATE_URL)) {
             $this->log('error', 'Invalid Google Calendar URL format', ['url' => $calendar_url, 'calendar_id' => $calendar_id]);
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         // Fetch and parse .ics feed
         $events = $this->fetch_calendar_events($calendar_url, $config);
         if (empty($events)) {
             $this->log('info', 'No events found in Google Calendar feed');
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         // Process single event (Data Machine single-item model)
@@ -143,11 +143,11 @@ class GoogleCalendar extends EventImportHandler {
                 'event_import'
             );
 
-            return $this->successResponse([$dataPacket]);
+            return [$dataPacket];
         }
 
         // No eligible events found
-        return $this->emptyResponse() ?? [];
+        return [];
     }
 
     /**

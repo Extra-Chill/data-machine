@@ -55,18 +55,18 @@ class Eventbrite extends EventImportHandler {
         $organizer_url = trim($config['organizer_url'] ?? '');
         if (empty($organizer_url)) {
             $this->log('error', 'No organizer URL configured');
-            return $this->emptyResponse();
+            return [];
         }
         
         if (!filter_var($organizer_url, FILTER_VALIDATE_URL)) {
             $this->log('error', 'Invalid organizer URL', ['url' => $organizer_url]);
-            return $this->emptyResponse();
+            return [];
         }
         
         $raw_events = $this->fetch_events_from_page($organizer_url);
         if (empty($raw_events)) {
             $this->log('info', 'No events found on Eventbrite organizer page');
-            return $this->emptyResponse();
+            return [];
         }
         
         $this->log('info', 'Processing events for eligible item', [
@@ -137,11 +137,11 @@ class Eventbrite extends EventImportHandler {
                 'event_import'
             );
             
-            return $this->successResponse([$dataPacket]);
+            return [$dataPacket];
         }
         
         $this->log('info', 'No eligible events found');
-        return $this->emptyResponse();
+        return [];
     }
     
     /**

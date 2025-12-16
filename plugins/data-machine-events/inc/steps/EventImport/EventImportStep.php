@@ -75,16 +75,25 @@ class EventImportStep extends Step {
             
             $result = $handler->get_fetch_data($pipeline_id, $handler_config, (string)$this->job_id);
             
+            // Handle both processed_items format and direct DataPacket arrays
             if (isset($result['processed_items']) && is_array($result['processed_items'])) {
-                // Process items (DataPacket objects only)
+                // Process items from processed_items format
                 foreach ($result['processed_items'] as $item) {
                     if ($item instanceof \DataMachine\Core\DataPacket) {
                         $this->dataPackets = $item->addTo($this->dataPackets);
                     }
                 }
                 return $this->dataPackets;
+            } elseif (is_array($result)) {
+                // Process direct DataPacket arrays (new standardized format)
+                foreach ($result as $item) {
+                    if ($item instanceof \DataMachine\Core\DataPacket) {
+                        $this->dataPackets = $item->addTo($this->dataPackets);
+                    }
+                }
+                return $this->dataPackets;
             }
-            
+
             return $this->dataPackets;
         }
         

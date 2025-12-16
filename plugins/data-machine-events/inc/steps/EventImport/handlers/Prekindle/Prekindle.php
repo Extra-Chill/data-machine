@@ -50,7 +50,7 @@ class Prekindle extends EventImportHandler {
         $org_id = trim($config['org_id'] ?? '');
         if (empty($org_id)) {
             $this->log('error', 'Prekindle handler requires org_id configuration');
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         $widget_url = 'https://www.prekindle.com/organizer-grid-widget-main/id/' . urlencode($org_id) . '/?fp=false&thumbs=false&style=null';
@@ -64,23 +64,23 @@ class Prekindle extends EventImportHandler {
 
         if (!$result['success']) {
             $this->log('error', 'Prekindle request failed: ' . ($result['error'] ?? 'Unknown error'));
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         if (($result['status_code'] ?? 0) !== 200) {
             $this->log('error', 'Prekindle returned non-200 status', ['status' => $result['status_code'] ?? null]);
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         $html = $result['data'] ?? '';
         if (empty($html)) {
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         $events = $this->extractJsonLdEvents($html);
         if (empty($events)) {
             $this->log('info', 'No events found in Prekindle JSON-LD');
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         $times_by_event_title = $this->extractEventTimesByTitle($html);
@@ -149,11 +149,11 @@ class Prekindle extends EventImportHandler {
                 'event_import'
             );
 
-            return $this->successResponse([$dataPacket]);
+            return [$dataPacket];
         }
 
         $this->log('info', 'No eligible Prekindle events found');
-        return $this->emptyResponse() ?? [];
+        return [];
     }
 
     private function extractJsonLdEvents(string $html): array {

@@ -52,13 +52,13 @@ class SpotHopper extends EventImportHandler {
         $spot_id = $config['spot_id'] ?? '';
         if (empty($spot_id)) {
             $this->log('error', 'SpotHopper handler requires spot_id configuration');
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         $api_response = $this->fetch_events($spot_id);
         if (empty($api_response)) {
             $this->log('info', 'No events returned from SpotHopper API');
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         $raw_events = $api_response['events'] ?? [];
@@ -66,7 +66,7 @@ class SpotHopper extends EventImportHandler {
 
         if (empty($raw_events)) {
             $this->log('info', 'No events found in SpotHopper response');
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         $this->log('info', 'Processing SpotHopper events', [
@@ -154,11 +154,11 @@ class SpotHopper extends EventImportHandler {
                 'event_import'
             );
 
-            return $this->successResponse([$dataPacket]);
+            return [$dataPacket];
         }
 
         $this->log('info', 'No eligible SpotHopper events found');
-        return $this->emptyResponse() ?? [];
+        return [];
     }
 
     private function fetch_events(string $spot_id): array {

@@ -46,13 +46,13 @@ class BandzoogleCalendar extends EventImportHandler {
         $calendar_url = trim($config['calendar_url'] ?? '');
         if (empty($calendar_url)) {
             $this->log('error', 'BandzoogleCalendar handler requires calendar_url configuration');
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         $current_url = $this->sanitizeUrl($calendar_url);
         if (empty($current_url)) {
             $this->log('error', 'Invalid calendar_url for BandzoogleCalendar handler');
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         $visited = [];
@@ -68,7 +68,7 @@ class BandzoogleCalendar extends EventImportHandler {
             $calendar_html = $this->fetchHtml($current_url);
             if (empty($calendar_html)) {
                 if ($page === 1) {
-                    return $this->emptyResponse() ?? [];
+                    return [];
                 }
                 break;
             }
@@ -148,7 +148,7 @@ class BandzoogleCalendar extends EventImportHandler {
                     'event_import'
                 );
 
-                return $this->successResponse([$dataPacket]);
+                return [$dataPacket];
             }
 
             $next_url = $this->findNextMonthUrl($calendar_html, $current_url);
@@ -160,7 +160,7 @@ class BandzoogleCalendar extends EventImportHandler {
             $page++;
         }
 
-        return $this->emptyResponse() ?? [];
+        return [];
     }
 
     private function fetchHtml(string $url): string {

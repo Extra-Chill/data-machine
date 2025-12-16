@@ -53,18 +53,18 @@ class IcsCalendar extends EventImportHandler {
 
         if (empty($feed_url)) {
             $this->log('error', 'ICS feed URL not configured');
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         if (!filter_var($feed_url, FILTER_VALIDATE_URL)) {
             $this->log('error', 'Invalid ICS feed URL format', ['url' => $feed_url]);
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         $events = $this->fetch_calendar_events($feed_url, $config);
         if (empty($events)) {
             $this->log('info', 'No events found in ICS feed');
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         $this->log('info', 'Processing ICS calendar events', [
@@ -137,11 +137,11 @@ class IcsCalendar extends EventImportHandler {
                 'event_import'
             );
 
-            return $this->successResponse([$dataPacket]);
+            return [$dataPacket];
         }
 
         $this->log('info', 'No eligible ICS calendar events found');
-        return $this->emptyResponse() ?? [];
+        return [];
     }
 
     /**

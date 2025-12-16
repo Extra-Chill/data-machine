@@ -50,18 +50,18 @@ class WordPressEventsAPI extends EventImportHandler {
         $endpoint_url = trim($config['endpoint_url'] ?? '');
         if (empty($endpoint_url)) {
             $this->log('error', 'WordPress Events API handler requires endpoint_url configuration');
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         if (!filter_var($endpoint_url, FILTER_VALIDATE_URL)) {
             $this->log('error', 'Invalid endpoint URL format', ['endpoint_url' => $endpoint_url]);
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         $api_response = $this->fetch_events($endpoint_url, $config);
         if (empty($api_response)) {
             $this->log('info', 'No response from WordPress Events API');
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         $api_format = $this->detect_api_format($api_response);
@@ -69,7 +69,7 @@ class WordPressEventsAPI extends EventImportHandler {
         $raw_events = $this->extract_events_from_response($api_response, $api_format);
         if (empty($raw_events)) {
             $this->log('info', 'No events found in WordPress Events API response');
-            return $this->emptyResponse() ?? [];
+            return [];
         }
 
         $this->log('info', 'Processing WordPress Events API events', [
@@ -158,11 +158,11 @@ class WordPressEventsAPI extends EventImportHandler {
                 'event_import'
             );
 
-            return $this->successResponse([$dataPacket]);
+            return [$dataPacket];
         }
 
         $this->log('info', 'No eligible WordPress Events API events found');
-        return $this->emptyResponse() ?? [];
+        return [];
     }
 
     private function fetch_events(string $endpoint_url, array $config): array {
