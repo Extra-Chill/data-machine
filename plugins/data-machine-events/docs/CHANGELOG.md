@@ -18,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Web Scraper Processing**: Enhanced to process multiple sections per page with keyword-based filtering
 - **Meta Storage**: Improved time format handling with automatic HH:MM:SS conversion
 
+## [0.6.3] - 2025-12-17
+
+### Added
+- **SingleRecurring Event Handler**: New handler for creating weekly recurring events like open mics, trivia nights, and regular gatherings
+  - Configurable day of week, start/end times, and expiration dates
+  - Full venue metadata support with address, city, state, zip, country fields
+  - Single-item processing with EventIdentifierGenerator for deduplication
+  - Keyword filtering (include/exclude) for selective event imports
+  - Automatic next-occurrence calculation based on configured day of week
+  - Uses existing venue taxonomy and metadata extraction patterns
+
 ## [0.6.2] - 2025-12-17
 
 ### Changed
