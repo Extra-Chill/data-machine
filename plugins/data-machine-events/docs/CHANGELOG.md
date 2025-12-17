@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Web Scraper Processing**: Enhanced to process multiple sections per page with keyword-based filtering
 - **Meta Storage**: Improved time format handling with automatic HH:MM:SS conversion
 
+## [0.6.2] - 2025-12-17
+
+### Changed
+- **Carousel Single Card Mode**: Enhanced carousel indicators to activate viewport dots only when displaying single cards on narrow screens, improving mobile responsiveness
+- **Carousel Code Optimization**: Removed duplicate firstEventWidth calculation in chevron navigation logic
+
 ## [0.6.0] - 2025-12-16
 
 ### Added

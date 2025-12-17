@@ -130,7 +130,10 @@ export function initCarousel(calendar) {
             }
             indicators.innerHTML = '';
 
-            const useViewport = eventCount > MAX_VISIBLE_DOTS;
+            const wrapperRect = wrapper.getBoundingClientRect();
+            const firstEventWidth = events[0]?.getBoundingClientRect().width || 300;
+            const isSingleCardMode = (wrapperRect.width / firstEventWidth) < 1.5;
+            const useViewport = isSingleCardMode && eventCount > MAX_VISIBLE_DOTS;
             
             let trackParent = indicators;
             if (useViewport) {
@@ -166,7 +169,6 @@ export function initCarousel(calendar) {
             }
 
             // Chevron click/hold navigation
-            const firstEventWidth = events[0]?.getBoundingClientRect().width || 300;
             let holdInterval = null;
 
             const scrollByCard = function(direction) {
