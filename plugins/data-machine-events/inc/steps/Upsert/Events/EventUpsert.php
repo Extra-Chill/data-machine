@@ -21,6 +21,7 @@ use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\VenueParameterProvider;
 use DataMachineEvents\Core\Promoter_Taxonomy;
 use DataMachineEvents\Core\EventSchemaProvider;
+use DataMachineEvents\Utilities\EventIdentifierGenerator;
 use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
 use const DataMachineEvents\Core\EVENT_END_DATETIME_META_KEY;
 use DataMachine\Core\Steps\Update\Handlers\UpdateHandler;
@@ -137,15 +138,155 @@ class EventUpsert extends UpdateHandler {
     /**
      * Find existing event by title, venue, and start date
      *
+     * Uses fuzzy title matching when venue and date are available to catch
+     * duplicates across sources with varying title formats.
+     *
      * @param string $title Event title
      * @param string $venue Venue name
      * @param string $startDate Start date (YYYY-MM-DD)
      * @return int|null Post ID if found, null otherwise
      */
     private function findExistingEvent(string $title, string $venue, string $startDate): ?int {
-        global $wpdb;
+        // Try fuzzy matching first when we have venue and date
+        if (!empty($venue) && !empty($startDate)) {
+            $fuzzy_match = $this->findEventByVenueDateAndFuzzyTitle($title, $venue, $startDate);
+            if ($fuzzy_match) {
+                return $fuzzy_match;
+            }
+        }
 
-        // Query by exact title match
+        // Fall back to exact title matching
+        return $this->findEventByExactTitle($title, $venue, $startDate);
+    }
+
+    /**
+     * Find event by venue + date, then fuzzy title comparison
+     *
+     * Queries all events at a venue on a given date, then compares titles
+     * using core title extraction to catch variations like tour names or openers.
+     *
+     * @param string $title Event title to match
+     * @param string $venue Venue name
+     * @param string $startDate Start date (YYYY-MM-DD)
+     * @return int|null Post ID if fuzzy match found, null otherwise
+     */
+    private function findEventByVenueDateAndFuzzyTitle(string $title, string $venue, string $startDate): ?int {
+        // Find venue term
+        $venue_term = get_term_by('name', $venue, 'venue');
+        if (!$venue_term) {
+            return null;
+        }
+
+        // Query events at this venue on this date
+        $args = [
+            'post_type' => Event_Post_Type::POST_TYPE,
+            'posts_per_page' => 10,
+            'post_status' => ['publish', 'draft', 'pending'],
+            'tax_query' => [
+                [
+                    'taxonomy' => 'venue',
+                    'field' => 'term_id',
+                    'terms' => $venue_term->term_id
+                ]
+            ],
+            'meta_query' => [
+                [
+                    'key' => EVENT_DATETIME_META_KEY,
+                    'value' => $startDate,
+                    'compare' => 'LIKE'
+                ]
+            ]
+        ];
+
+        $candidates = get_posts($args);
+
+        if (empty($candidates)) {
+            return null;
+        }
+
+        // Compare titles using core extraction and time window
+        foreach ($candidates as $candidate) {
+            if (!EventIdentifierGenerator::titlesMatch($title, $candidate->post_title)) {
+                continue;
+            }
+
+            // Check time window if both events have time data
+            $existing_datetime = get_post_meta($candidate->ID, EVENT_DATETIME_META_KEY, true);
+            if (!$this->isWithinTimeWindow($startDate, $existing_datetime)) {
+                $this->log('debug', 'Event Upsert: Title matched but outside time window (possible early/late show)', [
+                    'incoming_title' => $title,
+                    'matched_title' => $candidate->post_title,
+                    'incoming_datetime' => $startDate,
+                    'existing_datetime' => $existing_datetime,
+                    'post_id' => $candidate->ID
+                ]);
+                continue;
+            }
+
+            $this->log('info', 'Event Upsert: Fuzzy matched incoming title to existing event', [
+                'incoming_title' => $title,
+                'matched_title' => $candidate->post_title,
+                'post_id' => $candidate->ID,
+                'venue' => $venue,
+                'date' => $startDate
+            ]);
+            return $candidate->ID;
+        }
+
+        return null;
+    }
+
+    /**
+     * Check if two datetimes are within a tolerance window
+     *
+     * Used to distinguish early/late shows (3+ hours apart) from the same event
+     * listed with different times across sources (typically within 1-2 hours).
+     *
+     * If either datetime lacks a time component, returns true (allows match).
+     *
+     * @param string $datetime1 First datetime (YYYY-MM-DD or YYYY-MM-DDTHH:MM)
+     * @param string $datetime2 Second datetime (YYYY-MM-DD or YYYY-MM-DDTHH:MM)
+     * @param int $windowHours Maximum hours apart to consider a match (default 2)
+     * @return bool True if within window or time data unavailable
+     */
+    private function isWithinTimeWindow(string $datetime1, string $datetime2, int $windowHours = 2): bool {
+        // If either is empty, allow match
+        if (empty($datetime1) || empty($datetime2)) {
+            return true;
+        }
+
+        // Check if both have time components (look for T or space followed by time)
+        $has_time1 = preg_match('/[T\s]\d{2}:\d{2}/', $datetime1);
+        $has_time2 = preg_match('/[T\s]\d{2}:\d{2}/', $datetime2);
+
+        // If either lacks time, allow match (can't compare)
+        if (!$has_time1 || !$has_time2) {
+            return true;
+        }
+
+        // Parse both datetimes
+        $time1 = strtotime($datetime1);
+        $time2 = strtotime($datetime2);
+
+        if ($time1 === false || $time2 === false) {
+            return true;
+        }
+
+        // Calculate absolute difference in hours
+        $diff_hours = abs($time1 - $time2) / 3600;
+
+        return $diff_hours <= $windowHours;
+    }
+
+    /**
+     * Find event by exact title match (original behavior)
+     *
+     * @param string $title Event title
+     * @param string $venue Venue name
+     * @param string $startDate Start date (YYYY-MM-DD)
+     * @return int|null Post ID if found, null otherwise
+     */
+    private function findEventByExactTitle(string $title, string $venue, string $startDate): ?int {
         $args = [
             'post_type' => Event_Post_Type::POST_TYPE,
             'title' => $title,
@@ -154,7 +295,6 @@ class EventUpsert extends UpdateHandler {
             'fields' => 'ids'
         ];
 
-        // Add date filter if provided
         if (!empty($startDate)) {
             $args['meta_query'] = [
                 [
@@ -168,7 +308,6 @@ class EventUpsert extends UpdateHandler {
         $posts = get_posts($args);
 
         if (!empty($posts)) {
-            // If we have a venue, verify it matches
             if (!empty($venue)) {
                 $post_id = $posts[0];
                 $venue_terms = wp_get_post_terms($post_id, 'venue', ['fields' => 'names']);
@@ -176,11 +315,9 @@ class EventUpsert extends UpdateHandler {
                 if (!empty($venue_terms) && in_array($venue, $venue_terms, true)) {
                     return $post_id;
                 } elseif (empty($venue_terms)) {
-                    // Post has no venue assigned, but title and date match
                     return $post_id;
                 }
             } else {
-                // No venue specified, return first match
                 return $posts[0];
             }
         }

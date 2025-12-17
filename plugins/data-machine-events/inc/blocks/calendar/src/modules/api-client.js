@@ -2,10 +2,15 @@
  * REST API communication and calendar DOM updates.
  */
 
-export async function fetchCalendarEvents(calendar, params) {
+export async function fetchCalendarEvents(calendar, params, archiveContext = {}) {
     const content = calendar.querySelector('.datamachine-events-content');
     
     content.classList.add('loading');
+
+    if (archiveContext.taxonomy && archiveContext.term_id) {
+        params.set('archive_taxonomy', archiveContext.taxonomy);
+        params.set('archive_term_id', archiveContext.term_id);
+    }
 
     try {
         const apiUrl = `/wp-json/datamachine/v1/events/calendar?${params.toString()}`;

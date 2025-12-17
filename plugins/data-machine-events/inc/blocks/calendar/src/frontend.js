@@ -98,7 +98,10 @@ async function refreshCalendar(calendar, params) {
     destroyDatePicker(calendar);
     destroyFilterModal(calendar);
 
-    await fetchCalendarEvents(calendar, params);
+    const filterState = getFilterState(calendar);
+    const archiveContext = filterState.getArchiveContext();
+
+    await fetchCalendarEvents(calendar, params, archiveContext);
 
     calendar.dataset.dmInitialized = 'false';
     initCalendarInstance(calendar);

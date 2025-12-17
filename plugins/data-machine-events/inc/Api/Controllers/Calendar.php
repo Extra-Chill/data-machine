@@ -31,18 +31,18 @@ class Calendar {
 		$user_date_end = $request->get_param('date_end');
 		$tax_filters = $request->get_param('tax_filter');
 
+		$archive_taxonomy = sanitize_key( $request->get_param( 'archive_taxonomy' ) ?? '' );
+		$archive_term_id  = absint( $request->get_param( 'archive_term_id' ) ?? 0 );
+
 		$tax_query_override = null;
-		if (is_tax()) {
-			$term = get_queried_object();
-			if ($term && isset($term->taxonomy) && isset($term->term_id)) {
-				$tax_query_override = [
-					[
-						'taxonomy' => $term->taxonomy,
-						'field' => 'term_id',
-						'terms' => $term->term_id,
-					],
-				];
-			}
+		if ( $archive_taxonomy && $archive_term_id ) {
+			$tax_query_override = [
+				[
+					'taxonomy' => $archive_taxonomy,
+					'field'    => 'term_id',
+					'terms'    => $archive_term_id,
+				],
+			];
 		}
 
 		$base_params = [
@@ -52,6 +52,9 @@ class Calendar {
 			'date_end' => $user_date_end ?? '',
 			'tax_filters' => is_array($tax_filters) ? $tax_filters : [],
 			'tax_query_override' => $tax_query_override,
+			'archive_taxonomy' => $archive_taxonomy,
+			'archive_term_id' => $archive_term_id,
+			'source' => 'rest',
 		];
 
 		$unique_dates = Calendar_Query::get_unique_event_dates($base_params);

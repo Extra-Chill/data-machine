@@ -67,6 +67,14 @@ function register_routes() {
 					return $sanitized;
 				},
 			),
+				'archive_taxonomy' => array(
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_key',
+				),
+				'archive_term_id' => array(
+					'type'              => 'integer',
+					'sanitize_callback' => 'absint',
+				),
 				'paged' => array(
 					'type'              => 'integer',
 					'default'           => 1,

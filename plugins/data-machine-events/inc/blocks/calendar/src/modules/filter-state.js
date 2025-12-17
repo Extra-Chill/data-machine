@@ -29,6 +29,14 @@ class FilterStateManager {
     }
 
     /**
+     * Get archive context for API calls
+     * @returns {Object} { taxonomy, term_id, term_name }
+     */
+    getArchiveContext() {
+        return this.archiveContext;
+    }
+
+    /**
      * Parse taxonomy filters from URL
      * @returns {Object} { taxonomy_slug: [term_id, ...], ... }
      */

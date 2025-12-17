@@ -13,6 +13,8 @@ namespace DataMachineEvents\Blocks\Calendar;
 use WP_Query;
 use DateTime;
 use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\Venue_Taxonomy;
+use DataMachineEvents\Core\Promoter_Taxonomy;
 use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
 use const DataMachineEvents\Core\EVENT_END_DATETIME_META_KEY;
 
@@ -38,9 +40,39 @@ class Calendar_Query {
             'date_end' => '',
             'tax_filters' => [],
             'tax_query_override' => null,
+            'archive_taxonomy' => '',
+            'archive_term_id' => 0,
+            'source' => 'unknown',
         ];
 
         $params = wp_parse_args($params, $defaults);
+
+        /**
+         * Filter the base query constraint for calendar events.
+         *
+         * Allows plugins to modify or replace the archive-based constraint
+         * before user filters are applied. This filter runs on both initial
+         * page load and REST API requests.
+         *
+         * @param array|null $tax_query_override The base tax_query constraint (null if none).
+         * @param array      $context {
+         *     Context information about the request.
+         *
+         *     @type string $archive_taxonomy Taxonomy slug from archive page (empty if not archive).
+         *     @type int    $archive_term_id  Term ID from archive page (0 if not archive).
+         *     @type string $source           'render' for initial load, 'rest' for API requests.
+         * }
+         * @return array|null Modified tax_query constraint or null to remove constraint.
+         */
+        $params['tax_query_override'] = apply_filters(
+            'datamachine_events_calendar_base_query',
+            $params['tax_query_override'],
+            [
+                'archive_taxonomy' => $params['archive_taxonomy'],
+                'archive_term_id'  => $params['archive_term_id'],
+                'source'           => $params['source'],
+            ]
+        );
 
         $query_args = [
             'post_type' => Event_Post_Type::POST_TYPE,
@@ -164,34 +196,116 @@ class Calendar_Query {
     }
 
     /**
-     * Parse event data from post content block attributes
+     * Parse event data from post, hydrating from authoritative sources.
+     *
+     * Combines block attributes with post meta (datetime) and taxonomy terms
+     * (venue, promoter) to return complete, authoritative event data.
      *
      * @param \WP_Post $post Post object
      * @return array|null Event data array or null if not found
      */
     public static function parse_event_data(\WP_Post $post): ?array {
         $blocks = parse_blocks($post->post_content);
-        $event_data = null;
+        $event_data = [];
 
         foreach ($blocks as $block) {
             if ('datamachine-events/event-details' === $block['blockName']) {
-                $event_data = $block['attrs'];
+                $event_data = $block['attrs'] ?? [];
                 break;
             }
         }
 
-        if (empty($event_data) || empty($event_data['startDate'])) {
-            $meta_datetime = get_post_meta($post->ID, EVENT_DATETIME_META_KEY, true);
-            if ($meta_datetime) {
-                $event_data = is_array($event_data) ? $event_data : [];
-                $event_data['startDate'] = date('Y-m-d', strtotime($meta_datetime));
+        self::hydrate_datetime_from_meta($post->ID, $event_data);
+        self::hydrate_venue_from_taxonomy($post->ID, $event_data);
+        self::hydrate_promoter_from_taxonomy($post->ID, $event_data);
+
+        return !empty($event_data['startDate']) ? $event_data : null;
+    }
+
+    /**
+     * Hydrate datetime fields from post meta.
+     *
+     * Post meta is the source of truth for datetime. Fills in any missing
+     * startDate, startTime, endDate, or endTime from stored meta values.
+     *
+     * @param int $post_id Post ID
+     * @param array $event_data Event data array (modified by reference)
+     */
+    private static function hydrate_datetime_from_meta(int $post_id, array &$event_data): void {
+        $start_datetime = get_post_meta($post_id, EVENT_DATETIME_META_KEY, true);
+        if ($start_datetime) {
+            $date_obj = date_create($start_datetime);
+            if ($date_obj) {
+                if (empty($event_data['startDate'])) {
+                    $event_data['startDate'] = $date_obj->format('Y-m-d');
+                }
                 if (empty($event_data['startTime'])) {
-                    $event_data['startTime'] = date('H:i:s', strtotime($meta_datetime));
+                    $event_data['startTime'] = $date_obj->format('H:i:s');
                 }
             }
         }
 
-        return !empty($event_data['startDate']) ? $event_data : null;
+        $end_datetime = get_post_meta($post_id, EVENT_END_DATETIME_META_KEY, true);
+        if ($end_datetime) {
+            $date_obj = date_create($end_datetime);
+            if ($date_obj) {
+                if (empty($event_data['endDate'])) {
+                    $event_data['endDate'] = $date_obj->format('Y-m-d');
+                }
+                if (empty($event_data['endTime'])) {
+                    $event_data['endTime'] = $date_obj->format('H:i:s');
+                }
+            }
+        }
+    }
+
+    /**
+     * Hydrate venue fields from taxonomy.
+     *
+     * Venue taxonomy is the source of truth. If event has an assigned venue
+     * term, its name and formatted address override any block attribute values.
+     *
+     * @param int $post_id Post ID
+     * @param array $event_data Event data array (modified by reference)
+     */
+    private static function hydrate_venue_from_taxonomy(int $post_id, array &$event_data): void {
+        $venue_terms = get_the_terms($post_id, 'venue');
+        if (!$venue_terms || is_wp_error($venue_terms)) {
+            return;
+        }
+
+        $venue_term = $venue_terms[0];
+        $venue_data = Venue_Taxonomy::get_venue_data($venue_term->term_id);
+
+        $event_data['venue'] = $venue_data['name'];
+        $event_data['address'] = Venue_Taxonomy::get_formatted_address($venue_term->term_id);
+    }
+
+    /**
+     * Hydrate promoter/organizer fields from taxonomy.
+     *
+     * Promoter taxonomy is the source of truth. If event has an assigned
+     * promoter term, its data overrides any block attribute values.
+     *
+     * @param int $post_id Post ID
+     * @param array $event_data Event data array (modified by reference)
+     */
+    private static function hydrate_promoter_from_taxonomy(int $post_id, array &$event_data): void {
+        $promoter_terms = get_the_terms($post_id, 'promoter');
+        if (!$promoter_terms || is_wp_error($promoter_terms)) {
+            return;
+        }
+
+        $promoter_term = $promoter_terms[0];
+        $promoter_data = Promoter_Taxonomy::get_promoter_data($promoter_term->term_id);
+
+        $event_data['organizer'] = $promoter_data['name'];
+        if (!empty($promoter_data['url'])) {
+            $event_data['organizerUrl'] = $promoter_data['url'];
+        }
+        if (!empty($promoter_data['type'])) {
+            $event_data['organizerType'] = $promoter_data['type'];
+        }
     }
 
     /**

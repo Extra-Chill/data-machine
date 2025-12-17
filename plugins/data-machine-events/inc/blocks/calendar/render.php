@@ -89,6 +89,9 @@ $base_params = [
     'date_end' => $user_date_end,
     'tax_filters' => $tax_filters,
     'tax_query_override' => $tax_query_override,
+    'archive_taxonomy' => $archive_context['taxonomy'],
+    'archive_term_id' => $archive_context['term_id'],
+    'source' => 'render',
 ];
 
 $unique_dates = Calendar_Query::get_unique_event_dates($base_params);

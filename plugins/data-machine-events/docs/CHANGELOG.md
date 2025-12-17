@@ -5,6 +5,19 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2025-12-16
+
+### Added
+- **Archive Context Support**: Calendar block automatically filters to current taxonomy term when viewing venue or promoter archive pages
+- **Fuzzy Title Matching**: EventIdentifierGenerator now supports fuzzy title comparison for improved duplicate detection across import sources with varying title formats
+- **Enhanced Event Finding**: EventUpsert uses fuzzy title matching when venue and date context are available for better cross-source duplicate detection
+
+### Changed
+- **Calendar REST API**: Added `archive_taxonomy` and `archive_term_id` parameters for archive page context
+- **Calendar Query Builder**: Enhanced with archive context support and additional taxonomy imports
+- **Frontend JavaScript**: Integrated archive context in filter state management system
+- **API Client**: Updated to accept and forward archive context to REST endpoints
+
 ## [0.5.20] - 2025-12-16
 
 ### Changed
