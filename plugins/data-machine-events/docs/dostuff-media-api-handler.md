@@ -12,7 +12,7 @@ Discovered automatically by `EventImportStep` via `HandlerRegistrationTrait`.
 ## Configuration
 
 - `feed_url` (required): Public JSON feed URL (e.g., `http://events.waterloorecords.com/events.json`).
-- `include_keywords` / `exclude_keywords`: Comma-separated filters applied before normalization.
+- `search` / `exclude_keywords`: Comma-separated filters applied before normalization.
 - `date_range` (optional): Limits how far ahead the handler looks for events.
 - No authentication is required since DoStuff publishes public feeds.
 

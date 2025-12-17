@@ -82,7 +82,7 @@ $config = [
 $config = [
     'url' => 'https://festival-site.com/schedule',
     'venue_override' => 'Festival Grounds',
-    'include_keywords' => 'concert,music',
+    'search' => 'concert,music',
     'exclude_keywords' => 'cancelled,sold-out'
 ];
 ```

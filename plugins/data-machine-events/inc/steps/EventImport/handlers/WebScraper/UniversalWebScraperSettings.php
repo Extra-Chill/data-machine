@@ -35,6 +35,20 @@ class UniversalWebScraperSettings {
                 'placeholder' => 'https://venue.com/events',
                 'required' => true,
             ],
+            'search' => [
+                'type' => 'text',
+                'label' => __('Include Keywords', 'datamachine-events'),
+                'description' => __('Only import events containing any of these keywords (comma-separated). Leave empty to import all.', 'datamachine-events'),
+                'placeholder' => __('concert, live music, band', 'datamachine-events'),
+                'required' => false,
+            ],
+            'exclude_keywords' => [
+                'type' => 'text',
+                'label' => __('Exclude Keywords', 'datamachine-events'),
+                'description' => __('Skip events containing any of these keywords (comma-separated).', 'datamachine-events'),
+                'placeholder' => __('trivia, karaoke, brunch, bingo', 'datamachine-events'),
+                'required' => false,
+            ],
         ];
 
         $venue_fields = self::get_venue_fields();
@@ -51,6 +65,8 @@ class UniversalWebScraperSettings {
     public static function sanitize(array $raw_settings): array {
         $handler_settings = [
             'source_url' => esc_url_raw($raw_settings['source_url'] ?? ''),
+            'search' => sanitize_text_field($raw_settings['search'] ?? ''),
+            'exclude_keywords' => sanitize_text_field($raw_settings['exclude_keywords'] ?? ''),
         ];
 
         $venue_settings = self::sanitize_venue_fields($raw_settings);
@@ -78,6 +94,8 @@ class UniversalWebScraperSettings {
     public static function get_defaults(): array {
         $handler_defaults = [
             'source_url' => '',
+            'search' => '',
+            'exclude_keywords' => '',
         ];
 
         $venue_defaults = self::get_venue_field_defaults();

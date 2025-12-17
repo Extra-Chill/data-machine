@@ -109,55 +109,79 @@ class UniversalWebScraper extends EventImportHandler {
                 break;
             }
             
-            // Find first potential event section on this page
-            $event_section = $this->extract_event_sections($html_content, $current_url, $flow_step_id);
-            
-            if (!empty($event_section)) {
-                // Found an unprocessed event section - process it
+            $skipped_identifiers = [];
+
+            while (true) {
+                $event_section = $this->extract_event_sections($html_content, $current_url, (string) $flow_step_id, $skipped_identifiers);
+
+                if (empty($event_section)) {
+                    break;
+                }
+
                 $this->log('info', 'Universal Web Scraper: Processing event section', [
                     'section_identifier' => $event_section['identifier'],
                     'page' => $current_page,
                     'pipeline_id' => $pipeline_id
                 ]);
 
-                // Process HTML section to prepare raw data for AI step
                 $raw_html_data = $this->extract_raw_html_section($event_section['html'], $current_url, $config);
 
-                if ($raw_html_data) {
-                    // Mark as processed and return immediately (single event processing)
-                    $this->markItemProcessed($event_section['identifier'], $flow_step_id, $job_id);
-
-                    $this->log('info', 'Universal Web Scraper: Found eligible HTML section', [
-                        'source_url' => $current_url,
-                        'section_identifier' => $event_section['identifier'],
-                        'page' => $current_page,
-                        'pipeline_id' => $pipeline_id
-                    ]);
-
-                    // Create DataPacket
-                    $dataPacket = new DataPacket(
-                        [
-                            'title' => 'Raw HTML Event Section',
-                            'body' => wp_json_encode([
-                                'raw_html' => $raw_html_data,
-                                'source_url' => $current_url,
-                                'import_source' => 'universal_web_scraper',
-                                'section_identifier' => $event_section['identifier']
-                            ], JSON_PRETTY_PRINT)
-                        ],
-                        [
-                            'source_type' => 'universal_web_scraper',
-                            'pipeline_id' => $pipeline_id,
-                            'flow_id' => $flow_id,
-                            'original_title' => 'HTML Section from ' . parse_url($current_url, PHP_URL_HOST),
-                            'event_identifier' => $event_section['identifier'],
-                            'import_timestamp' => time()
-                        ],
-                        'event_import'
-                    );
-
-                    return [$dataPacket];
+                if (!$raw_html_data) {
+                    $skipped_identifiers[$event_section['identifier']] = true;
+                    continue;
                 }
+
+                $search_text = html_entity_decode(wp_strip_all_tags($raw_html_data));
+
+                if (!$this->applyKeywordSearch($search_text, $config['search'] ?? '')) {
+                    $this->log('debug', 'Universal Web Scraper: Skipping event section (include keywords)', [
+                        'section_identifier' => $event_section['identifier'],
+                        'source_url' => $current_url,
+                    ]);
+                    $skipped_identifiers[$event_section['identifier']] = true;
+                    continue;
+                }
+
+                if ($this->applyExcludeKeywords($search_text, $config['exclude_keywords'] ?? '')) {
+                    $this->log('debug', 'Universal Web Scraper: Skipping event section (exclude keywords)', [
+                        'section_identifier' => $event_section['identifier'],
+                        'source_url' => $current_url,
+                    ]);
+                    $skipped_identifiers[$event_section['identifier']] = true;
+                    continue;
+                }
+
+                $this->markItemProcessed($event_section['identifier'], $flow_step_id, $job_id);
+
+                $this->log('info', 'Universal Web Scraper: Found eligible HTML section', [
+                    'source_url' => $current_url,
+                    'section_identifier' => $event_section['identifier'],
+                    'page' => $current_page,
+                    'pipeline_id' => $pipeline_id
+                ]);
+
+                $dataPacket = new DataPacket(
+                    [
+                        'title' => 'Raw HTML Event Section',
+                        'body' => wp_json_encode([
+                            'raw_html' => $raw_html_data,
+                            'source_url' => $current_url,
+                            'import_source' => 'universal_web_scraper',
+                            'section_identifier' => $event_section['identifier']
+                        ], JSON_PRETTY_PRINT)
+                    ],
+                    [
+                        'source_type' => 'universal_web_scraper',
+                        'pipeline_id' => $pipeline_id,
+                        'flow_id' => $flow_id,
+                        'original_title' => 'HTML Section from ' . parse_url($current_url, PHP_URL_HOST),
+                        'event_identifier' => $event_section['identifier'],
+                        'import_timestamp' => time()
+                    ],
+                    'event_import'
+                );
+
+                return [$dataPacket];
             }
 
             // No eligible events on this page - look for next page
@@ -251,9 +275,9 @@ class UniversalWebScraper extends EventImportHandler {
      * @param string $flow_step_id Flow step ID for processed item tracking
      * @return array|null Single event section or null if none found
      */
-    private function extract_event_sections(string $html_content, string $url, string $flow_step_id): ?array {
+    private function extract_event_sections(string $html_content, string $url, string $flow_step_id, array $skipped_identifiers = []): ?array {
         $finder = new EventSectionFinder(
-            fn (string $identifier, string $step_id): bool => $this->isItemProcessed($identifier, $step_id),
+            fn (string $identifier, string $step_id): bool => isset($skipped_identifiers[$identifier]) || $this->isItemProcessed($identifier, $step_id),
             fn (string $html): string => $this->clean_html_for_ai($html),
             fn (string $ymd): bool => $this->isPastEvent($ymd)
         );

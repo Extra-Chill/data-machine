@@ -225,8 +225,8 @@ class Calendar_Query {
     /**
      * Hydrate datetime fields from post meta.
      *
-     * Post meta is the source of truth for datetime. Fills in any missing
-     * startDate, startTime, endDate, or endTime from stored meta values.
+     * Post meta is the source of truth for datetime.
+     * When meta values exist, they override any block attribute values.
      *
      * @param int $post_id Post ID
      * @param array $event_data Event data array (modified by reference)
@@ -236,12 +236,8 @@ class Calendar_Query {
         if ($start_datetime) {
             $date_obj = date_create($start_datetime);
             if ($date_obj) {
-                if (empty($event_data['startDate'])) {
-                    $event_data['startDate'] = $date_obj->format('Y-m-d');
-                }
-                if (empty($event_data['startTime'])) {
-                    $event_data['startTime'] = $date_obj->format('H:i:s');
-                }
+                $event_data['startDate'] = $date_obj->format('Y-m-d');
+                $event_data['startTime'] = $date_obj->format('H:i:s');
             }
         }
 
@@ -249,12 +245,8 @@ class Calendar_Query {
         if ($end_datetime) {
             $date_obj = date_create($end_datetime);
             if ($date_obj) {
-                if (empty($event_data['endDate'])) {
-                    $event_data['endDate'] = $date_obj->format('Y-m-d');
-                }
-                if (empty($event_data['endTime'])) {
-                    $event_data['endTime'] = $date_obj->format('H:i:s');
-                }
+                $event_data['endDate'] = $date_obj->format('Y-m-d');
+                $event_data['endTime'] = $date_obj->format('H:i:s');
             }
         }
     }

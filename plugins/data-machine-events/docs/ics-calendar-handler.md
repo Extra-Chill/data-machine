@@ -54,7 +54,7 @@ $config = [
 ```php
 $config = [
     'ics_url' => 'https://calendar.google.com/calendar/ical/.../basic.ics',
-    'include_keywords' => 'concert,music,jazz',
+    'search' => 'concert,music,jazz',
     'exclude_keywords' => 'cancelled,postponed'
 ];
 ```

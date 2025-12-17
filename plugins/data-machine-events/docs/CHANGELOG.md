@@ -5,6 +5,19 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2025-12-16
+
+### Changed
+- **Universal Web Scraper Keyword Filtering**: Added include/exclude keyword filtering to improve event selection accuracy
+- **Datetime Meta Synchronization**: Post meta now always overrides block attributes for datetime values, ensuring data consistency
+- **Time Format Standardization**: Automatic seconds padding for time fields in meta storage
+- **Documentation Field References**: Updated handler documentation to reflect 'search' field naming
+
+### Technical Details
+- **Calendar Query Hydration**: Modified `hydrate_datetime_fields()` to prioritize meta values over block attributes
+- **Web Scraper Processing**: Enhanced to process multiple sections per page with keyword-based filtering
+- **Meta Storage**: Improved time format handling with automatic HH:MM:SS conversion
+
 ## [0.6.0] - 2025-12-16
 
 ### Added

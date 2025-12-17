@@ -6,7 +6,7 @@ The Dice FM handler (`inc/Steps/EventImport/Handlers/DiceFm/DiceFm.php`, `DiceFm
 
 - **City** (`city`): Required Dice FM market.
 - **API Key** (`api_key`): Dice FM authentication token.
-- **Include Keywords** (`include_keywords`): Comma-separated keywords to restrict imported events.
+- **Include Keywords** (`search`): Comma-separated keywords to restrict imported events.
 - **Exclude Keywords** (`exclude_keywords`): Skip events containing these terms.
 - **Date Range** (`date_range`): Controls how far ahead the handler scans.
 
