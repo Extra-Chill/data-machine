@@ -17,6 +17,11 @@
     "test:unit": "wp-scripts test-unit-js"
   },
   "devDependencies": {
-    "@wordpress/scripts": "30.19.0"
+    "@wordpress/scripts": "31.1.0"
+  },
+  "overrides": {
+    "rimraf": "^4.4.1",
+    "glob": "^9.3.5",
+    "eslint": "^9.0.0"
   }
 }

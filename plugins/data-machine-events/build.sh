@@ -34,7 +34,7 @@ build_block() {
   local block_label="$2"
 
   echo -e "${YELLOW}${block_label}${NC}"
-  (cd "${block_dir}" && npm ci --no-audit --no-fund && npm run build)
+  (cd "${block_dir}" && npm ci --silent --no-audit --no-fund && npm run build)
 }
 
 # Clean and create dist directory

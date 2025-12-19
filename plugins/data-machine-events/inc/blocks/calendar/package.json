@@ -17,9 +17,14 @@
   "license": "GPL-2.0-or-later",
   "description": "Events calendar block for Data Machine Events plugin",
   "devDependencies": {
-    "@wordpress/scripts": "30.19.0"
+    "@wordpress/scripts": "31.1.0"
   },
   "dependencies": {
     "flatpickr": "^4.6.13"
+  },
+  "overrides": {
+    "rimraf": "^4.4.1",
+    "glob": "^9.3.5",
+    "eslint": "^9.0.0"
   }
 }
