@@ -27,6 +27,9 @@ $modal_id = 'datamachine-taxonomy-filter-modal-' . $instance_id;
 
 $archive_context = $archive_context ?? ['taxonomy' => '', 'term_id' => 0, 'term_name' => ''];
 $has_archive_context = !empty($archive_context['taxonomy']) && !empty($archive_context['term_id']);
+
+$hide_filter_button_when_inactive = $hide_filter_button_when_inactive ?? false;
+$hide_filter_button_attr = $hide_filter_button_when_inactive ? ' hidden data-hide-when-inactive="1"' : '';
 ?>
 
 <div class="datamachine-events-filter-bar">
@@ -58,7 +61,7 @@ $has_archive_context = !empty($archive_context['taxonomy']) && !empty($archive_c
         </div>
         
         <div class="datamachine-events-taxonomy-filter">
-            <button type="button" class="datamachine-events-filter-btn datamachine-taxonomy-modal-trigger<?php echo (!empty($tax_filters) ? ' datamachine-filters-active' : ''); ?>" data-modal-id="<?php echo esc_attr($modal_id); ?>" aria-controls="<?php echo esc_attr($modal_id); ?>" aria-expanded="<?php echo (!empty($tax_filters) ? 'true' : 'false'); ?>">
+            <button<?php echo $hide_filter_button_attr; ?> type="button" class="datamachine-events-filter-btn datamachine-taxonomy-modal-trigger<?php echo (!empty($tax_filters) ? ' datamachine-filters-active' : ''); ?>" data-modal-id="<?php echo esc_attr($modal_id); ?>" aria-controls="<?php echo esc_attr($modal_id); ?>" aria-expanded="<?php echo (!empty($tax_filters) ? 'true' : 'false'); ?>">
                 <span class="datamachine-filter-count" aria-hidden="true"><?php echo (!empty($tax_filters) ? array_sum(array_map('count', $tax_filters)) : ''); ?></span>
                 <span class="dashicons dashicons-filter"></span>
                 <?php _e('Filter', 'datamachine-events'); ?>

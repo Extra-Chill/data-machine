@@ -37,23 +37,25 @@ class Filters {
 		$archive_term_id  = absint( $request->get_param( 'archive_term_id' ) ?? 0 );
 
 		$archive_context = [];
+		$tax_query_override = null;
 		if ( $archive_taxonomy && $archive_term_id ) {
-			if ( ! isset( $active_filters[ $archive_taxonomy ] ) ) {
-				$active_filters[ $archive_taxonomy ] = [];
-			}
-			if ( ! in_array( $archive_term_id, $active_filters[ $archive_taxonomy ], true ) ) {
-				$active_filters[ $archive_taxonomy ][] = $archive_term_id;
-			}
+			$tax_query_override = [
+				[
+					'taxonomy' => $archive_taxonomy,
+					'field'    => 'term_id',
+					'terms'    => $archive_term_id,
+				],
+			];
 
 			$term = get_term( $archive_term_id, $archive_taxonomy );
 			$archive_context = [
-				'taxonomy' => $archive_taxonomy,
-				'term_id'  => $archive_term_id,
+				'taxonomy'  => $archive_taxonomy,
+				'term_id'   => $archive_term_id,
 				'term_name' => $term && ! is_wp_error( $term ) ? $term->name : '',
 			];
 		}
 
-		$taxonomies_data = Taxonomy_Helper::get_all_taxonomies_with_counts( $active_filters, $date_context );
+		$taxonomies_data = Taxonomy_Helper::get_all_taxonomies_with_counts( $active_filters, $date_context, $tax_query_override );
 
 		return rest_ensure_response(
 			[

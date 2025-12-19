@@ -249,13 +249,19 @@ class FilterStateManager {
         const count = this.getFilterCount();
         
         if (count > 0) {
+            filterBtn.hidden = false;
             countBadge.textContent = count;
             countBadge.classList.add('visible');
             filterBtn.classList.add('datamachine-filters-active');
-        } else {
-            countBadge.textContent = '';
-            countBadge.classList.remove('visible');
-            filterBtn.classList.remove('datamachine-filters-active');
+            return;
+        }
+
+        countBadge.textContent = '';
+        countBadge.classList.remove('visible');
+        filterBtn.classList.remove('datamachine-filters-active');
+
+        if (filterBtn.dataset.hideWhenInactive === '1') {
+            filterBtn.hidden = true;
         }
     }
 

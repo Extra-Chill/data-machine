@@ -3,7 +3,7 @@
  * Plugin Name: Data Machine Events
  * Plugin URI: https://chubes.net
  * Description: WordPress events plugin with block-first architecture. Features AI-driven event creation via Data Machine integration, Event Details blocks for data storage, Calendar blocks for display, and venue taxonomy management.
- * Version: 0.6.3
+ * Version: 0.6.4
  * Author: Chris Huber
  * Author URI: https://chubes.net
  * License: GPL v2 or later
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once __DIR__ . '/vendor/autoload.php';
 }
-define('DATAMACHINE_EVENTS_VERSION', '0.6.3');
+define('DATAMACHINE_EVENTS_VERSION', '0.6.4');
 define('DATAMACHINE_EVENTS_PLUGIN_FILE', __FILE__);
 define('DATAMACHINE_EVENTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DATAMACHINE_EVENTS_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -319,3 +319,45 @@ function datamachine_events() {
 }
 
 datamachine_events();
+
+/**
+ * Generate excerpt from Event Details block for datamachine_events posts
+ *
+ * Extracts paragraph text from the Event Details block's inner blocks
+ * when no manual excerpt is set.
+ *
+ * @param string $excerpt Current excerpt
+ * @param WP_Post $post Post object
+ * @return string Generated excerpt or original
+ */
+add_filter('get_the_excerpt', function ($excerpt, $post) {
+    if ($post->post_type !== 'datamachine_events') {
+        return $excerpt;
+    }
+
+    if (!empty(trim($excerpt))) {
+        return $excerpt;
+    }
+
+    $blocks = parse_blocks($post->post_content);
+
+    foreach ($blocks as $block) {
+        if ($block['blockName'] !== 'datamachine-events/event-details') {
+            continue;
+        }
+
+        $text_parts = [];
+        foreach ($block['innerBlocks'] as $inner) {
+            if ($inner['blockName'] === 'core/paragraph' && !empty($inner['innerHTML'])) {
+                $text_parts[] = wp_strip_all_tags($inner['innerHTML']);
+            }
+        }
+
+        if (!empty($text_parts)) {
+            $full_text = implode(' ', $text_parts);
+            return wp_trim_words($full_text, 55, '...');
+        }
+    }
+
+    return $excerpt;
+}, 10, 2);

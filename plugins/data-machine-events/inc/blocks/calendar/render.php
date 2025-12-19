@@ -15,6 +15,7 @@ if (!defined('ABSPATH')) {
 
 use DataMachineEvents\Blocks\Calendar\Calendar_Query;
 use DataMachineEvents\Blocks\Calendar\Pagination;
+use DataMachineEvents\Blocks\Calendar\Taxonomy_Helper;
 
 if (wp_is_json_request() || (defined('REST_REQUEST') && REST_REQUEST)) {
     return '';
@@ -94,6 +95,12 @@ $base_params = [
     'source' => 'render',
 ];
 
+$date_context = [
+    'date_start' => $user_date_start,
+    'date_end'   => $user_date_end,
+    'past'       => $show_past ? '1' : '',
+];
+
 $unique_dates = Calendar_Query::get_unique_event_dates($base_params);
 $date_boundaries = Calendar_Query::get_date_boundaries_for_page($unique_dates, $current_page);
 
@@ -150,9 +157,39 @@ if (!empty($archive_context['taxonomy'])) {
 
 <div data-instance-id="<?php echo esc_attr($instance_id); ?>"<?php echo $archive_data_attrs; ?> <?php echo $wrapper_attributes; ?>>
     <?php 
-    $filter_count = !empty($tax_filters) ? array_sum(array_map('count', $tax_filters)) : 0;
+    $filter_count = ! empty( $tax_filters ) ? array_sum( array_map( 'count', $tax_filters ) ) : 0;
 
-    \DataMachineEvents\Blocks\Calendar\Template_Loader::include_template('filter-bar', [
+    $hide_filter_button_when_inactive = false;
+    if ( ! empty( $archive_context['taxonomy'] ) && ! empty( $archive_context['term_id'] ) && 0 === $filter_count ) {
+        $taxonomies_with_counts = Taxonomy_Helper::get_all_taxonomies_with_counts( $tax_filters, $date_context, $tax_query_override );
+
+        $has_other_taxonomy_options = false;
+        foreach ( $taxonomies_with_counts as $taxonomy_slug => $taxonomy_data ) {
+            if ( $taxonomy_slug === $archive_context['taxonomy'] ) {
+                continue;
+            }
+
+            if ( ! empty( $taxonomy_data['terms'] ) ) {
+                $has_other_taxonomy_options = true;
+                break;
+            }
+        }
+
+        $has_other_archive_taxonomy_terms = false;
+        if ( isset( $taxonomies_with_counts[ $archive_context['taxonomy'] ] ) ) {
+            $archive_terms = Taxonomy_Helper::flatten_hierarchy( $taxonomies_with_counts[ $archive_context['taxonomy'] ]['terms'] ?? [] );
+            foreach ( $archive_terms as $term_data ) {
+                if ( (int) ( $term_data['term_id'] ?? 0 ) !== (int) $archive_context['term_id'] ) {
+                    $has_other_archive_taxonomy_terms = true;
+                    break;
+                }
+            }
+        }
+
+        $hide_filter_button_when_inactive = ! $has_other_taxonomy_options && ! $has_other_archive_taxonomy_terms;
+    }
+
+    \DataMachineEvents\Blocks\Calendar\Template_Loader::include_template( 'filter-bar', [
         'attributes' => $attributes,
         'instance_id' => $instance_id,
         'tax_filters' => $tax_filters,
@@ -161,6 +198,7 @@ if (!empty($archive_context['taxonomy'])) {
         'date_end' => $date_end,
         'filter_count' => $filter_count,
         'archive_context' => $archive_context,
+        'hide_filter_button_when_inactive' => $hide_filter_button_when_inactive,
     ]);
     ?>
     

@@ -26,7 +26,7 @@ class Taxonomy_Helper {
      * @param array $date_context Optional date filtering context (date_start, date_end, past).
      * @return array Structured taxonomy data with hierarchy and event counts.
      */
-    public static function get_all_taxonomies_with_counts( $active_filters = [], $date_context = [] ) {
+    public static function get_all_taxonomies_with_counts( $active_filters = [], $date_context = [], $tax_query_override = null ) {
         $taxonomies_data = [];
         
         $taxonomies = get_object_taxonomies( Event_Post_Type::POST_TYPE, 'objects' );
@@ -42,7 +42,7 @@ class Taxonomy_Helper {
                 continue;
             }
             
-            $terms_hierarchy = self::get_taxonomy_hierarchy( $taxonomy->name, null, $date_context, $active_filters );
+            $terms_hierarchy = self::get_taxonomy_hierarchy( $taxonomy->name, null, $date_context, $active_filters, $tax_query_override );
             
             if ( ! empty( $terms_hierarchy ) ) {
                 $taxonomies_data[ $taxonomy->name ] = [
@@ -66,7 +66,7 @@ class Taxonomy_Helper {
      * @param array      $active_filters Optional active taxonomy filters for cross-filtering.
      * @return array Hierarchical term structure with event counts.
      */
-    public static function get_taxonomy_hierarchy( $taxonomy_slug, $allowed_term_ids = null, $date_context = [], $active_filters = [] ) {
+    public static function get_taxonomy_hierarchy( $taxonomy_slug, $allowed_term_ids = null, $date_context = [], $active_filters = [], $tax_query_override = null ) {
         $terms = get_terms([
             'taxonomy'   => $taxonomy_slug,
             'hide_empty' => false,
@@ -82,7 +82,7 @@ class Taxonomy_Helper {
             return [];
         }
         
-        $term_counts = self::get_batch_term_counts( $taxonomy_slug, $date_context, $active_filters );
+        $term_counts = self::get_batch_term_counts( $taxonomy_slug, $date_context, $active_filters, $tax_query_override );
         
         $terms_with_events = [];
         foreach ( $terms as $term ) {
@@ -126,7 +126,7 @@ class Taxonomy_Helper {
      * @param array  $active_filters Optional active taxonomy filters for cross-filtering.
      * @return array Term ID => event count mapping.
      */
-    public static function get_batch_term_counts( $taxonomy_slug, $date_context = [], $active_filters = [] ) {
+    public static function get_batch_term_counts( $taxonomy_slug, $date_context = [], $active_filters = [], $tax_query_override = null ) {
         global $wpdb;
         
         $post_type = Event_Post_Type::POST_TYPE;
@@ -162,6 +162,32 @@ class Taxonomy_Helper {
             }
         }
         
+        if ( ! empty( $tax_query_override ) && is_array( $tax_query_override ) ) {
+            $base_join_index = 0;
+            foreach ( $tax_query_override as $clause ) {
+                $base_taxonomy = sanitize_key( $clause['taxonomy'] ?? '' );
+                $base_terms    = array_map( 'absint', (array) ( $clause['terms'] ?? [] ) );
+
+                if ( ! $base_taxonomy || empty( $base_terms ) ) {
+                    continue;
+                }
+
+                $placeholders = implode( ',', array_fill( 0, count( $base_terms ), '%d' ) );
+                $alias_tr = "base_tr_{$base_join_index}";
+                $alias_tt = "base_tt_{$base_join_index}";
+
+                $joins .= " INNER JOIN {$wpdb->term_relationships} {$alias_tr} ON p.ID = {$alias_tr}.object_id";
+                $joins .= " INNER JOIN {$wpdb->term_taxonomy} {$alias_tt} ON {$alias_tr}.term_taxonomy_id = {$alias_tt}.term_taxonomy_id";
+
+                // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+                $where_clauses .= " AND {$alias_tt}.taxonomy = %s AND {$alias_tt}.term_id IN ($placeholders)";
+                $params[] = $base_taxonomy;
+                $params = array_merge( $params, $base_terms );
+
+                $base_join_index++;
+            }
+        }
+
         // Cross-taxonomy filtering (exclude current taxonomy from cross-filter)
         $cross_filters = array_diff_key( $active_filters, [ $taxonomy_slug => true ] );
         $join_index = 0;

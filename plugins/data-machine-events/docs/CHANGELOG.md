@@ -5,7 +5,19 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.1] - 2025-12-16
+## [0.6.4] - 2025-12-19
+
+### Added
+- **Event Excerpt Generation**: Automatic excerpt creation from Event Details block content when no manual excerpt is set
+- **Archive Filter UX**: Hide taxonomy filter button on archive pages when no additional filter options are available
+
+### Changed
+- **Calendar Filter State**: Enhanced filter button visibility logic for archive contexts
+- **Event Details Rendering**: Simplified block content output structure
+- **Taxonomy Helper**: Added archive taxonomy query override support for accurate filtering
+- **Filters API**: Updated to handle archive context for proper term count calculations
+
+## [0.6.3] - 2025-12-17
 
 ### Changed
 - **Universal Web Scraper Keyword Filtering**: Added include/exclude keyword filtering to improve event selection accuracy

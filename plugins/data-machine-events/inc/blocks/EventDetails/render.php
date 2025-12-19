@@ -84,9 +84,7 @@ $event_schema = EventSchemaProvider::generateSchemaOrg($event_data, $venue_data 
 
 <div class="<?php echo esc_attr($block_class); ?>">
     <?php if (!empty($content)): ?>
-        <div class="event-description">
-            <?php echo $content; ?>
-        </div>
+        <?php echo $content; ?>
     <?php endif; ?>
     
     <div class="event-info-grid">
