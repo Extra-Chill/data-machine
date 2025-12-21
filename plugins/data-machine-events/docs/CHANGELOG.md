@@ -5,13 +5,21 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.0] - 2025-12-21
 
 ### Added
-- **GoDaddy Calendar Handler**: New JSON-based import handler for GoDaddy Website Builder calendars using `events_url`
+- **GoDaddy Calendar Handler**: New JSON-based import handler for GoDaddy Website Builder calendars using `events_url` with configurable venue fields and keyword filtering
+- **Global Title Exclusion**: All import handlers now skip events whose title contains `closed` (case-insensitive) for universal event filtering
+- **Enhanced Keyword Filtering**: Eventbrite and GoogleCalendar handlers now support include/exclude keyword filtering via `search` and `exclude_keywords` settings
 
 ### Changed
-- **Global Title Exclusion**: All import handlers now skip events whose title contains `closed` (case-insensitive)
+- **PSR-4 Directory Structure**: Normalized directory names to PascalCase (`inc/Core`, `inc/Steps`, `inc/Steps/EventImport/Handlers`) for proper PHP namespace alignment
+- **Handler Title Validation**: Centralized title exclusion logic in `EventImportHandler::shouldSkipEventTitle()` called by all handlers (BandzoogleCalendar, DiceFm, DoStuffMediaApi, EventFlyer, Eventbrite, GoogleCalendar, Ticketmaster)
+- **EventbriteSettings**: Added `search` and `exclude_keywords` fields for improved event filtering
+
+### Technical Details
+- **Handler Base Class**: Added `getGlobalExcludedTitleKeywords()` and `shouldSkipEventTitle()` methods to support centralized title filtering
+- **Documentation**: Created `docs/godaddy-calendar-handler.md` with full setup, configuration, and data mapping documentation
 
 ## [0.6.5] - 2025-12-20
 
