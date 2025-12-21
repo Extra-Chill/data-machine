@@ -5,6 +5,18 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.5] - 2025-12-20
+
+### Fixed
+- **Plugin Dependency Slug**: Corrected `Requires Plugins` header from `datamachine` to `data-machine` for proper WordPress plugin dependency detection
+
+### Added
+- **Ticketmaster Price Data Merging**: Price information from Ticketmaster imports now merges into engine data via `datamachine_merge_engine_data()` for improved AI processing context
+
+### Changed
+- **EventUpsert Field Support**: Added `price` field to resolved fields array in EventUpsert handler for complete price field handling during event updates
+- **Build Dependencies**: Updated @wordpress/scripts and npm package configurations with build warning suppressions for cleaner development experience
+
 ## [0.6.4] - 2025-12-19
 
 ### Added

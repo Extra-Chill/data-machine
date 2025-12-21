@@ -135,6 +135,13 @@ class Ticketmaster extends EventImportHandler {
                 
                 EventEngineData::storeVenueContext($job_id, $standardized_event, $venue_metadata);
 
+                $resolved_job_id = (int) $job_id;
+                if ($resolved_job_id > 0 && function_exists('datamachine_merge_engine_data') && !empty($standardized_event['price'])) {
+                    datamachine_merge_engine_data($resolved_job_id, [
+                        'price' => $standardized_event['price'],
+                    ]);
+                }
+
                 $this->stripVenueMetadataFromEvent($standardized_event);
                 
                 $dataPacket = new DataPacket(

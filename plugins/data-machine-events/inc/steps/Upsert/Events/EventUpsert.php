@@ -764,7 +764,8 @@ class EventUpsert extends UpdateHandler {
             'venue', 'venueAddress', 'venueCity', 'venueState', 'venueZip',
             'venueCountry', 'venuePhone', 'venueWebsite', 'venueCoordinates',
             'venueCapacity', 'eventImage',
-            'organizer', 'organizerUrl', 'organizerType'
+            'organizer', 'organizerUrl', 'organizerType',
+            'price'
         ];
 
         $resolved = [];
