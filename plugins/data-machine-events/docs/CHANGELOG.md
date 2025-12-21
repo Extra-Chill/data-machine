@@ -5,6 +5,14 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **GoDaddy Calendar Handler**: New JSON-based import handler for GoDaddy Website Builder calendars using `events_url`
+
+### Changed
+- **Global Title Exclusion**: All import handlers now skip events whose title contains `closed` (case-insensitive)
+
 ## [0.6.5] - 2025-12-20
 
 ### Fixed

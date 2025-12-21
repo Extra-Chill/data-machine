@@ -149,6 +149,7 @@ class DATAMACHINE_Events {
             'DataMachineEvents\\Steps\\EventImport\\Handlers\\GoogleCalendar\\GoogleCalendar',
             'DataMachineEvents\\Steps\\EventImport\\Handlers\\IcsCalendar\\IcsCalendar',
             'DataMachineEvents\\Steps\\EventImport\\Handlers\\Prekindle\\Prekindle',
+            'DataMachineEvents\\Steps\\EventImport\\Handlers\\GoDaddyCalendar\\GoDaddyCalendar',
             'DataMachineEvents\\Steps\\EventImport\\Handlers\\SpotHopper\\SpotHopper',
             'DataMachineEvents\\Steps\\EventImport\\Handlers\\WebScraper\\UniversalWebScraper',
             'DataMachineEvents\\Steps\\EventImport\\Handlers\\WordPressEventsAPI\\WordPressEventsAPI',
