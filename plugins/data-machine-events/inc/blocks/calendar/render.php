@@ -93,6 +93,7 @@ $base_params = [
     'archive_taxonomy' => $archive_context['taxonomy'],
     'archive_term_id' => $archive_context['term_id'],
     'source' => 'render',
+    'user_date_range' => !empty($user_date_start) || !empty($user_date_end),
 ];
 
 $date_context = [

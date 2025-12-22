@@ -55,6 +55,7 @@ class Calendar {
 			'archive_taxonomy' => $archive_taxonomy,
 			'archive_term_id' => $archive_term_id,
 			'source' => 'rest',
+			'user_date_range' => !empty($user_date_start) || !empty($user_date_end),
 		];
 
 		$unique_dates = Calendar_Query::get_unique_event_dates($base_params);

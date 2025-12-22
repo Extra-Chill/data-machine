@@ -43,6 +43,7 @@ class Calendar_Query {
             'archive_taxonomy' => '',
             'archive_term_id' => 0,
             'source' => 'unknown',
+            'user_date_range' => false,
         ];
 
         $params = wp_parse_args($params, $defaults);
@@ -87,14 +88,14 @@ class Calendar_Query {
         $current_datetime = current_time('mysql');
         $has_date_range = !empty($params['date_start']) || !empty($params['date_end']);
 
-        if ($params['show_past'] && !$has_date_range) {
+        if ($params['show_past'] && !$params['user_date_range']) {
             $meta_query[] = [
                 'key' => EVENT_END_DATETIME_META_KEY,
                 'value' => $current_datetime,
                 'compare' => '<',
                 'type' => 'DATETIME',
             ];
-        } elseif (!$params['show_past'] && !$has_date_range) {
+        } elseif (!$params['show_past'] && !$params['user_date_range']) {
             $meta_query[] = [
                 'key' => EVENT_END_DATETIME_META_KEY,
                 'value' => $current_datetime,

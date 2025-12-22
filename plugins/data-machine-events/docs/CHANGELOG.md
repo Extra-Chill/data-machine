@@ -5,6 +5,19 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2025-12-22
+
+### Added
+- **Archive Taxonomy Context Support**: Calendar and filters REST endpoints now accept `archive_taxonomy` and `archive_term_id` parameters for proper filtering on taxonomy archive pages
+
+### Changed
+- **Enhanced Date Range Filtering**: Added `user_date_range` flag to detect when users specify custom date ranges, improving query logic for date boundary calculations and calendar rendering
+- **API Route Extensions**: Extended calendar and filters endpoints with new parameters for archive-aware taxonomy filtering
+
+### Technical Details
+- **Calendar_Query Logic**: Modified date boundary handling to respect user-specified ranges while maintaining default pagination behavior
+- **REST Parameter Sanitization**: Added proper sanitization for new archive context parameters in API controllers
+
 ## [0.7.0] - 2025-12-21
 
 ### Added
