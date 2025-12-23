@@ -5,6 +5,23 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] - 2025-12-23
+
+### Added
+- **Ticketbud Event Import Handler**: New OAuth 2.0 authenticated handler for Ticketbud API
+  - Full event data extraction: title, description, dates, times, venue, pricing
+  - Venue metadata: name, address, city, state, zip, country, phone, website, coordinates
+  - Keyword filtering: include/exclude keywords for selective event imports
+  - Past/over event filtering: configurable option to include events marked as over
+  - Single-item processing with EventIdentifierGenerator for duplicate prevention
+  - OAuth 2.0 authentication with client ID/secret configuration
+  - User profile integration: email, name, default subdomain
+
+### Technical Details
+- **Ticketbud API Integration**: Fetches from `https://api.ticketbud.com/events.json` with access token
+- **Venue Metadata Extraction**: Complete location data mapping from Ticketbud event structure
+- **Handler Registration**: Added to `load_event_import_handlers()` array in main plugin file
+
 ## [0.7.1] - 2025-12-22
 
 ### Added
