@@ -53,7 +53,7 @@ class TicketbudAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
         return $this->oauth2->get_authorization_url(self::AUTH_URL, [
             'response_type' => 'code',
             'client_id' => $client_id,
-            'redirect_url' => $this->get_callback_url(),
+            'redirect_uri' => $this->get_callback_url(),
             'state' => $state,
         ]);
     }
