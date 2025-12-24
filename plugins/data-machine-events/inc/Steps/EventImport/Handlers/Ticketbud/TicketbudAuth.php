@@ -54,6 +54,7 @@ class TicketbudAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
             'response_type' => 'code',
             'client_id' => $client_id,
             'redirect_uri' => $this->get_callback_url(),
+            'scope' => 'public',
             'state' => $state,
         ]);
     }
