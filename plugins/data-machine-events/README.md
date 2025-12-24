@@ -2,18 +2,18 @@
 
 Frontend-focused WordPress events plugin with a **block-first architecture** that ties Event Details data storage to Calendar block progressive enhancement and REST API-driven filtering.
 
-**Version**: 0.7.1
+**Version**: 0.8.0
 
 ## Architecture Overview
 
 - **Blocks First**: `inc/Blocks/EventDetails` captures authoritative event data while `inc/Blocks/Calendar` renders Carousel List views informed by `_datamachine_event_datetime` post meta and REST responses.
-- **Data Machine Imports**: The pipeline runs through `inc/Steps/EventImport/EventImportStep` and ten registered handlers. Each handler builds a `DataPacket`, normalizes titles/dates/venues via `Utilities/EventIdentifierGenerator`, marks items processed, and returns immediately after a valid event to enable incremental syncing.
+- **Data Machine Imports**: The pipeline runs through `inc/Steps/EventImport/EventImportStep` and 15 registered handlers. Each handler builds a `DataPacket`, normalizes titles/dates/venues via `Utilities/EventIdentifierGenerator`, marks items processed, and returns immediately after a valid event to enable incremental syncing.
 - **EventUpsert Workflow**: `Steps/Upsert/Events/EventUpsert` merges engine data snapshots, runs field-by-field change detection, delegates taxonomy assignments to `DataMachine\Core\WordPress\TaxonomyHandler`, uses `WordPressPublishHelper` for images, and keeps `_datamachine_event_datetime` synced for performant calendar queries.
 
 ## Import Pipeline
 
 1. `EventImportStep` discovers handlers that register themselves via `HandlerRegistrationTrait` and exposes configuration through handler settings classes.
-2. **Handlers**: Ticketmaster, Dice FM, Google Calendar (with `GoogleCalendarUtils` for ID/URL resolution), ICS Calendar, SpotHopper, Universal WebScraper, WordPress Events API, EventFlyer, Eventbrite, DoStuff Media API, Bandzoogle Calendar, and Prekindle.
+2. **Handlers**: Bandzoogle Calendar, Dice FM, DoStuff Media API, Eventbrite, EventFlyer, GoDaddy Calendar, Google Calendar (with `GoogleCalendarUtils` for ID/URL resolution), ICS Calendar, Prekindle, SingleRecurring, SpotHopper, Ticketbud, Ticketmaster, Universal WebScraper, and WordPress Events API.
 3. Each handler applies `EventIdentifierGenerator::generate($title, $startDate, $venue)` to deduplicate, merges venue metadata into `EventEngineData`, and forwards standardized payloads to `EventUpsert`.
 4. `VenueService`/`Venue_Taxonomy` find or create venue terms and store nine meta fields (address, city, state, zip, country, phone, website, capacity, coordinates) for use in blocks and REST endpoints.
 5. `EventUpsertSettings` exposes status, author, taxonomy, and image download toggles via `WordPressSettingsHandler` so runtime behavior remains configurable.

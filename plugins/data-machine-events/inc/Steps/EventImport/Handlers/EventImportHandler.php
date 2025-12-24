@@ -23,7 +23,7 @@ abstract class EventImportHandler extends FetchHandler {
         ];
     }
 
-    protected function shouldSkipEventTitle(string $title): bool {
+    public function shouldSkipEventTitle(string $title): bool {
         if (empty($title)) {
             return false;
         }
@@ -70,11 +70,11 @@ abstract class EventImportHandler extends FetchHandler {
     /**
      * @return array Venue metadata extracted from event data
      */
-    protected function extractVenueMetadata(array $event): array {
+    public function extractVenueMetadata(array $event): array {
         return VenueParameterProvider::extractFromEventData($event);
     }
 
-    protected function stripVenueMetadataFromEvent(array &$event): void {
+    public function stripVenueMetadataFromEvent(array &$event): void {
         VenueParameterProvider::stripFromEventData($event);
     }
 
@@ -84,11 +84,39 @@ abstract class EventImportHandler extends FetchHandler {
      * @param string $start_date Event start date (Y-m-d format expected)
      * @return bool True if event is in the past, false otherwise
      */
-    protected function isPastEvent(string $start_date): bool {
+    public function isPastEvent(string $start_date): bool {
         if (empty($start_date)) {
             return false;
         }
         return strtotime($start_date) < strtotime('today');
+    }
+
+    /**
+     * Public wrapper for keyword search (for use by processors).
+     */
+    public function applyKeywordSearch(string $text, string $search): bool {
+        return parent::applyKeywordSearch($text, $search);
+    }
+
+    /**
+     * Public wrapper for exclude keywords (for use by processors).
+     */
+    public function applyExcludeKeywords(string $text, string $exclude_keywords): bool {
+        return parent::applyExcludeKeywords($text, $exclude_keywords);
+    }
+
+    /**
+     * Public wrapper for processed item check (for use by processors).
+     */
+    public function isItemProcessed(string $item_id, ?string $flow_step_id): bool {
+        return parent::isItemProcessed($item_id, $flow_step_id);
+    }
+
+    /**
+     * Public wrapper for marking item processed (for use by processors).
+     */
+    public function markItemProcessed(string $item_id, ?string $flow_step_id, ?string $job_id): void {
+        parent::markItemProcessed($item_id, $flow_step_id, $job_id);
     }
 
     /**

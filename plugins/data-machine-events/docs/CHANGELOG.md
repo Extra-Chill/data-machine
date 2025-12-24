@@ -5,6 +5,41 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.0] - 2025-12-24
+
+### Breaking Changes
+- **Ticketbud Handler Removal**: Removed entire Ticketbud event import handler (Ticketbud.php, TicketbudAuth.php, TicketbudSettings.php)
+
+### Added
+- **Wix Events Extractor**: New extractor for Wix platform websites
+  - Extracts events from wix-warmup-data JSON script tags
+  - Full venue metadata (address, city, state, zip, coordinates)
+  - Timezone-aware date/time parsing
+  - Ticket URL and image extraction
+- **RHP Events Plugin Extractor**: New extractor for WordPress sites using RHP Events plugin
+  - Detects `.rhpSingleEvent` HTML elements
+  - Extracts event title, date, time, venue, price, age restriction
+  - Year detection from month separators
+  - External ticket link (Etix, etc.) and event detail URL extraction
+- **StructuredDataProcessor**: New centralized processing class for structured event data
+  - Handles venue config override and engine data storage
+  - Creates DataPackets with extraction method metadata
+  - Filters events by keywords, past date detection, and duplicates
+- **Extractor Architecture**: New modular extractor system
+  - ExtractorInterface contract for all structured data parsers
+  - Extractors: WixEventsExtractor, RhpEventsExtractor, JsonLdExtractor, MicrodataExtractor
+  - Priority-based extraction: Wix → RHP → JSON-LD → Microdata → AI fallback
+
+### Changed
+- **Universal Web Scraper**: Refactored to use structured data extractors instead of monolithic extraction logic
+- **EventImportHandler**: Changed several methods from protected to public (shouldSkipEventTitle, extractVenueMetadata, stripVenueMetadataFromEvent, isPastEvent) for better extensibility
+- **Documentation**: Completely rewrote universal-web-scraper-handler.md to document new extraction architecture
+
+### Technical Details
+- **Extraction Priority**: The handler now tries extractors in priority order, using first successful extraction method
+- **Engine Data Integration**: Structured data stores venue and event fields in engine data before AI processing
+- **Event Filtering**: Structured data processors apply keyword filtering, past event detection, and duplicate prevention uniformly
+
 ## [0.7.4] - 2025-12-24
 
 ### Fixed

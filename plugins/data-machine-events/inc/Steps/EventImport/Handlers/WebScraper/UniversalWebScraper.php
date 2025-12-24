@@ -1,14 +1,16 @@
 <?php
 /**
- * Universal Schema.org Compliant Web Scraper Handler
+ * Universal Web Scraper Handler
  *
- * Prioritizes Schema.org Event microdata and JSON-LD extraction for maximum accuracy.
+ * Prioritizes structured data extraction for accuracy.
  * Falls back to AI-enhanced HTML parsing when structured data is unavailable.
  *
  * Extraction Priority:
- * 1. JSON-LD structured data (highest accuracy)
- * 2. Schema.org microdata parsing
- * 3. AI-enhanced HTML pattern matching
+ * 1. Wix Events JSON (wix-warmup-data)
+ * 2. RHP Events WordPress plugin HTML
+ * 3. Schema.org JSON-LD
+ * 4. Schema.org microdata
+ * 5. AI-enhanced HTML pattern matching
  *
  * @package DataMachineEvents\Steps\EventImport\Handlers\WebScraper
  */
@@ -16,20 +18,20 @@
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper;
 
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
-use DataMachineEvents\Steps\EventImport\EventEngineData;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\ExtractorInterface;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\WixEventsExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\JsonLdExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\MicrodataExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\RhpEventsExtractor;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
-// Prevent direct access
 if (!defined('ABSPATH')) {
     exit;
 }
 
 /**
- * Schema.org compliant universal web scraper handler
- *
- * Extracts event data using Schema.org standards with intelligent fallbacks.
- * Fully compatible with DataMachineEventsSchema for proper JSON-LD output generation.
+ * Universal web scraper handler with structured data extraction.
  */
 class UniversalWebScraper extends EventImportHandler {
 
@@ -37,8 +39,16 @@ class UniversalWebScraper extends EventImportHandler {
 
     const MAX_PAGES = 20;
 
+    private StructuredDataProcessor $processor;
+
+    /** @var ExtractorInterface[] */
+    private array $extractors;
+
     public function __construct() {
         parent::__construct('universal_web_scraper');
+
+        $this->processor = new StructuredDataProcessor($this);
+        $this->extractors = $this->getExtractors();
 
         self::registerHandler(
             'universal_web_scraper',
@@ -54,17 +64,21 @@ class UniversalWebScraper extends EventImportHandler {
     }
 
     /**
-     * Execute web scraper with AI event extraction and automatic pagination
-     * 
-     * Traverses multiple pages of event listings until an eligible event is found
-     * or the maximum page limit is reached.
-     * 
-     * @param int $pipeline_id Pipeline ID
-     * @param array $config Handler configuration
-     * @param string|null $flow_step_id Flow step ID
-     * @param int $flow_id Flow ID
-     * @param string|null $job_id Job ID
-     * @return array Processed items array
+     * Get registered extractors in priority order.
+     *
+     * @return ExtractorInterface[]
+     */
+    private function getExtractors(): array {
+        return [
+            new WixEventsExtractor(),
+            new RhpEventsExtractor(),
+            new JsonLdExtractor(),
+            new MicrodataExtractor(),
+        ];
+    }
+
+    /**
+     * Execute web scraper with structured data extraction and AI fallback.
      */
     protected function executeFetch(int $pipeline_id, array $config, ?string $flow_step_id, int $flow_id, ?string $job_id): array {
         $this->log('debug', 'Universal Web Scraper: Payload received', [
@@ -90,7 +104,6 @@ class UniversalWebScraper extends EventImportHandler {
         $visited_urls = [];
 
         while ($current_page <= self::MAX_PAGES) {
-            // Prevent infinite loops by tracking visited URLs
             $url_hash = md5($current_url);
             if (isset($visited_urls[$url_hash])) {
                 $this->log('debug', 'Universal Web Scraper: Already visited URL, ending pagination', [
@@ -100,7 +113,6 @@ class UniversalWebScraper extends EventImportHandler {
             }
             $visited_urls[$url_hash] = true;
 
-            // Fetch HTML content for current page
             $html_content = $this->fetch_html($current_url);
             if (empty($html_content)) {
                 if ($current_page === 1) {
@@ -108,86 +120,36 @@ class UniversalWebScraper extends EventImportHandler {
                 }
                 break;
             }
+
+            // Try structured data extraction first
+            $structured_result = $this->tryStructuredDataExtraction(
+                $html_content,
+                $current_url,
+                $config,
+                $pipeline_id,
+                $flow_id,
+                $flow_step_id,
+                $job_id
+            );
+
+            if ($structured_result !== null) {
+                return $structured_result;
+            }
             
-            $skipped_identifiers = [];
+            // Fall back to HTML section extraction
+            $html_result = $this->tryHtmlSectionExtraction(
+                $html_content,
+                $current_url,
+                $config,
+                $pipeline_id,
+                $flow_id,
+                $flow_step_id,
+                $job_id,
+                $current_page
+            );
 
-            while (true) {
-                $event_section = $this->extract_event_sections($html_content, $current_url, (string) $flow_step_id, $skipped_identifiers);
-
-                if (empty($event_section)) {
-                    break;
-                }
-
-                $this->log('info', 'Universal Web Scraper: Processing event section', [
-                    'section_identifier' => $event_section['identifier'],
-                    'page' => $current_page,
-                    'pipeline_id' => $pipeline_id
-                ]);
-
-                $raw_html_data = $this->extract_raw_html_section($event_section['html'], $current_url, $config);
-
-                if (!$raw_html_data) {
-                    $skipped_identifiers[$event_section['identifier']] = true;
-                    continue;
-                }
-
-                $section_title = $this->extract_section_title($raw_html_data);
-                if ($section_title !== '' && $this->shouldSkipEventTitle($section_title)) {
-                    $skipped_identifiers[$event_section['identifier']] = true;
-                    continue;
-                }
-
-                $search_text = html_entity_decode(wp_strip_all_tags($raw_html_data));
-
-                if (!$this->applyKeywordSearch($search_text, $config['search'] ?? '')) {
-                    $this->log('debug', 'Universal Web Scraper: Skipping event section (include keywords)', [
-                        'section_identifier' => $event_section['identifier'],
-                        'source_url' => $current_url,
-                    ]);
-                    $skipped_identifiers[$event_section['identifier']] = true;
-                    continue;
-                }
-
-                if ($this->applyExcludeKeywords($search_text, $config['exclude_keywords'] ?? '')) {
-                    $this->log('debug', 'Universal Web Scraper: Skipping event section (exclude keywords)', [
-                        'section_identifier' => $event_section['identifier'],
-                        'source_url' => $current_url,
-                    ]);
-                    $skipped_identifiers[$event_section['identifier']] = true;
-                    continue;
-                }
-
-                $this->markItemProcessed($event_section['identifier'], $flow_step_id, $job_id);
-
-                $this->log('info', 'Universal Web Scraper: Found eligible HTML section', [
-                    'source_url' => $current_url,
-                    'section_identifier' => $event_section['identifier'],
-                    'page' => $current_page,
-                    'pipeline_id' => $pipeline_id
-                ]);
-
-                $dataPacket = new DataPacket(
-                    [
-                        'title' => 'Raw HTML Event Section',
-                        'body' => wp_json_encode([
-                            'raw_html' => $raw_html_data,
-                            'source_url' => $current_url,
-                            'import_source' => 'universal_web_scraper',
-                            'section_identifier' => $event_section['identifier']
-                        ], JSON_PRETTY_PRINT)
-                    ],
-                    [
-                        'source_type' => 'universal_web_scraper',
-                        'pipeline_id' => $pipeline_id,
-                        'flow_id' => $flow_id,
-                        'original_title' => 'HTML Section from ' . parse_url($current_url, PHP_URL_HOST),
-                        'event_identifier' => $event_section['identifier'],
-                        'import_timestamp' => time()
-                    ],
-                    'event_import'
-                );
-
-                return [$dataPacket];
+            if ($html_result !== null) {
+                return $html_result;
             }
 
             // No eligible events on this page - look for next page
@@ -199,60 +161,192 @@ class UniversalWebScraper extends EventImportHandler {
             $next_url = $this->find_next_page_url($html_content, $current_url);
             
             if (empty($next_url)) {
-                $this->log('info', 'Universal Web Scraper: No pagination link found, ending search', [
-                    'pages_searched' => $current_page
+                $this->log('info', 'Universal Web Scraper: No more pages to process', [
+                    'pages_checked' => $current_page
                 ]);
                 break;
             }
 
-            $this->log('info', 'Universal Web Scraper: Found next page URL', [
-                'next_url' => $next_url,
-                'page' => $current_page + 1
-            ]);
-
             $current_url = $next_url;
             $current_page++;
-        }
 
-        if ($current_page > self::MAX_PAGES) {
-            $this->log('info', 'Universal Web Scraper: Reached max pages limit', [
-                'max_pages' => self::MAX_PAGES
+            $this->log('info', 'Universal Web Scraper: Moving to next page', [
+                'page' => $current_page,
+                'next_url' => $next_url
             ]);
         }
-
-        $this->log('info', 'Universal Web Scraper: No eligible events found', [
-            'pages_searched' => $current_page,
-            'pipeline_id' => $pipeline_id
-        ]);
 
         return [];
     }
-    
+
     /**
-     * @param string $url Target URL
-     * @return string HTML content or empty string on failure
+     * Try structured data extraction using registered extractors.
+     */
+    private function tryStructuredDataExtraction(
+        string $html_content,
+        string $current_url,
+        array $config,
+        int $pipeline_id,
+        int $flow_id,
+        ?string $flow_step_id,
+        ?string $job_id
+    ): ?array {
+        foreach ($this->extractors as $extractor) {
+            if (!$extractor->canExtract($html_content)) {
+                continue;
+            }
+
+            $events = $extractor->extract($html_content, $current_url);
+            if (empty($events)) {
+                continue;
+            }
+
+            $this->log('info', 'Universal Web Scraper: Found structured data', [
+                'extractor' => $extractor->getMethod(),
+                'event_count' => count($events),
+                'source_url' => $current_url
+            ]);
+
+            $result = $this->processor->process(
+                $events,
+                $extractor->getMethod(),
+                $current_url,
+                $config,
+                $pipeline_id,
+                $flow_id,
+                $flow_step_id,
+                $job_id
+            );
+
+            if ($result !== null) {
+                return $result;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Try HTML section extraction (AI fallback).
+     */
+    private function tryHtmlSectionExtraction(
+        string $html_content,
+        string $current_url,
+        array $config,
+        int $pipeline_id,
+        int $flow_id,
+        ?string $flow_step_id,
+        ?string $job_id,
+        int $current_page
+    ): ?array {
+        $skipped_identifiers = [];
+
+        while (true) {
+            $event_section = $this->extract_event_sections($html_content, $current_url, (string) $flow_step_id, $skipped_identifiers);
+
+            if (empty($event_section)) {
+                break;
+            }
+
+            $this->log('info', 'Universal Web Scraper: Processing event section', [
+                'section_identifier' => $event_section['identifier'],
+                'page' => $current_page,
+                'pipeline_id' => $pipeline_id
+            ]);
+
+            $raw_html_data = $this->extract_raw_html_section($event_section['html'], $current_url, $config);
+
+            if (!$raw_html_data) {
+                $skipped_identifiers[$event_section['identifier']] = true;
+                continue;
+            }
+
+            $section_title = $this->extract_section_title($raw_html_data);
+            if ($section_title !== '' && $this->shouldSkipEventTitle($section_title)) {
+                $skipped_identifiers[$event_section['identifier']] = true;
+                continue;
+            }
+
+            $search_text = html_entity_decode(wp_strip_all_tags($raw_html_data));
+
+            if (!$this->applyKeywordSearch($search_text, $config['search'] ?? '')) {
+                $this->log('debug', 'Universal Web Scraper: Skipping event section (include keywords)', [
+                    'section_identifier' => $event_section['identifier'],
+                    'source_url' => $current_url,
+                ]);
+                $skipped_identifiers[$event_section['identifier']] = true;
+                continue;
+            }
+
+            if ($this->applyExcludeKeywords($search_text, $config['exclude_keywords'] ?? '')) {
+                $this->log('debug', 'Universal Web Scraper: Skipping event section (exclude keywords)', [
+                    'section_identifier' => $event_section['identifier'],
+                    'source_url' => $current_url,
+                ]);
+                $skipped_identifiers[$event_section['identifier']] = true;
+                continue;
+            }
+
+            $this->markItemProcessed($event_section['identifier'], $flow_step_id, $job_id);
+
+            $this->log('info', 'Universal Web Scraper: Found eligible HTML section', [
+                'source_url' => $current_url,
+                'section_identifier' => $event_section['identifier'],
+                'page' => $current_page,
+                'pipeline_id' => $pipeline_id
+            ]);
+
+            $dataPacket = new DataPacket(
+                [
+                    'title' => 'Raw HTML Event Section',
+                    'body' => wp_json_encode([
+                        'raw_html' => $raw_html_data,
+                        'source_url' => $current_url,
+                        'import_source' => 'universal_web_scraper',
+                        'section_identifier' => $event_section['identifier']
+                    ], JSON_PRETTY_PRINT)
+                ],
+                [
+                    'source_type' => 'universal_web_scraper',
+                    'pipeline_id' => $pipeline_id,
+                    'flow_id' => $flow_id,
+                    'original_title' => 'HTML Section from ' . parse_url($current_url, PHP_URL_HOST),
+                    'event_identifier' => $event_section['identifier'],
+                    'import_timestamp' => time()
+                ],
+                'event_import'
+            );
+
+            return [$dataPacket];
+        }
+
+        return null;
+    }
+
+    /**
+     * Fetch HTML content from URL.
      */
     private function fetch_html(string $url): string {
-        $result = $this->httpGet($url, [
+        $result = datamachine_http_get($url, [
             'timeout' => 30,
+            'user-agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'headers' => [
                 'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language' => 'en-US,en;q=0.9',
-            ],
-            'browser_mode' => true,
+                'Accept-Language' => 'en-US,en;q=0.5',
+            ]
         ]);
-        
-        if (!$result['success']) {
-            $this->log('error', 'Universal AI Scraper: Failed to fetch URL', [
+
+        if (is_wp_error($result)) {
+            $this->log('error', 'Universal AI Scraper: HTTP request failed', [
                 'url' => $url,
-                'error' => $result['error'] ?? 'Unknown error',
+                'error' => $result->get_error_message(),
             ]);
             return '';
         }
-        
-        $status_code = $result['status_code'];
-        if ($status_code !== 200) {
-            $this->log('error', 'Universal AI Scraper: HTTP error when fetching URL', [
+
+        $status_code = $result['status_code'] ?? 0;
+        if ($status_code < 200 || $status_code >= 300) {
+            $this->log('error', 'Universal AI Scraper: Non-success status code', [
                 'url' => $url,
                 'status_code' => $status_code,
             ]);
@@ -269,17 +363,9 @@ class UniversalWebScraper extends EventImportHandler {
         
         return $body;
     }
-    
+
     /**
-     * Extract first non-processed event HTML section from content
-     *
-     * Finds potential event HTML elements using pattern matching and returns
-     * the first unprocessed event as raw HTML for AI analysis.
-     *
-     * @param string $html_content Raw HTML content
-     * @param string $url Source URL for context
-     * @param string $flow_step_id Flow step ID for processed item tracking
-     * @return array|null Single event section or null if none found
+     * Extract first non-processed event HTML section from content.
      */
     private function extract_event_sections(string $html_content, string $url, string $flow_step_id, array $skipped_identifiers = []): ?array {
         $finder = new EventSectionFinder(
@@ -298,50 +384,45 @@ class UniversalWebScraper extends EventImportHandler {
 
         return $event_section;
     }
-    
+
     /**
-     * Clean HTML for AI processing
-     * 
-     * @param string $html Raw HTML content
-     * @return string Cleaned HTML suitable for AI analysis
+     * Clean HTML for AI processing.
      */
     private function clean_html_for_ai(string $html): string {
-        $html = preg_replace('/<script[^>]*>.*?<\/script>/is', '', $html);
-        $html = preg_replace('/<style[^>]*>.*?<\/style>/is', '', $html);
-        
+        $html = preg_replace('/<script\b[^>]*>(.*?)<\/script>/is', '', $html);
+        $html = preg_replace('/<style\b[^>]*>(.*?)<\/style>/is', '', $html);
         $html = preg_replace('/<!--.*?-->/s', '', $html);
-        
         $html = preg_replace('/\s+/', ' ', $html);
-        
-        // Truncate for AI token limits
-        if (strlen($html) > 3000) {
-            $html = substr($html, 0, 3000) . '...';
-        }
-        
         return trim($html);
     }
 
+    /**
+     * Extract a potential title from HTML section for early filtering.
+     */
     private function extract_section_title(string $html): string {
         $dom = new \DOMDocument();
         libxml_use_internal_errors(true);
-        $dom->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $dom->loadHTML('<meta charset="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         libxml_clear_errors();
 
         $xpath = new \DOMXPath($dom);
 
-        $name = $xpath->query('//*[@itemprop="name"]');
-        if ($name->length > 0) {
-            $title = trim($name->item(0)->textContent);
-            if ($title !== '') {
-                return $title;
-            }
-        }
+        $queries = [
+            "//h1",
+            "//h2",
+            "//h3",
+            "//*[contains(@class, 'title')]",
+            "//*[contains(@class, 'event-name')]",
+            "//*[@itemprop='name']",
+        ];
 
-        $headings = $xpath->query('//h1|//h2|//h3');
-        foreach ($headings as $node) {
-            $title = trim($node->textContent);
-            if ($title !== '') {
-                return $title;
+        foreach ($queries as $query) {
+            $nodes = $xpath->query($query);
+            if ($nodes !== false && $nodes->length > 0) {
+                $text = trim($nodes->item(0)->textContent);
+                if (!empty($text)) {
+                    return $text;
+                }
             }
         }
 
@@ -349,14 +430,7 @@ class UniversalWebScraper extends EventImportHandler {
     }
 
     /**
-     * Find next page URL from pagination links in HTML
-     *
-     * Detects common pagination patterns and returns the next page URL.
-     * Only follows same-domain links to prevent security issues.
-     *
-     * @param string $html HTML content to search for pagination
-     * @param string $current_url Current page URL for domain validation
-     * @return string|null Next page URL or null if not found
+     * Find next page URL from pagination links in HTML.
      */
     private function find_next_page_url(string $html, string $current_url): ?string {
         $current_host = parse_url($current_url, PHP_URL_HOST);
@@ -429,7 +503,6 @@ class UniversalWebScraper extends EventImportHandler {
                 $class = strtolower($node->getAttribute('class'));
                 $aria_label = strtolower($node->getAttribute('aria-label'));
 
-                // Look for "next" indicators
                 if (
                     strpos($text, 'next') !== false ||
                     strpos($class, 'next') !== false ||
@@ -450,12 +523,7 @@ class UniversalWebScraper extends EventImportHandler {
     }
 
     /**
-     * Extract and validate href from a DOM node
-     *
-     * @param \DOMNode $node DOM node to extract href from
-     * @param string $current_url Current page URL for resolving relative URLs
-     * @param string $current_host Current host for domain validation
-     * @return string|null Valid absolute URL or null
+     * Extract and validate href from DOM node.
      */
     private function extract_valid_href(\DOMNode $node, string $current_url, string $current_host): ?string {
         if (!($node instanceof \DOMElement)) {
@@ -463,7 +531,7 @@ class UniversalWebScraper extends EventImportHandler {
         }
 
         $href = $node->getAttribute('href');
-        if (empty($href)) {
+        if (empty($href) || $href === '#') {
             return null;
         }
 
@@ -471,41 +539,25 @@ class UniversalWebScraper extends EventImportHandler {
     }
 
     /**
-     * Resolve and validate a URL
-     *
-     * Converts relative URLs to absolute and validates same-domain requirement.
-     *
-     * @param string $href URL or path to resolve
-     * @param string $current_url Current page URL for resolving relative URLs
-     * @param string $current_host Current host for domain validation
-     * @return string|null Valid absolute URL or null
+     * Resolve relative URL and validate same-domain.
      */
     private function resolve_url(string $href, string $current_url, string $current_host): ?string {
-        $href = trim($href);
-
-        // Skip invalid href values
-        if (
-            empty($href) ||
-            $href === '#' ||
-            strpos($href, 'javascript:') === 0 ||
-            strpos($href, 'mailto:') === 0
-        ) {
+        if (strpos($href, 'javascript:') === 0) {
             return null;
         }
 
         // Handle protocol-relative URLs
         if (strpos($href, '//') === 0) {
-            $href = parse_url($current_url, PHP_URL_SCHEME) . ':' . $href;
+            $href = 'https:' . $href;
         }
+
         // Handle relative URLs
-        elseif (strpos($href, '/') === 0) {
-            $scheme = parse_url($current_url, PHP_URL_SCHEME);
+        if (strpos($href, '/') === 0) {
+            $scheme = parse_url($current_url, PHP_URL_SCHEME) ?? 'https';
             $href = $scheme . '://' . $current_host . $href;
-        }
-        // Handle relative paths without leading slash
-        elseif (strpos($href, 'http') !== 0) {
-            $base_path = dirname(parse_url($current_url, PHP_URL_PATH));
-            $scheme = parse_url($current_url, PHP_URL_SCHEME);
+        } elseif (!preg_match('/^https?:\/\//i', $href)) {
+            $base_path = dirname(parse_url($current_url, PHP_URL_PATH) ?: '/');
+            $scheme = parse_url($current_url, PHP_URL_SCHEME) ?? 'https';
             $href = $scheme . '://' . $current_host . $base_path . '/' . $href;
         }
 
@@ -515,534 +567,37 @@ class UniversalWebScraper extends EventImportHandler {
             return null;
         }
 
-        // Validate URL format
-        if (!filter_var($href, FILTER_VALIDATE_URL)) {
+        // Skip if it's the same as current URL
+        $current_normalized = strtok($current_url, '#');
+        $href_normalized = strtok($href, '#');
+        if ($current_normalized === $href_normalized) {
             return null;
         }
 
         return $href;
     }
-    
+
     /**
-     * Extract raw HTML section for AI processing in subsequent pipeline steps
-     *
-     * Prepares cleaned HTML content for processing by AI steps later in the pipeline.
-     * Does not perform any AI processing - just returns cleaned HTML data.
-     *
-     * @param string $section_html Raw HTML section containing event information
-     * @param string $source_url Source URL for context
-     * @param array $config Handler configuration (unused for universal scraping)
-     * @return string|null Cleaned HTML data or null if processing failed
+     * Extract raw HTML section for AI processing.
      */
     private function extract_raw_html_section(string $section_html, string $source_url, array $config = []): ?string {
-        $this->log('debug', 'Universal Web Scraper: Preparing raw HTML for pipeline processing', [
-            'source_url' => $source_url,
-            'section_length' => strlen($section_html)
-        ]);
+        $cleaned = $this->clean_html_for_ai($section_html);
 
-        // Clean HTML for processing (remove scripts, styles, comments)
-        $cleaned_html = $this->clean_html_for_ai($section_html);
-
-        if (empty($cleaned_html) || strlen($cleaned_html) < 30) {
-            $this->log('debug', 'Universal Web Scraper: HTML section too short after cleaning');
-            return null;
-        }
-
-        $this->log('info', 'Universal Web Scraper: Successfully prepared HTML section', [
-            'source_url' => $source_url,
-            'cleaned_length' => strlen($cleaned_html)
-        ]);
-
-        return $cleaned_html;
-    }
-
-
-    /**
-     * Extract Schema.org microdata from HTML element
-     *
-     * Parses Schema.org Event microdata using itemtype and itemprop attributes.
-     * Provides more accurate data extraction than CSS parsing.
-     *
-     * @param string $html HTML content containing Schema.org microdata
-     * @param string $source_url Source URL for context
-     * @return array|null Structured event data or null if no valid microdata found
-     */
-    private function extract_schema_microdata(string $html, string $source_url): ?array {
-        $dom = new \DOMDocument();
-        libxml_use_internal_errors(true);
-        $dom->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-        libxml_clear_errors();
-
-        $xpath = new \DOMXPath($dom);
-
-        // Find Event microdata elements
-        $event_elements = $xpath->query("//*[@itemtype='https://schema.org/Event' or @itemtype='http://schema.org/Event']");
-
-        if ($event_elements->length === 0) {
-            return null;
-        }
-
-        $event_element = $event_elements->item(0);
-        $event_data = [];
-
-        // Extract basic event properties
-        $name = $xpath->query(".//*[@itemprop='name']", $event_element);
-        if ($name->length > 0) {
-            $event_data['title'] = trim($name->item(0)->textContent);
-        }
-
-        $start_date = $xpath->query(".//*[@itemprop='startDate']", $event_element);
-        if ($start_date->length > 0) {
-            $start_node = $start_date->item(0);
-            $datetime = '';
-            if ($start_node instanceof \DOMElement) {
-                $datetime = $start_node->getAttribute('datetime') ?: $start_node->textContent;
-            } elseif ($start_node) {
-                $datetime = $start_node->textContent;
-            }
-
-            if (!empty($datetime)) {
-                $parsed_date = date('Y-m-d', strtotime($datetime));
-                $parsed_time = date('H:i', strtotime($datetime));
-                $event_data['startDate'] = $parsed_date;
-                $event_data['startTime'] = $parsed_time !== '00:00' ? $parsed_time : '';
-            }
-        }
-
-        $end_date = $xpath->query(".//*[@itemprop='endDate']", $event_element);
-        if ($end_date->length > 0) {
-            $end_node = $end_date->item(0);
-            $datetime = '';
-            if ($end_node instanceof \DOMElement) {
-                $datetime = $end_node->getAttribute('datetime') ?: $end_node->textContent;
-            } elseif ($end_node) {
-                $datetime = $end_node->textContent;
-            }
-
-            if (!empty($datetime)) {
-                $event_data['endDate'] = date('Y-m-d', strtotime($datetime));
-                $event_data['endTime'] = date('H:i', strtotime($datetime));
-            }
-        }
-
-        $description = $xpath->query(".//*[@itemprop='description']", $event_element);
-        if ($description->length > 0) {
-            $event_data['description'] = trim($description->item(0)->textContent);
-        }
-
-        // Extract performer data (Schema.org compliant)
-        $performer = $xpath->query(".//*[@itemprop='performer']", $event_element);
-        if ($performer->length > 0) {
-            $performer_name = $xpath->query(".//*[@itemprop='name']", $performer->item(0));
-            if ($performer_name->length > 0) {
-                $event_data['performer'] = trim($performer_name->item(0)->textContent);
-            } else {
-                $event_data['performer'] = trim($performer->item(0)->textContent);
-            }
-        }
-
-        // Extract organizer data
-        $organizer = $xpath->query(".//*[@itemprop='organizer']", $event_element);
-        if ($organizer->length > 0) {
-            $organizer_name = $xpath->query(".//*[@itemprop='name']", $organizer->item(0));
-            if ($organizer_name->length > 0) {
-                $event_data['organizer'] = trim($organizer_name->item(0)->textContent);
-            } else {
-                $event_data['organizer'] = trim($organizer->item(0)->textContent);
-            }
-        }
-
-        // Extract location (venue) data
-        $location = $xpath->query(".//*[@itemprop='location']", $event_element);
-        if ($location->length > 0) {
-            $location_element = $location->item(0);
-
-            // Venue name
-            $venue_name = $xpath->query(".//*[@itemprop='name']", $location_element);
-            if ($venue_name->length > 0) {
-                $event_data['venue'] = trim($venue_name->item(0)->textContent);
-            }
-
-            // Address components
-            $address = $xpath->query(".//*[@itemprop='address']", $location_element);
-            if ($address->length > 0) {
-                $address_element = $address->item(0);
-
-                $street_address = $xpath->query(".//*[@itemprop='streetAddress']", $address_element);
-                if ($street_address->length > 0) {
-                    $event_data['venueAddress'] = trim($street_address->item(0)->textContent);
-                }
-
-                $locality = $xpath->query(".//*[@itemprop='addressLocality']", $address_element);
-                if ($locality->length > 0) {
-                    $event_data['venueCity'] = trim($locality->item(0)->textContent);
-                }
-
-                $region = $xpath->query(".//*[@itemprop='addressRegion']", $address_element);
-                if ($region->length > 0) {
-                    $event_data['venueState'] = trim($region->item(0)->textContent);
-                }
-
-                $postal_code = $xpath->query(".//*[@itemprop='postalCode']", $address_element);
-                if ($postal_code->length > 0) {
-                    $event_data['venueZip'] = trim($postal_code->item(0)->textContent);
-                }
-
-                $country = $xpath->query(".//*[@itemprop='addressCountry']", $address_element);
-                if ($country->length > 0) {
-                    $event_data['venueCountry'] = trim($country->item(0)->textContent);
-                }
-            }
-
-            // Venue phone
-            $telephone = $xpath->query(".//*[@itemprop='telephone']", $location_element);
-            if ($telephone->length > 0) {
-                $event_data['venuePhone'] = trim($telephone->item(0)->textContent);
-            }
-
-            // Venue website
-            $url = $xpath->query(".//*[@itemprop='url']", $location_element);
-            if ($url->length > 0) {
-                $url_node = $url->item(0);
-                $website = '';
-                if ($url_node instanceof \DOMElement) {
-                    $website = $url_node->getAttribute('href') ?: $url_node->textContent;
-                } elseif ($url_node) {
-                    $website = $url_node->textContent;
-                }
-
-                if (!empty($website)) {
-                    $event_data['venueWebsite'] = trim($website);
-                }
-            }
-
-            // Geo coordinates
-            $geo = $xpath->query(".//*[@itemprop='geo']", $location_element);
-            if ($geo->length > 0) {
-                $geo_element = $geo->item(0);
-                $latitude = $xpath->query(".//*[@itemprop='latitude']", $geo_element);
-                $longitude = $xpath->query(".//*[@itemprop='longitude']", $geo_element);
-                if ($latitude->length > 0 && $longitude->length > 0) {
-                    $lat = trim($latitude->item(0)->textContent);
-                    $lng = trim($longitude->item(0)->textContent);
-                    $event_data['venueCoordinates'] = $lat . ',' . $lng;
-                }
-            }
-        }
-
-        // Extract offers (pricing) data
-        $offers = $xpath->query(".//*[@itemprop='offers']", $event_element);
-        if ($offers->length > 0) {
-            $offers_element = $offers->item(0);
-
-            $price = $xpath->query(".//*[@itemprop='price']", $offers_element);
-            if ($price->length > 0) {
-                $event_data['price'] = trim($price->item(0)->textContent);
-            }
-
-            $ticket_url = $xpath->query(".//*[@itemprop='url']", $offers_element);
-            if ($ticket_url->length > 0) {
-                $ticket_node = $ticket_url->item(0);
-                $candidate_url = '';
-                if ($ticket_node instanceof \DOMElement) {
-                    $candidate_url = $ticket_node->getAttribute('href') ?: $ticket_node->textContent;
-                } elseif ($ticket_node) {
-                    $candidate_url = $ticket_node->textContent;
-                }
-
-                if (!empty($candidate_url)) {
-                    $event_data['ticketUrl'] = trim($candidate_url);
-                }
-            }
-        }
-
-        // Extract image
-        $image = $xpath->query(".//*[@itemprop='image']", $event_element);
-        if ($image->length > 0) {
-            $image_node = $image->item(0);
-            $image_value = '';
-            if ($image_node instanceof \DOMElement) {
-                $image_value = $image_node->getAttribute('src') ?: $image_node->getAttribute('href') ?: $image_node->textContent;
-            } elseif ($image_node) {
-                $image_value = $image_node->textContent;
-            }
-
-            if (!empty($image_value)) {
-                $event_data['image'] = trim($image_value);
-            }
-        }
-
-        // Require at least title and startDate for valid event
-        if (empty($event_data['title']) || empty($event_data['startDate'])) {
-            $this->log('debug', 'Universal Web Scraper: Invalid Schema.org microdata - missing title or startDate', [
+        if (empty($cleaned) || strlen($cleaned) < 50) {
+            $this->log('debug', 'Universal Web Scraper: HTML section too short after cleaning', [
                 'source_url' => $source_url,
-                'has_title' => !empty($event_data['title']),
-                'has_start_date' => !empty($event_data['startDate'])
+                'cleaned_length' => strlen($cleaned)
             ]);
             return null;
         }
 
-        $this->log('info', 'Universal Web Scraper: Successfully extracted Schema.org microdata', [
-            'source_url' => $source_url,
-            'title' => $event_data['title'],
-            'start_date' => $event_data['startDate'],
-            'venue' => $event_data['venue'] ?? 'N/A'
-        ]);
-
-        return $event_data;
-    }
-
-    /**
-     * Extract Schema.org JSON-LD structured data from HTML
-     *
-     * Parses <script type="application/ld+json"> tags for Schema.org Event objects.
-     * Provides the most accurate extraction method when available.
-     *
-     * @param string $html HTML content containing JSON-LD scripts
-     * @param string $source_url Source URL for context
-     * @return array|null Structured event data or null if no valid JSON-LD found
-     */
-    private function extract_jsonld_events(string $html, string $source_url): ?array {
-        // Find all JSON-LD script tags
-        preg_match_all('/<script[^>]*type=["\']application\/ld\+json["\'][^>]*>(.*?)<\/script>/is', $html, $matches);
-
-        if (empty($matches[1])) {
-            return null;
-        }
-
-        foreach ($matches[1] as $json_content) {
-            $data = json_decode(trim($json_content), true);
-
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                continue;
-            }
-
-            // Handle single Event object
-            if (isset($data['@type']) && $data['@type'] === 'Event') {
-                return $this->parse_jsonld_event($data, $source_url);
-            }
-
-            // Handle array of objects
-            if (is_array($data)) {
-                foreach ($data as $item) {
-                    if (isset($item['@type']) && $item['@type'] === 'Event') {
-                        return $this->parse_jsonld_event($item, $source_url);
-                    }
-                }
-            }
-
-            // Handle graph structure
-            if (isset($data['@graph']) && is_array($data['@graph'])) {
-                foreach ($data['@graph'] as $item) {
-                    if (isset($item['@type']) && $item['@type'] === 'Event') {
-                        return $this->parse_jsonld_event($item, $source_url);
-                    }
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Parse individual JSON-LD Event object
-     *
-     * @param array $event_data JSON-LD Event object
-     * @param string $source_url Source URL for context
-     * @return array|null Structured event data
-     */
-    private function parse_jsonld_event(array $event_data, string $source_url): ?array {
-        $parsed_event = [];
-
-        // Extract basic event properties
-        $parsed_event['title'] = $event_data['name'] ?? '';
-        $parsed_event['description'] = $event_data['description'] ?? '';
-
-        // Parse start date and time
-        if (!empty($event_data['startDate'])) {
-            $start_datetime = $event_data['startDate'];
-            $parsed_event['startDate'] = date('Y-m-d', strtotime($start_datetime));
-            $parsed_time = date('H:i', strtotime($start_datetime));
-            $parsed_event['startTime'] = $parsed_time !== '00:00' ? $parsed_time : '';
-        }
-
-        // Parse end date and time
-        if (!empty($event_data['endDate'])) {
-            $end_datetime = $event_data['endDate'];
-            $parsed_event['endDate'] = date('Y-m-d', strtotime($end_datetime));
-            $parsed_event['endTime'] = date('H:i', strtotime($end_datetime));
-        }
-
-        // Extract performer (Schema.org compliant)
-        if (!empty($event_data['performer'])) {
-            $performer = $event_data['performer'];
-            if (is_array($performer)) {
-                $parsed_event['performer'] = $performer['name'] ?? $performer[0]['name'] ?? '';
-            } else {
-                $parsed_event['performer'] = $performer;
-            }
-        }
-
-        // Extract organizer
-        if (!empty($event_data['organizer'])) {
-            $organizer = $event_data['organizer'];
-            if (is_array($organizer)) {
-                $parsed_event['organizer'] = $organizer['name'] ?? $organizer[0]['name'] ?? '';
-            } else {
-                $parsed_event['organizer'] = $organizer;
-            }
-        }
-
-        // Extract location (venue) data
-        if (!empty($event_data['location'])) {
-            $location = $event_data['location'];
-
-            // Venue name
-            $parsed_event['venue'] = $location['name'] ?? '';
-
-            // Address data
-            if (!empty($location['address'])) {
-                $address = $location['address'];
-                $parsed_event['venueAddress'] = $address['streetAddress'] ?? '';
-                $parsed_event['venueCity'] = $address['addressLocality'] ?? '';
-                $parsed_event['venueState'] = $address['addressRegion'] ?? '';
-                $parsed_event['venueZip'] = $address['postalCode'] ?? '';
-                $parsed_event['venueCountry'] = $address['addressCountry'] ?? '';
-            }
-
-            // Additional venue data
-            $parsed_event['venuePhone'] = $location['telephone'] ?? '';
-            $parsed_event['venueWebsite'] = $location['url'] ?? '';
-
-            // Geo coordinates
-            if (!empty($location['geo'])) {
-                $geo = $location['geo'];
-                $lat = $geo['latitude'] ?? '';
-                $lng = $geo['longitude'] ?? '';
-                if ($lat && $lng) {
-                    $parsed_event['venueCoordinates'] = $lat . ',' . $lng;
-                }
-            }
-        }
-
-        // Extract offers (pricing) data
-        if (!empty($event_data['offers'])) {
-            $offers = $event_data['offers'];
-            if (is_array($offers) && isset($offers[0])) {
-                $offers = $offers[0]; // Use first offer
-            }
-
-            $parsed_event['price'] = $offers['price'] ?? '';
-            $parsed_event['ticketUrl'] = $offers['url'] ?? '';
-        }
-
-        // Extract image
-        if (!empty($event_data['image'])) {
-            $image = $event_data['image'];
-            if (is_array($image)) {
-                $parsed_event['image'] = $image[0] ?? '';
-            } else {
-                $parsed_event['image'] = $image;
-            }
-        }
-
-        // Require at least title and startDate for valid event
-        if (empty($parsed_event['title']) || empty($parsed_event['startDate'])) {
-            $this->log('debug', 'Universal Web Scraper: Invalid JSON-LD Event - missing title or startDate', [
-                'source_url' => $source_url,
-                'has_title' => !empty($parsed_event['title']),
-                'has_start_date' => !empty($parsed_event['startDate'])
+        if (strlen($cleaned) > 50000) {
+            $cleaned = substr($cleaned, 0, 50000);
+            $this->log('debug', 'Universal Web Scraper: Truncated HTML section to 50KB', [
+                'source_url' => $source_url
             ]);
-            return null;
         }
 
-        $this->log('info', 'Universal Web Scraper: Successfully extracted JSON-LD Event', [
-            'source_url' => $source_url,
-            'title' => $parsed_event['title'],
-            'start_date' => $parsed_event['startDate'],
-            'venue' => $parsed_event['venue'] ?? 'N/A'
-        ]);
-
-        return $parsed_event;
+        return $cleaned;
     }
-
-    /**
-     * Extract structured event data from AI tool parameters
-     * 
-     * @param array $parameters AI tool parameters containing event data
-     * @param string $source_url Source URL for context
-     * @param array $handler_config Handler configuration containing static venue data
-     * @return array|null Standardized event data or null if extraction failed
-     */
-    private function extract_structured_event_data(array $parameters, string $source_url, array $handler_config = []): ?array {
-        // Validate required fields
-        if (empty($parameters['title'])) {
-            $this->log('debug', 'Universal AI Scraper: Missing required title field', [
-                'source_url' => $source_url,
-                'parameter_keys' => array_keys($parameters)
-            ]);
-            return null;
-        }
-
-        if ($this->shouldSkipEventTitle($parameters['title'])) {
-            return null;
-        }
-        
-        if ($this->isPastEvent($parameters['startDate'] ?? '')) {
-            $this->log('debug', 'Universal AI Scraper: Skipping past event', [
-                'source_url' => $source_url,
-                'title' => $parameters['title'],
-                'start_date' => $parameters['startDate'] ?? ''
-            ]);
-            return null;
-        }
-        
-        // Get handler config for venue settings
-        $config = $handler_config['universal_web_scraper'] ?? [];
-        
-        // Standardize and sanitize event data from AI parameters
-        $standardized_event = [
-            'title' => sanitize_text_field($parameters['title']),
-            'startDate' => sanitize_text_field($parameters['startDate'] ?? ''),
-            'endDate' => sanitize_text_field($parameters['endDate'] ?? $parameters['startDate'] ?? ''),
-            'startTime' => sanitize_text_field($parameters['startTime'] ?? ''),
-            'endTime' => sanitize_text_field($parameters['endTime'] ?? ''),
-            'address' => sanitize_text_field($parameters['address'] ?? ''),
-            'price' => sanitize_text_field($parameters['price'] ?? ''),
-            'ticketUrl' => esc_url_raw($parameters['ticketUrl'] ?? ''),
-            'performer' => sanitize_text_field($parameters['performer'] ?? ''),
-            'organizer' => sanitize_text_field($parameters['organizer'] ?? ''),
-            'description' => sanitize_textarea_field($parameters['description'] ?? ''),
-            'image' => esc_url_raw($parameters['image'] ?? ''),
-            'source_url' => $source_url
-        ];
-        
-        // Handle venue data - use static config or let AI extract (same parameter names as Ticketmaster)
-        if (!empty($config['venue'])) {
-            // Use static venue data from handler config (same flow as Ticketmaster)
-            $standardized_event['venue'] = sanitize_text_field($config['venue']);
-            $standardized_event['venueAddress'] = sanitize_text_field($config['venueAddress'] ?? '');
-            $standardized_event['venueCity'] = sanitize_text_field($config['venueCity'] ?? '');
-            $standardized_event['venueState'] = sanitize_text_field($config['venueState'] ?? '');
-            $standardized_event['venueZip'] = sanitize_text_field($config['venueZip'] ?? '');
-            $standardized_event['venueCountry'] = sanitize_text_field($config['venueCountry'] ?? '');
-            $standardized_event['venuePhone'] = sanitize_text_field($config['venuePhone'] ?? '');
-            $standardized_event['venueWebsite'] = esc_url_raw($config['venueWebsite'] ?? '');
-            $standardized_event['venueCoordinates'] = sanitize_text_field($config['venueCoordinates'] ?? '');
-        } else {
-            // Let AI extract venue data from HTML (existing behavior)
-            $standardized_event['venue'] = sanitize_text_field($parameters['venue'] ?? '');
-            $standardized_event['venueAddress'] = sanitize_text_field($parameters['venueAddress'] ?? '');
-            $standardized_event['venueCity'] = sanitize_text_field($parameters['venueCity'] ?? '');
-            $standardized_event['venueState'] = sanitize_text_field($parameters['venueState'] ?? '');
-            $standardized_event['venueZip'] = sanitize_text_field($parameters['venueZip'] ?? '');
-            $standardized_event['venueCountry'] = sanitize_text_field($parameters['venueCountry'] ?? '');
-            $standardized_event['venuePhone'] = sanitize_text_field($parameters['venuePhone'] ?? '');
-            $standardized_event['venueWebsite'] = esc_url_raw($parameters['venueWebsite'] ?? '');
-            $standardized_event['venueCoordinates'] = sanitize_text_field($parameters['venueCoordinates'] ?? '');
-        }
-        
-        return $standardized_event;
-    }
-    
 }

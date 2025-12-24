@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.7.1
+**Version**: 0.8.0
 
 ## Plugin Bootstrap
 
@@ -14,19 +14,22 @@ Technical guidance for Claude Code when working with the **Data Machine Events**
 ## Data Machine Integration
 
 - **`init_data_machine_integration()`**: Runs at priority 25 on `init`. After verifying `DATAMACHINE_VERSION`, it loads `EventImportFilters`, instantiates all import handlers, loads EventUpsert filters, and registers the EventUpsert handler from `inc/Steps/Upsert/Events/EventUpsert.php`.
-- **Event import handlers**: `load_event_import_handlers()` instantiates the following `FetchHandler` implementations (all located under `inc/Steps/EventImport/Handlers`):
-  - `Ticketmaster\Ticketmaster` (with automatic API pagination up to MAX_PAGE=19)
+- **Event import handlers**: `load_event_import_handlers()` instantiates 15 `FetchHandler` implementations (all located under `inc/Steps/EventImport/Handlers`):
+  - `BandzoogleCalendar\BandzoogleCalendar` (forward-only calendar crawling with popup HTML parsing)
   - `DiceFm\DiceFm`
+  - `DoStuffMediaApi\DoStuffMediaApi`
+  - `Eventbrite\Eventbrite`
+  - `EventFlyer\EventFlyer`
+  - `GoDaddyCalendar\GoDaddyCalendar` (@since v0.7.0)
   - `GoogleCalendar\GoogleCalendar` (with `GoogleCalendarUtils` for ID/URL resolution)
   - `IcsCalendar\IcsCalendar`
+  - `Prekindle\Prekindle` (JSON-LD + HTML time extraction from organizer widgets)
+  - `SingleRecurring\SingleRecurring` (@since v0.6.3)
   - `SpotHopper\SpotHopper`
+  - `Ticketbud\Ticketbud` (OAuth integration, @since v0.7.2)
+  - `Ticketmaster\Ticketmaster` (with automatic API pagination up to MAX_PAGE=19)
   - `WebScraper\UniversalWebScraper` (with Schema.org JSON-LD/microdata priority, XPath selector rules, EventSectionFinder/EventSectionSelectors classes, and automatic pagination up to MAX_PAGES=20)
   - `WordPressEventsAPI\WordPressEventsAPI`
-  - `EventFlyer\EventFlyer`
-  - `Eventbrite\Eventbrite`
-  - `DoStuffMediaApi\DoStuffMediaApi`
-  - `BandzoogleCalendar\BandzoogleCalendar` (forward-only calendar crawling with popup HTML parsing)
-  - `Prekindle\Prekindle` (JSON-LD + HTML time extraction from organizer widgets)
 - **Handler discovery**: `EventImportStep` (extends `DataMachine\Core\Steps\Step`) reads the configured handler slug, looks it up via `datamachine_handlers`, instantiates the class, and delegates to `get_fetch_data()` on `FetchHandler` (or falls back to legacy `execute()`). It merges returned `DataPacket` results into the pipeline and logs configuration issues.
 - **Single-item processing**: Each handler normalizes `(title, startDate, venue)` through `EventIdentifierGenerator::generate()`, checks `datamachine_is_item_processed`, marks the identifier via `datamachine_mark_item_processed`, and returns immediately after pushing a valid event to maintain incremental imports.
 - **EventUpsert**: `Steps\Upsert\Events\EventUpsert` extends `DataMachine\Core\Steps\Update\Handlers\UpdateHandler`. It registers custom taxonomy handlers for `venue` and `promoter`, merges `EngineData` snapshots with AI parameters, identifies existing events (title + venue + start date), runs field-by-field change detection, updates or creates events, processes featured images via `WordPressPublishHelper`, and keeps `_datamachine_event_datetime` synced for calendar queries.
