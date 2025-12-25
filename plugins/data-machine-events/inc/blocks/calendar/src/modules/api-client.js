@@ -99,11 +99,15 @@ export async function fetchFilters(activeFilters = {}, dateContext = {}, archive
 function updatePagination(calendar, pagination) {
     const paginationContainer = calendar.querySelector('.datamachine-events-pagination');
     
-    if (paginationContainer && pagination?.html) {
-        paginationContainer.outerHTML = pagination.html;
-    } else if (!paginationContainer && pagination?.html) {
-        const content = calendar.querySelector('.datamachine-events-content');
-        content.insertAdjacentHTML('afterend', pagination.html);
+    if (pagination?.html) {
+        if (paginationContainer) {
+            paginationContainer.outerHTML = pagination.html;
+        } else {
+            const content = calendar.querySelector('.datamachine-events-content');
+            content.insertAdjacentHTML('afterend', pagination.html);
+        }
+    } else if (paginationContainer) {
+        paginationContainer.remove();
     }
 }
 

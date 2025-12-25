@@ -5,6 +5,14 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.1] - 2025-12-25
+
+### Fixed
+- **Calendar Pagination Logic**: Improved pagination container handling in Calendar block
+  - Simplified conditional logic for pagination updates when HTML response exists
+  - Added removal of pagination container when no pagination HTML is returned
+  - Ensures proper pagination DOM management during filter and navigation updates
+
 ## [0.8.0] - 2025-12-24
 
 ### Breaking Changes
