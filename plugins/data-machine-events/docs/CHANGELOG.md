@@ -5,6 +5,21 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.2] - 2025-12-26
+
+### Changed
+- **Universal Web Scraper HTTP Modernization**: Migrated fetch_html() method from legacy `datamachine_http_get()` to modern `DataMachine\Core\HttpClient::get()`
+  - Simplified error handling with HttpClient response format
+  - Added `'browser_mode' => true` for proper browser-like requests
+  - Added `'context'` parameter for improved logging
+  - Fixed log message consistency ("Universal Web Scraper" instead of "Universal AI Scraper")
+  - Aligns with HTTP Client modernization from v0.4.17
+
+### Technical Details
+- HTTP response handling now uses unified HttpClient format
+- Removed redundant status code and body checks
+- Improved error logging with structured context
+
 ## [0.8.1] - 2025-12-25
 
 ### Fixed

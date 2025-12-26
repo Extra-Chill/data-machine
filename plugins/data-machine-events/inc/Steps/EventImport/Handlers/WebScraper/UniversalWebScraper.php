@@ -327,41 +327,32 @@ class UniversalWebScraper extends EventImportHandler {
      * Fetch HTML content from URL.
      */
     private function fetch_html(string $url): string {
-        $result = datamachine_http_get($url, [
+        $result = \DataMachine\Core\HttpClient::get($url, [
             'timeout' => 30,
-            'user-agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'browser_mode' => true,
             'headers' => [
                 'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                 'Accept-Language' => 'en-US,en;q=0.5',
-            ]
+            ],
+            'context' => 'Universal Web Scraper'
         ]);
 
-        if (is_wp_error($result)) {
-            $this->log('error', 'Universal AI Scraper: HTTP request failed', [
+        if (!$result['success']) {
+            $this->log('error', 'Universal Web Scraper: HTTP request failed', [
                 'url' => $url,
-                'error' => $result->get_error_message(),
+                'error' => $result['error'] ?? 'Unknown error',
             ]);
             return '';
         }
 
-        $status_code = $result['status_code'] ?? 0;
-        if ($status_code < 200 || $status_code >= 300) {
-            $this->log('error', 'Universal AI Scraper: Non-success status code', [
-                'url' => $url,
-                'status_code' => $status_code,
-            ]);
-            return '';
-        }
-        
-        $body = $result['data'];
-        if (empty($body)) {
-            $this->log('error', 'Universal AI Scraper: Empty response body', [
+        if (empty($result['data'])) {
+            $this->log('error', 'Universal Web Scraper: Empty response body', [
                 'url' => $url,
             ]);
             return '';
         }
-        
-        return $body;
+
+        return $result['data'];
     }
 
     /**
