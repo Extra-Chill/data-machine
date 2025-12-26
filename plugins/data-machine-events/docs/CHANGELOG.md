@@ -5,6 +5,25 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.3] - 2025-12-26
+
+### Changed
+- **EventUpsert Code Refactoring**: Simplified architecture by removing intermediate parameter extraction and using EngineData object directly
+  - Removed `extract_event_engine_parameters()`, `dmLog()`, and `log()` methods (~68 lines removed)
+  - `buildEventData()` now uses `$engine->get()` instead of `$engine_parameters` array
+  - `processVenue()` and `processPromoter()` simplified with direct EngineData access
+  - `createEventPost()` and `updateEventPost()` methods no longer require `$engine_parameters` parameter
+  - `assignVenueTaxonomy()` and `assignPromoterTaxonomy()` use `$engine->get()` directly for all metadata
+  - All logging calls changed from wrapper methods to direct `do_action('datamachine_log', ...)`
+  - Title validation improved with better error messages after extracting from engine data
+
+### Technical Details
+- **Single source of truth**: Schema providers (EventSchemaProvider, VenueParameterProvider) define field keys
+- **Direct EngineData access**: Using `$engine->get()` instead of extracting to intermediate array
+- **Simplified logging**: Direct `do_action('datamachine_log', ...)` instead of wrapper methods
+- **Reduced complexity**: Removed ~68 lines of code while maintaining identical functionality
+- **Better data flow**: Engine data takes precedence over AI parameters consistently
+
 ## [0.8.2] - 2025-12-26
 
 ### Changed
