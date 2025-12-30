@@ -42,8 +42,9 @@ class OpenDateExtractor implements ExtractorInterface {
                 continue;
             }
 
+            $react_json = $this->extractReactJson($detail_html);
             $coordinates = $this->extractCoordinates($detail_html);
-            $event = $this->normalizeEvent($jsonld, $coordinates, $event_url);
+            $event = $this->normalizeEvent($jsonld, $react_json, $coordinates, $event_url);
 
             if (!empty($event['title'])) {
                 $events[] = $event;
@@ -147,6 +148,28 @@ class OpenDateExtractor implements ExtractorInterface {
     }
 
     /**
+     * Extract React component JSON with accurate datetime from detail page.
+     *
+     * OpenDate embeds a React component with ISO 8601 datetime values that
+     * include time and timezone, unlike the JSON-LD which only has dates.
+     *
+     * @param string $html Detail page HTML
+     * @return array|null Parsed React JSON confirm data or null
+     */
+    private function extractReactJson(string $html): ?array {
+        if (!preg_match('/<script[^>]*class=["\']js-react-on-rails-component["\'][^>]*data-component-name=["\']AddConfirmToCalendar["\'][^>]*>(.*?)<\/script>/is', $html, $matches)) {
+            return null;
+        }
+
+        $data = json_decode(trim($matches[1]), true);
+        if (json_last_error() !== JSON_ERROR_NONE || empty($data['confirm'])) {
+            return null;
+        }
+
+        return $data['confirm'];
+    }
+
+    /**
      * Extract coordinates from Google Static Maps URL in HTML.
      *
      * @param string $html Detail page HTML
@@ -164,17 +187,18 @@ class OpenDateExtractor implements ExtractorInterface {
      * Normalize JSON-LD Event to standard format.
      *
      * @param array $jsonld JSON-LD Event data
+     * @param array|null $react_json React component confirm data with accurate times
      * @param string|null $coordinates Extracted coordinates
      * @param string $source_url Event detail page URL
      * @return array Normalized event data
      */
-    private function normalizeEvent(array $jsonld, ?string $coordinates, string $source_url): array {
+    private function normalizeEvent(array $jsonld, ?array $react_json, ?string $coordinates, string $source_url): array {
         $event = [
             'title' => $jsonld['name'] ?? '',
             'description' => $jsonld['description'] ?? '',
         ];
 
-        $this->parseDates($event, $jsonld);
+        $this->parseDates($event, $jsonld, $react_json);
         $this->parseLocation($event, $jsonld, $coordinates);
         $this->parseOffers($event, $jsonld, $source_url);
         $this->parsePerformers($event, $jsonld);
@@ -184,20 +208,32 @@ class OpenDateExtractor implements ExtractorInterface {
     }
 
     /**
-     * Parse date/time from JSON-LD event.
+     * Parse date/time from React JSON (preferred) or JSON-LD (fallback).
+     *
+     * React JSON contains accurate ISO 8601 datetime with timezone.
+     * JSON-LD only contains date without time on OpenDate pages.
      */
-    private function parseDates(array &$event, array $jsonld): void {
-        if (!empty($jsonld['startDate'])) {
+    private function parseDates(array &$event, array $jsonld, ?array $react_json): void {
+        if (!empty($react_json['start_time'])) {
+            $start_datetime = $react_json['start_time'];
+            $event['startDate'] = date('Y-m-d', strtotime($start_datetime));
+            $event['startTime'] = date('H:i', strtotime($start_datetime));
+        } elseif (!empty($jsonld['startDate'])) {
             $start_datetime = $jsonld['startDate'];
             $event['startDate'] = date('Y-m-d', strtotime($start_datetime));
             $parsed_time = date('H:i', strtotime($start_datetime));
             $event['startTime'] = $parsed_time !== '00:00' ? $parsed_time : '';
         }
 
-        if (!empty($jsonld['endDate'])) {
-            $end_datetime = $jsonld['endDate'];
+        if (!empty($react_json['end_time_for_calendar'])) {
+            $end_datetime = $react_json['end_time_for_calendar'];
             $event['endDate'] = date('Y-m-d', strtotime($end_datetime));
             $event['endTime'] = date('H:i', strtotime($end_datetime));
+        } elseif (!empty($jsonld['endDate'])) {
+            $end_datetime = $jsonld['endDate'];
+            $event['endDate'] = date('Y-m-d', strtotime($end_datetime));
+            $parsed_time = date('H:i', strtotime($end_datetime));
+            $event['endTime'] = $parsed_time !== '00:00' ? $parsed_time : '';
         }
     }
 

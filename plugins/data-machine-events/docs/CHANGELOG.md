@@ -5,6 +5,14 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.5] - 2025-12-30
+
+### Fixed
+- **OpenDate Extractor Time Accuracy**: Improved date and time extraction for OpenDate.io
+  - Added React component JSON extraction (`js-react-on-rails-component`) to capture accurate ISO 8601 datetimes
+  - Prioritizes React JSON datetime values over JSON-LD (which only contains dates on OpenDate)
+  - Ensures correct event start and end times are captured along with timezone data
+
 ## [0.8.4] - 2025-12-30
 
 ### Added
