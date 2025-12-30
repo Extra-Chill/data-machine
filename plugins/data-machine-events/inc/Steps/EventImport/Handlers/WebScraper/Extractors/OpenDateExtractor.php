@@ -212,13 +212,20 @@ class OpenDateExtractor implements ExtractorInterface {
      *
      * React JSON contains accurate ISO 8601 datetime with timezone.
      * JSON-LD only contains date without time on OpenDate pages.
+     * Uses DateTime to preserve the embedded timezone from ISO 8601 strings.
      */
     private function parseDates(array &$event, array $jsonld, ?array $react_json): void {
         if (!empty($react_json['start_time'])) {
-            $start_datetime = $react_json['start_time'];
-            $event['startDate'] = date('Y-m-d', strtotime($start_datetime));
-            $event['startTime'] = date('H:i', strtotime($start_datetime));
-        } elseif (!empty($jsonld['startDate'])) {
+            try {
+                $dt = new \DateTime($react_json['start_time']);
+                $event['startDate'] = $dt->format('Y-m-d');
+                $event['startTime'] = $dt->format('H:i');
+            } catch (\Exception $e) {
+                // Fall through to JSON-LD fallback
+            }
+        }
+        
+        if (empty($event['startDate']) && !empty($jsonld['startDate'])) {
             $start_datetime = $jsonld['startDate'];
             $event['startDate'] = date('Y-m-d', strtotime($start_datetime));
             $parsed_time = date('H:i', strtotime($start_datetime));
@@ -226,10 +233,16 @@ class OpenDateExtractor implements ExtractorInterface {
         }
 
         if (!empty($react_json['end_time_for_calendar'])) {
-            $end_datetime = $react_json['end_time_for_calendar'];
-            $event['endDate'] = date('Y-m-d', strtotime($end_datetime));
-            $event['endTime'] = date('H:i', strtotime($end_datetime));
-        } elseif (!empty($jsonld['endDate'])) {
+            try {
+                $dt = new \DateTime($react_json['end_time_for_calendar']);
+                $event['endDate'] = $dt->format('Y-m-d');
+                $event['endTime'] = $dt->format('H:i');
+            } catch (\Exception $e) {
+                // Fall through to JSON-LD fallback
+            }
+        }
+        
+        if (empty($event['endDate']) && !empty($jsonld['endDate'])) {
             $end_datetime = $jsonld['endDate'];
             $event['endDate'] = date('Y-m-d', strtotime($end_datetime));
             $parsed_time = date('H:i', strtotime($end_datetime));

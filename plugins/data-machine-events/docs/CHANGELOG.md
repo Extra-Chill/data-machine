@@ -5,6 +5,14 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.6] - 2025-12-30
+
+### Fixed
+- **OpenDate Extractor Timezone Handling**: Switched to `DateTime` object for parsing React JSON datetimes
+  - Ensures ISO 8601 strings with embedded timezones are correctly parsed and formatted
+  - Improved robustness with try-catch blocks for datetime parsing
+  - Maintains JSON-LD fallback for date extraction
+
 ## [0.8.5] - 2025-12-30
 
 ### Fixed
