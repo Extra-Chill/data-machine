@@ -22,6 +22,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\Extractor
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\WixEventsExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\JsonLdExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\MicrodataExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\OpenDateExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\RhpEventsExtractor;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
@@ -72,6 +73,7 @@ class UniversalWebScraper extends EventImportHandler {
         return [
             new WixEventsExtractor(),
             new RhpEventsExtractor(),
+            new OpenDateExtractor(),
             new JsonLdExtractor(),
             new MicrodataExtractor(),
         ];

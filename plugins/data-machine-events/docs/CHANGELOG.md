@@ -5,6 +5,20 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.4] - 2025-12-30
+
+### Added
+- **OpenDate Extractor**: New extractor for OpenDate.io calendar pages
+  - Two-step extraction process: parses listing HTML for event detail URLs, then fetches detail pages
+  - High-fidelity extraction using Schema.org JSON-LD from detail pages
+  - Extracts full venue metadata including street address, city, state, zip, and coordinates
+  - Image and pricing (offer) data extraction
+  - Coordinates extracted from static map URLs when direct geo data is missing
+
+### Changed
+- **Universal Web Scraper**: Integrated `OpenDateExtractor` into the extraction pipeline
+- **Documentation**: Updated `AGENTS.md` to reflect the new OpenDate.io extraction capability
+
 ## [0.8.3] - 2025-12-26
 
 ### Changed
