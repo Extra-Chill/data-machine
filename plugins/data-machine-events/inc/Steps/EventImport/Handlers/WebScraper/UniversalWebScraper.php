@@ -6,11 +6,14 @@
  * Falls back to AI-enhanced HTML parsing when structured data is unavailable.
  *
  * Extraction Priority:
- * 1. Wix Events JSON (wix-warmup-data)
- * 2. RHP Events WordPress plugin HTML
- * 3. Schema.org JSON-LD
- * 4. Schema.org microdata
- * 5. AI-enhanced HTML pattern matching
+ * 1. AEG/AXS JSON (aegwebprod.blob.core.windows.net)
+ * 2. Red Rocks JSON (RedRocksExtractor)
+ * 3. Wix Events JSON (wix-warmup-data)
+ * 4. RHP Events WordPress plugin HTML
+ * 5. OpenDate.io JSON
+ * 6. Schema.org JSON-LD
+ * 7. Schema.org microdata
+ * 8. AI-enhanced HTML pattern matching (Fallback)
  *
  * @package DataMachineEvents\Steps\EventImport\Handlers\WebScraper
  */
