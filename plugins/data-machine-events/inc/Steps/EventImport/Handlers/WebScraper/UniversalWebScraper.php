@@ -24,6 +24,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\JsonLdExt
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\MicrodataExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\OpenDateExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\RhpEventsExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\AegAxsExtractor;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
@@ -71,6 +72,7 @@ class UniversalWebScraper extends EventImportHandler {
      */
     private function getExtractors(): array {
         return [
+            new AegAxsExtractor(),
             new WixEventsExtractor(),
             new RhpEventsExtractor(),
             new OpenDateExtractor(),
