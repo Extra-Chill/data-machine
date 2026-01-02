@@ -5,6 +5,19 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.9] - 2026-01-02
+
+### Added
+- **Freshtix Extractor**: New extractor for the Universal Web Scraper
+  - Parses embedded JavaScript event objects on Freshtix platform pages
+  - Extracts high-fidelity venue metadata from Organization JSON-LD
+  - Handles automatic base URL resolution for images and ticket links
+  - High-accuracy date and time parsing with normalization logic
+
+### Changed
+- **Universal Web Scraper**: Integrated `FreshtixExtractor` into the extraction pipeline at priority 3
+- **Version Alignment**: Synchronized version numbers across all core files including `composer.json` (bumped from 0.8.6 to 0.8.9)
+
 ## [0.8.8] - 2026-01-02
 
 ### Added
