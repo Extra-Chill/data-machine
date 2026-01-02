@@ -17,7 +17,7 @@ The Calendar block renders a Carousel List of events with progressive enhancemen
 
 ## REST API Support
 
-- `GET /wp-json/datamachine/v1/events/calendar`: Calendar controller returns `html`, `pagination`, `navigation`, `counter`, and `success` fragments. It accepts `event_search`, `date_start`, `date_end`, `tax_filter[taxonomy][]`, `paged`, and `past`, sanitizes inputs, builds SQL-aware WP_Query args, and caches taxonomy counts for pagination.
+- `GET /wp-json/datamachine/v1/events/calendar`: Calendar controller returns `html`, `pagination`, `navigation`, `counter`, and `success` fragments. It accepts `event_search`, `date_start`, `date_end`, `tax_filter` (object), `archive_taxonomy`, `archive_term_id`, `paged`, and `past`.
 - `GET /wp-json/datamachine/v1/events/filters`: Filters controller lists taxonomy terms with counts, dependency hints, and hierarchy metadata; accepts `active`, `context`, `date_start`, `date_end`, and `past` so the modal shows accurate controls that respect the current date logic.
 - Progressive enhancement: server-rendered HTML works without JavaScript; when scripts run they fetch these routes for instant filtering while preserving their shareable URL state.
 

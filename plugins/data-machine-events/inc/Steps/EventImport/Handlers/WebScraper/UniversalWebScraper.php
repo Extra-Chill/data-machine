@@ -25,6 +25,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\Microdata
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\OpenDateExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\RhpEventsExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\AegAxsExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\RedRocksExtractor;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
@@ -73,6 +74,7 @@ class UniversalWebScraper extends EventImportHandler {
     private function getExtractors(): array {
         return [
             new AegAxsExtractor(),
+            new RedRocksExtractor(),
             new WixEventsExtractor(),
             new RhpEventsExtractor(),
             new OpenDateExtractor(),

@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.8.0
+**Version**: 0.8.8
 
 ## Plugin Bootstrap
 
@@ -26,9 +26,8 @@ Technical guidance for Claude Code when working with the **Data Machine Events**
   - `Prekindle\Prekindle` (JSON-LD + HTML time extraction from organizer widgets)
   - `SingleRecurring\SingleRecurring` (@since v0.6.3)
   - `SpotHopper\SpotHopper`
-  - `Ticketbud\Ticketbud` (OAuth integration, @since v0.7.2)
   - `Ticketmaster\Ticketmaster` (with automatic API pagination up to MAX_PAGE=19)
-  - `WebScraper\UniversalWebScraper` (with Schema.org JSON-LD/microdata priority, OpenDate.io two-step extraction, XPath selector rules, EventSectionFinder/EventSectionSelectors classes, and automatic pagination up to MAX_PAGES=20)
+  - `WebScraper\\UniversalWebScraper` (extractor priority: AEG/AXS  Wix  RHP  OpenDate.io  JSON-LD  Microdata; then HTML section fallback; automatic pagination up to MAX_PAGES=20)
   - `WordPressEventsAPI\WordPressEventsAPI`
 - **Handler discovery**: `EventImportStep` (extends `DataMachine\Core\Steps\Step`) reads the configured handler slug, looks it up via `datamachine_handlers`, instantiates the class, and delegates to `get_fetch_data()` on `FetchHandler` (or falls back to legacy `execute()`). It merges returned `DataPacket` results into the pipeline and logs configuration issues.
 - **Single-item processing**: Each handler normalizes `(title, startDate, venue)` through `EventIdentifierGenerator::generate()`, checks `datamachine_is_item_processed`, marks the identifier via `datamachine_mark_item_processed`, and returns immediately after pushing a valid event to maintain incremental imports.
@@ -57,7 +56,7 @@ Technical guidance for Claude Code when working with the **Data Machine Events**
 
 Routes in `inc/Api/Routes.php` register controllers from `inc/Api/Controllers/{Calendar,Venues,Filters,Geocoding}` under the `datamachine/v1` namespace.
 
-- `GET /wp-json/datamachine/v1/events/calendar`: Public endpoint powering Calendar block filtering. Accepts `event_search`, `date_start`, `date_end`, `tax_filter[taxonomy][]`, `paged`, and `past`, sanitizes inputs, runs SQL-based WP_Query filtering, and returns `success`, `html`, `pagination`, `navigation`, and `counter` fragments.
+- `GET /wp-json/datamachine/v1/events/calendar`: Public endpoint powering Calendar block filtering. Accepts `event_search`, `date_start`, `date_end`, `tax_filter` (object), `archive_taxonomy`, `archive_term_id`, `paged`, and `past`.
 - `GET /wp-json/datamachine/v1/events/venues/{id}`: Admin-only (`manage_options`). Returns venue description plus metadata (address, city, state, zip, country, phone, website, capacity, coordinates via `Venue_Taxonomy::get_venue_data`).
 - `GET /wp-json/datamachine/v1/events/venues/check-duplicate`: Admin-only duplicate check requiring `name` (and optional `address`), sanitizes input, and responds with `is_duplicate`, `existing_venue_id`, and contextual messaging.
 - `GET /wp-json/datamachine/v1/events/filters`: Public taxonomy filters powered by `Filters` controller. Accepts `active`, `context`, `date_start`, `date_end`, `past`, and returns taxonomy term metadata with counts, parent relationships, and dependency hints.
@@ -87,12 +86,10 @@ Routes in `inc/Api/Routes.php` register controllers from `inc/Api/Controllers/{C
 ## Build Commands
 
 ```bash
-composer install --no-dev          # PHP dependencies
-cd inc/Blocks/Calendar && npm install && npm run build
-cd ../EventDetails && npm install && npm run build
-npm run start                      # Block watchers (Calendar + Event Details)
-npm run lint:js && npm run lint:css  # Event Details linting
-./build.sh                         # Creates /dist/datamachine-events.zip with production assets
+composer install --no-dev --optimize-autoloader
+cd inc/Blocks/Calendar && npm ci && npm run build
+cd ../EventDetails && npm ci && npm run build
+./build.sh
 ```
 
 ## Removed Features (Completed)

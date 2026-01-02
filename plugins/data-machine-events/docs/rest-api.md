@@ -20,26 +20,28 @@ Data Machine Events exposes a focused REST surface under the `datamachine/v1` na
 - **Purpose**: Supplies calendar HTML fragments (`html`, `pagination`, `navigation`, `counter`) for the Calendar block while keeping server-side pagination/accounting.
 - **Controller**: `Calendar::calendar()`.
 - **Arguments**:
-  - `event_search` (string): Searches titles, venue names, and taxonomy badges.
-  - `date_start` / `date_end` (YYYY-MM-DD): Bound the query range for day grouping.
-  - `tax_filter[taxonomy][]` (array): Term IDs per taxonomy.
-  - `paged` (int): Pagination page number (5 days per page enforced by `inc/Blocks/Calendar/Pagination.php`).
-  - `past` (0/1): Toggle past events.
+  - `event_search` (string): Free text search.
+  - `date_start` / `date_end` (YYYY-MM-DD): Bound the query range.
+  - `tax_filter` (object): Map of `{ taxonomy: [termId, ...] }`.
+  - `archive_taxonomy` (string): Sanitized taxonomy key for archive context.
+  - `archive_term_id` (int): Term ID for archive context.
+  - `paged` (int): Page number.
+  - `past` (string): Past-event toggle.
 - **Behavior**: Sanitizes every argument, builds SQL-based WP_Query filters (dates, `_datamachine_event_datetime`, taxonomies), caches taxonomy counts via helper classes, and returns success + fragments for frontend replacement.
 
 ### GET `/wp-json/datamachine/v1/events/filters`
 - **Purpose**: Provides taxonomy term data (counts, parents, dependencies) for the Calendar filter modal.
-- **Controller**: `Filters::filters()`.
+- **Controller**: `Filters::get()`. 
 - **Arguments**:
-  - `active` or `active_filters[taxonomy][]`: Currently selected term IDs.
-  - `context` (string): Optional block context (e.g., `calendar`).
-  - `date_start` / `date_end`: Date window to keep counts accurate.
-  - `past` (0/1): Past event mode influence.
-- **Behavior**: Sanitizes keys/values, streams SQL queries to compute term counts, respects `datamachine_events_excluded_taxonomies`, and responds with structured metadata used by `modules/filter-modal.js`.
+  - `active` (object): Map of `{ taxonomy: [termId, ...] }`.
+  - `context` (string): Defaults to `modal`.
+  - `date_start` / `date_end` (string)
+  - `past` (string)
+- **Behavior**: Sanitizes keys/values, computes term counts for the current calendar context, respects `datamachine_events_excluded_taxonomies`, and responds with structured metadata used by the Calendar block modal.
 
 ### GET `/wp-json/datamachine/v1/events/venues/{id}`
 - **Purpose**: Returns venue description plus nine meta fields for admin editors and pipeline components.
-- **Controller**: `Venues::venue()`.
+- **Controller**: `Venues::get()`. 
 - **Permissions**: `current_user_can('manage_options')`.
 - **Arguments**:
   - `id` (term ID): Sanitized through `absint`.
@@ -61,8 +63,7 @@ Data Machine Events exposes a focused REST surface under the `datamachine/v1` na
   - `query` (string): Sanitized with `sanitize_text_field`.
 - **Behavior**: Calls Nominatim (with `DataMachine\Core\HttpClient`), handles rate limiting, returns `display_name`, `lat`, `lon`, and address parts, and surfaces errors when remote services fail.
 
-## Shared Features
-- **SQL-powered queries**: Calendar queries rely on `_datamachine_event_datetime` meta and taxonomy joins, ensuring pagination/filter fragments return accurate, performant results.
-- **Caching**: REST responses reuse taxonomy counts computed via helpers to avoid redundant queries when the Calendar block changes filters rapidly.
-- **Standard JSON structure**: Controllers always return `success` plus payload/`data`, making the JS modules and admin hooks predictable.
-- **Graceful degradation**: The Calendar block renders identical templates on the server side so REST failures simply fall back to PHP rendering.
+## Notes
+
+- **Query performance**: Calendar queries rely on `_datamachine_event_datetime` meta and taxonomy joins.
+- **Response shape**: Endpoints return JSON suitable for progressive enhancement, but templates still render server-side when JS is absent.

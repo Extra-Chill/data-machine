@@ -1,20 +1,22 @@
 # Universal Web Scraper Handler
 
-Schema.org-compliant web scraping for extracting event data from any HTML page with automated processing, structured data parsing, and paginated site support.
+Web scraping handler that extracts event data from arbitrary HTML pages using structured-data extractors first, then an HTML-section fallback.
 
 ## Overview
 
-The Universal Web Scraper handler prioritizes structured data extraction for maximum accuracy, falling back to AI-enhanced HTML parsing when structured data is unavailable. Features support for Wix Events JSON, Schema.org JSON-LD, HTML section detection using prioritized XPath selector rules, automatic pagination for multi-page results, and ProcessedItems tracking to prevent duplicate processing.
+The Universal Web Scraper handler prioritizes structured data extraction for maximum accuracy, falling back to HTML-section extraction when structured data is unavailable. It supports multiple extractor implementations, XPath-based event section detection, automatic pagination (up to `MAX_PAGES = 20`), and ProcessedItems tracking to prevent duplicate processing.
 
 ## Features
 
 ### Structured Data Extraction (Priority Order)
 
-1. **Wix Events JSON**: Extracts events from `<script id="wix-warmup-data">` containing Wix platform event data
-2. **RHP Events Plugin**: Extracts events from WordPress sites using the RHP Events plugin HTML structure
-3. **JSON-LD Parsing**: Extracts event data from `<script type="application/ld+json">` tags containing Schema.org Event objects
-4. **Schema.org Microdata**: Extracts events from HTML elements with Schema.org itemtype/itemprop attributes
-5. **AI-Enhanced HTML Parsing**: Falls back to AI analysis when structured data is unavailable
+1. **AEG/AXS JSON feed** (`AegAxsExtractor`): Extracts events from AEG/AXS venue JSON feeds
+2. **Wix Events JSON** (`WixEventsExtractor`): Extracts events from `<script id="wix-warmup-data">`
+3. **RHP Events plugin HTML** (`RhpEventsExtractor`): Extracts events from `.rhpSingleEvent` markup
+4. **OpenDate.io** (`OpenDateExtractor`): Two-step extraction (listing → detail page)
+5. **Schema.org JSON-LD** (`JsonLdExtractor`): Parses `<script type="application/ld+json">`
+6. **Schema.org Microdata** (`MicrodataExtractor`): Parses itemtype/itemprop markup
+7. **HTML section extraction** (fallback): Uses XPath selector rules to extract one candidate section at a time for downstream processing
 
 ### Wix Events Support
 
@@ -23,7 +25,7 @@ The handler automatically detects and parses Wix Events platform data:
 - **Automatic Detection**: Identifies `wix-warmup-data` script tags in page HTML
 - **Full Event Data**: Extracts title, dates, venue, location, coordinates, ticket URLs, and images
 - **Timezone Handling**: Properly converts dates using the event's configured timezone
-- **Ticketing Integration**: Captures external ticket URLs (Ticketbud, Eventbrite, etc.)
+- **Ticket URL capture**: Extractors capture ticket URLs when present in source data
 
 ### RHP Events Plugin Support
 
@@ -41,16 +43,15 @@ The handler extracts events from WordPress sites using the RHP Events plugin:
 - **Comprehensive Coverage**: Supports all major Schema.org Event properties
 - **Nested Structures**: Handles @graph structures and arrays of events
 
-### AI-Enhanced HTML Parsing (Fallback)
+### HTML Section Extraction (Fallback)
 
-- **Intelligent Content Detection**: AI identifies event-related content sections in HTML when structured data is unavailable
-- **Contextual Understanding**: AI understands event context and relationships for unstructured content
-- **Multi-Format Support**: Works with various website layouts and content structures
+- EventSectionFinder selects candidate event HTML sections using XPath rules
+- Extracted HTML is sent downstream for AI extraction
 
 ### Processing Features
 
 - **Engine Data Integration**: Stores extracted venue and event data in pipeline engine data
-- **Duplicate Prevention**: Uses EventIdentifierGenerator for consistent duplicate detection
+- **Duplicate Prevention**: Uses ProcessedItems tracking (via handler base methods) to skip already-processed identifiers
 - **Automatic Pagination**: Follows "next page" links to traverse multi-page event listings (MAX_PAGES=20)
 - **XPath Selector Rules**: Prioritized selector system for identifying candidate event sections
 
@@ -88,29 +89,15 @@ The handler uses VenueFieldsTrait for venue configuration:
 
 - **Venue Dropdown**: Select from existing venue taxonomy terms
 - **Create New Venue**: Enter venue name and address details
-- **Address Autocomplete**: Google Places integration for address entry
+- **Address Autocomplete**: Venue fields support coordinate lookup via the plugin's OpenStreetMap/Nominatim-based geocoding endpoint
 - **Override Behavior**: Handler venue config overrides extracted venue data
 
-## Usage Examples
+## Configuration Notes
 
-### Basic Web Scraping
+- **Required**: `source_url`
+- **Optional**: `search`, `exclude_keywords`, and venue override fields (via `VenueFieldsTrait` in the settings UI)
 
-```php
-$config = [
-    'source_url' => 'https://venue-website.com/events'
-];
-```
-
-### With Venue Override
-
-```php
-$config = [
-    'source_url' => 'https://venue-website.com/events',
-    'venue' => 123,  // Existing venue term ID
-    'search' => 'concert,music',
-    'exclude_keywords' => 'cancelled,sold-out'
-];
-```
+This handler returns a single eligible event per run (or a single HTML section for downstream extraction), keeping pipeline imports incremental.
 
 ## Supported Platforms
 
@@ -120,7 +107,7 @@ Websites built on Wix platform with the Wix Events widget:
 
 - Event listings with embedded JSON data
 - Full venue and location information
-- External ticketing links (Ticketbud, Eventbrite, etc.)
+- External ticketing links when present
 - Event images and descriptions
 
 ### RHP Events (WordPress Plugin)
@@ -161,10 +148,12 @@ Websites without structured data (AI fallback):
 ### Extractors (Extractors/ directory)
 
 - **ExtractorInterface.php**: Contract for all extractor implementations
+- **AegAxsExtractor.php**: Parses AEG/AXS JSON feeds
 - **WixEventsExtractor.php**: Parses Wix warmup-data JSON
-- **RhpEventsExtractor.php**: Parses RHP Events WordPress plugin HTML
+- **RhpEventsExtractor.php**: Parses RHP Events plugin HTML
+- **OpenDateExtractor.php**: Handles OpenDate.io listing/detail extraction
 - **JsonLdExtractor.php**: Parses Schema.org JSON-LD script tags
-- **MicrodataExtractor.php**: Parses Schema.org HTML microdata attributes
+- **MicrodataExtractor.php**: Parses Schema.org microdata attributes
 
 ### DataPacket Format
 
@@ -200,45 +189,26 @@ When using HTML fallback:
 }
 ```
 
-## Pagination Features
+## Pagination Details
 
 - **Automatic Link Following**: Detects "next page" links using multiple patterns (rel="next", common navigation selectors)
 - **Domain Validation**: Only follows links on the same domain to prevent crawl drift
 - **URL Tracking**: Maintains visited URL tracking to prevent re-scraping the same page
 - **Max Pages Limit**: Respects MAX_PAGES=20 constant to prevent infinite loops
 
-## Error Handling
+## Data Output
 
-### Network Errors
+- Structured extraction returns a `DataPacket` with JSON `body` containing:
+  - `event`
+  - `venue_metadata`
+  - `import_source`
+  - `extraction_method`
+- HTML section fallback returns a `DataPacket` containing `raw_html` + `source_url` for downstream extraction.
 
-- **Connection Issues**: Timeout and retry logic for network problems
-- **Invalid URLs**: Validation and error reporting for malformed URLs
+## Supported Sources
 
-### Content Errors
-
-- **Parse Failures**: Handling of malformed HTML/JSON content
-- **Missing Content**: Graceful handling when expected content is absent
-- **AI Extraction Errors**: Fallback strategies for extraction failures
-
-## Troubleshooting
-
-### Common Issues
-
-- **Content Structure Changes**: Websites updating layouts breaking extraction
-- **Rate Limiting**: Being blocked by target websites
-- **Dynamic Content**: JavaScript-rendered content not accessible
-- **Encoding Issues**: Non-UTF8 content causing parsing problems
-
-### Debug Information
-
-- Check logs for extraction method used (wix_events, rhp_events, jsonld, microdata, html_section)
-- Review engine data for stored venue/event fields
-- Verify DataPacket contents in pipeline execution logs
-
-### Best Practices
-
-- **Wix Sites**: No configuration needed - automatic detection and extraction
-- **RHP Events Sites**: No configuration needed - automatic detection and extraction
-- **Schema.org Sites**: Automatic detection - verify with Google's Rich Results Test
-- **Custom Sites**: May need keyword filtering to focus on relevant content
-- **Rate Limiting**: Implement delays between scrapes to be respectful to target sites
+- Wix (Wix Events)
+- WordPress sites using the RHP Events plugin
+- OpenDate.io calendars
+- Sites with Schema.org Event JSON-LD or microdata
+- AEG/AXS venue feeds embedded/linked from venue pages

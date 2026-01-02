@@ -2,7 +2,7 @@
 
 Frontend-focused WordPress events plugin with a **block-first architecture** that ties Event Details data storage to Calendar block progressive enhancement and REST API-driven filtering.
 
-**Version**: 0.8.1
+**Version**: 0.8.8
 
 ## Architecture Overview
 
@@ -13,7 +13,7 @@ Frontend-focused WordPress events plugin with a **block-first architecture** tha
 ## Import Pipeline
 
 1. `EventImportStep` discovers handlers that register themselves via `HandlerRegistrationTrait` and exposes configuration through handler settings classes.
-2. **Handlers**: Bandzoogle Calendar, Dice FM, DoStuff Media API, Eventbrite, EventFlyer, GoDaddy Calendar, Google Calendar (with `GoogleCalendarUtils` for ID/URL resolution), ICS Calendar, Prekindle, SingleRecurring, SpotHopper, Ticketbud, Ticketmaster, Universal WebScraper, and WordPress Events API.
+2. **Handlers**: Bandzoogle Calendar, Dice FM, DoStuff Media API, Eventbrite, EventFlyer, GoDaddy Calendar, Google Calendar (with `GoogleCalendarUtils` for ID/URL resolution), ICS Calendar, Prekindle, SingleRecurring, SpotHopper, Ticketmaster, Universal Web Scraper, and WordPress Events API.
 3. Each handler applies `EventIdentifierGenerator::generate($title, $startDate, $venue)` to deduplicate, merges venue metadata into `EventEngineData`, and forwards standardized payloads to `EventUpsert`.
 4. `VenueService`/`Venue_Taxonomy` find or create venue terms and store nine meta fields (address, city, state, zip, country, phone, website, capacity, coordinates) for use in blocks and REST endpoints.
 5. `EventUpsertSettings` exposes status, author, taxonomy, and image download toggles via `WordPressSettingsHandler` so runtime behavior remains configurable.
@@ -22,7 +22,7 @@ Frontend-focused WordPress events plugin with a **block-first architecture** tha
 
 Routes live under `/wp-json/datamachine/v1/events/*` and are registered in `inc/Api/Routes.php` with controllers in `inc/Api/Controllers`.
 
-- `GET /events/calendar`: Calendar controller returns fragments (`html`, `pagination`, `navigation`, `counter`) plus success metadata; accepts `event_search`, `date_start`, `date_end`, `tax_filter[taxonomy][]`, `paged`, and `past`, sanitizes inputs, uses SQL-based query logic, and caches taxonomy counts for pagination.
+- `GET /events/calendar`: Calendar controller returns fragments (`html`, `pagination`, `navigation`, `counter`) plus success metadata; accepts `event_search`, `date_start`, `date_end`, `tax_filter` (object), `archive_taxonomy`, `archive_term_id`, `paged`, and `past`.
 - `GET /events/filters`: Filters controller lists taxonomy terms with counts, hierarchy, and dependency hints; accepts `active`, `context`, `date_start`, `date_end`, and `past` and powers the filter modal in the Calendar block.
 - `GET /events/venues/{id}`: Venues controller (capability `manage_options`) returns venue description and nine meta fields including coordinates from `Venue_Taxonomy::get_venue_data()`.
 - `GET /events/venues/check-duplicate`: Venues controller checks `name`/`address` combinations, sanitizes input, and returns `is_duplicate`, `existing_venue_id`, and friendly messaging to avoid duplicates during admin venue creation.
@@ -65,12 +65,10 @@ datamachine-events/
 ## Commands
 
 ```bash
-composer install                                # PHP dependencies
-cd inc/Blocks/Calendar && npm install && npm run build
-cd ../EventDetails && npm install && npm run build
-npm run start                                   # Run watchers for Calendar and Event Details blocks from their directories
-npm run lint:js && npm run lint:css             # Event Details block linting
-./build.sh                                      # Creates /dist/datamachine-events.zip
+composer install --no-dev --optimize-autoloader  # PHP dependencies (production, matches build.sh)
+cd inc/Blocks/Calendar && npm ci && npm run build
+cd ../EventDetails && npm ci && npm run build
+./build.sh                                       # Creates /dist/datamachine-events.zip
 ```
 
 Watchers should run inside their respective block directories (`inc/Blocks/Calendar` and `inc/Blocks/EventDetails`).

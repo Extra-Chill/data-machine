@@ -129,18 +129,34 @@ class AegAxsExtractor implements ExtractorInterface {
     }
 
     private function parseDateTime(array &$event, array $raw): void {
-        if (!empty($raw['eventDateTimeISO'])) {
-            $timestamp = strtotime($raw['eventDateTimeISO']);
-            if ($timestamp !== false) {
-                $event['startDate'] = date('Y-m-d', $timestamp);
-                $event['startTime'] = date('H:i', $timestamp);
+        $venue_tz = null;
+        if (!empty($raw['eventDateTimeZone'])) {
+            try {
+                $venue_tz = new \DateTimeZone($raw['eventDateTimeZone']);
+            } catch (\Exception $e) {
+                // Invalid timezone, fall back to parsing as-is
             }
         }
 
-        if (!empty($raw['doorDateTime'])) {
-            $door_timestamp = strtotime($raw['doorDateTime']);
-            if ($door_timestamp !== false) {
-                $event['doorsTime'] = date('H:i', $door_timestamp);
+        if (!empty($raw['eventDateTimeISO'])) {
+            try {
+                $dt = new \DateTime($raw['eventDateTimeISO']);
+                if ($venue_tz) {
+                    $dt->setTimezone($venue_tz);
+                }
+                $event['startDate'] = $dt->format('Y-m-d');
+                $event['startTime'] = $dt->format('H:i');
+            } catch (\Exception $e) {
+                // Invalid datetime
+            }
+        }
+
+        if (!empty($raw['doorDateTime']) && $venue_tz) {
+            try {
+                $dt = new \DateTime($raw['doorDateTime'], $venue_tz);
+                $event['doorsTime'] = $dt->format('H:i');
+            } catch (\Exception $e) {
+                // Invalid datetime
             }
         }
     }

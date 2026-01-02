@@ -5,6 +5,25 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.8] - 2026-01-02
+
+### Added
+- **Red Rocks Extractor**: New extractor for redrocksonline.com
+  - Extracts events from custom WordPress card-event patterns
+  - Automatic year detection from month headers
+  - High-fidelity venue metadata for Red Rocks Amphitheatre
+  - Ticket URL, image, and category extraction
+- **Documentation Alignment**: Comprehensive update of AGENTS.md, README.md, and handler documentation to reflect current architecture and extraction priorities
+
+### Fixed
+- **AegAxs Extractor Timezone Handling**: Improved datetime parsing using venue-provided timezone strings
+  - Ensures accurate start and door times by applying `eventDateTimeZone` metadata
+  - Robust handling of ISO 8601 strings with PHP `DateTime` and `DateTimeZone`
+- **Ticketbud Handler Removal**: Final cleanup of Ticketbud references in main plugin file
+
+### Changed
+- **Universal Web Scraper**: Integrated `RedRocksExtractor` into the extraction pipeline
+
 ## [0.8.7] - 2026-01-01
 
 ### Added
