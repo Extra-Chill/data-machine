@@ -226,7 +226,7 @@ class EventSchemaProvider {
      */
     protected static function getEngineAwareKeys(): array {
         $all_keys = array_keys(self::getAllFields());
-        return array_filter($all_keys, fn($key) => $key !== 'description');
+        return array_filter($all_keys, fn($key) => $key !== 'description' && $key !== 'title');
     }
 
     /**

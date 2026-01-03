@@ -5,6 +5,12 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.10] - 2026-01-02
+
+### Changed
+- **Event Identity Priority**: Modified `EventUpsert` to prioritize AI-provided titles over engine data titles during event creation/updates. This allows AI refinements to title data to take precedence while maintaining engine data as a fallback.
+- **Dynamic Tool Parameters**: Updated `EventSchemaProvider` to exclude `title` from engine-aware keys, ensuring the AI can always provide or refine the event title regardless of engine data presence.
+
 ## [0.8.9] - 2026-01-02
 
 ### Added

@@ -60,8 +60,8 @@ class EventUpsert extends UpdateHandler {
             $engine = new EngineData($engine_snapshot, $job_id);
         }
 
-        // Extract event identity fields (engine data takes precedence over AI-provided values)
-        $title = sanitize_text_field($engine->get('title') ?? $parameters['title'] ?? '');
+        // Extract event identity fields (AI title takes precedence, engine data fallback for other fields)
+        $title = sanitize_text_field($parameters['title'] ?? $engine->get('title') ?? '');
         $venue = $engine->get('venue') ?? $parameters['venue'] ?? '';
         $startDate = $engine->get('startDate') ?? $parameters['startDate'] ?? '';
 
@@ -495,7 +495,7 @@ class EventUpsert extends UpdateHandler {
      */
     private function buildEventData(array $parameters, array $handler_config, EngineData $engine): array {
         $event_data = [
-            'title' => sanitize_text_field($engine->get('title') ?? $parameters['title'] ?? ''),
+            'title' => sanitize_text_field($parameters['title'] ?? $engine->get('title') ?? ''),
             'description' => $parameters['description'] ?? ''
         ];
 
