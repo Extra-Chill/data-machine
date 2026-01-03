@@ -3,7 +3,7 @@
  * Plugin Name: Data Machine Events
  * Plugin URI: https://chubes.net
  * Description: WordPress events plugin with block-first architecture. Features AI-driven event creation via Data Machine integration, Event Details blocks for data storage, Calendar blocks for display, and venue taxonomy management.
- * Version: 0.8.10
+ * Version: 0.8.11
  * Author: Chris Huber
  * Author URI: https://chubes.net
  * License: GPL v2 or later
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once __DIR__ . '/vendor/autoload.php';
 }
-define('DATAMACHINE_EVENTS_VERSION', '0.8.10');
+define('DATAMACHINE_EVENTS_VERSION', '0.8.11');
 define('DATAMACHINE_EVENTS_PLUGIN_FILE', __FILE__);
 define('DATAMACHINE_EVENTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DATAMACHINE_EVENTS_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -127,8 +127,10 @@ class DATAMACHINE_Events {
     }
     
     private function load_data_machine_components() {
-        // EventImportStep is autoloaded
+        // Load step type - self-registers via constructor using StepTypeRegistrationTrait
+        new \DataMachineEvents\Steps\EventImport\EventImportStep();
 
+        // Load EventImportFilters for admin asset enqueuing
         if (file_exists(DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Steps/EventImport/EventImportFilters.php')) {
             require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Steps/EventImport/EventImportFilters.php';
         }

@@ -4,7 +4,7 @@ Tags: events, calendar, ticketmaster, eventbrite, import, venues, api
 Requires at least: 6.0
 Tested up to: 6.4
 Requires PHP: 8.0
-Stable tag: 0.8.10
+Stable tag: 0.8.11
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -151,6 +151,11 @@ Yes! Data Machine Events uses dedicated CSS files (no inline styles) and follows
 7. **Import Logs** - Comprehensive analytics and import history
 
 == Changelog ==
+
+= 0.8.11 =
+* Refactored EventImportStep to use StepTypeRegistrationTrait for standardized step registration
+* Updated plugin bootstrap to instantiate EventImportStep during Data Machine integration
+* Removed legacy manual step registration filters from EventImportFilters.php
 
 = 1.0.0 =
 * Initial release

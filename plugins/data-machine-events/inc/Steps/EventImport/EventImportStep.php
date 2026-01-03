@@ -8,6 +8,7 @@
 namespace DataMachineEvents\Steps\EventImport;
 
 use DataMachine\Core\Steps\Step;
+use DataMachine\Core\Steps\StepTypeRegistrationTrait;
 use DataMachine\Core\Steps\Fetch\Handlers\FetchHandler;
 
 if (!defined('ABSPATH')) {
@@ -19,8 +20,20 @@ if (!defined('ABSPATH')) {
  */
 class EventImportStep extends Step {
 
+    use StepTypeRegistrationTrait;
+
     public function __construct() {
         parent::__construct('event_import');
+
+        self::registerStepType(
+            slug: 'event_import',
+            label: 'Event Import',
+            description: 'Import events from venues and ticketing platforms',
+            class: self::class,
+            position: 25,
+            usesHandler: true,
+            hasPipelineConfig: false
+        );
     }
 
     /**

@@ -5,6 +5,13 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.11] - 2026-01-03
+
+### Changed
+- **Step Registration Standard**: Refactored `EventImportStep` to use `StepTypeRegistrationTrait` for standardized self-registration within the Data Machine pipeline.
+- **Bootstrap Architecture**: Updated main plugin file to instantiate `EventImportStep` directly, ensuring early registration of the step type and its associated capabilities.
+- **Code Cleanup**: Removed legacy `datamachine_step_types` filter from `EventImportFilters.php`, delegating all step registration to the class-based trait system.
+
 ## [0.8.10] - 2026-01-02
 
 ### Changed

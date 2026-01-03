@@ -1,10 +1,9 @@
 <?php
 /**
- * Event Import System Registration
+ * Event Import Admin Assets
  * 
- * Registers event import step type, handlers, and universal venue parameter injection.
- * Venue parameters are persisted via engine data making them available
- * to ALL subsequent steps (AI, Publish, Update) following Data Machine's unified architecture.
+ * Enqueues admin assets for the Event Import step type.
+ * Step type registration is handled by EventImportStep using StepTypeRegistrationTrait.
  *
  * @package DataMachineEvents\Steps\EventImport
  * @since 1.0.0
@@ -15,26 +14,6 @@ if (!defined('ABSPATH')) {
 }
 
 use const DataMachineEvents\Api\API_NAMESPACE;
-
-/**
- * Register Event Import step type with Data Machine
- * 
- * Adds the event_import step type to Data Machine's step registry.
- * This step will appear in the pipeline builder as an available step.
- */
-add_filter('datamachine_step_types', function($steps) {
-    $steps['event_import'] = [
-        'label' => __('Event Import', 'datamachine-events'),
-        'description' => __('Import events from venues and ticketing platforms', 'datamachine-events'),
-        'class' => 'DataMachineEvents\\Steps\\EventImport\\EventImportStep',
-        'position' => 25 // Position between fetch (20) and AI (30)
-    ];
-    
-    return $steps;
-});
-
-// Handler registration is now decentralized to individual handler filters
-// using the HandlerRegistrationTrait for standardization.
 
 /**
  * Enqueue venue autocomplete and selector assets on Data Machine admin pages
