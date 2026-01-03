@@ -11,12 +11,14 @@ The Universal Web Scraper handler prioritizes structured data extraction for max
 ### Structured Data Extraction (Priority Order)
 
 1. **AEG/AXS JSON feed** (`AegAxsExtractor`): Extracts events from AEG/AXS venue JSON feeds
-2. **Wix Events JSON** (`WixEventsExtractor`): Extracts events from `<script id="wix-warmup-data">`
-3. **RHP Events plugin HTML** (`RhpEventsExtractor`): Extracts events from `.rhpSingleEvent` markup
-4. **OpenDate.io** (`OpenDateExtractor`): Two-step extraction (listing → detail page)
-5. **Schema.org JSON-LD** (`JsonLdExtractor`): Parses `<script type="application/ld+json">`
-6. **Schema.org Microdata** (`MicrodataExtractor`): Parses itemtype/itemprop markup
-7. **HTML section extraction** (fallback): Uses XPath selector rules to extract one candidate section at a time for downstream processing
+2. **Red Rocks** (`RedRocksExtractor`): Parses Red Rocks Amphitheatre event pages (@since v0.8.0)
+3. **Freshtix** (`FreshtixExtractor`): Parses embedded JavaScript event objects on Freshtix platform pages (@since v0.8.0)
+4. **Wix Events JSON** (`WixEventsExtractor`): Extracts events from `<script id="wix-warmup-data">`
+5. **RHP Events plugin HTML** (`RhpEventsExtractor`): Extracts events from `.rhpSingleEvent` markup
+6. **OpenDate.io** (`OpenDateExtractor`): Two-step extraction (listing → detail page). Prioritizes React JSON datetime values over JSON-LD for improved time accuracy.
+7. **Schema.org JSON-LD** (`JsonLdExtractor`): Parses `<script type="application/ld+json">`
+8. **Schema.org Microdata** (`MicrodataExtractor`): Parses itemtype/itemprop markup
+9. **HTML section extraction** (fallback): Uses XPath selector rules to extract one candidate section at a time for downstream processing
 
 ### Wix Events Support
 
@@ -149,6 +151,8 @@ Websites without structured data (AI fallback):
 
 - **ExtractorInterface.php**: Contract for all extractor implementations
 - **AegAxsExtractor.php**: Parses AEG/AXS JSON feeds
+- **RedRocksExtractor.php**: Parses Red Rocks Amphitheatre event pages
+- **FreshtixExtractor.php**: Parses Freshtix platform pages
 - **WixEventsExtractor.php**: Parses Wix warmup-data JSON
 - **RhpEventsExtractor.php**: Parses RHP Events plugin HTML
 - **OpenDateExtractor.php**: Handles OpenDate.io listing/detail extraction
@@ -208,6 +212,8 @@ When using HTML fallback:
 ## Supported Sources
 
 - Wix (Wix Events)
+- Red Rocks Amphitheatre
+- Freshtix platform sites
 - WordPress sites using the RHP Events plugin
 - OpenDate.io calendars
 - Sites with Schema.org Event JSON-LD or microdata

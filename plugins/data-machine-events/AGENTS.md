@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.8.10
+**Version**: 0.8.11
 
 ## Plugin Bootstrap
 
@@ -27,7 +27,7 @@ Technical guidance for Claude Code when working with the **Data Machine Events**
   - `SingleRecurring\SingleRecurring` (@since v0.6.3)
   - `SpotHopper\SpotHopper`
   - `Ticketmaster\Ticketmaster` (with automatic API pagination up to MAX_PAGE=19)
-  - `WebScraper\\UniversalWebScraper` (extractor priority: AEG/AXS  Wix  RHP  OpenDate.io  JSON-LD  Microdata; then HTML section fallback; automatic pagination up to MAX_PAGES=20)
+  - `WebScraper\\UniversalWebScraper` (extractor priority: AEG/AXS, RedRocks, Freshtix, Wix, RHP, OpenDate.io, JSON-LD, Microdata; then HTML section fallback; automatic pagination up to MAX_PAGES=20)
   - `WordPressEventsAPI\WordPressEventsAPI`
 - **Handler discovery**: `EventImportStep` (extends `DataMachine\Core\Steps\Step`) reads the configured handler slug, looks it up via `datamachine_handlers`, instantiates the class, and delegates to `get_fetch_data()` on `FetchHandler` (or falls back to legacy `execute()`). It merges returned `DataPacket` results into the pipeline and logs configuration issues.
 - **Single-item processing**: Each handler normalizes `(title, startDate, venue)` through `EventIdentifierGenerator::generate()`, checks `datamachine_is_item_processed`, marks the identifier via `datamachine_mark_item_processed`, and returns immediately after pushing a valid event to maintain incremental imports.
