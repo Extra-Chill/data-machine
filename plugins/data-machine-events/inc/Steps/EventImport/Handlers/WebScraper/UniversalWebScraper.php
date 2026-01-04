@@ -37,6 +37,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\FreshtixE
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\FirebaseExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SquarespaceExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SpotHopperExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\PrekindleExtractor;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
@@ -90,6 +91,7 @@ class UniversalWebScraper extends EventImportHandler {
             new FirebaseExtractor(),
             new SquarespaceExtractor(),
             new SpotHopperExtractor(),
+            new PrekindleExtractor(),
             new WixEventsExtractor(),
             new RhpEventsExtractor(),
             new OpenDateExtractor(),

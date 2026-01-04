@@ -4,7 +4,7 @@ Tags: events, calendar, ticketmaster, eventbrite, import, venues, api
 Requires at least: 6.0
 Tested up to: 6.4
 Requires PHP: 8.0
-Stable tag: 0.8.14
+Stable tag: 0.8.15
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -151,6 +151,12 @@ Yes! Data Machine Events uses dedicated CSS files (no inline styles) and follows
 7. **Import Logs** - Comprehensive analytics and import history
 
 == Changelog ==
+
+= 0.8.15 =
+* Refactored Prekindle handler into a specialized extractor within Universal Web Scraper
+* Added PrekindleExtractor with support for hybrid API/HTML data extraction
+* Removed legacy standalone Prekindle handler and settings classes
+* Updated Universal Web Scraper documentation to reflect Prekindle integration
 
 = 0.8.14 = 
 * Introduced centralized timezone handling via DateTimeParser and venueTimezone metadata 

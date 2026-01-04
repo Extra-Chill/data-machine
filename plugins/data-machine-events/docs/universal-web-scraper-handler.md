@@ -16,12 +16,13 @@ The Universal Web Scraper handler prioritizes structured data extraction for max
 4. **Firebase Realtime Database** (`FirebaseExtractor`): Detects Firebase SDK and fetches events from the Firebase REST API (@since v0.8.12)
 5. **Squarespace** (`SquarespaceExtractor`): Extracts events from `Static.SQUARESPACE_CONTEXT` JavaScript objects (@since v0.8.12)
 6. **SpotHopper** (`SpotHopperExtractor`): Auto-detects SpotHopper platform and extracts events from their public API (@since v0.8.12)
-7. **Wix Events JSON** (`WixEventsExtractor`): Extracts events from `<script id="wix-warmup-data">`
-6. **RHP Events plugin HTML** (`RhpEventsExtractor`): Extracts events from `.rhpSingleEvent` markup
-7. **OpenDate.io** (`OpenDateExtractor`): Two-step extraction (listing → detail page). Prioritizes React JSON datetime values over JSON-LD for improved time accuracy.
-8. **Schema.org JSON-LD** (`JsonLdExtractor`): Parses `<script type="application/ld+json">`
-9. **Schema.org Microdata** (`MicrodataExtractor`): Parses itemtype/itemprop markup
-10. **HTML section extraction** (fallback): Uses XPath selector rules to extract one candidate section at a time for downstream processing
+7. **Prekindle** (`PrekindleExtractor`): Auto-detects Prekindle widgets/links and extracts high-fidelity data from their mobile API (@since v0.8.12)
+8. **Wix Events JSON** (`WixEventsExtractor`): Extracts events from `<script id="wix-warmup-data">`
+9. **RHP Events plugin HTML** (`RhpEventsExtractor`): Extracts events from `.rhpSingleEvent` markup
+10. **OpenDate.io** (`OpenDateExtractor`): Two-step extraction (listing → detail page). Prioritizes React JSON datetime values over JSON-LD for improved time accuracy.
+11. **Schema.org JSON-LD** (`JsonLdExtractor`): Parses `<script type="application/ld+json">`
+12. **Schema.org Microdata** (`MicrodataExtractor`): Parses itemtype/itemprop markup
+13. **HTML section extraction** (fallback): Uses XPath selector rules to extract one candidate section at a time for downstream processing
 
 ### Wix Events Support
 
@@ -61,6 +62,16 @@ The handler supports seamless extraction from venues using the SpotHopper platfo
 - **API Extraction**: Fetches structured event data directly from SpotHopper's public API
 - **Linked Data Parsing**: Correctly resolves linked venue and image objects from the API response
 - **Full Venue Data**: Captures complete venue metadata including coordinates, phone, and address
+
+### Prekindle Support
+
+The handler provides high-fidelity extraction for venues using the Prekindle ticketing platform:
+
+- **Automatic Detection**: Detects Prekindle widgets (`pk-cal-widget`) or organizer links in the page HTML
+- **Automatic ID Extraction**: Automatically "sniffs" the `org_id` from widget attributes or script source URLs
+- **Hybrid Extraction**: Fetches the Prekindle mobile grid widget which provides both Schema.org JSON-LD and precise HTML time blocks
+- **Precise Timing**: Scrapes the `pk-times` HTML blocks to capture door and show times that are often missing from standard JSON-LD
+- **Full Metadata**: Extracts title, description, ticket URLs, images, price, and organizer information
 
 ### RHP Events Plugin Support
 
@@ -258,6 +269,7 @@ When using HTML fallback:
 - Wix (Wix Events)
 - Squarespace (Context JS)
 - SpotHopper (API)
+- Prekindle (Hybrid API/HTML)
 - Red Rocks Amphitheatre
 - Freshtix platform sites
 - Firebase Realtime Database sites

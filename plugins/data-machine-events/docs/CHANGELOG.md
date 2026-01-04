@@ -5,6 +5,16 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.15] - 2026-01-04
+
+### Changed
+- **Prekindle Integration**: Refactored the Prekindle handler into a specialized extractor within the `UniversalWebScraper`.
+  - Added `PrekindleExtractor` with support for hybrid API/HTML data extraction.
+  - Improved data accuracy by scraping `pk-times` HTML blocks for door and show times.
+  - Removed legacy standalone `Prekindle` handler and settings classes.
+- **Universal Web Scraper**: Integrated `PrekindleExtractor` into the extraction pipeline.
+- **Documentation**: Updated `universal-web-scraper-handler.md` with technical details for Prekindle extraction support.
+
 ## [0.8.14] - 2026-01-04 
 
 ### Added 

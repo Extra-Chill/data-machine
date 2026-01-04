@@ -30,8 +30,8 @@ class UniversalWebScraperSettings {
         $handler_fields = [
             'source_url' => [
                 'type' => 'url',
-                'label' => __('Website URL', 'datamachine-events'),
-                'description' => __('URL of the webpage containing events. The AI will analyze the page and extract event information automatically.', 'datamachine-events'),
+                'label' => __('Scraper Source URL', 'datamachine-events'),
+                'description' => __('The specific webpage the AI should analyze to extract events.', 'datamachine-events'),
                 'placeholder' => 'https://venue.com/events',
                 'required' => true,
             ],
