@@ -4,7 +4,7 @@ Tags: events, calendar, ticketmaster, eventbrite, import, venues, api
 Requires at least: 6.0
 Tested up to: 6.4
 Requires PHP: 8.0
-Stable tag: 0.8.20
+Stable tag: 0.8.21
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -71,20 +71,20 @@ Frontend-focused WordPress events plugin with block-first architecture. Integrat
 = Why Choose Data Machine Events? =
 
 **vs. Tribe Events Calendar:**
-✅ Lightweight architecture vs. bloated codebase
-✅ Modern WordPress standards vs. legacy approach  
-✅ Visual configuration vs. complex settings
-✅ Native API integrations vs. manual entry
-✅ Universal taxonomy support vs. rigid structure
+* ✅ Lightweight architecture vs. bloated codebase
+* ✅ Modern WordPress standards vs. legacy approach  
+* ✅ Visual configuration vs. complex settings
+* ✅ Native API integrations vs. manual entry
+* ✅ Universal taxonomy support vs. rigid structure
 
 **vs. Other Event Plugins:**
-✅ Block-first architecture (modern WordPress standards)
-✅ Data Machine integration for automated imports and AI publishing
-✅ AI-driven content creation and taxonomy management
-✅ Performance-optimized with background meta sync
-✅ Lightweight single post type approach
-✅ Legacy status detection removed; plugin now relies on Data Machine core health checks
-✅ PSR-4 autoloading with clean class organization
+* ✅ Block-first architecture (modern WordPress standards)
+* ✅ Data Machine integration for automated imports and AI publishing
+* ✅ AI-driven content creation and taxonomy management
+* ✅ Performance-optimized with background meta sync
+* ✅ Lightweight single post type approach
+* ✅ Legacy status detection removed; plugin now relies on Data Machine core health checks
+* ✅ PSR-4 autoloading with clean class organization
 
 = Data Machine Events Workflow =
 
@@ -152,6 +152,13 @@ Yes! Data Machine Events uses dedicated CSS files (no inline styles) and follows
 7. **Import Logs** - Comprehensive analytics and import history
 
 == Changelog ==
+
+= 0.8.21 =
+* Enhanced PageVenueExtractor with multi-layered JSON-LD structured data support
+* Improved address extraction with footer and organization schema parsing
+* Added page-level venue data merging to RhpEventsExtractor for better event fidelity
+* Refined PageVenueExtractor priority order: JSON-LD > Title > Footer/Body
+* Optimized UniversalWebScraper with consolidated extraction methods
 
 = 0.8.20 =
 * Added WordPress API Discovery to UniversalWebScraper for automatic platform identification

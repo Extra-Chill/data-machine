@@ -10,6 +10,8 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors;
 
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\PageVenueExtractor;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -34,17 +36,43 @@ class RhpEventsExtractor implements ExtractorInterface {
             return [];
         }
 
+        $page_venue = PageVenueExtractor::extract($html, $source_url);
+
         $current_year = $this->detectYear($xpath);
         $events = [];
 
         foreach ($event_nodes as $event_node) {
             $normalized = $this->normalizeEvent($xpath, $event_node, $current_year, $source_url);
             if (!empty($normalized['title'])) {
+                $normalized = $this->mergePageVenueData($normalized, $page_venue);
                 $events[] = $normalized;
             }
         }
 
         return $events;
+    }
+
+    /**
+     * Merge page-level venue data into event for missing fields.
+     *
+     * @param array $event Event data
+     * @param array $page_venue Page-level venue data from PageVenueExtractor
+     * @return array Event with merged venue data
+     */
+    private function mergePageVenueData(array $event, array $page_venue): array {
+        $address_fields = ['venueAddress', 'venueCity', 'venueState', 'venueZip', 'venueCountry'];
+
+        foreach ($address_fields as $field) {
+            if (empty($event[$field]) && !empty($page_venue[$field])) {
+                $event[$field] = $page_venue[$field];
+            }
+        }
+
+        if (empty($event['venue']) && !empty($page_venue['venue'])) {
+            $event['venue'] = $page_venue['venue'];
+        }
+
+        return $event;
     }
 
     public function getMethod(): string {

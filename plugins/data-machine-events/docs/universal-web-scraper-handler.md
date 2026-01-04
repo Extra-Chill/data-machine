@@ -20,7 +20,9 @@ The Universal Web Scraper handler prioritizes structured data extraction for max
 8. **Wix Events JSON** (`WixEventsExtractor`): Extracts events from `<script id="wix-warmup-data">`
 9. **RHP Events plugin HTML** (`RhpEventsExtractor`): Extracts events from `.rhpSingleEvent` markup
 10. **OpenDate.io** (`OpenDateExtractor`): Two-step extraction (listing → detail page). Prioritizes React JSON datetime values over JSON-LD for improved time accuracy.
-11. **Schema.org JSON-LD** (`JsonLdExtractor`): Parses `<script type="application/ld+json">`
+11. **Embedded Calendars** (`EmbeddedCalendarExtractor`): Detects and scrapes embedded Google Calendar, SeeTickets, and Turntable widgets. Consolidates legacy standalone `GoogleCalendar` handler logic. (@since v0.8.0)
+12. **External WordPress** (`WordPressExtractor`): Extracts events from external WordPress sites via REST API or structured HTML. Consolidates legacy standalone `WordPressEventsAPI` handler logic. (@since v0.8.0)
+13. **Schema.org JSON-LD** (`JsonLdExtractor`): Parses `<script type="application/ld+json">`
 12. **Schema.org Microdata** (`MicrodataExtractor`): Parses itemtype/itemprop markup
 13. **HTML section extraction** (fallback): Uses XPath selector rules to extract one candidate section at a time for downstream processing
 
@@ -277,3 +279,5 @@ When using HTML fallback:
 - OpenDate.io calendars
 - Sites with Schema.org Event JSON-LD or microdata
 - AEG/AXS venue feeds embedded/linked from venue pages
+- Google Calendar (via EmbeddedCalendarExtractor)
+- External WordPress Events (via WordPressExtractor)

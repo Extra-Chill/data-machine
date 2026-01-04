@@ -5,6 +5,17 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.21] - 2026-01-04
+
+### Added
+- **Enhanced Page Venue Extraction**: Added multi-layered JSON-LD support to `PageVenueExtractor` for high-fidelity venue metadata parsing from site headers and footers.
+- **Venue Entity Discovery**: Improved identification of `MusicVenue`, `EntertainmentBusiness`, and `NightClub` schema types in structured data.
+- **RhpEvents Enhancement**: Integrated page-level venue data merging into the `RhpEventsExtractor` to fill missing address fields in event listings.
+
+### Changed
+- **Extraction Priority**: Refined `PageVenueExtractor` to prioritize JSON-LD structured data over page title parsing and footer scanning.
+- **Address Detection**: Improved robust address detection with expanded support for Squarespace announcement bars and site-wide footers.
+
 ## [0.8.20] - 2026-01-04
 
 ### Added
@@ -82,197 +93,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Squarespace Extractor**: New extractor for the Universal Web Scraper 
   - Extracts events from `Static.SQUARESPACE_CONTEXT` JavaScript objects 
   - High-fidelity extraction of title, description, images, and ticket URLs 
-- **SpotHopper Extractor**: Converted SpotHopper into a Universal Web Scraper extractor 
-  - Improved auto-detection of SpotHopper platform and spot_id extraction 
-  - Fetches structured event data directly from SpotHopper public API 
-
-### Changed 
-- **Standardized Datetime Parsing**: Refactored all event import handlers to use `DateTimeParser` 
-  - Updated `DiceFm`, `Eventbrite`, `GoogleCalendar`, `IcsCalendar`, and `Ticketmaster` handlers 
-  - Improved accuracy for events in different timezones 
-- **Universal Web Scraper**: Integrated `SquarespaceExtractor` and `SpotHopperExtractor` into the extraction pipeline 
-
-## [0.8.13] - 2026-01-04
-
-### Added
-- **Firebase Extractor**: New extractor for the Universal Web Scraper
-  - Detects Firebase SDK and fetches events from the Firebase Realtime Database REST API
-  - Extracts title, dates, description, ticket URLs, and poster images
-  - Handles Firebase JS date strings with timezone information
-  - Automatic base URL resolution for assets
+- **SpotHopper Support**: Converted SpotHopper into a Universal Web Scraper extractor
+  - Improved auto-detection of SpotHopper platform and spot_id extraction
+  - Fetches structured event data directly from SpotHopper public API
 
 ### Changed
-- **Universal Web Scraper**: Integrated `FirebaseExtractor` into the extraction pipeline at priority 4
-- **Documentation**: Updated `universal-web-scraper-handler.md` with technical details for Firebase extraction support
-
-## [0.8.12] - 2026-01-03
-
-### Changed
-- **Taxonomy Filter Sanitization**: Unified query parameter sanitization using recursive logic to preserve nested array structures (e.g., `tax_filter[genre][0]`), improving filter reliability across REST API and pagination.
-- **Schema.org Description**: Enhanced `EventSchemaProvider` to extract plain text from Event Details block content for Schema.org `description` field, improving structured data quality for search engines.
-- **Filter State Management**: Updated `FilterStateManager` regex to support both indexed (`tax_filter[taxonomy][0]`) and non-indexed (`tax_filter[taxonomy][]`) array syntax for better compatibility with varying WordPress conventions.
-- **REST API Terminology**: Updated documentation and descriptions to favor "API-first" over "headless" for better alignment with project goals.
-- **Venue Taxonomy Optimization**: Removed redundant `register_all_public_taxonomies` call in `Venue_Taxonomy` to prevent unintended taxonomy attachments and maintain clean post type registration.
-
-## [0.8.11] - 2026-01-03
-
-### Changed
-- **Step Registration Standard**: Refactored `EventImportStep` to use `StepTypeRegistrationTrait` for standardized self-registration within the Data Machine pipeline.
-- **Bootstrap Architecture**: Updated main plugin file to instantiate `EventImportStep` directly, ensuring early registration of the step type and its associated capabilities.
-- **Code Cleanup**: Removed legacy `datamachine_step_types` filter from `EventImportFilters.php`, delegating all step registration to the class-based trait system.
-
-## [0.8.10] - 2026-01-02
-
-### Changed
-- **Event Identity Priority**: Modified `EventUpsert` to prioritize AI-provided titles over engine data titles during event creation/updates. This allows AI refinements to title data to take precedence while maintaining engine data as a fallback.
-- **Dynamic Tool Parameters**: Updated `EventSchemaProvider` to exclude `title` from engine-aware keys, ensuring the AI can always provide or refine the event title regardless of engine data presence.
-
-## [0.8.9] - 2026-01-02
-
-### Added
-- **Freshtix Extractor**: New extractor for the Universal Web Scraper
-  - Parses embedded JavaScript event objects on Freshtix platform pages
-  - Extracts high-fidelity venue metadata from Organization JSON-LD
-  - Handles automatic base URL resolution for images and ticket links
-  - High-accuracy date and time parsing with normalization logic
-
-### Changed
-- **Universal Web Scraper**: Integrated `FreshtixExtractor` into the extraction pipeline at priority 3
-- **Version Alignment**: Synchronized version numbers across all core files including `composer.json` (bumped from 0.8.6 to 0.8.9)
-
-## [0.8.8] - 2026-01-02
-
-### Added
-- **Red Rocks Extractor**: New extractor for redrocksonline.com
-  - Extracts events from custom WordPress card-event patterns
-  - Automatic year detection from month headers
-  - High-fidelity venue metadata for Red Rocks Amphitheatre
-  - Ticket URL, image, and category extraction
-- **Documentation Alignment**: Comprehensive update of AGENTS.md, README.md, and handler documentation to reflect current architecture and extraction priorities
-
-### Fixed
-- **AegAxs Extractor Timezone Handling**: Improved datetime parsing using venue-provided timezone strings
-  - Ensures accurate start and door times by applying `eventDateTimeZone` metadata
-  - Robust handling of ISO 8601 strings with PHP `DateTime` and `DateTimeZone`
-- **Ticketbud Handler Removal**: Final cleanup of Ticketbud references in main plugin file
-
-### Changed
-- **Universal Web Scraper**: Integrated `RedRocksExtractor` into the extraction pipeline
-
-## [0.8.7] - 2026-01-01
-
-### Added
-- **AegAxs Extractor**: New extractor for AEG/AXS venue JSON feeds
-  - Extracts events from aegwebprod.blob.core.windows.net JSON feeds
-  - Full title building from headliners, supporting acts, and tour data
-  - High-fidelity venue metadata extraction (address, city, state, zip, country)
-  - Image, ticketing status (InStock/SoldOut), and age restriction extraction
-  - Price range extraction from ticketPriceLow/High fields
-  - Automatic JSON feed detection from HTML `data-file` attributes
-
-### Changed
-- **Universal Web Scraper**: Integrated `AegAxsExtractor` into the extraction pipeline
-
-## [0.8.6] - 2025-12-30
-
-### Fixed
-- **OpenDate Extractor Timezone Handling**: Switched to `DateTime` object for parsing React JSON datetimes
-  - Ensures ISO 8601 strings with embedded timezones are correctly parsed and formatted
-  - Improved robustness with try-catch blocks for datetime parsing
-  - Maintains JSON-LD fallback for date extraction
-
-## [0.8.5] - 2025-12-30
-
-### Fixed
-- **OpenDate Extractor Time Accuracy**: Improved date and time extraction for OpenDate.io
-  - Added React component JSON extraction (`js-react-on-rails-component`) to capture accurate ISO 8601 datetimes
-  - Prioritizes React JSON datetime values over JSON-LD (which only contains dates on OpenDate)
-  - Ensures correct event start and end times are captured along with timezone data
-
-## [0.8.4] - 2025-12-30
-
-### Added
-- **OpenDate Extractor**: New extractor for OpenDate.io calendar pages
-  - Two-step extraction process: parses listing HTML for event detail URLs, then fetches detail pages
-  - High-fidelity extraction using Schema.org JSON-LD from detail pages
-  - Extracts full venue metadata including street address, city, state, zip, and coordinates
-  - Image and pricing (offer) data extraction
-  - Coordinates extracted from static map URLs when direct geo data is missing
-
-### Changed
-- **Universal Web Scraper**: Integrated `OpenDateExtractor` into the extraction pipeline
-- **Documentation**: Updated `AGENTS.md` to reflect the new OpenDate.io extraction capability
-
-## [0.8.3] - 2025-12-26
-
-### Changed
-- **EventUpsert Code Refactoring**: Simplified architecture by removing intermediate parameter extraction and using EngineData object directly
-  - Removed `extract_event_engine_parameters()`, `dmLog()`, and `log()` methods (~68 lines removed)
-  - `buildEventData()` now uses `$engine->get()` instead of `$engine_parameters` array
-  - `processVenue()` and `processPromoter()` simplified with direct EngineData access
-  - `createEventPost()` and `updateEventPost()` methods no longer require `$engine_parameters` parameter
-  - `assignVenueTaxonomy()` and `assignPromoterTaxonomy()` use `$engine->get()` directly for all metadata
-  - All logging calls changed from wrapper methods to direct `do_action('datamachine_log', ...)`
-  - Title validation improved with better error messages after extracting from engine data
-
-### Technical Details
-- **Single source of truth**: Schema providers (EventSchemaProvider, VenueParameterProvider) define field keys
-- **Direct EngineData access**: Using `$engine->get()` instead of extracting to intermediate array
-- **Simplified logging**: Direct `do_action('datamachine_log', ...)` instead of wrapper methods
-- **Reduced complexity**: Removed ~68 lines of code while maintaining identical functionality
-- **Better data flow**: Engine data takes precedence over AI parameters consistently
-
-## [0.8.2] - 2025-12-26
-
-### Changed
-- **Universal Web Scraper HTTP Modernization**: Migrated fetch_html() method from legacy `datamachine_http_get()` to modern `DataMachine\Core\HttpClient::get()`
-  - Simplified error handling with HttpClient response format
-  - Added `'browser_mode' => true` for proper browser-like requests
-  - Added `'context'` parameter for improved logging
-  - Fixed log message consistency ("Universal Web Scraper" instead of "Universal AI Scraper")
-  - Aligns with HTTP Client modernization from v0.4.17
-
-### Technical Details
-- HTTP response handling now uses unified HttpClient format
-- Removed redundant status code and body checks
-- Improved error logging with structured context
-
-## [0.8.1] - 2025-12-25
-
-### Fixed
-- **Calendar Pagination Logic**: Improved pagination container handling in Calendar block
-  - Simplified conditional logic for pagination updates when HTML response exists
-  - Added removal of pagination container when no pagination HTML is returned
-  - Ensures proper pagination DOM management during filter and navigation updates
-
-## [0.8.0] - 2025-12-24
-
-### Breaking Changes
-- **Ticketbud Handler Removal**: Removed entire Ticketbud event import handler (Ticketbud.php, TicketbudAuth.php, TicketbudSettings.php)
-
-### Added
-- **Wix Events Extractor**: New extractor for Wix platform websites
-  - Extracts events from wix-warmup-data JSON script tags
-  - Full venue metadata (address, city, state, zip, coordinates)
-  - Timezone-aware date/time parsing
-  - Ticket URL and image extraction
-- **RHP Events Plugin Extractor**: New extractor for WordPress sites using RHP Events plugin
-  - Detects `.rhpSingleEvent` HTML elements
-  - Extracts event title, date, time, venue, price, age restriction
-  - Year detection from month separators
-  - External ticket link (Etix, etc.) and event detail URL extraction
-- **StructuredDataProcessor**: New centralized processing class for structured event data
-  - Handles venue config override and engine data storage
-  - Creates DataPackets with extraction method metadata
-  - Filters events by keywords, past date detection, and duplicates
-- **Extractor Architecture**: New modular extractor system
-  - ExtractorInterface contract for all structured data parsers
-  - Extractors: WixEventsExtractor, RhpEventsExtractor, JsonLdExtractor, MicrodataExtractor
-  - Priority-based extraction: Wix → RHP → JSON-LD → Microdata → AI fallback
-
-### Changed
-- **Universal Web Scraper**: Refactored to use structured data extractors instead of monolithic extraction logic
-- **EventImportHandler**: Changed several methods from protected to public (shouldSkipEventTitle, extractVenueMetadata, stripVenueMetadataFromEvent, isPastEvent) for better extensibility
+- **Handler Consolidation**: Migrated `DiceFm`, `Eventbrite`, `IcsCalendar`, and `Ticketmaster` to standardized FetchHandler patterns.
+- **Universal Web Scraper**: Refactored to use structured data extractors instead of monolithic extraction logic. Consolidated legacy standalone `GoogleCalendar` and `WordPressEventsAPI` handlers into `EmbeddedCalendarExtractor` and `WordPressExtractor`.
+- **EventImportHandler**: Changed several methods from protected to public (shouldSkipEventTitle, extractVenueMetadata, stripVenueMetadataFromEvent, isPastEvent) for better extensibility.
 - **Documentation**: Completely rewrote universal-web-scraper-handler.md to document new extraction architecture
 
 ### Technical Details
@@ -325,11 +153,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **GoDaddy Calendar Handler**: New JSON-based import handler for GoDaddy Website Builder calendars using `events_url` with configurable venue fields and keyword filtering
 - **Global Title Exclusion**: All import handlers now skip events whose title contains `closed` (case-insensitive) for universal event filtering
-- **Enhanced Keyword Filtering**: Eventbrite and GoogleCalendar handlers now support include/exclude keyword filtering via `search` and `exclude_keywords` settings
-
-### Changed
-- **PSR-4 Directory Structure**: Normalized directory names to PascalCase (`inc/Core`, `inc/Steps`, `inc/Steps/EventImport/Handlers`) for proper PHP namespace alignment
-- **Handler Title Validation**: Centralized title exclusion logic in `EventImportHandler::shouldSkipEventTitle()` called by all handlers (BandzoogleCalendar, DiceFm, DoStuffMediaApi, EventFlyer, Eventbrite, GoogleCalendar, Ticketmaster)
+- **Enhanced Keyword Filtering**: Eventbrite and Google Calendar (via `EmbeddedCalendarExtractor`) handlers now support include/exclude keyword filtering via `search` and `exclude_keywords` settings
+- **Handler Title Validation**: Centralized title exclusion logic in `EventImportHandler::shouldSkipEventTitle()` called by all handlers (DiceFm, DoStuffMediaApi, EventFlyer, Eventbrite, Universal Web Scraper, Ticketmaster)
 - **EventbriteSettings**: Added `search` and `exclude_keywords` fields for improved event filtering
 
 ### Technical Details

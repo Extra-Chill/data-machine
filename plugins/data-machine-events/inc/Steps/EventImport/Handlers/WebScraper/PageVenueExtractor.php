@@ -42,6 +42,11 @@ class PageVenueExtractor {
     /**
      * Extract venue information from page HTML.
      *
+     * Priority order:
+     * 1. JSON-LD structured data (most reliable)
+     * 2. Page title parsing for venue name
+     * 3. Footer/body scanning for address
+     *
      * @param string $html Page HTML content
      * @param string $source_url Source URL for context
      * @return array Venue data with keys: venue, venueAddress, venueCity, venueState, venueZip, venueCountry, venueTimezone
@@ -57,13 +62,172 @@ class PageVenueExtractor {
             'venueTimezone' => '',
         ];
 
-        $venue['venue'] = self::extractVenueName($html);
-        $venue['venueTimezone'] = self::extractTimezone($html);
+        $jsonld_data = self::extractFromJsonLd($html);
+        $venue = array_merge($venue, array_filter($jsonld_data));
 
-        $address_data = self::extractAddress($html);
-        $venue = array_merge($venue, $address_data);
+        if (empty($venue['venue'])) {
+            $venue['venue'] = self::extractVenueName($html);
+        }
+
+        if (empty($venue['venueTimezone'])) {
+            $venue['venueTimezone'] = self::extractTimezone($html);
+        }
+
+        if (empty($venue['venueAddress']) || empty($venue['venueCity'])) {
+            $address_data = self::extractAddress($html);
+            foreach ($address_data as $key => $value) {
+                if (empty($venue[$key]) && !empty($value)) {
+                    $venue[$key] = $value;
+                }
+            }
+        }
 
         return $venue;
+    }
+
+    /**
+     * Extract venue information from JSON-LD structured data.
+     *
+     * Looks for EntertainmentBusiness, LocalBusiness, Place, or Organization
+     * schema types and extracts venue name and address fields.
+     *
+     * @param string $html Page HTML content
+     * @return array Venue data (may be partially filled)
+     */
+    public static function extractFromJsonLd(string $html): array {
+        $data = [
+            'venue' => '',
+            'venueAddress' => '',
+            'venueCity' => '',
+            'venueState' => '',
+            'venueZip' => '',
+            'venueCountry' => '',
+        ];
+
+        if (strpos($html, 'application/ld+json') === false) {
+            return $data;
+        }
+
+        if (!preg_match_all('/<script[^>]*type=["\']application\/ld\+json["\'][^>]*>(.*?)<\/script>/is', $html, $matches)) {
+            return $data;
+        }
+
+        $target_types = ['EntertainmentBusiness', 'LocalBusiness', 'Place', 'Organization', 'MusicVenue', 'NightClub', 'BarOrPub'];
+
+        foreach ($matches[1] as $json_content) {
+            $json_data = json_decode(trim($json_content), true);
+            if (json_last_error() !== JSON_ERROR_NONE || empty($json_data)) {
+                continue;
+            }
+
+            $venue_entity = self::findVenueEntity($json_data, $target_types);
+            if ($venue_entity !== null) {
+                $data = self::parseVenueEntity($venue_entity);
+                if (!empty($data['venueAddress']) || !empty($data['venue'])) {
+                    return $data;
+                }
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * Find venue entity in JSON-LD data.
+     *
+     * @param array $json_data Parsed JSON-LD data
+     * @param array $target_types Schema types to look for
+     * @return array|null Venue entity or null
+     */
+    private static function findVenueEntity(array $json_data, array $target_types): ?array {
+        if (isset($json_data['@type']) && in_array($json_data['@type'], $target_types, true)) {
+            return $json_data;
+        }
+
+        if (isset($json_data['@graph']) && is_array($json_data['@graph'])) {
+            foreach ($json_data['@graph'] as $item) {
+                if (isset($item['@type']) && in_array($item['@type'], $target_types, true)) {
+                    return $item;
+                }
+            }
+        }
+
+        if (array_keys($json_data) === range(0, count($json_data) - 1)) {
+            foreach ($json_data as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+
+                if (isset($item['@type']) && in_array($item['@type'], $target_types, true)) {
+                    return $item;
+                }
+
+                if (isset($item['@graph']) && is_array($item['@graph'])) {
+                    foreach ($item['@graph'] as $graph_item) {
+                        if (isset($graph_item['@type']) && in_array($graph_item['@type'], $target_types, true)) {
+                            return $graph_item;
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Parse venue entity into standardized format.
+     *
+     * @param array $entity JSON-LD venue entity
+     * @return array Venue data
+     */
+    private static function parseVenueEntity(array $entity): array {
+        $data = [
+            'venue' => '',
+            'venueAddress' => '',
+            'venueCity' => '',
+            'venueState' => '',
+            'venueZip' => '',
+            'venueCountry' => '',
+        ];
+
+        if (!empty($entity['name'])) {
+            $data['venue'] = html_entity_decode(sanitize_text_field($entity['name']), ENT_QUOTES, 'UTF-8');
+        }
+
+        $address = $entity['address'] ?? null;
+
+        if (is_string($address)) {
+            $data['venueAddress'] = sanitize_text_field($address);
+            return $data;
+        }
+
+        if (!is_array($address)) {
+            if (!empty($entity['location']) && is_array($entity['location'])) {
+                $address = $entity['location']['address'] ?? $entity['location'];
+            }
+        }
+
+        if (is_array($address)) {
+            if (!empty($address['streetAddress'])) {
+                $data['venueAddress'] = html_entity_decode(sanitize_text_field($address['streetAddress']), ENT_QUOTES, 'UTF-8');
+            }
+            if (!empty($address['addressLocality'])) {
+                $data['venueCity'] = html_entity_decode(sanitize_text_field($address['addressLocality']), ENT_QUOTES, 'UTF-8');
+            }
+            if (!empty($address['addressRegion'])) {
+                $data['venueState'] = html_entity_decode(sanitize_text_field($address['addressRegion']), ENT_QUOTES, 'UTF-8');
+            }
+            if (!empty($address['postalCode'])) {
+                $data['venueZip'] = sanitize_text_field($address['postalCode']);
+            }
+            if (!empty($address['addressCountry'])) {
+                $country = $address['addressCountry'];
+                $data['venueCountry'] = is_array($country) ? ($country['name'] ?? '') : sanitize_text_field($country);
+            }
+        }
+
+        return $data;
     }
 
     /**
