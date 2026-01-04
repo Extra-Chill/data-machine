@@ -5,6 +5,18 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.18] - 2026-01-04
+
+### Added
+- **Embedded Calendar Extractor**: New extractor for Universal Web Scraper to detect and parse events from embedded calendar widgets (Tockify, etc.).
+- **Timely Extractor**: Specialized extractor for Time.ly All-in-One Event Calendar platform.
+- **Page Venue Extractor**: Enhanced venue metadata extraction for Universal Web Scraper that parses parent page context for venue details when event listings are sparse.
+
+### Changed
+- **Handler Consolidation**: Removed standalone `GoogleCalendar` and `WordPressEventsAPI` handlers. Their logic is now consolidated into the `UniversalWebScraper` via specialized extractors (`EmbeddedCalendarExtractor` and `WordPressExtractor`).
+- **Web Scraper Optimization**: Reorganized extractor priority for better detection accuracy and reduced external HTTP requests.
+- **CLI Improvements**: Enhanced `UniversalWebScraperTestCommand` with improved venue ZIP code handling and display formatting.
+
 ## [0.8.17] - 2026-01-04
 
 ### Changed

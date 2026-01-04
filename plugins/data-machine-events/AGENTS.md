@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.8.17
+**Version**: 0.8.18
 
 ## Plugin Bootstrap
 
@@ -19,13 +19,10 @@ Technical guidance for Claude Code when working with the **Data Machine Events**
   - `DoStuffMediaApi\DoStuffMediaApi`
   - `Eventbrite\Eventbrite`
   - `EventFlyer\EventFlyer`
-  - `GoDaddyCalendar\GoDaddyCalendar` (@since v0.7.0)
-  - `GoogleCalendar\GoogleCalendar` (with `GoogleCalendarUtils` for ID/URL resolution)
   - `IcsCalendar\IcsCalendar`
   - `SingleRecurring\SingleRecurring` (@since v0.6.3)
   - `Ticketmaster\Ticketmaster` (with automatic API pagination up to MAX_PAGE=19)
-  - `WebScraper\\UniversalWebScraper` (extractor priority: AEG/AXS, RedRocks, Freshtix, Firebase, Squarespace, SpotHopper, Bandzoogle, GoDaddy, Prekindle, Wix, RHP, OpenDate.io, JSON-LD, Microdata; then HTML section fallback; automatic pagination up to MAX_PAGES=20)
-  - `WordPressEventsAPI\WordPressEventsAPI`
+  - `WebScraper\\UniversalWebScraper` (extractor priority: AEG/AXS, RedRocks, Freshtix, Firebase, Squarespace, SpotHopper, Bandzoogle, GoDaddy, WordPress/Tribe, Prekindle, Wix, RHP, OpenDate.io, JSON-LD, Microdata; then HTML section fallback; automatic pagination up to MAX_PAGES=20)
 - **Handler discovery**: `EventImportStep` (extends `DataMachine\Core\Steps\Step`) reads the configured handler slug, looks it up via `datamachine_handlers`, instantiates the class, and delegates to `get_fetch_data()` on `FetchHandler` (or falls back to legacy `execute()`). It merges returned `DataPacket` results into the pipeline and logs configuration issues.
 - **Single-item processing**: Each handler normalizes `(title, startDate, venue)` through `EventIdentifierGenerator::generate()`, checks `datamachine_is_item_processed`, marks the identifier via `datamachine_mark_item_processed`, and returns immediately after pushing a valid event to maintain incremental imports.
 - **EventUpsert**: `Steps\Upsert\Events\EventUpsert` extends `DataMachine\Core\Steps\Update\Handlers\UpdateHandler`. It registers custom taxonomy handlers for `venue` and `promoter`, merges `EngineData` snapshots with AI parameters, identifies existing events (title + venue + start date), runs field-by-field change detection, updates or creates events, processes featured images via `WordPressPublishHelper`, and keeps `_datamachine_event_datetime` synced for calendar queries.

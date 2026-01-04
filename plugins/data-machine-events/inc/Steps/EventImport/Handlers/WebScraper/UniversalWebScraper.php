@@ -10,14 +10,20 @@
  * 2. Red Rocks (redrocksonline.com)
  * 3. Freshtix (*.freshtix.com)
  * 4. Firebase Realtime Database (firebaseio.com)
- * 5. Squarespace context (Static.SQUARESPACE_CONTEXT)
- * 6. SpotHopper API (spothopperapp.com)
- * 7. Wix Events JSON (wix-warmup-data)
- * 7. RHP Events WordPress plugin HTML
- * 8. OpenDate.io JSON
- * 9. Schema.org JSON-LD
- * 10. Schema.org microdata
- * 11. AI-enhanced HTML pattern matching (Fallback)
+ * 5. Embedded Calendar (Google Calendar iframe → ICS feed)
+ * 6. Squarespace context (Static.SQUARESPACE_CONTEXT)
+ * 7. SpotHopper API (spothopperapp.com)
+ * 8. Bandzoogle calendar
+ * 9. GoDaddy website builder
+ * 10. Timely Event Discovery (FullCalendar.js)
+ * 11. Schema.org JSON-LD
+ * 12. WordPress (Tribe Events, WP REST)
+ * 13. Prekindle ticketing
+ * 14. Wix Events JSON (wix-warmup-data)
+ * 15. RHP Events WordPress plugin HTML
+ * 16. OpenDate.io JSON
+ * 17. Schema.org microdata
+ * 18. AI-enhanced HTML pattern matching (Fallback)
  *
  * @package DataMachineEvents\Steps\EventImport\Handlers\WebScraper
  */
@@ -35,12 +41,14 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\AegAxsExt
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\RedRocksExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\FreshtixExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\FirebaseExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\EmbeddedCalendarExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SquarespaceExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SpotHopperExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\PrekindleExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\GoDaddyExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\BandzoogleExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\WordPressExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\TimelyExtractor;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
@@ -92,10 +100,12 @@ class UniversalWebScraper extends EventImportHandler {
             new RedRocksExtractor(),
             new FreshtixExtractor(),
             new FirebaseExtractor(),
+            new EmbeddedCalendarExtractor(),
             new SquarespaceExtractor(),
             new SpotHopperExtractor(),
             new BandzoogleExtractor(),
             new GoDaddyExtractor(),
+            new TimelyExtractor(),
             new JsonLdExtractor(),
             new WordPressExtractor(),
             new PrekindleExtractor(),

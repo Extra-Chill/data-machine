@@ -137,14 +137,18 @@ class UniversalWebScraperTestCommand {
 			$venue_addr = (string) ( $event['venueAddress'] ?? '' );
 			$venue_city = (string) ( $event['venueCity'] ?? '' );
 			$venue_state = (string) ( $event['venueState'] ?? '' );
+			$venue_zip = (string) ( $event['venueZip'] ?? '' );
 
 			if ( is_array( $payload ) && isset( $payload['venue_metadata'] ) && is_array( $payload['venue_metadata'] ) ) {
 				$venue_meta = $payload['venue_metadata'];
 				$venue_addr = $venue_addr !== '' ? $venue_addr : (string) ( $venue_meta['venueAddress'] ?? '' );
 				$venue_city = $venue_city !== '' ? $venue_city : (string) ( $venue_meta['venueCity'] ?? '' );
 				$venue_state = $venue_state !== '' ? $venue_state : (string) ( $venue_meta['venueState'] ?? '' );
+				$venue_zip = $venue_zip !== '' ? $venue_zip : (string) ( $venue_meta['venueZip'] ?? '' );
 			}
-			$venue_full = trim( implode( ', ', array_filter( [ $venue_addr, trim( $venue_city . ' ' . $venue_state ) ] ) ) );
+			$city_state_zip = trim( $venue_city . ', ' . $venue_state . ' ' . $venue_zip );
+			$city_state_zip = $city_state_zip === ',' ? '' : $city_state_zip;
+			$venue_full = trim( implode( ', ', array_filter( [ $venue_addr, $city_state_zip ] ) ) );
 
 			\WP_CLI::log( 'Venue: ' . $venue_name_out );
 			\WP_CLI::log( 'Venue address: ' . $venue_full );

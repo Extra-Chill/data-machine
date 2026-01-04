@@ -11,7 +11,7 @@ The EventIdentifierGenerator provides standardized event identity generation and
 ### Identity Normalization
 - **Text Normalization**: Lowercase conversion, whitespace trimming, article removal
 - **Consistent Hashing**: MD5-based identifier generation from normalized components
-- **Cross-Handler Compatibility**: Works with all import handlers (Ticketmaster, DiceFm, GoogleCalendar, WebScraper)
+- **Cross-Handler Compatibility**: Works with all import handlers (Ticketmaster, DiceFm, IcsCalendar, WebScraper)
 - **Duplicate Prevention**: Reliable event identity matching across imports
 
 ### Flexible Input Handling
@@ -37,7 +37,7 @@ $event_identifier = EventIdentifierGenerator::generate(
 
 ### Import Handler Integration
 ```php
-// In import handler (Ticketmaster, DiceFm, GoogleCalendar, etc.)
+// In import handler (Ticketmaster, DiceFm, IcsCalendar, etc.)
 foreach ($raw_events as $raw_event) {
     $standardized_event = $this->map_to_standard_format($raw_event);
     
@@ -105,13 +105,13 @@ $event_identifier = EventIdentifierGenerator::generate(
 );
 ```
 
-### Google Calendar Handler
+### ICS Calendar Handler
 ```php
-// In GoogleCalendar.php
+// In IcsCalendar.php
 $event_identifier = EventIdentifierGenerator::generate(
-    $google_event['summary'],
-    $google_event['start']['date'],
-    $google_event['location'] ?? ''
+    $ical_event->summary,
+    $ical_event->dtstart,
+    $ical_event->location ?? ''
 );
 ```
 
