@@ -5,6 +5,26 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.14] - 2026-01-04 
+
+### Added 
+- **Timezone Support**: Introduced centralized timezone handling for events and venues 
+  - Added `DateTimeParser` utility for robust UTC, local, and ISO 8601 parsing 
+  - Added `venueTimezone` metadata to `VenueParameterProvider` and `Venue_Taxonomy` 
+  - Updated `Calendar_Query` to respect venue-specific timezones for date grouping and display 
+- **Squarespace Extractor**: New extractor for the Universal Web Scraper 
+  - Extracts events from `Static.SQUARESPACE_CONTEXT` JavaScript objects 
+  - High-fidelity extraction of title, description, images, and ticket URLs 
+- **SpotHopper Extractor**: Converted SpotHopper into a Universal Web Scraper extractor 
+  - Improved auto-detection of SpotHopper platform and spot_id extraction 
+  - Fetches structured event data directly from SpotHopper public API 
+
+### Changed 
+- **Standardized Datetime Parsing**: Refactored all event import handlers to use `DateTimeParser` 
+  - Updated `DiceFm`, `Eventbrite`, `GoogleCalendar`, `IcsCalendar`, and `Ticketmaster` handlers 
+  - Improved accuracy for events in different timezones 
+- **Universal Web Scraper**: Integrated `SquarespaceExtractor` and `SpotHopperExtractor` into the extraction pipeline 
+
 ## [0.8.13] - 2026-01-04
 
 ### Added

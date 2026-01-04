@@ -12,6 +12,7 @@ namespace DataMachineEvents\Blocks\Calendar;
 
 use WP_Query;
 use DateTime;
+use DateTimeZone;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Core\Promoter_Taxonomy;
@@ -256,7 +257,7 @@ class Calendar_Query {
      * Hydrate venue fields from taxonomy.
      *
      * Venue taxonomy is the source of truth. If event has an assigned venue
-     * term, its name and formatted address override any block attribute values.
+     * term, its name, formatted address, and timezone override any block attribute values.
      *
      * @param int $post_id Post ID
      * @param array $event_data Event data array (modified by reference)
@@ -272,6 +273,10 @@ class Calendar_Query {
 
         $event_data['venue'] = $venue_data['name'];
         $event_data['address'] = Venue_Taxonomy::get_formatted_address($venue_term->term_id);
+        
+        if (!empty($venue_data['timezone'])) {
+            $event_data['venueTimezone'] = $venue_data['timezone'];
+        }
     }
 
     /**
@@ -321,9 +326,10 @@ class Calendar_Query {
 
             if ($event_data) {
                 $start_time = $event_data['startTime'] ?? '00:00:00';
+                $event_tz = self::get_event_timezone($event_data);
                 $event_datetime = new DateTime(
                     $event_data['startDate'] . ' ' . $start_time,
-                    wp_timezone()
+                    $event_tz
                 );
 
                 $paged_events[] = [
@@ -337,6 +343,28 @@ class Calendar_Query {
         wp_reset_postdata();
 
         return $paged_events;
+    }
+
+    /**
+     * Get DateTimeZone for an event.
+     *
+     * Uses venue timezone if available, falls back to WordPress site timezone.
+     *
+     * @param array $event_data Event data array
+     * @return DateTimeZone Timezone for the event
+     */
+    private static function get_event_timezone(array $event_data): DateTimeZone {
+        $tz_string = $event_data['venueTimezone'] ?? '';
+        
+        if (!empty($tz_string)) {
+            try {
+                return new DateTimeZone($tz_string);
+            } catch (\Exception $e) {
+                // Invalid timezone, fall through to default
+            }
+        }
+        
+        return wp_timezone();
     }
 
     /**
@@ -358,7 +386,8 @@ class Calendar_Query {
             }
 
             $start_time = $event_data['startTime'] ?? '00:00:00';
-            $start_datetime_obj = new DateTime($start_date . ' ' . $start_time, wp_timezone());
+            $event_tz = self::get_event_timezone($event_data);
+            $start_datetime_obj = new DateTime($start_date . ' ' . $start_time, $event_tz);
             $date_key = $start_datetime_obj->format('Y-m-d');
 
             if (!isset($date_groups[$date_key])) {
@@ -392,7 +421,8 @@ class Calendar_Query {
         $iso_start_date = '';
 
         if ($start_date) {
-            $start_datetime_obj = new DateTime($start_date . ' ' . $start_time, wp_timezone());
+            $event_tz = self::get_event_timezone($event_data);
+            $start_datetime_obj = new DateTime($start_date . ' ' . $start_time, $event_tz);
             $formatted_start_time = $start_datetime_obj->format('g:i A');
             $iso_start_date = $start_datetime_obj->format('c');
         }

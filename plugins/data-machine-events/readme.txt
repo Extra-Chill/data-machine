@@ -4,7 +4,7 @@ Tags: events, calendar, ticketmaster, eventbrite, import, venues, api
 Requires at least: 6.0
 Tested up to: 6.4
 Requires PHP: 8.0
-Stable tag: 0.8.13
+Stable tag: 0.8.14
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -151,6 +151,14 @@ Yes! Data Machine Events uses dedicated CSS files (no inline styles) and follows
 7. **Import Logs** - Comprehensive analytics and import history
 
 == Changelog ==
+
+= 0.8.14 = 
+* Introduced centralized timezone handling via DateTimeParser and venueTimezone metadata 
+* Updated Calendar block to respect venue-specific timezones for date grouping and display 
+* Added SquarespaceExtractor for Universal Web Scraper to parse Squarespace platform events 
+* Added SpotHopperExtractor to Universal Web Scraper and converted SpotHopper into an extractor 
+* Standardized UTC and local datetime parsing across all event import handlers 
+* Added venueTimezone to VenueParameterProvider and Venue_Taxonomy 
 
 = 0.8.13 =
 * Unified taxonomy filter parameter sanitization with recursive structure preservation

@@ -207,6 +207,8 @@ class GoogleCalendar extends EventImportHandler {
      * @return array Standardized event data
      */
     private function map_ical_event(array $ical_event, array $config): array {
+        $event_timezone = $this->extract_event_timezone($ical_event);
+        
         $standardized_event = [
             'title' => sanitize_text_field($ical_event['SUMMARY'] ?? ''),
             'description' => sanitize_textarea_field($ical_event['DESCRIPTION'] ?? ''),
@@ -216,6 +218,7 @@ class GoogleCalendar extends EventImportHandler {
             'endTime' => '',
             'venue' => '',
             'address' => '',
+            'venueTimezone' => $event_timezone,
             'ticketUrl' => esc_url_raw($ical_event['URL'] ?? ''),
             'image' => '',
             'price' => '',
@@ -224,40 +227,41 @@ class GoogleCalendar extends EventImportHandler {
             'source_url' => esc_url_raw($ical_event['URL'] ?? '')
         ];
 
-        // Parse start date/time
         if (!empty($ical_event['DTSTART'])) {
             $start_datetime = $ical_event['DTSTART'];
             if ($start_datetime instanceof \DateTime) {
                 $standardized_event['startDate'] = $start_datetime->format('Y-m-d');
                 $standardized_event['startTime'] = $start_datetime->format('H:i');
+                if (empty($event_timezone)) {
+                    $tz = $start_datetime->getTimezone();
+                    if ($tz) {
+                        $standardized_event['venueTimezone'] = $tz->getName();
+                    }
+                }
             } elseif (is_string($start_datetime)) {
-                $parsed_start = strtotime($start_datetime);
-                if ($parsed_start) {
-                    $standardized_event['startDate'] = date('Y-m-d', $parsed_start);
-                    $standardized_event['startTime'] = date('H:i', $parsed_start);
+                $parsed = $this->parseDateTimeIso($start_datetime);
+                $standardized_event['startDate'] = $parsed['date'];
+                $standardized_event['startTime'] = $parsed['time'];
+                if (empty($standardized_event['venueTimezone']) && !empty($parsed['timezone'])) {
+                    $standardized_event['venueTimezone'] = $parsed['timezone'];
                 }
             }
         }
 
-        // Parse end date/time
         if (!empty($ical_event['DTEND'])) {
             $end_datetime = $ical_event['DTEND'];
             if ($end_datetime instanceof \DateTime) {
                 $standardized_event['endDate'] = $end_datetime->format('Y-m-d');
                 $standardized_event['endTime'] = $end_datetime->format('H:i');
             } elseif (is_string($end_datetime)) {
-                $parsed_end = strtotime($end_datetime);
-                if ($parsed_end) {
-                    $standardized_event['endDate'] = date('Y-m-d', $parsed_end);
-                    $standardized_event['endTime'] = date('H:i', $parsed_end);
-                }
+                $parsed = $this->parseDateTimeIso($end_datetime);
+                $standardized_event['endDate'] = $parsed['date'];
+                $standardized_event['endTime'] = $parsed['time'];
             }
         }
 
-        // Parse location/venue data
         $location = $ical_event['LOCATION'] ?? '';
         if (!empty($location)) {
-            // Try to split location into venue name and address
             $location_parts = explode(',', $location, 2);
             $standardized_event['venue'] = sanitize_text_field(trim($location_parts[0]));
             if (isset($location_parts[1])) {
@@ -271,7 +275,6 @@ class GoogleCalendar extends EventImportHandler {
             }
         }
 
-        // Organizer config overrides (fallback when iCal ORGANIZER is empty)
         if (!empty($config['organizer_name'])) {
             $standardized_event['organizer'] = sanitize_text_field($config['organizer_name']);
         }
@@ -283,5 +286,29 @@ class GoogleCalendar extends EventImportHandler {
         }
 
         return $standardized_event;
+    }
+
+    /**
+     * Extract timezone from iCal event array
+     *
+     * @param array $ical_event iCal event array
+     * @return string IANA timezone identifier or empty string
+     */
+    private function extract_event_timezone(array $ical_event): string {
+        if (!empty($ical_event['DTSTART_TZ'])) {
+            return $ical_event['DTSTART_TZ'];
+        }
+
+        if (!empty($ical_event['DTSTART']) && $ical_event['DTSTART'] instanceof \DateTime) {
+            $tz = $ical_event['DTSTART']->getTimezone();
+            if ($tz) {
+                $tz_name = $tz->getName();
+                if ($tz_name !== 'UTC' && $tz_name !== 'Z') {
+                    return $tz_name;
+                }
+            }
+        }
+
+        return '';
     }
 }

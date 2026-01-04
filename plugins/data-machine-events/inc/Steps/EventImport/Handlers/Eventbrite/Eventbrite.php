@@ -238,21 +238,10 @@ class Eventbrite extends EventImportHandler {
         $title = $eb_event['name'] ?? '';
         $description = $eb_event['description'] ?? '';
         
-        $start_date = '';
-        $start_time = '';
-        if (!empty($eb_event['startDate'])) {
-            $parsed = $this->parse_iso_datetime($eb_event['startDate']);
-            $start_date = $parsed['date'];
-            $start_time = $parsed['time'];
-        }
+        $start_parsed = $this->parseDateTimeIso($eb_event['startDate'] ?? '');
+        $end_parsed = $this->parseDateTimeIso($eb_event['endDate'] ?? '');
         
-        $end_date = '';
-        $end_time = '';
-        if (!empty($eb_event['endDate'])) {
-            $parsed = $this->parse_iso_datetime($eb_event['endDate']);
-            $end_date = $parsed['date'];
-            $end_time = $parsed['time'];
-        }
+        $venue_timezone = $start_parsed['timezone'];
         
         $venue_name = '';
         $venue_address = '';
@@ -327,10 +316,10 @@ class Eventbrite extends EventImportHandler {
         
         return [
             'title' => $this->sanitizeText($title),
-            'startDate' => $start_date,
-            'endDate' => $end_date,
-            'startTime' => $start_time,
-            'endTime' => $end_time,
+            'startDate' => $start_parsed['date'],
+            'endDate' => $end_parsed['date'],
+            'startTime' => $start_parsed['time'],
+            'endTime' => $end_parsed['time'],
             'venue' => $this->sanitizeText($venue_name),
             'artist' => $this->sanitizeText($artist),
             'organizer' => $this->sanitizeText($organizer),
@@ -347,27 +336,7 @@ class Eventbrite extends EventImportHandler {
             'venuePhone' => '',
             'venueWebsite' => '',
             'venueCoordinates' => $this->sanitizeText($venue_coordinates),
+            'venueTimezone' => $this->sanitizeText($venue_timezone),
         ];
-    }
-    
-    /**
-     * Parse ISO 8601 datetime string into date and time components
-     */
-    private function parse_iso_datetime(string $datetime): array {
-        $result = ['date' => '', 'time' => ''];
-        
-        if (empty($datetime)) {
-            return $result;
-        }
-        
-        try {
-            $dt = new \DateTime($datetime);
-            $result['date'] = $dt->format('Y-m-d');
-            $result['time'] = $dt->format('H:i');
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to parse datetime: ' . $datetime);
-        }
-        
-        return $result;
     }
 }

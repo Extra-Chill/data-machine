@@ -197,6 +197,8 @@ class IcsCalendar extends EventImportHandler {
      * Map iCal event to standardized event format
      */
     private function map_ical_event($ical_event, array $config): array {
+        $event_timezone = $this->extract_event_timezone($ical_event);
+        
         $standardized_event = [
             'title' => sanitize_text_field($ical_event->summary ?? ''),
             'description' => sanitize_textarea_field($ical_event->description ?? ''),
@@ -210,6 +212,7 @@ class IcsCalendar extends EventImportHandler {
             'venueState' => '',
             'venueZip' => '',
             'venueCountry' => '',
+            'venueTimezone' => $event_timezone,
             'ticketUrl' => esc_url_raw($ical_event->url ?? ''),
             'image' => '',
             'price' => '',
@@ -223,11 +226,18 @@ class IcsCalendar extends EventImportHandler {
             if ($start_datetime instanceof \DateTime) {
                 $standardized_event['startDate'] = $start_datetime->format('Y-m-d');
                 $standardized_event['startTime'] = $start_datetime->format('H:i');
+                if (empty($event_timezone)) {
+                    $tz = $start_datetime->getTimezone();
+                    if ($tz) {
+                        $standardized_event['venueTimezone'] = $tz->getName();
+                    }
+                }
             } elseif (is_string($start_datetime)) {
-                $parsed_start = strtotime($start_datetime);
-                if ($parsed_start) {
-                    $standardized_event['startDate'] = date('Y-m-d', $parsed_start);
-                    $standardized_event['startTime'] = date('H:i', $parsed_start);
+                $parsed = $this->parseDateTimeIso($start_datetime);
+                $standardized_event['startDate'] = $parsed['date'];
+                $standardized_event['startTime'] = $parsed['time'];
+                if (empty($standardized_event['venueTimezone']) && !empty($parsed['timezone'])) {
+                    $standardized_event['venueTimezone'] = $parsed['timezone'];
                 }
             }
         }
@@ -238,11 +248,9 @@ class IcsCalendar extends EventImportHandler {
                 $standardized_event['endDate'] = $end_datetime->format('Y-m-d');
                 $standardized_event['endTime'] = $end_datetime->format('H:i');
             } elseif (is_string($end_datetime)) {
-                $parsed_end = strtotime($end_datetime);
-                if ($parsed_end) {
-                    $standardized_event['endDate'] = date('Y-m-d', $parsed_end);
-                    $standardized_event['endTime'] = date('H:i', $parsed_end);
-                }
+                $parsed = $this->parseDateTimeIso($end_datetime);
+                $standardized_event['endDate'] = $parsed['date'];
+                $standardized_event['endTime'] = $parsed['time'];
             }
         }
 
@@ -277,5 +285,31 @@ class IcsCalendar extends EventImportHandler {
         }
 
         return $standardized_event;
+    }
+
+    /**
+     * Extract timezone from iCal event
+     *
+     * Checks dtstart_tz property and falls back to DateTime timezone.
+     *
+     * @param object $ical_event iCal event object
+     * @return string IANA timezone identifier or empty string
+     */
+    private function extract_event_timezone($ical_event): string {
+        if (!empty($ical_event->dtstart_tz)) {
+            return $ical_event->dtstart_tz;
+        }
+
+        if (!empty($ical_event->dtstart) && $ical_event->dtstart instanceof \DateTime) {
+            $tz = $ical_event->dtstart->getTimezone();
+            if ($tz) {
+                $tz_name = $tz->getName();
+                if ($tz_name !== 'UTC' && $tz_name !== 'Z') {
+                    return $tz_name;
+                }
+            }
+        }
+
+        return '';
     }
 }

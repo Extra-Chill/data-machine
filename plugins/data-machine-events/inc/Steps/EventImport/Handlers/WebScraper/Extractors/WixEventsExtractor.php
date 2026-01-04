@@ -10,6 +10,8 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors;
 
+use DataMachineEvents\Core\DateTimeParser;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -101,28 +103,22 @@ class WixEventsExtractor implements ExtractorInterface {
      */
     private function parseScheduling(array &$event, array $wix_event): void {
         $scheduling = $wix_event['scheduling']['config'] ?? [];
-        $timezone_id = $scheduling['timeZoneId'] ?? 'UTC';
+        $timezone_id = $scheduling['timeZoneId'] ?? '';
 
         if (!empty($scheduling['startDate'])) {
-            try {
-                $start = new \DateTime($scheduling['startDate']);
-                $start->setTimezone(new \DateTimeZone($timezone_id));
-                $event['startDate'] = $start->format('Y-m-d');
-                $event['startTime'] = $start->format('H:i');
-            } catch (\Exception $e) {
-                // Skip on parse failure
-            }
+            $start_parsed = DateTimeParser::parseUtc($scheduling['startDate'], $timezone_id);
+            $event['startDate'] = $start_parsed['date'];
+            $event['startTime'] = $start_parsed['time'];
         }
 
         if (!empty($scheduling['endDate'])) {
-            try {
-                $end = new \DateTime($scheduling['endDate']);
-                $end->setTimezone(new \DateTimeZone($timezone_id));
-                $event['endDate'] = $end->format('Y-m-d');
-                $event['endTime'] = $end->format('H:i');
-            } catch (\Exception $e) {
-                // Skip on parse failure
-            }
+            $end_parsed = DateTimeParser::parseUtc($scheduling['endDate'], $timezone_id);
+            $event['endDate'] = $end_parsed['date'];
+            $event['endTime'] = $end_parsed['time'];
+        }
+
+        if (!empty($timezone_id) && DateTimeParser::isValidTimezone($timezone_id)) {
+            $event['venueTimezone'] = $timezone_id;
         }
     }
 

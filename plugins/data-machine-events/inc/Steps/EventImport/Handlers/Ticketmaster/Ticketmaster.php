@@ -374,12 +374,11 @@ class Ticketmaster extends EventImportHandler {
         $title = $tm_event['name'] ?? '';
         $description = $tm_event['info'] ?? $tm_event['pleaseNote'] ?? '';
         
-        $start_date = '';
-        $start_time = '';
-        if (!empty($tm_event['dates']['start']['localDate'])) {
-            $start_date = $tm_event['dates']['start']['localDate'];
-            $start_time = $tm_event['dates']['start']['localTime'] ?? '';
-        }
+        $start_parsed = $this->parseDateTimeLocal(
+            $tm_event['dates']['start']['localDate'] ?? '',
+            $tm_event['dates']['start']['localTime'] ?? '',
+            $tm_event['_embedded']['venues'][0]['timezone'] ?? ''
+        );
         
         $venue_name = '';
         $venue_address = '';
@@ -390,10 +389,12 @@ class Ticketmaster extends EventImportHandler {
         $venue_phone = '';
         $venue_website = '';
         $venue_coordinates = '';
+        $venue_timezone = '';
         
         if (!empty($tm_event['_embedded']['venues'][0])) {
             $venue = $tm_event['_embedded']['venues'][0];
             $venue_name = $venue['name'] ?? '';
+            $venue_timezone = $venue['timezone'] ?? '';
             
             if (!empty($venue['address'])) {
                 if (!empty($venue['address']['line1'])) {
@@ -445,9 +446,9 @@ class Ticketmaster extends EventImportHandler {
         
         return [
             'title' => $this->sanitizeText($title),
-            'startDate' => $start_date,
+            'startDate' => $start_parsed['date'],
             'endDate' => '',
-            'startTime' => $start_time,
+            'startTime' => $start_parsed['time'],
             'endTime' => '',
             'venue' => $this->sanitizeText($venue_name),
             'artist' => $this->sanitizeText($artist),
@@ -463,6 +464,7 @@ class Ticketmaster extends EventImportHandler {
             'venuePhone' => $this->sanitizeText($venue_phone),
             'venueWebsite' => $this->sanitizeUrl($venue_website),
             'venueCoordinates' => $this->sanitizeText($venue_coordinates),
+            'venueTimezone' => $this->sanitizeText($venue_timezone),
         ];
     }
 }

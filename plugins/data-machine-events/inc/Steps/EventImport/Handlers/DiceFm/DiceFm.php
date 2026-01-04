@@ -159,22 +159,11 @@ class DiceFm extends EventImportHandler {
                 'pipeline_id' => $pipeline_id
             ]);
             
-            // Extract limited venue metadata for nested structure (Dice FM has less data than Ticketmaster)
-            $venue_metadata = [
-                'venueAddress' => $standardized_event['address'] ?? '',
-                'venueCity' => '',      // Not available in Dice FM API
-                'venueState' => '',     // Not available in Dice FM API
-                'venueZip' => '',       // Not available in Dice FM API
-                'venueCountry' => '',   // Not available in Dice FM API
-                'venuePhone' => '',     // Not available in Dice FM API
-                'venueWebsite' => '',   // Not available in Dice FM API
-                'venueCoordinates' => '' // Not available in Dice FM API
-            ];
+            $venue_metadata = $this->extractVenueMetadata($standardized_event);
             
             EventEngineData::storeVenueContext($job_id, $standardized_event, $venue_metadata);
 
-            // Remove venue metadata from event data (move to separate structure)
-            unset($standardized_event['address']);
+            $this->stripVenueMetadataFromEvent($standardized_event);
             
             // Create DataPacket
             $dataPacket = new DataPacket(
@@ -280,25 +269,30 @@ class DiceFm extends EventImportHandler {
      * @return array Standardized event data
      */
     private function convert_dice_fm_event($event) {
-        // Extract venue data
         $venue_data = $this->extract_venue_data($event);
+        $timezone = $event['timezone'] ?? '';
         
-        // Parse dates
-        $start_date = $this->parse_dice_fm_date($event['date'] ?? '');
-        $end_date = $this->parse_dice_fm_date($event['date_end'] ?? '');
+        $start_parsed = $this->parseDateTimeUtc($event['date'] ?? '', $timezone);
+        $end_parsed = $this->parseDateTimeUtc($event['date_end'] ?? '', $timezone);
         
         return [
             'title' => sanitize_text_field($event['name'] ?? ''),
-            'startDate' => $this->extract_date($start_date),
-            'endDate' => $this->extract_date($end_date),
-            'startTime' => $this->extract_time($start_date),
-            'endTime' => $this->extract_time($end_date),
+            'startDate' => $start_parsed['date'],
+            'endDate' => $end_parsed['date'],
+            'startTime' => $start_parsed['time'],
+            'endTime' => $end_parsed['time'],
             'venue' => sanitize_text_field($venue_data['venue_name']),
-            'address' => sanitize_text_field($venue_data['venue_address']),
-            'artist' => '', // Dice.fm doesn't separate artists
-            'price' => '', // Price info not in API response
+            'artist' => '',
+            'price' => '',
             'ticketUrl' => esc_url_raw($event['url'] ?? ''),
             'description' => wp_kses_post($event['description'] ?? ''),
+            'venueAddress' => sanitize_text_field($venue_data['venue_address']),
+            'venueCity' => sanitize_text_field($venue_data['venue_city']),
+            'venueState' => sanitize_text_field($venue_data['venue_state']),
+            'venueZip' => sanitize_text_field($venue_data['venue_zip']),
+            'venueCountry' => sanitize_text_field($venue_data['venue_country']),
+            'venueCoordinates' => sanitize_text_field($venue_data['venue_coordinates']),
+            'venueTimezone' => sanitize_text_field($timezone),
         ];
     }
     
@@ -306,107 +300,39 @@ class DiceFm extends EventImportHandler {
      * Extract venue data from Dice.fm event
      *
      * @param array $event Raw event data
-     * @return array Venue data
+     * @return array Venue data with all location fields
      */
     private function extract_venue_data($event) {
-        $venue_data = array(
-            'venue_name' => 'N/A',
-            'venue_address' => 'N/A',
-        );
+        $venue_data = [
+            'venue_name' => '',
+            'venue_address' => '',
+            'venue_city' => '',
+            'venue_state' => '',
+            'venue_zip' => '',
+            'venue_country' => '',
+            'venue_coordinates' => '',
+        ];
         
-        if (!empty($event['venues']) && is_array($event['venues'])) {
-            $venue = $event['venues'][0]; // Use the first venue
+        if (!empty($event['venue'])) {
+            $venue_data['venue_name'] = $event['venue'];
+        } elseif (!empty($event['venues']) && is_array($event['venues']) && !empty($event['venues'][0]['name'])) {
+            $venue_data['venue_name'] = $event['venues'][0]['name'];
+        }
+        
+        $location = $event['location'] ?? [];
+        if (!empty($location)) {
+            $venue_data['venue_address'] = $location['street'] ?? '';
+            $venue_data['venue_city'] = $location['city'] ?? '';
+            $venue_data['venue_state'] = $location['state'] ?? '';
+            $venue_data['venue_zip'] = $location['zip'] ?? '';
+            $venue_data['venue_country'] = $location['country'] ?? '';
             
-            // Venue name
-            if (isset($venue['name'])) {
-                $venue_data['venue_name'] = $venue['name'];
-            }
-            
-            // Address - prefer location object, fall back to top-level address
-            if (isset($event['location']['street']) && !empty($event['location']['street'])) {
-                $venue_data['venue_address'] = $event['location']['street'];
-            } elseif (isset($event['address']) && !empty($event['address'])) {
-                $venue_data['venue_address'] = $event['address'];
-            }
-            
-            // City - try venue city first, then location
-            if (isset($venue['city'])) {
-                if (is_array($venue['city']) && isset($venue['city']['name'])) {
-                    $city = $venue['city']['name'];
-                } else {
-                    $city = $venue['city'];
-                }
-                $venue_data['venue_address'] .= ', ' . $city;
-            } elseif (isset($event['location']['city'])) {
-                $venue_data['venue_address'] .= ', ' . $event['location']['city'];
+            if (!empty($location['lat']) && !empty($location['lng'])) {
+                $venue_data['venue_coordinates'] = $location['lat'] . ',' . $location['lng'];
             }
         }
         
         return $venue_data;
     }
     
-    /**
-     * Parse Dice.fm date format to standardized format
-     *
-     * @param string $date_string Dice.fm date string
-     * @return string Standardized date string
-     */
-    private function parse_dice_fm_date($date_string) {
-        if (empty($date_string)) {
-            return '';
-        }
-        
-        try {
-            $date = new \DateTime($date_string);
-            $date->setTimezone(new \DateTimeZone('America/Chicago'));
-            return $date->format('Y-m-d H:i:s');
-        } catch (\Exception $e) {
-            $this->log('error', 'Failed to parse Dice.fm date: ' . $date_string);
-            return $date_string;
-        }
-    }
-    
-    /**
-     * Extract date from datetime string
-     * 
-     * @param string $datetime Datetime string
-     * @return string Date in Y-m-d format
-     */
-    private function extract_date(string $datetime): string {
-        if (empty($datetime)) {
-            return '';
-        }
-        
-        try {
-            $date = new \DateTime($datetime);
-            return $date->format('Y-m-d');
-        } catch (\Exception $e) {
-            $this->log('error', 'Date extraction failed: ' . $e->getMessage(), [
-                'datetime' => $datetime
-            ]);
-            return '';
-        }
-    }
-    
-    /**
-     * Extract time from datetime string
-     * 
-     * @param string $datetime Datetime string
-     * @return string Time in H:i format
-     */
-    private function extract_time(string $datetime): string {
-        if (empty($datetime)) {
-            return '';
-        }
-        
-        try {
-            $date = new \DateTime($datetime);
-            return $date->format('H:i');
-        } catch (\Exception $e) {
-            $this->log('error', 'Time extraction failed: ' . $e->getMessage(), [
-                'datetime' => $datetime
-            ]);
-            return '';
-        }
-    }
 }

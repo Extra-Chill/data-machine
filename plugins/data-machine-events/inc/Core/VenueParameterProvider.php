@@ -68,6 +68,11 @@ class VenueParameterProvider {
             'type' => 'string',
             'required' => false,
             'description' => 'Maximum venue capacity'
+        ],
+        'venueTimezone' => [
+            'type' => 'string',
+            'required' => false,
+            'description' => 'IANA timezone identifier (e.g., America/Chicago, America/Los_Angeles)'
         ]
     ];
 
@@ -81,7 +86,8 @@ class VenueParameterProvider {
         'venuePhone' => 'phone',
         'venueWebsite' => 'website',
         'venueCoordinates' => 'coordinates',
-        'venueCapacity' => 'capacity'
+        'venueCapacity' => 'capacity',
+        'venueTimezone' => 'timezone'
     ];
 
     /**

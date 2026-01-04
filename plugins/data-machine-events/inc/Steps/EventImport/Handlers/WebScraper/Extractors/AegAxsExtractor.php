@@ -10,6 +10,8 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors;
 
+use DataMachineEvents\Core\DateTimeParser;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -129,35 +131,21 @@ class AegAxsExtractor implements ExtractorInterface {
     }
 
     private function parseDateTime(array &$event, array $raw): void {
-        $venue_tz = null;
-        if (!empty($raw['eventDateTimeZone'])) {
-            try {
-                $venue_tz = new \DateTimeZone($raw['eventDateTimeZone']);
-            } catch (\Exception $e) {
-                // Invalid timezone, fall back to parsing as-is
-            }
-        }
+        $timezone = $raw['eventDateTimeZone'] ?? '';
 
         if (!empty($raw['eventDateTimeISO'])) {
-            try {
-                $dt = new \DateTime($raw['eventDateTimeISO']);
-                if ($venue_tz) {
-                    $dt->setTimezone($venue_tz);
-                }
-                $event['startDate'] = $dt->format('Y-m-d');
-                $event['startTime'] = $dt->format('H:i');
-            } catch (\Exception $e) {
-                // Invalid datetime
-            }
+            $parsed = DateTimeParser::parseUtc($raw['eventDateTimeISO'], $timezone);
+            $event['startDate'] = $parsed['date'];
+            $event['startTime'] = $parsed['time'];
         }
 
-        if (!empty($raw['doorDateTime']) && $venue_tz) {
-            try {
-                $dt = new \DateTime($raw['doorDateTime'], $venue_tz);
-                $event['doorsTime'] = $dt->format('H:i');
-            } catch (\Exception $e) {
-                // Invalid datetime
-            }
+        if (!empty($raw['doorDateTime']) && !empty($timezone)) {
+            $doors_parsed = DateTimeParser::parseUtc($raw['doorDateTime'], $timezone);
+            $event['doorsTime'] = $doors_parsed['time'];
+        }
+
+        if (!empty($timezone) && DateTimeParser::isValidTimezone($timezone)) {
+            $event['venueTimezone'] = $timezone;
         }
     }
 

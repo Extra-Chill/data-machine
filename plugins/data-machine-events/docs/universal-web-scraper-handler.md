@@ -14,7 +14,9 @@ The Universal Web Scraper handler prioritizes structured data extraction for max
 2. **Red Rocks** (`RedRocksExtractor`): Parses Red Rocks Amphitheatre event pages (@since v0.8.0)
 3. **Freshtix** (`FreshtixExtractor`): Parses embedded JavaScript event objects on Freshtix platform pages (@since v0.8.0)
 4. **Firebase Realtime Database** (`FirebaseExtractor`): Detects Firebase SDK and fetches events from the Firebase REST API (@since v0.8.12)
-5. **Wix Events JSON** (`WixEventsExtractor`): Extracts events from `<script id="wix-warmup-data">`
+5. **Squarespace** (`SquarespaceExtractor`): Extracts events from `Static.SQUARESPACE_CONTEXT` JavaScript objects (@since v0.8.12)
+6. **SpotHopper** (`SpotHopperExtractor`): Auto-detects SpotHopper platform and extracts events from their public API (@since v0.8.12)
+7. **Wix Events JSON** (`WixEventsExtractor`): Extracts events from `<script id="wix-warmup-data">`
 6. **RHP Events plugin HTML** (`RhpEventsExtractor`): Extracts events from `.rhpSingleEvent` markup
 7. **OpenDate.io** (`OpenDateExtractor`): Two-step extraction (listing → detail page). Prioritizes React JSON datetime values over JSON-LD for improved time accuracy.
 8. **Schema.org JSON-LD** (`JsonLdExtractor`): Parses `<script type="application/ld+json">`
@@ -39,6 +41,26 @@ The handler extracts events from websites using Firebase Realtime Database for e
 - **Published Filter**: Only imports events where `isPublished` is true
 - **Full Event Data**: Extracts title, dates, description, ticket URLs, and poster images
 - **Date Parsing**: Handles Firebase JS date strings with timezone information
+
+### Squarespace Support
+
+The handler extracts events from Squarespace platform websites, even when standard JSON-LD is missing or incomplete:
+
+- **Automatic Detection**: Identifies `Static.SQUARESPACE_CONTEXT` script tags in page HTML
+- **Deep Extraction**: Recursively searches the Squarespace context for `userItems` or `items` collections
+- **Full Event Data**: Extracts title, description, ticket URLs (via `buttonLink` or `clickthroughUrl`), and images (`assetUrl`)
+- **Smart Date Parsing**: Handles millisecond timestamps and ISO strings; falls back to parsing dates from description text
+- **Ticket URL capture**: Captures specific event call-to-action links common in Squarespace templates
+
+### SpotHopper Support
+
+The handler supports seamless extraction from venues using the SpotHopper platform:
+
+- **Automatic Detection**: Detects SpotHopper scripts, widgets, or platform URLs in the page HTML
+- **Automatic ID Extraction**: Extracts the venue's `spot_id` from JavaScript variables, static asset URLs, or widget configurations
+- **API Extraction**: Fetches structured event data directly from SpotHopper's public API
+- **Linked Data Parsing**: Correctly resolves linked venue and image objects from the API response
+- **Full Venue Data**: Captures complete venue metadata including coordinates, phone, and address
 
 ### RHP Events Plugin Support
 
@@ -173,6 +195,8 @@ Websites without structured data (AI fallback):
 - **RedRocksExtractor.php**: Parses Red Rocks Amphitheatre event pages
 - **FreshtixExtractor.php**: Parses Freshtix platform pages
 - **FirebaseExtractor.php**: Fetches events from Firebase Realtime Database REST API
+- **SquarespaceExtractor.php**: Parses Squarespace context JSON
+- **SpotHopperExtractor.php**: Detects SpotHopper and parses their API
 - **WixEventsExtractor.php**: Parses Wix warmup-data JSON
 - **RhpEventsExtractor.php**: Parses RHP Events plugin HTML
 - **OpenDateExtractor.php**: Handles OpenDate.io listing/detail extraction
@@ -232,6 +256,8 @@ When using HTML fallback:
 ## Supported Sources
 
 - Wix (Wix Events)
+- Squarespace (Context JS)
+- SpotHopper (API)
 - Red Rocks Amphitheatre
 - Freshtix platform sites
 - Firebase Realtime Database sites

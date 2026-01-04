@@ -9,6 +9,7 @@
 namespace DataMachineEvents\Steps\EventImport\Handlers;
 
 use DataMachine\Core\Steps\Fetch\Handlers\FetchHandler;
+use DataMachineEvents\Core\DateTimeParser;
 use DataMachineEvents\Core\VenueParameterProvider;
 
 if (!defined('ABSPATH')) {
@@ -117,6 +118,39 @@ abstract class EventImportHandler extends FetchHandler {
      */
     public function markItemProcessed(string $item_id, ?string $flow_step_id, ?string $job_id): void {
         parent::markItemProcessed($item_id, $flow_step_id, $job_id);
+    }
+
+    /**
+     * Parse UTC datetime and convert to target timezone.
+     *
+     * @param string $datetime UTC datetime string
+     * @param string $timezone Target IANA timezone
+     * @return array{date: string, time: string, timezone: string}
+     */
+    protected function parseDateTimeUtc(string $datetime, string $timezone): array {
+        return DateTimeParser::parseUtc($datetime, $timezone);
+    }
+
+    /**
+     * Parse local datetime already in venue timezone.
+     *
+     * @param string $date Date string
+     * @param string $time Time string
+     * @param string $timezone IANA timezone identifier
+     * @return array{date: string, time: string, timezone: string}
+     */
+    protected function parseDateTimeLocal(string $date, string $time, string $timezone): array {
+        return DateTimeParser::parseLocal($date, $time, $timezone);
+    }
+
+    /**
+     * Parse ISO 8601 datetime with embedded timezone.
+     *
+     * @param string $datetime ISO 8601 string
+     * @return array{date: string, time: string, timezone: string}
+     */
+    protected function parseDateTimeIso(string $datetime): array {
+        return DateTimeParser::parseIso($datetime);
     }
 
     /**

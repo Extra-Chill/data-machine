@@ -30,7 +30,8 @@ class Venue_Taxonomy {
         'phone' => '_venue_phone',
         'website' => '_venue_website',
         'capacity' => '_venue_capacity',
-        'coordinates' => '_venue_coordinates'
+        'coordinates' => '_venue_coordinates',
+        'timezone' => '_venue_timezone'
     ];
     
     private static $field_labels = [
@@ -42,7 +43,8 @@ class Venue_Taxonomy {
         'phone' => 'Phone',
         'website' => 'Website',
         'capacity' => 'Capacity',
-        'coordinates' => 'Coordinates'
+        'coordinates' => 'Coordinates',
+        'timezone' => 'Timezone'
     ];
     
     public static function register() {
