@@ -13,12 +13,13 @@ The Universal Web Scraper handler prioritizes structured data extraction for max
 1. **AEG/AXS JSON feed** (`AegAxsExtractor`): Extracts events from AEG/AXS venue JSON feeds
 2. **Red Rocks** (`RedRocksExtractor`): Parses Red Rocks Amphitheatre event pages (@since v0.8.0)
 3. **Freshtix** (`FreshtixExtractor`): Parses embedded JavaScript event objects on Freshtix platform pages (@since v0.8.0)
-4. **Wix Events JSON** (`WixEventsExtractor`): Extracts events from `<script id="wix-warmup-data">`
-5. **RHP Events plugin HTML** (`RhpEventsExtractor`): Extracts events from `.rhpSingleEvent` markup
-6. **OpenDate.io** (`OpenDateExtractor`): Two-step extraction (listing → detail page). Prioritizes React JSON datetime values over JSON-LD for improved time accuracy.
-7. **Schema.org JSON-LD** (`JsonLdExtractor`): Parses `<script type="application/ld+json">`
-8. **Schema.org Microdata** (`MicrodataExtractor`): Parses itemtype/itemprop markup
-9. **HTML section extraction** (fallback): Uses XPath selector rules to extract one candidate section at a time for downstream processing
+4. **Firebase Realtime Database** (`FirebaseExtractor`): Detects Firebase SDK and fetches events from the Firebase REST API (@since v0.8.12)
+5. **Wix Events JSON** (`WixEventsExtractor`): Extracts events from `<script id="wix-warmup-data">`
+6. **RHP Events plugin HTML** (`RhpEventsExtractor`): Extracts events from `.rhpSingleEvent` markup
+7. **OpenDate.io** (`OpenDateExtractor`): Two-step extraction (listing → detail page). Prioritizes React JSON datetime values over JSON-LD for improved time accuracy.
+8. **Schema.org JSON-LD** (`JsonLdExtractor`): Parses `<script type="application/ld+json">`
+9. **Schema.org Microdata** (`MicrodataExtractor`): Parses itemtype/itemprop markup
+10. **HTML section extraction** (fallback): Uses XPath selector rules to extract one candidate section at a time for downstream processing
 
 ### Wix Events Support
 
@@ -28,6 +29,16 @@ The handler automatically detects and parses Wix Events platform data:
 - **Full Event Data**: Extracts title, dates, venue, location, coordinates, ticket URLs, and images
 - **Timezone Handling**: Properly converts dates using the event's configured timezone
 - **Ticket URL capture**: Extractors capture ticket URLs when present in source data
+
+### Firebase Realtime Database Support
+
+The handler extracts events from websites using Firebase Realtime Database for event storage:
+
+- **Automatic Detection**: Identifies Firebase SDK scripts and `databaseURL` config in page HTML
+- **REST API Extraction**: Fetches events directly from `{databaseURL}/events.json`
+- **Published Filter**: Only imports events where `isPublished` is true
+- **Full Event Data**: Extracts title, dates, description, ticket URLs, and poster images
+- **Date Parsing**: Handles Firebase JS date strings with timezone information
 
 ### RHP Events Plugin Support
 
@@ -129,6 +140,14 @@ Any website implementing Schema.org Event markup:
 - Schema.org microdata in HTML elements
 - Standard Event, MusicEvent, Festival, etc. types
 
+### Firebase Sites
+
+Websites using Firebase Realtime Database for event management:
+
+- Single-page applications that load events via JavaScript
+- Sites with Firebase SDK and public database configuration
+- Event data stored in `/events` path with `metadata` structure
+
 ### Custom HTML Sites
 
 Websites without structured data (AI fallback):
@@ -153,6 +172,7 @@ Websites without structured data (AI fallback):
 - **AegAxsExtractor.php**: Parses AEG/AXS JSON feeds
 - **RedRocksExtractor.php**: Parses Red Rocks Amphitheatre event pages
 - **FreshtixExtractor.php**: Parses Freshtix platform pages
+- **FirebaseExtractor.php**: Fetches events from Firebase Realtime Database REST API
 - **WixEventsExtractor.php**: Parses Wix warmup-data JSON
 - **RhpEventsExtractor.php**: Parses RHP Events plugin HTML
 - **OpenDateExtractor.php**: Handles OpenDate.io listing/detail extraction
@@ -214,6 +234,7 @@ When using HTML fallback:
 - Wix (Wix Events)
 - Red Rocks Amphitheatre
 - Freshtix platform sites
+- Firebase Realtime Database sites
 - WordPress sites using the RHP Events plugin
 - OpenDate.io calendars
 - Sites with Schema.org Event JSON-LD or microdata

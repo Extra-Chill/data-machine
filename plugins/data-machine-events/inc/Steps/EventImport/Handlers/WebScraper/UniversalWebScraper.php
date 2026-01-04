@@ -9,12 +9,13 @@
  * 1. AEG/AXS JSON (aegwebprod.blob.core.windows.net)
  * 2. Red Rocks (redrocksonline.com)
  * 3. Freshtix (*.freshtix.com)
- * 4. Wix Events JSON (wix-warmup-data)
- * 5. RHP Events WordPress plugin HTML
- * 6. OpenDate.io JSON
- * 7. Schema.org JSON-LD
- * 8. Schema.org microdata
- * 9. AI-enhanced HTML pattern matching (Fallback)
+ * 4. Firebase Realtime Database (firebaseio.com)
+ * 5. Wix Events JSON (wix-warmup-data)
+ * 6. RHP Events WordPress plugin HTML
+ * 7. OpenDate.io JSON
+ * 8. Schema.org JSON-LD
+ * 9. Schema.org microdata
+ * 10. AI-enhanced HTML pattern matching (Fallback)
  *
  * @package DataMachineEvents\Steps\EventImport\Handlers\WebScraper
  */
@@ -31,6 +32,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\RhpEvents
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\AegAxsExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\RedRocksExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\FreshtixExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\FirebaseExtractor;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
@@ -81,6 +83,7 @@ class UniversalWebScraper extends EventImportHandler {
             new AegAxsExtractor(),
             new RedRocksExtractor(),
             new FreshtixExtractor(),
+            new FirebaseExtractor(),
             new WixEventsExtractor(),
             new RhpEventsExtractor(),
             new OpenDateExtractor(),

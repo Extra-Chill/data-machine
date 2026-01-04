@@ -4,7 +4,7 @@ Tags: events, calendar, ticketmaster, eventbrite, import, venues, api
 Requires at least: 6.0
 Tested up to: 6.4
 Requires PHP: 8.0
-Stable tag: 0.8.12
+Stable tag: 0.8.13
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -152,7 +152,7 @@ Yes! Data Machine Events uses dedicated CSS files (no inline styles) and follows
 
 == Changelog ==
 
-= 0.8.12 =
+= 0.8.13 =
 * Unified taxonomy filter parameter sanitization with recursive structure preservation
 * Improved structured data quality by extracting plain text for Schema.org descriptions
 * Enhanced filter state management with support for both indexed and non-indexed array syntax
