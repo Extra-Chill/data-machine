@@ -138,6 +138,30 @@ class UniversalWebScraper extends EventImportHandler {
             'flow_step_id' => $flow_step_id
         ]);
 
+        // Direct support for ICS/JSON URLs
+        if (preg_match('/\.ics($|\?)/i', $url) || preg_match('/wp-json\/tribe\/events/i', $url)) {
+            $this->log('info', 'Universal Web Scraper: Direct structured data URL detected', [
+                'url' => $url
+            ]);
+            
+            $content = $this->fetch_html($url);
+            if (!empty($content)) {
+                $result = $this->tryStructuredDataExtraction(
+                    $content,
+                    $url,
+                    $config,
+                    $pipeline_id,
+                    $flow_id,
+                    $flow_step_id,
+                    $job_id
+                );
+                
+                if ($result !== null) {
+                    return $result;
+                }
+            }
+        }
+
         $current_url = $url;
         $current_page = 1;
         $visited_urls = [];
@@ -155,10 +179,31 @@ class UniversalWebScraper extends EventImportHandler {
             $html_content = $this->fetch_html($current_url);
             if (empty($html_content)) {
                 if ($current_page === 1) {
+                    // If initial page fails, try WordPress API discovery as a last resort
+                    $discovered_api = $this->attemptWordPressApiDiscovery($current_url);
+                    if ($discovered_api) {
+                        $this->log('info', 'Universal Web Scraper: Fallback API discovery successful', [
+                            'api_url' => $discovered_api
+                        ]);
+                        $api_content = $this->fetch_html($discovered_api);
+                        if (!empty($api_content)) {
+                            return $this->tryStructuredDataExtraction(
+                                $api_content,
+                                $discovered_api,
+                                $config,
+                                $pipeline_id,
+                                $flow_id,
+                                $flow_step_id,
+                                $job_id
+                            ) ?? [];
+                        }
+                    }
                     return [];
                 }
                 break;
             }
+            
+            // ... (rest of the method remains same)
 
             // Try structured data extraction first
             $structured_result = $this->tryStructuredDataExtraction(
@@ -368,10 +413,11 @@ class UniversalWebScraper extends EventImportHandler {
     private function fetch_html(string $url): string {
         $result = \DataMachine\Core\HttpClient::get($url, [
             'timeout' => 30,
-            'browser_mode' => true,
+            'browser_mode' => false,
             'headers' => [
                 'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                 'Accept-Language' => 'en-US,en;q=0.5',
+                'User-Agent' => 'DataMachineScraper/' . (defined('DATAMACHINE_VERSION') ? DATAMACHINE_VERSION : '1.0') . ' (+' . home_url() . ')',
             ],
             'context' => 'Universal Web Scraper'
         ]);
@@ -413,6 +459,39 @@ class UniversalWebScraper extends EventImportHandler {
         }
 
         return $event_section;
+    }
+
+    /**
+     * Attempt to discover WordPress API endpoint if initial fetch fails.
+     */
+    private function attemptWordPressApiDiscovery(string $url): ?string {
+        $parsed = parse_url($url);
+        if (empty($parsed['host'])) {
+            return null;
+        }
+
+        $base_url = ($parsed['scheme'] ?? 'https') . '://' . $parsed['host'];
+        $endpoints = [
+            $base_url . '/wp-json/tribe/events/v1/events?per_page=100',
+            $base_url . '/wp-json/wp/v2/events?per_page=100',
+        ];
+
+        foreach ($endpoints as $endpoint) {
+            $result = \DataMachine\Core\HttpClient::get($endpoint, [
+                'timeout' => 10,
+                'browser_mode' => true,
+                'context' => 'Universal Web Scraper (API Fallback)'
+            ]);
+
+            if ($result['success'] && !empty($result['data'])) {
+                $data = json_decode($result['data'], true);
+                if (is_array($data) && (isset($data['events']) || (isset($data[0]) && isset($data[0]['id'])))) {
+                    return $endpoint;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
