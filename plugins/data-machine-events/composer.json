@@ -1,7 +1,7 @@
 {
     "name": "chubes/datamachine-events",
     "description": "Data Machine Events plugin dependencies",
-    "version": "0.8.16",
+    "version": "0.8.17",
     "license": "GPL-2.0-or-later",
     "require": {
         "php": ">=8.2",

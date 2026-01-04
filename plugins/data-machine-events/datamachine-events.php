@@ -3,15 +3,15 @@
  * Plugin Name: Data Machine Events
  * Plugin URI: https://chubes.net
  * Description: WordPress events plugin with block-first architecture. Features AI-driven event creation via Data Machine integration, Event Details blocks for data storage, Calendar blocks for display, and venue taxonomy management.
- * Version: 0.8.16
+ * Version: 0.8.17
  * Author: Chris Huber
  * Author URI: https://chubes.net
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
-  * Text Domain: datamachine-events
+ * Text Domain: datamachine-events
  * Domain Path: /languages
  * Requires at least: 6.0
-  * Tested up to: 6.8
+ * Tested up to: 6.8
  * Requires PHP: 8.2
  * Requires Plugins: data-machine
  * Network: false
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once __DIR__ . '/vendor/autoload.php';
 }
-define('DATAMACHINE_EVENTS_VERSION', '0.8.16');
+define('DATAMACHINE_EVENTS_VERSION', '0.8.17');
 define('DATAMACHINE_EVENTS_PLUGIN_FILE', __FILE__);
 define('DATAMACHINE_EVENTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DATAMACHINE_EVENTS_PLUGIN_URL', plugin_dir_url(__FILE__));

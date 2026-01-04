@@ -22,6 +22,14 @@ class GoDaddyExtractor implements ExtractorInterface {
         $is_json = strpos(trim($html), '{') === 0;
         if ($is_json) {
             $data = json_decode($html, true);
+            if (!is_array($data)) {
+                return false;
+            }
+
+            if (isset($data['rest_url']) && str_contains((string) $data['rest_url'], '/wp-json/tribe/events/')) {
+                return false;
+            }
+
             return isset($data['events']) && is_array($data['events']);
         }
 
