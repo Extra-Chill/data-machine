@@ -4,7 +4,7 @@ Tags: events, calendar, ticketmaster, eventbrite, import, venues, api
 Requires at least: 6.0
 Tested up to: 6.4
 Requires PHP: 8.0
-Stable tag: 0.8.11
+Stable tag: 0.8.12
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -36,7 +36,7 @@ Frontend-focused WordPress events plugin with block-first architecture. Integrat
 **⚡ Lightweight & Modern**
 * **Gutenberg-First:** All event data is managed via blocks, not custom meta boxes.
 * Single custom post type vs. 50+ database tables (Tribe Events)
-* REST API enabled for headless implementations
+* REST API enabled for API-first implementations
 * Clean, modern codebase following WordPress standards
 
 **🎨 Complete Frontend System**
@@ -49,7 +49,7 @@ Frontend-focused WordPress events plugin with block-first architecture. Integrat
 **🔧 WordPress Native Integration**
 * Single `datamachine_events` post type with venue taxonomy
 * Comprehensive venue meta fields (10 fields: address, phone, website, capacity, coordinates, etc.)
-* REST API enabled for headless implementations
+* REST API enabled for API-first implementations
 * Block-first approach with background meta field sync for performance
 * Legacy status detection monitors removed (class retained as compatibility stub)
 
@@ -151,6 +151,13 @@ Yes! Data Machine Events uses dedicated CSS files (no inline styles) and follows
 7. **Import Logs** - Comprehensive analytics and import history
 
 == Changelog ==
+
+= 0.8.12 =
+* Unified taxonomy filter parameter sanitization with recursive structure preservation
+* Improved structured data quality by extracting plain text for Schema.org descriptions
+* Enhanced filter state management with support for both indexed and non-indexed array syntax
+* Refactored EventImportStep for standardized self-registration via StepTypeRegistrationTrait
+* Updated REST API terminology from 'headless' to 'API-first'
 
 = 0.8.11 =
 * Refactored EventImportStep to use StepTypeRegistrationTrait for standardized step registration

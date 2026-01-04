@@ -5,6 +5,15 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.12] - 2026-01-03
+
+### Changed
+- **Taxonomy Filter Sanitization**: Unified query parameter sanitization using recursive logic to preserve nested array structures (e.g., `tax_filter[genre][0]`), improving filter reliability across REST API and pagination.
+- **Schema.org Description**: Enhanced `EventSchemaProvider` to extract plain text from Event Details block content for Schema.org `description` field, improving structured data quality for search engines.
+- **Filter State Management**: Updated `FilterStateManager` regex to support both indexed (`tax_filter[taxonomy][0]`) and non-indexed (`tax_filter[taxonomy][]`) array syntax for better compatibility with varying WordPress conventions.
+- **REST API Terminology**: Updated documentation and descriptions to favor "API-first" over "headless" for better alignment with project goals.
+- **Venue Taxonomy Optimization**: Removed redundant `register_all_public_taxonomies` call in `Venue_Taxonomy` to prevent unintended taxonomy attachments and maintain clean post type registration.
+
 ## [0.8.11] - 2026-01-03
 
 ### Changed

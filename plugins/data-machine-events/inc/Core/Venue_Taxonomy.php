@@ -48,8 +48,6 @@ class Venue_Taxonomy {
     public static function register() {
         self::register_venue_taxonomy();
         
-        self::register_all_public_taxonomies();
-        
         self::init_admin_hooks();
     }
     
@@ -79,22 +77,6 @@ class Venue_Taxonomy {
         }
         
         register_taxonomy_for_object_type('venue', Event_Post_Type::POST_TYPE);
-    }
-    
-    private static function register_all_public_taxonomies() {
-        $taxonomies = get_taxonomies(['public' => true], 'names');
-        
-        if (!$taxonomies || is_wp_error($taxonomies)) {
-            return;
-        }
-        
-        foreach ($taxonomies as $taxonomy_slug) {
-            if ($taxonomy_slug === 'venue') {
-                continue;
-            }
-            
-            register_taxonomy_for_object_type($taxonomy_slug, Event_Post_Type::POST_TYPE);
-        }
     }
     
     /**
