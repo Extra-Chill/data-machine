@@ -5,6 +5,16 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.20] - 2026-01-04
+
+### Added
+- **WordPress API Discovery**: Added `attemptWordPressApiDiscovery` to `UniversalWebScraper` to automatically find event API endpoints when the main URL fetch fails.
+- **Direct Structured Data Support**: Added direct support for `.ics` and WordPress Tribe Events API URLs in the Universal Web Scraper, bypassing HTML parsing when a direct data feed is provided.
+
+### Changed
+- **Scraper User Agent**: Standardized the scraper's User-Agent string to include the Data Machine version and site URL for better transparency.
+- **Scraper HTTP Configuration**: Optimized `UniversalWebScraper` HTTP requests to use non-browser mode for faster direct data fetching while maintaining compatibility.
+
 ## [0.8.19] - 2026-01-04
 
 ### Added

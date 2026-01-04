@@ -4,7 +4,7 @@ Tags: events, calendar, ticketmaster, eventbrite, import, venues, api
 Requires at least: 6.0
 Tested up to: 6.4
 Requires PHP: 8.0
-Stable tag: 0.8.19
+Stable tag: 0.8.20
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -152,6 +152,12 @@ Yes! Data Machine Events uses dedicated CSS files (no inline styles) and follows
 7. **Import Logs** - Comprehensive analytics and import history
 
 == Changelog ==
+
+= 0.8.20 =
+* Added WordPress API Discovery to UniversalWebScraper for automatic platform identification
+* Added direct structured data support for .ics and WordPress API URLs
+* Standardized scraper User-Agent for better transparency
+* Optimized UniversalWebScraper HTTP configuration
 
 = 0.8.19 =
 * Enhanced SquarespaceExtractor with JSON API support and HTML list view fallback parsing
