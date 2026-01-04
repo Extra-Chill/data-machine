@@ -5,6 +5,20 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.22] - 2026-01-04
+
+### Added
+- **New Scraper Selectors**: Added XPath patterns for Brown Bear (Sahara Lounge) and Drupal Views/Node event listings in `EventSectionSelectors`.
+- **Squarespace Map Block Extraction**: Integrated `extractFromSquarespaceMapBlock` into `PageVenueExtractor` for high-reliability venue data parsing from map widgets.
+
+### Changed
+- **UniversalWebScraper Fetch Configuration**: Switched `fetch_html` to use `browser_mode => true` by default to improve compatibility with JavaScript-rendered sites.
+- **Improved Address Parsing**: Enhanced `extractCityStateZip` regex to handle comma-separated city/state/zip formats and added stricter US state/zip validation.
+- **CLI Command Enhancement**: Updated `UniversalWebScraperTestCommand` to output the full raw HTML content when extraction fails, aiding in scraper debugging.
+
+### Fixed
+- **Scraper Title Detection**: Added `EventLink` class pattern to title extraction logic for improved link identification.
+
 ## [0.8.21] - 2026-01-04
 
 ### Added

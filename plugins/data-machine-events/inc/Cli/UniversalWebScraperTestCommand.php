@@ -119,7 +119,8 @@ class UniversalWebScraperTestCommand {
 				$coverage_warning = true;
 				\WP_CLI::log( 'Venue: (unknown; extracted by AI)' );
 				\WP_CLI::log( 'Venue address: (missing)' );
-				\WP_CLI::log( substr( $payload['raw_html'], 0, 800 ) );
+				\WP_CLI::log( '--- Raw HTML Content ---' );
+				\WP_CLI::log( $payload['raw_html'] );
 				continue;
 			}
 

@@ -123,8 +123,13 @@ Updates existing event posts with changed data.
 
 - Custom handler for `promoter` taxonomy
 - Maps Schema.org "organizer" field to promoter terms
+- **Default Handling**: If no promoter configuration is provided in the handler settings, the system defaults to `skip`, ensuring no unintended promoter terms are attached.
 - Supports configurable assignment modes (AI-decided, term-specific, skip)
 - Handles promoter metadata (URL, type)
+
+### Global Event Filtering
+
+- **"Closed" Event Skipping**: All events with "closed" in the title (case-insensitive) are automatically skipped by the import handlers. This prevents venue closure notices from being created as event posts.
 
 ## Data Merging Logic
 

@@ -65,6 +65,16 @@ class PageVenueExtractor {
         $jsonld_data = self::extractFromJsonLd($html);
         $venue = array_merge($venue, array_filter($jsonld_data));
 
+        // Squarespace map block (highly reliable when present)
+        if (empty($venue['venueAddress']) || empty($venue['venueCity'])) {
+            $map_data = self::extractFromSquarespaceMapBlock($html);
+            foreach ($map_data as $key => $value) {
+                if (empty($venue[$key]) && !empty($value)) {
+                    $venue[$key] = $value;
+                }
+            }
+        }
+
         if (empty($venue['venue'])) {
             $venue['venue'] = self::extractVenueName($html);
         }
@@ -127,6 +137,70 @@ class PageVenueExtractor {
                     return $data;
                 }
             }
+        }
+
+        return $data;
+    }
+
+    /**
+     * Extract venue information from Squarespace map block.
+     *
+     * Squarespace sites often include a map widget in the footer with
+     * structured venue data in a data-context attribute.
+     *
+     * @param string $html Page HTML content
+     * @return array Venue data (may be partially filled)
+     */
+    public static function extractFromSquarespaceMapBlock(string $html): array {
+        $data = [
+            'venue' => '',
+            'venueAddress' => '',
+            'venueCity' => '',
+            'venueState' => '',
+            'venueZip' => '',
+            'venueCountry' => '',
+        ];
+
+        // Look for map block with address data in data-context attribute
+        if (!preg_match('/data-context="([^"]*addressLine1[^"]*)"/i', $html, $matches)) {
+            return $data;
+        }
+
+        // Decode HTML entities and parse JSON
+        $json_str = html_entity_decode($matches[1], ENT_QUOTES, 'UTF-8');
+        $context = json_decode($json_str, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($context)) {
+            return $data;
+        }
+
+        // Location data may be nested under 'location' key
+        $location = $context['location'] ?? $context;
+
+        if (!is_array($location)) {
+            return $data;
+        }
+
+        // Extract venue name
+        if (!empty($location['addressTitle'])) {
+            $data['venue'] = html_entity_decode(sanitize_text_field($location['addressTitle']), ENT_QUOTES, 'UTF-8');
+        }
+
+        // Extract street address
+        if (!empty($location['addressLine1'])) {
+            $data['venueAddress'] = html_entity_decode(sanitize_text_field($location['addressLine1']), ENT_QUOTES, 'UTF-8');
+        }
+
+        // Parse addressLine2 for city, state, zip (e.g., "Austin, TX, 78704")
+        if (!empty($location['addressLine2'])) {
+            $line2 = $location['addressLine2'];
+            $csz = self::extractCityStateZip($line2);
+            $data = array_merge($data, $csz);
+        }
+
+        // Extract country if present
+        if (!empty($location['addressCountry'])) {
+            $data['venueCountry'] = sanitize_text_field($location['addressCountry']);
         }
 
         return $data;
@@ -457,9 +531,9 @@ class PageVenueExtractor {
             'venueZip' => '',
         ];
 
-        // Pattern matches "City, ST 12345" or "City ST 12345" on a single line
+        // Pattern matches "City, ST 12345" or "City, ST, 12345" on a single line
         // We now require the state to be one of the US_STATES and a 5-digit ZIP
-        $pattern = '/([A-Z][a-z]+(?:\s[A-Z][a-z]+)*),?\s+(' . self::US_STATES . ')\s+(\d{5}(?:-\d{4})?)/m';
+        $pattern = '/([A-Z][a-z]+(?:\s[A-Z][a-z]+)*),?\s+(' . self::US_STATES . '),?\s+(\d{5}(?:-\d{4})?)/m';
 
         if (preg_match($pattern, $text, $matches)) {
             $data['venueCity'] = sanitize_text_field(trim($matches[1]));

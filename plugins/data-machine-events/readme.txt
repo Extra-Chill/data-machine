@@ -4,7 +4,7 @@ Tags: events, calendar, ticketmaster, eventbrite, import, venues, api
 Requires at least: 6.0
 Tested up to: 6.4
 Requires PHP: 8.0
-Stable tag: 0.8.21
+Stable tag: 0.8.22
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -152,6 +152,13 @@ Yes! Data Machine Events uses dedicated CSS files (no inline styles) and follows
 7. **Import Logs** - Comprehensive analytics and import history
 
 == Changelog ==
+
+= 0.8.22 =
+* Enhanced UniversalWebScraper with improved XPath selectors for Brown Bear and Drupal event listings
+* Optimized PageVenueExtractor with robust Squarespace map block data parsing
+* Improved address detection with stricter state and ZIP code validation
+* Standardized UniversalWebScraper fetch configuration to use browser mode for improved compatibility
+* Enhanced CLI output with full raw HTML display in scraper test command
 
 = 0.8.21 =
 * Enhanced PageVenueExtractor with multi-layered JSON-LD structured data support

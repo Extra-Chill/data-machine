@@ -14,17 +14,28 @@ The Universal Web Scraper handler prioritizes structured data extraction for max
 2. **Red Rocks** (`RedRocksExtractor`): Parses Red Rocks Amphitheatre event pages (@since v0.8.0)
 3. **Freshtix** (`FreshtixExtractor`): Parses embedded JavaScript event objects on Freshtix platform pages (@since v0.8.0)
 4. **Firebase Realtime Database** (`FirebaseExtractor`): Detects Firebase SDK and fetches events from the Firebase REST API (@since v0.8.12)
-5. **Squarespace** (`SquarespaceExtractor`): Extracts events from `Static.SQUARESPACE_CONTEXT` JavaScript objects (@since v0.8.12)
-6. **SpotHopper** (`SpotHopperExtractor`): Auto-detects SpotHopper platform and extracts events from their public API (@since v0.8.12)
-7. **Prekindle** (`PrekindleExtractor`): Auto-detects Prekindle widgets/links and extracts high-fidelity data from their mobile API (@since v0.8.12)
-8. **Wix Events JSON** (`WixEventsExtractor`): Extracts events from `<script id="wix-warmup-data">`
-9. **RHP Events plugin HTML** (`RhpEventsExtractor`): Extracts events from `.rhpSingleEvent` markup
-10. **OpenDate.io** (`OpenDateExtractor`): Two-step extraction (listing → detail page). Prioritizes React JSON datetime values over JSON-LD for improved time accuracy.
-11. **Embedded Calendars** (`EmbeddedCalendarExtractor`): Detects and scrapes embedded Google Calendar, SeeTickets, and Turntable widgets. Consolidates legacy standalone `GoogleCalendar` handler logic. (@since v0.8.0)
+5. **Embedded Calendars** (`EmbeddedCalendarExtractor`): Detects and scrapes embedded Google Calendar, SeeTickets, and Turntable widgets. Consolidates legacy standalone `GoogleCalendar` handler logic. (@since v0.8.0)
+6. **Squarespace** (`SquarespaceExtractor`): Extracts events from `Static.SQUARESPACE_CONTEXT` JavaScript objects (@since v0.8.12)
+7. **SpotHopper** (`SpotHopperExtractor`): Auto-detects SpotHopper platform and extracts events from their public API (@since v0.8.12)
+8. **Bandzoogle** (`BandzoogleExtractor`): Extracts events from Bandzoogle-powered venue calendar pages (@since v0.8.16)
+9. **GoDaddy** (`GoDaddyExtractor`): Extracts events from GoDaddy Website Builder calendars with REST API detection (@since v0.8.16)
+10. **Timely** (`TimelyExtractor`): Specialized extractor for Time.ly All-in-One Event Calendar platform (@since v0.8.18)
+11. **Schema.org JSON-LD** (`JsonLdExtractor`): Parses `<script type="application/ld+json">`
 12. **External WordPress** (`WordPressExtractor`): Extracts events from external WordPress sites via REST API or structured HTML. Consolidates legacy standalone `WordPressEventsAPI` handler logic. (@since v0.8.0)
-13. **Schema.org JSON-LD** (`JsonLdExtractor`): Parses `<script type="application/ld+json">`
-12. **Schema.org Microdata** (`MicrodataExtractor`): Parses itemtype/itemprop markup
-13. **HTML section extraction** (fallback): Uses XPath selector rules to extract one candidate section at a time for downstream processing
+13. **Prekindle** (`PrekindleExtractor`): Auto-detects Prekindle widgets/links and extracts high-fidelity data from their mobile API (@since v0.8.12)
+14. **Wix Events JSON** (`WixEventsExtractor`): Extracts events from `<script id="wix-warmup-data">`
+15. **RHP Events plugin HTML** (`RhpEventsExtractor`): Extracts events from `.rhpSingleEvent` markup. Enhanced to merge page-level venue data (@since v0.8.21).
+16. **OpenDate.io** (`OpenDateExtractor`): Two-step extraction (listing → detail page). Prioritizes React JSON datetime values over JSON-LD for improved time accuracy.
+17. **Schema.org Microdata** (`MicrodataExtractor`): Parses itemtype/itemprop markup
+18. **HTML section extraction** (fallback): Uses XPath selector rules to extract one candidate section at a time for downstream processing
+
+### Page Venue Extraction
+
+The handler includes a `PageVenueExtractor` (@since v0.8.18) that provides multi-layered venue metadata parsing from site headers and footers. This is particularly useful when event listings are sparse but the parent site contains rich venue information.
+
+- **JSON-LD Support**: Prioritizes `MusicVenue`, `EntertainmentBusiness`, and `NightClub` schema types found in site-wide headers or footers (@since v0.8.21).
+- **Address Detection**: Robust identification of addresses in Squarespace announcement bars, footers, and page titles.
+- **Contextual Merging**: Automatically merges discovered page-level venue data into event listings that lack complete address information (e.g., in the `RhpEventsExtractor`).
 
 ### Wix Events Support
 

@@ -50,6 +50,24 @@ final class EventSectionSelectors {
                 'enable_table_row_date_filter' => false,
             ],
 
+            // Brown Bear Calendar (Sahara Lounge, etc.)
+            [
+                'xpath' => '//*[contains(concat(" ", normalize-space(@class), " "), " CalEvent ")]',
+                'enable_table_row_date_filter' => false,
+            ],
+
+            // Drupal Views patterns (Views module event listings)
+            [
+                'xpath' => '//*[contains(concat(" ", normalize-space(@class), " "), " views-row ")]',
+                'enable_table_row_date_filter' => false,
+            ],
+
+            // Drupal node type patterns
+            [
+                'xpath' => '//*[contains(concat(" ", normalize-space(@class), " "), " node--type-event ")]',
+                'enable_table_row_date_filter' => false,
+            ],
+
             // Table-based event patterns (venue calendars often use tables)
             [
                 'xpath' => '//tr[.//td[contains(@class, "event-date") or contains(@class, "event-name") or contains(@class, "event")]]',
@@ -93,6 +111,10 @@ final class EventSectionSelectors {
             ],
 
             // Common event class patterns
+            [
+                'xpath' => '//*[contains(concat(" ", normalize-space(@class), " "), " full-event ")]',
+                'enable_table_row_date_filter' => false,
+            ],
             [
                 'xpath' => '//*[contains(@class, "event-content-row")]',
                 'enable_table_row_date_filter' => false,

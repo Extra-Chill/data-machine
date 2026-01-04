@@ -15,7 +15,7 @@ Data Machine Events provides a complete venue management system through WordPres
 - **REST API Integration**: Venue data available via endpoints
 
 ### Meta Fields
-Venues include 9 comprehensive metadata fields:
+Venues include 10 comprehensive metadata fields:
 - **address**: Street address for venue location
 - **city**: Venue city or locality
 - **state**: State or province
@@ -25,6 +25,16 @@ Venues include 9 comprehensive metadata fields:
 - **website**: Venue website URL
 - **capacity**: Maximum venue capacity
 - **coordinates**: GPS coordinates (latitude, longitude)
+- **venueTimezone**: IANA timezone identifier (e.g., "America/New_York") (@since v0.8.14)
+
+### Timezone Detection
+
+Venues support automatic timezone detection based on coordinates via the GeoNames API (@since v0.8.16).
+
+- **Automatic Lookup**: When a venue is created or updated with valid coordinates, the `GeoNamesService` automatically fetches the correct IANA timezone identifier.
+- **Batch Processing**: A dedicated REST API and admin UI (`assets/js/settings-backfill.js`) allow admins to backfill timezones for existing venues.
+- **Settings**: A `geonames_username` must be configured in the main plugin settings to enable this feature.
+- **Calendar Integration**: `Calendar_Query` and `DateTimeParser` respect venue-specific timezones for accurate date grouping and display.
 
 ### Admin Interface
 - **Venue Management**: Full admin interface for venue operations

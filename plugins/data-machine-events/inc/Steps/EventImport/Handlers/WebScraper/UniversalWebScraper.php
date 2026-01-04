@@ -413,7 +413,7 @@ class UniversalWebScraper extends EventImportHandler {
     private function fetch_html(string $url): string {
         $result = \DataMachine\Core\HttpClient::get($url, [
             'timeout' => 30,
-            'browser_mode' => false,
+            'browser_mode' => true,
             'headers' => [
                 'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                 'Accept-Language' => 'en-US,en;q=0.5',
@@ -522,6 +522,7 @@ class UniversalWebScraper extends EventImportHandler {
             "//h3",
             "//*[contains(@class, 'title')]",
             "//*[contains(@class, 'event-name')]",
+            "//*[contains(@class, 'EventLink')]//a",
             "//*[@itemprop='name']",
         ];
 
