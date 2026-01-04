@@ -25,7 +25,19 @@ class PageVenueExtractor {
     /**
      * Words to filter out when extracting venue name from title.
      */
-    private const TITLE_FILTER_WORDS = ['events', 'calendar', 'shows', 'upcoming events', 'concerts', 'schedule'];
+    private const TITLE_FILTER_WORDS = [
+        'events',
+        'calendar',
+        'shows',
+        'upcoming events',
+        'concerts',
+        'schedule',
+        'tickets',
+        'reservations',
+        'live music',
+        'event calendar',
+        'upcoming',
+    ];
 
     /**
      * Extract venue information from page HTML.
@@ -48,7 +60,7 @@ class PageVenueExtractor {
         $venue['venue'] = self::extractVenueName($html);
         $venue['venueTimezone'] = self::extractTimezone($html);
 
-        $address_data = self::extractAddressFromFooter($html);
+        $address_data = self::extractAddress($html);
         $venue = array_merge($venue, $address_data);
 
         return $venue;
@@ -64,24 +76,53 @@ class PageVenueExtractor {
      * @return string Venue name or empty string
      */
     public static function extractVenueName(string $html): string {
+        // Squarespace specific site title extraction from Static.SQUARESPACE_CONTEXT
+        // This is the most reliable source for Squarespace sites
+        if (preg_match('/Static\.SQUARESPACE_CONTEXT\s*=\s*\{[^}]*"siteTitle"\s*:\s*"([^"]+)"/s', $html, $ss_matches)) {
+            return sanitize_text_field($ss_matches[1]);
+        }
+
         if (!preg_match('/<title[^>]*>([^<]+)<\/title>/i', $html, $matches)) {
             return '';
         }
 
         $title = html_entity_decode(trim($matches[1]), ENT_QUOTES, 'UTF-8');
 
-        $separators = [' — ', ' - ', ' | ', ': '];
+        $separators = [' — ', ' – ', ' - ', ' | ', ': ', ' · '];
         foreach ($separators as $sep) {
             if (strpos($title, $sep) !== false) {
                 $parts = explode($sep, $title);
 
+                // Try to find the part that isn't a filtered word
+                // Usually the venue name is at the end or beginning
+                $candidate = '';
                 foreach ($parts as $part) {
                     $part = trim($part);
                     $lower = strtolower($part);
-
-                    if (!in_array($lower, self::TITLE_FILTER_WORDS, true)) {
-                        return sanitize_text_field($part);
+                    
+                    if (empty($part)) {
+                        continue;
                     }
+
+                    $is_filtered = false;
+                    foreach (self::TITLE_FILTER_WORDS as $word) {
+                        if (strpos($lower, $word) !== false) {
+                            $is_filtered = true;
+                            break;
+                        }
+                    }
+
+                    if (!$is_filtered) {
+                        // If we find a candidate, prefer the one that doesn't look like "Home" or "Welcome"
+                        if (in_array($lower, ['home', 'welcome', 'index'])) {
+                            continue;
+                        }
+                        $candidate = $part;
+                    }
+                }
+                
+                if (!empty($candidate)) {
+                    return sanitize_text_field($candidate);
                 }
             }
         }
@@ -124,16 +165,12 @@ class PageVenueExtractor {
     }
 
     /**
-     * Extract address information from page footer.
-     *
-     * Looks for common footer patterns and extracts:
-     * - Street address
-     * - City, State, ZIP
+     * Extract address information from page.
      *
      * @param string $html Page HTML content
-     * @return array Address data with keys: venueAddress, venueCity, venueState, venueZip
+     * @return array Address data
      */
-    public static function extractAddressFromFooter(string $html): array {
+    public static function extractAddress(string $html): array {
         $data = [
             'venueAddress' => '',
             'venueCity' => '',
@@ -141,17 +178,42 @@ class PageVenueExtractor {
             'venueZip' => '',
         ];
 
-        $footer_html = self::findFooterContent($html);
-
-        if (empty($footer_html)) {
-            return $data;
+        // 1. Check Squarespace-specific announcement bar first (common for addresses/hours)
+        if (preg_match('/class="[^"]*sqs-announcement-bar[^"]*"[^>]*>(.*?)<\/div>/is', $html, $matches)) {
+            $announcement_text = wp_strip_all_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $matches[1]));
+            $csz = self::extractCityStateZip($announcement_text);
+            if (!empty($csz['venueZip'])) {
+                $data = array_merge($data, $csz);
+                $data['venueAddress'] = self::extractStreetAddress($announcement_text);
+                if (!empty($data['venueAddress'])) {
+                    return $data;
+                }
+            }
         }
 
-        $footer_text = wp_strip_all_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $footer_html));
+        // 2. Try standard footer content
+        $footer_html = self::findFooterContent($html);
+        if (!empty($footer_html)) {
+            $footer_text = wp_strip_all_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $footer_html));
+            $csz = self::extractCityStateZip($footer_text);
+            if (!empty($csz['venueZip'])) {
+                $data = array_merge($data, $csz);
+                $data['venueAddress'] = self::extractStreetAddress($footer_text);
+                if (!empty($data['venueAddress'])) {
+                    return $data;
+                }
+            }
+        }
 
-        $data['venueAddress'] = self::extractStreetAddress($footer_text);
-        $csz = self::extractCityStateZip($footer_text);
-        $data = array_merge($data, $csz);
+        // 3. Last resort: scan whole body but only for high-confidence address patterns
+        if (preg_match('/<body[^>]*>(.*?)<\/body>/is', $html, $matches)) {
+            $body_text = wp_strip_all_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $matches[1]));
+            $csz = self::extractCityStateZip($body_text);
+            if (!empty($csz['venueZip'])) {
+                $data = array_merge($data, $csz);
+                $data['venueAddress'] = self::extractStreetAddress($body_text);
+            }
+        }
 
         return $data;
     }
@@ -168,18 +230,23 @@ class PageVenueExtractor {
             return $matches[1];
         }
 
-        // Section with footer ID
-        if (preg_match('/<section[^>]*id="footer[^"]*"[^>]*>(.*?)<\/section>/is', $html, $matches)) {
+        // Squarespace footer sections
+        if (preg_match('/id="footer-sections"[^>]*>(.*?)($|(?=<section))/is', $html, $matches)) {
             return $matches[1];
         }
 
-        // Squarespace footer sections
-        if (preg_match('/id="footer-sections"[^>]*>(.*?)$/is', $html, $matches)) {
+        // Section with footer ID
+        if (preg_match('/<section[^>]*id="[^"]*footer[^"]*"[^>]*>(.*?)<\/section>/is', $html, $matches)) {
             return $matches[1];
         }
 
         // Div with footer class
         if (preg_match('/<div[^>]*class="[^"]*footer[^"]*"[^>]*>(.*?)<\/div>/is', $html, $matches)) {
+            return $matches[1];
+        }
+
+        // Squarespace nav-footer
+        if (preg_match('/class="[^"]*footer-nav[^"]*"[^>]*>(.*?)<\/div>/is', $html, $matches)) {
             return $matches[1];
         }
 
@@ -193,17 +260,19 @@ class PageVenueExtractor {
      * @return string Street address or empty string
      */
     private static function extractStreetAddress(string $text): string {
-        // Look for common street suffixes
-        $street_pattern = '/(\d+[^,\n]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Boulevard|Blvd|Lane|Ln|Way|Court|Ct|Circle|Cir|Highway|Hwy|Pkwy|Parkway)[^,\n]*)/i';
+        // Look for common street suffixes with a leading number
+        $street_pattern = '/(\d+[ ]+[A-Za-z0-9. ]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Boulevard|Blvd|Lane|Ln|Way|Court|Ct|Circle|Cir|Highway|Hwy|Pkwy|Parkway|Plaza|Pl|Square|Sq|Trail|Trl|Loop|Broadway)[.]?)/i';
 
         if (preg_match($street_pattern, $text, $matches)) {
             return sanitize_text_field(trim($matches[1]));
         }
 
-        // Fallback: number followed by words (potential address)
-        if (preg_match('/(\d+\s+[A-Za-z0-9\s]+)/m', $text, $matches)) {
+        // Fallback: number followed by uppercase words (potential address)
+        // More strict than before to avoid "Operating Hours"
+        if (preg_match('/(\d{1,5}\s+[A-Z][A-Za-z0-9\s]{5,50})/m', $text, $matches)) {
             $potential = trim($matches[1]);
-            if (strlen($potential) > 10 && strlen($potential) < 100) {
+            // Avoid matches that look like times (e.g. "10 am - 10 pm")
+            if (!preg_match('/\d+\s*(?:am|pm|am\s*-|pm\s*-)/i', $potential)) {
                 return sanitize_text_field($potential);
             }
         }
@@ -225,8 +294,8 @@ class PageVenueExtractor {
         ];
 
         // Pattern matches "City, ST 12345" or "City ST 12345" on a single line
-        // [A-Za-z ]+ captures city name (letters and spaces only, no newlines)
-        $pattern = '/^([A-Za-z ]+),?\s*(' . self::US_STATES . ')\s+(\d{5}(?:-\d{4})?)/im';
+        // We now require the state to be one of the US_STATES and a 5-digit ZIP
+        $pattern = '/([A-Z][a-z]+(?:\s[A-Z][a-z]+)*),?\s+(' . self::US_STATES . ')\s+(\d{5}(?:-\d{4})?)/m';
 
         if (preg_match($pattern, $text, $matches)) {
             $data['venueCity'] = sanitize_text_field(trim($matches[1]));

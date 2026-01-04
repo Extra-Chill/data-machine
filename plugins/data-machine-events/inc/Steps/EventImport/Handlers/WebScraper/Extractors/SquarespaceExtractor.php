@@ -21,34 +21,120 @@ class SquarespaceExtractor implements ExtractorInterface {
     }
 
     public function extract(string $html, string $source_url): array {
-        if (!preg_match('/Static\.SQUARESPACE_CONTEXT\s*=\s*(\{.*?\});\s*<\/script>/is', $html, $matches)) {
-            // Try a looser match if the above fails
-            if (!preg_match('/Static\.SQUARESPACE_CONTEXT\s*=\s*(\{.*?\});/is', $html, $matches)) {
-                return [];
-            }
-        }
+        $data = $this->fetchJsonData($html, $source_url);
 
-        $json_content = trim($matches[1]);
-        $data = json_decode($json_content, true);
-
-        if (json_last_error() !== JSON_ERROR_NONE || empty($data)) {
+        if (empty($data)) {
             return [];
         }
 
         $raw_items = $this->findItemsRecursive($data);
         if (empty($raw_items)) {
+            // 3. Fallback to parsing HTML directly if JSON is empty
+            $raw_items = $this->parseHtmlItems($html);
+        }
+
+        if (empty($raw_items)) {
             return [];
         }
 
+        // Extract venue info from page context as fallback
+        $page_venue = \DataMachineEvents\Steps\EventImport\Handlers\WebScraper\PageVenueExtractor::extract($html, $source_url);
+
         $events = [];
         foreach ($raw_items as $raw_item) {
-            $normalized = $this->normalizeItem($raw_item);
+            $normalized = $this->normalizeItem($raw_item, $page_venue);
             if (!empty($normalized['title'])) {
                 $events[] = $normalized;
             }
         }
 
         return $events;
+    }
+
+    /**
+     * Parse events from Squarespace HTML list view (e.g., eventlist-event).
+     *
+     * @param string $html Page HTML
+     * @return array Array of raw item-like structures
+     */
+    private function parseHtmlItems(string $html): array {
+        $items = [];
+        
+        // Find all article tags with eventlist-event class
+        if (!preg_match_all('/<article[^>]+class="[^"]*eventlist-event[^"]*"[^>]*>(.*?)<\/article>/is', $html, $matches)) {
+            return [];
+        }
+
+        foreach ($matches[1] as $index => $article_html) {
+            $item = [
+                'title' => '',
+                'startDate' => '',
+                'fullUrl' => '',
+                'assetUrl' => '',
+                'description' => '',
+            ];
+
+            // Title and Link
+            if (preg_match('/<h1[^>]*class="eventlist-title"[^>]*>.*?<a[^>]+href="([^"]+)"[^>]*>(.*?)<\/a>/is', $article_html, $title_matches)) {
+                $item['fullUrl'] = $title_matches[1];
+                $item['title'] = wp_strip_all_tags($title_matches[2]);
+            }
+
+            // Date (from time tag)
+            if (preg_match('/<time[^>]+datetime="([^"]+)"/i', $article_html, $date_matches)) {
+                $item['startDate'] = $date_matches[1];
+            }
+
+            // Image
+            if (preg_match('/<img[^>]+data-src="([^"]+)"/i', $article_html, $img_matches)) {
+                $item['assetUrl'] = $img_matches[1];
+            }
+
+            if (!empty($item['title'])) {
+                $items[] = $item;
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * Fetch Squarespace data via JSON API or HTML context.
+     */
+    private function fetchJsonData(string $html, string $source_url): array {
+        // 1. Try JSON API first (most reliable for large pages)
+        $json_url = add_query_arg('format', 'json', $source_url);
+        $response = \DataMachine\Core\HttpClient::get($json_url, [
+            'timeout' => 30,
+            'context' => 'Squarespace Extractor JSON API',
+        ]);
+
+        if ($response['success'] && !empty($response['data'])) {
+            $data = json_decode($response['data'], true);
+            if (json_last_error() === JSON_ERROR_NONE && !empty($data)) {
+                return $data;
+            }
+        }
+
+        // 2. Fallback to extracting from HTML using string search (avoids regex backtracking)
+        $start_token = 'Static.SQUARESPACE_CONTEXT = ';
+        $pos = strpos($html, $start_token);
+        if ($pos === false) {
+            return [];
+        }
+
+        $json_part = substr($html, $pos + strlen($start_token));
+        
+        // Find the first semicolon that isn't inside a string
+        // Simple approach: look for }; or } followed by </script>
+        if (preg_match('/^(\{.*?\});\s*(?:<\/script>|window)/s', $json_part, $matches)) {
+            $data = json_decode($matches[1], true);
+            if (json_last_error() === JSON_ERROR_NONE && !empty($data)) {
+                return $data;
+            }
+        }
+
+        return [];
     }
 
     public function getMethod(): string {
@@ -93,13 +179,27 @@ class SquarespaceExtractor implements ExtractorInterface {
      * Normalize Squarespace item to standardized format.
      *
      * @param array $item Raw Squarespace item object
+     * @param array $page_venue Venue info extracted from page context
      * @return array Standardized event data
      */
-    private function normalizeItem(array $item): array {
+    private function normalizeItem(array $item, array $page_venue): array {
         $event = [
             'title' => $this->sanitizeText($item['title'] ?? ''),
             'description' => $this->cleanHtml($item['description'] ?? $item['body'] ?? ''),
+            'venue' => $page_venue['venue'] ?? '',
+            'venueAddress' => $page_venue['venueAddress'] ?? '',
+            'venueCity' => $page_venue['venueCity'] ?? '',
+            'venueState' => $page_venue['venueState'] ?? '',
+            'venueZip' => $page_venue['venueZip'] ?? '',
+            'venueCountry' => $page_venue['venueCountry'] ?? 'US',
+            'venueTimezone' => $page_venue['venueTimezone'] ?? '',
+            'source_url' => '',
         ];
+
+        // Set source URL
+        if (!empty($item['fullUrl'])) {
+            $event['source_url'] = $item['fullUrl'];
+        }
 
         $this->parseScheduling($event, $item);
         $this->parseTicketing($event, $item);

@@ -4,7 +4,7 @@ Tags: events, calendar, ticketmaster, eventbrite, import, venues, api
 Requires at least: 6.0
 Tested up to: 6.4
 Requires PHP: 8.0
-Stable tag: 0.8.18
+Stable tag: 0.8.19
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -152,6 +152,13 @@ Yes! Data Machine Events uses dedicated CSS files (no inline styles) and follows
 7. **Import Logs** - Comprehensive analytics and import history
 
 == Changelog ==
+
+= 0.8.19 =
+* Enhanced SquarespaceExtractor with JSON API support and HTML list view fallback parsing
+* Improved PageVenueExtractor with specific Squarespace site title extraction and robust address detection
+* Added support for announcement bar and footer section address extraction in Squarespace sites
+* Refined venue name extraction from page titles with expanded filter keywords and separator support
+* Added documentation for Universal Web Scraper test commands
 
 = 0.8.17 =
 * Enhanced GoDaddyExtractor with Rest API detection to prevent incorrect platform identification

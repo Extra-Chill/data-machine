@@ -5,6 +5,17 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.19] - 2026-01-04
+
+### Added
+- **Squarespace Extractor Enhancement**: Added JSON API support and HTML list view fallback parsing for better reliability on Squarespace sites.
+- **Page Venue Extractor Improvements**: Enhanced with specific Squarespace site title extraction and robust address detection.
+- **Universal Web Scraper Documentation**: Added `docs/universal-web-scraper-test-command.md` documenting WP-CLI test commands.
+
+### Changed
+- **Venue Detection**: Refined venue name extraction from page titles with expanded filter keywords and better separator support.
+- **Address Extraction**: Improved extraction logic to handle Squarespace announcement bars and specific footer sections.
+
 ## [0.8.18] - 2026-01-04
 
 ### Added
