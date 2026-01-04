@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.8.13
+**Version**: 0.8.16
 
 ## Plugin Bootstrap
 
@@ -14,8 +14,7 @@ Technical guidance for Claude Code when working with the **Data Machine Events**
 ## Data Machine Integration
 
 - **`init_data_machine_integration()`**: Runs at priority 25 on `init`. After verifying `DATAMACHINE_VERSION`, it loads `EventImportFilters`, instantiates all import handlers, loads EventUpsert filters, and registers the EventUpsert handler from `inc/Steps/Upsert/Events/EventUpsert.php`.
-- **Event import handlers**: `load_event_import_handlers()` instantiates 15 `FetchHandler` implementations (all located under `inc/Steps/EventImport/Handlers`):
-  - `BandzoogleCalendar\BandzoogleCalendar` (forward-only calendar crawling with popup HTML parsing)
+- **Event import handlers**: `load_event_import_handlers()` instantiates the following `FetchHandler` implementations (all located under `inc/Steps/EventImport/Handlers`):
   - `DiceFm\DiceFm`
   - `DoStuffMediaApi\DoStuffMediaApi`
   - `Eventbrite\Eventbrite`
@@ -23,11 +22,9 @@ Technical guidance for Claude Code when working with the **Data Machine Events**
   - `GoDaddyCalendar\GoDaddyCalendar` (@since v0.7.0)
   - `GoogleCalendar\GoogleCalendar` (with `GoogleCalendarUtils` for ID/URL resolution)
   - `IcsCalendar\IcsCalendar`
-  - `Prekindle\Prekindle` (JSON-LD + HTML time extraction from organizer widgets)
   - `SingleRecurring\SingleRecurring` (@since v0.6.3)
-  - `SpotHopper\SpotHopper`
   - `Ticketmaster\Ticketmaster` (with automatic API pagination up to MAX_PAGE=19)
-  - `WebScraper\\UniversalWebScraper` (extractor priority: AEG/AXS, RedRocks, Freshtix, Wix, RHP, OpenDate.io, JSON-LD, Microdata; then HTML section fallback; automatic pagination up to MAX_PAGES=20)
+  - `WebScraper\\UniversalWebScraper` (extractor priority: AEG/AXS, RedRocks, Freshtix, Firebase, Squarespace, SpotHopper, Bandzoogle, GoDaddy, Prekindle, Wix, RHP, OpenDate.io, JSON-LD, Microdata; then HTML section fallback; automatic pagination up to MAX_PAGES=20)
   - `WordPressEventsAPI\WordPressEventsAPI`
 - **Handler discovery**: `EventImportStep` (extends `DataMachine\Core\Steps\Step`) reads the configured handler slug, looks it up via `datamachine_handlers`, instantiates the class, and delegates to `get_fetch_data()` on `FetchHandler` (or falls back to legacy `execute()`). It merges returned `DataPacket` results into the pipeline and logs configuration issues.
 - **Single-item processing**: Each handler normalizes `(title, startDate, venue)` through `EventIdentifierGenerator::generate()`, checks `datamachine_is_item_processed`, marks the identifier via `datamachine_mark_item_processed`, and returns immediately after pushing a valid event to maintain incremental imports.
@@ -101,4 +98,4 @@ cd ../EventDetails && npm ci && npm run build
 ## Observability Notes
 
 - `inc/Core/meta-storage.php` keeps `_datamachine_event_datetime` synced for SQL queries.
-- EventUpsert logs debug/info messages for creation/update skip paths. 
+- EventUpsert logs debug/info messages for creation/update skip paths.

@@ -5,6 +5,24 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.16] - 2026-01-04
+
+### Added
+- **GeoNames Integration**: Added automatic venue timezone detection based on coordinates using the GeoNames API.
+- **Timezone Backfill System**: Added a batch-processing REST API and admin UI for updating timezones for existing venues.
+- **Scraper Extractors**: Added `WordPressExtractor`, `GoDaddyExtractor`, and `BandzoogleExtractor` to the Universal Web Scraper.
+- **WP-CLI Commands**: Added `test-scraper` and `test-scraper-url` commands for debugging web scrapers.
+- **Settings**: Added `geonames_username` field to plugin settings for timezone detection.
+
+### Changed
+- **Firebase Extractor**: Enhanced script sniffing to automatically detect Firebase database URLs from external scripts.
+- **Handler Consolidation**: Removed legacy standalone Bandzoogle, GoDaddy, and SpotHopper handlers in favor of Universal Web Scraper extractors.
+
+### Technical Details
+- Added `GeoNamesService` for timezone lookups.
+- Added `Venues::batch_update_timezones()` REST endpoint.
+- Added `assets/js/settings-backfill.js` for admin timezone processing.
+
 ## [0.8.15] - 2026-01-04
 
 ### Changed

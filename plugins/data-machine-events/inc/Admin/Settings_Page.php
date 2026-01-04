@@ -27,7 +27,8 @@ class Settings_Page {
         'include_in_archives' => false,
         'include_in_search' => true,
         'main_events_page_url' => '',
-        'map_display_type' => 'osm-standard'
+        'map_display_type' => 'osm-standard',
+        'geonames_username' => ''
     );
     
     public function __construct() {
@@ -111,6 +112,11 @@ class Settings_Page {
         $sanitized['map_display_type'] = in_array($input['map_display_type'], $allowed_map_types)
             ? $input['map_display_type']
             : 'osm-standard';
+
+        // GeoNames username
+        $sanitized['geonames_username'] = !empty($input['geonames_username'])
+            ? sanitize_text_field($input['geonames_username'])
+            : '';
 
         return $sanitized;
     }

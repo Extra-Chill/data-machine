@@ -64,7 +64,35 @@ class JsonLdExtractor implements ExtractorInterface {
             }
         }
 
+        if ($this->isList($data)) {
+            foreach ($data as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+
+                if (isset($item['@type']) && $item['@type'] === 'Event') {
+                    return $this->parseEvent($item, $source_url);
+                }
+
+                if (isset($item['@graph']) && is_array($item['@graph'])) {
+                    foreach ($item['@graph'] as $graph_item) {
+                        if (isset($graph_item['@type']) && $graph_item['@type'] === 'Event') {
+                            return $this->parseEvent($graph_item, $source_url);
+                        }
+                    }
+                }
+            }
+        }
+
         return null;
+    }
+
+    private function isList(array $data): bool {
+        if (empty($data)) {
+            return false;
+        }
+
+        return array_keys($data) === range(0, count($data) - 1);
     }
 
     /**
@@ -76,7 +104,7 @@ class JsonLdExtractor implements ExtractorInterface {
      */
     private function parseEvent(array $event_data, string $source_url): ?array {
         $event = [
-            'title' => $event_data['name'] ?? '',
+            'title' => html_entity_decode((string) ($event_data['name'] ?? '')),
             'description' => $event_data['description'] ?? '',
         ];
 
@@ -143,7 +171,7 @@ class JsonLdExtractor implements ExtractorInterface {
         }
 
         $location = $event_data['location'];
-        $event['venue'] = $location['name'] ?? '';
+        $event['venue'] = html_entity_decode((string) ($location['name'] ?? ''));
 
         if (!empty($location['address'])) {
             $address = $location['address'];
@@ -152,6 +180,16 @@ class JsonLdExtractor implements ExtractorInterface {
             $event['venueState'] = $address['addressRegion'] ?? '';
             $event['venueZip'] = $address['postalCode'] ?? '';
             $event['venueCountry'] = $address['addressCountry'] ?? '';
+        }
+
+        if (!empty($event['venueAddress'])) {
+            $event['venueAddress'] = html_entity_decode($event['venueAddress']);
+        }
+        if (!empty($event['venueCity'])) {
+            $event['venueCity'] = html_entity_decode($event['venueCity']);
+        }
+        if (!empty($event['venueState'])) {
+            $event['venueState'] = html_entity_decode($event['venueState']);
         }
 
         $event['venuePhone'] = $location['telephone'] ?? '';

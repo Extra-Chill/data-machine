@@ -8,6 +8,7 @@
 namespace DataMachineEvents\Core;
 
 use DataMachine\Core\HttpClient;
+use DataMachineEvents\Core\GeoNamesService;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -242,6 +243,7 @@ class Venue_Taxonomy {
 
         $existing_coords = get_term_meta($term_id, '_venue_coordinates', true);
         if (!empty($existing_coords)) {
+            self::maybe_derive_timezone($term_id, $existing_coords);
             return false;
         }
 
@@ -250,10 +252,175 @@ class Venue_Taxonomy {
 
         if ($coordinates) {
             update_term_meta($term_id, '_venue_coordinates', $coordinates);
+            self::maybe_derive_timezone($term_id, $coordinates);
             return true;
         }
 
         return false;
+    }
+
+    /**
+     * Derive timezone from coordinates if timezone is missing
+     *
+     * Uses GeoNames API to lookup IANA timezone from lat/lng coordinates.
+     * Only runs if GeoNames username is configured in settings.
+     *
+     * @param int $term_id Venue term ID
+     * @param string $coordinates Coordinates as "lat,lng"
+     * @return bool True if timezone was derived and saved, false otherwise
+     */
+    public static function maybe_derive_timezone($term_id, $coordinates = '') {
+        if (!$term_id) {
+            return false;
+        }
+
+        $existing_timezone = get_term_meta($term_id, '_venue_timezone', true);
+        if (!empty($existing_timezone)) {
+            return false;
+        }
+
+        if (empty($coordinates)) {
+            $coordinates = get_term_meta($term_id, '_venue_coordinates', true);
+        }
+
+        if (empty($coordinates)) {
+            return false;
+        }
+
+        if (!GeoNamesService::isConfigured()) {
+            return false;
+        }
+
+        $timezone = GeoNamesService::getTimezoneFromCoordinates($coordinates);
+
+        if ($timezone) {
+            update_term_meta($term_id, '_venue_timezone', $timezone);
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Backfill timezones for venues with coordinates but no timezone.
+     *
+     * Processes venues in batches for REST API pagination support.
+     * Geocodes venues without coordinates, then derives timezone from coordinates.
+     *
+     * @param int $batch_size Number of venues to process (0 = all)
+     * @param int $offset Starting position for batch processing
+     * @return array{processed: int, geocoded: int, timezones_derived: int, errors: int, has_more: bool, next_offset: int}
+     */
+    public static function backfill_venue_timezones(int $batch_size = 0, int $offset = 0): array {
+        $result = [
+            'processed' => 0,
+            'geocoded' => 0,
+            'timezones_derived' => 0,
+            'errors' => 0,
+            'has_more' => false,
+            'next_offset' => 0,
+        ];
+
+        if (!GeoNamesService::isConfigured()) {
+            return $result;
+        }
+
+        $args = [
+            'taxonomy' => 'venue',
+            'hide_empty' => false,
+            'offset' => $offset,
+        ];
+
+        if ($batch_size > 0) {
+            $args['number'] = $batch_size;
+        }
+
+        $venues = get_terms($args);
+
+        if (is_wp_error($venues) || empty($venues)) {
+            return $result;
+        }
+
+        foreach ($venues as $venue) {
+            $result['processed']++;
+
+            $coordinates = get_term_meta($venue->term_id, '_venue_coordinates', true);
+
+            if (empty($coordinates)) {
+                if (self::maybe_geocode_venue($venue->term_id)) {
+                    $result['geocoded']++;
+                    $coordinates = get_term_meta($venue->term_id, '_venue_coordinates', true);
+                }
+            }
+
+            if (empty($coordinates)) {
+                continue;
+            }
+
+            $timezone = get_term_meta($venue->term_id, '_venue_timezone', true);
+            if (!empty($timezone)) {
+                continue;
+            }
+
+            if (self::maybe_derive_timezone($venue->term_id, $coordinates)) {
+                $result['timezones_derived']++;
+            } else {
+                $result['errors']++;
+            }
+        }
+
+        if ($batch_size > 0) {
+            $total_count = wp_count_terms(['taxonomy' => 'venue', 'hide_empty' => false]);
+            $next_offset = $offset + $batch_size;
+            $result['has_more'] = $next_offset < $total_count;
+            $result['next_offset'] = $next_offset;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get count of venues that need timezone backfill.
+     *
+     * @return array{total: int, with_coordinates: int, with_timezone: int, needs_timezone: int}
+     */
+    public static function get_backfill_stats(): array {
+        $stats = [
+            'total' => 0,
+            'with_coordinates' => 0,
+            'with_timezone' => 0,
+            'needs_timezone' => 0,
+        ];
+
+        $venues = get_terms([
+            'taxonomy' => 'venue',
+            'hide_empty' => false,
+        ]);
+
+        if (is_wp_error($venues) || empty($venues)) {
+            return $stats;
+        }
+
+        $stats['total'] = count($venues);
+
+        foreach ($venues as $venue) {
+            $coordinates = get_term_meta($venue->term_id, '_venue_coordinates', true);
+            $timezone = get_term_meta($venue->term_id, '_venue_timezone', true);
+
+            if (!empty($coordinates)) {
+                $stats['with_coordinates']++;
+            }
+
+            if (!empty($timezone)) {
+                $stats['with_timezone']++;
+            }
+
+            if (!empty($coordinates) && empty($timezone)) {
+                $stats['needs_timezone']++;
+            }
+        }
+
+        return $stats;
     }
 
     /**

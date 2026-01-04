@@ -3,7 +3,7 @@
  * Plugin Name: Data Machine Events
  * Plugin URI: https://chubes.net
  * Description: WordPress events plugin with block-first architecture. Features AI-driven event creation via Data Machine integration, Event Details blocks for data storage, Calendar blocks for display, and venue taxonomy management.
- * Version: 0.8.15
+ * Version: 0.8.16
  * Author: Chris Huber
  * Author URI: https://chubes.net
  * License: GPL v2 or later
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once __DIR__ . '/vendor/autoload.php';
 }
-define('DATAMACHINE_EVENTS_VERSION', '0.8.15');
+define('DATAMACHINE_EVENTS_VERSION', '0.8.16');
 define('DATAMACHINE_EVENTS_PLUGIN_FILE', __FILE__);
 define('DATAMACHINE_EVENTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DATAMACHINE_EVENTS_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -54,10 +54,18 @@ if (!function_exists('datamachine_events_sanitize_query_params')) {
 // Load core meta storage (monitors Event Details block saves)
 require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/meta-storage.php';
 
-// Load REST API routes (modular)
-if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php' ) ) {
-	require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php';
-}
+	// Load REST API routes (modular)
+	if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php' ) ) {
+		require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php';
+	}
+
+	// WP-CLI commands (optional)
+	if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/UniversalWebScraperTestCommand.php' ) ) {
+		require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/UniversalWebScraperTestCommand.php';
+		\WP_CLI::add_command( 'datamachine-events test-scraper', \DataMachineEvents\Cli\UniversalWebScraperTestCommand::class );
+		\WP_CLI::add_command( 'datamachine-events test-scraper-url', \DataMachineEvents\Cli\UniversalWebScraperTestCommand::class );
+	}
+
 
 /**
  * Main Data Machine Events plugin class
@@ -150,14 +158,11 @@ class DATAMACHINE_Events {
             'DataMachineEvents\\Steps\\EventImport\\Handlers\\DiceFm\\DiceFm',
             'DataMachineEvents\\Steps\\EventImport\\Handlers\\GoogleCalendar\\GoogleCalendar',
             'DataMachineEvents\\Steps\\EventImport\\Handlers\\IcsCalendar\\IcsCalendar',
-            'DataMachineEvents\\Steps\\EventImport\\Handlers\\GoDaddyCalendar\\GoDaddyCalendar',
-            'DataMachineEvents\\Steps\\EventImport\\Handlers\\SpotHopper\\SpotHopper',
             'DataMachineEvents\\Steps\\EventImport\\Handlers\\WebScraper\\UniversalWebScraper',
             'DataMachineEvents\\Steps\\EventImport\\Handlers\\WordPressEventsAPI\\WordPressEventsAPI',
             'DataMachineEvents\\Steps\\EventImport\\Handlers\\EventFlyer\\EventFlyer',
             'DataMachineEvents\\Steps\\EventImport\\Handlers\\Eventbrite\\Eventbrite',
             'DataMachineEvents\\Steps\\EventImport\\Handlers\\DoStuffMediaApi\\DoStuffMediaApi',
-            'DataMachineEvents\\Steps\\EventImport\\Handlers\\BandzoogleCalendar\\BandzoogleCalendar',
             'DataMachineEvents\\Steps\\EventImport\\Handlers\\SingleRecurring\\SingleRecurring',
         ];
         
@@ -207,11 +212,27 @@ class DATAMACHINE_Events {
                 filemtime($css_file)
             );
         }
-    }
-    
-    
 
-    
+        if (strpos($hook, 'datamachine-events-settings') !== false) {
+            $js_file = DATAMACHINE_EVENTS_PLUGIN_DIR . 'assets/js/settings-backfill.js';
+
+            if (file_exists($js_file)) {
+                wp_enqueue_script(
+                    'datamachine-events-settings-backfill',
+                    DATAMACHINE_EVENTS_PLUGIN_URL . 'assets/js/settings-backfill.js',
+                    array('wp-api-fetch'),
+                    filemtime($js_file),
+                    true
+                );
+
+                wp_localize_script('datamachine-events-settings-backfill', 'dmEventsSettings', array(
+                    'restNamespace' => 'datamachine/v1',
+                    'nonce' => wp_create_nonce('wp_rest'),
+                ));
+            }
+        }
+    }
+
     public function activate() {
         $this->register_post_types();
         $this->register_taxonomies();

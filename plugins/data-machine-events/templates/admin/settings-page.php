@@ -21,6 +21,7 @@ $settings = [
     'include_in_search' => Settings_Page::get_setting('include_in_search'),
     'main_events_page_url' => Settings_Page::get_setting('main_events_page_url'),
     'map_display_type' => Settings_Page::get_setting('map_display_type'),
+    'geonames_username' => Settings_Page::get_setting('geonames_username'),
 ];
 
 // Handle settings updates
@@ -146,6 +147,45 @@ settings_errors('datamachine_events_messages');
                             <?php _e('<strong>CartoDB Voyager:</strong> Modern street map with balanced detail<br>', 'datamachine-events'); ?>
                             <?php _e('<strong>CartoDB Dark Matter:</strong> Dark theme for low-light viewing<br>', 'datamachine-events'); ?>
                             <?php _e('<strong>Humanitarian:</strong> High-contrast style optimized for accessibility', 'datamachine-events'); ?>
+                        </p>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Venue Timezone Settings -->
+        <h2><?php _e('Venue Timezone Settings', 'datamachine-events'); ?></h2>
+        <p class="description"><?php _e('Configure automatic timezone detection for venues using their coordinates.', 'datamachine-events'); ?></p>
+
+        <table class="form-table" role="presentation">
+            <tbody>
+                <tr>
+                    <th scope="row"><?php _e('GeoNames Username', 'datamachine-events'); ?></th>
+                    <td>
+                        <input type="text"
+                               name="datamachine_events_settings[geonames_username]"
+                               value="<?php echo esc_attr($settings['geonames_username'] ?? ''); ?>"
+                               placeholder="your_geonames_username"
+                               class="regular-text" />
+                        <p class="description">
+                            <?php printf(
+                                __('Required for automatic timezone detection from venue coordinates. <a href="%s" target="_blank">Create a free GeoNames account</a> and enable web services in your account settings.', 'datamachine-events'),
+                                'https://www.geonames.org/login'
+                            ); ?>
+                        </p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><?php _e('Backfill Timezones', 'datamachine-events'); ?></th>
+                    <td>
+                        <div id="dm-backfill-stats" style="margin-bottom: 12px;"></div>
+                        <button type="button" id="dm-backfill-button" class="button button-secondary">
+                            <?php _e('Backfill Venue Timezones', 'datamachine-events'); ?>
+                        </button>
+                        <div id="dm-backfill-progress" style="display: none; margin-top: 10px;"></div>
+                        <div id="dm-backfill-results"></div>
+                        <p class="description" style="margin-top: 8px;">
+                            <?php _e('Derive timezones for existing venues using their coordinates. New venues automatically get timezones during import.', 'datamachine-events'); ?>
                         </p>
                     </td>
                 </tr>

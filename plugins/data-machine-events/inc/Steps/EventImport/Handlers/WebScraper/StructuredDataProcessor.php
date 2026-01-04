@@ -86,6 +86,16 @@ class StructuredDataProcessor {
 
             $this->applyVenueConfigOverride($event, $config);
 
+            $venue_from_config = !empty($config['venue']) || !empty($config['venue_name']);
+            if (!$venue_from_config && empty(trim((string)($event['venue'] ?? '')))) {
+                do_action('datamachine_log', 'warning', 'Universal Web Scraper: Missing venue; configure venue override', [
+                    'source_url' => $source_url,
+                    'extraction_method' => $extraction_method,
+                    'title' => $event['title'] ?? '',
+                    'startDate' => $event['startDate'] ?? '',
+                ]);
+            }
+
             $venue_metadata = $this->handler->extractVenueMetadata($event);
             EventEngineData::storeVenueContext($job_id, $event, $venue_metadata);
 

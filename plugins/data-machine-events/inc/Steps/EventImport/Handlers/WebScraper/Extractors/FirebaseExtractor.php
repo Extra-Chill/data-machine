@@ -20,16 +20,13 @@ if (!defined('ABSPATH')) {
 class FirebaseExtractor implements ExtractorInterface {
 
     public function canExtract(string $html): bool {
-        $has_firebase = strpos($html, 'firebase-database.js') !== false
-            || strpos($html, 'firebase-app.js') !== false;
-        $has_db_url = strpos($html, 'databaseURL') !== false
-            && strpos($html, 'firebaseio.com') !== false;
-
-        return $has_firebase && $has_db_url;
+        return strpos($html, 'firebase-database.js') !== false
+            || strpos($html, 'firebase-app.js') !== false
+            || strpos($html, 'firebaseio.com') !== false;
     }
 
     public function extract(string $html, string $source_url): array {
-        $database_url = $this->extractDatabaseUrl($html);
+        $database_url = $this->extractDatabaseUrl($html, $source_url);
         if (empty($database_url)) {
             return [];
         }
@@ -41,13 +38,19 @@ class FirebaseExtractor implements ExtractorInterface {
 
         $events = [];
         foreach ($events_data as $event_id => $event) {
-            $metadata = $event['metadata'] ?? [];
+            // Handle both { id: { metadata: {...} } } and { id: { ...metadata... } }
+            $metadata = $event['metadata'] ?? $event;
 
-            if (empty($metadata['isPublished'])) {
+            if (isset($metadata['isPublished']) && !$metadata['isPublished']) {
                 continue;
             }
 
-            $normalized = $this->normalizeEvent($metadata, $event_id);
+            // Some implementations might not have isPublished, look for title as minimum
+            if (empty($metadata['title']) && isset($event['title'])) {
+                $metadata = $event;
+            }
+
+            $normalized = $this->normalizeEvent($metadata, (string)$event_id);
             if (!empty($normalized['title'])) {
                 $events[] = $normalized;
             }
@@ -61,14 +64,50 @@ class FirebaseExtractor implements ExtractorInterface {
     }
 
     /**
-     * Extract Firebase database URL from embedded JS config.
+     * Extract Firebase database URL from embedded JS config or external scripts.
      *
      * @param string $html Page HTML
+     * @param string $source_url Source URL for resolving relative script paths
      * @return string|null Database URL or null if not found
      */
-    private function extractDatabaseUrl(string $html): ?string {
+    private function extractDatabaseUrl(string $html, string $source_url): ?string {
+        // 1. Try embedded config first
         if (preg_match('/databaseURL\s*:\s*["\']([^"\']+firebaseio\.com)["\']/', $html, $matches)) {
             return rtrim($matches[1], '/');
+        }
+
+        // 2. Look for local script tags and sniff them
+        if (preg_match_all('/<script[^>]+src=["\']([^"\']+\.js[^"\']*)["\']/', $html, $matches)) {
+            $base_url = rtrim(dirname($source_url), '/') . '/';
+            $parsed_source = parse_url($source_url);
+            $host_url = ($parsed_source['scheme'] ?? 'https') . '://' . ($parsed_source['host'] ?? '');
+
+            foreach ($matches[1] as $script_src) {
+                // Ignore external library CDNs to save time, focus on local scripts
+                if (strpos($script_src, 'http') === 0 && strpos($script_src, $host_url) === false) {
+                    continue;
+                }
+
+                $script_url = $script_src;
+                if (strpos($script_src, '//') === 0) {
+                    $script_url = ($parsed_source['scheme'] ?? 'https') . ':' . $script_src;
+                } elseif (strpos($script_src, '/') === 0) {
+                    $script_url = $host_url . $script_src;
+                } elseif (strpos($script_src, 'http') !== 0) {
+                    $script_url = $base_url . $script_src;
+                }
+
+                $result = HttpClient::get($script_url, [
+                    'timeout' => 10,
+                    'context' => 'Firebase Extractor Script Sniffing'
+                ]);
+
+                if ($result['success'] && !empty($result['data'])) {
+                    if (preg_match('/databaseURL\s*:\s*["\']([^"\']+firebaseio\.com)["\']/', $result['data'], $inner_matches)) {
+                        return rtrim($inner_matches[1], '/');
+                    }
+                }
+            }
         }
 
         return null;
@@ -113,7 +152,7 @@ class FirebaseExtractor implements ExtractorInterface {
     private function normalizeEvent(array $metadata, string $event_id): array {
         $event = [
             'title' => $this->sanitizeText($metadata['title'] ?? ''),
-            'description' => $this->cleanDescription($metadata['longDescription'] ?? ''),
+            'description' => $this->cleanDescription($metadata['longDescription'] ?? $metadata['shortDescription'] ?? $metadata['description'] ?? ''),
         ];
 
         $this->parseDate($event, $metadata);
@@ -178,8 +217,9 @@ class FirebaseExtractor implements ExtractorInterface {
      * Parse price from Firebase event.
      */
     private function parsePrice(array &$event, array $metadata): void {
-        if (!empty($metadata['door'])) {
-            $event['price'] = $this->sanitizeText($metadata['door']);
+        $price = $metadata['door'] ?? $metadata['price'] ?? $metadata['cost'] ?? '';
+        if (!empty($price)) {
+            $event['price'] = $this->sanitizeText((string)$price);
         }
     }
 

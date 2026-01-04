@@ -38,6 +38,9 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\FirebaseE
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SquarespaceExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SpotHopperExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\PrekindleExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\GoDaddyExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\BandzoogleExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\WordPressExtractor;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
@@ -91,11 +94,14 @@ class UniversalWebScraper extends EventImportHandler {
             new FirebaseExtractor(),
             new SquarespaceExtractor(),
             new SpotHopperExtractor(),
+            new BandzoogleExtractor(),
+            new GoDaddyExtractor(),
+            new JsonLdExtractor(),
+            new WordPressExtractor(),
             new PrekindleExtractor(),
             new WixEventsExtractor(),
             new RhpEventsExtractor(),
             new OpenDateExtractor(),
-            new JsonLdExtractor(),
             new MicrodataExtractor(),
         ];
     }

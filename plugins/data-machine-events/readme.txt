@@ -4,7 +4,7 @@ Tags: events, calendar, ticketmaster, eventbrite, import, venues, api
 Requires at least: 6.0
 Tested up to: 6.4
 Requires PHP: 8.0
-Stable tag: 0.8.15
+Stable tag: 0.8.16
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -52,6 +52,7 @@ Frontend-focused WordPress events plugin with block-first architecture. Integrat
 * REST API enabled for API-first implementations
 * Block-first approach with background meta field sync for performance
 * Legacy status detection monitors removed (class retained as compatibility stub)
+* PSR-4 autoloading with clean class organization
 
 = Real-World Examples =
 
@@ -151,6 +152,16 @@ Yes! Data Machine Events uses dedicated CSS files (no inline styles) and follows
 7. **Import Logs** - Comprehensive analytics and import history
 
 == Changelog ==
+
+= 0.8.16 =
+* Added GeoNames integration for automatic venue timezone detection based on coordinates
+* Introduced Venue Timezone backfill system with batch processing via REST API
+* Enhanced Universal Web Scraper with WordPressExtractor, GoDaddyExtractor, and BandzoogleExtractor
+* Integrated WP-CLI commands for testing Universal Web Scraper directly from command line
+* Improved FirebaseExtractor with script sniffing for database URL discovery
+* Enhanced JsonLdExtractor with HTML entity decoding and venue address support
+* Refined EventUpsert with better venue/promoter configuration logic
+* Standardized admin setting for geonames_username in plugin settings
 
 = 0.8.15 =
 * Refactored Prekindle handler into a specialized extractor within Universal Web Scraper
