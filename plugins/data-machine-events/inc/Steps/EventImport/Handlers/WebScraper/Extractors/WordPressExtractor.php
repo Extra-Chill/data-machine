@@ -38,10 +38,9 @@ class WordPressExtractor extends BaseExtractor {
             }
         }
 
-        // Check HTML for WordPress/Tribe Events indicators
+        // Check HTML for Tribe Events indicators only (not generic WordPress)
         return strpos($html, 'tribe-events') !== false
             || strpos($html, '/wp-json/tribe/events/') !== false
-            || strpos($html, 'rel="https://api.w.org/"') !== false
             || (strpos($html, 'wp-content') !== false && strpos($html, 'tribe_events') !== false);
     }
 

@@ -13,18 +13,19 @@
  * 5. Embedded Calendar (Google Calendar iframe → ICS feed)
  * 6. Squarespace context (Static.SQUARESPACE_CONTEXT)
  * 7. SpotHopper API (spothopperapp.com)
- * 8. Bandzoogle calendar
- * 9. GoDaddy website builder
- * 10. Timely Event Discovery (FullCalendar.js)
- * 11. Elfsight Events Calendar (shy.elfsight.com API)
- * 12. Schema.org JSON-LD
- * 13. WordPress (Tribe Events, WP REST)
- * 14. Prekindle ticketing
- * 15. Wix Events JSON (wix-warmup-data)
- * 16. RHP Events WordPress plugin HTML
- * 17. OpenDate.io JSON
- * 18. Schema.org microdata
- * 19. AI-enhanced HTML pattern matching (Fallback)
+ * 8. Gigwell booking platform (gigwell-gigstream)
+ * 9. Bandzoogle calendar
+ * 10. GoDaddy website builder
+ * 11. Timely Event Discovery (FullCalendar.js)
+ * 12. Elfsight Events Calendar (shy.elfsight.com API)
+ * 13. Schema.org JSON-LD
+ * 14. WordPress (Tribe Events, WP REST)
+ * 15. Prekindle ticketing
+ * 16. Wix Events JSON (wix-warmup-data)
+ * 17. RHP Events WordPress plugin HTML
+ * 18. OpenDate.io JSON
+ * 19. Schema.org microdata
+ * 20. AI-enhanced HTML pattern matching (Fallback)
  *
  * @package DataMachineEvents\Steps\EventImport\Handlers\WebScraper
  */
@@ -51,6 +52,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\Bandzoogl
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\WordPressExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\TimelyExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\ElfsightEventsExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\GigwellExtractor;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
@@ -105,6 +107,7 @@ class UniversalWebScraper extends EventImportHandler {
             new EmbeddedCalendarExtractor(),
             new SquarespaceExtractor(),
             new SpotHopperExtractor(),
+            new GigwellExtractor(),
             new BandzoogleExtractor(),
             new GoDaddyExtractor(),
             new TimelyExtractor(),

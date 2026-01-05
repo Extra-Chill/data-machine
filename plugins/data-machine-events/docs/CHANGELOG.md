@@ -5,6 +5,16 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.32] - 2026-01-05
+
+### Added
+- **Gigwell Extractor**: New specialized extractor for venues using the Gigwell booking platform (`<gigwell-gigstream>`). Fetches high-fidelity event data including artist details, local timezones, and ticket links via Gigwell's public API.
+- **Improved HTML Fallback**: Added XPath support for `article` elements containing `time` tags, improving event detection for sites using Bricks builder and other modern CSS-in-JS frameworks.
+
+### Changed
+- **WordPress Extractor Optimization**: Refined `WordPressExtractor` to target Tribe Events specific indicators (`tribe-events`) only, preventing false positives on generic WordPress sites.
+- **Universal Web Scraper Expansion**: Reordered extractor priority to include Gigwell and updated documentation to reflect 20 distinct extraction layers.
+
 ## [0.8.31] - 2026-01-05
 
 ### Added

@@ -110,6 +110,12 @@ final class EventSectionSelectors {
                 'enable_table_row_date_filter' => false,
             ],
 
+            // Articles containing time elements (Bricks builder, generic event cards)
+            [
+                'xpath' => '//article[.//time]',
+                'enable_table_row_date_filter' => false,
+            ],
+
             // Common event class patterns
             [
                 'xpath' => '//*[contains(concat(" ", normalize-space(@class), " "), " full-event ")]',
