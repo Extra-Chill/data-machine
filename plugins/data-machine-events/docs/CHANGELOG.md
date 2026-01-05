@@ -5,6 +5,14 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.30] - 2026-01-05
+
+### Added
+- **Get Venue Events AI Tool**: New tool to retrieve events for a specific venue, aiding in term investigation and data management.
+
+### Fixed
+- **Venue Update AI Tool**: Added check for empty strings in meta field updates to prevent accidental clearing of data when non-null but empty values are passed.
+
 ## [0.8.29] - 2026-01-05
 
 ### Added

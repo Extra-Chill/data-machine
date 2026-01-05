@@ -135,7 +135,7 @@ class UpdateVenue {
         $meta_data = [];
 
         foreach ($meta_keys as $key) {
-            if (array_key_exists($key, $parameters) && $parameters[$key] !== null) {
+            if (array_key_exists($key, $parameters) && $parameters[$key] !== null && $parameters[$key] !== '') {
                 $meta_data[$key] = $parameters[$key];
                 $updated_fields[] = $key;
             }
