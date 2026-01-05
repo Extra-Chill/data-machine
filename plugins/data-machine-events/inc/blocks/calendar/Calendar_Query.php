@@ -417,19 +417,22 @@ class Calendar_Query {
     public static function build_display_vars(array $event_data): array {
         $start_date = $event_data['startDate'] ?? '';
         $start_time = $event_data['startTime'] ?? '';
+        $end_date = $event_data['endDate'] ?? '';
+        $end_time = $event_data['endTime'] ?? '';
 
-        $formatted_start_time = '';
+        $formatted_time_display = '';
         $iso_start_date = '';
 
         if ($start_date) {
             $event_tz = self::get_event_timezone($event_data);
             $start_datetime_obj = new DateTime($start_date . ' ' . $start_time, $event_tz);
-            $formatted_start_time = $start_datetime_obj->format('g:i A');
             $iso_start_date = $start_datetime_obj->format('c');
+
+            $formatted_time_display = self::format_time_range($start_datetime_obj, $end_date, $end_time, $event_tz);
         }
 
         return [
-            'formatted_start_time' => $formatted_start_time,
+            'formatted_time_display' => $formatted_time_display,
             'venue_name' => self::decode_unicode($event_data['venue'] ?? ''),
             'performer_name' => self::decode_unicode($event_data['performer'] ?? ''),
             'iso_start_date' => $iso_start_date,
@@ -437,6 +440,45 @@ class Calendar_Query {
             'show_price' => $event_data['showPrice'] ?? true,
             'show_ticket_link' => $event_data['showTicketLink'] ?? true,
         ];
+    }
+
+    /**
+     * Format time range for display
+     *
+     * Formats start and end times into a readable range. When both times share
+     * the same AM/PM period, only shows the period once (e.g., "7:30 - 10:00 PM").
+     *
+     * @param DateTime $start_datetime_obj Start datetime object
+     * @param string $end_date End date (Y-m-d format)
+     * @param string $end_time End time (H:i:s format)
+     * @param DateTimeZone $event_tz Event timezone
+     * @return string Formatted time display
+     */
+    private static function format_time_range(DateTime $start_datetime_obj, string $end_date, string $end_time, \DateTimeZone $event_tz): string {
+        $start_formatted_full = $start_datetime_obj->format('g:i A');
+
+        if (empty($end_date) || empty($end_time)) {
+            return $start_formatted_full;
+        }
+
+        $end_datetime_obj = new DateTime($end_date . ' ' . $end_time, $event_tz);
+
+        $is_same_day = $start_datetime_obj->format('Y-m-d') === $end_datetime_obj->format('Y-m-d');
+        if (!$is_same_day) {
+            return $start_formatted_full;
+        }
+
+        $start_period = $start_datetime_obj->format('A');
+        $end_period = $end_datetime_obj->format('A');
+
+        if ($start_period === $end_period) {
+            $start_time_only = $start_datetime_obj->format('g:i');
+            $end_formatted_full = $end_datetime_obj->format('g:i A');
+            return $start_time_only . ' - ' . $end_formatted_full;
+        }
+
+        $end_formatted_full = $end_datetime_obj->format('g:i A');
+        return $start_formatted_full . ' - ' . $end_formatted_full;
     }
 
     /**

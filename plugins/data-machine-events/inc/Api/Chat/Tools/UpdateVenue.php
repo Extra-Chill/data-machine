@@ -39,6 +39,11 @@ class UpdateVenue {
                     'required' => false,
                     'description' => 'New venue name'
                 ],
+                'description' => [
+                    'type' => 'string',
+                    'required' => false,
+                    'description' => 'Venue description'
+                ],
                 'address' => [
                     'type' => 'string',
                     'required' => false,
@@ -116,18 +121,26 @@ class UpdateVenue {
 
         $updated_fields = [];
 
-        // Update name if provided
-        $new_name = $parameters['name'] ?? null;
-        if (!empty($new_name)) {
-            $result = wp_update_term($term->term_id, 'venue', ['name' => sanitize_text_field($new_name)]);
+        // Update term fields (name, description) if provided
+        $term_updates = [];
+        if (!empty($parameters['name'])) {
+            $term_updates['name'] = sanitize_text_field($parameters['name']);
+            $updated_fields[] = 'name';
+        }
+        if (isset($parameters['description']) && $parameters['description'] !== '') {
+            $term_updates['description'] = wp_kses_post($parameters['description']);
+            $updated_fields[] = 'description';
+        }
+
+        if (!empty($term_updates)) {
+            $result = wp_update_term($term->term_id, 'venue', $term_updates);
             if (is_wp_error($result)) {
                 return [
                     'success' => false,
-                    'error' => 'Failed to update venue name: ' . $result->get_error_message(),
+                    'error' => 'Failed to update venue: ' . $result->get_error_message(),
                     'tool_name' => 'update_venue'
                 ];
             }
-            $updated_fields[] = 'name';
         }
 
         // Build meta data array from parameters

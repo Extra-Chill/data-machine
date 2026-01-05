@@ -196,41 +196,6 @@ function register_routes() {
 		)
 	);
 
-	register_rest_route(
-		API_NAMESPACE,
-		'/events/venues/backfill-stats',
-		array(
-			'methods'             => 'GET',
-			'callback'            => array( $venues, 'backfill_stats' ),
-			'permission_callback' => function() {
-				return current_user_can( 'manage_options' );
-			},
-		)
-	);
-
-	register_rest_route(
-		API_NAMESPACE,
-		'/events/venues/backfill-timezones',
-		array(
-			'methods'             => 'POST',
-			'callback'            => array( $venues, 'backfill_timezones' ),
-			'permission_callback' => function() {
-				return current_user_can( 'manage_options' );
-			},
-			'args'                => array(
-				'batch_size' => array(
-					'type'              => 'integer',
-					'default'           => 10,
-					'sanitize_callback' => 'absint',
-				),
-				'offset'     => array(
-					'type'              => 'integer',
-					'default'           => 0,
-					'sanitize_callback' => 'absint',
-				),
-			),
-		)
-	);
 }
 
 add_action( 'rest_api_init', __NAMESPACE__ . '\\register_routes' );

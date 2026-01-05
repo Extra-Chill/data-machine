@@ -4,7 +4,7 @@ Tags: events, calendar, ticketmaster, eventbrite, import, venues, api
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.2
-Stable tag: 0.8.29
+Stable tag: 0.8.31
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -152,6 +152,34 @@ Yes! Data Machine Events uses dedicated CSS files (no inline styles) and follows
 7. **Import Logs** - Comprehensive analytics and import history
 
 == Changelog ==
+
+= 0.8.31 =
+* Added time range display support to Calendar block and event items
+* Enhanced Event Details block with dynamic "Event Link" CTA for free/TBD events
+* Integrated venueTimezone into EventEngineData for end-to-end timezone propagation
+* Added description support to UpdateVenue AI tool
+* Automated timezone derivation on coordinate updates in Venue_Taxonomy
+* Removed legacy Timezone Backfill UI and REST endpoints
+* Explicitly clear stale coordinates on address changes to trigger re-geocoding
+* Added comprehensive query parameter sanitization to Calendar navigation
+
+= 0.8.30 =
+* Added Get Venue Events AI tool for event retrieval and term investigation
+* Enhanced UpdateVenue AI tool with empty string checks to prevent data clearing
+
+= 0.8.29 =
+* Implemented automatic sorting by event count in Venue Health Check AI tool
+* Prioritized venues with active events for data quality fixes
+
+= 0.8.28 =
+* Added automatic coordinate clearing on address changes for venues
+* Improved address change detection across all components (city, state, zip, etc.)
+
+= 0.8.27 =
+* Introduced BaseExtractor for standardized Web Scraper Extractors
+* Standardized date/time parsing and HTML cleaning across 18+ handlers
+* Added WP-CLI `scrape-test` command for validation
+* Added address autocomplete and geocoding integration to venue admin UI
 
 = 0.8.22 =
 * Enhanced UniversalWebScraper with improved XPath selectors for Brown Bear and Drupal event listings

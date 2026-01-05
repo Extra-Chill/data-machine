@@ -67,6 +67,15 @@ if (!empty($attributes['align'])) {
 }
 $block_class = implode(' ', $block_classes);
 
+$non_ticket_patterns = apply_filters('datamachine_events_non_ticket_price_patterns', ['free', 'tbd']);
+$price_lower = strtolower(trim($price));
+$is_non_ticket_price = empty($price) || array_reduce($non_ticket_patterns, function($carry, $pattern) use ($price_lower) {
+    return $carry || str_contains($price_lower, strtolower($pattern));
+}, false);
+$ticket_button_text = $is_non_ticket_price 
+    ? __('Event Link', 'datamachine-events') 
+    : __('Get Tickets', 'datamachine-events');
+
 
 $event_schema = null;
 $description_text = !empty($content) ? wp_strip_all_tags($content) : '';
@@ -129,7 +138,7 @@ $event_schema = EventSchemaProvider::generateSchemaOrg($event_data, $venue_data 
     <div class="event-action-buttons">
         <?php if ($show_ticket_link && $ticket_url): ?>
             <a href="<?php echo esc_url($ticket_url); ?>" class="<?php echo esc_attr(implode(' ', apply_filters('datamachine_events_ticket_button_classes', ['ticket-button']))); ?>" target="_blank" rel="noopener">
-                <?php _e('Get Tickets', 'datamachine-events'); ?>
+                <?php echo esc_html($ticket_button_text); ?>
             </a>
         <?php endif; ?>
 

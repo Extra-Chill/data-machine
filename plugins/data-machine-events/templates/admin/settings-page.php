@@ -175,20 +175,7 @@ settings_errors('datamachine_events_messages');
                         </p>
                     </td>
                 </tr>
-                <tr>
-                    <th scope="row"><?php _e('Backfill Timezones', 'datamachine-events'); ?></th>
-                    <td>
-                        <div id="dm-backfill-stats" style="margin-bottom: 12px;"></div>
-                        <button type="button" id="dm-backfill-button" class="button button-secondary">
-                            <?php _e('Backfill Venue Timezones', 'datamachine-events'); ?>
-                        </button>
-                        <div id="dm-backfill-progress" style="display: none; margin-top: 10px;"></div>
-                        <div id="dm-backfill-results"></div>
-                        <p class="description" style="margin-top: 8px;">
-                            <?php _e('Derive timezones for existing venues using their coordinates. New venues automatically get timezones during import.', 'datamachine-events'); ?>
-                        </p>
-                    </td>
-                </tr>
+
             </tbody>
         </table>
 

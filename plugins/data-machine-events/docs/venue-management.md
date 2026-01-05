@@ -29,11 +29,11 @@ Venues include 10 comprehensive metadata fields:
 
 ### Timezone Detection
 
-Venues support automatic timezone detection based on coordinates via the GeoNames API (@since v0.8.16).
+Venues support automatic timezone detection through multiple mechanisms:
 
-- **Automatic Lookup**: When a venue is created or updated with valid coordinates, the `GeoNamesService` automatically fetches the correct IANA timezone identifier.
-- **Batch Processing**: A dedicated REST API and admin UI (`assets/js/settings-backfill.js`) allow admins to backfill timezones for existing venues.
-- **Settings**: A `geonames_username` must be configured in the main plugin settings to enable this feature.
+- **Source Data**: Import handlers (Ticketmaster, Eventbrite, DiceFm, ICS calendars, web scrapers) extract and store timezone data when available from the source.
+- **GeoNames Fallback**: When a venue is created or updated with valid coordinates but no timezone, the `GeoNamesService` automatically fetches the correct IANA timezone identifier. Requires `geonames_username` configured in Event Settings.
+- **AI Chat Tools**: Use `venue_health_check` to identify venues missing timezone data, `update_venue` to fix them, and `get_venue_events` to retrieve upcoming events for a specific venue. The update triggers automatic timezone derivation via GeoNames when coordinates are available.
 - **Calendar Integration**: `Calendar_Query` and `DateTimeParser` respect venue-specific timezones for accurate date grouping and display.
 
 ### Admin Interface

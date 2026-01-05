@@ -43,7 +43,8 @@ class EventEngineData {
             'venuePhone' => $venue_metadata['venuePhone'] ?? '',
             'venueWebsite' => $venue_metadata['venueWebsite'] ?? '',
             'venueCoordinates' => $venue_metadata['venueCoordinates'] ?? '',
-            'venueCapacity' => $venue_metadata['venueCapacity'] ?? ''
+            'venueCapacity' => $venue_metadata['venueCapacity'] ?? '',
+            'venueTimezone' => $venue_metadata['venueTimezone'] ?? ''
         ];
 
         $metadata = [
@@ -56,7 +57,8 @@ class EventEngineData {
             'phone' => $flattened['venuePhone'] ?? '',
             'website' => $flattened['venueWebsite'] ?? '',
             'coordinates' => $flattened['venueCoordinates'] ?? '',
-            'capacity' => $flattened['venueCapacity'] ?? ''
+            'capacity' => $flattened['venueCapacity'] ?? '',
+            'timezone' => $flattened['venueTimezone'] ?? ''
         ];
 
         $payload = array_filter($flattened, static function($value) {

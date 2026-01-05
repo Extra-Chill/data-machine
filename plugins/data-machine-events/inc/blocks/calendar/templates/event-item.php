@@ -12,7 +12,7 @@
 if (!defined('ABSPATH')) {
     exit;
 }
-$formatted_start_time = $display_vars['formatted_start_time'] ?? '';
+$formatted_time_display = $display_vars['formatted_time_display'] ?? '';
 $venue_name = $display_vars['venue_name'] ?? '';
 $performer_name = $display_vars['performer_name'] ?? '';
 $price = $display_vars['price'] ?? '';
@@ -43,10 +43,10 @@ $show_ticket_link = $display_vars['show_ticket_link'] ?? true;
         </h4>
 
         <div class="datamachine-event-meta">
-            <?php if (!empty($formatted_start_time)) : ?>
+            <?php if (!empty($formatted_time_display)) : ?>
                 <div class="datamachine-event-time">
                     <span class="dashicons dashicons-clock"></span>
-                    <?php echo esc_html($formatted_start_time); ?>
+                    <?php echo esc_html($formatted_time_display); ?>
                 </div>
             <?php endif; ?>
 

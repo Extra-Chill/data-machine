@@ -5,7 +5,6 @@ defined( 'ABSPATH' ) || exit;
 
 use WP_REST_Request;
 use DataMachineEvents\Core\Venue_Taxonomy;
-use DataMachineEvents\Core\GeoNamesService;
 
 /**
  * Venues API controller
@@ -118,52 +117,4 @@ class Venues {
 		);
 	}
 
-	/**
-	 * Get venue timezone backfill statistics
-	 *
-	 * @param WP_REST_Request $request
-	 * @return \WP_REST_Response
-	 */
-	public function backfill_stats( WP_REST_Request $request ) {
-		$stats = Venue_Taxonomy::get_backfill_stats();
-		$is_configured = GeoNamesService::isConfigured();
-
-		return rest_ensure_response(
-			array(
-				'success' => true,
-				'data'    => array(
-					'stats'         => $stats,
-					'is_configured' => $is_configured,
-				),
-			)
-		);
-	}
-
-	/**
-	 * Backfill venue timezones in batches
-	 *
-	 * @param WP_REST_Request $request
-	 * @return \WP_REST_Response|\WP_Error
-	 */
-	public function backfill_timezones( WP_REST_Request $request ) {
-		if ( ! GeoNamesService::isConfigured() ) {
-			return new \WP_Error(
-				'geonames_not_configured',
-				__( 'GeoNames username is not configured. Please add your username in Event Settings.', 'datamachine-events' ),
-				array( 'status' => 400 )
-			);
-		}
-
-		$batch_size = $request->get_param( 'batch_size' );
-		$offset     = $request->get_param( 'offset' );
-
-		$result = Venue_Taxonomy::backfill_venue_timezones( $batch_size, $offset );
-
-		return rest_ensure_response(
-			array(
-				'success' => true,
-				'data'    => $result,
-			)
-		);
-	}
 }

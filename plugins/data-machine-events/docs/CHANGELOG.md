@@ -5,6 +5,23 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.31] - 2026-01-05
+
+### Added
+- **Time Range Display**: Enhanced Calendar block and event items to display full time ranges (e.g., "7:00 PM - 10:00 PM") instead of just start times. Includes smart formatting to omit redundant AM/PM markers when periods match.
+- **Dynamic Ticket Button**: Event Details block now automatically changes CTA text from "Get Tickets" to "Event Link" for free or TBD priced events.
+- **Venue Timezone Propagation**: Integrated `venueTimezone` into `EventEngineData` to ensure timezone data flows through the Data Machine pipeline to EventUpsert.
+- **Venue Description Support**: Added `description` field to `UpdateVenue` AI tool, allowing AI to update venue descriptions via REST API.
+
+### Changed
+- **Venue Management Cleanup**: Removed legacy Timezone Backfill UI and REST endpoints. Timezone detection is now fully automated via GeoNames during venue creation/update or provided by import handlers.
+- **Improved Venue Logic**: Enhanced `Venue_Taxonomy` to automatically trigger timezone derivation when coordinates are added to an existing venue without them.
+- **Sanitization Enhancements**: Added comprehensive query parameter sanitization to Calendar block navigation.
+
+### Fixed
+- **Venue Update AI Tool**: Standardized term update logic to use `wp_update_term` correctly for both name and description.
+- **Coordinate Stale Data**: Explicitly clearing coordinates when address fields change to ensure re-geocoding uses fresh data.
+
 ## [0.8.30] - 2026-01-05
 
 ### Added

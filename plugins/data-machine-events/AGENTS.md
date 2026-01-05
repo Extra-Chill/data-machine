@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.8.29
+**Version**: 0.8.31
 
 ## Plugin Bootstrap
 
@@ -15,7 +15,7 @@ Technical guidance for Claude Code when working with the **Data Machine Events**
 
 - **`init_data_machine_integration()`**: Runs at priority 25 on `init`. After verifying `DATAMACHINE_VERSION`, it loads `EventImportFilters`, instantiates all import handlers, loads EventUpsert filters, and registers the EventUpsert handler from `inc/Steps/Upsert/Events/EventUpsert.php`.
 - **Event import handlers**: `load_event_import_handlers()` instantiates the following `FetchHandler` implementations (all located under `inc/Steps/EventImport/Handlers`):
-- **Universal Web Scraper Architecture**: A multi-layered system that prioritizes structured data extraction (Schema.org JSON-LD/Microdata and 17+ specialized extractors) before falling back to AI-enhanced HTML section parsing. It coordinates fetching, pagination, and normalization via a centralized `StructuredDataProcessor`. The scraper implements a "Smart Fallback" mechanism that retries requests with standard headers if browser-mode spoofing is blocked by captchas (SiteGround/Cloudflare) or encounters 403 errors.
+- **Universal Web Scraper Architecture**: A multi-layered system that prioritizes structured data extraction (Schema.org JSON-LD/Microdata and 19 specialized extractors) before falling back to AI-enhanced HTML section parsing. It coordinates fetching, pagination, and normalization via a centralized `StructuredDataProcessor`. The scraper implements a "Smart Fallback" mechanism that retries requests with standard headers if browser-mode spoofing is blocked by captchas (SiteGround/Cloudflare) or encounters 403 errors.
   - `DiceFm\DiceFm`
   - `DoStuffMediaApi\DoStuffMediaApi`
   - `Eventbrite\Eventbrite`
@@ -66,6 +66,7 @@ Chat tools in `inc/Api/Chat/Tools` provide AI-driven venue management capabiliti
 
 - **VenueHealthCheck**: Scans all venues for data quality issues (missing address, coordinates, or timezone) and returns detailed counts and lists of problematic venues. Optional `limit` parameter controls maximum venues returned per category (default: 25).
 - **UpdateVenue**: Updates venue name and/or meta fields (address, city, state, zip, country, phone, website, capacity, coordinates, timezone). Accepts venue identifier (term ID, name, or slug) and any combination of fields to update. Address field changes trigger automatic geocoding via `Venue_Taxonomy::update_venue_meta`.
+- **GetVenueEvents**: Retrieves upcoming events for a specific venue. Accepts venue identifier (term ID, name, or slug) and optional parameters for limiting results and date range filtering.
 
 ## Templates & Rendering
 
