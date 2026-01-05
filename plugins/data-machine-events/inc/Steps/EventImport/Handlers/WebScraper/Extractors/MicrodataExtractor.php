@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class MicrodataExtractor implements ExtractorInterface {
+class MicrodataExtractor extends BaseExtractor {
 
     public function canExtract(string $html): bool {
         return strpos($html, 'itemtype="https://schema.org/Event"') !== false
@@ -87,15 +87,17 @@ class MicrodataExtractor implements ExtractorInterface {
 
     /**
      * Parse start and end dates.
+     *
+     * Microdata dates typically include timezone offset (ISO 8601 format).
      */
     private function parseDates(\DOMXPath $xpath, \DOMNode $event_element, array &$event): void {
         $start_date = $xpath->query(".//*[@itemprop='startDate']", $event_element);
         if ($start_date->length > 0) {
             $datetime = $this->extractDatetime($start_date->item(0));
             if (!empty($datetime)) {
-                $event['startDate'] = date('Y-m-d', strtotime($datetime));
-                $parsed_time = date('H:i', strtotime($datetime));
-                $event['startTime'] = $parsed_time !== '00:00' ? $parsed_time : '';
+                $parsed = $this->parseDatetime($datetime);
+                $event['startDate'] = $parsed['date'];
+                $event['startTime'] = $parsed['time'] !== '00:00' ? $parsed['time'] : '';
             }
         }
 
@@ -103,8 +105,9 @@ class MicrodataExtractor implements ExtractorInterface {
         if ($end_date->length > 0) {
             $datetime = $this->extractDatetime($end_date->item(0));
             if (!empty($datetime)) {
-                $event['endDate'] = date('Y-m-d', strtotime($datetime));
-                $event['endTime'] = date('H:i', strtotime($datetime));
+                $parsed = $this->parseDatetime($datetime);
+                $event['endDate'] = $parsed['date'];
+                $event['endTime'] = $parsed['time'];
             }
         }
     }

@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class WordPressExtractor implements ExtractorInterface {
+class WordPressExtractor extends BaseExtractor {
 
     public function canExtract(string $html): bool {
         $trimmed = trim($html);
@@ -184,19 +184,15 @@ class WordPressExtractor implements ExtractorInterface {
         $end_time = '';
 
         if (!empty($event['start_date'])) {
-            try {
-                $dt = new \DateTime($event['start_date']);
-                $start_date = $dt->format('Y-m-d');
-                $start_time = $dt->format('H:i');
-            } catch (\Exception $e) {}
+            $parsed = $this->parseDatetime($event['start_date']);
+            $start_date = $parsed['date'];
+            $start_time = $parsed['time'];
         }
 
         if (!empty($event['end_date'])) {
-            try {
-                $dt = new \DateTime($event['end_date']);
-                $end_date = $dt->format('Y-m-d');
-                $end_time = $dt->format('H:i');
-            } catch (\Exception $e) {}
+            $parsed = $this->parseDatetime($event['end_date']);
+            $end_date = $parsed['date'];
+            $end_time = $parsed['time'];
         }
 
         // Prefer detailed time if available
@@ -217,23 +213,23 @@ class WordPressExtractor implements ExtractorInterface {
         $organizer = $this->extractTribeOrganizer($event);
 
         return [
-            'title' => sanitize_text_field($event['title'] ?? ''),
-            'description' => wp_kses_post($event['description'] ?? ''),
+            'title' => $this->sanitizeText($event['title'] ?? ''),
+            'description' => $this->cleanHtml($event['description'] ?? ''),
             'startDate' => $start_date,
             'endDate' => $end_date ?: $start_date,
             'startTime' => $start_time,
             'endTime' => $end_time,
-            'venue' => sanitize_text_field($venue['venue']),
-            'venueAddress' => sanitize_text_field($venue['venueAddress']),
-            'venueCity' => sanitize_text_field($venue['venueCity']),
-            'venueState' => sanitize_text_field($venue['venueState']),
-            'venueZip' => sanitize_text_field($venue['venueZip']),
+            'venue' => $this->sanitizeText($venue['venue']),
+            'venueAddress' => $this->sanitizeText($venue['venueAddress']),
+            'venueCity' => $this->sanitizeText($venue['venueCity']),
+            'venueState' => $this->sanitizeText($venue['venueState']),
+            'venueZip' => $this->sanitizeText($venue['venueZip']),
             'venueCountry' => sanitize_text_field($venue['venueCountry']),
             'venuePhone' => sanitize_text_field($venue['venuePhone']),
             'venueWebsite' => esc_url_raw($venue['venueWebsite']),
             'organizer' => sanitize_text_field($organizer['organizer']),
             'organizerUrl' => esc_url_raw($organizer['organizerUrl']),
-            'price' => sanitize_text_field($event['cost'] ?? ''),
+            'price' => $this->sanitizeText($event['cost'] ?? ''),
             'ticketUrl' => esc_url_raw($event['website'] ?? $event['url'] ?? ''),
             'imageUrl' => esc_url_raw($event['image']['url'] ?? ''),
             'eventType' => 'Event',
@@ -295,18 +291,14 @@ class WordPressExtractor implements ExtractorInterface {
 
         $meta = $event['meta'] ?? [];
         if (!empty($meta['_EventStartDate'])) {
-            try {
-                $dt = new \DateTime($meta['_EventStartDate']);
-                $start_date = $dt->format('Y-m-d');
-                $start_time = $dt->format('H:i');
-            } catch (\Exception $e) {}
+            $parsed = $this->parseDatetime($meta['_EventStartDate']);
+            $start_date = $parsed['date'];
+            $start_time = $parsed['time'];
         }
         if (!empty($meta['_EventEndDate'])) {
-            try {
-                $dt = new \DateTime($meta['_EventEndDate']);
-                $end_date = $dt->format('Y-m-d');
-                $end_time = $dt->format('H:i');
-            } catch (\Exception $e) {}
+            $parsed = $this->parseDatetime($meta['_EventEndDate']);
+            $end_date = $parsed['date'];
+            $end_time = $parsed['time'];
         }
 
         $coordinates = '';
@@ -317,20 +309,20 @@ class WordPressExtractor implements ExtractorInterface {
         $image_url = $event['_embedded']['wp:featuredmedia'][0]['source_url'] ?? '';
 
         return [
-            'title' => sanitize_text_field($title),
-            'description' => wp_kses_post($description),
+            'title' => $this->sanitizeText($title),
+            'description' => $this->cleanHtml($description),
             'startDate' => $start_date,
             'endDate' => $end_date ?: $start_date,
             'startTime' => $start_time,
             'endTime' => $end_time,
-            'venue' => sanitize_text_field($meta['_VenueName'] ?? ''),
-            'venueAddress' => sanitize_text_field($meta['_VenueAddress'] ?? ''),
-            'venueCity' => sanitize_text_field($meta['_VenueCity'] ?? ''),
-            'venueState' => sanitize_text_field($meta['_VenueState'] ?? $meta['_VenueProvince'] ?? ''),
-            'venueZip' => sanitize_text_field($meta['_VenueZip'] ?? ''),
-            'venueCountry' => sanitize_text_field($meta['_VenueCountry'] ?? ''),
+            'venue' => $this->sanitizeText($meta['_VenueName'] ?? ''),
+            'venueAddress' => $this->sanitizeText($meta['_VenueAddress'] ?? ''),
+            'venueCity' => $this->sanitizeText($meta['_VenueCity'] ?? ''),
+            'venueState' => $this->sanitizeText($meta['_VenueState'] ?? $meta['_VenueProvince'] ?? ''),
+            'venueZip' => $this->sanitizeText($meta['_VenueZip'] ?? ''),
+            'venueCountry' => $this->sanitizeText($meta['_VenueCountry'] ?? ''),
             'venueCoordinates' => $coordinates,
-            'price' => sanitize_text_field($meta['_EventCost'] ?? ''),
+            'price' => $this->sanitizeText($meta['_EventCost'] ?? ''),
             'ticketUrl' => esc_url_raw($meta['_EventURL'] ?? $event['link'] ?? ''),
             'imageUrl' => esc_url_raw($image_url),
             'eventType' => 'Event',
@@ -353,24 +345,24 @@ class WordPressExtractor implements ExtractorInterface {
         $date_fields = ['start_date', 'event_date', 'date', 'startDate'];
         foreach ($date_fields as $field) {
             if (!empty($event[$field])) {
-                try {
-                    $dt = new \DateTime($event[$field]);
-                    $start_date = $dt->format('Y-m-d');
-                    $start_time = $dt->format('H:i');
+                $parsed = $this->parseDatetime($event[$field]);
+                if (!empty($parsed['date'])) {
+                    $start_date = $parsed['date'];
+                    $start_time = $parsed['time'];
                     break;
-                } catch (\Exception $e) {}
+                }
             }
         }
 
         $end_date_fields = ['end_date', 'endDate'];
         foreach ($end_date_fields as $field) {
             if (!empty($event[$field])) {
-                try {
-                    $dt = new \DateTime($event[$field]);
-                    $end_date = $dt->format('Y-m-d');
-                    $end_time = $dt->format('H:i');
+                $parsed = $this->parseDatetime($event[$field]);
+                if (!empty($parsed['date'])) {
+                    $end_date = $parsed['date'];
+                    $end_time = $parsed['time'];
                     break;
-                } catch (\Exception $e) {}
+                }
             }
         }
 

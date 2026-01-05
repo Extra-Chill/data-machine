@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class OpenDateExtractor implements ExtractorInterface {
+class OpenDateExtractor extends BaseExtractor {
 
     public function canExtract(string $html): bool {
         return strpos($html, 'confirm-card') !== false
@@ -212,41 +212,34 @@ class OpenDateExtractor implements ExtractorInterface {
      *
      * React JSON contains accurate ISO 8601 datetime with timezone.
      * JSON-LD only contains date without time on OpenDate pages.
-     * Uses DateTime to preserve the embedded timezone from ISO 8601 strings.
      */
     private function parseDates(array &$event, array $jsonld, ?array $react_json): void {
         if (!empty($react_json['start_time'])) {
-            try {
-                $dt = new \DateTime($react_json['start_time']);
-                $event['startDate'] = $dt->format('Y-m-d');
-                $event['startTime'] = $dt->format('H:i');
-            } catch (\Exception $e) {
-                // Fall through to JSON-LD fallback
+            $parsed = $this->parseDatetime($react_json['start_time']);
+            if (!empty($parsed['date'])) {
+                $event['startDate'] = $parsed['date'];
+                $event['startTime'] = $parsed['time'];
             }
         }
-        
+
         if (empty($event['startDate']) && !empty($jsonld['startDate'])) {
-            $start_datetime = $jsonld['startDate'];
-            $event['startDate'] = date('Y-m-d', strtotime($start_datetime));
-            $parsed_time = date('H:i', strtotime($start_datetime));
-            $event['startTime'] = $parsed_time !== '00:00' ? $parsed_time : '';
+            $parsed = $this->parseDatetime($jsonld['startDate']);
+            $event['startDate'] = $parsed['date'];
+            $event['startTime'] = $parsed['time'] !== '00:00' ? $parsed['time'] : '';
         }
 
         if (!empty($react_json['end_time_for_calendar'])) {
-            try {
-                $dt = new \DateTime($react_json['end_time_for_calendar']);
-                $event['endDate'] = $dt->format('Y-m-d');
-                $event['endTime'] = $dt->format('H:i');
-            } catch (\Exception $e) {
-                // Fall through to JSON-LD fallback
+            $parsed = $this->parseDatetime($react_json['end_time_for_calendar']);
+            if (!empty($parsed['date'])) {
+                $event['endDate'] = $parsed['date'];
+                $event['endTime'] = $parsed['time'];
             }
         }
-        
+
         if (empty($event['endDate']) && !empty($jsonld['endDate'])) {
-            $end_datetime = $jsonld['endDate'];
-            $event['endDate'] = date('Y-m-d', strtotime($end_datetime));
-            $parsed_time = date('H:i', strtotime($end_datetime));
-            $event['endTime'] = $parsed_time !== '00:00' ? $parsed_time : '';
+            $parsed = $this->parseDatetime($jsonld['endDate']);
+            $event['endDate'] = $parsed['date'];
+            $event['endTime'] = $parsed['time'] !== '00:00' ? $parsed['time'] : '';
         }
     }
 

@@ -10,13 +10,11 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors;
 
-use DataMachineEvents\Core\DateTimeParser;
-
 if (!defined('ABSPATH')) {
     exit;
 }
 
-class WixEventsExtractor implements ExtractorInterface {
+class WixEventsExtractor extends BaseExtractor {
 
     public function canExtract(string $html): bool {
         return strpos($html, 'id="wix-warmup-data"') !== false
@@ -106,18 +104,18 @@ class WixEventsExtractor implements ExtractorInterface {
         $timezone_id = $scheduling['timeZoneId'] ?? '';
 
         if (!empty($scheduling['startDate'])) {
-            $start_parsed = DateTimeParser::parseUtc($scheduling['startDate'], $timezone_id);
+            $start_parsed = $this->parseUtcDatetime($scheduling['startDate'], $timezone_id);
             $event['startDate'] = $start_parsed['date'];
             $event['startTime'] = $start_parsed['time'];
         }
 
         if (!empty($scheduling['endDate'])) {
-            $end_parsed = DateTimeParser::parseUtc($scheduling['endDate'], $timezone_id);
+            $end_parsed = $this->parseUtcDatetime($scheduling['endDate'], $timezone_id);
             $event['endDate'] = $end_parsed['date'];
             $event['endTime'] = $end_parsed['time'];
         }
 
-        if (!empty($timezone_id) && DateTimeParser::isValidTimezone($timezone_id)) {
+        if (!empty($timezone_id) && $this->isValidTimezone($timezone_id)) {
             $event['venueTimezone'] = $timezone_id;
         }
     }
@@ -180,11 +178,4 @@ class WixEventsExtractor implements ExtractorInterface {
         }
     }
 
-    private function sanitizeText(string $text): string {
-        return sanitize_text_field(trim($text));
-    }
-
-    private function cleanHtml(string $html): string {
-        return wp_kses_post(trim($html));
-    }
 }

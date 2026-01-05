@@ -82,7 +82,8 @@ class VenueHealthCheck {
 
             $venue_info = [
                 'term_id' => $venue->term_id,
-                'name' => $venue->name
+                'name' => $venue->name,
+                'event_count' => $venue->count
             ];
 
             if (empty($address) && empty($city)) {

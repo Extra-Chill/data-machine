@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class PrekindleExtractor implements ExtractorInterface {
+class PrekindleExtractor extends BaseExtractor {
 
     const WIDGET_BASE = 'https://www.prekindle.com/organizer-grid-widget-main/id/';
 

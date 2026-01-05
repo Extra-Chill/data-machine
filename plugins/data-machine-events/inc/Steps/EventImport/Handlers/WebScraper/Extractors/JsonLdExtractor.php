@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class JsonLdExtractor implements ExtractorInterface {
+class JsonLdExtractor extends BaseExtractor {
 
     public function canExtract(string $html): bool {
         return strpos($html, 'application/ld+json') !== false;
@@ -123,19 +123,20 @@ class JsonLdExtractor implements ExtractorInterface {
 
     /**
      * Parse date/time from JSON-LD event.
+     *
+     * JSON-LD dates typically include timezone offset (ISO 8601 format).
      */
     private function parseDates(array &$event, array $event_data): void {
         if (!empty($event_data['startDate'])) {
-            $start_datetime = $event_data['startDate'];
-            $event['startDate'] = date('Y-m-d', strtotime($start_datetime));
-            $parsed_time = date('H:i', strtotime($start_datetime));
-            $event['startTime'] = $parsed_time !== '00:00' ? $parsed_time : '';
+            $parsed = $this->parseDatetime($event_data['startDate']);
+            $event['startDate'] = $parsed['date'];
+            $event['startTime'] = $parsed['time'] !== '00:00' ? $parsed['time'] : '';
         }
 
         if (!empty($event_data['endDate'])) {
-            $end_datetime = $event_data['endDate'];
-            $event['endDate'] = date('Y-m-d', strtotime($end_datetime));
-            $event['endTime'] = date('H:i', strtotime($end_datetime));
+            $parsed = $this->parseDatetime($event_data['endDate']);
+            $event['endDate'] = $parsed['date'];
+            $event['endTime'] = $parsed['time'];
         }
     }
 

@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class ElfsightEventsExtractor implements ExtractorInterface {
+class ElfsightEventsExtractor extends BaseExtractor {
 
     private const API_BASE_URL = 'https://shy.elfsight.com/p/boot/';
 
@@ -139,14 +139,14 @@ class ElfsightEventsExtractor implements ExtractorInterface {
      * Normalize Elfsight event to standard format.
      */
     private function normalizeEvent(array $event, array $locations, array $page_venue, string $timezone): array {
-        $start_parsed = $this->parseTimestamp($event['start'] ?? 0, $timezone);
-        $end_parsed = $this->parseTimestamp($event['end'] ?? 0, $timezone);
+        $start_parsed = $this->parseUtcTimestamp($event['start'] ?? 0, $timezone);
+        $end_parsed = $this->parseUtcTimestamp($event['end'] ?? 0, $timezone);
 
         $location_data = $this->resolveLocation($event['location'] ?? '', $locations);
 
         $normalized = [
-            'title' => sanitize_text_field($event['name'] ?? ''),
-            'description' => $this->cleanDescription($event['description'] ?? ''),
+            'title' => $this->sanitizeText($event['name'] ?? ''),
+            'description' => $this->cleanHtml($event['description'] ?? ''),
             'startDate' => $start_parsed['date'],
             'endDate' => $end_parsed['date'],
             'startTime' => $start_parsed['time'],
@@ -164,8 +164,8 @@ class ElfsightEventsExtractor implements ExtractorInterface {
         ];
 
         if (!empty($location_data['name'])) {
-            $normalized['venue'] = sanitize_text_field($location_data['name']);
-            $normalized['venueAddress'] = sanitize_text_field($location_data['address'] ?? '');
+            $normalized['venue'] = $this->sanitizeText($location_data['name']);
+            $normalized['venueAddress'] = $this->sanitizeText($location_data['address'] ?? '');
         } else {
             $normalized['venue'] = $page_venue['venue'] ?? '';
             $normalized['venueAddress'] = $page_venue['venueAddress'] ?? '';
@@ -176,29 +176,6 @@ class ElfsightEventsExtractor implements ExtractorInterface {
         }
 
         return $normalized;
-    }
-
-    /**
-     * Parse millisecond timestamp to date and time.
-     */
-    private function parseTimestamp(int $timestamp_ms, string $timezone): array {
-        $result = ['date' => '', 'time' => ''];
-
-        if ($timestamp_ms <= 0) {
-            return $result;
-        }
-
-        try {
-            $dt = new \DateTime('@' . (int) ($timestamp_ms / 1000));
-            $dt->setTimezone(new \DateTimeZone($timezone));
-
-            $result['date'] = $dt->format('Y-m-d');
-            $result['time'] = $dt->format('H:i');
-        } catch (\Exception $e) {
-            return $result;
-        }
-
-        return $result;
     }
 
     /**
@@ -221,12 +198,4 @@ class ElfsightEventsExtractor implements ExtractorInterface {
         return [];
     }
 
-    /**
-     * Clean HTML from description.
-     */
-    private function cleanDescription(string $description): string {
-        $description = wp_kses_post($description);
-        $description = wp_strip_all_tags($description);
-        return sanitize_textarea_field(trim($description));
-    }
 }

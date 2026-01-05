@@ -58,26 +58,34 @@ class Calendar {
 			'user_date_range' => !empty($user_date_start) || !empty($user_date_end),
 		];
 
-		$unique_dates = Calendar_Query::get_unique_event_dates($base_params);
-		$date_boundaries = Calendar_Query::get_date_boundaries_for_page($unique_dates, $current_page);
+		$date_data = Calendar_Query::get_unique_event_dates($base_params);
+		$unique_dates = $date_data['dates'];
+		$total_event_count = $date_data['total_events'];
+
+		$date_boundaries = Calendar_Query::get_date_boundaries_for_page($unique_dates, $current_page, $total_event_count);
 
 		$max_pages = $date_boundaries['max_pages'];
 		$current_page = max(1, min($current_page, max(1, $max_pages)));
 
 		$query_params = $base_params;
 		if (!empty($date_boundaries['start_date']) && !empty($date_boundaries['end_date'])) {
+			// For past events, boundaries are in DESC order (newest first), so swap them
+			// to create a valid query range where date_start < date_end
+			$range_start = $show_past ? $date_boundaries['end_date'] : $date_boundaries['start_date'];
+			$range_end = $show_past ? $date_boundaries['start_date'] : $date_boundaries['end_date'];
+
 			if (empty($user_date_start)) {
-				$query_params['date_start'] = $date_boundaries['start_date'];
+				$query_params['date_start'] = $range_start;
 			}
 			if (empty($user_date_end)) {
-				$query_params['date_end'] = $date_boundaries['end_date'];
+				$query_params['date_end'] = $range_end;
 			}
 		}
 
 		$query_args = Calendar_Query::build_query_args($query_params);
 		$events_query = new WP_Query($query_args);
 
-		$total_events = count($unique_dates);
+		$total_events = $total_event_count;
 
 		$event_counts = Calendar_Query::get_event_counts();
 		$past_count = $event_counts['past'];
@@ -147,6 +155,7 @@ class Calendar {
 				'page_start_date' => $date_boundaries['start_date'],
 				'page_end_date' => $date_boundaries['end_date'],
 				'event_count' => $events_query->post_count,
+				'total_events' => $total_event_count,
 			]
 		);
 		$counter_html = ob_get_clean();

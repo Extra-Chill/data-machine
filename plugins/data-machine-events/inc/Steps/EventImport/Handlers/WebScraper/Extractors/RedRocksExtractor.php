@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class RedRocksExtractor implements ExtractorInterface {
+class RedRocksExtractor extends BaseExtractor {
 
     private const VENUE_NAME = 'Red Rocks Amphitheatre';
     private const VENUE_ADDRESS = '18300 W Alameda Pkwy';
@@ -90,7 +90,7 @@ class RedRocksExtractor implements ExtractorInterface {
             'venueCountry' => self::VENUE_COUNTRY,
         ];
 
-        $this->parseDateTime($event, $xpath, $node, $year);
+        $this->parseEventDateTime($event, $xpath, $node, $year);
         $this->parseImage($event, $xpath, $node);
         $this->parseTicketUrl($event, $xpath, $node);
         $this->parseEventUrl($event, $xpath, $node, $source_url);
@@ -133,7 +133,7 @@ class RedRocksExtractor implements ExtractorInterface {
      *
      * Red Rocks displays dates like "Wed, Apr 15, 7:30 pm" in the .date element.
      */
-    private function parseDateTime(array &$event, \DOMXPath $xpath, \DOMElement $node, int $year): void {
+    private function parseEventDateTime(array &$event, \DOMXPath $xpath, \DOMElement $node, int $year): void {
         $date_node = $xpath->query(".//*[contains(@class, 'date')]", $node)->item(0);
         if (!$date_node) {
             return;
@@ -243,9 +243,5 @@ class RedRocksExtractor implements ExtractorInterface {
             ];
             $event['category'] = $category_map[$category_id] ?? '';
         }
-    }
-
-    private function sanitizeText(string $text): string {
-        return sanitize_text_field(trim($text));
     }
 }

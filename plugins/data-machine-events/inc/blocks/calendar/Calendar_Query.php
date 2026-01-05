@@ -24,6 +24,7 @@ if (!defined('ABSPATH')) {
 }
 
 const DAYS_PER_PAGE = 5;
+const MIN_EVENTS_FOR_PAGINATION = 20;
 
 class Calendar_Query {
 
@@ -481,13 +482,17 @@ class Calendar_Query {
      * Get unique event dates for pagination calculations
      *
      * @param array $params Query parameters (show_past, search_query, tax_filters, etc.)
-     * @return array Ordered array of unique date strings (Y-m-d)
+     * @return array {
+     *     @type array $dates        Ordered array of unique date strings (Y-m-d)
+     *     @type int   $total_events Total number of matching events
+     * }
      */
     public static function get_unique_event_dates(array $params): array {
         $query_args = self::build_query_args($params);
         $query_args['fields'] = 'ids';
 
         $query = new WP_Query($query_args);
+        $total_events = $query->found_posts;
         $dates = [];
 
         if ($query->have_posts()) {
@@ -508,17 +513,24 @@ class Calendar_Query {
             sort($dates);
         }
 
-        return $dates;
+        return [
+            'dates' => $dates,
+            'total_events' => $total_events,
+        ];
     }
 
     /**
      * Get date boundaries for a specific page
      *
+     * When total_events is below MIN_EVENTS_FOR_PAGINATION threshold,
+     * pagination is bypassed and all dates are returned on a single page.
+     *
      * @param array $unique_dates Ordered array of unique dates
      * @param int $page Page number (1-based)
+     * @param int $total_events Total event count for pagination threshold check
      * @return array ['start_date' => 'Y-m-d', 'end_date' => 'Y-m-d', 'max_pages' => int]
      */
-    public static function get_date_boundaries_for_page(array $unique_dates, int $page): array {
+    public static function get_date_boundaries_for_page(array $unique_dates, int $page, int $total_events = 0): array {
         $total_days = count($unique_dates);
 
         if ($total_days === 0) {
@@ -526,6 +538,14 @@ class Calendar_Query {
                 'start_date' => '',
                 'end_date' => '',
                 'max_pages' => 0,
+            ];
+        }
+
+        if ($total_events > 0 && $total_events < MIN_EVENTS_FOR_PAGINATION) {
+            return [
+                'start_date' => $unique_dates[0],
+                'end_date' => $unique_dates[$total_days - 1],
+                'max_pages' => 1,
             ];
         }
 

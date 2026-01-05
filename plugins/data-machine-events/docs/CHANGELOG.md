@@ -5,6 +5,30 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.27] - 2026-01-05
+
+### Added
+- **BaseExtractor**: New abstract class to standardize Web Scraper Extractors
+  - Centralizes date/time parsing, timezone handling, and HTML cleaning
+  - Provides consistent sanitization and image resolution helpers
+  - Implemented by all specialized extractors (18+ handlers)
+- **Universal Web Scraper Test Command**: WP-CLI command to test extraction against a target URL
+  - Registers `datamachine-events scrape-test` invokable
+  - Supports `--upsert` flag to validate end-to-end venue/event creation
+- **Venue Admin Enhancements**:
+  - Added address autocomplete to venue term creation/edit screens
+  - Integrated geocoding trigger on address updates in admin UI
+  - Added event count column to Venue Health Check AI tool
+
+### Changed
+- **Calendar Pagination**: Added `MIN_EVENTS_FOR_PAGINATION` (20) threshold
+  - Bypasses multi-page navigation when event count is low
+  - Simplifies view for users with small event sets
+- **Past Events Navigation**: Fixed "Upcoming Events" button URL to correctly remove `past` query parameter
+- **Past Events Logic**: Improved date range handling for past events queries (swaps start/end boundaries for correct WP_Query range)
+- **Squarespace Extractor**: Enhanced collection discovery and location object parsing
+- **Results Counter**: Updated to show relative progress (e.g., "Viewing 1-5 of 120 Events")
+
 ## [0.8.26] - 2026-01-04
 
 ### Added

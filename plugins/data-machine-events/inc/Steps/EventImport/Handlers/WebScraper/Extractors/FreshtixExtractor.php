@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class FreshtixExtractor implements ExtractorInterface {
+class FreshtixExtractor extends BaseExtractor {
 
     public function canExtract(string $html): bool {
         if (strpos($html, 'freshtix.com') === false) {
@@ -121,7 +121,7 @@ class FreshtixExtractor implements ExtractorInterface {
             'description' => '',
         ];
 
-        $this->parseDateTime($event, $raw);
+        $this->parseEventDateTime($event, $raw);
         $this->parseVenue($event, $raw, $venue_data);
         $this->parseTicketUrl($event, $raw);
         $this->parseImage($event, $raw, $base_url);
@@ -129,20 +129,18 @@ class FreshtixExtractor implements ExtractorInterface {
         return $event;
     }
 
-    private function parseDateTime(array &$event, array $raw): void {
+    private function parseEventDateTime(array &$event, array $raw): void {
         if (!empty($raw['start_datetime'])) {
-            try {
-                $dt = new \DateTime($raw['start_datetime']);
-                $event['startDate'] = $dt->format('Y-m-d');
-                $event['startTime'] = $dt->format('H:i');
+            $parsed = $this->parseDatetime($raw['start_datetime']);
+            if (!empty($parsed['date'])) {
+                $event['startDate'] = $parsed['date'];
+                $event['startTime'] = $parsed['time'];
                 return;
-            } catch (\Exception $e) {
-                // Fall through to alternatives
             }
         }
 
         if (!empty($raw['start_date'])) {
-            $event['startDate'] = sanitize_text_field($raw['start_date']);
+            $event['startDate'] = $this->sanitizeText($raw['start_date']);
         }
 
         if (!empty($raw['start_time'])) {
@@ -204,7 +202,4 @@ class FreshtixExtractor implements ExtractorInterface {
         $event['imageUrl'] = esc_url_raw($image_url);
     }
 
-    private function sanitizeText(string $text): string {
-        return sanitize_text_field(trim($text));
-    }
 }

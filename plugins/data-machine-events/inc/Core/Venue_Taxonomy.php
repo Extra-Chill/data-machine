@@ -719,6 +719,8 @@ class Venue_Taxonomy {
         add_action('created_venue', [__CLASS__, 'save_venue_meta']);
         
         add_action('edited_venue', [__CLASS__, 'save_venue_meta']);
+
+        add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_term_edit_assets']);
     }
     
     public static function add_venue_form_fields($taxonomy) {
@@ -726,7 +728,14 @@ class Venue_Taxonomy {
             $label = self::$field_labels[$key] ?? ucfirst($key);
             echo '<div class="form-field">';
             echo "<label for='$meta_key'>$label</label>";
-            echo "<input type='text' name='$meta_key' id='$meta_key' value='' class='regular-text' />";
+
+            if ($key === 'address') {
+                echo "<input type='text' name='$meta_key' id='$meta_key' value='' class='regular-text venue-address-autocomplete' ";
+                echo "data-city-field='_venue_city' data-state-field='_venue_state' data-zip-field='_venue_zip' data-country-field='_venue_country' />";
+            } else {
+                echo "<input type='text' name='$meta_key' id='$meta_key' value='' class='regular-text' />";
+            }
+
             echo '</div>';
         }
     }
@@ -737,17 +746,65 @@ class Venue_Taxonomy {
             $value = get_term_meta($term->term_id, $meta_key, true);
             echo '<tr class="form-field">';
             echo "<th scope='row'><label for='$meta_key'>$label</label></th>";
-            echo "<td><input type='text' name='$meta_key' id='$meta_key' value='" . esc_attr($value) . "' class='regular-text' /></td>";
+
+            if ($key === 'address') {
+                echo "<td><input type='text' name='$meta_key' id='$meta_key' value='" . esc_attr($value) . "' class='regular-text venue-address-autocomplete' ";
+                echo "data-city-field='_venue_city' data-state-field='_venue_state' data-zip-field='_venue_zip' data-country-field='_venue_country' /></td>";
+            } else {
+                echo "<td><input type='text' name='$meta_key' id='$meta_key' value='" . esc_attr($value) . "' class='regular-text' /></td>";
+            }
+
             echo '</tr>';
         }
     }
 
     public static function save_venue_meta($term_id) {
+        $address_fields = ['address', 'city', 'state', 'zip', 'country'];
+        $address_updated = false;
+
         foreach (self::$meta_fields as $key => $meta_key) {
             if (isset($_POST[$meta_key])) {
-                update_term_meta($term_id, $meta_key, sanitize_text_field($_POST[$meta_key]));
+                $new_value = sanitize_text_field(wp_unslash($_POST[$meta_key]));
+                $old_value = get_term_meta($term_id, $meta_key, true);
+
+                if ($new_value !== $old_value) {
+                    update_term_meta($term_id, $meta_key, $new_value);
+
+                    if (in_array($key, $address_fields, true)) {
+                        $address_updated = true;
+                    }
+                }
             }
         }
+
+        if ($address_updated) {
+            self::maybe_geocode_venue($term_id);
+        }
     }
-    
+
+    public static function enqueue_term_edit_assets($hook) {
+        if ($hook !== 'term.php' && $hook !== 'edit-tags.php') {
+            return;
+        }
+
+        $screen = get_current_screen();
+        if (!$screen || $screen->taxonomy !== 'venue') {
+            return;
+        }
+
+        wp_enqueue_script(
+            'datamachine-events-venue-autocomplete',
+            DATAMACHINE_EVENTS_PLUGIN_URL . 'assets/js/venue-autocomplete.js',
+            [],
+            filemtime(DATAMACHINE_EVENTS_PLUGIN_DIR . 'assets/js/venue-autocomplete.js'),
+            true
+        );
+
+        wp_enqueue_style(
+            'datamachine-events-venue-autocomplete',
+            DATAMACHINE_EVENTS_PLUGIN_URL . 'assets/css/venue-autocomplete.css',
+            [],
+            filemtime(DATAMACHINE_EVENTS_PLUGIN_DIR . 'assets/css/venue-autocomplete.css')
+        );
+    }
 }

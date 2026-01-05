@@ -10,13 +10,11 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors;
 
-use DataMachineEvents\Core\DateTimeParser;
-
 if (!defined('ABSPATH')) {
     exit;
 }
 
-class AegAxsExtractor implements ExtractorInterface {
+class AegAxsExtractor extends BaseExtractor {
 
     private const JSON_HOST = 'aegwebprod.blob.core.windows.net';
 
@@ -96,7 +94,7 @@ class AegAxsExtractor implements ExtractorInterface {
             'description' => $this->extractDescription($raw),
         ];
 
-        $this->parseDateTime($event, $raw);
+        $this->parseEventDateTime($event, $raw);
         $this->parseVenue($event, $raw);
         $this->parsePrice($event, $raw);
         $this->parseImage($event, $raw);
@@ -130,21 +128,21 @@ class AegAxsExtractor implements ExtractorInterface {
         return wp_kses_post(trim($description));
     }
 
-    private function parseDateTime(array &$event, array $raw): void {
+    private function parseEventDateTime(array &$event, array $raw): void {
         $timezone = $raw['eventDateTimeZone'] ?? '';
 
         if (!empty($raw['eventDateTimeISO'])) {
-            $parsed = DateTimeParser::parseUtc($raw['eventDateTimeISO'], $timezone);
+            $parsed = $this->parseUtcDatetime($raw['eventDateTimeISO'], $timezone);
             $event['startDate'] = $parsed['date'];
             $event['startTime'] = $parsed['time'];
         }
 
         if (!empty($raw['doorDateTime']) && !empty($timezone)) {
-            $doors_parsed = DateTimeParser::parseUtc($raw['doorDateTime'], $timezone);
+            $doors_parsed = $this->parseUtcDatetime($raw['doorDateTime'], $timezone);
             $event['doorsTime'] = $doors_parsed['time'];
         }
 
-        if (!empty($timezone) && DateTimeParser::isValidTimezone($timezone)) {
+        if (!empty($timezone) && $this->isValidTimezone($timezone)) {
             $event['venueTimezone'] = $timezone;
         }
     }

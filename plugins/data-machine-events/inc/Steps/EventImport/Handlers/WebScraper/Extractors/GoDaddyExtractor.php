@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class GoDaddyExtractor implements ExtractorInterface {
+class GoDaddyExtractor extends BaseExtractor {
 
     public function canExtract(string $html): bool {
         // Check if content is GoDaddy JSON or if HTML contains GoDaddy calendar identifiers
@@ -67,8 +67,8 @@ class GoDaddyExtractor implements ExtractorInterface {
      * Map GoDaddy raw event to standard format.
      */
     private function mapEvent(array $raw, string $source_url): array {
-        $start = $this->parseIsoDatetime($raw['start'] ?? '');
-        $end = $this->parseIsoDatetime($raw['end'] ?? '');
+        $start = $this->parseGoDaddyDatetime($raw['start'] ?? '');
+        $end = $this->parseGoDaddyDatetime($raw['end'] ?? '');
 
         return [
             'title' => sanitize_text_field($raw['title'] ?? ''),
@@ -86,9 +86,9 @@ class GoDaddyExtractor implements ExtractorInterface {
     }
 
     /**
-     * Parse ISO datetime strings into date and time parts.
+     * Parse GoDaddy datetime strings into date and time parts.
      */
-    private function parseIsoDatetime(string $datetime): array {
+    private function parseGoDaddyDatetime(string $datetime): array {
         $datetime = trim($datetime);
         if ($datetime === '') {
             return ['date' => '', 'time' => ''];

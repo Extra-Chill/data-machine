@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class RhpEventsExtractor implements ExtractorInterface {
+class RhpEventsExtractor extends BaseExtractor {
 
     public function canExtract(string $html): bool {
         return strpos($html, 'rhpSingleEvent') !== false
@@ -307,9 +307,5 @@ class RhpEventsExtractor implements ExtractorInterface {
         if ($age_node) {
             $event['ageRestriction'] = $this->sanitizeText($age_node->textContent);
         }
-    }
-
-    private function sanitizeText(string $text): string {
-        return sanitize_text_field(trim($text));
     }
 }

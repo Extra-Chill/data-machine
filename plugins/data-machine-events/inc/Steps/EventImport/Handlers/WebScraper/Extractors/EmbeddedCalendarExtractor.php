@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class EmbeddedCalendarExtractor implements ExtractorInterface {
+class EmbeddedCalendarExtractor extends BaseExtractor {
 
     public function canExtract(string $html): bool {
         return strpos($html, 'google.com/calendar/embed') !== false;

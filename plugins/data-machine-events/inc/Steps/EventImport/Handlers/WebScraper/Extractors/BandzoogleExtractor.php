@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class BandzoogleExtractor implements ExtractorInterface {
+class BandzoogleExtractor extends BaseExtractor {
 
     const MAX_PAGES = 12; // Limit pagination to 1 year forward
 

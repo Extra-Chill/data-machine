@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class FirebaseExtractor implements ExtractorInterface {
+class FirebaseExtractor extends BaseExtractor {
 
     public function canExtract(string $html): bool {
         return strpos($html, 'firebase-database.js') !== false
@@ -152,7 +152,7 @@ class FirebaseExtractor implements ExtractorInterface {
     private function normalizeEvent(array $metadata, string $event_id): array {
         $event = [
             'title' => $this->sanitizeText($metadata['title'] ?? ''),
-            'description' => $this->cleanDescription($metadata['longDescription'] ?? $metadata['shortDescription'] ?? $metadata['description'] ?? ''),
+            'description' => $this->cleanHtml($metadata['longDescription'] ?? $metadata['shortDescription'] ?? $metadata['description'] ?? ''),
         ];
 
         $this->parseDate($event, $metadata);
@@ -169,6 +169,7 @@ class FirebaseExtractor implements ExtractorInterface {
      * Parse date from Firebase JS date string.
      *
      * Firebase stores dates like: "Wed Sep 11 2024 18:30:00 GMT-0500 (Central Daylight Time)"
+     * The timezone is embedded in the string, so parseDatetime handles it correctly.
      */
     private function parseDate(array &$event, array $metadata): void {
         $date_string = $metadata['date'] ?? '';
@@ -178,17 +179,9 @@ class FirebaseExtractor implements ExtractorInterface {
 
         $date_string = preg_replace('/\s*\([^)]+\)\s*$/', '', $date_string);
 
-        try {
-            $dt = new \DateTime($date_string);
-            $event['startDate'] = $dt->format('Y-m-d');
-            $event['startTime'] = $dt->format('H:i');
-        } catch (\Exception $e) {
-            $timestamp = strtotime($date_string);
-            if ($timestamp !== false) {
-                $event['startDate'] = date('Y-m-d', $timestamp);
-                $event['startTime'] = date('H:i', $timestamp);
-            }
-        }
+        $parsed = $this->parseDatetime($date_string);
+        $event['startDate'] = $parsed['date'];
+        $event['startTime'] = $parsed['time'];
     }
 
     /**
@@ -223,11 +216,4 @@ class FirebaseExtractor implements ExtractorInterface {
         }
     }
 
-    private function sanitizeText(string $text): string {
-        return sanitize_text_field(trim($text));
-    }
-
-    private function cleanDescription(string $text): string {
-        return wp_kses_post(trim($text));
-    }
 }

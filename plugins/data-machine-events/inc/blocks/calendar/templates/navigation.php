@@ -32,7 +32,7 @@ if ( ! $show_past && $past_events_count > 0 ) :
 	<?php
 	// Show Upcoming Events button when viewing past events and future events exist
 elseif ( $show_past && $future_events_count > 0 ) :
-	$upcoming_url = add_query_arg( $get_params );
+	$upcoming_url = remove_query_arg( 'past', add_query_arg( $get_params ) );
 	?>
 	<div class="datamachine-events-past-navigation">
 		<a href="<?php echo esc_url( $upcoming_url ); ?>" class="datamachine-events-upcoming-btn">

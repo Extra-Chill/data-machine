@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class SpotHopperExtractor implements ExtractorInterface {
+class SpotHopperExtractor extends BaseExtractor {
 
     const API_BASE = 'https://www.spothopperapp.com/api/spots/';
 
@@ -125,21 +125,22 @@ class SpotHopperExtractor implements ExtractorInterface {
         $end_time = '';
 
         if (!empty($event['event_date'])) {
-            try {
-                $date_obj = new \DateTime($event['event_date']);
-                $start_date = $date_obj->format('Y-m-d');
-            } catch (\Exception $e) {}
+            $parsed = $this->parseDatetime($event['event_date']);
+            $start_date = $parsed['date'];
         }
 
         if (!empty($event['start_time'])) {
             $start_time = $event['start_time'];
 
             if (!empty($event['duration_minutes']) && is_numeric($event['duration_minutes']) && !empty($start_date)) {
-                try {
-                    $start_datetime = new \DateTime($start_date . ' ' . $start_time);
-                    $start_datetime->modify('+' . (int)$event['duration_minutes'] . ' minutes');
-                    $end_time = $start_datetime->format('H:i');
-                } catch (\Exception $e) {}
+                $parsed = $this->parseLocalDatetime($start_date, $start_time, '');
+                if (!empty($parsed['date'])) {
+                    try {
+                        $start_datetime = new \DateTime($start_date . ' ' . $start_time);
+                        $start_datetime->modify('+' . (int)$event['duration_minutes'] . ' minutes');
+                        $end_time = $start_datetime->format('H:i');
+                    } catch (\Exception $e) {}
+                }
             }
         }
 
@@ -147,8 +148,8 @@ class SpotHopperExtractor implements ExtractorInterface {
         $image_url = $this->resolveImageUrl($event, $linked);
 
         return array_merge([
-            'title' => sanitize_text_field($title),
-            'description' => wp_kses_post($description),
+            'title' => $this->sanitizeText($title),
+            'description' => $this->cleanHtml($description),
             'startDate' => $start_date,
             'endDate' => '',
             'startTime' => $start_time,
@@ -175,13 +176,13 @@ class SpotHopperExtractor implements ExtractorInterface {
         }
 
         return [
-            'venue' => sanitize_text_field($spot['name'] ?? ''),
-            'venueAddress' => sanitize_text_field($spot['address'] ?? ''),
-            'venueCity' => sanitize_text_field($spot['city'] ?? ''),
-            'venueState' => sanitize_text_field($spot['state'] ?? ''),
-            'venueZip' => sanitize_text_field($spot['zip'] ?? ''),
-            'venueCountry' => sanitize_text_field($spot['country'] ?? 'US'),
-            'venuePhone' => sanitize_text_field($spot['phone_number'] ?? ''),
+            'venue' => $this->sanitizeText($spot['name'] ?? ''),
+            'venueAddress' => $this->sanitizeText($spot['address'] ?? ''),
+            'venueCity' => $this->sanitizeText($spot['city'] ?? ''),
+            'venueState' => $this->sanitizeText($spot['state'] ?? ''),
+            'venueZip' => $this->sanitizeText($spot['zip'] ?? ''),
+            'venueCountry' => $this->sanitizeText($spot['country'] ?? 'US'),
+            'venuePhone' => $this->sanitizeText($spot['phone_number'] ?? ''),
             'venueWebsite' => esc_url_raw($spot['website_url'] ?? ''),
             'venueCoordinates' => $venue_coordinates,
         ];

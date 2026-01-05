@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class SquarespaceExtractor implements ExtractorInterface {
+class SquarespaceExtractor extends BaseExtractor {
 
     public function canExtract(string $html): bool {
         return strpos($html, 'Static.SQUARESPACE_CONTEXT') !== false;
@@ -27,19 +27,35 @@ class SquarespaceExtractor implements ExtractorInterface {
             return [];
         }
 
-        $raw_items = $this->findItemsRecursive($data);
+        // 1. Check for top-level 'upcoming' array (common in Squarespace event collections)
+        if (isset($data['upcoming']) && is_array($data['upcoming']) && !empty($data['upcoming'])) {
+            $raw_items = $data['upcoming'];
+        }
+
         if (empty($raw_items)) {
-            // 3. Fallback to parsing HTML directly if JSON is empty
+            // 2. Check for top-level 'past' array if no upcoming events
+            if (isset($data['past']) && is_array($data['past']) && !empty($data['past'])) {
+                $raw_items = $data['past'];
+            }
+        }
+
+        if (empty($raw_items)) {
+            // 3. Try recursive search for items in collection structure
+            $raw_items = $this->findItemsRecursive($data);
+        }
+
+        if (empty($raw_items)) {
+            // 4. Fallback to parsing HTML directly if JSON is empty
             $raw_items = $this->parseHtmlItems($html);
         }
 
         if (empty($raw_items)) {
-            // 4. Check for Summary Blocks or Gallery items in SQUARESPACE_CONTEXT
+            // 5. Check for Summary Blocks or Gallery items in SQUARESPACE_CONTEXT
             $raw_items = $this->findBlockItems($data);
         }
 
         if (empty($raw_items)) {
-            // 5. Check for upcomingEvents in website (common in some templates)
+            // 6. Check for upcomingEvents in website (common in some templates)
             if (isset($data['website']['upcomingEvents']) && is_array($data['website']['upcomingEvents'])) {
                 $raw_items = $data['website']['upcomingEvents'];
             }
@@ -124,11 +140,32 @@ class SquarespaceExtractor implements ExtractorInterface {
         if ($response['success'] && !empty($response['data'])) {
             $data = json_decode($response['data'], true);
             if (json_last_error() === JSON_ERROR_NONE && !empty($data)) {
+                // Check if this is an events collection page (has upcoming/past arrays)
+                if (isset($data['upcoming']) || isset($data['past'])) {
+                    return $data;
+                }
+
+                // 2. Check if page has a Summary Block referencing an events collection
+                $events_collection_url = $this->findEventsCollectionUrl($html, $source_url);
+                if ($events_collection_url) {
+                    $collection_response = \DataMachine\Core\HttpClient::get($events_collection_url, [
+                        'timeout' => 30,
+                        'context' => 'Squarespace Extractor Events Collection',
+                    ]);
+
+                    if ($collection_response['success'] && !empty($collection_response['data'])) {
+                        $collection_data = json_decode($collection_response['data'], true);
+                        if (json_last_error() === JSON_ERROR_NONE && !empty($collection_data)) {
+                            return $collection_data;
+                        }
+                    }
+                }
+
                 return $data;
             }
         }
 
-        // 2. Fallback to extracting from HTML using string search (avoids regex backtracking)
+        // 3. Fallback to extracting from HTML using string search (avoids regex backtracking)
         $start_token = 'Static.SQUARESPACE_CONTEXT = ';
         $pos = strpos($html, $start_token);
         if ($pos === false) {
@@ -147,6 +184,65 @@ class SquarespaceExtractor implements ExtractorInterface {
         }
 
         return [];
+    }
+
+    /**
+     * Find events collection URL from Summary Block references in HTML.
+     *
+     * Summary Blocks on Squarespace pages reference source collections via collectionId.
+     * This method extracts that ID and constructs the collection's JSON URL.
+     */
+    private function findEventsCollectionUrl(string $html, string $source_url): ?string {
+        // Look for Summary Block with showPastOrUpcomingEvents setting (indicates events collection)
+        if (!preg_match('/data-block-json="([^"]*showPastOrUpcomingEvents[^"]*)"/', $html, $matches)) {
+            return null;
+        }
+
+        $block_json = html_entity_decode($matches[1], ENT_QUOTES, 'UTF-8');
+        $block_data = json_decode($block_json, true);
+
+        if (empty($block_data['collectionId'])) {
+            return null;
+        }
+
+        // Get the collection URL by fetching the site's navigation/collections
+        // For now, try common event collection paths
+        $parsed = parse_url($source_url);
+        $base_url = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? '');
+
+        // Try common Squarespace event collection paths
+        $common_paths = [
+            '/events',
+            '/event-listings', 
+            '/calendar',
+            '/shows',
+            '/upcoming-events',
+            '/live-events',
+        ];
+
+        foreach ($common_paths as $path) {
+            // Skip if it's the current URL
+            $current_path = $parsed['path'] ?? '';
+            if (rtrim($path, '/') === rtrim($current_path, '/')) {
+                continue;
+            }
+
+            $test_url = $base_url . $path . '?format=json';
+            $response = \DataMachine\Core\HttpClient::get($test_url, [
+                'timeout' => 10,
+                'context' => 'Squarespace Extractor Collection Discovery',
+            ]);
+
+            if ($response['success'] && !empty($response['data'])) {
+                $test_data = json_decode($response['data'], true);
+                // Check if this collection has the events we're looking for
+                if (isset($test_data['upcoming']) && !empty($test_data['upcoming'])) {
+                    return $test_url;
+                }
+            }
+        }
+
+        return null;
     }
 
     public function getMethod(): string {
@@ -228,6 +324,9 @@ class SquarespaceExtractor implements ExtractorInterface {
             'source_url' => '',
         ];
 
+        // Extract venue from event's location object (takes priority over page_venue)
+        $this->parseEventLocation($event, $item);
+
         // Set source URL
         if (!empty($item['fullUrl'])) {
             $event['source_url'] = $item['fullUrl'];
@@ -241,20 +340,67 @@ class SquarespaceExtractor implements ExtractorInterface {
     }
 
     /**
+     * Parse venue info from event's location object.
+     */
+    private function parseEventLocation(array &$event, array $item): void {
+        if (empty($item['location']) || !is_array($item['location'])) {
+            return;
+        }
+
+        $location = $item['location'];
+
+        if (!empty($location['addressTitle'])) {
+            $event['venue'] = $this->sanitizeText($location['addressTitle']);
+        }
+
+        if (!empty($location['addressLine1'])) {
+            $event['venueAddress'] = $this->sanitizeText($location['addressLine1']);
+        }
+
+        // Parse addressLine2 for city, state, zip (format: "City, ST, ZIPCODE")
+        if (!empty($location['addressLine2'])) {
+            $parts = array_map('trim', explode(',', $location['addressLine2']));
+            if (count($parts) >= 1) {
+                $event['venueCity'] = $this->sanitizeText($parts[0]);
+            }
+            if (count($parts) >= 2) {
+                $event['venueState'] = $this->sanitizeText($parts[1]);
+            }
+            if (count($parts) >= 3) {
+                $event['venueZip'] = $this->sanitizeText($parts[2]);
+            }
+        }
+
+        if (!empty($location['addressCountry'])) {
+            $event['venueCountry'] = $this->sanitizeText($location['addressCountry']);
+        }
+    }
+
+    /**
      * Parse scheduling data from Squarespace item.
+     *
+     * Squarespace stores timestamps in UTC. This method converts them to local
+     * timezone using the venueTimezone extracted from the page context.
      */
     private function parseScheduling(array &$event, array $item): void {
-        // Squarespace events often have startDate and endDate in milliseconds or ISO format
+        $timezone = $event['venueTimezone'] ?? '';
+
         if (!empty($item['startDate'])) {
-            $this->setDateAndTime($event, $item['startDate'], 'start');
+            $parsed = $this->parseSquarespaceTimestamp($item['startDate'], $timezone);
+            $event['startDate'] = $parsed['date'];
+            $event['startTime'] = $parsed['time'];
         } elseif (!empty($item['publishOn'])) {
-            $this->setDateAndTime($event, $item['publishOn'], 'start');
+            $parsed = $this->parseSquarespaceTimestamp($item['publishOn'], $timezone);
+            $event['startDate'] = $parsed['date'];
+            $event['startTime'] = $parsed['time'];
         }
 
         if (!empty($item['endDate'])) {
-            $this->setDateAndTime($event, $item['endDate'], 'end');
+            $parsed = $this->parseSquarespaceTimestamp($item['endDate'], $timezone);
+            $event['endDate'] = $parsed['date'];
+            $event['endTime'] = $parsed['time'];
         }
-        
+
         // Fallback: search description for dates if not found
         if (empty($event['startDate'])) {
             $this->extractDateFromText($event, $event['description']);
@@ -262,21 +408,18 @@ class SquarespaceExtractor implements ExtractorInterface {
     }
 
     /**
-     * Set date and time from timestamp or string.
+     * Parse Squarespace timestamp (milliseconds UTC or ISO string) to local timezone.
+     *
+     * @param mixed $value Timestamp in milliseconds, seconds, or ISO string
+     * @param string $timezone IANA timezone identifier
+     * @return array{date: string, time: string, timezone: string}
      */
-    private function setDateAndTime(array &$event, $value, string $prefix): void {
-        try {
-            // Handle millisecond timestamps (common in JS/Squarespace)
-            if (is_numeric($value) && $value > 1000000000000) {
-                $value = (int)($value / 1000);
-            }
-            
-            $dt = new \DateTime(is_numeric($value) ? "@$value" : $value);
-            $event[$prefix . 'Date'] = $dt->format('Y-m-d');
-            $event[$prefix . 'Time'] = $dt->format('H:i');
-        } catch (\Exception $e) {
-            // Ignore parse errors
+    private function parseSquarespaceTimestamp($value, string $timezone): array {
+        if (is_numeric($value)) {
+            return $this->parseUtcTimestamp($value, $timezone);
         }
+
+        return $this->parseDatetime((string) $value, $timezone);
     }
 
     /**
@@ -327,11 +470,4 @@ class SquarespaceExtractor implements ExtractorInterface {
         }
     }
 
-    private function sanitizeText(string $text): string {
-        return sanitize_text_field(trim($text));
-    }
-
-    private function cleanHtml(string $html): string {
-        return wp_kses_post(trim($html));
-    }
 }

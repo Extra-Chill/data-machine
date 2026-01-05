@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class TimelyExtractor implements ExtractorInterface {
+class TimelyExtractor extends BaseExtractor {
 
     public function canExtract(string $html): bool {
         $has_fullcalendar = strpos($html, 'FullCalendar.Calendar') !== false;
@@ -225,12 +225,8 @@ class TimelyExtractor implements ExtractorInterface {
             return $date;
         }
 
-        try {
-            $dt = new \DateTime($date);
-            return $dt->format('Y-m-d');
-        } catch (\Exception $e) {
-            return '';
-        }
+        $parsed = $this->parseDatetime($date);
+        return $parsed['date'];
     }
 
     /**
@@ -389,25 +385,4 @@ class TimelyExtractor implements ExtractorInterface {
         return $metadata;
     }
 
-    /**
-     * Sanitize text field.
-     *
-     * @param string $text Raw text
-     * @return string Sanitized text
-     */
-    private function sanitizeText(string $text): string {
-        return sanitize_text_field(trim($text));
-    }
-
-    /**
-     * Clean HTML content for description.
-     *
-     * @param string $html Raw HTML
-     * @return string Cleaned text
-     */
-    private function cleanHtml(string $html): string {
-        // Remove extra whitespace but preserve paragraph breaks
-        $text = preg_replace('/\s+/', ' ', $html);
-        return trim($text);
-    }
 }

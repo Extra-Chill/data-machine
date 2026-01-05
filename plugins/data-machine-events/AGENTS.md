@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.8.26
+**Version**: 0.8.27
 
 ## Plugin Bootstrap
 
@@ -85,6 +85,10 @@ Chat tools in `inc/Api/Chat/Tools` provide AI-driven venue management capabiliti
 - `datamachine_events_excluded_taxonomies`: Control taxonomies excluded from badge lists or filter modals.
 - Badge/action filters: `datamachine_events_badge_wrapper_classes`, `datamachine_events_badge_classes`, `datamachine_events_more_info_button_classes`, `datamachine_events_ticket_button_classes`, and `datamachine_events_action_buttons` customize badge/CTA markup.
 - Pagination filters: `datamachine_events_pagination_wrapper_classes`, `datamachine_events_pagination_args` customize pagination markup.
+
+## WP-CLI Commands
+
+- **Universal Web Scraper Test Command**: `inc/Cli/UniversalWebScraperTestCommand.php` registers a WP-CLI invokable that runs the `WebScraper\\UniversalWebScraper` handler against a `--target_url`, creates a job record for context, prints a packet summary (structured vs HTML fallback), and can optionally run `EventUpsert` (`--upsert`) to validate end-to-end venue coverage.
 
 ## Build Commands
 
