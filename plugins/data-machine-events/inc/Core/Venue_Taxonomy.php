@@ -212,18 +212,28 @@ class Venue_Taxonomy {
             return false;
         }
 
-        // Only update fields present in $venue_data array
+        $address_fields = ['address', 'city', 'state', 'zip', 'country'];
+        $address_changed = false;
+
         foreach (self::$meta_fields as $data_key => $meta_key) {
             if (array_key_exists($data_key, $venue_data)) {
-                update_term_meta($term_id, $meta_key, sanitize_text_field($venue_data[$data_key]));
+                $new_value = sanitize_text_field($venue_data[$data_key]);
+
+                // Check if address field actually changed
+                if (in_array($data_key, $address_fields, true)) {
+                    $old_value = get_term_meta($term_id, $meta_key, true);
+                    if ($new_value !== $old_value) {
+                        $address_changed = true;
+                    }
+                }
+
+                update_term_meta($term_id, $meta_key, $new_value);
             }
         }
 
-        // Geocode if address fields were updated and coordinates are empty
-        $address_fields = ['address', 'city', 'state', 'zip', 'country'];
-        $address_updated = !empty(array_intersect($address_fields, array_keys($venue_data)));
-        
-        if ($address_updated) {
+        // If address changed, clear coordinates and re-geocode
+        if ($address_changed) {
+            delete_term_meta($term_id, '_venue_coordinates');
             self::maybe_geocode_venue($term_id);
         }
 
@@ -778,6 +788,7 @@ class Venue_Taxonomy {
         }
 
         if ($address_updated) {
+            delete_term_meta($term_id, '_venue_coordinates');
             self::maybe_geocode_venue($term_id);
         }
     }

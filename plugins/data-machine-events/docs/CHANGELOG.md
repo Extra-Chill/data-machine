@@ -5,6 +5,15 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.28] - 2026-01-05
+
+### Added
+- **Venue Geocoding Optimization**: Added automatic coordinate clearing when address fields change, ensuring stale coordinates are removed before re-geocoding.
+
+### Fixed
+- **Venue Update AI Tool**: Refined meta data update logic to preserve empty strings when intentionally passed, while still filtering null values.
+- **Address Change Detection**: Improved venue update logic to explicitly detect changes in any address component (address, city, state, zip, country) before triggering geocoding.
+
 ## [0.8.27] - 2026-01-05
 
 ### Added
