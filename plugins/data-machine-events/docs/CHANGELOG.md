@@ -5,6 +5,22 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.26] - 2026-01-04
+
+### Added
+- **Elfsight Events Extractor**: New specialized extractor for Universal Web Scraper
+  - Detects Elfsight Events Calendar widgets via `elfsight-sapp-{uuid}` class pattern
+  - Fetches structured event data from Elfsight API (shy.elfsight.com)
+  - Handles JSONP response parsing and widget settings extraction
+  - Normalizes events with complete venue, date/time, image, and ticket URL data
+  - Supports Shopify domain extraction for widget context
+  - Resolves location data from event metadata with timezone handling
+  - Extracted 233 lines to `ElfsightEventsExtractor.php`
+
+### Changed
+- **UniversalWebScraper**: Added ElfsightEventsExtractor to extraction pipeline at priority 11 (before JSON-LD extractors)
+- **Extraction Documentation**: Updated priority list to include Elfsight Events Calendar API support
+
 ## [0.8.25] - 2026-01-05
 
 ### Added

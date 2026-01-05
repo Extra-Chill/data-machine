@@ -16,14 +16,15 @@
  * 8. Bandzoogle calendar
  * 9. GoDaddy website builder
  * 10. Timely Event Discovery (FullCalendar.js)
- * 11. Schema.org JSON-LD
- * 12. WordPress (Tribe Events, WP REST)
- * 13. Prekindle ticketing
- * 14. Wix Events JSON (wix-warmup-data)
- * 15. RHP Events WordPress plugin HTML
- * 16. OpenDate.io JSON
- * 17. Schema.org microdata
- * 18. AI-enhanced HTML pattern matching (Fallback)
+ * 11. Elfsight Events Calendar (shy.elfsight.com API)
+ * 12. Schema.org JSON-LD
+ * 13. WordPress (Tribe Events, WP REST)
+ * 14. Prekindle ticketing
+ * 15. Wix Events JSON (wix-warmup-data)
+ * 16. RHP Events WordPress plugin HTML
+ * 17. OpenDate.io JSON
+ * 18. Schema.org microdata
+ * 19. AI-enhanced HTML pattern matching (Fallback)
  *
  * @package DataMachineEvents\Steps\EventImport\Handlers\WebScraper
  */
@@ -49,6 +50,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\GoDaddyEx
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\BandzoogleExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\WordPressExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\TimelyExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\ElfsightEventsExtractor;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
@@ -106,6 +108,7 @@ class UniversalWebScraper extends EventImportHandler {
             new BandzoogleExtractor(),
             new GoDaddyExtractor(),
             new TimelyExtractor(),
+            new ElfsightEventsExtractor(),
             new JsonLdExtractor(),
             new WordPressExtractor(),
             new PrekindleExtractor(),
