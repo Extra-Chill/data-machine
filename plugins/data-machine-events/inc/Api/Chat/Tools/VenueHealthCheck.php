@@ -100,8 +100,13 @@ class VenueHealthCheck {
         }
 
         $total = count($venues);
-        $issues_count = count($missing_address) + count($missing_coordinates) + count($missing_timezone);
-        
+
+        // Sort each array by event_count descending (most events first)
+        $sort_by_events = fn($a, $b) => $b['event_count'] <=> $a['event_count'];
+        usort($missing_address, $sort_by_events);
+        usort($missing_coordinates, $sort_by_events);
+        usort($missing_timezone, $sort_by_events);
+
         // Build message
         $message_parts = [];
         if (!empty($missing_address)) {

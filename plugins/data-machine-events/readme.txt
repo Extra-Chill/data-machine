@@ -2,9 +2,9 @@
 Contributors: chubes
 Tags: events, calendar, ticketmaster, eventbrite, import, venues, api
 Requires at least: 6.0
-Tested up to: 6.4
-Requires PHP: 8.0
-Stable tag: 0.8.28
+Tested up to: 6.8
+Requires PHP: 8.2
+Stable tag: 0.8.29
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
