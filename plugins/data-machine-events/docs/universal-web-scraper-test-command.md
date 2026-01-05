@@ -98,6 +98,10 @@ Raw HTML packets indicate AI extraction is needed for venue data.
 ## Use Cases
 
 - **Handler Testing**: Verify the scraper works on a new venue website
-- **Extraction Debugging**: Inspect raw extraction results before running a full pipeline
+- **Extraction Debugging**: Inspect raw extraction results before running a full pipeline. If extraction fails, the command outputs the full raw HTML to assist in troubleshooting.
 - **Coverage Assessment**: Check if venue data will be complete after import
 - **Platform Detection**: Identify which extractor is being used (Wix, Squarespace, etc.)
+
+## Reliability & Debugging
+
+The test command is essential for verifying the scraper's **Smart Fallback** and **Browser Spoofing** capabilities. When testing URLs known to have strict bot detection, observe the logs for "retrying with standard mode" to confirm the fallback is functioning correctly. Increased reliability for platforms like Squarespace and embedded Google Calendars can be verified by checking for successfully decoded IDs and block-based extraction results in the command output.

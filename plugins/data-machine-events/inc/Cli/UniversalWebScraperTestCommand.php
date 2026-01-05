@@ -79,7 +79,11 @@ class UniversalWebScraperTestCommand {
 			if ( ! empty( $logs ) ) {
 				\WP_CLI::log( 'Logs (tail):' );
 				foreach ( array_slice( $logs, -20 ) as $entry ) {
-					\WP_CLI::log( strtoupper( $entry['level'] ) . ': ' . $entry['message'] );
+					$message = strtoupper( $entry['level'] ) . ': ' . $entry['message'];
+					if ( ! empty( $entry['context'] ) ) {
+						$message .= ' ' . wp_json_encode( $entry['context'] );
+					}
+					\WP_CLI::log( $message );
 				}
 			}
 			return;

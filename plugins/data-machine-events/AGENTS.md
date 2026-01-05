@@ -15,6 +15,7 @@ Technical guidance for Claude Code when working with the **Data Machine Events**
 
 - **`init_data_machine_integration()`**: Runs at priority 25 on `init`. After verifying `DATAMACHINE_VERSION`, it loads `EventImportFilters`, instantiates all import handlers, loads EventUpsert filters, and registers the EventUpsert handler from `inc/Steps/Upsert/Events/EventUpsert.php`.
 - **Event import handlers**: `load_event_import_handlers()` instantiates the following `FetchHandler` implementations (all located under `inc/Steps/EventImport/Handlers`):
+- **Universal Web Scraper Architecture**: A multi-layered system that prioritizes structured data extraction (Schema.org JSON-LD/Microdata and 17+ specialized extractors) before falling back to AI-enhanced HTML section parsing. It coordinates fetching, pagination, and normalization via a centralized `StructuredDataProcessor`. The scraper implements a "Smart Fallback" mechanism that retries requests with standard headers if browser-mode spoofing is blocked by captchas (SiteGround/Cloudflare) or encounters 403 errors.
   - `DiceFm\DiceFm`
   - `DoStuffMediaApi\DoStuffMediaApi`
   - `Eventbrite\Eventbrite`

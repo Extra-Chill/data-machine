@@ -89,7 +89,18 @@ class EmbeddedCalendarExtractor implements ExtractorInterface {
         parse_str($parsed_url['query'], $query_params);
 
         if (!empty($query_params['src'])) {
-            $data['calendar_id'] = $query_params['src'];
+            $src = $query_params['src'];
+            
+            // Check if ID is Base64 encoded (common in some Squarespace embeds)
+            // Normal IDs usually contain '@', Base64 often doesn't
+            if (strpos($src, '@') === false && preg_match('/^[a-zA-Z0-9\/+]+={0,2}$/', $src)) {
+                $decoded = base64_decode($src, true);
+                if ($decoded && (strpos($decoded, '@') !== false || strpos($decoded, 'calendar.google.com') !== false)) {
+                    $src = $decoded;
+                }
+            }
+            
+            $data['calendar_id'] = $src;
         }
 
         if (!empty($query_params['ctz'])) {
@@ -109,16 +120,27 @@ class EmbeddedCalendarExtractor implements ExtractorInterface {
 
     /**
      * Fetch ICS content from URL.
+     *
+     * Tries with browser_mode first, then falls back to standard mode
+     * since Google sometimes blocks spoofed browser headers for ICS feeds.
      */
     private function fetchIcsContent(string $url): string {
-        $result = HttpClient::get($url, [
+        $options = [
             'timeout' => 30,
             'browser_mode' => true,
             'headers' => [
                 'Accept' => 'text/calendar, text/plain',
             ],
             'context' => 'Embedded Calendar Extractor',
-        ]);
+        ];
+
+        $result = HttpClient::get($url, $options);
+
+        // Fallback: Try without browser_mode if failed
+        if (!$result['success'] || $result['status_code'] !== 200) {
+            $options['browser_mode'] = false;
+            $result = HttpClient::get($url, $options);
+        }
 
         if (!$result['success'] || $result['status_code'] !== 200) {
             return '';
@@ -155,8 +177,15 @@ class EmbeddedCalendarExtractor implements ExtractorInterface {
      * Uses page venue as fallback when calendar event lacks venue data.
      */
     private function normalizeEvent($ical_event, array $page_venue, string $default_timezone): array {
+        $summary = $ical_event->summary ?? '';
+        
+        // Handle potential double encoding or strange characters in summary
+        if (is_string($summary)) {
+            $summary = html_entity_decode($summary, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+
         $event = [
-            'title' => sanitize_text_field($ical_event->summary ?? ''),
+            'title' => sanitize_text_field($summary),
             'description' => sanitize_textarea_field($ical_event->description ?? ''),
             'startDate' => '',
             'endDate' => '',

@@ -4,7 +4,7 @@ Web scraping handler that extracts event data from arbitrary HTML pages using st
 
 ## Overview
 
-The Universal Web Scraper handler prioritizes structured data extraction for maximum accuracy, falling back to HTML-section extraction when structured data is unavailable. It supports multiple extractor implementations, XPath-based event section detection, automatic pagination (up to `MAX_PAGES = 20`), and ProcessedItems tracking to prevent duplicate processing.
+The Universal Web Scraper handler prioritizes structured data extraction for maximum accuracy, falling back to HTML-section extraction when structured data is unavailable. It supports multiple extractor implementations, XPath-based event section detection, automatic pagination (up to `MAX_PAGES = 20`), and ProcessedItems tracking to prevent duplicate processing. It features a "Smart Fallback" mechanism that retries requests with standard headers if browser-mode requests are blocked by captchas (SiteGround/Cloudflare) or return 403 errors.
 
 ## Features
 
@@ -14,8 +14,8 @@ The Universal Web Scraper handler prioritizes structured data extraction for max
 2. **Red Rocks** (`RedRocksExtractor`): Parses Red Rocks Amphitheatre event pages (@since v0.8.0)
 3. **Freshtix** (`FreshtixExtractor`): Parses embedded JavaScript event objects on Freshtix platform pages (@since v0.8.0)
 4. **Firebase Realtime Database** (`FirebaseExtractor`): Detects Firebase SDK and fetches events from the Firebase REST API (@since v0.8.12)
-5. **Embedded Calendars** (`EmbeddedCalendarExtractor`): Detects and scrapes embedded Google Calendar, SeeTickets, and Turntable widgets. Consolidates legacy standalone `GoogleCalendar` handler logic. (@since v0.8.0)
-6. **Squarespace** (`SquarespaceExtractor`): Extracts events from `Static.SQUARESPACE_CONTEXT` JavaScript objects (@since v0.8.12)
+5. **Embedded Calendars** (`EmbeddedCalendarExtractor`): Detects and scrapes embedded Google Calendar, SeeTickets, and Turntable widgets. Decodes Base64-encoded Google Calendar IDs. Consolidates legacy standalone `GoogleCalendar` handler logic. (@since v0.8.0)
+6. **Squarespace** (`SquarespaceExtractor`): Extracts events from `Static.SQUARESPACE_CONTEXT` JavaScript objects. Enhanced to search for events in "Summary Blocks" and hidden template data if the main collection is empty. (@since v0.8.12)
 7. **SpotHopper** (`SpotHopperExtractor`): Auto-detects SpotHopper platform and extracts events from their public API (@since v0.8.12)
 8. **Bandzoogle** (`BandzoogleExtractor`): Extracts events from Bandzoogle-powered venue calendar pages (@since v0.8.16)
 9. **GoDaddy** (`GoDaddyExtractor`): Extracts events from GoDaddy Website Builder calendars with REST API detection (@since v0.8.16)
@@ -27,14 +27,15 @@ The Universal Web Scraper handler prioritizes structured data extraction for max
 15. **RHP Events plugin HTML** (`RhpEventsExtractor`): Extracts events from `.rhpSingleEvent` markup. Enhanced to merge page-level venue data (@since v0.8.21).
 16. **OpenDate.io** (`OpenDateExtractor`): Two-step extraction (listing → detail page). Prioritizes React JSON datetime values over JSON-LD for improved time accuracy.
 17. **Schema.org Microdata** (`MicrodataExtractor`): Parses itemtype/itemprop markup
-18. **HTML section extraction** (fallback): Uses XPath selector rules to extract one candidate section at a time for downstream processing
+18. **HTML section extraction** (fallback): Uses XPath selector rules to extract one candidate section at a time for downstream processing. Includes high-confidence selectors for `brownbearsw.com` (Sahara Lounge).
 
 ### Page Venue Extraction
 
 The handler includes a `PageVenueExtractor` (@since v0.8.18) that provides multi-layered venue metadata parsing from site headers and footers. This is particularly useful when event listings are sparse but the parent site contains rich venue information.
 
 - **JSON-LD Support**: Prioritizes `MusicVenue`, `EntertainmentBusiness`, and `NightClub` schema types found in site-wide headers or footers (@since v0.8.21).
-- **Address Detection**: Robust identification of addresses in Squarespace announcement bars, footers, and page titles.
+- **Address Detection**: Robust identification of addresses in Squarespace announcement bars, footers, and page titles. Handles non-standard US address strings more effectively.
+- **Squarespace Map Blocks**: Detects and extracts structured venue data from Squarespace map widgets.
 - **Contextual Merging**: Automatically merges discovered page-level venue data into event listings that lack complete address information (e.g., in the `RhpEventsExtractor`).
 
 ### Wix Events Support

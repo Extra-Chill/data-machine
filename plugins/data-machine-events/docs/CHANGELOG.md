@@ -5,6 +5,16 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.24] - 2026-01-04
+
+### Added
+- **Smart Fallback Mechanism**: Implemented automatic retry with standard headers in `UniversalWebScraper` when browser-mode requests encounter 403 errors or captcha challenges (SiteGround/Cloudflare).
+- **Advanced Browser Spoofing**: Updated `HttpClient` with comprehensive browser headers (Sec-Fetch, Accept-Language, etc.) and support for HTTP 202 (Accepted) success codes.
+- **Embedded Calendar Enhancements**: Added detection and decoding of Base64-encoded Google Calendar IDs in `EmbeddedCalendarExtractor`.
+- **Squarespace Scraper Improvements**: Enhanced `SquarespaceExtractor` to search for events in "Summary Blocks" and hidden template data when main collections are empty.
+- **Improved Venue Extraction**: Enhanced `PageVenueExtractor` to handle non-standard US address strings and Squarespace map widgets more effectively.
+- **Sahara Lounge Support**: Added `brownbearsw.com` as a reliable source for Sahara Lounge events when the main domain is blocked.
+
 ## [0.8.23] - 2026-01-04
 
 ### Fixed

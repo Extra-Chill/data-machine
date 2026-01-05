@@ -409,18 +409,36 @@ class UniversalWebScraper extends EventImportHandler {
 
     /**
      * Fetch HTML content from URL.
+     * 
+     * Tries with browser spoofing first, then falls back to standard headers
+     * if it encounters a 403 or a captcha challenge.
      */
     private function fetch_html(string $url): string {
         $result = \DataMachine\Core\HttpClient::get($url, [
             'timeout' => 30,
             'browser_mode' => true,
-            'headers' => [
-                'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language' => 'en-US,en;q=0.5',
-                'User-Agent' => 'DataMachineScraper/' . (defined('DATAMACHINE_VERSION') ? DATAMACHINE_VERSION : '1.0') . ' (+' . home_url() . ')',
-            ],
             'context' => 'Universal Web Scraper'
         ]);
+
+        $is_captcha = isset($result['data']) && (
+            strpos($result['data'], 'sgcaptcha') !== false || 
+            strpos($result['data'], 'cloudflare-challenge') !== false ||
+            strpos($result['data'], 'Checking your browser') !== false
+        );
+
+        if (!$result['success'] || $is_captcha) {
+            $this->log('info', 'Universal Web Scraper: Browser mode blocked or captcha detected, retrying with standard mode', [
+                'url' => $url,
+                'status_code' => $result['status_code'] ?? 'unknown',
+                'is_captcha' => $is_captcha
+            ]);
+
+            $result = \DataMachine\Core\HttpClient::get($url, [
+                'timeout' => 30,
+                'browser_mode' => false,
+                'context' => 'Universal Web Scraper (Fallback)'
+            ]);
+        }
 
         if (!$result['success']) {
             $this->log('error', 'Universal Web Scraper: HTTP request failed', [

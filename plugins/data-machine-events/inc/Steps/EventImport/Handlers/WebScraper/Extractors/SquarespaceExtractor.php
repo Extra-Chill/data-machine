@@ -34,6 +34,18 @@ class SquarespaceExtractor implements ExtractorInterface {
         }
 
         if (empty($raw_items)) {
+            // 4. Check for Summary Blocks or Gallery items in SQUARESPACE_CONTEXT
+            $raw_items = $this->findBlockItems($data);
+        }
+
+        if (empty($raw_items)) {
+            // 5. Check for upcomingEvents in website (common in some templates)
+            if (isset($data['website']['upcomingEvents']) && is_array($data['website']['upcomingEvents'])) {
+                $raw_items = $data['website']['upcomingEvents'];
+            }
+        }
+
+        if (empty($raw_items)) {
             return [];
         }
 
@@ -139,6 +151,26 @@ class SquarespaceExtractor implements ExtractorInterface {
 
     public function getMethod(): string {
         return 'squarespace';
+    }
+
+    /**
+     * Look for items inside blocks (Summary Blocks, etc) in the data structure.
+     */
+    private function findBlockItems(array $data): array {
+        if (isset($data['website']['upcomingEvents']) && is_array($data['website']['upcomingEvents'])) {
+            return $data['website']['upcomingEvents'];
+        }
+
+        // Search for blocks that might contain items
+        if (isset($data['blocks']) && is_array($data['blocks'])) {
+            foreach ($data['blocks'] as $block) {
+                if (isset($block['items']) && is_array($block['items'])) {
+                    return $block['items'];
+                }
+            }
+        }
+
+        return [];
     }
 
     /**
