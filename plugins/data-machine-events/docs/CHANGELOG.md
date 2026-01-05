@@ -5,6 +5,17 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.25] - 2026-01-05
+
+### Added
+- **AI Chat Tools**: New venue management tools for Data Machine's AI framework (`inc/Api/Chat/Tools/`):
+  - `VenueHealthCheck`: Scans all venues for data quality issues (missing address, coordinates, timezone) and returns detailed counts and lists. Optional `limit` parameter controls results per category (default: 25).
+  - `UpdateVenue`: Updates venue name and/or meta fields (address, city, state, zip, country, phone, website, capacity, coordinates, timezone). Accepts venue identifier (term ID, name, or slug) and any combination of fields. Address changes trigger automatic geocoding.
+- **Tool Self-Registration**: Both tools use `ToolRegistrationTrait` for automatic registration with the Data Machine AI chat system.
+
+### Changed
+- **Plugin Bootstrap**: `load_data_machine_components()` now instantiates Chat tools for AI-driven venue management capabilities.
+
 ## [0.8.24] - 2026-01-04
 
 ### Added

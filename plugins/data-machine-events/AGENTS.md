@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.8.21
+**Version**: 0.8.25
 
 ## Plugin Bootstrap
 
@@ -59,6 +59,13 @@ Routes in `inc/Api/Routes.php` register controllers from `inc/Api/Controllers/{C
 - `POST /wp-json/datamachine/v1/events/geocode/search`: Admin-accessed `Geocoding::search()` calling OpenStreetMap Nominatim with sanitized `query`, returning `display_name`, `lat`, `lon`, and structured address segments.
 
 **Security**: Admin endpoints check `current_user_can('manage_options')`. All args sanitize via `sanitize_text_field`, `absint`, `sanitize_key`, or callback sanitizers. The controllers log and respond with consistent JSON structures.
+
+## AI Chat Tools
+
+Chat tools in `inc/Api/Chat/Tools` provide AI-driven venue management capabilities via the Data Machine's AI framework. Tools are self-registering via `ToolRegistrationTrait`:
+
+- **VenueHealthCheck**: Scans all venues for data quality issues (missing address, coordinates, or timezone) and returns detailed counts and lists of problematic venues. Optional `limit` parameter controls maximum venues returned per category (default: 25).
+- **UpdateVenue**: Updates venue name and/or meta fields (address, city, state, zip, country, phone, website, capacity, coordinates, timezone). Accepts venue identifier (term ID, name, or slug) and any combination of fields to update. Address field changes trigger automatic geocoding via `Venue_Taxonomy::update_venue_meta`.
 
 ## Templates & Rendering
 
