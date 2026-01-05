@@ -66,9 +66,10 @@ class EventUpsertSettings {
         
         // Add dynamic taxonomy fields using core WordPressSettingsHandler
         // Venue is excluded because it has a custom handler registered in EventUpsert.php
+        // Category and post_tag are excluded as they are not valid for event upsert
         $taxonomy_fields = WordPressSettingsHandler::get_taxonomy_fields([
             'post_type' => Event_Post_Type::POST_TYPE,
-            'exclude_taxonomies' => ['venue'],
+            'exclude_taxonomies' => ['venue', 'category', 'post_tag'],
             'field_suffix' => '_selection',
             'first_options' => [
                 'skip' => __('Skip', 'datamachine-events'),
@@ -110,9 +111,10 @@ class EventUpsertSettings {
         
         // Sanitize dynamic taxonomy selections using core WordPressSettingsHandler
         // Venue is excluded because it has a custom handler registered in EventUpsert.php
+        // Category and post_tag are excluded as they are not valid for event upsert
         $sanitized = array_merge($sanitized, WordPressSettingsHandler::sanitize_taxonomy_fields($raw_settings, [
             'post_type' => Event_Post_Type::POST_TYPE,
-            'exclude_taxonomies' => ['venue'],
+            'exclude_taxonomies' => ['venue', 'category', 'post_tag'],
             'field_suffix' => '_selection',
             'allowed_values' => ['skip', 'ai_decides'],
             'default_value' => 'skip'

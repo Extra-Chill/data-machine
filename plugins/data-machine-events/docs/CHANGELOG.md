@@ -5,6 +5,15 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.23] - 2026-01-04
+
+### Fixed
+- **Google Calendar Detection**: Expanded embedded calendar detection pattern to match `google.com/calendar/embed` without requiring `calendar.` subdomain, improving flexibility for various Google Calendar embed implementations.
+- **HTTP Client Configuration**: Added `browser_mode => true` to Google Calendar ICS fetch requests to improve compatibility with sites requiring browser-like behavior.
+
+### Changed
+- **EventUpsert Settings**: Excluded `category` and `post_tag` taxonomies from EventUpsert configuration to prevent invalid taxonomy assignments during event import and upsert operations.
+
 ## [0.8.22] - 2026-01-04
 
 ### Added

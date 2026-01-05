@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 class EmbeddedCalendarExtractor implements ExtractorInterface {
 
     public function canExtract(string $html): bool {
-        return strpos($html, 'calendar.google.com/calendar/embed') !== false;
+        return strpos($html, 'google.com/calendar/embed') !== false;
     }
 
     public function extract(string $html, string $source_url): array {
@@ -75,7 +75,7 @@ class EmbeddedCalendarExtractor implements ExtractorInterface {
             'timezone' => '',
         ];
 
-        if (!preg_match('/<iframe[^>]+src=["\']([^"\']*calendar\.google\.com\/calendar\/embed[^"\']*)["\'][^>]*>/i', $html, $matches)) {
+        if (!preg_match('/<iframe[^>]+src=["\']([^"\']*google\.com\/calendar\/embed[^"\']*)["\'][^>]*>/i', $html, $matches)) {
             return $data;
         }
 
@@ -113,6 +113,7 @@ class EmbeddedCalendarExtractor implements ExtractorInterface {
     private function fetchIcsContent(string $url): string {
         $result = HttpClient::get($url, [
             'timeout' => 30,
+            'browser_mode' => true,
             'headers' => [
                 'Accept' => 'text/calendar, text/plain',
             ],
