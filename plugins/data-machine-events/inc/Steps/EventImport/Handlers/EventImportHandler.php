@@ -11,6 +11,7 @@ namespace DataMachineEvents\Steps\EventImport\Handlers;
 use DataMachine\Core\Steps\Fetch\Handlers\FetchHandler;
 use DataMachineEvents\Core\DateTimeParser;
 use DataMachineEvents\Core\VenueParameterProvider;
+use DataMachineEvents\Steps\EventImport\EventEngineData;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -115,9 +116,20 @@ abstract class EventImportHandler extends FetchHandler {
 
     /**
      * Public wrapper for marking item processed (for use by processors).
+     *
+     * Also stores item context in engine data for the skip_item tool.
+     * This enables the AI to skip items that don't meet criteria while
+     * still marking them as processed so they won't be refetched.
+     *
+     * @since 0.8.31
      */
     public function markItemProcessed(string $item_id, ?string $flow_step_id, ?string $job_id): void {
         parent::markItemProcessed($item_id, $flow_step_id, $job_id);
+
+        // Store item context for skip_item tool
+        if ($job_id) {
+            EventEngineData::storeItemContext((int) $job_id, $item_id, $this->handler_type);
+        }
     }
 
     /**
