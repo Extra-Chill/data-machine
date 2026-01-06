@@ -18,6 +18,10 @@ if (!defined('ABSPATH')) {
 
 class WordPressExtractor extends BaseExtractor {
 
+    private const SKIP_DOMAINS = [
+        'resoundpresents.com',
+    ];
+
     public function canExtract(string $html): bool {
         $trimmed = trim($html);
 
@@ -38,13 +42,26 @@ class WordPressExtractor extends BaseExtractor {
             }
         }
 
-        // Check HTML for Tribe Events indicators only (not generic WordPress)
-        return strpos($html, 'tribe-events') !== false
-            || strpos($html, '/wp-json/tribe/events/') !== false
-            || (strpos($html, 'wp-content') !== false && strpos($html, 'tribe_events') !== false);
+        // Check HTML for actual Tribe Events content containers (not plugin CSS/JS asset references)
+        // Only match content elements (div, section, article, main) - exclude link, script, style elements
+        $hasTribeContainer = preg_match('/<(div|section|article|main)[^>]+class=["\'][^"\']*tribe-events[^"\']*["\'][^>]*>/i', $html)
+            || preg_match('/<(div|section|article|main)[^>]+id=["\'][^"\']*tribe-events[^"\']*["\'][^>]*>/i', $html)
+            || strpos($html, '/wp-json/tribe/events/') !== false;
+
+        $hasTribePostType = strpos($html, 'wp-content') !== false
+            && strpos($html, 'tribe_events') !== false;
+
+        return $hasTribeContainer || $hasTribePostType;
     }
 
     public function extract(string $html, string $source_url): array {
+        // Skip domains with non-functional Tribe installations
+        $host = parse_url($source_url, PHP_URL_HOST);
+        $host = preg_replace('/^www\./', '', $host);
+        if (in_array($host, self::SKIP_DOMAINS, true)) {
+            return [];
+        }
+
         $trimmed = trim($html);
 
         // Try direct JSON parsing first
@@ -118,8 +135,9 @@ class WordPressExtractor extends BaseExtractor {
             }
         }
 
-        // Fallback: construct Tribe endpoint from base URL
-        if (strpos($html, 'tribe-events') !== false) {
+        // Fallback: construct Tribe endpoint from base URL (only if actual Tribe container elements exist)
+        if (preg_match('/<(div|section|article|main)[^>]+class=["\'][^"\']*tribe-events[^"\']*["\'][^>]*>/i', $html)
+            || preg_match('/<(div|section|article|main)[^>]+id=["\'][^"\']*tribe-events[^"\']*["\'][^>]*>/i', $html)) {
             return $base_url . '/wp-json/tribe/events/v1/events?per_page=100';
         }
 

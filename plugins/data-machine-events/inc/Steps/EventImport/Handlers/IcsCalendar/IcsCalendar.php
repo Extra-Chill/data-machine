@@ -175,7 +175,7 @@ class IcsCalendar extends EventImportHandler {
                 'filterDaysBefore' => 1,
             ]);
 
-            $events = $ical->events();
+            $events = $ical->sortEventsWithOrder($ical->events(), SORT_ASC);
 
             $this->log('info', 'ICS Calendar: Successfully fetched events', [
                 'total_events' => count($events),

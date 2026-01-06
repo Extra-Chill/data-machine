@@ -5,6 +5,15 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.34] - 2026-01-05
+
+### Changed
+- **ICS Calendar Sorting**: Updated `IcsCalendar` handler to explicitly sort events chronologically using `sortEventsWithOrder` with `SORT_ASC` to ensure consistent data processing order.
+- **WordPress Extractor Refinement**: Enhanced `WordPressExtractor` to more accurately detect Tribe Events content.
+  - Implemented stricter regex matching for Tribe-specific container classes and IDs on content elements (div, section, article, main).
+  - Added a `SKIP_DOMAINS` blacklist to prevent extraction from domains with non-functional or broken Tribe installations (e.g., `resoundpresents.com`).
+  - Refined fallback endpoint construction to only trigger when actual Tribe container elements are present.
+
 ## [0.8.33] - 2026-01-05
 
 ### Added
