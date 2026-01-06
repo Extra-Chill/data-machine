@@ -535,44 +535,54 @@ class Calendar_Query {
 
         $query = new WP_Query($query_args);
         $total_events = $query->found_posts;
-        $dates = [];
+        $events_per_date = [];
 
         if ($query->have_posts()) {
             foreach ($query->posts as $post_id) {
                 $datetime = get_post_meta($post_id, EVENT_DATETIME_META_KEY, true);
                 if ($datetime) {
                     $date = date('Y-m-d', strtotime($datetime));
-                    if (!in_array($date, $dates, true)) {
-                        $dates[] = $date;
+                    if (isset($events_per_date[$date])) {
+                        $events_per_date[$date]++;
+                    } else {
+                        $events_per_date[$date] = 1;
                     }
                 }
             }
         }
 
         if ($params['show_past'] ?? false) {
-            rsort($dates);
+            krsort($events_per_date);
         } else {
-            sort($dates);
+            ksort($events_per_date);
         }
+
+        $dates = array_keys($events_per_date);
 
         return [
             'dates' => $dates,
             'total_events' => $total_events,
+            'events_per_date' => $events_per_date,
         ];
     }
 
     /**
      * Get date boundaries for a specific page
      *
-     * When total_events is below MIN_EVENTS_FOR_PAGINATION threshold,
-     * pagination is bypassed and all dates are returned on a single page.
+     * Pages must contain at least DAYS_PER_PAGE (5) days AND at least
+     * MIN_EVENTS_FOR_PAGINATION (20) events. Days are added beyond the
+     * minimum until the event threshold is met. The day that crosses
+     * the 20-event threshold is included in full (never split days).
+     *
+     * If total_events is below the threshold, all dates are shown on one page.
      *
      * @param array $unique_dates Ordered array of unique dates
      * @param int $page Page number (1-based)
      * @param int $total_events Total event count for pagination threshold check
+     * @param array $events_per_date Event counts keyed by date ['Y-m-d' => count]
      * @return array ['start_date' => 'Y-m-d', 'end_date' => 'Y-m-d', 'max_pages' => int]
      */
-    public static function get_date_boundaries_for_page(array $unique_dates, int $page, int $total_events = 0): array {
+    public static function get_date_boundaries_for_page(array $unique_dates, int $page, int $total_events = 0, array $events_per_date = []): array {
         $total_days = count($unique_dates);
 
         if ($total_days === 0) {
@@ -591,15 +601,51 @@ class Calendar_Query {
             ];
         }
 
-        $max_pages = (int) ceil($total_days / DAYS_PER_PAGE);
-        $page = max(1, min($page, $max_pages));
+        if (empty($events_per_date)) {
+            $max_pages = (int) ceil($total_days / DAYS_PER_PAGE);
+            $page = max(1, min($page, $max_pages));
 
-        $start_index = ($page - 1) * DAYS_PER_PAGE;
-        $end_index = min($start_index + DAYS_PER_PAGE - 1, $total_days - 1);
+            $start_index = ($page - 1) * DAYS_PER_PAGE;
+            $end_index = min($start_index + DAYS_PER_PAGE - 1, $total_days - 1);
+
+            return [
+                'start_date' => $unique_dates[$start_index],
+                'end_date' => $unique_dates[$end_index],
+                'max_pages' => $max_pages,
+            ];
+        }
+
+        $page_boundaries = [];
+        $current_page_start = 0;
+        $cumulative_events = 0;
+        $days_in_current_page = 0;
+
+        for ($i = 0; $i < $total_days; $i++) {
+            $date = $unique_dates[$i];
+            $cumulative_events += $events_per_date[$date] ?? 0;
+            $days_in_current_page++;
+
+            $is_last_date = ($i === $total_days - 1);
+            $meets_minimums = ($days_in_current_page >= DAYS_PER_PAGE && $cumulative_events >= MIN_EVENTS_FOR_PAGINATION);
+
+            if ($meets_minimums || $is_last_date) {
+                $page_boundaries[] = [
+                    'start' => $current_page_start,
+                    'end' => $i,
+                ];
+                $current_page_start = $i + 1;
+                $cumulative_events = 0;
+                $days_in_current_page = 0;
+            }
+        }
+
+        $max_pages = count($page_boundaries);
+        $page = max(1, min($page, $max_pages));
+        $boundary = $page_boundaries[$page - 1];
 
         return [
-            'start_date' => $unique_dates[$start_index],
-            'end_date' => $unique_dates[$end_index],
+            'start_date' => $unique_dates[$boundary['start']],
+            'end_date' => $unique_dates[$boundary['end']],
             'max_pages' => $max_pages,
         ];
     }

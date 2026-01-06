@@ -5,6 +5,14 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.36] - 2026-01-06
+
+### Changed
+- **Calendar Pagination Boundaries**: Updated calendar pagination so page boundaries respect both minimum day count and minimum event count.
+  - `Calendar_Query::get_unique_event_dates()` now returns `events_per_date` and counts events per `Y-m-d` date while building the unique date list.
+  - `Calendar_Query::get_date_boundaries_for_page()` now accepts `events_per_date` and constructs variable-length pages that include at least `DAYS_PER_PAGE` (5) dates and at least `MIN_EVENTS_FOR_PAGINATION` (20) events, without splitting a date across pages.
+  - The REST calendar controller (`inc/Api/Controllers/Calendar.php`) and calendar block renderer (`inc/blocks/calendar/render.php`) now pass `events_per_date` into `get_date_boundaries_for_page()`.
+
 ## [0.8.35] - 2026-01-06
 
 ### Added

@@ -105,8 +105,9 @@ $date_context = [
 $date_data = Calendar_Query::get_unique_event_dates($base_params);
 $unique_dates = $date_data['dates'];
 $total_event_count = $date_data['total_events'];
+$events_per_date = $date_data['events_per_date'];
 
-$date_boundaries = Calendar_Query::get_date_boundaries_for_page($unique_dates, $current_page, $total_event_count);
+$date_boundaries = Calendar_Query::get_date_boundaries_for_page($unique_dates, $current_page, $total_event_count, $events_per_date);
 
 $max_pages = $date_boundaries['max_pages'];
 $current_page = max(1, min($current_page, max(1, $max_pages)));
