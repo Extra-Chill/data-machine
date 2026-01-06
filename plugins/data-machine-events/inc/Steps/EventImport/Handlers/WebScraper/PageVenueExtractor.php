@@ -499,19 +499,24 @@ class PageVenueExtractor {
      */
     private static function extractStreetAddress(string $text): string {
         // Look for common street suffixes with a leading number
-        $street_pattern = '/(\d+[ ]+[A-Za-z0-9. ]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Boulevard|Blvd|Lane|Ln|Way|Court|Ct|Circle|Cir|Highway|Hwy|Pkwy|Parkway|Plaza|Pl|Square|Sq|Trail|Trl|Loop|Broadway)[.]?)/i';
+        // Allows optional letter/hyphen suffix after number (e.g., "610-A", "123B")
+        $street_pattern = '/(\d+[-A-Za-z]*\s+[A-Za-z0-9. ]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Boulevard|Blvd|Lane|Ln|Way|Court|Ct|Circle|Cir|Highway|Hwy|Pkwy|Parkway|Plaza|Pl|Square|Sq|Trail|Trl|Loop|Broadway)[.]?)/i';
 
         if (preg_match($street_pattern, $text, $matches)) {
             return sanitize_text_field(trim($matches[1]));
         }
 
-        // Fallback: number followed by uppercase words (potential address)
-        // More strict than before to avoid "Operating Hours"
-        if (preg_match('/(\d{1,5}\s+[A-Z][A-Za-z0-9\s]{5,50})/m', $text, $matches)) {
+        // Fallback: number followed by words on same line (potential address)
+        // Requires: digits, space, then words without newlines
+        // Excludes phone numbers by requiring the number to be followed by a word starting with uppercase
+        if (preg_match('/^.*?(\d{1,5}\s+[A-Z][A-Za-z]+(?:\s+[A-Za-z]+){1,6}).*$/m', $text, $matches)) {
             $potential = trim($matches[1]);
             // Avoid matches that look like times (e.g. "10 am - 10 pm")
             if (!preg_match('/\d+\s*(?:am|pm|am\s*-|pm\s*-)/i', $potential)) {
-                return sanitize_text_field($potential);
+                // Avoid matches that are just numbers followed by generic words
+                if (preg_match('/\d+\s+[A-Z][a-z]+\s+[A-Z]/', $potential)) {
+                    return sanitize_text_field($potential);
+                }
             }
         }
 

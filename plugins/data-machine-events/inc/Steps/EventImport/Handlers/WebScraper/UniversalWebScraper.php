@@ -53,6 +53,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\WordPress
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\TimelyExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\ElfsightEventsExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\GigwellExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\MusicItemExtractor;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
@@ -116,6 +117,7 @@ class UniversalWebScraper extends EventImportHandler {
             new WordPressExtractor(),
             new PrekindleExtractor(),
             new WixEventsExtractor(),
+            new MusicItemExtractor(),
             new RhpEventsExtractor(),
             new OpenDateExtractor(),
             new MicrodataExtractor(),

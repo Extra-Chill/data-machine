@@ -29,7 +29,6 @@ class UpdateEvent {
         'startTime',
         'endDate',
         'endTime',
-        'description',
         'price',
         'priceCurrency',
         'ticketUrl',
@@ -259,6 +258,14 @@ class UpdateEvent {
             }
         }
 
+        // Handle description separately - stored as InnerBlocks, not attributes
+        if (array_key_exists('description', $event_update)) {
+            $description_value = $event_update['description'] ?? '';
+            $inner_blocks = $this->generateDescriptionInnerBlocks($description_value);
+            $this->updateBlockInnerBlocks($blocks[$block_index], $inner_blocks);
+            $updated_fields[] = 'description';
+        }
+
         if (empty($updated_fields) && empty($warnings)) {
             return [
                 'post_id' => $post_id,
@@ -422,5 +429,61 @@ class UpdateEvent {
         }
 
         return implode(', ', $parts);
+    }
+
+    /**
+     * Generate paragraph InnerBlocks from HTML description.
+     *
+     * Descriptions are stored as core/paragraph InnerBlocks inside the
+     * event-details block, not as a block attribute.
+     *
+     * @param string $description HTML description content
+     * @return array Array of paragraph block structures
+     */
+    private function generateDescriptionInnerBlocks(string $description): array {
+        if (empty($description)) {
+            return [];
+        }
+
+        $description = wp_kses_post($description);
+        $paragraphs = preg_split('/<\/p>\s*<p[^>]*>|<\/p>\s*<p>|\n\n+/', $description);
+
+        $blocks = [];
+        foreach ($paragraphs as $para) {
+            $para = preg_replace('/^<p[^>]*>|<\/p>$/', '', trim($para));
+            $para = trim($para);
+
+            if (!empty($para)) {
+                $html = '<p>' . $para . '</p>';
+                $blocks[] = [
+                    'blockName'    => 'core/paragraph',
+                    'attrs'        => [],
+                    'innerBlocks'  => [],
+                    'innerHTML'    => $html,
+                    'innerContent' => [$html]
+                ];
+            }
+        }
+
+        return $blocks;
+    }
+
+    /**
+     * Update block InnerBlocks with new paragraph content.
+     *
+     * @param array $block The event-details block (by reference)
+     * @param array $inner_blocks New paragraph blocks to set
+     */
+    private function updateBlockInnerBlocks(array &$block, array $inner_blocks): void {
+        $block['innerBlocks'] = $inner_blocks;
+
+        $inner_content = ['<div class="wp-block-datamachine-events-event-details">'];
+        foreach ($inner_blocks as $_) {
+            $inner_content[] = null;
+        }
+        $inner_content[] = '</div>';
+
+        $block['innerContent'] = $inner_content;
+        $block['innerHTML'] = '<div class="wp-block-datamachine-events-event-details"></div>';
     }
 }

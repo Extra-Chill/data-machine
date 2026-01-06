@@ -116,8 +116,8 @@ class EventHealthCheck {
                 $missing_venue[] = $event_info;
             }
 
-            $description = $block_attrs['description'] ?? '';
-            if (empty(trim(wp_strip_all_tags($description)))) {
+            $description = $this->extractDescriptionFromInnerBlocks($event->ID);
+            if (empty(trim($description))) {
                 $missing_description[] = $event_info;
             }
         }
@@ -248,5 +248,44 @@ class EventHealthCheck {
         }
 
         return [];
+    }
+
+    /**
+     * Extract description content from InnerBlocks (paragraph blocks).
+     *
+     * Descriptions are stored as core/paragraph InnerBlocks inside the
+     * event-details block, not as a block attribute.
+     *
+     * @param int $post_id Event post ID
+     * @return string Combined plain text from paragraph blocks
+     */
+    private function extractDescriptionFromInnerBlocks(int $post_id): string {
+        $post = get_post($post_id);
+        if (!$post) {
+            return '';
+        }
+
+        $blocks = parse_blocks($post->post_content);
+
+        foreach ($blocks as $block) {
+            if ($block['blockName'] !== 'datamachine-events/event-details') {
+                continue;
+            }
+
+            if (empty($block['innerBlocks'])) {
+                return '';
+            }
+
+            $text_parts = [];
+            foreach ($block['innerBlocks'] as $inner) {
+                if ($inner['blockName'] === 'core/paragraph' && !empty($inner['innerHTML'])) {
+                    $text_parts[] = wp_strip_all_tags($inner['innerHTML']);
+                }
+            }
+
+            return implode(' ', $text_parts);
+        }
+
+        return '';
     }
 }

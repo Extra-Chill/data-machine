@@ -5,6 +5,17 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.37] - 2026-01-06
+
+### Added
+- **Music Item Extractor**: Added `MusicItemExtractor` to the Universal Web Scraper to extract events from `.music__item` / `.music__artist` HTML patterns.
+
+### Changed
+- **Update Event Description Storage**: Updated the `UpdateEvent` AI chat tool to write `description` updates into `core/paragraph` InnerBlocks inside the `datamachine-events/event-details` block (instead of treating description as a block attribute).
+- **Event Health Check Description Detection**: Updated the `EventHealthCheck` AI chat tool to derive the event description from the Event Details block InnerBlocks (paragraph content) rather than a non-existent `description` attribute.
+- **Venue Address Parsing**: Enhanced `PageVenueExtractor::extractStreetAddress()` to better detect real street addresses (supports `610-A` / `123B` patterns and tighter fallback matching) while reducing false positives.
+- **Universal Web Scraper Pipeline**: Added `MusicItemExtractor` to the extraction priority list.
+
 ## [0.8.36] - 2026-01-06
 
 ### Changed

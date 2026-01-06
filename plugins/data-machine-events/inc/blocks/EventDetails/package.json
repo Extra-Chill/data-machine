@@ -1,6 +1,6 @@
 {
   "name": "dm-events-event-details",
-  "version": "0.8.36",
+  "version": "0.8.37",
   "description": "Event Details block for Data Machine Events plugin",
   "main": "build/index.js",
   "scripts": {
