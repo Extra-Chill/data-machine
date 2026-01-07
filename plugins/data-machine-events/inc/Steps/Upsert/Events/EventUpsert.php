@@ -24,6 +24,8 @@ use DataMachineEvents\Core\EventSchemaProvider;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
 use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
 use const DataMachineEvents\Core\EVENT_END_DATETIME_META_KEY;
+use const DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY;
+use function DataMachineEvents\Core\datamachine_normalize_ticket_url;
 use DataMachine\Core\Steps\Update\Handlers\UpdateHandler;
 use DataMachine\Core\WordPress\TaxonomyHandler;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
@@ -64,6 +66,7 @@ class EventUpsert extends UpdateHandler {
         $title = sanitize_text_field($parameters['title'] ?? $engine->get('title') ?? '');
         $venue = $engine->get('venue') ?? $parameters['venue'] ?? '';
         $startDate = $engine->get('startDate') ?? $parameters['startDate'] ?? '';
+        $ticketUrl = $engine->get('ticketUrl') ?? $parameters['ticketUrl'] ?? '';
 
         // Validate title after extraction from engine data or parameters
         if (empty($title)) {
@@ -76,11 +79,12 @@ class EventUpsert extends UpdateHandler {
         do_action('datamachine_log', 'debug', 'Event Upsert: Processing event', [
             'title' => $title,
             'venue' => $venue,
-            'startDate' => $startDate
+            'startDate' => $startDate,
+            'ticketUrl' => $ticketUrl
         ]);
 
         // Search for existing event
-        $existing_post_id = $this->findExistingEvent($title, $venue, $startDate);
+        $existing_post_id = $this->findExistingEvent($title, $venue, $startDate, $ticketUrl);
 
         if ($existing_post_id) {
             // Event exists - check if data changed
@@ -137,18 +141,29 @@ class EventUpsert extends UpdateHandler {
     }
 
     /**
-     * Find existing event by title, venue, and start date
+     * Find existing event by title, venue, start date, and ticket URL
      *
-     * Uses fuzzy title matching when venue and date are available to catch
-     * duplicates across sources with varying title formats.
+     * Checks in order of reliability:
+     * 1. Ticket URL matching (most reliable - stable identifier from ticketing platform)
+     * 2. Fuzzy title matching at same venue/date
+     * 3. Exact title matching
      *
      * @param string $title Event title
      * @param string $venue Venue name
      * @param string $startDate Start date (YYYY-MM-DD)
+     * @param string $ticketUrl Ticket purchase URL
      * @return int|null Post ID if found, null otherwise
      */
-    private function findExistingEvent(string $title, string $venue, string $startDate): ?int {
-        // Try fuzzy matching first when we have venue and date
+    private function findExistingEvent(string $title, string $venue, string $startDate, string $ticketUrl = ''): ?int {
+        // Try ticket URL matching first (most reliable)
+        if (!empty($ticketUrl) && !empty($startDate)) {
+            $ticket_match = $this->findEventByTicketUrl($ticketUrl, $startDate);
+            if ($ticket_match) {
+                return $ticket_match;
+            }
+        }
+
+        // Try fuzzy title matching when we have venue and date
         if (!empty($venue) && !empty($startDate)) {
             $fuzzy_match = $this->findEventByVenueDateAndFuzzyTitle($title, $venue, $startDate);
             if ($fuzzy_match) {
@@ -175,6 +190,11 @@ class EventUpsert extends UpdateHandler {
         // Find venue term
         $venue_term = get_term_by('name', $venue, 'venue');
         if (!$venue_term) {
+            do_action('datamachine_log', 'warning', 'Event Upsert: Venue term not found, skipping fuzzy title matching', [
+                'venue_name' => $venue,
+                'title' => $title,
+                'startDate' => $startDate
+            ]);
             return null;
         }
 
@@ -321,6 +341,61 @@ class EventUpsert extends UpdateHandler {
             } else {
                 return $posts[0];
             }
+        }
+
+        return null;
+    }
+
+    /**
+     * Find event by matching ticket URL on the same date
+     *
+     * Ticket URLs are stable identifiers from ticketing platforms.
+     * Same ticket URL + same date = definitively the same event.
+     *
+     * @param string $ticketUrl Ticket purchase URL
+     * @param string $startDate Start date (YYYY-MM-DD)
+     * @return int|null Post ID if found, null otherwise
+     */
+    private function findEventByTicketUrl(string $ticketUrl, string $startDate): ?int {
+        if (empty($ticketUrl) || empty($startDate)) {
+            return null;
+        }
+
+        $normalized_url = datamachine_normalize_ticket_url($ticketUrl);
+        if (empty($normalized_url)) {
+            return null;
+        }
+
+        $args = [
+            'post_type' => Event_Post_Type::POST_TYPE,
+            'posts_per_page' => 1,
+            'post_status' => ['publish', 'draft', 'pending'],
+            'fields' => 'ids',
+            'meta_query' => [
+                'relation' => 'AND',
+                [
+                    'key' => EVENT_TICKET_URL_META_KEY,
+                    'value' => $normalized_url,
+                    'compare' => '='
+                ],
+                [
+                    'key' => EVENT_DATETIME_META_KEY,
+                    'value' => $startDate,
+                    'compare' => 'LIKE'
+                ]
+            ]
+        ];
+
+        $posts = get_posts($args);
+
+        if (!empty($posts)) {
+            do_action('datamachine_log', 'info', 'Event Upsert: Found duplicate by ticket URL', [
+                'ticket_url' => $ticketUrl,
+                'normalized_url' => $normalized_url,
+                'matched_post_id' => $posts[0],
+                'date' => $startDate
+            ]);
+            return $posts[0];
         }
 
         return null;

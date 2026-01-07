@@ -5,6 +5,15 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.39] - 2026-01-07
+
+### Added
+- **Ticket URL Indexing Migration**: Added `DataMachineEvents\Admin\TicketUrlMigration`, a one-time admin-triggered migration that backfills `_datamachine_ticket_url` post meta from `datamachine-events/event-details` block `ticketUrl` attributes for existing events.
+
+### Changed
+- **Ticket URL Meta Sync**: Event Details block saves now sync a normalized ticket URL into `_datamachine_ticket_url` (query params stripped; trailing slash trimmed) for consistent lookups.
+- **Duplicate Detection via Ticket URLs**: `Steps\Upsert\Events\EventUpsert::findExistingEvent()` now checks for existing events by normalized ticket URL + date before falling back to fuzzy/exact title matching.
+
 ## [0.8.38] - 2026-01-06
 
 ### Changed

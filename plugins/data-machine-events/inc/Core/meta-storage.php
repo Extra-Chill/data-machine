@@ -12,6 +12,35 @@ namespace DataMachineEvents\Core;
 
 const EVENT_DATETIME_META_KEY = '_datamachine_event_datetime';
 const EVENT_END_DATETIME_META_KEY = '_datamachine_event_end_datetime';
+const EVENT_TICKET_URL_META_KEY = '_datamachine_ticket_url';
+
+/**
+ * Normalize ticket URL for consistent duplicate detection
+ *
+ * Strips query parameters (UTM tracking, etc.) and trailing slashes
+ * to ensure the same ticket page matches regardless of tracking params.
+ *
+ * @param string $url Raw ticket URL
+ * @return string Normalized URL (scheme + host + path only)
+ */
+function datamachine_normalize_ticket_url( string $url ): string {
+	if ( empty( $url ) ) {
+		return '';
+	}
+
+	$parsed = wp_parse_url( $url );
+	if ( ! $parsed || empty( $parsed['host'] ) ) {
+		return esc_url_raw( $url );
+	}
+
+	$scheme     = $parsed['scheme'] ?? 'https';
+	$normalized = $scheme . '://' . $parsed['host'];
+	if ( ! empty( $parsed['path'] ) ) {
+		$normalized .= $parsed['path'];
+	}
+
+	return rtrim( $normalized, '/' );
+}
 
 /**
  * Sync event datetime to post meta on save
@@ -73,6 +102,15 @@ function datamachine_events_sync_datetime_meta( $post_id, $post, $update ) {
 				delete_post_meta( $post_id, EVENT_DATETIME_META_KEY );
 				delete_post_meta( $post_id, EVENT_END_DATETIME_META_KEY );
 			}
+
+			// Sync ticket URL for duplicate detection queries.
+			$ticket_url = $block['attrs']['ticketUrl'] ?? '';
+			if ( $ticket_url ) {
+				update_post_meta( $post_id, EVENT_TICKET_URL_META_KEY, datamachine_normalize_ticket_url( $ticket_url ) );
+			} else {
+				delete_post_meta( $post_id, EVENT_TICKET_URL_META_KEY );
+			}
+
 			break;
 		}
 	}
