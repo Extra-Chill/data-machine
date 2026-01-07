@@ -10,7 +10,7 @@ WP-CLI command for testing the Universal Web Scraper handler with any target URL
 Both commands are aliases and function identically.
 
 ```bash
-wp datamachine-events universal-web-scraper-test --target_url=<url> [--upsert] [--pipeline_id=<id>] [--flow_id=<id>] [--flow_step_id=<uuid>] [--venue_name=<name>] [--max=<count>]
+wp datamachine-events test-scraper-url --target_url=<url>
 ```
 
 ## Parameters
@@ -19,59 +19,18 @@ wp datamachine-events universal-web-scraper-test --target_url=<url> [--upsert] [
 
 - `--target_url=<url>`: The web page URL to scrape for event data
 
-### Optional
-
-- `--upsert`: If set, upserts discovered events to the database
-- `--pipeline_id=<id>`: Pipeline ID for job creation (default: 1)
-- `--flow_id=<id>`: Flow ID for job creation (default: 1)
-- `--flow_step_id=<uuid>`: Custom flow step UUID (auto-generated if omitted)
-- `--venue_name=<name>`: Venue name override for reliable address/geocoding
-- `--max=<count>`: Maximum number of packets to display (default: 3)
-
-## Examples
-
-### Basic Test
+## Example
 
 ```bash
-wp datamachine-events universal-web-scraper-test --target_url=https://example.com/events
-```
-
-### Test with Upsert
-
-```bash
-wp datamachine-events universal-web-scraper-test --target_url=https://example.com/events --upsert
-```
-
-### Test with Venue Override
-
-```bash
-wp datamachine-events universal-web-scraper-test --target_url=https://example.com/events --venue_name="The Fillmore"
-```
-
-### Show More Results
-
-```bash
-wp datamachine-events universal-web-scraper-test --target_url=https://example.com/events --max=10
-```
-
-### Full Options
-
-```bash
-wp datamachine-events universal-web-scraper-test \
-  --target_url=https://example.com/events \
-  --upsert \
-  --pipeline_id=5 \
-  --flow_id=3 \
-  --venue_name="Red Rocks Amphitheatre" \
-  --max=5
+wp datamachine-events test-scraper-url --target_url=https://example.com/events
 ```
 
 ## Output
 
 The command displays:
 
-1. **Target Information**: Target URL, Job ID, Flow Step ID, Packet count
-2. **Packet Details**: For each packet:
+1. **Target URL**: The URL being tested
+2. **Extraction Details**:
    - Packet title
    - Source type (e.g., `wix_events`, `json_ld`, `raw_html`)
    - Extraction method
@@ -79,13 +38,12 @@ The command displays:
    - Venue name and address
 3. **Status**: OK (complete venue/address coverage) or WARNING (incomplete coverage)
 4. **Warnings**: Any extraction warnings encountered
-5. **Upsert Results**: If `--upsert` is set, shows action taken (insert/update) and post_id
 
 ## Venue Coverage Warnings
 
 The command evaluates venue data completeness:
 
-- **Missing venue name**: Set `--venue_name` override
+- **Missing venue name**: Venue override required in flow configuration
 - **Missing address fields**: Address, city, and state are required for geocoding
 
 Raw HTML packets indicate AI extraction is needed for venue data.
@@ -93,7 +51,7 @@ Raw HTML packets indicate AI extraction is needed for venue data.
 ## Exit Codes
 
 - `0`: Command completed successfully
-- `1`: Error (missing required参数, job creation failed, etc.)
+- `1`: Error (missing required parameter)
 
 ## Use Cases
 
@@ -104,4 +62,4 @@ Raw HTML packets indicate AI extraction is needed for venue data.
 
 ## Reliability & Debugging
 
-The test command is essential for verifying the scraper's **Smart Fallback** and **Browser Spoofing** capabilities. When testing URLs known to have strict bot detection, observe the logs for "retrying with standard mode" to confirm the fallback is functioning correctly. Increased reliability for platforms like Squarespace and embedded Google Calendars can be verified by checking for successfully decoded IDs and block-based extraction results in the command output.
+The test command is essential for verifying the scraper's **Smart Fallback** and **Browser Spoofing** capabilities. When testing URLs known to have strict bot detection, observe the logs for "retrying with standard mode" to confirm the fallback is functioning correctly.

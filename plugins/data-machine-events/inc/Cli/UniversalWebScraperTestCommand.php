@@ -2,9 +2,7 @@
 
 namespace DataMachineEvents\Cli;
 
-use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\UniversalWebScraper;
-use DataMachineEvents\Steps\Upsert\Events\EventUpsert;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -23,13 +21,6 @@ class UniversalWebScraperTestCommand {
 			\WP_CLI::error( 'Missing required --target_url parameter.' );
 		}
 
-		$do_upsert = (bool) ( $assoc_args['upsert'] ?? false );
-		$pipeline_id = (int) ( $assoc_args['pipeline_id'] ?? 1 );
-		$flow_id = (int) ( $assoc_args['flow_id'] ?? 1 );
-		$flow_step_id = (string) ( $assoc_args['flow_step_id'] ?? '' );
-		$flow_step_id = $flow_step_id ? $flow_step_id : 'flow_step_' . wp_generate_uuid4();
-		$venue_name = (string) ( $assoc_args['venue_name'] ?? '' );
-
 		$logs = [];
 		add_action(
 			'datamachine_log',
@@ -44,33 +35,17 @@ class UniversalWebScraperTestCommand {
 			3
 		);
 
-		$db_jobs = new Jobs();
-		$job_id  = $db_jobs->create_job( [
-			'pipeline_id' => $pipeline_id,
-			'flow_id' => $flow_id,
-		] );
-
-		if ( ! is_int( $job_id ) || $job_id <= 0 ) {
-			\WP_CLI::error( 'Failed to create a job record.' );
-		}
-
 		$config = [
 			'source_url' => $target_url,
-			'flow_step_id' => $flow_step_id,
-			'flow_id' => $flow_id,
+			'flow_step_id' => 'cli_test_' . wp_generate_uuid4(),
+			'flow_id' => 0,
 			'search' => '',
 		];
 
-		if ( $venue_name ) {
-			$config['venue_name'] = $venue_name;
-		}
-
 		$handler = new UniversalWebScraper();
-		$results = $handler->get_fetch_data( $pipeline_id, $config, (string) $job_id );
+		$results = $handler->get_fetch_data( 0, $config, null );
 
 		\WP_CLI::log( "Target URL: {$target_url}" );
-		\WP_CLI::log( "Job ID: {$job_id}" );
-		\WP_CLI::log( "Flow Step ID: {$flow_step_id}" );
 
 		if ( empty( $results ) ) {
 			\WP_CLI::warning( 'No events returned.' );
@@ -127,7 +102,7 @@ class UniversalWebScraperTestCommand {
 			\WP_CLI::log( 'Title: ' . (string) ( $event['title'] ?? '' ) );
 			\WP_CLI::log( 'Start: ' . (string) ( $event['startDate'] ?? '' ) );
 
-			$venue_name_out = (string) ( $event['venue'] ?? '' );
+			$venue_name = (string) ( $event['venue'] ?? '' );
 			$venue_addr = (string) ( $event['venueAddress'] ?? '' );
 			$venue_city = (string) ( $event['venueCity'] ?? '' );
 			$venue_state = (string) ( $event['venueState'] ?? '' );
@@ -144,10 +119,10 @@ class UniversalWebScraperTestCommand {
 			$city_state_zip = $city_state_zip === ',' ? '' : $city_state_zip;
 			$venue_full = trim( implode( ', ', array_filter( [ $venue_addr, $city_state_zip ] ) ) );
 
-			\WP_CLI::log( 'Venue: ' . $venue_name_out );
+			\WP_CLI::log( 'Venue: ' . $venue_name );
 			\WP_CLI::log( 'Venue address: ' . $venue_full );
 
-			if ( empty( trim( $venue_name_out ) ) ) {
+			if ( empty( trim( $venue_name ) ) ) {
 				\WP_CLI::warning( 'VENUE COVERAGE: Missing venue name; set venue override.' );
 				$coverage_warning = true;
 			}
@@ -155,24 +130,6 @@ class UniversalWebScraperTestCommand {
 			if ( empty( trim( $venue_addr ) ) || empty( trim( $venue_city ) ) || empty( trim( $venue_state ) ) ) {
 				\WP_CLI::warning( 'VENUE COVERAGE: Missing venue address fields (venueAddress/venueCity/venueState). Geocoding may fail; set venue override.' );
 				$coverage_warning = true;
-			}
-
-			if ( $do_upsert ) {
-				$upsert = new EventUpsert();
-				$response = $upsert->handle_tool_call( [
-					'title' => (string) ( $event['title'] ?? '' ),
-					'venue' => $venue_name_out,
-					'startDate' => (string) ( $event['startDate'] ?? '' ),
-					'venueAddress' => $venue_addr,
-					'venueCity' => $venue_city,
-					'venueState' => $venue_state,
-					'job_id' => $job_id,
-				], [] );
-
-				$action = is_array( $response ) ? ( $response['data']['action'] ?? 'unknown' ) : 'unknown';
-				$post_id = is_array( $response ) ? ( $response['data']['post_id'] ?? null ) : null;
-
-				\WP_CLI::log( 'Upsert: ' . (string) $action . ' (post_id=' . (string) $post_id . ')' );
 			}
 		}
 

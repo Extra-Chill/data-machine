@@ -5,6 +5,11 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.42] - 2026-01-07
+
+### Changed
+- **WP-CLI Scraper Test Command Simplification**: Updated `Cli\\UniversalWebScraperTestCommand` to run without job creation or upsert options, generating a `cli_test_*` flow step id internally and focusing output on a single packet’s extraction metadata, event payload shape (structured vs `raw_html`), venue/address coverage warnings, and captured `datamachine_log` warnings.
+
 ## [0.8.41] - 2026-01-07
 
 ### Added
