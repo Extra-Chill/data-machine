@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.8.39
+**Version**: 0.8.40
 
 ## Plugin Bootstrap
 

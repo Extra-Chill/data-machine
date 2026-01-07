@@ -18,7 +18,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}"
 
 VERSION="$(awk -F': *' '/^[[:space:]]*\*[[:space:]]*Version:/ { print $2; exit }' datamachine-events.php | tr -d '\r')"
-DIST_DIR="dist"
+DIST_DIR="build"
 PACKAGE_NAME="datamachine-events"
 TEMP_DIR="${DIST_DIR}/${PACKAGE_NAME}"
 

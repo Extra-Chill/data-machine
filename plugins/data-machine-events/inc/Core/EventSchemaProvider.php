@@ -59,7 +59,7 @@ class EventSchemaProvider {
         'title' => [
             'type' => 'string',
             'required' => true,
-            'description' => 'Event title should be direct and descriptive (event name, performer) but exclude dates',
+            'description' => 'Event title. The original scraped title is in data packet metadata (original_title). Use it directly if clear and complete, or write a better title if the original is unclear, truncated, ALL CAPS, contains emojis, dates, or unnecessary formatting.',
             'schema_property' => 'name'
         ],
         'startDate' => [

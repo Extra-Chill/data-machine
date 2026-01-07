@@ -67,7 +67,7 @@ if (!empty($attributes['align'])) {
 }
 $block_class = implode(' ', $block_classes);
 
-$non_ticket_patterns = apply_filters('datamachine_events_non_ticket_price_patterns', ['free', 'tbd']);
+$non_ticket_patterns = apply_filters('datamachine_events_non_ticket_price_patterns', ['free', 'tbd', 'no cover']);
 $price_lower = strtolower(trim($price));
 $is_non_ticket_price = empty($price) || array_reduce($non_ticket_patterns, function($carry, $pattern) use ($price_lower) {
     return $carry || str_contains($price_lower, strtolower($pattern));

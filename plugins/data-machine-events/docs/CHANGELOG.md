@@ -5,6 +5,14 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.40] - 2026-01-07
+
+### Changed
+- **Remove Ticket URL Migration Notice**: Removed `DataMachineEvents\\Admin\\TicketUrlMigration` and its instantiation from `DATAMACHINE_Events::init()` now that the one-time backfill flow is no longer needed.
+- **Schema Tool Guidance for Titles**: Updated the AI schema tool parameter description for `Core\\EventSchemaProvider` `title` to emphasize using `original_title` when it is clear, and to rewrite when the scraped title is low quality (ALL CAPS, emojis, dates, formatting).
+- **Free Show Price Detection**: Expanded Event Details price CTA logic to treat "no cover" as a non-ticket price alongside "free" and "tbd".
+- **Build Output Directory**: Updated `build.sh` to output the packaged plugin into `build/` instead of `dist/`.
+
 ## [0.8.39] - 2026-01-07
 
 ### Added
