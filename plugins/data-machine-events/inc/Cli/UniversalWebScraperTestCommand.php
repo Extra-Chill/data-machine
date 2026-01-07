@@ -71,8 +71,6 @@ class UniversalWebScraperTestCommand {
 		\WP_CLI::log( "Target URL: {$target_url}" );
 		\WP_CLI::log( "Job ID: {$job_id}" );
 		\WP_CLI::log( "Flow Step ID: {$flow_step_id}" );
-		\WP_CLI::log( 'Packets: ' . count( $results ) );
-		\WP_CLI::log( 'Note: HTML fallback packets are acceptable (AI can parse).' );
 
 		if ( empty( $results ) ) {
 			\WP_CLI::warning( 'No events returned.' );
@@ -89,51 +87,42 @@ class UniversalWebScraperTestCommand {
 			return;
 		}
 
-		$max = (int) ( $assoc_args['max'] ?? 3 );
-		$max = $max > 0 ? $max : 3;
-
 		$coverage_warning = false;
 
-		foreach ( array_slice( $results, 0, $max ) as $index => $packet ) {
-			$packet_array = $packet->addTo( [] );
-			$packet_entry = $packet_array[0] ?? [];
-			$packet_data = $packet_entry['data'] ?? [];
-			$packet_meta = $packet_entry['metadata'] ?? [];
-			$body = $packet_data['body'] ?? '';
-			if ( $body === '' && isset( $packet_entry['body'] ) ) {
-				$body = (string) $packet_entry['body'];
-			}
-			$payload = json_decode( (string) $body, true );
-			$event = is_array( $payload ) ? ( $payload['event'] ?? null ) : null;
+		$packet = $results[0];
+		$packet_array = $packet->addTo( [] );
+		$packet_entry = $packet_array[0] ?? [];
+		$packet_data = $packet_entry['data'] ?? [];
+		$packet_meta = $packet_entry['metadata'] ?? [];
+		$body = $packet_data['body'] ?? '';
+		if ( $body === '' && isset( $packet_entry['body'] ) ) {
+			$body = (string) $packet_entry['body'];
+		}
+		$payload = json_decode( (string) $body, true );
+		$event = is_array( $payload ) ? ( $payload['event'] ?? null ) : null;
 
-			\WP_CLI::log( "---- Packet #" . ( $index + 1 ) . " ----" );
-			if ( isset( $packet_data['title'] ) ) {
-				\WP_CLI::log( 'Packet title: ' . (string) $packet_data['title'] );
-			}
-			if ( isset( $packet_meta['source_type'] ) ) {
-				\WP_CLI::log( 'Source type: ' . (string) $packet_meta['source_type'] );
-			}
-			if ( isset( $packet_meta['extraction_method'] ) ) {
-				\WP_CLI::log( 'Extraction method: ' . (string) $packet_meta['extraction_method'] );
-			}
+		if ( isset( $packet_data['title'] ) ) {
+			\WP_CLI::log( 'Packet title: ' . (string) $packet_data['title'] );
+		}
+		if ( isset( $packet_meta['source_type'] ) ) {
+			\WP_CLI::log( 'Source type: ' . (string) $packet_meta['source_type'] );
+		}
+		if ( isset( $packet_meta['extraction_method'] ) ) {
+			\WP_CLI::log( 'Extraction method: ' . (string) $packet_meta['extraction_method'] );
+		}
 
-			if ( is_array( $payload ) && isset( $payload['raw_html'] ) && is_string( $payload['raw_html'] ) ) {
-				\WP_CLI::log( 'Payload type: raw_html (HTML fallback)' );
-				\WP_CLI::warning( 'VENUE COVERAGE: No structured venue fields. Set venue override for reliable address/geocoding.' );
-				$coverage_warning = true;
-				\WP_CLI::log( 'Venue: (unknown; extracted by AI)' );
-				\WP_CLI::log( 'Venue address: (missing)' );
-				\WP_CLI::log( '--- Raw HTML Content ---' );
-				\WP_CLI::log( $payload['raw_html'] );
-				continue;
-			}
-
-			if ( ! is_array( $event ) ) {
-				\WP_CLI::warning( 'Payload did not contain an event object.' );
-				\WP_CLI::log( 'Packet body (head): ' . substr( (string) $body, 0, 800 ) );
-				continue;
-			}
-
+		if ( is_array( $payload ) && isset( $payload['raw_html'] ) && is_string( $payload['raw_html'] ) ) {
+			\WP_CLI::log( 'Payload type: raw_html (HTML fallback)' );
+			\WP_CLI::warning( 'VENUE COVERAGE: No structured venue fields. Set venue override for reliable address/geocoding.' );
+			$coverage_warning = true;
+			\WP_CLI::log( 'Venue: (unknown; extracted by AI)' );
+			\WP_CLI::log( 'Venue address: (missing)' );
+			\WP_CLI::log( '--- Raw HTML Content ---' );
+			\WP_CLI::log( $payload['raw_html'] );
+		} elseif ( ! is_array( $event ) ) {
+			\WP_CLI::warning( 'Payload did not contain an event object.' );
+			\WP_CLI::log( 'Packet body (head): ' . substr( (string) $body, 0, 800 ) );
+		} else {
 			\WP_CLI::log( 'Payload type: event' );
 			\WP_CLI::log( 'Title: ' . (string) ( $event['title'] ?? '' ) );
 			\WP_CLI::log( 'Start: ' . (string) ( $event['startDate'] ?? '' ) );

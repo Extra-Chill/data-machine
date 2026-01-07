@@ -83,29 +83,6 @@ echo -e "${YELLOW}📦 Creating .zip package...${NC}"
   zip -r "${PACKAGE_NAME}.zip" "${PACKAGE_NAME}" -q
 )
 
-# Generate build info
-echo -e "${YELLOW}📋 Generating build info...${NC}"
-cat > "${DIST_DIR}/build-info.txt" << EOF
-Data Machine Events - Build Information
-=====================================
-Version: ${VERSION}
-Built: $(date)
-Builder: $(whoami)@$(hostname)
-PHP Version Required: >=8.0
-WordPress Version Required: >=6.0
-
-Package Contents:
-- Plugin files
-- Optimized frontend assets
-- Production composer dependencies
-- Built block assets (Calendar & Event Details)
-
-Installation:
-1. Upload ${PACKAGE_NAME}.zip to WordPress
-2. Activate the plugin
-3. Configure via Settings > Data Machine Events
-EOF
-
 # Calculate file sizes
 ZIP_SIZE=$(du -sh "${DIST_DIR}/${PACKAGE_NAME}.zip" | cut -f1)
 

@@ -5,6 +5,15 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.8.41] - 2026-01-07
+
+### Added
+- **Craftpeak/Arryved Extractor**: Added `Steps\\EventImport\\Handlers\\WebScraper\\Extractors\\CraftpeakExtractor` to extract events from Craftpeak/Arryved "Label" theme sites by parsing `/event/{slug}-{YYYY-MM-DD}/` style listings and normalizing title/date/time/image + page-level venue fields.
+
+### Changed
+- **Universal Web Scraper Priority**: Updated `UniversalWebScraper` extractor priority to include the Craftpeak/Arryved extractor in the structured extraction pipeline.
+- **WP-CLI Scraper Diagnostics**: Enhanced `Cli\\UniversalWebScraperTestCommand` output to report venue/address field coverage (structured vs HTML fallback) and surface warnings when venue metadata is incomplete.
+
 ## [0.8.40] - 2026-01-07
 
 ### Changed
