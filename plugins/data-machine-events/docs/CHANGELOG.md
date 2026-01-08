@@ -5,6 +5,13 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.9.0] - 2026-01-08
+
+### Changed
+- **ExecutionContext Handler Refactor**: Updated Event Import handlers (`DiceFm`, `DoStuffMediaApi`, `Eventbrite`, `EventFlyer`, `IcsCalendar`, `SingleRecurring`, `Ticketmaster`) and the Universal Web Scraper (`UniversalWebScraper`, `StructuredDataProcessor`, `EventSectionFinder`) to use `ExecutionContext` for logging, processed item tracking, flow/pipeline ids, and engine data storage.
+- **Engine Data Storage**: Replaced direct `datamachine_merge_engine_data()` calls with `ExecutionContext::storeEngineData()` in the Ticketmaster handler and structured scraper pipeline.
+- **WP-CLI Scraper Flow Id**: Updated `Cli\UniversalWebScraperTestCommand` to use `'direct'` flow id when calling `get_fetch_data()`.
+
 ## [0.8.42] - 2026-01-07
 
 ### Changed

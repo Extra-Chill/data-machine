@@ -33,6 +33,7 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper;
 
+use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\ExtractorInterface;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\WixEventsExtractor;
@@ -130,41 +131,37 @@ class UniversalWebScraper extends EventImportHandler {
     /**
      * Execute web scraper with structured data extraction and AI fallback.
      */
-    protected function executeFetch(int $pipeline_id, array $config, ?string $flow_step_id, int $flow_id, ?string $job_id): array {
-        $this->log('debug', 'Universal Web Scraper: Payload received', [
+    protected function executeFetch(array $config, ExecutionContext $context): array {
+        $context->log('debug', 'Universal Web Scraper: Payload received', [
             'config_keys' => array_keys($config)
         ]);
         
         $url = $config['source_url'] ?? '';
         
         if (empty($url)) {
-            $this->log('error', 'Universal Web Scraper: No URL configured', [
+            $context->log('error', 'Universal Web Scraper: No URL configured', [
                 'config' => $config
             ]);
             return [];
         }
         
-        $this->log('info', 'Universal Web Scraper: Starting event extraction', [
-            'url' => $url,
-            'flow_step_id' => $flow_step_id
+        $context->log('info', 'Universal Web Scraper: Starting event extraction', [
+            'url' => $url
         ]);
 
         // Direct support for ICS/JSON URLs
         if (preg_match('/\.ics($|\?)/i', $url) || preg_match('/wp-json\/tribe\/events/i', $url)) {
-            $this->log('info', 'Universal Web Scraper: Direct structured data URL detected', [
+            $context->log('info', 'Universal Web Scraper: Direct structured data URL detected', [
                 'url' => $url
             ]);
             
-            $content = $this->fetch_html($url);
+            $content = $this->fetch_html($url, $context);
             if (!empty($content)) {
                 $result = $this->tryStructuredDataExtraction(
                     $content,
                     $url,
                     $config,
-                    $pipeline_id,
-                    $flow_id,
-                    $flow_step_id,
-                    $job_id
+                    $context
                 );
                 
                 if ($result !== null) {
@@ -180,32 +177,29 @@ class UniversalWebScraper extends EventImportHandler {
         while ($current_page <= self::MAX_PAGES) {
             $url_hash = md5($current_url);
             if (isset($visited_urls[$url_hash])) {
-                $this->log('debug', 'Universal Web Scraper: Already visited URL, ending pagination', [
+                $context->log('debug', 'Universal Web Scraper: Already visited URL, ending pagination', [
                     'url' => $current_url
                 ]);
                 break;
             }
             $visited_urls[$url_hash] = true;
 
-            $html_content = $this->fetch_html($current_url);
+            $html_content = $this->fetch_html($current_url, $context);
             if (empty($html_content)) {
                 if ($current_page === 1) {
                     // If initial page fails, try WordPress API discovery as a last resort
-                    $discovered_api = $this->attemptWordPressApiDiscovery($current_url);
+                    $discovered_api = $this->attemptWordPressApiDiscovery($current_url, $context);
                     if ($discovered_api) {
-                        $this->log('info', 'Universal Web Scraper: Fallback API discovery successful', [
+                        $context->log('info', 'Universal Web Scraper: Fallback API discovery successful', [
                             'api_url' => $discovered_api
                         ]);
-                        $api_content = $this->fetch_html($discovered_api);
+                        $api_content = $this->fetch_html($discovered_api, $context);
                         if (!empty($api_content)) {
                             return $this->tryStructuredDataExtraction(
                                 $api_content,
                                 $discovered_api,
                                 $config,
-                                $pipeline_id,
-                                $flow_id,
-                                $flow_step_id,
-                                $job_id
+                                $context
                             ) ?? [];
                         }
                     }
@@ -213,18 +207,13 @@ class UniversalWebScraper extends EventImportHandler {
                 }
                 break;
             }
-            
-            // ... (rest of the method remains same)
 
             // Try structured data extraction first
             $structured_result = $this->tryStructuredDataExtraction(
                 $html_content,
                 $current_url,
                 $config,
-                $pipeline_id,
-                $flow_id,
-                $flow_step_id,
-                $job_id
+                $context
             );
 
             if ($structured_result !== null) {
@@ -236,10 +225,7 @@ class UniversalWebScraper extends EventImportHandler {
                 $html_content,
                 $current_url,
                 $config,
-                $pipeline_id,
-                $flow_id,
-                $flow_step_id,
-                $job_id,
+                $context,
                 $current_page
             );
 
@@ -248,7 +234,7 @@ class UniversalWebScraper extends EventImportHandler {
             }
 
             // No eligible events on this page - look for next page
-            $this->log('info', 'Universal Web Scraper: No unprocessed events on page, checking for next page', [
+            $context->log('info', 'Universal Web Scraper: No unprocessed events on page, checking for next page', [
                 'page' => $current_page,
                 'url' => $current_url
             ]);
@@ -256,7 +242,7 @@ class UniversalWebScraper extends EventImportHandler {
             $next_url = $this->find_next_page_url($html_content, $current_url);
             
             if (empty($next_url)) {
-                $this->log('info', 'Universal Web Scraper: No more pages to process', [
+                $context->log('info', 'Universal Web Scraper: No more pages to process', [
                     'pages_checked' => $current_page
                 ]);
                 break;
@@ -265,7 +251,7 @@ class UniversalWebScraper extends EventImportHandler {
             $current_url = $next_url;
             $current_page++;
 
-            $this->log('info', 'Universal Web Scraper: Moving to next page', [
+            $context->log('info', 'Universal Web Scraper: Moving to next page', [
                 'page' => $current_page,
                 'next_url' => $next_url
             ]);
@@ -281,10 +267,7 @@ class UniversalWebScraper extends EventImportHandler {
         string $html_content,
         string $current_url,
         array $config,
-        int $pipeline_id,
-        int $flow_id,
-        ?string $flow_step_id,
-        ?string $job_id
+        ExecutionContext $context
     ): ?array {
         foreach ($this->extractors as $extractor) {
             if (!$extractor->canExtract($html_content)) {
@@ -296,7 +279,7 @@ class UniversalWebScraper extends EventImportHandler {
                 continue;
             }
 
-            $this->log('info', 'Universal Web Scraper: Found structured data', [
+            $context->log('info', 'Universal Web Scraper: Found structured data', [
                 'extractor' => $extractor->getMethod(),
                 'event_count' => count($events),
                 'source_url' => $current_url
@@ -307,10 +290,7 @@ class UniversalWebScraper extends EventImportHandler {
                 $extractor->getMethod(),
                 $current_url,
                 $config,
-                $pipeline_id,
-                $flow_id,
-                $flow_step_id,
-                $job_id
+                $context
             );
 
             if ($result !== null) {
@@ -328,25 +308,21 @@ class UniversalWebScraper extends EventImportHandler {
         string $html_content,
         string $current_url,
         array $config,
-        int $pipeline_id,
-        int $flow_id,
-        ?string $flow_step_id,
-        ?string $job_id,
+        ExecutionContext $context,
         int $current_page
     ): ?array {
         $skipped_identifiers = [];
 
         while (true) {
-            $event_section = $this->extract_event_sections($html_content, $current_url, (string) $flow_step_id, $skipped_identifiers);
+            $event_section = $this->extract_event_sections($html_content, $current_url, $context, $skipped_identifiers);
 
             if (empty($event_section)) {
                 break;
             }
 
-            $this->log('info', 'Universal Web Scraper: Processing event section', [
+            $context->log('info', 'Universal Web Scraper: Processing event section', [
                 'section_identifier' => $event_section['identifier'],
-                'page' => $current_page,
-                'pipeline_id' => $pipeline_id
+                'page' => $current_page
             ]);
 
             $raw_html_data = $this->extract_raw_html_section($event_section['html'], $current_url, $config);
@@ -365,7 +341,7 @@ class UniversalWebScraper extends EventImportHandler {
             $search_text = html_entity_decode(wp_strip_all_tags($raw_html_data));
 
             if (!$this->applyKeywordSearch($search_text, $config['search'] ?? '')) {
-                $this->log('debug', 'Universal Web Scraper: Skipping event section (include keywords)', [
+                $context->log('debug', 'Universal Web Scraper: Skipping event section (include keywords)', [
                     'section_identifier' => $event_section['identifier'],
                     'source_url' => $current_url,
                 ]);
@@ -374,7 +350,7 @@ class UniversalWebScraper extends EventImportHandler {
             }
 
             if ($this->applyExcludeKeywords($search_text, $config['exclude_keywords'] ?? '')) {
-                $this->log('debug', 'Universal Web Scraper: Skipping event section (exclude keywords)', [
+                $context->log('debug', 'Universal Web Scraper: Skipping event section (exclude keywords)', [
                     'section_identifier' => $event_section['identifier'],
                     'source_url' => $current_url,
                 ]);
@@ -382,13 +358,12 @@ class UniversalWebScraper extends EventImportHandler {
                 continue;
             }
 
-            $this->markItemProcessed($event_section['identifier'], $flow_step_id, $job_id);
+            $this->markItemAsProcessed($context, $event_section['identifier']);
 
-            $this->log('info', 'Universal Web Scraper: Found eligible HTML section', [
+            $context->log('info', 'Universal Web Scraper: Found eligible HTML section', [
                 'source_url' => $current_url,
                 'section_identifier' => $event_section['identifier'],
-                'page' => $current_page,
-                'pipeline_id' => $pipeline_id
+                'page' => $current_page
             ]);
 
             $dataPacket = new DataPacket(
@@ -403,8 +378,8 @@ class UniversalWebScraper extends EventImportHandler {
                 ],
                 [
                     'source_type' => 'universal_web_scraper',
-                    'pipeline_id' => $pipeline_id,
-                    'flow_id' => $flow_id,
+                    'pipeline_id' => $context->getPipelineId(),
+                    'flow_id' => $context->getFlowId(),
                     'original_title' => 'HTML Section from ' . parse_url($current_url, PHP_URL_HOST),
                     'event_identifier' => $event_section['identifier'],
                     'import_timestamp' => time()
@@ -424,7 +399,7 @@ class UniversalWebScraper extends EventImportHandler {
      * Tries with browser spoofing first, then falls back to standard headers
      * if it encounters a 403 or a captcha challenge.
      */
-    private function fetch_html(string $url): string {
+    private function fetch_html(string $url, ExecutionContext $context): string {
         $result = \DataMachine\Core\HttpClient::get($url, [
             'timeout' => 30,
             'browser_mode' => true,
@@ -438,7 +413,7 @@ class UniversalWebScraper extends EventImportHandler {
         );
 
         if (!$result['success'] || $is_captcha) {
-            $this->log('info', 'Universal Web Scraper: Browser mode blocked or captcha detected, retrying with standard mode', [
+            $context->log('info', 'Universal Web Scraper: Browser mode blocked or captcha detected, retrying with standard mode', [
                 'url' => $url,
                 'status_code' => $result['status_code'] ?? 'unknown',
                 'is_captcha' => $is_captcha
@@ -452,7 +427,7 @@ class UniversalWebScraper extends EventImportHandler {
         }
 
         if (!$result['success']) {
-            $this->log('error', 'Universal Web Scraper: HTTP request failed', [
+            $context->log('error', 'Universal Web Scraper: HTTP request failed', [
                 'url' => $url,
                 'error' => $result['error'] ?? 'Unknown error',
             ]);
@@ -460,7 +435,7 @@ class UniversalWebScraper extends EventImportHandler {
         }
 
         if (empty($result['data'])) {
-            $this->log('error', 'Universal Web Scraper: Empty response body', [
+            $context->log('error', 'Universal Web Scraper: Empty response body', [
                 'url' => $url,
             ]);
             return '';
@@ -472,16 +447,16 @@ class UniversalWebScraper extends EventImportHandler {
     /**
      * Extract first non-processed event HTML section from content.
      */
-    private function extract_event_sections(string $html_content, string $url, string $flow_step_id, array $skipped_identifiers = []): ?array {
+    private function extract_event_sections(string $html_content, string $url, ExecutionContext $context, array $skipped_identifiers = []): ?array {
         $finder = new EventSectionFinder(
-            fn (string $identifier, string $step_id): bool => isset($skipped_identifiers[$identifier]) || $this->isItemProcessed($identifier, $step_id),
+            fn (string $identifier): bool => isset($skipped_identifiers[$identifier]) || $context->isItemProcessed($identifier),
             fn (string $html): string => $this->clean_html_for_ai($html),
             fn (string $ymd): bool => $this->isPastEvent($ymd)
         );
 
-        $event_section = $finder->find_first_eligible_section($html_content, $url, $flow_step_id);
+        $event_section = $finder->find_first_eligible_section($html_content, $url, $context);
         if ($event_section !== null) {
-            $this->log('debug', 'Universal Web Scraper: Matched event section selector', [
+            $context->log('debug', 'Universal Web Scraper: Matched event section selector', [
                 'selector' => $event_section['selector'] ?? '',
                 'url' => $url,
             ]);
@@ -493,7 +468,7 @@ class UniversalWebScraper extends EventImportHandler {
     /**
      * Attempt to discover WordPress API endpoint if initial fetch fails.
      */
-    private function attemptWordPressApiDiscovery(string $url): ?string {
+    private function attemptWordPressApiDiscovery(string $url, ExecutionContext $context): ?string {
         $parsed = parse_url($url);
         if (empty($parsed['host'])) {
             return null;

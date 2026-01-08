@@ -11,6 +11,7 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\EventFlyer;
 
+use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\Handlers\VenueFieldsTrait;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
@@ -43,32 +44,28 @@ class EventFlyer extends EventImportHandler {
         );
     }
 
-    protected function executeFetch(int $pipeline_id, array $config, ?string $flow_step_id, int $flow_id, ?string $job_id): array {
-        $this->log('info', 'Starting Event Flyer import', [
-            'pipeline_id' => $pipeline_id,
-            'job_id' => $job_id,
-            'flow_step_id' => $flow_step_id
-        ]);
+    protected function executeFetch(array $config, ExecutionContext $context): array {
+        $context->log('info', 'EventFlyer: Starting import');
 
-        $image_file = $this->getNextUnprocessedImage($pipeline_id, $flow_id, $flow_step_id, $job_id);
+        $image_file = $this->getNextUnprocessedImage($context);
 
         if (!$image_file) {
-            $this->log('info', 'No unprocessed flyer images available');
+            $context->log('info', 'EventFlyer: No unprocessed flyer images available');
             return [];
         }
 
         if (!file_exists($image_file['persistent_path'])) {
-            $this->log('error', 'Flyer image file not found', ['path' => $image_file['persistent_path']]);
+            $context->log('error', 'EventFlyer: Image file not found', ['path' => $image_file['persistent_path']]);
             return [];
         }
 
-        $this->log('info', 'Processing flyer image', [
+        $context->log('info', 'EventFlyer: Processing flyer image', [
             'file' => $image_file['original_name'],
             'path' => $image_file['persistent_path']
         ]);
 
         $file_identifier = $image_file['persistent_path'];
-        $this->markItemProcessed($file_identifier, $flow_step_id, $job_id);
+        $this->markItemAsProcessed($context, $file_identifier);
 
         $ai_fields = $this->buildAIExtractionFields($config);
 
@@ -77,11 +74,12 @@ class EventFlyer extends EventImportHandler {
         if (!empty($event_data['title']) && $this->shouldSkipEventTitle($event_data['title'])) {
             return [];
         }
- 
+
+        $job_id = $context->getJobId();
         $this->storeImageInEngine($job_id, $image_file['persistent_path']);
 
         if (empty($event_data['title']) || empty($event_data['startDate'])) {
-            $this->log('warning', 'Flyer extraction requires AI processing for missing fields', [
+            $context->log('warning', 'EventFlyer: Requires AI processing for missing fields', [
                 'ai_fields_needed' => array_keys($ai_fields)
             ]);
         }
@@ -111,8 +109,8 @@ class EventFlyer extends EventImportHandler {
             ],
             [
                 'source_type' => 'event_flyer',
-                'pipeline_id' => $pipeline_id,
-                'flow_id' => $flow_id,
+                'pipeline_id' => $context->getPipelineId(),
+                'flow_id' => $context->getFlowId(),
                 'original_title' => $event_data['title'] ?: $image_file['original_name'],
                 'event_identifier' => $event_identifier,
                 'import_timestamp' => time(),
@@ -124,17 +122,11 @@ class EventFlyer extends EventImportHandler {
         return [$dataPacket];
     }
 
-    private function getNextUnprocessedImage(int $pipeline_id, int $flow_id, ?string $flow_step_id, ?string $job_id): ?array {
+    private function getNextUnprocessedImage(ExecutionContext $context): ?array {
         $storage = $this->getFileStorage();
+        $storage_context = $context->getFileContext();
 
-        $context = [
-            'pipeline_id' => $pipeline_id,
-            'pipeline_name' => "pipeline-{$pipeline_id}",
-            'flow_id' => $flow_id,
-            'flow_name' => "flow-{$flow_id}"
-        ];
-
-        $repo_files = $storage->get_all_files($context);
+        $repo_files = $storage->get_all_files($storage_context);
 
         if (empty($repo_files)) {
             return null;
@@ -151,7 +143,7 @@ class EventFlyer extends EventImportHandler {
 
             $file_identifier = $file['path'];
 
-            if ($this->isItemProcessed($file_identifier, $flow_step_id)) {
+            if ($this->checkItemProcessed($context, $file_identifier)) {
                 continue;
             }
 

@@ -10,6 +10,8 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper;
 
+use DataMachine\Core\ExecutionContext;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -17,7 +19,7 @@ if (!defined('ABSPATH')) {
 final class EventSectionFinder {
 
     /**
-     * @var callable(string, string): bool
+     * @var callable(string): bool
      */
     private $is_item_processed;
 
@@ -32,9 +34,9 @@ final class EventSectionFinder {
     private $is_past_event;
 
     /**
-     * @param callable(string, string): bool $is_item_processed
-     * @param callable(string): string $clean_html_for_ai
-     * @param callable(string): bool $is_past_event
+     * @param callable(string): bool $is_item_processed Check if item identifier has been processed
+     * @param callable(string): string $clean_html_for_ai Clean HTML for AI processing
+     * @param callable(string): bool $is_past_event Check if Y-m-d date is in the past
      */
     public function __construct(callable $is_item_processed, callable $clean_html_for_ai, callable $is_past_event) {
         $this->is_item_processed = $is_item_processed;
@@ -45,7 +47,7 @@ final class EventSectionFinder {
     /**
      * @return array{html: string, raw_html: string, identifier: string, selector: string, url: string}|null
      */
-    public function find_first_eligible_section(string $html_content, string $url, string $flow_step_id): ?array {
+    public function find_first_eligible_section(string $html_content, string $url, ExecutionContext $context): ?array {
         $dom = new \DOMDocument();
         libxml_use_internal_errors(true);
         $dom->loadHTML($html_content, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
@@ -94,7 +96,7 @@ final class EventSectionFinder {
                     // Build stable identifier from decoded data
                     $event_identifier = md5($url . $summary . ($event_data['start'] ?? ''));
 
-                    if (call_user_func($this->is_item_processed, $event_identifier, $flow_step_id)) {
+                    if (call_user_func($this->is_item_processed, $event_identifier)) {
                         continue;
                     }
 
@@ -126,7 +128,7 @@ final class EventSectionFinder {
                 $content_hash = md5($raw_html);
                 $event_identifier = md5($url . $content_hash);
 
-                if (call_user_func($this->is_item_processed, $event_identifier, $flow_step_id)) {
+                if (call_user_func($this->is_item_processed, $event_identifier)) {
                     continue;
                 }
 

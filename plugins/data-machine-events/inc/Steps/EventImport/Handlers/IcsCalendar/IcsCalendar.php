@@ -12,6 +12,7 @@
 namespace DataMachineEvents\Steps\EventImport\Handlers\IcsCalendar;
 
 use ICal\ICal;
+use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
@@ -42,34 +43,29 @@ class IcsCalendar extends EventImportHandler {
         );
     }
 
-    protected function executeFetch(int $pipeline_id, array $config, ?string $flow_step_id, int $flow_id, ?string $job_id): array {
-        $this->log('info', 'Starting ICS calendar feed import', [
-            'pipeline_id' => $pipeline_id,
-            'job_id' => $job_id,
-            'flow_step_id' => $flow_step_id
-        ]);
+    protected function executeFetch(array $config, ExecutionContext $context): array {
+        $context->log('info', 'IcsCalendar: Starting ICS calendar feed import');
 
         $feed_url = $this->normalize_feed_url($config['feed_url'] ?? '');
 
         if (empty($feed_url)) {
-            $this->log('error', 'ICS feed URL not configured');
+            $context->log('error', 'IcsCalendar: Feed URL not configured');
             return [];
         }
 
         if (!filter_var($feed_url, FILTER_VALIDATE_URL)) {
-            $this->log('error', 'Invalid ICS feed URL format', ['url' => $feed_url]);
+            $context->log('error', 'IcsCalendar: Invalid feed URL format', ['url' => $feed_url]);
             return [];
         }
 
-        $events = $this->fetch_calendar_events($feed_url, $config);
+        $events = $this->fetch_calendar_events($feed_url, $config, $context);
         if (empty($events)) {
-            $this->log('info', 'No events found in ICS feed');
+            $context->log('info', 'IcsCalendar: No events found in feed');
             return [];
         }
 
-        $this->log('info', 'Processing ICS calendar events', [
-            'events_available' => count($events),
-            'pipeline_id' => $pipeline_id
+        $context->log('info', 'IcsCalendar: Processing calendar events', [
+            'events_available' => count($events)
         ]);
 
         foreach ($events as $ical_event) {
@@ -99,7 +95,7 @@ class IcsCalendar extends EventImportHandler {
                 $standardized_event['venue'] ?? ''
             );
 
-            if ($this->isItemProcessed($event_identifier, $flow_step_id)) {
+            if ($this->checkItemProcessed($context, $event_identifier)) {
                 continue;
             }
 
@@ -107,15 +103,16 @@ class IcsCalendar extends EventImportHandler {
                 continue;
             }
 
-            $this->markItemProcessed($event_identifier, $flow_step_id, $job_id);
+            $this->markItemAsProcessed($context, $event_identifier);
 
-            $this->log('info', 'Found eligible ICS calendar event', [
+            $context->log('info', 'IcsCalendar: Found eligible event', [
                 'title' => $standardized_event['title'],
                 'date' => $standardized_event['startDate'],
                 'venue' => $standardized_event['venue']
             ]);
 
             $venue_metadata = $this->extractVenueMetadata($standardized_event);
+            $job_id = $context->getJobId();
 
             EventEngineData::storeVenueContext($job_id, $standardized_event, $venue_metadata);
 
@@ -132,8 +129,8 @@ class IcsCalendar extends EventImportHandler {
                 ],
                 [
                     'source_type' => 'ics_calendar',
-                    'pipeline_id' => $pipeline_id,
-                    'flow_id' => $flow_id,
+                    'pipeline_id' => $context->getPipelineId(),
+                    'flow_id' => $context->getFlowId(),
                     'original_title' => $standardized_event['title'],
                     'event_identifier' => $event_identifier,
                     'import_timestamp' => time()
@@ -144,7 +141,7 @@ class IcsCalendar extends EventImportHandler {
             return [$dataPacket];
         }
 
-        $this->log('info', 'No eligible ICS calendar events found');
+        $context->log('info', 'IcsCalendar: No eligible events found');
         return [];
     }
 
@@ -164,7 +161,7 @@ class IcsCalendar extends EventImportHandler {
     /**
      * Fetch and parse calendar events from ICS feed URL
      */
-    private function fetch_calendar_events(string $feed_url, array $config): array {
+    private function fetch_calendar_events(string $feed_url, array $config, ExecutionContext $context): array {
         try {
             $ical = new ICal($feed_url, [
                 'defaultSpan' => 2,
@@ -177,7 +174,7 @@ class IcsCalendar extends EventImportHandler {
 
             $events = $ical->sortEventsWithOrder($ical->events(), SORT_ASC);
 
-            $this->log('info', 'ICS Calendar: Successfully fetched events', [
+            $context->log('info', 'IcsCalendar: Successfully fetched events', [
                 'total_events' => count($events),
                 'feed_url' => $feed_url
             ]);
@@ -185,7 +182,7 @@ class IcsCalendar extends EventImportHandler {
             return $events;
 
         } catch (\Exception $e) {
-            $this->log('error', 'ICS Calendar: Failed to fetch or parse feed', [
+            $context->log('error', 'IcsCalendar: Failed to fetch or parse feed', [
                 'feed_url' => $feed_url,
                 'error' => $e->getMessage()
             ]);

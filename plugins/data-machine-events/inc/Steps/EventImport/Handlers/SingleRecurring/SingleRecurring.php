@@ -11,6 +11,7 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\SingleRecurring;
 
+use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
@@ -51,16 +52,12 @@ class SingleRecurring extends EventImportHandler {
         );
     }
 
-    protected function executeFetch(int $pipeline_id, array $config, ?string $flow_step_id, int $flow_id, ?string $job_id): array {
-        $this->log('info', 'Starting single recurring event handler', [
-            'pipeline_id' => $pipeline_id,
-            'job_id' => $job_id,
-            'flow_step_id' => $flow_step_id
-        ]);
+    protected function executeFetch(array $config, ExecutionContext $context): array {
+        $context->log('info', 'SingleRecurring: Starting event handler');
 
          $event_title = $config['event_title'] ?? '';
          if (empty($event_title)) {
-             $this->log('error', 'Event title not configured');
+             $context->log('error', 'SingleRecurring: Event title not configured');
              return [];
          }
 
@@ -79,7 +76,7 @@ class SingleRecurring extends EventImportHandler {
 
         $expiration_date = $config['expiration_date'] ?? '';
         if (!empty($expiration_date) && strtotime($expiration_date) < strtotime('today')) {
-            $this->log('info', 'Single recurring event handler expired', [
+            $context->log('info', 'SingleRecurring: Event handler expired', [
                 'event_title' => $event_title,
                 'expiration_date' => $expiration_date
             ]);
@@ -88,7 +85,7 @@ class SingleRecurring extends EventImportHandler {
 
         $day_of_week = (int) ($config['day_of_week'] ?? 0);
         if ($day_of_week < 0 || $day_of_week > 6) {
-            $this->log('error', 'Invalid day of week configured', ['day_of_week' => $day_of_week]);
+            $context->log('error', 'SingleRecurring: Invalid day of week configured', ['day_of_week' => $day_of_week]);
             return [];
         }
 
@@ -98,8 +95,8 @@ class SingleRecurring extends EventImportHandler {
         $venue_name = $config['venue_name'] ?? '';
         $event_identifier = EventIdentifierGenerator::generate($event_title, $next_date, $venue_name);
 
-        if ($this->isItemProcessed($event_identifier, $flow_step_id)) {
-            $this->log('info', 'Event occurrence already processed', [
+        if ($this->checkItemProcessed($context, $event_identifier)) {
+            $context->log('info', 'SingleRecurring: Event occurrence already processed', [
                 'event_title' => $event_title,
                 'date' => $next_date,
                 'venue' => $venue_name
@@ -109,9 +106,9 @@ class SingleRecurring extends EventImportHandler {
 
         $standardized_event = $this->buildEventData($config, $next_date);
 
-        $this->markItemProcessed($event_identifier, $flow_step_id, $job_id);
+        $this->markItemAsProcessed($context, $event_identifier);
 
-        $this->log('info', 'Created single recurring event', [
+        $context->log('info', 'SingleRecurring: Created event', [
             'title' => $event_title,
             'date' => $next_date,
             'day' => self::DAY_NAMES[$day_of_week],
@@ -119,6 +116,7 @@ class SingleRecurring extends EventImportHandler {
         ]);
 
         $venue_metadata = $this->extractVenueMetadata($standardized_event);
+        $job_id = $context->getJobId();
         EventEngineData::storeVenueContext($job_id, $standardized_event, $venue_metadata);
         $this->stripVenueMetadataFromEvent($standardized_event);
 
@@ -133,8 +131,8 @@ class SingleRecurring extends EventImportHandler {
             ],
             [
                 'source_type' => 'single_recurring',
-                'pipeline_id' => $pipeline_id,
-                'flow_id' => $flow_id,
+                'pipeline_id' => $context->getPipelineId(),
+                'flow_id' => $context->getFlowId(),
                 'original_title' => $event_title,
                 'event_identifier' => $event_identifier,
                 'import_timestamp' => time()

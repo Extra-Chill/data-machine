@@ -38,12 +38,12 @@ class UniversalWebScraperTestCommand {
 		$config = [
 			'source_url' => $target_url,
 			'flow_step_id' => 'cli_test_' . wp_generate_uuid4(),
-			'flow_id' => 0,
+			'flow_id' => 'direct',
 			'search' => '',
 		];
 
 		$handler = new UniversalWebScraper();
-		$results = $handler->get_fetch_data( 0, $config, null );
+		$results = $handler->get_fetch_data( 'direct', $config, null );
 
 		\WP_CLI::log( "Target URL: {$target_url}" );
 

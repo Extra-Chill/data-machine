@@ -10,6 +10,7 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper;
 
+use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachine\Core\DataPacket;
@@ -29,14 +30,11 @@ class StructuredDataProcessor {
     /**
      * Process structured events and return first eligible DataPacket.
      *
-     * @param array $events Array of normalized event data from extractor
-     * @param string $extraction_method Extraction method identifier
-     * @param string $source_url Source URL
-     * @param array $config Handler configuration
-     * @param int $pipeline_id Pipeline ID
-     * @param int $flow_id Flow ID
-     * @param string|null $flow_step_id Flow step ID
-     * @param string|null $job_id Job ID
+     * @param array            $events            Array of normalized event data from extractor
+     * @param string           $extraction_method Extraction method identifier
+     * @param string           $source_url        Source URL
+     * @param array            $config            Handler configuration
+     * @param ExecutionContext $context           Execution context
      * @return array|null DataPacket array or null if no eligible events
      */
     public function process(
@@ -44,10 +42,7 @@ class StructuredDataProcessor {
         string $extraction_method,
         string $source_url,
         array $config,
-        int $pipeline_id,
-        int $flow_id,
-        ?string $flow_step_id,
-        ?string $job_id
+        ExecutionContext $context
     ): ?array {
         foreach ($events as $raw_event) {
             $event = $raw_event;
@@ -78,17 +73,17 @@ class StructuredDataProcessor {
                 $event['venue'] ?? ''
             );
 
-            if ($this->handler->isItemProcessed($event_identifier, $flow_step_id)) {
+            if ($this->handler->checkItemProcessed($context, $event_identifier)) {
                 continue;
             }
 
-            $this->handler->markItemProcessed($event_identifier, $flow_step_id, $job_id);
+            $this->handler->markItemAsProcessed($context, $event_identifier);
 
             $this->applyVenueConfigOverride($event, $config);
 
             $venue_from_config = !empty($config['venue']) || !empty($config['venue_name']);
             if (!$venue_from_config && empty(trim((string)($event['venue'] ?? '')))) {
-                do_action('datamachine_log', 'warning', 'Universal Web Scraper: Missing venue; configure venue override', [
+                $context->log('warning', 'Universal Web Scraper: Missing venue; configure venue override', [
                     'source_url' => $source_url,
                     'extraction_method' => $extraction_method,
                     'title' => $event['title'] ?? '',
@@ -97,9 +92,10 @@ class StructuredDataProcessor {
             }
 
             $venue_metadata = $this->handler->extractVenueMetadata($event);
+            $job_id = $context->getJobId();
             EventEngineData::storeVenueContext($job_id, $event, $venue_metadata);
 
-            $this->storeEventEngineData($job_id, $event);
+            $this->storeEventEngineData($context, $event);
             $this->handler->stripVenueMetadataFromEvent($event);
 
             $dataPacket = new DataPacket(
@@ -116,8 +112,8 @@ class StructuredDataProcessor {
                 [
                     'source_type' => 'universal_web_scraper',
                     'extraction_method' => $extraction_method,
-                    'pipeline_id' => $pipeline_id,
-                    'flow_id' => $flow_id,
+                    'pipeline_id' => $context->getPipelineId(),
+                    'flow_id' => $context->getFlowId(),
                     'original_title' => $event['title'],
                     'event_identifier' => $event_identifier,
                     'import_timestamp' => time()
@@ -200,15 +196,10 @@ class StructuredDataProcessor {
     /**
      * Store additional event fields in engine data.
      *
-     * @param string|null $job_id Job ID
-     * @param array $event Standardized event data
+     * @param ExecutionContext $context Execution context
+     * @param array            $event   Standardized event data
      */
-    private function storeEventEngineData(?string $job_id, array $event): void {
-        $job_id = (int) $job_id;
-        if ($job_id <= 0 || !function_exists('datamachine_merge_engine_data')) {
-            return;
-        }
-
+    private function storeEventEngineData(ExecutionContext $context, array $event): void {
         $payload = array_filter([
             'title' => $event['title'] ?? '',
             'startDate' => $event['startDate'] ?? '',
@@ -223,7 +214,7 @@ class StructuredDataProcessor {
         });
 
         if (!empty($payload)) {
-            datamachine_merge_engine_data($job_id, $payload);
+            $context->storeEngineData($payload);
         }
     }
 }

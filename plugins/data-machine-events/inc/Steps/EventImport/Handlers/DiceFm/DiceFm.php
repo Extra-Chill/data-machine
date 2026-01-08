@@ -11,6 +11,7 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\DiceFm;
 
+use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachine\Core\DataPacket;
@@ -48,42 +49,28 @@ class DiceFm extends EventImportHandler {
     }
     
     /**
-    * Execute Dice FM event import with flat parameter structure
-    * 
-     * Stores venue context in engine data for downstream steps.
-     * Fetches events, processes deduplication tracking, and returns data packet array.
-     * 
-     * @param int $pipeline_id Pipeline ID
-     * @param array $config Handler configuration
-     * @param string|null $flow_step_id Flow step ID
-     * @param int $flow_id Flow ID
-     * @param string|null $job_id Job ID
-     * @return array Processed items array
+     * Execute Dice FM event import with flat parameter structure
      */
-    protected function executeFetch(int $pipeline_id, array $config, ?string $flow_step_id, int $flow_id, ?string $job_id): array {
-        $this->log('info', 'Starting event import', [
-            'pipeline_id' => $pipeline_id,
-            'job_id' => $job_id,
-            'flow_step_id' => $flow_step_id
-        ]);
+    protected function executeFetch(array $config, ExecutionContext $context): array {
+        $context->log('info', 'DiceFm: Starting event import');
         
         // Get API configuration from Data Machine auth system
         $auth = $this->getAuthProvider('dice_fm');
         if (!$auth) {
-            $this->log('error', 'Dice.fm authentication provider not found');
+            $context->log('error', 'DiceFm: Authentication provider not found');
             return [];
         }
 
         $api_config = $auth->get_account();
         if (empty($api_config['api_key'])) {
-            $this->log('error', 'Dice.fm API key not configured');
+            $context->log('error', 'DiceFm: API key not configured');
             return [];
         }
         
         // Get required city parameter
         $city = isset($config['city']) ? trim($config['city']) : '';
         if (empty($city)) {
-            $this->log('error', 'No city specified for Dice.fm search', $config);
+            $context->log('error', 'DiceFm: No city specified for search', $config);
             return [];
         }
         
@@ -91,16 +78,15 @@ class DiceFm extends EventImportHandler {
         $partner_id = !empty($api_config['partner_id']) ? trim($api_config['partner_id']) : '';
         
         // Fetch events from API
-        $raw_events = $this->fetch_dice_fm_events($api_config['api_key'], $city, $partner_id);
+        $raw_events = $this->fetch_dice_fm_events($api_config['api_key'], $city, $partner_id, $context);
         if (empty($raw_events)) {
-            $this->log('info', 'No events found from Dice.fm API');
+            $context->log('info', 'DiceFm: No events found from API');
             return [];
         }
         
         // Process events one at a time (Data Machine single-item model)
-        $this->log('info', 'Processing events for eligible item', [
-            'raw_events_available' => count($raw_events),
-            'pipeline_id' => $pipeline_id
+        $context->log('info', 'DiceFm: Processing events for eligible item', [
+            'raw_events_available' => count($raw_events)
         ]);
         
         foreach ($raw_events as $raw_event) {
@@ -120,16 +106,10 @@ class DiceFm extends EventImportHandler {
             $search_text = $standardized_event['title'] . ' ' . ($standardized_event['description'] ?? '');
 
             if (!$this->applyKeywordSearch($search_text, $config['search'] ?? '')) {
-                $this->log('debug', 'Skipping event (include keywords)', [
-                    'title' => $standardized_event['title']
-                ]);
                 continue;
             }
 
             if ($this->applyExcludeKeywords($search_text, $config['exclude_keywords'] ?? '')) {
-                $this->log('debug', 'Skipping event (exclude keywords)', [
-                    'title' => $standardized_event['title']
-                ]);
                 continue;
             }
             
@@ -141,25 +121,21 @@ class DiceFm extends EventImportHandler {
             );
             
             // Check if already processed FIRST
-            if ($this->isItemProcessed($event_identifier, $flow_step_id)) {
-                $this->log('debug', 'Skipping already processed event', [
-                    'title' => $standardized_event['title'],
-                    'event_identifier' => $event_identifier
-                ]);
+            if ($this->checkItemProcessed($context, $event_identifier)) {
                 continue;
             }
             
             // Found eligible event - mark as processed
-            $this->markItemProcessed($event_identifier, $flow_step_id, $job_id);
+            $this->markItemAsProcessed($context, $event_identifier);
             
-            $this->log('info', 'Found eligible event', [
+            $context->log('info', 'DiceFm: Found eligible event', [
                 'title' => $standardized_event['title'],
                 'date' => $standardized_event['startDate'],
-                'venue' => $standardized_event['venue'],
-                'pipeline_id' => $pipeline_id
+                'venue' => $standardized_event['venue']
             ]);
             
             $venue_metadata = $this->extractVenueMetadata($standardized_event);
+            $job_id = $context->getJobId();
             
             EventEngineData::storeVenueContext($job_id, $standardized_event, $venue_metadata);
 
@@ -177,8 +153,8 @@ class DiceFm extends EventImportHandler {
                 ],
                 [
                     'source_type' => 'dice_fm',
-                    'pipeline_id' => $pipeline_id,
-                    'flow_id' => $flow_id,
+                    'pipeline_id' => $context->getPipelineId(),
+                    'flow_id' => $context->getFlowId(),
                     'original_title' => $standardized_event['title'] ?? '',
                     'event_identifier' => $event_identifier,
                     'import_timestamp' => time()
@@ -190,9 +166,8 @@ class DiceFm extends EventImportHandler {
         }
         
         // No eligible events found
-        $this->log('info', 'No eligible events found', [
-            'raw_events_checked' => count($raw_events),
-            'pipeline_id' => $pipeline_id
+        $context->log('info', 'DiceFm: No eligible events found', [
+            'raw_events_checked' => count($raw_events)
         ]);
         
         return [];
@@ -200,13 +175,8 @@ class DiceFm extends EventImportHandler {
     
     /**
      * Fetch events from Dice.fm API
-     *
-     * @param string $api_key API key
-     * @param string $city City name
-     * @param string $partner_id Partner ID (optional)
-     * @return array Raw event data from API
      */
-    private function fetch_dice_fm_events($api_key, $city, $partner_id = '') {
+    private function fetch_dice_fm_events($api_key, $city, $partner_id, ExecutionContext $context): array {
         $base_url = 'https://partners-endpoint.dice.fm/api/v2/events';
         
         // Build query parameters
@@ -235,7 +205,7 @@ class DiceFm extends EventImportHandler {
         ]);
         
         if (!$result['success']) {
-            $this->log('error', 'Dice.fm API request failed: ' . ($result['error'] ?? 'Unknown error'));
+            $context->log('error', 'DiceFm: API request failed', ['error' => $result['error'] ?? 'Unknown error']);
             return [];
         }
         
@@ -243,19 +213,19 @@ class DiceFm extends EventImportHandler {
         $body = $result['data'];
         
         if ($response_code !== 200) {
-            $this->log('error', "Dice.fm API returned status {$response_code}: {$body}");
+            $context->log('error', 'DiceFm: API returned status ' . $response_code);
             return [];
         }
         
         $data = json_decode($body, true);
         
         if (json_last_error() !== JSON_ERROR_NONE) {
-            $this->log('error', 'Invalid JSON response from Dice.fm API');
+            $context->log('error', 'DiceFm: Invalid JSON response from API');
             return [];
         }
         
         if (!isset($data['data']) || !is_array($data['data'])) {
-            $this->log('error', 'No events data in Dice.fm response');
+            $context->log('error', 'DiceFm: No events data in response');
             return [];
         }
         

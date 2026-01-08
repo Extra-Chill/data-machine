@@ -8,6 +8,7 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers;
 
+use DataMachine\Core\ExecutionContext;
 use DataMachine\Core\Steps\Fetch\Handlers\FetchHandler;
 use DataMachineEvents\Core\DateTimeParser;
 use DataMachineEvents\Core\VenueParameterProvider;
@@ -94,39 +95,29 @@ abstract class EventImportHandler extends FetchHandler {
     }
 
     /**
-     * Public wrapper for keyword search (for use by processors).
+     * Check if item has been processed (uses ExecutionContext).
+     *
+     * @param ExecutionContext $context Execution context
+     * @param string           $item_id Item identifier
+     * @return bool True if already processed
      */
-    public function applyKeywordSearch(string $text, string $search): bool {
-        return parent::applyKeywordSearch($text, $search);
+    public function checkItemProcessed(ExecutionContext $context, string $item_id): bool {
+        return $context->isItemProcessed($item_id);
     }
 
     /**
-     * Public wrapper for exclude keywords (for use by processors).
-     */
-    public function applyExcludeKeywords(string $text, string $exclude_keywords): bool {
-        return parent::applyExcludeKeywords($text, $exclude_keywords);
-    }
-
-    /**
-     * Public wrapper for processed item check (for use by processors).
-     */
-    public function isItemProcessed(string $item_id, ?string $flow_step_id): bool {
-        return parent::isItemProcessed($item_id, $flow_step_id);
-    }
-
-    /**
-     * Public wrapper for marking item processed (for use by processors).
+     * Mark item as processed (uses ExecutionContext).
      *
      * Also stores item context in engine data for the skip_item tool.
-     * This enables the AI to skip items that don't meet criteria while
-     * still marking them as processed so they won't be refetched.
      *
-     * @since 0.8.31
+     * @param ExecutionContext $context Execution context
+     * @param string           $item_id Item identifier
      */
-    public function markItemProcessed(string $item_id, ?string $flow_step_id, ?string $job_id): void {
-        parent::markItemProcessed($item_id, $flow_step_id, $job_id);
+    public function markItemAsProcessed(ExecutionContext $context, string $item_id): void {
+        $context->markItemProcessed($item_id);
 
         // Store item context for skip_item tool
+        $job_id = $context->getJobId();
         if ($job_id) {
             EventEngineData::storeItemContext((int) $job_id, $item_id, $this->handler_type);
         }

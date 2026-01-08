@@ -1,6 +1,6 @@
 {
   "name": "datamachine-events-calendar-block",
-  "version": "0.8.42",
+  "version": "0.9.0",
   "main": "index.js",
   "scripts": {
     "build": "wp-scripts build",

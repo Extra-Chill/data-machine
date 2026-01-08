@@ -10,6 +10,7 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\Eventbrite;
 
+use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachine\Core\DataPacket;
@@ -45,33 +46,28 @@ class Eventbrite extends EventImportHandler {
     /**
      * Execute fetch logic - parse Eventbrite organizer page for events
      */
-    protected function executeFetch(int $pipeline_id, array $config, ?string $flow_step_id, int $flow_id, ?string $job_id): array {
-        $this->log('info', 'Starting Eventbrite event import', [
-            'pipeline_id' => $pipeline_id,
-            'job_id' => $job_id,
-            'flow_step_id' => $flow_step_id
-        ]);
+    protected function executeFetch(array $config, ExecutionContext $context): array {
+        $context->log('info', 'Eventbrite: Starting event import');
         
         $organizer_url = trim($config['organizer_url'] ?? '');
         if (empty($organizer_url)) {
-            $this->log('error', 'No organizer URL configured');
+            $context->log('error', 'Eventbrite: No organizer URL configured');
             return [];
         }
         
         if (!filter_var($organizer_url, FILTER_VALIDATE_URL)) {
-            $this->log('error', 'Invalid organizer URL', ['url' => $organizer_url]);
+            $context->log('error', 'Eventbrite: Invalid organizer URL', ['url' => $organizer_url]);
             return [];
         }
         
-        $raw_events = $this->fetch_events_from_page($organizer_url);
+        $raw_events = $this->fetch_events_from_page($organizer_url, $context);
         if (empty($raw_events)) {
-            $this->log('info', 'No events found on Eventbrite organizer page');
+            $context->log('info', 'Eventbrite: No events found on organizer page');
             return [];
         }
         
-        $this->log('info', 'Processing events for eligible item', [
-            'raw_events_available' => count($raw_events),
-            'pipeline_id' => $pipeline_id
+        $context->log('info', 'Eventbrite: Processing events for eligible item', [
+            'raw_events_available' => count($raw_events)
         ]);
         
         foreach ($raw_events as $raw_event) {
@@ -101,31 +97,24 @@ class Eventbrite extends EventImportHandler {
                 $standardized_event['venue'] ?? ''
             );
             
-            if ($this->isItemProcessed($event_identifier, $flow_step_id)) {
-                $this->log('debug', 'Skipping already processed event', [
-                    'title' => $standardized_event['title'],
-                    'event_identifier' => $event_identifier
-                ]);
+            if ($this->checkItemProcessed($context, $event_identifier)) {
                 continue;
             }
             
             if ($this->isPastEvent($standardized_event['startDate'] ?? '')) {
-                $this->log('debug', 'Skipping past event', [
-                    'title' => $standardized_event['title'],
-                    'date' => $standardized_event['startDate']
-                ]);
                 continue;
             }
             
-            $this->markItemProcessed($event_identifier, $flow_step_id, $job_id);
+            $this->markItemAsProcessed($context, $event_identifier);
             
-            $this->log('info', 'Found eligible event', [
+            $context->log('info', 'Eventbrite: Found eligible event', [
                 'title' => $standardized_event['title'],
                 'date' => $standardized_event['startDate'],
                 'venue' => $standardized_event['venue']
             ]);
             
             $venue_metadata = $this->extractVenueMetadata($standardized_event);
+            $job_id = $context->getJobId();
             
             EventEngineData::storeVenueContext($job_id, $standardized_event, $venue_metadata);
             
@@ -142,8 +131,8 @@ class Eventbrite extends EventImportHandler {
                 ],
                 [
                     'source_type' => 'eventbrite',
-                    'pipeline_id' => $pipeline_id,
-                    'flow_id' => $flow_id,
+                    'pipeline_id' => $context->getPipelineId(),
+                    'flow_id' => $context->getFlowId(),
                     'original_title' => $standardized_event['title'] ?? '',
                     'event_identifier' => $event_identifier,
                     'import_timestamp' => time()
@@ -154,14 +143,14 @@ class Eventbrite extends EventImportHandler {
             return [$dataPacket];
         }
         
-        $this->log('info', 'No eligible events found');
+        $context->log('info', 'Eventbrite: No eligible events found');
         return [];
     }
     
     /**
      * Fetch and parse events from Eventbrite organizer page
      */
-    private function fetch_events_from_page(string $url): array {
+    private function fetch_events_from_page(string $url, ExecutionContext $context): array {
         $result = $this->httpGet($url, [
             'timeout' => 30,
             'headers' => [
@@ -171,29 +160,29 @@ class Eventbrite extends EventImportHandler {
         ]);
         
         if (!$result['success']) {
-            $this->log('error', 'Failed to fetch Eventbrite page: ' . ($result['error'] ?? 'Unknown error'));
+            $context->log('error', 'Eventbrite: Failed to fetch page', ['error' => $result['error'] ?? 'Unknown error']);
             return [];
         }
         
         $status_code = $result['status_code'];
         if ($status_code !== 200) {
-            $this->log('error', 'Eventbrite page returned status ' . $status_code);
+            $context->log('error', 'Eventbrite: Page returned status ' . $status_code);
             return [];
         }
         
         $html = $result['data'];
         
-        return $this->extract_json_ld_events($html);
+        return $this->extract_json_ld_events($html, $context);
     }
     
     /**
      * Extract events from JSON-LD script tags in HTML
      */
-    private function extract_json_ld_events(string $html): array {
+    private function extract_json_ld_events(string $html, ExecutionContext $context): array {
         $events = [];
         
         if (!preg_match_all('/<script[^>]*type=["\']application\/ld\+json["\'][^>]*>(.*?)<\/script>/si', $html, $matches)) {
-            $this->log('debug', 'No JSON-LD scripts found in page');
+            $context->log('debug', 'Eventbrite: No JSON-LD scripts found in page');
             return [];
         }
         
@@ -226,7 +215,7 @@ class Eventbrite extends EventImportHandler {
             }
         }
         
-        $this->log('debug', 'Extracted events from JSON-LD', ['count' => count($events)]);
+        $context->log('debug', 'Eventbrite: Extracted events from JSON-LD', ['count' => count($events)]);
         
         return $events;
     }

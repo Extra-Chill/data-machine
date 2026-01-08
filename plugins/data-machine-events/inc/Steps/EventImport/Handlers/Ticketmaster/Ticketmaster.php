@@ -7,6 +7,7 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster;
 
+use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachine\Core\DataPacket;
@@ -52,52 +53,48 @@ class Ticketmaster extends EventImportHandler {
     /**
      * Execute fetch logic
      */
-    protected function executeFetch(int $pipeline_id, array $config, ?string $flow_step_id, int $flow_id, ?string $job_id): array {
-        $this->log('info', 'Starting event import', [
-            'pipeline_id' => $pipeline_id,
-            'job_id' => $job_id,
-            'flow_step_id' => $flow_step_id
-        ]);
+    protected function executeFetch(array $config, ExecutionContext $context): array {
+        $context->log('info', 'Ticketmaster: Starting event import');
         
         $auth = $this->getAuthProvider('ticketmaster');
         if (!$auth) {
-            $this->log('error', 'Ticketmaster authentication provider not found');
+            $context->log('error', 'Ticketmaster: Authentication provider not found');
             return [];
         }
 
         $api_config = $auth->get_account();
         if (empty($api_config['api_key'])) {
-            $this->log('error', 'API key not configured');
+            $context->log('error', 'Ticketmaster: API key not configured');
             return [];
         }
         
         try {
-            $search_params = $this->build_search_params($config, $api_config['api_key']);
+            $search_params = $this->build_search_params($config, $api_config['api_key'], $context);
         } catch (\Exception $e) {
-            $this->log('error', $e->getMessage());
+            $context->log('error', 'Ticketmaster: ' . $e->getMessage());
             return [];
         }
         
         $current_page = 0;
+        $has_more_pages = false;
         
         do {
             $search_params['page'] = $current_page;
-            $result = $this->fetch_events($search_params);
+            $result = $this->fetch_events($search_params, $context);
             $raw_events = $result['events'];
             $page_info = $result['page'];
             
             if (empty($raw_events)) {
                 if ($current_page === 0) {
-                    $this->log('info', 'No events found from Ticketmaster API');
+                    $context->log('info', 'Ticketmaster: No events found from API');
                 }
                 break;
             }
             
-            $this->log('info', 'Processing events for eligible item', [
+            $context->log('info', 'Ticketmaster: Processing events for eligible item', [
                 'page' => $current_page,
                 'events_on_page' => count($raw_events),
-                'total_pages' => $page_info['totalPages'],
-                'pipeline_id' => $pipeline_id
+                'total_pages' => $page_info['totalPages']
             ]);
             
             foreach ($raw_events as $raw_event) {
@@ -132,13 +129,13 @@ class Ticketmaster extends EventImportHandler {
                     $standardized_event['venue'] ?? ''
                 );
                 
-                if ($this->isItemProcessed($event_identifier, $flow_step_id)) {
+                if ($this->checkItemProcessed($context, $event_identifier)) {
                     continue;
                 }
                 
-                $this->markItemProcessed($event_identifier, $flow_step_id, $job_id);
+                $this->markItemAsProcessed($context, $event_identifier);
                 
-                $this->log('info', 'Found eligible event', [
+                $context->log('info', 'Ticketmaster: Found eligible event', [
                     'title' => $standardized_event['title'],
                     'date' => $standardized_event['startDate'],
                     'venue' => $standardized_event['venue'],
@@ -146,12 +143,12 @@ class Ticketmaster extends EventImportHandler {
                 ]);
                 
                 $venue_metadata = $this->extractVenueMetadata($standardized_event);
+                $job_id = $context->getJobId();
                 
                 EventEngineData::storeVenueContext($job_id, $standardized_event, $venue_metadata);
 
-                $resolved_job_id = (int) $job_id;
-                if ($resolved_job_id > 0 && function_exists('datamachine_merge_engine_data') && !empty($standardized_event['price'])) {
-                    datamachine_merge_engine_data($resolved_job_id, [
+                if (!empty($standardized_event['price'])) {
+                    $context->storeEngineData([
                         'price' => $standardized_event['price'],
                     ]);
                 }
@@ -169,8 +166,8 @@ class Ticketmaster extends EventImportHandler {
                     ],
                     [
                         'source_type' => 'ticketmaster',
-                        'pipeline_id' => $pipeline_id,
-                        'flow_id' => $flow_id,
+                        'pipeline_id' => $context->getPipelineId(),
+                        'flow_id' => $context->getFlowId(),
                         'original_title' => $standardized_event['title'] ?? '',
                         'event_identifier' => $event_identifier,
                         'import_timestamp' => time()
@@ -185,7 +182,7 @@ class Ticketmaster extends EventImportHandler {
                               && $current_page < self::MAX_PAGE;
             
             if ($has_more_pages) {
-                $this->log('info', 'No eligible events on page, fetching next', [
+                $context->log('info', 'Ticketmaster: No eligible events on page, fetching next', [
                     'current_page' => $current_page,
                     'total_pages' => $page_info['totalPages']
                 ]);
@@ -195,7 +192,7 @@ class Ticketmaster extends EventImportHandler {
             
         } while ($has_more_pages);
         
-        $this->log('info', 'No eligible events found', [
+        $context->log('info', 'Ticketmaster: No eligible events found', [
             'pages_searched' => $current_page
         ]);
         return [];
@@ -204,7 +201,7 @@ class Ticketmaster extends EventImportHandler {
     /**
      * Build search parameters for API request
      */
-    private function build_search_params(array $handler_config, string $api_key): array {
+    private function build_search_params(array $handler_config, string $api_key, ExecutionContext $context): array {
         $params = array_merge(self::DEFAULT_PARAMS, [
             'apikey' => $api_key
         ]);
@@ -222,7 +219,7 @@ class Ticketmaster extends EventImportHandler {
         
         $params['segmentName'] = $classifications[$classification_slug];
         
-        $this->log('info', 'Added segment filter', [
+        $context->log('info', 'Ticketmaster: Added segment filter', [
             'slug' => $classification_slug,
             'segment_name' => $classifications[$classification_slug]
         ]);
@@ -343,7 +340,7 @@ class Ticketmaster extends EventImportHandler {
         return self::get_classifications($api_key);
     }
     
-    private function fetch_events(array $params): array {
+    private function fetch_events(array $params, ExecutionContext $context): array {
         $url = self::API_BASE . 'events.json?' . http_build_query($params);
         
         $result = $this->httpGet($url, [
@@ -354,7 +351,7 @@ class Ticketmaster extends EventImportHandler {
         ]);
         
         if (!$result['success']) {
-            $this->log('error', 'API request failed: ' . ($result['error'] ?? 'Unknown error'));
+            $context->log('error', 'Ticketmaster: API request failed', ['error' => $result['error'] ?? 'Unknown error']);
             return [
                 'events' => [],
                 'page' => ['number' => 0, 'totalPages' => 1]

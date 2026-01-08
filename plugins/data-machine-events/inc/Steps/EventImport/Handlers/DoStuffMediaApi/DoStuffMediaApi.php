@@ -11,6 +11,7 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\DoStuffMediaApi;
 
+use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
@@ -41,34 +42,29 @@ class DoStuffMediaApi extends EventImportHandler {
         );
     }
 
-    protected function executeFetch(int $pipeline_id, array $config, ?string $flow_step_id, int $flow_id, ?string $job_id): array {
-        $this->log('info', 'Starting DoStuff Media API event import', [
-            'pipeline_id' => $pipeline_id,
-            'job_id' => $job_id,
-            'flow_step_id' => $flow_step_id
-        ]);
+    protected function executeFetch(array $config, ExecutionContext $context): array {
+        $context->log('info', 'DoStuffMediaApi: Starting event import');
 
         $feed_url = trim($config['feed_url'] ?? '');
 
         if (empty($feed_url)) {
-            $this->log('error', 'DoStuff Media API feed URL not configured');
+            $context->log('error', 'DoStuffMediaApi: Feed URL not configured');
             return [];
         }
 
         if (!filter_var($feed_url, FILTER_VALIDATE_URL)) {
-            $this->log('error', 'Invalid DoStuff Media API feed URL format', ['url' => $feed_url]);
+            $context->log('error', 'DoStuffMediaApi: Invalid feed URL format', ['url' => $feed_url]);
             return [];
         }
 
-        $raw_events = $this->fetch_events($feed_url);
+        $raw_events = $this->fetch_events($feed_url, $context);
         if (empty($raw_events)) {
-            $this->log('info', 'No events found from DoStuff Media API');
+            $context->log('info', 'DoStuffMediaApi: No events found');
             return [];
         }
 
-        $this->log('info', 'Processing DoStuff Media events', [
-            'events_available' => count($raw_events),
-            'pipeline_id' => $pipeline_id
+        $context->log('info', 'DoStuffMediaApi: Processing events', [
+            'events_available' => count($raw_events)
         ]);
 
         foreach ($raw_events as $raw_event) {
@@ -82,7 +78,6 @@ class DoStuffMediaApi extends EventImportHandler {
                 continue;
             }
 
-            // Skip past events
             if (!empty($raw_event['past'])) {
                 continue;
             }
@@ -103,7 +98,7 @@ class DoStuffMediaApi extends EventImportHandler {
                 $standardized_event['venue'] ?? ''
             );
 
-            if ($this->isItemProcessed($event_identifier, $flow_step_id)) {
+            if ($this->checkItemProcessed($context, $event_identifier)) {
                 continue;
             }
 
@@ -111,15 +106,16 @@ class DoStuffMediaApi extends EventImportHandler {
                 continue;
             }
 
-            $this->markItemProcessed($event_identifier, $flow_step_id, $job_id);
+            $this->markItemAsProcessed($context, $event_identifier);
 
-            $this->log('info', 'Found eligible DoStuff Media event', [
+            $context->log('info', 'DoStuffMediaApi: Found eligible event', [
                 'title' => $standardized_event['title'],
                 'date' => $standardized_event['startDate'],
                 'venue' => $standardized_event['venue']
             ]);
 
             $venue_metadata = $this->extractVenueMetadata($standardized_event);
+            $job_id = $context->getJobId();
 
             EventEngineData::storeVenueContext($job_id, $standardized_event, $venue_metadata);
 
@@ -136,8 +132,8 @@ class DoStuffMediaApi extends EventImportHandler {
                 ],
                 [
                     'source_type' => 'dostuff_media_api',
-                    'pipeline_id' => $pipeline_id,
-                    'flow_id' => $flow_id,
+                    'pipeline_id' => $context->getPipelineId(),
+                    'flow_id' => $context->getFlowId(),
                     'original_title' => $standardized_event['title'],
                     'event_identifier' => $event_identifier,
                     'import_timestamp' => time()
@@ -148,14 +144,14 @@ class DoStuffMediaApi extends EventImportHandler {
             return [$dataPacket];
         }
 
-        $this->log('info', 'No eligible DoStuff Media events found');
+        $context->log('info', 'DoStuffMediaApi: No eligible events found');
         return [];
     }
 
     /**
      * Fetch events from DoStuff Media JSON feed
      */
-    private function fetch_events(string $feed_url): array {
+    private function fetch_events(string $feed_url, ExecutionContext $context): array {
         $result = $this->httpGet($feed_url, [
             'timeout' => 30,
             'headers' => [
@@ -165,7 +161,7 @@ class DoStuffMediaApi extends EventImportHandler {
         ]);
 
         if (!$result['success']) {
-            $this->log('error', 'DoStuff Media API request failed', [
+            $context->log('error', 'DoStuffMediaApi: Request failed', [
                 'url' => $feed_url,
                 'error' => $result['error'] ?? 'Unknown error',
             ]);
@@ -174,7 +170,7 @@ class DoStuffMediaApi extends EventImportHandler {
 
         $status_code = $result['status_code'];
         if ($status_code !== 200) {
-            $this->log('error', 'DoStuff Media API HTTP error', [
+            $context->log('error', 'DoStuffMediaApi: HTTP error', [
                 'url' => $feed_url,
                 'status_code' => $status_code,
             ]);
@@ -185,7 +181,7 @@ class DoStuffMediaApi extends EventImportHandler {
         $data = json_decode($body, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            $this->log('error', 'DoStuff Media API invalid JSON response', [
+            $context->log('error', 'DoStuffMediaApi: Invalid JSON response', [
                 'url' => $feed_url,
                 'json_error' => json_last_error_msg()
             ]);
@@ -203,7 +199,7 @@ class DoStuffMediaApi extends EventImportHandler {
             }
         }
 
-        $this->log('info', 'DoStuff Media API: Successfully fetched events', [
+        $context->log('info', 'DoStuffMediaApi: Fetched events', [
             'total_events' => count($events),
             'feed_url' => $feed_url
         ]);
