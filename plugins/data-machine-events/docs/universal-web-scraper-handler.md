@@ -10,7 +10,7 @@ The Universal Web Scraper handler prioritizes structured data extraction for max
 
 ### Structured Data Extraction (Priority Order)
 
-The handler registers 20 extraction layers (19 extractors + HTML fallback) in `UniversalWebScraper::getExtractors()`.
+The handler registers 22 extraction layers (21 specialized extractors + HTML fallback) in `UniversalWebScraper::getExtractors()`.
 
 1. **AEG/AXS JSON feed** (`AegAxsExtractor`): Extracts events from AEG/AXS venue JSON feeds
 2. **Red Rocks** (`RedRocksExtractor`): Parses Red Rocks Amphitheatre event pages (@since v0.8.0)
@@ -18,20 +18,22 @@ The handler registers 20 extraction layers (19 extractors + HTML fallback) in `U
 4. **Firebase Realtime Database** (`FirebaseExtractor`): Detects Firebase SDK and fetches events from the Firebase REST API (@since v0.8.12)
 5. **Embedded Calendars** (`EmbeddedCalendarExtractor`): Detects and scrapes embedded Google Calendar, SeeTickets, and Turntable widgets. Decodes Base64-encoded Google Calendar IDs. Consolidates legacy standalone `GoogleCalendar` handler logic. (@since v0.8.0)
 6. **Squarespace** (`SquarespaceExtractor`): Extracts events from `Static.SQUARESPACE_CONTEXT` JavaScript objects. Enhanced to search for events in "Summary Blocks" and hidden template data if the main collection is empty. (@since v0.8.12)
-7. **SpotHopper** (`SpotHopperExtractor`): Auto-detects SpotHopper platform and extracts events from their public API (@since v0.8.12)
-8. **Gigwell** (`GigwellExtractor`): Detects gigwell-gigstream embeds and extracts events from the Gigwell API
-9. **Bandzoogle** (`BandzoogleExtractor`): Extracts events from Bandzoogle-powered venue calendar pages (@since v0.8.16)
-10. **GoDaddy** (`GoDaddyExtractor`): Extracts events from GoDaddy Website Builder calendars with REST API detection (@since v0.8.16)
-11. **Timely** (`TimelyExtractor`): Specialized extractor for Time.ly All-in-One Event Calendar platform (@since v0.8.18)
-12. **Elfsight Events** (`ElfsightEventsExtractor`): Extracts events from Elfsight Event Calendar widgets embedded on venue websites (@since v0.8.30)
-13. **Schema.org JSON-LD** (`JsonLdExtractor`): Parses `<script type="application/ld+json">`
-14. **External WordPress** (`WordPressExtractor`): Extracts events from external WordPress sites via REST API or structured HTML. Consolidates legacy standalone `WordPressEventsAPI` handler logic. (@since v0.8.0)
-15. **Prekindle** (`PrekindleExtractor`): Auto-detects Prekindle widgets/links and extracts high-fidelity data from their mobile API (@since v0.8.12)
-16. **Wix Events JSON** (`WixEventsExtractor`): Extracts events from `<script id="wix-warmup-data">`
-17. **RHP Events plugin HTML** (`RhpEventsExtractor`): Extracts events from `.rhpSingleEvent` markup. Enhanced to merge page-level venue data (@since v0.8.21).
-18. **OpenDate.io** (`OpenDateExtractor`): Two-step extraction (listing → detail page). Prioritizes React JSON datetime values over JSON-LD for improved time accuracy.
-19. **Schema.org Microdata** (`MicrodataExtractor`): Parses itemtype/itemprop markup
-20. **HTML section extraction** (fallback): Uses XPath selector rules to extract one candidate section at a time for downstream processing. Includes high-confidence selectors for `brownbearsw.com` (Sahara Lounge).
+7. **Craftpeak** (`CraftpeakExtractor`): Parses Craftpeak brewery/venue calendar pages
+8. **SpotHopper** (`SpotHopperExtractor`): Auto-detects SpotHopper platform and extracts events from their public API (@since v0.8.12)
+9. **Gigwell** (`GigwellExtractor`): Detects gigwell-gigstream embeds and extracts events from the Gigwell API
+10. **Bandzoogle** (`BandzoogleExtractor`): Extracts events from Bandzoogle-powered venue calendar pages (@since v0.8.16)
+11. **GoDaddy** (`GoDaddyExtractor`): Extracts events from GoDaddy Website Builder calendars with REST API detection (@since v0.8.16)
+12. **Timely** (`TimelyExtractor`): Specialized extractor for Time.ly All-in-One Event Calendar platform (@since v0.8.18)
+13. **Elfsight Events** (`ElfsightEventsExtractor`): Extracts events from Elfsight Event Calendar widgets embedded on venue websites (@since v0.8.30)
+14. **Schema.org JSON-LD** (`JsonLdExtractor`): Parses `<script type="application/ld+json">`
+15. **External WordPress** (`WordPressExtractor`): Extracts events from external WordPress sites via REST API or structured HTML. Consolidates legacy standalone `WordPressEventsAPI` handler logic. (@since v0.8.0)
+16. **Prekindle** (`PrekindleExtractor`): Auto-detects Prekindle widgets/links and extracts high-fidelity data from their mobile API (@since v0.8.12)
+17. **Wix Events JSON** (`WixEventsExtractor`): Extracts events from `<script id="wix-warmup-data">`
+18. **MusicItem** (`MusicItemExtractor`): Extracts Schema.org MusicEvent items from structured data
+19. **RHP Events plugin HTML** (`RhpEventsExtractor`): Extracts events from `.rhpSingleEvent` markup. Enhanced to merge page-level venue data (@since v0.8.21).
+20. **OpenDate.io** (`OpenDateExtractor`): Two-step extraction (listing → detail page). Prioritizes React JSON datetime values over JSON-LD for improved time accuracy.
+21. **Schema.org Microdata** (`MicrodataExtractor`): Parses itemtype/itemprop markup
+22. **HTML section extraction** (fallback): Uses XPath selector rules to extract one candidate section at a time for downstream processing. Includes high-confidence selectors for `brownbearsw.com` (Sahara Lounge).
 
 ### Page Venue Extraction
 
@@ -232,6 +234,8 @@ Websites without structured data (AI fallback):
 - **JsonLdExtractor.php**: Parses Schema.org JSON-LD script tags
 - **MicrodataExtractor.php**: Parses Schema.org microdata attributes
 - **ElfsightEventsExtractor.php**: Parses Elfsight Event Calendar widget data
+- **CraftpeakExtractor.php**: Parses Craftpeak brewery/venue calendar pages
+- **MusicItemExtractor.php**: Extracts Schema.org MusicEvent items
 
 ### DataPacket Format
 

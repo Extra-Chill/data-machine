@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.9.0
+**Version**: 0.9.2
 
 ## Plugin Bootstrap
 
@@ -15,7 +15,7 @@ Technical guidance for Claude Code when working with the **Data Machine Events**
 
 - **`init_data_machine_integration()`**: Runs at priority 25 on `init`. After verifying `DATAMACHINE_VERSION`, it loads `EventImportFilters`, instantiates all import handlers, loads EventUpsert filters, and registers the EventUpsert handler from `inc/Steps/Upsert/Events/EventUpsert.php`.
 - **Event import handlers**: `load_event_import_handlers()` instantiates the following `FetchHandler` implementations (all located under `inc/Steps/EventImport/Handlers`):
-- **Universal Web Scraper Architecture**: A multi-layered system that prioritizes structured data extraction (Schema.org JSON-LD/Microdata and 19 specialized extractors) before falling back to AI-enhanced HTML section parsing. It coordinates fetching, pagination, and normalization via a centralized `StructuredDataProcessor`. The scraper implements a "Smart Fallback" mechanism that retries requests with standard headers if browser-mode spoofing is blocked by captchas (SiteGround/Cloudflare) or encounters 403 errors.
+- **Universal Web Scraper Architecture**: A multi-layered system that prioritizes structured data extraction (Schema.org JSON-LD/Microdata and 21 specialized extractors) before falling back to AI-enhanced HTML section parsing. It coordinates fetching, pagination, and normalization via a centralized `StructuredDataProcessor`. The scraper implements a "Smart Fallback" mechanism that retries requests with standard headers if browser-mode spoofing is blocked by captchas (SiteGround/Cloudflare) or encounters 403 errors.
   - `DiceFm\DiceFm`
   - `DoStuffMediaApi\DoStuffMediaApi`
   - `Eventbrite\Eventbrite`
@@ -23,7 +23,7 @@ Technical guidance for Claude Code when working with the **Data Machine Events**
   - `IcsCalendar\IcsCalendar`
   - `SingleRecurring\SingleRecurring` (@since v0.6.3)
   - `Ticketmaster\Ticketmaster` (with automatic API pagination up to MAX_PAGE=19)
-  - `WebScraper\\UniversalWebScraper` (extractor priority: AEG/AXS, RedRocks, Freshtix, Firebase, Embedded Calendar, Squarespace, SpotHopper, Bandzoogle, GoDaddy, Timely, JSON-LD, WordPress/Tribe, Prekindle, Wix, RHP, OpenDate.io, Microdata; then HTML section fallback; automatic pagination up to MAX_PAGES=20; automatic WordPress API discovery fallback)
+  - `WebScraper\\UniversalWebScraper` (extractor priority: AEG/AXS, RedRocks, Freshtix, Firebase, Embedded Calendar, Squarespace, Craftpeak, SpotHopper, Gigwell, Bandzoogle, GoDaddy, Timely, Elfsight, JSON-LD, WordPress/Tribe, Prekindle, Wix, MusicItem, RHP, OpenDate.io, Microdata; then HTML section fallback; automatic pagination up to MAX_PAGES=20; automatic WordPress API discovery fallback)
 - **Event Filtering**: All import handlers (via `EventImportHandler`) automatically skip events with "closed" in the title.
 - **Handler discovery**: `EventImportStep` (extends `DataMachine\Core\Steps\Step`) reads the configured handler slug, looks it up via `datamachine_handlers`, instantiates the class, and delegates to `get_fetch_data()` on `FetchHandler` (or falls back to legacy `execute()`). It merges returned `DataPacket` results into the pipeline and logs configuration issues.
 - **Single-item processing**: Each handler normalizes `(title, startDate, venue)` through `EventIdentifierGenerator::generate()`, checks `datamachine_is_item_processed`, marks the identifier via `datamachine_mark_item_processed`, and returns immediately after pushing a valid event to maintain incremental imports.

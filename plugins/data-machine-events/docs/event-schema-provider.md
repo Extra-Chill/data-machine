@@ -11,6 +11,8 @@ The `EventSchemaProvider` class serves as the single source of truth for all eve
 - Field validation and defaults
 - Parameter routing between engine data and AI inference
 
+The class uses `DynamicToolParametersTrait` for dynamic parameter filtering based on engine data availability.
+
 ## Field Categories
 
 ### Core Fields
@@ -80,8 +82,14 @@ $venue_data = [
     'state' => 'NY'
 ];
 
+$organizer_data = [
+    'name' => 'Live Nation',
+    'type' => 'Organization',
+    'url' => 'https://livenation.com'
+];
+
 $post_id = 123;
-$schema = EventSchemaProvider::generateSchemaOrg($event_data, $venue_data, $post_id);
+$schema = EventSchemaProvider::generateSchemaOrg($event_data, $venue_data, $organizer_data, $post_id);
 
 // Output structured data
 echo '<script type="application/ld+json">' . wp_json_encode($schema) . '</script>';
@@ -90,6 +98,8 @@ echo '<script type="application/ld+json">' . wp_json_encode($schema) . '</script
 ### Get AI Tool Parameters
 
 All parameter methods accept optional `$engine_data` to filter out parameters that already have values in engine data. This ensures the AI only sees parameters it needs to provide.
+
+The `getEngineAwareKeys()` method excludes `description` and `title` from engine data filtering, ensuring the AI always generates these fields regardless of engine data contents.
 
 ```php
 // Get all tool parameters, filtered by engine data
@@ -126,11 +136,19 @@ The provider generates comprehensive Google Event structured data including:
 - **Event Details**: Name, dates, times, description
 - **Location**: Venue name, address, coordinates, contact info
 - **Performer**: Artist information with proper typing
-- **Organizer**: Promoter details with website links
+- **Organizer**: Promoter details with website links (via `buildOrganizerSchema()`)
 - **Offers**: Pricing, availability, purchase URLs
 - **Status**: Event scheduling status and rescheduling info
 - **Images**: Featured images in multiple sizes
 - **Event Type**: Rich result categorization
+
+### Organizer Schema Generation
+
+The `buildOrganizerSchema()` method generates organizer structured data with the following priority:
+
+1. Uses organizer taxonomy data (`$organizer_data`) when available
+2. Falls back to event_data fields (`organizer`, `organizerType`, `organizerUrl`) when taxonomy data is empty
+3. Returns empty array if no organizer name is found
 
 ## Integration with VenueParameterProvider
 

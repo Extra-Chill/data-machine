@@ -325,7 +325,7 @@ class UniversalWebScraper extends EventImportHandler {
                 'page' => $current_page
             ]);
 
-            $raw_html_data = $this->extract_raw_html_section($event_section['html'], $current_url, $config);
+            $raw_html_data = $this->extract_raw_html_section($event_section['html'], $current_url, $context, $config);
 
             if (!$raw_html_data) {
                 $skipped_identifiers[$event_section['identifier']] = true;
@@ -694,11 +694,11 @@ class UniversalWebScraper extends EventImportHandler {
     /**
      * Extract raw HTML section for AI processing.
      */
-    private function extract_raw_html_section(string $section_html, string $source_url, array $config = []): ?string {
+    private function extract_raw_html_section(string $section_html, string $source_url, ExecutionContext $context, array $config = []): ?string {
         $cleaned = $this->clean_html_for_ai($section_html);
 
         if (empty($cleaned) || strlen($cleaned) < 50) {
-            $this->log('debug', 'Universal Web Scraper: HTML section too short after cleaning', [
+            $context->log('debug', 'Universal Web Scraper: HTML section too short after cleaning', [
                 'source_url' => $source_url,
                 'cleaned_length' => strlen($cleaned)
             ]);
@@ -707,7 +707,7 @@ class UniversalWebScraper extends EventImportHandler {
 
         if (strlen($cleaned) > 50000) {
             $cleaned = substr($cleaned, 0, 50000);
-            $this->log('debug', 'Universal Web Scraper: Truncated HTML section to 50KB', [
+            $context->log('debug', 'Universal Web Scraper: Truncated HTML section to 50KB', [
                 'source_url' => $source_url
             ]);
         }

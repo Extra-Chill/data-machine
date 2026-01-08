@@ -5,6 +5,11 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.9.2] - 2026-01-08
+
+### Fixed
+- **Universal Web Scraper HTML Fallback Logging**: Updated `DataMachineEvents\Steps\EventImport\Handlers\WebScraper\UniversalWebScraper::extract_raw_html_section()` to log via `ExecutionContext` (and updated the call site), keeping scraper diagnostics consistent during AI HTML fallback extraction.
+
 ## [0.9.1] - 2026-01-08
 
 ### Fixed
