@@ -26,7 +26,7 @@ class EventEngineData {
      * @param array $event_data Standardized event data
      * @param array $venue_metadata Venue metadata
      */
-    public static function storeVenueContext(string $job_id, array $event_data, array $venue_metadata): void {
+    public static function storeVenueContext(?string $job_id, array $event_data, array $venue_metadata): void {
         $job_id = (int) $job_id;
 
         if ($job_id <= 0 || !function_exists('datamachine_merge_engine_data')) {
