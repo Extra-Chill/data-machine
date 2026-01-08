@@ -5,6 +5,15 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.9.3] - 2026-01-08
+
+### Added
+- **Venue Health Check Website Detection**: Enhanced `VenueHealthCheck` AI tool to detect data quality issues related to venue websites.
+  - Added detection for missing venue websites.
+  - Implemented suspicious website detection that flags ticket platform URLs (Eventbrite, Ticketmaster, Dice, etc.) or event-specific paths (`/event/`, `/tickets/`) mistakenly stored in the venue website field.
+  - Added sorting for missing and suspicious website categories by event count.
+  - Updated tool metadata and response messages to surface these new health indicators to the AI.
+
 ## [0.9.2] - 2026-01-08
 
 ### Fixed

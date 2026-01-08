@@ -2,7 +2,9 @@
 /**
  * Venue Health Check Tool
  *
- * Scans venues for data quality issues: missing address, coordinates, or timezone.
+ * Scans venues for data quality issues: missing address, coordinates, timezone,
+ * or website. Also detects suspicious websites where a ticket URL was mistakenly
+ * stored as the venue website.
  *
  * @package DataMachineEvents\Api\Chat\Tools
  */
@@ -21,6 +23,36 @@ class VenueHealthCheck {
 
     private const DEFAULT_LIMIT = 25;
 
+    private const TICKET_PLATFORM_DOMAINS = [
+        'eventbrite.com',
+        'ticketmaster.com',
+        'axs.com',
+        'dice.fm',
+        'seetickets.com',
+        'bandsintown.com',
+        'songkick.com',
+        'livenation.com',
+        'ticketweb.com',
+        'etix.com',
+        'ticketfly.com',
+        'showclix.com',
+        'prekindle.com',
+        'freshtix.com',
+        'tixr.com',
+        'seated.com',
+        'stubhub.com',
+        'vividseats.com',
+    ];
+
+    private const SUSPICIOUS_PATH_PATTERNS = [
+        '/event/',
+        '/events/',
+        '/e/',
+        '/tickets/',
+        '/shows/',
+        '/tour/',
+    ];
+
     public function __construct() {
         $this->registerTool('chat', 'venue_health_check', [$this, 'getToolDefinition']);
     }
@@ -29,7 +61,7 @@ class VenueHealthCheck {
         return [
             'class' => self::class,
             'method' => 'handle_tool_call',
-            'description' => 'Check venues for data quality issues: missing address, missing coordinates, or missing timezone. Returns counts and lists of problematic venues.',
+            'description' => 'Check venues for data quality issues: missing address, coordinates, timezone, or website. Also detects suspicious websites where a ticket URL was mistakenly stored as venue website. Returns counts and lists of problematic venues.',
             'parameters' => [
                 'limit' => [
                     'type' => 'integer',
@@ -73,6 +105,8 @@ class VenueHealthCheck {
         $missing_address = [];
         $missing_coordinates = [];
         $missing_timezone = [];
+        $missing_website = [];
+        $suspicious_website = [];
 
         foreach ($venues as $venue) {
             $address = get_term_meta($venue->term_id, '_venue_address', true);
@@ -97,6 +131,19 @@ class VenueHealthCheck {
             if (!empty($coordinates) && empty($timezone)) {
                 $missing_timezone[] = $venue_info;
             }
+
+            $website = get_term_meta($venue->term_id, '_venue_website', true);
+
+            if (empty($website)) {
+                $missing_website[] = $venue_info;
+            } else {
+                $suspicion = self::checkSuspiciousWebsite($website);
+                if ($suspicion) {
+                    $venue_info['website'] = $website;
+                    $venue_info['suspicion_reason'] = $suspicion;
+                    $suspicious_website[] = $venue_info;
+                }
+            }
         }
 
         $total = count($venues);
@@ -106,6 +153,8 @@ class VenueHealthCheck {
         usort($missing_address, $sort_by_events);
         usort($missing_coordinates, $sort_by_events);
         usort($missing_timezone, $sort_by_events);
+        usort($missing_website, $sort_by_events);
+        usort($suspicious_website, $sort_by_events);
 
         // Build message
         $message_parts = [];
@@ -117,6 +166,12 @@ class VenueHealthCheck {
         }
         if (!empty($missing_timezone)) {
             $message_parts[] = count($missing_timezone) . ' missing timezone';
+        }
+        if (!empty($missing_website)) {
+            $message_parts[] = count($missing_website) . ' missing website';
+        }
+        if (!empty($suspicious_website)) {
+            $message_parts[] = count($suspicious_website) . ' suspicious website (possible ticket URL)';
         }
 
         if (empty($message_parts)) {
@@ -141,9 +196,51 @@ class VenueHealthCheck {
                     'count' => count($missing_timezone),
                     'venues' => array_slice($missing_timezone, 0, $limit)
                 ],
+                'missing_website' => [
+                    'count' => count($missing_website),
+                    'venues' => array_slice($missing_website, 0, $limit)
+                ],
+                'suspicious_website' => [
+                    'count' => count($suspicious_website),
+                    'venues' => array_slice($suspicious_website, 0, $limit)
+                ],
                 'message' => $message
             ],
             'tool_name' => 'venue_health_check'
         ];
+    }
+
+    /**
+     * Check if a URL looks like a ticket/event URL rather than a venue website.
+     *
+     * @param string $url Website URL to check
+     * @return string|null Suspicion reason, or null if URL looks legitimate
+     */
+    private static function checkSuspiciousWebsite(string $url): ?string {
+        if (empty($url)) {
+            return null;
+        }
+
+        $parsed = wp_parse_url($url);
+        if (empty($parsed['host'])) {
+            return null;
+        }
+
+        $host = strtolower($parsed['host']);
+
+        foreach (self::TICKET_PLATFORM_DOMAINS as $domain) {
+            if (str_contains($host, $domain)) {
+                return 'ticket_platform_domain';
+            }
+        }
+
+        $path = strtolower($parsed['path'] ?? '');
+        foreach (self::SUSPICIOUS_PATH_PATTERNS as $pattern) {
+            if (str_contains($path, $pattern)) {
+                return 'event_url_path';
+            }
+        }
+
+        return null;
     }
 }
