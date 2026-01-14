@@ -44,6 +44,16 @@ class GetVenueEvents {
                     'type' => 'string',
                     'required' => false,
                     'description' => 'Post status filter: any, publish, future, draft (default: any)'
+                ],
+                'published_before' => [
+                    'type' => 'string',
+                    'required' => false,
+                    'description' => 'Only return events published before this date (YYYY-MM-DD format)'
+                ],
+                'published_after' => [
+                    'type' => 'string',
+                    'required' => false,
+                    'description' => 'Only return events published after this date (YYYY-MM-DD format)'
                 ]
             ]
         ];
@@ -77,6 +87,20 @@ class GetVenueEvents {
             $status = 'any';
         }
 
+        $date_query = [];
+        if (!empty($parameters['published_before'])) {
+            $date_query[] = [
+                'before' => $parameters['published_before'],
+                'inclusive' => false
+            ];
+        }
+        if (!empty($parameters['published_after'])) {
+            $date_query[] = [
+                'after' => $parameters['published_after'],
+                'inclusive' => true
+            ];
+        }
+
         $query_args = [
             'post_type' => Event_Post_Type::POST_TYPE,
             'post_status' => $status,
@@ -93,6 +117,10 @@ class GetVenueEvents {
             ]
         ];
 
+        if (!empty($date_query)) {
+            $query_args['date_query'] = $date_query;
+        }
+
         $query = new \WP_Query($query_args);
         $events = [];
 
@@ -104,6 +132,7 @@ class GetVenueEvents {
                 'post_id' => $post->ID,
                 'title' => $post->post_title,
                 'status' => $post->post_status,
+                'published' => $post->post_date,
                 'start_date' => $start_date ?: null,
                 'end_date' => $end_date ?: null,
                 'permalink' => get_permalink($post->ID)
