@@ -22,6 +22,7 @@ $settings = [
     'main_events_page_url' => Settings_Page::get_setting('main_events_page_url'),
     'map_display_type' => Settings_Page::get_setting('map_display_type'),
     'geonames_username' => Settings_Page::get_setting('geonames_username'),
+    'next_day_cutoff' => Settings_Page::get_setting('next_day_cutoff'),
 ];
 
 // Handle settings updates
@@ -176,6 +177,27 @@ settings_errors('datamachine_events_messages');
                     </td>
                 </tr>
 
+            </tbody>
+        </table>
+
+        <!-- Calendar Display Settings -->
+        <h2><?php _e('Calendar Display Settings', 'datamachine-events'); ?></h2>
+        <p class="description"><?php _e('Configure how events display in the Calendar block.', 'datamachine-events'); ?></p>
+
+        <table class="form-table" role="presentation">
+            <tbody>
+                <tr>
+                    <th scope="row"><?php _e('Next Day Cutoff Time', 'datamachine-events'); ?></th>
+                    <td>
+                        <input type="time"
+                               name="datamachine_events_settings[next_day_cutoff]"
+                               value="<?php echo esc_attr($settings['next_day_cutoff'] ?? '05:00'); ?>"
+                               class="small-text" />
+                        <p class="description">
+                            <?php _e('Events ending before this time on the following day are treated as single-day events, not multi-day. Default: 5:00 AM (typical end of late-night shows).', 'datamachine-events'); ?>
+                        </p>
+                    </td>
+                </tr>
             </tbody>
         </table>
 

@@ -28,7 +28,8 @@ class Settings_Page {
         'include_in_search' => true,
         'main_events_page_url' => '',
         'map_display_type' => 'osm-standard',
-        'geonames_username' => ''
+        'geonames_username' => '',
+        'next_day_cutoff' => '05:00'
     );
     
     public function __construct() {
@@ -118,6 +119,11 @@ class Settings_Page {
             ? sanitize_text_field($input['geonames_username'])
             : '';
 
+        // Next day cutoff time (HH:MM format)
+        $sanitized['next_day_cutoff'] = !empty($input['next_day_cutoff'])
+            ? sanitize_text_field($input['next_day_cutoff'])
+            : '05:00';
+
         return $sanitized;
     }
     
@@ -196,6 +202,17 @@ class Settings_Page {
      */
     public static function get_map_display_type() {
         return self::get_setting('map_display_type', 'osm-standard');
+    }
+
+    /**
+     * Get next day cutoff time setting
+     *
+     * Events ending before this time on the following day are treated as single-day events.
+     *
+     * @return string Time in HH:MM format (default: 05:00)
+     */
+    public static function get_next_day_cutoff(): string {
+        return self::get_setting('next_day_cutoff', '05:00');
     }
 
     /**

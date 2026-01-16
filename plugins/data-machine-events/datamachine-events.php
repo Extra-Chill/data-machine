@@ -66,6 +66,11 @@ require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/meta-storage.php';
 		\WP_CLI::add_command( 'datamachine-events test-scraper-url', \DataMachineEvents\Cli\UniversalWebScraperTestCommand::class );
 	}
 
+	if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/SettingsCommand.php' ) ) {
+		require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/SettingsCommand.php';
+		\WP_CLI::add_command( 'datamachine-events settings', \DataMachineEvents\Cli\SettingsCommand::class );
+	}
+
 
 /**
  * Main Data Machine Events plugin class

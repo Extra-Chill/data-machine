@@ -16,6 +16,7 @@ use DateTimeZone;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Core\Promoter_Taxonomy;
+use DataMachineEvents\Admin\Settings_Page;
 use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
 use const DataMachineEvents\Core\EVENT_END_DATETIME_META_KEY;
 
@@ -371,18 +372,43 @@ class Calendar_Query {
     /**
      * Check if an event spans multiple days
      *
+     * Events ending before the next_day_cutoff time on the following day
+     * are treated as single-day events (typical late-night shows).
+     *
      * @param array $event_data Event data array
      * @return bool True if event spans multiple days
      */
     private static function is_multi_day_event(array $event_data): bool {
         $start_date = $event_data['startDate'] ?? '';
         $end_date = $event_data['endDate'] ?? '';
+        $end_time = $event_data['endTime'] ?? '';
 
         if (empty($start_date) || empty($end_date)) {
             return false;
         }
 
-        return $start_date !== $end_date;
+        if ($start_date === $end_date) {
+            return false;
+        }
+
+        $start = new DateTime($start_date);
+        $end = new DateTime($end_date);
+        $diff = $start->diff($end)->days;
+
+        if ($diff === 1 && !empty($end_time)) {
+            $cutoff = Settings_Page::get_next_day_cutoff();
+            $cutoff_parts = explode(':', $cutoff);
+            $cutoff_seconds = ((int) $cutoff_parts[0] * 3600) + ((int) ($cutoff_parts[1] ?? 0) * 60);
+
+            $end_time_parts = explode(':', $end_time);
+            $end_seconds = ((int) $end_time_parts[0] * 3600) + ((int) ($end_time_parts[1] ?? 0) * 60);
+
+            if ($end_seconds < $cutoff_seconds) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

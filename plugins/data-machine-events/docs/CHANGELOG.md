@@ -5,8 +5,11 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
-## [0.9.6] - 2026-01-15
+## [0.9.6] - 2026-01-16
 
+- Add `next_day_cutoff` setting for multi-day event detection - events ending before this time (default 5:00 AM) on the following day are treated as single-day events.
+- Add Calendar Display Settings section to admin settings page.
+- Add `datamachine-events settings` WP-CLI command for managing plugin settings.
 - Add `late_night_time` and `suspicious_end_time` health check categories to `event_health_check` tool.
 
 ## [0.9.5] - 2026-01-15
