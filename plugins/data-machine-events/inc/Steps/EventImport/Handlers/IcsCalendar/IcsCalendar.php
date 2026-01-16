@@ -14,7 +14,6 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\IcsCalendar;
 use ICal\ICal;
 use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
-use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
@@ -112,10 +111,7 @@ class IcsCalendar extends EventImportHandler {
             ]);
 
             $venue_metadata = $this->extractVenueMetadata($standardized_event);
-            $job_id = $context->getJobId();
-
-            EventEngineData::storeVenueContext($job_id, $standardized_event, $venue_metadata);
-
+            $this->storeEventContext($context, $standardized_event);
             $this->stripVenueMetadataFromEvent($standardized_event);
 
             $dataPacket = new DataPacket(

@@ -238,16 +238,17 @@ if (!empty($archive_context['taxonomy'])) {
 
                 <div class="datamachine-events-wrapper">
                     <?php
-                    foreach ($events_for_date as $event_item) : 
+                    foreach ($events_for_date as $event_item) :
                         $event_post = $event_item['post'];
                         $event_data = $event_item['event_data'];
-                        
+                        $display_context = $event_item['display_context'] ?? [];
+
                         global $post;
                         $post = $event_post;
                         setup_postdata($post);
-                        
-                        $display_vars = Calendar_Query::build_display_vars($event_data);
-                        
+
+                        $display_vars = Calendar_Query::build_display_vars($event_data, $display_context);
+
                         \DataMachineEvents\Blocks\Calendar\Template_Loader::include_template('event-item', [
                             'event_post' => $event_post,
                             'event_data' => $event_data,

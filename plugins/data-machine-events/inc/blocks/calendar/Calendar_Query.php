@@ -273,7 +273,7 @@ class Calendar_Query {
         $venue_data = Venue_Taxonomy::get_venue_data($venue_term->term_id);
 
         $event_data['venue'] = $venue_data['name'];
-        $event_data['address'] = Venue_Taxonomy::get_formatted_address($venue_term->term_id);
+        $event_data['address'] = Venue_Taxonomy::get_formatted_address($venue_term->term_id, $venue_data);
         
         if (!empty($venue_data['timezone'])) {
             $event_data['venueTimezone'] = $venue_data['timezone'];
@@ -369,7 +369,50 @@ class Calendar_Query {
     }
 
     /**
-     * Group events by date
+     * Check if an event spans multiple days
+     *
+     * @param array $event_data Event data array
+     * @return bool True if event spans multiple days
+     */
+    private static function is_multi_day_event(array $event_data): bool {
+        $start_date = $event_data['startDate'] ?? '';
+        $end_date = $event_data['endDate'] ?? '';
+
+        if (empty($start_date) || empty($end_date)) {
+            return false;
+        }
+
+        return $start_date !== $end_date;
+    }
+
+    /**
+     * Generate all dates an event spans
+     *
+     * @param string $start_date Start date (Y-m-d)
+     * @param string $end_date End date (Y-m-d)
+     * @param DateTimeZone $event_tz Event timezone
+     * @return array Array of date strings (Y-m-d)
+     */
+    private static function get_event_date_range(string $start_date, string $end_date, DateTimeZone $event_tz): array {
+        $dates = [];
+
+        $start = new DateTime($start_date, $event_tz);
+        $end = new DateTime($end_date, $event_tz);
+
+        $max_days = 90;
+        $day_count = 0;
+
+        while ($start <= $end && $day_count < $max_days) {
+            $dates[] = $start->format('Y-m-d');
+            $start->modify('+1 day');
+            $day_count++;
+        }
+
+        return $dates;
+    }
+
+    /**
+     * Group events by date, expanding multi-day events across their date range
      *
      * @param array $paged_events Array of event items
      * @param bool $show_past Whether showing past events (affects sort order)
@@ -381,24 +424,44 @@ class Calendar_Query {
         foreach ($paged_events as $event_item) {
             $event_data = $event_item['event_data'];
             $start_date = $event_data['startDate'] ?? '';
+            $end_date = $event_data['endDate'] ?? $start_date;
 
             if (empty($start_date)) {
                 continue;
             }
 
-            $start_time = $event_data['startTime'] ?? '00:00:00';
             $event_tz = self::get_event_timezone($event_data);
-            $start_datetime_obj = new DateTime($start_date . ' ' . $start_time, $event_tz);
-            $date_key = $start_datetime_obj->format('Y-m-d');
+            $is_multi_day = self::is_multi_day_event($event_data);
 
-            if (!isset($date_groups[$date_key])) {
-                $date_groups[$date_key] = [
-                    'date_obj' => $start_datetime_obj,
-                    'events' => [],
+            $event_dates = $is_multi_day
+                ? self::get_event_date_range($start_date, $end_date, $event_tz)
+                : [$start_date];
+
+            foreach ($event_dates as $index => $date_key) {
+                $display_datetime_obj = new DateTime($date_key . ' 00:00:00', $event_tz);
+
+                if (!isset($date_groups[$date_key])) {
+                    $date_groups[$date_key] = [
+                        'date_obj' => $display_datetime_obj,
+                        'events' => [],
+                    ];
+                }
+
+                $display_item = $event_item;
+                $display_item['display_context'] = [
+                    'is_multi_day' => $is_multi_day,
+                    'is_start_day' => ($date_key === $start_date),
+                    'is_end_day' => ($date_key === $end_date),
+                    'is_continuation' => ($date_key !== $start_date),
+                    'display_date' => $date_key,
+                    'original_start_date' => $start_date,
+                    'original_end_date' => $end_date,
+                    'day_number' => $index + 1,
+                    'total_days' => count($event_dates),
                 ];
-            }
 
-            $date_groups[$date_key]['events'][] = $event_item;
+                $date_groups[$date_key]['events'][] = $display_item;
+            }
         }
 
         uksort($date_groups, function ($a, $b) use ($show_past) {
@@ -412,9 +475,10 @@ class Calendar_Query {
      * Build display variables for an event
      *
      * @param array $event_data Event data from block attributes
+     * @param array $display_context Optional display context for multi-day events
      * @return array Display variables
      */
-    public static function build_display_vars(array $event_data): array {
+    public static function build_display_vars(array $event_data, array $display_context = []): array {
         $start_date = $event_data['startDate'] ?? '';
         $start_time = $event_data['startTime'] ?? '';
         $end_date = $event_data['endDate'] ?? '';
@@ -422,13 +486,31 @@ class Calendar_Query {
 
         $formatted_time_display = '';
         $iso_start_date = '';
+        $multi_day_label = '';
 
         if ($start_date) {
             $event_tz = self::get_event_timezone($event_data);
             $start_datetime_obj = new DateTime($start_date . ' ' . $start_time, $event_tz);
             $iso_start_date = $start_datetime_obj->format('c');
 
-            $formatted_time_display = self::format_time_range($start_datetime_obj, $end_date, $end_time, $event_tz);
+            $is_multi_day = !empty($display_context['is_multi_day']);
+            $is_continuation = !empty($display_context['is_continuation']);
+
+            if ($is_multi_day && !empty($end_date)) {
+                $end_datetime_obj = new DateTime($end_date, $event_tz);
+                $multi_day_label = sprintf(
+                    __('through %s', 'datamachine-events'),
+                    $end_datetime_obj->format('M j')
+                );
+
+                if ($is_continuation) {
+                    $formatted_time_display = __('All Day', 'datamachine-events');
+                } else {
+                    $formatted_time_display = self::format_time_range($start_datetime_obj, $end_date, $end_time, $event_tz);
+                }
+            } else {
+                $formatted_time_display = self::format_time_range($start_datetime_obj, $end_date, $end_time, $event_tz);
+            }
         }
 
         return [
@@ -436,9 +518,12 @@ class Calendar_Query {
             'venue_name' => self::decode_unicode($event_data['venue'] ?? ''),
             'performer_name' => self::decode_unicode($event_data['performer'] ?? ''),
             'iso_start_date' => $iso_start_date,
-            'show_performer' => false, // Always hide performer in calendar display
+            'show_performer' => false,
             'show_price' => $event_data['showPrice'] ?? true,
             'show_ticket_link' => $event_data['showTicketLink'] ?? true,
+            'multi_day_label' => $multi_day_label,
+            'is_continuation' => $display_context['is_continuation'] ?? false,
+            'is_multi_day' => $display_context['is_multi_day'] ?? false,
         ];
     }
 
@@ -523,6 +608,8 @@ class Calendar_Query {
     /**
      * Get unique event dates for pagination calculations
      *
+     * Expands multi-day events to count on each day they span.
+     *
      * @param array $params Query parameters (show_past, search_query, tax_filters, etc.)
      * @return array {
      *     @type array $dates        Ordered array of unique date strings (Y-m-d)
@@ -539,9 +626,21 @@ class Calendar_Query {
 
         if ($query->have_posts()) {
             foreach ($query->posts as $post_id) {
-                $datetime = get_post_meta($post_id, EVENT_DATETIME_META_KEY, true);
-                if ($datetime) {
-                    $date = date('Y-m-d', strtotime($datetime));
+                $start_datetime = get_post_meta($post_id, EVENT_DATETIME_META_KEY, true);
+                $end_datetime = get_post_meta($post_id, EVENT_END_DATETIME_META_KEY, true);
+
+                if (!$start_datetime) {
+                    continue;
+                }
+
+                $start_date = date('Y-m-d', strtotime($start_datetime));
+                $end_date = $end_datetime ? date('Y-m-d', strtotime($end_datetime)) : $start_date;
+
+                $event_dates = ($start_date !== $end_date)
+                    ? self::get_event_date_range($start_date, $end_date, wp_timezone())
+                    : [$start_date];
+
+                foreach ($event_dates as $date) {
                     if (isset($events_per_date[$date])) {
                         $events_per_date[$date]++;
                     } else {

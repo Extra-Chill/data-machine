@@ -157,6 +157,27 @@ abstract class EventImportHandler extends FetchHandler {
     }
 
     /**
+     * Store event context (venue + core fields) in engine data.
+     *
+     * Call this after standardizing event data. Stores venue metadata
+     * and core fields (dates, ticketUrl, price) so the AI cannot override them.
+     *
+     * @param ExecutionContext $context Execution context
+     * @param array $event_data Standardized event data
+     * @since 0.8.32
+     */
+    protected function storeEventContext(ExecutionContext $context, array $event_data): void {
+        $job_id = $context->getJobId();
+        if (!$job_id) {
+            return;
+        }
+
+        $venue_metadata = $this->extractVenueMetadata($event_data);
+        EventEngineData::storeVenueContext($job_id, $event_data, $venue_metadata);
+        EventEngineData::storeEventCoreFields($job_id, $event_data);
+    }
+
+    /**
      * @return array{lat: float, lng: float}|false
      */
     protected function parseCoordinates(string $location): array|false {

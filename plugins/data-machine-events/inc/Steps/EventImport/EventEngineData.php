@@ -81,6 +81,42 @@ class EventEngineData {
     }
 
     /**
+     * Store core event fields in engine data.
+     *
+     * When these fields exist in engine data, they are:
+     * 1. Excluded from AI tool parameters (AI can't override them)
+     * 2. Read directly by EventUpsert::buildEventData()
+     *
+     * @param string|int $job_id Job ID
+     * @param array $event_data Standardized event data
+     * @since 0.8.32
+     */
+    public static function storeEventCoreFields($job_id, array $event_data): void {
+        $job_id = (int) $job_id;
+
+        if ($job_id <= 0 || !function_exists('datamachine_merge_engine_data')) {
+            return;
+        }
+
+        $core_fields = [
+            'startDate' => $event_data['startDate'] ?? '',
+            'startTime' => $event_data['startTime'] ?? '',
+            'endDate' => $event_data['endDate'] ?? '',
+            'endTime' => $event_data['endTime'] ?? '',
+            'ticketUrl' => $event_data['ticketUrl'] ?? '',
+            'price' => $event_data['price'] ?? '',
+        ];
+
+        $payload = array_filter($core_fields, static function($value) {
+            return $value !== '' && $value !== null;
+        });
+
+        if (!empty($payload)) {
+            datamachine_merge_engine_data($job_id, $payload);
+        }
+    }
+
+    /**
      * Store item context in engine data for skip_item tool.
      *
      * This enables the skip_item tool to mark items as processed even when

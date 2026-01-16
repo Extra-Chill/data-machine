@@ -13,7 +13,6 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\DiceFm;
 
 use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
-use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
@@ -135,10 +134,7 @@ class DiceFm extends EventImportHandler {
             ]);
             
             $venue_metadata = $this->extractVenueMetadata($standardized_event);
-            $job_id = $context->getJobId();
-            
-            EventEngineData::storeVenueContext($job_id, $standardized_event, $venue_metadata);
-
+            $this->storeEventContext($context, $standardized_event);
             $this->stripVenueMetadataFromEvent($standardized_event);
             
             // Create DataPacket

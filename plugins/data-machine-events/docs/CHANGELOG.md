@@ -479,7 +479,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Universal Web Scraper Handler**: Updated documentation to clarify Schema.org JSON-LD and microdata priority over AI processing
 - **BandzoogleCalendar Handler**: Added comprehensive documentation for the Bandzoogle calendar import handler
 - **Prekindle Handler**: Added complete documentation for the Prekindle widget import handler
-- **AGENTS.md**: Updated to include BandzoogleCalendar and Prekindle handlers
+- **CLAUDE.md**: Updated to include BandzoogleCalendar and Prekindle handlers
 - **README.md**: Updated import pipeline section to reflect all 12 handlers
 
 ## [0.5.18] - 2025-12-15
@@ -523,7 +523,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Carousel Navigation Improvements**: Enhanced mobile dot indicators with viewport-based overflow handling for better navigation with many events
 - **CSS Optimization**: Simplified carousel indicators styling by removing class-based collapsed states
-- **Documentation**: Renamed CLAUDE.md to AGENTS.md for consistency
+- **Documentation**: Renamed AGENTS.md to CLAUDE.md for consistency
 
 ## [0.5.12] - 2025-12-09
 
@@ -545,7 +545,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.5.9] - 2025-12-09
 
 ### Changed
-- **Documentation Updates**: Comprehensive alignment of AGENTS.md, calendar-block.md, event-details-block.md, ticketmaster-handler.md, and universal-web-scraper-handler.md for improved clarity and current architecture reflection
+- **Documentation Updates**: Comprehensive alignment of CLAUDE.md, calendar-block.md, event-details-block.md, ticketmaster-handler.md, and universal-web-scraper-handler.md for improved clarity and current architecture reflection
 - **Carousel Enhancements**: Added collapsed dots functionality for mobile navigation with small/medium/active dot states and improved touch interaction
 - **Filter Bar Styling**: Modernized search input and filter bar styles with improved focus states, transitions, and responsive design
 - **Version Synchronization**: Corrected composer.json version from 0.5.7 to match current version
@@ -663,7 +663,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.5.1] - 2025-12-03
 
 ### Changed
-- **Documentation Updates**: Comprehensive documentation alignment across AGENTS.md, README.md, and all docs/ files to reflect current architecture
+- **Documentation Updates**: Comprehensive documentation alignment across CLAUDE.md, README.md, and all docs/ files to reflect current architecture
 - **Calendar Controller**: Enhanced pagination logic and parameter handling
 - **Results Counter**: Improved date formatting and event count display for better user experience
 
@@ -1221,6 +1221,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Modern UX**: Horizontal scroll aligns with contemporary touch interfaces
 
 ## [Unreleased]
+
+## [0.9.4] - 2026-01-15
+
+- Add published_before/published_after filters to GetVenueEvents tool.
+- Improve venue health checks with website detection.
 
 ### Fixed
 - **Event Details Block Description** - Fixed InnerBlocks content being stripped when saving

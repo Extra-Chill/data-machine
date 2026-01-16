@@ -9,7 +9,6 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster;
 
 use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
-use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
@@ -143,16 +142,7 @@ class Ticketmaster extends EventImportHandler {
                 ]);
                 
                 $venue_metadata = $this->extractVenueMetadata($standardized_event);
-                $job_id = $context->getJobId();
-                
-                EventEngineData::storeVenueContext($job_id, $standardized_event, $venue_metadata);
-
-                if (!empty($standardized_event['price'])) {
-                    $context->storeEngineData([
-                        'price' => $standardized_event['price'],
-                    ]);
-                }
-
+                $this->storeEventContext($context, $standardized_event);
                 $this->stripVenueMetadataFromEvent($standardized_event);
                 
                 $dataPacket = new DataPacket(

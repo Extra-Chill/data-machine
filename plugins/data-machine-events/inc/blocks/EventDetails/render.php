@@ -41,7 +41,7 @@ if ($venue_terms && !is_wp_error($venue_terms)) {
     $venue_term = $venue_terms[0];
     $venue_data = Venue_Taxonomy::get_venue_data($venue_term->term_id);
     $venue = $venue_data['name'];
-    $address = Venue_Taxonomy::get_formatted_address($venue_term->term_id);
+    $address = Venue_Taxonomy::get_formatted_address($venue_term->term_id, $venue_data);
 }
 
 // Promoter taxonomy maps to Schema.org organizer property

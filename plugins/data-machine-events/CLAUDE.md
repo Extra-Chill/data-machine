@@ -1,4 +1,4 @@
-# AGENTS.md
+# CLAUDE.md
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
@@ -103,7 +103,6 @@ cd ../EventDetails && npm ci && npm run build
 ## Removed Features (Completed)
 
 - **Circuit Grid/past-grid modes** were removed in favor of the Carousel List; no branching logic remains.
-- **Legacy status detection** (`Admin/Status_Detection.php`) is retained only for backwards compatibility logging and no longer influences scheduling.
 - **AJAX calendar filtering/FilterManager** have been replaced entirely by REST endpoints.
 
 ## Observability Notes

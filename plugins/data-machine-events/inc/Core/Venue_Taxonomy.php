@@ -528,8 +528,10 @@ class Venue_Taxonomy {
      * @param int $term_id Venue term ID
      * @return string Formatted address string
      */
-    public static function get_formatted_address($term_id) {
-        $venue_data = self::get_venue_data($term_id);
+    public static function get_formatted_address($term_id, ?array $venue_data = null) {
+        if ($venue_data === null) {
+            $venue_data = self::get_venue_data($term_id);
+        }
         
         $address_parts = [];
         
@@ -594,29 +596,7 @@ class Venue_Taxonomy {
         
         return $venue_data;
     }
-    
-    private static function extract_city_from_location($location_name) {
-        if (empty($location_name)) {
-            return '';
-        }
-        
-        $parts = explode(',', $location_name);
-        return trim($parts[0]);
-    }
-    
-    private static function extract_state_from_location($location_name) {
-        if (empty($location_name)) {
-            return '';
-        }
-        
-        $parts = explode(',', $location_name);
-        if (count($parts) > 1) {
-            return trim($parts[1]);
-        }
-        
-        return '';
-    }
-    
+
     private static function init_admin_hooks() {
         add_action('venue_add_form_fields', [__CLASS__, 'add_venue_form_fields']);
         

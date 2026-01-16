@@ -22,9 +22,21 @@ $iso_start_date = $display_vars['iso_start_date'] ?? '';
 $show_performer = $display_vars['show_performer'] ?? true;
 $show_price = $display_vars['show_price'] ?? true;
 $show_ticket_link = $display_vars['show_ticket_link'] ?? true;
+
+$multi_day_label = $display_vars['multi_day_label'] ?? '';
+$is_continuation = $display_vars['is_continuation'] ?? false;
+$is_multi_day = $display_vars['is_multi_day'] ?? false;
+
+$item_classes = ['datamachine-event-item'];
+if ($is_continuation) {
+    $item_classes[] = 'datamachine-event-continuation';
+}
+if ($is_multi_day) {
+    $item_classes[] = 'datamachine-event-multi-day';
+}
 ?>
 
-<div class="datamachine-event-item"
+<div class="<?php echo esc_attr(implode(' ', $item_classes)); ?>"
      data-title="<?php echo esc_attr(get_the_title()); ?>"
      data-venue="<?php echo esc_attr($venue_name); ?>"
      data-performer="<?php echo esc_attr($performer_name); ?>"
@@ -47,6 +59,9 @@ $show_ticket_link = $display_vars['show_ticket_link'] ?? true;
                 <div class="datamachine-event-time">
                     <span class="dashicons dashicons-clock"></span>
                     <?php echo esc_html($formatted_time_display); ?>
+                    <?php if (!empty($multi_day_label)) : ?>
+                        <span class="datamachine-event-multi-day-label"><?php echo esc_html($multi_day_label); ?></span>
+                    <?php endif; ?>
                 </div>
             <?php endif; ?>
 

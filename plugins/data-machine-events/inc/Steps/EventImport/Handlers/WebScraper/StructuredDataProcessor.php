@@ -196,25 +196,28 @@ class StructuredDataProcessor {
     /**
      * Store additional event fields in engine data.
      *
+     * Uses centralized EventEngineData::storeEventCoreFields() for core fields,
+     * then stores web scraper-specific fields (title, image_url).
+     *
      * @param ExecutionContext $context Execution context
      * @param array            $event   Standardized event data
      */
     private function storeEventEngineData(ExecutionContext $context, array $event): void {
-        $payload = array_filter([
+        $job_id = $context->getJobId();
+
+        if ($job_id) {
+            EventEngineData::storeEventCoreFields($job_id, $event);
+        }
+
+        $scraper_fields = array_filter([
             'title' => $event['title'] ?? '',
-            'startDate' => $event['startDate'] ?? '',
-            'startTime' => $event['startTime'] ?? '',
-            'endDate' => $event['endDate'] ?? '',
-            'endTime' => $event['endTime'] ?? '',
-            'ticketUrl' => $event['ticketUrl'] ?? '',
-            'price' => $event['price'] ?? '',
             'image_url' => $event['imageUrl'] ?? '',
         ], static function($value) {
             return $value !== '' && $value !== null;
         });
 
-        if (!empty($payload)) {
-            $context->storeEngineData($payload);
+        if (!empty($scraper_fields)) {
+            $context->storeEngineData($scraper_fields);
         }
     }
 }
