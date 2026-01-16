@@ -5,6 +5,35 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [Unreleased]
+
+## [0.9.5] - 2026-01-15
+
+- Calendar groups multi-day events across their full date range.
+- Calendar UI adds multi-day labels and continuation styling.
+- Event import stores core fields in engine data to prevent AI overrides.
+- Venue address formatting reuses preloaded venue data.
+- Remove Status_Detection admin file.
+- Rename AGENTS.md to CLAUDE.md.
+
+## [0.9.4] - 2026-01-15
+
+- Add published_before/published_after filters to GetVenueEvents tool.
+- Improve venue health checks with website detection.
+
+### Fixed
+- **Event Details Block Description** - Fixed InnerBlocks content being stripped when saving
+  - Changed `save()` function from returning `null` to returning `<InnerBlocks.Content />` wrapped in block props
+  - Description content with formatting (line breaks, headings, lists, etc.) now persists correctly through save/edit cycles
+  - Expanded allowed blocks to include: paragraph, heading, image, list, quote, gallery, video, audio, embed, separator, spacer, columns, column, group, freeform, and html blocks
+
+### Added
+- **Documentation Alignment** - Comprehensive documentation updates for v0.3.5
+  - Added Google Calendar integration documentation with calendar ID/URL utilities
+  - Added ColorManager system documentation with CSS custom properties integration
+  - Added EventIdentifierGenerator utility documentation with normalization examples
+  - Updated file structure documentation to reflect current architecture
+
 ## [0.9.3] - 2026-01-08
 
 ### Added
@@ -1219,10 +1248,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Single source of truth**: One display path, no branching logic
 - **Better maintainability**: Future changes only affect one display mode
 - **Modern UX**: Horizontal scroll aligns with contemporary touch interfaces
-
-## [Unreleased]
-
-## [0.9.4] - 2026-01-15
 
 - Add published_before/published_after filters to GetVenueEvents tool.
 - Improve venue health checks with website detection.
