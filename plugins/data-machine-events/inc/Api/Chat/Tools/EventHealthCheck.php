@@ -3,7 +3,8 @@
  * Event Health Check Tool
  *
  * Scans events for data quality issues: missing time, suspicious midnight start,
- * missing venue, or missing description.
+ * late night start (midnight-4am), suspicious 11:59pm end time, missing venue,
+ * or missing description.
  *
  * @package DataMachineEvents\Api\Chat\Tools
  */
@@ -31,7 +32,7 @@ class EventHealthCheck {
         return [
             'class' => self::class,
             'method' => 'handle_tool_call',
-            'description' => 'Check events for data quality issues: missing start time, suspicious midnight start, missing venue, or missing description. Returns counts and lists of problematic events.',
+            'description' => 'Check events for data quality issues: missing start time, suspicious midnight start, late night start (midnight-4am), suspicious 11:59pm end time, missing venue, or missing description. Returns counts and lists of problematic events.',
             'parameters' => [
                 'scope' => [
                     'type' => 'string',
@@ -89,6 +90,8 @@ class EventHealthCheck {
 
         $missing_time = [];
         $midnight_time = [];
+        $late_night_time = [];
+        $suspicious_end_time = [];
         $missing_venue = [];
         $missing_description = [];
 
@@ -105,11 +108,18 @@ class EventHealthCheck {
             ];
 
             $start_time = $block_attrs['startTime'] ?? '';
+            $end_time = $block_attrs['endTime'] ?? '';
 
             if (empty($start_time)) {
                 $missing_time[] = $event_info;
             } elseif ($start_time === '00:00' || $start_time === '00:00:00') {
                 $midnight_time[] = $event_info;
+            } elseif ($this->isLateNightTime($start_time)) {
+                $late_night_time[] = $event_info;
+            }
+
+            if ($this->isSuspiciousEndTime($end_time)) {
+                $suspicious_end_time[] = $event_info;
             }
 
             if (empty($venue_name)) {
@@ -131,6 +141,8 @@ class EventHealthCheck {
 
         usort($missing_time, $sort_by_date);
         usort($midnight_time, $sort_by_date);
+        usort($late_night_time, $sort_by_date);
+        usort($suspicious_end_time, $sort_by_date);
         usort($missing_venue, $sort_by_date);
         usort($missing_description, $sort_by_date);
 
@@ -140,6 +152,12 @@ class EventHealthCheck {
         }
         if (!empty($midnight_time)) {
             $message_parts[] = count($midnight_time) . ' suspicious midnight';
+        }
+        if (!empty($late_night_time)) {
+            $message_parts[] = count($late_night_time) . ' late night (midnight-4am)';
+        }
+        if (!empty($suspicious_end_time)) {
+            $message_parts[] = count($suspicious_end_time) . ' suspicious 11:59pm end';
         }
         if (!empty($missing_venue)) {
             $message_parts[] = count($missing_venue) . ' missing venue';
@@ -166,6 +184,14 @@ class EventHealthCheck {
                 'midnight_time' => [
                     'count' => count($midnight_time),
                     'events' => array_slice($midnight_time, 0, $limit)
+                ],
+                'late_night_time' => [
+                    'count' => count($late_night_time),
+                    'events' => array_slice($late_night_time, 0, $limit)
+                ],
+                'suspicious_end_time' => [
+                    'count' => count($suspicious_end_time),
+                    'events' => array_slice($suspicious_end_time, 0, $limit)
                 ],
                 'missing_venue' => [
                     'count' => count($missing_venue),
@@ -287,5 +313,40 @@ class EventHealthCheck {
         }
 
         return '';
+    }
+
+    /**
+     * Check if time falls in late-night window (00:01-03:59).
+     *
+     * @param string $time Time string in HH:MM or HH:MM:SS format
+     * @return bool True if time is between 00:01 and 03:59
+     */
+    private function isLateNightTime(string $time): bool {
+        if (empty($time)) {
+            return false;
+        }
+
+        $hour = (int) substr($time, 0, 2);
+        $minute = (int) substr($time, 3, 2);
+
+        if ($hour === 0 && $minute > 0) {
+            return true;
+        }
+
+        return $hour >= 1 && $hour <= 3;
+    }
+
+    /**
+     * Check if end time is suspicious 11:59pm (likely default/placeholder).
+     *
+     * @param string $time Time string in HH:MM or HH:MM:SS format
+     * @return bool True if time is 23:59
+     */
+    private function isSuspiciousEndTime(string $time): bool {
+        if (empty($time)) {
+            return false;
+        }
+
+        return $time === '23:59' || $time === '23:59:00';
     }
 }
