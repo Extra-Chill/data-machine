@@ -75,7 +75,7 @@ class DoStuffExtractor extends BaseExtractor {
             'source_url' => ''
         ];
 
-        $this->parseDateTime($standardized_event, $event);
+        $this->parseDoStuffDateTime($standardized_event, $event);
         $this->parseVenue($standardized_event, $event);
         $this->parseImage($standardized_event, $event);
         $this->parsePrice($standardized_event, $event);
@@ -85,7 +85,7 @@ class DoStuffExtractor extends BaseExtractor {
         return $standardized_event;
     }
 
-    private function parseDateTime(array &$event, array $raw_event): void {
+    private function parseDoStuffDateTime(array &$event, array $raw_event): void {
         if (!empty($raw_event['begin_time'])) {
             $start_datetime = strtotime($raw_event['begin_time']);
 

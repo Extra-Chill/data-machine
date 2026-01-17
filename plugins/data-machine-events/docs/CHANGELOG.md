@@ -22,6 +22,9 @@ Created IcsExtractor to parse raw ICS feed content, supporting Tockify, Google C
 - Universal Web Scraper Documentation Updates
 - Repository Documentation Alignment
 - MigrateHandlersCommand Expansion
+- MigrateHandlersCommand Eventbrite Support
+
+Expanded migration command to support Eventbrite handler migrations. Added migrateEventbrite() method with 1:1 configuration field mapping from organizer_url to source_url.
 
 Expanded migration command to support DoStuff Media API handler migrations. Added migrateDoStuffMediaApi() method with 1:1 configuration field mapping from feed_url to source_url.
 
@@ -30,6 +33,9 @@ Updated universal-web-scraper-test-command.md with ICS feed support documentatio
 ### Deprecated
 - ICS Calendar Handler Deprecation
 - DoStuff Media API Handler Deprecation
+- Eventbrite Handler Deprecation
+
+Added deprecation notices to Eventbrite handler and settings classes. Existing flows using Eventbrite continue to work but should migrate to Universal Web Scraper using MigrateHandlersCommand. Note: Eventbrite is already handled by JsonLdExtractor in Universal Web Scraper - no new extractor code needed.
 
 Added deprecation notices to DoStuffMediaApi handler and settings classes. Existing flows using DoStuff Media API continue to work but should migrate to Universal Web Scraper using MigrateHandlersCommand.
 

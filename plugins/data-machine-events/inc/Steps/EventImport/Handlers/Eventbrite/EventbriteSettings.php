@@ -1,10 +1,11 @@
 <?php
 /**
  * Eventbrite Event Import Handler Settings
- * 
+ *
  * Defines settings fields and sanitization for Eventbrite event import handler.
  * Requires only an organizer page URL - no API authentication needed.
  *
+ * @deprecated 0.9.8 Use Universal Web Scraper handler with Eventbrite URLs instead
  * @package DataMachineEvents\Steps\EventImport\Handlers\Eventbrite
  */
 
@@ -29,11 +30,22 @@ class EventbriteSettings {
      * @return array Associative array defining the settings fields
      */
     public static function get_fields(array $current_config = []): array {
-        return [
+        $deprecation_notice = [
+            '_deprecated_notice' => [
+                'type' => 'html',
+                'label' => __('Important Notice', 'datamachine-events'),
+                'description' => __(
+                    '<strong>This handler is deprecated.</strong> Please use <strong>Universal Web Scraper</strong> with your Eventbrite organizer page URL instead. Existing flows using this handler will continue to work.',
+                    'datamachine-events'
+                ),
+            ],
+        ];
+
+        $handler_fields = [
             'organizer_url' => [
                 'type' => 'text',
                 'label' => __('Organizer Page URL', 'datamachine-events'),
-                'description' => __('Enter the full Eventbrite organizer page URL (e.g., https://www.eventbrite.com/o/lo-fi-brewing-14959647606). Events are extracted from the public page - no API key required.', 'datamachine-events'),
+                'description' => __('Enter full Eventbrite organizer page URL (e.g., https://www.eventbrite.com/o/lo-fi-brewing-14959647606). Events are extracted from the public page - no API key required.', 'datamachine-events'),
                 'placeholder' => __('https://www.eventbrite.com/o/organizer-name-12345678', 'datamachine-events'),
             ],
             'search' => [
@@ -51,6 +63,8 @@ class EventbriteSettings {
                 'required' => false,
             ],
         ];
+
+        return array_merge($deprecation_notice, $handler_fields);
     }
     
     /**

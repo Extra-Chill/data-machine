@@ -1,10 +1,11 @@
 <?php
 /**
  * Eventbrite Event Import Handler
- * 
+ *
  * Parses public Eventbrite organizer pages to extract events from embedded
  * Schema.org JSON-LD structured data. Works with any public organizer URL.
  *
+ * @deprecated 0.9.8 Use Universal Web Scraper handler with Eventbrite URLs instead
  * @package DataMachineEvents\Steps\EventImport\Handlers\Eventbrite
  */
 
@@ -28,6 +29,13 @@ class Eventbrite extends EventImportHandler {
 
     public function __construct() {
         parent::__construct('eventbrite');
+
+        if (function_exists('trigger_error')) {
+            trigger_error(
+                'Eventbrite handler is deprecated. Use Universal Web Scraper handler with Eventbrite organizer URLs instead.',
+                E_USER_DEPRECATED
+            );
+        }
 
         self::registerHandler(
             'eventbrite',
