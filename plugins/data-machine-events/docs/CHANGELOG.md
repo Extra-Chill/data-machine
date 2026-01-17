@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - ICS Calendar Migration to Universal Web Scraper
 - WP-CLI Migration Tool for Handler Deprecation
+- DoStuff Media API Extractor
+
+Created DoStuffExtractor to parse DoStuff Media JSON feeds (Waterloo Records, Do512, etc.). Extracts complete event data including venue coordinates, pricing, artist information, and image URLs. Handles event_groups structure and normalizes all fields to standard event format.
 
 Created MigrateHandlersCommand WP-CLI tool to migrate flows from deprecated handlers to their replacements. Supports ICS Calendar to Universal Web Scraper migration with dry-run mode for safe testing and automatic configuration field mapping.
 
@@ -18,11 +21,17 @@ Created IcsExtractor to parse raw ICS feed content, supporting Tockify, Google C
 ### Changed
 - Universal Web Scraper Documentation Updates
 - Repository Documentation Alignment
+- MigrateHandlersCommand Expansion
+
+Expanded migration command to support DoStuff Media API handler migrations. Added migrateDoStuffMediaApi() method with 1:1 configuration field mapping from feed_url to source_url.
 
 Updated universal-web-scraper-test-command.md with ICS feed support documentation. Added ICS Calendar Feed Support section with examples for Tockify, Google Calendar exports, and migration command usage.
 
 ### Deprecated
 - ICS Calendar Handler Deprecation
+- DoStuff Media API Handler Deprecation
+
+Added deprecation notices to DoStuffMediaApi handler and settings classes. Existing flows using DoStuff Media API continue to work but should migrate to Universal Web Scraper using MigrateHandlersCommand.
 
 Added deprecation notices to IcsCalendar handler and settings classes. Existing flows using ICS Calendar continue to work but should migrate to Universal Web Scraper using MigrateHandlersCommand.
 

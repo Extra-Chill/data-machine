@@ -5,6 +5,7 @@
  * Defines settings fields and sanitization for DoStuff Media API import handler.
  * No authentication required - works with public JSON feeds.
  *
+ * @deprecated 0.9.8 Use Universal Web Scraper handler with DoStuff Media URLs instead
  * @package DataMachineEvents\Steps\EventImport\Handlers\DoStuffMediaApi
  */
 
@@ -26,6 +27,17 @@ class DoStuffMediaApiSettings {
      * @return array Associative array defining the settings fields
      */
     public static function get_fields(array $current_config = []): array {
+        $deprecation_notice = [
+            '_deprecated_notice' => [
+                'type' => 'html',
+                'label' => __('Important Notice', 'datamachine-events'),
+                'description' => __(
+                    '<strong>This handler is deprecated.</strong> Please use <strong>Universal Web Scraper</strong> with your DoStuff Media JSON feed URL instead. Existing flows using this handler will continue to work.',
+                    'datamachine-events'
+                ),
+            ],
+        ];
+
         $handler_fields = [
             'feed_url' => [
                 'type' => 'text',
@@ -53,7 +65,7 @@ class DoStuffMediaApiSettings {
             ]
         ];
 
-        return array_merge($handler_fields, $filter_fields);
+        return array_merge($deprecation_notice, $handler_fields, $filter_fields);
     }
 
     /**

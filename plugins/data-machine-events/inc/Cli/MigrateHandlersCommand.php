@@ -10,8 +10,6 @@
 
 namespace DataMachineEvents\Cli;
 
-use DataMachine\Services\HandlerService;
-
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -30,7 +28,7 @@ class MigrateHandlersCommand {
         $handler = $assoc_args['handler'] ?? '';
 
         if (empty($handler)) {
-            \WP_CLI::error('Missing required --handler parameter. Available: ics_calendar');
+            \WP_CLI::error('Missing required --handler parameter. Available: ics_calendar, dostuff_media_api');
             return;
         }
 
@@ -38,8 +36,13 @@ class MigrateHandlersCommand {
             case 'ics_calendar':
                 $this->migrateIcsCalendar($dry_run);
                 break;
+
+            case 'dostuff_media_api':
+                $this->migrateDoStuffMediaApi($dry_run);
+                break;
+
             default:
-                \WP_CLI::error("Unknown handler: {$handler}. Available: ics_calendar");
+                \WP_CLI::error("Unknown handler: {$handler}. Available: ics_calendar, dostuff_media_api");
                 return;
         }
     }
@@ -94,6 +97,23 @@ class MigrateHandlersCommand {
 
                     $steps_updated = true;
                     \WP_CLI::log("  Migrating: {$flow_title} (step {$step_index})");
+                } elseif ($step['handler'] === 'dostuff_media_api') {
+                    if ($dry_run) {
+                        \WP_CLI::log("  Would migrate: {$flow_title} (step {$step_index})");
+                        $migrated++;
+                        $steps_updated = true;
+                        continue;
+                    }
+
+                    $migrated_config = $this->migrateDoStuffMediaApiConfig($step['config'] ?? []);
+
+                    $flow_steps[$step_index] = array_merge($step, [
+                        'handler' => 'universal_web_scraper',
+                        'config' => $migrated_config,
+                    ]);
+
+                    $steps_updated = true;
+                    \WP_CLI::log("  Migrating: {$flow_title} (step {$step_index})");
                 }
             }
 
@@ -105,7 +125,7 @@ class MigrateHandlersCommand {
                     $migrated++;
                 }
             } else {
-                \WP_CLI::warning("  Skip: {$flow_title} (no ics_calendar steps found)");
+                \WP_CLI::warning("  Skip: {$flow_title} (no ics_calendar or dostuff_media_api steps found)");
                 $failed++;
             }
         }
@@ -142,6 +162,16 @@ class MigrateHandlersCommand {
             'venue_phone' => $ics_config['venue_phone'] ?? '',
             'venue_website' => $ics_config['venue_website'] ?? '',
             'venue_coordinates' => $ics_config['venue_coordinates'] ?? '',
+        ];
+
+        return $scraper_config;
+    }
+
+    private function migrateDoStuffMediaApiConfig(array $dostuff_config): array {
+        $scraper_config = [
+            'source_url' => $dostuff_config['feed_url'] ?? '',
+            'search' => $dostuff_config['search'] ?? '',
+            'exclude_keywords' => $dostuff_config['exclude_keywords'] ?? '',
         ];
 
         return $scraper_config;

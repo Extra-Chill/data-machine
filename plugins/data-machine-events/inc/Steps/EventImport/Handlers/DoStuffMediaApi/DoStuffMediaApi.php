@@ -6,6 +6,7 @@
  * Single-item processing with EventIdentifierGenerator for deduplication.
  * No authentication required - works with public JSON feeds.
  *
+ * @deprecated 0.9.8 Use Universal Web Scraper handler with DoStuff Media URLs instead
  * @package DataMachineEvents\Steps\EventImport\Handlers\DoStuffMediaApi
  */
 
@@ -27,6 +28,13 @@ class DoStuffMediaApi extends EventImportHandler {
 
     public function __construct() {
         parent::__construct('dostuff_media_api');
+
+        if (function_exists('trigger_error')) {
+            trigger_error(
+                'DoStuff Media API handler is deprecated. Use Universal Web Scraper handler with DoStuff Media JSON URLs instead.',
+                E_USER_DEPRECATED
+            );
+        }
 
         self::registerHandler(
             'dostuff_media_api',
