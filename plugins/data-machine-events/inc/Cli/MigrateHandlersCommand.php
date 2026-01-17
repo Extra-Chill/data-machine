@@ -177,8 +177,92 @@ class MigrateHandlersCommand {
             'search' => $dostuff_config['search'] ?? '',
             'exclude_keywords' => $dostuff_config['exclude_keywords'] ?? '',
         ];
-
+        
         return $scraper_config;
+    }
+    
+    private function migrateDoStuffMediaApi(bool $dry_run): void {
+        \WP_CLI::log('Migrating Do Stuff Media API → Universal Web Scraper');
+        \WP_CLI::log('');
+        
+        $flows = $this->getFlowsUsingHandler('dostuff_media_api');
+        
+        if (empty($flows)) {
+            \WP_CLI::log('No flows found using Do Stuff Media API handler.');
+            \WP_CLI::log('');
+            \WP_CLI::success('Migration complete. Nothing to do.');
+            return;
+        }
+        
+        \WP_CLI::log(sprintf('Found %d flow(s) using Do Stuff Media API handler', count($flows)));
+        \WP_CLI::log('');
+        
+        $migrated = 0;
+        $failed = 0;
+        
+        foreach ($flows as $flow) {
+            $flow_id = $flow->ID;
+            $flow_title = $flow->post_title;
+            
+            $flow_steps = get_post_meta($flow_id, 'datamachine_flow_steps', true);
+            $steps_updated = false;
+            
+            if (empty($flow_steps) || !is_array($flow_steps)) {
+                \WP_CLI::warning("  Skip: {$flow_title} (no steps found)");
+                $failed++;
+                continue;
+            }
+            
+            foreach ($flow_steps as $step_index => $step) {
+                if ($step['handler'] === 'dostuff_media_api') {
+                    if ($dry_run) {
+                        \WP_CLI::log("  Would migrate: {$flow_title} (step {$step_index})");
+                        $migrated++;
+                        $steps_updated = true;
+                        continue;
+                    }
+                    
+                    $migrated_config = $this->migrateDoStuffMediaApiConfig($step['config'] ?? []);
+                    
+                    $flow_steps[$step_index] = array_merge($step, [
+                        'handler' => 'universal_web_scraper',
+                        'config' => $migrated_config,
+                    ]);
+                    
+                    $steps_updated = true;
+                    \WP_CLI::log("  Migrating: {$flow_title} (step {$step_index})");
+                }
+            }
+            
+            if ($steps_updated) {
+                if (!$dry_run) {
+                    update_post_meta($flow_id, 'datamachine_flow_steps', $flow_steps);
+                    
+                    \WP_CLI::log("  ✓ Updated flow: {$flow_title}");
+                    $migrated++;
+                }
+            } else {
+                \WP_CLI::warning("  Skip: {$flow_title} (no dostuff_media_api steps found)");
+                $failed++;
+            }
+        }
+        
+        \WP_CLI::log('');
+        if ($dry_run) {
+            \WP_CLI::log('DRY RUN - No changes made');
+            \WP_CLI::log("Would migrate {$migrated} flow(s)");
+        } else {
+            \WP_CLI::success(sprintf('Migration complete: %d flow(s) migrated', $migrated));
+        }
+        
+        if ($failed > 0) {
+            \WP_CLI::warning(sprintf('%d flow(s) failed to migrate', $failed));
+        }
+        
+        \WP_CLI::log('');
+        \WP_CLI::log('Next steps:');
+        \WP_CLI::log('1. Test your migrated flows to ensure events import correctly');
+        \WP_CLI::log('2. Delete Do Stuff Media API handler files when migration is verified');
     }
 
     private function migrateEventbriteConfig(array $eb_config): array {
