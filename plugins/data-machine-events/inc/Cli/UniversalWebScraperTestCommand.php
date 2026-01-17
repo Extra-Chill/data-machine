@@ -2,7 +2,7 @@
 
 namespace DataMachineEvents\Cli;
 
-use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\UniversalWebScraper;
+use DataMachineEvents\Abilities\EventScraperTest;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -21,37 +21,30 @@ class UniversalWebScraperTestCommand {
 			\WP_CLI::error( 'Missing required --target_url parameter.' );
 		}
 
-		$logs = [];
-		add_action(
-			'datamachine_log',
-			static function ( string $level, string $message, array $context = [] ) use ( &$logs ): void {
-				$logs[] = [
-					'level' => $level,
-					'message' => $message,
-					'context' => $context,
-				];
-			},
-			10,
-			3
-		);
+		$result = $this->callAbility( $target_url );
+		$this->outputResult( $result );
+	}
 
-		$config = [
-			'source_url' => $target_url,
-			'flow_step_id' => 'cli_test_' . wp_generate_uuid4(),
-			'flow_id' => 'direct',
-			'search' => '',
-		];
+	private function callAbility( string $target_url ): array {
+		$tester = new EventScraperTest();
+		return $tester->test( $target_url );
+	}
 
-		$handler = new UniversalWebScraper();
-		$results = $handler->get_fetch_data( 'direct', $config, null );
+	private function outputResult( array $result ): void {
+		\WP_CLI::log( 'Target URL: ' . $result['target_url'] );
 
-		\WP_CLI::log( "Target URL: {$target_url}" );
+		if ( ! $result['success'] ) {
+			\WP_CLI::error( 'Failed to test scraper.' );
 
-		if ( empty( $results ) ) {
-			\WP_CLI::warning( 'No events returned.' );
-			if ( ! empty( $logs ) ) {
+			if ( ! empty( $result['warnings'] ) ) {
+				foreach ( $result['warnings'] as $warning ) {
+					\WP_CLI::warning( $warning );
+				}
+			}
+
+			if ( ! empty( $result['logs'] ) ) {
 				\WP_CLI::log( 'Logs (tail):' );
-				foreach ( array_slice( $logs, -20 ) as $entry ) {
+				foreach ( array_slice( $result['logs'], -20 ) as $entry ) {
 					$message = strtoupper( $entry['level'] ) . ': ' . $entry['message'];
 					if ( ! empty( $entry['context'] ) ) {
 						$message .= ' ' . wp_json_encode( $entry['context'] );
@@ -59,118 +52,93 @@ class UniversalWebScraperTestCommand {
 					\WP_CLI::log( $message );
 				}
 			}
+
 			return;
 		}
 
-		$coverage_warning = false;
+		$extraction_info = $result['extraction_info'] ?? [];
 
-		$packet = $results[0];
-		$packet_array = $packet->addTo( [] );
-		$packet_entry = $packet_array[0] ?? [];
-		$packet_data = $packet_entry['data'] ?? [];
-		$packet_meta = $packet_entry['metadata'] ?? [];
-		$body = $packet_data['body'] ?? '';
-		if ( $body === '' && isset( $packet_entry['body'] ) ) {
-			$body = (string) $packet_entry['body'];
+		if ( isset( $extraction_info['packet_title'] ) && $extraction_info['packet_title'] !== '' ) {
+			\WP_CLI::log( 'Packet title: ' . $extraction_info['packet_title'] );
 		}
-		$payload = json_decode( (string) $body, true );
-		$event = is_array( $payload ) ? ( $payload['event'] ?? null ) : null;
-
-		if ( isset( $packet_data['title'] ) ) {
-			\WP_CLI::log( 'Packet title: ' . (string) $packet_data['title'] );
+		if ( isset( $extraction_info['source_type'] ) && $extraction_info['source_type'] !== '' ) {
+			\WP_CLI::log( 'Source type: ' . $extraction_info['source_type'] );
 		}
-		if ( isset( $packet_meta['source_type'] ) ) {
-			\WP_CLI::log( 'Source type: ' . (string) $packet_meta['source_type'] );
-		}
-		if ( isset( $packet_meta['extraction_method'] ) ) {
-			\WP_CLI::log( 'Extraction method: ' . (string) $packet_meta['extraction_method'] );
+		if ( isset( $extraction_info['extraction_method'] ) && $extraction_info['extraction_method'] !== '' ) {
+			\WP_CLI::log( 'Extraction method: ' . $extraction_info['extraction_method'] );
 		}
 
-		if ( is_array( $payload ) && isset( $payload['raw_html'] ) && is_string( $payload['raw_html'] ) ) {
+		$payload_type = $extraction_info['payload_type'] ?? '';
+
+		if ( $payload_type === 'raw_html' ) {
 			\WP_CLI::log( 'Payload type: raw_html (HTML fallback)' );
 			\WP_CLI::warning( 'VENUE COVERAGE: No structured venue fields. Set venue override for reliable address/geocoding.' );
-			$coverage_warning = true;
 			\WP_CLI::log( 'Venue: (unknown; extracted by AI)' );
 			\WP_CLI::log( 'Venue address: (missing)' );
 			\WP_CLI::log( '--- Raw HTML Content ---' );
-			\WP_CLI::log( $payload['raw_html'] );
-		} elseif ( ! is_array( $event ) ) {
+			if ( isset( $result['event_data'] ) && isset( $result['event_data']['raw_html'] ) ) {
+				\WP_CLI::log( $result['event_data']['raw_html'] );
+			}
+		} elseif ( $payload_type !== 'event' ) {
 			\WP_CLI::warning( 'Payload did not contain an event object.' );
-			\WP_CLI::log( 'Packet body (head): ' . substr( (string) $body, 0, 800 ) );
+			\WP_CLI::log( 'Payload type: ' . $payload_type );
 		} else {
-		\WP_CLI::log( 'Payload type: event' );
-		\WP_CLI::log( 'Title: ' . (string) ( $event['title'] ?? '' ) );
-		\WP_CLI::log( 'Start Date: ' . (string) ( $event['startDate'] ?? '' ) );
-		\WP_CLI::log( 'Start Time: ' . (string) ( $event['startTime'] ?? '' ) );
-		\WP_CLI::log( 'End Date: ' . (string) ( $event['endDate'] ?? '' ) );
-		\WP_CLI::log( 'End Time: ' . (string) ( $event['endTime'] ?? '' ) );
-		\WP_CLI::log( 'Timezone: ' . (string) ( $event['venueTimezone'] ?? '' ) );
+			$event_data = $result['event_data'] ?? [];
+			\WP_CLI::log( 'Payload type: event' );
+			\WP_CLI::log( 'Title: ' . ( $event_data['title'] ?? '' ) );
+			\WP_CLI::log( 'Start Date: ' . ( $event_data['startDate'] ?? '' ) );
+			\WP_CLI::log( 'Start Time: ' . ( $event_data['startTime'] ?? '' ) );
+			\WP_CLI::log( 'End Date: ' . ( $event_data['endDate'] ?? '' ) );
+			\WP_CLI::log( 'End Time: ' . ( $event_data['endTime'] ?? '' ) );
+			\WP_CLI::log( 'Timezone: ' . ( $event_data['venueTimezone'] ?? '' ) );
+			\WP_CLI::log( 'Venue: ' . ( $event_data['venue'] ?? '' ) );
+			\WP_CLI::log( 'Venue address: ' . ( $event_data['venueAddress'] ?? '' ) );
 
-		$venue_name = (string) ( $event['venue'] ?? '' );
-			$venue_addr = (string) ( $event['venueAddress'] ?? '' );
-			$venue_city = (string) ( $event['venueCity'] ?? '' );
-			$venue_state = (string) ( $event['venueState'] ?? '' );
-			$venue_zip = (string) ( $event['venueZip'] ?? '' );
+			$coverage_issues = $result['coverage_issues'] ?? [];
 
-			if ( is_array( $payload ) && isset( $payload['venue_metadata'] ) && is_array( $payload['venue_metadata'] ) ) {
-				$venue_meta = $payload['venue_metadata'];
-				$venue_addr = $venue_addr !== '' ? $venue_addr : (string) ( $venue_meta['venueAddress'] ?? '' );
-				$venue_city = $venue_city !== '' ? $venue_city : (string) ( $venue_meta['venueCity'] ?? '' );
-				$venue_state = $venue_state !== '' ? $venue_state : (string) ( $venue_meta['venueState'] ?? '' );
-				$venue_zip = $venue_zip !== '' ? $venue_zip : (string) ( $venue_meta['venueZip'] ?? '' );
-			}
-			$city_state_zip = trim( $venue_city . ', ' . $venue_state . ' ' . $venue_zip );
-			$city_state_zip = $city_state_zip === ',' ? '' : $city_state_zip;
-			$venue_full = trim( implode( ', ', array_filter( [ $venue_addr, $city_state_zip ] ) ) );
-
-		\WP_CLI::log( 'Venue: ' . $venue_name );
-		\WP_CLI::log( 'Venue address: ' . $venue_full );
-
-		$time_data_warning = false;
-
-		if ( empty( trim( $event['startTime'] ?? '' ) ) && ! empty( trim( $event['startDate'] ?? '' ) ) ) {
-			\WP_CLI::warning( 'TIME DATA: Missing start/end time - check ICS feed timezone handling or source data' );
-			$time_data_warning = true;
-			$coverage_warning = true;
-		}
-
-		if ( empty( trim( $venue_name ) ) ) {
-				\WP_CLI::warning( 'VENUE COVERAGE: Missing venue name; set venue override.' );
-				$coverage_warning = true;
-			}
-
-			if ( empty( trim( $venue_addr ) ) || empty( trim( $venue_city ) ) || empty( trim( $venue_state ) ) ) {
-				\WP_CLI::warning( 'VENUE COVERAGE: Missing venue address fields (venueAddress/venueCity/venueState). Geocoding may fail; set venue override.' );
-				$coverage_warning = true;
-			}
-		}
-
-		if ( $coverage_warning ) {
-			$warning_parts = [];
-			if ( $time_data_warning ) {
-				$warning_parts[] = 'time data missing';
-			}
-			if ( empty( trim( $venue_name ) ) || empty( trim( $venue_addr ) ) || empty( trim( $venue_city ) ) || empty( trim( $venue_state ) ) ) {
-				$warning_parts[] = 'venue/address incomplete';
-			}
-			\WP_CLI::warning( 'STATUS: WARNING (' . implode( ', ', $warning_parts ) . ')' );
-		} else {
-			\WP_CLI::log( 'STATUS: OK (venue/address/time coverage present)' );
-		}
-
-		$warnings = array_values(
-			array_filter(
-				$logs,
-				static function ( array $entry ): bool {
-					return ( $entry['level'] ?? '' ) === 'warning';
+			if ( ! empty( $coverage_issues ) ) {
+				if ( $coverage_issues['time_data_warning'] ?? false ) {
+					\WP_CLI::warning( 'TIME DATA: Missing start/end time - check ICS feed timezone handling or source data' );
 				}
-			)
-		);
+				if ( $coverage_issues['missing_venue'] ?? false ) {
+					\WP_CLI::warning( 'VENUE COVERAGE: Missing venue name; set venue override.' );
+				}
+				if ( $coverage_issues['incomplete_address'] ?? false ) {
+					\WP_CLI::warning( 'VENUE COVERAGE: Missing venue address fields (venueAddress/venueCity/venueState). Geocoding may fail; set venue override.' );
+				}
+			}
 
-		if ( ! empty( $warnings ) ) {
-			\WP_CLI::log( 'Warnings:' );
-			foreach ( $warnings as $entry ) {
-				\WP_CLI::log( '- ' . (string) $entry['message'] );
+			$warnings = $result['warnings'] ?? [];
+
+			if ( $result['status'] === 'warning' && ! empty( $coverage_issues ) ) {
+				$warning_parts = [];
+				if ( $coverage_issues['time_data_warning'] ?? false ) {
+					$warning_parts[] = 'time data missing';
+				}
+				if ( ( $coverage_issues['missing_venue'] ?? false ) || ( $coverage_issues['incomplete_address'] ?? false ) ) {
+					$warning_parts[] = 'venue/address incomplete';
+				}
+				\WP_CLI::warning( 'STATUS: WARNING (' . implode( ', ', $warning_parts ) . ')' );
+			} elseif ( $result['status'] === 'ok' ) {
+				\WP_CLI::log( 'STATUS: OK (venue/address/time coverage present)' );
+			}
+
+			if ( ! empty( $warnings ) ) {
+				\WP_CLI::log( 'Warnings:' );
+				foreach ( $warnings as $warning ) {
+					\WP_CLI::log( '- ' . $warning );
+				}
+			}
+		}
+
+		if ( ! empty( $result['logs'] ) ) {
+			\WP_CLI::log( 'Logs (tail):' );
+			foreach ( array_slice( $result['logs'], -20 ) as $entry ) {
+				$message = strtoupper( $entry['level'] ) . ': ' . $entry['message'];
+				if ( ! empty( $entry['context'] ) ) {
+					$message .= ' ' . wp_json_encode( $entry['context'] );
+				}
+				\WP_CLI::log( $message );
 			}
 		}
 	}

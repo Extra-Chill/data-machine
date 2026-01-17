@@ -167,6 +167,17 @@ class DATAMACHINE_Events {
         new \DataMachineEvents\Api\Chat\Tools\GetVenueEvents();
         new \DataMachineEvents\Api\Chat\Tools\EventHealthCheck();
         new \DataMachineEvents\Api\Chat\Tools\UpdateEvent();
+
+        // Load abilities - self-register ability + tool
+        if (file_exists(DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventScraperTest.php')) {
+            require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventScraperTest.php';
+            new \DataMachineEvents\Abilities\EventScraperTest();
+        }
+
+        if (file_exists(DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TimezoneAbilities.php')) {
+            require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TimezoneAbilities.php';
+            new \DataMachineEvents\Abilities\TimezoneAbilities();
+        }
     }
     
     private function load_event_import_handlers() {

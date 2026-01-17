@@ -32,7 +32,7 @@ class EventHealthCheck {
         return [
             'class' => self::class,
             'method' => 'handle_tool_call',
-            'description' => 'Check events for data quality issues: missing start time, suspicious midnight start, late night start (midnight-4am), suspicious 11:59pm end time, missing venue, or missing description. Returns counts and lists of problematic events.',
+            'description' => 'Check events for data quality issues: missing start time, suspicious midnight start, late night start (midnight-4am), suspicious 11:59pm end time, missing venue, missing description, or missing venue timezone. Returns counts and lists of problematic events.',
             'parameters' => [
                 'scope' => [
                     'type' => 'string',
@@ -94,6 +94,8 @@ class EventHealthCheck {
         $suspicious_end_time = [];
         $missing_venue = [];
         $missing_description = [];
+        $broken_timezone = [];
+        $no_venue_count = 0;
 
         foreach ($events as $event) {
             $block_attrs = $this->extractBlockAttributes($event->ID);
@@ -132,6 +134,19 @@ class EventHealthCheck {
             }
         }
 
+        $ability = wp_get_ability('datamachine-events/find-broken-timezone-events');
+        if ($ability) {
+            $result = $ability->execute([
+                'scope' => $scope,
+                'limit' => $limit
+            ]);
+
+            $broken_timezone = $result['broken_events'] ?? [];
+            $no_venue_count = $result['no_venue_count'] ?? 0;
+        } else {
+            $broken_timezone = [];
+        }
+
         $total = count($events);
 
         $sort_by_date = fn($a, $b) => strcmp($a['date'], $b['date']);
@@ -164,6 +179,12 @@ class EventHealthCheck {
         }
         if (!empty($missing_description)) {
             $message_parts[] = count($missing_description) . ' missing description';
+        }
+        if (count($broken_timezone) > 0) {
+            $message_parts[] = count($broken_timezone) . ' missing timezone';
+        }
+        if ($no_venue_count > 0) {
+            $message_parts[] = $no_venue_count . ' no venue';
         }
 
         if (empty($message_parts)) {
@@ -200,6 +221,10 @@ class EventHealthCheck {
                 'missing_description' => [
                     'count' => count($missing_description),
                     'events' => array_slice($missing_description, 0, $limit)
+                ],
+                'broken_timezone' => [
+                    'count' => count($broken_timezone),
+                    'events' => array_slice($broken_timezone, 0, $limit)
                 ],
                 'message' => $message
             ],

@@ -34,6 +34,7 @@ Updated universal-web-scraper-test-command.md with ICS feed support documentatio
 - ICS Calendar Handler Deprecation
 - DoStuff Media API Handler Deprecation
 - Eventbrite Handler Deprecation
+- Add TimezoneAbilities system with find_broken_timezone_events and fix_event_timezone abilities. EventsHealthCheck now uses abilities as primitives for timezone checking.
 
 Added deprecation notices to Eventbrite handler and settings classes. Existing flows using Eventbrite continue to work but should migrate to Universal Web Scraper using MigrateHandlersCommand. Note: Eventbrite is already handled by JsonLdExtractor in Universal Web Scraper - no new extractor code needed.
 

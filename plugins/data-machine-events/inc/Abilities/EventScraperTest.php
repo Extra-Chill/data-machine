@@ -22,11 +22,6 @@ class EventScraperTest {
 	use ToolRegistrationTrait;
 
 	public function __construct() {
-		$this->registerAbility();
-		$this->registerTool('chat', 'test_scraper', [$this, 'getToolDefinition']);
-	}
-
-	private function registerAbility(): void {
 		add_action('wp_abilities_api_init', function() {
 			wp_register_ability('datamachine/test-event-scraper', [
 				'label' => __('Test Event Scraper', 'datamachine-events'),
@@ -63,6 +58,8 @@ class EventScraperTest {
 				'meta' => ['show_in_rest' => true]
 			]);
 		});
+
+		$this->registerTool('chat', 'test_event_scraper', [$this, 'getToolDefinition']);
 	}
 
 	public function getToolDefinition(): array {
@@ -97,7 +94,7 @@ class EventScraperTest {
 			return [
 				'success' => false,
 				'error' => 'Missing required target_url parameter.',
-				'tool_name' => 'test_scraper'
+				'tool_name' => 'test_event_scraper'
 			];
 		}
 
@@ -106,7 +103,7 @@ class EventScraperTest {
 		return [
 			'success' => true,
 			'data' => $result,
-			'tool_name' => 'test_scraper'
+			'tool_name' => 'test_event_scraper'
 		];
 	}
 
