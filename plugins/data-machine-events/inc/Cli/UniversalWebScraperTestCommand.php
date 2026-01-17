@@ -98,11 +98,15 @@ class UniversalWebScraperTestCommand {
 			\WP_CLI::warning( 'Payload did not contain an event object.' );
 			\WP_CLI::log( 'Packet body (head): ' . substr( (string) $body, 0, 800 ) );
 		} else {
-			\WP_CLI::log( 'Payload type: event' );
-			\WP_CLI::log( 'Title: ' . (string) ( $event['title'] ?? '' ) );
-			\WP_CLI::log( 'Start: ' . (string) ( $event['startDate'] ?? '' ) );
+		\WP_CLI::log( 'Payload type: event' );
+		\WP_CLI::log( 'Title: ' . (string) ( $event['title'] ?? '' ) );
+		\WP_CLI::log( 'Start Date: ' . (string) ( $event['startDate'] ?? '' ) );
+		\WP_CLI::log( 'Start Time: ' . (string) ( $event['startTime'] ?? '' ) );
+		\WP_CLI::log( 'End Date: ' . (string) ( $event['endDate'] ?? '' ) );
+		\WP_CLI::log( 'End Time: ' . (string) ( $event['endTime'] ?? '' ) );
+		\WP_CLI::log( 'Timezone: ' . (string) ( $event['venueTimezone'] ?? '' ) );
 
-			$venue_name = (string) ( $event['venue'] ?? '' );
+		$venue_name = (string) ( $event['venue'] ?? '' );
 			$venue_addr = (string) ( $event['venueAddress'] ?? '' );
 			$venue_city = (string) ( $event['venueCity'] ?? '' );
 			$venue_state = (string) ( $event['venueState'] ?? '' );
@@ -119,10 +123,18 @@ class UniversalWebScraperTestCommand {
 			$city_state_zip = $city_state_zip === ',' ? '' : $city_state_zip;
 			$venue_full = trim( implode( ', ', array_filter( [ $venue_addr, $city_state_zip ] ) ) );
 
-			\WP_CLI::log( 'Venue: ' . $venue_name );
-			\WP_CLI::log( 'Venue address: ' . $venue_full );
+		\WP_CLI::log( 'Venue: ' . $venue_name );
+		\WP_CLI::log( 'Venue address: ' . $venue_full );
 
-			if ( empty( trim( $venue_name ) ) ) {
+		$time_data_warning = false;
+
+		if ( empty( trim( $event['startTime'] ?? '' ) ) && ! empty( trim( $event['startDate'] ?? '' ) ) ) {
+			\WP_CLI::warning( 'TIME DATA: Missing start/end time - check ICS feed timezone handling or source data' );
+			$time_data_warning = true;
+			$coverage_warning = true;
+		}
+
+		if ( empty( trim( $venue_name ) ) ) {
 				\WP_CLI::warning( 'VENUE COVERAGE: Missing venue name; set venue override.' );
 				$coverage_warning = true;
 			}
@@ -134,9 +146,16 @@ class UniversalWebScraperTestCommand {
 		}
 
 		if ( $coverage_warning ) {
-			\WP_CLI::warning( 'STATUS: WARNING (venue/address coverage incomplete)' );
+			$warning_parts = [];
+			if ( $time_data_warning ) {
+				$warning_parts[] = 'time data missing';
+			}
+			if ( empty( trim( $venue_name ) ) || empty( trim( $venue_addr ) ) || empty( trim( $venue_city ) ) || empty( trim( $venue_state ) ) ) {
+				$warning_parts[] = 'venue/address incomplete';
+			}
+			\WP_CLI::warning( 'STATUS: WARNING (' . implode( ', ', $warning_parts ) . ')' );
 		} else {
-			\WP_CLI::log( 'STATUS: OK (venue/address coverage present)' );
+			\WP_CLI::log( 'STATUS: OK (venue/address/time coverage present)' );
 		}
 
 		$warnings = array_values(

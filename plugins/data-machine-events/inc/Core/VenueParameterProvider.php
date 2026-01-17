@@ -213,7 +213,7 @@ class VenueParameterProvider {
      */
     public static function stripFromEventData(array &$event): void {
         foreach (self::getParameterKeys() as $key) {
-            if ($key === 'venue') {
+            if ($key === 'venue' || $key === 'venueTimezone') {
                 continue;
             }
             unset($event[$key]);

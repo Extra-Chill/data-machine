@@ -128,6 +128,47 @@ class DateTimeParser {
     }
 
     /**
+     * Parse ICS datetime with calendar timezone context.
+     *
+     * Handles ICS-specific datetime formats:
+     * - UTC with Z suffix: "20230809T000000Z"
+     * - Plain datetime: "20230809T000000"
+     * - Uses calendar timezone (from VTIMEZONE section) when no explicit event timezone
+     *
+     * @param string $datetime ICS datetime string (e.g., "20230809T000000Z")
+     * @param string $calendar_timezone Calendar timezone from VTIMEZONE section (e.g., "America/Chicago")
+     * @return array{date: string, time: string, timezone: string}
+     */
+    public static function parseIcs(string $datetime, string $calendar_timezone = 'UTC'): array {
+        $result = self::emptyResult();
+
+        if (empty($datetime)) {
+            return $result;
+        }
+
+        try {
+            $dt = new DateTime($datetime, new DateTimeZone('UTC'));
+            $tz = $dt->getTimezone();
+            $tz_name = $tz ? $tz->getName() : '';
+
+            $has_embedded_tz = self::hasEmbeddedTimezone($datetime);
+
+            if (!$has_embedded_tz && !empty($calendar_timezone) && self::isValidTimezone($calendar_timezone)) {
+                $dt->setTimezone(new DateTimeZone($calendar_timezone));
+                $tz_name = $calendar_timezone;
+            }
+
+            $result['date'] = $dt->format('Y-m-d');
+            $result['time'] = $dt->format('H:i');
+            $result['timezone'] = $tz_name;
+        } catch (Exception $e) {
+            return $result;
+        }
+
+        return $result;
+    }
+
+    /**
      * Parse datetime with automatic format detection.
      *
      * Attempts to parse any datetime string and extract timezone if present.
@@ -193,9 +234,10 @@ class DateTimeParser {
      * @return bool True if timezone is embedded
      */
     private static function hasEmbeddedTimezone(string $datetime): bool {
-        // Check for Z (UTC) suffix
+        // Z suffix means UTC, not an embedded timezone that should be preserved
+        // We want to convert UTC times to calendar timezone
         if (preg_match('/Z$/i', $datetime)) {
-            return true;
+            return false;
         }
 
         // Check for offset like +00:00, -05:00, +0530
@@ -203,7 +245,7 @@ class DateTimeParser {
             return true;
         }
 
-        // Check for timezone abbreviation or name in the string
+        // Check for timezone abbreviation or name in string
         if (preg_match('/\s[A-Z]{2,5}$/', $datetime)) {
             return true;
         }

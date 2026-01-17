@@ -5,6 +5,7 @@
  * Defines settings fields and sanitization for ICS calendar feed import handler.
  * No authentication required - works with any public ICS/iCal feed URL.
  *
+ * @deprecated 0.9.8 Use Universal Web Scraper handler with ICS URLs instead
  * @package DataMachineEvents\Steps\EventImport\Handlers\IcsCalendar
  */
 
@@ -30,6 +31,17 @@ class IcsCalendarSettings {
      * @return array Associative array defining the settings fields
      */
     public static function get_fields(array $current_config = []): array {
+        $deprecation_notice = [
+            '_deprecated_notice' => [
+                'type' => 'html',
+                'label' => __('Important Notice', 'datamachine-events'),
+                'description' => __(
+                    '<strong>This handler is deprecated.</strong> Please use <strong>Universal Web Scraper</strong> with your ICS feed URL instead. Existing flows using this handler will continue to work.',
+                    'datamachine-events'
+                ),
+            ],
+        ];
+
         $handler_fields = [
             'feed_url' => [
                 'type' => 'text',
@@ -59,7 +71,7 @@ class IcsCalendarSettings {
             ]
         ];
 
-        return array_merge($handler_fields, $venue_fields, $filter_fields);
+        return array_merge($deprecation_notice, $handler_fields, $venue_fields, $filter_fields);
     }
 
     /**

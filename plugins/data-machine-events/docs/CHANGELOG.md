@@ -5,6 +5,27 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## Unreleased
+
+### Added
+- ICS Calendar Migration to Universal Web Scraper
+- WP-CLI Migration Tool for Handler Deprecation
+
+Created MigrateHandlersCommand WP-CLI tool to migrate flows from deprecated handlers to their replacements. Supports ICS Calendar to Universal Web Scraper migration with dry-run mode for safe testing and automatic configuration field mapping.
+
+Created IcsExtractor to parse raw ICS feed content, supporting Tockify, Google Calendar, Apple Calendar, and any standard ICS/iCal feed. Extractor handles timezone detection and venue data extraction from ICS location fields.
+
+### Changed
+- Universal Web Scraper Documentation Updates
+- Repository Documentation Alignment
+
+Updated universal-web-scraper-test-command.md with ICS feed support documentation. Added ICS Calendar Feed Support section with examples for Tockify, Google Calendar exports, and migration command usage.
+
+### Deprecated
+- ICS Calendar Handler Deprecation
+
+Added deprecation notices to IcsCalendar handler and settings classes. Existing flows using ICS Calendar continue to work but should migrate to Universal Web Scraper using MigrateHandlersCommand.
+
 ## [0.9.7] - 2026-01-16
 
 - Add `next_day_cutoff` setting for multi-day event detection - events ending before this time (default 5:00 AM) on the following day are treated as single-day events.

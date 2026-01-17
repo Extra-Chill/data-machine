@@ -39,7 +39,8 @@ class EmbeddedCalendarExtractor extends BaseExtractor {
             return [];
         }
 
-        $ical_events = $this->parseIcsContent($ics_content);
+        $calendar_timezone = $calendar_data['timezone'] ?: '';
+        [$ical_events, $calendar_timezone] = $this->parseIcsContent($ics_content, $calendar_timezone);
 
         if (empty($ical_events)) {
             return [];
@@ -52,16 +53,22 @@ class EmbeddedCalendarExtractor extends BaseExtractor {
         $timezone = $calendar_data['timezone'] ?: $page_venue['venueTimezone'];
 
         $events = [];
-        foreach ($ical_events as $ical_event) {
-            $normalized = $this->normalizeEvent($ical_event, $page_venue, $timezone);
-            if (!empty($normalized['title'])) {
-                $events[] = $normalized;
+        if (is_array($ical_events)) {
+            foreach ($ical_events as $ical_event) {
+                $normalized = $this->normalizeEvent($ical_event, $page_venue, $calendar_timezone);
+
+                if (!empty($normalized['title'])) {
+                    $events[] = $normalized;
+                }
             }
         }
 
         return $events;
     }
 
+    /**
+     * Extract calendar ID and timezone from Google Calendar embed iframe.
+     */
     public function getMethod(): string {
         return 'embedded_calendar';
     }
@@ -75,7 +82,7 @@ class EmbeddedCalendarExtractor extends BaseExtractor {
             'timezone' => '',
         ];
 
-        if (!preg_match('/<iframe[^>]+src=["\']([^"\']*google\.com\/calendar\/embed[^"\']*)["\'][^>]*>/i', $html, $matches)) {
+        if (!preg_match('/<iframe[^>]+src=["\']([^"]*google\.com\/calendar\/embed[^"]*)["\'][^>]*>/i', $html, $matches)) {
             return $data;
         }
 
@@ -152,11 +159,11 @@ class EmbeddedCalendarExtractor extends BaseExtractor {
     /**
      * Parse ICS content using ICal library.
      */
-    private function parseIcsContent(string $ics_content): array {
+    private function parseIcsContent(string $ics_content, string $calendar_timezone = 'UTC'): array {
         try {
             $ical = new ICal(false, [
                 'defaultSpan' => 2,
-                'defaultTimeZone' => 'UTC',
+                'defaultTimeZone' => !empty($calendar_timezone) ? $calendar_timezone : 'UTC',
                 'defaultWeekStart' => 'MO',
                 'skipRecurrence' => false,
                 'useTimeZoneWithRRules' => false,
@@ -165,9 +172,14 @@ class EmbeddedCalendarExtractor extends BaseExtractor {
 
             $ical->initString($ics_content);
 
-            return $ical->events() ?? [];
+            $extracted_timezone = $ical->calendarTimeZone() ?? '';
+            if (!empty($extracted_timezone) && $extracted_timezone !== 'UTC') {
+                $calendar_timezone = $extracted_timezone;
+            }
+
+            return [$ical->events() ?? [], $calendar_timezone];
         } catch (\Exception $e) {
-            return [];
+            return [[], ''];
         }
     }
 
@@ -231,24 +243,31 @@ class EmbeddedCalendarExtractor extends BaseExtractor {
     /**
      * Parse date/time values from iCal event.
      */
-    private function parseDateTimes(array &$event, $ical_event, string $default_timezone): void {
+    private function parseDateTimes(array &$event, $ical_event, string $calendar_timezone): void {
         if (!empty($ical_event->dtstart)) {
             $start = $ical_event->dtstart;
 
             if ($start instanceof \DateTime) {
-                $event['startDate'] = $start->format('Y-m-d');
-                $event['startTime'] = $start->format('H:i');
+                $tz = $start->getTimezone();
+                $tz_name = $tz ? $tz->getName() : '';
 
-                if (empty($event['venueTimezone'])) {
-                    $tz = $start->getTimezone();
-                    if ($tz && $tz->getName() !== 'UTC' && $tz->getName() !== 'Z') {
-                        $event['venueTimezone'] = $tz->getName();
-                    }
+                $event['startDate'] = $start->format('Y-m-d');
+
+                if ($tz_name !== 'UTC' && $tz_name !== 'Z') {
+                    $event['venueTimezone'] = $tz_name;
+                    $event['startTime'] = $start->format('H:i');
+                } elseif (!empty($calendar_timezone) && $calendar_timezone !== 'UTC') {
+                    $event['venueTimezone'] = $calendar_timezone;
+                    $start->setTimezone(new \DateTimeZone($calendar_timezone));
+                    $event['startTime'] = $start->format('H:i');
+                } else {
+                    $event['startTime'] = $start->format('H:i');
                 }
-            } elseif (is_string($start)) {
-                $parsed = $this->parseDateTimeString($start, $default_timezone);
+                } elseif (is_string($start)) {
+                $parsed = \DataMachineEvents\Core\DateTimeParser::parseIcs($start, $calendar_timezone);
                 $event['startDate'] = $parsed['date'];
                 $event['startTime'] = $parsed['time'];
+                $event['venueTimezone'] = $parsed['timezone'];
             }
         }
 
@@ -256,10 +275,23 @@ class EmbeddedCalendarExtractor extends BaseExtractor {
             $end = $ical_event->dtend;
 
             if ($end instanceof \DateTime) {
+                $tz = $end->getTimezone();
+                $tz_name = $tz ? $tz->getName() : '';
+
                 $event['endDate'] = $end->format('Y-m-d');
-                $event['endTime'] = $end->format('H:i');
+
+                if ($tz_name !== 'UTC' && $tz_name !== 'Z') {
+                    $event['venueTimezone'] = $tz_name;
+                    $event['endTime'] = $end->format('H:i');
+                } elseif (!empty($calendar_timezone) && $calendar_timezone !== 'UTC') {
+                    $event['venueTimezone'] = $calendar_timezone;
+                    $end->setTimezone(new \DateTimeZone($calendar_timezone));
+                    $event['endTime'] = $end->format('H:i');
+                } else {
+                    $event['endTime'] = $end->format('H:i');
+                }
             } elseif (is_string($end)) {
-                $parsed = $this->parseDateTimeString($end, $default_timezone);
+                $parsed = \DataMachineEvents\Core\DateTimeParser::parseIcs($end, $calendar_timezone);
                 $event['endDate'] = $parsed['date'];
                 $event['endTime'] = $parsed['time'];
             }
@@ -270,26 +302,4 @@ class EmbeddedCalendarExtractor extends BaseExtractor {
         }
     }
 
-    /**
-     * Parse date/time string to components.
-     */
-    private function parseDateTimeString(string $datetime_str, string $default_timezone): array {
-        $result = ['date' => '', 'time' => ''];
-
-        try {
-            $tz = !empty($default_timezone) ? new \DateTimeZone($default_timezone) : null;
-            $dt = new \DateTime($datetime_str, $tz);
-            $result['date'] = $dt->format('Y-m-d');
-            $result['time'] = $dt->format('H:i');
-        } catch (\Exception $e) {
-            if (preg_match('/^(\d{4})(\d{2})(\d{2})/', $datetime_str, $matches)) {
-                $result['date'] = $matches[1] . '-' . $matches[2] . '-' . $matches[3];
-            }
-            if (preg_match('/T(\d{2})(\d{2})(\d{2})/', $datetime_str, $matches)) {
-                $result['time'] = $matches[1] . ':' . $matches[2];
-            }
-        }
-
-        return $result;
-    }
 }

@@ -71,6 +71,11 @@ require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/meta-storage.php';
 		\WP_CLI::add_command( 'datamachine-events settings', \DataMachineEvents\Cli\SettingsCommand::class );
 	}
 
+	if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/MigrateHandlersCommand.php' ) ) {
+		require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/MigrateHandlersCommand.php';
+		\WP_CLI::add_command( 'datamachine-events migrate-handlers', \DataMachineEvents\Cli\MigrateHandlersCommand::class );
+	}
+
 
 /**
  * Main Data Machine Events plugin class

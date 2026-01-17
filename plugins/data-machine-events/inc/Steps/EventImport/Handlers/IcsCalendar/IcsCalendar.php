@@ -6,6 +6,7 @@
  * Single-item processing pattern with EventIdentifierGenerator for deduplication.
  * No authentication required - works with public calendar feeds.
  *
+ * @deprecated 0.9.8 Use Universal Web Scraper handler with ICS URLs instead
  * @package DataMachineEvents\Steps\EventImport\Handlers\IcsCalendar
  */
 
@@ -17,6 +18,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
+use DataMachineEvents\Core\DateTimeParser;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -28,6 +30,13 @@ class IcsCalendar extends EventImportHandler {
 
     public function __construct() {
         parent::__construct('ics_calendar');
+
+        if (function_exists('trigger_error')) {
+            trigger_error(
+                'ICS Calendar handler is deprecated. Use Universal Web Scraper handler with ICS feed URLs instead.',
+                E_USER_DEPRECATED
+            );
+        }
 
         self::registerHandler(
             'ics_calendar',
@@ -57,7 +66,7 @@ class IcsCalendar extends EventImportHandler {
             return [];
         }
 
-        $events = $this->fetch_calendar_events($feed_url, $config, $context);
+        [$events, $ical] = $this->fetch_calendar_events($feed_url, $config, $context);
         if (empty($events)) {
             $context->log('info', 'IcsCalendar: No events found in feed');
             return [];
@@ -68,7 +77,7 @@ class IcsCalendar extends EventImportHandler {
         ]);
 
         foreach ($events as $ical_event) {
-            $standardized_event = $this->map_ical_event($ical_event, $config);
+            $standardized_event = $this->map_ical_event($ical_event, $ical, $config);
 
             if (empty($standardized_event['title'])) {
                 continue;
@@ -161,7 +170,7 @@ class IcsCalendar extends EventImportHandler {
         try {
             $ical = new ICal($feed_url, [
                 'defaultSpan' => 2,
-                'defaultTimeZone' => 'UTC',
+                'defaultTimeZone' => $config['venue_timezone'] ?? 'UTC',
                 'defaultWeekStart' => 'MO',
                 'skipRecurrence' => false,
                 'useTimeZoneWithRRules' => false,
@@ -175,7 +184,7 @@ class IcsCalendar extends EventImportHandler {
                 'feed_url' => $feed_url
             ]);
 
-            return $events;
+            return [$events, $ical];
 
         } catch (\Exception $e) {
             $context->log('error', 'IcsCalendar: Failed to fetch or parse feed', [
@@ -189,8 +198,9 @@ class IcsCalendar extends EventImportHandler {
     /**
      * Map iCal event to standardized event format
      */
-    private function map_ical_event($ical_event, array $config): array {
-        $event_timezone = $this->extract_event_timezone($ical_event);
+    private function map_ical_event($ical_event, $ical, array $config): array {
+        $calendar_timezone = $this->extract_calendar_timezone($ical);
+        $event_timezone = $calendar_timezone ?: $this->extract_event_timezone($ical_event);
         
         $standardized_event = [
             'title' => sanitize_text_field($ical_event->summary ?? ''),
@@ -217,31 +227,49 @@ class IcsCalendar extends EventImportHandler {
         if (!empty($ical_event->dtstart)) {
             $start_datetime = $ical_event->dtstart;
             if ($start_datetime instanceof \DateTime) {
+                $tz = $start_datetime->getTimezone();
+                $tz_name = $tz ? $tz->getName() : '';
+
                 $standardized_event['startDate'] = $start_datetime->format('Y-m-d');
-                $standardized_event['startTime'] = $start_datetime->format('H:i');
-                if (empty($event_timezone)) {
-                    $tz = $start_datetime->getTimezone();
-                    if ($tz) {
-                        $standardized_event['venueTimezone'] = $tz->getName();
-                    }
+
+                if ($tz_name !== 'UTC' && $tz_name !== 'Z') {
+                    $standardized_event['venueTimezone'] = $tz_name;
+                    $standardized_event['startTime'] = $start_datetime->format('H:i');
+                } elseif (!empty($calendar_timezone) && $calendar_timezone !== 'UTC') {
+                    $standardized_event['venueTimezone'] = $calendar_timezone;
+                    $start_datetime->setTimezone(new \DateTimeZone($calendar_timezone));
+                    $standardized_event['startTime'] = $start_datetime->format('H:i');
+                } else {
+                    $standardized_event['startTime'] = $start_datetime->format('H:i');
                 }
             } elseif (is_string($start_datetime)) {
-                $parsed = $this->parseDateTimeIso($start_datetime);
+                $parsed = DateTimeParser::parseIcs($start_datetime, $calendar_timezone);
                 $standardized_event['startDate'] = $parsed['date'];
                 $standardized_event['startTime'] = $parsed['time'];
-                if (empty($standardized_event['venueTimezone']) && !empty($parsed['timezone'])) {
-                    $standardized_event['venueTimezone'] = $parsed['timezone'];
-                }
+                $standardized_event['venueTimezone'] = $parsed['timezone'];
             }
         }
 
         if (!empty($ical_event->dtend)) {
             $end_datetime = $ical_event->dtend;
             if ($end_datetime instanceof \DateTime) {
+                $tz = $end_datetime->getTimezone();
+                $tz_name = $tz ? $tz->getName() : '';
+
                 $standardized_event['endDate'] = $end_datetime->format('Y-m-d');
-                $standardized_event['endTime'] = $end_datetime->format('H:i');
+
+                if ($tz_name !== 'UTC' && $tz_name !== 'Z') {
+                    $standardized_event['venueTimezone'] = $tz_name;
+                    $standardized_event['endTime'] = $end_datetime->format('H:i');
+                } elseif (!empty($calendar_timezone) && $calendar_timezone !== 'UTC') {
+                    $standardized_event['venueTimezone'] = $calendar_timezone;
+                    $end_datetime->setTimezone(new \DateTimeZone($calendar_timezone));
+                    $standardized_event['endTime'] = $end_datetime->format('H:i');
+                } else {
+                    $standardized_event['endTime'] = $end_datetime->format('H:i');
+                }
             } elseif (is_string($end_datetime)) {
-                $parsed = $this->parseDateTimeIso($end_datetime);
+                $parsed = DateTimeParser::parseIcs($end_datetime, $calendar_timezone);
                 $standardized_event['endDate'] = $parsed['date'];
                 $standardized_event['endTime'] = $parsed['time'];
             }
@@ -281,11 +309,32 @@ class IcsCalendar extends EventImportHandler {
     }
 
     /**
+     * Extract timezone from iCal calendar (VTIMEZONE section).
+     *
+     * @param ICal $ical Parsed iCal object
+     * @return string IANA timezone identifier or empty string
+     */
+    private function extract_calendar_timezone($ical): string {
+        if (!$ical instanceof ICal) {
+            return '';
+        }
+
+        $calendar_timezone = $ical->calendarTimeZone() ?? '';
+
+        if (!empty($calendar_timezone) && $calendar_timezone !== 'UTC') {
+            return $calendar_timezone;
+        }
+
+        return '';
+    }
+
+    /**
      * Extract timezone from iCal event
      *
      * Checks dtstart_tz property and falls back to DateTime timezone.
+     * Returns empty string for UTC (to avoid storing redundant data).
      *
-     * @param object $ical_event iCal event object
+     * @param object $ical_event Parsed iCal event object
      * @return string IANA timezone identifier or empty string
      */
     private function extract_event_timezone($ical_event): string {

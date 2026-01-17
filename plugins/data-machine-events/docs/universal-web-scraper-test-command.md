@@ -1,6 +1,6 @@
 # Universal Web Scraper Test Command
 
-WP-CLI command for testing the Universal Web Scraper handler with any target URL.
+WP-CLI command for testing the Universal Web Scraper handler with any target URL. Supports web pages, ICS feeds, and JSON APIs.
 
 ## Command Names
 
@@ -17,12 +17,23 @@ wp datamachine-events test-scraper-url --target_url=<url>
 
 ### Required
 
-- `--target_url=<url>`: The web page URL to scrape for event data
+- `--target_url=<url>`: The web page URL, ICS feed, or JSON API to test
 
-## Example
+## Examples
 
+### Web Page Scraping
 ```bash
 wp datamachine-events test-scraper-url --target_url=https://example.com/events
+```
+
+### ICS Calendar Feeds
+```bash
+wp datamachine-events test-scraper-url --target_url=https://tockify.com/api/feeds/ics/calendar-name
+```
+
+### Google Calendar Export
+```bash
+wp datamachine-events test-scraper-url --target_url=webcal://calendar.google.com/calendar/ical/...
 ```
 
 ## Output
@@ -63,3 +74,45 @@ Raw HTML packets indicate AI extraction is needed for venue data.
 ## Reliability & Debugging
 
 The test command is essential for verifying the scraper's **Smart Fallback** and **Browser Spoofing** capabilities. When testing URLs known to have strict bot detection, observe the logs for "retrying with standard mode" to confirm the fallback is functioning correctly.
+
+## ICS Calendar Feed Support
+
+The Universal Web Scraper now directly supports ICS/iCal feed URLs, replacing the deprecated ICS Calendar handler.
+
+### Supported ICS Formats
+
+- Direct `.ics` files
+- Tockify feeds
+- Google Calendar exports
+- Apple Calendar exports
+- Outlook calendar exports
+- Any standard ICS/iCal feed
+
+### ICS Handler Migration
+
+The legacy **ICS Calendar** handler is deprecated. Migrate existing flows using:
+
+```bash
+wp datamachine-events migrate-handlers --handler=ics_calendar --dry-run
+```
+
+To perform the migration:
+
+```bash
+wp datamachine-events migrate-handlers --handler=ics_calendar
+```
+
+The migration tool automatically:
+- Updates flow handler from `ics_calendar` to `universal_web_scraper`
+- Maps `feed_url` config to `source_url`
+- Preserves all venue override and keyword filtering settings
+- Validates configuration before applying changes
+
+### ICS-Specific Output
+
+When testing ICS feeds, the command displays:
+
+- **Source type**: `ics_feed`
+- **Timezone information**: Calendar timezone and event-specific timezone
+- **Venue data**: From ICS location field (optional venue override available)
+- **Time coverage warnings**: For missing start/end times (common in all-day events)
