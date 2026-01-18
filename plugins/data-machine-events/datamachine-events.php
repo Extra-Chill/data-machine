@@ -3,7 +3,7 @@
  * Plugin Name: Data Machine Events
  * Plugin URI: https://chubes.net
  * Description: WordPress events plugin with block-first architecture. Features AI-driven event creation via Data Machine integration, Event Details blocks for data storage, Calendar blocks for display, and venue taxonomy management.
- * Version: 0.9.11
+ * Version: 0.9.12
  * Author: Chris Huber
  * Author URI: https://chubes.net
  * License: GPL v2 or later
@@ -69,11 +69,6 @@ require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/meta-storage.php';
 	if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/SettingsCommand.php' ) ) {
 		require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/SettingsCommand.php';
 		\WP_CLI::add_command( 'datamachine-events settings', \DataMachineEvents\Cli\SettingsCommand::class );
-	}
-
-	if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/MigrateHandlersCommand.php' ) ) {
-		require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/MigrateHandlersCommand.php';
-		\WP_CLI::add_command( 'datamachine-events migrate-handlers', \DataMachineEvents\Cli\MigrateHandlersCommand::class );
 	}
 
 
@@ -184,14 +179,11 @@ class DATAMACHINE_Events {
         $handlers = [
             'DataMachineEvents\\Steps\\EventImport\\Handlers\\Ticketmaster\\Ticketmaster',
             'DataMachineEvents\\Steps\\EventImport\\Handlers\\DiceFm\\DiceFm',
-            'DataMachineEvents\\Steps\\EventImport\\Handlers\\IcsCalendar\\IcsCalendar',
             'DataMachineEvents\\Steps\\EventImport\\Handlers\\WebScraper\\UniversalWebScraper',
             'DataMachineEvents\\Steps\\EventImport\\Handlers\\EventFlyer\\EventFlyer',
-            'DataMachineEvents\\Steps\\EventImport\\Handlers\\Eventbrite\\Eventbrite',
-            'DataMachineEvents\\Steps\\EventImport\\Handlers\\DoStuffMediaApi\\DoStuffMediaApi',
             'DataMachineEvents\\Steps\\EventImport\\Handlers\\SingleRecurring\\SingleRecurring',
         ];
-        
+
         foreach ($handlers as $handler_class) {
             if (class_exists($handler_class)) {
                 new $handler_class();
