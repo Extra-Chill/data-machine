@@ -32,7 +32,7 @@ class MusicItemExtractor extends BaseExtractor {
 		$xpath       = new \DOMXPath( $dom );
 		$event_nodes = $xpath->query( "//*[contains(concat(' ', normalize-space(@class), ' '), ' music__item ')]" );
 
-		if ( $event_nodes->length === 0 ) {
+		if ( 0 === $event_nodes->length ) {
 			return array();
 		}
 
@@ -128,7 +128,7 @@ class MusicItemExtractor extends BaseExtractor {
 
 		$date_text = '';
 		foreach ( $date_node->childNodes as $child ) {
-			if ( $child->nodeType === XML_TEXT_NODE ) {
+			if ( XML_TEXT_NODE === $child->nodeType ) {
 				$date_text .= $child->textContent;
 			}
 		}

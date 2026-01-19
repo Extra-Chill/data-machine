@@ -162,7 +162,7 @@ class Event_Post_Type {
 		}
 
 		$screen = get_current_screen();
-		if ( ! $screen || $screen->post_type !== self::POST_TYPE ) {
+		if ( ! $screen || self::POST_TYPE !== $screen->post_type ) {
 			return;
 		}
 
@@ -216,7 +216,7 @@ class Event_Post_Type {
 	public static function filter_parent_file( $parent_file ) {
 		global $current_screen;
 
-		if ( ! $current_screen || $current_screen->post_type !== self::POST_TYPE ) {
+		if ( ! $current_screen || self::POST_TYPE !== $current_screen->post_type ) {
 			return $parent_file;
 		}
 
@@ -242,7 +242,7 @@ class Event_Post_Type {
 	public static function filter_submenu_file( $submenu_file ) {
 		global $current_screen;
 
-		if ( ! $current_screen || $current_screen->post_type !== self::POST_TYPE ) {
+		if ( ! $current_screen || self::POST_TYPE !== $current_screen->post_type ) {
 			return $submenu_file;
 		}
 

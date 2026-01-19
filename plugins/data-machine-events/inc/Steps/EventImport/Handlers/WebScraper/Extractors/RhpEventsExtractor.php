@@ -32,7 +32,7 @@ class RhpEventsExtractor extends BaseExtractor {
 		$xpath       = new \DOMXPath( $dom );
 		$event_nodes = $xpath->query( "//*[contains(@class, 'rhpSingleEvent')]" );
 
-		if ( $event_nodes->length === 0 ) {
+		if ( 0 === $event_nodes->length ) {
 			return array();
 		}
 

@@ -461,7 +461,7 @@ class TimezoneAbilities {
 		}
 
 		$post = get_post( $event_id );
-		if ( ! $post || $post->post_type !== Event_Post_Type::POST_TYPE ) {
+		if ( ! $post || Event_Post_Type::POST_TYPE !== $post->post_type ) {
 			return array(
 				'event'  => $event_id,
 				'status' => 'failed',

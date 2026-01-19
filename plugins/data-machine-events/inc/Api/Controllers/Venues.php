@@ -91,6 +91,7 @@ class Venues {
 							'is_duplicate'        => true,
 							'existing_term_id'    => $existing_term->term_id,
 							'existing_venue_name' => $existing_term->name,
+							/* translators: %s: venue name */
 							'message'             => sprintf(
 								__( 'A venue named "%s" with this address already exists.', 'datamachine-events' ),
 								esc_html( $existing_term->name )
@@ -108,6 +109,7 @@ class Venues {
 					'is_duplicate'        => true,
 					'existing_term_id'    => $existing_term->term_id,
 					'existing_venue_name' => $existing_term->name,
+					/* translators: %s: venue name */
 					'message'             => sprintf(
 						__( 'A venue named "%s" already exists. Consider using a more specific name or check if this is the same venue.', 'datamachine-events' ),
 						esc_html( $existing_term->name )

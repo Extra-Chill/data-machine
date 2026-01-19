@@ -44,6 +44,7 @@ class Template_Loader {
 		}
 
 		if ( ! empty( $variables ) ) {
+			// phpcs:ignore WordPress.PHP.DontExtract.extract_extract -- Template variable extraction with EXTR_SKIP is intentional
 			extract( $variables, EXTR_SKIP );
 		}
 		ob_start();
@@ -58,6 +59,7 @@ class Template_Loader {
 	 * @param array $variables Variables to extract into template scope using EXTR_SKIP
 	 */
 	public static function include_template( $template_name, $variables = array() ) {
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Template output is escaped within templates
 		echo self::get_template( $template_name, $variables );
 	}
 

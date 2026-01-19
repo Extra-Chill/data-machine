@@ -40,7 +40,7 @@ class RedRocksExtractor extends BaseExtractor {
 		$xpath       = new \DOMXPath( $dom );
 		$event_nodes = $xpath->query( "//*[contains(@class, 'card-event')]" );
 
-		if ( $event_nodes->length === 0 ) {
+		if ( 0 === $event_nodes->length ) {
 			return array();
 		}
 

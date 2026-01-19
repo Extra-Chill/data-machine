@@ -26,6 +26,7 @@ $settings = array(
 );
 
 // Handle settings updates
+// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Checking settings-updated flag set by WordPress core
 if ( isset( $_GET['settings-updated'] ) ) {
 	add_settings_error(
 		'datamachine_events_messages',
@@ -170,9 +171,18 @@ settings_errors( 'datamachine_events_messages' );
 								class="regular-text" />
 						<p class="description">
 							<?php
-							printf(
-								__( 'Required for automatic timezone detection from venue coordinates. <a href="%s" target="_blank">Create a free GeoNames account</a> and enable web services in your account settings.', 'datamachine-events' ),
-								'https://www.geonames.org/login'
+							/* translators: %s: GeoNames login URL */
+							echo wp_kses(
+								sprintf(
+									__( 'Required for automatic timezone detection from venue coordinates. <a href="%s" target="_blank">Create a free GeoNames account</a> and enable web services in your account settings.', 'datamachine-events' ),
+									'https://www.geonames.org/login'
+								),
+								array(
+									'a' => array(
+										'href'   => array(),
+										'target' => array(),
+									),
+								)
 							);
 							?>
 						</p>

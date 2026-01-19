@@ -33,7 +33,7 @@ class MicrodataExtractor extends BaseExtractor {
 
 		$event_elements = $xpath->query( "//*[@itemtype='https://schema.org/Event' or @itemtype='http://schema.org/Event']" );
 
-		if ( $event_elements->length === 0 ) {
+		if ( 0 === $event_elements->length ) {
 			return array();
 		}
 
@@ -142,7 +142,7 @@ class MicrodataExtractor extends BaseExtractor {
 	 */
 	private function parseLocation( \DOMXPath $xpath, \DOMNode $event_element, array &$event ): void {
 		$location = $xpath->query( ".//*[@itemprop='location']", $event_element );
-		if ( $location->length === 0 ) {
+		if ( 0 === $location->length ) {
 			return;
 		}
 
@@ -163,7 +163,7 @@ class MicrodataExtractor extends BaseExtractor {
 	 */
 	private function parseAddress( \DOMXPath $xpath, \DOMNode $location_element, array &$event ): void {
 		$address = $xpath->query( ".//*[@itemprop='address']", $location_element );
-		if ( $address->length === 0 ) {
+		if ( 0 === $address->length ) {
 			return;
 		}
 
@@ -218,7 +218,7 @@ class MicrodataExtractor extends BaseExtractor {
 	 */
 	private function parseGeo( \DOMXPath $xpath, \DOMNode $location_element, array &$event ): void {
 		$geo = $xpath->query( ".//*[@itemprop='geo']", $location_element );
-		if ( $geo->length === 0 ) {
+		if ( 0 === $geo->length ) {
 			return;
 		}
 
@@ -238,7 +238,7 @@ class MicrodataExtractor extends BaseExtractor {
 	 */
 	private function parseOffers( \DOMXPath $xpath, \DOMNode $event_element, array &$event ): void {
 		$offers = $xpath->query( ".//*[@itemprop='offers']", $event_element );
-		if ( $offers->length === 0 ) {
+		if ( 0 === $offers->length ) {
 			return;
 		}
 
@@ -263,7 +263,7 @@ class MicrodataExtractor extends BaseExtractor {
 	 */
 	private function parseImage( \DOMXPath $xpath, \DOMNode $event_element, array &$event ): void {
 		$image = $xpath->query( ".//*[@itemprop='image']", $event_element );
-		if ( $image->length === 0 ) {
+		if ( 0 === $image->length ) {
 			return;
 		}
 

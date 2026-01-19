@@ -691,7 +691,7 @@ class Venue_Taxonomy {
 		}
 
 		$screen = get_current_screen();
-		if ( ! $screen || $screen->taxonomy !== 'venue' ) {
+		if ( ! $screen || 'venue' !== $screen->taxonomy ) {
 			return;
 		}
 

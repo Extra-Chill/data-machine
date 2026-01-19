@@ -123,6 +123,7 @@ class Calendar {
 						$display_context = $event_item['display_context'] ?? array();
 
 						global $post;
+						// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Required for setup_postdata()
 						$post = $event_post;
 						setup_postdata( $post );
 

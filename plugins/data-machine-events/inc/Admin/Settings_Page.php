@@ -75,7 +75,7 @@ class Settings_Page {
 
 	public function render_settings_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( __( 'You do not have sufficient permissions to access this page.', 'datamachine-events' ) );
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'datamachine-events' ) );
 		}
 
 		$template_path = DATAMACHINE_EVENTS_PLUGIN_DIR . 'templates/admin/settings-page.php';

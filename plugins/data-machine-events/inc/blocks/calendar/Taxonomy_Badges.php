@@ -139,23 +139,27 @@ class Taxonomy_Badges {
 		global $wpdb;
 
 		$excluded_taxonomies = apply_filters( 'datamachine_events_excluded_taxonomies', array(), 'badge' );
-		$excluded_sql        = '';
+
+		$base_query = "
+			SELECT DISTINCT tt.taxonomy, t.name
+			FROM {$wpdb->term_taxonomy} tt
+			INNER JOIN {$wpdb->term_relationships} tr ON tt.term_taxonomy_id = tr.term_taxonomy_id
+			INNER JOIN {$wpdb->posts} p ON tr.object_id = p.ID
+			INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
+			WHERE p.post_type = %s
+			AND p.post_status = 'publish'
+		";
+
 		if ( ! empty( $excluded_taxonomies ) ) {
-			$excluded_sql = "AND tt.taxonomy NOT IN ('" . implode( "','", array_map( 'esc_sql', $excluded_taxonomies ) ) . "')";
+			$placeholders = implode( ', ', array_fill( 0, count( $excluded_taxonomies ), '%s' ) );
+			$base_query  .= " AND tt.taxonomy NOT IN ($placeholders)";
+			$query_args   = array_merge( array( Event_Post_Type::POST_TYPE ), $excluded_taxonomies );
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Query is built with placeholders above
+			$results      = $wpdb->get_results( $wpdb->prepare( $base_query, $query_args ) );
+		} else {
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Simple query with single placeholder
+			$results = $wpdb->get_results( $wpdb->prepare( $base_query, Event_Post_Type::POST_TYPE ) );
 		}
-
-		$query = "
-            SELECT DISTINCT tt.taxonomy, t.name
-            FROM {$wpdb->term_taxonomy} tt
-            INNER JOIN {$wpdb->term_relationships} tr ON tt.term_taxonomy_id = tr.term_taxonomy_id
-            INNER JOIN {$wpdb->posts} p ON tr.object_id = p.ID
-            INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
-            WHERE p.post_type = '" . esc_sql( Event_Post_Type::POST_TYPE ) . "'
-            AND p.post_status = 'publish'
-            {$excluded_sql}
-        ";
-
-		$results = $wpdb->get_results( $query );
 
 		if ( ! $results ) {
 			return array();
