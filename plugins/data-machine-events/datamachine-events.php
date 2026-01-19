@@ -3,7 +3,7 @@
  * Plugin Name: Data Machine Events
  * Plugin URI: https://chubes.net
  * Description: WordPress events plugin with block-first architecture. Features AI-driven event creation via Data Machine integration, Event Details blocks for data storage, Calendar blocks for display, and venue taxonomy management.
- * Version: 0.9.15
+ * Version: 0.9.16
  * Author: Chris Huber
  * Author URI: https://chubes.net
  * License: GPL v2 or later
@@ -28,7 +28,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( file_exists( __DIR__ . '/vendor/autoload.php' ) ) {
 	require_once __DIR__ . '/vendor/autoload.php';
 }
-define( 'DATAMACHINE_EVENTS_VERSION', '0.9.15' );
+define( 'DATAMACHINE_EVENTS_VERSION', '0.9.16' );
 define( 'DATAMACHINE_EVENTS_PLUGIN_FILE', __FILE__ );
 define( 'DATAMACHINE_EVENTS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_EVENTS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -84,6 +84,11 @@ if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR
 if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/UpdateEventCommand.php' ) ) {
 	require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/UpdateEventCommand.php';
 	\WP_CLI::add_command( 'datamachine-events update-event', \DataMachineEvents\Cli\UpdateEventCommand::class );
+}
+
+if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/BatchTimeFixCommand.php' ) ) {
+	require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/BatchTimeFixCommand.php';
+	\WP_CLI::add_command( 'datamachine-events batch-time-fix', \DataMachineEvents\Cli\BatchTimeFixCommand::class );
 }
 
 
@@ -202,6 +207,11 @@ class DATAMACHINE_Events {
 		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventUpdateAbilities.php' ) ) {
 			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventUpdateAbilities.php';
 			new \DataMachineEvents\Abilities\EventUpdateAbilities();
+		}
+
+		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/BatchTimeFixAbilities.php' ) ) {
+			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/BatchTimeFixAbilities.php';
+			new \DataMachineEvents\Abilities\BatchTimeFixAbilities();
 		}
 	}
 

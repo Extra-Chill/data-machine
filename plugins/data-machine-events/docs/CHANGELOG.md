@@ -5,6 +5,11 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.9.16] - 2026-01-19
+
+- Fixed: ICS feed timezone parsing - events now display in correct local time instead of being offset by timezone difference
+- Added: BatchTimeFixAbilities for batch correction of events with systematic timezone issues
+
 ## [0.9.15] - 2026-01-19
 
 ### Changed
