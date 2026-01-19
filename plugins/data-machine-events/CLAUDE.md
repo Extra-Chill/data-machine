@@ -60,13 +60,23 @@ Routes in `inc/Api/Routes.php` register controllers from `inc/Api/Controllers/{C
 
 **Security**: Admin endpoints check `current_user_can('manage_options')`. All args sanitize via `sanitize_text_field`, `absint`, `sanitize_key`, or callback sanitizers. The controllers log and respond with consistent JSON structures.
 
+## Abilities
+
+Abilities in `inc/Abilities` expose functionality via WordPress 6.9 Abilities API with companion chat tool wrappers. The pattern ensures business logic is accessible via REST/WP-CLI/ability callers, while chat tools wrap abilities for AI consumption.
+
+- **EventScraperTest**: Tests universal web scraper compatibility with a target URL. Ability: `datamachine/test-event-scraper`. Chat tool: `test_event_scraper`.
+- **TimezoneAbilities**: Finds events with missing venue timezone and fixes them with geocoding support. Abilities: `datamachine-events/find-broken-timezone-events`, `datamachine-events/fix-event-timezone`. Chat tools: `find_broken_timezone_events`, `fix_event_timezone`.
+- **EventQueryAbilities**: Query events by venue with filtering options. Ability: `datamachine-events/get-venue-events`. Chat tool wrapper in `inc/Api/Chat/Tools/GetVenueEvents.php`.
+
 ## AI Chat Tools
 
-Chat tools in `inc/Api/Chat/Tools` provide AI-driven venue management capabilities via the Data Machine's AI framework. Tools are self-registering via `ToolRegistrationTrait`:
+Chat tools in `inc/Api/Chat/Tools` provide AI-driven venue and event management capabilities via the Data Machine's AI framework. Tools are self-registering via `ToolRegistrationTrait`:
 
 - **VenueHealthCheck**: Scans all venues for data quality issues (missing address, coordinates, or timezone) and returns detailed counts and lists of problematic venues. Optional `limit` parameter controls maximum venues returned per category (default: 25).
 - **UpdateVenue**: Updates venue name and/or meta fields (address, city, state, zip, country, phone, website, capacity, coordinates, timezone). Accepts venue identifier (term ID, name, or slug) and any combination of fields to update. Address field changes trigger automatic geocoding via `Venue_Taxonomy::update_venue_meta`.
-- **GetVenueEvents**: Retrieves upcoming events for a specific venue. Accepts venue identifier (term ID, name, or slug) and optional parameters for limiting results and date range filtering.
+- **EventHealthCheck**: Scans events for data quality issues and returns detailed reports.
+- **UpdateEvent**: Updates event fields and metadata.
+- **GetVenueEvents**: Get events attached to a specific venue. Wraps `EventQueryAbilities::executeGetVenueEvents()`. Accepts venue identifier (term ID, name, or slug) and optional parameters for limiting results, status filtering, and date range filtering.
 
 ## Templates & Rendering
 
@@ -90,6 +100,7 @@ Chat tools in `inc/Api/Chat/Tools` provide AI-driven venue management capabiliti
 ## WP-CLI Commands
 
 - **Universal Web Scraper Test Command**: `inc/Cli/UniversalWebScraperTestCommand.php` registers a WP-CLI invokable that runs the `WebScraper\\UniversalWebScraper` handler against a `--target_url`, creates a job record for context, prints a packet summary (structured vs HTML fallback), and can optionally run `EventUpsert` (`--upsert`) to validate end-to-end venue coverage.
+- **Get Venue Events Command**: `inc/Cli/GetVenueEventsCommand.php` queries events for a specific venue. Wraps `EventQueryAbilities::executeGetVenueEvents()`. Usage: `wp datamachine-events get-venue-events <venue>` or `--venue=<venue>`. Options: `--limit` (default 25, max 100), `--status` (any/publish/future/draft/pending/private), `--published_before`, `--published_after`.
 
 ## Build Commands
 
