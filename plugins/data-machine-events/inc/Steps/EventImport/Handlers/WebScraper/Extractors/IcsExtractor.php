@@ -11,7 +11,6 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors;
 
-use ICal\ICal;
 use DataMachineEvents\Core\DateTimeParser;
 
 if (!defined('ABSPATH')) {
@@ -21,6 +20,10 @@ if (!defined('ABSPATH')) {
 class IcsExtractor extends BaseExtractor {
 
     public function canExtract(string $content): bool {
+        if (!class_exists('ICal\ICal')) {
+            return false;
+        }
+
         $content = trim($content);
 
         if (empty($content)) {
@@ -31,8 +34,12 @@ class IcsExtractor extends BaseExtractor {
     }
 
     public function extract(string $content, string $source_url): array {
+        if (!class_exists('ICal\ICal')) {
+            return [];
+        }
+
         try {
-            $ical = new ICal(false, [
+            $ical = new \ICal\ICal(false, [
                 'defaultSpan' => 2,
                 'defaultTimeZone' => 'UTC',
                 'defaultWeekStart' => 'MO',

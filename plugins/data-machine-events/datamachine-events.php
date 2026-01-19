@@ -99,8 +99,8 @@ class DATAMACHINE_Events {
         $this->init_hooks();
         $this->register_post_types();
         add_action('init', array($this, 'register_taxonomies'), 20);
-        $this->register_blocks();
-        
+        add_action('init', array($this, 'register_blocks'), 15);
+
         add_filter('block_categories_all', array($this, 'register_block_category'), 10, 2);
         add_filter('allowed_block_types_all', array($this, 'filter_allowed_block_types'), 10, 2);
         
