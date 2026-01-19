@@ -2,14 +2,17 @@
  * Taxonomy filter modal UI with REST API integration for dynamic filter loading.
  */
 
+/**
+ * Internal dependencies
+ */
 import { fetchFilters } from './api-client.js';
 import { getFilterState } from './filter-state.js';
 
 export function initFilterModal(calendar, onApply, onReset) {
     const modal = calendar.querySelector('.datamachine-taxonomy-modal');
-    if (!modal) return;
+    if (!modal) {return;}
 
-    if (modal.dataset.dmListenersAttached === 'true') return;
+    if (modal.dataset.dmListenersAttached === 'true') {return;}
     modal.dataset.dmListenersAttached = 'true';
 
     const filterState = getFilterState(calendar);
@@ -66,7 +69,7 @@ export function initFilterModal(calendar, onApply, onReset) {
     };
 
     const applyHandler = function() {
-        if (onApply) onApply();
+        if (onApply) {onApply();}
         closeModal();
         filterState.updateFilterCountBadge();
     };
@@ -82,7 +85,7 @@ export function initFilterModal(calendar, onApply, onReset) {
 
         filterState.updateFilterCountBadge();
 
-        if (onReset) onReset(new URLSearchParams());
+        if (onReset) {onReset(new URLSearchParams());}
         closeModal();
     };
 
@@ -123,9 +126,9 @@ export function initFilterModal(calendar, onApply, onReset) {
 
 export function destroyFilterModal(calendar) {
     const modal = calendar.querySelector('.datamachine-taxonomy-modal');
-    if (!modal) return;
+    if (!modal) {return;}
 
-    if (modal.dataset.dmListenersAttached !== 'true') return;
+    if (modal.dataset.dmListenersAttached !== 'true') {return;}
 
     const filterBtn = calendar.querySelector('.datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .datamachine-events-filter-btn');
 
@@ -183,9 +186,9 @@ async function loadFilters(modal, activeFilters = {}, dateContext = {}, archiveC
     const container = modal.querySelector('.datamachine-filter-taxonomies');
     const loading = modal.querySelector('.datamachine-filter-loading');
     
-    if (!container) return;
+    if (!container) {return;}
     
-    if (loading) loading.style.display = 'flex';
+    if (loading) {loading.style.display = 'flex';}
     container.innerHTML = '';
     
     try {
@@ -201,7 +204,7 @@ async function loadFilters(modal, activeFilters = {}, dateContext = {}, archiveC
     } catch (error) {
         container.innerHTML = '<div class="datamachine-filter-error"><p>Error loading filters. Please try again.</p></div>';
     } finally {
-        if (loading) loading.style.display = 'none';
+        if (loading) {loading.style.display = 'none';}
     }
 }
 

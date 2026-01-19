@@ -12,10 +12,10 @@ export function initCarousel(calendar) {
 
     groups.forEach(function(group) {
         const wrapper = group.querySelector('.datamachine-events-wrapper');
-        if (!wrapper) return;
+        if (!wrapper) {return;}
 
         const eventCount = parseInt(group.dataset.eventCount, 10) || 0;
-        if (eventCount <= 1) return;
+        if (eventCount <= 1) {return;}
 
         const events = wrapper.querySelectorAll('.datamachine-event-item');
 
@@ -25,11 +25,11 @@ export function initCarousel(calendar) {
         let scrollHandler = null;
 
         const updateIndicators = function() {
-            if (!indicators) return;
+            if (!indicators) {return;}
 
             const track = indicators.querySelector('.datamachine-carousel-dots-track');
             const dots = track ? track.querySelectorAll('.datamachine-carousel-dot') : [];
-            if (!track || dots.length === 0) return;
+            if (!track || dots.length === 0) {return;}
 
             const wrapperRect = wrapper.getBoundingClientRect();
             const firstEventWidth = events[0]?.getBoundingClientRect().width || 0;
@@ -110,9 +110,9 @@ export function initCarousel(calendar) {
             chevronRight = group.querySelector('.datamachine-carousel-chevron-right');
 
             if (!hasOverflow) {
-                if (indicators) indicators.remove();
-                if (chevronLeft) chevronLeft.remove();
-                if (chevronRight) chevronRight.remove();
+                if (indicators) {indicators.remove();}
+                if (chevronLeft) {chevronLeft.remove();}
+                if (chevronRight) {chevronRight.remove();}
                 indicators = null;
                 chevronLeft = null;
                 chevronRight = null;
@@ -192,11 +192,11 @@ export function initCarousel(calendar) {
             // Click handlers
             chevronLeft.addEventListener('click', function(e) {
                 e.preventDefault();
-                if (!holdInterval) scrollByCard(-1);
+                if (!holdInterval) {scrollByCard(-1);}
             });
             chevronRight.addEventListener('click', function(e) {
                 e.preventDefault();
-                if (!holdInterval) scrollByCard(1);
+                if (!holdInterval) {scrollByCard(1);}
             });
 
             // Hold handlers (mouse)

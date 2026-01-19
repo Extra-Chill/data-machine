@@ -2,7 +2,7 @@
 
 Technical guidance for Claude Code when working with the **Data Machine Events** WordPress plugin.
 
-**Version**: 0.9.3
+**Version**: 0.9.15
 
 ## Plugin Bootstrap
 
@@ -62,11 +62,63 @@ Routes in `inc/Api/Routes.php` register controllers from `inc/Api/Controllers/{C
 
 ## Abilities
 
-Abilities in `inc/Abilities` expose functionality via WordPress 6.9 Abilities API with companion chat tool wrappers. The pattern ensures business logic is accessible via REST/WP-CLI/ability callers, while chat tools wrap abilities for AI consumption.
+Abilities in `inc/Abilities` expose functionality via WordPress 6.9 Abilities API. This pattern is becoming a core tenet of Data Machine architecture, ensuring business logic is accessible via REST/WP-CLI/ability callers, while chat tools can wrap abilities for AI consumption.
+
+### Abilities API Integration Pattern
+
+All ability classes follow this standardized pattern:
+
+```php
+class ExampleAbilities {
+    private static bool $registered = false;  // Prevents duplicate registration
+
+    public function __construct() {
+        if ( ! self::$registered ) {
+            $this->registerAbility();
+            self::$registered = true;
+        }
+    }
+
+    private function registerAbility(): void {
+        add_action(
+            'wp_abilities_api_init',
+            function () {
+                wp_register_ability(
+                    'datamachine-events/ability-slug',
+                    array(
+                        'label'               => __( 'Ability Name', 'datamachine-events' ),
+                        'description'         => __( 'What this ability does', 'datamachine-events' ),
+                        'category'            => 'datamachine',
+                        'input_schema'        => array( /* JSON Schema */ ),
+                        'output_schema'       => array( /* JSON Schema */ ),
+                        'execute_callback'    => array( $this, 'executeMethod' ),
+                        'permission_callback' => function () {
+                            return current_user_can( 'manage_options' );
+                        },
+                        'meta'                => array( 'show_in_rest' => true ),
+                    )
+                );
+            }
+        );
+    }
+}
+```
+
+Key integration points:
+- **Static registration flag**: Prevents duplicate ability registration when class is instantiated multiple times (e.g., by chat tools and CLI commands).
+- **Hook timing**: Abilities register on `wp_abilities_api_init` hook, which fires after WordPress initializes.
+- **Permission callback**: Enforces capability requirements (typically `manage_options` for admin operations).
+- **Input/output schemas**: Define JSON Schema for validation and documentation.
+- **Instantiation**: Classes are instantiated in `DATAMACHINE_Events::load_data_machine_components()` after verifying Data Machine core is active.
+
+### Available Abilities
 
 - **EventScraperTest**: Tests universal web scraper compatibility with a target URL. Ability: `datamachine/test-event-scraper`. Chat tool: `test_event_scraper`.
 - **TimezoneAbilities**: Finds events with missing venue timezone and fixes them with geocoding support. Abilities: `datamachine-events/find-broken-timezone-events`, `datamachine-events/fix-event-timezone`. Chat tools: `find_broken_timezone_events`, `fix_event_timezone`.
 - **EventQueryAbilities**: Query events by venue with filtering options. Ability: `datamachine-events/get-venue-events`. Chat tool wrapper in `inc/Api/Chat/Tools/GetVenueEvents.php`.
+- **EventHealthAbilities**: Scans events for data quality issues (missing time, suspicious midnight, late night times, missing venue, etc.). Ability: `datamachine-events/event-health-check`. CLI wrapper: `wp datamachine-events health-check`.
+- **EventUpdateAbilities**: Updates event block attributes and venue assignment, supporting single or batch updates. Ability: `datamachine-events/update-event`. CLI wrapper: `wp datamachine-events update-event`.
+- **BatchTimeFixAbilities** (@since 0.9.16): Batch correction for events with systematic timezone/offset issues. Filters by venue (required), date range, and optionally source URL pattern. Supports offset-based fixes (`+6h`, `-1h`) or explicit time replacement. Ability: `datamachine-events/batch-time-fix`. CLI wrapper: `wp datamachine-events batch-time-fix`.
 
 ## AI Chat Tools
 
@@ -103,6 +155,7 @@ Chat tools in `inc/Api/Chat/Tools` provide AI-driven venue and event management 
 - **Get Venue Events Command**: `inc/Cli/GetVenueEventsCommand.php` queries events for a specific venue. Wraps `EventQueryAbilities::executeGetVenueEvents()`. Usage: `wp datamachine-events get-venue-events <venue>` or `--venue=<venue>`. Options: `--limit` (default 25, max 100), `--status` (any/publish/future/draft/pending/private), `--published_before`, `--published_after`.
 - **Health Check Command**: `inc/Cli/HealthCheckCommand.php` scans events for data quality issues. Wraps `EventHealthCheck` chat tool. Usage: `wp datamachine-events health-check`. Options: `--scope` (upcoming/all/past, default: upcoming), `--days_ahead` (default: 90), `--limit` (default: 25), `--category` (late_night_time/midnight_time/missing_time/suspicious_end_time/missing_venue/missing_description/broken_timezone), `--format` (table/json, default: table).
 - **Update Event Command**: `inc/Cli/UpdateEventCommand.php` updates event details. Wraps `UpdateEvent` chat tool. Usage: `wp datamachine-events update-event <event_ids> [--startTime=<time>]`. Accepts single ID or comma-separated IDs. Options: `--startDate`, `--startTime`, `--endDate`, `--endTime`, `--venue`, `--price`, `--ticketUrl`, `--performer`, `--performerType`, `--eventStatus`, `--eventType`, `--description`, `--format` (table/json, default: table).
+- **Batch Time Fix Command** (@since 0.9.16): `inc/Cli/BatchTimeFixCommand.php` batch-fixes event times with offset correction or explicit replacement. Wraps `BatchTimeFixAbilities`. Usage: `wp datamachine-events batch-time-fix --venue=<venues> --offset=<offset>`. Required: `--venue` (comma-separated), at least one of `--before`/`--after`. Fix modes: `--offset` (e.g., `+6h`, `-1h`, `+30m`) or `--new-time` (requires `--where-time`). Options: `--source-pattern` (SQL LIKE, e.g., `%.ics`), `--where-time` (filter by current time), `--limit` (default: 100), `--dry-run` (preview, default), `--execute` (apply changes), `--format` (table/json).
 
 ## Build Commands
 

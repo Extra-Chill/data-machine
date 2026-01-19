@@ -1,3 +1,6 @@
+/**
+ * WordPress dependencies
+ */
 import { registerBlockType } from '@wordpress/blocks';
 import { __ } from '@wordpress/i18n';
 import { 
@@ -29,7 +32,7 @@ const ALLOWED_BLOCKS = [
 ];
 
 const DESCRIPTION_TEMPLATE = [
-    ['core/paragraph', { placeholder: __('Add event description...', 'datamachine-events') }]
+    ['core/paragraph', { placeholder: __('Add event description…', 'datamachine-events') }]
 ];
 
 /**
@@ -40,6 +43,10 @@ const DESCRIPTION_TEMPLATE = [
 registerBlockType('datamachine-events/event-details', {
     /**
      * Block editor component with comprehensive event data fields and InnerBlocks support
+     * @param root0
+     * @param root0.attributes
+     * @param root0.setAttributes
+     * @param root0.clientId
      */
     edit: function Edit({ attributes, setAttributes, clientId }) {
         const {

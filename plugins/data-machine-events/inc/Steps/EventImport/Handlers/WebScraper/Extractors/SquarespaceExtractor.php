@@ -62,6 +62,11 @@ class SquarespaceExtractor extends BaseExtractor {
 		}
 
 		if ( empty( $raw_items ) ) {
+			// 7. Parse User Items List blocks (custom event listings without Events collection)
+			$raw_items = $this->parseUserItemsList( $html );
+		}
+
+		if ( empty( $raw_items ) ) {
 			return array();
 		}
 
@@ -124,6 +129,115 @@ class SquarespaceExtractor extends BaseExtractor {
 		}
 
 		return $items;
+	}
+
+	/**
+	 * Parse events from Squarespace User Items List blocks.
+	 *
+	 * Some Squarespace sites use User Items List blocks instead of the native Events
+	 * collection. This parses li.list-item elements inside .user-items-list and extracts
+	 * event data including times from description text.
+	 *
+	 * @since 0.9.17
+	 * @param string $html Page HTML
+	 * @return array Array of raw item-like structures
+	 */
+	private function parseUserItemsList( string $html ): array {
+		if ( strpos( $html, 'user-items-list' ) === false ) {
+			return array();
+		}
+
+		$items = array();
+
+		if ( ! preg_match_all( '/<li[^>]+class="[^"]*list-item[^"]*"[^>]*>(.*?)<\/li>/is', $html, $matches ) ) {
+			return array();
+		}
+
+		foreach ( $matches[1] as $item_html ) {
+			$item = array(
+				'title'       => '',
+				'startDate'   => '',
+				'startTime'   => '',
+				'fullUrl'     => '',
+				'assetUrl'    => '',
+				'description' => '',
+			);
+
+			if ( preg_match( '/<h2[^>]+class="[^"]*list-item-content__title[^"]*"[^>]*>(.*?)<\/h2>/is', $item_html, $title_matches ) ) {
+				$item['title'] = trim( wp_strip_all_tags( html_entity_decode( $title_matches[1], ENT_QUOTES, 'UTF-8' ) ) );
+			}
+
+			if ( preg_match( '/<div[^>]+class="[^"]*list-item-content__description[^"]*"[^>]*>(.*?)<\/div>/is', $item_html, $desc_matches ) ) {
+				$description         = $desc_matches[1];
+				$description_text    = wp_strip_all_tags( $description );
+				$item['description'] = trim( $description_text );
+
+				if ( preg_match( '/<p[^>]*>(.*?)<\/p>/is', $description, $first_p ) ) {
+					$date_text         = wp_strip_all_tags( $first_p[1] );
+					$item['startDate'] = trim( $date_text );
+				}
+
+				$extracted_time = $this->extractTimeFromText( $description_text );
+				if ( $extracted_time ) {
+					$item['startTime'] = $extracted_time;
+				}
+			}
+
+			if ( preg_match( '/<a[^>]+class="[^"]*list-item-content__button[^"]*"[^>]+href="([^"]+)"/i', $item_html, $link_matches ) ) {
+				$item['fullUrl'] = $link_matches[1];
+			}
+
+			if ( preg_match( '/<img[^>]+class="[^"]*list-image[^"]*"[^>]+(?:data-src|src)="([^"]+)"/i', $item_html, $img_matches ) ) {
+				$item['assetUrl'] = $img_matches[1];
+			} elseif ( preg_match( '/<img[^>]+(?:data-src|src)="([^"]+)"/i', $item_html, $img_matches ) ) {
+				$item['assetUrl'] = $img_matches[1];
+			}
+
+			if ( ! empty( $item['title'] ) && ! empty( $item['startDate'] ) ) {
+				$items[] = $item;
+			}
+		}
+
+		return $items;
+	}
+
+	/**
+	 * Extract time from descriptive text.
+	 *
+	 * Parses common time patterns found in event descriptions like "DOORS AT 8PM",
+	 * "11AM DOORS", "SHOWTIME 9:30PM", etc.
+	 *
+	 * @since 0.9.17
+	 * @param string $text Text to search for time patterns
+	 * @return string|null Time in H:i format or null if not found
+	 */
+	private function extractTimeFromText( string $text ): ?string {
+		$patterns = array(
+			'/DOORS\s*(?:AT\s*)?(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i',
+			'/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)\s*DOORS/i',
+			'/SHOW(?:TIME)?\s*(?:AT\s*)?(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i',
+			'/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)\s*SHOW(?:TIME)?/i',
+			'/START(?:S)?\s*(?:AT\s*)?(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i',
+			'/(?:^|\s)(\d{1,2})(?::(\d{2}))?\s*(AM|PM)(?:\s|$|,)/i',
+		);
+
+		foreach ( $patterns as $pattern ) {
+			if ( preg_match( $pattern, $text, $matches ) ) {
+				$hour    = (int) $matches[1];
+				$minutes = isset( $matches[2] ) && $matches[2] !== '' ? $matches[2] : '00';
+				$period  = strtoupper( $matches[3] );
+
+				if ( 'PM' === $period && $hour < 12 ) {
+					$hour += 12;
+				} elseif ( 'AM' === $period && 12 === $hour ) {
+					$hour = 0;
+				}
+
+				return sprintf( '%02d:%s', $hour, $minutes );
+			}
+		}
+
+		return null;
 	}
 
 	/**
@@ -390,18 +504,31 @@ class SquarespaceExtractor extends BaseExtractor {
 	 *
 	 * Squarespace stores timestamps in UTC. This method converts them to local
 	 * timezone using the venueTimezone extracted from the page context.
+	 *
+	 * Also handles text date formats from User Items List (e.g., "January 16, 2026")
+	 * and preserves pre-extracted startTime from description parsing.
 	 */
 	private function parseScheduling( array &$event, array $item ): void {
 		$timezone = $event['venueTimezone'] ?? '';
 
+		$pre_extracted_time = ! empty( $item['startTime'] ) ? $item['startTime'] : null;
+
 		if ( ! empty( $item['startDate'] ) ) {
-			$parsed             = $this->parseSquarespaceTimestamp( $item['startDate'], $timezone );
-			$event['startDate'] = $parsed['date'];
-			$event['startTime'] = $parsed['time'];
+			if ( is_numeric( $item['startDate'] ) || preg_match( '/^\d{4}-\d{2}-\d{2}/', $item['startDate'] ) ) {
+				$parsed             = $this->parseSquarespaceTimestamp( $item['startDate'], $timezone );
+				$event['startDate'] = $parsed['date'];
+				$event['startTime'] = $parsed['time'];
+			} else {
+				$this->parseTextDate( $event, $item['startDate'] );
+			}
 		} elseif ( ! empty( $item['publishOn'] ) ) {
 			$parsed             = $this->parseSquarespaceTimestamp( $item['publishOn'], $timezone );
 			$event['startDate'] = $parsed['date'];
 			$event['startTime'] = $parsed['time'];
+		}
+
+		if ( $pre_extracted_time && ( empty( $event['startTime'] ) || '00:00' === $event['startTime'] ) ) {
+			$event['startTime'] = $pre_extracted_time;
 		}
 
 		if ( ! empty( $item['endDate'] ) ) {
@@ -478,6 +605,41 @@ class SquarespaceExtractor extends BaseExtractor {
 				}
 				$event['startDate'] = $dt->format( 'Y-m-d' );
 			} catch ( \Exception $e ) {
+			}
+		}
+	}
+
+	/**
+	 * Parse text date format from User Items List blocks.
+	 *
+	 * Handles formats like "January 16, 2026" or "Jan 16" commonly found
+	 * in Squarespace User Items List event dates.
+	 *
+	 * @since 0.9.17
+	 * @param array  $event Event array to update
+	 * @param string $text  Date text to parse
+	 */
+	private function parseTextDate( array &$event, string $text ): void {
+		if ( empty( $text ) ) {
+			return;
+		}
+
+		$months = 'January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
+
+		if ( preg_match( '/(' . $months . ')\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?/i', $text, $matches ) ) {
+			$month = $matches[1];
+			$day   = $matches[2];
+			$year  = ! empty( $matches[3] ) ? $matches[3] : gmdate( 'Y' );
+
+			try {
+				$dt = new \DateTime( "$month $day $year" );
+
+				if ( $dt < new \DateTime( 'today' ) && empty( $matches[3] ) ) {
+					$dt->modify( '+1 year' );
+				}
+				$event['startDate'] = $dt->format( 'Y-m-d' );
+			} catch ( \Exception $e ) {
+				return;
 			}
 		}
 	}

@@ -25,8 +25,13 @@ class EventHealthAbilities {
 	private const DEFAULT_LIMIT      = 25;
 	private const DEFAULT_DAYS_AHEAD = 90;
 
+	private static bool $registered = false;
+
 	public function __construct() {
-		$this->registerAbility();
+		if ( ! self::$registered ) {
+			$this->registerAbility();
+			self::$registered = true;
+		}
 	}
 
 	private function registerAbility(): void {

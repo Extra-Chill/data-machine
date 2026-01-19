@@ -7,7 +7,7 @@
  * Provides handler-agnostic venue enrichment for any handler that uses VenueFieldsTrait.
  * When a modal opens with a venue term_id, fetches venue data and populates form fields.
  *
- * @package DataMachineEvents
+ * @package
  * @since 1.0.0
  */
 
@@ -36,6 +36,7 @@
 
 	/**
 	 * Check if a value is a valid venue term ID (numeric string or number)
+	 * @param value
 	 */
 	function isValidVenueTermId( value ) {
 		if ( ! value ) {
@@ -46,6 +47,7 @@
 
 	/**
 	 * Fetch venue data from REST API and map to form fields
+	 * @param venueId
 	 */
 	async function fetchVenueData( venueId ) {
 		const response = await apiFetch( {

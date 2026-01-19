@@ -28,10 +28,13 @@ class GetVenueEventsCommand {
 			\WP_CLI::error( 'Missing required venue parameter. Use: wp datamachine-events get-venue-events <venue> or --venue=<venue>' );
 		}
 
+		$include_description = isset( $assoc_args['include-description'] );
+
 		$input = array(
-			'venue'  => $venue,
-			'limit'  => (int) ( $assoc_args['limit'] ?? 25 ),
-			'status' => $assoc_args['status'] ?? 'any',
+			'venue'               => $venue,
+			'limit'               => (int) ( $assoc_args['limit'] ?? 25 ),
+			'status'              => $assoc_args['status'] ?? 'any',
+			'include_description' => $include_description,
 		);
 
 		if ( ! empty( $assoc_args['published_before'] ) ) {
@@ -44,10 +47,10 @@ class GetVenueEventsCommand {
 		$abilities = new EventQueryAbilities();
 		$result    = $abilities->executeGetVenueEvents( $input );
 
-		$this->outputResult( $result );
+		$this->outputResult( $result, $include_description );
 	}
 
-	private function outputResult( array $result ): void {
+	private function outputResult( array $result, bool $include_description = false ): void {
 		if ( isset( $result['error'] ) ) {
 			\WP_CLI::error( $result['error'] );
 		}
@@ -66,6 +69,11 @@ class GetVenueEventsCommand {
 			return;
 		}
 
+		if ( $include_description ) {
+			$this->outputEventsWithDescriptions( $events );
+			return;
+		}
+
 		$table_data = array();
 		foreach ( $events as $event ) {
 			$table_data[] = array(
@@ -78,5 +86,23 @@ class GetVenueEventsCommand {
 		}
 
 		\WP_CLI\Utils\format_items( 'table', $table_data, array( 'ID', 'Title', 'Status', 'Start Date', 'Published' ) );
+	}
+
+	private function outputEventsWithDescriptions( array $events ): void {
+		foreach ( $events as $event ) {
+			\WP_CLI::log( str_repeat( '=', 70 ) );
+			\WP_CLI::log( "ID: {$event['post_id']} | {$event['title']}" );
+			\WP_CLI::log( 'Start: ' . ( $event['start_date'] ?? 'N/A' ) . " | Status: {$event['status']}" );
+			\WP_CLI::log( str_repeat( '-', 70 ) );
+
+			$description = $event['description'] ?? '';
+			if ( empty( $description ) ) {
+				\WP_CLI::log( '(No description)' );
+			} else {
+				\WP_CLI::log( $description );
+			}
+
+			\WP_CLI::log( '' );
+		}
 	}
 }

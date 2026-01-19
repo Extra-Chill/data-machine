@@ -45,8 +45,13 @@ class EventUpdateAbilities {
 		'eventType',
 	);
 
+	private static bool $registered = false;
+
 	public function __construct() {
-		$this->registerAbility();
+		if ( ! self::$registered ) {
+			$this->registerAbility();
+			self::$registered = true;
+		}
 	}
 
 	private function registerAbility(): void {

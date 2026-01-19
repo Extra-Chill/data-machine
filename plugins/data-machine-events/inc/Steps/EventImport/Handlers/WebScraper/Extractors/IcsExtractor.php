@@ -139,17 +139,50 @@ class IcsExtractor extends BaseExtractor {
 				$tz      = $start_datetime->getTimezone();
 				$tz_name = $tz ? $tz->getName() : '';
 
-				$event['startDate'] = $start_datetime->format( 'Y-m-d' );
+				$dtstart_array   = $ical_event->dtstart_array ?? array();
+				$is_explicit_utc = $this->hasUtcMarker( $dtstart_array );
+				$is_floating     = ! $is_explicit_utc && ! $this->hasExplicitTimezone( $dtstart_array );
 
-				if ( 'UTC' !== $tz_name && 'Z' !== $tz_name ) {
+				$explicit_tzid = $this->getExplicitTimezone( $dtstart_array );
+				if ( ! empty( $explicit_tzid ) ) {
+					$local_dt = $this->parseFloatingTime( $dtstart_array, $explicit_tzid );
+					if ( $local_dt ) {
+						$event['startDate']     = $local_dt->format( 'Y-m-d' );
+						$event['startTime']     = $local_dt->format( 'H:i' );
+						$event['venueTimezone'] = $explicit_tzid;
+					} else {
+						$event['startDate']     = $start_datetime->format( 'Y-m-d' );
+						$event['startTime']     = $start_datetime->format( 'H:i' );
+						$event['venueTimezone'] = $explicit_tzid;
+					}
+				} elseif ( $is_floating && ! empty( $event_timezone ) ) {
+					$local_dt = $this->parseFloatingTime( $dtstart_array, $event_timezone );
+					if ( $local_dt ) {
+						$event['startDate']     = $local_dt->format( 'Y-m-d' );
+						$event['startTime']     = $local_dt->format( 'H:i' );
+						$event['venueTimezone'] = $event_timezone;
+					} else {
+						$event['startDate'] = $start_datetime->format( 'Y-m-d' );
+						$event['startTime'] = $start_datetime->format( 'H:i' );
+						if ( ! empty( $event_timezone ) ) {
+							$event['venueTimezone'] = $event_timezone;
+						}
+					}
+				} elseif ( 'UTC' !== $tz_name && 'Z' !== $tz_name ) {
+					$event['startDate']     = $start_datetime->format( 'Y-m-d' );
 					$event['venueTimezone'] = $tz_name;
 					$event['startTime']     = $start_datetime->format( 'H:i' );
-				} elseif ( ! empty( $event_timezone ) ) {
+				} elseif ( $is_explicit_utc && ! empty( $event_timezone ) ) {
 					$event['venueTimezone'] = $event_timezone;
 					$start_datetime->setTimezone( new \DateTimeZone( $event_timezone ) );
+					$event['startDate'] = $start_datetime->format( 'Y-m-d' );
 					$event['startTime'] = $start_datetime->format( 'H:i' );
 				} else {
+					$event['startDate'] = $start_datetime->format( 'Y-m-d' );
 					$event['startTime'] = $start_datetime->format( 'H:i' );
+					if ( ! empty( $event_timezone ) ) {
+						$event['venueTimezone'] = $event_timezone;
+					}
 				}
 			} elseif ( is_string( $start_datetime ) ) {
 				$parsed                 = DateTimeParser::parseIcs( $start_datetime, $calendar_timezone );
@@ -168,16 +201,43 @@ class IcsExtractor extends BaseExtractor {
 				$tz      = $end_datetime->getTimezone();
 				$tz_name = $tz ? $tz->getName() : '';
 
-				$event['endDate'] = $end_datetime->format( 'Y-m-d' );
+				$dtend_array     = $ical_event->dtend_array ?? array();
+				$is_explicit_utc = $this->hasUtcMarker( $dtend_array );
+				$is_floating     = ! $is_explicit_utc && ! $this->hasExplicitTimezone( $dtend_array );
 
-				if ( 'UTC' !== $tz_name && 'Z' !== $tz_name ) {
+				$explicit_tzid = $this->getExplicitTimezone( $dtend_array );
+				if ( ! empty( $explicit_tzid ) ) {
+					$local_dt = $this->parseFloatingTime( $dtend_array, $explicit_tzid );
+					if ( $local_dt ) {
+						$event['endDate']       = $local_dt->format( 'Y-m-d' );
+						$event['endTime']       = $local_dt->format( 'H:i' );
+						$event['venueTimezone'] = $explicit_tzid;
+					} else {
+						$event['endDate']       = $end_datetime->format( 'Y-m-d' );
+						$event['endTime']       = $end_datetime->format( 'H:i' );
+						$event['venueTimezone'] = $explicit_tzid;
+					}
+				} elseif ( $is_floating && ! empty( $event_timezone ) ) {
+					$local_dt = $this->parseFloatingTime( $dtend_array, $event_timezone );
+					if ( $local_dt ) {
+						$event['endDate']       = $local_dt->format( 'Y-m-d' );
+						$event['endTime']       = $local_dt->format( 'H:i' );
+						$event['venueTimezone'] = $event_timezone;
+					} else {
+						$event['endDate'] = $end_datetime->format( 'Y-m-d' );
+						$event['endTime'] = $end_datetime->format( 'H:i' );
+					}
+				} elseif ( 'UTC' !== $tz_name && 'Z' !== $tz_name ) {
+					$event['endDate']       = $end_datetime->format( 'Y-m-d' );
 					$event['venueTimezone'] = $tz_name;
 					$event['endTime']       = $end_datetime->format( 'H:i' );
-				} elseif ( ! empty( $event_timezone ) ) {
+				} elseif ( $is_explicit_utc && ! empty( $event_timezone ) ) {
 					$event['venueTimezone'] = $event_timezone;
 					$end_datetime->setTimezone( new \DateTimeZone( $event_timezone ) );
+					$event['endDate'] = $end_datetime->format( 'Y-m-d' );
 					$event['endTime'] = $end_datetime->format( 'H:i' );
 				} else {
+					$event['endDate'] = $end_datetime->format( 'Y-m-d' );
 					$event['endTime'] = $end_datetime->format( 'H:i' );
 				}
 			} elseif ( is_string( $end_datetime ) ) {
@@ -200,6 +260,38 @@ class IcsExtractor extends BaseExtractor {
 			} else {
 				$event['venueAddress'] = sanitize_text_field( $location );
 			}
+		}
+	}
+
+	private function hasUtcMarker( array $dtarray ): bool {
+		$raw_value = $dtarray[1] ?? '';
+		return str_ends_with( $raw_value, 'Z' );
+	}
+
+	private function hasExplicitTimezone( array $dtarray ): bool {
+		$params = $dtarray[0] ?? array();
+		return ! empty( $params['TZID'] );
+	}
+
+	private function getExplicitTimezone( array $dtarray ): string {
+		$params = $dtarray[0] ?? array();
+		return $params['TZID'] ?? '';
+	}
+
+	private function parseFloatingTime( array $dtarray, string $timezone ): ?\DateTime {
+		$raw_value = $dtarray[1] ?? '';
+
+		if ( ! preg_match( '/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?)?$/', $raw_value, $m ) ) {
+			return null;
+		}
+
+		$date_str = sprintf( '%s-%s-%s', $m[1], $m[2], $m[3] );
+		$time_str = isset( $m[4] ) ? sprintf( '%s:%s:%s', $m[4], $m[5], $m[6] ?? '00' ) : '00:00:00';
+
+		try {
+			return new \DateTime( $date_str . ' ' . $time_str, new \DateTimeZone( $timezone ) );
+		} catch ( \Exception $e ) {
+			return null;
 		}
 	}
 }

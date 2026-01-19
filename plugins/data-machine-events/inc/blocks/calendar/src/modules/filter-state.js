@@ -1,10 +1,10 @@
 /**
  * Centralized filter state management for the Calendar block.
- * 
+ *
  * Source of truth hierarchy:
  * 1. URL params (explicit, shareable)
  * 2. localStorage (persistence for taxonomy filters only)
- * 
+ *
  * Archive context is read from DOM data attributes (page-level, not user state).
  */
 
@@ -18,7 +18,7 @@ class FilterStateManager {
 
     /**
      * Read archive context from calendar data attributes
-     * @returns {Object}
+     * @return {Object}
      */
     readArchiveContext() {
         return {
@@ -30,7 +30,7 @@ class FilterStateManager {
 
     /**
      * Get archive context for API calls
-     * @returns {Object} { taxonomy, term_id, term_name }
+     * @return {Object} { taxonomy, term_id, term_name }
      */
     getArchiveContext() {
         return this.archiveContext;
@@ -38,7 +38,7 @@ class FilterStateManager {
 
     /**
      * Parse taxonomy filters from URL
-     * @returns {Object} { taxonomy_slug: [term_id, ...], ... }
+     * @return {Object} { taxonomy_slug: [term_id, ...], ... }
      */
     getTaxFilters() {
         const params = new URLSearchParams(window.location.search);
@@ -63,7 +63,7 @@ class FilterStateManager {
 
     /**
      * Get date context from URL
-     * @returns {Object} { date_start, date_end, past }
+     * @return {Object} { date_start, date_end, past }
      */
     getDateContext() {
         const params = new URLSearchParams(window.location.search);
@@ -76,7 +76,7 @@ class FilterStateManager {
 
     /**
      * Get search query from URL
-     * @returns {string}
+     * @return {string}
      */
     getSearchQuery() {
         const params = new URLSearchParams(window.location.search);
@@ -85,7 +85,7 @@ class FilterStateManager {
 
     /**
      * Get current page from URL
-     * @returns {number}
+     * @return {number}
      */
     getCurrentPage() {
         const params = new URLSearchParams(window.location.search);
@@ -94,7 +94,7 @@ class FilterStateManager {
 
     /**
      * Count active taxonomy filters
-     * @returns {number}
+     * @return {number}
      */
     getFilterCount() {
         const filters = this.getTaxFilters();
@@ -103,12 +103,12 @@ class FilterStateManager {
 
     /**
      * Check if URL has any taxonomy filter params
-     * @returns {boolean}
+     * @return {boolean}
      */
     hasUrlFilters() {
         const params = new URLSearchParams(window.location.search);
         for (const key of params.keys()) {
-            if (key.startsWith('tax_filter[')) return true;
+            if (key.startsWith('tax_filter[')) {return true;}
         }
         return false;
     }
@@ -117,7 +117,7 @@ class FilterStateManager {
      * Build URLSearchParams from current UI state
      * Reads from: search input, date picker, modal checkboxes
      * @param {Object|null} datePicker - Flatpickr instance
-     * @returns {URLSearchParams}
+     * @return {URLSearchParams}
      */
     buildParams(datePicker = null) {
         const params = new URLSearchParams();
@@ -178,7 +178,7 @@ class FilterStateManager {
         try {
             const taxFilters = {};
             for (const [key, value] of params.entries()) {
-                if (!key.startsWith('tax_filter[')) continue;
+                if (!key.startsWith('tax_filter[')) {continue;}
                 
                 if (!taxFilters[key]) {
                     taxFilters[key] = [];
@@ -198,14 +198,14 @@ class FilterStateManager {
 
     /**
      * Restore taxonomy filters from localStorage if URL has no filters
-     * @returns {boolean} true if state was restored
+     * @return {boolean} true if state was restored
      */
     restoreFromStorage() {
-        if (this.hasUrlFilters()) return false;
+        if (this.hasUrlFilters()) {return false;}
         
         try {
             const stored = localStorage.getItem(STORAGE_KEY);
-            if (!stored) return false;
+            if (!stored) {return false;}
             
             const taxFilters = JSON.parse(stored);
             const params = new URLSearchParams(window.location.search);
@@ -244,7 +244,7 @@ class FilterStateManager {
         );
         const countBadge = filterBtn?.querySelector('.datamachine-filter-count');
         
-        if (!filterBtn || !countBadge) return;
+        if (!filterBtn || !countBadge) {return;}
         
         const count = this.getFilterCount();
         
@@ -268,7 +268,7 @@ class FilterStateManager {
     /**
      * Format date as YYYY-MM-DD
      * @param {Date} date
-     * @returns {string}
+     * @return {string}
      */
     formatDate(date) {
         const year = date.getFullYear();
@@ -283,7 +283,7 @@ const instances = new WeakMap();
 /**
  * Get or create FilterStateManager instance for a calendar element
  * @param {HTMLElement} calendar
- * @returns {FilterStateManager}
+ * @return {FilterStateManager}
  */
 export function getFilterState(calendar) {
     if (!instances.has(calendar)) {

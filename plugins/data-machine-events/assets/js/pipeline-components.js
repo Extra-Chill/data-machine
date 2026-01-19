@@ -4,7 +4,7 @@
  * Custom React field components for Data Machine pipeline modals.
  * Uses vanilla JS with wp.element.createElement - no build process required.
  *
- * @package DataMachineEvents
+ * @package
  * @since 0.4.5
  */
 
@@ -62,7 +62,7 @@
 			apiFetch( {
 				path: GEOCODE_ENDPOINT,
 				method: 'POST',
-				data: { query: query },
+				data: { query },
 			} )
 				.then( function( response ) {
 					if ( response.success && response.results ) {
@@ -216,10 +216,10 @@
 							{
 								key: place.place_id,
 								className: 'venue-autocomplete-item' + ( index === selectedIndex ? ' selected' : '' ),
-								onClick: function() {
+								onClick() {
 									handleSelectPlace( place );
 								},
-								onMouseEnter: function() {
+								onMouseEnter() {
 									setSelectedIndex( index );
 								},
 							},

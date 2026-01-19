@@ -4,7 +4,7 @@
  * Provides address autocomplete functionality using OpenStreetMap's Nominatim API.
  * Complies with Nominatim usage policy: 1 request per second maximum.
  *
- * @package DataMachineEvents
+ * @package
  * @since 1.0.0
  */
 
@@ -50,6 +50,7 @@
 
     /**
      * Setup autocomplete for a single field
+     * @param field
      */
     function setupAutocomplete(field) {
         // Wrap field in container
@@ -84,6 +85,7 @@
 
     /**
      * Handle input event with debouncing
+     * @param e
      */
     function handleInput(e) {
         const field = e.target;
@@ -111,6 +113,7 @@
 
     /**
      * Handle keyboard navigation
+     * @param e
      */
     function handleKeydown(e) {
         const field = e.target;
@@ -151,6 +154,7 @@
 
     /**
      * Update visual selection in dropdown
+     * @param items
      */
     function updateSelection(items) {
         items.forEach((item, index) => {
@@ -165,6 +169,8 @@
 
     /**
      * Search address using Nominatim API
+     * @param field
+     * @param query
      */
     function searchAddress(field, query) {
         // Check cache first
@@ -222,6 +228,8 @@
 
     /**
      * Display search results in dropdown
+     * @param field
+     * @param results
      */
     function displayResults(field, results) {
         const dropdown = field.autocompleteDropdown;
@@ -253,6 +261,8 @@
 
     /**
      * Select a place and populate dependent fields
+     * @param field
+     * @param place
      */
     function selectPlace(field, place) {
         const address = place.address || {};
@@ -295,6 +305,7 @@
 
     /**
      * Build street address from Nominatim address components
+     * @param address
      */
     function buildStreetAddress(address) {
         const components = [];
@@ -314,6 +325,8 @@
 
     /**
      * Set value of a dependent field
+     * @param fieldName
+     * @param value
      */
     function setFieldValue(fieldName, value) {
         // Try multiple selector strategies to find the field
@@ -336,6 +349,7 @@
 
     /**
      * Show loading state
+     * @param field
      */
     function showLoading(field) {
         const dropdown = field.autocompleteDropdown;
@@ -346,6 +360,8 @@
 
     /**
      * Show error message
+     * @param field
+     * @param message
      */
     function showError(field, message) {
         const dropdown = field.autocompleteDropdown;
@@ -367,12 +383,14 @@
 
     /**
      * Cache results in sessionStorage
+     * @param query
+     * @param results
      */
     function cacheResults(query, results) {
         try {
             const cache = getCache();
             cache[query] = {
-                results: results,
+                results,
                 timestamp: Date.now()
             };
             sessionStorage.setItem(CACHE_KEY, JSON.stringify(cache));
@@ -384,6 +402,7 @@
 
     /**
      * Get cached results if available and not expired
+     * @param query
      */
     function getCachedResults(query) {
         try {
@@ -443,6 +462,7 @@
 
     /**
      * Escape HTML to prevent XSS
+     * @param text
      */
     function escapeHtml(text) {
         const div = document.createElement('div');

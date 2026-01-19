@@ -155,7 +155,7 @@ class Taxonomy_Badges {
 			$base_query  .= " AND tt.taxonomy NOT IN ($placeholders)";
 			$query_args   = array_merge( array( Event_Post_Type::POST_TYPE ), $excluded_taxonomies );
 			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Query is built with placeholders above
-			$results      = $wpdb->get_results( $wpdb->prepare( $base_query, $query_args ) );
+			$results = $wpdb->get_results( $wpdb->prepare( $base_query, $query_args ) );
 		} else {
 			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Simple query with single placeholder
 			$results = $wpdb->get_results( $wpdb->prepare( $base_query, Event_Post_Type::POST_TYPE ) );

@@ -5,7 +5,7 @@
 /**
  * Format date as YYYY-MM-DD
  * @param {Date} date
- * @returns {string}
+ * @return {string}
  */
 export function formatDate(date) {
     const year = date.getFullYear();
@@ -16,7 +16,7 @@ export function formatDate(date) {
 
 /**
  * Get current URL parameters
- * @returns {URLSearchParams}
+ * @return {URLSearchParams}
  */
 export function getUrlParams() {
     return new URLSearchParams(window.location.search);

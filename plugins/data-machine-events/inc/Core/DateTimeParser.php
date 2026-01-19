@@ -147,16 +147,25 @@ class DateTimeParser {
 		}
 
 		try {
-			$dt      = new DateTime( $datetime, new DateTimeZone( 'UTC' ) );
+			$has_embedded_tz = self::hasEmbeddedTimezone( $datetime );
+			$is_explicit_utc = str_ends_with( strtoupper( $datetime ), 'Z' );
+
+			if ( $has_embedded_tz ) {
+				$dt = new DateTime( $datetime );
+			} elseif ( $is_explicit_utc ) {
+				$dt = new DateTime( $datetime, new DateTimeZone( 'UTC' ) );
+				if ( ! empty( $calendar_timezone ) && self::isValidTimezone( $calendar_timezone ) ) {
+					$dt->setTimezone( new DateTimeZone( $calendar_timezone ) );
+				}
+			} else {
+				$tz = ! empty( $calendar_timezone ) && self::isValidTimezone( $calendar_timezone )
+					? new DateTimeZone( $calendar_timezone )
+					: new DateTimeZone( 'UTC' );
+				$dt = new DateTime( $datetime, $tz );
+			}
+
 			$tz      = $dt->getTimezone();
 			$tz_name = $tz ? $tz->getName() : '';
-
-			$has_embedded_tz = self::hasEmbeddedTimezone( $datetime );
-
-			if ( ! $has_embedded_tz && ! empty( $calendar_timezone ) && self::isValidTimezone( $calendar_timezone ) ) {
-				$dt->setTimezone( new DateTimeZone( $calendar_timezone ) );
-				$tz_name = $calendar_timezone;
-			}
 
 			$result['date']     = $dt->format( 'Y-m-d' );
 			$result['time']     = $dt->format( 'H:i' );

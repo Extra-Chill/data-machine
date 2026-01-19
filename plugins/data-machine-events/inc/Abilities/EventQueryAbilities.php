@@ -23,8 +23,13 @@ class EventQueryAbilities {
 	const DEFAULT_LIMIT = 25;
 	const MAX_LIMIT     = 100;
 
+	private static bool $registered = false;
+
 	public function __construct() {
-		$this->registerAbility();
+		if ( ! self::$registered ) {
+			$this->registerAbility();
+			self::$registered = true;
+		}
 	}
 
 	private function registerAbility(): void {
@@ -41,26 +46,30 @@ class EventQueryAbilities {
 							'type'       => 'object',
 							'required'   => array( 'venue' ),
 							'properties' => array(
-								'venue'            => array(
+								'venue'               => array(
 									'type'        => 'string',
 									'description' => 'Venue identifier (term ID, name, or slug)',
 								),
-								'limit'            => array(
+								'limit'               => array(
 									'type'        => 'integer',
 									'description' => 'Maximum events to return (default: 25, max: 100)',
 								),
-								'status'           => array(
+								'status'              => array(
 									'type'        => 'string',
 									'enum'        => array( 'any', 'publish', 'future', 'draft', 'pending', 'private' ),
 									'description' => 'Post status filter (default: any)',
 								),
-								'published_before' => array(
+								'published_before'    => array(
 									'type'        => 'string',
 									'description' => 'Only return events published before this date (YYYY-MM-DD format)',
 								),
-								'published_after'  => array(
+								'published_after'     => array(
 									'type'        => 'string',
 									'description' => 'Only return events published after this date (YYYY-MM-DD format)',
+								),
+								'include_description' => array(
+									'type'        => 'boolean',
+									'description' => 'Include full description text in output (default: false)',
 								),
 							),
 						),
@@ -82,13 +91,14 @@ class EventQueryAbilities {
 									'items' => array(
 										'type'       => 'object',
 										'properties' => array(
-											'post_id'    => array( 'type' => 'integer' ),
-											'title'      => array( 'type' => 'string' ),
-											'status'     => array( 'type' => 'string' ),
-											'published'  => array( 'type' => 'string' ),
-											'start_date' => array( 'type' => 'string' ),
-											'end_date'   => array( 'type' => 'string' ),
-											'permalink'  => array( 'type' => 'string' ),
+											'post_id'     => array( 'type' => 'integer' ),
+											'title'       => array( 'type' => 'string' ),
+											'status'      => array( 'type' => 'string' ),
+											'published'   => array( 'type' => 'string' ),
+											'start_date'  => array( 'type' => 'string' ),
+											'end_date'    => array( 'type' => 'string' ),
+											'permalink'   => array( 'type' => 'string' ),
+											'description' => array( 'type' => 'string' ),
 										),
 									),
 								),
@@ -165,14 +175,15 @@ class EventQueryAbilities {
 			$query_args['date_query'] = $date_query;
 		}
 
-		$query  = new \WP_Query( $query_args );
-		$events = array();
+		$query               = new \WP_Query( $query_args );
+		$events              = array();
+		$include_description = ! empty( $input['include_description'] );
 
 		foreach ( $query->posts as $post ) {
 			$start_date = get_post_meta( $post->ID, '_datamachine_event_datetime', true );
 			$end_date   = get_post_meta( $post->ID, '_datamachine_event_end_datetime', true );
 
-			$events[] = array(
+			$event_data = array(
 				'post_id'    => $post->ID,
 				'title'      => $post->post_title,
 				'status'     => $post->post_status,
@@ -181,6 +192,12 @@ class EventQueryAbilities {
 				'end_date'   => $end_date ? $end_date : null,
 				'permalink'  => get_permalink( $post->ID ),
 			);
+
+			if ( $include_description ) {
+				$event_data['description'] = $this->extractDescription( $post->ID );
+			}
+
+			$events[] = $event_data;
 		}
 
 		$venue_data  = Venue_Taxonomy::get_venue_data( $term->term_id );
@@ -224,5 +241,41 @@ class EventQueryAbilities {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Extract description from Event Details block InnerBlocks.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return string Description text (plain text, paragraphs joined with newlines).
+	 */
+	private function extractDescription( int $post_id ): string {
+		$post = get_post( $post_id );
+		if ( ! $post ) {
+			return '';
+		}
+
+		$blocks = parse_blocks( $post->post_content );
+
+		foreach ( $blocks as $block ) {
+			if ( 'datamachine-events/event-details' !== $block['blockName'] ) {
+				continue;
+			}
+
+			if ( empty( $block['innerBlocks'] ) ) {
+				return '';
+			}
+
+			$text_parts = array();
+			foreach ( $block['innerBlocks'] as $inner ) {
+				if ( 'core/paragraph' === $inner['blockName'] && ! empty( $inner['innerHTML'] ) ) {
+					$text_parts[] = wp_strip_all_tags( $inner['innerHTML'] );
+				}
+			}
+
+			return implode( "\n\n", $text_parts );
+		}
+
+		return '';
 	}
 }

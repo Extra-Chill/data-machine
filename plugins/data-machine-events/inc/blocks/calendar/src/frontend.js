@@ -4,7 +4,13 @@
  * Module orchestration for calendar blocks with REST API filtering.
  */
 
+/**
+ * External dependencies
+ */
 import 'flatpickr/dist/flatpickr.css';
+/**
+ * Internal dependencies
+ */
 import './flatpickr-theme.css';
 
 import { initCarousel, destroyCarousel } from './modules/carousel.js';
@@ -19,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initCalendarInstance(calendar) {
-    if (calendar.dataset.dmInitialized === 'true') return;
+    if (calendar.dataset.dmInitialized === 'true') {return;}
     calendar.dataset.dmInitialized = 'true';
 
     const filterState = getFilterState(calendar);
@@ -56,7 +62,7 @@ function initSearchInput(calendar) {
     const searchInput = calendar.querySelector('.datamachine-events-search-input') 
         || calendar.querySelector('[id^="datamachine-events-search-"]');
     
-    if (!searchInput) return;
+    if (!searchInput) {return;}
 
     let searchTimeout;
     searchInput.addEventListener('input', function() {

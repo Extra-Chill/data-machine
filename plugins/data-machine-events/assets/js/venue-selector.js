@@ -4,7 +4,7 @@
  * Handles venue dropdown selection, REST API data loading, field population,
  * change tracking, and duplicate prevention for the Universal Web Scraper modal.
  *
- * @package DataMachineEvents
+ * @package
  * @since 1.0.0
  */
 
@@ -49,6 +49,7 @@
 
     /**
      * Handle venue dropdown change event
+     * @param e
      */
     function handleVenueChange(e) {
         const termId = e.target.value;
@@ -67,6 +68,7 @@
     /**
      * Toggle venue_name field visibility
      * Show when creating new venue, hide when editing existing
+     * @param show
      */
     function toggleVenueNameField(show) {
         const venueNameField = document.querySelector('[name="venue_name"]');
@@ -224,7 +226,7 @@
     /**
      * Check for duplicate venue before creating new one
      *
-     * @param {string} venueName Venue name
+     * @param {string} venueName    Venue name
      * @param {string} venueAddress Venue address
      * @return {Promise} Promise resolving to true if can proceed, false if duplicate
      */
@@ -277,8 +279,8 @@
 
     // Expose functions for potential external use
     window.dmEventsVenueSelector = {
-        getChangedFields: getChangedFields,
-        checkDuplicateVenue: checkDuplicateVenue
+        getChangedFields,
+        checkDuplicateVenue
     };
 
 })();

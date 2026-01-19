@@ -48,11 +48,11 @@ export async function fetchCalendarEvents(calendar, params, archiveContext = {})
 
 /**
  * Fetch filter options from REST API with active filters, date context, and archive context
- * 
- * @param {Object} activeFilters Current filter selections keyed by taxonomy slug
- * @param {Object} dateContext Date filtering context (date_start, date_end, past)
+ *
+ * @param {Object} activeFilters  Current filter selections keyed by taxonomy slug
+ * @param {Object} dateContext    Date filtering context (date_start, date_end, past)
  * @param {Object} archiveContext Archive page context (taxonomy, term_id, term_name)
- * @returns {Promise<Object>} Filter data with taxonomies and meta
+ * @return {Promise<Object>} Filter data with taxonomies and meta
  */
 export async function fetchFilters(activeFilters = {}, dateContext = {}, archiveContext = {}) {
     const params = new URLSearchParams();

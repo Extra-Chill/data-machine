@@ -2,6 +2,9 @@
  * Flatpickr date range picker integration.
  */
 
+/**
+ * External dependencies
+ */
 import flatpickr from 'flatpickr';
 
 const datePickers = new Map();
@@ -10,13 +13,13 @@ export function initDatePicker(calendar, onChange) {
     const dateRangeInput = calendar.querySelector('.datamachine-events-date-range-input') 
         || calendar.querySelector('[id^="datamachine-events-date-range-"]');
     
-    if (!dateRangeInput) return null;
+    if (!dateRangeInput) {return null;}
 
     const clearBtn = calendar.querySelector('.datamachine-events-date-clear-btn');
 
     const initialStart = dateRangeInput.getAttribute('data-date-start');
     const initialEnd = dateRangeInput.getAttribute('data-date-end');
-    let defaultDate = undefined;
+    let defaultDate;
     
     if (initialStart) {
         defaultDate = initialEnd ? [initialStart, initialEnd] : initialStart;
@@ -28,9 +31,9 @@ export function initDatePicker(calendar, onChange) {
         placeholder: 'Select date range...',
         allowInput: false,
         clickOpens: true,
-        defaultDate: defaultDate,
-        onChange: function(selectedDates) {
-            if (onChange) onChange(selectedDates);
+        defaultDate,
+        onChange(selectedDates) {
+            if (onChange) {onChange(selectedDates);}
 
             if (clearBtn) {
                 if (selectedDates && selectedDates.length > 0) {
@@ -40,9 +43,9 @@ export function initDatePicker(calendar, onChange) {
                 }
             }
         },
-        onClear: function() {
-            if (onChange) onChange([]);
-            if (clearBtn) clearBtn.classList.remove('visible');
+        onClear() {
+            if (onChange) {onChange([]);}
+            if (clearBtn) {clearBtn.classList.remove('visible');}
         }
     });
 

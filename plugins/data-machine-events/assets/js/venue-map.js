@@ -5,7 +5,7 @@
  * in Event Details blocks. Uses 📍 emoji marker for consistency with
  * venue card icon.
  *
- * @package DataMachineEvents
+ * @package
  * @since 1.0.0
  */
 
@@ -35,6 +35,7 @@
 
     /**
      * Initialize a single venue map
+     * @param container
      */
     function initSingleMap(container) {
         // Get map data from attributes
@@ -131,6 +132,7 @@
 
     /**
      * Escape HTML to prevent XSS
+     * @param text
      */
     function escapeHtml(text) {
         const div = document.createElement('div');

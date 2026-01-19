@@ -9,7 +9,7 @@ export function initNavigation(calendar, onNavigate) {
 
 function initPastUpcomingButtons(calendar, onNavigate) {
     const navContainer = calendar.querySelector('.datamachine-events-past-navigation');
-    if (!navContainer) return;
+    if (!navContainer) {return;}
 
     navContainer.addEventListener('click', function(e) {
         const pastBtn = e.target.closest('.datamachine-events-past-btn');
@@ -27,24 +27,24 @@ function initPastUpcomingButtons(calendar, onNavigate) {
                 params.delete('past');
             }
 
-            if (onNavigate) onNavigate(params);
+            if (onNavigate) {onNavigate(params);}
         }
     });
 }
 
 function initPaginationLinks(calendar, onNavigate) {
     const paginationContainer = calendar.querySelector('.datamachine-events-pagination');
-    if (!paginationContainer) return;
+    if (!paginationContainer) {return;}
 
     paginationContainer.addEventListener('click', function(e) {
         const link = e.target.closest('a');
-        if (!link) return;
+        if (!link) {return;}
 
         e.preventDefault();
 
         const url = new URL(link.href);
         const params = new URLSearchParams(url.search);
 
-        if (onNavigate) onNavigate(params);
+        if (onNavigate) {onNavigate(params);}
     });
 }
