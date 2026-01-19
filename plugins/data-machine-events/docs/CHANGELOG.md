@@ -5,6 +5,11 @@ All notable changes to Data Machine Events will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.9.15] - 2026-01-19
+
+### Changed
+- Refactor EventHealthCheck and UpdateEvent to Abilities pattern - CLI and chat tools now share business logic via EventHealthAbilities and EventUpdateAbilities
+
 ## [0.9.14] - 2026-01-19
 
 ### Added

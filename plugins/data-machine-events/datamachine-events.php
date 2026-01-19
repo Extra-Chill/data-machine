@@ -3,7 +3,7 @@
  * Plugin Name: Data Machine Events
  * Plugin URI: https://chubes.net
  * Description: WordPress events plugin with block-first architecture. Features AI-driven event creation via Data Machine integration, Event Details blocks for data storage, Calendar blocks for display, and venue taxonomy management.
- * Version: 0.9.14
+ * Version: 0.9.15
  * Author: Chris Huber
  * Author URI: https://chubes.net
  * License: GPL v2 or later
@@ -28,7 +28,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( file_exists( __DIR__ . '/vendor/autoload.php' ) ) {
 	require_once __DIR__ . '/vendor/autoload.php';
 }
-define( 'DATAMACHINE_EVENTS_VERSION', '0.9.14' );
+define( 'DATAMACHINE_EVENTS_VERSION', '0.9.15' );
 define( 'DATAMACHINE_EVENTS_PLUGIN_FILE', __FILE__ );
 define( 'DATAMACHINE_EVENTS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_EVENTS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -74,6 +74,16 @@ if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR
 if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/GetVenueEventsCommand.php' ) ) {
 	require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/GetVenueEventsCommand.php';
 	\WP_CLI::add_command( 'datamachine-events get-venue-events', \DataMachineEvents\Cli\GetVenueEventsCommand::class );
+}
+
+if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/HealthCheckCommand.php' ) ) {
+	require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/HealthCheckCommand.php';
+	\WP_CLI::add_command( 'datamachine-events health-check', \DataMachineEvents\Cli\HealthCheckCommand::class );
+}
+
+if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/UpdateEventCommand.php' ) ) {
+	require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/UpdateEventCommand.php';
+	\WP_CLI::add_command( 'datamachine-events update-event', \DataMachineEvents\Cli\UpdateEventCommand::class );
 }
 
 
@@ -182,6 +192,16 @@ class DATAMACHINE_Events {
 		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventQueryAbilities.php' ) ) {
 			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventQueryAbilities.php';
 			new \DataMachineEvents\Abilities\EventQueryAbilities();
+		}
+
+		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventHealthAbilities.php' ) ) {
+			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventHealthAbilities.php';
+			new \DataMachineEvents\Abilities\EventHealthAbilities();
+		}
+
+		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventUpdateAbilities.php' ) ) {
+			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventUpdateAbilities.php';
+			new \DataMachineEvents\Abilities\EventUpdateAbilities();
 		}
 	}
 
@@ -366,7 +386,7 @@ datamachine_events();
 add_filter(
 	'get_the_excerpt',
 	function ( $excerpt, $post ) {
-		if ( $post->post_type !== 'datamachine_events' ) {
+		if ( 'datamachine_events' !== $post->post_type ) {
 			return $excerpt;
 		}
 
