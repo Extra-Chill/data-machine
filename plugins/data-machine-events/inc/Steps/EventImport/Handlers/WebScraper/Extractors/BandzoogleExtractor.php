@@ -225,7 +225,7 @@ class BandzoogleExtractor extends BaseExtractor {
 		}
 
 		$start_date = $this->resolveDate( $date_text, $context );
-		$start_time = $this->parseTime( $time_text );
+		$start_time = $this->parseTimeString( $time_text );
 
 		return array(
 			'title'       => sanitize_text_field( $title ),
@@ -266,11 +266,6 @@ class BandzoogleExtractor extends BaseExtractor {
 		}
 
 		return sprintf( '%04d-%02d-%02d', $year, $month, $day );
-	}
-
-	private function parseTime( string $time_text ): string {
-		$ts = strtotime( trim( $time_text ) );
-		return $ts ? date( 'H:i', $ts ) : '';
 	}
 
 	private function fetchHtml( string $url ): string {

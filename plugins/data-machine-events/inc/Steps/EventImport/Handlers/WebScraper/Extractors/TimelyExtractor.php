@@ -175,7 +175,7 @@ class TimelyExtractor extends BaseExtractor {
 
 		// Parse time from displayTime (e.g., "Show: 8:30 PM")
 		if ( ! empty( $raw_event['displayTime'] ) ) {
-			$time = $this->parseDisplayTime( $raw_event['displayTime'] );
+			$time = $this->parseTimeString( $raw_event['displayTime'] );
 			if ( $time ) {
 				$event['startTime'] = $time;
 			}
@@ -183,7 +183,7 @@ class TimelyExtractor extends BaseExtractor {
 
 		// Parse doors time
 		if ( ! empty( $raw_event['doors'] ) ) {
-			$doors_time = $this->parseDisplayTime( $raw_event['doors'] );
+			$doors_time = $this->parseTimeString( $raw_event['doors'] );
 			if ( $doors_time ) {
 				$event['doorsTime'] = $doors_time;
 			}
@@ -227,38 +227,6 @@ class TimelyExtractor extends BaseExtractor {
 
 		$parsed = $this->parseDatetime( $date );
 		return $parsed['date'];
-	}
-
-	/**
-	 * Parse display time string to 24-hour format.
-	 *
-	 * @param string $time_str Time string (e.g., "Show: 8:30 PM", "7:00 PM", "8 pm")
-	 * @return string Time in H:i format or empty string
-	 */
-	private function parseDisplayTime( string $time_str ): string {
-		// Remove "Show:" or "Doors:" prefix
-		$time_str = preg_replace( '/^(show|doors)\s*:\s*/i', '', trim( $time_str ) );
-
-		if ( empty( $time_str ) ) {
-			return '';
-		}
-
-		// Handle formats like "8:30 PM", "7 PM", "8pm"
-		if ( preg_match( '/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i', $time_str, $matches ) ) {
-			$hour   = (int) $matches[1];
-			$minute = ! empty( $matches[2] ) ? $matches[2] : '00';
-			$ampm   = ! empty( $matches[3] ) ? strtolower( $matches[3] ) : 'pm'; // Default to PM for concerts
-
-			if ( 'pm' === $ampm && $hour < 12 ) {
-				$hour += 12;
-			} elseif ( 'am' === $ampm && 12 === $hour ) {
-				$hour = 0;
-			}
-
-			return sprintf( '%02d:%s', $hour, $minute );
-		}
-
-		return '';
 	}
 
 	/**

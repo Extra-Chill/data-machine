@@ -202,45 +202,6 @@ class SquarespaceExtractor extends BaseExtractor {
 	}
 
 	/**
-	 * Extract time from descriptive text.
-	 *
-	 * Parses common time patterns found in event descriptions like "DOORS AT 8PM",
-	 * "11AM DOORS", "SHOWTIME 9:30PM", etc.
-	 *
-	 * @since 0.9.17
-	 * @param string $text Text to search for time patterns
-	 * @return string|null Time in H:i format or null if not found
-	 */
-	private function extractTimeFromText( string $text ): ?string {
-		$patterns = array(
-			'/DOORS\s*(?:AT\s*)?(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i',
-			'/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)\s*DOORS/i',
-			'/SHOW(?:TIME)?\s*(?:AT\s*)?(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i',
-			'/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)\s*SHOW(?:TIME)?/i',
-			'/START(?:S)?\s*(?:AT\s*)?(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i',
-			'/(?:^|\s)(\d{1,2})(?::(\d{2}))?\s*(AM|PM)(?:\s|$|,)/i',
-		);
-
-		foreach ( $patterns as $pattern ) {
-			if ( preg_match( $pattern, $text, $matches ) ) {
-				$hour    = (int) $matches[1];
-				$minutes = isset( $matches[2] ) && $matches[2] !== '' ? $matches[2] : '00';
-				$period  = strtoupper( $matches[3] );
-
-				if ( 'PM' === $period && $hour < 12 ) {
-					$hour += 12;
-				} elseif ( 'AM' === $period && 12 === $hour ) {
-					$hour = 0;
-				}
-
-				return sprintf( '%02d:%s', $hour, $minutes );
-			}
-		}
-
-		return null;
-	}
-
-	/**
 	 * Fetch Squarespace data via JSON API or HTML context.
 	 */
 	private function fetchJsonData( string $html, string $source_url ): array {

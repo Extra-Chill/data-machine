@@ -133,4 +133,84 @@ abstract class BaseExtractor implements ExtractorInterface {
 	protected function cleanHtml( string $html ): string {
 		return wp_kses_post( trim( $html ) );
 	}
+
+	/**
+	 * Parse a clean time string to 24-hour format.
+	 *
+	 * Use for well-formatted time strings like "7:00 pm", "8pm", "19:30".
+	 * For extracting times from longer text, use extractTimeFromText() instead.
+	 *
+	 * @since 0.9.17
+	 * @param string $time_str Time string (e.g., "7:00 pm", "8pm", "19:30")
+	 * @return string Time in H:i format or empty string if parsing fails
+	 */
+	protected function parseTimeString( string $time_str ): string {
+		$time_str = strtolower( trim( $time_str ) );
+
+		if ( empty( $time_str ) ) {
+			return '';
+		}
+
+		$time_str = preg_replace( '/^(show|doors)\s*:\s*/i', '', $time_str );
+
+		$timestamp = strtotime( $time_str );
+		if ( false !== $timestamp ) {
+			return gmdate( 'H:i', $timestamp );
+		}
+
+		if ( preg_match( '/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i', $time_str, $matches ) ) {
+			$hour   = (int) $matches[1];
+			$minute = ! empty( $matches[2] ) ? $matches[2] : '00';
+			$ampm   = ! empty( $matches[3] ) ? strtolower( $matches[3] ) : 'pm';
+
+			if ( 'pm' === $ampm && $hour < 12 ) {
+				$hour += 12;
+			} elseif ( 'am' === $ampm && 12 === $hour ) {
+				$hour = 0;
+			}
+
+			return sprintf( '%02d:%s', $hour, $minute );
+		}
+
+		return '';
+	}
+
+	/**
+	 * Extract time from descriptive text.
+	 *
+	 * Parses common time patterns found in event descriptions like "DOORS AT 8PM",
+	 * "11AM DOORS", "SHOWTIME 9:30PM", "Show: 8:30 PM", etc.
+	 *
+	 * @since 0.9.17
+	 * @param string $text Text to search for time patterns
+	 * @return string|null Time in H:i format or null if not found
+	 */
+	protected function extractTimeFromText( string $text ): ?string {
+		$patterns = array(
+			'/DOORS\s*(?:AT\s*)?(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i',
+			'/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)\s*DOORS/i',
+			'/SHOW(?:TIME)?\s*(?:AT\s*)?(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i',
+			'/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)\s*SHOW(?:TIME)?/i',
+			'/START(?:S)?\s*(?:AT\s*)?(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i',
+			'/(?:^|\s)(\d{1,2})(?::(\d{2}))?\s*(AM|PM)(?:\s|$|,)/i',
+		);
+
+		foreach ( $patterns as $pattern ) {
+			if ( preg_match( $pattern, $text, $matches ) ) {
+				$hour    = (int) $matches[1];
+				$minutes = isset( $matches[2] ) && '' !== $matches[2] ? $matches[2] : '00';
+				$period  = strtoupper( $matches[3] );
+
+				if ( 'PM' === $period && $hour < 12 ) {
+					$hour += 12;
+				} elseif ( 'AM' === $period && 12 === $hour ) {
+					$hour = 0;
+				}
+
+				return sprintf( '%02d:%s', $hour, $minutes );
+			}
+		}
+
+		return null;
+	}
 }

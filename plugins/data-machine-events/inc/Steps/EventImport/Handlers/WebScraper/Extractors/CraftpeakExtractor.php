@@ -265,21 +265,4 @@ class CraftpeakExtractor extends BaseExtractor {
 		}
 	}
 
-	/**
-	 * Parse time string to H:i format.
-	 *
-	 * @param string $time_str Time string like "7:00 pm"
-	 * @return string Time in H:i format (24-hour)
-	 */
-	private function parseTimeString( string $time_str ): string {
-		$time_str = strtolower( trim( $time_str ) );
-		$time_str = str_replace( ' ', '', $time_str );
-
-		$timestamp = strtotime( $time_str );
-		if ( false === $timestamp ) {
-			return '';
-		}
-
-		return date( 'H:i', $timestamp );
-	}
 }
