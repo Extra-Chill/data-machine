@@ -41,46 +41,46 @@ function register_routes() {
 			'callback'            => array( $calendar, 'calendar' ),
 			'permission_callback' => '__return_true',
 			'args'                => array(
-				'event_search' => array(
+				'event_search'     => array(
 					'type'              => 'string',
 					'sanitize_callback' => 'sanitize_text_field',
 				),
-				'date_start' => array(
+				'date_start'       => array(
 					'type'              => 'string',
 					'sanitize_callback' => 'sanitize_text_field',
 				),
-				'date_end' => array(
+				'date_end'         => array(
 					'type'              => 'string',
 					'sanitize_callback' => 'sanitize_text_field',
 				),
-			'tax_filter' => array(
-				'type' => 'object',
-				'sanitize_callback' => function( $value ) {
-					if ( ! is_array( $value ) ) {
-						return array();
-					}
-					$sanitized = array();
-					foreach ( $value as $taxonomy => $term_ids ) {
-						$taxonomy = sanitize_key( $taxonomy );
-						$sanitized[ $taxonomy ] = array_map( 'absint', (array) $term_ids );
-					}
-					return $sanitized;
-				},
-			),
+				'tax_filter'       => array(
+					'type'              => 'object',
+					'sanitize_callback' => function ( $value ) {
+						if ( ! is_array( $value ) ) {
+							return array();
+						}
+						$sanitized = array();
+						foreach ( $value as $taxonomy => $term_ids ) {
+							$taxonomy = sanitize_key( $taxonomy );
+							$sanitized[ $taxonomy ] = array_map( 'absint', (array) $term_ids );
+						}
+						return $sanitized;
+					},
+				),
 				'archive_taxonomy' => array(
 					'type'              => 'string',
 					'sanitize_callback' => 'sanitize_key',
 				),
-				'archive_term_id' => array(
+				'archive_term_id'  => array(
 					'type'              => 'integer',
 					'sanitize_callback' => 'absint',
 				),
-				'paged' => array(
+				'paged'            => array(
 					'type'              => 'integer',
 					'default'           => 1,
 					'sanitize_callback' => 'absint',
 				),
-				'past' => array(
+				'past'             => array(
 					'type'              => 'string',
 					'sanitize_callback' => 'sanitize_text_field',
 				),
@@ -94,12 +94,12 @@ function register_routes() {
 		array(
 			'methods'             => 'GET',
 			'callback'            => array( $venues, 'get' ),
-			'permission_callback' => function() {
+			'permission_callback' => function () {
 				return current_user_can( 'manage_options' );
 			},
 			'args'                => array(
 				'id' => array(
-					'validate_callback' => function( $param ) {
+					'validate_callback' => function ( $param ) {
 						return is_numeric( $param );
 					},
 					'sanitize_callback' => 'absint',
@@ -114,11 +114,11 @@ function register_routes() {
 		array(
 			'methods'             => 'GET',
 			'callback'            => array( $venues, 'check_duplicate' ),
-			'permission_callback' => function() {
+			'permission_callback' => function () {
 				return current_user_can( 'manage_options' );
 			},
 			'args'                => array(
-				'name' => array(
+				'name'    => array(
 					'required'          => true,
 					'sanitize_callback' => 'sanitize_text_field',
 				),
@@ -142,7 +142,7 @@ function register_routes() {
 				'active'     => array(
 					'type'              => 'object',
 					'default'           => array(),
-					'sanitize_callback' => function( $value ) {
+					'sanitize_callback' => function ( $value ) {
 						if ( ! is_array( $value ) ) {
 							return array();
 						}
@@ -183,7 +183,7 @@ function register_routes() {
 		array(
 			'methods'             => 'POST',
 			'callback'            => array( $geocoding, 'search' ),
-			'permission_callback' => function() {
+			'permission_callback' => function () {
 				return current_user_can( 'manage_options' );
 			},
 			'args'                => array(
@@ -195,7 +195,6 @@ function register_routes() {
 			),
 		)
 	);
-
 }
 
 add_action( 'rest_api_init', __NAMESPACE__ . '\\register_routes' );

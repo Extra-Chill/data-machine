@@ -10,9 +10,9 @@
 
 namespace DataMachineEvents\Core;
 
-const EVENT_DATETIME_META_KEY = '_datamachine_event_datetime';
+const EVENT_DATETIME_META_KEY     = '_datamachine_event_datetime';
 const EVENT_END_DATETIME_META_KEY = '_datamachine_event_end_datetime';
-const EVENT_TICKET_URL_META_KEY = '_datamachine_ticket_url';
+const EVENT_TICKET_URL_META_KEY   = '_datamachine_ticket_url';
 
 /**
  * Normalize ticket URL for consistent duplicate detection

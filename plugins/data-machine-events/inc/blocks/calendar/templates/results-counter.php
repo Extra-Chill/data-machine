@@ -20,10 +20,10 @@ if ( empty( $page_start_date ) || empty( $page_end_date ) || ! $event_count ) {
 }
 
 $formatted_start = date_i18n( 'M j', strtotime( $page_start_date ) );
-$formatted_end = date_i18n( 'M j', strtotime( $page_end_date ) );
-$is_same_day = $page_start_date === $page_end_date;
-$is_paginated = isset( $total_events ) && $event_count < $total_events;
-$event_label = 1 === $total_events ? __( 'Event', 'datamachine-events' ) : __( 'Events', 'datamachine-events' );
+$formatted_end   = date_i18n( 'M j', strtotime( $page_end_date ) );
+$is_same_day     = $page_start_date === $page_end_date;
+$is_paginated    = isset( $total_events ) && $event_count < $total_events;
+$event_label     = 1 === $total_events ? __( 'Event', 'datamachine-events' ) : __( 'Events', 'datamachine-events' );
 ?>
 
 <div class="datamachine-events-results-counter">

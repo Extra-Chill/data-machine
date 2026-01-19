@@ -56,21 +56,21 @@ class UniversalWebScraperTestCommand {
 			return;
 		}
 
-		$extraction_info = $result['extraction_info'] ?? [];
+		$extraction_info = $result['extraction_info'] ?? array();
 
-		if ( isset( $extraction_info['packet_title'] ) && $extraction_info['packet_title'] !== '' ) {
+		if ( isset( $extraction_info['packet_title'] ) && '' !== $extraction_info['packet_title'] ) {
 			\WP_CLI::log( 'Packet title: ' . $extraction_info['packet_title'] );
 		}
-		if ( isset( $extraction_info['source_type'] ) && $extraction_info['source_type'] !== '' ) {
+		if ( isset( $extraction_info['source_type'] ) && '' !== $extraction_info['source_type'] ) {
 			\WP_CLI::log( 'Source type: ' . $extraction_info['source_type'] );
 		}
-		if ( isset( $extraction_info['extraction_method'] ) && $extraction_info['extraction_method'] !== '' ) {
+		if ( isset( $extraction_info['extraction_method'] ) && '' !== $extraction_info['extraction_method'] ) {
 			\WP_CLI::log( 'Extraction method: ' . $extraction_info['extraction_method'] );
 		}
 
 		$payload_type = $extraction_info['payload_type'] ?? '';
 
-		if ( $payload_type === 'raw_html' ) {
+		if ( 'raw_html' === $payload_type ) {
 			\WP_CLI::log( 'Payload type: raw_html (HTML fallback)' );
 			\WP_CLI::warning( 'VENUE COVERAGE: No structured venue fields. Set venue override for reliable address/geocoding.' );
 			\WP_CLI::log( 'Venue: (unknown; extracted by AI)' );
@@ -79,11 +79,11 @@ class UniversalWebScraperTestCommand {
 			if ( isset( $result['event_data'] ) && isset( $result['event_data']['raw_html'] ) ) {
 				\WP_CLI::log( $result['event_data']['raw_html'] );
 			}
-		} elseif ( $payload_type !== 'event' ) {
+		} elseif ( 'event' !== $payload_type ) {
 			\WP_CLI::warning( 'Payload did not contain an event object.' );
 			\WP_CLI::log( 'Payload type: ' . $payload_type );
 		} else {
-			$event_data = $result['event_data'] ?? [];
+			$event_data = $result['event_data'] ?? array();
 			\WP_CLI::log( 'Payload type: event' );
 			\WP_CLI::log( 'Title: ' . ( $event_data['title'] ?? '' ) );
 			\WP_CLI::log( 'Start Date: ' . ( $event_data['startDate'] ?? '' ) );
@@ -94,7 +94,7 @@ class UniversalWebScraperTestCommand {
 			\WP_CLI::log( 'Venue: ' . ( $event_data['venue'] ?? '' ) );
 			\WP_CLI::log( 'Venue address: ' . ( $event_data['venueAddress'] ?? '' ) );
 
-			$coverage_issues = $result['coverage_issues'] ?? [];
+			$coverage_issues = $result['coverage_issues'] ?? array();
 
 			if ( ! empty( $coverage_issues ) ) {
 				if ( $coverage_issues['time_data_warning'] ?? false ) {
@@ -108,10 +108,10 @@ class UniversalWebScraperTestCommand {
 				}
 			}
 
-			$warnings = $result['warnings'] ?? [];
+			$warnings = $result['warnings'] ?? array();
 
-			if ( $result['status'] === 'warning' && ! empty( $coverage_issues ) ) {
-				$warning_parts = [];
+			if ( 'warning' === $result['status'] && ! empty( $coverage_issues ) ) {
+				$warning_parts = array();
 				if ( $coverage_issues['time_data_warning'] ?? false ) {
 					$warning_parts[] = 'time data missing';
 				}
@@ -119,7 +119,7 @@ class UniversalWebScraperTestCommand {
 					$warning_parts[] = 'venue/address incomplete';
 				}
 				\WP_CLI::warning( 'STATUS: WARNING (' . implode( ', ', $warning_parts ) . ')' );
-			} elseif ( $result['status'] === 'ok' ) {
+			} elseif ( 'ok' === $result['status'] ) {
 				\WP_CLI::log( 'STATUS: OK (venue/address/time coverage present)' );
 			}
 

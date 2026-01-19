@@ -25,7 +25,7 @@ class BlockRegistrationTest extends WP_UnitTestCase {
 		foreach ( $GLOBALS['wp_filter'][ 'init' ]->callbacks as $priority => $callbacks ) {
 			foreach ( $callbacks as $callback ) {
 				if ( is_array( $callback['function'] ) ) {
-					if ( $callback['function'][0] === $plugin && $callback['function'][1] === 'register_blocks' ) {
+					if ( $callback['function'][0] === $plugin && 'register_blocks'=== $callback['function'][1] ) {
 						$has_init_hook = true;
 						break 2;
 					}

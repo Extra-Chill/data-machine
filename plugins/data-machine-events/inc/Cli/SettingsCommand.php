@@ -14,7 +14,7 @@ use WP_CLI;
 use WP_CLI_Command;
 use DataMachineEvents\Admin\Settings_Page;
 
-if (!defined('ABSPATH')) {
+if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
@@ -61,26 +61,32 @@ class SettingsCommand extends WP_CLI_Command {
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Associative arguments.
 	 */
-	public function get(array $args, array $assoc_args): void {
-		$key = $args[0];
+	public function get( array $args, array $assoc_args ): void {
+		$key    = $args[0];
 		$format = $assoc_args['format'] ?? 'value';
 
-		$value = Settings_Page::get_setting($key);
+		$value = Settings_Page::get_setting( $key );
 
-		if ($value === null) {
-			WP_CLI::error("Setting '{$key}' is not set.");
+		if ( null === $value ) {
+			WP_CLI::error( "Setting '{$key}' is not set." );
 		}
 
-		if ($format === 'json') {
-			WP_CLI::log(wp_json_encode(['key' => $key, 'value' => $value], JSON_PRETTY_PRINT));
+		if ( 'json' === $format ) {
+			WP_CLI::log(
+				wp_json_encode(
+					array(
+						'key'   => $key,
+						'value' => $value,
+					),
+					JSON_PRETTY_PRINT
+				)
+			);
+		} elseif ( is_array( $value ) || is_object( $value ) ) {
+				WP_CLI::log( wp_json_encode( $value, JSON_PRETTY_PRINT ) );
+		} elseif ( is_bool( $value ) ) {
+			WP_CLI::log( $value ? 'true' : 'false' );
 		} else {
-			if (is_array($value) || is_object($value)) {
-				WP_CLI::log(wp_json_encode($value, JSON_PRETTY_PRINT));
-			} elseif (is_bool($value)) {
-				WP_CLI::log($value ? 'true' : 'false');
-			} else {
-				WP_CLI::log((string) $value);
-			}
+			WP_CLI::log( (string) $value );
 		}
 	}
 
@@ -104,30 +110,28 @@ class SettingsCommand extends WP_CLI_Command {
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Associative arguments.
 	 */
-	public function set(array $args, array $assoc_args): void {
-		$key = $args[0];
+	public function set( array $args, array $assoc_args ): void {
+		$key   = $args[0];
 		$value = $args[1];
 
-		if ($value === 'true') {
+		if ( 'true' === $value ) {
 			$value = true;
-		} elseif ($value === 'false') {
+		} elseif ( 'false' === $value ) {
 			$value = false;
 		}
 
-		$settings = get_option(self::OPTION_NAME, []);
-		$old_value = $settings[$key] ?? null;
-		$settings[$key] = $value;
+		$settings         = get_option( self::OPTION_NAME, array() );
+		$old_value        = $settings[ $key ] ?? null;
+		$settings[ $key ] = $value;
 
-		$result = update_option(self::OPTION_NAME, $settings);
+		$result = update_option( self::OPTION_NAME, $settings );
 
-		if ($result) {
-			WP_CLI::success("Updated '{$key}': " . $this->format_value($old_value) . " → " . $this->format_value($value));
+		if ( $result ) {
+			WP_CLI::success( "Updated '{$key}': " . $this->format_value( $old_value ) . ' → ' . $this->format_value( $value ) );
+		} elseif ( $old_value === $value ) {
+				WP_CLI::warning( "Setting '{$key}' already has value: " . $this->format_value( $value ) );
 		} else {
-			if ($old_value === $value) {
-				WP_CLI::warning("Setting '{$key}' already has value: " . $this->format_value($value));
-			} else {
-				WP_CLI::error("Failed to update setting '{$key}'.");
-			}
+			WP_CLI::error( "Failed to update setting '{$key}'." );
 		}
 	}
 
@@ -153,26 +157,26 @@ class SettingsCommand extends WP_CLI_Command {
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Associative arguments.
 	 */
-	public function list(array $args, array $assoc_args): void {
-		$format = $assoc_args['format'] ?? 'table';
-		$settings = get_option(self::OPTION_NAME, []);
+	public function list( array $args, array $assoc_args ): void {
+		$format   = $assoc_args['format'] ?? 'table';
+		$settings = get_option( self::OPTION_NAME, array() );
 
-		if (empty($settings)) {
-			WP_CLI::warning('No settings configured.');
+		if ( empty( $settings ) ) {
+			WP_CLI::warning( 'No settings configured.' );
 			return;
 		}
 
-		if ($format === 'json') {
-			WP_CLI::log(wp_json_encode($settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 		} else {
-			$rows = [];
-			foreach ($settings as $key => $value) {
-				$rows[] = [
-					'key' => $key,
-					'value' => $this->format_value($value),
-				];
+			$rows = array();
+			foreach ( $settings as $key => $value ) {
+				$rows[] = array(
+					'key'   => $key,
+					'value' => $this->format_value( $value ),
+				);
 			}
-			WP_CLI\Utils\format_items('table', $rows, ['key', 'value']);
+			WP_CLI\Utils\format_items( 'table', $rows, array( 'key', 'value' ) );
 		}
 	}
 
@@ -182,15 +186,15 @@ class SettingsCommand extends WP_CLI_Command {
 	 * @param mixed $value Value to format.
 	 * @return string Formatted value.
 	 */
-	private function format_value(mixed $value): string {
-		if ($value === null) {
+	private function format_value( mixed $value ): string {
+		if ( null === $value ) {
 			return '(null)';
 		}
-		if (is_bool($value)) {
+		if ( is_bool( $value ) ) {
 			return $value ? 'true' : 'false';
 		}
-		if (is_array($value)) {
-			return wp_json_encode($value);
+		if ( is_array( $value ) ) {
+			return wp_json_encode( $value );
 		}
 		return (string) $value;
 	}

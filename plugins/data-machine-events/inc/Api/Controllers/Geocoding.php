@@ -48,29 +48,29 @@ class Geocoding {
 
 		$result = HttpClient::get(
 			$url,
-			[
+			array(
 				'timeout' => 10,
-				'headers' => [
+				'headers' => array(
 					'User-Agent' => self::USER_AGENT,
-				],
+				),
 				'context' => 'Geocoding API',
-			]
+			)
 		);
 
 		if ( ! $result['success'] ) {
 			return new \WP_Error(
 				'geocoding_failed',
 				__( 'Geocoding request failed', 'datamachine-events' ),
-				[ 'status' => 500 ]
+				array( 'status' => 500 )
 			);
 		}
 
 		$status_code = $result['status_code'];
-		if ( $status_code !== 200 ) {
+		if ( 200 !== $status_code ) {
 			return new \WP_Error(
 				'geocoding_error',
 				__( 'Geocoding service returned an error', 'datamachine-events' ),
-				[ 'status' => $status_code ]
+				array( 'status' => $status_code )
 			);
 		}
 

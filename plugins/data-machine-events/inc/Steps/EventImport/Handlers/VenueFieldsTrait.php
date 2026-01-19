@@ -18,235 +18,238 @@ namespace DataMachineEvents\Steps\EventImport\Handlers;
 
 use DataMachineEvents\Core\Venue_Taxonomy;
 
-if (!defined('ABSPATH')) {
-    exit;
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
 }
 
 trait VenueFieldsTrait {
 
-    /**
-     * Get venue selector and all venue field definitions.
-     *
-     * @return array Associative array of venue field definitions
-     */
-    protected static function get_venue_fields(): array {
-        $all_venues = Venue_Taxonomy::get_all_venues();
+	/**
+	 * Get venue selector and all venue field definitions.
+	 *
+	 * @return array Associative array of venue field definitions
+	 */
+	protected static function get_venue_fields(): array {
+		$all_venues = Venue_Taxonomy::get_all_venues();
 
-        usort($all_venues, function ($a, $b) {
-            return strcasecmp($a['name'], $b['name']);
-        });
+		usort(
+			$all_venues,
+			function ( $a, $b ) {
+				return strcasecmp( $a['name'], $b['name'] );
+			}
+		);
 
-        $venue_options = ['' => __('-- Create New Venue --', 'datamachine-events')];
-        foreach ($all_venues as $venue) {
-            $venue_options[$venue['term_id']] = $venue['name'];
-        }
+		$venue_options = array( '' => __( '-- Create New Venue --', 'datamachine-events' ) );
+		foreach ( $all_venues as $venue ) {
+			$venue_options[ $venue['term_id'] ] = $venue['name'];
+		}
 
-        return [
-            'venue' => [
-                'type' => 'select',
-                'label' => __('Venue', 'datamachine-events'),
-                'description' => __('Select an existing venue or choose "Create New Venue" to add a new one.', 'datamachine-events'),
-                'options' => $venue_options,
-                'required' => false,
-            ],
-            'venue_name' => [
-                'type' => 'text',
-                'label' => __('Venue Name', 'datamachine-events'),
-                'description' => __('Required when creating a new venue.', 'datamachine-events'),
-                'placeholder' => __('The Royal American', 'datamachine-events'),
-                'required' => false,
-            ],
-            'venue_address' => [
-                'type' => 'address-autocomplete',
-                'label' => __('Venue Address', 'datamachine-events'),
-                'description' => __('Start typing to search. Auto-fills city, state, zip, country.', 'datamachine-events'),
-                'placeholder' => __('970 Morrison Drive', 'datamachine-events'),
-                'required' => false,
-            ],
-            'venue_city' => [
-                'type' => 'text',
-                'label' => __('City', 'datamachine-events'),
-                'description' => __('Auto-filled from address selection.', 'datamachine-events'),
-                'placeholder' => __('Charleston', 'datamachine-events'),
-                'required' => false,
-            ],
-            'venue_state' => [
-                'type' => 'text',
-                'label' => __('State', 'datamachine-events'),
-                'description' => __('Auto-filled from address selection.', 'datamachine-events'),
-                'placeholder' => __('South Carolina', 'datamachine-events'),
-                'required' => false,
-            ],
-            'venue_zip' => [
-                'type' => 'text',
-                'label' => __('ZIP Code', 'datamachine-events'),
-                'description' => __('Auto-filled from address selection.', 'datamachine-events'),
-                'placeholder' => __('29403', 'datamachine-events'),
-                'required' => false,
-            ],
-            'venue_country' => [
-                'type' => 'text',
-                'label' => __('Country', 'datamachine-events'),
-                'description' => __('Auto-filled from address selection. Two-letter country code.', 'datamachine-events'),
-                'placeholder' => __('US', 'datamachine-events'),
-                'required' => false,
-            ],
-            'venue_phone' => [
-                'type' => 'text',
-                'label' => __('Phone', 'datamachine-events'),
-                'description' => __('Venue phone number.', 'datamachine-events'),
-                'placeholder' => __('(843) 817-6925', 'datamachine-events'),
-                'required' => false,
-            ],
-            'venue_website' => [
-                'type' => 'url',
-                'label' => __('Website', 'datamachine-events'),
-                'description' => __('Venue website URL.', 'datamachine-events'),
-                'placeholder' => __('https://www.theroyalamerican.com', 'datamachine-events'),
-                'required' => false,
-            ],
-            'venue_capacity' => [
-                'type' => 'number',
-                'label' => __('Capacity', 'datamachine-events'),
-                'description' => __('Maximum venue capacity.', 'datamachine-events'),
-                'placeholder' => __('500', 'datamachine-events'),
-                'required' => false,
-            ],
-        ];
-    }
+		return array(
+			'venue'          => array(
+				'type'        => 'select',
+				'label'       => __( 'Venue', 'datamachine-events' ),
+				'description' => __( 'Select an existing venue or choose "Create New Venue" to add a new one.', 'datamachine-events' ),
+				'options'     => $venue_options,
+				'required'    => false,
+			),
+			'venue_name'     => array(
+				'type'        => 'text',
+				'label'       => __( 'Venue Name', 'datamachine-events' ),
+				'description' => __( 'Required when creating a new venue.', 'datamachine-events' ),
+				'placeholder' => __( 'The Royal American', 'datamachine-events' ),
+				'required'    => false,
+			),
+			'venue_address'  => array(
+				'type'        => 'address-autocomplete',
+				'label'       => __( 'Venue Address', 'datamachine-events' ),
+				'description' => __( 'Start typing to search. Auto-fills city, state, zip, country.', 'datamachine-events' ),
+				'placeholder' => __( '970 Morrison Drive', 'datamachine-events' ),
+				'required'    => false,
+			),
+			'venue_city'     => array(
+				'type'        => 'text',
+				'label'       => __( 'City', 'datamachine-events' ),
+				'description' => __( 'Auto-filled from address selection.', 'datamachine-events' ),
+				'placeholder' => __( 'Charleston', 'datamachine-events' ),
+				'required'    => false,
+			),
+			'venue_state'    => array(
+				'type'        => 'text',
+				'label'       => __( 'State', 'datamachine-events' ),
+				'description' => __( 'Auto-filled from address selection.', 'datamachine-events' ),
+				'placeholder' => __( 'South Carolina', 'datamachine-events' ),
+				'required'    => false,
+			),
+			'venue_zip'      => array(
+				'type'        => 'text',
+				'label'       => __( 'ZIP Code', 'datamachine-events' ),
+				'description' => __( 'Auto-filled from address selection.', 'datamachine-events' ),
+				'placeholder' => __( '29403', 'datamachine-events' ),
+				'required'    => false,
+			),
+			'venue_country'  => array(
+				'type'        => 'text',
+				'label'       => __( 'Country', 'datamachine-events' ),
+				'description' => __( 'Auto-filled from address selection. Two-letter country code.', 'datamachine-events' ),
+				'placeholder' => __( 'US', 'datamachine-events' ),
+				'required'    => false,
+			),
+			'venue_phone'    => array(
+				'type'        => 'text',
+				'label'       => __( 'Phone', 'datamachine-events' ),
+				'description' => __( 'Venue phone number.', 'datamachine-events' ),
+				'placeholder' => __( '(843) 817-6925', 'datamachine-events' ),
+				'required'    => false,
+			),
+			'venue_website'  => array(
+				'type'        => 'url',
+				'label'       => __( 'Website', 'datamachine-events' ),
+				'description' => __( 'Venue website URL.', 'datamachine-events' ),
+				'placeholder' => __( 'https://www.theroyalamerican.com', 'datamachine-events' ),
+				'required'    => false,
+			),
+			'venue_capacity' => array(
+				'type'        => 'number',
+				'label'       => __( 'Capacity', 'datamachine-events' ),
+				'description' => __( 'Maximum venue capacity.', 'datamachine-events' ),
+				'placeholder' => __( '500', 'datamachine-events' ),
+				'required'    => false,
+			),
+		);
+	}
 
-    /**
-     * Get default values for all venue fields.
-     *
-     * @return array Default values keyed by field name
-     */
-    protected static function get_venue_field_defaults(): array {
-        return [
-            'venue' => '',
-            'venue_name' => '',
-            'venue_address' => '',
-            'venue_city' => '',
-            'venue_state' => '',
-            'venue_zip' => '',
-            'venue_country' => '',
-            'venue_phone' => '',
-            'venue_website' => '',
-            'venue_capacity' => '',
-        ];
-    }
+	/**
+	 * Get default values for all venue fields.
+	 *
+	 * @return array Default values keyed by field name
+	 */
+	protected static function get_venue_field_defaults(): array {
+		return array(
+			'venue'          => '',
+			'venue_name'     => '',
+			'venue_address'  => '',
+			'venue_city'     => '',
+			'venue_state'    => '',
+			'venue_zip'      => '',
+			'venue_country'  => '',
+			'venue_phone'    => '',
+			'venue_website'  => '',
+			'venue_capacity' => '',
+		);
+	}
 
-    /**
-     * Sanitize venue fields from raw settings input.
-     *
-     * @param array $raw_settings Raw settings input
-     * @return array Sanitized venue field values
-     */
-    protected static function sanitize_venue_fields(array $raw_settings): array {
-        return [
-            'venue' => sanitize_text_field($raw_settings['venue'] ?? ''),
-            'venue_name' => sanitize_text_field($raw_settings['venue_name'] ?? ''),
-            'venue_address' => sanitize_text_field($raw_settings['venue_address'] ?? ''),
-            'venue_city' => sanitize_text_field($raw_settings['venue_city'] ?? ''),
-            'venue_state' => sanitize_text_field($raw_settings['venue_state'] ?? ''),
-            'venue_zip' => sanitize_text_field($raw_settings['venue_zip'] ?? ''),
-            'venue_country' => sanitize_text_field($raw_settings['venue_country'] ?? ''),
-            'venue_phone' => sanitize_text_field($raw_settings['venue_phone'] ?? ''),
-            'venue_website' => esc_url_raw($raw_settings['venue_website'] ?? ''),
-            'venue_capacity' => !empty($raw_settings['venue_capacity']) ? absint($raw_settings['venue_capacity']) : '',
-        ];
-    }
+	/**
+	 * Sanitize venue fields from raw settings input.
+	 *
+	 * @param array $raw_settings Raw settings input
+	 * @return array Sanitized venue field values
+	 */
+	protected static function sanitize_venue_fields( array $raw_settings ): array {
+		return array(
+			'venue'          => sanitize_text_field( $raw_settings['venue'] ?? '' ),
+			'venue_name'     => sanitize_text_field( $raw_settings['venue_name'] ?? '' ),
+			'venue_address'  => sanitize_text_field( $raw_settings['venue_address'] ?? '' ),
+			'venue_city'     => sanitize_text_field( $raw_settings['venue_city'] ?? '' ),
+			'venue_state'    => sanitize_text_field( $raw_settings['venue_state'] ?? '' ),
+			'venue_zip'      => sanitize_text_field( $raw_settings['venue_zip'] ?? '' ),
+			'venue_country'  => sanitize_text_field( $raw_settings['venue_country'] ?? '' ),
+			'venue_phone'    => sanitize_text_field( $raw_settings['venue_phone'] ?? '' ),
+			'venue_website'  => esc_url_raw( $raw_settings['venue_website'] ?? '' ),
+			'venue_capacity' => ! empty( $raw_settings['venue_capacity'] ) ? absint( $raw_settings['venue_capacity'] ) : '',
+		);
+	}
 
-    /**
-     * Process venue data on settings save.
-     *
-     * Creates new venue term if venue is empty and venue_name is provided.
-     * Updates existing venue term meta if venue has a term_id.
-     * Stores both term_id AND venue fields in handler_config for dual storage.
-     *
-     * @param array $settings Sanitized settings array (modified in place)
-     * @return array Modified settings with venue term_id set
-     */
-    protected static function save_venue_on_settings_save(array $settings): array {
-        $venue_term_id = $settings['venue'] ?? '';
+	/**
+	 * Process venue data on settings save.
+	 *
+	 * Creates new venue term if venue is empty and venue_name is provided.
+	 * Updates existing venue term meta if venue has a term_id.
+	 * Stores both term_id AND venue fields in handler_config for dual storage.
+	 *
+	 * @param array $settings Sanitized settings array (modified in place)
+	 * @return array Modified settings with venue term_id set
+	 */
+	protected static function save_venue_on_settings_save( array $settings ): array {
+		$venue_term_id = $settings['venue'] ?? '';
 
-        $venue_data = [
-            'address' => $settings['venue_address'] ?? '',
-            'city' => $settings['venue_city'] ?? '',
-            'state' => $settings['venue_state'] ?? '',
-            'zip' => $settings['venue_zip'] ?? '',
-            'country' => $settings['venue_country'] ?? '',
-            'phone' => $settings['venue_phone'] ?? '',
-            'website' => $settings['venue_website'] ?? '',
-            'capacity' => $settings['venue_capacity'] ?? '',
-        ];
+		$venue_data = array(
+			'address'  => $settings['venue_address'] ?? '',
+			'city'     => $settings['venue_city'] ?? '',
+			'state'    => $settings['venue_state'] ?? '',
+			'zip'      => $settings['venue_zip'] ?? '',
+			'country'  => $settings['venue_country'] ?? '',
+			'phone'    => $settings['venue_phone'] ?? '',
+			'website'  => $settings['venue_website'] ?? '',
+			'capacity' => $settings['venue_capacity'] ?? '',
+		);
 
-        if (empty($venue_term_id)) {
-            $venue_name = $settings['venue_name'] ?? '';
+		if ( empty( $venue_term_id ) ) {
+			$venue_name = $settings['venue_name'] ?? '';
 
-            if (!empty($venue_name)) {
-                $result = Venue_Taxonomy::find_or_create_venue($venue_name, $venue_data);
-                $venue_term_id = $result['term_id'] ?? '';
-            }
-        } else {
-            $original_data = Venue_Taxonomy::get_venue_data($venue_term_id);
-            $changed_fields = [];
+			if ( ! empty( $venue_name ) ) {
+				$result        = Venue_Taxonomy::find_or_create_venue( $venue_name, $venue_data );
+				$venue_term_id = $result['term_id'] ?? '';
+			}
+		} else {
+			$original_data  = Venue_Taxonomy::get_venue_data( $venue_term_id );
+			$changed_fields = array();
 
-            foreach ($venue_data as $key => $value) {
-                $original_value = $original_data[$key] ?? '';
-                if (trim((string) $original_value) !== trim((string) $value)) {
-                    $changed_fields[$key] = $value;
-                }
-            }
+			foreach ( $venue_data as $key => $value ) {
+				$original_value = $original_data[ $key ] ?? '';
+				if ( trim( (string) $original_value ) !== trim( (string) $value ) ) {
+					$changed_fields[ $key ] = $value;
+				}
+			}
 
-            if (!empty($changed_fields)) {
-                Venue_Taxonomy::update_venue_meta($venue_term_id, $changed_fields);
-            }
-        }
+			if ( ! empty( $changed_fields ) ) {
+				Venue_Taxonomy::update_venue_meta( $venue_term_id, $changed_fields );
+			}
+		}
 
-        $settings['venue'] = $venue_term_id;
+		$settings['venue'] = $venue_term_id;
 
-        return $settings;
-    }
+		return $settings;
+	}
 
-    /**
-     * Get venue field keys for settings operations.
-     *
-     * @return array List of venue field keys (snake_case)
-     */
-    protected static function get_venue_field_keys(): array {
-        return [
-            'venue',
-            'venue_name',
-            'venue_address',
-            'venue_city',
-            'venue_state',
-            'venue_zip',
-            'venue_country',
-            'venue_phone',
-            'venue_website',
-            'venue_capacity',
-        ];
-    }
+	/**
+	 * Get venue field keys for settings operations.
+	 *
+	 * @return array List of venue field keys (snake_case)
+	 */
+	protected static function get_venue_field_keys(): array {
+		return array(
+			'venue',
+			'venue_name',
+			'venue_address',
+			'venue_city',
+			'venue_state',
+			'venue_zip',
+			'venue_country',
+			'venue_phone',
+			'venue_website',
+			'venue_capacity',
+		);
+	}
 
-    /**
-     * Map handler config venue fields (snake_case) to event data format (camelCase).
-     *
-     * Used by handlers when building standardized event data from config.
-     *
-     * @param array $config Handler configuration
-     * @return array Venue data in camelCase format for event processing
-     */
-    protected static function map_venue_config_to_event_data(array $config): array {
-        return [
-            'venue' => $config['venue_name'] ?? '',
-            'venueAddress' => $config['venue_address'] ?? '',
-            'venueCity' => $config['venue_city'] ?? '',
-            'venueState' => $config['venue_state'] ?? '',
-            'venueZip' => $config['venue_zip'] ?? '',
-            'venueCountry' => $config['venue_country'] ?? '',
-            'venuePhone' => $config['venue_phone'] ?? '',
-            'venueWebsite' => $config['venue_website'] ?? '',
-            'venueCapacity' => $config['venue_capacity'] ?? '',
-        ];
-    }
+	/**
+	 * Map handler config venue fields (snake_case) to event data format (camelCase).
+	 *
+	 * Used by handlers when building standardized event data from config.
+	 *
+	 * @param array $config Handler configuration
+	 * @return array Venue data in camelCase format for event processing
+	 */
+	protected static function map_venue_config_to_event_data( array $config ): array {
+		return array(
+			'venue'         => $config['venue_name'] ?? '',
+			'venueAddress'  => $config['venue_address'] ?? '',
+			'venueCity'     => $config['venue_city'] ?? '',
+			'venueState'    => $config['venue_state'] ?? '',
+			'venueZip'      => $config['venue_zip'] ?? '',
+			'venueCountry'  => $config['venue_country'] ?? '',
+			'venuePhone'    => $config['venue_phone'] ?? '',
+			'venueWebsite'  => $config['venue_website'] ?? '',
+			'venueCapacity' => $config['venue_capacity'] ?? '',
+		);
+	}
 }
