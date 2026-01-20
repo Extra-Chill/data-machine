@@ -10,7 +10,6 @@
 
 namespace DataMachineEvents\Abilities;
 
-use DataMachine\Engine\AI\Tools\ToolRegistrationTrait;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\Venue_Taxonomy;
 
@@ -19,15 +18,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class TimezoneAbilities {
-	use ToolRegistrationTrait;
 
 	const DEFAULT_LIMIT      = 50;
 	const DEFAULT_DAYS_AHEAD = 90;
 
 	public function __construct() {
 		$this->registerAbility();
-		$this->registerTool( 'chat', 'find_broken_timezone_events', array( $this, 'getFindToolDefinition' ) );
-		$this->registerTool( 'chat', 'fix_event_timezone', array( $this, 'getFixToolDefinition' ) );
 	}
 
 	private function registerAbility(): void {
@@ -183,116 +179,6 @@ class TimezoneAbilities {
 					)
 				);
 			}
-		);
-	}
-
-	public function getFindToolDefinition(): array {
-		return array(
-			'class'       => self::class,
-			'method'      => 'handle_tool_call_find',
-			'description' => 'Find events where venue has no timezone or coordinates. Also separately notes events with no venue assigned. Returns actual timezone/coordinates values when present.',
-			'parameters'  => array(
-				'scope'      => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Which events to check: "upcoming" (default), "all", or "past"',
-					'enum'        => array( 'upcoming', 'all', 'past' ),
-				),
-				'days_ahead' => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Days to look ahead for upcoming scope (default: 90)',
-				),
-				'limit'      => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Max events to return (default: 50)',
-				),
-			),
-		);
-	}
-
-	public function getFixToolDefinition(): array {
-		return array(
-			'class'       => self::class,
-			'method'      => 'handle_tool_call_fix',
-			'description' => 'Fix event timezone by updating venue metadata. Supports batch updates. Event times remain as-is (8pm stays 8pm) regardless of timezone. Calls geocoding if venue lacks coordinates. Returns inline errors and continues processing.',
-			'parameters'  => array(
-				'event'       => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Single event post ID to fix',
-				),
-				'events'      => array(
-					'type'        => 'array',
-					'required'    => false,
-					'description' => 'Array of event updates. Each item must have "event" (post ID) and optionally "timezone" and "auto_derive".',
-				),
-				'timezone'    => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'IANA timezone identifier (e.g., "America/Chicago"). If omitted and auto_derive is false, no change is made.',
-				),
-				'auto_derive' => array(
-					'type'        => 'boolean',
-					'required'    => false,
-					'description' => 'If true, derive timezone from venue coordinates via GeoNames API (requires GeoNames username configured). Default: false.',
-				),
-			),
-		);
-	}
-
-	public function handle_tool_call_find( array $parameters, array $tool_def = array() ): array {
-		$scope      = $parameters['scope'] ?? 'upcoming';
-		$days_ahead = (int) ( $parameters['days_ahead'] ?? self::DEFAULT_DAYS_AHEAD );
-		$limit      = (int) ( $parameters['limit'] ?? self::DEFAULT_LIMIT );
-
-		$result = $this->findBrokenTimezoneEvents( $scope, $days_ahead, $limit );
-
-		return array(
-			'success'   => true,
-			'data'      => $result,
-			'tool_name' => 'find_broken_timezone_events',
-		);
-	}
-
-	public function handle_tool_call_fix( array $parameters, array $tool_def = array() ): array {
-		$updates = $this->normalizeFixInput( $parameters );
-
-		if ( empty( $updates ) ) {
-			return array(
-				'success'   => false,
-				'error'     => 'Either "event" (single) or "events" (batch) parameter is required',
-				'tool_name' => 'fix_event_timezone',
-			);
-		}
-
-		$results       = array();
-		$updated_count = 0;
-		$failed_count  = 0;
-
-		foreach ( $updates as $update ) {
-			$result    = $this->fixSingleEventTimezone( $update );
-			$results[] = $result;
-
-			if ( 'updated' === $result['status'] ) {
-				++$updated_count;
-			} else {
-				++$failed_count;
-			}
-		}
-
-		return array(
-			'success'   => $updated_count > 0,
-			'data'      => array(
-				'results' => $results,
-				'summary' => array(
-					'updated' => $updated_count,
-					'failed'  => $failed_count,
-					'total'   => count( $updates ),
-				),
-			),
-			'tool_name' => 'fix_event_timezone',
 		);
 	}
 

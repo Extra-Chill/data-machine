@@ -182,6 +182,9 @@ class DATAMACHINE_Events {
 		new \DataMachineEvents\Api\Chat\Tools\EventHealthCheck();
 		new \DataMachineEvents\Api\Chat\Tools\UpdateEvent();
 		new \DataMachineEvents\Api\Chat\Tools\GetVenueEvents();
+		new \DataMachineEvents\Api\Chat\Tools\FindBrokenTimezoneEvents();
+		new \DataMachineEvents\Api\Chat\Tools\FixEventTimezone();
+		new \DataMachineEvents\Api\Chat\Tools\TestEventScraper();
 
 		// Load abilities - self-register ability + tool
 		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventScraperTest.php' ) ) {
