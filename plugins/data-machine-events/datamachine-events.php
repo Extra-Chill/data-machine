@@ -213,6 +213,11 @@ class DATAMACHINE_Events {
 			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/BatchTimeFixAbilities.php';
 			new \DataMachineEvents\Abilities\BatchTimeFixAbilities();
 		}
+
+		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/VenueAbilities.php' ) ) {
+			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/VenueAbilities.php';
+			new \DataMachineEvents\Abilities\VenueAbilities();
+		}
 	}
 
 	private function load_event_import_handlers() {

@@ -4,10 +4,11 @@ namespace DataMachineEvents\Api\Controllers;
 defined( 'ABSPATH' ) || exit;
 
 use WP_REST_Request;
-use DataMachineEvents\Core\Venue_Taxonomy;
 
 /**
  * Venues API controller
+ *
+ * Delegates to VenueAbilities for business logic.
  */
 class Venues {
 	/**
@@ -27,12 +28,21 @@ class Venues {
 			);
 		}
 
-		$venue_data = \DataMachineEvents\Core\Venue_Taxonomy::get_venue_data( $term_id );
+		$ability = wp_get_ability( 'datamachine-events/get-venue' );
+		if ( ! $ability ) {
+			return new \WP_Error(
+				'ability_not_found',
+				__( 'Ability not available', 'datamachine-events' ),
+				array( 'status' => 500 )
+			);
+		}
 
-		if ( empty( $venue_data ) ) {
+		$result = $ability->execute( array( 'id' => (int) $term_id ) );
+
+		if ( isset( $result['error'] ) ) {
 			return new \WP_Error(
 				'venue_not_found',
-				__( 'Venue not found', 'datamachine-events' ),
+				$result['error'],
 				array( 'status' => 404 )
 			);
 		}
@@ -40,7 +50,7 @@ class Venues {
 		return rest_ensure_response(
 			array(
 				'success' => true,
-				'data'    => $venue_data,
+				'data'    => $result,
 			)
 		);
 	}
@@ -49,7 +59,7 @@ class Venues {
 	 * Check duplicate venue
 	 *
 	 * @param WP_REST_Request $request
-	 * @return \WP_REST_Response
+	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public function check_duplicate( WP_REST_Request $request ) {
 		$venue_name    = $request->get_param( 'name' );
@@ -63,58 +73,34 @@ class Venues {
 			);
 		}
 
-		$existing_term = get_term_by( 'name', $venue_name, 'venue' );
-
-		if ( ! $existing_term ) {
-			return rest_ensure_response(
-				array(
-					'success' => true,
-					'data'    => array(
-						'is_duplicate' => false,
-						'message'      => '',
-					),
-				)
+		$ability = wp_get_ability( 'datamachine-events/check-duplicate-venue' );
+		if ( ! $ability ) {
+			return new \WP_Error(
+				'ability_not_found',
+				__( 'Ability not available', 'datamachine-events' ),
+				array( 'status' => 500 )
 			);
 		}
 
+		$input = array( 'name' => sanitize_text_field( $venue_name ) );
 		if ( ! empty( $venue_address ) ) {
-			$existing_address = get_term_meta( $existing_term->term_id, '_venue_address', true );
+			$input['address'] = sanitize_text_field( $venue_address );
+		}
 
-			$normalized_new      = strtolower( trim( $venue_address ) );
-			$normalized_existing = strtolower( trim( $existing_address ) );
+		$result = $ability->execute( $input );
 
-			if ( $normalized_new === $normalized_existing ) {
-				return rest_ensure_response(
-					array(
-						'success' => true,
-						'data'    => array(
-							'is_duplicate'        => true,
-							'existing_term_id'    => $existing_term->term_id,
-							'existing_venue_name' => $existing_term->name,
-							/* translators: %s: venue name */
-							'message'             => sprintf(
-								__( 'A venue named "%s" with this address already exists.', 'datamachine-events' ),
-								esc_html( $existing_term->name )
-							),
-						),
-					)
-				);
-			}
+		if ( isset( $result['error'] ) ) {
+			return new \WP_Error(
+				'check_duplicate_failed',
+				$result['error'],
+				array( 'status' => 400 )
+			);
 		}
 
 		return rest_ensure_response(
 			array(
 				'success' => true,
-				'data'    => array(
-					'is_duplicate'        => true,
-					'existing_term_id'    => $existing_term->term_id,
-					'existing_venue_name' => $existing_term->name,
-					/* translators: %s: venue name */
-					'message'             => sprintf(
-						__( 'A venue named "%s" already exists. Consider using a more specific name or check if this is the same venue.', 'datamachine-events' ),
-						esc_html( $existing_term->name )
-					),
-				),
+				'data'    => $result,
 			)
 		);
 	}
