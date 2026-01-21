@@ -93,7 +93,12 @@ class Calendar {
 		$future_count = $event_counts['future'];
 
 		$paged_events      = Calendar_Query::build_paged_events( $events_query );
-		$paged_date_groups = Calendar_Query::group_events_by_date( $paged_events, $show_past );
+		$paged_date_groups = Calendar_Query::group_events_by_date(
+			$paged_events,
+			$show_past,
+			$range_start ?? '',
+			$range_end ?? ''
+		);
 
 		ob_start();
 

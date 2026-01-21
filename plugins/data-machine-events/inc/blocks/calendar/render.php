@@ -140,8 +140,8 @@ $paged_events      = Calendar_Query::build_paged_events( $events_query );
 $paged_date_groups = Calendar_Query::group_events_by_date(
 	$paged_events,
 	$show_past,
-	$date_boundaries['start_date'] ?? '',
-	$date_boundaries['end_date'] ?? ''
+	$range_start ?? '',
+	$range_end ?? ''
 );
 
 $can_go_previous = $current_page > 1;
