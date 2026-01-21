@@ -64,6 +64,26 @@ class JsonLdExtractor extends BaseExtractor {
 			}
 		}
 
+		// Handle ItemList with ListItem elements (Eventbrite pattern)
+		if ( isset( $data['@type'] ) && 'ItemList' === $data['@type'] && isset( $data['itemListElement'] ) ) {
+			foreach ( $data['itemListElement'] as $list_item ) {
+				if ( ! is_array( $list_item ) ) {
+					continue;
+				}
+				// ListItem wraps the actual item
+				if ( isset( $list_item['@type'] ) && 'ListItem' === $list_item['@type'] && isset( $list_item['item'] ) ) {
+					$nested = $list_item['item'];
+					if ( isset( $nested['@type'] ) && 'Event' === $nested['@type'] ) {
+						return $this->parseEvent( $nested, $source_url );
+					}
+				}
+				// Direct Event in itemListElement (fallback)
+				if ( isset( $list_item['@type'] ) && 'Event' === $list_item['@type'] ) {
+					return $this->parseEvent( $list_item, $source_url );
+				}
+			}
+		}
+
 		if ( $this->isList( $data ) ) {
 			foreach ( $data as $item ) {
 				if ( ! is_array( $item ) ) {

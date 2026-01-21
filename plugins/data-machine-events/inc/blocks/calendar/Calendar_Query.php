@@ -464,8 +464,10 @@ class Calendar_Query {
 			$is_multi_day = self::is_multi_day_event( $event_data );
 
 			// Use explicit occurrence dates if provided, otherwise expand full range
-			$occurrence_dates = $event_data['occurrenceDates'] ?? array();
-			if ( ! empty( $occurrence_dates ) && is_array( $occurrence_dates ) ) {
+			$occurrence_dates     = $event_data['occurrenceDates'] ?? array();
+			$has_occurrence_dates = ! empty( $occurrence_dates ) && is_array( $occurrence_dates );
+
+			if ( $has_occurrence_dates ) {
 				$event_dates = $occurrence_dates;
 			} elseif ( $is_multi_day ) {
 				$event_dates = self::get_event_date_range( $start_date, $end_date, $event_tz );
@@ -483,12 +485,15 @@ class Calendar_Query {
 					);
 				}
 
+				// Events with explicit occurrence dates are NOT continuations - each is a discrete showing
+				$is_continuation = $has_occurrence_dates ? false : ( $date_key !== $start_date );
+
 				$display_item                    = $event_item;
 				$display_item['display_context'] = array(
-					'is_multi_day'        => $is_multi_day,
-					'is_start_day'        => ( $date_key === $start_date ),
-					'is_end_day'          => ( $date_key === $end_date ),
-					'is_continuation'     => ( $date_key !== $start_date ),
+					'is_multi_day'        => $has_occurrence_dates ? false : $is_multi_day,
+					'is_start_day'        => $has_occurrence_dates ? true : ( $date_key === $start_date ),
+					'is_end_day'          => $has_occurrence_dates ? true : ( $date_key === $end_date ),
+					'is_continuation'     => $is_continuation,
 					'display_date'        => $date_key,
 					'original_start_date' => $start_date,
 					'original_end_date'   => $end_date,
@@ -692,7 +697,7 @@ class Calendar_Query {
 				// Check for explicit occurrence dates in block attributes
 				$post             = get_post( $post_id );
 				$event_data       = self::parse_event_data( $post );
-				$occurrence_dates = $event_data['occurrenceDates'] ?? array();
+				$occurrence_dates = is_array( $event_data ) ? ( $event_data['occurrenceDates'] ?? array() ) : array();
 
 				if ( ! empty( $occurrence_dates ) && is_array( $occurrence_dates ) ) {
 					$event_dates = $occurrence_dates;
