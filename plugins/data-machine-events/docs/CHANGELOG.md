@@ -2,7 +2,7 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
-## Unreleased
+## [0.10.0] - 2026-01-21
 
 - Add occurrenceDates attribute for recurring events with specific display dates
 - Add occurrenceDates support in AI tools (EventSchemaProvider, EventUpsert, EventUpdateAbilities)
