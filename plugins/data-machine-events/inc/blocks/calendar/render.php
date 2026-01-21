@@ -137,7 +137,12 @@ $past_events_count   = $event_counts['past'];
 $future_events_count = $event_counts['future'];
 
 $paged_events      = Calendar_Query::build_paged_events( $events_query );
-$paged_date_groups = Calendar_Query::group_events_by_date( $paged_events, $show_past );
+$paged_date_groups = Calendar_Query::group_events_by_date(
+	$paged_events,
+	$show_past,
+	$date_boundaries['start_date'] ?? '',
+	$date_boundaries['end_date'] ?? ''
+);
 
 $can_go_previous = $current_page > 1;
 $can_go_next     = $current_page < $max_pages;

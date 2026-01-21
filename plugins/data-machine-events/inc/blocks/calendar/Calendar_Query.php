@@ -444,11 +444,13 @@ class Calendar_Query {
 	/**
 	 * Group events by date, expanding multi-day events across their date range
 	 *
-	 * @param array $paged_events Array of event items
-	 * @param bool $show_past Whether showing past events (affects sort order)
+	 * @param array  $paged_events Array of event items
+	 * @param bool   $show_past Whether showing past events (affects sort order)
+	 * @param string $date_start Optional start date boundary (Y-m-d) to filter occurrence dates
+	 * @param string $date_end Optional end date boundary (Y-m-d) to filter occurrence dates
 	 * @return array Date-grouped events
 	 */
-	public static function group_events_by_date( array $paged_events, bool $show_past = false ): array {
+	public static function group_events_by_date( array $paged_events, bool $show_past = false, string $date_start = '', string $date_end = '' ): array {
 		$date_groups = array();
 
 		foreach ( $paged_events as $event_item ) {
@@ -473,6 +475,22 @@ class Calendar_Query {
 				$event_dates = self::get_event_date_range( $start_date, $end_date, $event_tz );
 			} else {
 				$event_dates = array( $start_date );
+			}
+
+			// Filter to page date boundaries if provided
+			if ( $date_start || $date_end ) {
+				$event_dates = array_filter(
+					$event_dates,
+					function ( $date ) use ( $date_start, $date_end ) {
+						if ( $date_start && $date < $date_start ) {
+							return false;
+						}
+						if ( $date_end && $date > $date_end ) {
+							return false;
+						}
+						return true;
+					}
+				);
 			}
 
 			foreach ( $event_dates as $index => $date_key ) {
