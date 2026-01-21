@@ -264,5 +264,4 @@ class CraftpeakExtractor extends BaseExtractor {
 			return '';
 		}
 	}
-
 }

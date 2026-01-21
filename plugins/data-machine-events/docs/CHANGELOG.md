@@ -2,6 +2,10 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## Unreleased
+
+- Calendar query improvements and Craftpeak extractor updates
+
 ## [0.9.17] - 2026-01-19
 
 ### Added

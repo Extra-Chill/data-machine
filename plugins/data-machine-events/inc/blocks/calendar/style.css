@@ -468,17 +468,7 @@
 
 }
 
-@media (max-width: 480px) {
-    
-    .datamachine-events-view-btn {
-        padding: 0.5rem 0.75rem;
-        font-size: 0.8rem;
-    }
-    
-    .datamachine-events-view-btn .dashicons {
-        display: none;
-    }
-}
+/* 480px breakpoint reserved for future mobile refinements */
 
 /* ========== Taxonomy Filter Modal Styles ========== */
 
@@ -699,8 +689,8 @@
     background: var(--datamachine-background-hover);
 }
 
-.datamachine-term-checkbox {
-    margin: 0 !important;
+.datamachine-term-checkbox-label .datamachine-term-checkbox {
+    margin: 0;
     flex-shrink: 0;
 }
 
