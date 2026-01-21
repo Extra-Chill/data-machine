@@ -2,6 +2,10 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## Unreleased
+
+- Refactor calendar system to Abilities API: consolidate duplicated logic from render.php and REST controller into CalendarAbilities, migrate frontend from AJAX to URL navigation
+
 ## [0.10.0] - 2026-01-21
 
 - Add occurrenceDates attribute for recurring events with specific display dates

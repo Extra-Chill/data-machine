@@ -221,6 +221,11 @@ class DATAMACHINE_Events {
 			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/VenueAbilities.php';
 			new \DataMachineEvents\Abilities\VenueAbilities();
 		}
+
+		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/CalendarAbilities.php' ) ) {
+			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/CalendarAbilities.php';
+			new \DataMachineEvents\Abilities\CalendarAbilities();
+		}
 	}
 
 	private function load_event_import_handlers() {

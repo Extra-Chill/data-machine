@@ -1,7 +1,8 @@
 /**
  * Data Machine Events Calendar Frontend
  *
- * Module orchestration for calendar blocks with REST API filtering.
+ * Module orchestration for calendar blocks with URL-based filtering.
+ * All filter/pagination changes trigger full page navigation.
  */
 
 /**
@@ -17,7 +18,6 @@ import { initCarousel, destroyCarousel } from './modules/carousel.js';
 import { initDatePicker, destroyDatePicker, getDatePicker } from './modules/date-picker.js';
 import { initFilterModal, destroyFilterModal } from './modules/filter-modal.js';
 import { initNavigation } from './modules/navigation.js';
-import { fetchCalendarEvents } from './modules/api-client.js';
 import { getFilterState, destroyFilterState } from './modules/filter-state.js';
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -29,8 +29,8 @@ function initCalendarInstance(calendar) {
     calendar.dataset.dmInitialized = 'true';
 
     const filterState = getFilterState(calendar);
-    
-    const restored = filterState.restoreFromStorage();
+
+    filterState.restoreFromStorage();
 
     initCarousel(calendar);
 
@@ -41,27 +41,22 @@ function initCalendarInstance(calendar) {
     initFilterModal(
         calendar,
         function() { handleFilterChange(calendar); },
-        function(params) { handleFilterReset(calendar, params); }
+        function(params) { navigateToUrl(params); }
     );
 
     initNavigation(calendar, function(params) {
-        handleNavigation(calendar, params);
+        navigateToUrl(params);
     });
 
     initSearchInput(calendar);
-
-    if (restored) {
-        const params = new URLSearchParams(window.location.search);
-        refreshCalendar(calendar, params);
-    }
 
     filterState.updateFilterCountBadge();
 }
 
 function initSearchInput(calendar) {
-    const searchInput = calendar.querySelector('.datamachine-events-search-input') 
+    const searchInput = calendar.querySelector('.datamachine-events-search-input')
         || calendar.querySelector('[id^="datamachine-events-search-"]');
-    
+
     if (!searchInput) {return;}
 
     let searchTimeout;
@@ -81,36 +76,29 @@ function initSearchInput(calendar) {
     }
 }
 
-async function handleFilterChange(calendar) {
+/**
+ * Handle filter changes by building params and navigating
+ */
+function handleFilterChange(calendar) {
     const filterState = getFilterState(calendar);
     const datePicker = getDatePicker(calendar);
     const params = filterState.buildParams(datePicker);
-    filterState.updateUrl(params);
-    await refreshCalendar(calendar, params);
+
+    filterState.saveToStorage(params);
+
+    navigateToUrl(params);
 }
 
-async function handleFilterReset(calendar, params) {
-    await refreshCalendar(calendar, params);
-}
+/**
+ * Navigate to URL with params (full page reload)
+ */
+function navigateToUrl(params) {
+    const queryString = params.toString();
+    const newUrl = queryString
+        ? `${window.location.pathname}?${queryString}`
+        : window.location.pathname;
 
-async function handleNavigation(calendar, params) {
-    const filterState = getFilterState(calendar);
-    filterState.updateUrl(params);
-    await refreshCalendar(calendar, params);
-}
-
-async function refreshCalendar(calendar, params) {
-    destroyCarousel(calendar);
-    destroyDatePicker(calendar);
-    destroyFilterModal(calendar);
-
-    const filterState = getFilterState(calendar);
-    const archiveContext = filterState.getArchiveContext();
-
-    await fetchCalendarEvents(calendar, params, archiveContext);
-
-    calendar.dataset.dmInitialized = 'false';
-    initCalendarInstance(calendar);
+    window.location.href = newUrl;
 }
 
 window.addEventListener('beforeunload', function() {

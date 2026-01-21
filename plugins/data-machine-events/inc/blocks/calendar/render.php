@@ -3,6 +3,7 @@
  * Calendar Block Server-Side Render Template
  *
  * Renders events calendar with filtering and pagination.
+ * Uses CalendarAbilities for event data and HTML generation.
  *
  * @var array $attributes Block attributes
  * @var string $content Block inner content
@@ -13,8 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-use DataMachineEvents\Blocks\Calendar\Calendar_Query;
-use DataMachineEvents\Blocks\Calendar\Pagination;
+use DataMachineEvents\Abilities\CalendarAbilities;
 use DataMachineEvents\Blocks\Calendar\Taxonomy_Helper;
 
 if ( wp_is_json_request() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
@@ -55,8 +55,7 @@ if ( is_array( $tax_filters_raw ) ) {
 	}
 }
 
-$tax_query_override = null;
-$archive_context    = array(
+$archive_context = array(
 	'taxonomy'  => '',
 	'term_id'   => 0,
 	'term_name' => '',
@@ -65,14 +64,7 @@ $archive_context    = array(
 if ( is_tax() ) {
 	$term = get_queried_object();
 	if ( $term && isset( $term->taxonomy ) && isset( $term->term_id ) ) {
-		$tax_query_override = array(
-			array(
-				'taxonomy' => $term->taxonomy,
-				'field'    => 'term_id',
-				'terms'    => $term->term_id,
-			),
-		);
-		$archive_context    = array(
+		$archive_context = array(
 			'taxonomy'  => $term->taxonomy,
 			'term_id'   => $term->term_id,
 			'term_name' => $term->name,
@@ -80,76 +72,44 @@ if ( is_tax() ) {
 	}
 }
 
-$user_date_start = $date_start;
-$user_date_end   = $date_end;
-
-$base_params = array(
-	'show_past'          => $show_past,
-	'search_query'       => $search_query,
-	'date_start'         => $user_date_start,
-	'date_end'           => $user_date_end,
-	'tax_filters'        => $tax_filters,
-	'tax_query_override' => $tax_query_override,
-	'archive_taxonomy'   => $archive_context['taxonomy'],
-	'archive_term_id'    => $archive_context['term_id'],
-	'source'             => 'render',
-	'user_date_range'    => ! empty( $user_date_start ) || ! empty( $user_date_end ),
+$abilities = new CalendarAbilities();
+$result    = $abilities->executeGetCalendarPage(
+	array(
+		'paged'            => $current_page,
+		'past'             => $show_past,
+		'event_search'     => $search_query,
+		'date_start'       => $date_start,
+		'date_end'         => $date_end,
+		'tax_filter'       => $tax_filters,
+		'archive_taxonomy' => $archive_context['taxonomy'],
+		'archive_term_id'  => $archive_context['term_id'],
+		'include_html'     => true,
+		'include_gaps'     => true,
+	)
 );
 
+$current_page        = $result['current_page'];
+$max_pages           = $result['max_pages'];
+$total_event_count   = $result['total_event_count'];
+$past_events_count   = $result['event_counts']['past'];
+$future_events_count = $result['event_counts']['future'];
+
 $date_context = array(
-	'date_start' => $user_date_start,
-	'date_end'   => $user_date_end,
+	'date_start' => $date_start,
+	'date_end'   => $date_end,
 	'past'       => $show_past ? '1' : '',
 );
 
-$date_data         = Calendar_Query::get_unique_event_dates( $base_params );
-$unique_dates      = $date_data['dates'];
-$total_event_count = $date_data['total_events'];
-$events_per_date   = $date_data['events_per_date'];
-
-$date_boundaries = Calendar_Query::get_date_boundaries_for_page( $unique_dates, $current_page, $total_event_count, $events_per_date );
-
-$max_pages    = $date_boundaries['max_pages'];
-$current_page = max( 1, min( $current_page, max( 1, $max_pages ) ) );
-
-$query_params = $base_params;
-if ( ! empty( $date_boundaries['start_date'] ) && ! empty( $date_boundaries['end_date'] ) ) {
-	// For past events, boundaries are in DESC order (newest first), so swap them
-	// to create a valid query range where date_start < date_end
-	$range_start = $show_past ? $date_boundaries['end_date'] : $date_boundaries['start_date'];
-	$range_end   = $show_past ? $date_boundaries['start_date'] : $date_boundaries['end_date'];
-
-	if ( empty( $user_date_start ) ) {
-		$query_params['date_start'] = $range_start;
-	}
-	if ( empty( $user_date_end ) ) {
-		$query_params['date_end'] = $range_end;
-	}
+$tax_query_override = null;
+if ( ! empty( $archive_context['taxonomy'] ) && ! empty( $archive_context['term_id'] ) ) {
+	$tax_query_override = array(
+		array(
+			'taxonomy' => $archive_context['taxonomy'],
+			'field'    => 'term_id',
+			'terms'    => $archive_context['term_id'],
+		),
+	);
 }
-
-$query_args   = Calendar_Query::build_query_args( $query_params );
-$events_query = new WP_Query( $query_args );
-
-$total_events = count( $unique_dates );
-
-$event_counts        = Calendar_Query::get_event_counts();
-$past_events_count   = $event_counts['past'];
-$future_events_count = $event_counts['future'];
-
-$paged_events      = Calendar_Query::build_paged_events( $events_query );
-$paged_date_groups = Calendar_Query::group_events_by_date(
-	$paged_events,
-	$show_past,
-	$range_start ?? '',
-	$range_end ?? ''
-);
-
-$can_go_previous = $current_page > 1;
-$can_go_next     = $current_page < $max_pages;
-
-$gaps_detected = ! empty( $paged_date_groups )
-	? Calendar_Query::detect_time_gaps( $paged_date_groups )
-	: array();
 
 \DataMachineEvents\Blocks\Calendar\Template_Loader::init();
 
@@ -221,95 +181,20 @@ if ( ! empty( $archive_context['taxonomy'] ) ) {
 		)
 	);
 	?>
-	
+
 	<div class="datamachine-events-content">
-		<?php if ( ! empty( $paged_date_groups ) ) : ?>
-			<?php
-			foreach ( $paged_date_groups as $date_key => $date_group ) :
-				$date_obj        = $date_group['date_obj'];
-				$events_for_date = $date_group['events'];
-
-				if ( isset( $gaps_detected[ $date_key ] ) ) {
-					\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template(
-						'time-gap-separator',
-						array(
-							'gap_days' => $gaps_detected[ $date_key ],
-						)
-					);
-				}
-
-				$day_of_week          = strtolower( $date_obj->format( 'l' ) );
-				$formatted_date_label = $date_obj->format( 'l, F jS' );
-
-				\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template(
-					'date-group',
-					array(
-						'date_obj'             => $date_obj,
-						'day_of_week'          => $day_of_week,
-						'formatted_date_label' => $formatted_date_label,
-						'events_count'         => count( $events_for_date ),
-					)
-				);
-				?>
-
-				<div class="datamachine-events-wrapper">
-					<?php
-					foreach ( $events_for_date as $event_item ) :
-						$event_post      = $event_item['post'];
-						$event_data      = $event_item['event_data'];
-						$display_context = $event_item['display_context'] ?? array();
-
-						global $post;
-						$post = $event_post;
-						setup_postdata( $post );
-
-						$display_vars = Calendar_Query::build_display_vars( $event_data, $display_context );
-
-						\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template(
-							'event-item',
-							array(
-								'event_post'   => $event_post,
-								'event_data'   => $event_data,
-								'display_vars' => $display_vars,
-							)
-						);
-					endforeach;
-					?>
-				</div><!-- .datamachine-events-wrapper -->
-				<?php
-				echo '</div><!-- .datamachine-date-group -->';
-			endforeach;
-			?>
-			
-		<?php else : ?>
-			<?php \DataMachineEvents\Blocks\Calendar\Template_Loader::include_template( 'no-events' ); ?>
-		<?php endif; ?>
+		<?php
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- HTML generated by Template_Loader
+		echo $result['html']['events'];
+		?>
 	</div>
 
 	<?php
-	\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template(
-		'results-counter',
-		array(
-			'page_start_date' => $date_boundaries['start_date'],
-			'page_end_date'   => $date_boundaries['end_date'],
-			'event_count'     => $events_query->post_count,
-			'total_events'    => $total_event_count,
-		)
-	);
-
-	echo Pagination::render_pagination( $current_page, $max_pages, $show_past );
-
-	\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template(
-		'navigation',
-		array(
-			'show_past'           => $show_past,
-			'past_events_count'   => $past_events_count,
-			'future_events_count' => $future_events_count,
-		)
-	);
+	// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- HTML generated by Template_Loader
+	echo $result['html']['counter'];
+	// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- HTML generated by Pagination::render_pagination
+	echo $result['html']['pagination'];
+	// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- HTML generated by Template_Loader
+	echo $result['html']['navigation'];
 	?>
 </div>
-
-<?php
-wp_reset_postdata();
-?>

@@ -1,13 +1,17 @@
 <?php
+/**
+ * Calendar REST API Controller
+ *
+ * Thin wrapper around CalendarAbilities for REST API access.
+ * All business logic delegated to CalendarAbilities.
+ */
+
 namespace DataMachineEvents\Api\Controllers;
 
 defined( 'ABSPATH' ) || exit;
 
-use WP_Query;
 use WP_REST_Request;
-use DataMachineEvents\Blocks\Calendar\Calendar_Query;
-use DataMachineEvents\Blocks\Calendar\Pagination;
-use DataMachineEvents\Blocks\Calendar\Template_Loader;
+use DataMachineEvents\Abilities\CalendarAbilities;
 
 /**
  * Calendar API controller
@@ -17,184 +21,42 @@ class Calendar {
 	/**
 	 * Calendar endpoint implementation
 	 *
-	 * @param WP_REST_Request $request
+	 * @param WP_REST_Request $request REST request object
 	 * @return \WP_REST_Response
 	 */
 	public function calendar( WP_REST_Request $request ) {
-		Template_Loader::init();
-
-		$current_page = max( 1, (int) $request->get_param( 'paged' ) );
-		$show_past    = '1' === $request->get_param( 'past' );
-
-		$search_query    = $request->get_param( 'event_search' );
-		$user_date_start = $request->get_param( 'date_start' );
-		$user_date_end   = $request->get_param( 'date_end' );
-		$tax_filters     = $request->get_param( 'tax_filter' );
-
-		$archive_taxonomy = sanitize_key( $request->get_param( 'archive_taxonomy' ) ?? '' );
-		$archive_term_id  = absint( $request->get_param( 'archive_term_id' ) ?? 0 );
-
-		$tax_query_override = null;
-		if ( $archive_taxonomy && $archive_term_id ) {
-			$tax_query_override = array(
-				array(
-					'taxonomy' => $archive_taxonomy,
-					'field'    => 'term_id',
-					'terms'    => $archive_term_id,
-				),
-			);
-		}
-
-		$base_params = array(
-			'show_past'          => $show_past,
-			'search_query'       => $search_query ?? '',
-			'date_start'         => $user_date_start ?? '',
-			'date_end'           => $user_date_end ?? '',
-			'tax_filters'        => is_array( $tax_filters ) ? $tax_filters : array(),
-			'tax_query_override' => $tax_query_override,
-			'archive_taxonomy'   => $archive_taxonomy,
-			'archive_term_id'    => $archive_term_id,
-			'source'             => 'rest',
-			'user_date_range'    => ! empty( $user_date_start ) || ! empty( $user_date_end ),
-		);
-
-		$date_data         = Calendar_Query::get_unique_event_dates( $base_params );
-		$unique_dates      = $date_data['dates'];
-		$total_event_count = $date_data['total_events'];
-		$events_per_date   = $date_data['events_per_date'];
-
-		$date_boundaries = Calendar_Query::get_date_boundaries_for_page( $unique_dates, $current_page, $total_event_count, $events_per_date );
-
-		$max_pages    = $date_boundaries['max_pages'];
-		$current_page = max( 1, min( $current_page, max( 1, $max_pages ) ) );
-
-		$query_params = $base_params;
-		if ( ! empty( $date_boundaries['start_date'] ) && ! empty( $date_boundaries['end_date'] ) ) {
-			// For past events, boundaries are in DESC order (newest first), so swap them
-			// to create a valid query range where date_start < date_end
-			$range_start = $show_past ? $date_boundaries['end_date'] : $date_boundaries['start_date'];
-			$range_end   = $show_past ? $date_boundaries['start_date'] : $date_boundaries['end_date'];
-
-			if ( empty( $user_date_start ) ) {
-				$query_params['date_start'] = $range_start;
-			}
-			if ( empty( $user_date_end ) ) {
-				$query_params['date_end'] = $range_end;
-			}
-		}
-
-		$query_args   = Calendar_Query::build_query_args( $query_params );
-		$events_query = new WP_Query( $query_args );
-
-		$total_events = $total_event_count;
-
-		$event_counts = Calendar_Query::get_event_counts();
-		$past_count   = $event_counts['past'];
-		$future_count = $event_counts['future'];
-
-		$paged_events      = Calendar_Query::build_paged_events( $events_query );
-		$paged_date_groups = Calendar_Query::group_events_by_date(
-			$paged_events,
-			$show_past,
-			$range_start ?? '',
-			$range_end ?? ''
-		);
-
-		ob_start();
-
-		if ( ! empty( $paged_date_groups ) ) {
-			foreach ( $paged_date_groups as $date_key => $date_group ) {
-				$date_obj        = $date_group['date_obj'];
-				$events_for_date = $date_group['events'];
-
-				$day_of_week          = strtolower( $date_obj->format( 'l' ) );
-				$formatted_date_label = $date_obj->format( 'l, F jS' );
-
-				\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template(
-					'date-group',
-					array(
-						'date_obj'             => $date_obj,
-						'day_of_week'          => $day_of_week,
-						'formatted_date_label' => $formatted_date_label,
-						'events_count'         => count( $events_for_date ),
-					)
-				);
-				?>
-				<div class="datamachine-events-wrapper">
-					<?php
-					foreach ( $events_for_date as $event_item ) {
-						$event_post      = $event_item['post'];
-						$event_data      = $event_item['event_data'];
-						$display_context = $event_item['display_context'] ?? array();
-
-						global $post;
-						// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Required for setup_postdata()
-						$post = $event_post;
-						setup_postdata( $post );
-
-						$display_vars = Calendar_Query::build_display_vars( $event_data, $display_context );
-
-						\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template(
-							'event-item',
-							array(
-								'event_post'   => $event_post,
-								'event_data'   => $event_data,
-								'display_vars' => $display_vars,
-							)
-						);
-					}
-					?>
-				</div><!-- .datamachine-events-wrapper -->
-				<?php
-				echo '</div><!-- .datamachine-date-group -->';
-			}
-		} else {
-			\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template( 'no-events' );
-		}
-
-		$events_html = ob_get_clean();
-
-		$pagination_html = Pagination::render_pagination( $current_page, $max_pages, $show_past );
-
-		ob_start();
-		\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template(
-			'results-counter',
+		$abilities = new CalendarAbilities();
+		$result    = $abilities->executeGetCalendarPage(
 			array(
-				'page_start_date' => $date_boundaries['start_date'],
-				'page_end_date'   => $date_boundaries['end_date'],
-				'event_count'     => $events_query->post_count,
-				'total_events'    => $total_event_count,
+				'paged'            => $request->get_param( 'paged' ) ?? 1,
+				'past'             => '1' === $request->get_param( 'past' ),
+				'event_search'     => $request->get_param( 'event_search' ) ?? '',
+				'date_start'       => $request->get_param( 'date_start' ) ?? '',
+				'date_end'         => $request->get_param( 'date_end' ) ?? '',
+				'tax_filter'       => $request->get_param( 'tax_filter' ) ?? array(),
+				'archive_taxonomy' => $request->get_param( 'archive_taxonomy' ) ?? '',
+				'archive_term_id'  => $request->get_param( 'archive_term_id' ) ?? 0,
+				'include_html'     => true,
+				'include_gaps'     => true,
 			)
 		);
-		$counter_html = ob_get_clean();
-
-		ob_start();
-		\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template(
-			'navigation',
-			array(
-				'show_past'           => $show_past,
-				'past_events_count'   => $past_count,
-				'future_events_count' => $future_count,
-			)
-		);
-		$navigation_html = ob_get_clean();
 
 		return rest_ensure_response(
 			array(
 				'success'    => true,
-				'html'       => $events_html,
+				'html'       => $result['html']['events'],
 				'pagination' => array(
-					'html'         => $pagination_html,
-					'current_page' => $current_page,
-					'max_pages'    => $max_pages,
-					'total_events' => $total_events,
+					'html'         => $result['html']['pagination'],
+					'current_page' => $result['current_page'],
+					'max_pages'    => $result['max_pages'],
+					'total_events' => $result['total_event_count'],
 				),
-				'counter'    => $counter_html,
+				'counter'    => $result['html']['counter'],
 				'navigation' => array(
-					'html'         => $navigation_html,
-					'past_count'   => $past_count,
-					'future_count' => $future_count,
-					'show_past'    => $show_past,
+					'html'         => $result['html']['navigation'],
+					'past_count'   => $result['event_counts']['past'],
+					'future_count' => $result['event_counts']['future'],
+					'show_past'    => ! empty( $request->get_param( 'past' ) ),
 				),
 			)
 		);

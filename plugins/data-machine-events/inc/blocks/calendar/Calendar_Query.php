@@ -682,6 +682,89 @@ class Calendar_Query {
 	}
 
 	/**
+	 * Render date groups as HTML
+	 *
+	 * Used by CalendarAbilities for HTML generation. Iterates through date groups,
+	 * rendering time-gap separators and event items using templates.
+	 *
+	 * @param array $paged_date_groups Date-grouped events from group_events_by_date()
+	 * @param array $gaps_detected Time gaps from detect_time_gaps()
+	 * @param bool  $include_gaps Whether to render time-gap separators
+	 * @return string Rendered HTML
+	 */
+	public static function render_date_groups(
+		array $paged_date_groups,
+		array $gaps_detected = array(),
+		bool $include_gaps = true
+	): string {
+		if ( empty( $paged_date_groups ) ) {
+			ob_start();
+			Template_Loader::include_template( 'no-events' );
+			return ob_get_clean();
+		}
+
+		ob_start();
+
+		foreach ( $paged_date_groups as $date_key => $date_group ) {
+			$date_obj        = $date_group['date_obj'];
+			$events_for_date = $date_group['events'];
+
+			if ( $include_gaps && isset( $gaps_detected[ $date_key ] ) ) {
+				Template_Loader::include_template(
+					'time-gap-separator',
+					array(
+						'gap_days' => $gaps_detected[ $date_key ],
+					)
+				);
+			}
+
+			$day_of_week          = strtolower( $date_obj->format( 'l' ) );
+			$formatted_date_label = $date_obj->format( 'l, F jS' );
+
+			Template_Loader::include_template(
+				'date-group',
+				array(
+					'date_obj'             => $date_obj,
+					'day_of_week'          => $day_of_week,
+					'formatted_date_label' => $formatted_date_label,
+					'events_count'         => count( $events_for_date ),
+				)
+			);
+			?>
+
+			<div class="datamachine-events-wrapper">
+				<?php
+				foreach ( $events_for_date as $event_item ) {
+					$event_post      = $event_item['post'];
+					$event_data      = $event_item['event_data'];
+					$display_context = $event_item['display_context'] ?? array();
+
+					global $post;
+					// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Required for setup_postdata()
+					$post = $event_post;
+					setup_postdata( $post );
+
+					$display_vars = self::build_display_vars( $event_data, $display_context );
+
+					Template_Loader::include_template(
+						'event-item',
+						array(
+							'event_post'   => $event_post,
+							'event_data'   => $event_data,
+							'display_vars' => $display_vars,
+						)
+					);
+				}
+				?>
+			</div><!-- .datamachine-events-wrapper -->
+			<?php
+			echo '</div><!-- .datamachine-date-group -->';
+		}
+
+		return ob_get_clean();
+	}
+
+	/**
 	 * Get unique event dates for pagination calculations
 	 *
 	 * Expands multi-day events to count on each day they span.
