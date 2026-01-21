@@ -41,7 +41,7 @@ class UpdateEventCommand {
 		$fields = $this->extractUpdateFields( $assoc_args );
 
 		if ( empty( $fields ) ) {
-			\WP_CLI::error( 'No fields to update. Provide at least one of: --startDate, --startTime, --endDate, --endTime, --venue, --price, --ticketUrl, --performer, --performerType, --eventStatus, --eventType, --description' );
+			\WP_CLI::error( 'No fields to update. Provide at least one of: --startDate, --startTime, --endDate, --endTime, --occurrenceDates, --venue, --price, --ticketUrl, --performer, --performerType, --eventStatus, --eventType, --description' );
 		}
 
 		$abilities = new EventUpdateAbilities();
@@ -71,6 +71,7 @@ class UpdateEventCommand {
 			'startTime',
 			'endDate',
 			'endTime',
+			'occurrenceDates',
 			'venue',
 			'price',
 			'priceCurrency',
@@ -92,7 +93,17 @@ class UpdateEventCommand {
 
 		foreach ( $allowed_fields as $field ) {
 			if ( isset( $assoc_args[ $field ] ) ) {
-				$fields[ $field ] = $assoc_args[ $field ];
+				$value = $assoc_args[ $field ];
+
+				// Parse JSON for array fields
+				if ( 'occurrenceDates' === $field && is_string( $value ) ) {
+					$decoded = json_decode( $value, true );
+					if ( is_array( $decoded ) ) {
+						$value = $decoded;
+					}
+				}
+
+				$fields[ $field ] = $value;
 			}
 		}
 
