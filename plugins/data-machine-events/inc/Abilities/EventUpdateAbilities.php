@@ -30,6 +30,7 @@ class EventUpdateAbilities {
 		'startTime',
 		'endDate',
 		'endTime',
+		'occurrenceDates',
 		'price',
 		'priceCurrency',
 		'ticketUrl',
@@ -121,10 +122,15 @@ class EventUpdateAbilities {
 									'enum'        => array( 'EventScheduled', 'EventPostponed', 'EventCancelled', 'EventRescheduled' ),
 									'description' => 'Event status',
 								),
-								'eventType'     => array(
+								'eventType'       => array(
 									'type'        => 'string',
 									'enum'        => array( 'Event', 'MusicEvent', 'Festival', 'ComedyEvent', 'DanceEvent', 'TheaterEvent', 'SportsEvent', 'ExhibitionEvent' ),
 									'description' => 'Event type for Schema.org',
+								),
+								'occurrenceDates' => array(
+									'type'        => 'array',
+									'items'       => array( 'type' => 'string' ),
+									'description' => 'Array of specific dates (YYYY-MM-DD) when the event occurs',
 								),
 							),
 						),
@@ -377,6 +383,15 @@ class EventUpdateAbilities {
 			}
 
 			$value = $event_update[ $field ];
+
+			// Handle array fields (like occurrenceDates)
+			if ( 'occurrenceDates' === $field ) {
+				if ( is_array( $value ) ) {
+					$new_attrs[ $field ] = array_values( array_filter( $value, 'is_string' ) );
+					$updated_fields[]    = $field;
+				}
+				continue;
+			}
 
 			if ( in_array( $field, array( 'startDate', 'endDate' ), true ) ) {
 				$parsed = DateTimeParser::parse( $value );

@@ -98,11 +98,16 @@ class UpdateEvent {
 					'description' => 'Event status',
 					'enum'        => array( 'EventScheduled', 'EventPostponed', 'EventCancelled', 'EventRescheduled' ),
 				),
-				'eventType'     => array(
+				'eventType'       => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'Event type for Schema.org',
 					'enum'        => array( 'Event', 'MusicEvent', 'Festival', 'ComedyEvent', 'DanceEvent', 'TheaterEvent', 'SportsEvent', 'ExhibitionEvent' ),
+				),
+				'occurrenceDates' => array(
+					'type'        => 'array',
+					'required'    => false,
+					'description' => 'Array of specific dates (YYYY-MM-DD) when the event occurs. For recurring events within a date range.',
 				),
 			),
 		);

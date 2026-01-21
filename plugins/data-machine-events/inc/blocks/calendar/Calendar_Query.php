@@ -463,9 +463,15 @@ class Calendar_Query {
 			$event_tz     = self::get_event_timezone( $event_data );
 			$is_multi_day = self::is_multi_day_event( $event_data );
 
-			$event_dates = $is_multi_day
-				? self::get_event_date_range( $start_date, $end_date, $event_tz )
-				: array( $start_date );
+			// Use explicit occurrence dates if provided, otherwise expand full range
+			$occurrence_dates = $event_data['occurrenceDates'] ?? array();
+			if ( ! empty( $occurrence_dates ) && is_array( $occurrence_dates ) ) {
+				$event_dates = $occurrence_dates;
+			} elseif ( $is_multi_day ) {
+				$event_dates = self::get_event_date_range( $start_date, $end_date, $event_tz );
+			} else {
+				$event_dates = array( $start_date );
+			}
 
 			foreach ( $event_dates as $index => $date_key ) {
 				$display_datetime_obj = new DateTime( $date_key . ' 00:00:00', $event_tz );
@@ -683,9 +689,18 @@ class Calendar_Query {
 				$start_date = date( 'Y-m-d', strtotime( $start_datetime ) );
 				$end_date   = $end_datetime ? date( 'Y-m-d', strtotime( $end_datetime ) ) : $start_date;
 
-				$event_dates = ( $start_date !== $end_date )
-					? self::get_event_date_range( $start_date, $end_date, wp_timezone() )
-					: array( $start_date );
+				// Check for explicit occurrence dates in block attributes
+				$post             = get_post( $post_id );
+				$event_data       = self::parse_event_data( $post );
+				$occurrence_dates = $event_data['occurrenceDates'] ?? array();
+
+				if ( ! empty( $occurrence_dates ) && is_array( $occurrence_dates ) ) {
+					$event_dates = $occurrence_dates;
+				} elseif ( $start_date !== $end_date ) {
+					$event_dates = self::get_event_date_range( $start_date, $end_date, wp_timezone() );
+				} else {
+					$event_dates = array( $start_date );
+				}
 
 				foreach ( $event_dates as $date ) {
 					if ( isset( $events_per_date[ $date ] ) ) {

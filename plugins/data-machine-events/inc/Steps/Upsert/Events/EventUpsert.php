@@ -848,6 +848,7 @@ class EventUpsert extends UpdateHandler {
 			'startTime'         => $event_data['startTime'] ?? '',
 			'endDate'           => $event_data['endDate'] ?? '',
 			'endTime'           => $event_data['endTime'] ?? '',
+			'occurrenceDates'   => $event_data['occurrenceDates'] ?? array(),
 			'venue'             => $event_data['venue'] ?? $parameters['venue'] ?? '',
 			'address'           => $event_data['venueAddress'] ?? $parameters['venueAddress'] ?? '',
 			'price'             => $event_data['price'] ?? '',

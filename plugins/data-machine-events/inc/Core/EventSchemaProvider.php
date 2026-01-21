@@ -80,13 +80,19 @@ class EventSchemaProvider {
 			'description'     => 'Event start time (HH:MM 24-hour format)',
 			'schema_property' => null,
 		),
-		'endTime'     => array(
+		'endTime'         => array(
 			'type'            => 'string',
 			'required'        => false,
 			'description'     => 'Event end time (HH:MM 24-hour format)',
 			'schema_property' => null,
 		),
-		'description' => array(
+		'occurrenceDates' => array(
+			'type'            => 'array',
+			'required'        => false,
+			'description'     => 'For recurring events: array of specific dates (YYYY-MM-DD) when the event occurs within the start/end range. If provided, event displays only on these dates instead of every day in the range.',
+			'schema_property' => null,
+		),
+		'description'     => array(
 			'type'            => 'string',
 			'required'        => true,
 			'description'     => 'Generate an engaging, informative HTML description. Use <p> tags for paragraphs, <strong> for emphasis. Focus on what makes this event unique and what attendees can expect.',
