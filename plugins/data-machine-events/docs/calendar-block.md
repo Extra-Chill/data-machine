@@ -23,7 +23,7 @@ The Calendar block renders a Carousel List of events with progressive enhancemen
 
 ## JavaScript Modules
 
-- `src/frontend.js` bootstraps each `.datamachine-events-calendar`, wiring the following modules:
+- `inc/Blocks/Calendar/src/frontend.js` bootstraps each `.datamachine-events-calendar`, wiring the following modules:
   - `modules/api-client.js` handles REST requests and swaps fragments.
   - `modules/carousel.js` detects overflow, updates dots, and powers chevrons (with click-and-hold support).
   - `modules/date-picker.js` integrates Flatpickr for date range filters.

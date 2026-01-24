@@ -1,8 +1,10 @@
-# DoStuff Media API Handler
+# DoStuff Media API Handler (Deprecated)
 
-**Handler**: `inc/Steps/EventImport/Handlers/DoStuffMediaApi/DoStuffMediaApi.php` 
-**Settings**: `DoStuffMediaApiSettings` 
-Discovered automatically by `EventImportStep` via `HandlerRegistrationTrait`.
+This handler has been consolidated into the Universal Web Scraper as the `DoStuffExtractor`.
+
+Previously the handler lived at `inc/Steps/EventImport/Handlers/DoStuffMediaApi/DoStuffMediaApi.php`. That standalone handler and its settings were removed; existing flows should migrate to the scraper-based extractor using the WP-CLI migration tooling or by reconfiguring the fetch step to use the `UniversalWebScraper` with the DoStuff extractor.
+
+See `docs/universal-web-scraper-handler.md` for extraction behavior and `inc/Steps/EventImport/Handlers/WebScraper/Extractors/DoStuffExtractor.php` for the implementation.
 
 ## Workflow
 
@@ -11,7 +13,7 @@ Discovered automatically by `EventImportStep` via `HandlerRegistrationTrait`.
 
 ## Configuration
 
-- `feed_url` (required): Public JSON feed URL (e.g., `http://events.waterloorecords.com/events.json`).
+- `feed_url` (required): Public JSON feed URL (e.g., `http://events.waterloorecords.com/events.json`). When migrating to the Universal Web Scraper, supply the same `source_url` / `feed_url` to the scraper settings and enable the DoStuff extractor behavior.
 - `search` / `exclude_keywords`: Comma-separated filters applied before normalization.
 - `date_range` (optional): Limits how far ahead the handler looks for events.
 - No authentication is required since DoStuff publishes public feeds.
