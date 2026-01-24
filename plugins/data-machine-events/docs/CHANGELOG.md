@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## Unreleased
+
+### Added
+- Test coverage for EventIdentifierGenerator with title matching scenarios
+
+### Fixed
+- Duplicate event detection now uses rightmost delimiter for title extraction, fixing false negatives when titles contain multiple delimiters
+
 ## [0.10.1] - 2026-01-21
 
 - Refactor calendar system to Abilities API: consolidate duplicated logic from render.php and REST controller into CalendarAbilities, migrate frontend from AJAX to URL navigation

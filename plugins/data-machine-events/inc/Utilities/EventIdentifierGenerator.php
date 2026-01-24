@@ -105,12 +105,21 @@ class EventIdentifierGenerator {
 			' + ',
 		);
 
+		// Find the rightmost delimiter position to maximize extracted title
+		$best_pos       = -1;
+		$best_delimiter = null;
+
 		foreach ( $delimiters as $delimiter ) {
-			if ( strpos( $text, $delimiter ) !== false ) {
-				$parts = explode( $delimiter, $text, 2 );
-				$text  = $parts[0];
-				break;
+			$pos = strpos( $text, $delimiter );
+			if ( $pos !== false && $pos > $best_pos ) {
+				$best_pos       = $pos;
+				$best_delimiter = $delimiter;
 			}
+		}
+
+		if ( $best_delimiter !== null ) {
+			$parts = explode( $best_delimiter, $text, 2 );
+			$text  = $parts[0];
 		}
 
 		// Remove articles at word boundaries
