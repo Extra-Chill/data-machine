@@ -2,7 +2,7 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
-## Unreleased
+## [0.10.2] - 2026-01-24
 
 ### Added
 - Test coverage for EventIdentifierGenerator with title matching scenarios
