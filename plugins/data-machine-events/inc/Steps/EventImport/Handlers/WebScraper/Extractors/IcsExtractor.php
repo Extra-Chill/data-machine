@@ -135,11 +135,13 @@ class IcsExtractor extends BaseExtractor {
 		if ( ! empty( $ical_event->dtstart ) ) {
 			$start_datetime = $ical_event->dtstart;
 
+			$dtstart_array = $ical_event->dtstart_array ?? array();
+			$is_date_only  = isset( $dtstart_array[0]['VALUE'] ) && 'DATE' === $dtstart_array[0]['VALUE'];
+
 			if ( $start_datetime instanceof \DateTime ) {
 				$tz      = $start_datetime->getTimezone();
 				$tz_name = $tz ? $tz->getName() : '';
 
-				$dtstart_array   = $ical_event->dtstart_array ?? array();
 				$is_explicit_utc = $this->hasUtcMarker( $dtstart_array );
 				$is_floating     = ! $is_explicit_utc && ! $this->hasExplicitTimezone( $dtstart_array );
 
@@ -190,6 +192,11 @@ class IcsExtractor extends BaseExtractor {
 				$event['startTime']     = $parsed['time'];
 				$event['venueTimezone'] = $parsed['timezone'];
 			}
+
+			// For date-only events, leave time empty so agent can parse from title
+			if ( $is_date_only && '00:00' === $event['startTime'] ) {
+				$event['startTime'] = '';
+			}
 		}
 	}
 
@@ -197,11 +204,13 @@ class IcsExtractor extends BaseExtractor {
 		if ( ! empty( $ical_event->dtend ) ) {
 			$end_datetime = $ical_event->dtend;
 
+			$dtend_array = $ical_event->dtend_array ?? array();
+			$is_date_only = isset( $dtend_array[0]['VALUE'] ) && 'DATE' === $dtend_array[0]['VALUE'];
+
 			if ( $end_datetime instanceof \DateTime ) {
 				$tz      = $end_datetime->getTimezone();
 				$tz_name = $tz ? $tz->getName() : '';
 
-				$dtend_array     = $ical_event->dtend_array ?? array();
 				$is_explicit_utc = $this->hasUtcMarker( $dtend_array );
 				$is_floating     = ! $is_explicit_utc && ! $this->hasExplicitTimezone( $dtend_array );
 
@@ -244,6 +253,11 @@ class IcsExtractor extends BaseExtractor {
 				$parsed           = DateTimeParser::parseIcs( $end_datetime, $calendar_timezone );
 				$event['endDate'] = $parsed['date'];
 				$event['endTime'] = $parsed['time'];
+			}
+
+			// For date-only events, leave time empty so agent can parse from title
+			if ( $is_date_only && '00:00' === $event['endTime'] ) {
+				$event['endTime'] = '';
 			}
 		}
 	}

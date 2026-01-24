@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## Unreleased
+
+### Fixed
+- Fix ICS date-only events to leave time fields empty for agent parsing
+
 ## [0.10.2] - 2026-01-24
 
 ### Added
