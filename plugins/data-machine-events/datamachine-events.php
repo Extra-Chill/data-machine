@@ -236,6 +236,53 @@ class DATAMACHINE_Events {
 			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/CalendarAbilities.php';
 			new \DataMachineEvents\Abilities\CalendarAbilities();
 		}
+
+		$this->registerSystemHealthChecks();
+	}
+
+	/**
+	 * Register event extension health checks with the unified system health check.
+	 *
+	 * @since 0.10.10
+	 */
+	private function registerSystemHealthChecks(): void {
+		add_filter(
+			'datamachine_system_health_checks',
+			function ( $checks ) {
+				$checks['events'] = array(
+					'label'    => __( 'Event Health', 'datamachine-events' ),
+					'callback' => function ( $options ) {
+						$abilities = new \DataMachineEvents\Abilities\EventHealthAbilities();
+						return $abilities->executeHealthCheck( $options );
+					},
+					'default'  => true,
+				);
+
+				$checks['venues'] = array(
+					'label'    => __( 'Venue Health', 'datamachine-events' ),
+					'callback' => function ( $options ) {
+						$abilities = new \DataMachineEvents\Abilities\VenueAbilities();
+						return $abilities->executeHealthCheck( $options );
+					},
+					'default'  => true,
+				);
+
+				$checks['handlers'] = array(
+					'label'    => __( 'Handler Test', 'datamachine-events' ),
+					'callback' => function ( $options ) {
+						$url = $options['url'] ?? '';
+						if ( empty( $url ) ) {
+							return array( 'error' => 'URL required for handler testing' );
+						}
+						$abilities = new \DataMachineEvents\Abilities\EventScraperTest();
+						return $abilities->test( $url );
+					},
+					'default'  => false,
+				);
+
+				return $checks;
+			}
+		);
 	}
 
 	private function load_event_import_handlers() {
