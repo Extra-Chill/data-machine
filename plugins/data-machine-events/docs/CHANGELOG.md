@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.10.8] - 2026-01-26
+
+### Fixed
+- Recurring event occurrence filtering now excludes past dates when show_past is false
+
 ## [0.10.7] - 2026-01-25
 
 - Style tweak in event details block frontend CSS
