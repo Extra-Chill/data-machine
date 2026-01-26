@@ -2,7 +2,7 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
-## Unreleased
+## [0.10.7] - 2026-01-25
 
 - Style tweak in event details block frontend CSS
 
