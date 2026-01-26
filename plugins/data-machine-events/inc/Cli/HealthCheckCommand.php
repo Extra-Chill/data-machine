@@ -27,6 +27,7 @@ class HealthCheckCommand {
 		'missing_venue',
 		'missing_description',
 		'broken_timezone',
+		'invalid_encoding',
 	);
 	private const DEFAULT_LIMIT    = 25;
 	private const DEFAULT_DAYS     = 90;
@@ -144,6 +145,7 @@ class HealthCheckCommand {
 			'missing_venue'       => 'Missing Venue',
 			'missing_description' => 'Missing Description',
 			'broken_timezone'     => 'Missing Venue Timezone',
+			'invalid_encoding'    => 'Invalid Unicode Encoding',
 		);
 
 		return $labels[ $category ] ?? $category;

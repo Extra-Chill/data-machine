@@ -91,6 +91,11 @@ if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR
 	\WP_CLI::add_command( 'datamachine-events batch-time-fix', \DataMachineEvents\Cli\BatchTimeFixCommand::class );
 }
 
+if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/EncodingFixCommand.php' ) ) {
+	require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/EncodingFixCommand.php';
+	\WP_CLI::add_command( 'datamachine-events fix-encoding', \DataMachineEvents\Cli\EncodingFixCommand::class );
+}
+
 
 /**
  * Main Data Machine Events plugin class
@@ -215,6 +220,11 @@ class DATAMACHINE_Events {
 		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/BatchTimeFixAbilities.php' ) ) {
 			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/BatchTimeFixAbilities.php';
 			new \DataMachineEvents\Abilities\BatchTimeFixAbilities();
+		}
+
+		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EncodingFixAbilities.php' ) ) {
+			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EncodingFixAbilities.php';
+			new \DataMachineEvents\Abilities\EncodingFixAbilities();
 		}
 
 		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/VenueAbilities.php' ) ) {

@@ -114,6 +114,13 @@ class EventHealthAbilities {
 									'events' => array( 'type' => 'array' ),
 								),
 							),
+							'invalid_encoding'    => array(
+								'type'       => 'object',
+								'properties' => array(
+									'count'  => array( 'type' => 'integer' ),
+									'events' => array( 'type' => 'array' ),
+								),
+							),
 							'message'             => array( 'type' => 'string' ),
 						),
 					),
@@ -174,6 +181,7 @@ class EventHealthAbilities {
 		$missing_venue       = array();
 		$missing_description = array();
 		$broken_timezone     = array();
+		$invalid_encoding    = array();
 		$no_venue_count      = 0;
 
 		foreach ( $events as $event ) {
@@ -211,6 +219,12 @@ class EventHealthAbilities {
 			if ( empty( trim( $description ) ) ) {
 				$missing_description[] = $event_info;
 			}
+
+			$encoding_fields = $this->checkEncodingIssues( $block_attrs );
+			if ( ! empty( $encoding_fields ) ) {
+				$event_info['affected_fields'] = $encoding_fields;
+				$invalid_encoding[]            = $event_info;
+			}
 		}
 
 		$ability = wp_get_ability( 'datamachine-events/find-broken-timezone-events' );
@@ -241,6 +255,7 @@ class EventHealthAbilities {
 		usort( $suspicious_end_time, $sort_by_date );
 		usort( $missing_venue, $sort_by_date );
 		usort( $missing_description, $sort_by_date );
+		usort( $invalid_encoding, $sort_by_date );
 
 		$message_parts = array();
 		if ( ! empty( $missing_time ) ) {
@@ -263,6 +278,9 @@ class EventHealthAbilities {
 		}
 		if ( count( $broken_timezone ) > 0 ) {
 			$message_parts[] = count( $broken_timezone ) . ' missing timezone';
+		}
+		if ( ! empty( $invalid_encoding ) ) {
+			$message_parts[] = count( $invalid_encoding ) . ' invalid encoding';
 		}
 		if ( $no_venue_count > 0 ) {
 			$message_parts[] = $no_venue_count . ' no venue';
@@ -304,6 +322,10 @@ class EventHealthAbilities {
 			'broken_timezone'     => array(
 				'count'  => count( $broken_timezone ),
 				'events' => array_slice( $broken_timezone, 0, $limit ),
+			),
+			'invalid_encoding'    => array(
+				'count'  => count( $invalid_encoding ),
+				'events' => array_slice( $invalid_encoding, 0, $limit ),
 			),
 			'message'             => $message,
 		);
@@ -450,5 +472,30 @@ class EventHealthAbilities {
 		}
 
 		return '23:59' === $time || '23:59:00' === $time;
+	}
+
+	/**
+	 * Check for Unicode encoding issues in block attributes.
+	 *
+	 * Detects escaped unicode sequences like \u00a3 that should be
+	 * rendered as actual characters (£).
+	 *
+	 * @param array $attrs Block attributes to check
+	 * @return array List of affected field names, empty if none
+	 */
+	private function checkEncodingIssues( array $attrs ): array {
+		$fields_to_check = array( 'price', 'venue', 'address' );
+		$affected_fields = array();
+
+		foreach ( $fields_to_check as $field ) {
+			if ( empty( $attrs[ $field ] ) ) {
+				continue;
+			}
+			if ( preg_match( '/\\\\u[0-9a-fA-F]{4}/', $attrs[ $field ] ) ) {
+				$affected_fields[] = $field;
+			}
+		}
+
+		return $affected_fields;
 	}
 }

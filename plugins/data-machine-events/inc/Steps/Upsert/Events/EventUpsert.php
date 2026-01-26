@@ -880,7 +880,7 @@ class EventUpsert extends UpdateHandler {
 		$block_attributes['showPrice']      = true;
 		$block_attributes['showTicketLink'] = true;
 
-		$block_json  = wp_json_encode( $block_attributes );
+		$block_json  = wp_json_encode( $block_attributes, JSON_UNESCAPED_UNICODE );
 		$description = ! empty( $event_data['description'] ) ? wp_kses_post( $event_data['description'] ) : '';
 
 		$inner_blocks = $this->generate_description_blocks( $description );
