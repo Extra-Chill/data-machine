@@ -477,6 +477,17 @@ class Calendar_Query {
 				$event_dates = array( $start_date );
 			}
 
+			// Filter out past occurrence dates when show_past is false.
+			if ( ! $show_past && $has_occurrence_dates ) {
+				$current_date = current_time( 'Y-m-d' );
+				$event_dates  = array_filter(
+					$event_dates,
+					function ( $date ) use ( $current_date ) {
+						return $date >= $current_date;
+					}
+				);
+			}
+
 			// Filter to page date boundaries if provided
 			if ( $date_start || $date_end ) {
 				$event_dates = array_filter(
@@ -806,6 +817,18 @@ class Calendar_Query {
 					$event_dates = self::get_event_date_range( $start_date, $end_date, wp_timezone() );
 				} else {
 					$event_dates = array( $start_date );
+				}
+
+				// Filter out past occurrence dates when show_past is false.
+				$show_past_param = $params['show_past'] ?? false;
+				if ( ! $show_past_param && ! empty( $occurrence_dates ) && is_array( $occurrence_dates ) ) {
+					$current_date = current_time( 'Y-m-d' );
+					$event_dates  = array_filter(
+						$event_dates,
+						function ( $date ) use ( $current_date ) {
+							return $date >= $current_date;
+						}
+					);
 				}
 
 				foreach ( $event_dates as $date ) {
