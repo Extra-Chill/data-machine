@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.10.11] - 2026-01-26
+
+### Fixed
+- Fix ticket URL normalization to preserve affiliate identity params
+
 ## [0.10.10] - 2026-01-26
 
 ### Changed
