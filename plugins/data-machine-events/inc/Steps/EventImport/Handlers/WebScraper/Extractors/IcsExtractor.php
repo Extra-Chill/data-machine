@@ -204,7 +204,7 @@ class IcsExtractor extends BaseExtractor {
 		if ( ! empty( $ical_event->dtend ) ) {
 			$end_datetime = $ical_event->dtend;
 
-			$dtend_array = $ical_event->dtend_array ?? array();
+			$dtend_array  = $ical_event->dtend_array ?? array();
 			$is_date_only = isset( $dtend_array[0]['VALUE'] ) && 'DATE' === $dtend_array[0]['VALUE'];
 
 			if ( $end_datetime instanceof \DateTime ) {

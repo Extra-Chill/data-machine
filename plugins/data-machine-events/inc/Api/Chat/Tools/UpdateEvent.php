@@ -31,68 +31,68 @@ class UpdateEvent {
 			'method'      => 'handle_tool_call',
 			'description' => 'Update event details. Accepts a single event or batch of events. Only post IDs are accepted for event identification. Venue must be an existing venue term ID.',
 			'parameters'  => array(
-				'event'         => array(
+				'event'           => array(
 					'type'        => 'integer',
 					'required'    => false,
 					'description' => 'Single event post ID to update',
 				),
-				'events'        => array(
+				'events'          => array(
 					'type'        => 'array',
 					'required'    => false,
 					'description' => 'Array of event updates. Each item must have "event" (post ID) plus fields to update.',
 				),
-				'startDate'     => array(
+				'startDate'       => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'Start date (any parseable format, normalized to YYYY-MM-DD)',
 				),
-				'startTime'     => array(
+				'startTime'       => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'Start time (any parseable format like "8pm", "20:00", normalized to HH:MM)',
 				),
-				'endDate'       => array(
+				'endDate'         => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'End date (any parseable format, normalized to YYYY-MM-DD)',
 				),
-				'endTime'       => array(
+				'endTime'         => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'End time (any parseable format, normalized to HH:MM)',
 				),
-				'venue'         => array(
+				'venue'           => array(
 					'type'        => 'integer',
 					'required'    => false,
 					'description' => 'Existing venue term ID to assign',
 				),
-				'description'   => array(
+				'description'     => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'Event description (HTML allowed)',
 				),
-				'price'         => array(
+				'price'           => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'Ticket price (e.g., "$25" or "$20 adv / $25 door")',
 				),
-				'ticketUrl'     => array(
+				'ticketUrl'       => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'URL to purchase tickets',
 				),
-				'performer'     => array(
+				'performer'       => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'Performer name',
 				),
-				'performerType' => array(
+				'performerType'   => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'Performer type: Person, PerformingGroup, or MusicGroup',
 					'enum'        => array( 'Person', 'PerformingGroup', 'MusicGroup' ),
 				),
-				'eventStatus'   => array(
+				'eventStatus'     => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'Event status',

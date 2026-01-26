@@ -67,15 +67,15 @@ class TimezoneAbilities {
 								'items' => array(
 									'type'       => 'object',
 									'properties' => array(
-										'id'        => array( 'type' => 'integer' ),
-										'title'     => array( 'type' => 'string' ),
-										'startDate' => array( 'type' => 'string' ),
-										'startTime' => array( 'type' => 'string' ),
-										'venue'     => array( 'type' => 'string' ),
-										'venue_id'  => array( 'type' => 'integer' ),
+										'id'             => array( 'type' => 'integer' ),
+										'title'          => array( 'type' => 'string' ),
+										'startDate'      => array( 'type' => 'string' ),
+										'startTime'      => array( 'type' => 'string' ),
+										'venue'          => array( 'type' => 'string' ),
+										'venue_id'       => array( 'type' => 'integer' ),
 										'venue_timezone' => array( 'type' => 'string' ),
 										'venue_coordinates' => array( 'type' => 'string' ),
-										'reason'    => array(
+										'reason'         => array(
 											'type' => 'string',
 											'enum' => array( 'no_timezone', 'no_coordinates' ),
 										),
@@ -149,18 +149,18 @@ class TimezoneAbilities {
 								'items' => array(
 									'type'       => 'object',
 									'properties' => array(
-										'event'    => array( 'type' => 'integer' ),
-										'title'    => array( 'type' => 'string' ),
-										'status'   => array(
+										'event'           => array( 'type' => 'integer' ),
+										'title'           => array( 'type' => 'string' ),
+										'status'          => array(
 											'type' => 'string',
 											'enum' => array( 'updated', 'no_change', 'failed' ),
 										),
-										'timezone' => array( 'type' => 'string' ),
+										'timezone'        => array( 'type' => 'string' ),
 										'timezone_source' => array(
 											'type' => 'string',
 											'enum' => array( 'provided', 'auto_derived', 'geocoded' ),
 										),
-										'error'    => array( 'type' => 'string' ),
+										'error'           => array( 'type' => 'string' ),
 									),
 								),
 							),

@@ -66,56 +66,56 @@ class EventUpdateAbilities {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'event'         => array(
+							'event'           => array(
 								'type'        => 'integer',
 								'description' => 'Single event post ID to update',
 							),
-							'events'        => array(
+							'events'          => array(
 								'type'        => 'array',
 								'description' => 'Array of event updates. Each item must have "event" (post ID) plus fields to update.',
 							),
-							'startDate'     => array(
+							'startDate'       => array(
 								'type'        => 'string',
 								'description' => 'Start date (any parseable format, normalized to YYYY-MM-DD)',
 							),
-							'startTime'     => array(
+							'startTime'       => array(
 								'type'        => 'string',
 								'description' => 'Start time (any parseable format like "8pm", "20:00", normalized to HH:MM)',
 							),
-							'endDate'       => array(
+							'endDate'         => array(
 								'type'        => 'string',
 								'description' => 'End date (any parseable format, normalized to YYYY-MM-DD)',
 							),
-							'endTime'       => array(
+							'endTime'         => array(
 								'type'        => 'string',
 								'description' => 'End time (any parseable format, normalized to HH:MM)',
 							),
-							'venue'         => array(
+							'venue'           => array(
 								'type'        => 'integer',
 								'description' => 'Existing venue term ID to assign',
 							),
-							'description'   => array(
+							'description'     => array(
 								'type'        => 'string',
 								'description' => 'Event description (HTML allowed)',
 							),
-							'price'         => array(
+							'price'           => array(
 								'type'        => 'string',
 								'description' => 'Ticket price (e.g., "$25" or "$20 adv / $25 door")',
 							),
-							'ticketUrl'     => array(
+							'ticketUrl'       => array(
 								'type'        => 'string',
 								'description' => 'URL to purchase tickets',
 							),
-							'performer'     => array(
+							'performer'       => array(
 								'type'        => 'string',
 								'description' => 'Performer name',
 							),
-							'performerType' => array(
+							'performerType'   => array(
 								'type'        => 'string',
 								'enum'        => array( 'Person', 'PerformingGroup', 'MusicGroup' ),
 								'description' => 'Performer type: Person, PerformingGroup, or MusicGroup',
 							),
-							'eventStatus'   => array(
+							'eventStatus'     => array(
 								'type'        => 'string',
 								'enum'        => array( 'EventScheduled', 'EventPostponed', 'EventCancelled', 'EventRescheduled' ),
 								'description' => 'Event status',
@@ -140,12 +140,12 @@ class EventUpdateAbilities {
 								'items' => array(
 									'type'       => 'object',
 									'properties' => array(
-										'post_id'  => array( 'type' => 'integer' ),
-										'title'    => array( 'type' => 'string' ),
-										'status'   => array( 'type' => 'string' ),
+										'post_id'        => array( 'type' => 'integer' ),
+										'title'          => array( 'type' => 'string' ),
+										'status'         => array( 'type' => 'string' ),
 										'updated_fields' => array( 'type' => 'array' ),
-										'warnings' => array( 'type' => 'array' ),
-										'error'    => array( 'type' => 'string' ),
+										'warnings'       => array( 'type' => 'array' ),
+										'error'          => array( 'type' => 'string' ),
 									),
 								),
 							),

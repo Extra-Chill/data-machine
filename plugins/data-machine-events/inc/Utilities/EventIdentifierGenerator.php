@@ -111,13 +111,13 @@ class EventIdentifierGenerator {
 
 		foreach ( $delimiters as $delimiter ) {
 			$pos = strpos( $text, $delimiter );
-			if ( $pos !== false && $pos > $best_pos ) {
+			if ( false !== $pos && $pos > $best_pos ) {
 				$best_pos       = $pos;
 				$best_delimiter = $delimiter;
 			}
 		}
 
-		if ( $best_delimiter !== null ) {
+		if ( null !== $best_delimiter ) {
 			$parts = explode( $best_delimiter, $text, 2 );
 			$text  = $parts[0];
 		}
