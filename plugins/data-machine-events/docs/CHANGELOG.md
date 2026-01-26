@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## Unreleased
+
+### Added
+- Action hook after price display for extensibility (datamachine_events_after_price_display)
+
 ## [0.10.3] - 2026-01-24
 
 ### Fixed
