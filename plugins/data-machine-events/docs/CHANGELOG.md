@@ -2,6 +2,10 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## Unreleased
+
+- Fixed hook placement for datamachine_events_after_price_display to render inside .event-price div
+
 ## [0.10.5] - 2026-01-25
 
 ### Changed

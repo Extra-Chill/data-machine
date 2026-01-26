@@ -138,21 +138,20 @@ $event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_
 			<div class="event-price">
 				<span class="icon">💰</span>
 				<span class="text"><?php echo esc_html( $price ); ?></span>
+				<?php
+				/**
+				 * Action hook for content below the price text.
+				 *
+				 * Renders inside .event-price div, below the price text.
+				 * Use for promotional content like membership discounts.
+				 *
+				 * @param int    $post_id Current event post ID
+				 * @param string $price   Event price string
+				 */
+				do_action( 'datamachine_events_after_price_display', $post_id, $price );
+				?>
 			</div>
 		<?php endif; ?>
-
-		<?php
-		/**
-		 * Action hook for custom content near the price display.
-		 *
-		 * Allows plugins and themes to add promotional content, membership ads,
-		 * or other custom elements adjacent to the event price.
-		 *
-		 * @param int    $post_id Current event post ID
-		 * @param string $price   Event price string (may be empty)
-		 */
-		do_action( 'datamachine_events_after_price_display', $post_id, $price );
-		?>
 	</div>
 
 	<div class="event-action-buttons">
