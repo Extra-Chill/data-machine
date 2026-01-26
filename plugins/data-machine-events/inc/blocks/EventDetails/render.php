@@ -32,6 +32,7 @@ $ticket_url       = $attributes['ticketUrl'] ?? '';
 $show_venue       = $attributes['showVenue'] ?? true;
 $show_price       = $attributes['showPrice'] ?? true;
 $show_ticket_link = $attributes['showTicketLink'] ?? true;
+$occurrence_dates = $attributes['occurrenceDates'] ?? array();
 
 $post_id = get_the_ID();
 
@@ -60,6 +61,26 @@ if ( $start_date ) {
 if ( $end_date ) {
 	$end_datetime = $end_time ? $end_date . ' ' . $end_time : $end_date;
 }
+
+// Filter and limit occurrence dates for display.
+$upcoming_occurrences = array();
+if ( ! empty( $occurrence_dates ) && is_array( $occurrence_dates ) ) {
+	$current_date = current_time( 'Y-m-d' );
+	$max_display  = apply_filters( 'datamachine_events_max_occurrence_display', 5 );
+
+	// Filter to future dates only and limit count.
+	$upcoming_occurrences = array_slice(
+		array_filter(
+			$occurrence_dates,
+			function ( $date ) use ( $current_date ) {
+				return $date >= $current_date;
+			}
+		),
+		0,
+		$max_display
+	);
+}
+$has_more_occurrences = count( $occurrence_dates ) > count( $upcoming_occurrences );
 
 $block_classes = array( 'datamachine-event-details' );
 if ( ! empty( $attributes['align'] ) ) {
@@ -113,6 +134,19 @@ $event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_
 						<br><small><?php echo esc_html( date_i18n( get_option( 'time_format' ), strtotime( $start_datetime ) ) ); ?></small>
 					<?php endif; ?>
 				</span>
+				<?php if ( ! empty( $upcoming_occurrences ) ) : ?>
+					<div class="occurrence-dates">
+						<small><?php esc_html_e( 'Also showing:', 'datamachine-events' ); ?></small>
+						<ul>
+							<?php foreach ( $upcoming_occurrences as $occ_date ) : ?>
+								<li><?php echo esc_html( date_i18n( get_option( 'date_format' ), strtotime( $occ_date ) ) ); ?></li>
+							<?php endforeach; ?>
+						</ul>
+						<?php if ( $has_more_occurrences ) : ?>
+							<small class="more-dates"><?php esc_html_e( '+ more dates', 'datamachine-events' ); ?></small>
+						<?php endif; ?>
+					</div>
+				<?php endif; ?>
 			</div>
 		<?php endif; ?>
 
