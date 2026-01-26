@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.10.9] - 2026-01-26
+
+### Changed
+- Add centralized PriceFormatter utility and improve AI price guidance
+- Display occurrence dates in Event Details block
+
+### Fixed
+- Fix lint alignment and Yoda conditions
+
 ## [0.10.8] - 2026-01-26
 
 ### Fixed
