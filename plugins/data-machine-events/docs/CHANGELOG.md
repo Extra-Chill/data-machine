@@ -2,7 +2,7 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
-## Unreleased
+## [0.10.5] - 2026-01-25
 
 ### Changed
 - Add defensive registration pattern to all Abilities for late-loading compatibility
