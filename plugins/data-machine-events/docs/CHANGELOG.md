@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.10.10] - 2026-01-26
+
+### Changed
+- Integrate with unified system health check ability
+- Add UTF-8 encoding fix and health check detection
+- Update required WordPress version to 6.9 for Abilities API support
+
 ## [0.10.9] - 2026-01-26
 
 ### Changed
