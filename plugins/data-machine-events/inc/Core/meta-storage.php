@@ -17,11 +17,18 @@ const EVENT_TICKET_URL_META_KEY   = '_datamachine_ticket_url';
 /**
  * Normalize ticket URL for consistent duplicate detection
  *
- * Strips query parameters (UTM tracking, etc.) and trailing slashes
- * to ensure the same ticket page matches regardless of tracking params.
+ * Strips tracking query parameters (UTM, etc.) while preserving identity
+ * parameters that contain unique ticket identifiers (affiliate redirect URLs).
+ *
+ * Identity parameters preserved:
+ * - 'u' = redirect URL (Ticketmaster affiliate via evyy.net)
+ * - 'e' = event ID (DoStuff, some redirect services)
+ *
+ * @since 0.8.39 Original implementation (stripped all query params - bug)
+ * @since 0.10.11 Fixed to preserve identity parameters for affiliate URLs
  *
  * @param string $url Raw ticket URL
- * @return string Normalized URL (scheme + host + path only)
+ * @return string Normalized URL (scheme + host + path + identity params)
  */
 function datamachine_normalize_ticket_url( string $url ): string {
 	if ( empty( $url ) ) {
@@ -35,8 +42,29 @@ function datamachine_normalize_ticket_url( string $url ): string {
 
 	$scheme     = $parsed['scheme'] ?? 'https';
 	$normalized = $scheme . '://' . $parsed['host'];
+
 	if ( ! empty( $parsed['path'] ) ) {
 		$normalized .= $parsed['path'];
+	}
+
+	// Preserve identity parameters for affiliate/redirect URLs
+	// These contain the actual unique ticket identifier
+	if ( ! empty( $parsed['query'] ) ) {
+		parse_str( $parsed['query'], $query_params );
+		$identity_params = array();
+
+		// 'u' = redirect URL (Ticketmaster affiliate, evyy.net)
+		if ( ! empty( $query_params['u'] ) ) {
+			$identity_params['u'] = $query_params['u'];
+		}
+		// 'e' = event ID (DoStuff, some redirect services)
+		if ( ! empty( $query_params['e'] ) ) {
+			$identity_params['e'] = $query_params['e'];
+		}
+
+		if ( ! empty( $identity_params ) ) {
+			$normalized .= '?' . http_build_query( $identity_params );
+		}
 	}
 
 	return rtrim( $normalized, '/' );
