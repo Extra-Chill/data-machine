@@ -33,88 +33,91 @@ class EventQueryAbilities {
 	}
 
 	private function registerAbility(): void {
-		add_action(
-			'wp_abilities_api_init',
-			function () {
-				wp_register_ability(
-					'datamachine-events/get-venue-events',
-					array(
-						'label'               => __( 'Get Venue Events', 'datamachine-events' ),
-						'description'         => __( 'Query events for a specific venue', 'datamachine-events' ),
-						'category'            => 'datamachine',
-						'input_schema'        => array(
-							'type'       => 'object',
-							'required'   => array( 'venue' ),
-							'properties' => array(
-								'venue'               => array(
-									'type'        => 'string',
-									'description' => 'Venue identifier (term ID, name, or slug)',
-								),
-								'limit'               => array(
-									'type'        => 'integer',
-									'description' => 'Maximum events to return (default: 25, max: 100)',
-								),
-								'status'              => array(
-									'type'        => 'string',
-									'enum'        => array( 'any', 'publish', 'future', 'draft', 'pending', 'private' ),
-									'description' => 'Post status filter (default: any)',
-								),
-								'published_before'    => array(
-									'type'        => 'string',
-									'description' => 'Only return events published before this date (YYYY-MM-DD format)',
-								),
-								'published_after'     => array(
-									'type'        => 'string',
-									'description' => 'Only return events published after this date (YYYY-MM-DD format)',
-								),
-								'include_description' => array(
-									'type'        => 'boolean',
-									'description' => 'Include full description text in output (default: false)',
-								),
+		$register_callback = function () {
+			wp_register_ability(
+				'datamachine-events/get-venue-events',
+				array(
+					'label'               => __( 'Get Venue Events', 'datamachine-events' ),
+					'description'         => __( 'Query events for a specific venue', 'datamachine-events' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'venue' ),
+						'properties' => array(
+							'venue'               => array(
+								'type'        => 'string',
+								'description' => 'Venue identifier (term ID, name, or slug)',
+							),
+							'limit'               => array(
+								'type'        => 'integer',
+								'description' => 'Maximum events to return (default: 25, max: 100)',
+							),
+							'status'              => array(
+								'type'        => 'string',
+								'enum'        => array( 'any', 'publish', 'future', 'draft', 'pending', 'private' ),
+								'description' => 'Post status filter (default: any)',
+							),
+							'published_before'    => array(
+								'type'        => 'string',
+								'description' => 'Only return events published before this date (YYYY-MM-DD format)',
+							),
+							'published_after'     => array(
+								'type'        => 'string',
+								'description' => 'Only return events published after this date (YYYY-MM-DD format)',
+							),
+							'include_description' => array(
+								'type'        => 'boolean',
+								'description' => 'Include full description text in output (default: false)',
 							),
 						),
-						'output_schema'       => array(
-							'type'       => 'object',
-							'properties' => array(
-								'venue'          => array(
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'venue'          => array(
+								'type'       => 'object',
+								'properties' => array(
+									'term_id'      => array( 'type' => 'integer' ),
+									'name'         => array( 'type' => 'string' ),
+									'slug'         => array( 'type' => 'string' ),
+									'total_events' => array( 'type' => 'integer' ),
+									'venue_data'   => array( 'type' => 'object' ),
+								),
+							),
+							'events'         => array(
+								'type'  => 'array',
+								'items' => array(
 									'type'       => 'object',
 									'properties' => array(
-										'term_id'      => array( 'type' => 'integer' ),
-										'name'         => array( 'type' => 'string' ),
-										'slug'         => array( 'type' => 'string' ),
-										'total_events' => array( 'type' => 'integer' ),
-										'venue_data'   => array( 'type' => 'object' ),
+										'post_id'     => array( 'type' => 'integer' ),
+										'title'       => array( 'type' => 'string' ),
+										'status'      => array( 'type' => 'string' ),
+										'published'   => array( 'type' => 'string' ),
+										'start_date'  => array( 'type' => 'string' ),
+										'end_date'    => array( 'type' => 'string' ),
+										'permalink'   => array( 'type' => 'string' ),
+										'description' => array( 'type' => 'string' ),
 									),
 								),
-								'events'         => array(
-									'type'  => 'array',
-									'items' => array(
-										'type'       => 'object',
-										'properties' => array(
-											'post_id'     => array( 'type' => 'integer' ),
-											'title'       => array( 'type' => 'string' ),
-											'status'      => array( 'type' => 'string' ),
-											'published'   => array( 'type' => 'string' ),
-											'start_date'  => array( 'type' => 'string' ),
-											'end_date'    => array( 'type' => 'string' ),
-											'permalink'   => array( 'type' => 'string' ),
-											'description' => array( 'type' => 'string' ),
-										),
-									),
-								),
-								'returned_count' => array( 'type' => 'integer' ),
-								'message'        => array( 'type' => 'string' ),
 							),
+							'returned_count' => array( 'type' => 'integer' ),
+							'message'        => array( 'type' => 'string' ),
 						),
-						'execute_callback'    => array( $this, 'executeGetVenueEvents' ),
-						'permission_callback' => function () {
-							return current_user_can( 'manage_options' );
-						},
-						'meta'                => array( 'show_in_rest' => true ),
-					)
-				);
-			}
-		);
+					),
+					'execute_callback'    => array( $this, 'executeGetVenueEvents' ),
+					'permission_callback' => function () {
+						return current_user_can( 'manage_options' );
+					},
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+		};
+
+		if ( did_action( 'wp_abilities_api_init' ) ) {
+			$register_callback();
+		} else {
+			add_action( 'wp_abilities_api_init', $register_callback );
+		}
 	}
 
 	public function executeGetVenueEvents( array $input ): array {

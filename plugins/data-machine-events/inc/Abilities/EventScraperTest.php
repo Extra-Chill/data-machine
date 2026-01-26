@@ -22,51 +22,55 @@ class EventScraperTest {
 
 	public function __construct() {
 		if ( ! self::$registered ) {
-			add_action(
-				'wp_abilities_api_init',
-				function () {
-					wp_register_ability(
-						'datamachine/test-event-scraper',
-						array(
-							'label'               => __( 'Test Event Scraper', 'datamachine-events' ),
-							'description'         => __( 'Test universal web scraper compatibility with a target URL', 'datamachine-events' ),
-							'category'            => 'datamachine',
-							'input_schema'        => array(
-								'type'       => 'object',
-								'required'   => array( 'target_url' ),
-								'properties' => array(
-									'target_url' => array(
-										'type'        => 'string',
-										'format'      => 'uri',
-										'description' => 'Target URL to test scraper against',
-									),
+			$register_callback = function () {
+				wp_register_ability(
+					'datamachine/test-event-scraper',
+					array(
+						'label'               => __( 'Test Event Scraper', 'datamachine-events' ),
+						'description'         => __( 'Test universal web scraper compatibility with a target URL', 'datamachine-events' ),
+						'category'            => 'datamachine',
+						'input_schema'        => array(
+							'type'       => 'object',
+							'required'   => array( 'target_url' ),
+							'properties' => array(
+								'target_url' => array(
+									'type'        => 'string',
+									'format'      => 'uri',
+									'description' => 'Target URL to test scraper against',
 								),
 							),
-							'output_schema'       => array(
-								'type'       => 'object',
-								'properties' => array(
-									'success'         => array( 'type' => 'boolean' ),
-									'status'          => array(
-										'type' => 'string',
-										'enum' => array( 'ok', 'warning', 'error' ),
-									),
-									'target_url'      => array( 'type' => 'string' ),
-									'event_data'      => array( 'type' => 'object' ),
-									'extraction_info' => array( 'type' => 'object' ),
-									'coverage_issues' => array( 'type' => 'object' ),
-									'warnings'        => array( 'type' => 'array' ),
-									'logs'            => array( 'type' => 'array' ),
+						),
+						'output_schema'       => array(
+							'type'       => 'object',
+							'properties' => array(
+								'success'         => array( 'type' => 'boolean' ),
+								'status'          => array(
+									'type' => 'string',
+									'enum' => array( 'ok', 'warning', 'error' ),
 								),
+								'target_url'      => array( 'type' => 'string' ),
+								'event_data'      => array( 'type' => 'object' ),
+								'extraction_info' => array( 'type' => 'object' ),
+								'coverage_issues' => array( 'type' => 'object' ),
+								'warnings'        => array( 'type' => 'array' ),
+								'logs'            => array( 'type' => 'array' ),
 							),
-							'execute_callback'    => array( $this, 'executeAbility' ),
-							'permission_callback' => function () {
-								return current_user_can( 'manage_options' );
-							},
-							'meta'                => array( 'show_in_rest' => true ),
-						)
-					);
-				}
-			);
+						),
+						'execute_callback'    => array( $this, 'executeAbility' ),
+						'permission_callback' => function () {
+							return current_user_can( 'manage_options' );
+						},
+						'meta'                => array( 'show_in_rest' => true ),
+					)
+				);
+			};
+
+			if ( did_action( 'wp_abilities_api_init' ) ) {
+				$register_callback();
+			} else {
+				add_action( 'wp_abilities_api_init', $register_callback );
+			}
+
 			self::$registered = true;
 		}
 	}

@@ -31,107 +31,110 @@ class CalendarAbilities {
 	}
 
 	private function registerAbility(): void {
-		add_action(
-			'wp_abilities_api_init',
-			function () {
-				wp_register_ability(
-					'datamachine-events/get-calendar-page',
-					array(
-						'label'               => __( 'Get Calendar Page', 'datamachine-events' ),
-						'description'         => __( 'Query paginated calendar events with optional filtering and HTML rendering', 'datamachine-events' ),
-						'category'            => 'datamachine',
-						'input_schema'        => array(
-							'type'       => 'object',
-							'properties' => array(
-								'paged'            => array(
-									'type'        => 'integer',
-									'description' => 'Page number (default: 1)',
+		$register_callback = function () {
+			wp_register_ability(
+				'datamachine-events/get-calendar-page',
+				array(
+					'label'               => __( 'Get Calendar Page', 'datamachine-events' ),
+					'description'         => __( 'Query paginated calendar events with optional filtering and HTML rendering', 'datamachine-events' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'paged'            => array(
+								'type'        => 'integer',
+								'description' => 'Page number (default: 1)',
+							),
+							'past'             => array(
+								'type'        => 'boolean',
+								'description' => 'Show past events (default: false)',
+							),
+							'event_search'     => array(
+								'type'        => 'string',
+								'description' => 'Search query string',
+							),
+							'date_start'       => array(
+								'type'        => 'string',
+								'description' => 'Start date filter (Y-m-d format)',
+							),
+							'date_end'         => array(
+								'type'        => 'string',
+								'description' => 'End date filter (Y-m-d format)',
+							),
+							'tax_filter'       => array(
+								'type'        => 'object',
+								'description' => 'Taxonomy filters [taxonomy => [term_ids]]',
+							),
+							'archive_taxonomy' => array(
+								'type'        => 'string',
+								'description' => 'Archive constraint taxonomy slug',
+							),
+							'archive_term_id'  => array(
+								'type'        => 'integer',
+								'description' => 'Archive constraint term ID',
+							),
+							'include_html'     => array(
+								'type'        => 'boolean',
+								'description' => 'Return rendered HTML (default: true)',
+							),
+							'include_gaps'     => array(
+								'type'        => 'boolean',
+								'description' => 'Include time-gap separators (default: true)',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'paged_date_groups' => array(
+								'type'        => 'array',
+								'description' => 'Date-grouped event data',
+							),
+							'gaps_detected'     => array(
+								'type'        => 'object',
+								'description' => 'Time gaps between dates [date_key => gap_days]',
+							),
+							'current_page'      => array( 'type' => 'integer' ),
+							'max_pages'         => array( 'type' => 'integer' ),
+							'total_event_count' => array( 'type' => 'integer' ),
+							'event_count'       => array( 'type' => 'integer' ),
+							'date_boundaries'   => array(
+								'type'       => 'object',
+								'properties' => array(
+									'start_date' => array( 'type' => 'string' ),
+									'end_date'   => array( 'type' => 'string' ),
 								),
-								'past'             => array(
-									'type'        => 'boolean',
-									'description' => 'Show past events (default: false)',
+							),
+							'event_counts'      => array(
+								'type'       => 'object',
+								'properties' => array(
+									'past'   => array( 'type' => 'integer' ),
+									'future' => array( 'type' => 'integer' ),
 								),
-								'event_search'     => array(
-									'type'        => 'string',
-									'description' => 'Search query string',
-								),
-								'date_start'       => array(
-									'type'        => 'string',
-									'description' => 'Start date filter (Y-m-d format)',
-								),
-								'date_end'         => array(
-									'type'        => 'string',
-									'description' => 'End date filter (Y-m-d format)',
-								),
-								'tax_filter'       => array(
-									'type'        => 'object',
-									'description' => 'Taxonomy filters [taxonomy => [term_ids]]',
-								),
-								'archive_taxonomy' => array(
-									'type'        => 'string',
-									'description' => 'Archive constraint taxonomy slug',
-								),
-								'archive_term_id'  => array(
-									'type'        => 'integer',
-									'description' => 'Archive constraint term ID',
-								),
-								'include_html'     => array(
-									'type'        => 'boolean',
-									'description' => 'Return rendered HTML (default: true)',
-								),
-								'include_gaps'     => array(
-									'type'        => 'boolean',
-									'description' => 'Include time-gap separators (default: true)',
+							),
+							'html'              => array(
+								'type'       => 'object',
+								'properties' => array(
+									'events'     => array( 'type' => 'string' ),
+									'pagination' => array( 'type' => 'string' ),
+									'counter'    => array( 'type' => 'string' ),
+									'navigation' => array( 'type' => 'string' ),
 								),
 							),
 						),
-						'output_schema'       => array(
-							'type'       => 'object',
-							'properties' => array(
-								'paged_date_groups' => array(
-									'type'        => 'array',
-									'description' => 'Date-grouped event data',
-								),
-								'gaps_detected'     => array(
-									'type'        => 'object',
-									'description' => 'Time gaps between dates [date_key => gap_days]',
-								),
-								'current_page'      => array( 'type' => 'integer' ),
-								'max_pages'         => array( 'type' => 'integer' ),
-								'total_event_count' => array( 'type' => 'integer' ),
-								'event_count'       => array( 'type' => 'integer' ),
-								'date_boundaries'   => array(
-									'type'       => 'object',
-									'properties' => array(
-										'start_date' => array( 'type' => 'string' ),
-										'end_date'   => array( 'type' => 'string' ),
-									),
-								),
-								'event_counts'      => array(
-									'type'       => 'object',
-									'properties' => array(
-										'past'   => array( 'type' => 'integer' ),
-										'future' => array( 'type' => 'integer' ),
-									),
-								),
-								'html'              => array(
-									'type'       => 'object',
-									'properties' => array(
-										'events'     => array( 'type' => 'string' ),
-										'pagination' => array( 'type' => 'string' ),
-										'counter'    => array( 'type' => 'string' ),
-										'navigation' => array( 'type' => 'string' ),
-									),
-								),
-							),
-						),
-						'execute_callback'    => array( $this, 'executeGetCalendarPage' ),
-						'permission_callback' => '__return_true',
-						'meta'                => array( 'show_in_rest' => true ),
-					)
-				);
-			}
-		);
+					),
+					'execute_callback'    => array( $this, 'executeGetCalendarPage' ),
+					'permission_callback' => '__return_true',
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+		};
+
+		if ( did_action( 'wp_abilities_api_init' ) ) {
+			$register_callback();
+		} else {
+			add_action( 'wp_abilities_api_init', $register_callback );
+		}
 	}
 
 	/**

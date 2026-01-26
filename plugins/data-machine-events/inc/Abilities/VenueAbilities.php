@@ -61,15 +61,18 @@ class VenueAbilities {
 	}
 
 	private function registerAbilities(): void {
-		add_action(
-			'wp_abilities_api_init',
-			function () {
-				$this->registerHealthCheckAbility();
-				$this->registerUpdateVenueAbility();
-				$this->registerGetVenueAbility();
-				$this->registerCheckDuplicateAbility();
-			}
-		);
+		$register_callback = function () {
+			$this->registerHealthCheckAbility();
+			$this->registerUpdateVenueAbility();
+			$this->registerGetVenueAbility();
+			$this->registerCheckDuplicateAbility();
+		};
+
+		if ( did_action( 'wp_abilities_api_init' ) ) {
+			$register_callback();
+		} else {
+			add_action( 'wp_abilities_api_init', $register_callback );
+		}
 	}
 
 	private function registerHealthCheckAbility(): void {

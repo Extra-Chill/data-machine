@@ -32,159 +32,162 @@ class TimezoneAbilities {
 	}
 
 	private function registerAbility(): void {
-		add_action(
-			'wp_abilities_api_init',
-			function () {
-				wp_register_ability(
-					'datamachine-events/find-broken-timezone-events',
-					array(
-						'label'               => __( 'Find Events with Missing Timezone', 'datamachine-events' ),
-						'description'         => __( 'Find events where venue has no timezone or coordinates', 'datamachine-events' ),
-						'category'            => 'datamachine',
-						'input_schema'        => array(
-							'type'       => 'object',
-							'required'   => array(),
-							'properties' => array(
-								'scope'      => array(
-									'type'        => 'string',
-									'enum'        => array( 'upcoming', 'all', 'past' ),
-									'description' => 'Which events to check (default: upcoming)',
-								),
-								'days_ahead' => array(
-									'type'        => 'integer',
-									'description' => 'Days to look ahead for upcoming scope (default: 90)',
-								),
-								'limit'      => array(
-									'type'        => 'integer',
-									'description' => 'Max events to return (default: 50)',
-								),
+		$register_callback = function () {
+			wp_register_ability(
+				'datamachine-events/find-broken-timezone-events',
+				array(
+					'label'               => __( 'Find Events with Missing Timezone', 'datamachine-events' ),
+					'description'         => __( 'Find events where venue has no timezone or coordinates', 'datamachine-events' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array(),
+						'properties' => array(
+							'scope'      => array(
+								'type'        => 'string',
+								'enum'        => array( 'upcoming', 'all', 'past' ),
+								'description' => 'Which events to check (default: upcoming)',
+							),
+							'days_ahead' => array(
+								'type'        => 'integer',
+								'description' => 'Days to look ahead for upcoming scope (default: 90)',
+							),
+							'limit'      => array(
+								'type'        => 'integer',
+								'description' => 'Max events to return (default: 50)',
 							),
 						),
-						'output_schema'       => array(
-							'type'       => 'object',
-							'properties' => array(
-								'total_broken'    => array( 'type' => 'integer' ),
-								'broken_events'   => array(
-									'type'  => 'array',
-									'items' => array(
-										'type'       => 'object',
-										'properties' => array(
-											'id'        => array( 'type' => 'integer' ),
-											'title'     => array( 'type' => 'string' ),
-											'startDate' => array( 'type' => 'string' ),
-											'startTime' => array( 'type' => 'string' ),
-											'venue'     => array( 'type' => 'string' ),
-											'venue_id'  => array( 'type' => 'integer' ),
-											'venue_timezone' => array( 'type' => 'string' ),
-											'venue_coordinates' => array( 'type' => 'string' ),
-											'reason'    => array(
-												'type' => 'string',
-												'enum' => array( 'no_timezone', 'no_coordinates' ),
-											),
-										),
-									),
-								),
-								'no_venue_count'  => array( 'type' => 'integer' ),
-								'no_venue_events' => array(
-									'type'  => 'array',
-									'items' => array(
-										'type'       => 'object',
-										'properties' => array(
-											'id'        => array( 'type' => 'integer' ),
-											'title'     => array( 'type' => 'string' ),
-											'startDate' => array( 'type' => 'string' ),
-											'startTime' => array( 'type' => 'string' ),
-										),
-									),
-								),
-								'message'         => array( 'type' => 'string' ),
-							),
-						),
-						'execute_callback'    => array( $this, 'executeAbility' ),
-						'permission_callback' => function () {
-							return current_user_can( 'manage_options' );
-						},
-						'meta'                => array( 'show_in_rest' => true ),
-					)
-				);
-
-				wp_register_ability(
-					'datamachine-events/fix-event-timezone',
-					array(
-						'label'               => __( 'Fix Event Timezone', 'datamachine-events' ),
-						'description'         => __( 'Update venue timezone with geocoding support. Supports batch updates with inline errors.', 'datamachine-events' ),
-						'category'            => 'datamachine',
-						'input_schema'        => array(
-							'type'       => 'object',
-							'required'   => array(),
-							'properties' => array(
-								'event'       => array(
-									'type'        => 'integer',
-									'description' => 'Single event post ID',
-								),
-								'events'      => array(
-									'type'  => 'array',
-									'items' => array(
-										'type'       => 'object',
-										'properties' => array(
-											'event'       => array( 'type' => 'integer' ),
-											'timezone'    => array( 'type' => 'string' ),
-											'auto_derive' => array( 'type' => 'boolean' ),
-										),
-									),
-								),
-								'timezone'    => array(
-									'type'        => 'string',
-									'description' => 'IANA timezone identifier',
-								),
-								'auto_derive' => array(
-									'type'        => 'boolean',
-									'description' => 'Derive from coordinates via GeoNames API',
-								),
-							),
-						),
-						'output_schema'       => array(
-							'type'       => 'object',
-							'properties' => array(
-								'results' => array(
-									'type'  => 'array',
-									'items' => array(
-										'type'       => 'object',
-										'properties' => array(
-											'event'    => array( 'type' => 'integer' ),
-											'title'    => array( 'type' => 'string' ),
-											'status'   => array(
-												'type' => 'string',
-												'enum' => array( 'updated', 'no_change', 'failed' ),
-											),
-											'timezone' => array( 'type' => 'string' ),
-											'timezone_source' => array(
-												'type' => 'string',
-												'enum' => array( 'provided', 'auto_derived', 'geocoded' ),
-											),
-											'error'    => array( 'type' => 'string' ),
-										),
-									),
-								),
-								'summary' => array(
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'total_broken'    => array( 'type' => 'integer' ),
+							'broken_events'   => array(
+								'type'  => 'array',
+								'items' => array(
 									'type'       => 'object',
 									'properties' => array(
-										'updated' => array( 'type' => 'integer' ),
-										'failed'  => array( 'type' => 'integer' ),
-										'total'   => array( 'type' => 'integer' ),
+										'id'        => array( 'type' => 'integer' ),
+										'title'     => array( 'type' => 'string' ),
+										'startDate' => array( 'type' => 'string' ),
+										'startTime' => array( 'type' => 'string' ),
+										'venue'     => array( 'type' => 'string' ),
+										'venue_id'  => array( 'type' => 'integer' ),
+										'venue_timezone' => array( 'type' => 'string' ),
+										'venue_coordinates' => array( 'type' => 'string' ),
+										'reason'    => array(
+											'type' => 'string',
+											'enum' => array( 'no_timezone', 'no_coordinates' ),
+										),
 									),
 								),
 							),
+							'no_venue_count'  => array( 'type' => 'integer' ),
+							'no_venue_events' => array(
+								'type'  => 'array',
+								'items' => array(
+									'type'       => 'object',
+									'properties' => array(
+										'id'        => array( 'type' => 'integer' ),
+										'title'     => array( 'type' => 'string' ),
+										'startDate' => array( 'type' => 'string' ),
+										'startTime' => array( 'type' => 'string' ),
+									),
+								),
+							),
+							'message'         => array( 'type' => 'string' ),
 						),
-						'execute_callback'    => array( $this, 'executeFixAbility' ),
-						'permission_callback' => function () {
-							return current_user_can( 'manage_options' );
-						},
-						'meta'                => array( 'show_in_rest' => true ),
-					)
-				);
-			}
-		);
+					),
+					'execute_callback'    => array( $this, 'executeAbility' ),
+					'permission_callback' => function () {
+						return current_user_can( 'manage_options' );
+					},
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine-events/fix-event-timezone',
+				array(
+					'label'               => __( 'Fix Event Timezone', 'datamachine-events' ),
+					'description'         => __( 'Update venue timezone with geocoding support. Supports batch updates with inline errors.', 'datamachine-events' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array(),
+						'properties' => array(
+							'event'       => array(
+								'type'        => 'integer',
+								'description' => 'Single event post ID',
+							),
+							'events'      => array(
+								'type'  => 'array',
+								'items' => array(
+									'type'       => 'object',
+									'properties' => array(
+										'event'       => array( 'type' => 'integer' ),
+										'timezone'    => array( 'type' => 'string' ),
+										'auto_derive' => array( 'type' => 'boolean' ),
+									),
+								),
+							),
+							'timezone'    => array(
+								'type'        => 'string',
+								'description' => 'IANA timezone identifier',
+							),
+							'auto_derive' => array(
+								'type'        => 'boolean',
+								'description' => 'Derive from coordinates via GeoNames API',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'results' => array(
+								'type'  => 'array',
+								'items' => array(
+									'type'       => 'object',
+									'properties' => array(
+										'event'    => array( 'type' => 'integer' ),
+										'title'    => array( 'type' => 'string' ),
+										'status'   => array(
+											'type' => 'string',
+											'enum' => array( 'updated', 'no_change', 'failed' ),
+										),
+										'timezone' => array( 'type' => 'string' ),
+										'timezone_source' => array(
+											'type' => 'string',
+											'enum' => array( 'provided', 'auto_derived', 'geocoded' ),
+										),
+										'error'    => array( 'type' => 'string' ),
+									),
+								),
+							),
+							'summary' => array(
+								'type'       => 'object',
+								'properties' => array(
+									'updated' => array( 'type' => 'integer' ),
+									'failed'  => array( 'type' => 'integer' ),
+									'total'   => array( 'type' => 'integer' ),
+								),
+							),
+						),
+					),
+					'execute_callback'    => array( $this, 'executeFixAbility' ),
+					'permission_callback' => function () {
+						return current_user_can( 'manage_options' );
+					},
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+		};
+
+		if ( did_action( 'wp_abilities_api_init' ) ) {
+			$register_callback();
+		} else {
+			add_action( 'wp_abilities_api_init', $register_callback );
+		}
 	}
 
 	public function executeAbility( array $input ): array {

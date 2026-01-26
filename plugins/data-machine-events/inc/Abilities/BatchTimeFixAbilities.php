@@ -39,98 +39,101 @@ class BatchTimeFixAbilities {
 	}
 
 	private function registerAbility(): void {
-		add_action(
-			'wp_abilities_api_init',
-			function () {
-				wp_register_ability(
-					'datamachine-events/batch-time-fix',
-					array(
-						'label'               => __( 'Batch Time Fix', 'datamachine-events' ),
-						'description'         => __( 'Batch fix event times with offset correction or explicit replacement', 'datamachine-events' ),
-						'category'            => 'datamachine',
-						'input_schema'        => array(
-							'type'       => 'object',
-							'required'   => array( 'venue' ),
-							'properties' => array(
-								'venue'          => array(
-									'type'        => 'string',
-									'description' => 'Venue name(s) to filter by, comma-separated for multiple',
-								),
-								'before'         => array(
-									'type'        => 'string',
-									'description' => 'Filter events imported before this date (YYYY-MM-DD)',
-								),
-								'after'          => array(
-									'type'        => 'string',
-									'description' => 'Filter events imported after this date (YYYY-MM-DD)',
-								),
-								'source_pattern' => array(
-									'type'        => 'string',
-									'description' => 'Filter by source URL pattern (SQL LIKE syntax, e.g., %.ics)',
-								),
-								'where_time'     => array(
-									'type'        => 'string',
-									'description' => 'Only fix events with this specific current startTime (HH:MM)',
-								),
-								'offset'         => array(
-									'type'        => 'string',
-									'description' => 'Time offset to apply (e.g., +6h, -1h, +30m)',
-								),
-								'new_time'       => array(
-									'type'        => 'string',
-									'description' => 'Explicit new time to set (HH:MM). Use with where_time.',
-								),
-								'dry_run'        => array(
-									'type'        => 'boolean',
-									'description' => 'Preview changes without applying (default: true)',
-								),
-								'limit'          => array(
-									'type'        => 'integer',
-									'description' => 'Maximum events to process (default: 100)',
-								),
+		$register_callback = function () {
+			wp_register_ability(
+				'datamachine-events/batch-time-fix',
+				array(
+					'label'               => __( 'Batch Time Fix', 'datamachine-events' ),
+					'description'         => __( 'Batch fix event times with offset correction or explicit replacement', 'datamachine-events' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'venue' ),
+						'properties' => array(
+							'venue'          => array(
+								'type'        => 'string',
+								'description' => 'Venue name(s) to filter by, comma-separated for multiple',
+							),
+							'before'         => array(
+								'type'        => 'string',
+								'description' => 'Filter events imported before this date (YYYY-MM-DD)',
+							),
+							'after'          => array(
+								'type'        => 'string',
+								'description' => 'Filter events imported after this date (YYYY-MM-DD)',
+							),
+							'source_pattern' => array(
+								'type'        => 'string',
+								'description' => 'Filter by source URL pattern (SQL LIKE syntax, e.g., %.ics)',
+							),
+							'where_time'     => array(
+								'type'        => 'string',
+								'description' => 'Only fix events with this specific current startTime (HH:MM)',
+							),
+							'offset'         => array(
+								'type'        => 'string',
+								'description' => 'Time offset to apply (e.g., +6h, -1h, +30m)',
+							),
+							'new_time'       => array(
+								'type'        => 'string',
+								'description' => 'Explicit new time to set (HH:MM). Use with where_time.',
+							),
+							'dry_run'        => array(
+								'type'        => 'boolean',
+								'description' => 'Preview changes without applying (default: true)',
+							),
+							'limit'          => array(
+								'type'        => 'integer',
+								'description' => 'Maximum events to process (default: 100)',
 							),
 						),
-						'output_schema'       => array(
-							'type'       => 'object',
-							'properties' => array(
-								'dry_run'       => array( 'type' => 'boolean' ),
-								'total_matched' => array( 'type' => 'integer' ),
-								'events'        => array(
-									'type'  => 'array',
-									'items' => array(
-										'type'       => 'object',
-										'properties' => array(
-											'id'           => array( 'type' => 'integer' ),
-											'title'        => array( 'type' => 'string' ),
-											'venue'        => array( 'type' => 'string' ),
-											'startDate'    => array( 'type' => 'string' ),
-											'current_time' => array( 'type' => 'string' ),
-											'new_time'     => array( 'type' => 'string' ),
-											'status'       => array( 'type' => 'string' ),
-										),
-									),
-								),
-								'summary'       => array(
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'dry_run'       => array( 'type' => 'boolean' ),
+							'total_matched' => array( 'type' => 'integer' ),
+							'events'        => array(
+								'type'  => 'array',
+								'items' => array(
 									'type'       => 'object',
 									'properties' => array(
-										'matched' => array( 'type' => 'integer' ),
-										'updated' => array( 'type' => 'integer' ),
-										'skipped' => array( 'type' => 'integer' ),
-										'failed'  => array( 'type' => 'integer' ),
+										'id'           => array( 'type' => 'integer' ),
+										'title'        => array( 'type' => 'string' ),
+										'venue'        => array( 'type' => 'string' ),
+										'startDate'    => array( 'type' => 'string' ),
+										'current_time' => array( 'type' => 'string' ),
+										'new_time'     => array( 'type' => 'string' ),
+										'status'       => array( 'type' => 'string' ),
 									),
 								),
-								'message'       => array( 'type' => 'string' ),
 							),
+							'summary'       => array(
+								'type'       => 'object',
+								'properties' => array(
+									'matched' => array( 'type' => 'integer' ),
+									'updated' => array( 'type' => 'integer' ),
+									'skipped' => array( 'type' => 'integer' ),
+									'failed'  => array( 'type' => 'integer' ),
+								),
+							),
+							'message'       => array( 'type' => 'string' ),
 						),
-						'execute_callback'    => array( $this, 'executeBatchTimeFix' ),
-						'permission_callback' => function () {
-							return current_user_can( 'manage_options' );
-						},
-						'meta'                => array( 'show_in_rest' => true ),
-					)
-				);
-			}
-		);
+					),
+					'execute_callback'    => array( $this, 'executeBatchTimeFix' ),
+					'permission_callback' => function () {
+						return current_user_can( 'manage_options' );
+					},
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+		};
+
+		if ( did_action( 'wp_abilities_api_init' ) ) {
+			$register_callback();
+		} else {
+			add_action( 'wp_abilities_api_init', $register_callback );
+		}
 	}
 
 	/**

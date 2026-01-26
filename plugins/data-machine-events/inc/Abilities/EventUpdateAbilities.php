@@ -56,121 +56,124 @@ class EventUpdateAbilities {
 	}
 
 	private function registerAbility(): void {
-		add_action(
-			'wp_abilities_api_init',
-			function () {
-				wp_register_ability(
-					'datamachine-events/update-event',
-					array(
-						'label'               => __( 'Update Event', 'datamachine-events' ),
-						'description'         => __( 'Update event details including dates, times, venue, and metadata', 'datamachine-events' ),
-						'category'            => 'datamachine',
-						'input_schema'        => array(
-							'type'       => 'object',
-							'properties' => array(
-								'event'         => array(
-									'type'        => 'integer',
-									'description' => 'Single event post ID to update',
-								),
-								'events'        => array(
-									'type'        => 'array',
-									'description' => 'Array of event updates. Each item must have "event" (post ID) plus fields to update.',
-								),
-								'startDate'     => array(
-									'type'        => 'string',
-									'description' => 'Start date (any parseable format, normalized to YYYY-MM-DD)',
-								),
-								'startTime'     => array(
-									'type'        => 'string',
-									'description' => 'Start time (any parseable format like "8pm", "20:00", normalized to HH:MM)',
-								),
-								'endDate'       => array(
-									'type'        => 'string',
-									'description' => 'End date (any parseable format, normalized to YYYY-MM-DD)',
-								),
-								'endTime'       => array(
-									'type'        => 'string',
-									'description' => 'End time (any parseable format, normalized to HH:MM)',
-								),
-								'venue'         => array(
-									'type'        => 'integer',
-									'description' => 'Existing venue term ID to assign',
-								),
-								'description'   => array(
-									'type'        => 'string',
-									'description' => 'Event description (HTML allowed)',
-								),
-								'price'         => array(
-									'type'        => 'string',
-									'description' => 'Ticket price (e.g., "$25" or "$20 adv / $25 door")',
-								),
-								'ticketUrl'     => array(
-									'type'        => 'string',
-									'description' => 'URL to purchase tickets',
-								),
-								'performer'     => array(
-									'type'        => 'string',
-									'description' => 'Performer name',
-								),
-								'performerType' => array(
-									'type'        => 'string',
-									'enum'        => array( 'Person', 'PerformingGroup', 'MusicGroup' ),
-									'description' => 'Performer type: Person, PerformingGroup, or MusicGroup',
-								),
-								'eventStatus'   => array(
-									'type'        => 'string',
-									'enum'        => array( 'EventScheduled', 'EventPostponed', 'EventCancelled', 'EventRescheduled' ),
-									'description' => 'Event status',
-								),
-								'eventType'       => array(
-									'type'        => 'string',
-									'enum'        => array( 'Event', 'MusicEvent', 'Festival', 'ComedyEvent', 'DanceEvent', 'TheaterEvent', 'SportsEvent', 'ExhibitionEvent' ),
-									'description' => 'Event type for Schema.org',
-								),
-								'occurrenceDates' => array(
-									'type'        => 'array',
-									'items'       => array( 'type' => 'string' ),
-									'description' => 'Array of specific dates (YYYY-MM-DD) when the event occurs',
-								),
+		$register_callback = function () {
+			wp_register_ability(
+				'datamachine-events/update-event',
+				array(
+					'label'               => __( 'Update Event', 'datamachine-events' ),
+					'description'         => __( 'Update event details including dates, times, venue, and metadata', 'datamachine-events' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'event'         => array(
+								'type'        => 'integer',
+								'description' => 'Single event post ID to update',
+							),
+							'events'        => array(
+								'type'        => 'array',
+								'description' => 'Array of event updates. Each item must have "event" (post ID) plus fields to update.',
+							),
+							'startDate'     => array(
+								'type'        => 'string',
+								'description' => 'Start date (any parseable format, normalized to YYYY-MM-DD)',
+							),
+							'startTime'     => array(
+								'type'        => 'string',
+								'description' => 'Start time (any parseable format like "8pm", "20:00", normalized to HH:MM)',
+							),
+							'endDate'       => array(
+								'type'        => 'string',
+								'description' => 'End date (any parseable format, normalized to YYYY-MM-DD)',
+							),
+							'endTime'       => array(
+								'type'        => 'string',
+								'description' => 'End time (any parseable format, normalized to HH:MM)',
+							),
+							'venue'         => array(
+								'type'        => 'integer',
+								'description' => 'Existing venue term ID to assign',
+							),
+							'description'   => array(
+								'type'        => 'string',
+								'description' => 'Event description (HTML allowed)',
+							),
+							'price'         => array(
+								'type'        => 'string',
+								'description' => 'Ticket price (e.g., "$25" or "$20 adv / $25 door")',
+							),
+							'ticketUrl'     => array(
+								'type'        => 'string',
+								'description' => 'URL to purchase tickets',
+							),
+							'performer'     => array(
+								'type'        => 'string',
+								'description' => 'Performer name',
+							),
+							'performerType' => array(
+								'type'        => 'string',
+								'enum'        => array( 'Person', 'PerformingGroup', 'MusicGroup' ),
+								'description' => 'Performer type: Person, PerformingGroup, or MusicGroup',
+							),
+							'eventStatus'   => array(
+								'type'        => 'string',
+								'enum'        => array( 'EventScheduled', 'EventPostponed', 'EventCancelled', 'EventRescheduled' ),
+								'description' => 'Event status',
+							),
+							'eventType'       => array(
+								'type'        => 'string',
+								'enum'        => array( 'Event', 'MusicEvent', 'Festival', 'ComedyEvent', 'DanceEvent', 'TheaterEvent', 'SportsEvent', 'ExhibitionEvent' ),
+								'description' => 'Event type for Schema.org',
+							),
+							'occurrenceDates' => array(
+								'type'        => 'array',
+								'items'       => array( 'type' => 'string' ),
+								'description' => 'Array of specific dates (YYYY-MM-DD) when the event occurs',
 							),
 						),
-						'output_schema'       => array(
-							'type'       => 'object',
-							'properties' => array(
-								'results' => array(
-									'type'  => 'array',
-									'items' => array(
-										'type'       => 'object',
-										'properties' => array(
-											'post_id'  => array( 'type' => 'integer' ),
-											'title'    => array( 'type' => 'string' ),
-											'status'   => array( 'type' => 'string' ),
-											'updated_fields' => array( 'type' => 'array' ),
-											'warnings' => array( 'type' => 'array' ),
-											'error'    => array( 'type' => 'string' ),
-										),
-									),
-								),
-								'summary' => array(
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'results' => array(
+								'type'  => 'array',
+								'items' => array(
 									'type'       => 'object',
 									'properties' => array(
-										'updated' => array( 'type' => 'integer' ),
-										'failed'  => array( 'type' => 'integer' ),
-										'total'   => array( 'type' => 'integer' ),
+										'post_id'  => array( 'type' => 'integer' ),
+										'title'    => array( 'type' => 'string' ),
+										'status'   => array( 'type' => 'string' ),
+										'updated_fields' => array( 'type' => 'array' ),
+										'warnings' => array( 'type' => 'array' ),
+										'error'    => array( 'type' => 'string' ),
 									),
 								),
-								'message' => array( 'type' => 'string' ),
 							),
+							'summary' => array(
+								'type'       => 'object',
+								'properties' => array(
+									'updated' => array( 'type' => 'integer' ),
+									'failed'  => array( 'type' => 'integer' ),
+									'total'   => array( 'type' => 'integer' ),
+								),
+							),
+							'message' => array( 'type' => 'string' ),
 						),
-						'execute_callback'    => array( $this, 'executeUpdateEvent' ),
-						'permission_callback' => function () {
-							return current_user_can( 'manage_options' );
-						},
-						'meta'                => array( 'show_in_rest' => true ),
-					)
-				);
-			}
-		);
+					),
+					'execute_callback'    => array( $this, 'executeUpdateEvent' ),
+					'permission_callback' => function () {
+						return current_user_can( 'manage_options' );
+					},
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+		};
+
+		if ( did_action( 'wp_abilities_api_init' ) ) {
+			$register_callback();
+		} else {
+			add_action( 'wp_abilities_api_init', $register_callback );
+		}
 	}
 
 	/**

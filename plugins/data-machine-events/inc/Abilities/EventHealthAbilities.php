@@ -35,99 +35,102 @@ class EventHealthAbilities {
 	}
 
 	private function registerAbility(): void {
-		add_action(
-			'wp_abilities_api_init',
-			function () {
-				wp_register_ability(
-					'datamachine-events/event-health-check',
-					array(
-						'label'               => __( 'Event Health Check', 'datamachine-events' ),
-						'description'         => __( 'Scan events for data quality issues', 'datamachine-events' ),
-						'category'            => 'datamachine',
-						'input_schema'        => array(
-							'type'       => 'object',
-							'properties' => array(
-								'scope'      => array(
-									'type'        => 'string',
-									'enum'        => array( 'upcoming', 'all', 'past' ),
-									'description' => 'Which events to check: "upcoming" (default), "all", or "past"',
-								),
-								'days_ahead' => array(
-									'type'        => 'integer',
-									'description' => 'Days to look ahead for upcoming scope (default: 90)',
-								),
-								'limit'      => array(
-									'type'        => 'integer',
-									'description' => 'Max events to return per issue category (default: 25)',
-								),
+		$register_callback = function () {
+			wp_register_ability(
+				'datamachine-events/event-health-check',
+				array(
+					'label'               => __( 'Event Health Check', 'datamachine-events' ),
+					'description'         => __( 'Scan events for data quality issues', 'datamachine-events' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'scope'      => array(
+								'type'        => 'string',
+								'enum'        => array( 'upcoming', 'all', 'past' ),
+								'description' => 'Which events to check: "upcoming" (default), "all", or "past"',
+							),
+							'days_ahead' => array(
+								'type'        => 'integer',
+								'description' => 'Days to look ahead for upcoming scope (default: 90)',
+							),
+							'limit'      => array(
+								'type'        => 'integer',
+								'description' => 'Max events to return per issue category (default: 25)',
 							),
 						),
-						'output_schema'       => array(
-							'type'       => 'object',
-							'properties' => array(
-								'total_scanned'       => array( 'type' => 'integer' ),
-								'scope'               => array( 'type' => 'string' ),
-								'missing_time'        => array(
-									'type'       => 'object',
-									'properties' => array(
-										'count'  => array( 'type' => 'integer' ),
-										'events' => array( 'type' => 'array' ),
-									),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'total_scanned'       => array( 'type' => 'integer' ),
+							'scope'               => array( 'type' => 'string' ),
+							'missing_time'        => array(
+								'type'       => 'object',
+								'properties' => array(
+									'count'  => array( 'type' => 'integer' ),
+									'events' => array( 'type' => 'array' ),
 								),
-								'midnight_time'       => array(
-									'type'       => 'object',
-									'properties' => array(
-										'count'  => array( 'type' => 'integer' ),
-										'events' => array( 'type' => 'array' ),
-									),
-								),
-								'late_night_time'     => array(
-									'type'       => 'object',
-									'properties' => array(
-										'count'  => array( 'type' => 'integer' ),
-										'events' => array( 'type' => 'array' ),
-									),
-								),
-								'suspicious_end_time' => array(
-									'type'       => 'object',
-									'properties' => array(
-										'count'  => array( 'type' => 'integer' ),
-										'events' => array( 'type' => 'array' ),
-									),
-								),
-								'missing_venue'       => array(
-									'type'       => 'object',
-									'properties' => array(
-										'count'  => array( 'type' => 'integer' ),
-										'events' => array( 'type' => 'array' ),
-									),
-								),
-								'missing_description' => array(
-									'type'       => 'object',
-									'properties' => array(
-										'count'  => array( 'type' => 'integer' ),
-										'events' => array( 'type' => 'array' ),
-									),
-								),
-								'broken_timezone'     => array(
-									'type'       => 'object',
-									'properties' => array(
-										'count'  => array( 'type' => 'integer' ),
-										'events' => array( 'type' => 'array' ),
-									),
-								),
-								'message'             => array( 'type' => 'string' ),
 							),
+							'midnight_time'       => array(
+								'type'       => 'object',
+								'properties' => array(
+									'count'  => array( 'type' => 'integer' ),
+									'events' => array( 'type' => 'array' ),
+								),
+							),
+							'late_night_time'     => array(
+								'type'       => 'object',
+								'properties' => array(
+									'count'  => array( 'type' => 'integer' ),
+									'events' => array( 'type' => 'array' ),
+								),
+							),
+							'suspicious_end_time' => array(
+								'type'       => 'object',
+								'properties' => array(
+									'count'  => array( 'type' => 'integer' ),
+									'events' => array( 'type' => 'array' ),
+								),
+							),
+							'missing_venue'       => array(
+								'type'       => 'object',
+								'properties' => array(
+									'count'  => array( 'type' => 'integer' ),
+									'events' => array( 'type' => 'array' ),
+								),
+							),
+							'missing_description' => array(
+								'type'       => 'object',
+								'properties' => array(
+									'count'  => array( 'type' => 'integer' ),
+									'events' => array( 'type' => 'array' ),
+								),
+							),
+							'broken_timezone'     => array(
+								'type'       => 'object',
+								'properties' => array(
+									'count'  => array( 'type' => 'integer' ),
+									'events' => array( 'type' => 'array' ),
+								),
+							),
+							'message'             => array( 'type' => 'string' ),
 						),
-						'execute_callback'    => array( $this, 'executeHealthCheck' ),
-						'permission_callback' => function () {
-							return current_user_can( 'manage_options' );
-						},
-						'meta'                => array( 'show_in_rest' => true ),
-					)
-				);
-			}
-		);
+					),
+					'execute_callback'    => array( $this, 'executeHealthCheck' ),
+					'permission_callback' => function () {
+						return current_user_can( 'manage_options' );
+					},
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+		};
+
+		if ( did_action( 'wp_abilities_api_init' ) ) {
+			$register_callback();
+		} else {
+			add_action( 'wp_abilities_api_init', $register_callback );
+		}
 	}
 
 	/**
