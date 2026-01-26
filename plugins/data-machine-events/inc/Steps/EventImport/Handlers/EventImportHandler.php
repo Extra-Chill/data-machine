@@ -11,6 +11,7 @@ namespace DataMachineEvents\Steps\EventImport\Handlers;
 use DataMachine\Core\ExecutionContext;
 use DataMachine\Core\Steps\Fetch\Handlers\FetchHandler;
 use DataMachineEvents\Core\DateTimeParser;
+use DataMachineEvents\Core\PriceFormatter;
 use DataMachineEvents\Core\VenueParameterProvider;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 
@@ -154,6 +155,17 @@ abstract class EventImportHandler extends FetchHandler {
 	 */
 	protected function parseDateTimeIso( string $datetime ): array {
 		return DateTimeParser::parseIso( $datetime );
+	}
+
+	/**
+	 * Format a price range as a display string.
+	 *
+	 * @param float|null $min Minimum price
+	 * @param float|null $max Maximum price (optional)
+	 * @return string Formatted price or empty if invalid
+	 */
+	protected function formatPriceRange( ?float $min, ?float $max = null ): string {
+		return PriceFormatter::formatRange( $min, $max );
 	}
 
 	/**

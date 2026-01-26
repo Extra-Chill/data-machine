@@ -457,14 +457,10 @@ class Ticketmaster extends EventImportHandler {
 		$price = '';
 		if ( ! empty( $tm_event['priceRanges'][0] ) ) {
 			$price_range = $tm_event['priceRanges'][0];
-			$min         = $price_range['min'] ?? 0;
-			$max         = $price_range['max'] ?? 0;
-
-			if ( $min == $max ) {
-				$price = '$' . number_format( $min, 2 );
-			} else {
-				$price = '$' . number_format( $min, 2 ) . ' - $' . number_format( $max, 2 );
-			}
+			$price       = $this->formatPriceRange(
+				$price_range['min'] ?? null,
+				$price_range['max'] ?? null
+			);
 		}
 
 		$ticket_url = $tm_event['url'] ?? '';

@@ -176,19 +176,12 @@ class AegAxsExtractor extends BaseExtractor {
 	}
 
 	private function parsePrice( array &$event, array $raw ): void {
-		$low  = isset( $raw['ticketPriceLow'] ) ? (float) $raw['ticketPriceLow'] : 0;
-		$high = isset( $raw['ticketPriceHigh'] ) ? (float) $raw['ticketPriceHigh'] : 0;
+		$low  = isset( $raw['ticketPriceLow'] ) ? (float) $raw['ticketPriceLow'] : null;
+		$high = isset( $raw['ticketPriceHigh'] ) ? (float) $raw['ticketPriceHigh'] : null;
 
-		if ( $low <= 0 && $high <= 0 ) {
-			return;
-		}
-
-		if ( $low > 0 && $high > 0 && $low !== $high ) {
-			$event['price'] = '$' . number_format( $low, 2 ) . ' - $' . number_format( $high, 2 );
-		} elseif ( $low > 0 ) {
-			$event['price'] = '$' . number_format( $low, 2 );
-		} elseif ( $high > 0 ) {
-			$event['price'] = '$' . number_format( $high, 2 );
+		$formatted = $this->formatPriceRange( $low, $high );
+		if ( ! empty( $formatted ) ) {
+			$event['price'] = $formatted;
 		}
 	}
 

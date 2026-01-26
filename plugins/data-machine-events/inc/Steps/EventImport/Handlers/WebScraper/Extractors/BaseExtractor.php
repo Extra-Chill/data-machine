@@ -12,6 +12,7 @@
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors;
 
 use DataMachineEvents\Core\DateTimeParser;
+use DataMachineEvents\Core\PriceFormatter;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -212,5 +213,16 @@ abstract class BaseExtractor implements ExtractorInterface {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Format a price range as a display string.
+	 *
+	 * @param float|null $min Minimum price
+	 * @param float|null $max Maximum price (optional)
+	 * @return string Formatted price or empty if invalid
+	 */
+	protected function formatPriceRange( ?float $min, ?float $max = null ): string {
+		return PriceFormatter::formatRange( $min, $max );
 	}
 }

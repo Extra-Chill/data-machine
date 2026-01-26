@@ -56,25 +56,25 @@ class EventSchemaProvider {
 	);
 
 	private const CORE_FIELDS = array(
-		'title'       => array(
+		'title'           => array(
 			'type'            => 'string',
 			'required'        => true,
 			'description'     => 'Event title. The original scraped title is in data packet metadata (original_title). Use it directly if clear and complete, or write a better title if the original is unclear, truncated, ALL CAPS, contains emojis, dates, or unnecessary formatting.',
 			'schema_property' => 'name',
 		),
-		'startDate'   => array(
+		'startDate'       => array(
 			'type'            => 'string',
 			'required'        => false,
 			'description'     => 'Event start date (YYYY-MM-DD format)',
 			'schema_property' => 'startDate',
 		),
-		'endDate'     => array(
+		'endDate'         => array(
 			'type'            => 'string',
 			'required'        => false,
 			'description'     => 'Event end date (YYYY-MM-DD format)',
 			'schema_property' => 'endDate',
 		),
-		'startTime'   => array(
+		'startTime'       => array(
 			'type'            => 'string',
 			'required'        => false,
 			'description'     => 'Event start time (HH:MM 24-hour format)',
@@ -104,7 +104,7 @@ class EventSchemaProvider {
 		'price'             => array(
 			'type'            => 'string',
 			'required'        => false,
-			'description'     => 'Ticket price (e.g., "$25" or "$20 adv / $25 door")',
+			'description'     => 'Ticket price if mentioned in the content. Acceptable formats: "$25", "$25 - $75" (range), "$20 adv / $25 door", or "Free". Extract the actual price from the description if visible. Leave empty if no price information is available - do not use "TBD", "Varies", or other placeholders.',
 			'schema_property' => 'offers.price',
 		),
 		'priceCurrency'     => array(
