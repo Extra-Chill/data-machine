@@ -2,6 +2,10 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.10.16] - 2026-01-27
+
+- Add ticketUrl field to scraper test ability and CLI output
+
 ## [0.10.15] - 2026-01-27
 
 - Fix JSON-LD extractor missing ticket URL from Eventbrite and other sources that store URL at event level
