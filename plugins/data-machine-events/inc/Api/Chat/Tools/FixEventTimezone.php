@@ -14,11 +14,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-use DataMachine\Engine\AI\Tools\ToolRegistrationTrait;
+use DataMachine\Engine\AI\Tools\BaseTool;
 use DataMachineEvents\Abilities\TimezoneAbilities;
 
-class FixEventTimezone {
-	use ToolRegistrationTrait;
+class FixEventTimezone extends BaseTool {
 
 	public function __construct() {
 		$this->registerTool( 'chat', 'fix_event_timezone', array( $this, 'getToolDefinition' ) );

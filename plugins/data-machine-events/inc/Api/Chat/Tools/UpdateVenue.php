@@ -14,11 +14,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-use DataMachine\Engine\AI\Tools\ToolRegistrationTrait;
+use DataMachine\Engine\AI\Tools\BaseTool;
 use DataMachineEvents\Abilities\VenueAbilities;
 
-class UpdateVenue {
-	use ToolRegistrationTrait;
+class UpdateVenue extends BaseTool {
 
 	public function __construct() {
 		$this->registerTool( 'chat', 'update_venue', array( $this, 'getToolDefinition' ) );

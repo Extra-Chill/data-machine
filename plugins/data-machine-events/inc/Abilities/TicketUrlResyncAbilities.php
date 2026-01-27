@@ -156,7 +156,7 @@ class TicketUrlResyncAbilities {
 				$changes[] = array(
 					'post_id' => $event->ID,
 					'title'   => $event->post_title,
-					'old'     => $old_normalized ?: '(empty)',
+					'old'     => $old_normalized ? $old_normalized : '(empty)',
 					'new'     => $new_normalized,
 				);
 				++$updated;

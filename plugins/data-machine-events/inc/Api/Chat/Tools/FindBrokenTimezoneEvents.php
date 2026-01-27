@@ -14,11 +14,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-use DataMachine\Engine\AI\Tools\ToolRegistrationTrait;
+use DataMachine\Engine\AI\Tools\BaseTool;
 use DataMachineEvents\Abilities\TimezoneAbilities;
 
-class FindBrokenTimezoneEvents {
-	use ToolRegistrationTrait;
+class FindBrokenTimezoneEvents extends BaseTool {
 
 	public function __construct() {
 		$this->registerTool( 'chat', 'find_broken_timezone_events', array( $this, 'getToolDefinition' ) );

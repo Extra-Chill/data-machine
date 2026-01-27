@@ -15,11 +15,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-use DataMachine\Engine\AI\Tools\ToolRegistrationTrait;
+use DataMachine\Engine\AI\Tools\BaseTool;
 use DataMachineEvents\Abilities\EventHealthAbilities;
 
-class EventHealthCheck {
-	use ToolRegistrationTrait;
+class EventHealthCheck extends BaseTool {
 
 	public function __construct() {
 		$this->registerTool( 'chat', 'event_health_check', array( $this, 'getToolDefinition' ) );
