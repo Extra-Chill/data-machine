@@ -62,8 +62,7 @@ if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php' ) ) {
 	// WP-CLI commands (optional)
 if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/UniversalWebScraperTestCommand.php' ) ) {
 	require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/UniversalWebScraperTestCommand.php';
-	\WP_CLI::add_command( 'datamachine-events test-scraper', \DataMachineEvents\Cli\UniversalWebScraperTestCommand::class );
-	\WP_CLI::add_command( 'datamachine-events test-scraper-url', \DataMachineEvents\Cli\UniversalWebScraperTestCommand::class );
+	\WP_CLI::add_command( 'datamachine-events test-event-scraper', \DataMachineEvents\Cli\UniversalWebScraperTestCommand::class );
 }
 
 if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/SettingsCommand.php' ) ) {

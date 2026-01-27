@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## Unreleased
+
+### Changed
+- Consolidate `test-scraper` and `test-scraper-url` CLI commands into single `test-event-scraper` command
+
 ## [0.10.16] - 2026-01-27
 
 - Add ticketUrl field to scraper test ability and CLI output

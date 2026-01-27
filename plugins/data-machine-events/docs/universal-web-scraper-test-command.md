@@ -2,15 +2,8 @@
 
 WP-CLI command for testing the Universal Web Scraper handler with any target URL. Supports web pages, ICS feeds, and JSON APIs.
 
-## Command Names
-
-- `wp datamachine-events test-scraper`
-- `wp datamachine-events test-scraper-url`
-
-Both commands are aliases and function identically.
-
 ```bash
-wp datamachine-events test-scraper-url --target_url=<url>
+wp datamachine-events test-event-scraper --target_url=<url>
 ```
 
 ## Parameters
@@ -23,17 +16,17 @@ wp datamachine-events test-scraper-url --target_url=<url>
 
 ### Web Page Scraping
 ```bash
-wp datamachine-events test-scraper-url --target_url=https://example.com/events
+wp datamachine-events test-event-scraper --target_url=https://example.com/events
 ```
 
 ### ICS Calendar Feeds
 ```bash
-wp datamachine-events test-scraper-url --target_url=https://tockify.com/api/feeds/ics/calendar-name
+wp datamachine-events test-event-scraper --target_url=https://tockify.com/api/feeds/ics/calendar-name
 ```
 
 ### Google Calendar Export
 ```bash
-wp datamachine-events test-scraper-url --target_url=webcal://calendar.google.com/calendar/ical/...
+wp datamachine-events test-event-scraper --target_url=webcal://calendar.google.com/calendar/ical/...
 ```
 
 ## Output
