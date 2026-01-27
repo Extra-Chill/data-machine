@@ -230,17 +230,19 @@ class JsonLdExtractor extends BaseExtractor {
 	 * Parse offers/pricing from JSON-LD event.
 	 */
 	private function parseOffers( array &$event, array $event_data ): void {
-		if ( empty( $event_data['offers'] ) ) {
-			return;
+		$offers = array();
+
+		if ( ! empty( $event_data['offers'] ) ) {
+			$offers = $event_data['offers'];
+			if ( is_array( $offers ) && isset( $offers[0] ) ) {
+				$offers = $offers[0];
+			}
 		}
 
-		$offers = $event_data['offers'];
-		if ( is_array( $offers ) && isset( $offers[0] ) ) {
-			$offers = $offers[0];
-		}
+		$event['price'] = $offers['price'] ?? '';
 
-		$event['price']     = $offers['price'] ?? '';
-		$event['ticketUrl'] = $offers['url'] ?? '';
+		// Ticket URL: check offers.url first, then fall back to event-level url (Eventbrite pattern).
+		$event['ticketUrl'] = $offers['url'] ?? $event_data['url'] ?? '';
 	}
 
 	/**

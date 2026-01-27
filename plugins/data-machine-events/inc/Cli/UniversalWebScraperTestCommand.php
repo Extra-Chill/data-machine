@@ -93,6 +93,7 @@ class UniversalWebScraperTestCommand {
 			\WP_CLI::log( 'Timezone: ' . ( $event_data['venueTimezone'] ?? '' ) );
 			\WP_CLI::log( 'Venue: ' . ( $event_data['venue'] ?? '' ) );
 			\WP_CLI::log( 'Venue address: ' . ( $event_data['venueAddress'] ?? '' ) );
+			\WP_CLI::log( 'Ticket URL: ' . ( $event_data['ticketUrl'] ?? '' ) );
 
 			$coverage_issues = $result['coverage_issues'] ?? array();
 
