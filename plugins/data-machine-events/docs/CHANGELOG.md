@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.10.14] - 2026-01-27
+
+### Fixed
+- Fix double-cleaning bug in Universal Web Scraper
+
 ## [0.10.13] - 2026-01-27
 
 ### Changed
