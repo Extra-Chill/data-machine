@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.10.13] - 2026-01-27
+
+### Changed
+- Migrate chat tools to BaseTool architecture
+
 ## [0.10.12] - 2026-01-27
 
 ### Fixed
