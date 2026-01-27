@@ -2,7 +2,7 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
-## Unreleased
+## [0.10.17] - 2026-01-27
 
 ### Changed
 - Consolidate `test-scraper` and `test-scraper-url` CLI commands into single `test-event-scraper` command
