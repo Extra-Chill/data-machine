@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.10.12] - 2026-01-27
+
+### Fixed
+- fix scraper test CLI to show errors before exit
+
 ## [0.10.11] - 2026-01-26
 
 ### Fixed
