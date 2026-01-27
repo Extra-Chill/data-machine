@@ -34,8 +34,7 @@ class UniversalWebScraperTestCommand {
 		\WP_CLI::log( 'Target URL: ' . $result['target_url'] );
 
 		if ( ! $result['success'] ) {
-			\WP_CLI::error( 'Failed to test scraper.' );
-
+			// Print diagnostics BEFORE error (which exits)
 			if ( ! empty( $result['warnings'] ) ) {
 				foreach ( $result['warnings'] as $warning ) {
 					\WP_CLI::warning( $warning );
@@ -53,6 +52,7 @@ class UniversalWebScraperTestCommand {
 				}
 			}
 
+			\WP_CLI::error( 'Failed to test scraper.' );
 			return;
 		}
 
