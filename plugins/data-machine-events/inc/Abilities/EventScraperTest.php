@@ -157,7 +157,7 @@ class EventScraperTest {
 				'success'         => true,
 				'status'          => 'warning',
 				'target_url'      => $target_url,
-				'event_data'      => null,
+				'event_data'      => array( 'raw_html' => $payload['raw_html'] ),
 				'extraction_info' => array_merge(
 					$extraction_info,
 					array(

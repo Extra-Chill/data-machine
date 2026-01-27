@@ -375,7 +375,7 @@ class UniversalWebScraper extends EventImportHandler {
 				)
 			);
 
-			$raw_html_data = $this->extract_raw_html_section( $event_section['html'], $current_url, $context, $config );
+			$raw_html_data = $this->extract_raw_html_section( $event_section['raw_html'], $current_url, $context, $config );
 
 			if ( ! $raw_html_data ) {
 				$skipped_identifiers[ $event_section['identifier'] ] = true;
