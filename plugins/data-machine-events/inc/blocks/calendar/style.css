@@ -71,62 +71,73 @@
 }
 
 /* Modern Date Filter Styles */
-.datamachine-events-date-filter {
-    width: 240px;
-}
-
 .datamachine-events-date-range-wrapper {
-    position: relative;
     display: flex;
     align-items: center;
+    gap: 0.25rem;
 }
 
-.datamachine-events-calendar .datamachine-events-filter-bar .datamachine-events-date-filter input.datamachine-events-date-range-input {
-    width: 100%;
-    padding: 0.875rem 1.25rem;
-    padding-right: 3rem;
-    border: none;
-    border-radius: var(--datamachine-border-radius);
+.datamachine-events-date-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem;
     font-size: 0.95rem;
-    font-weight: 400;
+    border-radius: var(--datamachine-border-radius);
     background: var(--datamachine-background-light);
+    border: 1px solid var(--datamachine-border-light);
     color: var(--datamachine-text-primary);
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), inset 0 0 0 1px var(--datamachine-border-light);
-    margin: 0;
-    line-height: normal;
-
+    line-height: 1;
 }
 
-.datamachine-events-calendar .datamachine-events-filter-bar .datamachine-events-date-filter input.datamachine-events-date-range-input:focus {
+.datamachine-events-date-btn:hover {
+    background: var(--datamachine-background-hover);
+    border-color: var(--datamachine-border-hover);
+}
+
+.datamachine-events-date-btn:focus {
     outline: none;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), inset 0 0 0 2px var(--datamachine-border-focus);
+    box-shadow: 0 0 0 2px var(--datamachine-border-focus);
+}
+
+.datamachine-events-date-btn .dashicons {
+    width: 20px;
+    height: 20px;
+    font-size: 20px;
+}
+
+.datamachine-events-date-btn.has-dates {
+    background: var(--datamachine-text-accent);
+    color: white;
+    border-color: var(--datamachine-border-focus);
+}
+
+.datamachine-events-date-btn.has-dates:hover {
+    background: var(--datamachine-border-focus);
 }
 
 .datamachine-events-date-clear-btn {
-    position: absolute;
-    right: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
-    color: var(--datamachine-text-muted);
-    cursor: pointer;
-    padding: 0.625rem;
-    border-radius: var(--datamachine-border-radius);
-    font-size: 0.875rem;
-    font-weight: 500;
-    transition: all 0.2s ease;
     display: none;
     align-items: center;
     justify-content: center;
+    padding: 0.75rem;
+    background: var(--datamachine-background-light);
+    border: 1px solid var(--datamachine-border-light);
+    border-radius: var(--datamachine-border-radius);
+    color: var(--datamachine-text-muted);
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
     line-height: 1;
 }
 
 .datamachine-events-date-clear-btn:hover {
     color: #ef4444;
     background: rgba(239, 68, 68, 0.1);
+    border-color: #ef4444;
 }
 
 .datamachine-events-date-clear-btn.visible {
@@ -437,10 +448,6 @@
         grid-template-columns: 1fr;
         gap: 1rem;
         align-items: stretch;
-    }
-
-    .datamachine-events-date-filter {
-        width: 100%;
     }
 
     .datamachine-events-time-filter {

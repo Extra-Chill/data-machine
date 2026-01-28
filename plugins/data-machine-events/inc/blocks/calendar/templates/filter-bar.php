@@ -51,14 +51,19 @@ $hide_filter_button_attr          = $hide_filter_button_when_inactive ? ' hidden
 		
 		<div class="datamachine-events-date-filter">
 			<div class="datamachine-events-date-range-wrapper">
-				<input type="text" 
+				<input type="hidden"
 						id="<?php echo esc_attr( $date_range_id ); ?>"
-						class="datamachine-events-date-range-input" data-date-start="<?php echo esc_attr( $date_start ); ?>" data-date-end="<?php echo esc_attr( $date_end ); ?>" 
-						placeholder="<?php esc_html_e( 'Select date range...', 'datamachine-events' ); ?>" 
-						readonly />
-				<button type="button" 
-						class="datamachine-events-date-clear-btn" 
-						title="<?php esc_html_e( 'Clear date filter', 'datamachine-events' ); ?>">
+						class="datamachine-events-date-range-input"
+						data-date-start="<?php echo esc_attr( $date_start ); ?>"
+						data-date-end="<?php echo esc_attr( $date_end ); ?>" />
+				<button type="button"
+						class="datamachine-events-date-btn"
+						title="<?php esc_attr_e( 'Select date range', 'datamachine-events' ); ?>">
+					<span class="dashicons dashicons-calendar"></span>
+				</button>
+				<button type="button"
+						class="datamachine-events-date-clear-btn"
+						title="<?php esc_attr_e( 'Clear date filter', 'datamachine-events' ); ?>">
 					✕
 				</button>
 			</div>

@@ -10,53 +10,62 @@ import flatpickr from 'flatpickr';
 const datePickers = new Map();
 
 export function initDatePicker(calendar, onChange) {
-    const dateRangeInput = calendar.querySelector('.datamachine-events-date-range-input') 
+    const dateRangeInput = calendar.querySelector('.datamachine-events-date-range-input')
         || calendar.querySelector('[id^="datamachine-events-date-range-"]');
-    
+
     if (!dateRangeInput) {return null;}
 
+    const dateBtn = calendar.querySelector('.datamachine-events-date-btn');
     const clearBtn = calendar.querySelector('.datamachine-events-date-clear-btn');
 
     const initialStart = dateRangeInput.getAttribute('data-date-start');
     const initialEnd = dateRangeInput.getAttribute('data-date-end');
     let defaultDate;
-    
+
     if (initialStart) {
         defaultDate = initialEnd ? [initialStart, initialEnd] : initialStart;
     }
 
+    const updateDateState = (selectedDates) => {
+        const hasDates = selectedDates && selectedDates.length > 0;
+        if (dateBtn) {
+            dateBtn.classList.toggle('has-dates', hasDates);
+        }
+        if (clearBtn) {
+            clearBtn.classList.toggle('visible', hasDates);
+        }
+    };
+
     const picker = flatpickr(dateRangeInput, {
         mode: 'range',
         dateFormat: 'Y-m-d',
-        placeholder: 'Select date range...',
         allowInput: false,
-        clickOpens: true,
+        clickOpens: false,
         defaultDate,
         onChange(selectedDates) {
             if (onChange) {onChange(selectedDates);}
-
-            if (clearBtn) {
-                if (selectedDates && selectedDates.length > 0) {
-                    clearBtn.classList.add('visible');
-                } else {
-                    clearBtn.classList.remove('visible');
-                }
-            }
+            updateDateState(selectedDates);
         },
         onClear() {
             if (onChange) {onChange([]);}
-            if (clearBtn) {clearBtn.classList.remove('visible');}
+            updateDateState([]);
         }
     });
+
+    const dateBtnHandler = function() {
+        picker.open();
+    };
 
     const clearHandler = function() {
         picker.clear();
     };
 
-    datePickers.set(calendar, { picker, clearBtn, clearHandler });
+    datePickers.set(calendar, { picker, dateBtn, dateBtnHandler, clearBtn, clearHandler });
 
-    if (picker.selectedDates && picker.selectedDates.length > 0 && clearBtn) {
-        clearBtn.classList.add('visible');
+    updateDateState(picker.selectedDates);
+
+    if (dateBtn) {
+        dateBtn.addEventListener('click', dateBtnHandler);
     }
 
     if (clearBtn) {
@@ -69,8 +78,12 @@ export function initDatePicker(calendar, onChange) {
 export function destroyDatePicker(calendar) {
     const data = datePickers.get(calendar);
     if (data) {
-        const { picker, clearBtn, clearHandler } = data;
-        
+        const { picker, dateBtn, dateBtnHandler, clearBtn, clearHandler } = data;
+
+        if (dateBtn && dateBtnHandler) {
+            dateBtn.removeEventListener('click', dateBtnHandler);
+        }
+
         if (clearBtn && clearHandler) {
             clearBtn.removeEventListener('click', clearHandler);
         }
