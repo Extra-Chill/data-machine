@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.11.4] - 2026-01-28
+
+### Added
+- Add CLI test commands for Ticketmaster and Dice FM handlers
+
+### Changed
+- Remove dead show* attributes, always fire price hook
+
 ## [0.11.3] - 2026-01-28
 
 ### Changed
