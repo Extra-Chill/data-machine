@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.10.19] - 2026-01-27
+
+### Changed
+- Revert date filter to text input (reverts de37727)
+
 ## [0.10.18] - 2026-01-27
 
 ### Changed
