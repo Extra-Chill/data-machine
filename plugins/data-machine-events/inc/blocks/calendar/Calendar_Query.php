@@ -831,6 +831,7 @@ class Calendar_Query {
 			'display_vars'    => $display_vars,
 			'display_context' => $display_context,
 			'badges_html'     => Taxonomy_Badges::render_taxonomy_badges( $event_post->ID ),
+			'button_classes'  => implode( ' ', apply_filters( 'datamachine_events_more_info_button_classes', array( 'datamachine-more-info-button' ) ) ),
 		);
 
 		$item_classes = array( 'datamachine-event-item', 'datamachine-event-placeholder' );
@@ -864,13 +865,13 @@ class Calendar_Query {
 	 */
 	private static function generate_cache_key( array $params, string $prefix ): string {
 		$key_data = array(
-			'show_past'     => $params['show_past'] ?? false,
-			'search_query'  => $params['search_query'] ?? '',
-			'date_start'    => $params['date_start'] ?? '',
-			'date_end'      => $params['date_end'] ?? '',
-			'tax_filters'   => $params['tax_filters'] ?? array(),
-			'archive_tax'   => $params['archive_taxonomy'] ?? '',
-			'archive_term'  => $params['archive_term_id'] ?? 0,
+			'show_past'    => $params['show_past'] ?? false,
+			'search_query' => $params['search_query'] ?? '',
+			'date_start'   => $params['date_start'] ?? '',
+			'date_end'     => $params['date_end'] ?? '',
+			'tax_filters'  => $params['tax_filters'] ?? array(),
+			'archive_tax'  => $params['archive_taxonomy'] ?? '',
+			'archive_term' => $params['archive_term_id'] ?? 0,
 		);
 
 		return CACHE_PREFIX . $prefix . '_' . md5( wp_json_encode( $key_data ) );

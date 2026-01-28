@@ -124,7 +124,7 @@ function hydratePlaceholder(placeholder) {
         '<div class="datamachine-event-meta">' +
             timeHtml +
             performerHtml +
-            '<a href="' + escapeAttr(data.permalink) + '" class="datamachine-more-info-button">More Info</a>' +
+            '<a href="' + escapeAttr(data.permalink) + '" class="' + escapeAttr(data.button_classes || 'datamachine-more-info-button') + '">More Info</a>' +
         '</div>' +
     '</div>';
 
