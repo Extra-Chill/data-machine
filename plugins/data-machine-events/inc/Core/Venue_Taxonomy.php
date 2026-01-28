@@ -150,7 +150,15 @@ class Venue_Taxonomy {
 		$result = wp_insert_term( $venue_name, 'venue' );
 
 		if ( is_wp_error( $result ) ) {
-			error_log( 'DM Events: Failed to create venue "' . $venue_name . '": ' . $result->get_error_message() );
+			do_action(
+				'datamachine_log',
+				'error',
+				'Failed to create venue term',
+				array(
+					'venue_name' => $venue_name,
+					'error'      => $result->get_error_message(),
+				)
+			);
 			return array(
 				'term_id'     => null,
 				'was_created' => false,
@@ -385,7 +393,15 @@ class Venue_Taxonomy {
 		);
 
 		if ( ! $result['success'] ) {
-			error_log( 'DM Events Geocoding Error: ' . ( $result['error'] ?? 'Unknown error' ) );
+			do_action(
+				'datamachine_log',
+				'error',
+				'Geocoding request failed',
+				array(
+					'error' => $result['error'] ?? 'Unknown error',
+					'query' => $query,
+				)
+			);
 			return null;
 		}
 

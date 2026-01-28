@@ -105,7 +105,15 @@ class Promoter_Taxonomy {
 		$result = wp_insert_term( $promoter_name, 'promoter', $term_args );
 
 		if ( is_wp_error( $result ) ) {
-			error_log( 'DM Events: Failed to create promoter "' . $promoter_name . '": ' . $result->get_error_message() );
+			do_action(
+				'datamachine_log',
+				'error',
+				'Failed to create promoter term',
+				array(
+					'promoter_name' => $promoter_name,
+					'error'         => $result->get_error_message(),
+				)
+			);
 			return array(
 				'term_id'     => null,
 				'was_created' => false,

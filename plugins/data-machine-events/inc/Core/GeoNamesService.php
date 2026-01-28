@@ -68,7 +68,15 @@ class GeoNamesService {
 		);
 
 		if ( ! $result['success'] ) {
-			error_log( 'DM Events GeoNames Error: ' . ( $result['error'] ?? 'Unknown error' ) );
+			do_action(
+				'datamachine_log',
+				'error',
+				'GeoNames API request failed',
+				array(
+					'error'       => $result['error'] ?? 'Unknown error',
+					'coordinates' => $coordinates,
+				)
+			);
 			return null;
 		}
 
@@ -79,7 +87,15 @@ class GeoNamesService {
 		}
 
 		if ( isset( $data['status'] ) ) {
-			error_log( 'DM Events GeoNames API Error: ' . ( $data['status']['message'] ?? 'Unknown' ) );
+			do_action(
+				'datamachine_log',
+				'error',
+				'GeoNames API returned error status',
+				array(
+					'message'     => $data['status']['message'] ?? 'Unknown',
+					'coordinates' => $coordinates,
+				)
+			);
 			return null;
 		}
 
