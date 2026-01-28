@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.10.18] - 2026-01-27
+
+### Changed
+- Replace date range text input with calendar icon button
+
 ## [0.10.17] - 2026-01-27
 
 ### Changed
