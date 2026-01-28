@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.11.0] - 2026-01-27
+
+### Added
+- Calendar block transient caching for event queries with automatic invalidation on event/taxonomy changes
+- Lazy rendering for horizontal scroll carousels - renders first 5 events, hydrates rest via IntersectionObserver
+- Skeleton shimmer animation for placeholder event cards during lazy load
+
 ## [0.10.19] - 2026-01-27
 
 ### Changed
