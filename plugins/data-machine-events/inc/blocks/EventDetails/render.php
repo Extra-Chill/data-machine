@@ -29,9 +29,6 @@ $venue            = $decode_unicode( $attributes['venue'] ?? '' );
 $address          = $decode_unicode( $attributes['address'] ?? '' );
 $price            = $decode_unicode( $attributes['price'] ?? '' );
 $ticket_url       = $attributes['ticketUrl'] ?? '';
-$show_venue       = $attributes['showVenue'] ?? true;
-$show_price       = $attributes['showPrice'] ?? true;
-$show_ticket_link = $attributes['showTicketLink'] ?? true;
 $occurrence_dates = $attributes['occurrenceDates'] ?? array();
 
 $post_id = get_the_ID();
@@ -150,7 +147,7 @@ $event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_
 			</div>
 		<?php endif; ?>
 
-		<?php if ( $show_venue && $venue ) : ?>
+		<?php if ( $venue ) : ?>
 			<div class="event-venue">
 				<span class="icon">📍</span>
 				<span class="text">
@@ -168,28 +165,28 @@ $event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_
 			</div>
 		<?php endif; ?>
 
-		<?php if ( $show_price && $price ) : ?>
-			<div class="event-price">
+		<div class="event-price">
+			<?php if ( $price ) : ?>
 				<span class="icon">💰</span>
 				<span class="text"><?php echo esc_html( $price ); ?></span>
-				<?php
-				/**
-				 * Action hook for content below the price text.
-				 *
-				 * Renders inside .event-price div, below the price text.
-				 * Use for promotional content like membership discounts.
-				 *
-				 * @param int    $post_id Current event post ID
-				 * @param string $price   Event price string
-				 */
-				do_action( 'datamachine_events_after_price_display', $post_id, $price );
-				?>
-			</div>
-		<?php endif; ?>
+			<?php endif; ?>
+			<?php
+			/**
+			 * Fires after price text, inside .event-price container.
+			 *
+			 * Always fires to support promotional content (e.g., membership badges)
+			 * even when no price is set.
+			 *
+			 * @param int    $post_id Current event post ID.
+			 * @param string $price   Event price string (may be empty).
+			 */
+			do_action( 'datamachine_events_after_price_display', $post_id, $price );
+			?>
+		</div>
 	</div>
 
 	<div class="event-action-buttons">
-		<?php if ( $show_ticket_link && $ticket_url ) : ?>
+		<?php if ( $ticket_url ) : ?>
 			<a href="<?php echo esc_url( $ticket_url ); ?>" class="<?php echo esc_attr( implode( ' ', apply_filters( 'datamachine_events_ticket_button_classes', array( 'ticket-button' ) ) ) ); ?>" target="_blank" rel="noopener">
 				<?php echo esc_html( $ticket_button_text ); ?>
 			</a>
