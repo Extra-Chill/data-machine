@@ -105,6 +105,16 @@ if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR
 	\WP_CLI::add_command( 'datamachine-events resync-meta', \DataMachineEvents\Cli\ResyncMetaCommand::class );
 }
 
+if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/TicketmasterTestCommand.php' ) ) {
+	require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/TicketmasterTestCommand.php';
+	\WP_CLI::add_command( 'datamachine-events test-ticketmaster', \DataMachineEvents\Cli\TicketmasterTestCommand::class );
+}
+
+if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/DiceFmTestCommand.php' ) ) {
+	require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/DiceFmTestCommand.php';
+	\WP_CLI::add_command( 'datamachine-events test-dice-fm', \DataMachineEvents\Cli\DiceFmTestCommand::class );
+}
+
 
 /**
  * Main Data Machine Events plugin class
@@ -254,6 +264,16 @@ class DATAMACHINE_Events {
 		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/MetaSyncAbilities.php' ) ) {
 			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/MetaSyncAbilities.php';
 			new \DataMachineEvents\Abilities\MetaSyncAbilities();
+		}
+
+		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TicketmasterTest.php' ) ) {
+			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TicketmasterTest.php';
+			new \DataMachineEvents\Abilities\TicketmasterTest();
+		}
+
+		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/DiceFmTest.php' ) ) {
+			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/DiceFmTest.php';
+			new \DataMachineEvents\Abilities\DiceFmTest();
 		}
 
 		$this->registerSystemHealthChecks();
