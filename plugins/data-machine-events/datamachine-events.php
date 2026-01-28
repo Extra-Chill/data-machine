@@ -100,6 +100,11 @@ if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR
 	\WP_CLI::add_command( 'datamachine-events resync-ticket-urls', \DataMachineEvents\Cli\TicketUrlResyncCommand::class );
 }
 
+if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/ResyncMetaCommand.php' ) ) {
+	require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/ResyncMetaCommand.php';
+	\WP_CLI::add_command( 'datamachine-events resync-meta', \DataMachineEvents\Cli\ResyncMetaCommand::class );
+}
+
 
 /**
  * Main Data Machine Events plugin class
@@ -244,6 +249,11 @@ class DATAMACHINE_Events {
 		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TicketUrlResyncAbilities.php' ) ) {
 			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TicketUrlResyncAbilities.php';
 			new \DataMachineEvents\Abilities\TicketUrlResyncAbilities();
+		}
+
+		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/MetaSyncAbilities.php' ) ) {
+			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/MetaSyncAbilities.php';
+			new \DataMachineEvents\Abilities\MetaSyncAbilities();
 		}
 
 		$this->registerSystemHealthChecks();

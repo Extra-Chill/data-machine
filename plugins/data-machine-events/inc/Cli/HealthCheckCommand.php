@@ -27,6 +27,7 @@ class HealthCheckCommand {
 		'missing_description',
 		'broken_timezone',
 		'invalid_encoding',
+		'missing_meta_sync',
 	);
 	private const DEFAULT_LIMIT    = 25;
 	private const DEFAULT_DAYS     = 90;
@@ -272,6 +273,7 @@ class HealthCheckCommand {
 			'missing_description' => 'Missing Description',
 			'broken_timezone'     => 'Missing Venue Timezone',
 			'invalid_encoding'    => 'Invalid Unicode Encoding',
+			'missing_meta_sync'   => 'Missing Meta Sync (block ok, meta missing)',
 		);
 
 		return $labels[ $category ] ?? $category;

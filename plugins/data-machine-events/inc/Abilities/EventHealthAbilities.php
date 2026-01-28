@@ -4,7 +4,7 @@
  *
  * Scans events for data quality issues: missing time, suspicious midnight start,
  * late night start (midnight-4am), suspicious 11:59pm end time, missing venue,
- * or missing description.
+ * missing description, or missing meta sync (block has data but post meta failed).
  *
  * Provides abilities for CLI/REST/MCP consumption.
  * Chat tool wrapper lives in inc/Api/Chat/Tools/EventHealthCheck.php.
@@ -242,6 +242,13 @@ class EventHealthAbilities {
 			$broken_timezone = array();
 		}
 
+		$missing_meta_sync = array();
+		$meta_sync_ability = wp_get_ability( 'datamachine-events/find-missing-meta-sync' );
+		if ( $meta_sync_ability ) {
+			$meta_sync_result  = $meta_sync_ability->execute( array( 'limit' => $limit ) );
+			$missing_meta_sync = $meta_sync_result['events'] ?? array();
+		}
+
 		$total = count( $events );
 
 		$sort_by_date = fn( $a, $b ) => strcmp( $a['date'], $b['date'] );
@@ -281,6 +288,9 @@ class EventHealthAbilities {
 		}
 		if ( ! empty( $invalid_encoding ) ) {
 			$message_parts[] = count( $invalid_encoding ) . ' invalid encoding';
+		}
+		if ( ! empty( $missing_meta_sync ) ) {
+			$message_parts[] = count( $missing_meta_sync ) . ' missing meta sync';
 		}
 		if ( $no_venue_count > 0 ) {
 			$message_parts[] = $no_venue_count . ' no venue';
@@ -326,6 +336,10 @@ class EventHealthAbilities {
 			'invalid_encoding'    => array(
 				'count'  => count( $invalid_encoding ),
 				'events' => array_slice( $invalid_encoding, 0, $limit ),
+			),
+			'missing_meta_sync'   => array(
+				'count'  => count( $missing_meta_sync ),
+				'events' => array_slice( $missing_meta_sync, 0, $limit ),
 			),
 			'message'             => $message,
 		);
