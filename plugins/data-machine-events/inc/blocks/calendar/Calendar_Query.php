@@ -26,6 +26,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 const DAYS_PER_PAGE             = 5;
 const MIN_EVENTS_FOR_PAGINATION = 20;
+const CACHE_TTL_DATES           = 5 * MINUTE_IN_SECONDS;
+const CACHE_TTL_COUNTS          = 10 * MINUTE_IN_SECONDS;
+const CACHE_PREFIX              = 'datamachine_cal_';
+const LAZY_RENDER_THRESHOLD     = 5;
 
 class Calendar_Query {
 
@@ -158,9 +162,31 @@ class Calendar_Query {
 	/**
 	 * Get past and future event counts
 	 *
+	 * Results are cached for CACHE_TTL_COUNTS seconds.
+	 *
 	 * @return array ['past' => int, 'future' => int]
 	 */
 	public static function get_event_counts(): array {
+		$cache_key = CACHE_PREFIX . 'counts';
+		$cached    = get_transient( $cache_key );
+
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		$result = self::compute_event_counts();
+
+		set_transient( $cache_key, $result, CACHE_TTL_COUNTS );
+
+		return $result;
+	}
+
+	/**
+	 * Compute past and future event counts (uncached)
+	 *
+	 * @return array ['past' => int, 'future' => int]
+	 */
+	private static function compute_event_counts(): array {
 		$current_datetime = current_time( 'mysql' );
 
 		$future_query = new WP_Query(
@@ -745,6 +771,7 @@ class Calendar_Query {
 
 			<div class="datamachine-events-wrapper">
 				<?php
+				$event_index = 0;
 				foreach ( $events_for_date as $event_item ) {
 					$event_post      = $event_item['post'];
 					$event_data      = $event_item['event_data'];
@@ -757,14 +784,19 @@ class Calendar_Query {
 
 					$display_vars = self::build_display_vars( $event_data, $display_context );
 
-					Template_Loader::include_template(
-						'event-item',
-						array(
-							'event_post'   => $event_post,
-							'event_data'   => $event_data,
-							'display_vars' => $display_vars,
-						)
-					);
+					if ( $event_index < LAZY_RENDER_THRESHOLD ) {
+						Template_Loader::include_template(
+							'event-item',
+							array(
+								'event_post'   => $event_post,
+								'event_data'   => $event_data,
+								'display_vars' => $display_vars,
+							)
+						);
+					} else {
+						self::render_event_placeholder( $event_post, $event_data, $display_vars, $display_context );
+					}
+					++$event_index;
 				}
 				?>
 			</div><!-- .datamachine-events-wrapper -->
@@ -776,9 +808,79 @@ class Calendar_Query {
 	}
 
 	/**
+	 * Render an event placeholder for lazy loading
+	 *
+	 * Outputs a skeleton placeholder with JSON data for client-side hydration.
+	 *
+	 * @param \WP_Post $event_post    Event post object
+	 * @param array    $event_data    Event data from block attributes
+	 * @param array    $display_vars  Processed display variables
+	 * @param array    $display_context Display context for multi-day events
+	 */
+	private static function render_event_placeholder(
+		\WP_Post $event_post,
+		array $event_data,
+		array $display_vars,
+		array $display_context
+	): void {
+		$placeholder_data = array(
+			'id'              => $event_post->ID,
+			'title'           => get_the_title( $event_post ),
+			'permalink'       => get_the_permalink( $event_post ),
+			'event_data'      => $event_data,
+			'display_vars'    => $display_vars,
+			'display_context' => $display_context,
+			'badges_html'     => Taxonomy_Badges::render_taxonomy_badges( $event_post->ID ),
+		);
+
+		$item_classes = array( 'datamachine-event-item', 'datamachine-event-placeholder' );
+		if ( ! empty( $display_vars['is_continuation'] ) ) {
+			$item_classes[] = 'datamachine-event-continuation';
+		}
+		if ( ! empty( $display_vars['is_multi_day'] ) ) {
+			$item_classes[] = 'datamachine-event-multi-day';
+		}
+
+		printf(
+			'<div class="%s" data-event-json="%s">
+				<div class="datamachine-placeholder-skeleton">
+					<div class="datamachine-skeleton-badges"></div>
+					<div class="datamachine-skeleton-title"></div>
+					<div class="datamachine-skeleton-meta"></div>
+					<div class="datamachine-skeleton-button"></div>
+				</div>
+			</div>',
+			esc_attr( implode( ' ', $item_classes ) ),
+			esc_attr( wp_json_encode( $placeholder_data ) )
+		);
+	}
+
+	/**
+	 * Generate cache key from query parameters
+	 *
+	 * @param array  $params Query parameters
+	 * @param string $prefix Cache key prefix
+	 * @return string Cache key
+	 */
+	private static function generate_cache_key( array $params, string $prefix ): string {
+		$key_data = array(
+			'show_past'     => $params['show_past'] ?? false,
+			'search_query'  => $params['search_query'] ?? '',
+			'date_start'    => $params['date_start'] ?? '',
+			'date_end'      => $params['date_end'] ?? '',
+			'tax_filters'   => $params['tax_filters'] ?? array(),
+			'archive_tax'   => $params['archive_taxonomy'] ?? '',
+			'archive_term'  => $params['archive_term_id'] ?? 0,
+		);
+
+		return CACHE_PREFIX . $prefix . '_' . md5( wp_json_encode( $key_data ) );
+	}
+
+	/**
 	 * Get unique event dates for pagination calculations
 	 *
 	 * Expands multi-day events to count on each day they span.
+	 * Results are cached for CACHE_TTL_DATES seconds.
 	 *
 	 * @param array $params Query parameters (show_past, search_query, tax_filters, etc.)
 	 * @return array {
@@ -787,6 +889,27 @@ class Calendar_Query {
 	 * }
 	 */
 	public static function get_unique_event_dates( array $params ): array {
+		$cache_key = self::generate_cache_key( $params, 'dates' );
+		$cached    = get_transient( $cache_key );
+
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		$result = self::compute_unique_event_dates( $params );
+
+		set_transient( $cache_key, $result, CACHE_TTL_DATES );
+
+		return $result;
+	}
+
+	/**
+	 * Compute unique event dates (uncached)
+	 *
+	 * @param array $params Query parameters
+	 * @return array Event dates data
+	 */
+	private static function compute_unique_event_dates( array $params ): array {
 		$query_args           = self::build_query_args( $params );
 		$query_args['fields'] = 'ids';
 

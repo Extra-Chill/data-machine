@@ -393,6 +393,9 @@ class DATAMACHINE_Events {
 		register_block_type( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/Calendar' );
 		register_block_type( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/EventDetails' );
 
+		// Initialize calendar cache invalidation hooks
+		\DataMachineEvents\Blocks\Calendar\Cache_Invalidator::init();
+
 		// Enqueue root CSS custom properties when any block is present
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_root_styles' ) );
 		add_action( 'enqueue_block_assets', array( $this, 'enqueue_root_styles' ) );

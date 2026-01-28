@@ -1379,3 +1379,65 @@
     border-radius: 4px;
 }
 
+/* ================================
+   LAZY LOAD PLACEHOLDER SKELETONS
+   ================================ */
+
+.datamachine-event-placeholder {
+    overflow: hidden;
+}
+
+.datamachine-placeholder-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    height: 100%;
+    padding: var(--datamachine-card-padding);
+}
+
+.datamachine-skeleton-badges,
+.datamachine-skeleton-title,
+.datamachine-skeleton-meta,
+.datamachine-skeleton-button {
+    background: linear-gradient(
+        90deg,
+        var(--datamachine-border-light) 25%,
+        var(--datamachine-background-hover) 50%,
+        var(--datamachine-border-light) 75%
+    );
+    background-size: 200% 100%;
+    animation: datamachine-skeleton-shimmer 1.5s ease-in-out infinite;
+    border-radius: 4px;
+}
+
+.datamachine-skeleton-badges {
+    width: 60%;
+    height: 1.25rem;
+}
+
+.datamachine-skeleton-title {
+    width: 85%;
+    height: 1.5rem;
+}
+
+.datamachine-skeleton-meta {
+    width: 70%;
+    height: 1rem;
+    margin-top: auto;
+}
+
+.datamachine-skeleton-button {
+    width: 5rem;
+    height: 2rem;
+    margin-top: 0.5rem;
+}
+
+@keyframes datamachine-skeleton-shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+

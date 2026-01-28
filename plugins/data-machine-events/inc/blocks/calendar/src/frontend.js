@@ -19,6 +19,7 @@ import { initDatePicker, destroyDatePicker, getDatePicker } from './modules/date
 import { initFilterModal, destroyFilterModal } from './modules/filter-modal.js';
 import { initNavigation } from './modules/navigation.js';
 import { getFilterState, destroyFilterState } from './modules/filter-state.js';
+import { initLazyRender, destroyLazyRender } from './modules/lazy-render.js';
 
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.datamachine-events-calendar').forEach(initCalendarInstance);
@@ -32,6 +33,7 @@ function initCalendarInstance(calendar) {
 
     filterState.restoreFromStorage();
 
+    initLazyRender(calendar);
     initCarousel(calendar);
 
     initDatePicker(calendar, function() {
@@ -105,6 +107,7 @@ window.addEventListener('beforeunload', function() {
     document.querySelectorAll('.datamachine-events-calendar').forEach(function(calendar) {
         destroyDatePicker(calendar);
         destroyCarousel(calendar);
+        destroyLazyRender(calendar);
         destroyFilterState(calendar);
     });
 });
