@@ -39,8 +39,8 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		$this->assertTrue( class_exists( TicketmasterSettings::class ) );
 	}
 
-	public function test_normalize_event_returns_array() {
-		$method = $this->getProtectedMethod( 'normalizeEvent' );
+	public function test_map_event_returns_array() {
+		$method = $this->getProtectedMethod( 'map_ticketmaster_event' );
 
 		$api_event = array(
 			'name'        => 'Test Concert',
@@ -85,8 +85,8 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		$this->assertEquals( '19:30', $result['startTime'] );
 	}
 
-	public function test_normalize_event_handles_missing_venue() {
-		$method = $this->getProtectedMethod( 'normalizeEvent' );
+	public function test_map_event_handles_missing_venue() {
+		$method = $this->getProtectedMethod( 'map_ticketmaster_event' );
 
 		$api_event = array(
 			'name'  => 'No Venue Event',
@@ -105,8 +105,8 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		$this->assertEquals( '', $result['venue'] ?? '' );
 	}
 
-	public function test_normalize_event_handles_price_ranges() {
-		$method = $this->getProtectedMethod( 'normalizeEvent' );
+	public function test_map_event_handles_price_ranges() {
+		$method = $this->getProtectedMethod( 'map_ticketmaster_event' );
 
 		$api_event = array(
 			'name'        => 'Priced Event',
@@ -131,32 +131,51 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		$this->assertNotEmpty( $result['price'] ?? '' );
 	}
 
-	public function test_build_api_url_includes_required_params() {
-		$method = $this->getProtectedMethod( 'buildApiUrl' );
+	public function test_map_event_formats_price_correctly() {
+		$method = $this->getProtectedMethod( 'map_ticketmaster_event' );
 
-		$config = array(
-			'api_key'     => 'test_key_123',
-			'venue_id'    => 'KovZpZA7AAEA',
-			'search_term' => '',
+		$api_event = array(
+			'name'        => 'Price Format Test',
+			'id'          => 'TM789',
+			'priceRanges' => array(
+				array(
+					'min'      => 50.00,
+					'max'      => 50.00,
+					'currency' => 'USD',
+				),
+			),
+			'dates'       => array(
+				'start' => array(
+					'localDate' => '2026-06-01',
+				),
+			),
 		);
 
-		$result = $method->invoke( $this->handler, $config, 0 );
+		$result = $method->invoke( $this->handler, $api_event );
 
-		$this->assertStringContainsString( 'apikey=test_key_123', $result );
-		$this->assertStringContainsString( 'venueId=KovZpZA7AAEA', $result );
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'price', $result );
+		$this->assertEquals( '$50.00', $result['price'] );
 	}
 
-	public function test_build_api_url_with_pagination() {
-		$method = $this->getProtectedMethod( 'buildApiUrl' );
+	public function test_map_event_handles_missing_price() {
+		$method = $this->getProtectedMethod( 'map_ticketmaster_event' );
 
-		$config = array(
-			'api_key'  => 'test_key',
-			'venue_id' => 'TEST123',
+		$api_event = array(
+			'name'  => 'No Price Event',
+			'id'    => 'TM999',
+			'dates' => array(
+				'start' => array(
+					'localDate' => '2026-07-01',
+				),
+			),
 		);
 
-		$result = $method->invoke( $this->handler, $config, 2 );
+		$result = $method->invoke( $this->handler, $api_event );
 
-		$this->assertStringContainsString( 'page=2', $result );
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'price', $result );
+		$this->assertEquals( '', $result['price'] );
 	}
 
 	private function getProtectedMethod( string $name ) {

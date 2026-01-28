@@ -461,6 +461,22 @@ class Ticketmaster extends EventImportHandler {
 				$price_range['min'] ?? null,
 				$price_range['max'] ?? null
 			);
+			error_log(
+				sprintf(
+					'[Ticketmaster] Price extracted for "%s": %s (min: %s, max: %s)',
+					$title,
+					$price,
+					$price_range['min'] ?? 'null',
+					$price_range['max'] ?? 'null'
+				)
+			);
+		} else {
+			error_log(
+				sprintf(
+					'[Ticketmaster] No priceRanges in API response for "%s"',
+					$title
+				)
+			);
 		}
 
 		$ticket_url = $tm_event['url'] ?? '';
