@@ -167,11 +167,11 @@ class UniversalWebScraper extends EventImportHandler {
 			)
 		);
 
-		// Direct support for ICS/JSON URLs
-		if ( preg_match( '/\.ics($|\?)/i', $url ) || preg_match( '/wp-json\/tribe\/events/i', $url ) ) {
+		// Direct support for ICS feeds (single fetch, no pagination)
+		if ( preg_match( '/\.ics($|\?)/i', $url ) ) {
 			$context->log(
 				'info',
-				'Universal Web Scraper: Direct structured data URL detected',
+				'Universal Web Scraper: Direct ICS feed URL detected',
 				array(
 					'url' => $url,
 				)
@@ -190,6 +190,11 @@ class UniversalWebScraper extends EventImportHandler {
 					return $result;
 				}
 			}
+		}
+
+		// JSON REST APIs get pagination support
+		if ( preg_match( '/wp-json\/tribe\/events/i', $url ) || preg_match( '/wp-json\/wp\/v2\/events/i', $url ) ) {
+			return $this->executeJsonApiPagination( $url, $config, $context );
 		}
 
 		$current_url  = $url;
@@ -586,6 +591,156 @@ class UniversalWebScraper extends EventImportHandler {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Execute JSON API pagination for WordPress REST endpoints.
+	 *
+	 * Fetches pages sequentially until an eligible event is found or all pages exhausted.
+	 */
+	private function executeJsonApiPagination( string $url, array $config, ExecutionContext $context ): array {
+		$context->log(
+			'info',
+			'Universal Web Scraper: Starting JSON API pagination',
+			array(
+				'url' => $url,
+			)
+		);
+
+		$current_page = 1;
+		$total_pages  = 1;
+
+		while ( $current_page <= self::MAX_PAGES && $current_page <= $total_pages ) {
+			$page_url = $this->buildPaginatedUrl( $url, $current_page );
+
+			$context->log(
+				'info',
+				'Universal Web Scraper: JSON API pagination',
+				array(
+					'page'        => $current_page,
+					'total_pages' => $total_pages,
+					'url'         => $page_url,
+				)
+			);
+
+			$content = $this->fetch_html( $page_url, $context );
+			if ( empty( $content ) ) {
+				$context->log(
+					'debug',
+					'Universal Web Scraper: Empty response from JSON API, ending pagination',
+					array(
+						'page' => $current_page,
+						'url'  => $page_url,
+					)
+				);
+				break;
+			}
+
+			// Parse pagination metadata before extraction
+			$pagination = $this->parseJsonPaginationMetadata( $content );
+			if ( $pagination['total_pages'] > $total_pages ) {
+				$total_pages = $pagination['total_pages'];
+				$context->log(
+					'debug',
+					'Universal Web Scraper: Updated total pages from API response',
+					array(
+						'total_pages' => $total_pages,
+						'total'       => $pagination['total'],
+					)
+				);
+			}
+
+			// Try structured data extraction
+			$result = $this->tryStructuredDataExtraction(
+				$content,
+				$page_url,
+				$config,
+				$context
+			);
+
+			if ( null !== $result ) {
+				return $result;
+			}
+
+			// No eligible event on this page, check if more pages exist
+			if ( ! $pagination['has_more'] ) {
+				$context->log(
+					'info',
+					'Universal Web Scraper: No more JSON API pages available',
+					array(
+						'pages_checked' => $current_page,
+						'total_pages'   => $total_pages,
+					)
+				);
+				break;
+			}
+
+			++$current_page;
+		}
+
+		$context->log(
+			'info',
+			'Universal Web Scraper: JSON API pagination complete, no eligible events found',
+			array(
+				'pages_checked' => $current_page,
+				'total_pages'   => $total_pages,
+			)
+		);
+
+		return array();
+	}
+
+	/**
+	 * Parse pagination metadata from JSON API response.
+	 */
+	private function parseJsonPaginationMetadata( string $content ): array {
+		$data = json_decode( trim( $content ), true );
+
+		if ( ! is_array( $data ) ) {
+			return array(
+				'has_more'     => false,
+				'current_page' => 1,
+				'total_pages'  => 1,
+				'total'        => 0,
+			);
+		}
+
+		// Tribe Events REST API format
+		$current_page = (int) ( $data['page'] ?? 1 );
+		$total_pages  = (int) ( $data['total_pages'] ?? 1 );
+		$total        = (int) ( $data['total'] ?? 0 );
+
+		return array(
+			'current_page' => $current_page,
+			'total_pages'  => $total_pages,
+			'total'        => $total,
+			'has_more'     => $current_page < $total_pages,
+		);
+	}
+
+	/**
+	 * Build a paginated URL by adding or updating the page parameter.
+	 */
+	private function buildPaginatedUrl( string $base_url, int $page ): string {
+		$parsed = wp_parse_url( $base_url );
+		$query  = array();
+
+		if ( ! empty( $parsed['query'] ) ) {
+			parse_str( $parsed['query'], $query );
+		}
+
+		$query['page'] = $page;
+
+		$url = ( $parsed['scheme'] ?? 'https' ) . '://' . $parsed['host'];
+		if ( ! empty( $parsed['port'] ) ) {
+			$url .= ':' . $parsed['port'];
+		}
+		if ( ! empty( $parsed['path'] ) ) {
+			$url .= $parsed['path'];
+		}
+		$url .= '?' . http_build_query( $query );
+
+		return $url;
 	}
 
 	/**
