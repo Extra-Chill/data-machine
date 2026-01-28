@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.11.1] - 2026-01-27
+
+### Changed
+- Add JSON API pagination for WordPress REST event endpoints
+
+### Fixed
+- Fix lazy-loaded button classes not respecting filter hook
+
 ## [0.11.0] - 2026-01-27
 
 ### Added
