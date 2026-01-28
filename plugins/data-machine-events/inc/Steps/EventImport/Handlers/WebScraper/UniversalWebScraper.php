@@ -61,6 +61,9 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\MusicItem
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\CraftpeakExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\IcsExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\DoStuffExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators\PaginatorInterface;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators\JsonApiPaginator;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators\HtmlLinkPaginator;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
@@ -82,11 +85,15 @@ class UniversalWebScraper extends EventImportHandler {
 	/** @var ExtractorInterface[] */
 	private array $extractors;
 
+	/** @var PaginatorInterface[] */
+	private array $paginators;
+
 	public function __construct() {
 		parent::__construct( 'universal_web_scraper' );
 
 		$this->processor  = new StructuredDataProcessor( $this );
 		$this->extractors = $this->getExtractors();
+		$this->paginators = $this->getPaginators();
 
 		self::registerHandler(
 			'universal_web_scraper',
@@ -135,6 +142,18 @@ class UniversalWebScraper extends EventImportHandler {
 	}
 
 	/**
+	 * Get registered paginators in priority order.
+	 *
+	 * @return PaginatorInterface[]
+	 */
+	private function getPaginators(): array {
+		return array(
+			new JsonApiPaginator(),
+			new HtmlLinkPaginator(),
+		);
+	}
+
+	/**
 	 * Execute web scraper with structured data extraction and AI fallback.
 	 */
 	protected function executeFetch( array $config, ExecutionContext $context ): array {
@@ -167,7 +186,7 @@ class UniversalWebScraper extends EventImportHandler {
 			)
 		);
 
-		// Direct support for ICS feeds (single fetch, no pagination)
+		// ICS feeds: single fetch, no pagination
 		if ( preg_match( '/\.ics($|\?)/i', $url ) ) {
 			$context->log(
 				'info',
@@ -190,13 +209,10 @@ class UniversalWebScraper extends EventImportHandler {
 					return $result;
 				}
 			}
+			return array();
 		}
 
-		// JSON REST APIs get pagination support
-		if ( preg_match( '/wp-json\/tribe\/events/i', $url ) || preg_match( '/wp-json\/wp\/v2\/events/i', $url ) ) {
-			return $this->executeJsonApiPagination( $url, $config, $context );
-		}
-
+		// Unified pagination loop
 		$current_url  = $url;
 		$current_page = 1;
 		$visited_urls = array();
@@ -268,19 +284,9 @@ class UniversalWebScraper extends EventImportHandler {
 				return $html_result;
 			}
 
-			// No eligible events on this page - look for next page
-			$context->log(
-				'info',
-				'Universal Web Scraper: No unprocessed events on page, checking for next page',
-				array(
-					'page' => $current_page,
-					'url'  => $current_url,
-				)
-			);
-
-			$next_url = $this->find_next_page_url( $html_content, $current_url );
-
-			if ( empty( $next_url ) ) {
+			// Find next page via paginators
+			$next_url = $this->findNextPage( $current_url, $html_content, $context );
+			if ( null === $next_url ) {
 				$context->log(
 					'info',
 					'Universal Web Scraper: No more pages to process',
@@ -594,153 +600,30 @@ class UniversalWebScraper extends EventImportHandler {
 	}
 
 	/**
-	 * Execute JSON API pagination for WordPress REST endpoints.
+	 * Find next page URL using registered paginators.
 	 *
-	 * Fetches pages sequentially until an eligible event is found or all pages exhausted.
+	 * @param string           $url     Current page URL.
+	 * @param string           $content Current page content.
+	 * @param ExecutionContext $context Execution context for logging.
+	 * @return string|null Next page URL, or null if no more pages.
 	 */
-	private function executeJsonApiPagination( string $url, array $config, ExecutionContext $context ): array {
-		$context->log(
-			'info',
-			'Universal Web Scraper: Starting JSON API pagination',
-			array(
-				'url' => $url,
-			)
-		);
-
-		$current_page = 1;
-		$total_pages  = 1;
-
-		while ( $current_page <= self::MAX_PAGES && $current_page <= $total_pages ) {
-			$page_url = $this->buildPaginatedUrl( $url, $current_page );
-
-			$context->log(
-				'info',
-				'Universal Web Scraper: JSON API pagination',
-				array(
-					'page'        => $current_page,
-					'total_pages' => $total_pages,
-					'url'         => $page_url,
-				)
-			);
-
-			$content = $this->fetch_html( $page_url, $context );
-			if ( empty( $content ) ) {
-				$context->log(
-					'debug',
-					'Universal Web Scraper: Empty response from JSON API, ending pagination',
-					array(
-						'page' => $current_page,
-						'url'  => $page_url,
-					)
-				);
-				break;
+	private function findNextPage( string $url, string $content, ExecutionContext $context ): ?string {
+		foreach ( $this->paginators as $paginator ) {
+			if ( $paginator->canPaginate( $url, $content ) ) {
+				$next = $paginator->getNextPageUrl( $url, $content );
+				if ( null !== $next ) {
+					$context->log(
+						'debug',
+						'Universal Web Scraper: Pagination via ' . $paginator->getMethod(),
+						array(
+							'next_url' => $next,
+						)
+					);
+					return $next;
+				}
 			}
-
-			// Parse pagination metadata before extraction
-			$pagination = $this->parseJsonPaginationMetadata( $content );
-			if ( $pagination['total_pages'] > $total_pages ) {
-				$total_pages = $pagination['total_pages'];
-				$context->log(
-					'debug',
-					'Universal Web Scraper: Updated total pages from API response',
-					array(
-						'total_pages' => $total_pages,
-						'total'       => $pagination['total'],
-					)
-				);
-			}
-
-			// Try structured data extraction
-			$result = $this->tryStructuredDataExtraction(
-				$content,
-				$page_url,
-				$config,
-				$context
-			);
-
-			if ( null !== $result ) {
-				return $result;
-			}
-
-			// No eligible event on this page, check if more pages exist
-			if ( ! $pagination['has_more'] ) {
-				$context->log(
-					'info',
-					'Universal Web Scraper: No more JSON API pages available',
-					array(
-						'pages_checked' => $current_page,
-						'total_pages'   => $total_pages,
-					)
-				);
-				break;
-			}
-
-			++$current_page;
 		}
-
-		$context->log(
-			'info',
-			'Universal Web Scraper: JSON API pagination complete, no eligible events found',
-			array(
-				'pages_checked' => $current_page,
-				'total_pages'   => $total_pages,
-			)
-		);
-
-		return array();
-	}
-
-	/**
-	 * Parse pagination metadata from JSON API response.
-	 */
-	private function parseJsonPaginationMetadata( string $content ): array {
-		$data = json_decode( trim( $content ), true );
-
-		if ( ! is_array( $data ) ) {
-			return array(
-				'has_more'     => false,
-				'current_page' => 1,
-				'total_pages'  => 1,
-				'total'        => 0,
-			);
-		}
-
-		// Tribe Events REST API format
-		$current_page = (int) ( $data['page'] ?? 1 );
-		$total_pages  = (int) ( $data['total_pages'] ?? 1 );
-		$total        = (int) ( $data['total'] ?? 0 );
-
-		return array(
-			'current_page' => $current_page,
-			'total_pages'  => $total_pages,
-			'total'        => $total,
-			'has_more'     => $current_page < $total_pages,
-		);
-	}
-
-	/**
-	 * Build a paginated URL by adding or updating the page parameter.
-	 */
-	private function buildPaginatedUrl( string $base_url, int $page ): string {
-		$parsed = wp_parse_url( $base_url );
-		$query  = array();
-
-		if ( ! empty( $parsed['query'] ) ) {
-			parse_str( $parsed['query'], $query );
-		}
-
-		$query['page'] = $page;
-
-		$url = ( $parsed['scheme'] ?? 'https' ) . '://' . $parsed['host'];
-		if ( ! empty( $parsed['port'] ) ) {
-			$url .= ':' . $parsed['port'];
-		}
-		if ( ! empty( $parsed['path'] ) ) {
-			$url .= $parsed['path'];
-		}
-		$url .= '?' . http_build_query( $query );
-
-		return $url;
+		return null;
 	}
 
 	/**
@@ -786,154 +669,6 @@ class UniversalWebScraper extends EventImportHandler {
 		}
 
 		return '';
-	}
-
-	/**
-	 * Find next page URL from pagination links in HTML.
-	 */
-	private function find_next_page_url( string $html, string $current_url ): ?string {
-		$current_host = parse_url( $current_url, PHP_URL_HOST );
-		if ( empty( $current_host ) ) {
-			return null;
-		}
-
-		$dom = new \DOMDocument();
-		libxml_use_internal_errors( true );
-		$dom->loadHTML( $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD );
-		libxml_clear_errors();
-
-		$xpath = new \DOMXPath( $dom );
-
-		// Priority 1: Standard HTML5 rel="next" on links
-		$next_links = $xpath->query( '//a[@rel="next"]' );
-		if ( $next_links->length > 0 ) {
-			$href = $this->extract_valid_href( $next_links->item( 0 ), $current_url, $current_host );
-			if ( $href ) {
-				return $href;
-			}
-		}
-
-		// Priority 2: Link element with rel="next" (SEO pagination)
-		$link_next = $xpath->query( '//link[@rel="next"]' );
-		if ( $link_next->length > 0 ) {
-			$node = $link_next->item( 0 );
-			if ( $node instanceof \DOMElement ) {
-				$href     = $node->getAttribute( 'href' );
-				$resolved = $this->resolve_url( $href, $current_url, $current_host );
-				if ( $resolved ) {
-					return $resolved;
-				}
-			}
-		}
-
-		// Priority 3: Links with "next" in class name
-		$next_class_patterns = array(
-			'//a[contains(@class, "next")]',
-			'//a[contains(@class, "pagination-next")]',
-			'//a[contains(@class, "page-next")]',
-		);
-
-		foreach ( $next_class_patterns as $pattern ) {
-			$nodes = $xpath->query( $pattern );
-			foreach ( $nodes as $node ) {
-				$href = $this->extract_valid_href( $node, $current_url, $current_host );
-				if ( $href ) {
-					return $href;
-				}
-			}
-		}
-
-		// Priority 4: Links within pagination containers
-		$pagination_containers = array(
-			'//*[contains(@class, "pagination")]//a',
-			'//*[contains(@class, "pager")]//a',
-			'//nav[@aria-label="pagination"]//a',
-			'//*[@role="navigation"]//a',
-		);
-
-		foreach ( $pagination_containers as $container_pattern ) {
-			$nodes = $xpath->query( $container_pattern );
-			foreach ( $nodes as $node ) {
-				if ( ! ( $node instanceof \DOMElement ) ) {
-					continue;
-				}
-
-				$text       = strtolower( trim( $node->textContent ) );
-				$class      = strtolower( $node->getAttribute( 'class' ) );
-				$aria_label = strtolower( $node->getAttribute( 'aria-label' ) );
-
-				if (
-					strpos( $text, 'next' ) !== false ||
-					strpos( $class, 'next' ) !== false ||
-					strpos( $aria_label, 'next' ) !== false ||
-					'>' === $text ||
-					'>>' === $text ||
-					'→' === $text
-				) {
-					$href = $this->extract_valid_href( $node, $current_url, $current_host );
-					if ( $href ) {
-						return $href;
-					}
-				}
-			}
-		}
-
-		return null;
-	}
-
-	/**
-	 * Extract and validate href from DOM node.
-	 */
-	private function extract_valid_href( \DOMNode $node, string $current_url, string $current_host ): ?string {
-		if ( ! ( $node instanceof \DOMElement ) ) {
-			return null;
-		}
-
-		$href = $node->getAttribute( 'href' );
-		if ( empty( $href ) || '#' === $href ) {
-			return null;
-		}
-
-		return $this->resolve_url( $href, $current_url, $current_host );
-	}
-
-	/**
-	 * Resolve relative URL and validate same-domain.
-	 */
-	private function resolve_url( string $href, string $current_url, string $current_host ): ?string {
-		if ( strpos( $href, 'javascript:' ) === 0 ) {
-			return null;
-		}
-
-		// Handle protocol-relative URLs
-		if ( strpos( $href, '//' ) === 0 ) {
-			$href = 'https:' . $href;
-		}
-
-		// Handle relative URLs
-		if ( strpos( $href, '/' ) === 0 ) {
-			$scheme = parse_url( $current_url, PHP_URL_SCHEME ) ?? 'https';
-			$href   = $scheme . '://' . $current_host . $href;
-		} elseif ( ! preg_match( '/^https?:\/\//i', $href ) ) {
-			$base_path = dirname( parse_url( $current_url, PHP_URL_PATH ) ?: '/' );
-			$scheme    = parse_url( $current_url, PHP_URL_SCHEME ) ?? 'https';
-			$href      = $scheme . '://' . $current_host . $base_path . '/' . $href;
-		}
-
-		// Validate same domain
-		$href_host = parse_url( $href, PHP_URL_HOST );
-		if ( $href_host !== $current_host ) {
-			return null;
-		}
-
-		// Skip if it's the same as current URL
-		$current_normalized = strtok( $current_url, '#' );
-		$href_normalized    = strtok( $href, '#' );
-		if ( $current_normalized === $href_normalized ) {
-			return null;
-		}
-
-		return $href;
 	}
 
 	/**
