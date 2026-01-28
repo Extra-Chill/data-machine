@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.11.2] - 2026-01-28
+
+### Changed
+- Refactor UniversalWebScraper pagination into dedicated classes
+
+### Fixed
+- Fix undefined CACHE_PREFIX constant in Cache_Invalidator
+
 ## [0.11.1] - 2026-01-27
 
 ### Changed
