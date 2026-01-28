@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.11.3] - 2026-01-28
+
+### Changed
+- Add meta sync detection and repair via Abilities API
+
 ## [0.11.2] - 2026-01-28
 
 ### Changed
