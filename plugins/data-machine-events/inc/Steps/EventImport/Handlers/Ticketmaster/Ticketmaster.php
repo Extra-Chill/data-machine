@@ -223,7 +223,7 @@ class Ticketmaster extends EventImportHandler {
 		}
 
 		$classifications     = self::get_classifications( $api_key );
-		$classification_slug = $handler_config['classification_type'];
+		$classification_slug = strtolower( $handler_config['classification_type'] );
 
 		if ( ! isset( $classifications[ $classification_slug ] ) ) {
 			throw new \Exception( 'Invalid Ticketmaster classification_type: ' . $classification_slug );
