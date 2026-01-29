@@ -214,10 +214,13 @@ function datamachine_get_recent_logs( string $agent_type = AgentType::PIPELINE, 
 		return array( 'No log file found.' );
 	}
 
-	$file_content = file( $log_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES );
-	if ( false === $file_content ) {
+	$fs      = \DataMachine\Core\FilesRepository\FilesystemHelper::get();
+	$content = $fs ? $fs->get_contents( $log_file ) : false;
+	if ( false === $content ) {
 		return array( 'Unable to read log file.' );
 	}
+
+	$file_content = array_filter( explode( "\n", $content ), 'strlen' );
 
 	return array_slice( $file_content, -$lines );
 }
@@ -279,7 +282,8 @@ function datamachine_clear_log_file( string $agent_type ): bool {
 		wp_mkdir_p( $log_dir );
 	}
 
-	$clear_result = file_put_contents( $log_file, '' );
+	$fs           = \DataMachine\Core\FilesRepository\FilesystemHelper::get();
+	$clear_result = $fs ? $fs->put_contents( $log_file, '' ) : false;
 
 	if ( false !== $clear_result ) {
 		datamachine_log_debug( "Log file cleared successfully for agent type: {$agent_type}" );

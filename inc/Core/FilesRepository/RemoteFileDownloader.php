@@ -92,18 +92,21 @@ class RemoteFileDownloader {
 		$safe_filename = sanitize_file_name( $filename );
 		$destination   = "{$directory}/{$safe_filename}";
 
-		if ( ! function_exists( 'WP_Filesystem' ) ) {
-			require_once ABSPATH . 'wp-admin/includes/file.php';
+		$fs = FilesystemHelper::get();
+		if ( ! $fs ) {
+			wp_delete_file( $temp_file );
+			do_action(
+				'datamachine_log',
+				'error',
+				'RemoteFileDownloader: Filesystem not available.',
+				array(
+					'url' => esc_url_raw( $url ),
+				)
+			);
+			return null;
 		}
 
-		$filesystem_initialized = WP_Filesystem();
-
-		if ( $filesystem_initialized ) {
-			global $wp_filesystem;
-			$copied = $wp_filesystem->copy( $temp_file, $destination, true );
-		} else {
-			$copied = copy( $temp_file, $destination );
-		}
+		$copied = $fs->copy( $temp_file, $destination, true );
 
 		if ( ! $copied ) {
 			wp_delete_file( $temp_file );

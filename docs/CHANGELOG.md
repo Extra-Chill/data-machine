@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
+## Unreleased
+
+### Changed
+- Migrate all file operations to WordPress WP_Filesystem API for Plugin Check compliance
+- Add centralized FilesystemHelper for filesystem initialization
+- Remove forbidden fallback pattern in RemoteFileDownloader
+
 ## [0.15.2] - 2026-01-28
 
 ### Changed

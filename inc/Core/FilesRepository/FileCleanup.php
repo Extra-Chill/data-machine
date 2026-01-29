@@ -43,6 +43,19 @@ class FileCleanup {
 			return true;
 		}
 
+		$fs = FilesystemHelper::get();
+		if ( ! $fs ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'FilesRepository: Filesystem not available.',
+				array(
+					'directory_path' => $directory_path,
+				)
+			);
+			return false;
+		}
+
 		$files = new \RecursiveIteratorIterator(
 			new \RecursiveDirectoryIterator( $directory_path, \RecursiveDirectoryIterator::SKIP_DOTS ),
 			\RecursiveIteratorIterator::CHILD_FIRST
@@ -50,13 +63,13 @@ class FileCleanup {
 
 		foreach ( $files as $file ) {
 			if ( $file->isDir() ) {
-				rmdir( $file->getRealPath() );
+				$fs->rmdir( $file->getRealPath() );
 			} else {
-				wp_delete_file( $file->getRealPath() );
+				$fs->delete( $file->getRealPath() );
 			}
 		}
 
-		$deleted = rmdir( $directory_path );
+		$deleted = $fs->rmdir( $directory_path );
 
 		if ( ! $deleted ) {
 			do_action(

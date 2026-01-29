@@ -66,7 +66,8 @@ class FileStorage {
 		$safe_filename = sanitize_file_name( $filename );
 		$destination   = "{$directory}/{$safe_filename}";
 
-		if ( ! copy( $source_path, $destination ) ) {
+		$fs = FilesystemHelper::get();
+		if ( ! $fs || ! $fs->copy( $source_path, $destination, true ) ) {
 			do_action(
 				'datamachine_log',
 				'error',
@@ -127,7 +128,8 @@ class FileStorage {
 		$safe_filename = sanitize_file_name( $filename );
 		$destination   = "{$directory}/{$safe_filename}";
 
-		if ( ! copy( $source_path, $destination ) ) {
+		$fs = FilesystemHelper::get();
+		if ( ! $fs || ! $fs->copy( $source_path, $destination, true ) ) {
 			do_action(
 				'datamachine_log',
 				'error',
@@ -296,8 +298,9 @@ class FileStorage {
 
 		// Load existing data for accumulation
 		$accumulated_data = array();
-		if ( file_exists( $file_path ) ) {
-			$existing_json = file_get_contents( $file_path );
+		$fs               = FilesystemHelper::get();
+		if ( $fs && file_exists( $file_path ) ) {
+			$existing_json = $fs->get_contents( $file_path );
 			if ( false !== $existing_json ) {
 				$accumulated_data = json_decode( $existing_json, true );
 				if ( ! is_array( $accumulated_data ) ) {
@@ -325,7 +328,7 @@ class FileStorage {
 			return false;
 		}
 
-		if ( file_put_contents( $file_path, $json_data ) === false ) {
+		if ( ! $fs || ! $fs->put_contents( $file_path, $json_data ) ) {
 			do_action(
 				'datamachine_log',
 				'error',
@@ -371,7 +374,8 @@ class FileStorage {
 			return null;
 		}
 
-		$json_data = file_get_contents( $file_path );
+		$fs        = FilesystemHelper::get();
+		$json_data = $fs ? $fs->get_contents( $file_path ) : false;
 		if ( false === $json_data ) {
 			do_action(
 				'datamachine_log',
