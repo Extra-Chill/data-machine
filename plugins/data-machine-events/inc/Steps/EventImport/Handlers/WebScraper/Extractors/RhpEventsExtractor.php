@@ -170,17 +170,30 @@ class RhpEventsExtractor extends BaseExtractor {
 	/**
 	 * Parse time from event node.
 	 *
-	 * RHP displays times like "Doors: 7 pm | Show: 8 pm"
+	 * RHP displays times like "Doors: 7 pm | Show: 8 pm" or "Doors: 7 pm // Show: 8 pm"
 	 */
 	private function parseTime( array &$event, \DOMXPath $xpath, \DOMElement $node ): void {
-		$time_node = $xpath->query( ".//*[contains(@class, 'rhp-event__time-text--list')]", $node )->item( 0 );
+		$selectors = array(
+			".//*[contains(@class, 'rhp-event__time-text--list')]",
+			".//*[contains(@class, 'eventDoorStartDate')]",
+			".//*[contains(@class, 'rhp-event__doortext--card')]",
+		);
+
+		$time_node = null;
+		foreach ( $selectors as $selector ) {
+			$time_node = $xpath->query( $selector, $node )->item( 0 );
+			if ( $time_node ) {
+				break;
+			}
+		}
+
 		if ( ! $time_node ) {
 			return;
 		}
 
 		$time_text = trim( $time_node->textContent );
 
-		// Extract doors time
+		// Extract doors time (supports both | and // separators)
 		if ( preg_match( '/doors[:\s]*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i', $time_text, $matches ) ) {
 			$event['doorsTime'] = $this->normalizeTime( $matches[1] );
 		}
