@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.11.5] - 2026-01-29
+
+### Changed
+- Replace error_log calls with centralized Monolog integration
+
+### Fixed
+- Fix RHP Events extractor time parsing for The Grey Eagle
+
 ## [0.11.4] - 2026-01-28
 
 ### Added
