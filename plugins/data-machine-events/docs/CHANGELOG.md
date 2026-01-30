@@ -2,7 +2,7 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
-## Unreleased
+## [0.12.0] - 2026-01-30
 
 ### Added
 - Add VisionExtractor as final fallback for Universal Web Scraper
