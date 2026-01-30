@@ -547,19 +547,44 @@ class UniversalWebScraper extends EventImportHandler {
 		);
 
 		$visionProcessor = new VisionExtractionProcessor( $this );
-		$events          = $visionProcessor->process( $html_content, $current_url, $config, $context, $candidates );
+		$result          = $visionProcessor->process( $html_content, $current_url, $config, $context, $candidates );
 
-		if ( empty( $events ) ) {
+		if ( empty( $result ) ) {
 			return null;
 		}
 
-		return $this->processor->process(
-			$events,
-			$extraction_method,
-			$current_url,
-			$config,
-			$context
+		// VisionExtractionProcessor stores image_file_path in engine data.
+		// Return a DataPacket for the AI step to process.
+		$vision_data = $result[0];
+
+		$dataPacket = new DataPacket(
+			array(
+				'title' => 'Vision Flyer Analysis',
+				'body'  => wp_json_encode(
+					array(
+						'source_type'       => 'vision_flyer',
+						'image_url'         => $vision_data['image_url'] ?? '',
+						'page_url'          => $vision_data['page_url'] ?? $current_url,
+						'extraction_method' => $extraction_method,
+						'venue_config'      => array(
+							'venue'      => $config['venue'] ?? '',
+							'venue_name' => $config['venue_name'] ?? '',
+						),
+					),
+					JSON_PRETTY_PRINT
+				),
+			),
+			array(
+				'source_type'       => 'vision_flyer',
+				'extraction_method' => $extraction_method,
+				'pipeline_id'       => $context->getPipelineId(),
+				'flow_id'           => $context->getFlowId(),
+				'import_timestamp'  => time(),
+			),
+			'event_import'
 		);
+
+		return array( $dataPacket );
 	}
 
 	/**

@@ -79,6 +79,13 @@ class UniversalWebScraperTestCommand {
 			if ( isset( $result['event_data'] ) && isset( $result['event_data']['raw_html'] ) ) {
 				\WP_CLI::log( $result['event_data']['raw_html'] );
 			}
+		} elseif ( 'vision_flyer' === $payload_type ) {
+			\WP_CLI::log( 'Payload type: vision_flyer (image stored for AI step)' );
+			$event_data = $result['event_data'] ?? array();
+			\WP_CLI::log( 'Image URL: ' . ( $event_data['image_url'] ?? '' ) );
+			\WP_CLI::log( 'Page URL: ' . ( $event_data['page_url'] ?? '' ) );
+			\WP_CLI::success( 'Vision flyer detected. Image stored in engine data (image_file_path).' );
+			\WP_CLI::log( 'Pipeline requires AI step configured with event extraction prompt.' );
 		} elseif ( 'event' !== $payload_type ) {
 			\WP_CLI::warning( 'Payload did not contain an event object.' );
 			\WP_CLI::log( 'Payload type: ' . $payload_type );

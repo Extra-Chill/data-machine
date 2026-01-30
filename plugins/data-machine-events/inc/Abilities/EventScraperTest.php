@@ -176,6 +176,37 @@ class EventScraperTest {
 			);
 		}
 
+		// Vision flyer extraction - image stored for AI step processing.
+		if ( is_array( $payload ) && ( $payload['source_type'] ?? '' ) === 'vision_flyer' ) {
+			return array(
+				'success'         => true,
+				'status'          => 'ok',
+				'target_url'      => $target_url,
+				'event_data'      => array(
+					'image_url' => $payload['image_url'] ?? '',
+					'page_url'  => $payload['page_url'] ?? '',
+				),
+				'extraction_info' => array_merge(
+					$extraction_info,
+					array(
+						'payload_type'       => 'vision_flyer',
+						'requires_ai_step'   => true,
+						'image_file_stored'  => true,
+						'extraction_method'  => $payload['extraction_method'] ?? 'vision',
+					)
+				),
+				'coverage_issues' => array(
+					'missing_time'       => false,
+					'missing_venue'      => false,
+					'incomplete_address' => false,
+					'time_data_warning'  => false,
+					'vision_flyer'       => true,
+				),
+				'warnings'        => array( 'Vision flyer detected. Image stored in engine data. Pipeline requires AI step for event extraction.' ),
+				'logs'            => array_slice( $logs, -20 ),
+			);
+		}
+
 		if ( ! is_array( $event ) ) {
 			return array(
 				'success'         => false,

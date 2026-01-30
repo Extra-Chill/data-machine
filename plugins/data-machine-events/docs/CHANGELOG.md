@@ -11,6 +11,9 @@ All notable changes to Data Machine Events will be documented in this file.
 - Support multi-event flyers in vision extraction
 - Add SquareOnlineExtractor for Square Online sites (*.square.site) - parses __BOOTSTRAP_STATE__ JSON to find embedded images for vision extraction
 
+### Changed
+- Refactor VisionExtractionProcessor to align with Data Machine architecture - removes direct AI API calls, stores image to persistent storage, delegates AI processing to pipeline AI step
+
 ## [0.11.5] - 2026-01-29
 
 ### Changed
