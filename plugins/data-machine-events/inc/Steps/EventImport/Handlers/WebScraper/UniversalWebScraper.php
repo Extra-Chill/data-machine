@@ -29,6 +29,9 @@
  * 21. OpenDate.io JSON
  * 22. Schema.org microdata
  * 23. AI-enhanced HTML pattern matching (Fallback)
+ * 24. AI Vision flyer extraction (Final Fallback)
+ *     - Square Online (__BOOTSTRAP_STATE__ JSON images)
+ *     - Standard HTML <img> tag detection
  *
  * @package DataMachineEvents\Steps\EventImport\Handlers\WebScraper
  */
@@ -61,6 +64,9 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\MusicItem
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\CraftpeakExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\IcsExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\DoStuffExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\VisionExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SquareOnlineExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\VisionExtractionProcessor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators\PaginatorInterface;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators\JsonApiPaginator;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators\HtmlLinkPaginator;
@@ -284,6 +290,18 @@ class UniversalWebScraper extends EventImportHandler {
 				return $html_result;
 			}
 
+			// Final fallback: AI Vision flyer extraction
+			$vision_result = $this->tryVisionExtraction(
+				$html_content,
+				$current_url,
+				$config,
+				$context
+			);
+
+			if ( null !== $vision_result ) {
+				return $vision_result;
+			}
+
 			// Find next page via paginators
 			$next_url = $this->findNextPage( $current_url, $html_content, $context );
 			if ( null === $next_url ) {
@@ -467,6 +485,81 @@ class UniversalWebScraper extends EventImportHandler {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Try vision-based extraction from flyer images (final fallback).
+	 *
+	 * Analyzes potential event flyer images using AI vision when both
+	 * structured data and HTML section extraction have failed.
+	 *
+	 * Checks for Square Online embedded images first (via SquareOnlineExtractor),
+	 * then falls back to standard HTML image detection (via VisionExtractor).
+	 *
+	 * @since 0.9.18
+	 * @since 0.9.19 Added Square Online support via SquareOnlineExtractor
+	 */
+	private function tryVisionExtraction(
+		string $html_content,
+		string $current_url,
+		array $config,
+		ExecutionContext $context
+	): ?array {
+		$candidates        = null;
+		$extraction_method = 'vision';
+
+		$squareExtractor = new SquareOnlineExtractor();
+		if ( $squareExtractor->canExtract( $html_content ) ) {
+			$candidates = $squareExtractor->getImageCandidates( $html_content, $current_url );
+			if ( ! empty( $candidates ) ) {
+				$extraction_method = $squareExtractor->getMethod();
+				$context->log(
+					'info',
+					'Universal Web Scraper: Found Square Online embedded images',
+					array(
+						'url'             => $current_url,
+						'candidate_count' => count( $candidates ),
+					)
+				);
+			}
+		}
+
+		if ( empty( $candidates ) ) {
+			$visionExtractor = new VisionExtractor();
+
+			if ( ! $visionExtractor->canExtractWithUrl( $html_content, $current_url ) ) {
+				$context->log(
+					'debug',
+					'Universal Web Scraper: Vision extraction skipped - no viable image candidates',
+					array( 'url' => $current_url )
+				);
+				return null;
+			}
+		}
+
+		$context->log(
+			'info',
+			'Universal Web Scraper: Attempting vision extraction fallback',
+			array(
+				'url'    => $current_url,
+				'method' => $extraction_method,
+			)
+		);
+
+		$visionProcessor = new VisionExtractionProcessor( $this );
+		$events          = $visionProcessor->process( $html_content, $current_url, $config, $context, $candidates );
+
+		if ( empty( $events ) ) {
+			return null;
+		}
+
+		return $this->processor->process(
+			$events,
+			$extraction_method,
+			$current_url,
+			$config,
+			$context
+		);
 	}
 
 	/**

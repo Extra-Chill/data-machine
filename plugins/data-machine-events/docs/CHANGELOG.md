@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## Unreleased
+
+### Added
+- Add VisionExtractor as final fallback for Universal Web Scraper
+- Add ImageCandidateFinder for scoring potential event flyer images
+- Add VisionExtractionProcessor for AI vision API integration
+- Support multi-event flyers in vision extraction
+- Add SquareOnlineExtractor for Square Online sites (*.square.site) - parses __BOOTSTRAP_STATE__ JSON to find embedded images for vision extraction
+
 ## [0.11.5] - 2026-01-29
 
 ### Changed
