@@ -4,6 +4,7 @@
 
 const observers = new Map();
 const MAX_VISIBLE_DOTS = 12;
+const DESKTOP_MAX_VISIBLE_DOTS = 36;
 const DOT_WIDTH = 7;
 const DOT_GAP = 8;
 
@@ -80,13 +81,13 @@ export function initCarousel(calendar) {
                     track.style.transform = '';
                 }
             } else {
-                track.style.transform = '';
-                
+                const totalEvents = events.length;
+                const useDesktopCollapsed = totalEvents > DESKTOP_MAX_VISIBLE_DOTS;
+
                 const maxScroll = wrapper.scrollWidth - wrapper.clientWidth;
                 const scrollProgress = maxScroll > 0 ? wrapper.scrollLeft / maxScroll : 0;
                 const visibleCards = Math.floor(wrapperRect.width / firstEventWidth);
-                const totalCards = events.length;
-                const scrollableCards = totalCards - visibleCards;
+                const scrollableCards = totalEvents - visibleCards;
 
                 const firstActiveIndex = Math.round(scrollProgress * scrollableCards);
 
@@ -94,6 +95,28 @@ export function initCarousel(calendar) {
                     const isInVisibleRange = index >= firstActiveIndex && index < firstActiveIndex + visibleCards;
                     dot.classList.toggle('active', isInVisibleRange);
                 });
+
+                if (useDesktopCollapsed) {
+                    const rangeMidpoint = firstActiveIndex + Math.floor(visibleCards / 2);
+                    const halfWindow = Math.floor(DESKTOP_MAX_VISIBLE_DOTS / 2);
+                    const dotUnit = DOT_WIDTH + DOT_GAP;
+                    const totalDotsWidth = totalEvents * DOT_WIDTH + (totalEvents - 1) * DOT_GAP;
+                    const visibleWidth = DESKTOP_MAX_VISIBLE_DOTS * DOT_WIDTH + (DESKTOP_MAX_VISIBLE_DOTS - 1) * DOT_GAP;
+                    const maxShift = totalDotsWidth - visibleWidth;
+
+                    let shift;
+                    if (rangeMidpoint <= halfWindow) {
+                        shift = 0;
+                    } else if (rangeMidpoint >= totalEvents - halfWindow) {
+                        shift = maxShift;
+                    } else {
+                        shift = (rangeMidpoint - halfWindow) * dotUnit;
+                    }
+
+                    track.style.transform = 'translateX(-' + shift + 'px)';
+                } else {
+                    track.style.transform = '';
+                }
             }
 
             const atStart = wrapper.scrollLeft <= 5;
@@ -133,12 +156,15 @@ export function initCarousel(calendar) {
             const wrapperRect = wrapper.getBoundingClientRect();
             const firstEventWidth = events[0]?.getBoundingClientRect().width || 300;
             const isSingleCardMode = (wrapperRect.width / firstEventWidth) < 1.5;
-            const useViewport = isSingleCardMode && eventCount > MAX_VISIBLE_DOTS;
-            
+            const useMobileViewport = isSingleCardMode && eventCount > MAX_VISIBLE_DOTS;
+            const useDesktopViewport = !isSingleCardMode && eventCount > DESKTOP_MAX_VISIBLE_DOTS;
+
             let trackParent = indicators;
-            if (useViewport) {
+            if (useMobileViewport || useDesktopViewport) {
                 const viewport = document.createElement('div');
-                viewport.className = 'datamachine-carousel-viewport';
+                viewport.className = useDesktopViewport
+                    ? 'datamachine-carousel-viewport datamachine-carousel-viewport--desktop'
+                    : 'datamachine-carousel-viewport';
                 indicators.appendChild(viewport);
                 trackParent = viewport;
             }

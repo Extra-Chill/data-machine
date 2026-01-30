@@ -978,6 +978,10 @@
     width: 172px; /* 12 dots (7px) + 11 gaps (8px) */
 }
 
+.datamachine-carousel-viewport--desktop {
+    width: 532px; /* 36 dots (7px) + 35 gaps (8px) */
+}
+
 .datamachine-carousel-dots-track {
     display: flex;
     gap: 0.5rem;
