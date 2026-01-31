@@ -153,18 +153,16 @@ export function initCarousel(calendar) {
             }
             indicators.innerHTML = '';
 
-            const wrapperRect = wrapper.getBoundingClientRect();
-            const firstEventWidth = events[0]?.getBoundingClientRect().width || 300;
-            const isSingleCardMode = (wrapperRect.width / firstEventWidth) < 1.5;
-            const useMobileViewport = isSingleCardMode && eventCount > MAX_VISIBLE_DOTS;
-            const useDesktopViewport = !isSingleCardMode && eventCount > DESKTOP_MAX_VISIBLE_DOTS;
+            const isMobileScreen = window.matchMedia('(max-width: 768px)').matches;
+            const maxDotsForViewport = isMobileScreen ? MAX_VISIBLE_DOTS : DESKTOP_MAX_VISIBLE_DOTS;
+            const useViewport = eventCount > maxDotsForViewport;
 
             let trackParent = indicators;
-            if (useMobileViewport || useDesktopViewport) {
+            if (useViewport) {
                 const viewport = document.createElement('div');
-                viewport.className = useDesktopViewport
-                    ? 'datamachine-carousel-viewport datamachine-carousel-viewport--desktop'
-                    : 'datamachine-carousel-viewport';
+                viewport.className = isMobileScreen
+                    ? 'datamachine-carousel-viewport'
+                    : 'datamachine-carousel-viewport datamachine-carousel-viewport--desktop';
                 indicators.appendChild(viewport);
                 trackParent = viewport;
             }
@@ -198,7 +196,8 @@ export function initCarousel(calendar) {
             let holdInterval = null;
 
             const scrollByCard = function(direction) {
-                wrapper.scrollBy({ left: firstEventWidth * direction, behavior: 'smooth' });
+                const cardWidth = events[0]?.getBoundingClientRect().width || 300;
+                wrapper.scrollBy({ left: cardWidth * direction, behavior: 'smooth' });
             };
 
             const startHold = function(direction) {
@@ -258,9 +257,12 @@ export function initCarousel(calendar) {
                 requestAnimationFrame(setupIndicators);
             });
             observer.observe(wrapper);
-            
+            if (events[0]) {
+                observer.observe(events[0]);
+            }
+
             const existing = observers.get(calendar) || [];
-            existing.push({ observer, wrapper });
+            existing.push({ observer, wrapper, events });
             observers.set(calendar, existing);
         }
     });
@@ -269,8 +271,11 @@ export function initCarousel(calendar) {
 export function destroyCarousel(calendar) {
     const entries = observers.get(calendar);
     if (entries) {
-        entries.forEach(function({ observer, wrapper }) {
+        entries.forEach(function({ observer, wrapper, events }) {
             observer.unobserve(wrapper);
+            if (events && events[0]) {
+                observer.unobserve(events[0]);
+            }
             observer.disconnect();
         });
         observers.delete(calendar);
