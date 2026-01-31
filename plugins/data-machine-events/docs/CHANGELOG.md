@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.12.1] - 2026-01-31
+
+### Fixed
+- Fix carousel viewport class using CSS media query instead of timing-sensitive measurements
+
 ## [0.12.0] - 2026-01-30
 
 ### Added
