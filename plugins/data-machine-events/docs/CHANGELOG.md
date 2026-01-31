@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.12.2] - 2026-01-31
+
+### Changed
+- Sync block versions to 0.12.1
+
 ## [0.12.1] - 2026-01-31
 
 ### Fixed
