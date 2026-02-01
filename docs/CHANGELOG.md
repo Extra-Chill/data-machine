@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
+## [0.16.3] - 2026-02-01
+
+### Added
+- Prompt Queue for AI Flows (#27)
+
 ## [0.16.2] - 2026-02-01
 
 - Bump ai-http-client to v2.0.13
