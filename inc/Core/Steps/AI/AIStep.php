@@ -2,6 +2,7 @@
 
 namespace DataMachine\Core\Steps\AI;
 
+use DataMachine\Abilities\Flow\QueueAbility;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\Steps\Step;
@@ -94,6 +95,29 @@ class AIStep extends Step {
 	 */
 	protected function executeStep(): array {
 		$user_message = trim( $this->flow_step_config['user_message'] ?? '' );
+
+		// Check for prompt queue - if user_message is empty, pop from queue
+		$queued_prompt = null;
+		if ( empty( $user_message ) ) {
+			$flow_id = $this->engine->get( 'flow_id' );
+			if ( $flow_id ) {
+				$queued_item = QueueAbility::popFromQueue( (int) $flow_id );
+				if ( $queued_item && ! empty( $queued_item['prompt'] ) ) {
+					$user_message  = $queued_item['prompt'];
+					$queued_prompt = $queued_item;
+
+					do_action(
+						'datamachine_log',
+						'info',
+						'Using prompt from queue',
+						array(
+							'flow_id'  => $flow_id,
+							'added_at' => $queued_item['added_at'] ?? '',
+						)
+					);
+				}
+			}
+		}
 
 		// Vision image from engine data (single source of truth)
 		$file_path    = null;
