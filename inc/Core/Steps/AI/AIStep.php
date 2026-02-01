@@ -98,7 +98,8 @@ class AIStep extends Step {
 
 		// Check for prompt queue - if user_message is empty, pop from queue
 		if ( empty( $user_message ) ) {
-			$flow_id = $this->engine->get( 'flow_id' );
+			$job_context = $this->engine->getJobContext();
+			$flow_id = $job_context['flow_id'] ?? null;
 			if ( $flow_id ) {
 				$queued_item = QueueAbility::popFromQueue( (int) $flow_id );
 				if ( $queued_item && ! empty( $queued_item['prompt'] ) ) {

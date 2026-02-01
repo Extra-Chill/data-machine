@@ -11,6 +11,8 @@
 
 namespace DataMachine\Abilities\Flow;
 
+use DataMachine\Core\Database\Flows\Flows as DB_Flows;
+
 defined( 'ABSPATH' ) || exit;
 
 class QueueAbility {
