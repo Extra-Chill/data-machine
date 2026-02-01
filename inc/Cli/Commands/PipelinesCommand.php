@@ -323,4 +323,179 @@ class PipelinesCommand extends BaseCommand {
 		}
 		return implode( ', ', array_unique( $types ) );
 	}
+
+	/**
+	 * Create a new pipeline.
+	 *
+	 * @param array $assoc_args Associative arguments (name, steps, dry-run).
+	 */
+	private function createPipeline( array $assoc_args ): void {
+		$pipeline_name = $assoc_args['name'] ?? null;
+		$dry_run       = isset( $assoc_args['dry-run'] );
+		$format        = $assoc_args['format'] ?? 'table';
+
+		if ( ! $pipeline_name ) {
+			WP_CLI::error( 'Required: --name=<name>' );
+			return;
+		}
+
+		$steps = array();
+		if ( isset( $assoc_args['steps'] ) ) {
+			$decoded = json_decode( $assoc_args['steps'], true );
+			if ( null === $decoded && '' !== $assoc_args['steps'] ) {
+				WP_CLI::error( 'Invalid JSON in --steps' );
+				return;
+			}
+			$steps = $decoded ?? array();
+		}
+
+		$input = array(
+			'pipeline_name' => $pipeline_name,
+			'steps'         => $steps,
+		);
+
+		if ( $dry_run ) {
+			$input['validate_only'] = true;
+			$input['pipelines']     = array(
+				array(
+					'name'  => $pipeline_name,
+					'steps' => $steps,
+				),
+			);
+		}
+
+		$ability = new \DataMachine\Abilities\PipelineAbilities();
+		$result  = $ability->executeCreatePipeline( $input );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to create pipeline' );
+			return;
+		}
+
+		if ( $dry_run ) {
+			WP_CLI::success( 'Validation passed.' );
+			if ( isset( $result['would_create'] ) && 'json' === $format ) {
+				WP_CLI::line( wp_json_encode( $result['would_create'], JSON_PRETTY_PRINT ) );
+			} elseif ( isset( $result['would_create'] ) ) {
+				foreach ( $result['would_create'] as $preview ) {
+					WP_CLI::log( sprintf(
+						'Would create: "%s" with %d step(s)',
+						$preview['name'],
+						$preview['steps']
+					) );
+				}
+			}
+			return;
+		}
+
+		WP_CLI::success( sprintf( 'Pipeline created: ID %d', $result['pipeline_id'] ) );
+		WP_CLI::log( sprintf( 'Name: %s', $result['pipeline_name'] ) );
+		WP_CLI::log( sprintf( 'Steps created: %d', $result['steps_created'] ?? 0 ) );
+
+		if ( isset( $result['flow_id'] ) ) {
+			WP_CLI::log( sprintf( 'Default flow ID: %d', $result['flow_id'] ) );
+		}
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+		}
+	}
+
+	/**
+	 * Update an existing pipeline.
+	 *
+	 * @param int   $pipeline_id Pipeline ID to update.
+	 * @param array $assoc_args  Associative arguments (name, config).
+	 */
+	private function updatePipeline( int $pipeline_id, array $assoc_args ): void {
+		$format = $assoc_args['format'] ?? 'table';
+
+		if ( $pipeline_id <= 0 ) {
+			WP_CLI::error( 'pipeline_id must be a positive integer' );
+			return;
+		}
+
+		$input = array( 'pipeline_id' => $pipeline_id );
+
+		if ( isset( $assoc_args['name'] ) ) {
+			$input['pipeline_name'] = $assoc_args['name'];
+		}
+
+		if ( ! isset( $input['pipeline_name'] ) ) {
+			WP_CLI::error( 'Must provide --name to update' );
+			return;
+		}
+
+		$ability = new \DataMachine\Abilities\PipelineAbilities();
+		$result  = $ability->executeUpdatePipeline( $input );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to update pipeline' );
+			return;
+		}
+
+		WP_CLI::success( sprintf( 'Pipeline %d updated.', $result['pipeline_id'] ) );
+		WP_CLI::log( sprintf( 'Name: %s', $result['pipeline_name'] ) );
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+		}
+	}
+
+	/**
+	 * Delete a pipeline.
+	 *
+	 * @param int   $pipeline_id Pipeline ID to delete.
+	 * @param array $assoc_args  Associative arguments (force).
+	 */
+	private function deletePipeline( int $pipeline_id, array $assoc_args ): void {
+		$force  = isset( $assoc_args['force'] );
+		$format = $assoc_args['format'] ?? 'table';
+
+		if ( $pipeline_id <= 0 ) {
+			WP_CLI::error( 'pipeline_id must be a positive integer' );
+			return;
+		}
+
+		// First, get pipeline info for confirmation.
+		$ability = new \DataMachine\Abilities\PipelineAbilities();
+		$info    = $ability->executeGetPipelines( array( 'pipeline_id' => $pipeline_id ) );
+
+		if ( ! $info['success'] || empty( $info['pipelines'] ) ) {
+			WP_CLI::error( 'Pipeline not found' );
+			return;
+		}
+
+		$pipeline      = $info['pipelines'][0];
+		$pipeline_name = $pipeline['pipeline_name'] ?? 'Unknown';
+		$flow_count    = count( $pipeline['flows'] ?? array() );
+
+		// Confirm deletion unless --force is used.
+		if ( ! $force ) {
+			WP_CLI::confirm( sprintf(
+				'Delete pipeline "%s" (ID: %d) and its %d flow(s)?',
+				$pipeline_name,
+				$pipeline_id,
+				$flow_count
+			) );
+		}
+
+		$result = $ability->executeDeletePipeline( array( 'pipeline_id' => $pipeline_id ) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to delete pipeline' );
+			return;
+		}
+
+		WP_CLI::success( sprintf(
+			'Pipeline "%s" (ID: %d) deleted. %d flow(s) also removed.',
+			$result['pipeline_name'],
+			$result['pipeline_id'],
+			$result['deleted_flows']
+		) );
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+		}
+	}
 }
