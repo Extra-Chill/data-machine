@@ -185,7 +185,7 @@ class Chat {
 						'type'              => 'string',
 						'required'          => false,
 						'default'           => \DataMachine\Engine\AI\AgentType::CHAT,
-						'description'       => __( 'Agent type filter (chat, cli)', 'data-machine' ),
+						'description'       => __( 'Agent type filter (chat, pipeline, system)', 'data-machine' ),
 						'sanitize_callback' => 'sanitize_text_field',
 						'validate_callback' => function ( $param ) {
 							return \DataMachine\Engine\AI\AgentType::isValid( $param );
