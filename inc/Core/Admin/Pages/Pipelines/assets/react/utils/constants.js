@@ -13,6 +13,7 @@ export const MODAL_TYPES = {
 	CONFIGURE_STEP: 'configure-step',
 	HANDLER_SETTINGS: 'handler-settings',
 	FLOW_SCHEDULE: 'flow-schedule',
+	FLOW_QUEUE: 'flow-queue',
 	IMPORT_EXPORT: 'import-export',
 	OAUTH: 'oauth',
 	CONFIRM_DELETE: 'confirm-delete',

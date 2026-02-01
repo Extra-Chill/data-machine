@@ -129,6 +129,7 @@ function datamachine_run_datamachine_plugin() {
 	\DataMachine\Api\Pipelines\PipelineFlows::register();
 	\DataMachine\Api\Flows\Flows::register();
 	\DataMachine\Api\Flows\FlowSteps::register();
+	\DataMachine\Api\Flows\FlowQueue::register();
 	\DataMachine\Api\Files::register();
 	\DataMachine\Api\Users::register();
 	\DataMachine\Api\Logs::register();

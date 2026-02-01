@@ -16,6 +16,7 @@ import {
 	StepSelectionModal,
 	ConfigureStepModal,
 	FlowScheduleModal,
+	FlowQueueModal,
 	HandlerSelectionModal,
 	HandlerSettingsModal,
 	OAuthAuthenticationModal,
@@ -23,7 +24,9 @@ import {
 } from '../modals';
 
 export default function ModalSwitch( { activeModal, baseProps } ) {
-	if ( ! activeModal ) {return null;}
+	if ( ! activeModal ) {
+		return null;
+	}
 
 	switch ( activeModal ) {
 		case MODAL_TYPES.IMPORT_EXPORT:
@@ -42,6 +45,9 @@ export default function ModalSwitch( { activeModal, baseProps } ) {
 
 		case MODAL_TYPES.FLOW_SCHEDULE:
 			return <FlowScheduleModal { ...baseProps } />;
+
+		case MODAL_TYPES.FLOW_QUEUE:
+			return <FlowQueueModal { ...baseProps } />;
 
 		case MODAL_TYPES.HANDLER_SELECTION:
 			return (

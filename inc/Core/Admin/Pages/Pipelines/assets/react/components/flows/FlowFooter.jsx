@@ -8,6 +8,7 @@
 /**
  * WordPress dependencies
  */
+import { Button } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 
 /**
@@ -53,17 +54,24 @@ const formatStatus = ( status ) => {
 /**
  * Flow Footer Component
  *
- * @param {Object}  props                             - Component props
- * @param {number}  props.flowId                      - Flow ID
- * @param {Object}  props.scheduling                  - Scheduling display data
- * @param {string}  props.scheduling.interval         - Schedule interval
- * @param {string}  props.scheduling.last_run_display - Pre-formatted last run display
- * @param {string}  props.scheduling.last_run_status  - Job status from last run
- * @param {boolean} props.scheduling.is_running       - Whether a job is currently running
- * @param {string}  props.scheduling.next_run_display - Pre-formatted next run display
+ * @param {Object}   props                             - Component props
+ * @param {number}   props.flowId                      - Flow ID
+ * @param {Object}   props.scheduling                  - Scheduling display data
+ * @param {string}   props.scheduling.interval         - Schedule interval
+ * @param {string}   props.scheduling.last_run_display - Pre-formatted last run display
+ * @param {string}   props.scheduling.last_run_status  - Job status from last run
+ * @param {boolean}  props.scheduling.is_running       - Whether a job is currently running
+ * @param {string}   props.scheduling.next_run_display - Pre-formatted next run display
+ * @param {number}   props.queueCount                  - Number of prompts in queue
+ * @param {Function} props.onQueueClick                - Handler for queue button click
  * @return {React.ReactElement} Flow footer
  */
-export default function FlowFooter( { flowId, scheduling } ) {
+export default function FlowFooter( {
+	flowId,
+	scheduling,
+	queueCount = 0,
+	onQueueClick,
+} ) {
 	const {
 		interval,
 		last_run_display,
@@ -85,7 +93,8 @@ export default function FlowFooter( { flowId, scheduling } ) {
 	return (
 		<div className="datamachine-flow-footer">
 			<div className="datamachine-flow-meta-item datamachine-flow-meta-item--id">
-				<strong>{ __( 'Flow ID:', 'data-machine' ) }</strong> #{ flowId }
+				<strong>{ __( 'Flow ID:', 'data-machine' ) }</strong> #
+				{ flowId }
 			</div>
 
 			<div className="datamachine-flow-meta-item">
@@ -113,6 +122,27 @@ export default function FlowFooter( { flowId, scheduling } ) {
 				<div className="datamachine-flow-meta-item">
 					<strong>{ __( 'Next Run:', 'data-machine' ) }</strong>{ ' ' }
 					{ next_run_display || __( 'Never', 'data-machine' ) }
+				</div>
+			) }
+
+			{ onQueueClick && (
+				<div className="datamachine-flow-meta-item datamachine-flow-meta-item--queue">
+					<Button
+						variant="link"
+						onClick={ onQueueClick }
+						className="datamachine-queue-badge"
+					>
+						{ __( 'Queue', 'data-machine' ) }{ ' ' }
+						<span
+							className={ `datamachine-queue-count ${
+								queueCount > 0
+									? 'datamachine-queue-count--active'
+									: ''
+							}` }
+						>
+							({ queueCount })
+						</span>
+					</Button>
 				</div>
 			) }
 		</div>

@@ -505,3 +505,52 @@ export const getHandlers = async ( stepType = null ) => {
 	const params = stepType ? { step_type: stepType } : {};
 	return await client.get( '/handlers', params );
 };
+
+/**
+ * Queue Operations
+ */
+
+/**
+ * Fetch queue for a flow
+ *
+ * @param {number} flowId - Flow ID
+ * @return {Promise<Object>} Queue data with items and count
+ */
+export const fetchFlowQueue = async ( flowId ) => {
+	return await client.get( `/flows/${ flowId }/queue` );
+};
+
+/**
+ * Add prompt(s) to flow queue
+ *
+ * @param {number}               flowId  - Flow ID
+ * @param {string|Array<string>} prompts - Single prompt string or array of prompts
+ * @return {Promise<Object>} Result with added count and queue length
+ */
+export const addToFlowQueue = async ( flowId, prompts ) => {
+	const payload = Array.isArray( prompts )
+		? { prompts }
+		: { prompt: prompts };
+	return await client.post( `/flows/${ flowId }/queue`, payload );
+};
+
+/**
+ * Clear all prompts from flow queue
+ *
+ * @param {number} flowId - Flow ID
+ * @return {Promise<Object>} Result with cleared count
+ */
+export const clearFlowQueue = async ( flowId ) => {
+	return await client.delete( `/flows/${ flowId }/queue` );
+};
+
+/**
+ * Remove a specific prompt from flow queue by index
+ *
+ * @param {number} flowId - Flow ID
+ * @param {number} index  - Queue index (0-based)
+ * @return {Promise<Object>} Result with removed prompt and new queue length
+ */
+export const removeFromFlowQueue = async ( flowId, index ) => {
+	return await client.delete( `/flows/${ flowId }/queue/${ index }` );
+};
