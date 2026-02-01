@@ -32,6 +32,9 @@ class FlowAbilities {
 	private QueueAbility $queue;
 
 	public function __construct() {
+		// Always initialize queue - CLI commands need it regardless of WP_Ability
+		$this->queue = new QueueAbility();
+
 		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
 			return;
 		}
@@ -43,7 +46,6 @@ class FlowAbilities {
 		$this->update_flow    = new UpdateFlowAbility();
 		$this->delete_flow    = new DeleteFlowAbility();
 		$this->duplicate_flow = new DuplicateFlowAbility();
-		$this->queue          = new QueueAbility();
 
 		self::$registered = true;
 	}
