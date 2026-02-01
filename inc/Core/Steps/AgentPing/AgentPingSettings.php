@@ -26,13 +26,53 @@ class AgentPingSettings extends SettingsHandler {
 	 */
 	public static function get_fields(): array {
 		return array(
-			'webhook_url' => array(
+			'trigger_mode'   => array(
+				'type'        => 'select',
+				'label'       => __( 'Trigger Mode', 'data-machine' ),
+				'description' => __( 'How to notify the receiving agent', 'data-machine' ),
+				'default'     => 'webhook',
+				'options'     => array(
+					'webhook'  => __( 'Webhook (Discord, Slack, custom)', 'data-machine' ),
+					'openclaw' => __( 'OpenClaw Agent (CLI)', 'data-machine' ),
+				),
+			),
+			'webhook_url'    => array(
 				'type'        => 'text',
 				'label'       => __( 'Webhook URL', 'data-machine' ),
 				'description' => __( 'URL to POST data to (Discord, Slack, custom endpoint)', 'data-machine' ),
-				'required'    => true,
+				'required'    => false,
+				'conditions'  => array(
+					'trigger_mode' => 'webhook',
+				),
 			),
-			'prompt'      => array(
+			'openclaw_path'  => array(
+				'type'        => 'text',
+				'label'       => __( 'OpenClaw Path', 'data-machine' ),
+				'description' => __( 'Path to openclaw CLI binary (default: openclaw)', 'data-machine' ),
+				'default'     => 'openclaw',
+				'conditions'  => array(
+					'trigger_mode' => 'openclaw',
+				),
+			),
+			'channel'        => array(
+				'type'        => 'text',
+				'label'       => __( 'Channel', 'data-machine' ),
+				'description' => __( 'Delivery channel for agent response (e.g., discord)', 'data-machine' ),
+				'default'     => 'discord',
+				'conditions'  => array(
+					'trigger_mode' => 'openclaw',
+				),
+			),
+			'deliver'        => array(
+				'type'        => 'checkbox',
+				'label'       => __( 'Deliver Response', 'data-machine' ),
+				'description' => __( 'Whether the agent should deliver its response to the channel', 'data-machine' ),
+				'default'     => true,
+				'conditions'  => array(
+					'trigger_mode' => 'openclaw',
+				),
+			),
+			'prompt'         => array(
 				'type'        => 'textarea',
 				'label'       => __( 'Instructions', 'data-machine' ),
 				'description' => __( 'Optional instructions for the receiving agent', 'data-machine' ),
