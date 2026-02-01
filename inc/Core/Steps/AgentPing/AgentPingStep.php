@@ -48,6 +48,19 @@ class AgentPingStep extends Step {
 				'label'       => 'Agent Ping Configuration',
 			)
 		);
+
+		// Register settings for UI discovery.
+		add_filter(
+			'datamachine_handler_settings',
+			function ( $all_settings, $handler_slug ) {
+				if ( 'agent_ping' === $handler_slug ) {
+					$all_settings['agent_ping'] = new AgentPingSettings();
+				}
+				return $all_settings;
+			},
+			10,
+			2
+		);
 	}
 
 	/**
