@@ -5,6 +5,9 @@
  * Sends full pipeline context to configured webhook URL.
  * Supports Discord webhooks with human-readable formatting.
  *
+ * Configuration is at the flow step level via handler_config,
+ * allowing different webhook URLs per flow.
+ *
  * @package DataMachine\Core\Steps\AgentPing
  * @since 0.18.0
  */
@@ -36,10 +39,10 @@ class AgentPingStep extends Step {
 			class: self::class,
 			position: 80,
 			usesHandler: false,
-			hasPipelineConfig: true,
+			hasPipelineConfig: false,
 			consumeAllPackets: false,
 			stepSettings: array(
-				'config_type' => 'agent_ping_configuration',
+				'config_type' => 'handler',
 				'modal_type'  => 'configure-step',
 				'button_text' => 'Configure',
 				'label'       => 'Agent Ping Configuration',
@@ -53,19 +56,8 @@ class AgentPingStep extends Step {
 	 * @return bool
 	 */
 	protected function validateStepConfiguration(): bool {
-		$pipeline_step_id = $this->flow_step_config['pipeline_step_id'] ?? '';
-
-		if ( empty( $pipeline_step_id ) ) {
-			$this->log(
-				'error',
-				'Missing pipeline_step_id in Agent Ping step configuration',
-				array( 'flow_step_config' => $this->flow_step_config )
-			);
-			return false;
-		}
-
-		$pipeline_step_config = $this->engine->getPipelineStepConfig( $pipeline_step_id );
-		$webhook_url          = $pipeline_step_config['webhook_url'] ?? '';
+		$handler_config = $this->getHandlerConfig();
+		$webhook_url    = $handler_config['webhook_url'] ?? '';
 
 		if ( empty( trim( $webhook_url ) ) ) {
 			do_action(
@@ -73,9 +65,8 @@ class AgentPingStep extends Step {
 				$this->job_id,
 				'agent_ping_url_missing',
 				array(
-					'flow_step_id'     => $this->flow_step_id,
-					'pipeline_step_id' => $pipeline_step_id,
-					'error_message'    => 'Agent Ping step requires a webhook URL.',
+					'flow_step_id'  => $this->flow_step_id,
+					'error_message' => 'Agent Ping step requires a webhook URL.',
 				)
 			);
 			return false;
@@ -90,12 +81,11 @@ class AgentPingStep extends Step {
 	 * @return array
 	 */
 	protected function executeStep(): array {
-		$pipeline_step_id     = $this->flow_step_config['pipeline_step_id'];
-		$pipeline_step_config = $this->engine->getPipelineStepConfig( $pipeline_step_id );
+		$handler_config = $this->getHandlerConfig();
 
-		$webhook_url  = trim( $pipeline_step_config['webhook_url'] ?? '' );
-		$prompt       = $pipeline_step_config['prompt'] ?? '';
-		$data_packets = $this->engine->getDataPackets();
+		$webhook_url  = trim( $handler_config['webhook_url'] ?? '' );
+		$prompt       = $handler_config['prompt'] ?? '';
+		$data_packets = $this->dataPackets;
 
 		$payload = $this->buildPayload( $webhook_url, $prompt, $data_packets );
 
@@ -192,7 +182,7 @@ class AgentPingStep extends Step {
 	 * @return array Discord webhook payload
 	 */
 	private function buildDiscordPayload( string $prompt, array $data_packets ): array {
-		$first_packet = $data_packets[0] ?? [];
+		$first_packet = $data_packets[0] ?? array();
 		$title        = $first_packet['content']['title'] ?? 'New content';
 		$url          = $first_packet['metadata']['url'] ?? $first_packet['metadata']['permalink'] ?? '';
 

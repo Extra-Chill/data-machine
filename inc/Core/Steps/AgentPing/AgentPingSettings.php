@@ -6,7 +6,7 @@
  * Used by the admin UI to render configuration forms.
  *
  * @package DataMachine\Core\Steps\AgentPing
- * @since 0.14.0
+ * @since 0.18.0
  */
 
 namespace DataMachine\Core\Steps\AgentPing;
