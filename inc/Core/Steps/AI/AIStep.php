@@ -97,14 +97,12 @@ class AIStep extends Step {
 		$user_message = trim( $this->flow_step_config['user_message'] ?? '' );
 
 		// Check for prompt queue - if user_message is empty, pop from queue
-		$queued_prompt = null;
 		if ( empty( $user_message ) ) {
 			$flow_id = $this->engine->get( 'flow_id' );
 			if ( $flow_id ) {
 				$queued_item = QueueAbility::popFromQueue( (int) $flow_id );
 				if ( $queued_item && ! empty( $queued_item['prompt'] ) ) {
-					$user_message  = $queued_item['prompt'];
-					$queued_prompt = $queued_item;
+					$user_message = $queued_item['prompt'];
 
 					do_action(
 						'datamachine_log',

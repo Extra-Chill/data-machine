@@ -153,9 +153,6 @@ class FlowAbilities {
 	 * @return array Result with queue status.
 	 */
 	public function executeQueueAdd( array $input ): array {
-		if ( ! isset( $this->queue ) ) {
-			$this->queue = new QueueAbility();
-		}
 		return $this->queue->executeQueueAdd( $input );
 	}
 
@@ -166,9 +163,6 @@ class FlowAbilities {
 	 * @return array Result with queue items.
 	 */
 	public function executeQueueList( array $input ): array {
-		if ( ! isset( $this->queue ) ) {
-			$this->queue = new QueueAbility();
-		}
 		return $this->queue->executeQueueList( $input );
 	}
 
@@ -179,9 +173,6 @@ class FlowAbilities {
 	 * @return array Result with cleared count.
 	 */
 	public function executeQueueClear( array $input ): array {
-		if ( ! isset( $this->queue ) ) {
-			$this->queue = new QueueAbility();
-		}
 		return $this->queue->executeQueueClear( $input );
 	}
 
@@ -192,9 +183,6 @@ class FlowAbilities {
 	 * @return array Result with removed prompt info.
 	 */
 	public function executeQueueRemove( array $input ): array {
-		if ( ! isset( $this->queue ) ) {
-			$this->queue = new QueueAbility();
-		}
 		return $this->queue->executeQueueRemove( $input );
 	}
 }

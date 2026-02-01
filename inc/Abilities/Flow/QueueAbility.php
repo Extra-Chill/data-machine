@@ -462,13 +462,16 @@ class QueueAbility {
 	/**
 	 * Pop the first prompt from the queue (for engine use).
 	 *
-	 * @param int $flow_id Flow ID.
+	 * @param int      $flow_id  Flow ID.
+	 * @param DB_Flows $db_flows Database instance (avoids creating new instance each call).
 	 * @return array|null The popped queue item or null if empty.
 	 */
-	public static function popFromQueue( int $flow_id ): ?array {
-		$instance = new self();
+	public static function popFromQueue( int $flow_id, ?DB_Flows $db_flows = null ): ?array {
+		if ( null === $db_flows ) {
+			$db_flows = new DB_Flows();
+		}
 
-		$flow = $instance->db_flows->get_flow( $flow_id );
+		$flow = $db_flows->get_flow( $flow_id );
 		if ( ! $flow ) {
 			return null;
 		}
@@ -484,7 +487,7 @@ class QueueAbility {
 
 		$flow_config['prompt_queue'] = $prompt_queue;
 
-		$instance->db_flows->update_flow(
+		$db_flows->update_flow(
 			$flow_id,
 			array( 'flow_config' => $flow_config )
 		);
