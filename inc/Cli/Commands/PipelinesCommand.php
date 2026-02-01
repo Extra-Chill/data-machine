@@ -6,6 +6,7 @@
  * Wraps PipelineAbilities API primitives.
  *
  * @package DataMachine\Cli\Commands
+ * @since 0.16.0 Added create, update, delete subcommands.
  */
 
 namespace DataMachine\Cli\Commands;
@@ -29,8 +30,8 @@ class PipelinesCommand extends BaseCommand {
 	 *
 	 * ## OPTIONS
 	 *
-	 * [<pipeline_id>]
-	 * : Get a specific pipeline by ID.
+	 * [<args>...]
+	 * : Subcommand and arguments. Accepts: list [pipeline_id], get <pipeline_id>, create, update <pipeline_id>, delete <pipeline_id>.
 	 *
 	 * [--per_page=<number>]
 	 * : Number of pipelines to return.
@@ -60,6 +61,21 @@ class PipelinesCommand extends BaseCommand {
 	 * [--fields=<fields>]
 	 * : Limit output to specific fields (comma-separated).
 	 *
+	 * [--name=<name>]
+	 * : Pipeline name (create/update subcommands).
+	 *
+	 * [--steps=<json>]
+	 * : JSON array of steps (create subcommand). Each step: {step_type, label?}.
+	 *
+	 * [--config=<json>]
+	 * : JSON object with pipeline configuration (update subcommand).
+	 *
+	 * [--force]
+	 * : Skip confirmation prompt (delete subcommand).
+	 *
+	 * [--dry-run]
+	 * : Validate without creating (create subcommand).
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     # List all pipelines
@@ -88,9 +104,54 @@ class PipelinesCommand extends BaseCommand {
 	 *
 	 *     # JSON output
 	 *     wp datamachine pipelines --format=json
+	 *
+	 *     # Create a new pipeline (minimal)
+	 *     wp datamachine pipelines create --name="My Pipeline"
+	 *
+	 *     # Create a pipeline with steps
+	 *     wp datamachine pipelines create --name="Event Pipeline" \
+	 *       --steps='[{"step_type":"event_import"},{"step_type":"ai_enrich"}]'
+	 *
+	 *     # Dry-run validation
+	 *     wp datamachine pipelines create --name="Test" --dry-run
+	 *
+	 *     # Update a pipeline name
+	 *     wp datamachine pipelines update 5 --name="New Pipeline Name"
+	 *
+	 *     # Delete a pipeline (with confirmation)
+	 *     wp datamachine pipelines delete 5
+	 *
+	 *     # Delete a pipeline (skip confirmation)
+	 *     wp datamachine pipelines delete 5 --force
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		$pipeline_id = null;
+
+		// Handle 'create' subcommand.
+		if ( ! empty( $args ) && 'create' === $args[0] ) {
+			$this->createPipeline( $assoc_args );
+			return;
+		}
+
+		// Handle 'update' subcommand.
+		if ( ! empty( $args ) && 'update' === $args[0] ) {
+			if ( ! isset( $args[1] ) ) {
+				WP_CLI::error( 'Usage: wp datamachine pipelines update <pipeline_id> [--name=<name>] [--config=<json>]' );
+				return;
+			}
+			$this->updatePipeline( (int) $args[1], $assoc_args );
+			return;
+		}
+
+		// Handle 'delete' subcommand.
+		if ( ! empty( $args ) && 'delete' === $args[0] ) {
+			if ( ! isset( $args[1] ) ) {
+				WP_CLI::error( 'Usage: wp datamachine pipelines delete <pipeline_id> [--force]' );
+				return;
+			}
+			$this->deletePipeline( (int) $args[1], $assoc_args );
+			return;
+		}
 
 		// Handle 'get' subcommand: `pipelines get 5`.
 		if ( ! empty( $args ) && 'get' === $args[0] ) {

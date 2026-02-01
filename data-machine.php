@@ -209,6 +209,7 @@ function datamachine_load_step_types() {
 	new \DataMachine\Core\Steps\Publish\PublishStep();
 	new \DataMachine\Core\Steps\Update\UpdateStep();
 	new \DataMachine\Core\Steps\AI\AIStep();
+	new \DataMachine\Core\Steps\AgentPing\AgentPingStep();
 }
 
 /**
