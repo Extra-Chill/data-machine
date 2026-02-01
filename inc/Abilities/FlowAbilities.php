@@ -16,6 +16,7 @@ use DataMachine\Abilities\Flow\CreateFlowAbility;
 use DataMachine\Abilities\Flow\UpdateFlowAbility;
 use DataMachine\Abilities\Flow\DeleteFlowAbility;
 use DataMachine\Abilities\Flow\DuplicateFlowAbility;
+use DataMachine\Abilities\Flow\QueueAbility;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -28,6 +29,7 @@ class FlowAbilities {
 	private UpdateFlowAbility $update_flow;
 	private DeleteFlowAbility $delete_flow;
 	private DuplicateFlowAbility $duplicate_flow;
+	private QueueAbility $queue;
 
 	public function __construct() {
 		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
@@ -41,6 +43,7 @@ class FlowAbilities {
 		$this->update_flow    = new UpdateFlowAbility();
 		$this->delete_flow    = new DeleteFlowAbility();
 		$this->duplicate_flow = new DuplicateFlowAbility();
+		$this->queue          = new QueueAbility();
 
 		self::$registered = true;
 	}
@@ -141,5 +144,45 @@ class FlowAbilities {
 			$this->duplicate_flow = new DuplicateFlowAbility();
 		}
 		return $this->duplicate_flow->execute( $input );
+	}
+
+	/**
+	 * Execute queue-add ability.
+	 *
+	 * @param array $input Input parameters (flow_id, prompt).
+	 * @return array Result with queue status.
+	 */
+	public function executeQueueAdd( array $input ): array {
+		return $this->queue->executeQueueAdd( $input );
+	}
+
+	/**
+	 * Execute queue-list ability.
+	 *
+	 * @param array $input Input parameters (flow_id).
+	 * @return array Result with queue items.
+	 */
+	public function executeQueueList( array $input ): array {
+		return $this->queue->executeQueueList( $input );
+	}
+
+	/**
+	 * Execute queue-clear ability.
+	 *
+	 * @param array $input Input parameters (flow_id).
+	 * @return array Result with cleared count.
+	 */
+	public function executeQueueClear( array $input ): array {
+		return $this->queue->executeQueueClear( $input );
+	}
+
+	/**
+	 * Execute queue-remove ability.
+	 *
+	 * @param array $input Input parameters (flow_id, index).
+	 * @return array Result with removed prompt info.
+	 */
+	public function executeQueueRemove( array $input ): array {
+		return $this->queue->executeQueueRemove( $input );
 	}
 }

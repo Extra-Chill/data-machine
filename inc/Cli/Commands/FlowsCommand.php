@@ -31,7 +31,7 @@ class FlowsCommand extends BaseCommand {
 	 * ## OPTIONS
 	 *
 	 * [<args>...]
-	 * : Subcommand and arguments. Accepts: list [pipeline_id], get <flow_id>, run <flow_id>, create.
+	 * : Subcommand and arguments. Accepts: list [pipeline_id], get <flow_id>, run <flow_id>, create, queue.
 	 *
 	 * [--handler=<slug>]
 	 * : Filter flows using this handler slug (any step that uses this handler).
@@ -153,6 +153,21 @@ class FlowsCommand extends BaseCommand {
 	 *
 	 *     # Dry-run validation
 	 *     wp datamachine flows create --pipeline_id=3 --name="Test" --dry-run
+	 *
+	 *     # Add a prompt to the queue
+	 *     wp datamachine flows queue add 42 "Generate a blog post about AI"
+	 *
+	 *     # List queued prompts
+	 *     wp datamachine flows queue list 42
+	 *
+	 *     # List queued prompts as JSON
+	 *     wp datamachine flows queue list 42 --format=json
+	 *
+	 *     # Remove a prompt from queue by index
+	 *     wp datamachine flows queue remove 42 0
+	 *
+	 *     # Clear all prompts from queue
+	 *     wp datamachine flows queue clear 42
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		$flow_id     = null;
@@ -161,6 +176,12 @@ class FlowsCommand extends BaseCommand {
 		// Handle 'create' subcommand: `flows create --pipeline_id=3 --name="Test"`.
 		if ( ! empty( $args ) && 'create' === $args[0] ) {
 			$this->createFlow( $assoc_args );
+			return;
+		}
+
+		// Handle 'queue' subcommand: `flows queue add|list|clear|remove <flow_id> [prompt|index]`.
+		if ( ! empty( $args ) && 'queue' === $args[0] ) {
+			$this->handleQueue( array_slice( $args, 1 ), $assoc_args );
 			return;
 		}
 
@@ -423,5 +444,213 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		return implode( ', ', array_unique( $handlers ) );
+	}
+
+	/**
+	 * Handle queue subcommands.
+	 *
+	 * @param array $args       Positional arguments (action, flow_id, [prompt|index]).
+	 * @param array $assoc_args Associative arguments.
+	 */
+	private function handleQueue( array $args, array $assoc_args ): void {
+		if ( empty( $args ) ) {
+			WP_CLI::error( 'Usage: wp datamachine flows queue <add|list|clear|remove> <flow_id> [prompt|index]' );
+			return;
+		}
+
+		$action = $args[0] ?? '';
+
+		switch ( $action ) {
+			case 'add':
+				$this->queueAdd( array_slice( $args, 1 ), $assoc_args );
+				break;
+			case 'list':
+				$this->queueList( array_slice( $args, 1 ), $assoc_args );
+				break;
+			case 'clear':
+				$this->queueClear( array_slice( $args, 1 ), $assoc_args );
+				break;
+			case 'remove':
+				$this->queueRemove( array_slice( $args, 1 ), $assoc_args );
+				break;
+			default:
+				WP_CLI::error( "Unknown queue action: {$action}. Use: add, list, clear, remove" );
+		}
+	}
+
+	/**
+	 * Add a prompt to the flow queue.
+	 *
+	 * @param array $args       Positional arguments (flow_id, prompt).
+	 * @param array $assoc_args Associative arguments.
+	 */
+	private function queueAdd( array $args, array $assoc_args ): void {
+		if ( count( $args ) < 2 ) {
+			WP_CLI::error( 'Usage: wp datamachine flows queue add <flow_id> "prompt text"' );
+			return;
+		}
+
+		$flow_id = (int) $args[0];
+		$prompt  = $args[1];
+
+		if ( $flow_id <= 0 ) {
+			WP_CLI::error( 'flow_id must be a positive integer' );
+			return;
+		}
+
+		if ( empty( trim( $prompt ) ) ) {
+			WP_CLI::error( 'prompt cannot be empty' );
+			return;
+		}
+
+		$ability = new \DataMachine\Abilities\FlowAbilities();
+		$result  = $ability->executeQueueAdd(
+			array(
+				'flow_id' => $flow_id,
+				'prompt'  => $prompt,
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to add prompt to queue' );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] ?? 'Prompt added to queue.' );
+	}
+
+	/**
+	 * List all prompts in the flow queue.
+	 *
+	 * @param array $args       Positional arguments (flow_id).
+	 * @param array $assoc_args Associative arguments (format).
+	 */
+	private function queueList( array $args, array $assoc_args ): void {
+		if ( empty( $args ) ) {
+			WP_CLI::error( 'Usage: wp datamachine flows queue list <flow_id>' );
+			return;
+		}
+
+		$flow_id = (int) $args[0];
+		$format  = $assoc_args['format'] ?? 'table';
+
+		if ( $flow_id <= 0 ) {
+			WP_CLI::error( 'flow_id must be a positive integer' );
+			return;
+		}
+
+		$ability = new \DataMachine\Abilities\FlowAbilities();
+		$result  = $ability->executeQueueList( array( 'flow_id' => $flow_id ) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to list queue' );
+			return;
+		}
+
+		$queue = $result['queue'] ?? array();
+
+		if ( empty( $queue ) ) {
+			WP_CLI::log( 'Queue is empty.' );
+			return;
+		}
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( wp_json_encode( $queue, JSON_PRETTY_PRINT ) );
+			return;
+		}
+
+		// Transform for table display.
+		$items = array();
+		foreach ( $queue as $index => $item ) {
+			$prompt_preview = mb_strlen( $item['prompt'] ) > 60
+				? mb_substr( $item['prompt'], 0, 57 ) . '...'
+				: $item['prompt'];
+
+			$items[] = array(
+				'index'    => $index,
+				'prompt'   => $prompt_preview,
+				'added_at' => $item['added_at'] ?? '',
+			);
+		}
+
+		$this->format_items( $items, array( 'index', 'prompt', 'added_at' ), $assoc_args, 'index' );
+		WP_CLI::log( sprintf( 'Total: %d prompt(s) in queue.', count( $queue ) ) );
+	}
+
+	/**
+	 * Clear all prompts from the flow queue.
+	 *
+	 * @param array $args       Positional arguments (flow_id).
+	 * @param array $assoc_args Associative arguments.
+	 */
+	private function queueClear( array $args, array $assoc_args ): void {
+		if ( empty( $args ) ) {
+			WP_CLI::error( 'Usage: wp datamachine flows queue clear <flow_id>' );
+			return;
+		}
+
+		$flow_id = (int) $args[0];
+
+		if ( $flow_id <= 0 ) {
+			WP_CLI::error( 'flow_id must be a positive integer' );
+			return;
+		}
+
+		$ability = new \DataMachine\Abilities\FlowAbilities();
+		$result  = $ability->executeQueueClear( array( 'flow_id' => $flow_id ) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to clear queue' );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] ?? 'Queue cleared.' );
+	}
+
+	/**
+	 * Remove a specific prompt from the queue by index.
+	 *
+	 * @param array $args       Positional arguments (flow_id, index).
+	 * @param array $assoc_args Associative arguments.
+	 */
+	private function queueRemove( array $args, array $assoc_args ): void {
+		if ( count( $args ) < 2 ) {
+			WP_CLI::error( 'Usage: wp datamachine flows queue remove <flow_id> <index>' );
+			return;
+		}
+
+		$flow_id = (int) $args[0];
+		$index   = (int) $args[1];
+
+		if ( $flow_id <= 0 ) {
+			WP_CLI::error( 'flow_id must be a positive integer' );
+			return;
+		}
+
+		if ( $index < 0 ) {
+			WP_CLI::error( 'index must be a non-negative integer' );
+			return;
+		}
+
+		$ability = new \DataMachine\Abilities\FlowAbilities();
+		$result  = $ability->executeQueueRemove(
+			array(
+				'flow_id' => $flow_id,
+				'index'   => $index,
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to remove prompt from queue' );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] ?? 'Prompt removed from queue.' );
+		if ( ! empty( $result['removed_prompt'] ) ) {
+			$preview = mb_strlen( $result['removed_prompt'] ) > 80
+				? mb_substr( $result['removed_prompt'], 0, 77 ) . '...'
+				: $result['removed_prompt'];
+			WP_CLI::log( sprintf( 'Removed: %s', $preview ) );
+		}
 	}
 }
