@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
+## [0.19.9] - 2026-02-02
+
+### Changed
+- Merge pull request #69 from saraichinwag/fix/engine-step-failure-detection
+- Merge pull request #68 from saraichinwag/fix/agent-ping-flow-id
+
+### Fixed
+- detect step failure from packet metadata
+- fix(agent-ping): get flow_id/pipeline_id from flow_step_config
+
 ## [0.19.8] - 2026-02-02
 
 ### Added
