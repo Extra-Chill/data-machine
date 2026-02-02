@@ -63,6 +63,10 @@ class SendPingAbility {
 								'type'        => 'object',
 								'description' => __( 'Engine data including post_id, published_url, etc.', 'data-machine' ),
 							),
+							'from_queue'   => array(
+								'type'        => 'boolean',
+								'description' => __( 'Whether this job originated from the prompt queue', 'data-machine' ),
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -114,6 +118,7 @@ class SendPingAbility {
 		$flow_id      = $input['flow_id'] ?? null;
 		$pipeline_id  = $input['pipeline_id'] ?? null;
 		$job_id       = $input['job_id'] ?? null;
+		$from_queue   = $input['from_queue'] ?? false;
 
 		if ( empty( $webhook_url ) ) {
 			return array(
@@ -122,7 +127,7 @@ class SendPingAbility {
 			);
 		}
 
-		$payload = $this->buildPayload( $webhook_url, $prompt, $data_packets, $engine_data, $flow_id, $pipeline_id, $job_id );
+		$payload = $this->buildPayload( $webhook_url, $prompt, $data_packets, $engine_data, $flow_id, $pipeline_id, $job_id, $from_queue );
 
 		$response = wp_remote_post(
 			$webhook_url,
@@ -198,11 +203,12 @@ class SendPingAbility {
 	 * @param mixed      $flow_id Flow ID.
 	 * @param mixed      $pipeline_id Pipeline ID.
 	 * @param int|null   $job_id Job ID.
+	 * @param bool       $from_queue Whether job originated from prompt queue.
 	 * @return array Payload for POST request.
 	 */
-	private function buildPayload( string $url, string $prompt, array $data_packets, array $engine_data, $flow_id, $pipeline_id, ?int $job_id ): array {
+	private function buildPayload( string $url, string $prompt, array $data_packets, array $engine_data, $flow_id, $pipeline_id, ?int $job_id, bool $from_queue = false ): array {
 		if ( $this->isDiscordWebhook( $url ) ) {
-			return $this->buildDiscordPayload( $prompt, $data_packets, $engine_data );
+			return $this->buildDiscordPayload( $prompt, $data_packets, $engine_data, $from_queue );
 		}
 
 		return array(
@@ -213,6 +219,7 @@ class SendPingAbility {
 				'flow_id'      => $flow_id,
 				'pipeline_id'  => $pipeline_id,
 				'job_id'       => $job_id,
+				'from_queue'   => $from_queue,
 			),
 			'timestamp' => gmdate( 'c' ),
 		);
@@ -224,14 +231,16 @@ class SendPingAbility {
 	 * @param string $prompt Optional instructions.
 	 * @param array  $data_packets Pipeline data packets.
 	 * @param array  $engine_data Engine data (for future use).
+	 * @param bool   $from_queue Whether job originated from prompt queue.
 	 * @return array Discord webhook payload.
 	 */
-	private function buildDiscordPayload( string $prompt, array $data_packets, array $engine_data = array() ): array {
+	private function buildDiscordPayload( string $prompt, array $data_packets, array $engine_data = array(), bool $from_queue = false ): array {
 		$first_packet = $data_packets[0] ?? array();
 		$title        = $first_packet['content']['title'] ?? 'New content';
 		$url          = $first_packet['metadata']['url'] ?? $first_packet['metadata']['permalink'] ?? '';
 
-		$content = "🤖 **{$title}**";
+		$source  = $from_queue ? '📋' : '🤖';
+		$content = "{$source} **{$title}**";
 		if ( ! empty( $url ) ) {
 			$content .= "\n{$url}";
 		}

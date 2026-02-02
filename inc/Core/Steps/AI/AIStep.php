@@ -2,11 +2,11 @@
 
 namespace DataMachine\Core\Steps\AI;
 
-use DataMachine\Abilities\Flow\QueueAbility;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\Steps\Step;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
+use DataMachine\Core\Steps\QueueableTrait;
 use DataMachine\Engine\AI\AIConversationLoop;
 use DataMachine\Engine\AI\ConversationManager;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
@@ -24,6 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class AIStep extends Step {
 
 	use StepTypeRegistrationTrait;
+	use QueueableTrait;
 
 	/**
 	 * Initialize AI step.
@@ -94,29 +95,11 @@ class AIStep extends Step {
 	 * @return array
 	 */
 	protected function executeStep(): array {
-		$user_message = trim( $this->flow_step_config['user_message'] ?? '' );
+		$configured_message = trim( $this->flow_step_config['user_message'] ?? '' );
 
 		// Check for prompt queue - if user_message is empty, pop from queue
-		if ( empty( $user_message ) ) {
-			$job_context = $this->engine->getJobContext();
-			$flow_id = $job_context['flow_id'] ?? null;
-			if ( $flow_id ) {
-				$queued_item = QueueAbility::popFromQueue( (int) $flow_id );
-				if ( $queued_item && ! empty( $queued_item['prompt'] ) ) {
-					$user_message = $queued_item['prompt'];
-
-					do_action(
-						'datamachine_log',
-						'info',
-						'Using prompt from queue',
-						array(
-							'flow_id'  => $flow_id,
-							'added_at' => $queued_item['added_at'] ?? '',
-						)
-					);
-				}
-			}
-		}
+		$queue_result = $this->popFromQueueIfEmpty( $configured_message );
+		$user_message = $queue_result['value'];
 
 		// Vision image from engine data (single source of truth)
 		$file_path    = null;

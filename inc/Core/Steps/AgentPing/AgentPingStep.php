@@ -17,6 +17,7 @@ namespace DataMachine\Core\Steps\AgentPing;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\Step;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
+use DataMachine\Core\Steps\QueueableTrait;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -25,6 +26,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class AgentPingStep extends Step {
 
 	use StepTypeRegistrationTrait;
+	use QueueableTrait;
 
 	/**
 	 * Initialize Agent Ping step.
@@ -111,16 +113,22 @@ class AgentPingStep extends Step {
 	protected function executeStep(): array {
 		$handler_config = $this->getHandlerConfig();
 
-		$webhook_url  = trim( $handler_config['webhook_url'] ?? '' );
-		$prompt       = $handler_config['prompt'] ?? '';
-		$data_packets = $this->dataPackets;
+		$webhook_url       = trim( $handler_config['webhook_url'] ?? '' );
+		$configured_prompt = $handler_config['prompt'] ?? '';
+		$data_packets      = $this->dataPackets;
+
+		// Check for prompt queue - if prompt is empty, pop from queue
+		$queue_result = $this->popFromQueueIfEmpty( $configured_prompt );
+		$prompt       = $queue_result['value'];
+		$from_queue   = $queue_result['from_queue'];
 
 		// Execute the send-ping ability
-		$result = wp_execute_ability(
-			'datamachine/send-ping',
+		$ability = wp_get_ability( 'datamachine/send-ping' );
+		$result  = $ability->execute(
 			array(
 				'webhook_url'  => $webhook_url,
 				'prompt'       => $prompt,
+				'from_queue'   => $from_queue,
 				'data_packets' => $data_packets,
 				'engine_data'  => $this->engine->getAll(),
 				'flow_id'      => $this->engine->get( 'flow_id' ),

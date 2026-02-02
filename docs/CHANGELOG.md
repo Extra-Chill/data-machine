@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
+## [0.19.0] - 2026-02-02
+
+### Added
+- QueueableTrait for shared queue pop functionality across step types
+- Agent Ping step now supports prompt queue (same as AI step)
+
+### Changed
+- AIStep refactored to use QueueableTrait instead of inline queue logic
+- Agent Ping includes `from_queue` flag in webhook payload
+
 ## [0.18.6] - 2026-02-01
 
 ### Changed
