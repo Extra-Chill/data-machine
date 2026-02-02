@@ -227,35 +227,24 @@ class ToolManager {
 	// ============================================
 
 	/**
-	 * Get step-enabled tools for specific context.
+	 * Get step-disabled tools for specific context.
 	 * Use-case agnostic - works for pipeline steps or any context ID.
 	 *
 	 * @param string|null $context_id Context identifier (pipeline_step_id or null)
-	 * @return array Enabled tool IDs for context
+	 * @return array Disabled tool IDs for context
 	 */
-	public function get_step_enabled_tools( ?string $context_id = null ): array {
+	public function get_step_disabled_tools( ?string $context_id = null ): array {
 		if ( empty( $context_id ) ) {
 			return array();
 		}
 
 		$db_pipelines      = new \DataMachine\Core\Database\Pipelines\Pipelines();
 		$saved_step_config = $db_pipelines->get_pipeline_step_config( $context_id );
-		$step_tools        = $saved_step_config['enabled_tools'] ?? array();
+		$step_tools        = $saved_step_config['disabled_tools'] ?? array();
 
 		return is_array( $step_tools ) ? $step_tools : array();
 	}
 
-	/**
-	 * Check if tool is enabled for specific step/context.
-	 *
-	 * @param string $context_id Context identifier
-	 * @param string $tool_id Tool identifier
-	 * @return bool True if enabled for context
-	 */
-	public function is_step_tool_enabled( string $context_id, string $tool_id ): bool {
-		$step_tools = $this->get_step_enabled_tools( $context_id );
-		return in_array( $tool_id, $step_tools, true );
-	}
 
 	// ============================================
 	// AVAILABILITY CHECK (REPLACES datamachine_tool_enabled FILTER)
@@ -279,7 +268,11 @@ class ToolManager {
 
 		// Pipeline context: check step-specific selections
 		if ( $context_id ) {
-			return $this->is_step_tool_enabled( $context_id, $tool_id );
+			$disabled = $this->get_step_disabled_tools( $context_id );
+			if ( in_array( $tool_id, $disabled, true ) ) {
+				return false;
+			}
+			// Fall through to global checks
 		}
 
 		// Chat context (no context_id): check global enablement + configuration
@@ -360,7 +353,7 @@ class ToolManager {
 	public function get_tools_for_step_modal( string $context_id ): array {
 		return array(
 			'global_enabled_tools' => $this->get_global_tools(),
-			'modal_enabled_tools'  => $this->get_step_enabled_tools( $context_id ),
+			'modal_disabled_tools' => $this->get_step_disabled_tools( $context_id ),
 			'pipeline_step_id'     => $context_id,
 		);
 	}
