@@ -14,7 +14,7 @@ import { __ } from '@wordpress/i18n';
  * Internal dependencies
  */
 import FlowStepHandler from './FlowStepHandler';
-import { useUpdateUserMessage } from '../../queries/flows';
+import { useUpdateQueueItem } from '../../queries/queue';
 import { AUTO_SAVE_DELAY } from '../../utils/constants';
 import { useStepTypes } from '../../queries/config';
 
@@ -28,6 +28,7 @@ import { useStepTypes } from '../../queries/config';
  * @param {Object}   props.flowStepConfig - Flow step configuration.
  * @param {Object}   props.pipelineStep   - Pipeline step data.
  * @param {Object}   props.pipelineConfig - Pipeline AI configuration.
+ * @param {Array}    props.promptQueue    - Flow-level prompt queue.
  * @param {Function} props.onConfigure    - Configure handler callback.
  * @return {JSX.Element} Flow step card.
  */
@@ -38,6 +39,7 @@ export default function FlowStepCard( {
 	flowStepConfig,
 	pipelineStep,
 	pipelineConfig,
+	promptQueue = [],
 	onConfigure,
 } ) {
 	// Global config: Use stepTypes hook directly (TanStack Query handles caching)
@@ -48,31 +50,39 @@ export default function FlowStepCard( {
 		? pipelineConfig[ pipelineStep.pipeline_step_id ]
 		: null;
 
+	// Get the first queue item's prompt (if exists)
+	const queueHasItems = promptQueue.length > 0;
+	const firstQueuePrompt = queueHasItems ? promptQueue[ 0 ].prompt : '';
+
+	// Local state for the textarea - displays queue[0] if available
 	const [ localUserMessage, setLocalUserMessage ] = useState(
-		flowStepConfig.user_message || ''
+		firstQueuePrompt || flowStepConfig.user_message || ''
 	);
 	const [ isSaving, setIsSaving ] = useState( false );
 	const [ error, setError ] = useState( null );
 	const saveTimeout = useRef( null );
-	const updateUserMessageMutation = useUpdateUserMessage();
+	const updateQueueItemMutation = useUpdateQueueItem();
 
 	/**
-	 * Sync local user message with config changes
+	 * Sync local user message with queue/config changes
 	 */
 	useEffect( () => {
-		setLocalUserMessage( flowStepConfig.user_message || '' );
-	}, [ flowStepConfig.user_message ] );
+		// Priority: queue[0] > user_message
+		const newValue = firstQueuePrompt || flowStepConfig.user_message || '';
+		setLocalUserMessage( newValue );
+	}, [ firstQueuePrompt, flowStepConfig.user_message ] );
 
 	/**
-	 * Save user message to API
+	 * Save user message to queue (index 0)
 	 */
-	const saveUserMessage = useCallback(
+	const saveToQueue = useCallback(
 		async ( message ) => {
 			if ( ! isAiStep ) {
 				return;
 			}
 
-			const currentMessage = flowStepConfig.user_message || '';
+			// Compare to current queue value
+			const currentMessage = firstQueuePrompt || '';
 			if ( message === currentMessage ) {
 				return;
 			}
@@ -81,23 +91,22 @@ export default function FlowStepCard( {
 			setError( null );
 
 			try {
-				const response = await updateUserMessageMutation.mutateAsync( {
-					pipelineId,
+				const response = await updateQueueItemMutation.mutateAsync( {
 					flowId,
-					flowStepId,
-					message,
+					index: 0,
+					prompt: message,
 				} );
 
 				if ( ! response?.success ) {
 					setError(
 						response?.message ||
-							__( 'Failed to update user message', 'data-machine' )
+							__( 'Failed to update prompt queue', 'data-machine' )
 					);
 					setLocalUserMessage( currentMessage );
 				}
 			} catch ( err ) {
 				// eslint-disable-next-line no-console
-				console.error( 'User message update error:', err );
+				console.error( 'Queue update error:', err );
 				setError(
 					err.message || __( 'An error occurred', 'data-machine' )
 				);
@@ -108,11 +117,9 @@ export default function FlowStepCard( {
 		},
 		[
 			flowId,
-			pipelineId,
-			flowStepId,
-			flowStepConfig.user_message,
+			firstQueuePrompt,
 			isAiStep,
-			updateUserMessageMutation,
+			updateQueueItemMutation,
 		]
 	);
 
@@ -130,10 +137,10 @@ export default function FlowStepCard( {
 
 			// Set new timeout for debounced save
 			saveTimeout.current = setTimeout( () => {
-				saveUserMessage( value );
+				saveToQueue( value );
 			}, AUTO_SAVE_DELAY );
 		},
-		[ saveUserMessage ]
+		[ saveToQueue ]
 	);
 
 	/**
@@ -146,6 +153,45 @@ export default function FlowStepCard( {
 			}
 		};
 	}, [] );
+
+	/**
+	 * Build the label with queue indicator
+	 */
+	const getFieldLabel = () => {
+		if ( queueHasItems ) {
+			return (
+				<span className="datamachine-user-message-label">
+					{ __( 'User Message', 'data-machine' ) }
+					<span className="datamachine-queue-indicator">
+						{ ' ' }
+						<span className="datamachine-queue-badge">
+							{ __( 'Next in queue', 'data-machine' ) }
+						</span>
+					</span>
+				</span>
+			);
+		}
+		return __( 'User Message', 'data-machine' );
+	};
+
+	/**
+	 * Build help text
+	 */
+	const getHelpText = () => {
+		if ( isSaving ) {
+			return __( 'Saving…', 'data-machine' );
+		}
+		if ( queueHasItems ) {
+			return __(
+				'Editing updates the first item in the prompt queue.',
+				'data-machine'
+			);
+		}
+		return __(
+			'Type here to add a prompt to the queue.',
+			'data-machine'
+		);
+	};
 
 	return (
 		<Card
@@ -186,7 +232,7 @@ export default function FlowStepCard( {
 							</div>
 
 							<TextareaControl
-								label={ __( 'User Message', 'data-machine' ) }
+								label={ getFieldLabel() }
 								value={ localUserMessage }
 								onChange={ handleUserMessageChange }
 								placeholder={ __(
@@ -194,11 +240,8 @@ export default function FlowStepCard( {
 									'data-machine'
 								) }
 								rows={ 4 }
-								help={
-									isSaving
-										? __( 'Saving…', 'data-machine' )
-										: null
-								}
+								help={ getHelpText() }
+								className={ queueHasItems ? 'datamachine-queue-linked' : '' }
 							/>
 						</div>
 					) }

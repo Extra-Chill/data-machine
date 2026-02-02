@@ -16,6 +16,7 @@ import {
 	addToFlowQueue,
 	clearFlowQueue,
 	removeFromFlowQueue,
+	updateFlowQueueItem,
 } from '../utils/api';
 import { normalizeId } from '../utils/ids';
 
@@ -144,6 +145,79 @@ export const useRemoveFromQueue = () => {
 			const cachedFlowId = normalizeId( flowId );
 			queryClient.invalidateQueries( {
 				queryKey: [ 'flowQueue', cachedFlowId ],
+			} );
+		},
+	} );
+};
+
+/**
+ * Update a specific prompt in the flow queue
+ *
+ * @return {Object} Mutation result
+ */
+export const useUpdateQueueItem = () => {
+	const queryClient = useQueryClient();
+
+	return useMutation( {
+		mutationFn: ( { flowId, index, prompt } ) =>
+			updateFlowQueueItem( flowId, index, prompt ),
+		onMutate: async ( { flowId, index, prompt } ) => {
+			const cachedFlowId = normalizeId( flowId );
+
+			// Cancel any outgoing refetches
+			await queryClient.cancelQueries( {
+				queryKey: [ 'flowQueue', cachedFlowId ],
+			} );
+
+			// Snapshot the previous value
+			const previousQueue = queryClient.getQueryData( [
+				'flowQueue',
+				cachedFlowId,
+			] );
+
+			// Optimistically update
+			if ( previousQueue?.queue ) {
+				const newQueue = [ ...previousQueue.queue ];
+				if ( index < newQueue.length ) {
+					newQueue[ index ] = {
+						...newQueue[ index ],
+						prompt,
+					};
+				} else if ( index === 0 && newQueue.length === 0 && prompt ) {
+					// Creating first item
+					newQueue.push( {
+						prompt,
+						added_at: new Date().toISOString(),
+					} );
+				}
+
+				queryClient.setQueryData( [ 'flowQueue', cachedFlowId ], {
+					queue: newQueue,
+					count: newQueue.length,
+				} );
+			}
+
+			return { previousQueue, cachedFlowId };
+		},
+		onError: ( err, variables, context ) => {
+			// Rollback on error
+			if ( context?.previousQueue ) {
+				queryClient.setQueryData(
+					[ 'flowQueue', context.cachedFlowId ],
+					context.previousQueue
+				);
+			}
+		},
+		onSettled: ( response, error, { flowId } ) => {
+			// Refetch to ensure we're in sync
+			const cachedFlowId = normalizeId( flowId );
+			queryClient.invalidateQueries( {
+				queryKey: [ 'flowQueue', cachedFlowId ],
+			} );
+
+			// Also invalidate the flows cache since prompt_queue is in flow_config
+			queryClient.invalidateQueries( {
+				queryKey: [ 'flows' ],
 			} );
 		},
 	} );

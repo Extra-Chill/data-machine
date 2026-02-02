@@ -554,3 +554,17 @@ export const clearFlowQueue = async ( flowId ) => {
 export const removeFromFlowQueue = async ( flowId, index ) => {
 	return await client.delete( `/flows/${ flowId }/queue/${ index }` );
 };
+
+/**
+ * Update a specific prompt in flow queue by index
+ *
+ * @param {number} flowId - Flow ID
+ * @param {number} index  - Queue index (0-based)
+ * @param {string} prompt - New prompt text
+ * @return {Promise<Object>} Result with updated queue info
+ */
+export const updateFlowQueueItem = async ( flowId, index, prompt ) => {
+	return await client.put( `/flows/${ flowId }/queue/${ index }`, {
+		prompt,
+	} );
+};

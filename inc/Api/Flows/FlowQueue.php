@@ -93,25 +93,53 @@ class FlowQueue {
 		);
 
 		// DELETE /flows/{id}/queue/{index} - Remove specific item
+		// PUT /flows/{id}/queue/{index} - Update specific item
 		register_rest_route(
 			'datamachine/v1',
 			'/flows/(?P<flow_id>\d+)/queue/(?P<index>\d+)',
 			array(
-				'methods'             => WP_REST_Server::DELETABLE,
-				'callback'            => array( self::class, 'handle_remove_from_queue' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
-				'args'                => array(
-					'flow_id' => array(
-						'required'          => true,
-						'type'              => 'integer',
-						'sanitize_callback' => 'absint',
-						'description'       => __( 'Flow ID', 'data-machine' ),
+				array(
+					'methods'             => WP_REST_Server::DELETABLE,
+					'callback'            => array( self::class, 'handle_remove_from_queue' ),
+					'permission_callback' => array( self::class, 'check_permission' ),
+					'args'                => array(
+						'flow_id' => array(
+							'required'          => true,
+							'type'              => 'integer',
+							'sanitize_callback' => 'absint',
+							'description'       => __( 'Flow ID', 'data-machine' ),
+						),
+						'index'   => array(
+							'required'          => true,
+							'type'              => 'integer',
+							'sanitize_callback' => 'absint',
+							'description'       => __( 'Queue index (0-based)', 'data-machine' ),
+						),
 					),
-					'index'   => array(
-						'required'          => true,
-						'type'              => 'integer',
-						'sanitize_callback' => 'absint',
-						'description'       => __( 'Queue index (0-based)', 'data-machine' ),
+				),
+				array(
+					'methods'             => WP_REST_Server::EDITABLE,
+					'callback'            => array( self::class, 'handle_update_queue_item' ),
+					'permission_callback' => array( self::class, 'check_permission' ),
+					'args'                => array(
+						'flow_id' => array(
+							'required'          => true,
+							'type'              => 'integer',
+							'sanitize_callback' => 'absint',
+							'description'       => __( 'Flow ID', 'data-machine' ),
+						),
+						'index'   => array(
+							'required'          => true,
+							'type'              => 'integer',
+							'sanitize_callback' => 'absint',
+							'description'       => __( 'Queue index (0-based)', 'data-machine' ),
+						),
+						'prompt'  => array(
+							'required'          => true,
+							'type'              => 'string',
+							'description'       => __( 'New prompt text', 'data-machine' ),
+							'sanitize_callback' => 'sanitize_textarea_field',
+						),
 					),
 				),
 			)
@@ -352,6 +380,54 @@ class FlowQueue {
 					'flow_id'        => $result['flow_id'],
 					'removed_prompt' => $result['removed_prompt'],
 					'queue_length'   => $result['queue_length'],
+				),
+				'message' => $result['message'],
+			)
+		);
+	}
+
+	/**
+	 * Handle update queue item request
+	 *
+	 * PUT /flows/{id}/queue/{index}
+	 *
+	 * @param \WP_REST_Request $request Request object.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public static function handle_update_queue_item( $request ) {
+		$ability = wp_get_ability( 'datamachine/queue-update' );
+		if ( ! $ability ) {
+			return new \WP_Error( 'ability_not_found', 'Ability not found', array( 'status' => 500 ) );
+		}
+
+		$result = $ability->execute(
+			array(
+				'flow_id' => (int) $request->get_param( 'flow_id' ),
+				'index'   => (int) $request->get_param( 'index' ),
+				'prompt'  => $request->get_param( 'prompt' ),
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			$status = 400;
+			if ( false !== strpos( $result['error'] ?? '', 'not found' ) ) {
+				$status = 404;
+			}
+
+			return new \WP_Error(
+				'queue_update_failed',
+				$result['error'] ?? __( 'Failed to update queue item.', 'data-machine' ),
+				array( 'status' => $status )
+			);
+		}
+
+		return rest_ensure_response(
+			array(
+				'success' => true,
+				'data'    => array(
+					'flow_id'      => $result['flow_id'],
+					'index'        => $result['index'],
+					'queue_length' => $result['queue_length'],
 				),
 				'message' => $result['message'],
 			)
