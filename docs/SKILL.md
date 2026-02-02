@@ -57,7 +57,7 @@ Three levels, applied in order:
 All service logic uses WordPress Abilities API. Key abilities include:
 - `datamachine/create-flow`, `datamachine/update-flow`, `datamachine/delete-flow`
 - `datamachine/create-pipeline`, `datamachine/update-pipeline`, `datamachine/delete-pipeline`
-- `datamachine/queue-add`, `datamachine/queue-list`, `datamachine/queue-clear`, `datamachine/queue-remove`
+- `datamachine/queue-add`, `datamachine/queue-list`, `datamachine/queue-clear`, `datamachine/queue-remove`, `datamachine/queue-update`
 - `datamachine/send-ping`, `datamachine/execute-workflow`
 
 ## CLI Commands
