@@ -96,10 +96,20 @@ class AIStep extends Step {
 	 */
 	protected function executeStep(): array {
 		$configured_message = trim( $this->flow_step_config['user_message'] ?? '' );
+		$queue_enabled      = (bool) ( $this->flow_step_config['queue_enabled'] ?? false );
+		$prompt_queue       = $this->flow_step_config['prompt_queue'] ?? array();
+		$queued_prompt      = $prompt_queue[0]['prompt'] ?? '';
 
-		// Check for prompt queue - if user_message is empty, pop from queue
-		$queue_result = $this->popFromQueueIfEmpty( $configured_message );
-		$user_message = $queue_result['value'];
+		if ( $queue_enabled ) {
+			$queue_result = $this->popFromQueueIfEmpty( '', true );
+			$user_message = $queue_result['value'];
+		} else {
+			$user_message = $queued_prompt;
+		}
+
+		if ( empty( $user_message ) ) {
+			$user_message = $configured_message;
+		}
 
 		// Vision image from engine data (single source of truth)
 		$file_path    = null;

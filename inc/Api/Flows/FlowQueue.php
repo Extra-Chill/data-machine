@@ -47,6 +47,12 @@ class FlowQueue {
 							'sanitize_callback' => 'absint',
 							'description'       => __( 'Flow ID', 'data-machine' ),
 						),
+						'flow_step_id' => array(
+							'required'          => true,
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_text_field',
+							'description'       => __( 'Flow step ID', 'data-machine' ),
+						),
 					),
 				),
 				array(
@@ -59,6 +65,12 @@ class FlowQueue {
 							'type'              => 'integer',
 							'sanitize_callback' => 'absint',
 							'description'       => __( 'Flow ID', 'data-machine' ),
+						),
+						'flow_step_id' => array(
+							'required'          => true,
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_text_field',
+							'description'       => __( 'Flow step ID', 'data-machine' ),
 						),
 						'prompt'  => array(
 							'required'          => false,
@@ -87,6 +99,12 @@ class FlowQueue {
 							'sanitize_callback' => 'absint',
 							'description'       => __( 'Flow ID', 'data-machine' ),
 						),
+						'flow_step_id' => array(
+							'required'          => true,
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_text_field',
+							'description'       => __( 'Flow step ID', 'data-machine' ),
+						),
 					),
 				),
 			)
@@ -109,6 +127,12 @@ class FlowQueue {
 							'sanitize_callback' => 'absint',
 							'description'       => __( 'Flow ID', 'data-machine' ),
 						),
+						'flow_step_id' => array(
+							'required'          => true,
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_text_field',
+							'description'       => __( 'Flow step ID', 'data-machine' ),
+						),
 						'index'   => array(
 							'required'          => true,
 							'type'              => 'integer',
@@ -128,6 +152,12 @@ class FlowQueue {
 							'sanitize_callback' => 'absint',
 							'description'       => __( 'Flow ID', 'data-machine' ),
 						),
+						'flow_step_id' => array(
+							'required'          => true,
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_text_field',
+							'description'       => __( 'Flow step ID', 'data-machine' ),
+						),
 						'index'   => array(
 							'required'          => true,
 							'type'              => 'integer',
@@ -140,6 +170,35 @@ class FlowQueue {
 							'description'       => __( 'New prompt text', 'data-machine' ),
 							'sanitize_callback' => 'sanitize_textarea_field',
 						),
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			'datamachine/v1',
+			'/flows/(?P<flow_id>\d+)/queue/settings',
+			array(
+				'methods'             => WP_REST_Server::EDITABLE,
+				'callback'            => array( self::class, 'handle_update_queue_settings' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => array(
+					'flow_id' => array(
+						'required'          => true,
+						'type'              => 'integer',
+						'sanitize_callback' => 'absint',
+						'description'       => __( 'Flow ID', 'data-machine' ),
+					),
+					'flow_step_id' => array(
+						'required'          => true,
+						'type'              => 'string',
+						'sanitize_callback' => 'sanitize_text_field',
+						'description'       => __( 'Flow step ID', 'data-machine' ),
+					),
+					'queue_enabled' => array(
+						'required'          => true,
+						'type'              => 'boolean',
+						'description'       => __( 'Whether queue pop is enabled for this step', 'data-machine' ),
 					),
 				),
 			)
@@ -180,7 +239,8 @@ class FlowQueue {
 
 		$result = $ability->execute(
 			array(
-				'flow_id' => (int) $request->get_param( 'flow_id' ),
+				'flow_id'      => (int) $request->get_param( 'flow_id' ),
+				'flow_step_id' => sanitize_text_field( $request->get_param( 'flow_step_id' ) ),
 			)
 		);
 
@@ -201,9 +261,11 @@ class FlowQueue {
 			array(
 				'success' => true,
 				'data'    => array(
-					'flow_id' => $result['flow_id'],
-					'queue'   => $result['queue'],
-					'count'   => $result['count'],
+					'flow_id'       => $result['flow_id'],
+					'flow_step_id'  => $result['flow_step_id'],
+					'queue'         => $result['queue'],
+					'count'         => $result['count'],
+					'queue_enabled' => $result['queue_enabled'],
 				),
 			)
 		);
@@ -224,9 +286,10 @@ class FlowQueue {
 			return new \WP_Error( 'ability_not_found', 'Ability not found', array( 'status' => 500 ) );
 		}
 
-		$flow_id = (int) $request->get_param( 'flow_id' );
-		$prompt  = $request->get_param( 'prompt' );
-		$prompts = $request->get_param( 'prompts' );
+		$flow_id      = (int) $request->get_param( 'flow_id' );
+		$prompt       = $request->get_param( 'prompt' );
+		$prompts      = $request->get_param( 'prompts' );
+		$flow_step_id = sanitize_text_field( $request->get_param( 'flow_step_id' ) );
 
 		// Build list of prompts to add
 		$prompts_to_add = array();
@@ -256,8 +319,9 @@ class FlowQueue {
 		foreach ( $prompts_to_add as $p ) {
 			$result = $ability->execute(
 				array(
-					'flow_id' => $flow_id,
-					'prompt'  => $p,
+					'flow_id'      => $flow_id,
+					'flow_step_id' => $flow_step_id,
+					'prompt'       => $p,
 				)
 			);
 
@@ -281,6 +345,7 @@ class FlowQueue {
 				'success' => true,
 				'data'    => array(
 					'flow_id'      => $flow_id,
+					'flow_step_id' => $flow_step_id,
 					'added_count'  => $added_count,
 					'queue_length' => $queue_length,
 				),
@@ -310,7 +375,8 @@ class FlowQueue {
 
 		$result = $ability->execute(
 			array(
-				'flow_id' => (int) $request->get_param( 'flow_id' ),
+				'flow_id'      => (int) $request->get_param( 'flow_id' ),
+				'flow_step_id' => sanitize_text_field( $request->get_param( 'flow_step_id' ) ),
 			)
 		);
 
@@ -332,6 +398,7 @@ class FlowQueue {
 				'success' => true,
 				'data'    => array(
 					'flow_id'       => $result['flow_id'],
+					'flow_step_id'  => $result['flow_step_id'],
 					'cleared_count' => $result['cleared_count'],
 				),
 				'message' => $result['message'],
@@ -355,8 +422,9 @@ class FlowQueue {
 
 		$result = $ability->execute(
 			array(
-				'flow_id' => (int) $request->get_param( 'flow_id' ),
-				'index'   => (int) $request->get_param( 'index' ),
+				'flow_id'      => (int) $request->get_param( 'flow_id' ),
+				'flow_step_id' => sanitize_text_field( $request->get_param( 'flow_step_id' ) ),
+				'index'        => (int) $request->get_param( 'index' ),
 			)
 		);
 
@@ -378,6 +446,7 @@ class FlowQueue {
 				'success' => true,
 				'data'    => array(
 					'flow_id'        => $result['flow_id'],
+					'flow_step_id'   => $result['flow_step_id'],
 					'removed_prompt' => $result['removed_prompt'],
 					'queue_length'   => $result['queue_length'],
 				),
@@ -402,9 +471,10 @@ class FlowQueue {
 
 		$result = $ability->execute(
 			array(
-				'flow_id' => (int) $request->get_param( 'flow_id' ),
-				'index'   => (int) $request->get_param( 'index' ),
-				'prompt'  => $request->get_param( 'prompt' ),
+				'flow_id'      => (int) $request->get_param( 'flow_id' ),
+				'flow_step_id' => sanitize_text_field( $request->get_param( 'flow_step_id' ) ),
+				'index'        => (int) $request->get_param( 'index' ),
+				'prompt'       => $request->get_param( 'prompt' ),
 			)
 		);
 
@@ -426,10 +496,59 @@ class FlowQueue {
 				'success' => true,
 				'data'    => array(
 					'flow_id'      => $result['flow_id'],
+					'flow_step_id' => $result['flow_step_id'],
 					'index'        => $result['index'],
 					'queue_length' => $result['queue_length'],
 				),
 				'message' => $result['message'],
+			)
+		);
+	}
+
+	/**
+	 * Handle queue settings update.
+	 *
+	 * PUT /flows/{id}/queue/settings
+	 *
+	 * @param \WP_REST_Request $request Request object.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public static function handle_update_queue_settings( $request ) {
+		$ability = wp_get_ability( 'datamachine/queue-settings' );
+		if ( ! $ability ) {
+			return new \WP_Error( 'ability_not_found', 'Ability not found', array( 'status' => 500 ) );
+		}
+
+		$result = $ability->execute(
+			array(
+				'flow_id'       => (int) $request->get_param( 'flow_id' ),
+				'flow_step_id'  => sanitize_text_field( $request->get_param( 'flow_step_id' ) ),
+				'queue_enabled' => (bool) $request->get_param( 'queue_enabled' ),
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			$status = 400;
+			if ( false !== strpos( $result['error'] ?? '', 'not found' ) ) {
+				$status = 404;
+			}
+
+			return new \WP_Error(
+				'queue_settings_failed',
+				$result['error'] ?? __( 'Failed to update queue settings.', 'data-machine' ),
+				array( 'status' => $status )
+			);
+		}
+
+		return rest_ensure_response(
+			array(
+				'success' => true,
+				'data'    => array(
+					'flow_id'       => $result['flow_id'],
+					'flow_step_id'  => $result['flow_step_id'],
+					'queue_enabled' => $result['queue_enabled'],
+				),
+				'message' => $result['message'] ?? __( 'Queue settings updated.', 'data-machine' ),
 			)
 		);
 	}

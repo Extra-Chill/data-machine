@@ -276,12 +276,16 @@ function FlowCardContent( props ) {
 	/**
 	 * Handle queue button click - opens queue management modal
 	 */
-	const handleQueue = useCallback( () => {
-		openModal( MODAL_TYPES.FLOW_QUEUE, {
-			flowId: currentFlowData.flow_id,
-			flowName: currentFlowData.flow_name,
-		} );
-	}, [ currentFlowData.flow_id, currentFlowData.flow_name, openModal ] );
+	const handleQueue = useCallback(
+		( flowStepId ) => {
+			openModal( MODAL_TYPES.FLOW_QUEUE, {
+				flowId: currentFlowData.flow_id,
+				flowStepId,
+				flowName: currentFlowData.flow_name,
+			} );
+		},
+		[ currentFlowData.flow_id, currentFlowData.flow_name, openModal ]
+	);
 
 	/**
 	 * Handle step configuration

@@ -39,6 +39,7 @@ class QueueAbility {
 			$this->registerQueueClear();
 			$this->registerQueueRemove();
 			$this->registerQueueUpdate();
+			$this->registerQueueSettings();
 		};
 
 		if ( did_action( 'wp_abilities_api_init' ) ) {
@@ -60,11 +61,15 @@ class QueueAbility {
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
-					'required'   => array( 'flow_id', 'prompt' ),
+					'required'   => array( 'flow_id', 'flow_step_id', 'prompt' ),
 					'properties' => array(
 						'flow_id' => array(
 							'type'        => 'integer',
 							'description' => __( 'Flow ID to add prompt to', 'data-machine' ),
+						),
+						'flow_step_id' => array(
+							'type'        => 'string',
+							'description' => __( 'Flow step ID to add prompt to', 'data-machine' ),
 						),
 						'prompt'  => array(
 							'type'        => 'string',
@@ -77,6 +82,7 @@ class QueueAbility {
 					'properties' => array(
 						'success'      => array( 'type' => 'boolean' ),
 						'flow_id'      => array( 'type' => 'integer' ),
+						'flow_step_id' => array( 'type' => 'string' ),
 						'queue_length' => array( 'type' => 'integer' ),
 						'message'      => array( 'type' => 'string' ),
 						'error'        => array( 'type' => 'string' ),
@@ -101,11 +107,15 @@ class QueueAbility {
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
-					'required'   => array( 'flow_id' ),
+					'required'   => array( 'flow_id', 'flow_step_id' ),
 					'properties' => array(
 						'flow_id' => array(
 							'type'        => 'integer',
 							'description' => __( 'Flow ID to list queue for', 'data-machine' ),
+						),
+						'flow_step_id' => array(
+							'type'        => 'string',
+							'description' => __( 'Flow step ID to list queue for', 'data-machine' ),
 						),
 					),
 				),
@@ -114,8 +124,10 @@ class QueueAbility {
 					'properties' => array(
 						'success' => array( 'type' => 'boolean' ),
 						'flow_id' => array( 'type' => 'integer' ),
+						'flow_step_id' => array( 'type' => 'string' ),
 						'queue'   => array( 'type' => 'array' ),
 						'count'   => array( 'type' => 'integer' ),
+						'queue_enabled' => array( 'type' => 'boolean' ),
 						'error'   => array( 'type' => 'string' ),
 					),
 				),
@@ -138,11 +150,15 @@ class QueueAbility {
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
-					'required'   => array( 'flow_id' ),
+					'required'   => array( 'flow_id', 'flow_step_id' ),
 					'properties' => array(
 						'flow_id' => array(
 							'type'        => 'integer',
 							'description' => __( 'Flow ID to clear queue for', 'data-machine' ),
+						),
+						'flow_step_id' => array(
+							'type'        => 'string',
+							'description' => __( 'Flow step ID to clear queue for', 'data-machine' ),
 						),
 					),
 				),
@@ -151,6 +167,7 @@ class QueueAbility {
 					'properties' => array(
 						'success'         => array( 'type' => 'boolean' ),
 						'flow_id'         => array( 'type' => 'integer' ),
+						'flow_step_id'    => array( 'type' => 'string' ),
 						'cleared_count'   => array( 'type' => 'integer' ),
 						'message'         => array( 'type' => 'string' ),
 						'error'           => array( 'type' => 'string' ),
@@ -175,11 +192,15 @@ class QueueAbility {
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
-					'required'   => array( 'flow_id', 'index' ),
+					'required'   => array( 'flow_id', 'flow_step_id', 'index' ),
 					'properties' => array(
 						'flow_id' => array(
 							'type'        => 'integer',
 							'description' => __( 'Flow ID', 'data-machine' ),
+						),
+						'flow_step_id' => array(
+							'type'        => 'string',
+							'description' => __( 'Flow step ID', 'data-machine' ),
 						),
 						'index'   => array(
 							'type'        => 'integer',
@@ -217,11 +238,15 @@ class QueueAbility {
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
-					'required'   => array( 'flow_id', 'index', 'prompt' ),
+					'required'   => array( 'flow_id', 'flow_step_id', 'index', 'prompt' ),
 					'properties' => array(
 						'flow_id' => array(
 							'type'        => 'integer',
 							'description' => __( 'Flow ID', 'data-machine' ),
+						),
+						'flow_step_id' => array(
+							'type'        => 'string',
+							'description' => __( 'Flow step ID', 'data-machine' ),
 						),
 						'index'   => array(
 							'type'        => 'integer',
@@ -238,6 +263,7 @@ class QueueAbility {
 					'properties' => array(
 						'success'      => array( 'type' => 'boolean' ),
 						'flow_id'      => array( 'type' => 'integer' ),
+						'flow_step_id' => array( 'type' => 'string' ),
 						'index'        => array( 'type' => 'integer' ),
 						'queue_length' => array( 'type' => 'integer' ),
 						'message'      => array( 'type' => 'string' ),
@@ -252,19 +278,73 @@ class QueueAbility {
 	}
 
 	/**
+	 * Register queue settings ability.
+	 */
+	private function registerQueueSettings(): void {
+		wp_register_ability(
+			'datamachine/queue-settings',
+			array(
+				'label'               => __( 'Update Queue Settings', 'data-machine' ),
+				'description'         => __( 'Update queue settings for a flow step.', 'data-machine' ),
+				'category'            => 'datamachine',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'flow_id', 'flow_step_id', 'queue_enabled' ),
+					'properties' => array(
+						'flow_id' => array(
+							'type'        => 'integer',
+							'description' => __( 'Flow ID', 'data-machine' ),
+						),
+						'flow_step_id' => array(
+							'type'        => 'string',
+							'description' => __( 'Flow step ID', 'data-machine' ),
+						),
+						'queue_enabled' => array(
+							'type'        => 'boolean',
+							'description' => __( 'Whether queue pop is enabled for this step', 'data-machine' ),
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'      => array( 'type' => 'boolean' ),
+						'flow_id'      => array( 'type' => 'integer' ),
+						'flow_step_id' => array( 'type' => 'string' ),
+						'queue_enabled' => array( 'type' => 'boolean' ),
+						'message'      => array( 'type' => 'string' ),
+						'error'        => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeQueueSettings' ),
+				'permission_callback' => array( $this, 'checkPermission' ),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	/**
 	 * Add a prompt to the flow queue.
 	 *
 	 * @param array $input Input with flow_id and prompt.
 	 * @return array Result.
 	 */
 	public function executeQueueAdd( array $input ): array {
-		$flow_id = $input['flow_id'] ?? null;
-		$prompt  = $input['prompt'] ?? null;
+		$flow_id      = $input['flow_id'] ?? null;
+		$flow_step_id = $input['flow_step_id'] ?? null;
+		$prompt       = $input['prompt'] ?? null;
 
 		if ( ! is_numeric( $flow_id ) || (int) $flow_id <= 0 ) {
 			return array(
 				'success' => false,
 				'error'   => 'flow_id is required and must be a positive integer',
+			);
+		}
+
+		if ( empty( $flow_step_id ) || ! is_string( $flow_step_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_step_id is required and must be a string',
 			);
 		}
 
@@ -275,8 +355,9 @@ class QueueAbility {
 			);
 		}
 
-		$flow_id = (int) $flow_id;
-		$prompt  = sanitize_textarea_field( wp_unslash( $prompt ) );
+		$flow_id      = (int) $flow_id;
+		$flow_step_id = sanitize_text_field( $flow_step_id );
+		$prompt       = sanitize_textarea_field( wp_unslash( $prompt ) );
 
 		$flow = $this->db_flows->get_flow( $flow_id );
 		if ( ! $flow ) {
@@ -286,15 +367,21 @@ class QueueAbility {
 			);
 		}
 
-		$flow_config   = $flow['flow_config'] ?? array();
-		$prompt_queue  = $flow_config['prompt_queue'] ?? array();
+		$validation = $this->getStepConfigForQueue( $flow, $flow_step_id );
+		if ( ! $validation['success'] ) {
+			return $validation;
+		}
+
+		$flow_config  = $validation['flow_config'];
+		$step_config  = $validation['step_config'];
+		$prompt_queue = $step_config['prompt_queue'];
 
 		$prompt_queue[] = array(
 			'prompt'   => $prompt,
 			'added_at' => gmdate( 'c' ),
 		);
 
-		$flow_config['prompt_queue'] = $prompt_queue;
+		$flow_config[ $flow_step_id ]['prompt_queue'] = $prompt_queue;
 
 		$success = $this->db_flows->update_flow(
 			$flow_id,
@@ -321,6 +408,7 @@ class QueueAbility {
 		return array(
 			'success'      => true,
 			'flow_id'      => $flow_id,
+			'flow_step_id' => $flow_step_id,
 			'queue_length' => count( $prompt_queue ),
 			'message'      => sprintf( 'Prompt added to queue. Queue now has %d item(s).', count( $prompt_queue ) ),
 		);
@@ -333,7 +421,8 @@ class QueueAbility {
 	 * @return array Result with queue items.
 	 */
 	public function executeQueueList( array $input ): array {
-		$flow_id = $input['flow_id'] ?? null;
+		$flow_id      = $input['flow_id'] ?? null;
+		$flow_step_id = $input['flow_step_id'] ?? null;
 
 		if ( ! is_numeric( $flow_id ) || (int) $flow_id <= 0 ) {
 			return array(
@@ -342,7 +431,15 @@ class QueueAbility {
 			);
 		}
 
-		$flow_id = (int) $flow_id;
+		if ( empty( $flow_step_id ) || ! is_string( $flow_step_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_step_id is required and must be a string',
+			);
+		}
+
+		$flow_id      = (int) $flow_id;
+		$flow_step_id = sanitize_text_field( $flow_step_id );
 
 		$flow = $this->db_flows->get_flow( $flow_id );
 		if ( ! $flow ) {
@@ -352,14 +449,21 @@ class QueueAbility {
 			);
 		}
 
-		$flow_config  = $flow['flow_config'] ?? array();
-		$prompt_queue = $flow_config['prompt_queue'] ?? array();
+		$validation = $this->getStepConfigForQueue( $flow, $flow_step_id );
+		if ( ! $validation['success'] ) {
+			return $validation;
+		}
+
+		$step_config  = $validation['step_config'];
+		$prompt_queue = $step_config['prompt_queue'];
 
 		return array(
-			'success' => true,
-			'flow_id' => $flow_id,
-			'queue'   => $prompt_queue,
-			'count'   => count( $prompt_queue ),
+			'success'       => true,
+			'flow_id'       => $flow_id,
+			'flow_step_id'  => $flow_step_id,
+			'queue'         => $prompt_queue,
+			'count'         => count( $prompt_queue ),
+			'queue_enabled' => $step_config['queue_enabled'],
 		);
 	}
 
@@ -370,7 +474,8 @@ class QueueAbility {
 	 * @return array Result.
 	 */
 	public function executeQueueClear( array $input ): array {
-		$flow_id = $input['flow_id'] ?? null;
+		$flow_id      = $input['flow_id'] ?? null;
+		$flow_step_id = $input['flow_step_id'] ?? null;
 
 		if ( ! is_numeric( $flow_id ) || (int) $flow_id <= 0 ) {
 			return array(
@@ -379,7 +484,15 @@ class QueueAbility {
 			);
 		}
 
-		$flow_id = (int) $flow_id;
+		if ( empty( $flow_step_id ) || ! is_string( $flow_step_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_step_id is required and must be a string',
+			);
+		}
+
+		$flow_id      = (int) $flow_id;
+		$flow_step_id = sanitize_text_field( $flow_step_id );
 
 		$flow = $this->db_flows->get_flow( $flow_id );
 		if ( ! $flow ) {
@@ -389,10 +502,16 @@ class QueueAbility {
 			);
 		}
 
-		$flow_config   = $flow['flow_config'] ?? array();
-		$cleared_count = count( $flow_config['prompt_queue'] ?? array() );
+		$validation = $this->getStepConfigForQueue( $flow, $flow_step_id );
+		if ( ! $validation['success'] ) {
+			return $validation;
+		}
 
-		$flow_config['prompt_queue'] = array();
+		$flow_config   = $validation['flow_config'];
+		$step_config   = $validation['step_config'];
+		$cleared_count = count( $step_config['prompt_queue'] );
+
+		$flow_config[ $flow_step_id ]['prompt_queue'] = array();
 
 		$success = $this->db_flows->update_flow(
 			$flow_id,
@@ -419,6 +538,7 @@ class QueueAbility {
 		return array(
 			'success'       => true,
 			'flow_id'       => $flow_id,
+			'flow_step_id'  => $flow_step_id,
 			'cleared_count' => $cleared_count,
 			'message'       => sprintf( 'Cleared %d prompt(s) from queue.', $cleared_count ),
 		);
@@ -431,13 +551,21 @@ class QueueAbility {
 	 * @return array Result.
 	 */
 	public function executeQueueRemove( array $input ): array {
-		$flow_id = $input['flow_id'] ?? null;
-		$index   = $input['index'] ?? null;
+		$flow_id      = $input['flow_id'] ?? null;
+		$flow_step_id = $input['flow_step_id'] ?? null;
+		$index        = $input['index'] ?? null;
 
 		if ( ! is_numeric( $flow_id ) || (int) $flow_id <= 0 ) {
 			return array(
 				'success' => false,
 				'error'   => 'flow_id is required and must be a positive integer',
+			);
+		}
+
+		if ( empty( $flow_step_id ) || ! is_string( $flow_step_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_step_id is required and must be a string',
 			);
 		}
 
@@ -448,8 +576,9 @@ class QueueAbility {
 			);
 		}
 
-		$flow_id = (int) $flow_id;
-		$index   = (int) $index;
+		$flow_id      = (int) $flow_id;
+		$flow_step_id = sanitize_text_field( $flow_step_id );
+		$index        = (int) $index;
 
 		$flow = $this->db_flows->get_flow( $flow_id );
 		if ( ! $flow ) {
@@ -459,8 +588,14 @@ class QueueAbility {
 			);
 		}
 
-		$flow_config  = $flow['flow_config'] ?? array();
-		$prompt_queue = $flow_config['prompt_queue'] ?? array();
+		$validation = $this->getStepConfigForQueue( $flow, $flow_step_id );
+		if ( ! $validation['success'] ) {
+			return $validation;
+		}
+
+		$flow_config  = $validation['flow_config'];
+		$step_config  = $validation['step_config'];
+		$prompt_queue = $step_config['prompt_queue'];
 
 		if ( $index >= count( $prompt_queue ) ) {
 			return array(
@@ -474,7 +609,7 @@ class QueueAbility {
 
 		array_splice( $prompt_queue, $index, 1 );
 
-		$flow_config['prompt_queue'] = $prompt_queue;
+		$flow_config[ $flow_step_id ]['prompt_queue'] = $prompt_queue;
 
 		$success = $this->db_flows->update_flow(
 			$flow_id,
@@ -502,6 +637,7 @@ class QueueAbility {
 		return array(
 			'success'        => true,
 			'flow_id'        => $flow_id,
+			'flow_step_id'   => $flow_step_id,
 			'removed_prompt' => $removed_prompt,
 			'queue_length'   => count( $prompt_queue ),
 			'message'        => sprintf( 'Removed prompt at index %d. Queue now has %d item(s).', $index, count( $prompt_queue ) ),
@@ -517,14 +653,22 @@ class QueueAbility {
 	 * @return array Result.
 	 */
 	public function executeQueueUpdate( array $input ): array {
-		$flow_id = $input['flow_id'] ?? null;
-		$index   = $input['index'] ?? null;
-		$prompt  = $input['prompt'] ?? null;
+		$flow_id      = $input['flow_id'] ?? null;
+		$flow_step_id = $input['flow_step_id'] ?? null;
+		$index        = $input['index'] ?? null;
+		$prompt       = $input['prompt'] ?? null;
 
 		if ( ! is_numeric( $flow_id ) || (int) $flow_id <= 0 ) {
 			return array(
 				'success' => false,
 				'error'   => 'flow_id is required and must be a positive integer',
+			);
+		}
+
+		if ( empty( $flow_step_id ) || ! is_string( $flow_step_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_step_id is required and must be a string',
 			);
 		}
 
@@ -542,9 +686,10 @@ class QueueAbility {
 			);
 		}
 
-		$flow_id = (int) $flow_id;
-		$index   = (int) $index;
-		$prompt  = sanitize_textarea_field( wp_unslash( $prompt ) );
+		$flow_id      = (int) $flow_id;
+		$flow_step_id = sanitize_text_field( $flow_step_id );
+		$index        = (int) $index;
+		$prompt       = sanitize_textarea_field( wp_unslash( $prompt ) );
 
 		$flow = $this->db_flows->get_flow( $flow_id );
 		if ( ! $flow ) {
@@ -554,8 +699,14 @@ class QueueAbility {
 			);
 		}
 
-		$flow_config  = $flow['flow_config'] ?? array();
-		$prompt_queue = $flow_config['prompt_queue'] ?? array();
+		$validation = $this->getStepConfigForQueue( $flow, $flow_step_id );
+		if ( ! $validation['success'] ) {
+			return $validation;
+		}
+
+		$flow_config  = $validation['flow_config'];
+		$step_config  = $validation['step_config'];
+		$prompt_queue = $step_config['prompt_queue'];
 
 		// Special case: if index is 0 and queue is empty, create a new item
 		if ( 0 === $index && empty( $prompt_queue ) ) {
@@ -584,7 +735,7 @@ class QueueAbility {
 			$prompt_queue[ $index ]['prompt'] = $prompt;
 		}
 
-		$flow_config['prompt_queue'] = $prompt_queue;
+		$flow_config[ $flow_step_id ]['prompt_queue'] = $prompt_queue;
 
 		$success = $this->db_flows->update_flow(
 			$flow_id,
@@ -612,9 +763,82 @@ class QueueAbility {
 		return array(
 			'success'      => true,
 			'flow_id'      => $flow_id,
+			'flow_step_id' => $flow_step_id,
 			'index'        => $index,
 			'queue_length' => count( $prompt_queue ),
 			'message'      => sprintf( 'Updated prompt at index %d. Queue has %d item(s).', $index, count( $prompt_queue ) ),
+		);
+	}
+
+	/**
+	 * Update queue settings for a flow step.
+	 *
+	 * @param array $input Input with flow_id, flow_step_id, and queue_enabled.
+	 * @return array Result.
+	 */
+	public function executeQueueSettings( array $input ): array {
+		$flow_id        = $input['flow_id'] ?? null;
+		$flow_step_id   = $input['flow_step_id'] ?? null;
+		$queue_enabled  = $input['queue_enabled'] ?? null;
+
+		if ( ! is_numeric( $flow_id ) || (int) $flow_id <= 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_id is required and must be a positive integer',
+			);
+		}
+
+		if ( empty( $flow_step_id ) || ! is_string( $flow_step_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_step_id is required and must be a string',
+			);
+		}
+
+		if ( ! is_bool( $queue_enabled ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'queue_enabled is required and must be a boolean',
+			);
+		}
+
+		$flow_id      = (int) $flow_id;
+		$flow_step_id = sanitize_text_field( $flow_step_id );
+
+		$flow = $this->db_flows->get_flow( $flow_id );
+		if ( ! $flow ) {
+			return array(
+				'success' => false,
+				'error'   => 'Flow not found',
+			);
+		}
+
+		$validation = $this->getStepConfigForQueue( $flow, $flow_step_id );
+		if ( ! $validation['success'] ) {
+			return $validation;
+		}
+
+		$flow_config = $validation['flow_config'];
+		$flow_config[ $flow_step_id ]['queue_enabled'] = $queue_enabled;
+
+		$success = $this->db_flows->update_flow(
+			$flow_id,
+			array( 'flow_config' => $flow_config )
+		);
+
+		if ( ! $success ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to update queue settings',
+			);
+		}
+
+		return array(
+			'success'       => true,
+			'flow_id'       => $flow_id,
+			'flow_step_id'  => $flow_step_id,
+			'queue_enabled' => $queue_enabled,
+			'message'       => 'Queue settings updated successfully',
 		);
 	}
 
@@ -625,7 +849,7 @@ class QueueAbility {
 	 * @param DB_Flows $db_flows Database instance (avoids creating new instance each call).
 	 * @return array|null The popped queue item or null if empty.
 	 */
-	public static function popFromQueue( int $flow_id, ?DB_Flows $db_flows = null ): ?array {
+	public static function popFromQueue( int $flow_id, string $flow_step_id, ?DB_Flows $db_flows = null ): ?array {
 		if ( null === $db_flows ) {
 			$db_flows = new DB_Flows();
 		}
@@ -635,8 +859,13 @@ class QueueAbility {
 			return null;
 		}
 
-		$flow_config  = $flow['flow_config'] ?? array();
-		$prompt_queue = $flow_config['prompt_queue'] ?? array();
+		$flow_config = $flow['flow_config'] ?? array();
+		if ( ! isset( $flow_config[ $flow_step_id ] ) ) {
+			return null;
+		}
+
+		$step_config  = $flow_config[ $flow_step_id ];
+		$prompt_queue = $step_config['prompt_queue'] ?? array();
 
 		if ( empty( $prompt_queue ) ) {
 			return null;
@@ -644,7 +873,7 @@ class QueueAbility {
 
 		$popped_item = array_shift( $prompt_queue );
 
-		$flow_config['prompt_queue'] = $prompt_queue;
+		$flow_config[ $flow_step_id ]['prompt_queue'] = $prompt_queue;
 
 		$db_flows->update_flow(
 			$flow_id,
@@ -662,5 +891,52 @@ class QueueAbility {
 		);
 
 		return $popped_item;
+	}
+
+	/**
+	 * Normalize flow step queue config for queue operations.
+	 *
+	 * @param array  $flow Flow record.
+	 * @param string $flow_step_id Flow step ID.
+	 * @return array Result with flow_config and step_config or error.
+	 */
+	private function getStepConfigForQueue( array $flow, string $flow_step_id ): array {
+		$flow_id = (int) ( $flow['flow_id'] ?? 0 );
+		$parts   = apply_filters( 'datamachine_split_flow_step_id', null, $flow_step_id );
+		if ( ! $parts || empty( $parts['flow_id'] ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Invalid flow_step_id format',
+			);
+		}
+		if ( (int) $parts['flow_id'] !== $flow_id ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_step_id does not belong to this flow',
+			);
+		}
+
+		$flow_config = $flow['flow_config'] ?? array();
+		if ( ! isset( $flow_config[ $flow_step_id ] ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Flow step not found in flow config',
+			);
+		}
+
+		$step_config = $flow_config[ $flow_step_id ];
+		if ( ! isset( $step_config['prompt_queue'] ) || ! is_array( $step_config['prompt_queue'] ) ) {
+			$step_config['prompt_queue'] = array();
+		}
+		if ( ! isset( $step_config['queue_enabled'] ) || ! is_bool( $step_config['queue_enabled'] ) ) {
+			$step_config['queue_enabled'] = false;
+		}
+		$flow_config[ $flow_step_id ] = $step_config;
+
+		return array(
+			'success'     => true,
+			'flow_config' => $flow_config,
+			'step_config' => $step_config,
+		);
 	}
 }

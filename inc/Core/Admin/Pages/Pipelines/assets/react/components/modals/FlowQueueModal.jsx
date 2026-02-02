@@ -8,8 +8,14 @@
 /**
  * WordPress dependencies
  */
-import { useState, useCallback } from '@wordpress/element';
-import { Modal, Button, TextareaControl, Spinner } from '@wordpress/components';
+import { useState, useCallback, useEffect } from '@wordpress/element';
+import {
+	Modal,
+	Button,
+	TextareaControl,
+	Spinner,
+	CheckboxControl,
+} from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 /**
  * Internal dependencies
@@ -19,6 +25,7 @@ import {
 	useAddToQueue,
 	useClearQueue,
 	useRemoveFromQueue,
+	useUpdateQueueSettings,
 } from '../../queries/queue';
 
 /**
@@ -30,21 +37,47 @@ import {
  * @param {string}   props.flowName - Flow name
  * @return {JSX.Element} Flow queue modal
  */
-export default function FlowQueueModal( { onClose, flowId, flowName } ) {
+export default function FlowQueueModal( {
+	onClose,
+	flowId,
+	flowStepId,
+	flowName,
+} ) {
 	const [ newPrompt, setNewPrompt ] = useState( '' );
 	const [ confirmClear, setConfirmClear ] = useState( false );
+	const [ queueEnabled, setQueueEnabled ] = useState( false );
 
 	// Query hooks
-	const { data, isLoading, error } = useFlowQueue( flowId );
+	const { data, isLoading, error } = useFlowQueue( flowId, flowStepId );
 	const addMutation = useAddToQueue();
 	const clearMutation = useClearQueue();
 	const removeMutation = useRemoveFromQueue();
+	const updateSettingsMutation = useUpdateQueueSettings();
 
 	const queue = data?.queue || [];
 	const isOperating =
 		addMutation.isPending ||
 		clearMutation.isPending ||
-		removeMutation.isPending;
+		removeMutation.isPending ||
+		updateSettingsMutation.isPending;
+
+	useEffect( () => {
+		if ( typeof data?.queueEnabled === 'boolean' ) {
+			setQueueEnabled( data.queueEnabled );
+		}
+	}, [ data?.queueEnabled ] );
+
+	const handleQueueEnabledChange = useCallback(
+		( enabled ) => {
+			setQueueEnabled( enabled );
+			updateSettingsMutation.mutate( {
+				flowId,
+				flowStepId,
+				queueEnabled: enabled,
+			} );
+		},
+		[ flowId, flowStepId, updateSettingsMutation ]
+	);
 
 	/**
 	 * Handle adding a new prompt
@@ -56,23 +89,23 @@ export default function FlowQueueModal( { onClose, flowId, flowName } ) {
 		}
 
 		addMutation.mutate(
-			{ flowId, prompts: trimmed },
+			{ flowId, flowStepId, prompts: trimmed },
 			{
 				onSuccess: () => {
 					setNewPrompt( '' );
 				},
 			}
 		);
-	}, [ flowId, newPrompt, addMutation ] );
+	}, [ flowId, flowStepId, newPrompt, addMutation ] );
 
 	/**
 	 * Handle removing a prompt
 	 */
 	const handleRemove = useCallback(
 		( index ) => {
-			removeMutation.mutate( { flowId, index } );
+			removeMutation.mutate( { flowId, flowStepId, index } );
 		},
-		[ flowId, removeMutation ]
+		[ flowId, flowStepId, removeMutation ]
 	);
 
 	/**
@@ -85,14 +118,14 @@ export default function FlowQueueModal( { onClose, flowId, flowName } ) {
 		}
 
 		clearMutation.mutate(
-			{ flowId },
+			{ flowId, flowStepId },
 			{
 				onSuccess: () => {
 					setConfirmClear( false );
 				},
 			}
 		);
-	}, [ flowId, confirmClear, clearMutation ] );
+	}, [ flowId, flowStepId, confirmClear, clearMutation ] );
 
 	/**
 	 * Cancel clear confirmation
@@ -131,6 +164,32 @@ export default function FlowQueueModal( { onClose, flowId, flowName } ) {
 					<strong>{ __( 'Flow:', 'data-machine' ) }</strong>{ ' ' }
 					{ flowName }
 				</div>
+
+				{ ! flowStepId && (
+					<div className="datamachine-modal-error notice notice-error">
+						<p>
+							{ __(
+								'Flow step ID is required to manage the queue.',
+								'data-machine'
+							) }
+						</p>
+					</div>
+				) }
+
+				{ flowStepId && (
+					<div className="datamachine-modal-spacing--mb-20">
+						<CheckboxControl
+							label={ __( 'Queue enabled', 'data-machine' ) }
+							checked={ queueEnabled }
+							onChange={ handleQueueEnabledChange }
+							disabled={ isOperating }
+							help={ __(
+								'When enabled, the queue pops the next prompt each run. When disabled, the first queued prompt is reused every run without popping.',
+								'data-machine'
+							) }
+						/>
+					</div>
+				) }
 
 				{ /* Queue List */ }
 				<div className="datamachine-queue-list">
@@ -282,7 +341,7 @@ export default function FlowQueueModal( { onClose, flowId, flowName } ) {
 							{ __( 'How it works:', 'data-machine' ) }
 						</strong>{ ' ' }
 						{ __(
-							'Prompts are processed in order (FIFO). Each time the flow runs, the first prompt is removed and used as input for the AI step.',
+							'Prompts are processed in order (FIFO). When queue is enabled, the first prompt is removed each run. When disabled, the first prompt is reused each run without popping.',
 							'data-machine'
 						) }
 					</p>

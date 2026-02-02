@@ -359,6 +359,17 @@ export const updateFlowHandler = async (
 };
 
 /**
+ * Update flow step configuration
+ *
+ * @param {string} flowStepId - Flow step ID
+ * @param {Object} config     - Partial step configuration
+ * @return {Promise<Object>} Updated flow step data
+ */
+export const updateFlowStepConfig = async ( flowStepId, config ) => {
+	return await client.patch( `/flows/steps/${ flowStepId }/config`, config );
+};
+
+/**
  * Update user message for AI step in flow
  *
  * @param {string} flowStepId - Flow step ID
@@ -515,58 +526,97 @@ export const getHandlers = async ( stepType = null ) => {
 /**
  * Fetch queue for a flow
  *
- * @param {number} flowId - Flow ID
+ * @param {number} flowId     - Flow ID
+ * @param {string} flowStepId - Flow step ID
  * @return {Promise<Object>} Queue data with items and count
  */
-export const fetchFlowQueue = async ( flowId ) => {
-	return await client.get( `/flows/${ flowId }/queue` );
+export const fetchFlowQueue = async ( flowId, flowStepId ) => {
+	return await client.get( `/flows/${ flowId }/queue`, {
+		flow_step_id: flowStepId,
+	} );
 };
 
 /**
  * Add prompt(s) to flow queue
  *
- * @param {number}               flowId  - Flow ID
- * @param {string|Array<string>} prompts - Single prompt string or array of prompts
+ * @param {number}               flowId     - Flow ID
+ * @param {string}               flowStepId - Flow step ID
+ * @param {string|Array<string>} prompts    - Single prompt string or array of prompts
  * @return {Promise<Object>} Result with added count and queue length
  */
-export const addToFlowQueue = async ( flowId, prompts ) => {
+export const addToFlowQueue = async ( flowId, flowStepId, prompts ) => {
 	const payload = Array.isArray( prompts )
 		? { prompts }
 		: { prompt: prompts };
-	return await client.post( `/flows/${ flowId }/queue`, payload );
+	return await client.post( `/flows/${ flowId }/queue`, {
+		...payload,
+		flow_step_id: flowStepId,
+	} );
 };
 
 /**
  * Clear all prompts from flow queue
  *
- * @param {number} flowId - Flow ID
+ * @param {number} flowId     - Flow ID
+ * @param {string} flowStepId - Flow step ID
  * @return {Promise<Object>} Result with cleared count
  */
-export const clearFlowQueue = async ( flowId ) => {
-	return await client.delete( `/flows/${ flowId }/queue` );
+export const clearFlowQueue = async ( flowId, flowStepId ) => {
+	return await client.delete(
+		`/flows/${ flowId }/queue?flow_step_id=${ encodeURIComponent( flowStepId ) }`
+	);
 };
 
 /**
  * Remove a specific prompt from flow queue by index
  *
- * @param {number} flowId - Flow ID
- * @param {number} index  - Queue index (0-based)
+ * @param {number} flowId     - Flow ID
+ * @param {string} flowStepId - Flow step ID
+ * @param {number} index      - Queue index (0-based)
  * @return {Promise<Object>} Result with removed prompt and new queue length
  */
-export const removeFromFlowQueue = async ( flowId, index ) => {
-	return await client.delete( `/flows/${ flowId }/queue/${ index }` );
+export const removeFromFlowQueue = async ( flowId, flowStepId, index ) => {
+	return await client.delete(
+		`/flows/${ flowId }/queue/${ index }?flow_step_id=${ encodeURIComponent( flowStepId ) }`
+	);
 };
 
 /**
  * Update a specific prompt in flow queue by index
  *
- * @param {number} flowId - Flow ID
- * @param {number} index  - Queue index (0-based)
- * @param {string} prompt - New prompt text
+ * @param {number} flowId     - Flow ID
+ * @param {string} flowStepId - Flow step ID
+ * @param {number} index      - Queue index (0-based)
+ * @param {string} prompt     - New prompt text
  * @return {Promise<Object>} Result with updated queue info
  */
-export const updateFlowQueueItem = async ( flowId, index, prompt ) => {
+export const updateFlowQueueItem = async (
+	flowId,
+	flowStepId,
+	index,
+	prompt
+) => {
 	return await client.put( `/flows/${ flowId }/queue/${ index }`, {
+		flow_step_id: flowStepId,
 		prompt,
+	} );
+};
+
+/**
+ * Update queue settings for a flow step
+ *
+ * @param {number}  flowId       - Flow ID
+ * @param {string}  flowStepId   - Flow step ID
+ * @param {boolean} queueEnabled - Whether queue pop is enabled
+ * @return {Promise<Object>} Result
+ */
+export const updateFlowQueueSettings = async (
+	flowId,
+	flowStepId,
+	queueEnabled
+) => {
+	return await client.put( `/flows/${ flowId }/queue/settings`, {
+		flow_step_id: flowStepId,
+		queue_enabled: queueEnabled,
 	} );
 };

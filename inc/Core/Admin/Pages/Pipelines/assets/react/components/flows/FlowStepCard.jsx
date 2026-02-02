@@ -8,13 +8,14 @@
  * WordPress dependencies
  */
 import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
-import { Button, Card, CardBody, TextareaControl, Notice } from '@wordpress/components';
+import { Button, Card, CardBody, TextareaControl, TextControl, Notice } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
 import FlowStepHandler from './FlowStepHandler';
 import { useUpdateQueueItem, useAddToQueue } from '../../queries/queue';
+import { updateFlowStepConfig } from '../../utils/api';
 import { AUTO_SAVE_DELAY } from '../../utils/constants';
 import { useStepTypes } from '../../queries/config';
 
@@ -28,7 +29,6 @@ import { useStepTypes } from '../../queries/config';
  * @param {Object}   props.flowStepConfig - Flow step configuration.
  * @param {Object}   props.pipelineStep   - Pipeline step data.
  * @param {Object}   props.pipelineConfig - Pipeline AI configuration.
- * @param {Array}    props.promptQueue    - Flow-level prompt queue.
  * @param {Function} props.onConfigure    - Configure handler callback.
  * @param {Function} props.onQueueClick   - Queue button click handler (opens modal).
  * @return {JSX.Element} Flow step card.
@@ -40,7 +40,6 @@ export default function FlowStepCard( {
 	flowStepConfig,
 	pipelineStep,
 	pipelineConfig,
-	promptQueue = [],
 	onConfigure,
 	onQueueClick,
 } ) {
@@ -48,18 +47,26 @@ export default function FlowStepCard( {
 	const { data: stepTypes = {} } = useStepTypes();
 	const stepTypeInfo = stepTypes[ pipelineStep.step_type ] || {};
 	const isAiStep = pipelineStep.step_type === 'ai';
+	const isAgentPing = pipelineStep.step_type === 'agent_ping';
 	const aiConfig = isAiStep
 		? pipelineConfig[ pipelineStep.pipeline_step_id ]
 		: null;
 
-	// Get the first queue item's prompt (if exists)
+	const promptQueue = flowStepConfig.prompt_queue || [];
+	const queueEnabled = !! flowStepConfig.queue_enabled;
 	const queueCount = promptQueue.length;
 	const queueHasItems = queueCount > 0;
 	const firstQueuePrompt = queueHasItems ? promptQueue[ 0 ].prompt : '';
+	const shouldUseQueue = queueEnabled || queueHasItems;
 
-	// Local state for the textarea - displays queue[0] if available
 	const [ localUserMessage, setLocalUserMessage ] = useState(
 		firstQueuePrompt || flowStepConfig.user_message || ''
+	);
+	const [ localAgentPingPrompt, setLocalAgentPingPrompt ] = useState(
+		firstQueuePrompt || flowStepConfig?.handler_config?.prompt || ''
+	);
+	const [ localWebhookUrl, setLocalWebhookUrl ] = useState(
+		flowStepConfig?.handler_config?.webhook_url || ''
 	);
 	const [ isSaving, setIsSaving ] = useState( false );
 	const [ error, setError ] = useState( null );
@@ -76,12 +83,26 @@ export default function FlowStepCard( {
 		setLocalUserMessage( newValue );
 	}, [ firstQueuePrompt, flowStepConfig.user_message ] );
 
+	useEffect( () => {
+		const newValue =
+			firstQueuePrompt || flowStepConfig?.handler_config?.prompt || '';
+		setLocalAgentPingPrompt( newValue );
+	}, [ firstQueuePrompt, flowStepConfig?.handler_config?.prompt ] );
+
+	useEffect( () => {
+		setLocalWebhookUrl( flowStepConfig?.handler_config?.webhook_url || '' );
+	}, [ flowStepConfig?.handler_config?.webhook_url ] );
+
 	/**
 	 * Save user message to queue (add if empty, update index 0 if exists)
 	 */
 	const saveToQueue = useCallback(
 		async ( message ) => {
-			if ( ! isAiStep ) {
+			if ( ! isAiStep && ! isAgentPing ) {
+				return;
+			}
+
+			if ( ! shouldUseQueue ) {
 				return;
 			}
 
@@ -106,6 +127,7 @@ export default function FlowStepCard( {
 					// Update existing queue[0]
 					response = await updateQueueItemMutation.mutateAsync( {
 						flowId,
+						flowStepId,
 						index: 0,
 						prompt: message,
 					} );
@@ -113,6 +135,7 @@ export default function FlowStepCard( {
 					// Add new item when queue is empty
 					response = await addToQueueMutation.mutateAsync( {
 						flowId,
+						flowStepId,
 						prompt: message,
 					} );
 				}
@@ -137,12 +160,104 @@ export default function FlowStepCard( {
 		},
 		[
 			flowId,
+			flowStepId,
 			firstQueuePrompt,
 			queueHasItems,
 			isAiStep,
+			isAgentPing,
+			shouldUseQueue,
 			updateQueueItemMutation,
 			addToQueueMutation,
 		]
+	);
+
+	const saveStepConfig = useCallback(
+		async ( config, onErrorRevert ) => {
+			setIsSaving( true );
+			setError( null );
+
+			try {
+				const response = await updateFlowStepConfig( flowStepId, config );
+				if ( ! response?.success ) {
+					setError(
+						response?.message ||
+							__( 'Failed to save settings', 'data-machine' )
+					);
+					if ( onErrorRevert ) {
+						onErrorRevert();
+					}
+				}
+			} catch ( err ) {
+				// eslint-disable-next-line no-console
+				console.error( 'Flow step save error:', err );
+				setError(
+					err.message || __( 'An error occurred', 'data-machine' )
+				);
+				if ( onErrorRevert ) {
+					onErrorRevert();
+				}
+			} finally {
+				setIsSaving( false );
+			}
+		},
+		[ flowStepId ]
+	);
+
+	const handleAgentPingPromptChange = useCallback(
+		( value ) => {
+			setLocalAgentPingPrompt( value );
+
+			if ( saveTimeout.current ) {
+				clearTimeout( saveTimeout.current );
+			}
+
+			saveTimeout.current = setTimeout( () => {
+				if ( shouldUseQueue ) {
+					saveToQueue( value );
+					return;
+				}
+
+				saveStepConfig(
+					{
+						handler_config: {
+							webhook_url: localWebhookUrl,
+							prompt: value,
+						},
+					},
+					() => setLocalAgentPingPrompt( localAgentPingPrompt )
+				);
+			}, AUTO_SAVE_DELAY );
+		},
+		[
+			shouldUseQueue,
+			saveToQueue,
+			saveStepConfig,
+			localWebhookUrl,
+			localAgentPingPrompt,
+		]
+	);
+
+	const handleWebhookUrlChange = useCallback(
+		( value ) => {
+			setLocalWebhookUrl( value );
+
+			if ( saveTimeout.current ) {
+				clearTimeout( saveTimeout.current );
+			}
+
+			saveTimeout.current = setTimeout( () => {
+				saveStepConfig(
+					{
+						handler_config: {
+							webhook_url: value,
+							prompt: localAgentPingPrompt,
+						},
+					},
+					() => setLocalWebhookUrl( localWebhookUrl )
+				);
+			}, AUTO_SAVE_DELAY );
+		},
+		[ saveStepConfig, localAgentPingPrompt, localWebhookUrl ]
 	);
 
 	/**
@@ -157,13 +272,30 @@ export default function FlowStepCard( {
 				clearTimeout( saveTimeout.current );
 			}
 
-			// Set new timeout for debounced save
 			saveTimeout.current = setTimeout( () => {
-				saveToQueue( value );
+				if ( shouldUseQueue ) {
+					saveToQueue( value );
+					return;
+				}
+
+				saveStepConfig(
+					{ user_message: value },
+					() => setLocalUserMessage( localUserMessage )
+				);
 			}, AUTO_SAVE_DELAY );
 		},
-		[ saveToQueue ]
+		[ shouldUseQueue, saveToQueue, saveStepConfig, localUserMessage ]
 	);
+
+	const getPromptValue = () => {
+		if ( shouldUseQueue ) {
+			return queueHasItems ? firstQueuePrompt : '';
+		}
+		if ( isAiStep ) {
+			return localUserMessage;
+		}
+		return localAgentPingPrompt;
+	};
 
 	/**
 	 * Cleanup timeout on unmount
@@ -203,14 +335,20 @@ export default function FlowStepCard( {
 		if ( isSaving ) {
 			return __( 'Saving…', 'data-machine' );
 		}
-		if ( queueHasItems ) {
+		if ( shouldUseQueue ) {
+			if ( queueHasItems ) {
+				return __(
+					'Editing updates the first item in the prompt queue.',
+					'data-machine'
+				);
+			}
 			return __(
-				'Editing updates the first item in the prompt queue.',
+				'Queue enabled. Type a prompt to add it to the queue. Use Manage Queue for multiple prompts.',
 				'data-machine'
 			);
 		}
 		return __(
-			'Type a prompt to add it to the queue. Use Manage Queue for multiple prompts.',
+			'Type a prompt to save it directly. Enable the queue to pop prompts in order.',
 			'data-machine'
 		);
 	};
@@ -238,59 +376,120 @@ export default function FlowStepCard( {
 						</strong>
 					</div>
 
-					{ /* AI Configuration Display */ }
-					{ isAiStep && aiConfig && (
-						<div className="datamachine-ai-config-display">
-							<div className="datamachine-ai-provider-info">
-								<strong>
-									{ __( 'AI Provider:', 'data-machine' ) }
-								</strong>{ ' ' }
-								{ aiConfig.provider || 'Not configured' }
-								{ ' | ' }
-								<strong>
-									{ __( 'Model:', 'data-machine' ) }
-								</strong>{ ' ' }
-								{ aiConfig.model || 'Not configured' }
-							</div>
-
-							{ /* Prompt Field - shows/edits queue[0] */ }
-							<TextareaControl
-								label={ getFieldLabel() }
-								value={ localUserMessage }
-								onChange={ handleUserMessageChange }
-								placeholder={ __(
-									'Enter user message for AI processing…',
-									'data-machine'
-								) }
-								rows={ 4 }
-								help={ getHelpText() }
-								className={ queueHasItems ? 'datamachine-queue-linked' : '' }
-							/>
-
-							{ /* Queue Management Button */ }
-							<div className="datamachine-queue-actions">
-								<Button
-									variant="secondary"
-									size="small"
-									onClick={ onQueueClick }
-								>
-									{ __( 'Manage Queue', 'data-machine' ) }
-									{ ' ' }
-									<span
-										className={ `datamachine-queue-count ${
-											queueCount > 0
-												? 'datamachine-queue-count--active'
-												: ''
-										}` }
-									>
-										({ queueCount })
-									</span>
-								</Button>
-							</div>
+				{ /* AI Configuration Display */ }
+				{ isAiStep && aiConfig && (
+					<div className="datamachine-ai-config-display">
+						<div className="datamachine-ai-provider-info">
+							<strong>
+								{ __( 'AI Provider:', 'data-machine' ) }
+							</strong>{ ' ' }
+							{ aiConfig.provider || 'Not configured' }
+							{ ' | ' }
+							<strong>
+								{ __( 'Model:', 'data-machine' ) }
+							</strong>{ ' ' }
+							{ aiConfig.model || 'Not configured' }
 						</div>
-					) }
 
-					{ /* Handler Configuration */ }
+						{ /* Prompt Field - shows/edits queue[0] */ }
+						<TextareaControl
+							label={ getFieldLabel() }
+							value={ getPromptValue() }
+							onChange={ handleUserMessageChange }
+							placeholder={ __(
+								'Enter user message for AI processing…',
+								'data-machine'
+							) }
+							rows={ 4 }
+							help={ getHelpText() }
+							className={
+								queueHasItems
+									? 'datamachine-queue-linked'
+									: ''
+							}
+						/>
+
+						{ /* Queue Management Button */ }
+						<div className="datamachine-queue-actions">
+							<Button
+								variant="secondary"
+								size="small"
+								onClick={ onQueueClick }
+							>
+								{ __( 'Manage Queue', 'data-machine' ) }
+								{ ' ' }
+								<span
+									className={ `datamachine-queue-count ${
+										queueCount > 0
+											? 'datamachine-queue-count--active'
+											: ''
+									}` }
+								>
+									({ queueCount })
+								</span>
+							</Button>
+						</div>
+					</div>
+				) }
+
+				{ /* Agent Ping Configuration */ }
+				{ isAgentPing && (
+					<div className="datamachine-agent-ping-config">
+						<TextControl
+							label={ __( 'Webhook URL', 'data-machine' ) }
+							value={ localWebhookUrl }
+							onChange={ handleWebhookUrlChange }
+							placeholder={ __(
+								'Enter webhook URL…',
+								'data-machine'
+							) }
+							help={ __(
+								'URL to POST data to (Discord, Slack, custom endpoint).',
+								'data-machine'
+							) }
+							className="datamachine-agent-ping-webhook"
+						/>
+
+						<TextareaControl
+							label={ getFieldLabel() }
+							value={ getPromptValue() }
+							onChange={ handleAgentPingPromptChange }
+							placeholder={ __(
+								'Enter instructions for the agent…',
+								'data-machine'
+							) }
+							rows={ 4 }
+							help={ getHelpText() }
+							className={
+								queueHasItems
+									? 'datamachine-queue-linked'
+									: ''
+							}
+						/>
+
+						<div className="datamachine-queue-actions">
+							<Button
+								variant="secondary"
+								size="small"
+								onClick={ onQueueClick }
+							>
+								{ __( 'Manage Queue', 'data-machine' ) }
+								{ ' ' }
+								<span
+									className={ `datamachine-queue-count ${
+										queueCount > 0
+											? 'datamachine-queue-count--active'
+											: ''
+									}` }
+								>
+									({ queueCount })
+								</span>
+							</Button>
+						</div>
+					</div>
+				) }
+
+				{ /* Handler Configuration */ }
 					{ ( () => {
 						const handlerStepTypeInfo =
 							stepTypes[ pipelineStep.step_type ] || {};

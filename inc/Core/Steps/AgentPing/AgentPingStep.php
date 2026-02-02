@@ -116,11 +116,23 @@ class AgentPingStep extends Step {
 		$webhook_url       = trim( $handler_config['webhook_url'] ?? '' );
 		$configured_prompt = $handler_config['prompt'] ?? '';
 		$data_packets      = $this->dataPackets;
+		$queue_enabled     = (bool) ( $this->flow_step_config['queue_enabled'] ?? false );
+		$prompt_queue      = $this->flow_step_config['prompt_queue'] ?? array();
+		$queued_prompt     = $prompt_queue[0]['prompt'] ?? '';
 
-		// Check for prompt queue - if prompt is empty, pop from queue
-		$queue_result = $this->popFromQueueIfEmpty( $configured_prompt );
-		$prompt       = $queue_result['value'];
-		$from_queue   = $queue_result['from_queue'];
+		$from_queue = false;
+
+		if ( $queue_enabled ) {
+			$queue_result = $this->popFromQueueIfEmpty( '', true );
+			$prompt       = $queue_result['value'];
+			$from_queue   = $queue_result['from_queue'];
+		} else {
+			$prompt = $queued_prompt;
+		}
+
+		if ( empty( $prompt ) ) {
+			$prompt = $configured_prompt;
+		}
 
 		// Execute the send-ping ability
 		$ability = wp_get_ability( 'datamachine/send-ping' );

@@ -185,7 +185,7 @@ class FlowSteps {
 			$input['handler_slug'] = $handler_slug;
 		}
 
-		if ( ! empty( $handler_config ) ) {
+		if ( is_array( $handler_config ) ) {
 			$input['handler_config'] = $handler_config;
 		}
 
@@ -290,7 +290,7 @@ class FlowSteps {
 				'success' => true,
 				'data'    => array(
 					'flow_step_id' => $flow_step_id,
-					'step_config'  => $result['step'],
+					'step_config'  => $result['steps'][0] ?? array(),
 				),
 			)
 		);

@@ -25,7 +25,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *       use QueueableTrait;
  *
  *       protected function executeStep(): array {
- *           $task = $this->popFromQueueIfEmpty( $this->getConfigValue( 'prompt' ) );
+ *           $task = $this->popFromQueueIfEmpty( '', true );
  *           // Use $task...
  *       }
  *   }
@@ -33,16 +33,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 trait QueueableTrait {
 
 	/**
-	 * Pop from queue if the provided value is empty.
+	 * Pop from queue if the provided value is empty and queue is enabled.
 	 *
 	 * @param string $current_value The current value (e.g., user_message or prompt).
+	 * @param bool   $queue_enabled Whether queue pop is enabled for this step.
 	 * @return array{value: string, from_queue: bool, added_at: string|null} Result with value and source info.
 	 */
-	protected function popFromQueueIfEmpty( string $current_value ): array {
-		// If we already have a value, use it
-		if ( ! empty( $current_value ) ) {
+	protected function popFromQueueIfEmpty( string $current_value, bool $queue_enabled = false ): array {
+		if ( ! $queue_enabled ) {
 			return array(
-				'value'      => $current_value,
+				'value'      => '',
 				'from_queue' => false,
 				'added_at'   => null,
 			);
@@ -60,7 +60,7 @@ trait QueueableTrait {
 			);
 		}
 
-		$queued_item = QueueAbility::popFromQueue( (int) $flow_id );
+		$queued_item = QueueAbility::popFromQueue( (int) $flow_id, $this->flow_step_id );
 
 		if ( $queued_item && ! empty( $queued_item['prompt'] ) ) {
 			do_action(

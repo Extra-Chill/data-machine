@@ -80,6 +80,8 @@ trait FlowHelpers {
 				'execution_order'  => $step['execution_order'] ?? 0,
 				'enabled_tools'    => $enabled_tools,
 				'handler'          => null,
+				'prompt_queue'     => array(),
+				'queue_enabled'    => false,
 			);
 		}
 
