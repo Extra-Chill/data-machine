@@ -279,7 +279,10 @@ class ToolManager {
 
 		// Pipeline context: check step-specific selections
 		if ( $context_id ) {
-			return $this->is_step_tool_enabled( $context_id, $tool_id );
+			$step_tools = $this->get_step_enabled_tools( $context_id );
+			if ( ! empty( $step_tools ) ) {
+				return in_array( $tool_id, $step_tools, true );
+			}
 		}
 
 		// Chat context (no context_id): check global enablement + configuration
