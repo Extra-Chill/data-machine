@@ -39,6 +39,7 @@ class QueueAbility {
 			$this->registerQueueClear();
 			$this->registerQueueRemove();
 			$this->registerQueueUpdate();
+			$this->registerQueueMove();
 			$this->registerQueueSettings();
 		};
 
@@ -271,6 +272,58 @@ class QueueAbility {
 					),
 				),
 				'execute_callback'    => array( $this, 'executeQueueUpdate' ),
+				'permission_callback' => array( $this, 'checkPermission' ),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	/**
+	 * Register queue-move ability.
+	 */
+	private function registerQueueMove(): void {
+		wp_register_ability(
+			'datamachine/queue-move',
+			array(
+				'label'               => __( 'Move Queue Item', 'data-machine' ),
+				'description'         => __( 'Move a prompt from one position to another in the queue.', 'data-machine' ),
+				'category'            => 'datamachine',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'flow_id', 'flow_step_id', 'from_index', 'to_index' ),
+					'properties' => array(
+						'flow_id'      => array(
+							'type'        => 'integer',
+							'description' => __( 'Flow ID', 'data-machine' ),
+						),
+						'flow_step_id' => array(
+							'type'        => 'string',
+							'description' => __( 'Flow step ID', 'data-machine' ),
+						),
+						'from_index'   => array(
+							'type'        => 'integer',
+							'description' => __( 'Current index of item to move (0-based)', 'data-machine' ),
+						),
+						'to_index'     => array(
+							'type'        => 'integer',
+							'description' => __( 'Target index to move item to (0-based)', 'data-machine' ),
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'       => array( 'type' => 'boolean' ),
+						'flow_id'       => array( 'type' => 'integer' ),
+						'flow_step_id'  => array( 'type' => 'string' ),
+						'from_index'    => array( 'type' => 'integer' ),
+						'to_index'      => array( 'type' => 'integer' ),
+						'queue_length'  => array( 'type' => 'integer' ),
+						'message'       => array( 'type' => 'string' ),
+						'error'         => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeQueueMove' ),
 				'permission_callback' => array( $this, 'checkPermission' ),
 				'meta'                => array( 'show_in_rest' => true ),
 			)
@@ -767,6 +820,138 @@ class QueueAbility {
 			'index'        => $index,
 			'queue_length' => count( $prompt_queue ),
 			'message'      => sprintf( 'Updated prompt at index %d. Queue has %d item(s).', $index, count( $prompt_queue ) ),
+		);
+	}
+
+	/**
+	 * Move a prompt from one position to another in the queue.
+	 *
+	 * @param array $input Input with flow_id, flow_step_id, from_index, and to_index.
+	 * @return array Result.
+	 */
+	public function executeQueueMove( array $input ): array {
+		$flow_id      = $input['flow_id'] ?? null;
+		$flow_step_id = $input['flow_step_id'] ?? null;
+		$from_index   = $input['from_index'] ?? null;
+		$to_index     = $input['to_index'] ?? null;
+
+		if ( ! is_numeric( $flow_id ) || (int) $flow_id <= 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_id is required and must be a positive integer',
+			);
+		}
+
+		if ( empty( $flow_step_id ) || ! is_string( $flow_step_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_step_id is required and must be a string',
+			);
+		}
+
+		if ( ! is_numeric( $from_index ) || (int) $from_index < 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'from_index is required and must be a non-negative integer',
+			);
+		}
+
+		if ( ! is_numeric( $to_index ) || (int) $to_index < 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'to_index is required and must be a non-negative integer',
+			);
+		}
+
+		$flow_id      = (int) $flow_id;
+		$flow_step_id = sanitize_text_field( $flow_step_id );
+		$from_index   = (int) $from_index;
+		$to_index     = (int) $to_index;
+
+		if ( $from_index === $to_index ) {
+			return array(
+				'success'      => true,
+				'flow_id'      => $flow_id,
+				'flow_step_id' => $flow_step_id,
+				'from_index'   => $from_index,
+				'to_index'     => $to_index,
+				'queue_length' => 0,
+				'message'      => 'No move needed (same position).',
+			);
+		}
+
+		$flow = $this->db_flows->get_flow( $flow_id );
+		if ( ! $flow ) {
+			return array(
+				'success' => false,
+				'error'   => 'Flow not found',
+			);
+		}
+
+		$validation = $this->getStepConfigForQueue( $flow, $flow_step_id );
+		if ( ! $validation['success'] ) {
+			return $validation;
+		}
+
+		$flow_config  = $validation['flow_config'];
+		$step_config  = $validation['step_config'];
+		$prompt_queue = $step_config['prompt_queue'];
+		$queue_length = count( $prompt_queue );
+
+		if ( $from_index >= $queue_length ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'from_index %d is out of range. Queue has %d item(s).', $from_index, $queue_length ),
+			);
+		}
+
+		if ( $to_index >= $queue_length ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'to_index %d is out of range. Queue has %d item(s).', $to_index, $queue_length ),
+			);
+		}
+
+		// Extract the item and reinsert at new position
+		$item = $prompt_queue[ $from_index ];
+		array_splice( $prompt_queue, $from_index, 1 );
+		array_splice( $prompt_queue, $to_index, 0, array( $item ) );
+
+		$flow_config[ $flow_step_id ]['prompt_queue'] = $prompt_queue;
+
+		$success = $this->db_flows->update_flow(
+			$flow_id,
+			array( 'flow_config' => $flow_config )
+		);
+
+		if ( ! $success ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to move queue item',
+			);
+		}
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Queue item moved',
+			array(
+				'flow_id'      => $flow_id,
+				'flow_step_id' => $flow_step_id,
+				'from_index'   => $from_index,
+				'to_index'     => $to_index,
+				'queue_length' => $queue_length,
+			)
+		);
+
+		return array(
+			'success'       => true,
+			'flow_id'       => $flow_id,
+			'flow_step_id'  => $flow_step_id,
+			'from_index'    => $from_index,
+			'to_index'      => $to_index,
+			'queue_length'  => $queue_length,
+			'message'       => sprintf( 'Moved item from index %d to %d.', $from_index, $to_index ),
 		);
 	}
 

@@ -154,20 +154,26 @@ class FlowsCommand extends BaseCommand {
 	 *     # Dry-run validation
 	 *     wp datamachine flows create --pipeline_id=3 --name="Test" --dry-run
 	 *
-	 *     # Add a prompt to the queue
-	 *     wp datamachine flows queue add 42 "Generate a blog post about AI"
+	 *     # Add a prompt to the queue (requires --step)
+	 *     wp datamachine flows queue add 42 --step=flow-42-step-abc123 "Generate a blog post about AI"
 	 *
-	 *     # List queued prompts
-	 *     wp datamachine flows queue list 42
+	 *     # List queued prompts for a step
+	 *     wp datamachine flows queue list 42 --step=flow-42-step-abc123
 	 *
 	 *     # List queued prompts as JSON
-	 *     wp datamachine flows queue list 42 --format=json
+	 *     wp datamachine flows queue list 42 --step=flow-42-step-abc123 --format=json
 	 *
 	 *     # Remove a prompt from queue by index
-	 *     wp datamachine flows queue remove 42 0
+	 *     wp datamachine flows queue remove 42 --step=flow-42-step-abc123 0
 	 *
 	 *     # Clear all prompts from queue
-	 *     wp datamachine flows queue clear 42
+	 *     wp datamachine flows queue clear 42 --step=flow-42-step-abc123
+	 *
+	 *     # Update a prompt at index 0
+	 *     wp datamachine flows queue update 42 --step=flow-42-step-abc123 0 "Updated prompt text"
+	 *
+	 *     # Move a prompt from index 2 to index 0 (front of queue)
+	 *     wp datamachine flows queue move 42 --step=flow-42-step-abc123 2 0
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		$flow_id     = null;
@@ -454,7 +460,7 @@ class FlowsCommand extends BaseCommand {
 	 */
 	private function handleQueue( array $args, array $assoc_args ): void {
 		if ( empty( $args ) ) {
-			WP_CLI::error( 'Usage: wp datamachine flows queue <add|list|clear|remove> <flow_id> [prompt|index]' );
+			WP_CLI::error( 'Usage: wp datamachine flows queue <add|list|clear|remove|update|move> <flow_id> --step=<flow_step_id> [prompt|index]' );
 			return;
 		}
 
@@ -473,8 +479,14 @@ class FlowsCommand extends BaseCommand {
 			case 'remove':
 				$this->queueRemove( array_slice( $args, 1 ), $assoc_args );
 				break;
+			case 'update':
+				$this->queueUpdate( array_slice( $args, 1 ), $assoc_args );
+				break;
+			case 'move':
+				$this->queueMove( array_slice( $args, 1 ), $assoc_args );
+				break;
 			default:
-				WP_CLI::error( "Unknown queue action: {$action}. Use: add, list, clear, remove" );
+				WP_CLI::error( "Unknown queue action: {$action}. Use: add, list, clear, remove, update, move" );
 		}
 	}
 
@@ -482,19 +494,25 @@ class FlowsCommand extends BaseCommand {
 	 * Add a prompt to the flow queue.
 	 *
 	 * @param array $args       Positional arguments (flow_id, prompt).
-	 * @param array $assoc_args Associative arguments.
+	 * @param array $assoc_args Associative arguments (--step).
 	 */
 	private function queueAdd( array $args, array $assoc_args ): void {
 		if ( count( $args ) < 2 ) {
-			WP_CLI::error( 'Usage: wp datamachine flows queue add <flow_id> "prompt text"' );
+			WP_CLI::error( 'Usage: wp datamachine flows queue add <flow_id> --step=<flow_step_id> "prompt text"' );
 			return;
 		}
 
-		$flow_id = (int) $args[0];
-		$prompt  = $args[1];
+		$flow_id      = (int) $args[0];
+		$flow_step_id = $assoc_args['step'] ?? null;
+		$prompt       = $args[1];
 
 		if ( $flow_id <= 0 ) {
 			WP_CLI::error( 'flow_id must be a positive integer' );
+			return;
+		}
+
+		if ( empty( $flow_step_id ) ) {
+			WP_CLI::error( 'Required: --step=<flow_step_id>' );
 			return;
 		}
 
@@ -506,8 +524,9 @@ class FlowsCommand extends BaseCommand {
 		$ability = new \DataMachine\Abilities\FlowAbilities();
 		$result  = $ability->executeQueueAdd(
 			array(
-				'flow_id' => $flow_id,
-				'prompt'  => $prompt,
+				'flow_id'      => $flow_id,
+				'flow_step_id' => $flow_step_id,
+				'prompt'       => $prompt,
 			)
 		);
 
@@ -523,34 +542,46 @@ class FlowsCommand extends BaseCommand {
 	 * List all prompts in the flow queue.
 	 *
 	 * @param array $args       Positional arguments (flow_id).
-	 * @param array $assoc_args Associative arguments (format).
+	 * @param array $assoc_args Associative arguments (--step, format).
 	 */
 	private function queueList( array $args, array $assoc_args ): void {
 		if ( empty( $args ) ) {
-			WP_CLI::error( 'Usage: wp datamachine flows queue list <flow_id>' );
+			WP_CLI::error( 'Usage: wp datamachine flows queue list <flow_id> --step=<flow_step_id>' );
 			return;
 		}
 
-		$flow_id = (int) $args[0];
-		$format  = $assoc_args['format'] ?? 'table';
+		$flow_id      = (int) $args[0];
+		$flow_step_id = $assoc_args['step'] ?? null;
+		$format       = $assoc_args['format'] ?? 'table';
 
 		if ( $flow_id <= 0 ) {
 			WP_CLI::error( 'flow_id must be a positive integer' );
 			return;
 		}
 
+		if ( empty( $flow_step_id ) ) {
+			WP_CLI::error( 'Required: --step=<flow_step_id>' );
+			return;
+		}
+
 		$ability = new \DataMachine\Abilities\FlowAbilities();
-		$result  = $ability->executeQueueList( array( 'flow_id' => $flow_id ) );
+		$result  = $ability->executeQueueList(
+			array(
+				'flow_id'      => $flow_id,
+				'flow_step_id' => $flow_step_id,
+			)
+		);
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to list queue' );
 			return;
 		}
 
-		$queue = $result['queue'] ?? array();
+		$queue         = $result['queue'] ?? array();
+		$queue_enabled = $result['queue_enabled'] ?? false;
 
 		if ( empty( $queue ) ) {
-			WP_CLI::log( 'Queue is empty.' );
+			WP_CLI::log( sprintf( 'Queue is empty. (queue_enabled: %s)', $queue_enabled ? 'yes' : 'no' ) );
 			return;
 		}
 
@@ -574,30 +605,41 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		$this->format_items( $items, array( 'index', 'prompt', 'added_at' ), $assoc_args, 'index' );
-		WP_CLI::log( sprintf( 'Total: %d prompt(s) in queue.', count( $queue ) ) );
+		WP_CLI::log( sprintf( 'Total: %d prompt(s) in queue. (queue_enabled: %s)', count( $queue ), $queue_enabled ? 'yes' : 'no' ) );
 	}
 
 	/**
 	 * Clear all prompts from the flow queue.
 	 *
 	 * @param array $args       Positional arguments (flow_id).
-	 * @param array $assoc_args Associative arguments.
+	 * @param array $assoc_args Associative arguments (--step).
 	 */
 	private function queueClear( array $args, array $assoc_args ): void {
 		if ( empty( $args ) ) {
-			WP_CLI::error( 'Usage: wp datamachine flows queue clear <flow_id>' );
+			WP_CLI::error( 'Usage: wp datamachine flows queue clear <flow_id> --step=<flow_step_id>' );
 			return;
 		}
 
-		$flow_id = (int) $args[0];
+		$flow_id      = (int) $args[0];
+		$flow_step_id = $assoc_args['step'] ?? null;
 
 		if ( $flow_id <= 0 ) {
 			WP_CLI::error( 'flow_id must be a positive integer' );
 			return;
 		}
 
+		if ( empty( $flow_step_id ) ) {
+			WP_CLI::error( 'Required: --step=<flow_step_id>' );
+			return;
+		}
+
 		$ability = new \DataMachine\Abilities\FlowAbilities();
-		$result  = $ability->executeQueueClear( array( 'flow_id' => $flow_id ) );
+		$result  = $ability->executeQueueClear(
+			array(
+				'flow_id'      => $flow_id,
+				'flow_step_id' => $flow_step_id,
+			)
+		);
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to clear queue' );
@@ -611,19 +653,25 @@ class FlowsCommand extends BaseCommand {
 	 * Remove a specific prompt from the queue by index.
 	 *
 	 * @param array $args       Positional arguments (flow_id, index).
-	 * @param array $assoc_args Associative arguments.
+	 * @param array $assoc_args Associative arguments (--step).
 	 */
 	private function queueRemove( array $args, array $assoc_args ): void {
 		if ( count( $args ) < 2 ) {
-			WP_CLI::error( 'Usage: wp datamachine flows queue remove <flow_id> <index>' );
+			WP_CLI::error( 'Usage: wp datamachine flows queue remove <flow_id> --step=<flow_step_id> <index>' );
 			return;
 		}
 
-		$flow_id = (int) $args[0];
-		$index   = (int) $args[1];
+		$flow_id      = (int) $args[0];
+		$flow_step_id = $assoc_args['step'] ?? null;
+		$index        = (int) $args[1];
 
 		if ( $flow_id <= 0 ) {
 			WP_CLI::error( 'flow_id must be a positive integer' );
+			return;
+		}
+
+		if ( empty( $flow_step_id ) ) {
+			WP_CLI::error( 'Required: --step=<flow_step_id>' );
 			return;
 		}
 
@@ -635,8 +683,9 @@ class FlowsCommand extends BaseCommand {
 		$ability = new \DataMachine\Abilities\FlowAbilities();
 		$result  = $ability->executeQueueRemove(
 			array(
-				'flow_id' => $flow_id,
-				'index'   => $index,
+				'flow_id'      => $flow_id,
+				'flow_step_id' => $flow_step_id,
+				'index'        => $index,
 			)
 		);
 
@@ -652,5 +701,105 @@ class FlowsCommand extends BaseCommand {
 				: $result['removed_prompt'];
 			WP_CLI::log( sprintf( 'Removed: %s', $preview ) );
 		}
+	}
+
+	/**
+	 * Update a prompt at a specific index in the queue.
+	 *
+	 * @param array $args       Positional arguments (flow_id, index, prompt).
+	 * @param array $assoc_args Associative arguments (--step).
+	 */
+	private function queueUpdate( array $args, array $assoc_args ): void {
+		if ( count( $args ) < 3 ) {
+			WP_CLI::error( 'Usage: wp datamachine flows queue update <flow_id> --step=<flow_step_id> <index> "new prompt text"' );
+			return;
+		}
+
+		$flow_id      = (int) $args[0];
+		$flow_step_id = $assoc_args['step'] ?? null;
+		$index        = (int) $args[1];
+		$prompt       = $args[2];
+
+		if ( $flow_id <= 0 ) {
+			WP_CLI::error( 'flow_id must be a positive integer' );
+			return;
+		}
+
+		if ( empty( $flow_step_id ) ) {
+			WP_CLI::error( 'Required: --step=<flow_step_id>' );
+			return;
+		}
+
+		if ( $index < 0 ) {
+			WP_CLI::error( 'index must be a non-negative integer' );
+			return;
+		}
+
+		$ability = new \DataMachine\Abilities\FlowAbilities();
+		$result  = $ability->executeQueueUpdate(
+			array(
+				'flow_id'      => $flow_id,
+				'flow_step_id' => $flow_step_id,
+				'index'        => $index,
+				'prompt'       => $prompt,
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to update prompt in queue' );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] ?? 'Prompt updated in queue.' );
+	}
+
+	/**
+	 * Move a prompt from one position to another in the queue.
+	 *
+	 * @param array $args       Positional arguments (flow_id, from_index, to_index).
+	 * @param array $assoc_args Associative arguments (--step).
+	 */
+	private function queueMove( array $args, array $assoc_args ): void {
+		if ( count( $args ) < 3 ) {
+			WP_CLI::error( 'Usage: wp datamachine flows queue move <flow_id> --step=<flow_step_id> <from_index> <to_index>' );
+			return;
+		}
+
+		$flow_id      = (int) $args[0];
+		$flow_step_id = $assoc_args['step'] ?? null;
+		$from_index   = (int) $args[1];
+		$to_index     = (int) $args[2];
+
+		if ( $flow_id <= 0 ) {
+			WP_CLI::error( 'flow_id must be a positive integer' );
+			return;
+		}
+
+		if ( empty( $flow_step_id ) ) {
+			WP_CLI::error( 'Required: --step=<flow_step_id>' );
+			return;
+		}
+
+		if ( $from_index < 0 || $to_index < 0 ) {
+			WP_CLI::error( 'indices must be non-negative integers' );
+			return;
+		}
+
+		$ability = new \DataMachine\Abilities\FlowAbilities();
+		$result  = $ability->executeQueueMove(
+			array(
+				'flow_id'      => $flow_id,
+				'flow_step_id' => $flow_step_id,
+				'from_index'   => $from_index,
+				'to_index'     => $to_index,
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to move item in queue' );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] ?? 'Item moved in queue.' );
 	}
 }
