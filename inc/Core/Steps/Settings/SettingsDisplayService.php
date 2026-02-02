@@ -29,7 +29,7 @@ class SettingsDisplayService {
 	 * Get formatted settings display for a flow step.
 	 *
 	 * @param string $flow_step_id Flow step ID to get settings for (format: {pipeline_step_id}_{flow_id})
-	 * @param string $step_type Step type (for future extensibility)
+	 * @param string $step_type Step type (for step types with usesHandler: false)
 	 * @return array Formatted settings display array
 	 */
 	public function getDisplaySettings( string $flow_step_id, string $step_type ): array {
@@ -42,6 +42,12 @@ class SettingsDisplayService {
 
 		$handler_slug     = $flow_step_config['handler_slug'] ?? '';
 		$current_settings = $flow_step_config['handler_config'] ?? array();
+
+		// For step types with usesHandler: false, fall back to step_type as settings key
+		// This allows steps like agent_ping to display their config without a traditional handler
+		if ( empty( $handler_slug ) && ! empty( $step_type ) ) {
+			$handler_slug = $step_type;
+		}
 
 		if ( empty( $handler_slug ) || empty( $current_settings ) ) {
 			return array();

@@ -48,6 +48,34 @@ class AgentPingStep extends Step {
 				'label'       => 'Agent Ping Configuration',
 			)
 		);
+
+		self::registerStepSettings();
+	}
+
+	/**
+	 * Register Agent Ping settings class for UI display.
+	 *
+	 * Step types with usesHandler: false still need their settings
+	 * registered for SettingsDisplayService to generate settings_display.
+	 */
+	private static function registerStepSettings(): void {
+		static $registered = false;
+		if ( $registered ) {
+			return;
+		}
+		$registered = true;
+
+		add_filter(
+			'datamachine_handler_settings',
+			function ( $all_settings, $handler_slug = null ) {
+				if ( null === $handler_slug || 'agent_ping' === $handler_slug ) {
+					$all_settings['agent_ping'] = new AgentPingSettings();
+				}
+				return $all_settings;
+			},
+			10,
+			2
+		);
 	}
 
 	/**

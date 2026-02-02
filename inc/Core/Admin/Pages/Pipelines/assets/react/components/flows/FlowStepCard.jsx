@@ -203,28 +203,43 @@ export default function FlowStepCard( {
 						</div>
 					) }
 
-					{ /* Handler Configuration - only for steps that use handlers */ }
+					{ /* Handler Configuration */ }
 					{ ( () => {
 						const handlerStepTypeInfo =
 							stepTypes[ pipelineStep.step_type ] || {};
 						const usesHandler =
 							handlerStepTypeInfo.uses_handler !== false; // Default true for safety
 
-						return usesHandler ? (
+						// For steps that don't use handlers (e.g., agent_ping),
+						// use the step_type as the effective handler slug for config display
+						const effectiveHandlerSlug = usesHandler
+							? flowStepConfig.handler_slug
+							: pipelineStep.step_type;
+
+						// Only skip rendering if this is a handler-based step with no handler configured
+						if ( usesHandler && ! flowStepConfig.handler_slug ) {
+							return (
+								<FlowStepHandler
+									handlerSlug={ null }
+									settingsDisplay={ [] }
+									onConfigure={ () =>
+										onConfigure && onConfigure( flowStepId )
+									}
+								/>
+							);
+						}
+
+						return (
 							<FlowStepHandler
-								handlerSlug={ flowStepConfig.handler_slug }
-								handlerConfig={
-									flowStepConfig.handler_config || {}
-								}
+								handlerSlug={ effectiveHandlerSlug }
 								settingsDisplay={
 									flowStepConfig.settings_display || []
 								}
-								stepType={ pipelineStep.step_type }
 								onConfigure={ () =>
 									onConfigure && onConfigure( flowStepId )
 								}
 							/>
-						) : null;
+						);
 					} )() }
 				</div>
 			</CardBody>
