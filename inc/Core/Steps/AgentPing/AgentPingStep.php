@@ -90,7 +90,12 @@ class AgentPingStep extends Step {
 		$handler_config = $this->getHandlerConfig();
 		$webhook_url    = $handler_config['webhook_url'] ?? '';
 
-		if ( empty( trim( $webhook_url ) ) ) {
+		// Handle both array (url_list) and string (legacy) formats.
+		$has_url = is_array( $webhook_url )
+			? ! empty( array_filter( $webhook_url, fn( $url ) => ! empty( trim( $url ) ) ) )
+			: ! empty( trim( $webhook_url ) );
+
+		if ( ! $has_url ) {
 			do_action(
 				'datamachine_fail_job',
 				$this->job_id,
@@ -114,7 +119,7 @@ class AgentPingStep extends Step {
 	protected function executeStep(): array {
 		$handler_config = $this->getHandlerConfig();
 
-		$webhook_url       = trim( $handler_config['webhook_url'] ?? '' );
+		$webhook_url       = $handler_config['webhook_url'] ?? '';
 		$configured_prompt = $handler_config['prompt'] ?? '';
 		$auth_header_name  = $handler_config['auth_header_name'] ?? '';
 		$auth_token        = $handler_config['auth_token'] ?? '';
