@@ -2,6 +2,37 @@
 
 **AI-first WordPress plugin for automating and orchestrating content workflows with a visual pipeline builder, conversational chat agent, REST API, and extensibility through handlers and tools.**
 
+## Agent-First Architecture
+
+Data Machine is designed for AI agents as primary users, not just tool operators.
+
+### The Self-Orchestration Pattern
+
+While humans use Data Machine to automate content workflows, AI agents can use it to **automate themselves**:
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   AGENT     │ ──▶ │   QUEUE     │ ──▶ │  PIPELINE   │ ──▶ │ AGENT PING  │
+│ queues task │     │  persists   │     │  executes   │     │  wakes agent│
+│             │     │  context    │     │             │     │             │
+└─────────────┘     └─────────────┘     └─────────────┘     └──────┬──────┘
+       ▲                                                          │
+       └──────────────────────────────────────────────────────────┘
+                         Agent processes, queues next task
+```
+
+**Key concepts:**
+
+- **Prompt Queue as Project Memory**: Queue items persist across sessions, storing project context that survives context window limits. Your multi-week project becomes a series of queued prompts.
+
+- **Agent Ping for Continuity**: The `agent_ping` step type triggers external agents (via webhook) after pipeline completion. This is how the loop closes — you get notified when it's your turn to act.
+
+- **Phased Execution**: Complex projects execute in stages over days or weeks. Each stage completes, pings the agent, and the agent queues the next stage.
+
+- **Autonomous Loops**: An agent can run indefinitely: process result → queue next task → sleep → wake on ping → repeat.
+
+This transforms Data Machine from a content automation tool into a **self-scheduling execution layer for AI agents**.
+
 ## System Architecture
 
 - **Pipelines** are reusable workflow templates that store handler order, tool selections, and AI settings.
