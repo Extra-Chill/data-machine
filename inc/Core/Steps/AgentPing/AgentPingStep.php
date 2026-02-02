@@ -5,8 +5,8 @@
  * Sends full pipeline context to configured webhook URL.
  * Supports Discord webhooks with human-readable formatting.
  *
- * Configuration is at the pipeline step level via pipeline_config,
- * shared across all flows using this pipeline.
+ * Configuration is at the flow step level via handler_config,
+ * allowing different webhook URLs per flow.
  *
  * @package DataMachine\Core\Steps\AgentPing
  * @since 0.18.0
@@ -41,7 +41,7 @@ class AgentPingStep extends Step {
 			class: self::class,
 			position: 80,
 			usesHandler: false,
-			hasPipelineConfig: true,
+			hasPipelineConfig: false,
 			consumeAllPackets: false,
 			stepSettings: array(
 				'config_type' => 'handler',
@@ -86,23 +86,8 @@ class AgentPingStep extends Step {
 	 * @return bool
 	 */
 	protected function validateStepConfiguration(): bool {
-		$pipeline_step_id = $this->flow_step_config['pipeline_step_id'] ?? null;
-
-		if ( ! $pipeline_step_id ) {
-			do_action(
-				'datamachine_fail_job',
-				$this->job_id,
-				'agent_ping_config_missing',
-				array(
-					'flow_step_id'  => $this->flow_step_id,
-					'error_message' => 'Missing pipeline_step_id in Agent Ping step configuration.',
-				)
-			);
-			return false;
-		}
-
-		$pipeline_step_config = $this->engine->getPipelineStepConfig( $pipeline_step_id );
-		$webhook_url          = $pipeline_step_config['webhook_url'] ?? '';
+		$handler_config = $this->getHandlerConfig();
+		$webhook_url    = $handler_config['webhook_url'] ?? '';
 
 		if ( empty( trim( $webhook_url ) ) ) {
 			do_action(
@@ -110,9 +95,8 @@ class AgentPingStep extends Step {
 				$this->job_id,
 				'agent_ping_url_missing',
 				array(
-					'flow_step_id'     => $this->flow_step_id,
-					'pipeline_step_id' => $pipeline_step_id,
-					'error_message'    => 'Agent Ping step requires a webhook URL. Configure it in pipeline step settings.',
+					'flow_step_id'  => $this->flow_step_id,
+					'error_message' => 'Agent Ping step requires a webhook URL.',
 				)
 			);
 			return false;
@@ -127,11 +111,10 @@ class AgentPingStep extends Step {
 	 * @return array
 	 */
 	protected function executeStep(): array {
-		$pipeline_step_id     = $this->flow_step_config['pipeline_step_id'];
-		$pipeline_step_config = $this->engine->getPipelineStepConfig( $pipeline_step_id );
+		$handler_config = $this->getHandlerConfig();
 
-		$webhook_url       = trim( $pipeline_step_config['webhook_url'] ?? '' );
-		$configured_prompt = $pipeline_step_config['prompt'] ?? '';
+		$webhook_url       = trim( $handler_config['webhook_url'] ?? '' );
+		$configured_prompt = $handler_config['prompt'] ?? '';
 		$data_packets      = $this->dataPackets;
 
 		// Check for prompt queue - if prompt is empty, pop from queue
