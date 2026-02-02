@@ -26,16 +26,28 @@ class AgentPingSettings extends SettingsHandler {
 	 */
 	public static function get_fields(): array {
 		return array(
-			'webhook_url' => array(
+			'webhook_url'      => array(
 				'type'        => 'url_list',
 				'label'       => __( 'Webhook URL(s)', 'data-machine' ),
 				'description' => __( 'URL(s) to POST data to (Discord, Slack, or custom endpoints).', 'data-machine' ),
 				'required'    => true,
 			),
-			'prompt'      => array(
+			'prompt'           => array(
 				'type'        => 'textarea',
 				'label'       => __( 'Instructions', 'data-machine' ),
 				'description' => __( 'Optional instructions for the receiving agent', 'data-machine' ),
+				'default'     => '',
+			),
+			'auth_header_name' => array(
+				'type'        => 'text',
+				'label'       => __( 'Auth Header Name', 'data-machine' ),
+				'description' => __( 'Optional header name for authentication (e.g., X-Agent-Token, Authorization).', 'data-machine' ),
+				'default'     => '',
+			),
+			'auth_token'       => array(
+				'type'        => 'text',
+				'label'       => __( 'Auth Token', 'data-machine' ),
+				'description' => __( 'Optional token/key to send in the auth header.', 'data-machine' ),
 				'default'     => '',
 			),
 		);
