@@ -18,6 +18,7 @@ export default function FlowStepHandler( {
 	settingsDisplay,
 	onConfigure,
 	showConfigureButton = true,
+	showBadge = true,
 } ) {
 	const { data: handlers = {} } = useHandlers();
 	const { data: stepTypes = {} } = useStepTypes();
@@ -59,9 +60,11 @@ export default function FlowStepHandler( {
 
 	return (
 		<div className="datamachine-flow-step-handler datamachine-handler-container">
-			<div className="datamachine-handler-tag datamachine-handler-badge">
-				{ handlerLabel }
-			</div>
+			{ showBadge && (
+				<div className="datamachine-handler-tag datamachine-handler-badge">
+					{ handlerLabel }
+				</div>
+			) }
 
 			{ hasSettings && (
 				<div className="datamachine-handler-settings-display">

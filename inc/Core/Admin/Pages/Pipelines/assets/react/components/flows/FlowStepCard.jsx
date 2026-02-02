@@ -8,13 +8,13 @@
  * WordPress dependencies
  */
 import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
-import { Card, CardBody, TextareaControl, Notice } from '@wordpress/components';
+import { Button, Card, CardBody, TextareaControl, Notice } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
 import FlowStepHandler from './FlowStepHandler';
-import { useUpdateQueueItem } from '../../queries/queue';
+import { useUpdateQueueItem, useAddToQueue } from '../../queries/queue';
 import { AUTO_SAVE_DELAY } from '../../utils/constants';
 import { useStepTypes } from '../../queries/config';
 
@@ -62,6 +62,7 @@ export default function FlowStepCard( {
 	const [ error, setError ] = useState( null );
 	const saveTimeout = useRef( null );
 	const updateQueueItemMutation = useUpdateQueueItem();
+	const addToQueueMutation = useAddToQueue();
 
 	/**
 	 * Sync local user message with queue/config changes
@@ -155,6 +156,41 @@ export default function FlowStepCard( {
 	}, [] );
 
 	/**
+	 * Add current message to queue
+	 */
+	const handleAddToQueue = useCallback( async () => {
+		if ( ! localUserMessage.trim() || ! isAiStep ) {
+			return;
+		}
+
+		setIsSaving( true );
+		setError( null );
+
+		try {
+			const response = await addToQueueMutation.mutateAsync( {
+				flowId,
+				prompt: localUserMessage.trim(),
+			} );
+
+			if ( response?.success ) {
+				// Clear the input after successful add
+				setLocalUserMessage( '' );
+			} else {
+				setError(
+					response?.message ||
+						__( 'Failed to add to queue', 'data-machine' )
+				);
+			}
+		} catch ( err ) {
+			// eslint-disable-next-line no-console
+			console.error( 'Add to queue error:', err );
+			setError( err.message || __( 'An error occurred', 'data-machine' ) );
+		} finally {
+			setIsSaving( false );
+		}
+	}, [ flowId, localUserMessage, isAiStep, addToQueueMutation ] );
+
+	/**
 	 * Build the label with queue indicator
 	 */
 	const getFieldLabel = () => {
@@ -243,6 +279,19 @@ export default function FlowStepCard( {
 								help={ getHelpText() }
 								className={ queueHasItems ? 'datamachine-queue-linked' : '' }
 							/>
+
+							<div className="datamachine-queue-actions">
+								<Button
+									variant="secondary"
+									size="small"
+									onClick={ handleAddToQueue }
+									disabled={ isSaving || ! localUserMessage.trim() }
+								>
+									{ isSaving
+										? __( 'Adding…', 'data-machine' )
+										: __( 'Add to Queue', 'data-machine' ) }
+								</Button>
+							</div>
 						</div>
 					) }
 
@@ -275,7 +324,7 @@ export default function FlowStepCard( {
 						}
 
 						// Show settings display (works for both handler steps and non-handler steps like agent_ping)
-						// Non-handler steps don't need Configure button (configured at pipeline level)
+						// Non-handler steps don't need Configure button or badge (configured at pipeline level)
 						return (
 							<FlowStepHandler
 								handlerSlug={ effectiveHandlerSlug }
@@ -286,6 +335,7 @@ export default function FlowStepCard( {
 									onConfigure && onConfigure( flowStepId )
 								}
 								showConfigureButton={ usesHandler }
+								showBadge={ usesHandler }
 							/>
 						);
 					} )() }
