@@ -25,6 +25,7 @@ import { isSameId } from '../../utils/ids';
  * @param {Object}   props.flowConfig       - Flow configuration (keyed by flow_step_id).
  * @param {Object}   props.pipelineConfig   - Pipeline configuration (keyed by pipeline_step_id).
  * @param {Function} props.onStepConfigured - Configure step handler.
+ * @param {Function} props.onQueueClick     - Queue button click handler (opens modal).
  * @return {JSX.Element} Flow steps container.
  */
 export default function FlowSteps( {
@@ -33,6 +34,7 @@ export default function FlowSteps( {
 	flowConfig,
 	pipelineConfig,
 	onStepConfigured,
+	onQueueClick,
 } ) {
 	// Extract prompt_queue from flow config (it's at the flow level, not step level)
 	const promptQueue = flowConfig?.prompt_queue || [];
@@ -124,6 +126,7 @@ export default function FlowSteps( {
 						pipelineConfig={ pipelineConfig }
 						promptQueue={ promptQueue }
 						onConfigure={ onStepConfigured }
+						onQueueClick={ onQueueClick }
 					/>
 				</div>
 			);
