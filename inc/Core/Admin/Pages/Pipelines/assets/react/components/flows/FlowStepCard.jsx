@@ -70,6 +70,12 @@ export default function FlowStepCard( {
 	const [ localWebhookUrl, setLocalWebhookUrl ] = useState(
 		flowStepConfig?.handler_config?.webhook_url || ''
 	);
+	const [ localAuthHeaderName, setLocalAuthHeaderName ] = useState(
+		flowStepConfig?.handler_config?.auth_header_name || ''
+	);
+	const [ localAuthToken, setLocalAuthToken ] = useState(
+		flowStepConfig?.handler_config?.auth_token || ''
+	);
 	const [ isSaving, setIsSaving ] = useState( false );
 	const [ error, setError ] = useState( null );
 	const saveTimeout = useRef( null );
@@ -94,6 +100,16 @@ export default function FlowStepCard( {
 	useEffect( () => {
 		setLocalWebhookUrl( flowStepConfig?.handler_config?.webhook_url || '' );
 	}, [ flowStepConfig?.handler_config?.webhook_url ] );
+
+	useEffect( () => {
+		setLocalAuthHeaderName(
+			flowStepConfig?.handler_config?.auth_header_name || ''
+		);
+	}, [ flowStepConfig?.handler_config?.auth_header_name ] );
+
+	useEffect( () => {
+		setLocalAuthToken( flowStepConfig?.handler_config?.auth_token || '' );
+	}, [ flowStepConfig?.handler_config?.auth_token ] );
 
 	/**
 	 * Save user message to queue (add if empty, update index 0 if exists)
@@ -224,6 +240,8 @@ export default function FlowStepCard( {
 						handler_config: {
 							webhook_url: localWebhookUrl,
 							prompt: value,
+							auth_header_name: localAuthHeaderName,
+							auth_token: localAuthToken,
 						},
 					},
 					() => setLocalAgentPingPrompt( localAgentPingPrompt )
@@ -236,6 +254,8 @@ export default function FlowStepCard( {
 			saveStepConfig,
 			localWebhookUrl,
 			localAgentPingPrompt,
+			localAuthHeaderName,
+			localAuthToken,
 		]
 	);
 
@@ -253,13 +273,83 @@ export default function FlowStepCard( {
 						handler_config: {
 							webhook_url: value,
 							prompt: localAgentPingPrompt,
+							auth_header_name: localAuthHeaderName,
+							auth_token: localAuthToken,
 						},
 					},
 					() => setLocalWebhookUrl( localWebhookUrl )
 				);
 			}, AUTO_SAVE_DELAY );
 		},
-		[ saveStepConfig, localAgentPingPrompt, localWebhookUrl ]
+		[
+			saveStepConfig,
+			localAgentPingPrompt,
+			localWebhookUrl,
+			localAuthHeaderName,
+			localAuthToken,
+		]
+	);
+
+	const handleAuthHeaderNameChange = useCallback(
+		( value ) => {
+			setLocalAuthHeaderName( value );
+
+			if ( saveTimeout.current ) {
+				clearTimeout( saveTimeout.current );
+			}
+
+			saveTimeout.current = setTimeout( () => {
+				saveStepConfig(
+					{
+						handler_config: {
+							webhook_url: localWebhookUrl,
+							prompt: localAgentPingPrompt,
+							auth_header_name: value,
+							auth_token: localAuthToken,
+						},
+					},
+					() => setLocalAuthHeaderName( localAuthHeaderName )
+				);
+			}, AUTO_SAVE_DELAY );
+		},
+		[
+			saveStepConfig,
+			localWebhookUrl,
+			localAgentPingPrompt,
+			localAuthToken,
+			localAuthHeaderName,
+		]
+	);
+
+	const handleAuthTokenChange = useCallback(
+		( value ) => {
+			setLocalAuthToken( value );
+
+			if ( saveTimeout.current ) {
+				clearTimeout( saveTimeout.current );
+			}
+
+			saveTimeout.current = setTimeout( () => {
+				saveStepConfig(
+					{
+						handler_config: {
+							webhook_url: localWebhookUrl,
+							prompt: localAgentPingPrompt,
+							auth_header_name: localAuthHeaderName,
+							auth_token: value,
+						},
+					},
+					() => setLocalAuthToken( localAuthToken )
+				);
+			}, AUTO_SAVE_DELAY );
+		},
+		[
+			saveStepConfig,
+			localWebhookUrl,
+			localAgentPingPrompt,
+			localAuthHeaderName,
+			localAuthToken,
+		]
 	);
 
 	/**
@@ -450,6 +540,19 @@ export default function FlowStepCard( {
 								'data-machine'
 							) }
 							className="datamachine-agent-ping-webhook"
+						/>
+
+						<TextControl
+							label={ __( 'Auth Header Name', 'data-machine' ) }
+							value={ localAuthHeaderName }
+							onChange={ handleAuthHeaderNameChange }
+							help={ __( 'e.g. X-Agent-Token', 'data-machine' ) }
+						/>
+
+						<TextControl
+							label={ __( 'Auth Token', 'data-machine' ) }
+							value={ localAuthToken }
+							onChange={ handleAuthTokenChange }
 						/>
 
 						<TextareaControl
