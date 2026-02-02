@@ -193,15 +193,42 @@ export default function PipelineStepCard( {
 						</div>
 						<div className="datamachine-step-card-tools-label">
 							<strong>{ __( 'Tools:', 'data-machine' ) }</strong>{ ' ' }
-							{ aiConfig.enabled_tools?.length > 0
-								? aiConfig.enabled_tools
-										.map(
-											( toolId ) =>
-												toolsData[ toolId ]?.label ||
-												toolId
-										)
-										.join( ', ' )
-								: __( 'No tools enabled', 'data-machine' ) }
+							{ ( () => {
+								/*
+								 * Tools display logic:
+								 * - Global settings = source of truth for NEW steps (defaults)
+								 * - Steps can DISABLE globally-enabled tools (override)
+								 * - Steps CANNOT enable globally-disabled tools
+								 *
+								 * Detection:
+								 * - enabled_tools is Array → explicitly configured (use as-is, even if empty)
+								 * - enabled_tools is undefined → never configured → show global defaults
+								 */
+								const isExplicitlyConfigured = Array.isArray(
+									aiConfig.enabled_tools
+								);
+								const effectiveTools = isExplicitlyConfigured
+									? aiConfig.enabled_tools
+									: Object.entries( toolsData )
+											.filter(
+												( [ , tool ] ) =>
+													tool.globally_enabled
+											)
+											.map( ( [ id ] ) => id );
+
+								if ( effectiveTools.length === 0 ) {
+									return isExplicitlyConfigured
+										? __( 'None (disabled)', 'data-machine' )
+										: __( 'None configured', 'data-machine' );
+								}
+
+								return effectiveTools
+									.map(
+										( toolId ) =>
+											toolsData[ toolId ]?.label || toolId
+									)
+									.join( ', ' );
+							} )() }
 						</div>
 
 						<TextareaControl

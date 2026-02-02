@@ -43,11 +43,13 @@ export default function PipelineSteps( {
 			return [];
 		}
 
-		return Object.values( pipelineConfig ).sort( ( a, b ) => {
-			const orderA = a.execution_order || 0;
-			const orderB = b.execution_order || 0;
-			return orderA - orderB;
-		} );
+		return Object.values( pipelineConfig )
+			.filter( ( step ) => step.step_type )
+			.sort( ( a, b ) => {
+				const orderA = a.execution_order || 0;
+				const orderB = b.execution_order || 0;
+				return orderA - orderB;
+			} );
 	}, [ pipelineConfig ] );
 
 	/**

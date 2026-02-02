@@ -110,14 +110,29 @@ export default function ConfigureStepModal( {
 			return;
 		}
 
-		// Pre-populate with all globally enabled tools for new AI steps
-		if ( ! currentConfig?.enabled_tools && tools ) {
-			const availableTools = Object.entries( tools )
+		/*
+		 * Tools selection logic:
+		 * - Global settings = source of truth for NEW steps (defaults)
+		 * - Steps can DISABLE globally-enabled tools (override)
+		 * - Steps CANNOT enable globally-disabled tools
+		 *
+		 * Detection:
+		 * - enabled_tools is Array → explicitly configured (use as-is, even if empty)
+		 * - enabled_tools is undefined → never configured → pre-fill with global defaults
+		 */
+		const isExplicitlyConfigured = Array.isArray(
+			currentConfig?.enabled_tools
+		);
+
+		if ( isExplicitlyConfigured ) {
+			// Use explicitly configured tools (even if empty array)
+			setSelectedTools( currentConfig.enabled_tools );
+		} else if ( tools ) {
+			// Never configured - pre-fill with globally enabled tools
+			const globalDefaults = Object.entries( tools )
 				.filter( ( [ , tool ] ) => tool.globally_enabled )
 				.map( ( [ id ] ) => id );
-			setSelectedTools( availableTools );
-		} else if ( currentConfig?.enabled_tools ) {
-			setSelectedTools( currentConfig.enabled_tools );
+			setSelectedTools( globalDefaults );
 		}
 	}, [ configKey, tools, isLoadingTools ] );
 
