@@ -762,3 +762,33 @@
         width: auto;
     }
 }
+
+/* ===== COMPONENT: QUEUE-LINKED USER MESSAGE ===== */
+
+.datamachine-user-message-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.datamachine-queue-indicator {
+    display: inline-flex;
+    align-items: center;
+}
+
+.datamachine-queue-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #0073aa;
+    background: rgba(0, 115, 170, 0.08);
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+/* Subtle border indicator when queue is linked */
+.datamachine-queue-linked textarea {
+    border-left: 3px solid #0073aa;
+}

@@ -34,6 +34,9 @@ export default function FlowSteps( {
 	pipelineConfig,
 	onStepConfigured,
 } ) {
+	// Extract prompt_queue from flow config (it's at the flow level, not step level)
+	const promptQueue = flowConfig?.prompt_queue || [];
+
 	/**
 	 * Sort flow steps by execution order and match with pipeline steps
 	 */
@@ -46,13 +49,13 @@ export default function FlowSteps( {
 			return [];
 		}
 
-		// Convert flow config object to array
-		const flowStepsArray = Object.entries( flowConfig ).map(
-			( [ flowStepId, config ] ) => ( {
+		// Convert flow config object to array (excluding prompt_queue which is flow-level)
+		const flowStepsArray = Object.entries( flowConfig )
+			.filter( ( [ key ] ) => key !== 'prompt_queue' )
+			.map( ( [ flowStepId, config ] ) => ( {
 				flowStepId,
 				...config,
-			} )
-		);
+			} ) );
 
 		// Sort by execution order
 		const sorted = flowStepsArray.sort( ( a, b ) => {
@@ -119,6 +122,7 @@ export default function FlowSteps( {
 						flowStepConfig={ step.flowStepConfig }
 						pipelineStep={ step.pipelineStep }
 						pipelineConfig={ pipelineConfig }
+						promptQueue={ promptQueue }
 						onConfigure={ onStepConfigured }
 					/>
 				</div>

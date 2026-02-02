@@ -38,6 +38,7 @@ class QueueAbility {
 			$this->registerQueueList();
 			$this->registerQueueClear();
 			$this->registerQueueRemove();
+			$this->registerQueueUpdate();
 		};
 
 		if ( did_action( 'wp_abilities_api_init' ) ) {
@@ -198,6 +199,52 @@ class QueueAbility {
 					),
 				),
 				'execute_callback'    => array( $this, 'executeQueueRemove' ),
+				'permission_callback' => array( $this, 'checkPermission' ),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	/**
+	 * Register queue-update ability.
+	 */
+	private function registerQueueUpdate(): void {
+		wp_register_ability(
+			'datamachine/queue-update',
+			array(
+				'label'               => __( 'Update Queue Item', 'data-machine' ),
+				'description'         => __( 'Update a prompt at a specific index in the flow queue.', 'data-machine' ),
+				'category'            => 'datamachine',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'flow_id', 'index', 'prompt' ),
+					'properties' => array(
+						'flow_id' => array(
+							'type'        => 'integer',
+							'description' => __( 'Flow ID', 'data-machine' ),
+						),
+						'index'   => array(
+							'type'        => 'integer',
+							'description' => __( 'Queue index to update (0-based)', 'data-machine' ),
+						),
+						'prompt'  => array(
+							'type'        => 'string',
+							'description' => __( 'New prompt text', 'data-machine' ),
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'      => array( 'type' => 'boolean' ),
+						'flow_id'      => array( 'type' => 'integer' ),
+						'index'        => array( 'type' => 'integer' ),
+						'queue_length' => array( 'type' => 'integer' ),
+						'message'      => array( 'type' => 'string' ),
+						'error'        => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeQueueUpdate' ),
 				'permission_callback' => array( $this, 'checkPermission' ),
 				'meta'                => array( 'show_in_rest' => true ),
 			)
@@ -458,6 +505,116 @@ class QueueAbility {
 			'removed_prompt' => $removed_prompt,
 			'queue_length'   => count( $prompt_queue ),
 			'message'        => sprintf( 'Removed prompt at index %d. Queue now has %d item(s).', $index, count( $prompt_queue ) ),
+		);
+	}
+
+	/**
+	 * Update a prompt at a specific index in the queue.
+	 *
+	 * If the index is 0 and the queue is empty, creates a new item.
+	 *
+	 * @param array $input Input with flow_id, index, and prompt.
+	 * @return array Result.
+	 */
+	public function executeQueueUpdate( array $input ): array {
+		$flow_id = $input['flow_id'] ?? null;
+		$index   = $input['index'] ?? null;
+		$prompt  = $input['prompt'] ?? null;
+
+		if ( ! is_numeric( $flow_id ) || (int) $flow_id <= 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_id is required and must be a positive integer',
+			);
+		}
+
+		if ( ! is_numeric( $index ) || (int) $index < 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'index is required and must be a non-negative integer',
+			);
+		}
+
+		if ( ! is_string( $prompt ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'prompt is required and must be a string',
+			);
+		}
+
+		$flow_id = (int) $flow_id;
+		$index   = (int) $index;
+		$prompt  = sanitize_textarea_field( wp_unslash( $prompt ) );
+
+		$flow = $this->db_flows->get_flow( $flow_id );
+		if ( ! $flow ) {
+			return array(
+				'success' => false,
+				'error'   => 'Flow not found',
+			);
+		}
+
+		$flow_config  = $flow['flow_config'] ?? array();
+		$prompt_queue = $flow_config['prompt_queue'] ?? array();
+
+		// Special case: if index is 0 and queue is empty, create a new item
+		if ( 0 === $index && empty( $prompt_queue ) ) {
+			// If prompt is empty, don't create anything
+			if ( '' === $prompt ) {
+				return array(
+					'success'      => true,
+					'flow_id'      => $flow_id,
+					'index'        => $index,
+					'queue_length' => 0,
+					'message'      => 'No changes made (empty prompt, empty queue).',
+				);
+			}
+
+			$prompt_queue[] = array(
+				'prompt'   => $prompt,
+				'added_at' => gmdate( 'c' ),
+			);
+		} elseif ( $index >= count( $prompt_queue ) ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Index %d is out of range. Queue has %d item(s).', $index, count( $prompt_queue ) ),
+			);
+		} else {
+			// Update existing item, preserving added_at
+			$prompt_queue[ $index ]['prompt'] = $prompt;
+		}
+
+		$flow_config['prompt_queue'] = $prompt_queue;
+
+		$success = $this->db_flows->update_flow(
+			$flow_id,
+			array( 'flow_config' => $flow_config )
+		);
+
+		if ( ! $success ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to update queue',
+			);
+		}
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Queue item updated',
+			array(
+				'flow_id'      => $flow_id,
+				'index'        => $index,
+				'queue_length' => count( $prompt_queue ),
+			)
+		);
+
+		return array(
+			'success'      => true,
+			'flow_id'      => $flow_id,
+			'index'        => $index,
+			'queue_length' => count( $prompt_queue ),
+			'message'      => sprintf( 'Updated prompt at index %d. Queue has %d item(s).', $index, count( $prompt_queue ) ),
 		);
 	}
 
