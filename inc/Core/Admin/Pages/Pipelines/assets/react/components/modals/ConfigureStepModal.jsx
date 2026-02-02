@@ -28,8 +28,8 @@ import AIToolsSelector from './configure-step/AIToolsSelector';
  */
 function AIStepConfig( {
 	formState,
-	selectedTools,
-	setSelectedTools,
+	disabledTools,
+	setDisabledTools,
 	isLoadingTools,
 	shouldApplyDefaults,
 } ) {
@@ -57,8 +57,8 @@ function AIStepConfig( {
 			/>
 
 			<AIToolsSelector
-				selectedTools={ selectedTools }
-				onSelectionChange={ setSelectedTools }
+				selectedTools={ disabledTools }
+				onSelectionChange={ setDisabledTools }
 			/>
 
 			<div className="datamachine-form-field-wrapper">
@@ -113,8 +113,8 @@ export default function ConfigureStepModal( {
 	currentConfig,
 	onSuccess,
 } ) {
-	const [ selectedTools, setSelectedTools ] = useState(
-		currentConfig?.enabled_tools || []
+	const [ disabledTools, setDisabledTools ] = useState(
+		currentConfig?.disabled_tools || []
 	);
 
 	const updateMutation = useUpdateSystemPrompt();
@@ -125,13 +125,13 @@ export default function ConfigureStepModal( {
 				provider: currentConfig?.provider,
 				model: currentConfig?.model,
 				system_prompt: currentConfig?.system_prompt,
-				enabled_tools: currentConfig?.enabled_tools,
+				disabled_tools: currentConfig?.disabled_tools,
 			} ),
 		[
 			currentConfig?.provider,
 			currentConfig?.model,
 			currentConfig?.system_prompt,
-			currentConfig?.enabled_tools,
+			currentConfig?.disabled_tools,
 		]
 	);
 
@@ -161,7 +161,7 @@ export default function ConfigureStepModal( {
 				prompt: data.systemPrompt,
 				provider: data.provider,
 				model: data.model,
-				enabledTools: selectedTools,
+				disabledTools: disabledTools,
 				stepType,
 				pipelineId,
 			} );
@@ -188,27 +188,22 @@ export default function ConfigureStepModal( {
 
 		/*
 		 * Tools selection logic:
-		 * - Global settings = source of truth for NEW steps (defaults)
-		 * - Steps can DISABLE globally-enabled tools (override)
-		 * - Steps CANNOT enable globally-disabled tools
-		 *
-		 * Detection:
-		 * - enabled_tools is Array → explicitly configured (use as-is, even if empty)
-		 * - enabled_tools is undefined → never configured → pre-fill with global defaults
+		 * - disabled_tools is Array → explicitly configured (use as-is, even if empty)
+		 * - disabled_tools is undefined → never configured → pre-fill with globally disabled tools
 		 */
 		const isExplicitlyConfigured = Array.isArray(
-			currentConfig?.enabled_tools
+			currentConfig?.disabled_tools
 		);
 
 		if ( isExplicitlyConfigured ) {
 			// Use explicitly configured tools (even if empty array)
-			setSelectedTools( currentConfig.enabled_tools );
+			setDisabledTools( currentConfig.disabled_tools );
 		} else if ( tools ) {
-			// Never configured - pre-fill with globally enabled tools
-			const globalDefaults = Object.entries( tools )
-				.filter( ( [ , tool ] ) => tool.globally_enabled )
+			// Never configured - pre-fill with globally disabled tools
+			const globalDisabled = Object.entries( tools )
+				.filter( ( [ , tool ] ) => ! tool.globally_enabled )
 				.map( ( [ id ] ) => id );
-			setSelectedTools( globalDefaults );
+			setDisabledTools( globalDisabled );
 		}
 	}, [ configKey, tools, isLoadingTools ] );
 
@@ -236,8 +231,8 @@ export default function ConfigureStepModal( {
 
 				<AIStepConfig
 					formState={ formState }
-					selectedTools={ selectedTools }
-					setSelectedTools={ setSelectedTools }
+					disabledTools={ disabledTools }
+					setDisabledTools={ setDisabledTools }
 					isLoadingTools={ isLoadingTools }
 					shouldApplyDefaults={ shouldApplyDefaults }
 				/>

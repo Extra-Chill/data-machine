@@ -152,8 +152,8 @@ export const useAddPipelineStep = () => {
 						if ( stepData.model ) {
 							configEntry.model = stepData.model;
 						}
-						if ( stepData.enabled_tools ) {
-							configEntry.enabled_tools = stepData.enabled_tools;
+						if ( stepData.disabled_tools ) {
+							configEntry.disabled_tools = stepData.disabled_tools;
 						}
 
 						return {
@@ -220,7 +220,7 @@ export const useUpdateSystemPrompt = () => {
 			prompt,
 			provider,
 			model,
-			enabledTools,
+			disabledTools,
 			stepType,
 			pipelineId,
 		} ) =>
@@ -229,7 +229,7 @@ export const useUpdateSystemPrompt = () => {
 				prompt,
 				provider,
 				model,
-				enabledTools,
+				disabledTools,
 				stepType,
 				pipelineId
 			),

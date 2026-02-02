@@ -221,7 +221,7 @@ export const updateSystemPrompt = async (
 	prompt,
 	provider,
 	model,
-	enabledTools = [],
+	disabledTools = [],
 	stepType = 'ai',
 	pipelineId = null
 ) => {
@@ -231,7 +231,7 @@ export const updateSystemPrompt = async (
 		provider,
 		model,
 		system_prompt: prompt,
-		enabled_tools: enabledTools,
+		disabled_tools: disabledTools,
 	};
 
 	return await client.put( `/pipelines/steps/${ stepId }/config`, payload );
