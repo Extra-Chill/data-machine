@@ -270,10 +270,15 @@ trait FlowStepHelpers {
 			);
 		}
 
-		$effective_slug = ! empty( $handler_slug ) ? $handler_slug : ( $flow_config[ $flow_step_id ]['handler_slug'] ?? null );
+		// Priority: explicit handler_slug > existing handler_slug > step_type (for non-handler steps like agent_ping).
+		$effective_slug = ! empty( $handler_slug )
+			? $handler_slug
+			: ( ! empty( $flow_config[ $flow_step_id ]['handler_slug'] )
+				? $flow_config[ $flow_step_id ]['handler_slug']
+				: ( $flow_config[ $flow_step_id ]['step_type'] ?? null ) );
 
 		if ( empty( $effective_slug ) ) {
-			do_action( 'datamachine_log', 'error', 'No handler slug available for flow step update', array( 'flow_step_id' => $flow_step_id ) );
+			do_action( 'datamachine_log', 'error', 'No handler slug or step_type available for flow step update', array( 'flow_step_id' => $flow_step_id ) );
 			return false;
 		}
 

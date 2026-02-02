@@ -118,12 +118,17 @@ class UpdateFlowStepAbility {
 		$updated_fields = array();
 
 		if ( $has_handler_update ) {
-			$effective_slug = ! empty( $handler_slug ) ? $handler_slug : ( $existing_step['handler_slug'] ?? '' );
+			// Priority: explicit handler_slug > existing handler_slug > step_type (for non-handler steps like agent_ping).
+			$effective_slug = ! empty( $handler_slug )
+				? $handler_slug
+				: ( ! empty( $existing_step['handler_slug'] )
+					? $existing_step['handler_slug']
+					: ( $existing_step['step_type'] ?? '' ) );
 
 			if ( empty( $effective_slug ) ) {
 				return array(
 					'success' => false,
-					'error'   => 'handler_slug is required when configuring a step without an existing handler',
+					'error'   => 'Unable to determine handler: no handler_slug provided, stored, or step_type available',
 				);
 			}
 
