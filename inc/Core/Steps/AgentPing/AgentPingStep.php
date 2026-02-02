@@ -124,18 +124,34 @@ class AgentPingStep extends Step {
 
 		// Execute the send-ping ability
 		$ability = wp_get_ability( 'datamachine/send-ping' );
-		$result  = $ability->execute(
-			array(
-				'webhook_url'  => $webhook_url,
-				'prompt'       => $prompt,
-				'from_queue'   => $from_queue,
-				'data_packets' => $data_packets,
-				'engine_data'  => $this->engine->all(),
-				'flow_id'      => $this->engine->get( 'flow_id' ),
-				'pipeline_id'  => $this->engine->get( 'pipeline_id' ),
-				'job_id'       => $this->job_id,
-			)
-		);
+
+		if ( ! $ability ) {
+			$result = array(
+				'success' => false,
+				'error'   => 'Ability datamachine/send-ping not registered',
+			);
+		} else {
+			$result = $ability->execute(
+				array(
+					'webhook_url'  => $webhook_url,
+					'prompt'       => $prompt,
+					'from_queue'   => $from_queue,
+					'data_packets' => $data_packets,
+					'engine_data'  => $this->engine->all(),
+					'flow_id'      => $this->engine->get( 'flow_id' ),
+					'pipeline_id'  => $this->engine->get( 'pipeline_id' ),
+					'job_id'       => $this->job_id,
+				)
+			);
+
+			// Handle WP_Error from ability execution
+			if ( is_wp_error( $result ) ) {
+				$result = array(
+					'success' => false,
+					'error'   => $result->get_error_message(),
+				);
+			}
+		}
 
 		$success = $result['success'] ?? false;
 
