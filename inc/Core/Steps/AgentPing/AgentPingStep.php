@@ -122,6 +122,7 @@ class AgentPingStep extends Step {
 				'webhook_url'  => $webhook_url,
 				'prompt'       => $prompt,
 				'data_packets' => $data_packets,
+				'engine_data'  => $this->engine->getAll(),
 				'flow_id'      => $this->engine->get( 'flow_id' ),
 				'pipeline_id'  => $this->engine->get( 'pipeline_id' ),
 				'job_id'       => $this->job_id,

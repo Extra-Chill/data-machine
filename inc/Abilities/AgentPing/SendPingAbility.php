@@ -59,6 +59,10 @@ class SendPingAbility {
 								'type'        => 'integer',
 								'description' => __( 'Job ID for context', 'data-machine' ),
 							),
+							'engine_data'  => array(
+								'type'        => 'object',
+								'description' => __( 'Engine data including post_id, published_url, etc.', 'data-machine' ),
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -106,6 +110,7 @@ class SendPingAbility {
 		$webhook_url  = trim( $input['webhook_url'] ?? '' );
 		$prompt       = $input['prompt'] ?? '';
 		$data_packets = $input['data_packets'] ?? array();
+		$engine_data  = $input['engine_data'] ?? array();
 		$flow_id      = $input['flow_id'] ?? null;
 		$pipeline_id  = $input['pipeline_id'] ?? null;
 		$job_id       = $input['job_id'] ?? null;
@@ -117,7 +122,7 @@ class SendPingAbility {
 			);
 		}
 
-		$payload = $this->buildPayload( $webhook_url, $prompt, $data_packets, $flow_id, $pipeline_id, $job_id );
+		$payload = $this->buildPayload( $webhook_url, $prompt, $data_packets, $engine_data, $flow_id, $pipeline_id, $job_id );
 
 		$response = wp_remote_post(
 			$webhook_url,
@@ -189,20 +194,22 @@ class SendPingAbility {
 	 * @param string     $url Webhook URL.
 	 * @param string     $prompt Optional instructions.
 	 * @param array      $data_packets Pipeline data packets.
+	 * @param array      $engine_data Engine data (post_id, published_url, etc.).
 	 * @param mixed      $flow_id Flow ID.
 	 * @param mixed      $pipeline_id Pipeline ID.
 	 * @param int|null   $job_id Job ID.
 	 * @return array Payload for POST request.
 	 */
-	private function buildPayload( string $url, string $prompt, array $data_packets, $flow_id, $pipeline_id, ?int $job_id ): array {
+	private function buildPayload( string $url, string $prompt, array $data_packets, array $engine_data, $flow_id, $pipeline_id, ?int $job_id ): array {
 		if ( $this->isDiscordWebhook( $url ) ) {
-			return $this->buildDiscordPayload( $prompt, $data_packets );
+			return $this->buildDiscordPayload( $prompt, $data_packets, $engine_data );
 		}
 
 		return array(
 			'prompt'    => $prompt,
 			'context'   => array(
 				'data_packets' => $data_packets,
+				'engine_data'  => $engine_data,
 				'flow_id'      => $flow_id,
 				'pipeline_id'  => $pipeline_id,
 				'job_id'       => $job_id,
@@ -216,9 +223,10 @@ class SendPingAbility {
 	 *
 	 * @param string $prompt Optional instructions.
 	 * @param array  $data_packets Pipeline data packets.
+	 * @param array  $engine_data Engine data (for future use).
 	 * @return array Discord webhook payload.
 	 */
-	private function buildDiscordPayload( string $prompt, array $data_packets ): array {
+	private function buildDiscordPayload( string $prompt, array $data_packets, array $engine_data = array() ): array {
 		$first_packet = $data_packets[0] ?? array();
 		$title        = $first_packet['content']['title'] ?? 'New content';
 		$url          = $first_packet['metadata']['url'] ?? $first_packet['metadata']['permalink'] ?? '';
