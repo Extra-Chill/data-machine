@@ -29,12 +29,17 @@ class FlowFormatter {
 		$handler_abilities = new HandlerAbilities();
 
 		foreach ( $flow_config as $flow_step_id => &$step_data ) {
-			if ( ! isset( $step_data['handler_slug'] ) ) {
+			$step_type    = $step_data['step_type'] ?? '';
+			$handler_slug = $step_data['handler_slug'] ?? '';
+
+			// For step types with usesHandler: false, use step_type as effective handler_slug
+			// This ensures settings_display is generated for steps like agent_ping
+			$effective_slug = ! empty( $handler_slug ) ? $handler_slug : $step_type;
+
+			// Skip steps with no handler or step type
+			if ( empty( $effective_slug ) ) {
 				continue;
 			}
-
-			$step_type    = $step_data['step_type'] ?? '';
-			$handler_slug = $step_data['handler_slug'];
 
 			$step_data['settings_display'] = apply_filters(
 				'datamachine_get_handler_settings_display',
@@ -43,10 +48,13 @@ class FlowFormatter {
 				$step_type
 			);
 
-			$step_data['handler_config'] = $handler_abilities->applyDefaults(
-				$handler_slug,
-				$step_data['handler_config'] ?? array()
-			);
+			// Apply defaults if we have an effective slug
+			if ( ! empty( $effective_slug ) ) {
+				$step_data['handler_config'] = $handler_abilities->applyDefaults(
+					$effective_slug,
+					$step_data['handler_config'] ?? array()
+				);
+			}
 
 			if ( ! empty( $step_data['settings_display'] ) && is_array( $step_data['settings_display'] ) ) {
 				$display_parts                 = array_map(

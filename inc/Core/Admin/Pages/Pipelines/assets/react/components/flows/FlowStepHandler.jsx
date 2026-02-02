@@ -11,6 +11,7 @@ import { __ } from '@wordpress/i18n';
  * Internal dependencies
  */
 import { useHandlers } from '../../queries/handlers';
+import { useStepTypes } from '../../queries/config';
 
 export default function FlowStepHandler( {
 	handlerSlug,
@@ -18,6 +19,7 @@ export default function FlowStepHandler( {
 	onConfigure,
 } ) {
 	const { data: handlers = {} } = useHandlers();
+	const { data: stepTypes = {} } = useStepTypes();
 
 	if ( ! handlerSlug ) {
 		return (
@@ -47,7 +49,12 @@ export default function FlowStepHandler( {
 		: {};
 
 	const hasSettings = Object.keys( displaySettings ).length > 0;
-	const handlerLabel = handlers[ handlerSlug ]?.label || handlerSlug;
+
+	// Look up label from handlers first, then step types, then fall back to slug
+	const handlerLabel =
+		handlers[ handlerSlug ]?.label ||
+		stepTypes[ handlerSlug ]?.label ||
+		handlerSlug;
 
 	return (
 		<div className="datamachine-flow-step-handler datamachine-handler-container">
