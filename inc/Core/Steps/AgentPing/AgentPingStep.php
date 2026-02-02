@@ -151,8 +151,8 @@ class AgentPingStep extends Step {
 					'from_queue'   => $from_queue,
 					'data_packets' => $data_packets,
 					'engine_data'  => $this->engine->all(),
-					'flow_id'      => $this->engine->get( 'flow_id' ),
-					'pipeline_id'  => $this->engine->get( 'pipeline_id' ),
+					'flow_id'      => $this->flow_step_config['flow_id'] ?? null,
+					'pipeline_id'  => $this->flow_step_config['pipeline_id'] ?? null,
 					'job_id'       => $this->job_id,
 				)
 			);
