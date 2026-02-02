@@ -41,7 +41,7 @@ class AgentPingStep extends Step {
 			class: self::class,
 			position: 80,
 			usesHandler: false,
-			hasPipelineConfig: false,
+			hasPipelineConfig: true,
 			consumeAllPackets: false,
 			stepSettings: array(
 				'config_type' => 'handler',

@@ -7,20 +7,19 @@
 /**
  * WordPress dependencies
  */
-import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
+import { useState, useCallback, useRef, useEffect } from '@wordpress/element';
 import {
 	Card,
 	CardBody,
 	Button,
-	TextareaControl,
 	Notice,
 } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
+import PromptField from '../shared/PromptField';
 import { updateSystemPrompt } from '../../utils/api';
-import { AUTO_SAVE_DELAY } from '../../utils/constants';
 import { useStepTypes, useTools } from '../../queries/config';
 
 /**
@@ -46,89 +45,60 @@ export default function PipelineStepCard( {
 	const { data: toolsData = {} } = useTools();
 	const stepTypeInfo = stepTypes?.[ step.step_type ] || {};
 	const canConfigure = stepTypeInfo.has_pipeline_config === true;
-	const aiConfig =
-		step.step_type === 'ai'
-			? pipelineConfig[ step.pipeline_step_id ]
-			: null;
 
-	const [ localPrompt, setLocalPrompt ] = useState(
-		aiConfig?.system_prompt || ''
-	);
-	const [ isSaving, setIsSaving ] = useState( false );
+	const isAiStep = step.step_type === 'ai';
+	const isAgentPing = step.step_type === 'agent_ping';
+
+	const stepConfig = pipelineConfig[ step.pipeline_step_id ] || null;
+
 	const [ error, setError ] = useState( null );
-	const saveTimeout = useRef( null );
 
 	/**
-	 * Sync local prompt with config changes
+	 * Save system prompt to API (AI steps)
 	 */
-	useEffect( () => {
-		if ( aiConfig ) {
-			setLocalPrompt( aiConfig.system_prompt || '' );
-		}
-	}, [ aiConfig ] );
-
-	/**
-	 * Save system prompt to API
-	 */
-	const savePrompt = useCallback(
+	const handleSavePrompt = useCallback(
 		async ( prompt ) => {
-			if ( ! aiConfig ) {return;}
+			if ( ! stepConfig ) {
+				return { success: false, message: 'No configuration found' };
+			}
 
-			const currentPrompt = aiConfig.system_prompt || '';
-			if ( prompt === currentPrompt ) {return;}
-
-			setIsSaving( true );
-			setError( null );
+			const currentPrompt = stepConfig.system_prompt || '';
+			if ( prompt === currentPrompt ) {
+				return { success: true };
+			}
 
 			try {
 				const response = await updateSystemPrompt(
 					step.pipeline_step_id,
 					prompt,
-					aiConfig.provider,
-					aiConfig.model,
+					stepConfig.provider,
+					stepConfig.model,
 					[], // enabledTools - not available in inline editing
 					step.step_type,
 					pipelineId
 				);
 
 				if ( ! response.success ) {
-					setError(
-						response.message ||
-							__( 'Failed to update prompt', 'data-machine' )
-					);
-					setLocalPrompt( currentPrompt ); // Revert on error
+					return {
+						success: false,
+						message:
+							response.message ||
+							__( 'Failed to update prompt', 'data-machine' ),
+					};
 				}
+
+				return { success: true };
 			} catch ( err ) {
 				console.error( 'Prompt update error:', err );
-				setError(
-					err.message || __( 'An error occurred', 'data-machine' )
-				);
-				setLocalPrompt( currentPrompt ); // Revert on error
-			} finally {
-				setIsSaving( false );
+				return {
+					success: false,
+					message:
+						err.message ||
+						__( 'An error occurred', 'data-machine' ),
+				};
 			}
 		},
-		[ pipelineId, step.pipeline_step_id, step.step_type, aiConfig ]
-	);
-
-	/**
-	 * Handle prompt change with debouncing
-	 */
-	const handlePromptChange = useCallback(
-		( value ) => {
-			setLocalPrompt( value );
-
-			// Clear existing timeout
-			if ( saveTimeout.current ) {
-				clearTimeout( saveTimeout.current );
-			}
-
-			// Set new timeout for debounced save
-			saveTimeout.current = setTimeout( () => {
-				savePrompt( value );
-			}, AUTO_SAVE_DELAY );
-		},
-		[ savePrompt ]
+		[ pipelineId, step.pipeline_step_id, step.step_type, stepConfig ]
 	);
 
 	/**
@@ -143,17 +113,6 @@ export default function PipelineStepCard( {
 			onDelete( step.pipeline_step_id );
 		}
 	}, [ step.pipeline_step_id, onDelete ] );
-
-	/**
-	 * Cleanup timeout on unmount
-	 */
-	useEffect( () => {
-		return () => {
-			if ( saveTimeout.current ) {
-				clearTimeout( saveTimeout.current );
-			}
-		};
-	}, [] );
 
 	return (
 		<Card
@@ -178,37 +137,27 @@ export default function PipelineStepCard( {
 				</div>
 
 				{ /* AI Configuration Display */ }
-				{ aiConfig && (
+				{ isAiStep && stepConfig && (
 					<div className="datamachine-ai-config-display datamachine-step-card-ai-config">
 						<div className="datamachine-step-card-ai-label">
 							<strong>
 								{ __( 'AI Provider:', 'data-machine' ) }
 							</strong>{ ' ' }
-							{ aiConfig.provider || 'Not configured' }
+							{ stepConfig.provider || 'Not configured' }
 							{ ' | ' }
 							<strong>
 								{ __( 'Model:', 'data-machine' ) }
 							</strong>{ ' ' }
-							{ aiConfig.model || 'Not configured' }
+							{ stepConfig.model || 'Not configured' }
 						</div>
 						<div className="datamachine-step-card-tools-label">
 							<strong>{ __( 'Tools:', 'data-machine' ) }</strong>{ ' ' }
 							{ ( () => {
-								/*
-								 * Tools display logic:
-								 * - Global settings = source of truth for NEW steps (defaults)
-								 * - Steps can DISABLE globally-enabled tools (override)
-								 * - Steps CANNOT enable globally-disabled tools
-								 *
-								 * Detection:
-								 * - enabled_tools is Array → explicitly configured (use as-is, even if empty)
-								 * - enabled_tools is undefined → never configured → show global defaults
-								 */
 								const isExplicitlyConfigured = Array.isArray(
-									aiConfig.enabled_tools
+									stepConfig.enabled_tools
 								);
 								const effectiveTools = isExplicitlyConfigured
-									? aiConfig.enabled_tools
+									? stepConfig.enabled_tools
 									: Object.entries( toolsData )
 											.filter(
 												( [ , tool ] ) =>
@@ -231,21 +180,61 @@ export default function PipelineStepCard( {
 							} )() }
 						</div>
 
-						<TextareaControl
+						<PromptField
 							label={ __( 'System Prompt', 'data-machine' ) }
-							value={ localPrompt }
-							onChange={ handlePromptChange }
+							value={ stepConfig.system_prompt || '' }
+							onSave={ handleSavePrompt }
 							placeholder={ __(
 								'Enter system prompt for AI processing…',
 								'data-machine'
 							) }
 							rows={ 6 }
-							help={
-								isSaving
-									? __( 'Saving…', 'data-machine' )
-									: null
-							}
 						/>
+					</div>
+				) }
+
+				{ /* Agent Ping Configuration Display */ }
+				{ isAgentPing && stepConfig && (
+					<div className="datamachine-agent-ping-config-display datamachine-step-card-agent-ping-config">
+						<div className="datamachine-step-card-webhook-label">
+							<strong>
+								{ __( 'Webhook URL:', 'data-machine' ) }
+							</strong>{ ' ' }
+							{ stepConfig.webhook_url ? (
+								<span className="datamachine-webhook-url-display">
+									{ stepConfig.webhook_url }
+								</span>
+							) : (
+								<span className="datamachine-not-configured">
+									{ __( 'Not configured', 'data-machine' ) }
+								</span>
+							) }
+						</div>
+						{ stepConfig.prompt && (
+							<div className="datamachine-step-card-prompt-preview">
+								<strong>
+									{ __( 'Instructions:', 'data-machine' ) }
+								</strong>{ ' ' }
+								<span className="datamachine-prompt-preview-text">
+									{ stepConfig.prompt.length > 100
+										? stepConfig.prompt.substring( 0, 100 ) +
+										  '…'
+										: stepConfig.prompt }
+								</span>
+							</div>
+						) }
+					</div>
+				) }
+
+				{ /* Agent Ping Not Configured Warning */ }
+				{ isAgentPing && ( ! stepConfig || ! stepConfig.webhook_url ) && (
+					<div className="datamachine-step-card-warning">
+						<Notice status="warning" isDismissible={ false }>
+							{ __(
+								'Configure this step to set the webhook URL.',
+								'data-machine'
+							) }
+						</Notice>
 					</div>
 				) }
 
