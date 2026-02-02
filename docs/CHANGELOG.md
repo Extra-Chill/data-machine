@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
+## [0.19.10] - 2026-02-02
+
+### Added
+- add optional auth header settings for Agent Ping webhooks
+
+### Changed
+- include optional auth header in Agent Ping webhook requests
+
 ## [0.19.9] - 2026-02-02
 
 ### Changed
