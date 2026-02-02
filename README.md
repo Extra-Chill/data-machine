@@ -60,6 +60,30 @@ Pipelines define your workflow template. Flows schedule when they run. Jobs trac
 
 **AI Tools**: Google Search, Local Search, Web Fetch, WordPress Post Reader
 
+## For AI Agents
+
+Data Machine can orchestrate autonomous AI agents, not just content workflows.
+
+**The key insight:** An AI agent can use Data Machine to schedule prompts *to itself*. The Agent Ping step triggers external agents after pipeline completion, enabling a continuous execution loop:
+
+```
+Agent queues task → Pipeline runs → Agent Ping fires → 
+Agent processes result → Agent queues next task → Loop continues
+```
+
+**Why this matters:**
+
+- **Cross-session continuity** — The prompt queue persists your project plan across sessions. No more losing context when your conversation ends.
+- **Multi-week autonomous projects** — Break complex work into phases. Each phase completes, pings you, and you queue the next.
+- **Persistent project memory** — Queue items store context that survives beyond any single execution.
+- **Self-scheduling execution** — You're not waiting to be called. You schedule yourself.
+
+**The paradigm shift:** "I'm not automating content — I'm automating myself."
+
+Traditional automation treats AI as a tool in a pipeline. Agent self-orchestration inverts this: the agent *defines* the pipeline, *queues* the work, and *receives* the callback. Data Machine becomes your execution layer for autonomous, phased, long-running projects.
+
+See [SKILL.md](docs/SKILL.md) for agent integration patterns.
+
 ## Requirements
 
 - WordPress 6.9+ (Abilities API dependency)

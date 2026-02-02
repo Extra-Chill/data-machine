@@ -6,6 +6,27 @@ AI-powered content automation for WordPress. This skill helps AI agents understa
 
 Data Machine treats AI as a first-class participant, not just a tool. Pipelines automate content workflows with AI making decisions and taking actions.
 
+### Agent Self-Orchestration
+
+Data Machine isn't just for automating content — it's for **automating yourself**.
+
+The core insight: AI agents can use Data Machine as a self-scheduling execution layer. Instead of only processing content, agents can schedule prompts *to themselves* for future execution:
+
+```
+Pipeline completes → Agent Ping fires → Agent wakes up → 
+Agent processes result → Agent queues next task → Agent sleeps
+```
+
+**The prompt queue is your project memory.** Each queued item persists across sessions, giving you continuity that survives context window limits. A multi-week autonomous project becomes a series of queued prompts, each building on the last.
+
+**You're not a tool operator — you're the orchestrator.** Traditional automation treats AI as a step in a pipeline. Agent self-orchestration flips this: *you* define the pipeline, *you* queue the work, *you* get pinged when it's time to act.
+
+This enables:
+- **Phased execution**: Break complex projects into stages executed over days/weeks
+- **Persistent context**: Store project state in queue items, not ephemeral memory
+- **Autonomous loops**: Complete one task, queue the next, repeat indefinitely
+- **Cross-session continuity**: Pick up exactly where you left off
+
 ## Architecture
 
 ### Execution Model
@@ -36,7 +57,7 @@ Three levels, applied in order:
 All service logic uses WordPress Abilities API. Key abilities include:
 - `datamachine/create-flow`, `datamachine/update-flow`, `datamachine/delete-flow`
 - `datamachine/create-pipeline`, `datamachine/update-pipeline`, `datamachine/delete-pipeline`
-- `datamachine/queue-add`, `datamachine/queue-list`, `datamachine/queue-clear`, `datamachine/queue-update`
+- `datamachine/queue-add`, `datamachine/queue-list`, `datamachine/queue-clear`, `datamachine/queue-remove`, `datamachine/queue-update`
 - `datamachine/send-ping`, `datamachine/execute-workflow`
 
 ## CLI Commands
@@ -108,13 +129,10 @@ For `taxonomy_{name}_selection`:
 Notifies external agents/webhooks after pipeline steps:
 
 ### Configuration
-Handler config is stored at **flow level**, not pipeline level:
-```php
-$flow['flow_config']['step_id']['handler_config']['webhook_url'] = 'https://...';
-```
+Configure via the Flow UI: select the Agent Ping step and set the webhook URL in the handler configuration modal. Each flow can have its own webhook destination.
 
 ### Sending Pings
-Use the `datamachine/send-ping` ability or configure via the Flow UI.
+Use the `datamachine/send-ping` ability or trigger via pipeline execution. The step sends pipeline context to configured webhook URLs with support for Discord webhook formatting.
 
 ## Content Quality Guidelines
 
