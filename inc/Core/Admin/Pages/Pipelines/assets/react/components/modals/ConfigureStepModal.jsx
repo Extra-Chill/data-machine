@@ -1,9 +1,8 @@
 /**
  * Configure Step Modal Component
  *
- * Modal for configuring step settings. Supports:
- * - AI steps: provider, model, tools, system prompt
- * - Agent Ping steps: webhook URL, prompt/instructions
+ * Modal for configuring AI step settings: provider, model, tools, system prompt.
+ * Agent Ping configuration is handled at flow level via handler config.
  */
 
 /**
@@ -23,7 +22,6 @@ import { useFormState } from '../../hooks/useFormState';
  */
 import ProviderModelSelector from '@shared/components/ai/ProviderModelSelector';
 import AIToolsSelector from './configure-step/AIToolsSelector';
-import WebhookUrlField from '../shared/WebhookUrlField';
 
 /**
  * AI Step Configuration Content
@@ -96,70 +94,13 @@ function AIStepConfig( {
 }
 
 /**
- * Agent Ping Step Configuration Content
- */
-function AgentPingConfig( { formState } ) {
-	return (
-		<>
-			<div className="datamachine-form-field-wrapper">
-				<WebhookUrlField
-					value={ formState.data.webhookUrl }
-					onChange={ ( value ) =>
-						formState.updateField( 'webhookUrl', value )
-					}
-					label={ __( 'Webhook URL', 'data-machine' ) }
-					placeholder={ __(
-						'https://discord.com/api/webhooks/...',
-						'data-machine'
-					) }
-					help={ __(
-						'URL to POST data to (Discord, Slack, custom endpoint)',
-						'data-machine'
-					) }
-					required
-				/>
-			</div>
-
-			<div className="datamachine-form-field-wrapper">
-				<TextareaControl
-					label={ __( 'Instructions', 'data-machine' ) }
-					value={ formState.data.prompt }
-					onChange={ ( value ) =>
-						formState.updateField( 'prompt', value )
-					}
-					placeholder={ __(
-						'Enter instructions for the receiving agent…',
-						'data-machine'
-					) }
-					rows={ 6 }
-					help={ __(
-						'Optional: Provide instructions or context to send with the webhook payload.',
-						'data-machine'
-					) }
-				/>
-			</div>
-
-			<div className="datamachine-modal-info-box datamachine-modal-info-box--note">
-				<p>
-					<strong>{ __( 'Note:', 'data-machine' ) }</strong>{ ' ' }
-					{ __(
-						'This configuration is shared across all flows using this pipeline. The webhook will receive pipeline context including all data packets from previous steps.',
-						'data-machine'
-					) }
-				</p>
-			</div>
-		</>
-	);
-}
-
-/**
  * Configure Step Modal Component
  *
  * @param {Object}   props                - Component props
  * @param {Function} props.onClose        - Close handler
  * @param {number}   props.pipelineId     - Pipeline ID
  * @param {string}   props.pipelineStepId - Pipeline step ID
- * @param {string}   props.stepType       - Step type ('ai' or 'agent_ping')
+ * @param {string}   props.stepType       - Step type (currently only 'ai' supported)
  * @param {Object}   props.currentConfig  - Current configuration
  * @param {Function} props.onSuccess      - Success callback
  * @return {React.ReactElement|null} Configure step modal
@@ -172,8 +113,6 @@ export default function ConfigureStepModal( {
 	currentConfig,
 	onSuccess,
 } ) {
-	const isAgentPing = stepType === 'agent_ping';
-
 	const [ selectedTools, setSelectedTools ] = useState(
 		currentConfig?.enabled_tools || []
 	);
@@ -187,46 +126,27 @@ export default function ConfigureStepModal( {
 				model: currentConfig?.model,
 				system_prompt: currentConfig?.system_prompt,
 				enabled_tools: currentConfig?.enabled_tools,
-				webhook_url: currentConfig?.webhook_url,
-				prompt: currentConfig?.prompt,
 			} ),
 		[
 			currentConfig?.provider,
 			currentConfig?.model,
 			currentConfig?.system_prompt,
 			currentConfig?.enabled_tools,
-			currentConfig?.webhook_url,
-			currentConfig?.prompt,
 		]
 	);
 
-	// Build initial data based on step type
+	// Build initial data for AI step
 	const initialData = useMemo( () => {
-		if ( isAgentPing ) {
-			return {
-				webhookUrl: currentConfig?.webhook_url || '',
-				prompt: currentConfig?.prompt || '',
-			};
-		}
 		return {
 			provider: currentConfig?.provider || '',
 			model: currentConfig?.model || '',
 			systemPrompt: currentConfig?.system_prompt || '',
 		};
-	}, [ isAgentPing, currentConfig ] );
+	}, [ currentConfig ] );
 
 	const formState = useFormState( {
 		initialData,
 		validate: ( data ) => {
-			if ( isAgentPing ) {
-				// Webhook URL is required - format validation handled by WebhookUrlField
-				if ( ! data.webhookUrl || ! data.webhookUrl.trim() ) {
-					return __( 'Webhook URL is required', 'data-machine' );
-				}
-				return null;
-			}
-
-			// AI step validation
 			if ( ! data.provider ) {
 				return __( 'Please select an AI provider', 'data-machine' );
 			}
@@ -236,29 +156,15 @@ export default function ConfigureStepModal( {
 			return null;
 		},
 		onSubmit: async ( data ) => {
-			let response;
-
-			if ( isAgentPing ) {
-				// Agent Ping configuration
-				response = await updateMutation.mutateAsync( {
-					stepId: pipelineStepId,
-					webhookUrl: data.webhookUrl,
-					prompt: data.prompt,
-					stepType: 'agent_ping',
-					pipelineId,
-				} );
-			} else {
-				// AI step configuration
-				response = await updateMutation.mutateAsync( {
-					stepId: pipelineStepId,
-					prompt: data.systemPrompt,
-					provider: data.provider,
-					model: data.model,
-					enabledTools: selectedTools,
-					stepType,
-					pipelineId,
-				} );
-			}
+			const response = await updateMutation.mutateAsync( {
+				stepId: pipelineStepId,
+				prompt: data.systemPrompt,
+				provider: data.provider,
+				model: data.model,
+				enabledTools: selectedTools,
+				stepType,
+				pipelineId,
+			} );
 
 			if ( response.success ) {
 				onClose();
@@ -271,12 +177,12 @@ export default function ConfigureStepModal( {
 		},
 	} );
 
-	// Use TanStack Query for tools data (AI steps only)
+	// Use TanStack Query for tools data
 	const { data: tools, isLoading: isLoadingTools } = useTools();
 
-	// Pre-populate tools when data loads (AI steps only)
+	// Pre-populate tools when data loads
 	useEffect( () => {
-		if ( isAgentPing || isLoadingTools ) {
+		if ( isLoadingTools ) {
 			return;
 		}
 
@@ -304,26 +210,20 @@ export default function ConfigureStepModal( {
 				.map( ( [ id ] ) => id );
 			setSelectedTools( globalDefaults );
 		}
-	}, [ configKey, tools, isLoadingTools, isAgentPing ] );
+	}, [ configKey, tools, isLoadingTools ] );
 
-	// Determine if defaults should be applied (only for new/unconfigured AI steps)
-	const shouldApplyDefaults = ! isAgentPing && ! currentConfig?.provider;
-
-	// Determine modal title
-	const modalTitle = isAgentPing
-		? __( 'Configure Agent Ping', 'data-machine' )
-		: __( 'Configure AI Step', 'data-machine' );
+	// Determine if defaults should be applied (only for new/unconfigured steps)
+	const shouldApplyDefaults = ! currentConfig?.provider;
 
 	// Determine if save button should be disabled
-	const isSaveDisabled = isAgentPing
-		? formState.isSubmitting || ! formState.data.webhookUrl?.trim()
-		: formState.isSubmitting ||
-		  ! formState.data.provider ||
-		  ! formState.data.model;
+	const isSaveDisabled =
+		formState.isSubmitting ||
+		! formState.data.provider ||
+		! formState.data.model;
 
 	return (
 		<Modal
-			title={ modalTitle }
+			title={ __( 'Configure AI Step', 'data-machine' ) }
 			onRequestClose={ onClose }
 			className="datamachine-configure-step-modal"
 		>
@@ -334,17 +234,13 @@ export default function ConfigureStepModal( {
 					</div>
 				) }
 
-				{ isAgentPing ? (
-					<AgentPingConfig formState={ formState } />
-				) : (
-					<AIStepConfig
-						formState={ formState }
-						selectedTools={ selectedTools }
-						setSelectedTools={ setSelectedTools }
-						isLoadingTools={ isLoadingTools }
-						shouldApplyDefaults={ shouldApplyDefaults }
-					/>
-				) }
+				<AIStepConfig
+					formState={ formState }
+					selectedTools={ selectedTools }
+					setSelectedTools={ setSelectedTools }
+					isLoadingTools={ isLoadingTools }
+					shouldApplyDefaults={ shouldApplyDefaults }
+				/>
 
 				<div className="datamachine-modal-actions">
 					<Button

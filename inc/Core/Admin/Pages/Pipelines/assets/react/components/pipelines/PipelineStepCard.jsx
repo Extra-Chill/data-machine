@@ -12,7 +12,6 @@ import {
 	Card,
 	CardBody,
 	Button,
-	Notice,
 } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 /**
@@ -47,7 +46,6 @@ export default function PipelineStepCard( {
 	const canConfigure = stepTypeInfo.has_pipeline_config === true;
 
 	const isAiStep = step.step_type === 'ai';
-	const isAgentPing = step.step_type === 'agent_ping';
 
 	const stepConfig = pipelineConfig[ step.pipeline_step_id ] || null;
 
@@ -178,51 +176,6 @@ export default function PipelineStepCard( {
 							) }
 							rows={ 6 }
 						/>
-					</div>
-				) }
-
-				{ /* Agent Ping Configuration Display */ }
-				{ isAgentPing && stepConfig && (
-					<div className="datamachine-agent-ping-config-display datamachine-step-card-agent-ping-config">
-						<div className="datamachine-step-card-webhook-label">
-							<strong>
-								{ __( 'Webhook URL:', 'data-machine' ) }
-							</strong>{ ' ' }
-							{ stepConfig.webhook_url ? (
-								<span className="datamachine-webhook-url-display">
-									{ stepConfig.webhook_url }
-								</span>
-							) : (
-								<span className="datamachine-not-configured">
-									{ __( 'Not configured', 'data-machine' ) }
-								</span>
-							) }
-						</div>
-						{ stepConfig.prompt && (
-							<div className="datamachine-step-card-prompt-preview">
-								<strong>
-									{ __( 'Instructions:', 'data-machine' ) }
-								</strong>{ ' ' }
-								<span className="datamachine-prompt-preview-text">
-									{ stepConfig.prompt.length > 100
-										? stepConfig.prompt.substring( 0, 100 ) +
-										  '…'
-										: stepConfig.prompt }
-								</span>
-							</div>
-						) }
-					</div>
-				) }
-
-				{ /* Agent Ping Not Configured Warning */ }
-				{ isAgentPing && ( ! stepConfig || ! stepConfig.webhook_url ) && (
-					<div className="datamachine-step-card-warning">
-						<Notice status="warning" isDismissible={ false }>
-							{ __(
-								'Configure this step to set the webhook URL.',
-								'data-machine'
-							) }
-						</Notice>
 					</div>
 				) }
 

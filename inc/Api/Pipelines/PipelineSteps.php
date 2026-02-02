@@ -168,7 +168,7 @@ class PipelineSteps {
 				'required'          => ! $is_patch,
 				'type'              => 'string',
 				'sanitize_callback' => 'sanitize_text_field',
-				'description'       => __( 'Step type (ai or agent_ping)', 'data-machine' ),
+				'description'       => __( 'Step type (ai)', 'data-machine' ),
 			),
 			'pipeline_id'      => array(
 				'required'          => ! $is_patch,
@@ -204,19 +204,6 @@ class PipelineSteps {
 				'type'              => 'string',
 				'sanitize_callback' => 'sanitize_textarea_field',
 				'description'       => __( 'System prompt for AI processing', 'data-machine' ),
-			),
-			// Agent Ping specific fields
-			'webhook_url'      => array(
-				'required'          => false,
-				'type'              => 'string',
-				'sanitize_callback' => 'sanitize_url',
-				'description'       => __( 'Webhook URL for Agent Ping step', 'data-machine' ),
-			),
-			'prompt'           => array(
-				'required'          => false,
-				'type'              => 'string',
-				'sanitize_callback' => 'sanitize_textarea_field',
-				'description'       => __( 'Instructions/prompt for Agent Ping step', 'data-machine' ),
 			),
 		);
 	}
@@ -479,7 +466,7 @@ class PipelineSteps {
 		}
 
 		// Validate step type supports configuration
-		$configurable_step_types = array( 'ai', 'agent_ping' );
+		$configurable_step_types = array( 'ai' );
 		if ( ! in_array( $step_type, $configurable_step_types, true ) ) {
 			return new \WP_Error(
 				'invalid_step_type',
@@ -500,31 +487,11 @@ class PipelineSteps {
 		$pipeline_config = $pipeline['pipeline_config'] ?? array();
 		$existing_config = $pipeline_config[ $pipeline_step_id ] ?? array();
 
-		// Build step configuration data based on step type
+		// Build step configuration data for AI steps
 		$step_config_data = array();
 		$api_key_saved    = false;
 
-		if ( 'agent_ping' === $step_type ) {
-			// Handle Agent Ping configuration
-			$has_webhook_url = $request->has_param( 'webhook_url' );
-			$has_prompt      = $request->has_param( 'prompt' );
-
-			if ( $has_webhook_url ) {
-				$step_config_data['webhook_url'] = sanitize_url( $request->get_param( 'webhook_url' ) );
-			}
-
-			if ( $has_prompt ) {
-				$step_config_data['prompt'] = sanitize_textarea_field( $request->get_param( 'prompt' ) );
-			}
-
-			if ( empty( $step_config_data ) ) {
-				return new \WP_Error(
-					'no_config_values',
-					__( 'No configuration values were provided.', 'data-machine' ),
-					array( 'status' => 400 )
-				);
-			}
-		} else {
+		{
 			// Handle AI step configuration
 			$has_provider      = $request->has_param( 'provider' );
 			$has_model         = $request->has_param( 'model' );
