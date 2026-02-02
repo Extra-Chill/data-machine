@@ -179,6 +179,11 @@ class PipelineStepAbilities {
 					'properties' => array(
 						'success'          => array( 'type' => 'boolean' ),
 						'pipeline_step_id' => array( 'type' => 'string' ),
+						'pipeline_id'      => array( 'type' => 'integer' ),
+						'updated_fields'   => array(
+							'type'  => 'array',
+							'items' => array( 'type' => 'string' ),
+						),
 						'message'          => array( 'type' => 'string' ),
 						'error'            => array( 'type' => 'string' ),
 					),
@@ -593,6 +598,8 @@ class PipelineStepAbilities {
 		return array(
 			'success'          => true,
 			'pipeline_step_id' => $pipeline_step_id,
+			'pipeline_id'      => $pipeline_id,
+			'updated_fields'   => $updated_fields,
 			'message'          => 'Pipeline step configuration updated successfully. Fields updated: ' . implode( ', ', $updated_fields ),
 		);
 	}
