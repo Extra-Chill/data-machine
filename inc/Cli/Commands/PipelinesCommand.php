@@ -415,30 +415,100 @@ class PipelinesCommand extends BaseCommand {
 			return;
 		}
 
-		$input = array( 'pipeline_id' => $pipeline_id );
+		$has_name   = isset( $assoc_args['name'] );
+		$has_config = isset( $assoc_args['config'] );
 
-		if ( isset( $assoc_args['name'] ) ) {
-			$input['pipeline_name'] = $assoc_args['name'];
-		}
-
-		if ( ! isset( $input['pipeline_name'] ) ) {
-			WP_CLI::error( 'Must provide --name to update' );
+		if ( ! $has_name && ! $has_config ) {
+			WP_CLI::error( 'Must provide --name and/or --config to update' );
 			return;
 		}
 
-		$ability = new \DataMachine\Abilities\PipelineAbilities();
-		$result  = $ability->executeUpdatePipeline( $input );
+		$updated = array();
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] ?? 'Failed to update pipeline' );
-			return;
+		// Update name if provided.
+		if ( $has_name ) {
+			$ability = new \DataMachine\Abilities\PipelineAbilities();
+			$result  = $ability->executeUpdatePipeline(
+				array(
+					'pipeline_id'   => $pipeline_id,
+					'pipeline_name' => $assoc_args['name'],
+				)
+			);
+
+			if ( ! $result['success'] ) {
+				WP_CLI::error( $result['error'] ?? 'Failed to update pipeline name' );
+				return;
+			}
+
+			$updated[] = 'name';
+			WP_CLI::log( sprintf( 'Name: %s', $result['pipeline_name'] ) );
 		}
 
-		WP_CLI::success( sprintf( 'Pipeline %d updated.', $result['pipeline_id'] ) );
-		WP_CLI::log( sprintf( 'Name: %s', $result['pipeline_name'] ) );
+		// Update step configs if --config provided.
+		if ( $has_config ) {
+			$config_json = $assoc_args['config'];
+			$config      = json_decode( $config_json, true );
+
+			if ( json_last_error() !== JSON_ERROR_NONE ) {
+				WP_CLI::error( 'Invalid JSON in --config: ' . json_last_error_msg() );
+				return;
+			}
+
+			$step_ability = new \DataMachine\Abilities\PipelineStepAbilities();
+
+			foreach ( $config as $step_id => $step_config ) {
+				// Skip if not a valid step config array.
+				if ( ! is_array( $step_config ) ) {
+					WP_CLI::warning( "Skipping invalid config for key: {$step_id}" );
+					continue;
+				}
+
+				// Build input for step update.
+				$step_input = array(
+					'pipeline_id'      => $pipeline_id,
+					'pipeline_step_id' => $step_id,
+				);
+
+				// Map known step config fields.
+				$field_map = array(
+					'system_prompt' => 'system_prompt',
+					'provider'      => 'provider',
+					'model'         => 'model',
+					'enabled_tools' => 'enabled_tools',
+				);
+
+				$has_update = false;
+				foreach ( $field_map as $config_key => $input_key ) {
+					if ( isset( $step_config[ $config_key ] ) ) {
+						$step_input[ $input_key ] = $step_config[ $config_key ];
+						$has_update               = true;
+					}
+				}
+
+				if ( ! $has_update ) {
+					continue;
+				}
+
+				$step_result = $step_ability->executeUpdatePipelineStep( $step_input );
+
+				if ( ! $step_result['success'] ) {
+					WP_CLI::warning( "Failed to update step {$step_id}: " . ( $step_result['error'] ?? 'Unknown error' ) );
+				} else {
+					$fields = implode( ', ', $step_result['updated_fields'] ?? array() );
+					WP_CLI::log( sprintf( 'Updated step %s: %s', $step_id, $fields ) );
+					$updated[] = "step:{$step_id}";
+				}
+			}
+		}
+
+		if ( empty( $updated ) ) {
+			WP_CLI::warning( 'No changes were made' );
+		} else {
+			WP_CLI::success( sprintf( 'Pipeline %d updated.', $pipeline_id ) );
+		}
 
 		if ( 'json' === $format ) {
-			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			WP_CLI::line( wp_json_encode( array( 'updated' => $updated ), JSON_PRETTY_PRINT ) );
 		}
 	}
 
