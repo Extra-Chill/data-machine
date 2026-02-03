@@ -2,6 +2,19 @@
 
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
+## [0.20.0] - 2026-02-03
+
+### Added
+- centralize term resolution with datamachine/resolve-term ability
+- system agent alt text generation with scheduled processing
+- flows delete and flows update CLI subcommands
+- auto-apply site handler defaults to unconfigured flow steps
+
+### Fixed
+- site-wide handler defaults not applied in handler details API endpoint
+- alt-text scheduling gated on provider/model config
+- taxonomy resolution null guard and Abilities API alignment
+
 ## [0.19.16] - 2026-02-03
 
 ### Added
