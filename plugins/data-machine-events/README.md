@@ -2,8 +2,6 @@
 
 Frontend-focused WordPress events plugin with a **block-first architecture** that ties Event Details data storage to Calendar block progressive enhancement and REST API-driven filtering.
 
-**Version**: 0.9.1
-
 ## Architecture Overview
 
 - **Blocks First**: `inc/Blocks/EventDetails` captures authoritative event data while `inc/Blocks/Calendar` renders Carousel List views informed by `_datamachine_event_datetime` post meta and REST responses.
