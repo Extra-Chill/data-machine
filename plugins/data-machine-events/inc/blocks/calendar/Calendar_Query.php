@@ -280,7 +280,11 @@ class Calendar_Query {
 			$date_obj = date_create( $end_datetime );
 			if ( $date_obj ) {
 				$event_data['endDate'] = $date_obj->format( 'Y-m-d' );
-				$event_data['endTime'] = $date_obj->format( 'H:i:s' );
+				$end_time_from_meta    = $date_obj->format( 'H:i:s' );
+				// Only set if not the sentinel value (23:59:59 means "no end time provided")
+				if ( '23:59:59' !== $end_time_from_meta ) {
+					$event_data['endTime'] = $end_time_from_meta;
+				}
 			}
 		}
 	}
@@ -655,7 +659,7 @@ class Calendar_Query {
 	private static function format_time_range( DateTime $start_datetime_obj, string $end_date, string $end_time, \DateTimeZone $event_tz ): string {
 		$start_formatted_full = $start_datetime_obj->format( 'g:i A' );
 
-		if ( empty( $end_date ) || empty( $end_time ) ) {
+		if ( empty( $end_date ) || empty( $end_time ) || self::isSentinelEndTime( $end_time ) ) {
 			return $start_formatted_full;
 		}
 
@@ -677,6 +681,20 @@ class Calendar_Query {
 
 		$end_formatted_full = $end_datetime_obj->format( 'g:i A' );
 		return $start_formatted_full . ' - ' . $end_formatted_full;
+	}
+
+	/**
+	 * Check if end time is the sentinel value used for SQL date range queries.
+	 *
+	 * When events have endDate but no endTime, meta-storage.php stores 23:59:59
+	 * to ensure proper date range filtering. This should not display to users.
+	 *
+	 * @param string $time Time string in HH:MM or HH:MM:SS format
+	 * @return bool True if time is the 23:59 sentinel value
+	 */
+	private static function isSentinelEndTime( string $time ): bool {
+		$normalized = substr( $time, 0, 5 );
+		return '23:59' === $normalized;
 	}
 
 	/**
