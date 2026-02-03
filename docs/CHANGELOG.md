@@ -2,7 +2,7 @@
 
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
-## Unreleased
+## [0.19.13] - 2026-02-03
 
 ### Changed
 - Clarify Agent Ping outbound-only loop patterns and REST triggers in docs
