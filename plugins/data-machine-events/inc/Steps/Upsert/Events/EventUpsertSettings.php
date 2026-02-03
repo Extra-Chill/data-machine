@@ -49,6 +49,7 @@ class EventUpsertSettings {
 					'pending' => __( 'Pending Review', 'datamachine-events' ),
 					'private' => __( 'Private', 'datamachine-events' ),
 				),
+				'default'     => 'draft',
 			),
 			'include_images' => array(
 				'type'        => 'checkbox',
@@ -61,6 +62,7 @@ class EventUpsertSettings {
 				'label'       => __( 'Post Author', 'datamachine-events' ),
 				'description' => __( 'Select which WordPress user to publish events under.', 'datamachine-events' ),
 				'options'     => $user_options,
+				'default'     => ! empty( $user_options ) ? array_key_first( $user_options ) : null,
 			),
 		);
 
