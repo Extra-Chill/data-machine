@@ -27,6 +27,7 @@ class ToolExecutor {
 	 */
 	public static function getAvailableTools( ?array $previous_step_config = null, ?array $next_step_config = null, ?string $current_pipeline_step_id = null, array $engine_data = array() ): array {
 		$available_tools = array();
+		$tool_manager    = new ToolManager();
 
 		if ( $previous_step_config ) {
 			$prev_handler_slug   = $previous_step_config['handler_slug'] ?? null;
@@ -34,7 +35,8 @@ class ToolExecutor {
 
 			if ( $prev_handler_slug ) {
 				$prev_tools         = apply_filters( 'chubes_ai_tools', array(), $prev_handler_slug, $prev_handler_config, $engine_data );
-				$allowed_prev_tools = self::getAllowedTools( $prev_tools, $prev_handler_slug, $current_pipeline_step_id );
+				$prev_tools         = self::resolveTools( $prev_tools );
+				$allowed_prev_tools = self::getAllowedTools( $prev_tools, $prev_handler_slug, $current_pipeline_step_id, $tool_manager );
 				$available_tools    = array_merge( $available_tools, $allowed_prev_tools );
 			}
 		}
@@ -45,32 +47,60 @@ class ToolExecutor {
 
 			if ( $next_handler_slug ) {
 				$next_tools         = apply_filters( 'chubes_ai_tools', array(), $next_handler_slug, $next_handler_config, $engine_data );
-				$allowed_next_tools = self::getAllowedTools( $next_tools, $next_handler_slug, $current_pipeline_step_id );
+				$next_tools         = self::resolveTools( $next_tools );
+				$allowed_next_tools = self::getAllowedTools( $next_tools, $next_handler_slug, $current_pipeline_step_id, $tool_manager );
 				$available_tools    = array_merge( $available_tools, $allowed_next_tools );
 			}
 		}
 
-		// Load global tools (available to all AI agents)
-		$global_tools         = apply_filters( 'datamachine_global_tools', array() );
-		$allowed_global_tools = self::getAllowedTools( $global_tools, null, $current_pipeline_step_id );
+		// Load global tools (available to all AI agents) - use ToolManager which resolves callables
+		$global_tools         = $tool_manager->get_global_tools();
+		$allowed_global_tools = self::getAllowedTools( $global_tools, null, $current_pipeline_step_id, $tool_manager );
 		$available_tools      = array_merge( $available_tools, $allowed_global_tools );
 
 		return array_unique( $available_tools, SORT_REGULAR );
 	}
 
 	/**
+	 * Resolve tool definitions from callables to arrays.
+	 *
+	 * Tool definitions may be registered as callables for lazy evaluation
+	 * (e.g., to defer translations until after init). This method invokes
+	 * callables and returns the resolved array definitions.
+	 *
+	 * @param array $tools Raw tools array (may contain callables)
+	 * @return array Resolved tools array with all definitions as arrays
+	 */
+	private static function resolveTools( array $tools ): array {
+		$resolved = array();
+		foreach ( $tools as $tool_id => $definition ) {
+			if ( is_callable( $definition ) ) {
+				$resolved[ $tool_id ] = $definition();
+			} else {
+				$resolved[ $tool_id ] = is_array( $definition ) ? $definition : array();
+			}
+		}
+		return $resolved;
+	}
+
+	/**
 	 * Get allowed tools based on enablement and configuration.
 	 *
-	 * @param array       $all_tools All available tools
+	 * @param array       $all_tools All available tools (must be resolved, not callables)
 	 * @param string|null $handler_slug Handler slug for filtering
 	 * @param string|null $pipeline_step_id Pipeline step ID (pipeline only, null for chat)
+	 * @param ToolManager $tool_manager Tool manager instance for availability checks
 	 * @return array Filtered allowed tools
 	 */
-	private static function getAllowedTools( array $all_tools, ?string $handler_slug, ?string $pipeline_step_id = null ): array {
+	private static function getAllowedTools( array $all_tools, ?string $handler_slug, ?string $pipeline_step_id, ToolManager $tool_manager ): array {
 		$allowed_tools = array();
-		$tool_manager  = new ToolManager();
 
 		foreach ( $all_tools as $tool_name => $tool_config ) {
+			// Skip if not a valid array definition
+			if ( ! is_array( $tool_config ) ) {
+				continue;
+			}
+
 			if ( isset( $tool_config['handler'] ) ) {
 				if ( $tool_config['handler'] === $handler_slug ) {
 					$allowed_tools[ $tool_name ] = $tool_config;
@@ -125,6 +155,15 @@ class ToolExecutor {
 			$payload,
 			$tool_def
 		);
+
+		// Ensure tool definition has required 'class' key
+		if ( ! isset( $tool_def['class'] ) || empty( $tool_def['class'] ) ) {
+			return array(
+				'success'   => false,
+				'error'     => "Tool '{$tool_name}' is missing required 'class' definition. This may indicate the tool was not properly resolved from a callable.",
+				'tool_name' => $tool_name,
+			);
+		}
 
 		$class_name = $tool_def['class'];
 		if ( ! class_exists( $class_name ) ) {
