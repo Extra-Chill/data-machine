@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.12.3] - 2026-02-03
+
+### Fixed
+- Fix 11:59 PM sentinel end time leaking into calendar display
+
 ## [0.12.2] - 2026-01-31
 
 ### Changed
