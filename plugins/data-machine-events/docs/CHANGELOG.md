@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## Unreleased
+
+### Fixed
+- Fix DuskFmExtractor timezone handling - treat times as local, not UTC
+
 ## [0.12.4] - 2026-02-03
 
 ### Added

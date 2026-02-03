@@ -216,19 +216,27 @@ class DuskFmExtractor extends BaseExtractor {
 		$schedule = $event['eventSchedule'] ?? array();
 		$timezone = $schedule['scheduleTimezone'] ?? ( $venue_data['timezone'] ?? '' );
 
+		// Dusk.fm returns times with "Z" suffix claiming UTC, but they're actually
+		// local times in scheduleTimezone. Strip the fake "Z" and parse as local.
 		if ( ! empty( $event['startDate'] ) ) {
-			$parsed     = $this->parseUtcDatetime( $event['startDate'], $timezone );
-			$start_date = $parsed['date'];
-			$start_time = $parsed['time'];
+			$datetime_str = rtrim( $event['startDate'], 'Z' );
+			$date_part    = substr( $datetime_str, 0, 10 );
+			$time_part    = substr( $datetime_str, 11, 5 );
+			$parsed       = $this->parseLocalDatetime( $date_part, $time_part, $timezone );
+			$start_date   = $parsed['date'];
+			$start_time   = $parsed['time'];
 			if ( ! empty( $parsed['timezone'] ) ) {
 				$timezone = $parsed['timezone'];
 			}
 		}
 
 		if ( ! empty( $event['endDate'] ) ) {
-			$parsed   = $this->parseUtcDatetime( $event['endDate'], $timezone );
-			$end_date = $parsed['date'];
-			$end_time = $parsed['time'];
+			$datetime_str = rtrim( $event['endDate'], 'Z' );
+			$date_part    = substr( $datetime_str, 0, 10 );
+			$time_part    = substr( $datetime_str, 11, 5 );
+			$parsed       = $this->parseLocalDatetime( $date_part, $time_part, $timezone );
+			$end_date     = $parsed['date'];
+			$end_time     = $parsed['time'];
 		}
 
 		$price  = '';
