@@ -97,7 +97,7 @@ class UniversalWebScraperTestCommand {
 			\WP_CLI::log( 'Start Time: ' . ( $event_data['startTime'] ?? '' ) );
 			\WP_CLI::log( 'End Date: ' . ( $event_data['endDate'] ?? '' ) );
 			\WP_CLI::log( 'End Time: ' . ( $event_data['endTime'] ?? '' ) );
-			\WP_CLI::log( 'Timezone: ' . ( $event_data['venueTimezone'] ?? '' ) );
+			\WP_CLI::log( 'Timezone: ' . ( $event_data['timezone'] ?? '' ) );
 			\WP_CLI::log( 'Venue: ' . ( $event_data['venue'] ?? '' ) );
 			\WP_CLI::log( 'Venue address: ' . ( $event_data['venueAddress'] ?? '' ) );
 			\WP_CLI::log( 'Ticket URL: ' . ( $event_data['ticketUrl'] ?? '' ) );

@@ -15,21 +15,22 @@
  * 7. DoStuff Media API (Waterloo Records, Do512)
  * 8. Squarespace context (Static.SQUARESPACE_CONTEXT)
  * 9. Craftpeak/Arryved (craft brewery CMS with Label theme)
- * 10. SpotHopper API (spothopperapp.com)
- * 11. Gigwell booking platform (gigwell-gigstream)
- * 12. Bandzoogle calendar
- * 13. GoDaddy website builder
- * 14. Timely Event Discovery (FullCalendar.js)
- * 15. Elfsight Events Calendar (shy.elfsight.com API)
- * 16. Schema.org JSON-LD
- * 17. WordPress (Tribe Events, WP REST)
- * 18. Prekindle ticketing
- * 19. Wix Events JSON (wix-warmup-data)
- * 20. RHP Events WordPress plugin HTML
- * 21. OpenDate.io JSON
- * 22. Schema.org microdata
- * 23. AI-enhanced HTML pattern matching (Fallback)
- * 24. AI Vision flyer extraction (Final Fallback)
+ * 10. Dusk.fm/BeatGig venue calendar (data-beatgig-embed → __NEXT_DATA__)
+ * 11. SpotHopper API (spothopperapp.com)
+ * 12. Gigwell booking platform (gigwell-gigstream)
+ * 13. Bandzoogle calendar
+ * 14. GoDaddy website builder
+ * 15. Timely Event Discovery (FullCalendar.js)
+ * 16. Elfsight Events Calendar (shy.elfsight.com API)
+ * 17. Schema.org JSON-LD
+ * 18. WordPress (Tribe Events, WP REST)
+ * 19. Prekindle ticketing
+ * 20. Wix Events JSON (wix-warmup-data)
+ * 21. RHP Events WordPress plugin HTML
+ * 22. OpenDate.io JSON
+ * 23. Schema.org microdata
+ * 24. AI-enhanced HTML pattern matching (Fallback)
+ * 25. AI Vision flyer extraction (Final Fallback)
  *     - Square Online (__BOOTSTRAP_STATE__ JSON images)
  *     - Standard HTML <img> tag detection
  *
@@ -62,6 +63,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\ElfsightE
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\GigwellExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\MusicItemExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\CraftpeakExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\DuskFmExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\IcsExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\DoStuffExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\VisionExtractor;
@@ -129,6 +131,7 @@ class UniversalWebScraper extends EventImportHandler {
 			new EmbeddedCalendarExtractor(),
 			new SquarespaceExtractor(),
 			new CraftpeakExtractor(),
+			new DuskFmExtractor(),
 			new SpotHopperExtractor(),
 			new GigwellExtractor(),
 			new DoStuffExtractor(),

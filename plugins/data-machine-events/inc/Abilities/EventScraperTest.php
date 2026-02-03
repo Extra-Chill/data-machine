@@ -231,7 +231,7 @@ class EventScraperTest {
 			'startTime'     => (string) ( $event['startTime'] ?? '' ),
 			'endDate'       => (string) ( $event['endDate'] ?? '' ),
 			'endTime'       => (string) ( $event['endTime'] ?? '' ),
-			'venueTimezone' => (string) ( $event['venueTimezone'] ?? '' ),
+			'timezone'      => (string) ( $event['timezone'] ?? $event['venueTimezone'] ?? '' ),
 			'ticketUrl'     => (string) ( $event['ticketUrl'] ?? '' ),
 		);
 

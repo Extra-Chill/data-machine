@@ -2,6 +2,17 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## Unreleased
+
+### Added
+- Add DuskFmExtractor for Dusk.fm/BeatGig venue calendars with embedded script detection
+
+### Changed
+- Internal improvements
+
+### Fixed
+- Fix timezone field not displaying in scraper test output
+
 ## [0.12.3] - 2026-02-03
 
 ### Fixed
