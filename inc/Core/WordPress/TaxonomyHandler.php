@@ -385,23 +385,52 @@ class TaxonomyHandler {
 		return $term_ids;
 	}
 
-	private function findOrCreateTerm( string $term_name, string $taxonomy_name ) {
-		$term = get_term_by( 'name', $term_name, $taxonomy_name );
+	/**
+	 * Find existing term or create new one.
+	 *
+	 * Searches for existing terms by:
+	 * 1. Term ID (if numeric)
+	 * 2. Term name (exact match)
+	 * 3. Term slug (exact match)
+	 *
+	 * Only creates a new term if no existing term is found.
+	 *
+	 * @param string $term_identifier Term name, slug, or ID
+	 * @param string $taxonomy_name   Taxonomy name
+	 * @return int|false Term ID on success, false on failure
+	 */
+	private function findOrCreateTerm( string $term_identifier, string $taxonomy_name ) {
+		// 1. Check if it's a numeric term ID
+		if ( is_numeric( $term_identifier ) ) {
+			$term = get_term( absint( $term_identifier ), $taxonomy_name );
+			if ( $term && ! is_wp_error( $term ) ) {
+				return $term->term_id;
+			}
+		}
 
+		// 2. Try by name (exact match)
+		$term = get_term_by( 'name', $term_identifier, $taxonomy_name );
 		if ( $term ) {
 			return $term->term_id;
 		}
 
-		$term_result = wp_insert_term( $term_name, $taxonomy_name );
+		// 3. Try by slug (handles cases where AI provides slug instead of name)
+		$term = get_term_by( 'slug', $term_identifier, $taxonomy_name );
+		if ( $term ) {
+			return $term->term_id;
+		}
+
+		// 4. No existing term found - create new one
+		$term_result = wp_insert_term( $term_identifier, $taxonomy_name );
 		if ( is_wp_error( $term_result ) ) {
 			do_action(
 				'datamachine_log',
 				'warning',
 				'Failed to create taxonomy term',
 				array(
-					'taxonomy'  => $taxonomy_name,
-					'term_name' => $term_name,
-					'error'     => $term_result->get_error_message(),
+					'taxonomy'        => $taxonomy_name,
+					'term_identifier' => $term_identifier,
+					'error'           => $term_result->get_error_message(),
 				)
 			);
 			return false;
