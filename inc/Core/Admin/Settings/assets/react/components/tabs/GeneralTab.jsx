@@ -22,6 +22,7 @@ const GeneralTab = () => {
 		file_retention_days: 7,
 		chat_retention_days: 90,
 		chat_ai_titles_enabled: true,
+		alt_text_auto_generate_enabled: true,
 		flows_per_page: 20,
 		jobs_per_page: 50,
 	} );
@@ -37,6 +38,8 @@ const GeneralTab = () => {
 				chat_retention_days: data.settings.chat_retention_days ?? 90,
 				chat_ai_titles_enabled:
 					data.settings.chat_ai_titles_enabled ?? true,
+				alt_text_auto_generate_enabled:
+					data.settings.alt_text_auto_generate_enabled ?? true,
 				flows_per_page: data.settings.flows_per_page ?? 20,
 				jobs_per_page: data.settings.jobs_per_page ?? 50,
 			} );
@@ -77,6 +80,14 @@ const GeneralTab = () => {
 		setFormState( ( prev ) => ( {
 			...prev,
 			chat_ai_titles_enabled: enabled,
+		} ) );
+		setHasChanges( true );
+	};
+
+	const handleAltTextAutoGenerateToggle = ( enabled ) => {
+		setFormState( ( prev ) => ( {
+			...prev,
+			alt_text_auto_generate_enabled: enabled,
 		} ) );
 		setHasChanges( true );
 	};
@@ -242,6 +253,31 @@ const GeneralTab = () => {
 									Disable to reduce API costs. Titles will use
 									the first message instead.
 								</p>
+							</fieldset>
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row">Auto-generate image alt text</th>
+						<td>
+							<fieldset>
+								<label htmlFor="alt_text_auto_generate_enabled">
+									<input
+										type="checkbox"
+										id="alt_text_auto_generate_enabled"
+										checked={
+											formState.alt_text_auto_generate_enabled
+										}
+										onChange={ ( e ) =>
+											handleAltTextAutoGenerateToggle(
+												e.target.checked
+											)
+										}
+									/>
+									Automatically generate AI-powered alt text when
+									images are uploaded. Disable to reduce API costs
+									or for manual control.
+								</label>
 							</fieldset>
 						</td>
 					</tr>

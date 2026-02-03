@@ -91,11 +91,12 @@ class SettingsAbilities {
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
-						'cleanup_job_data_on_failure' => array( 'type' => 'boolean' ),
-						'file_retention_days'         => array( 'type' => 'integer' ),
-						'chat_retention_days'         => array( 'type' => 'integer' ),
-						'chat_ai_titles_enabled'      => array( 'type' => 'boolean' ),
-						'problem_flow_threshold'      => array( 'type' => 'integer' ),
+						'cleanup_job_data_on_failure'     => array( 'type' => 'boolean' ),
+						'file_retention_days'             => array( 'type' => 'integer' ),
+						'chat_retention_days'             => array( 'type' => 'integer' ),
+						'chat_ai_titles_enabled'          => array( 'type' => 'boolean' ),
+						'alt_text_auto_generate_enabled'  => array( 'type' => 'boolean' ),
+						'problem_flow_threshold'          => array( 'type' => 'integer' ),
 						'flows_per_page'              => array( 'type' => 'integer' ),
 						'jobs_per_page'               => array( 'type' => 'integer' ),
 						'global_system_prompt'        => array( 'type' => 'string' ),
@@ -327,11 +328,12 @@ class SettingsAbilities {
 		return array(
 			'success'      => true,
 			'settings'     => array(
-				'cleanup_job_data_on_failure' => $settings['cleanup_job_data_on_failure'] ?? true,
-				'file_retention_days'         => $settings['file_retention_days'] ?? 7,
-				'chat_retention_days'         => $settings['chat_retention_days'] ?? 90,
-				'chat_ai_titles_enabled'      => $settings['chat_ai_titles_enabled'] ?? true,
-				'problem_flow_threshold'      => $settings['problem_flow_threshold'] ?? 3,
+				'cleanup_job_data_on_failure'    => $settings['cleanup_job_data_on_failure'] ?? true,
+				'file_retention_days'            => $settings['file_retention_days'] ?? 7,
+				'chat_retention_days'            => $settings['chat_retention_days'] ?? 90,
+				'chat_ai_titles_enabled'         => $settings['chat_ai_titles_enabled'] ?? true,
+				'alt_text_auto_generate_enabled' => $settings['alt_text_auto_generate_enabled'] ?? true,
+				'problem_flow_threshold'         => $settings['problem_flow_threshold'] ?? 3,
 				'flows_per_page'              => $settings['flows_per_page'] ?? 20,
 				'jobs_per_page'               => $settings['jobs_per_page'] ?? 50,
 				'global_system_prompt'        => $settings['global_system_prompt'] ?? '',
@@ -365,6 +367,10 @@ class SettingsAbilities {
 
 		if ( isset( $input['chat_ai_titles_enabled'] ) ) {
 			$all_settings['chat_ai_titles_enabled'] = (bool) $input['chat_ai_titles_enabled'];
+		}
+
+		if ( isset( $input['alt_text_auto_generate_enabled'] ) ) {
+			$all_settings['alt_text_auto_generate_enabled'] = (bool) $input['alt_text_auto_generate_enabled'];
 		}
 
 		if ( isset( $input['problem_flow_threshold'] ) ) {

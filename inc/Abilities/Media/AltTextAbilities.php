@@ -507,6 +507,12 @@ class AltTextAbilities {
 			return;
 		}
 
+		// Check if auto-generation is enabled (defaults to true, like chat_ai_titles_enabled).
+		$auto_generate_enabled = PluginSettings::get( 'alt_text_auto_generate_enabled', true );
+		if ( ! $auto_generate_enabled ) {
+			return;
+		}
+
 		// Skip scheduling if no provider/model configured - avoid queuing actions that will no-op.
 		$provider = PluginSettings::get( 'default_provider', '' );
 		$model    = PluginSettings::get( 'default_model', '' );

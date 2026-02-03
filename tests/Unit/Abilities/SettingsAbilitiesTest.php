@@ -91,6 +91,7 @@ class SettingsAbilitiesTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'file_retention_days', $settings );
 		$this->assertArrayHasKey( 'chat_retention_days', $settings );
 		$this->assertArrayHasKey( 'chat_ai_titles_enabled', $settings );
+		$this->assertArrayHasKey( 'alt_text_auto_generate_enabled', $settings );
 		$this->assertArrayHasKey( 'problem_flow_threshold', $settings );
 		$this->assertArrayHasKey( 'flows_per_page', $settings );
 		$this->assertArrayHasKey( 'jobs_per_page', $settings );
@@ -113,6 +114,27 @@ class SettingsAbilitiesTest extends WP_UnitTestCase {
 
 		$updated_settings = get_option( 'datamachine_settings', array() );
 		$this->assertFalse( $updated_settings['cleanup_job_data_on_failure'] );
+	}
+
+	public function test_update_settings_updates_alt_text_auto_generate_enabled(): void {
+		$result = $this->settings_abilities->executeUpdateSettings(
+			array( 'alt_text_auto_generate_enabled' => false )
+		);
+
+		$this->assertTrue( $result['success'] );
+
+		$updated_settings = get_option( 'datamachine_settings', array() );
+		$this->assertFalse( $updated_settings['alt_text_auto_generate_enabled'] );
+
+		// Re-enable and verify.
+		$result = $this->settings_abilities->executeUpdateSettings(
+			array( 'alt_text_auto_generate_enabled' => true )
+		);
+
+		$this->assertTrue( $result['success'] );
+
+		$updated_settings = get_option( 'datamachine_settings', array() );
+		$this->assertTrue( $updated_settings['alt_text_auto_generate_enabled'] );
 	}
 
 	public function test_update_settings_updates_integer_setting(): void {
