@@ -2,11 +2,19 @@
 
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
+## [0.19.14] - 2026-02-03
+
+### Fixed
+- normalize shorthand flow scheduling intervals before validation
+
 ## [0.19.13] - 2026-02-03
 
 ### Changed
 - Clarify Agent Ping outbound-only loop patterns and REST triggers in docs
 - Align cache management and direct execution sentinel docs; drop stale cache endpoint example
+
+### Fixed
+- normalize shorthand flow scheduling intervals before validation
 
 ## [0.19.12] - 2026-02-02
 
