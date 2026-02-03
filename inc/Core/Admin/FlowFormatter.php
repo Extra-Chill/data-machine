@@ -107,6 +107,6 @@ class FlowFormatter {
 
 		$next_timestamp = as_next_scheduled_action( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
 
-		return $next_timestamp ? wp_date( 'Y-m-d H:i:s', $next_timestamp ) : null;
+		return $next_timestamp ? wp_date( 'Y-m-d H:i:s', $next_timestamp, new \DateTimeZone( 'UTC' ) ) : null;
 	}
 }
