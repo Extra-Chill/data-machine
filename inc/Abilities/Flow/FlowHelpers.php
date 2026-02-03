@@ -12,6 +12,7 @@
 namespace DataMachine\Abilities\Flow;
 
 use DataMachine\Abilities\FlowStepAbilities;
+use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Core\Admin\FlowFormatter;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Jobs\Jobs;
@@ -78,7 +79,7 @@ trait FlowHelpers {
 				'pipeline_id'      => $pipeline_id,
 				'flow_id'          => $flow_id,
 				'execution_order'  => $step['execution_order'] ?? 0,
-				'disabled_tools'    => $disabled_tools,
+				'disabled_tools'   => $disabled_tools,
 				'handler'          => null,
 				'prompt_queue'     => array(),
 				'queue_enabled'    => false,
@@ -474,6 +475,90 @@ trait FlowHelpers {
 		return array(
 			'applied' => $applied,
 			'errors'  => $errors,
+		);
+	}
+
+	/**
+	 * Apply site handler defaults to unconfigured flow steps.
+	 *
+	 * For each step without a handler_slug, looks up handlers for that step_type
+	 * and applies site defaults from the first handler that has them configured.
+	 *
+	 * @param int   $flow_id Flow ID.
+	 * @param array $configured_step_types Step types that were explicitly configured.
+	 * @return array{applied: array, skipped: array}
+	 */
+	protected function applySiteDefaultsToUnconfiguredSteps( int $flow_id, array $configured_step_types ): array {
+		$applied = array();
+		$skipped = array();
+
+		$flow        = $this->db_flows->get_flow( $flow_id );
+		$flow_config = $flow['flow_config'] ?? array();
+
+		$handler_abilities = new HandlerAbilities();
+		$site_defaults     = $handler_abilities->getSiteDefaults();
+
+		if ( empty( $site_defaults ) ) {
+			return array(
+				'applied' => $applied,
+				'skipped' => array_keys( $flow_config ),
+			);
+		}
+
+		$flow_step_abilities = new FlowStepAbilities();
+
+		foreach ( $flow_config as $flow_step_id => $step_data ) {
+			$step_type = $step_data['step_type'] ?? '';
+
+			if ( in_array( $step_type, $configured_step_types, true ) ) {
+				continue;
+			}
+
+			if ( ! empty( $step_data['handler_slug'] ) ) {
+				continue;
+			}
+
+			$handlers = $handler_abilities->getAllHandlers( $step_type );
+
+			if ( empty( $handlers ) ) {
+				$skipped[] = $flow_step_id;
+				continue;
+			}
+
+			$default_handler_slug   = null;
+			$default_handler_config = array();
+
+			foreach ( $handlers as $handler_slug => $handler_def ) {
+				if ( isset( $site_defaults[ $handler_slug ] ) && ! empty( $site_defaults[ $handler_slug ] ) ) {
+					$default_handler_slug   = $handler_slug;
+					$default_handler_config = $site_defaults[ $handler_slug ];
+					break;
+				}
+			}
+
+			if ( ! $default_handler_slug ) {
+				$skipped[] = $flow_step_id;
+				continue;
+			}
+
+			$result = $flow_step_abilities->executeUpdateFlowStep(
+				array(
+					'flow_step_id'   => $flow_step_id,
+					'handler_slug'   => $default_handler_slug,
+					'handler_config' => $default_handler_config,
+				)
+			);
+
+			if ( $result['success'] ) {
+				$applied[] = $flow_step_id;
+			} else {
+				$skipped[] = $flow_step_id;
+			}
+		}
+
+		return array(
+			'applied' => $applied,
+			'skipped' => $skipped,
 		);
 	}
 }

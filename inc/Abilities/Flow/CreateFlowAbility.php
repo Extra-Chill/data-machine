@@ -222,6 +222,13 @@ class CreateFlowAbility {
 			$config_results = $this->applyStepConfigsToFlow( $flow_id, $step_configs );
 		}
 
+		$configured_step_types = array_keys( $step_configs );
+		$defaults_results      = $this->applySiteDefaultsToUnconfiguredSteps( $flow_id, $configured_step_types );
+
+		if ( ! empty( $defaults_results['applied'] ) ) {
+			$config_results['applied'] = array_merge( $config_results['applied'], $defaults_results['applied'] );
+		}
+
 		$flow = $this->db_flows->get_flow( $flow_id );
 
 		do_action(
