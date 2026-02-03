@@ -2,7 +2,7 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
-## Unreleased
+## [0.12.4] - 2026-02-03
 
 ### Added
 - Add DuskFmExtractor for Dusk.fm/BeatGig venue calendars with embedded script detection
