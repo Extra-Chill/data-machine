@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.12.6] - 2026-02-03
+
+### Fixed
+- instruct AI to parse times from event title/description
+
 ## [0.12.5] - 2026-02-03
 
 ### Fixed
