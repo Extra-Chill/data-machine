@@ -77,13 +77,13 @@ class EventSchemaProvider {
 		'startTime'       => array(
 			'type'            => 'string',
 			'required'        => false,
-			'description'     => 'Event start time (HH:MM 24-hour format)',
+			'description'     => 'Event start time (HH:MM 24-hour format). If not provided in structured data, extract from the event title or description (e.g., "6-9pm" → "18:00", "doors at 7" → "19:00", "starts 8pm" → "20:00"). Do not skip events when time can be parsed from text.',
 			'schema_property' => null,
 		),
 		'endTime'         => array(
 			'type'            => 'string',
 			'required'        => false,
-			'description'     => 'Event end time (HH:MM 24-hour format)',
+			'description'     => 'Event end time (HH:MM 24-hour format). If not provided in structured data but a time range is mentioned (e.g., "6-9pm"), extract the end time ("21:00"). If only a start time is found, leave this empty.',
 			'schema_property' => null,
 		),
 		'occurrenceDates' => array(
