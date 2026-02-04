@@ -74,17 +74,20 @@ trait QueueableTrait {
 				)
 			);
 
-            // Store backup of the popped prompt in engine data for retry on failure
-            if (property_exists($this, 'job_id') && !empty($this->job_id)) {
-                \datamachine_merge_engine_data($this->job_id, array(
-                    'queued_prompt_backup' => array(
-                        'prompt'      => $queued_item['prompt'],
-                        'flow_id'     => (int) $flow_id,
-                        'flow_step_id'=> $this->flow_step_id,
-                        'added_at'    => $queued_item['added_at'] ?? null,
-                    )
-                ));
-            }
+			// Store backup of the popped prompt in engine data for retry on failure.
+			if ( property_exists( $this, 'job_id' ) && ! empty( $this->job_id ) ) {
+				\datamachine_merge_engine_data(
+					$this->job_id,
+					array(
+						'queued_prompt_backup' => array(
+							'prompt'       => $queued_item['prompt'],
+							'flow_id'      => (int) $flow_id,
+							'flow_step_id' => $this->flow_step_id,
+							'added_at'     => $queued_item['added_at'] ?? null,
+						),
+					)
+				);
+			}
 
 			return array(
 				'value'      => $queued_item['prompt'],
