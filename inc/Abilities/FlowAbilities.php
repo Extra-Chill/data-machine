@@ -11,6 +11,8 @@
 
 namespace DataMachine\Abilities;
 
+use DataMachine\Abilities\PermissionHelper;
+
 use DataMachine\Abilities\Flow\GetFlowsAbility;
 use DataMachine\Abilities\Flow\CreateFlowAbility;
 use DataMachine\Abilities\Flow\UpdateFlowAbility;
@@ -77,10 +79,7 @@ class FlowAbilities {
 	 * @return bool True if user has permission.
 	 */
 	public function checkPermission(): bool {
-		if ( defined( 'WP_CLI' ) && WP_CLI ) {
-			return true;
-		}
-		return current_user_can( 'manage_options' );
+		return PermissionHelper::can_manage();
 	}
 
 	/**

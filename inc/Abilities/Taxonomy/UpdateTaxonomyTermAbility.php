@@ -10,6 +10,8 @@
 
 namespace DataMachine\Abilities\Taxonomy;
 
+use DataMachine\Abilities\PermissionHelper;
+
 use DataMachine\Core\WordPress\TaxonomyHandler;
 
 defined( 'ABSPATH' ) || exit;
@@ -267,9 +269,6 @@ class UpdateTaxonomyTermAbility {
 	 * @return bool True if user has permission.
 	 */
 	public function checkPermission(): bool {
-		if ( defined( 'WP_CLI' ) && WP_CLI ) {
-			return true;
-		}
-		return current_user_can( 'manage_options' );
+		return PermissionHelper::can_manage();
 	}
 }

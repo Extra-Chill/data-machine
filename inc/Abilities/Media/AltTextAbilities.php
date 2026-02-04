@@ -10,6 +10,7 @@
  */
 
 namespace DataMachine\Abilities\Media;
+use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\RequestBuilder;
@@ -76,12 +77,7 @@ class AltTextAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'generateAltText' ),
-					'permission_callback' => function () {
-						if ( defined( 'WP_CLI' ) && WP_CLI ) {
-							return true;
-						}
-						return current_user_can( 'manage_options' );
-					},
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => false ),
 				)
 			);
@@ -109,12 +105,7 @@ class AltTextAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'diagnoseAltText' ),
-					'permission_callback' => function () {
-						if ( defined( 'WP_CLI' ) && WP_CLI ) {
-							return true;
-						}
-						return current_user_can( 'manage_options' );
-					},
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);

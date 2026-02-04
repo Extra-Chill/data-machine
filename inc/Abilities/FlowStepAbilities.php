@@ -11,6 +11,8 @@
 
 namespace DataMachine\Abilities;
 
+use DataMachine\Abilities\PermissionHelper;
+
 use DataMachine\Abilities\FlowStep\GetFlowStepsAbility;
 use DataMachine\Abilities\FlowStep\UpdateFlowStepAbility;
 use DataMachine\Abilities\FlowStep\ConfigureFlowStepsAbility;
@@ -46,10 +48,7 @@ class FlowStepAbilities {
 	 * @return bool True if user has permission.
 	 */
 	public function checkPermission(): bool {
-		if ( defined( 'WP_CLI' ) && WP_CLI ) {
-			return true;
-		}
-		return current_user_can( 'manage_options' );
+		return PermissionHelper::can_manage();
 	}
 
 	/**

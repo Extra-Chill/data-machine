@@ -9,6 +9,7 @@
  */
 
 namespace DataMachine\Abilities;
+use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Engine\Logger;
 use DataMachine\Engine\AI\AgentType;
@@ -67,12 +68,7 @@ class LogAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'write' ),
-					'permission_callback' => function () {
-						if ( defined( 'WP_CLI' ) && WP_CLI ) {
-							return true;
-						}
-						return current_user_can( 'manage_options' );
-					},
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -106,12 +102,7 @@ class LogAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'clear' ),
-					'permission_callback' => function () {
-						if ( defined( 'WP_CLI' ) && WP_CLI ) {
-							return true;
-						}
-						return current_user_can( 'manage_options' );
-					},
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -168,12 +159,7 @@ class LogAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'readLogs' ),
-					'permission_callback' => function () {
-						if ( defined( 'WP_CLI' ) && WP_CLI ) {
-							return true;
-						}
-						return current_user_can( 'manage_options' );
-					},
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -205,12 +191,7 @@ class LogAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'getMetadata' ),
-					'permission_callback' => function () {
-						if ( defined( 'WP_CLI' ) && WP_CLI ) {
-							return true;
-						}
-						return current_user_can( 'manage_options' );
-					},
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -248,12 +229,7 @@ class LogAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'setLevel' ),
-					'permission_callback' => function () {
-						if ( defined( 'WP_CLI' ) && WP_CLI ) {
-							return true;
-						}
-						return current_user_can( 'manage_options' );
-					},
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -285,12 +261,7 @@ class LogAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'getLevel' ),
-					'permission_callback' => function () {
-						if ( defined( 'WP_CLI' ) && WP_CLI ) {
-							return true;
-						}
-						return current_user_can( 'manage_options' );
-					},
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);

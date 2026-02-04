@@ -11,6 +11,8 @@
 
 namespace DataMachine\Abilities;
 
+use DataMachine\Abilities\PermissionHelper;
+
 use DataMachine\Abilities\Job\GetJobsAbility;
 use DataMachine\Abilities\Job\DeleteJobsAbility;
 use DataMachine\Abilities\Job\ExecuteWorkflowAbility;
@@ -55,10 +57,7 @@ class JobAbilities {
 	 * @return bool True if user has permission.
 	 */
 	public function checkPermission(): bool {
-		if ( defined( 'WP_CLI' ) && WP_CLI ) {
-			return true;
-		}
-		return current_user_can( 'manage_options' );
+		return PermissionHelper::can_manage();
 	}
 
 	/**

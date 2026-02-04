@@ -10,6 +10,7 @@
  */
 
 namespace DataMachine\Abilities;
+use DataMachine\Abilities\PermissionHelper;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -73,12 +74,7 @@ class LocalSearchAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'executeLocalSearch' ),
-					'permission_callback' => function () {
-						if ( defined( 'WP_CLI' ) && WP_CLI ) {
-							return true;
-						}
-						return current_user_can( 'manage_options' );
-					},
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);

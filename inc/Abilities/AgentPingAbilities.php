@@ -9,6 +9,7 @@
  */
 
 namespace DataMachine\Abilities;
+use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Abilities\AgentPing\SendPingAbility;
 
@@ -36,10 +37,7 @@ class AgentPingAbilities {
 	 * @return bool True if user has permission.
 	 */
 	public function checkPermission(): bool {
-		if ( defined( 'WP_CLI' ) && WP_CLI ) {
-			return true;
-		}
-		return current_user_can( 'manage_options' );
+		return PermissionHelper::can_manage();
 	}
 
 	/**

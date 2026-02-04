@@ -10,6 +10,7 @@
  */
 
 namespace DataMachine\Abilities;
+use DataMachine\Abilities\PermissionHelper;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -293,10 +294,7 @@ class AuthAbilities {
 	}
 
 	public function checkPermission(): bool {
-		if ( defined( 'WP_CLI' ) && WP_CLI ) {
-			return true;
-		}
-		return current_user_can( 'manage_options' );
+		return PermissionHelper::can_manage();
 	}
 
 	public function executeGetAuthStatus( array $input ): array {

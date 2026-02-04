@@ -10,6 +10,7 @@
  */
 
 namespace DataMachine\Abilities;
+use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Engine\AI\RequestBuilder;
 use DataMachine\Engine\AI\AgentType;
@@ -85,12 +86,7 @@ class SystemAbilities {
 					),
 				),
 				'execute_callback'    => array( self::class, 'generateSessionTitle' ),
-				'permission_callback' => function () {
-					if ( defined('WP_CLI') && WP_CLI ) {
-						return true;
-					}
-					return current_user_can('manage_options');
-				},
+				'permission_callback' => fn() => PermissionHelper::can_manage(),
 				'meta'                => array( 'show_in_rest' => false ),
 			)
 		);
@@ -130,12 +126,7 @@ class SystemAbilities {
 					),
 				),
 				'execute_callback'    => array( $this, 'executeHealthCheck' ),
-				'permission_callback' => function () {
-					if ( defined('WP_CLI') && WP_CLI ) {
-						return true;
-					}
-					return current_user_can('manage_options');
-				},
+				'permission_callback' => fn() => PermissionHelper::can_manage(),
 				'meta'                => array( 'show_in_rest' => true ),
 			)
 		);

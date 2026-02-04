@@ -10,6 +10,7 @@
  */
 
 namespace DataMachine\Abilities;
+use DataMachine\Abilities\PermissionHelper;
 
 use const DataMachine\Core\WordPress\DATAMACHINE_POST_HANDLER_META_KEY;
 use const DataMachine\Core\WordPress\DATAMACHINE_POST_FLOW_ID_META_KEY;
@@ -105,12 +106,7 @@ class PostQueryAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'executeQueryPosts' ),
-					'permission_callback' => function () {
-						if ( defined( 'WP_CLI' ) && WP_CLI ) {
-							return true;
-						}
-						return current_user_can( 'manage_options' );
-					},
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
