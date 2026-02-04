@@ -39,6 +39,15 @@ class LocalSearch extends BaseTool {
 			)
 		);
 
+		// Handle WP_Error from ability execution (e.g., permission denied).
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'local_search',
+			);
+		}
+
 		if ( isset( $result['error'] ) ) {
 			return array(
 				'success'   => false,
