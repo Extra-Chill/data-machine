@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
+## [0.20.3] - 2026-02-04
+
+### Added
+- re-queue prompt on job failure
+
+### Fixed
+- only clear backup on successful re-queue, fix WPCS indentation
+
 ## [0.20.2] - 2026-02-04
 
 ### Changed
