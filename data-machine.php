@@ -68,6 +68,7 @@ require_once __DIR__ . '/inc/Core/Steps/AI/Directives/PipelineCoreDirective.php'
 require_once __DIR__ . '/inc/Core/Steps/AI/Directives/PipelineSystemPromptDirective.php';
 require_once __DIR__ . '/inc/Core/Steps/AI/Directives/PipelineContextDirective.php';
 require_once __DIR__ . '/inc/Core/FilesRepository/FileCleanup.php';
+require_once __DIR__ . '/inc/Core/ActionScheduler/ClaimsCleanup.php';
 require_once __DIR__ . '/inc/Api/StepTypes.php';
 require_once __DIR__ . '/inc/Api/Handlers.php';
 require_once __DIR__ . '/inc/Api/Providers.php';
