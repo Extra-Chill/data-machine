@@ -639,11 +639,15 @@ add_action(
 );
 
 /**
- * Schedule chat session cleanup after Action Scheduler is initialized
+ * Schedule chat session cleanup after Action Scheduler is initialized.
+ * Only check in admin context to avoid database queries on every frontend request.
  */
 add_action(
 	'action_scheduler_init',
 	function () {
+		if ( ! is_admin() ) {
+			return;
+		}
 		// Daily cleanup of old sessions
 		if ( ! as_next_scheduled_action( 'datamachine_cleanup_chat_sessions', array(), 'datamachine-chat' ) ) {
 			as_schedule_recurring_action(

@@ -237,11 +237,15 @@ add_action(
 );
 
 /**
- * Schedule cleanup after Action Scheduler is fully initialized
+ * Schedule cleanup after Action Scheduler is fully initialized.
+ * Only check in admin context to avoid database queries on every frontend request.
  */
 add_action(
 	'action_scheduler_init',
 	function () {
+		if ( ! is_admin() ) {
+			return;
+		}
 		if ( ! as_next_scheduled_action( 'datamachine_cleanup_old_files', array(), 'datamachine-files' ) ) {
 			as_schedule_recurring_action(
 				time() + WEEK_IN_SECONDS,
