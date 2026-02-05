@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
+## [0.20.5] - 2026-02-05
+
+### Fixed
+- Only check scheduled cleanup jobs in admin context
+
 ## [0.20.4] - 2026-02-04
 
 ### Fixed
