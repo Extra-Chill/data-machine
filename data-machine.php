@@ -43,6 +43,7 @@ require_once __DIR__ . '/inc/Engine/Filters/Handlers.php';
 require_once __DIR__ . '/inc/Engine/Filters/Admin.php';
 require_once __DIR__ . '/inc/Engine/Logger.php';
 require_once __DIR__ . '/inc/Engine/Filters/OAuth.php';
+require_once __DIR__ . '/inc/Engine/Filters/ActionSchedulerOverride.php';
 require_once __DIR__ . '/inc/Engine/Actions/DataMachineActions.php';
 require_once __DIR__ . '/inc/Engine/Filters/EngineData.php';
 require_once __DIR__ . '/inc/Engine/AI/ConversationManager.php';
