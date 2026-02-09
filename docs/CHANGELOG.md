@@ -3,11 +3,10 @@
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
 
-## [0.21.2] - 2026-02-09
+## Unreleased
 
 - CLI: Added --set-prompt option to flows update command for updating handler step prompts via WP-CLI
 - CLI: flows get now shows prompt preview column (truncated to 50 chars)
-- Fix prompt display when queue enabled but empty - shows stored prompt instead of blank field
 
 ## [0.21.1] - 2026-02-05
 
