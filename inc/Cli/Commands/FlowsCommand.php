@@ -23,7 +23,7 @@ class FlowsCommand extends BaseCommand {
 	 *
 	 * @var array
 	 */
-	private array $default_fields = array( 'id', 'name', 'pipeline_id', 'handlers', 'status', 'next_run' );
+	private array $default_fields = array( 'id', 'name', 'pipeline_id', 'handlers', 'prompt', 'status', 'next_run' );
 
 	/**
 	 * Get flows with optional filtering.
@@ -91,8 +91,12 @@ class FlowsCommand extends BaseCommand {
 	 * default: manual
 	 * ---
 	 *
+	 * [--set-prompt=<text>]
+	 * : Update the prompt for a handler step (requires handler step to exist).
+	 *
 	 * [--step=<flow_step_id>]
-	 * : Flow step ID for queue subcommands. Optional if flow has exactly one queueable step (auto-resolved).
+	 * : Target a specific flow step for prompt update (auto-resolved if flow has exactly one handler step).
+	 *   Also used for queue subcommands (auto-resolved if flow has exactly one queueable step).
 	 *
 	 * [--dry-run]
 	 * : Validate without creating (create subcommand).
@@ -175,6 +179,12 @@ class FlowsCommand extends BaseCommand {
 	 *     # Update both name and scheduling
 	 *     wp datamachine flows update 141 --name="Daily Import" --scheduling=daily
 	 *
+	 *     # Update flow prompt
+	 *     wp datamachine flows update 42 --set-prompt="New prompt text for this flow"
+	 *
+	 *     # Update prompt for specific step (multi-step flows)
+	 *     wp datamachine flows update 42 --step=flow-42-step-abc123 --set-prompt="Step-specific prompt"
+	 *
 	 *     # Add a prompt to the queue (--step auto-resolved if flow has one queueable step)
 	 *     wp datamachine flows queue add 42 "Generate a blog post about AI"
 	 *
@@ -228,7 +238,7 @@ class FlowsCommand extends BaseCommand {
 		// Handle 'update' subcommand: `flows update 42 --name="New Name"`.
 		if ( ! empty( $args ) && 'update' === $args[0] ) {
 			if ( ! isset( $args[1] ) ) {
-				WP_CLI::error( 'Usage: wp datamachine flows update <flow_id> [--name=<name>] [--scheduling=<interval>]' );
+				WP_CLI::error( 'Usage: wp datamachine flows update <flow_id> [--name=<name>] [--scheduling=<interval>] [--set-prompt=<text>] [--step=<flow_step_id>]' );
 				return;
 			}
 			$this->updateFlow( (int) $args[1], $assoc_args );
@@ -305,6 +315,7 @@ class FlowsCommand extends BaseCommand {
 					'name'        => $flow['flow_name'],
 					'pipeline_id' => $flow['pipeline_id'],
 					'handlers'    => $this->extractHandlers( $flow ),
+					'prompt'      => $this->extractPrompt( $flow ),
 					'status'      => $flow['last_run_status'] ?? 'Never',
 					'next_run'    => $flow['next_run_display'] ?? 'Not scheduled',
 				);
@@ -506,9 +517,13 @@ class FlowsCommand extends BaseCommand {
 
 		$name       = $assoc_args['name'] ?? null;
 		$scheduling = $assoc_args['scheduling'] ?? null;
+		$prompt     = isset( $assoc_args['set-prompt'] )
+			? wp_kses_post( wp_unslash( $assoc_args['set-prompt'] ) )
+			: null;
+		$step       = $assoc_args['step'] ?? null;
 
-		if ( null === $name && null === $scheduling ) {
-			WP_CLI::error( 'Must provide --name or --scheduling to update' );
+		if ( null === $name && null === $scheduling && null === $prompt ) {
+			WP_CLI::error( 'Must provide --name, --scheduling, or --set-prompt to update' );
 			return;
 		}
 
@@ -522,19 +537,47 @@ class FlowsCommand extends BaseCommand {
 			$input['scheduling_config'] = array( 'interval' => $scheduling );
 		}
 
-		$ability = new \DataMachine\Abilities\FlowAbilities();
-		$result  = $ability->executeUpdateFlow( $input );
+		if ( null !== $name || null !== $scheduling ) {
+			$ability = new \DataMachine\Abilities\FlowAbilities();
+			$result  = $ability->executeUpdateFlow( $input );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] ?? 'Failed to update flow' );
-			return;
+			if ( ! $result['success'] ) {
+				WP_CLI::error( $result['error'] ?? 'Failed to update flow' );
+				return;
+			}
+
+			WP_CLI::success( sprintf( 'Flow %d updated.', $flow_id ) );
+			WP_CLI::log( sprintf( 'Name: %s', $result['flow_name'] ?? '' ) );
+
+			if ( isset( $result['flow_data']['scheduling_config']['interval'] ) ) {
+				WP_CLI::log( sprintf( 'Scheduling: %s', $result['flow_data']['scheduling_config']['interval'] ) );
+			}
 		}
 
-		WP_CLI::success( sprintf( 'Flow %d updated.', $flow_id ) );
-		WP_CLI::log( sprintf( 'Name: %s', $result['flow_name'] ?? '' ) );
+		if ( null !== $prompt ) {
+			if ( null === $step ) {
+				$resolved = $this->resolveHandlerStep( $flow_id );
+				if ( $resolved['error'] ) {
+					WP_CLI::error( $resolved['error'] );
+					return;
+				}
+				$step = $resolved['step_id'];
+			}
 
-		if ( isset( $result['flow_data']['scheduling_config']['interval'] ) ) {
-			WP_CLI::log( sprintf( 'Scheduling: %s', $result['flow_data']['scheduling_config']['interval'] ) );
+			$step_ability = new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility();
+			$step_result  = $step_ability->execute(
+				array(
+					'flow_step_id'   => $step,
+					'handler_config' => array( 'prompt' => $prompt ),
+				)
+			);
+
+			if ( ! $step_result['success'] ) {
+				WP_CLI::error( $step_result['error'] ?? 'Failed to update prompt' );
+				return;
+			}
+
+			WP_CLI::success( 'Prompt updated for step: ' . $step );
 		}
 	}
 
@@ -577,6 +620,33 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		return implode( ', ', array_unique( $handlers ) );
+	}
+
+	/**
+	 * Extract the first prompt from flow config for display.
+	 *
+	 * @param array $flow Flow data.
+	 * @return string Prompt preview.
+	 */
+	private function extractPrompt( array $flow ): string {
+		$flow_config = $flow['flow_config'] ?? array();
+
+		foreach ( $flow_config as $step_data ) {
+			if ( ! empty( $step_data['handler_config']['prompt'] ) ) {
+				$prompt = $step_data['handler_config']['prompt'];
+				return mb_strlen( $prompt ) > 50
+					? mb_substr( $prompt, 0, 47 ) . '...'
+					: $prompt;
+			}
+			if ( ! empty( $step_data['pipeline_config']['prompt'] ) ) {
+				$prompt = $step_data['pipeline_config']['prompt'];
+				return mb_strlen( $prompt ) > 50
+					? mb_substr( $prompt, 0, 47 ) . '...'
+					: $prompt;
+			}
+		}
+
+		return '';
 	}
 
 	/**
@@ -634,6 +704,68 @@ class FlowsCommand extends BaseCommand {
 
 		return array(
 			'step_id' => $queueable[0],
+			'error'   => null,
+		);
+	}
+
+	/**
+	 * Resolve the handler step for a flow when --step is not provided.
+	 *
+	 * @param int $flow_id Flow ID.
+	 * @return array{step_id: string|null, error: string|null}
+	 */
+	private function resolveHandlerStep( int $flow_id ): array {
+		global $wpdb;
+
+		$flow = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT flow_config FROM {$wpdb->prefix}datamachine_flows WHERE flow_id = %d",
+				$flow_id
+			),
+			ARRAY_A
+		);
+
+		if ( ! $flow ) {
+			return array(
+				'step_id' => null,
+				'error'   => 'Flow not found',
+			);
+		}
+
+		$flow_config = json_decode( $flow['flow_config'], true );
+		if ( empty( $flow_config ) ) {
+			return array(
+				'step_id' => null,
+				'error'   => 'Flow has no steps',
+			);
+		}
+
+		$handler_steps = array();
+		foreach ( $flow_config as $step_id => $step_data ) {
+			if ( ! empty( $step_data['handler_slug'] ) ) {
+				$handler_steps[] = $step_id;
+			}
+		}
+
+		if ( empty( $handler_steps ) ) {
+			return array(
+				'step_id' => null,
+				'error'   => 'Flow has no handler steps',
+			);
+		}
+
+		if ( count( $handler_steps ) > 1 ) {
+			return array(
+				'step_id' => null,
+				'error'   => sprintf(
+					'Flow has multiple handler steps. Use --step=<id> to specify. Available: %s',
+					implode( ', ', $handler_steps )
+				),
+			);
+		}
+
+		return array(
+			'step_id' => $handler_steps[0],
 			'error'   => null,
 		);
 	}
