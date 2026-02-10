@@ -3,6 +3,10 @@
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
 
+## Unreleased
+
+- Queue validation: queue-add ability now checks for duplicate prompts in queue and similar existing posts before adding
+
 ## [0.21.4] - 2026-02-08
 
 - Fix: pin webpack to 5.104.1 for security; remove legacy CircleCI config

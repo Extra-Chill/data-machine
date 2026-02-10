@@ -429,6 +429,26 @@ class QueueAbility {
 		$step_config  = $validation['step_config'];
 		$prompt_queue = $step_config['prompt_queue'];
 
+		// Check for duplicates in existing queue.
+		foreach ( $prompt_queue as $queued_item ) {
+			if ( strcasecmp( $queued_item['prompt'], $prompt ) === 0 ) {
+				return array(
+					'success' => false,
+					'error'   => 'Duplicate: This prompt is already in the queue.',
+				);
+			}
+		}
+
+		// Check for similar existing posts.
+		$existing_post = $this->findSimilarExistingPost( $prompt );
+		if ( $existing_post ) {
+			return array(
+				'success'       => false,
+				'error'         => sprintf( 'Duplicate: Similar post already exists: "%s" (ID %d)', $existing_post['title'], $existing_post['id'] ),
+				'existing_post' => $existing_post,
+			);
+		}
+
 		$prompt_queue[] = array(
 			'prompt'   => $prompt,
 			'added_at' => gmdate( 'c' ),
@@ -1123,5 +1143,73 @@ class QueueAbility {
 			'flow_config' => $flow_config,
 			'step_config' => $step_config,
 		);
+	}
+
+	/**
+	 * Find an existing post with a similar title to the prompt.
+	 *
+	 * Extracts core topic from common prompt patterns and searches for matching posts.
+	 *
+	 * @param string $prompt The prompt to check for duplicates.
+	 * @return array|null Array with 'id' and 'title' if found, null otherwise.
+	 */
+	private function findSimilarExistingPost( string $prompt ): ?array {
+		global $wpdb;
+
+		// Extract core topic by removing common prefixes/suffixes.
+		$core_topic = $prompt;
+		$core_topic = preg_replace( '/^(the\s+)?(spiritual\s+meaning\s+of\s+)/i', '', $core_topic );
+		$core_topic = preg_replace( '/\s+(spiritual\s+meaning|symbolism|symbol|meaning).*$/i', '', $core_topic );
+		$core_topic = preg_replace( '/^(why\s+(do|are|is)\s+)/i', '', $core_topic );
+		$core_topic = preg_replace( '/^(what\s+(do|does|is|are)\s+)/i', '', $core_topic );
+		$core_topic = preg_replace( '/^(how\s+(do|does|to)\s+)/i', '', $core_topic );
+		$core_topic = trim( $core_topic );
+
+		// Skip if core topic is too short.
+		if ( strlen( $core_topic ) < 3 ) {
+			return null;
+		}
+
+		// Search for exact prompt match first.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$exact_match = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT ID, post_title FROM {$wpdb->posts}
+				WHERE post_type = 'post'
+				AND post_status = 'publish'
+				AND post_title = %s
+				LIMIT 1",
+				$prompt
+			)
+		);
+
+		if ( $exact_match ) {
+			return array(
+				'id'    => (int) $exact_match->ID,
+				'title' => $exact_match->post_title,
+			);
+		}
+
+		// Search for core topic in title.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$similar_match = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT ID, post_title FROM {$wpdb->posts}
+				WHERE post_type = 'post'
+				AND post_status = 'publish'
+				AND LOWER(post_title) LIKE %s
+				LIMIT 1",
+				'%' . $wpdb->esc_like( strtolower( $core_topic ) ) . '%'
+			)
+		);
+
+		if ( $similar_match ) {
+			return array(
+				'id'    => (int) $similar_match->ID,
+				'title' => $similar_match->post_title,
+			);
+		}
+
+		return null;
 	}
 }
