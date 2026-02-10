@@ -42,9 +42,9 @@ function datamachine_get_queue_tuning( string $key, int $default ): int {
  */
 function datamachine_get_queue_tuning_defaults(): array {
 	return array(
-		'concurrent_batches' => 2,  // AS default: 1
+		'concurrent_batches' => 3,  // AS default: 1
 		'batch_size'         => 25, // AS default: 25 (keep same)
-		'time_limit'         => 45, // AS default: 30
+		'time_limit'         => 60, // AS default: 30
 	);
 }
 

@@ -351,9 +351,9 @@ class SettingsAbilities {
 				'enabled_tools'               => $settings['enabled_tools'] ?? array(),
 				'ai_provider_keys'            => $masked_keys,
 				'queue_tuning'                => $settings['queue_tuning'] ?? array(
-					'concurrent_batches' => 2,
+					'concurrent_batches' => 3,
 					'batch_size'         => 25,
-					'time_limit'         => 45,
+					'time_limit'         => 60,
 				),
 			),
 			'global_tools' => $tools_keyed,
