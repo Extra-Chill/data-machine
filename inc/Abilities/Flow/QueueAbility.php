@@ -41,6 +41,7 @@ class QueueAbility {
 			$this->registerQueueUpdate();
 			$this->registerQueueMove();
 			$this->registerQueueSettings();
+			$this->registerQueueValidate();
 		};
 
 		if ( did_action( 'wp_abilities_api_init' ) ) {
@@ -370,6 +371,55 @@ class QueueAbility {
 					),
 				),
 				'execute_callback'    => array( $this, 'executeQueueSettings' ),
+				'permission_callback' => array( $this, 'checkPermission' ),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	/**
+	 * Register queue-validate ability.
+	 */
+	private function registerQueueValidate(): void {
+		wp_register_ability(
+			'datamachine/queue-validate',
+			array(
+				'label'               => __( 'Validate Queue', 'data-machine' ),
+				'description'         => __( 'Check queue items against existing posts and remove duplicates.', 'data-machine' ),
+				'category'            => 'datamachine',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'flow_id', 'flow_step_id' ),
+					'properties' => array(
+						'flow_id'      => array(
+							'type'        => 'integer',
+							'description' => __( 'Flow ID to validate queue for', 'data-machine' ),
+						),
+						'flow_step_id' => array(
+							'type'        => 'string',
+							'description' => __( 'Flow step ID to validate queue for', 'data-machine' ),
+						),
+						'dry_run'      => array(
+							'type'        => 'boolean',
+							'description' => __( 'If true, report duplicates without removing them', 'data-machine' ),
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'            => array( 'type' => 'boolean' ),
+						'flow_id'            => array( 'type' => 'integer' ),
+						'flow_step_id'       => array( 'type' => 'string' ),
+						'total_checked'      => array( 'type' => 'integer' ),
+						'duplicates_found'   => array( 'type' => 'integer' ),
+						'duplicates_removed' => array( 'type' => 'integer' ),
+						'duplicates'         => array( 'type' => 'array' ),
+						'message'            => array( 'type' => 'string' ),
+						'error'              => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeQueueValidate' ),
 				'permission_callback' => array( $this, 'checkPermission' ),
 				'meta'                => array( 'show_in_rest' => true ),
 			)
@@ -1044,6 +1094,127 @@ class QueueAbility {
 			'flow_step_id'  => $flow_step_id,
 			'queue_enabled' => $queue_enabled,
 			'message'       => 'Queue settings updated successfully',
+		);
+	}
+
+	/**
+	 * Validate queue items against existing posts and remove duplicates.
+	 *
+	 * @param array $input Input with flow_id, flow_step_id, and optional dry_run.
+	 * @return array Result with duplicates found.
+	 */
+	public function executeQueueValidate( array $input ): array {
+		$flow_id      = $input['flow_id'] ?? null;
+		$flow_step_id = $input['flow_step_id'] ?? null;
+		$dry_run      = $input['dry_run'] ?? false;
+
+		if ( ! is_numeric( $flow_id ) || (int) $flow_id <= 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_id is required and must be a positive integer',
+			);
+		}
+
+		if ( empty( $flow_step_id ) || ! is_string( $flow_step_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_step_id is required and must be a string',
+			);
+		}
+
+		$flow_id      = (int) $flow_id;
+		$flow_step_id = sanitize_text_field( $flow_step_id );
+
+		$flow = $this->db_flows->get_flow( $flow_id );
+		if ( ! $flow ) {
+			return array(
+				'success' => false,
+				'error'   => 'Flow not found',
+			);
+		}
+
+		$validation = $this->getStepConfigForQueue( $flow, $flow_step_id );
+		if ( ! $validation['success'] ) {
+			return $validation;
+		}
+
+		$flow_config  = $validation['flow_config'];
+		$step_config  = $validation['step_config'];
+		$prompt_queue = $step_config['prompt_queue'];
+
+		$total_checked     = count( $prompt_queue );
+		$duplicates        = array();
+		$indices_to_remove = array();
+
+		// Check each queue item against existing posts.
+		foreach ( $prompt_queue as $index => $item ) {
+			$prompt        = $item['prompt'] ?? '';
+			$existing_post = $this->findSimilarExistingPost( $prompt );
+
+			if ( $existing_post ) {
+				$duplicates[]        = array(
+					'index'               => $index,
+					'prompt'              => $prompt,
+					'existing_post_id'    => $existing_post['id'],
+					'existing_post_title' => $existing_post['title'],
+				);
+				$indices_to_remove[] = $index;
+			}
+		}
+
+		$duplicates_found   = count( $duplicates );
+		$duplicates_removed = 0;
+
+		// Remove duplicates if not dry run.
+		if ( ! $dry_run && ! empty( $indices_to_remove ) ) {
+			// Remove in reverse order to preserve indices.
+			rsort( $indices_to_remove );
+			foreach ( $indices_to_remove as $index ) {
+				array_splice( $prompt_queue, $index, 1 );
+			}
+
+			$flow_config[ $flow_step_id ]['prompt_queue'] = $prompt_queue;
+
+			$success = $this->db_flows->update_flow(
+				$flow_id,
+				array( 'flow_config' => $flow_config )
+			);
+
+			if ( $success ) {
+				$duplicates_removed = $duplicates_found;
+			}
+
+			do_action(
+				'datamachine_log',
+				'info',
+				'Queue validated and duplicates removed',
+				array(
+					'flow_id'            => $flow_id,
+					'duplicates_removed' => $duplicates_removed,
+					'remaining_count'    => count( $prompt_queue ),
+				)
+			);
+		}
+
+		$action  = $dry_run ? 'would remove' : 'removed';
+		$message = sprintf(
+			'Validated %d item(s). Found %d duplicate(s), %s %d.',
+			$total_checked,
+			$duplicates_found,
+			$action,
+			$dry_run ? $duplicates_found : $duplicates_removed
+		);
+
+		return array(
+			'success'            => true,
+			'flow_id'            => $flow_id,
+			'flow_step_id'       => $flow_step_id,
+			'total_checked'      => $total_checked,
+			'duplicates_found'   => $duplicates_found,
+			'duplicates_removed' => $duplicates_removed,
+			'duplicates'         => $duplicates,
+			'dry_run'            => $dry_run,
+			'message'            => $message,
 		);
 	}
 

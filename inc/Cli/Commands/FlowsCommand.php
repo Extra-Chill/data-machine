@@ -208,6 +208,12 @@ class FlowsCommand extends BaseCommand {
 	 *
 	 *     # Move a prompt from index 2 to index 0 (front of queue)
 	 *     wp datamachine flows queue move 42 2 0
+	 *
+	 *     # Validate queue items against existing posts (removes duplicates)
+	 *     wp datamachine flows queue validate 29
+	 *
+	 *     # Dry run validation (show duplicates without removing)
+	 *     wp datamachine flows queue validate 29 --dry-run
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		$flow_id     = null;
@@ -803,8 +809,11 @@ class FlowsCommand extends BaseCommand {
 			case 'move':
 				$this->queueMove( array_slice( $args, 1 ), $assoc_args );
 				break;
+			case 'validate':
+				$this->queueValidate( array_slice( $args, 1 ), $assoc_args );
+				break;
 			default:
-				WP_CLI::error( "Unknown queue action: {$action}. Use: add, list, clear, remove, update, move" );
+				WP_CLI::error( "Unknown queue action: {$action}. Use: add, list, clear, remove, update, move, validate" );
 		}
 	}
 
@@ -1143,5 +1152,91 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		WP_CLI::success( $result['message'] ?? 'Item moved in queue.' );
+	}
+
+	/**
+	 * Validate queue items against existing posts and remove duplicates.
+	 *
+	 * @param array $args       Positional arguments (flow_id).
+	 * @param array $assoc_args Associative arguments (--step, --dry-run, --format).
+	 */
+	private function queueValidate( array $args, array $assoc_args ): void {
+		if ( empty( $args ) ) {
+			WP_CLI::error( 'Usage: wp datamachine flows queue validate <flow_id> [--step=<flow_step_id>] [--dry-run]' );
+			return;
+		}
+
+		$flow_id      = (int) $args[0];
+		$flow_step_id = $assoc_args['step'] ?? null;
+		$dry_run      = isset( $assoc_args['dry-run'] );
+		$format       = $assoc_args['format'] ?? 'table';
+
+		if ( $flow_id <= 0 ) {
+			WP_CLI::error( 'flow_id must be a positive integer' );
+			return;
+		}
+
+		if ( empty( $flow_step_id ) ) {
+			$resolved = $this->resolveQueueableStep( $flow_id );
+			if ( $resolved['error'] ) {
+				WP_CLI::error( $resolved['error'] );
+				return;
+			}
+			$flow_step_id = $resolved['step_id'];
+		}
+
+		$ability = new \DataMachine\Abilities\FlowAbilities();
+		$result  = $ability->executeQueueValidate(
+			array(
+				'flow_id'      => $flow_id,
+				'flow_step_id' => $flow_step_id,
+				'dry_run'      => $dry_run,
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to validate queue' );
+			return;
+		}
+
+		$duplicates = $result['duplicates'] ?? array();
+
+		if ( empty( $duplicates ) ) {
+			WP_CLI::success( sprintf( 'Validated %d item(s). No duplicates found.', $result['total_checked'] ?? 0 ) );
+			return;
+		}
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			return;
+		}
+
+		// Transform for table display.
+		$items = array();
+		foreach ( $duplicates as $dup ) {
+			$prompt_preview = mb_strlen( $dup['prompt'] ) > 40
+				? mb_substr( $dup['prompt'], 0, 37 ) . '...'
+				: $dup['prompt'];
+
+			$items[] = array(
+				'index'          => $dup['index'],
+				'prompt'         => $prompt_preview,
+				'existing_id'    => $dup['existing_post_id'],
+				'existing_title' => mb_strlen( $dup['existing_post_title'] ) > 35
+					? mb_substr( $dup['existing_post_title'], 0, 32 ) . '...'
+					: $dup['existing_post_title'],
+			);
+		}
+
+		$this->format_items( $items, array( 'index', 'prompt', 'existing_id', 'existing_title' ), $assoc_args, 'index' );
+
+		$action = $dry_run ? 'would remove' : 'removed';
+		WP_CLI::success( sprintf(
+			'Validated %d item(s). Found %d duplicate(s), %s %d.',
+			$result['total_checked'],
+			$result['duplicates_found'],
+			$action,
+			$dry_run ? $result['duplicates_found'] : $result['duplicates_removed']
+		) );
 	}
 }

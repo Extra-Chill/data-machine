@@ -467,6 +467,10 @@
    GENERAL TAB
    ======================================================================== */
 
+.datamachine-section-description {
+    margin-bottom: 1em;
+}
+
 .datamachine-general-tab-loading,
 .datamachine-agent-tab-loading,
 .datamachine-api-keys-tab-loading {

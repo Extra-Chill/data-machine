@@ -366,7 +366,7 @@ const GeneralTab = () => {
 			</table>
 
 			<h3>Queue Performance</h3>
-			<p className="description" style={ { marginBottom: '1em' } }>
+			<p className="description datamachine-section-description">
 				Tune Action Scheduler for faster parallel execution. Higher values = more throughput but higher server load.
 			</p>
 			<table className="form-table">

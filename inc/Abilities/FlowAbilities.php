@@ -206,4 +206,14 @@ class FlowAbilities {
 	public function executeQueueMove( array $input ): array {
 		return $this->queue->executeQueueMove( $input );
 	}
+
+	/**
+	 * Execute queue-validate ability.
+	 *
+	 * @param array $input Input parameters (flow_id, flow_step_id, dry_run).
+	 * @return array Result with validation status and duplicates found.
+	 */
+	public function executeQueueValidate( array $input ): array {
+		return $this->queue->executeQueueValidate( $input );
+	}
 }
