@@ -12,7 +12,6 @@
 namespace DataMachineEvents\Blocks\Calendar;
 
 use DataMachineEvents\Core\Event_Post_Type;
-const CACHE_PREFIX = 'datamachine_cal_';
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
