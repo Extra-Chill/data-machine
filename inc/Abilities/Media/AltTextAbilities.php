@@ -123,7 +123,7 @@ class AltTextAbilities {
 			return;
 		}
 
-		add_action( 'datamachine_generate_image_alt_text', array( $this, 'handleGenerateImageAltText' ), 10, 2 );
+		add_action( 'datamachine_generate_image_alt_text', array( $this, 'handleGenerateImageAltText' ), 10, 3 );
 		add_action( 'add_attachment', array( $this, 'queueAttachmentAltText' ), 10, 1 );
 
 		self::$hooks_registered = true;
@@ -300,9 +300,10 @@ class AltTextAbilities {
 	 *
 	 * @param int  $attachment_id Attachment ID.
 	 * @param bool $force Force generation even if alt text exists.
+	 * @param int  $job_id Optional DM Job ID for tracking.
 	 * @return void
 	 */
-	public function handleGenerateImageAltText( int $attachment_id, bool $force = false ): void {
+	public function handleGenerateImageAltText( int $attachment_id, bool $force = false, int $job_id = 0 ): void {
 		$attachment_id = absint( $attachment_id );
 		if ( $attachment_id <= 0 ) {
 			return;
@@ -327,6 +328,10 @@ class AltTextAbilities {
 					'agent_type'    => 'system',
 				)
 			);
+			if ( $job_id > 0 ) {
+				$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
+				$jobs_db->complete_job( $job_id, (string) \DataMachine\Core\JobStatus::failed( 'image file missing' ) );
+			}
 			return;
 		}
 
@@ -343,6 +348,10 @@ class AltTextAbilities {
 					'agent_type'    => 'system',
 				)
 			);
+			if ( $job_id > 0 ) {
+				$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
+				$jobs_db->complete_job( $job_id, (string) \DataMachine\Core\JobStatus::failed( 'no AI provider configured' ) );
+			}
 			return;
 		}
 
@@ -422,6 +431,10 @@ class AltTextAbilities {
 					'agent_type'    => 'system',
 				)
 			);
+			if ( $job_id > 0 ) {
+				$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
+				$jobs_db->complete_job( $job_id, (string) \DataMachine\Core\JobStatus::failed( $response['error'] ?? 'Unknown error' ) );
+			}
 			return;
 		}
 
@@ -438,6 +451,10 @@ class AltTextAbilities {
 					'agent_type'    => 'system',
 				)
 			);
+			if ( $job_id > 0 ) {
+				$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
+				$jobs_db->complete_job( $job_id, (string) \DataMachine\Core\JobStatus::failed( 'empty AI response' ) );
+			}
 			return;
 		}
 
@@ -458,6 +475,16 @@ class AltTextAbilities {
 					'success'       => true,
 				)
 			);
+			// Update DM Job status
+			if ( $job_id > 0 ) {
+				$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
+				$jobs_db->store_engine_data( $job_id, [
+					'alt_text'      => $alt_text,
+					'attachment_id' => $attachment_id,
+					'completed_at'  => current_time( 'mysql' ),
+				] );
+				$jobs_db->complete_job( $job_id, \DataMachine\Core\JobStatus::COMPLETED );
+			}
 		} elseif ( $current_alt === $alt_text ) {
 			// Value unchanged - not an error, just already correct.
 			do_action(
@@ -471,6 +498,16 @@ class AltTextAbilities {
 					'success'       => true,
 				)
 			);
+			// Update DM Job status
+			if ( $job_id > 0 ) {
+				$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
+				$jobs_db->store_engine_data( $job_id, [
+					'alt_text'      => $alt_text,
+					'attachment_id' => $attachment_id,
+					'completed_at'  => current_time( 'mysql' ),
+				] );
+				$jobs_db->complete_job( $job_id, \DataMachine\Core\JobStatus::COMPLETED );
+			}
 		} else {
 			do_action(
 				'datamachine_log',
@@ -483,6 +520,10 @@ class AltTextAbilities {
 					'success'       => false,
 				)
 			);
+			if ( $job_id > 0 ) {
+				$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
+				$jobs_db->complete_job( $job_id, (string) \DataMachine\Core\JobStatus::failed( 'failed to save' ) );
+			}
 		}
 	}
 
@@ -548,6 +589,27 @@ class AltTextAbilities {
 			}
 		}
 
+		// Create a DM Job for tracking
+		$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
+		$job_id = $jobs_db->create_job( [
+			'pipeline_id' => 'direct',
+			'flow_id'     => 'direct',
+		] );
+
+		if ( $job_id ) {
+			// Store context in engine_data
+			$jobs_db->store_engine_data( (int) $job_id, [
+				'system_task_type' => 'alt_text_generation',
+				'attachment_id'    => $attachment_id,
+				'source'           => $source,
+				'force'            => $force,
+			] );
+			$jobs_db->start_job( (int) $job_id, 'processing' );
+		}
+
+		// Include job_id in AS action args so handler can update status
+		$args['job_id'] = $job_id ?: 0;
+
 		$action_id = as_schedule_single_action(
 			time(),
 			'datamachine_generate_image_alt_text',
@@ -562,6 +624,7 @@ class AltTextAbilities {
 			array(
 				'attachment_id' => $attachment_id,
 				'action_id'     => $action_id,
+				'job_id'        => $job_id ?: 0,
 				'source'        => $source,
 				'agent_type'    => 'system',
 				'success'       => ( false !== $action_id ),
