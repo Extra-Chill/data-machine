@@ -6,7 +6,7 @@ WordPress 6.9 Abilities API provides standardized capability discovery and execu
 
 The Abilities API in `inc/Abilities/` provides a unified interface for Data Machine operations. Each ability implements `execute_callback` with `permission_callback` for consistent access control across REST API, CLI commands, and Chat tools.
 
-**Total registered abilities**: 59
+**Total registered abilities**: 79
 
 ## Registered Abilities
 
@@ -50,7 +50,7 @@ The Abilities API in `inc/Abilities/` provides a unified interface for Data Mach
 | `datamachine/update-flow-step` | Update flow step config | `FlowStepAbilities.php` |
 | `datamachine/configure-flow-steps` | Bulk configure flow steps | `FlowStepAbilities.php` |
 
-### Job Execution (5 abilities)
+### Job Execution (6 abilities)
 
 | Ability | Description | Location |
 |---------|-------------|----------|
@@ -59,6 +59,7 @@ The Abilities API in `inc/Abilities/` provides a unified interface for Data Mach
 | `datamachine/execute-workflow` | Execute workflow | `JobAbilities.php` |
 | `datamachine/get-flow-health` | Get flow health metrics | `JobAbilities.php` |
 | `datamachine/get-problem-flows` | List flows exceeding failure threshold | `JobAbilities.php` |
+| `datamachine/get-jobs-summary` | Get job status summary counts | `JobAbilities.php` |
 
 ### File Management (5 abilities)
 
@@ -138,11 +139,60 @@ The Abilities API in `inc/Abilities/` provides a unified interface for Data Mach
 |---------|-------------|----------|
 | `datamachine/local-search` | Search WordPress site for posts by title or content | `LocalSearchAbilities.php` |
 
-### System Infrastructure (1 ability)
+### Taxonomy (5 abilities)
+
+| Ability | Description | Location |
+|---------|-------------|----------|
+| `datamachine/get-taxonomy-terms` | List taxonomy terms | `TaxonomyAbilities.php` |
+| `datamachine/create-taxonomy-term` | Create a taxonomy term | `TaxonomyAbilities.php` |
+| `datamachine/update-taxonomy-term` | Update a taxonomy term | `TaxonomyAbilities.php` |
+| `datamachine/delete-taxonomy-term` | Delete a taxonomy term | `TaxonomyAbilities.php` |
+| `datamachine/resolve-term` | Resolve a term by name or slug | `TaxonomyAbilities.php` |
+
+### Queue Management (8 abilities)
+
+| Ability | Description | Location |
+|---------|-------------|----------|
+| `datamachine/queue-list` | List queue entries | `FlowAbilities.php` |
+| `datamachine/queue-add` | Add item to queue | `FlowAbilities.php` |
+| `datamachine/queue-remove` | Remove item from queue | `FlowAbilities.php` |
+| `datamachine/queue-move` | Reorder queue item | `FlowAbilities.php` |
+| `datamachine/queue-clear` | Clear queue | `FlowAbilities.php` |
+| `datamachine/queue-update` | Update queue item | `FlowAbilities.php` |
+| `datamachine/queue-settings` | Get/set queue settings | `FlowAbilities.php` |
+| `datamachine/queue-validate` | Validate queue configuration | `FlowAbilities.php` |
+
+### Media (2 abilities)
+
+| Ability | Description | Location |
+|---------|-------------|----------|
+| `datamachine/generate-alt-text` | Generate alt text for media | `AltTextAbilities.php` |
+| `datamachine/diagnose-alt-text` | Diagnose alt text issues | `AltTextAbilities.php` |
+
+### Agent Ping (1 ability)
+
+| Ability | Description | Location |
+|---------|-------------|----------|
+| `datamachine/send-ping` | Send agent ping notification | `AgentPingAbilities.php` |
+
+### Job Recovery (1 ability)
+
+| Ability | Description | Location |
+|---------|-------------|----------|
+| `datamachine/recover-stuck-jobs` | Recover jobs stuck in processing state | `RecoverStuckJobsAbility.php` |
+
+### Flow Steps — Additional (1 ability)
+
+| Ability | Description | Location |
+|---------|-------------|----------|
+| `datamachine/validate-flow-steps-config` | Validate flow steps configuration | `FlowStepAbilities.php` |
+
+### System Infrastructure (2 abilities)
 
 | Ability | Description | Location |
 |---------|-------------|----------|
 | `datamachine/generate-session-title` | Generate descriptive titles for chat sessions | `SystemAbilities.php` |
+| `datamachine/system-health-check` | Run system health diagnostics | `SystemAbilities.php` |
 
 ## Category Registration
 

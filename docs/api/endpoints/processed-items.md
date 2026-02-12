@@ -393,6 +393,73 @@ curl -X DELETE https://example.com/wp-json/datamachine/v1/processed-items/1523 \
   -u username:application_password
 ```
 
+## Abilities API Integration
+
+Three registered abilities provide programmatic access to processed items operations. These are used by REST API endpoints, CLI commands, and Chat tools.
+
+| Ability | Description |
+|---------|-------------|
+| `datamachine/clear-processed-items` | Clear processed items by pipeline or flow scope |
+| `datamachine/check-processed-item` | Check if a specific item has been processed for a flow step |
+| `datamachine/has-processed-history` | Check if a flow step has any processing history |
+
+### has-processed-history
+
+Distinguishes "no new items found" from "first run with an empty source." The `has_processed_items()` method on `ProcessedItems` checks whether any record exists for a given `flow_step_id`. The engine uses this to select between two completion statuses:
+
+- **`completed_no_items`** — The flow step has processed items before but the current run found nothing new. This is normal steady-state behavior.
+- **`completed` (empty)** — The flow step has never processed anything. This indicates a first run that returned no data, which may signal a configuration issue.
+
+## SkipItemTool
+
+**Implementation**: `inc/Core/Steps/Fetch/Tools/SkipItemTool.php`
+**Since**: 0.9.7
+
+The `SkipItemTool` is a handler tool available during the Fetch step that allows the AI agent to explicitly skip an item that does not meet processing criteria. It acts as a safety net when keyword exclusions or other filters miss items that should not be processed.
+
+**Behavior**:
+1. Marks the item as processed via `datamachine_mark_item_processed` action so it is not refetched on subsequent runs
+2. Sets `job_status` in engine_data to `agent_skipped - {reason}` via `datamachine_merge_engine_data()`
+3. The engine reads the `job_status` override at completion and applies it as the final job status
+
+**Parameters**:
+- `reason` (string, required): Explanation of why the item is being skipped
+- `job_id` (integer, required): Current job ID
+- `engine` (object, injected): ExecutionContext engine providing `item_id`, `source_type`, and `flow_step_id`
+
+**Tool Result**:
+```php
+[
+    'success'   => true,
+    'message'   => 'Item skipped: {reason}',
+    'status'    => 'agent_skipped - {reason}',
+    'item_id'   => '{item_identifier}',
+    'tool_name' => 'skip_item',
+]
+```
+
+## ExecutionContext
+
+**Implementation**: `inc/Core/ExecutionContext.php`
+**Since**: 0.9.16
+
+`ExecutionContext` bridges fetch handlers to the database layer by encapsulating execution mode, deduplication, engine data access, file storage, and logging into a single object.
+
+**Execution Modes**:
+- **`flow`** — Standard flow-based execution with full pipeline/flow context and deduplication tracking
+- **`direct`** — Direct execution without database persistence (CLI tools, ephemeral workflows); deduplication is disabled and IDs are set to the sentinel value `'direct'`
+
+**Factory Methods**:
+- `ExecutionContext::fromFlow($pipeline_id, $flow_id, $flow_step_id, $job_id, $handler_type)` — Standard flow execution
+- `ExecutionContext::direct($handler_type)` — Direct execution mode
+- `ExecutionContext::fromConfig($config, $job_id, $handler_type)` — Backward-compatible creation from handler config array
+
+**Key Methods for Processed Items**:
+- `isItemProcessed(string $item_id): bool` — Checks deduplication via `ProcessedItems::has_item_been_processed()`. Returns `false` in direct mode.
+- `markItemProcessed(string $item_id): void` — Fires `datamachine_mark_item_processed` action. No-op in direct mode.
+- `storeEngineData(array $data): void` — Merges data into engine snapshot for the current job
+- `getEngine(): EngineData` — Lazily loads engine data for the current job
+
 ## Related Documentation
 
 - Execute Endpoint - Workflow execution
@@ -406,4 +473,4 @@ curl -X DELETE https://example.com/wp-json/datamachine/v1/processed-items/1523 \
 **Permission**: `manage_options` capability required
 **Implementation**: `inc/Api/ProcessedItems.php`
 **Database Table**: `wp_datamachine_processed_items`
-**Service**: `DataMachine\Services\ProcessedItemsManager`
+**Abilities**: `DataMachine\Abilities\ProcessedItemsAbilities`

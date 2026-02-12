@@ -16,7 +16,6 @@ Services layer architecture with direct method calls for optimal performance. Th
 - `wp_datamachine_pipelines` - Pipeline templates (reusable)
 - `wp_datamachine_flows` - Flow instances (scheduled + configured)
 - `wp_datamachine_logs` - Centralized system logs for all agent activity (@since v0.4.0)
-- `wp_datamachine_logs` - Centralized system logs for all agent activity (@since v0.4.0)
 - `wp_datamachine_processed_items` - Deduplication tracking per execution
 
 ### Engine Data Architecture

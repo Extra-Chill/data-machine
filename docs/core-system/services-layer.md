@@ -24,13 +24,14 @@ The migration from OOP service managers to WordPress Abilities API is **complete
 
 ## Abilities Overview
 
-14 ability classes provide 58 registered abilities covering all Data Machine operations:
+22 ability classes provide 79 registered abilities covering all Data Machine operations:
 
 - **PipelineAbilities** - 7 abilities for pipeline CRUD, import/export
 - **PipelineStepAbilities** - 5 abilities for pipeline step management
 - **FlowAbilities** - 5 abilities for flow CRUD and duplication
-- **FlowStepAbilities** - 3 abilities for flow step configuration
-- **JobAbilities** - 5 abilities for workflow execution, job management, health monitoring
+- **FlowStepAbilities** - 4 abilities for flow step configuration and validation
+- **JobAbilities** - 6 abilities for workflow execution, job management, health monitoring, summary
+- **RecoverStuckJobsAbility** - 1 ability for stuck job recovery
 - **FileAbilities** - 5 abilities for file management and uploads
 - **ProcessedItemsAbilities** - 3 abilities for deduplication tracking
 - **SettingsAbilities** - 7 abilities for plugin and handler settings
@@ -40,6 +41,11 @@ The migration from OOP service managers to WordPress Abilities API is **complete
 - **StepTypeAbilities** - 2 abilities for step type discovery and validation
 - **PostQueryAbilities** - 1 ability for querying Data Machine-created posts
 - **LocalSearchAbilities** - 1 ability for WordPress site search
+- **SystemAbilities** - 2 abilities for session titles and health checks
+- **TaxonomyAbilities** - 5 abilities for taxonomy term CRUD and resolution
+- **QueueAbility** - 8 abilities for flow queue management
+- **AltTextAbilities** - 2 abilities for media alt text generation and diagnostics
+- **SendPingAbility** - 1 ability for agent ping notifications
 
 ## Architecture Principles
 
