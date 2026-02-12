@@ -1426,9 +1426,42 @@ class QueueAbility {
 		$core = preg_replace( '/^(\d+\s+(amazing\s+|interesting\s+|fun\s+|cool\s+)?facts?\s+about\s+)/i', '', $core );
 		$core = preg_replace( '/^(the\s+history\s+of\s+)/i', '', $core );
 		$core = preg_replace( '/^(why\s+am\s+i\s+craving\s+)/i', '', $core );
+		$core = preg_replace( '/^mix\s+/i', '', $core );
 		$core = preg_replace( '/[?.!]+$/', '', $core );
 		$core = trim( $core );
 
+		// Normalize compound topics so word order doesn't matter.
+		// "Hydrogen Peroxide and Baking Soda" = "Baking Soda and Hydrogen Peroxide".
+		$core = $this->normalizeCompoundTopic( $core );
+
 		return $core;
+	}
+
+	/**
+	 * Normalize compound topics by sorting parts alphabetically.
+	 *
+	 * Handles "A and B" patterns so that word order doesn't affect matching.
+	 * e.g. "Hydrogen Peroxide and Baking Soda" becomes "Baking Soda and Hydrogen Peroxide".
+	 *
+	 * @param string $topic The topic string to normalize.
+	 * @return string Normalized topic with parts sorted alphabetically.
+	 */
+	private function normalizeCompoundTopic( string $topic ): string {
+		// Only normalize if there's an "and" joining two parts.
+		if ( ! preg_match( '/\band\b/i', $topic ) ) {
+			return $topic;
+		}
+
+		// Split on " and " (case-insensitive), sort parts, rejoin.
+		$parts = preg_split( '/\s+and\s+/i', $topic );
+
+		if ( count( $parts ) < 2 ) {
+			return $topic;
+		}
+
+		$parts = array_map( 'trim', $parts );
+		sort( $parts, SORT_STRING | SORT_FLAG_CASE );
+
+		return implode( ' and ', $parts );
 	}
 }
