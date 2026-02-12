@@ -17,33 +17,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 class FlowScheduling {
 
 	/**
-	 * Interval shorthand aliases.
-	 *
-	 * Maps common shorthand formats (from UI/database) to canonical interval names.
-	 * Ensures backwards compatibility with existing data.
-	 *
-	 * @var array<string, string>
-	 */
-	private static $interval_aliases = array(
-		'2hours' => 'every_2_hours',
-		'3days'  => 'every_3_days',
-		'4hours' => 'every_4_hours',
-		'6hours' => 'qtrdaily',
-		'5min'   => 'every_5_minutes',
-		'5mins'  => 'every_5_minutes',
-	);
-
-	/**
-	 * Normalize interval name, converting shorthands to canonical names.
-	 *
-	 * @param string $interval Raw interval value
-	 * @return string Normalized interval name
-	 */
-	private static function normalize_interval( string $interval ): string {
-		return self::$interval_aliases[ $interval ] ?? $interval;
-	}
-
-	/**
 	 * Handle scheduling configuration updates for a flow.
 	 *
 	 * scheduling_config now only contains scheduling data (interval, timestamps).
@@ -67,11 +40,6 @@ class FlowScheduling {
 		}
 
 		$interval = $scheduling_config['interval'] ?? null;
-
-		// Normalize shorthand intervals to canonical names
-		if ( $interval && 'manual' !== $interval && 'one_time' !== $interval ) {
-			$interval = self::normalize_interval( $interval );
-		}
 
 		// Handle manual scheduling (unschedule)
 		if ( 'manual' === $interval || null === $interval ) {

@@ -3,6 +3,10 @@
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
 
+## Unreleased
+
+- Remove scheduling interval aliases — only canonical names from SchedulerIntervals.php are accepted. Non-canonical values now return WP_Error instead of being silently normalized.
+
 ## [0.22.0] - 2026-02-11
 
 - feat(agent-ping): add reply_to field for custom channel routing (#111)
