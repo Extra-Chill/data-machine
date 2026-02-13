@@ -21,18 +21,6 @@ use DataMachine\Core\PluginSettings;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Get a queue tuning setting with fallback to default.
- *
- * @param string $key     Setting key (concurrent_batches, batch_size, time_limit).
- * @param int    $default Default value if not set.
- * @return int
- */
-function datamachine_get_queue_tuning( string $key, int $default ): int {
-	$tuning = PluginSettings::get( 'queue_tuning', array() );
-	return isset( $tuning[ $key ] ) ? absint( $tuning[ $key ] ) : $default;
-}
-
-/**
  * Get default queue tuning values.
  *
  * These defaults are more aggressive than Action Scheduler's ultra-conservative
@@ -49,45 +37,31 @@ function datamachine_get_queue_tuning_defaults(): array {
 }
 
 /**
- * Filter: Number of concurrent batches allowed.
+ * Apply queue tuning filters.
  *
- * Higher values = more parallel execution, but higher server load.
- * Recommended: 2-5 depending on server resources.
+ * Reads settings once and applies all three filters from the cached values.
+ * Avoids repeated get_option() calls on every page load.
  */
-add_filter(
-	'action_scheduler_queue_runner_concurrent_batches',
-	function ( $default ) {
+add_action(
+	'action_scheduler_init',
+	function () {
 		$defaults = datamachine_get_queue_tuning_defaults();
-		return datamachine_get_queue_tuning( 'concurrent_batches', $defaults['concurrent_batches'] );
+		$tuning   = \DataMachine\Core\PluginSettings::get( 'queue_tuning', array() );
+
+		$concurrent = isset( $tuning['concurrent_batches'] ) ? absint( $tuning['concurrent_batches'] ) : $defaults['concurrent_batches'];
+		$batch_size = isset( $tuning['batch_size'] ) ? absint( $tuning['batch_size'] ) : $defaults['batch_size'];
+		$time_limit = isset( $tuning['time_limit'] ) ? absint( $tuning['time_limit'] ) : $defaults['time_limit'];
+
+		add_filter( 'action_scheduler_queue_runner_concurrent_batches', function () use ( $concurrent ) {
+			return $concurrent;
+		} );
+
+		add_filter( 'action_scheduler_queue_runner_batch_size', function () use ( $batch_size ) {
+			return $batch_size;
+		} );
+
+		add_filter( 'action_scheduler_queue_runner_time_limit', function () use ( $time_limit ) {
+			return $time_limit;
+		} );
 	}
 );
-
-/**
- * Filter: Number of actions claimed per batch.
- *
- * Larger batches = fewer claim operations, but longer individual batch times.
- * For AI-heavy workloads, smaller batches with more concurrency often works better.
- */
-add_filter(
-	'action_scheduler_queue_runner_batch_size',
-	function ( $default ) {
-		$defaults = datamachine_get_queue_tuning_defaults();
-		return datamachine_get_queue_tuning( 'batch_size', $defaults['batch_size'] );
-	}
-);
-
-/**
- * Filter: Maximum execution time per batch in seconds.
- *
- * Should be less than PHP's max_execution_time to allow graceful completion.
- * AI steps with external API calls may need longer limits.
- */
-add_filter(
-	'action_scheduler_queue_runner_time_limit',
-	function ( $default ) {
-		$defaults = datamachine_get_queue_tuning_defaults();
-		return datamachine_get_queue_tuning( 'time_limit', $defaults['time_limit'] );
-	}
-);
-
-// Queue tuning is applied silently via filters above.

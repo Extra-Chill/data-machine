@@ -317,6 +317,9 @@ class AltTextAbilities {
 			return;
 		}
 
+		// Instantiate Jobs DB once for all job tracking in this method.
+		$jobs_db = ( $job_id > 0 ) ? new \DataMachine\Core\Database\Jobs\Jobs() : null;
+
 		$file_path = get_attached_file( $attachment_id );
 		if ( empty( $file_path ) || ! file_exists( $file_path ) ) {
 			do_action(
@@ -328,8 +331,7 @@ class AltTextAbilities {
 					'agent_type'    => 'system',
 				)
 			);
-			if ( $job_id > 0 ) {
-				$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
+			if ( $jobs_db ) {
 				$jobs_db->complete_job( $job_id, (string) \DataMachine\Core\JobStatus::failed( 'image file missing' ) );
 			}
 			return;
@@ -348,8 +350,7 @@ class AltTextAbilities {
 					'agent_type'    => 'system',
 				)
 			);
-			if ( $job_id > 0 ) {
-				$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
+			if ( $jobs_db ) {
 				$jobs_db->complete_job( $job_id, (string) \DataMachine\Core\JobStatus::failed( 'no AI provider configured' ) );
 			}
 			return;
@@ -431,8 +432,7 @@ class AltTextAbilities {
 					'agent_type'    => 'system',
 				)
 			);
-			if ( $job_id > 0 ) {
-				$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
+			if ( $jobs_db ) {
 				$jobs_db->complete_job( $job_id, (string) \DataMachine\Core\JobStatus::failed( $response['error'] ?? 'Unknown error' ) );
 			}
 			return;
@@ -451,8 +451,7 @@ class AltTextAbilities {
 					'agent_type'    => 'system',
 				)
 			);
-			if ( $job_id > 0 ) {
-				$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
+			if ( $jobs_db ) {
 				$jobs_db->complete_job( $job_id, (string) \DataMachine\Core\JobStatus::failed( 'empty AI response' ) );
 			}
 			return;
@@ -476,8 +475,7 @@ class AltTextAbilities {
 				)
 			);
 			// Update DM Job status
-			if ( $job_id > 0 ) {
-				$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
+			if ( $jobs_db ) {
 				$jobs_db->store_engine_data( $job_id, [
 					'alt_text'      => $alt_text,
 					'attachment_id' => $attachment_id,
@@ -499,8 +497,7 @@ class AltTextAbilities {
 				)
 			);
 			// Update DM Job status
-			if ( $job_id > 0 ) {
-				$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
+			if ( $jobs_db ) {
 				$jobs_db->store_engine_data( $job_id, [
 					'alt_text'      => $alt_text,
 					'attachment_id' => $attachment_id,
@@ -520,8 +517,7 @@ class AltTextAbilities {
 					'success'       => false,
 				)
 			);
-			if ( $job_id > 0 ) {
-				$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
+			if ( $jobs_db ) {
 				$jobs_db->complete_job( $job_id, (string) \DataMachine\Core\JobStatus::failed( 'failed to save' ) );
 			}
 		}
