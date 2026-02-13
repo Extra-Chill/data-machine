@@ -62,12 +62,8 @@ class JobsOperations {
 		$pipeline_id = $is_direct_execution ? 'direct' : (string) absint( $pipeline_id );
 		$flow_id     = $is_direct_execution ? 'direct' : (string) absint( $flow_id );
 
-		// Validate and set source
-		$valid_sources = array( 'pipeline', 'chat', 'system', 'api', 'direct' );
-		$source        = $job_data['source'] ?? ( $is_direct_execution ? 'direct' : 'pipeline' );
-		if ( ! in_array( $source, $valid_sources, true ) ) {
-			$source = 'direct';
-		}
+		// Sanitize source — accept any string, don't gatekeep values.
+		$source = sanitize_key( $job_data['source'] ?? ( $is_direct_execution ? 'direct' : 'pipeline' ) );
 
 		$label = isset( $job_data['label'] ) ? sanitize_text_field( $job_data['label'] ) : null;
 
