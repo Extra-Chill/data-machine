@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## Unreleased
+
+### Fixed
+- Fix CACHE_PREFIX not available in Cache_Invalidator due to PSR-4 autoloading not loading namespace constants across files — promote to class constant on Calendar_Query
+
 ## [0.12.7] - 2026-02-12
 
 ### Changed

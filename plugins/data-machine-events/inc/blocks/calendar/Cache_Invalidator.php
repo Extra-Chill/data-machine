@@ -71,8 +71,8 @@ class Cache_Invalidator {
 		$wpdb->query(
 			$wpdb->prepare(
 				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
-				'_transient_' . CACHE_PREFIX . '%',
-				'_transient_timeout_' . CACHE_PREFIX . '%'
+				'_transient_' . Calendar_Query::CACHE_PREFIX . '%',
+				'_transient_timeout_' . Calendar_Query::CACHE_PREFIX . '%'
 			)
 		);
 

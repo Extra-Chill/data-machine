@@ -28,10 +28,11 @@ const DAYS_PER_PAGE             = 5;
 const MIN_EVENTS_FOR_PAGINATION = 20;
 const CACHE_TTL_DATES           = 5 * MINUTE_IN_SECONDS;
 const CACHE_TTL_COUNTS          = 10 * MINUTE_IN_SECONDS;
-const CACHE_PREFIX              = 'datamachine_cal_';
 const LAZY_RENDER_THRESHOLD     = 5;
 
 class Calendar_Query {
+
+	const CACHE_PREFIX = 'datamachine_cal_';
 
 	/**
 	 * Build WP_Query arguments for calendar events
@@ -167,7 +168,7 @@ class Calendar_Query {
 	 * @return array ['past' => int, 'future' => int]
 	 */
 	public static function get_event_counts(): array {
-		$cache_key = CACHE_PREFIX . 'counts';
+		$cache_key = self::CACHE_PREFIX . 'counts';
 		$cached    = get_transient( $cache_key );
 
 		if ( false !== $cached ) {
@@ -892,7 +893,7 @@ class Calendar_Query {
 			'archive_term' => $params['archive_term_id'] ?? 0,
 		);
 
-		return CACHE_PREFIX . $prefix . '_' . md5( wp_json_encode( $key_data ) );
+		return self::CACHE_PREFIX . $prefix . '_' . md5( wp_json_encode( $key_data ) );
 	}
 
 	/**
