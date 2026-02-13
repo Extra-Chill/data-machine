@@ -32,9 +32,21 @@ class ToolResultFinder {
 		foreach ( $dataPackets as $entry ) {
 			$entry_type = $entry['type'] ?? '';
 
-			if ( in_array( $entry_type, array( 'tool_result', 'ai_handler_complete' ), true ) ) {
+			// Only match successful handler completions.
+			// 'ai_handler_complete' entries are already filtered for success during creation.
+			// 'tool_result' entries must be checked for tool_success to avoid treating
+			// failed tool calls as successful publish completions.
+			if ( 'ai_handler_complete' === $entry_type ) {
 				$handler_tool = $entry['metadata']['handler_tool'] ?? '';
 				if ( $handler_tool === $handler ) {
+					return $entry;
+				}
+			}
+
+			if ( 'tool_result' === $entry_type ) {
+				$handler_tool = $entry['metadata']['handler_tool'] ?? '';
+				$tool_success = $entry['metadata']['tool_success'] ?? false;
+				if ( $handler_tool === $handler && $tool_success ) {
 					return $entry;
 				}
 			}
