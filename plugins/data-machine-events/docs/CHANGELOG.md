@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.12.7] - 2026-02-12
+
+### Changed
+- Rewrite README for accessibility, move technical details to AGENTS.md
+
+### Fixed
+- Fix CACHE_PREFIX double-definition warning in Calendar namespace
+
 ## [0.12.6] - 2026-02-03
 
 ### Fixed
