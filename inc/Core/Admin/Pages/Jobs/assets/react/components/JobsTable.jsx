@@ -34,33 +34,6 @@ const formatStatus = ( status ) => {
 	);
 };
 
-const SOURCE_COLORS = {
-	pipeline: '#2271b1',
-	chat: '#00a32a',
-	system: '#8c5cb3',
-	api: '#dba617',
-	direct: '#787c82',
-};
-
-const SourceBadge = ( { source } ) => {
-	const color = SOURCE_COLORS[ source ] || SOURCE_COLORS.direct;
-	return (
-		<span
-			style={ {
-				display: 'inline-block',
-				padding: '2px 6px',
-				borderRadius: '3px',
-				fontSize: '11px',
-				color: '#fff',
-				backgroundColor: color,
-				marginRight: '8px',
-			} }
-		>
-			{ source || 'unknown' }
-		</span>
-	);
-};
-
 const JobsTable = ( { jobs, isLoading, isError, error } ) => {
 	if ( isLoading ) {
 		return (
@@ -101,7 +74,7 @@ const JobsTable = ( { jobs, isLoading, isError, error } ) => {
 						<th className="datamachine-col-job-id">
 							{ __( 'Job ID', 'data-machine' ) }
 						</th>
-						<th>{ __( 'Source', 'data-machine' ) }</th>
+						<th>{ __( 'Pipeline / Flow', 'data-machine' ) }</th>
 						<th className="datamachine-col-status">
 							{ __( 'Status', 'data-machine' ) }
 						</th>
@@ -120,11 +93,11 @@ const JobsTable = ( { jobs, isLoading, isError, error } ) => {
 								<strong>{ job.job_id }</strong>
 							</td>
 							<td>
-								<SourceBadge
-									source={ job.source }
-								/>
-								{ job.display_label ||
-									__( 'Unknown', 'data-machine' ) }
+								{ job.pipeline_name ||
+									__( 'Unknown Pipeline', 'data-machine' ) }
+								{ ' → ' }
+								{ job.flow_name ||
+									__( 'Unknown Flow', 'data-machine' ) }
 							</td>
 							<td>
 								<span
