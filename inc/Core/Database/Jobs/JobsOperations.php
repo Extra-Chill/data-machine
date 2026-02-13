@@ -62,13 +62,20 @@ class JobsOperations {
 		$pipeline_id = $is_direct_execution ? 'direct' : (string) absint( $pipeline_id );
 		$flow_id     = $is_direct_execution ? 'direct' : (string) absint( $flow_id );
 
+		// Sanitize source — accept any string, don't gatekeep values.
+		$source = sanitize_key( $job_data['source'] ?? ( $is_direct_execution ? 'direct' : 'pipeline' ) );
+
+		$label = isset( $job_data['label'] ) ? sanitize_text_field( $job_data['label'] ) : null;
+
 		$data = array(
 			'pipeline_id' => $pipeline_id,
 			'flow_id'     => $flow_id,
+			'source'      => $source,
+			'label'       => $label,
 			'status'      => 'pending',
 		);
 
-		$format = array( '%s', '%s', '%s' );
+		$format = array( '%s', '%s', '%s', '%s', '%s' );
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$inserted = $this->wpdb->insert( $this->table_name, $data, $format );
@@ -137,6 +144,11 @@ class JobsOperations {
 		if ( ! empty( $args['status'] ) ) {
 			$where_clauses[] = 'status = %s';
 			$where_values[]  = sanitize_text_field( $args['status'] );
+		}
+
+		if ( ! empty( $args['source'] ) ) {
+			$where_clauses[] = 'source = %s';
+			$where_values[]  = sanitize_text_field( $args['source'] );
 		}
 
 		$where_sql = '';
@@ -216,6 +228,11 @@ class JobsOperations {
 		if ( ! empty( $args['status'] ) ) {
 			$where_clauses[] = 'j.status = %s';
 			$where_values[]  = sanitize_text_field( $args['status'] );
+		}
+
+		if ( ! empty( $args['source'] ) ) {
+			$where_clauses[] = 'j.source = %s';
+			$where_values[]  = sanitize_text_field( $args['source'] );
 		}
 
 		$where_sql = '';

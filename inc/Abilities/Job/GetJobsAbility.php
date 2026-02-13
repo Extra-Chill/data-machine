@@ -55,6 +55,10 @@ class GetJobsAbility {
 								'type'        => array( 'string', 'null' ),
 								'description' => __( 'Filter jobs by status (pending, processing, completed, failed, completed_no_items, agent_skipped)', 'data-machine' ),
 							),
+							'source'      => array(
+								'type'        => array( 'string', 'null' ),
+								'description' => __( 'Filter jobs by source (pipeline, chat, system, api, direct)', 'data-machine' ),
+							),
 							'per_page'    => array(
 								'type'        => 'integer',
 								'default'     => self::DEFAULT_PER_PAGE,
@@ -118,6 +122,7 @@ class GetJobsAbility {
 		$flow_id     = $input['flow_id'] ?? null;
 		$pipeline_id = $input['pipeline_id'] ?? null;
 		$status      = $input['status'] ?? null;
+		$source      = $input['source'] ?? null;
 		$per_page    = (int) ( $input['per_page'] ?? self::DEFAULT_PER_PAGE );
 		$offset      = (int) ( $input['offset'] ?? 0 );
 		$orderby     = $input['orderby'] ?? 'j.job_id';
@@ -179,6 +184,11 @@ class GetJobsAbility {
 		if ( null !== $status && '' !== $status ) {
 			$args['status']            = sanitize_text_field( $status );
 			$filters_applied['status'] = $args['status'];
+		}
+
+		if ( null !== $source && '' !== $source ) {
+			$args['source']            = sanitize_text_field( $source );
+			$filters_applied['source'] = $args['source'];
 		}
 
 		$jobs  = $this->db_jobs->get_jobs_for_list_table( $args );

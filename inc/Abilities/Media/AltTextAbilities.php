@@ -594,6 +594,8 @@ class AltTextAbilities {
 		$job_id = $jobs_db->create_job( [
 			'pipeline_id' => 'direct',
 			'flow_id'     => 'direct',
+			'source'      => 'system',
+			'label'       => 'Alt Text Generation',
 		] );
 
 		if ( $job_id ) {

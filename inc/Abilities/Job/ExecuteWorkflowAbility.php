@@ -287,6 +287,8 @@ class ExecuteWorkflowAbility {
 			array(
 				'pipeline_id' => 'direct',
 				'flow_id'     => 'direct',
+				'source'      => 'chat',
+				'label'       => 'Chat Workflow',
 			)
 		);
 

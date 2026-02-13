@@ -84,6 +84,8 @@ function datamachine_register_execution_engine() {
 					array(
 						'pipeline_id' => $pipeline_id,
 						'flow_id'     => $flow_id,
+						'source'      => 'pipeline',
+						'label'       => $flow['flow_name'] ?? null,
 					)
 				);
 				if ( ! $job_id ) {

@@ -103,6 +103,8 @@ class Jobs {
             job_id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
             pipeline_id varchar(20) NOT NULL,
             flow_id varchar(20) NOT NULL,
+            source varchar(50) NOT NULL DEFAULT 'pipeline',
+            label varchar(255) NULL DEFAULT NULL,
             status varchar(255) NOT NULL,
             engine_data longtext NULL,
             created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -110,7 +112,8 @@ class Jobs {
             PRIMARY KEY  (job_id),
             KEY status (status),
             KEY pipeline_id (pipeline_id),
-            KEY flow_id (flow_id)
+            KEY flow_id (flow_id),
+            KEY source (source)
         ) $charset_collate;";
 
 		dbDelta( $sql );
@@ -148,7 +151,7 @@ class Jobs {
 				"SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH 
                  FROM information_schema.COLUMNS 
                  WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s 
-                 AND COLUMN_NAME IN ('status', 'pipeline_id', 'flow_id')",
+                 AND COLUMN_NAME IN ('status', 'pipeline_id', 'flow_id', 'source')",
 				DB_NAME,
 				$table_name
 			),
@@ -199,6 +202,41 @@ class Jobs {
 				array(
 					'table_name' => $table_name,
 				)
+			);
+		}
+
+		// Add source and label columns for pipeline decoupling.
+		if ( ! isset( $columns['source'] ) ) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$result = $wpdb->query(
+				"ALTER TABLE {$table_name}
+				 ADD COLUMN source varchar(50) NOT NULL DEFAULT 'pipeline' AFTER flow_id,
+				 ADD COLUMN label varchar(255) NULL DEFAULT NULL AFTER source,
+				 ADD KEY source (source)"
+			);
+
+			if ( false === $result ) {
+				do_action(
+					'datamachine_log',
+					'error',
+					'Failed to add source/label columns to jobs table',
+					array(
+						'table_name' => $table_name,
+						'db_error'   => $wpdb->last_error,
+					)
+				);
+				return;
+			}
+
+			// Backfill existing rows.
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$wpdb->query( "UPDATE {$table_name} SET source = 'direct' WHERE pipeline_id = 'direct'" );
+
+			do_action(
+				'datamachine_log',
+				'info',
+				'Added source and label columns to jobs table for pipeline decoupling',
+				array( 'table_name' => $table_name )
 			);
 		}
 	}

@@ -55,6 +55,16 @@ trait JobHelpers {
 			$job['completed_at_display'] = DateFormatter::format_for_display( $job['completed_at'] );
 		}
 
+		// Compute display_label for UI
+		if ( ! empty( $job['label'] ) ) {
+			$job['display_label'] = $job['label'];
+		} elseif ( ! empty( $job['pipeline_name'] ) && ! empty( $job['flow_name'] ) ) {
+			$job['display_label'] = $job['pipeline_name'] . ' → ' . $job['flow_name'];
+		} else {
+			$source               = $job['source'] ?? 'unknown';
+			$job['display_label'] = ucfirst( $source ) . ' Execution';
+		}
+
 		return $job;
 	}
 
@@ -66,19 +76,24 @@ trait JobHelpers {
 	 * @return int|null Job ID on success, null on failure.
 	 */
 	protected function createJob( int $flow_id, int $pipeline_id = 0 ): ?int {
+		$flow = $this->db_flows->get_flow( $flow_id );
+		if ( ! $flow ) {
+			do_action( 'datamachine_log', 'error', 'Job creation failed - flow not found', array( 'flow_id' => $flow_id ) );
+			return null;
+		}
+
 		if ( $pipeline_id <= 0 ) {
-			$flow = $this->db_flows->get_flow( $flow_id );
-			if ( ! $flow ) {
-				do_action( 'datamachine_log', 'error', 'Job creation failed - flow not found', array( 'flow_id' => $flow_id ) );
-				return null;
-			}
 			$pipeline_id = (int) $flow['pipeline_id'];
 		}
+
+		$flow_name = $flow['flow_name'] ?? null;
 
 		$job_id = $this->db_jobs->create_job(
 			array(
 				'pipeline_id' => $pipeline_id,
 				'flow_id'     => $flow_id,
+				'source'      => 'pipeline',
+				'label'       => $flow_name,
 			)
 		);
 
