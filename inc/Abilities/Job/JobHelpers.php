@@ -55,14 +55,19 @@ trait JobHelpers {
 			$job['completed_at_display'] = DateFormatter::format_for_display( $job['completed_at'] );
 		}
 
-		// Compute display_label for UI
+		// Handle direct execution jobs (system agent, chat, API).
+		if ( ( $job['pipeline_id'] ?? '' ) === 'direct' ) {
+			$job['pipeline_name'] = $job['pipeline_name'] ?? __( 'Direct', 'data-machine' );
+			$job['flow_name']     = $job['flow_name'] ?? __( 'Direct Execution', 'data-machine' );
+		}
+
+		// Compute display_label for UI.
 		if ( ! empty( $job['label'] ) ) {
 			$job['display_label'] = $job['label'];
 		} elseif ( ! empty( $job['pipeline_name'] ) && ! empty( $job['flow_name'] ) ) {
 			$job['display_label'] = $job['pipeline_name'] . ' → ' . $job['flow_name'];
 		} else {
-			$source               = $job['source'] ?? 'unknown';
-			$job['display_label'] = ucfirst( $source ) . ' Execution';
+			$job['display_label'] = __( 'Unknown Execution', 'data-machine' );
 		}
 
 		return $job;

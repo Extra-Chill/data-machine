@@ -93,11 +93,8 @@ const JobsTable = ( { jobs, isLoading, isError, error } ) => {
 								<strong>{ job.job_id }</strong>
 							</td>
 							<td>
-								{ job.pipeline_name ||
-									__( 'Unknown Pipeline', 'data-machine' ) }
-								{ ' → ' }
-								{ job.flow_name ||
-									__( 'Unknown Flow', 'data-machine' ) }
+								{ job.display_label ||
+									`${ job.pipeline_name || __( 'Unknown Pipeline', 'data-machine' ) } → ${ job.flow_name || __( 'Unknown Flow', 'data-machine' ) }` }
 							</td>
 							<td>
 								<span
