@@ -3,6 +3,11 @@
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
 
+## [0.22.2] - 2026-02-14
+
+### Fixed
+- Rebuild stale JS assets — Jobs page now correctly shows Pipeline/Flow source instead of 'unknown'
+
 ## [0.22.0] - 2026-02-11
 
 - feat(agent-ping): add reply_to field for custom channel routing (#111)
