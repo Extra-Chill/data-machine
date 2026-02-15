@@ -2,6 +2,8 @@
 
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
+## [Unreleased]
+
 ## [0.22.3] - 2026-02-15
 
 ### Changed
