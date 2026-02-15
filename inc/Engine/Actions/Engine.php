@@ -574,7 +574,7 @@ function datamachine_register_execution_engine() {
 
 			// 1. Always unschedule existing to prevent duplicates
 			if ( function_exists( 'as_unschedule_all_actions' ) ) {
-				as_unschedule_all_actions( 'datamachine_run_flow_now', array(), 'data-machine' );
+				as_unschedule_all_actions( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
 			}
 
 			// 2. Handle 'manual' case
