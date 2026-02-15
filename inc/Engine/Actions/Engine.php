@@ -573,8 +573,8 @@ function datamachine_register_execution_engine() {
 			$db_flows = new \DataMachine\Core\Database\Flows\Flows();
 
 			// 1. Always unschedule existing to prevent duplicates
-			if ( function_exists( 'as_unschedule_action' ) ) {
-				as_unschedule_action( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
+			if ( function_exists( 'as_unschedule_all_actions' ) ) {
+				as_unschedule_all_actions( 'datamachine_run_flow_now', array(), 'data-machine' );
 			}
 
 			// 2. Handle 'manual' case

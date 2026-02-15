@@ -43,8 +43,8 @@ class FlowScheduling {
 
 		// Handle manual scheduling (unschedule)
 		if ( 'manual' === $interval || null === $interval ) {
-			if ( function_exists( 'as_unschedule_action' ) ) {
-				as_unschedule_action( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
+			if ( function_exists( 'as_unschedule_all_actions' ) ) {
+				as_unschedule_all_actions( 'datamachine_run_flow_now', array(), 'data-machine' );
 			}
 
 			$db_flows->update_flow_scheduling( $flow_id, array( 'interval' => 'manual' ) );
@@ -109,8 +109,8 @@ class FlowScheduling {
 		}
 
 		// Clear any existing schedule first
-		if ( function_exists( 'as_unschedule_action' ) ) {
-			as_unschedule_action( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
+		if ( function_exists( 'as_unschedule_all_actions' ) ) {
+			as_unschedule_all_actions( 'datamachine_run_flow_now', array(), 'data-machine' );
 		}
 
 		as_schedule_recurring_action(
