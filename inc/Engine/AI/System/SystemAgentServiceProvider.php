@@ -14,6 +14,7 @@ namespace DataMachine\Engine\AI\System;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Engine\AI\System\Tasks\AltTextTask;
+use DataMachine\Engine\AI\System\Tasks\GitHubIssueTask;
 use DataMachine\Engine\AI\System\Tasks\ImageGenerationTask;
 
 class SystemAgentServiceProvider {
@@ -49,6 +50,7 @@ class SystemAgentServiceProvider {
 	public function getBuiltInTasks( array $tasks ): array {
 		$tasks['image_generation']    = ImageGenerationTask::class;
 		$tasks['alt_text_generation'] = AltTextTask::class;
+		$tasks['github_create_issue'] = GitHubIssueTask::class;
 
 		return $tasks;
 	}

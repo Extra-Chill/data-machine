@@ -47,6 +47,8 @@ class SystemAgentDirective implements \DataMachine\Engine\AI\Directives\Directiv
 		. '- User asks about API configuration → "API Configuration Help"' . "\n"
 		. '- User wants to create a workflow → "Workflow Creation Assistance"' . "\n"
 		. '- User reports an issue → "Bug Report Discussion"' . "\n\n"
+		. '## GitHub Issue Creation' . "\n\n"
+		. 'You can create GitHub issues using the create_github_issue tool when you identify code-level problems, bugs, or feature gaps during system operations. Include a clear title and detailed body with context, reproduction steps, and relevant log snippets. Use labels to categorize (e.g., "bug", "enhancement"). The repo parameter is optional if a default repository is configured in settings. Only create issues for genuine problems — never create duplicates.' . "\n\n"
 		. '## System Operations' . "\n\n"
 		. 'Execute system tasks with precision. Log all operations appropriately. Handle errors gracefully and provide clear feedback.';
 	}

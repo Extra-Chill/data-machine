@@ -83,4 +83,37 @@ $datamachine_all_pages = apply_filters( 'datamachine_admin_pages', array() );
 		</td>
 	</tr>
 
+	<tr>
+		<th scope="row">
+			<label for="github_pat"><?php esc_html_e( 'GitHub Personal Access Token', 'data-machine' ); ?></label>
+		</th>
+		<td>
+			<input type="password"
+					id="github_pat"
+					name="datamachine_settings[github_pat]"
+					value="<?php echo esc_attr( $datamachine_settings['github_pat'] ?? '' ); ?>"
+					class="regular-text">
+			<p class="description">
+				<?php esc_html_e( 'A GitHub PAT with the "repo" scope. Used by the System Agent to create issues.', 'data-machine' ); ?>
+			</p>
+		</td>
+	</tr>
+
+	<tr>
+		<th scope="row">
+			<label for="github_default_repo"><?php esc_html_e( 'Default GitHub Repository', 'data-machine' ); ?></label>
+		</th>
+		<td>
+			<input type="text"
+					id="github_default_repo"
+					name="datamachine_settings[github_default_repo]"
+					value="<?php echo esc_attr( $datamachine_settings['github_default_repo'] ?? '' ); ?>"
+					class="regular-text"
+					placeholder="owner/repo">
+			<p class="description">
+				<?php esc_html_e( 'Default repository for GitHub issue creation, e.g., owner/repo.', 'data-machine' ); ?>
+			</p>
+		</td>
+	</tr>
+
 </table>
