@@ -354,7 +354,22 @@ function datamachine_register_execution_engine() {
 					)
 				);
 
-				if ( $status_override ) {
+				if ( $status_override && JobStatus::isStatusWaiting( $status_override ) ) {
+					// Waiting status: pipeline is parked at a webhook gate.
+					// Job status was already set by the step. Do not schedule next step.
+					// Do not clean up data packets (needed when pipeline resumes).
+					do_action(
+						'datamachine_log',
+						'info',
+						'Pipeline parked in waiting state (webhook gate)',
+						[
+							'job_id'       => $job_id,
+							'pipeline_id'  => $flow_step_config['pipeline_id'] ?? null,
+							'flow_id'      => $flow_id,
+							'flow_step_id' => $flow_step_id,
+						]
+					);
+				} elseif ( $status_override ) {
 					$complete_result = $db_jobs->complete_job( $job_id, $status_override );
 
 					do_action(

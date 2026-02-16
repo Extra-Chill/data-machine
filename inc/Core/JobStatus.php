@@ -21,6 +21,7 @@ class JobStatus {
 	// Base status constants
 	public const PENDING            = 'pending';
 	public const PROCESSING         = 'processing';
+	public const WAITING            = 'waiting';
 	public const COMPLETED          = 'completed';
 	public const FAILED             = 'failed';
 	public const COMPLETED_NO_ITEMS = 'completed_no_items';
@@ -180,6 +181,28 @@ class JobStatus {
 	}
 
 	/**
+	 * Check if this is a waiting status (pipeline parked at webhook gate).
+	 */
+	public function isWaiting(): bool {
+		return $this->baseStatus === self::WAITING;
+	}
+
+	/**
+	 * Check if a status string represents waiting.
+	 */
+	public static function isStatusWaiting( string $status ): bool {
+		$base = self::parseBaseStatus( $status );
+		return $base === self::WAITING;
+	}
+
+	/**
+	 * Create a waiting status.
+	 */
+	public static function waiting(): self {
+		return new self( self::WAITING );
+	}
+
+	/**
 	 * Check if this is an agent_skipped status.
 	 */
 	public function isAgentSkipped(): bool {
@@ -253,6 +276,10 @@ class JobStatus {
 
 		if ( str_starts_with( $status, self::PROCESSING ) ) {
 			return self::PROCESSING;
+		}
+
+		if ( str_starts_with( $status, self::WAITING ) ) {
+			return self::WAITING;
 		}
 
 		if ( str_starts_with( $status, self::PENDING ) ) {
