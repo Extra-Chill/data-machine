@@ -223,7 +223,11 @@ class GoogleSearch extends BaseTool {
 		}
 	}
 
-	public function get_config_fields(): array {
+	public function get_config_fields( $fields = array(), $tool_id = '' ) {
+		if ( ! empty( $tool_id ) && 'google_search' !== $tool_id ) {
+			return $fields;
+		}
+
 		return array(
 			'api_key'          => array(
 				'type'        => 'text',
