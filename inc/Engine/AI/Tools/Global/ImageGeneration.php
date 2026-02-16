@@ -176,11 +176,13 @@ class ImageGeneration extends BaseTool {
 			return;
 		}
 
-		$config = array(
-			'api_key'              => $api_key,
-			'default_model'        => sanitize_text_field( $config_data['default_model'] ?? ImageGenerationAbilities::DEFAULT_MODEL ),
-			'default_aspect_ratio' => sanitize_text_field( $config_data['default_aspect_ratio'] ?? ImageGenerationAbilities::DEFAULT_ASPECT_RATIO ),
-		);
+		$config = [
+			'api_key'                    => $api_key,
+			'default_model'              => sanitize_text_field( $config_data['default_model'] ?? ImageGenerationAbilities::DEFAULT_MODEL ),
+			'default_aspect_ratio'       => sanitize_text_field( $config_data['default_aspect_ratio'] ?? ImageGenerationAbilities::DEFAULT_ASPECT_RATIO ),
+			'prompt_refinement_enabled'  => ! empty( $config_data['prompt_refinement_enabled'] ),
+			'prompt_style_guide'         => sanitize_textarea_field( $config_data['prompt_style_guide'] ?? '' ),
+		];
 
 		if ( update_site_option( ImageGenerationAbilities::CONFIG_OPTION, $config ) ) {
 			wp_send_json_success(
@@ -206,35 +208,48 @@ class ImageGeneration extends BaseTool {
 			return $fields;
 		}
 
-		return array(
-			'api_key'              => array(
+		return [
+			'api_key'                    => [
 				'type'        => 'password',
 				'label'       => __( 'Replicate API Key', 'data-machine' ),
 				'placeholder' => __( 'Enter your Replicate API key', 'data-machine' ),
 				'required'    => true,
 				'description' => __( 'Get your API key from replicate.com/account/api-tokens', 'data-machine' ),
-			),
-			'default_model'        => array(
+			],
+			'default_model'              => [
 				'type'        => 'text',
 				'label'       => __( 'Default Model', 'data-machine' ),
 				'placeholder' => ImageGenerationAbilities::DEFAULT_MODEL,
 				'required'    => false,
 				'description' => __( 'Replicate model identifier. Default: google/imagen-4-fast. AI agents can override per-call.', 'data-machine' ),
-			),
-			'default_aspect_ratio' => array(
+			],
+			'default_aspect_ratio'       => [
 				'type'        => 'select',
 				'label'       => __( 'Default Aspect Ratio', 'data-machine' ),
 				'required'    => false,
-				'options'     => array(
+				'options'     => [
 					'1:1'  => '1:1 (Square)',
 					'3:4'  => '3:4 (Portrait)',
 					'4:3'  => '4:3 (Landscape)',
 					'9:16' => '9:16 (Tall)',
 					'16:9' => '16:9 (Wide)',
-				),
+				],
 				'description' => __( 'Default aspect ratio for generated images. 3:4 (portrait) is ideal for Pinterest and blog featured images.', 'data-machine' ),
-			),
-		);
+			],
+			'prompt_refinement_enabled'  => [
+				'type'        => 'checkbox',
+				'label'       => __( 'Enable Prompt Refinement', 'data-machine' ),
+				'required'    => false,
+				'description' => __( 'Use Data Machine\'s AI to craft detailed image prompts from simple inputs. Requires a default AI provider in DM settings. Enabled by default.', 'data-machine' ),
+			],
+			'prompt_style_guide'         => [
+				'type'        => 'textarea',
+				'label'       => __( 'Image Style Guide', 'data-machine' ),
+				'placeholder' => ImageGenerationAbilities::get_default_style_guide(),
+				'required'    => false,
+				'description' => __( 'System prompt that guides how image prompts are refined. Customize this to match your brand\'s visual style. Leave empty to use the default.', 'data-machine' ),
+			],
+		];
 	}
 }
 
