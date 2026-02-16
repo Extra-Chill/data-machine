@@ -120,6 +120,24 @@ class SettingsCommand extends BaseCommand {
 			$value = false;
 		} elseif ( is_numeric( $value ) && strpos( $value, '.' ) === false ) {
 			$value = (int) $value;
+		} elseif ( is_string( $value ) ) {
+			$trimmed_value = trim( $value );
+
+			// Allow JSON input for array/object settings.
+			if ( '' !== $trimmed_value && ( str_starts_with( $trimmed_value, '{' ) || str_starts_with( $trimmed_value, '[' ) ) ) {
+				$decoded = json_decode( $trimmed_value, true );
+				if ( JSON_ERROR_NONE === json_last_error() ) {
+					$value = $decoded;
+				}
+			}
+
+			// Convenience format for enabled_tools: comma-separated list of tool IDs.
+			if ( 'enabled_tools' === $key && is_string( $value ) && '' !== trim( $value ) && ! str_contains( $value, '{' ) ) {
+				$tool_ids = array_filter( array_map( 'trim', explode( ',', $value ) ) );
+				if ( ! empty( $tool_ids ) ) {
+					$value = array_fill_keys( $tool_ids, true );
+				}
+			}
 		}
 
 		$old_value = PluginSettings::get( $key );
@@ -131,10 +149,16 @@ class SettingsCommand extends BaseCommand {
 
 		$result = $ability->execute( array( $key => $value ) );
 
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+
 		if ( $result['success'] ?? false ) {
 			WP_CLI::success( "Updated '{$key}': " . $this->format_value( $old_value ) . ' → ' . $this->format_value( $value ) );
 		} elseif ( $old_value === $value ) {
 			WP_CLI::warning( "Setting '{$key}' already has value: " . $this->format_value( $value ) );
+		} elseif ( ! empty( $result['error'] ) ) {
+			WP_CLI::error( (string) $result['error'] );
 		} else {
 			WP_CLI::error( "Failed to update setting '{$key}'." );
 		}
