@@ -58,6 +58,7 @@ require_once __DIR__ . '/inc/Engine/AI/Tools/Global/GoogleSearch.php';
 require_once __DIR__ . '/inc/Engine/AI/Tools/Global/LocalSearch.php';
 require_once __DIR__ . '/inc/Engine/AI/Tools/Global/WebFetch.php';
 require_once __DIR__ . '/inc/Engine/AI/Tools/Global/WordPressPostReader.php';
+require_once __DIR__ . '/inc/Engine/AI/Tools/Global/ImageGeneration.php';
 require_once __DIR__ . '/inc/Engine/AI/Directives/GlobalSystemPromptDirective.php';
 require_once __DIR__ . '/inc/Engine/AI/Directives/SiteContext.php';
 require_once __DIR__ . '/inc/Engine/AI/Directives/SiteContextDirective.php';
