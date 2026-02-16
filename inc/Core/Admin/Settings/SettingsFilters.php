@@ -118,7 +118,7 @@ function datamachine_sanitize_settings( $input ) {
 		foreach ( $soul_keys as $soul_key ) {
 			$sanitized['agent_soul'][ $soul_key ] = '';
 			if ( isset( $input['agent_soul'][ $soul_key ] ) ) {
-				$sanitized['agent_soul'][ $soul_key ] = wp_unslash( $input['agent_soul'][ $soul_key ] );
+				$sanitized['agent_soul'][ $soul_key ] = wp_kses_post( wp_unslash( $input['agent_soul'][ $soul_key ] ) );
 			}
 		}
 	}
@@ -126,7 +126,7 @@ function datamachine_sanitize_settings( $input ) {
 	// Legacy global system prompt (backward compat — read by AgentSoulDirective as fallback).
 	$sanitized['global_system_prompt'] = '';
 	if ( isset( $input['global_system_prompt'] ) ) {
-		$sanitized['global_system_prompt'] = wp_unslash( $input['global_system_prompt'] );
+		$sanitized['global_system_prompt'] = wp_kses_post( wp_unslash( $input['global_system_prompt'] ) );
 	}
 
 	// Site context toggle
