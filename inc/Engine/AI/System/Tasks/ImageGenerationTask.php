@@ -25,6 +25,13 @@ class ImageGenerationTask extends SystemTask {
 	const MAX_ATTEMPTS = 24;
 
 	/**
+	 * JPEG quality for converted images (0-100).
+	 *
+	 * @var int
+	 */
+	const JPEG_QUALITY = 85;
+
+	/**
 	 * Execute image generation task.
 	 *
 	 * Polls Replicate API once for prediction status. If still processing,
@@ -319,8 +326,8 @@ class ImageGenerationTask extends SystemTask {
 	/**
 	 * Sideload a remote image into the WordPress media library.
 	 *
-	 * Downloads the image from the remote URL and creates a WordPress
-	 * attachment with metadata for traceability.
+	 * Downloads the image from the remote URL, converts to JPEG for optimal
+	 * file size, and creates a WordPress attachment with metadata for traceability.
 	 *
 	 * @param string $image_url Remote image URL.
 	 * @param string $prompt    Generation prompt (used for title/description).
@@ -344,15 +351,18 @@ class ImageGenerationTask extends SystemTask {
 			return $tmp_file;
 		}
 
-		// Determine file extension from URL or default to jpg
-		$extension = pathinfo( wp_parse_url( $image_url, PHP_URL_PATH ), PATHINFO_EXTENSION );
-		if ( empty( $extension ) || ! in_array( $extension, [ 'jpg', 'jpeg', 'png', 'webp', 'gif' ], true ) ) {
-			$extension = 'jpg';
+		// Convert non-JPEG images to JPEG for smaller file sizes.
+		// Some providers (e.g. Replicate/Imagen) return PNG data even when
+		// JPEG is requested, so we normalize to JPEG after download.
+		$tmp_file = $this->maybeConvertToJpeg( $tmp_file );
+
+		if ( is_wp_error( $tmp_file ) ) {
+			return $tmp_file;
 		}
 
-		// Build a clean filename from the prompt
+		// Always use .jpg — maybeConvertToJpeg ensures the content is JPEG.
 		$slug     = sanitize_title( mb_substr( $prompt, 0, 80 ) );
-		$filename = "ai-generated-{$slug}.{$extension}";
+		$filename = "ai-generated-{$slug}.jpg";
 
 		$file_array = [
 			'name'     => $filename,
@@ -400,6 +410,62 @@ class ImageGenerationTask extends SystemTask {
 			'attachment_id'  => $attachment_id,
 			'attachment_url' => $attachment_url,
 		];
+	}
+
+	/**
+	 * Convert a downloaded image to JPEG if it isn't already.
+	 *
+	 * Uses WP_Image_Editor (GD/Imagick) for reliable conversion. If the file
+	 * is already JPEG or conversion fails, returns the original path unchanged.
+	 *
+	 * @param string $tmp_file Path to the temporary downloaded file.
+	 * @return string|\WP_Error Path to the (possibly converted) temp file, or WP_Error on critical failure.
+	 */
+	protected function maybeConvertToJpeg( string $tmp_file ): string|\WP_Error {
+		// Read actual MIME from file content using WordPress image editor.
+		$editor = wp_get_image_editor( $tmp_file );
+
+		if ( is_wp_error( $editor ) ) {
+			// Can't load image — return as-is, let sideload handle it.
+			return $tmp_file;
+		}
+
+		$current_mime = $editor->get_mime_type();
+
+		// Already JPEG — nothing to do.
+		if ( in_array( $current_mime, [ 'image/jpeg', 'image/jpg' ], true ) ) {
+			return $tmp_file;
+		}
+
+		// Set quality and save as JPEG to a new temp file.
+		$editor->set_quality( self::JPEG_QUALITY );
+		$converted = $editor->save( $tmp_file . '.jpg', 'image/jpeg' );
+
+		if ( is_wp_error( $converted ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'System Agent: JPEG conversion failed, using original file: ' . $converted->get_error_message(),
+				[ 'agent_type' => 'system' ]
+			);
+			// Fall back to original file — non-critical failure.
+			return $tmp_file;
+		}
+
+		// Clean up the original temp file and return the converted path.
+		wp_delete_file( $tmp_file );
+
+		do_action(
+			'datamachine_log',
+			'debug',
+			"System Agent: Converted {$current_mime} to JPEG for sideload",
+			[
+				'original_mime' => $current_mime,
+				'agent_type'    => 'system',
+			]
+		);
+
+		return $converted['path'];
 	}
 
 	/**
