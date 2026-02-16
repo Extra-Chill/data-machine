@@ -247,6 +247,7 @@ function datamachine_load_handlers() {
 	new \DataMachine\Core\Steps\Publish\Handlers\GoogleSheets\GoogleSheets();
 	new \DataMachine\Core\Steps\Publish\Handlers\Threads\Threads();
 	new \DataMachine\Core\Steps\Publish\Handlers\Bluesky\Bluesky();
+	new \DataMachine\Core\Steps\Publish\Handlers\Pinterest\Pinterest();
 
 	// Fetch Handlers
 	new \DataMachine\Core\Steps\Fetch\Handlers\WordPress\WordPress();
