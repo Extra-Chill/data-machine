@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
+## [0.23.1] - 2026-02-16
+
+### Added
+- Bing Webmaster Tools analytics connector
+
+### Fixed
+- WP-CLI settings set fatal when ability returns WP_Error
+- ImageGenerationTask undefined $params in handleSuccess()
+
 ## [0.23.0] - 2026-02-16
 
 ### Added
