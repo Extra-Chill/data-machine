@@ -16,6 +16,13 @@ defined( 'ABSPATH' ) || exit;
 abstract class BaseTool {
 
 	/**
+	 * Whether this tool supports async execution.
+	 *
+	 * @var bool
+	 */
+	protected bool $async = false;
+
+	/**
 	 * Register a tool for any agent type.
 	 *
 	 * Agent-agnostic tool registration that dynamically creates the appropriate filter
@@ -201,5 +208,35 @@ abstract class BaseTool {
 		}
 
 		return $response;
+	}
+
+	/**
+	 * Build pending response for async tasks.
+	 *
+	 * Schedules a task with the System Agent and returns a pending response
+	 * that indicates the task is being processed in the background.
+	 *
+	 * @param string $taskType   Task type identifier for System Agent.
+	 * @param array  $taskParams Task parameters to pass to the handler.
+	 * @param array  $context    Context for routing results back.
+	 * @param string $toolName   Tool name for the response.
+	 * @return array Pending response array.
+	 */
+	protected function buildPendingResponse( string $taskType, array $taskParams, array $context = [], string $toolName = '' ): array {
+		$systemAgent = \DataMachine\Engine\AI\System\SystemAgent::getInstance();
+		$jobId = $systemAgent->scheduleTask( $taskType, $taskParams, $context );
+
+		if ( ! $jobId ) {
+			return $this->buildErrorResponse( 'Failed to schedule async task.', $toolName );
+		}
+
+		return [
+			'success'   => true,
+			'pending'   => true,
+			'job_id'    => $jobId,
+			'task_type' => $taskType,
+			'message'   => "Task scheduled for background processing (Job #{$jobId}).",
+			'tool_name' => $toolName,
+		];
 	}
 }

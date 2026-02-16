@@ -19,6 +19,13 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class ImageGeneration extends BaseTool {
 
 	/**
+	 * This tool uses async execution via the System Agent.
+	 *
+	 * @var bool
+	 */
+	protected bool $async = true;
+
+	/**
 	 * Option key for storing image generation configuration.
 	 *
 	 * @var string
@@ -38,20 +45,6 @@ class ImageGeneration extends BaseTool {
 	 * @var string
 	 */
 	const DEFAULT_ASPECT_RATIO = '3:4';
-
-	/**
-	 * Maximum seconds to poll for prediction completion.
-	 *
-	 * @var int
-	 */
-	const POLL_TIMEOUT = 120;
-
-	/**
-	 * Seconds between poll requests.
-	 *
-	 * @var int
-	 */
-	const POLL_INTERVAL = 2;
 
 	/**
 	 * Valid aspect ratios.
@@ -134,26 +127,17 @@ class ImageGeneration extends BaseTool {
 			);
 		}
 
-		// Poll for completion.
-		$image_url = $this->poll_prediction( $prediction['id'], $config['api_key'] );
-
-		if ( null === $image_url ) {
-			return $this->buildErrorResponse(
-				'Image generation timed out or failed. Check Replicate dashboard for details.',
-				'image_generation'
-			);
-		}
-
-		return array(
-			'success'   => true,
-			'data'      => array(
-				'message'      => "Image generated successfully using {$model}.",
-				'image_url'    => $image_url,
-				'prompt'       => $prompt,
-				'model'        => $model,
-				'aspect_ratio' => $aspect_ratio,
-			),
-			'tool_name' => 'image_generation',
+		// NEW: Hand off to System Agent instead of polling
+		return $this->buildPendingResponse(
+			'image_generation',
+			[
+				'prediction_id' => $prediction['id'],
+				'model'         => $model,
+				'prompt'        => $prompt,
+				'aspect_ratio'  => $aspect_ratio,
+			],
+			[], // context - pipeline/chat routing handled upstream
+			'image_generation'
 		);
 	}
 
@@ -183,59 +167,6 @@ class ImageGeneration extends BaseTool {
 			'output_format'  => 'webp',
 			'output_quality' => 90,
 		);
-	}
-
-	/**
-	 * Poll Replicate for prediction completion.
-	 *
-	 * @param string $prediction_id Prediction ID.
-	 * @param string $api_key       Replicate API key.
-	 * @return string|null Image URL or null on failure/timeout.
-	 */
-	private function poll_prediction( string $prediction_id, string $api_key ): ?string {
-		$elapsed = 0;
-
-		while ( $elapsed < self::POLL_TIMEOUT ) {
-			sleep( self::POLL_INTERVAL );
-			$elapsed += self::POLL_INTERVAL;
-
-			$result = HttpClient::get(
-				"https://api.replicate.com/v1/predictions/{$prediction_id}",
-				array(
-					'timeout' => 15,
-					'headers' => array(
-						'Authorization' => 'Token ' . $api_key,
-					),
-					'context' => 'Image Generation Poll',
-				)
-			);
-
-			if ( ! $result['success'] ) {
-				continue;
-			}
-
-			$status = json_decode( $result['data'], true );
-
-			if ( 'succeeded' === ( $status['status'] ?? '' ) ) {
-				$output = $status['output'] ?? null;
-
-				if ( is_string( $output ) ) {
-					return $output;
-				}
-
-				if ( is_array( $output ) && ! empty( $output ) ) {
-					return $output[0];
-				}
-
-				return null;
-			}
-
-			if ( 'failed' === ( $status['status'] ?? '' ) || 'canceled' === ( $status['status'] ?? '' ) ) {
-				return null;
-			}
-		}
-
-		return null;
 	}
 
 	/**
