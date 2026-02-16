@@ -39,7 +39,7 @@ class ImageGenerationTask extends SystemTask {
 		$model = $params['model'] ?? 'unknown';
 
 		// Read API key from tool config — never store secrets in engine_data
-		$config  = \DataMachine\Engine\AI\Tools\Global\ImageGeneration::get_config();
+		$config  = \DataMachine\Abilities\Media\ImageGenerationAbilities::get_config();
 		$api_key = $config['api_key'] ?? '';
 		$prompt = $params['prompt'] ?? '';
 		$aspect_ratio = $params['aspect_ratio'] ?? '';

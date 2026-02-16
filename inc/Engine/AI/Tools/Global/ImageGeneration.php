@@ -1,10 +1,9 @@
 <?php
 /**
- * Image Generation tool using Replicate API.
+ * Image Generation tool — AI agent wrapper for the generate-image ability.
  *
- * Supports multiple models (Google Imagen 4 Fast, Flux, etc.) with
- * configurable defaults via the settings page. Available to all AI agents
- * during pipeline execution and chat.
+ * Provides the AI-callable tool interface and settings page configuration.
+ * Delegates actual image generation to the datamachine/generate-image ability.
  *
  * @package DataMachine\Engine\AI\Tools\Global
  */
@@ -13,7 +12,7 @@ namespace DataMachine\Engine\AI\Tools\Global;
 
 defined( 'ABSPATH' ) || exit;
 
-use DataMachine\Core\HttpClient;
+use DataMachine\Abilities\Media\ImageGenerationAbilities;
 use DataMachine\Engine\AI\Tools\BaseTool;
 
 class ImageGeneration extends BaseTool {
@@ -25,155 +24,59 @@ class ImageGeneration extends BaseTool {
 	 */
 	protected bool $async = true;
 
-	/**
-	 * Option key for storing image generation configuration.
-	 *
-	 * @var string
-	 */
-	const CONFIG_OPTION = 'datamachine_image_generation_config';
-
-	/**
-	 * Default model identifier on Replicate.
-	 *
-	 * @var string
-	 */
-	const DEFAULT_MODEL = 'google/imagen-4-fast';
-
-	/**
-	 * Default aspect ratio for generated images.
-	 *
-	 * @var string
-	 */
-	const DEFAULT_ASPECT_RATIO = '3:4';
-
-	/**
-	 * Valid aspect ratios.
-	 *
-	 * @var array
-	 */
-	const VALID_ASPECT_RATIOS = array( '1:1', '3:4', '4:3', '9:16', '16:9' );
-
 	public function __construct() {
 		$this->registerConfigurationHandlers( 'image_generation' );
 		$this->registerGlobalTool( 'image_generation', array( $this, 'getToolDefinition' ) );
 	}
 
 	/**
-	 * Execute image generation via Replicate API.
+	 * Execute image generation by delegating to the ability.
 	 *
 	 * @param array $parameters Contains 'prompt' and optional 'model', 'aspect_ratio'.
 	 * @param array $tool_def   Tool definition (unused).
-	 * @return array Result with image URL on success.
+	 * @return array Result with pending status on success.
 	 */
 	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
-		if ( empty( $parameters['prompt'] ) ) {
+		$ability = wp_get_ability( 'datamachine/generate-image' );
+
+		if ( ! $ability ) {
 			return $this->buildErrorResponse(
-				'Image generation requires a prompt parameter.',
+				'Image generation ability not registered. Ensure WordPress 6.9+ and ImageGenerationAbilities is loaded.',
 				'image_generation'
 			);
 		}
 
-		$config = self::get_config();
-
-		if ( empty( $config['api_key'] ) ) {
-			return $this->buildErrorResponse(
-				'Image generation tool not configured. Please add a Replicate API key in Settings.',
-				'image_generation'
-			);
-		}
-
-		$prompt       = sanitize_text_field( $parameters['prompt'] );
-		$model        = ! empty( $parameters['model'] ) ? sanitize_text_field( $parameters['model'] ) : ( $config['default_model'] ?? self::DEFAULT_MODEL );
-		$aspect_ratio = ! empty( $parameters['aspect_ratio'] ) ? sanitize_text_field( $parameters['aspect_ratio'] ) : ( $config['default_aspect_ratio'] ?? self::DEFAULT_ASPECT_RATIO );
-
-		if ( ! in_array( $aspect_ratio, self::VALID_ASPECT_RATIOS, true ) ) {
-			$aspect_ratio = self::DEFAULT_ASPECT_RATIO;
-		}
-
-		$input_params = $this->build_input_params( $prompt, $aspect_ratio, $model );
-
-		// Start prediction.
-		$result = HttpClient::post(
-			'https://api.replicate.com/v1/predictions',
-			array(
-				'timeout' => 30,
-				'headers' => array(
-					'Authorization' => 'Token ' . $config['api_key'],
-					'Content-Type'  => 'application/json',
-				),
-				'body'    => wp_json_encode(
-					array(
-						'model' => $model,
-						'input' => $input_params,
-					)
-				),
-				'context' => 'Image Generation Tool',
-			)
+		$input = array(
+			'prompt'       => $parameters['prompt'] ?? '',
+			'model'        => $parameters['model'] ?? '',
+			'aspect_ratio' => $parameters['aspect_ratio'] ?? '',
 		);
 
-		if ( ! $result['success'] ) {
-			return $this->buildErrorResponse(
-				'Failed to start image generation: ' . ( $result['error'] ?? 'Unknown error' ),
-				'image_generation'
-			);
-		}
-
-		$prediction = json_decode( $result['data'], true );
-
-		if ( json_last_error() !== JSON_ERROR_NONE || empty( $prediction['id'] ) ) {
-			return $this->buildErrorResponse(
-				'Invalid response from Replicate API.',
-				'image_generation'
-			);
-		}
-
-		// Hand off to System Agent instead of polling.
-		// Pass pipeline job_id in context so the System Agent can read
-		// engine data (e.g. post_id) and set featured image after publish.
-		$context = [];
+		// Pass pipeline job context for featured image assignment.
 		if ( ! empty( $parameters['job_id'] ) ) {
-			$context['pipeline_job_id'] = (int) $parameters['job_id'];
+			$input['pipeline_job_id'] = (int) $parameters['job_id'];
 		}
 
-		return $this->buildPendingResponse(
-			'image_generation',
-			[
-				'prediction_id' => $prediction['id'],
-				'model'         => $model,
-				'prompt'        => $prompt,
-				'aspect_ratio'  => $aspect_ratio,
-			],
-			$context,
-			'image_generation'
-		);
-	}
+		$result = $ability->execute( $input );
 
-	/**
-	 * Build model-specific input parameters for Replicate.
-	 *
-	 * @param string $prompt       Image generation prompt.
-	 * @param string $aspect_ratio Aspect ratio.
-	 * @param string $model        Model identifier.
-	 * @return array Input parameters for the prediction.
-	 */
-	private function build_input_params( string $prompt, string $aspect_ratio, string $model ): array {
-		if ( false !== strpos( $model, 'imagen' ) ) {
-			return array(
-				'prompt'               => $prompt,
-				'aspect_ratio'         => $aspect_ratio,
-				'output_format'        => 'jpg',
-				'safety_filter_level'  => 'block_only_high',
+		// Handle WP_Error from ability execution.
+		if ( is_wp_error( $result ) ) {
+			return $this->buildErrorResponse(
+				$result->get_error_message(),
+				'image_generation'
 			);
 		}
 
-		// Flux and other models.
-		return array(
-			'prompt'         => $prompt,
-			'num_outputs'    => 1,
-			'aspect_ratio'   => $aspect_ratio,
-			'output_format'  => 'webp',
-			'output_quality' => 90,
-		);
+		if ( ! empty( $result['error'] ) ) {
+			return $this->buildErrorResponse(
+				$result['error'],
+				'image_generation'
+			);
+		}
+
+		// Return the ability result with tool_name added.
+		$result['tool_name'] = 'image_generation';
+		return $result;
 	}
 
 	/**
@@ -213,8 +116,7 @@ class ImageGeneration extends BaseTool {
 	 * @return bool
 	 */
 	public static function is_configured(): bool {
-		$config = self::get_config();
-		return ! empty( $config['api_key'] );
+		return ImageGenerationAbilities::is_configured();
 	}
 
 	/**
@@ -223,7 +125,7 @@ class ImageGeneration extends BaseTool {
 	 * @return array
 	 */
 	public static function get_config(): array {
-		return get_site_option( self::CONFIG_OPTION, array() );
+		return ImageGenerationAbilities::get_config();
 	}
 
 	/**
@@ -276,11 +178,11 @@ class ImageGeneration extends BaseTool {
 
 		$config = array(
 			'api_key'              => $api_key,
-			'default_model'        => sanitize_text_field( $config_data['default_model'] ?? self::DEFAULT_MODEL ),
-			'default_aspect_ratio' => sanitize_text_field( $config_data['default_aspect_ratio'] ?? self::DEFAULT_ASPECT_RATIO ),
+			'default_model'        => sanitize_text_field( $config_data['default_model'] ?? ImageGenerationAbilities::DEFAULT_MODEL ),
+			'default_aspect_ratio' => sanitize_text_field( $config_data['default_aspect_ratio'] ?? ImageGenerationAbilities::DEFAULT_ASPECT_RATIO ),
 		);
 
-		if ( update_site_option( self::CONFIG_OPTION, $config ) ) {
+		if ( update_site_option( ImageGenerationAbilities::CONFIG_OPTION, $config ) ) {
 			wp_send_json_success(
 				array(
 					'message'    => __( 'Image generation configuration saved successfully', 'data-machine' ),
@@ -315,7 +217,7 @@ class ImageGeneration extends BaseTool {
 			'default_model'        => array(
 				'type'        => 'text',
 				'label'       => __( 'Default Model', 'data-machine' ),
-				'placeholder' => self::DEFAULT_MODEL,
+				'placeholder' => ImageGenerationAbilities::DEFAULT_MODEL,
 				'required'    => false,
 				'description' => __( 'Replicate model identifier. Default: google/imagen-4-fast. AI agents can override per-call.', 'data-machine' ),
 			),
