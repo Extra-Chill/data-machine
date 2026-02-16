@@ -779,11 +779,20 @@ class FlowsCommand extends BaseCommand {
 	 */
 	private function handleQueue( array $args, array $assoc_args ): void {
 		if ( empty( $args ) ) {
+			if ( isset( $assoc_args['help'] ) ) {
+				$this->showQueueHelp();
+				return;
+			}
 			WP_CLI::error( 'Usage: wp datamachine flows queue <add|list|clear|remove|update|move> <flow_id> --step=<flow_step_id> [prompt|index]' );
 			return;
 		}
 
 		$action = $args[0] ?? '';
+
+		if ( isset( $assoc_args['help'] ) ) {
+			$this->showQueueActionHelp( $action );
+			return;
+		}
 
 		switch ( $action ) {
 			case 'add':
@@ -1144,6 +1153,170 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		WP_CLI::success( $result['message'] ?? 'Item moved in queue.' );
+	}
+
+
+	/**
+	 * Display general queue help.
+	 */
+	private function showQueueHelp(): void {
+		$lines = [
+			'',
+			'NAME',
+			'  wp datamachine flows queue',
+			'',
+			'DESCRIPTION',
+			'  Manage the prompt queue for a flow step.',
+			'',
+			'SYNOPSIS',
+			'  wp datamachine flows queue <action> <flow_id> [<args>...] [--step=<flow_step_id>]',
+			'',
+			'ACTIONS',
+			'  add       Add a prompt to the queue',
+			'  list      List all queued prompts',
+			'  remove    Remove a prompt by index',
+			'  update    Update a prompt at a given index',
+			'  move      Move a prompt from one position to another',
+			'  clear     Remove all prompts from the queue',
+			'',
+			'GLOBAL OPTIONS',
+			'  [--step=<flow_step_id>]',
+			'    Target a specific flow step. Auto-resolved if the flow has exactly one queueable step.',
+			'',
+			'Run `wp datamachine flows queue <action> --help` for action-specific help.',
+			'',
+		];
+
+		foreach ( $lines as $line ) {
+			WP_CLI::log( $line );
+		}
+	}
+
+	/**
+	 * Display help for a specific queue action.
+	 *
+	 * @param string $action Queue action name.
+	 */
+	private function showQueueActionHelp( string $action ): void {
+		$help = [
+			'add' => [
+				'NAME'        => 'wp datamachine flows queue add',
+				'DESCRIPTION' => 'Add a prompt to the queue for a flow step.',
+				'SYNOPSIS'    => 'wp datamachine flows queue add <flow_id> "<prompt>" [--step=<flow_step_id>]',
+				'OPTIONS'     => [
+					'<flow_id>'              => 'The flow ID (required).',
+					'<prompt>'               => 'The prompt text to enqueue (required).',
+					'[--step=<flow_step_id>]' => 'Target step. Auto-resolved if the flow has one queueable step.',
+				],
+				'EXAMPLES'    => [
+					'wp datamachine flows queue add 42 "Generate a blog post about AI"',
+					'wp datamachine flows queue add 42 --step=flow-42-step-abc "Write about cats"',
+				],
+			],
+			'list' => [
+				'NAME'        => 'wp datamachine flows queue list',
+				'DESCRIPTION' => 'List all prompts currently in the queue.',
+				'SYNOPSIS'    => 'wp datamachine flows queue list <flow_id> [--step=<flow_step_id>] [--format=<format>]',
+				'OPTIONS'     => [
+					'<flow_id>'              => 'The flow ID (required).',
+					'[--step=<flow_step_id>]' => 'Target step. Auto-resolved if the flow has one queueable step.',
+					'[--format=<format>]'    => 'Output format: table, json, csv, yaml. Default: table.',
+				],
+				'EXAMPLES'    => [
+					'wp datamachine flows queue list 42',
+					'wp datamachine flows queue list 42 --format=json',
+				],
+			],
+			'remove' => [
+				'NAME'        => 'wp datamachine flows queue remove',
+				'DESCRIPTION' => 'Remove a prompt from the queue by its index position.',
+				'SYNOPSIS'    => 'wp datamachine flows queue remove <flow_id> <index> [--step=<flow_step_id>]',
+				'OPTIONS'     => [
+					'<flow_id>'              => 'The flow ID (required).',
+					'<index>'                => 'Zero-based index of the prompt to remove (required).',
+					'[--step=<flow_step_id>]' => 'Target step. Auto-resolved if the flow has one queueable step.',
+				],
+				'EXAMPLES'    => [
+					'wp datamachine flows queue remove 42 0',
+					'wp datamachine flows queue remove 42 3 --step=flow-42-step-abc',
+				],
+			],
+			'update' => [
+				'NAME'        => 'wp datamachine flows queue update',
+				'DESCRIPTION' => 'Replace the prompt at a given index with new text.',
+				'SYNOPSIS'    => 'wp datamachine flows queue update <flow_id> <index> "<new_prompt>" [--step=<flow_step_id>]',
+				'OPTIONS'     => [
+					'<flow_id>'              => 'The flow ID (required).',
+					'<index>'                => 'Zero-based index of the prompt to update (required).',
+					'<new_prompt>'           => 'The replacement prompt text (required).',
+					'[--step=<flow_step_id>]' => 'Target step. Auto-resolved if the flow has one queueable step.',
+				],
+				'EXAMPLES'    => [
+					'wp datamachine flows queue update 42 0 "Updated prompt text"',
+				],
+			],
+			'move' => [
+				'NAME'        => 'wp datamachine flows queue move',
+				'DESCRIPTION' => 'Move a prompt from one position to another in the queue.',
+				'SYNOPSIS'    => 'wp datamachine flows queue move <flow_id> <from_index> <to_index> [--step=<flow_step_id>]',
+				'OPTIONS'     => [
+					'<flow_id>'              => 'The flow ID (required).',
+					'<from_index>'           => 'Current zero-based index of the prompt (required).',
+					'<to_index>'             => 'Desired zero-based index (required).',
+					'[--step=<flow_step_id>]' => 'Target step. Auto-resolved if the flow has one queueable step.',
+				],
+				'EXAMPLES'    => [
+					'wp datamachine flows queue move 42 2 0',
+				],
+			],
+			'clear' => [
+				'NAME'        => 'wp datamachine flows queue clear',
+				'DESCRIPTION' => 'Remove all prompts from the queue.',
+				'SYNOPSIS'    => 'wp datamachine flows queue clear <flow_id> [--step=<flow_step_id>]',
+				'OPTIONS'     => [
+					'<flow_id>'              => 'The flow ID (required).',
+					'[--step=<flow_step_id>]' => 'Target step. Auto-resolved if the flow has one queueable step.',
+				],
+				'EXAMPLES'    => [
+					'wp datamachine flows queue clear 42',
+				],
+			],
+		];
+
+		if ( ! isset( $help[ $action ] ) ) {
+			WP_CLI::error( "Unknown queue action: {$action}. Use: add, list, clear, remove, update, move" );
+			return;
+		}
+
+		$info = $help[ $action ];
+
+		WP_CLI::log( '' );
+		WP_CLI::log( 'NAME' );
+		WP_CLI::log( '  ' . $info['NAME'] );
+		WP_CLI::log( '' );
+		WP_CLI::log( 'DESCRIPTION' );
+		WP_CLI::log( '  ' . $info['DESCRIPTION'] );
+		WP_CLI::log( '' );
+		WP_CLI::log( 'SYNOPSIS' );
+		WP_CLI::log( '  ' . $info['SYNOPSIS'] );
+		WP_CLI::log( '' );
+
+		if ( ! empty( $info['OPTIONS'] ) ) {
+			WP_CLI::log( 'OPTIONS' );
+			foreach ( $info['OPTIONS'] as $opt => $desc ) {
+				WP_CLI::log( '  ' . $opt );
+				WP_CLI::log( '    ' . $desc );
+				WP_CLI::log( '' );
+			}
+		}
+
+		if ( ! empty( $info['EXAMPLES'] ) ) {
+			WP_CLI::log( 'EXAMPLES' );
+			foreach ( $info['EXAMPLES'] as $example ) {
+				WP_CLI::log( '  $ ' . $example );
+			}
+			WP_CLI::log( '' );
+		}
 	}
 
 }
