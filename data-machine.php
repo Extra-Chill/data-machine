@@ -59,6 +59,7 @@ require_once __DIR__ . '/inc/Engine/AI/Tools/Global/LocalSearch.php';
 require_once __DIR__ . '/inc/Engine/AI/Tools/Global/WebFetch.php';
 require_once __DIR__ . '/inc/Engine/AI/Tools/Global/WordPressPostReader.php';
 require_once __DIR__ . '/inc/Engine/AI/Tools/Global/ImageGeneration.php';
+require_once __DIR__ . '/inc/Engine/AI/Tools/Global/QueueValidator.php';
 require_once __DIR__ . '/inc/Engine/AI/System/Tasks/SystemTask.php';
 require_once __DIR__ . '/inc/Engine/AI/System/Tasks/ImageGenerationTask.php';
 require_once __DIR__ . '/inc/Engine/AI/System/SystemAgent.php';
