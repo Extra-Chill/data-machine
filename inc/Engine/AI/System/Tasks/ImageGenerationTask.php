@@ -171,17 +171,24 @@ class ImageGenerationTask extends SystemTask {
 			$attachment_url = $sideload_result['attachment_url'];
 		}
 
+		// Get local file path for engine data — publish handler uses image_file_path
+		$image_file_path = null;
+		if ( $attachment_id ) {
+			$image_file_path = get_attached_file( $attachment_id );
+		}
+
 		// Complete job with success data
 		$result = [
 			'success'      => true,
 			'data'         => [
-				'message'        => "Image generated successfully using {$model}.",
-				'image_url'      => $image_url,
-				'attachment_id'  => $attachment_id,
-				'attachment_url' => $attachment_url,
-				'prompt'         => $prompt,
-				'model'          => $model,
-				'aspect_ratio'   => $aspectRatio,
+				'message'         => "Image generated successfully using {$model}.",
+				'image_url'       => $image_url,
+				'attachment_id'   => $attachment_id,
+				'attachment_url'  => $attachment_url,
+				'image_file_path' => $image_file_path,
+				'prompt'          => $prompt,
+				'model'           => $model,
+				'aspect_ratio'    => $aspectRatio,
 			],
 			'tool_name'    => 'image_generation',
 			'completed_at' => current_time( 'mysql' ),
