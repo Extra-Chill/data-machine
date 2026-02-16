@@ -168,26 +168,29 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/Media/ImageGenerationAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/AgentPingAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/TaxonomyAbilities.php';
-	new \DataMachine\Abilities\AuthAbilities();
-	new \DataMachine\Abilities\FileAbilities();
-	new \DataMachine\Abilities\FlowAbilities();
-	new \DataMachine\Abilities\FlowStepAbilities();
-	new \DataMachine\Abilities\JobAbilities();
-	new \DataMachine\Abilities\LogAbilities();
-	new \DataMachine\Abilities\PostQueryAbilities();
-	new \DataMachine\Abilities\PipelineAbilities();
-	new \DataMachine\Abilities\PipelineStepAbilities();
-	new \DataMachine\Abilities\ProcessedItemsAbilities();
-	new \DataMachine\Abilities\SettingsAbilities();
-	new \DataMachine\Abilities\HandlerAbilities();
-	new \DataMachine\Abilities\StepTypeAbilities();
-	new \DataMachine\Abilities\LocalSearchAbilities();
-	new \DataMachine\Abilities\SystemAbilities();
-	new \DataMachine\Engine\AI\System\SystemAgentServiceProvider();
-	new \DataMachine\Abilities\Media\AltTextAbilities();
-	new \DataMachine\Abilities\Media\ImageGenerationAbilities();
-	new \DataMachine\Abilities\AgentPingAbilities();
-	new \DataMachine\Abilities\TaxonomyAbilities();
+	// Defer ability instantiation to init so translations are loaded.
+	add_action( 'init', function () {
+		new \DataMachine\Abilities\AuthAbilities();
+		new \DataMachine\Abilities\FileAbilities();
+		new \DataMachine\Abilities\FlowAbilities();
+		new \DataMachine\Abilities\FlowStepAbilities();
+		new \DataMachine\Abilities\JobAbilities();
+		new \DataMachine\Abilities\LogAbilities();
+		new \DataMachine\Abilities\PostQueryAbilities();
+		new \DataMachine\Abilities\PipelineAbilities();
+		new \DataMachine\Abilities\PipelineStepAbilities();
+		new \DataMachine\Abilities\ProcessedItemsAbilities();
+		new \DataMachine\Abilities\SettingsAbilities();
+		new \DataMachine\Abilities\HandlerAbilities();
+		new \DataMachine\Abilities\StepTypeAbilities();
+		new \DataMachine\Abilities\LocalSearchAbilities();
+		new \DataMachine\Abilities\SystemAbilities();
+		new \DataMachine\Engine\AI\System\SystemAgentServiceProvider();
+		new \DataMachine\Abilities\Media\AltTextAbilities();
+		new \DataMachine\Abilities\Media\ImageGenerationAbilities();
+		new \DataMachine\Abilities\AgentPingAbilities();
+		new \DataMachine\Abilities\TaxonomyAbilities();
+	} );
 }
 
 
