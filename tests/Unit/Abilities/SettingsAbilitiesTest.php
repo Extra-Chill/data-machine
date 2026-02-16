@@ -95,6 +95,7 @@ class SettingsAbilitiesTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'problem_flow_threshold', $settings );
 		$this->assertArrayHasKey( 'flows_per_page', $settings );
 		$this->assertArrayHasKey( 'jobs_per_page', $settings );
+		$this->assertArrayHasKey( 'agent_soul', $settings );
 		$this->assertArrayHasKey( 'global_system_prompt', $settings );
 		$this->assertArrayHasKey( 'site_context_enabled', $settings );
 		$this->assertArrayHasKey( 'default_provider', $settings );
@@ -168,6 +169,40 @@ class SettingsAbilitiesTest extends WP_UnitTestCase {
 
 		$updated_settings = get_option( 'datamachine_settings', array() );
 		$this->assertEquals( 'Test prompt content', $updated_settings['global_system_prompt'] );
+	}
+
+	public function test_update_settings_updates_agent_soul(): void {
+		$soul = array(
+			'identity' => 'I am a test agent',
+			'voice'    => 'Professional and concise',
+			'rules'    => 'Always be accurate',
+			'context'  => 'Tech blog audience',
+		);
+
+		$result = $this->settings_abilities->executeUpdateSettings(
+			array( 'agent_soul' => $soul )
+		);
+
+		$this->assertTrue( $result['success'] );
+
+		$updated_settings = get_option( 'datamachine_settings', array() );
+		$this->assertEquals( $soul, $updated_settings['agent_soul'] );
+	}
+
+	public function test_get_settings_returns_agent_soul_structure(): void {
+		$soul = array(
+			'identity' => 'Test identity',
+			'voice'    => '',
+			'rules'    => '',
+			'context'  => '',
+		);
+		update_option( 'datamachine_settings', array( 'agent_soul' => $soul ) );
+
+		$result   = $this->settings_abilities->executeGetSettings( array() );
+		$settings = $result['settings'];
+
+		$this->assertArrayHasKey( 'agent_soul', $settings );
+		$this->assertEquals( 'Test identity', $settings['agent_soul']['identity'] );
 	}
 
 	public function test_get_scheduling_intervals_returns_intervals(): void {

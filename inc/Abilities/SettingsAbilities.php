@@ -100,6 +100,15 @@ class SettingsAbilities {
 						'problem_flow_threshold'          => array( 'type' => 'integer' ),
 						'flows_per_page'              => array( 'type' => 'integer' ),
 						'jobs_per_page'               => array( 'type' => 'integer' ),
+						'agent_soul'                 => array(
+							'type'       => 'object',
+							'properties' => array(
+								'identity' => array( 'type' => 'string' ),
+								'voice'    => array( 'type' => 'string' ),
+								'rules'    => array( 'type' => 'string' ),
+								'context'  => array( 'type' => 'string' ),
+							),
+						),
 						'global_system_prompt'        => array( 'type' => 'string' ),
 						'site_context_enabled'        => array( 'type' => 'boolean' ),
 						'default_provider'            => array( 'type' => 'string' ),
@@ -343,6 +352,12 @@ class SettingsAbilities {
 				'problem_flow_threshold'         => $settings['problem_flow_threshold'] ?? 3,
 				'flows_per_page'              => $settings['flows_per_page'] ?? 20,
 				'jobs_per_page'               => $settings['jobs_per_page'] ?? 50,
+				'agent_soul'                 => $settings['agent_soul'] ?? array(
+					'identity' => '',
+					'voice'    => '',
+					'rules'    => '',
+					'context'  => '',
+				),
 				'global_system_prompt'        => $settings['global_system_prompt'] ?? '',
 				'site_context_enabled'        => $settings['site_context_enabled'] ?? false,
 				'default_provider'            => $settings['default_provider'] ?? '',
@@ -398,6 +413,17 @@ class SettingsAbilities {
 		if ( isset( $input['jobs_per_page'] ) ) {
 			$jobs_per_page                 = absint( $input['jobs_per_page'] );
 			$all_settings['jobs_per_page'] = max( 5, min( 100, $jobs_per_page ) );
+		}
+
+		if ( isset( $input['agent_soul'] ) && is_array( $input['agent_soul'] ) ) {
+			$soul_keys = array( 'identity', 'voice', 'rules', 'context' );
+			$soul      = array();
+			foreach ( $soul_keys as $soul_key ) {
+				$soul[ $soul_key ] = isset( $input['agent_soul'][ $soul_key ] )
+					? wp_kses_post( $input['agent_soul'][ $soul_key ] )
+					: '';
+			}
+			$all_settings['agent_soul'] = $soul;
 		}
 
 		if ( isset( $input['global_system_prompt'] ) ) {

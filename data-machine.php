@@ -65,7 +65,7 @@ require_once __DIR__ . '/inc/Engine/AI/System/Tasks/SystemTask.php';
 require_once __DIR__ . '/inc/Engine/AI/System/Tasks/ImageGenerationTask.php';
 require_once __DIR__ . '/inc/Engine/AI/System/SystemAgent.php';
 require_once __DIR__ . '/inc/Engine/AI/System/SystemAgentServiceProvider.php';
-require_once __DIR__ . '/inc/Engine/AI/Directives/GlobalSystemPromptDirective.php';
+require_once __DIR__ . '/inc/Engine/AI/Directives/AgentSoulDirective.php';
 require_once __DIR__ . '/inc/Engine/AI/Directives/SiteContext.php';
 require_once __DIR__ . '/inc/Engine/AI/Directives/SiteContextDirective.php';
 require_once __DIR__ . '/inc/Engine/AI/RequestBuilder.php';

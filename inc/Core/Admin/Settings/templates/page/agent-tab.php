@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 $datamachine_settings             = \DataMachine\Core\PluginSettings::all();
-$datamachine_global_prompt        = $datamachine_settings['global_system_prompt'] ?? '';
+$datamachine_agent_soul           = $datamachine_settings['agent_soul'] ?? array();
 $datamachine_site_context_enabled = $datamachine_settings['site_context_enabled'] ?? false;
 $datamachine_default_provider     = $datamachine_settings['default_provider'] ?? '';
 $datamachine_default_model        = $datamachine_settings['default_model'] ?? '';
@@ -78,15 +78,55 @@ $datamachine_global_tools = $datamachine_tool_manager->get_global_tools();
 	</tr>
 
 	<tr>
-		<th scope="row"><?php esc_html_e( 'Global System Prompt', 'data-machine' ); ?></th>
+		<th scope="row"><?php esc_html_e( 'Agent Soul', 'data-machine' ); ?></th>
 		<td>
-			<textarea name="datamachine_settings[global_system_prompt]" 
-						rows="8" 
-						cols="70" 
-						class="large-text code"><?php echo esc_textarea( $datamachine_global_prompt ); ?></textarea>
-			<p class="description">
-				<?php esc_html_e( 'Primary system message that sets the tone and overall behavior for all AI agents. This is the first and most important instruction that influences every AI response in your workflows.', 'data-machine' ); ?>
+			<p class="description" style="margin-bottom: 12px;">
+				<?php esc_html_e( 'Define your agent\'s identity. These sections shape WHO the agent is across all pipelines and chat interactions. Empty sections are skipped.', 'data-machine' ); ?>
 			</p>
+
+			<details open style="margin-bottom: 10px;">
+				<summary style="cursor: pointer; font-weight: 600; padding: 6px 0;">
+					<?php esc_html_e( 'Identity', 'data-machine' ); ?>
+				</summary>
+				<textarea name="datamachine_settings[agent_soul][identity]"
+							rows="4"
+							cols="70"
+							class="large-text code"
+							placeholder="<?php esc_attr_e( 'Who is this agent? What site does it write for? What\'s its purpose?', 'data-machine' ); ?>"><?php echo esc_textarea( $datamachine_agent_soul['identity'] ?? '' ); ?></textarea>
+			</details>
+
+			<details style="margin-bottom: 10px;">
+				<summary style="cursor: pointer; font-weight: 600; padding: 6px 0;">
+					<?php esc_html_e( 'Voice & Tone', 'data-machine' ); ?>
+				</summary>
+				<textarea name="datamachine_settings[agent_soul][voice]"
+							rows="4"
+							cols="70"
+							class="large-text code"
+							placeholder="<?php esc_attr_e( 'Tone, personality, writing style. e.g. "Curious, warm, slightly chaotic" or "Professional, authoritative, concise"', 'data-machine' ); ?>"><?php echo esc_textarea( $datamachine_agent_soul['voice'] ?? '' ); ?></textarea>
+			</details>
+
+			<details style="margin-bottom: 10px;">
+				<summary style="cursor: pointer; font-weight: 600; padding: 6px 0;">
+					<?php esc_html_e( 'Rules', 'data-machine' ); ?>
+				</summary>
+				<textarea name="datamachine_settings[agent_soul][rules]"
+							rows="4"
+							cols="70"
+							class="large-text code"
+							placeholder="<?php esc_attr_e( 'Universal behavioral constraints. e.g. "Never include text in generated images", "Always use Oxford commas"', 'data-machine' ); ?>"><?php echo esc_textarea( $datamachine_agent_soul['rules'] ?? '' ); ?></textarea>
+			</details>
+
+			<details style="margin-bottom: 10px;">
+				<summary style="cursor: pointer; font-weight: 600; padding: 6px 0;">
+					<?php esc_html_e( 'Context', 'data-machine' ); ?>
+				</summary>
+				<textarea name="datamachine_settings[agent_soul][context]"
+							rows="4"
+							cols="70"
+							class="large-text code"
+							placeholder="<?php esc_attr_e( 'Audience, content philosophy, brand values, target demographics.', 'data-machine' ); ?>"><?php echo esc_textarea( $datamachine_agent_soul['context'] ?? '' ); ?></textarea>
+			</details>
 		</td>
 	</tr>
 

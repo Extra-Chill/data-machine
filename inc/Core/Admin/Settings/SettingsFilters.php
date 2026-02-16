@@ -111,7 +111,19 @@ function datamachine_sanitize_settings( $input ) {
 	// Cleanup flag
 	$sanitized['cleanup_job_data_on_failure'] = ! empty( $input['cleanup_job_data_on_failure'] );
 
-	// Global system prompt
+	// Agent Soul (structured identity sections).
+	$sanitized['agent_soul'] = array();
+	if ( isset( $input['agent_soul'] ) && is_array( $input['agent_soul'] ) ) {
+		$soul_keys = array( 'identity', 'voice', 'rules', 'context' );
+		foreach ( $soul_keys as $soul_key ) {
+			$sanitized['agent_soul'][ $soul_key ] = '';
+			if ( isset( $input['agent_soul'][ $soul_key ] ) ) {
+				$sanitized['agent_soul'][ $soul_key ] = wp_unslash( $input['agent_soul'][ $soul_key ] );
+			}
+		}
+	}
+
+	// Legacy global system prompt (backward compat — read by AgentSoulDirective as fallback).
 	$sanitized['global_system_prompt'] = '';
 	if ( isset( $input['global_system_prompt'] ) ) {
 		$sanitized['global_system_prompt'] = wp_unslash( $input['global_system_prompt'] );
