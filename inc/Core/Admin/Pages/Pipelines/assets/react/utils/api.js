@@ -1,105 +1,14 @@
 /**
  * REST API Wrapper for Data Machine Pipelines
  *
- * Centralized REST API calls with error handling and standardized responses.
- * Uses wp.apiFetch from @wordpress/api-fetch.
+ * Domain-specific API functions for pipelines, flows, steps, and queues.
+ * Uses the shared REST client from @shared/utils/api.
  */
 
 /**
- * WordPress dependencies
+ * Internal dependencies
  */
-import apiFetch from '@wordpress/api-fetch';
-import { addQueryArgs } from '@wordpress/url';
-
-/**
- * Get REST API configuration from WordPress globals
- */
-const getConfig = () => {
-	const config = window.dataMachineConfig || {};
-	return {
-		restNamespace: config.restNamespace || 'datamachine/v1',
-		restNonce: config.restNonce || '',
-	};
-};
-
-/**
- * Core API Request Handler
- *
- * @param {string} path         - Endpoint path (relative to namespace)
- * @param {string} method       - HTTP method
- * @param {Object} data         - Request body data (for JSON)
- * @param {Object} params       - Query parameters
- * @param {Object} extraOptions - Additional fetch options (headers, body, etc.)
- */
-const request = async (
-	path,
-	method = 'GET',
-	data = undefined,
-	params = {},
-	extraOptions = {}
-) => {
-	const config = getConfig();
-	const endpoint = addQueryArgs(
-		`/${ config.restNamespace }${ path }`,
-		params
-	);
-
-	try {
-		const response = await apiFetch( {
-			path: endpoint,
-			method,
-			data,
-			headers: {
-				'X-WP-Nonce': config.restNonce,
-				...extraOptions.headers,
-			},
-			...extraOptions,
-		} );
-
-		return {
-			success: response.success,
-			data: response.data,
-			message: response.message || '',
-			...response,
-		};
-	} catch ( error ) {
-		console.error( `API Request Error [${ method } ${ path }]:`, error );
-
-		return {
-			success: false,
-			data: null,
-			message: error.message || 'An error occurred',
-		};
-	}
-};
-
-/**
- * API Client Methods
- */
-const client = {
-	get: ( path, params = {} ) => request( path, 'GET', undefined, params ),
-	post: ( path, data ) => request( path, 'POST', data ),
-	put: ( path, data ) => request( path, 'PUT', data ),
-	patch: ( path, data ) => request( path, 'PATCH', data ),
-	delete: ( path ) => request( path, 'DELETE' ),
-	upload: async ( path, file, additionalData = {} ) => {
-		const formData = new FormData();
-		formData.append( 'file', file );
-		Object.keys( additionalData ).forEach( ( key ) =>
-			formData.append( key, additionalData[ key ] )
-		);
-
-		return request(
-			path,
-			'POST',
-			undefined,
-			{},
-			{
-				body: formData,
-			}
-		);
-	},
-};
+import { client } from '@shared/utils/api';
 
 /**
  * Pipeline Operations
