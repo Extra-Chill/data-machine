@@ -422,18 +422,26 @@ class ImageGenerationTask extends SystemTask {
 	 * @return string|\WP_Error Path to the (possibly converted) temp file, or WP_Error on critical failure.
 	 */
 	protected function maybeConvertToJpeg( string $tmp_file ): string|\WP_Error {
-		// Read actual MIME from file content using WordPress image editor.
-		$editor = wp_get_image_editor( $tmp_file );
+		// Detect actual MIME type from file content.
+		$check = wp_get_image_mime( $tmp_file );
 
-		if ( is_wp_error( $editor ) ) {
-			// Can't load image — return as-is, let sideload handle it.
+		if ( ! $check ) {
+			// Can't determine MIME — return as-is, let sideload handle it.
 			return $tmp_file;
 		}
 
-		$current_mime = $editor->get_mime_type();
-
 		// Already JPEG — nothing to do.
-		if ( in_array( $current_mime, [ 'image/jpeg', 'image/jpg' ], true ) ) {
+		if ( in_array( $check, [ 'image/jpeg', 'image/jpg' ], true ) ) {
+			return $tmp_file;
+		}
+
+		$current_mime = $check;
+
+		// Load into WP_Image_Editor for conversion.
+		$editor = wp_get_image_editor( $tmp_file );
+
+		if ( is_wp_error( $editor ) ) {
+			// Can't load image — return as-is.
 			return $tmp_file;
 		}
 
