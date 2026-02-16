@@ -20,6 +20,8 @@ use DataMachine\Abilities\Job\FlowHealthAbility;
 use DataMachine\Abilities\Job\ProblemFlowsAbility;
 use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Abilities\Job\JobsSummaryAbility;
+use DataMachine\Abilities\Job\FailJobAbility;
+use DataMachine\Abilities\Job\RetryJobAbility;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -34,6 +36,8 @@ class JobAbilities {
 	private ProblemFlowsAbility $problem_flows;
 	private RecoverStuckJobsAbility $recover_stuck_jobs;
 	private JobsSummaryAbility $jobs_summary;
+	private FailJobAbility $fail_job;
+	private RetryJobAbility $retry_job;
 
 	public function __construct() {
 		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
@@ -47,6 +51,8 @@ class JobAbilities {
 		$this->problem_flows      = new ProblemFlowsAbility();
 		$this->recover_stuck_jobs = new RecoverStuckJobsAbility();
 		$this->jobs_summary       = new JobsSummaryAbility();
+		$this->fail_job           = new FailJobAbility();
+		$this->retry_job          = new RetryJobAbility();
 
 		self::$registered = true;
 	}
@@ -149,5 +155,31 @@ class JobAbilities {
 			$this->jobs_summary = new JobsSummaryAbility();
 		}
 		return $this->jobs_summary->execute( $input );
+	}
+
+	/**
+	 * Execute fail-job ability.
+	 *
+	 * @param array $input Input parameters.
+	 * @return array Result with job_id, previous_status, and new_status.
+	 */
+	public function executeFailJob( array $input ): array {
+		if ( ! isset( $this->fail_job ) ) {
+			$this->fail_job = new FailJobAbility();
+		}
+		return $this->fail_job->execute( $input );
+	}
+
+	/**
+	 * Execute retry-job ability.
+	 *
+	 * @param array $input Input parameters.
+	 * @return array Result with job_id, previous_status, and prompt_requeued flag.
+	 */
+	public function executeRetryJob( array $input ): array {
+		if ( ! isset( $this->retry_job ) ) {
+			$this->retry_job = new RetryJobAbility();
+		}
+		return $this->retry_job->execute( $input );
 	}
 }

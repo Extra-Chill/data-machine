@@ -476,4 +476,98 @@ class JobsCommand extends BaseCommand {
 
 		$this->format_items( $items, array( 'status', 'count' ), $assoc_args );
 	}
+
+	/**
+	 * Manually fail a processing job.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <job_id>
+	 * : The job ID to fail.
+	 *
+	 * [--reason=<reason>]
+	 * : Reason for failure.
+	 * ---
+	 * default: manual
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Fail a stuck job
+	 *     wp datamachine jobs fail 844
+	 *
+	 *     # Fail with a reason
+	 *     wp datamachine jobs fail 844 --reason="timeout"
+	 *
+	 * @subcommand fail
+	 */
+	public function fail( array $args, array $assoc_args ): void {
+		if ( empty( $args[0] ) || ! is_numeric( $args[0] ) || (int) $args[0] <= 0 ) {
+			WP_CLI::error( 'Job ID is required and must be a positive integer.' );
+			return;
+		}
+
+		$result = $this->abilities->executeFailJob(
+			array(
+				'job_id' => (int) $args[0],
+				'reason' => $assoc_args['reason'] ?? 'manual',
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Unknown error occurred' );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] );
+	}
+
+	/**
+	 * Retry a failed or stuck job.
+	 *
+	 * Marks the job as failed and optionally requeues its prompt
+	 * if a queued_prompt_backup exists in engine_data.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <job_id>
+	 * : The job ID to retry.
+	 *
+	 * [--force]
+	 * : Allow retrying any status, not just failed/processing.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Retry a failed job
+	 *     wp datamachine jobs retry 844
+	 *
+	 *     # Force retry a completed job
+	 *     wp datamachine jobs retry 844 --force
+	 *
+	 * @subcommand retry
+	 */
+	public function retry( array $args, array $assoc_args ): void {
+		if ( empty( $args[0] ) || ! is_numeric( $args[0] ) || (int) $args[0] <= 0 ) {
+			WP_CLI::error( 'Job ID is required and must be a positive integer.' );
+			return;
+		}
+
+		$result = $this->abilities->executeRetryJob(
+			array(
+				'job_id' => (int) $args[0],
+				'force'  => isset( $assoc_args['force'] ),
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Unknown error occurred' );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] );
+
+		if ( ! empty( $result['prompt_requeued'] ) ) {
+			WP_CLI::log( 'Prompt was requeued to the flow.' );
+		}
+	}
 }
