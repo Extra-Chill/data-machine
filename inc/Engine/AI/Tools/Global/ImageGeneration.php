@@ -132,7 +132,6 @@ class ImageGeneration extends BaseTool {
 			'image_generation',
 			[
 				'prediction_id' => $prediction['id'],
-				'api_key'       => $config['api_key'],
 				'model'         => $model,
 				'prompt'        => $prompt,
 				'aspect_ratio'  => $aspect_ratio,

@@ -36,13 +36,21 @@ class ImageGenerationTask extends SystemTask {
 	 */
 	public function execute( int $jobId, array $params ): void {
 		$prediction_id = $params['prediction_id'] ?? '';
-		$api_key = $params['api_key'] ?? '';
 		$model = $params['model'] ?? 'unknown';
+
+		// Read API key from tool config — never store secrets in engine_data
+		$config  = \DataMachine\Engine\AI\Tools\Global\ImageGeneration::get_config();
+		$api_key = $config['api_key'] ?? '';
 		$prompt = $params['prompt'] ?? '';
 		$aspect_ratio = $params['aspect_ratio'] ?? '';
 
-		if ( empty( $prediction_id ) || empty( $api_key ) ) {
-			$this->failJob( $jobId, 'Missing prediction_id or api_key in task parameters' );
+		if ( empty( $prediction_id ) ) {
+			$this->failJob( $jobId, 'Missing prediction_id in task parameters' );
+			return;
+		}
+
+		if ( empty( $api_key ) ) {
+			$this->failJob( $jobId, 'Replicate API key not configured' );
 			return;
 		}
 
