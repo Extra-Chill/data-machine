@@ -498,7 +498,7 @@ class PipelinesCommand extends BaseCommand {
 					'system_prompt' => 'system_prompt',
 					'provider'      => 'provider',
 					'model'         => 'model',
-					'enabled_tools' => 'enabled_tools',
+					'disabled_tools' => 'disabled_tools',
 				);
 
 				$has_update = false;

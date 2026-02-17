@@ -31,7 +31,7 @@ import SettingsSaveBar, {
 import ProviderModelSelector from '@shared/components/ai/ProviderModelSelector';
 
 const DEFAULTS = {
-	enabled_tools: {},
+	disabled_tools: {},
 	global_system_prompt: '',
 	default_provider: '',
 	default_model: '',
@@ -103,7 +103,7 @@ const AgentTab = () => {
 	useEffect( () => {
 		if ( data?.settings ) {
 			form.reset( {
-				enabled_tools: data.settings.enabled_tools || {},
+				disabled_tools: data.settings.disabled_tools || {},
 				global_system_prompt:
 					data.settings.global_system_prompt || '',
 				default_provider: data.settings.default_provider || '',
@@ -128,13 +128,13 @@ const AgentTab = () => {
 	};
 
 	const handleToolToggle = ( toolName, enabled ) => {
-		const newTools = { ...form.data.enabled_tools };
+		const newTools = { ...form.data.disabled_tools };
 		if ( enabled ) {
-			newTools[ toolName ] = true;
-		} else {
 			delete newTools[ toolName ];
+		} else {
+			newTools[ toolName ] = true;
 		}
-		form.updateField( 'enabled_tools', newTools );
+		form.updateField( 'disabled_tools', newTools );
 		save.markChanged();
 	};
 
@@ -186,9 +186,9 @@ const AgentTab = () => {
 											const isConfigured =
 												toolConfig.is_configured;
 											const isEnabled =
-												form.data.enabled_tools?.[
+												! ( form.data.disabled_tools?.[
 													toolName
-												] ?? false;
+												] ?? false );
 											const toolLabel =
 												toolConfig.label ||
 												toolName.replace( /_/g, ' ' );
