@@ -5,21 +5,15 @@
 
 namespace DataMachine\Core\Database\Jobs;
 
+use DataMachine\Core\Database\BaseRepository;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-class JobsOperations {
+class JobsOperations extends BaseRepository {
 
-	private $table_name;
-
-	private $wpdb;
-
-	public function __construct() {
-		global $wpdb;
-		$this->wpdb       = $wpdb;
-		$this->table_name = $wpdb->prefix . 'datamachine_jobs';
-	}
+	const TABLE_NAME = 'datamachine_jobs';
 
 	/**
 	 * Create a new job record.

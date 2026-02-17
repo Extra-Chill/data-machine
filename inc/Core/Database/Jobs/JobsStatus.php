@@ -14,34 +14,16 @@
 
 namespace DataMachine\Core\Database\Jobs;
 
+use DataMachine\Core\Database\BaseRepository;
 use DataMachine\Core\JobStatus;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-class JobsStatus {
+class JobsStatus extends BaseRepository {
 
-	/**
-	 * The name of the jobs database table.
-	 *
-	 * @var string
-	 */
-	private $table_name;
-
-	/**
-	 * @var \wpdb WordPress database instance
-	 */
-	private $wpdb;
-
-	/**
-	 * Initialize the status component.
-	 */
-	public function __construct() {
-		global $wpdb;
-		$this->wpdb       = $wpdb;
-		$this->table_name = $this->wpdb->prefix . 'datamachine_jobs';
-	}
+	const TABLE_NAME = 'datamachine_jobs';
 
 	/**
 	 * Update the status for a job.

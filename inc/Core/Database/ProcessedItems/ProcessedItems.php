@@ -12,21 +12,15 @@
 
 namespace DataMachine\Core\Database\ProcessedItems;
 
+use DataMachine\Core\Database\BaseRepository;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-class ProcessedItems {
+class ProcessedItems extends BaseRepository {
 
-	private $table_name;
-	private $wpdb;
-
-
-	public function __construct() {
-		global $wpdb;
-		$this->wpdb       = $wpdb;
-		$this->table_name = $this->wpdb->prefix . 'datamachine_processed_items';
-	}
+	const TABLE_NAME = 'datamachine_processed_items';
 
 
 	/**

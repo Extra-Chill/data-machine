@@ -12,6 +12,7 @@
 namespace DataMachine\Core\Database\Chat;
 
 use DataMachine\Core\Admin\DateFormatter;
+use DataMachine\Core\Database\BaseRepository;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -20,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Chat Database Manager
  */
-class Chat {
+class Chat extends BaseRepository {
 
 	/**
 	 * Table name (without prefix)

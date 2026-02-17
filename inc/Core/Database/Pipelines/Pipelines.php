@@ -9,21 +9,13 @@
 
 namespace DataMachine\Core\Database\Pipelines;
 
+use DataMachine\Core\Database\BaseRepository;
+
 defined( 'ABSPATH' ) || exit;
 
-class Pipelines {
+class Pipelines extends BaseRepository {
 
-	/** @var string Database table name */
-	private $table_name;
-
-	/** @var \wpdb WordPress database instance */
-	private $wpdb;
-
-	public function __construct() {
-		global $wpdb;
-		$this->wpdb       = $wpdb;
-		$this->table_name = $wpdb->prefix . 'datamachine_pipelines';
-	}
+	const TABLE_NAME = 'datamachine_pipelines';
 
 	/**
 	 * Create a new pipeline in the database.

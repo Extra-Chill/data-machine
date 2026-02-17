@@ -2,6 +2,8 @@
 
 namespace DataMachine\Core\Database\Flows;
 
+use DataMachine\Core\Database\BaseRepository;
+
 /**
  * Flows Database Class
  *
@@ -9,17 +11,9 @@ namespace DataMachine\Core\Database\Flows;
  * and scheduling. Flow-level scheduling only - no pipeline-level scheduling.
  * Admin-only implementation.
  */
-class Flows {
+class Flows extends BaseRepository {
 
-	private $table_name;
-
-	private $wpdb;
-
-	public function __construct() {
-		global $wpdb;
-		$this->wpdb       = $wpdb;
-		$this->table_name = $this->wpdb->prefix . 'datamachine_flows';
-	}
+	const TABLE_NAME = 'datamachine_flows';
 
 	public static function create_table(): void {
 		global $wpdb;
