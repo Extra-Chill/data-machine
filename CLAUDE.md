@@ -2,7 +2,7 @@
 
 Data Machine — WordPress plugin for automating content workflows with AI. Visual pipeline builder, chat agent, REST API, and extensibility via handlers and tools.
 
-Version: 0.11.4
+<!-- Version is maintained automatically by Homeboy -->
 
 This file provides a concise, present-tense technical reference for contributors and automated agents. For user-focused docs see datamachine/docs/.
 
@@ -19,14 +19,14 @@ Testing
 
 - PHPUnit tests located in `tests/Unit/` directory
 - Tests use `WP_UnitTestCase` with homeboy's WordPress test environment
-- Ability registration tests in `tests/Unit/Abilities/` cover all 58 registered abilities
+- Ability registration tests in `tests/Unit/Abilities/` cover all registered abilities
 - Run tests: `homeboy test data-machine` (uses homeboy's WordPress installation)
 - Run build: `homeboy build data-machine` (runs tests, lints code, builds frontend assets, creates production ZIP)
 
 Abilities API
 
 - WordPress 6.9 Abilities API provides standardized capability discovery and execution for all Data Machine operations
-- **58 registered abilities** across 14 ability classes in `inc/Abilities/`:
+- Registered abilities across ability classes in `inc/Abilities/`:
   - `PipelineAbilities` - 7 abilities for pipeline CRUD, import/export
   - `PipelineStepAbilities` - 5 abilities for pipeline step management
   - `FlowAbilities` - 5 abilities for flow CRUD and duplication
@@ -41,6 +41,11 @@ Abilities API
   - `StepTypeAbilities` - 2 abilities for step type discovery and validation
   - `PostQueryAbilities` - 1 ability for querying Data Machine-created posts
   - `LocalSearchAbilities` - 1 ability for WordPress site search
+  - `TaxonomyAbilities` - 5 abilities for taxonomy term CRUD and resolution
+  - `ImageGenerationAbilities` - image generation with featured and insert modes
+  - `AltTextAbilities` - AI-powered alt text generation
+  - `SystemAbilities` - system-level operations
+  - `AnalyticsAbilities` - Bing Webmaster and Google Search Console integration
 - Category registration: `datamachine` category registered via `wp_register_ability_category()` on `wp_abilities_api_categories_init` hook
 - Ability execution: Each ability implements `execute_callback` with `permission_callback` (checks `manage_options` or WP_CLI)
 - REST API endpoints, CLI commands, and Chat tools delegate to abilities for business logic
@@ -60,7 +65,9 @@ Core architecture
 - EngineData provides platform-agnostic data access (single source of truth for engine parameters).
 - WordPressPublishHelper provides WordPress-specific publishing operations (image attachment, source attribution).
 - WordPressSettingsResolver provides centralized settings resolution with system defaults override.
+- Step types: `fetch`, `ai`, `publish`, `update`, `agent_ping`, `webhook_gate`. Each is registered via `StepTypeRegistrationTrait`.
 - Handler and Step registration use standardized traits (`HandlerRegistrationTrait`, `StepTypeRegistrationTrait`) to auto-register services via WordPress filters. Tools extend `BaseTool` for unified registration.
+- Per-agent model configuration: `agent_models` setting allows different AI providers/models per agent type (pipeline, chat, system).
 - Cache Management: Each ability class provides its own `clearCache()` method for domain-specific invalidation. `SiteContext` handles site metadata caching. Admin UI uses TanStack Query for client-side state.
 - Prompt and directive management is centralized via a PromptBuilder with ordered directives (site, pipeline, flow, context).
 - Providers are pluggable and configured by site administrators (OpenAI, Anthropic, Google, Grok, OpenRouter).

@@ -94,6 +94,48 @@ Pipeline (template) → Flow (instance) → Job (execution)
 | `publish` | Output (WordPress, Twitter, Discord) | Yes |
 | `update` | Modify existing content | Yes |
 | `agent_ping` | Webhook to external agents | No |
+| `webhook_gate` | Pause until external webhook fires | No |
+
+### Publish Handlers
+| Handler | Platform |
+|---------|----------|
+| `wordpress` | WordPress posts |
+| `twitter` | Twitter/X |
+| `discord` | Discord webhooks |
+| `threads` | Threads |
+| `bluesky` | Bluesky |
+| `facebook` | Facebook |
+| `pinterest` | Pinterest |
+| `google_sheets` | Google Sheets |
+
+### Multi-Handler Publish Steps
+
+A publish step can target multiple handlers simultaneously. Configure `handler_slugs` as an array in the flow step config instead of a single `handler_slug`. The step executes each handler and collects results from all of them.
+
+### Webhook Gate Step
+
+The `webhook_gate` step type (@since v0.25.0) pauses a pipeline until an external webhook fires. It is handler-free — no handler config needed.
+
+**How it works:**
+1. Step generates a unique webhook URL and parks the job in a "waiting" state
+2. The external system POSTs to the webhook URL when ready
+3. The pipeline resumes from the next step with the webhook payload injected as data packets
+
+**Configuration fields:**
+- `timeout_hours` — How long to wait before failing (0 = no timeout, defaults to 7-day token expiry)
+- `description` — Human-readable note about what the gate is waiting for
+
+### Image Generation Modes
+
+Image generation supports two modes via the `mode` parameter:
+- `featured` (default) — Sets the generated image as the post's featured image
+- `insert` — Inserts an image block directly into the post content
+
+In `insert` mode, the `position` parameter controls placement: `after_intro` (default), `before_heading`, `end`, or `index:N`.
+
+### Per-Agent Model Configuration
+
+The `agent_models` setting allows different AI providers and models per agent type (e.g., pipeline vs chat). Configure via Settings → Agent Models in the admin UI or via `wp datamachine settings set agent_models <json>`.
 
 ### Prompt Hierarchy
 Three levels, applied in order:
@@ -128,6 +170,10 @@ wp datamachine flows run <flow_id> --count=<n>
 wp datamachine flows queue add <flow_id> --step=<flow_step_id> "prompt text"
 wp datamachine flows queue list <flow_id> --step=<flow_step_id>
 wp datamachine flows queue clear <flow_id> --step=<flow_step_id>
+
+# Queue management
+wp datamachine flows queue update <flow_id> <index> "Updated prompt text"
+wp datamachine flows queue move <flow_id> <from_index> <to_index>
 
 # Jobs
 wp datamachine job list
@@ -231,8 +277,10 @@ inc/
 │   ├── Steps/          # Step type implementations
 │   │   ├── AI/
 │   │   ├── Fetch/
-│   │   ├── Publish/
-│   │   └── AgentPing/
+│   │   ├── Publish/    # Handlers: WordPress, Twitter, Discord, Threads, Bluesky, Facebook, Pinterest, GoogleSheets
+│   │   ├── Update/
+│   │   ├── AgentPing/
+│   │   └── WebhookGate/
 │   ├── WordPress/      # WP integrations (TaxonomyHandler, etc.)
 │   └── Admin/          # React admin UI
 ├── Cli/                # WP-CLI commands
