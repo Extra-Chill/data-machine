@@ -2,7 +2,7 @@
 
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
-## Unreleased
+## [0.26.0] - 2026-02-17
 
 ### Added
 - ChatErrorBoundary wraps chat sidebar with retry UI
