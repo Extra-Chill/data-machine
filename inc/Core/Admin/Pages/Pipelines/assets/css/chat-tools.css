@@ -1,0 +1,136 @@
+/**
+ * Chat Tools Styles
+ *
+ * Tool call/result display — collapsible tool messages.
+ */
+
+/* ===== TOOL MESSAGE (Collapsible) ===== */
+
+.datamachine-tool-message {
+	margin: 4px 0;
+}
+
+.datamachine-tool-message__toggle {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	padding: 6px 10px;
+	background: transparent;
+	border: 1px dashed #ddd;
+	border-radius: 6px;
+	font-size: 12px;
+	color: #757575;
+	cursor: pointer;
+	text-align: left;
+}
+
+.datamachine-tool-message__toggle:hover {
+	background: #f9f9f9;
+	border-color: #ccc;
+}
+
+.datamachine-tool-message__indicator {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+
+.datamachine-tool-message__indicator--success {
+	background: #00a32a;
+	color: #fff;
+}
+
+.datamachine-tool-message__indicator--error {
+	background: #d63638;
+	color: #fff;
+}
+
+.datamachine-tool-message__name {
+	font-weight: 500;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.datamachine-tool-message__timestamp {
+	display: none;
+	font-size: 10px;
+	color: #999;
+	margin-left: auto;
+	flex-shrink: 0;
+}
+
+.datamachine-tool-message__toggle:hover .datamachine-tool-message__timestamp {
+	display: block;
+}
+
+.datamachine-tool-message__details {
+	margin-top: 8px;
+	padding: 10px;
+	background: #f9f9f9;
+	border: 1px solid #eee;
+	border-radius: 6px;
+	font-size: 11px;
+}
+
+.datamachine-tool-message__tool {
+	margin-bottom: 12px;
+}
+
+.datamachine-tool-message__tool:last-child {
+	margin-bottom: 0;
+}
+
+.datamachine-tool-message__tool-header {
+	font-weight: 600;
+	color: #1e1e1e;
+	margin-bottom: 8px;
+	padding-bottom: 4px;
+	border-bottom: 1px solid #ddd;
+}
+
+.datamachine-tool-message__section {
+	margin-bottom: 8px;
+}
+
+.datamachine-tool-message__section:last-child {
+	margin-bottom: 0;
+}
+
+.datamachine-tool-message__label {
+	font-weight: 600;
+	color: #1e1e1e;
+	margin-bottom: 4px;
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.datamachine-tool-message__text {
+	color: #555;
+	margin-bottom: 4px;
+}
+
+.datamachine-tool-message__details pre {
+	margin: 0;
+	padding: 8px;
+	background: #fff;
+	border: 1px solid #eee;
+	border-radius: 4px;
+	white-space: pre-wrap;
+	word-break: break-word;
+	color: #555;
+	font-size: 10px;
+	max-height: 200px;
+	overflow-y: auto;
+}
+
+.datamachine-tool-message__pending {
+	color: #757575;
+	font-style: italic;
+}

@@ -1,0 +1,51 @@
+/**
+ * Chat Input Styles
+ *
+ * Input area, textarea, and send button.
+ */
+
+/* ===== INPUT CONTAINER ===== */
+
+.datamachine-chat-input {
+	padding: 12px;
+	border-top: 1px solid #ddd;
+	display: flex;
+	gap: 8px;
+	align-items: flex-end;
+	flex-shrink: 0;
+}
+
+/* ===== TEXTAREA ===== */
+
+.datamachine-chat-input__textarea {
+	flex: 1;
+	padding: 8px 12px;
+	border: 1px solid #ddd;
+	border-radius: 8px;
+	font-family: inherit;
+	font-size: 13px;
+	line-height: 1.4;
+	resize: none;
+	min-height: 36px;
+	max-height: 120px;
+}
+
+.datamachine-chat-input__textarea:focus {
+	outline: none;
+	border-color: #007cba;
+	box-shadow: 0 0 0 1px #007cba;
+}
+
+.datamachine-chat-input__textarea:disabled {
+	background: #f9f9f9;
+	color: #757575;
+}
+
+/* ===== SEND BUTTON ===== */
+
+.datamachine-chat-input__send {
+	flex-shrink: 0;
+	min-width: 36px;
+	height: 36px;
+	padding: 0;
+}
