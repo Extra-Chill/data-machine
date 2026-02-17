@@ -36,55 +36,9 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	require_once __DIR__ . '/inc/Cli/Bootstrap.php';
 }
 
-// Load function files that define global functions used by the plugin
-require_once __DIR__ . '/inc/Engine/Filters/SchedulerIntervals.php';
-require_once __DIR__ . '/inc/Engine/Filters/DataMachineFilters.php';
-require_once __DIR__ . '/inc/Engine/Filters/Handlers.php';
-require_once __DIR__ . '/inc/Engine/Filters/Admin.php';
-require_once __DIR__ . '/inc/Engine/Logger.php';
-require_once __DIR__ . '/inc/Engine/Filters/OAuth.php';
-require_once __DIR__ . '/inc/Engine/Actions/DataMachineActions.php';
-require_once __DIR__ . '/inc/Engine/Filters/EngineData.php';
-require_once __DIR__ . '/inc/Engine/AI/ConversationManager.php';
-require_once __DIR__ . '/inc/Core/Admin/Modal/ModalFilters.php';
-require_once __DIR__ . '/inc/Core/Admin/AdminRootFilters.php';
-require_once __DIR__ . '/inc/Core/Admin/Pages/Pipelines/PipelinesFilters.php';
-require_once __DIR__ . '/inc/Core/Admin/Settings/SettingsFilters.php';
-require_once __DIR__ . '/inc/Core/Admin/Pages/Logs/LogsFilters.php';
-require_once __DIR__ . '/inc/Core/Admin/Pages/Jobs/JobsFilters.php';
-require_once __DIR__ . '/inc/Core/WordPress/PostTrackingTrait.php';
-require_once __DIR__ . '/inc/Core/Steps/StepTypeRegistrationTrait.php';
-require_once __DIR__ . '/inc/Engine/AI/Tools/Global/GoogleSearch.php';
-require_once __DIR__ . '/inc/Engine/AI/Tools/Global/LocalSearch.php';
-require_once __DIR__ . '/inc/Engine/AI/Tools/Global/WebFetch.php';
-require_once __DIR__ . '/inc/Engine/AI/Tools/Global/WordPressPostReader.php';
-require_once __DIR__ . '/inc/Engine/AI/Tools/Global/ImageGeneration.php';
-require_once __DIR__ . '/inc/Engine/AI/Tools/Global/BingWebmaster.php';
-require_once __DIR__ . '/inc/Engine/AI/Tools/Global/GoogleSearchConsole.php';
-require_once __DIR__ . '/inc/Engine/AI/Tools/Global/QueueValidator.php';
-require_once __DIR__ . '/inc/Engine/AI/Tools/GitHubIssueTool.php';
-require_once __DIR__ . '/inc/Engine/AI/System/Tasks/SystemTask.php';
-require_once __DIR__ . '/inc/Engine/AI/System/Tasks/ImageGenerationTask.php';
-require_once __DIR__ . '/inc/Engine/AI/System/Tasks/GitHubIssueTask.php';
-require_once __DIR__ . '/inc/Engine/AI/System/SystemAgent.php';
-require_once __DIR__ . '/inc/Engine/AI/System/SystemAgentServiceProvider.php';
-require_once __DIR__ . '/inc/Engine/AI/Directives/AgentSoulDirective.php';
-require_once __DIR__ . '/inc/Engine/AI/Directives/SiteContext.php';
-require_once __DIR__ . '/inc/Engine/AI/Directives/SiteContextDirective.php';
-require_once __DIR__ . '/inc/Engine/AI/RequestBuilder.php';
-require_once __DIR__ . '/inc/Api/Chat/ChatFilters.php';
-require_once __DIR__ . '/inc/Api/Chat/ChatAgentDirective.php';
-require_once __DIR__ . '/inc/Core/Steps/AI/Directives/PipelineCoreDirective.php';
-require_once __DIR__ . '/inc/Core/Steps/AI/Directives/PipelineSystemPromptDirective.php';
-require_once __DIR__ . '/inc/Core/Steps/AI/Directives/PipelineContextDirective.php';
-require_once __DIR__ . '/inc/Core/FilesRepository/FileCleanup.php';
-require_once __DIR__ . '/inc/Core/ActionScheduler/ClaimsCleanup.php';
-require_once __DIR__ . '/inc/Core/ActionScheduler/QueueTuning.php';
-require_once __DIR__ . '/inc/Api/StepTypes.php';
-require_once __DIR__ . '/inc/Api/Handlers.php';
-require_once __DIR__ . '/inc/Api/Providers.php';
-require_once __DIR__ . '/inc/Api/Tools.php';
-require_once __DIR__ . '/inc/Api/Chat/Chat.php';
+// Procedural includes and side-effect registrations (see inc/bootstrap.php).
+// Namespaced classes without file-level side effects rely on Composer PSR-4.
+require_once __DIR__ . '/inc/bootstrap.php';
 
 if ( ! class_exists( 'ActionScheduler' ) ) {
 	require_once __DIR__ . '/vendor/woocommerce/action-scheduler/action-scheduler.php';
