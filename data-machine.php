@@ -299,6 +299,10 @@ function datamachine_load_chat_tools() {
 	new \DataMachine\Api\Chat\Tools\DeletePipelineStep();
 	new \DataMachine\Api\Chat\Tools\ReorderPipelineSteps();
 	new \DataMachine\Api\Chat\Tools\ListFlows();
+	new \DataMachine\Api\Chat\Tools\ManageQueue();
+	new \DataMachine\Api\Chat\Tools\ManageJobs();
+	new \DataMachine\Api\Chat\Tools\SendPing();
+	new \DataMachine\Api\Chat\Tools\SystemHealthCheck();
 }
 
 /**
