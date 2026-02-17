@@ -112,14 +112,19 @@ export default function ChatMessages( { messages, isLoading } ) {
 
 			{ displayItems.map( ( item, index ) => {
 				if ( item.type === 'tool_group' ) {
+					const toolKey = item.data.tools
+						.map( ( t ) => t.toolCall?.metadata?.tool_name || 'tool' )
+						.join( '-' );
 					return (
 						<ToolMessage
-							key={ `tool-group-${ index }` }
+							key={ `tool-group-${ toolKey }-${ index }` }
 							tools={ item.data.tools }
 						/>
 					);
 				}
-				return <ChatMessage key={ index } message={ item.data } />;
+				const msg = item.data;
+				const msgKey = `${ msg.role }-${ msg.metadata?.timestamp || index }`;
+				return <ChatMessage key={ msgKey } message={ msg } />;
 			} ) }
 
 			{ isLoading && (
