@@ -2,15 +2,15 @@
 
 Comprehensive reference for all WordPress actions used by Data Machine for pipeline execution, data processing, and system operations.
 
-**Note**: Since v0.4.0, most core operations use the Services Layer architecture (`\DataMachine\Services\`) for direct method calls, replacing filter-based actions for 3x performance improvement. These actions remain primarily for extensibility and backward compatibility.
+**Note**: Most core operations use the Abilities API (`DataMachine\Abilities`) for direct method calls. These actions remain primarily for extensibility and backward compatibility.
 
-## Service Manager Integration
+## Abilities API Integration
 
-Direct service method calls are preferred over actions for system operations:
-- `PipelineManager` -> `create()`, `delete()`, `duplicate()`
-- `FlowManager` -> `create()`, `delete()`, `duplicate()`
-- `JobManager` -> `updateStatus()`, `failJob()`
-- `LogsManager` -> `log()`, `get_logs()`, `clear_logs()`
+Direct ability calls are preferred over actions for system operations:
+- `PipelineAbilities` -> `create()`, `delete()`, `duplicate()`
+- `FlowAbilities` -> `create()`, `delete()`, `duplicate()`
+- `JobAbilities` -> `executeFailJob()`, `executeRetryJob()`
+- `LogAbilities` -> `write_to_log()`, `read_logs()`, `clear_logs()`
 
 ## Pipeline Execution Actions
 
@@ -99,7 +99,7 @@ do_action('datamachine_mark_item_processed', $flow_step_id, 'wordpress_local', $
 
 **Purpose**: Update job execution status
 
-**Services Integration**: Primarily handled by JobManager::updateStatus() since v0.4.0
+**Abilities Integration**: Handled by `datamachine/retry-job` and `datamachine/fail-job` abilities.
 
 **Parameters**:
 - `$job_id` (string) - Job identifier
@@ -108,9 +108,9 @@ do_action('datamachine_mark_item_processed', $flow_step_id, 'wordpress_local', $
 
 **Usage**:
 ```php
-// Services Layer (recommended since v0.4.0)
-$job_manager = new \DataMachine\Services\JobManager();
-$job_manager->updateStatus($job_id, 'completed', 'Pipeline executed successfully');
+// Abilities API
+$ability = wp_get_ability( 'datamachine/retry-job' );
+$ability->execute( [ 'job_id' => $job_id ] );
 
 // Action Hook (for extensibility)
 do_action('datamachine_update_job_status', $job_id, 'completed', 'Pipeline executed successfully');
@@ -120,7 +120,7 @@ do_action('datamachine_update_job_status', $job_id, 'completed', 'Pipeline execu
 
 **Purpose**: Mark job as failed with detailed error information
 
-**Services Integration**: Primarily handled by JobManager::failJob() since v0.4.0
+**Abilities Integration**: Handled by `datamachine/fail-job` ability.
 
 **Parameters**:
 - `$job_id` (string) - Job identifier
@@ -129,13 +129,12 @@ do_action('datamachine_update_job_status', $job_id, 'completed', 'Pipeline execu
 
 **Usage**:
 ```php
-// Services Layer (recommended since v0.4.0)
-$job_manager = new \DataMachine\Services\JobManager();
-$job_manager->failJob($job_id, 'step_execution_failure', [
-    'flow_step_id' => $flow_step_id,
-    'exception_message' => $e->getMessage(),
-    'reason' => 'detailed_error_reason'
-]);
+// Abilities API
+$ability = wp_get_ability( 'datamachine/fail-job' );
+$ability->execute( [
+    'job_id' => $job_id,
+    'reason' => 'step_execution_failure',
+] );
 
 // Action Hook (for extensibility)
 do_action('datamachine_fail_job', $job_id, 'step_execution_failure', [
@@ -268,58 +267,6 @@ do_action('datamachine_log', 'debug', 'AI Step Directive: Injected system direct
 - **info** - General operational information  
 - **warning** - Non-critical issues that should be noted
 - **error** - Critical errors that affect functionality
-
-## REST Endpoints
-
-### `GET /datamachine/v1/status`
-
-**Purpose**: Consolidated status refresh for flows and pipelines
-
-**Handler Class**: `DataMachine\Api\Status`
-
-**Query Parameters**:
-- `flow_id` (int|string|array) - One or more flow IDs (supports `flow_id[]=1&flow_id[]=2` or comma-separated string)
-- `pipeline_id` (int|string|array) - One or more pipeline IDs (supports `pipeline_id[]=3&pipeline_id[]=4` or comma-separated string)
-
-**Response**:
-```json
-{
-    "success": true,
-    "requested": {
-        "flows": [123],
-        "pipelines": [456]
-    },
-    "flows": {
-        "123": {
-            "step_statuses": {
-                "flow_step_id_1": "green",
-                "flow_step_id_2": "yellow"
-            }
-        }
-    },
-    "pipelines": {
-        "456": {
-            "step_statuses": {
-                "pipeline_step_id_1": "green",
-                "pipeline_step_id_2": "red"
-            }
-        }
-    }
-}
-```
-
-**Use Cases**:
-- Flow handler configuration changes
-- Pipeline template modifications
-- Batch polling for multiple flows/pipelines in UI dashboards
-
-**Status Contexts**:
-- `flow_step_status` for flow-scoped validation (handler configuration, scheduling, settings)
-- `pipeline_step_status` for pipeline-wide validation (template architecture, AI cascade effects)
-
-**Security**:
-- Requires `manage_options` capability
-- Requires REST nonce (`X-WP-Nonce`) when called from authenticated admin JavaScript
 
 ## Action Scheduler Integration
 

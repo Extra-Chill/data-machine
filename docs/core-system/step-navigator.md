@@ -106,11 +106,6 @@ if ($next_flow_step_id) {
     do_action('datamachine_schedule_next_step', $job_id, $next_flow_step_id, $data);
 } else {
     // Pipeline complete
-    // Services Layer (recommended since v0.4.0)
-    $job_manager = new \DataMachine\Services\JobManager();
-    $job_manager->updateStatus($job_id, 'completed');
-    
-    // Action Hook (for extensibility)
     do_action('datamachine_update_job_status', $job_id, 'completed');
 }
 ```

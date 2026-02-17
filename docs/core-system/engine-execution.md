@@ -244,17 +244,17 @@ $job_id = $db_jobs->create_job([
 
 **Update Status**:
 ```php
-$job_manager = new \DataMachine\Services\JobManager();
-$job_manager->updateStatus($job_id, 'completed', 'Pipeline executed successfully');
+$ability = wp_get_ability( 'datamachine/retry-job' );
+$ability->execute( [ 'job_id' => $job_id ] );
 ```
 
 **Fail Job**:
 ```php
-$job_manager = new \DataMachine\Services\JobManager();
-$job_manager->failJob($job_id, 'step_execution_failure', [
-    'flow_step_id' => $flow_step_id,
-    'reason' => 'detailed_error_reason'
-]);
+$ability = wp_get_ability( 'datamachine/fail-job' );
+$ability->execute( [
+    'job_id' => $job_id,
+    'reason' => 'step_execution_failure',
+] );
 ```
 
 ## Error Handling
@@ -268,14 +268,15 @@ try {
     $data = $flow_step->execute($parameters);
     return !empty($data); // Success = non-empty data packet
 } catch (\Throwable $e) {
-    $logs_manager = new \DataMachine\Services\LogsManager();
-    $logs_manager->log('error', 'Step execution failed', [
-        'exception' => $e->getMessage(),
-        'trace' => $e->getTraceAsString()
-    ]);
-    
-    $job_manager = new \DataMachine\Services\JobManager();
-    $job_manager->failJob($job_id, 'step_execution_failure', $context);
+    $log_ability = wp_get_ability( 'datamachine/write-to-log' );
+    $log_ability->execute( [
+        'level'   => 'error',
+        'message' => 'Step execution failed: ' . $e->getMessage(),
+        'agent'   => 'pipeline',
+    ] );
+
+    $fail_ability = wp_get_ability( 'datamachine/fail-job' );
+    $fail_ability->execute( [ 'job_id' => $job_id, 'reason' => 'step_execution_failure' ] );
     return false;
 }
 ```

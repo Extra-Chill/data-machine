@@ -38,9 +38,9 @@ Provides a lightweight inventory of all pipelines, including their configured st
 **Context Awareness**:
 When `selected_pipeline_id` is provided (e.g., from the Integrated Chat Sidebar), the agent prioritizes and expands context for that specific pipeline, enabling it to learn from established configuration patterns and provide targeted assistance.
 
-### GlobalSystemPromptDirective (Priority 20)
+### AgentSoulDirective (Priority 20)
 
-**Location**: `inc/Engine/AI/Directives/GlobalSystemPromptDirective.php`  
+**Location**: `inc/Engine/AI/Directives/AgentSoulDirective.php`  
 **Agent Types**: All agents  
 **Purpose**: Injects user-configured global AI behavior
 

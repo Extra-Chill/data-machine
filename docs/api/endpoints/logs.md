@@ -41,21 +41,22 @@ Clears log files.
 
 For technical details on the logging architecture and the service layer, see the [Logger System Documentation](../../core-system/logger.md).
 
-### LogsManager Service
+### Log Abilities
 
-The `LogsManager` service provides direct method calls for logging and retrieval. Note: logging-related actions are also exposed via Abilities (`LogAbilities.php`) and REST endpoints delegate to abilities where available; `LogsManager` remains as a file/IO utility during the Abilities migration.
+Logging operations are handled via the Abilities API (`DataMachine\Abilities\LogAbilities`).
 
 ```php
-$logs_manager = new \DataMachine\Services\LogsManager();
+// Write a log entry
+$ability = wp_get_ability( 'datamachine/write-to-log' );
+$ability->execute( [
+    'level'   => 'info',
+    'message' => 'Executing flow',
+    'agent'   => 'pipeline',
+] );
 
-// Log a message
-$logs_manager->log('info', 'Executing flow', ['flow_id' => 123]);
-
-// Retrieve logs
-$logs = $logs_manager->get_logs([
-    'level' => 'error',
-    'per_page' => 50
-]);
+// Read logs
+$ability = wp_get_ability( 'datamachine/read-logs' );
+$logs = $ability->execute( [ 'agent' => 'pipeline', 'limit' => 50 ] );
 ```
 
 ### Log Levels

@@ -377,7 +377,7 @@ add_filter('datamachine_session_title_prompt', function($prompt, $context) {
 
 **Purpose**: Create new pipeline
 
-**Services Integration**: Primarily handled by PipelineManager::create() since v0.4.0
+**Abilities Integration**: Handled by `datamachine/create-pipeline` ability.
 
 **Parameters**:
 - `$pipeline_id` (null) - Placeholder for return value
@@ -395,9 +395,9 @@ $data = [
 
 **Usage**:
 ```php
-// Services Layer (recommended since v0.4.0)
-$pipeline_manager = new \DataMachine\Services\PipelineManager();
-$result = $pipeline_manager->create('Pipeline Name', $options);
+// Abilities API
+$ability = wp_get_ability( 'datamachine/create-pipeline' );
+$result = $ability->execute( [ 'pipeline_name' => 'Pipeline Name', 'options' => $options ] );
 
 // Filter Hook (for extensibility)
 $pipeline_id = apply_filters('datamachine_create_pipeline', null, $data);
@@ -407,7 +407,7 @@ $pipeline_id = apply_filters('datamachine_create_pipeline', null, $data);
 
 **Purpose**: Create new flow instance
 
-**Services Integration**: Primarily handled by FlowManager::create() since v0.4.0
+**Abilities Integration**: Handled by `datamachine/create-flow` ability.
 
 **Parameters**:
 - `$flow_id` (null) - Placeholder for return value
@@ -417,9 +417,9 @@ $pipeline_id = apply_filters('datamachine_create_pipeline', null, $data);
 
 **Usage**:
 ```php
-// Services Layer (recommended since v0.4.0)
-$flow_manager = new \DataMachine\Services\FlowManager();
-$result = $flow_manager->create($pipeline_id, 'Flow Name', $options);
+// Abilities API
+$ability = wp_get_ability( 'datamachine/create-flow' );
+$result = $ability->execute( [ 'pipeline_id' => $pipeline_id, 'flow_name' => 'Flow Name' ] );
 
 // Filter Hook (for extensibility)
 $flow_id = apply_filters('datamachine_create_flow', null, $data);

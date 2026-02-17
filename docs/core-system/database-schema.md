@@ -223,9 +223,9 @@ $job_id = $db_jobs->create_job([
 
 **Update Status**:
 ```php
-// Services Layer (recommended since v0.4.0)
-$job_manager = new \DataMachine\Services\JobManager();
-$job_manager->updateStatus($job_id, 'completed', 'Success message');
+// Abilities API
+$ability = wp_get_ability( 'datamachine/fail-job' );
+$ability->execute( [ 'job_id' => $job_id, 'reason' => 'Success message' ] );
 
 // Action Hook (for extensibility)
 do_action('datamachine_update_job_status', $job_id, 'completed', 'Success message');

@@ -85,15 +85,13 @@ register_rest_route('datamachine/v1', '/pipelines', [
     'permission_callback' => [Pipelines::class, 'check_permission']
 ]);
 
-// Services layer usage in endpoint callbacks
+// Abilities API usage in endpoint callbacks
 public function create_pipeline($request) {
-    // Prefer abilities when available:
-    // $ability = wp_get_ability('datamachine/create-pipeline');
-    // return $ability->execute(['pipeline_name' => $request['name'], 'options' => $request['options'] ?? []]);
-
-    // Transitional: service manager usage supported until full migration completes
-    $pipeline_manager = new \DataMachine\Services\PipelineManager();
-    return $pipeline_manager->create($request['name'], $request['options'] ?? []);
+    $ability = wp_get_ability( 'datamachine/create-pipeline' );
+    return $ability->execute( [
+        'pipeline_name' => $request['name'],
+        'options'       => $request['options'] ?? [],
+    ] );
 }
 ```
 

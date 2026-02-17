@@ -53,7 +53,7 @@ curl https://example.com/wp-json/datamachine/v1/handlers?step_type=update \
   "data": {
     "rss": {
       "type": "fetch",
-      "class": "DataMachine\\Core\\Steps\\Fetch\\Handlers\\RSS\\RSS",
+      "class": "DataMachine\\Core\\Steps\\Fetch\\Handlers\\Rss\\Rss",
       "label": "RSS Feed",
       "description": "Fetch content from RSS feeds",
       "requires_auth": false
@@ -103,7 +103,7 @@ curl https://example.com/wp-json/datamachine/v1/handlers?step_type=update \
     },
     "wordpress-update": {
       "type": "update",
-      "class": "DataMachine\\Core\\Steps\\Update\\Handlers\\WordPressUpdate\\WordPressUpdate",
+      "class": "DataMachine\\Core\\Steps\\Update\\Handlers\\WordPress\\WordPress",
       "label": "WordPress Update",
       "description": "Update existing WordPress content",
       "requires_auth": false
