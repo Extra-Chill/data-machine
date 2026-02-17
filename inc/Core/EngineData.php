@@ -11,6 +11,8 @@
 
 namespace DataMachine\Core;
 
+use DataMachine\Core\Database\Jobs\Jobs;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -40,6 +42,82 @@ class EngineData {
 	public function __construct( array $data, $job_id = null ) {
 		$this->data   = $data;
 		$this->job_id = $job_id;
+	}
+
+	/**
+	 * Create an EngineData instance for a given job by retrieving its persisted snapshot.
+	 *
+	 * @param int $job_id Job ID.
+	 * @return self
+	 */
+	public static function forJob( int $job_id ): self {
+		return new self( self::retrieve( $job_id ), $job_id );
+	}
+
+	/**
+	 * Retrieve engine data snapshot for a job.
+	 *
+	 * Checks object cache first, falls back to database.
+	 *
+	 * @param int $job_id Job ID.
+	 * @return array Engine data array or empty array on failure.
+	 */
+	public static function retrieve( int $job_id ): array {
+		if ( $job_id <= 0 ) {
+			return array();
+		}
+
+		$cached = wp_cache_get( $job_id, 'datamachine_engine_data' );
+		if ( false !== $cached ) {
+			return is_array( $cached ) ? $cached : array();
+		}
+
+		$db_jobs     = new Jobs();
+		$engine_data = $db_jobs->retrieve_engine_data( $job_id );
+
+		wp_cache_set( $job_id, $engine_data, 'datamachine_engine_data' );
+
+		return $engine_data;
+	}
+
+	/**
+	 * Persist a complete engine data snapshot for a job.
+	 *
+	 * @param int   $job_id  Job ID.
+	 * @param array $snapshot Engine data snapshot to store.
+	 * @return bool True on success, false on failure.
+	 */
+	public static function persist( int $job_id, array $snapshot ): bool {
+		if ( $job_id <= 0 ) {
+			return false;
+		}
+
+		$db_jobs = new Jobs();
+		$success = $db_jobs->store_engine_data( $job_id, $snapshot );
+
+		if ( $success ) {
+			wp_cache_set( $job_id, $snapshot, 'datamachine_engine_data' );
+		}
+
+		return $success;
+	}
+
+	/**
+	 * Merge new data into the stored engine snapshot.
+	 *
+	 * @param int   $job_id Job ID.
+	 * @param array $data   Data to merge into existing snapshot.
+	 * @return bool True on success, false on failure.
+	 */
+	public static function merge( int $job_id, array $data ): bool {
+		if ( $job_id <= 0 ) {
+			return false;
+		}
+
+		$current = self::retrieve( $job_id );
+		$merged  = array_replace_recursive( $current, $data );
+
+		return self::persist( $job_id, $merged );
 	}
 
 	/**
