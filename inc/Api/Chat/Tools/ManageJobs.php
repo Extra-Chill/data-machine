@@ -64,15 +64,15 @@ class ManageJobs extends BaseTool {
 					'required'    => false,
 					'description' => 'Offset for pagination (for list action)',
 				),
+				'type'        => array(
+					'type'        => 'string',
+					'required'    => false,
+					'description' => 'For delete action: "all" or "failed". Required for delete.',
+				),
 				'job_id'      => array(
 					'type'        => 'integer',
 					'required'    => false,
-					'description' => 'Job ID (for fail, retry, and delete actions)',
-				),
-				'job_ids'     => array(
-					'type'        => 'array',
-					'required'    => false,
-					'description' => 'Array of job IDs (for delete action)',
+					'description' => 'Job ID (for fail and retry actions)',
 				),
 				'reason'      => array(
 					'type'        => 'string',
@@ -95,7 +95,7 @@ class ManageJobs extends BaseTool {
 ACTIONS:
 - list: List jobs with optional filtering by flow_id, pipeline_id, or status. Supports pagination via limit/offset.
 - summary: Get job counts grouped by status.
-- delete: Delete all or failed jobs. Use job_id or job_ids for specific jobs.
+- delete: Delete jobs by type. Requires type parameter: "all" or "failed".
 - fail: Manually fail a job (requires job_id, optional reason).
 - retry: Retry a failed job (requires job_id).
 - recover: Recover stuck processing jobs that have timed out.';
@@ -138,7 +138,12 @@ ACTIONS:
 			);
 		}
 
-		$input  = $this->buildInput( $action, $parameters );
+		$input = $this->buildInput( $action, $parameters );
+
+		if ( isset( $input['error'] ) ) {
+			return $this->buildErrorResponse( $input['error'], 'manage_jobs' );
+		}
+
 		$result = $ability->execute( $input );
 
 		if ( ! $this->isAbilitySuccess( $result ) ) {
@@ -186,14 +191,11 @@ ACTIONS:
 				return array();
 
 			case 'delete':
-				$input = array( 'type' => 'all' );
-				if ( isset( $parameters['job_id'] ) ) {
-					$input['job_id'] = $parameters['job_id'];
+				$type = $parameters['type'] ?? null;
+				if ( ! in_array( $type, array( 'all', 'failed' ), true ) ) {
+					return array( 'error' => 'delete action requires type parameter: "all" or "failed"' );
 				}
-				if ( isset( $parameters['job_ids'] ) ) {
-					$input['job_ids'] = $parameters['job_ids'];
-				}
-				return $input;
+				return array( 'type' => $type );
 
 			case 'fail':
 				$input = array(
