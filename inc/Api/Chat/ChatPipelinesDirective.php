@@ -103,9 +103,11 @@ class ChatPipelinesDirective implements \DataMachine\Engine\AI\Directives\Direct
 			$handlers    = array();
 
 			foreach ( $flow_config as $step_config ) {
-				$handler_slug = $step_config['handler_slug'] ?? null;
-				if ( $handler_slug && ! in_array( $handler_slug, $handlers, true ) ) {
-					$handlers[] = $handler_slug;
+				// Data is normalized at the DB layer — handler_slugs is canonical.
+				foreach ( $step_config['handler_slugs'] ?? array() as $slug ) {
+					if ( ! in_array( $slug, $handlers, true ) ) {
+						$handlers[] = $slug;
+					}
 				}
 			}
 

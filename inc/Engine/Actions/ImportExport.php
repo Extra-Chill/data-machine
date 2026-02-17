@@ -11,6 +11,8 @@
 
 namespace DataMachine\Engine\Actions;
 
+use DataMachine\Abilities\FlowStep\FlowStepHelpers;
+
 // Prevent direct access
 if ( ! defined( 'WPINC' ) ) {
 	die;
@@ -167,18 +169,19 @@ class ImportExport {
 					$flow_step_id = apply_filters( 'datamachine_generate_flow_step_id', '', $step['pipeline_step_id'], $flow['flow_id'] );
 					$flow_step    = $flow_config[ $flow_step_id ] ?? array();
 
-					if ( ! empty( $flow_step['handler_slug'] ) ) {
-						$settings = array(
-							'handler_config' => $flow_step['handler_config'] ?? array(),
-						);
+					// Normalize step data to ensure consistent format.
+					$normalized_step = FlowStepHelpers::normalizeHandlerFields( $flow_step );
+					$primary_handler = FlowStepHelpers::getPrimaryHandlerSlug( $normalized_step );
 
-						// Include multi-handler fields if present.
-						if ( ! empty( $flow_step['handler_slugs'] ) ) {
-							$settings['handler_slugs'] = $flow_step['handler_slugs'];
-						}
-						if ( ! empty( $flow_step['handler_configs'] ) ) {
-							$settings['handler_configs'] = $flow_step['handler_configs'];
-						}
+					if ( ! empty( $primary_handler ) ) {
+						// Export both plural and singular formats for maximum compatibility.
+						$settings = array(
+							// Plural fields (source of truth).
+							'handler_slugs'  => $normalized_step['handler_slugs'] ?? array(),
+							'handler_configs' => $normalized_step['handler_configs'] ?? array(),
+							// Singular fields (backward compatibility).
+							'handler_config' => FlowStepHelpers::getPrimaryHandlerConfig( $normalized_step ),
+						);
 
 						$csv_rows[] = array(
 							$pipeline_id,
@@ -188,7 +191,7 @@ class ImportExport {
 							wp_json_encode( $step ),
 							$flow['flow_id'],
 							$flow['flow_name'],
-							$flow_step['handler_slug'],
+							$primary_handler,
 							wp_json_encode( $settings ),
 						);
 					}

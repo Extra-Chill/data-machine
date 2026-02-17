@@ -236,16 +236,13 @@ class ConfigureFlowStepsAbility {
 				}
 
 				if ( ! empty( $handler_slug ) ) {
-					$config_handler_slug  = $step_config['handler_slug'] ?? null;
-					$config_handler_slugs = $step_config['handler_slugs'] ?? array();
-					// Match on singular field OR presence in handler_slugs array.
-					if ( $config_handler_slug !== $handler_slug && ! in_array( $handler_slug, $config_handler_slugs, true ) ) {
+					if ( ! in_array( $handler_slug, $step_config['handler_slugs'] ?? array(), true ) ) {
 						continue;
 					}
 				}
 
-				$existing_handler_slug   = $step_config['handler_slug'] ?? null;
-				$existing_handler_config = $step_config['handler_config'] ?? array();
+				$existing_handler_slug   = self::getPrimaryHandlerSlug( $step_config );
+				$existing_handler_config = self::getPrimaryHandlerConfig( $step_config );
 
 				$effective_handler_slug = $target_handler_slug ?? $existing_handler_slug;
 
@@ -550,7 +547,7 @@ class ConfigureFlowStepsAbility {
 				$handler_config = $config['handler_config'] ?? array();
 				$user_message   = $config['user_message'] ?? null;
 
-				$effective_slug = $handler_slug ?? ( $flow_config[ $flow_step_id ]['handler_slug'] ?? null );
+				$effective_slug = $handler_slug ?? self::getPrimaryHandlerSlug( $flow_config[ $flow_step_id ] );
 
 				if ( ! empty( $handler_config ) && ! empty( $effective_slug ) ) {
 					$validation_result = $this->validateHandlerConfig( $effective_slug, $handler_config );
@@ -714,10 +711,7 @@ class ConfigureFlowStepsAbility {
 					}
 				}
 
-				$config_handler_slug  = $step_config['handler_slug'] ?? null;
-				$config_handler_slugs = $step_config['handler_slugs'] ?? array();
-				// Match on singular field OR presence in handler_slugs array.
-				if ( $config_handler_slug === $handler_slug || in_array( $handler_slug, $config_handler_slugs, true ) ) {
+				if ( in_array( $handler_slug, $step_config['handler_slugs'] ?? array(), true ) ) {
 					$matching_flows[] = array(
 						'flow'         => $flow,
 						'flow_step_id' => $flow_step_id,
@@ -768,8 +762,8 @@ class ConfigureFlowStepsAbility {
 			$flow_id      = (int) $flow['flow_id'];
 			$flow_name    = $flow['flow_name'] ?? __( 'Unnamed Flow', 'data-machine' );
 
-			$existing_handler_slug   = $step_config['handler_slug'] ?? null;
-			$existing_handler_config = $step_config['handler_config'] ?? array();
+			$existing_handler_slug   = self::getPrimaryHandlerSlug( $step_config );
+			$existing_handler_config = self::getPrimaryHandlerConfig( $step_config );
 
 			$effective_handler_slug = $target_handler_slug ?? $existing_handler_slug;
 			$is_switching           = ! empty( $target_handler_slug ) && $target_handler_slug !== $existing_handler_slug;

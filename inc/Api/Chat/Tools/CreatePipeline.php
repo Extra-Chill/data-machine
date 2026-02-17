@@ -318,11 +318,14 @@ class CreatePipeline extends BaseTool {
 				$step = array( 'step_type' => $step );
 			}
 
+			$handler_slug   = $step['handler_slug'] ?? null;
+			$handler_config = $step['handler_config'] ?? array();
+
 			$normalized_step = array(
 				'step_type'       => $step['step_type'],
 				'execution_order' => $step['execution_order'] ?? $index,
-				'handler_slug'    => $step['handler_slug'] ?? null,
-				'handler_config'  => $step['handler_config'] ?? array(),
+				'handler_slugs'   => ! empty( $handler_slug ) ? array( $handler_slug ) : array(),
+				'handler_configs' => ! empty( $handler_slug ) ? array( $handler_slug => $handler_config ) : array(),
 			);
 
 			if ( isset( $step['provider'] ) ) {

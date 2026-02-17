@@ -224,7 +224,7 @@ abstract class Step
      */
     protected function getHandlerSlug(): ?string
     {
-        return $this->flow_step_config['handler_slug'] ?? null;
+        return $this->flow_step_config['handler_slugs'][0] ?? null;
     }
 
     /**
@@ -234,7 +234,8 @@ abstract class Step
      */
     protected function getHandlerConfig(): array
     {
-        return $this->flow_step_config['handler_config'] ?? array();
+        $slug = $this->getHandlerSlug();
+        return ! empty( $slug ) ? ( $this->flow_step_config['handler_configs'][ $slug ] ?? array() ) : array();
     }
 
     /**
@@ -244,31 +245,17 @@ abstract class Step
      */
     protected function getHandlerSlugs(): array
     {
-        // Check handler_slugs (new array format) first
-        if (! empty($this->flow_step_config['handler_slugs']) && is_array($this->flow_step_config['handler_slugs']) ) {
-            return $this->flow_step_config['handler_slugs'];
-        }
-        // Fall back to singular handler_slug
-        $slug = $this->getHandlerSlug();
-        return $slug ? array( $slug ) : array();
+        return $this->flow_step_config['handler_slugs'] ?? array();
     }
 
     /**
      * Get handler configs keyed by handler slug.
-     * Supports new per-handler format and falls back to single handler_config.
      *
      * @return array<string, array> Handler configs keyed by slug
      */
     protected function getHandlerConfigs(): array
     {
-        // New format: handler_configs keyed by slug
-        if (! empty($this->flow_step_config['handler_configs']) && is_array($this->flow_step_config['handler_configs']) ) {
-            return $this->flow_step_config['handler_configs'];
-        }
-        // Fall back: single handler_config paired with handler_slug
-        $slug   = $this->getHandlerSlug();
-        $config = $this->getHandlerConfig();
-        return $slug ? array( $slug => $config ) : array();
+        return $this->flow_step_config['handler_configs'] ?? array();
     }
 
     /**

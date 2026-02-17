@@ -2,6 +2,7 @@
 
 namespace DataMachine\Core\Database\Flows;
 
+use DataMachine\Abilities\FlowStep\FlowStepHelpers;
 use DataMachine\Core\Database\BaseRepository;
 
 /**
@@ -118,6 +119,22 @@ class Flows extends BaseRepository {
 		return $flow_id;
 	}
 
+	/**
+	 * Normalize handler fields in all steps of a flow config.
+	 *
+	 * Ensures every step uses handler_slugs/handler_configs as the canonical format.
+	 * Called at the data access layer so all consumers receive normalized data.
+	 *
+	 * @param array $flow_config Decoded flow config from database.
+	 * @return array Normalized flow config.
+	 */
+	private function normalizeFlowConfig( array $flow_config ): array {
+		foreach ( $flow_config as $step_id => $step_config ) {
+			$flow_config[ $step_id ] = FlowStepHelpers::normalizeHandlerFields( $step_config );
+		}
+		return $flow_config;
+	}
+
 	public function get_flow( int $flow_id ): ?array {
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$flow = $this->wpdb->get_row( $this->wpdb->prepare( 'SELECT * FROM %i WHERE flow_id = %d', $this->table_name, $flow_id ), ARRAY_A );
@@ -134,7 +151,7 @@ class Flows extends BaseRepository {
 			return null;
 		}
 
-		$flow['flow_config']       = json_decode( $flow['flow_config'], true ) ?? array();
+		$flow['flow_config']       = $this->normalizeFlowConfig( json_decode( $flow['flow_config'], true ) ?? array() );
 		$flow['scheduling_config'] = json_decode( $flow['scheduling_config'], true ) ?? array();
 
 		return $flow;
@@ -157,7 +174,7 @@ class Flows extends BaseRepository {
 		}
 
 		foreach ( $flows as &$flow ) {
-			$flow['flow_config']       = json_decode( $flow['flow_config'], true ) ?? array();
+			$flow['flow_config']       = $this->normalizeFlowConfig( json_decode( $flow['flow_config'], true ) ?? array() );
 			$flow['scheduling_config'] = json_decode( $flow['scheduling_config'], true ) ?? array();
 		}
 
@@ -183,7 +200,7 @@ class Flows extends BaseRepository {
 		}
 
 		foreach ( $flows as &$flow ) {
-			$flow['flow_config']       = json_decode( $flow['flow_config'], true ) ?? array();
+			$flow['flow_config']       = $this->normalizeFlowConfig( json_decode( $flow['flow_config'], true ) ?? array() );
 			$flow['scheduling_config'] = json_decode( $flow['scheduling_config'], true ) ?? array();
 		}
 
@@ -216,7 +233,7 @@ class Flows extends BaseRepository {
 		}
 
 		foreach ( $flows as &$flow ) {
-			$flow['flow_config']       = json_decode( $flow['flow_config'], true ) ?? array();
+			$flow['flow_config']       = $this->normalizeFlowConfig( json_decode( $flow['flow_config'], true ) ?? array() );
 			$flow['scheduling_config'] = json_decode( $flow['scheduling_config'], true ) ?? array();
 		}
 
@@ -527,7 +544,7 @@ class Flows extends BaseRepository {
 			$last_run_at       = $latest_job['created_at'] ?? null;
 
 			if ( $this->is_flow_ready_for_execution( $scheduling_config, $current_time, $last_run_at ) ) {
-				$flow['flow_config']       = json_decode( $flow['flow_config'], true );
+				$flow['flow_config']       = $this->normalizeFlowConfig( json_decode( $flow['flow_config'], true ) ?? array() );
 				$flow['scheduling_config'] = $scheduling_config;
 				$ready_flows[]             = $flow;
 			}
@@ -597,7 +614,7 @@ class Flows extends BaseRepository {
 			$flow_config = $engine_data['flow_config'] ?? array();
 			$step_config = $flow_config[ $flow_step_id ] ?? array();
 			if ( ! empty( $step_config ) ) {
-				return $step_config;
+				return FlowStepHelpers::normalizeHandlerFields( $step_config );
 			}
 
 			if ( $require_engine_data ) {

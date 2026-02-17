@@ -12,6 +12,7 @@
 namespace DataMachine\Core\Steps\Settings;
 
 use DataMachine\Abilities\HandlerAbilities;
+use DataMachine\Abilities\FlowStep\FlowStepHelpers;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -47,8 +48,9 @@ class SettingsDisplayService {
 			return array();
 		}
 
-		$handler_slug     = $flow_step_config['handler_slug'] ?? '';
-		$current_settings = $flow_step_config['handler_config'] ?? array();
+		// Data is normalized at the DB layer.
+		$handler_slug     = FlowStepHelpers::getPrimaryHandlerSlug( $flow_step_config );
+		$current_settings = FlowStepHelpers::getPrimaryHandlerConfig( $flow_step_config );
 
 		// For step types with usesHandler: false, fall back to step_type as settings key
 		// This allows steps like agent_ping to display their config without a traditional handler
@@ -81,13 +83,14 @@ class SettingsDisplayService {
 			return array();
 		}
 
+		// Data is normalized at the DB layer.
 		$handler_configs = $flow_step_config['handler_configs'] ?? array();
 		$handler_slugs   = $flow_step_config['handler_slugs'] ?? array();
 
-		// Fallback: build from singular fields when multi-handler data isn't populated.
+		// Fallback: build from primary handler when configs are empty.
 		if ( empty( $handler_configs ) ) {
-			$handler_slug     = $flow_step_config['handler_slug'] ?? '';
-			$current_settings = $flow_step_config['handler_config'] ?? array();
+			$handler_slug     = FlowStepHelpers::getPrimaryHandlerSlug( $flow_step_config );
+			$current_settings = FlowStepHelpers::getPrimaryHandlerConfig( $flow_step_config );
 
 			if ( empty( $handler_slug ) && ! empty( $step_type ) ) {
 				$handler_slug = $step_type;

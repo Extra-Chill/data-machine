@@ -615,9 +615,8 @@ class FlowsCommand extends BaseCommand {
 		$handlers    = array();
 
 		foreach ( $flow_config as $step_data ) {
-			if ( ! empty( $step_data['handler_slug'] ) ) {
-				$handlers[] = $step_data['handler_slug'];
-			}
+			// Data is normalized at the DB layer — handler_slugs is canonical.
+			$handlers = array_merge( $handlers, $step_data['handler_slugs'] ?? array() );
 		}
 
 		return implode( ', ', array_unique( $handlers ) );
@@ -633,8 +632,10 @@ class FlowsCommand extends BaseCommand {
 		$flow_config = $flow['flow_config'] ?? array();
 
 		foreach ( $flow_config as $step_data ) {
-			if ( ! empty( $step_data['handler_config']['prompt'] ) ) {
-				$prompt = $step_data['handler_config']['prompt'];
+			$primary_slug   = $step_data['handler_slugs'][0] ?? '';
+			$primary_config = ! empty( $primary_slug ) ? ( $step_data['handler_configs'][ $primary_slug ] ?? array() ) : array();
+			if ( ! empty( $primary_config['prompt'] ) ) {
+				$prompt = $primary_config['prompt'];
 				return mb_strlen( $prompt ) > 50
 					? mb_substr( $prompt, 0, 47 ) . '...'
 					: $prompt;
@@ -743,7 +744,7 @@ class FlowsCommand extends BaseCommand {
 
 		$handler_steps = array();
 		foreach ( $flow_config as $step_id => $step_data ) {
-			if ( ! empty( $step_data['handler_slug'] ) ) {
+			if ( ! empty( $step_data['handler_slugs'] ) ) {
 				$handler_steps[] = $step_id;
 			}
 		}

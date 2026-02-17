@@ -108,7 +108,6 @@ class PipelineSystemPromptDirective implements \DataMachine\Engine\AI\Directives
 				$sorted_steps[ $execution_order ] = array(
 					'pipeline_step_id' => $step_pipeline_step_id,
 					'step_type'        => $step_config['step_type'] ?? '',
-					'handler_slug'     => $step_config['handler_slug'] ?? '',
 					'handler_slugs'    => $step_config['handler_slugs'] ?? array(),
 				);
 			}
@@ -121,7 +120,6 @@ class PipelineSystemPromptDirective implements \DataMachine\Engine\AI\Directives
 
 		foreach ( $sorted_steps as $step_data ) {
 			$step_type             = $step_data['step_type'];
-			$handler_slug          = $step_data['handler_slug'];
 			$handler_slugs         = $step_data['handler_slugs'];
 			$step_pipeline_step_id = $step_data['pipeline_step_id'];
 
@@ -137,8 +135,10 @@ class PipelineSystemPromptDirective implements \DataMachine\Engine\AI\Directives
 					$labels[]     = strtoupper( $handler_info['label'] ?? $slug );
 				}
 				$workflow_parts[] = implode( '+', $labels ) . ' ' . strtoupper( $step_type );
-			} elseif ( $handler_slug ) {
-				$handler_info     = $handler_abilities->getHandler( $handler_slug, $step_type );
+			} elseif ( ! empty( $handler_slugs ) ) {
+				// Single handler step: show primary handler label.
+				$primary_slug     = $handler_slugs[0];
+				$handler_info     = $handler_abilities->getHandler( $primary_slug, $step_type );
 				$label            = strtoupper( $handler_info['label'] ?? 'UNKNOWN' );
 				$workflow_parts[] = $label . ' ' . strtoupper( $step_type );
 			} else {

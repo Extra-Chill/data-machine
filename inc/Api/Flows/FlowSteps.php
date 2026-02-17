@@ -14,6 +14,7 @@ namespace DataMachine\Api\Flows;
 use DataMachine\Abilities\FlowStepAbilities;
 use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Abilities\StepTypeAbilities;
+use DataMachine\Abilities\FlowStep\FlowStepHelpers;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;
@@ -356,20 +357,28 @@ class FlowSteps {
 				);
 			}
 
+			$db_flows      = new \DataMachine\Core\Database\Flows\Flows();
+			$flow          = $db_flows->get_flow( $flow_id );
+			$flow_config   = $flow['flow_config'] ?? array();
+			$existing_step = $flow_config[ $flow_step_id ] ?? array();
+
+			// Normalize the step config to use plural fields as source of truth.
+			$normalized_step = FlowStepHelpers::normalizeHandlerFields( $existing_step );
+
+			// Build step config for response (include both plural and singular for backward compatibility).
 			$step_config = array(
 				'step_type'        => $step_type,
-				'handler_slug'     => $handler_slug,
-				'handler_config'   => $handler_settings,
+				'handler_slugs'    => $normalized_step['handler_slugs'] ?? array(),
+				'handler_configs'  => $normalized_step['handler_configs'] ?? array(),
+				// Backward compatibility: derive singular from plural.
+				'handler_slug'     => FlowStepHelpers::getPrimaryHandlerSlug( $normalized_step ),
+				'handler_config'   => FlowStepHelpers::getPrimaryHandlerConfig( $normalized_step ),
 				'enabled'          => true,
 				'flow_id'          => $flow_id,
 				'pipeline_step_id' => $pipeline_step_id,
 				'flow_step_id'     => $flow_step_id,
 			);
 
-			$db_flows      = new \DataMachine\Core\Database\Flows\Flows();
-			$flow          = $db_flows->get_flow( $flow_id );
-			$flow_config   = $flow['flow_config'] ?? array();
-			$existing_step = $flow_config[ $flow_step_id ] ?? array();
 			if ( isset( $existing_step['execution_order'] ) ) {
 				$step_config['execution_order'] = $existing_step['execution_order'];
 			}

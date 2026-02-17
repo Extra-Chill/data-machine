@@ -237,7 +237,9 @@ trait FlowHelpers {
 				$flow_config = $flow['flow_config'] ?? array();
 
 				foreach ( $flow_config as $flow_step_id => $step_data ) {
-					if ( ! empty( $step_data['handler_slug'] ) && $step_data['handler_slug'] === $handler_slug ) {
+					// Data is normalized at the DB layer — handler_slugs is canonical.
+					$handler_slugs = $step_data['handler_slugs'] ?? array();
+					if ( in_array( $handler_slug, $handler_slugs, true ) ) {
 						return true;
 					}
 				}
@@ -353,12 +355,14 @@ trait FlowHelpers {
 			if ( isset( $source_steps_by_order[ $order ] ) ) {
 				$source_step = $source_steps_by_order[ $order ];
 
-				if ( ! empty( $source_step['handler_slug'] ) ) {
-					$new_step_config['handler_slug'] = $source_step['handler_slug'];
+				// Data is normalized at the DB layer — copy canonical plural fields.
+				if ( ! empty( $source_step['handler_slugs'] ) ) {
+					$new_step_config['handler_slugs'] = $source_step['handler_slugs'];
 				}
-				if ( ! empty( $source_step['handler_config'] ) ) {
-					$new_step_config['handler_config'] = $source_step['handler_config'];
+				if ( ! empty( $source_step['handler_configs'] ) ) {
+					$new_step_config['handler_configs'] = $source_step['handler_configs'];
 				}
+
 				if ( ! empty( $source_step['user_message'] ) ) {
 					$new_step_config['user_message'] = $source_step['user_message'];
 				}
@@ -370,11 +374,13 @@ trait FlowHelpers {
 			$override = $this->resolveOverride( $overrides, $step_type, $order );
 			if ( $override ) {
 				if ( ! empty( $override['handler_slug'] ) ) {
-					$new_step_config['handler_slug'] = $override['handler_slug'];
-				}
-				if ( ! empty( $override['handler_config'] ) ) {
-					$existing_config                   = $new_step_config['handler_config'] ?? array();
-					$new_step_config['handler_config'] = array_merge( $existing_config, $override['handler_config'] );
+					$new_step_config['handler_slugs'] = array( $override['handler_slug'] );
+					$handler_config                    = $override['handler_config'] ?? array();
+					$new_step_config['handler_configs'] = array( $override['handler_slug'] => $handler_config );
+				} elseif ( ! empty( $override['handler_config'] ) && ! empty( $new_step_config['handler_slugs'] ) ) {
+					$primary_slug = $new_step_config['handler_slugs'][0];
+					$existing_config = $new_step_config['handler_configs'][ $primary_slug ] ?? array();
+					$new_step_config['handler_configs'][ $primary_slug ] = array_merge( $existing_config, $override['handler_config'] );
 				}
 				if ( ! empty( $override['user_message'] ) ) {
 					$new_step_config['user_message'] = $override['user_message'];
@@ -512,7 +518,8 @@ trait FlowHelpers {
 				continue;
 			}
 
-			if ( ! empty( $step_data['handler_slug'] ) ) {
+			// Skip if handler already configured.
+			if ( ! empty( $step_data['handler_slugs'] ) ) {
 				continue;
 			}
 

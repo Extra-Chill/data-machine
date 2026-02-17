@@ -11,6 +11,7 @@
 namespace DataMachine\Core\Admin;
 
 use DataMachine\Abilities\HandlerAbilities;
+use DataMachine\Abilities\FlowStep\FlowStepHelpers;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -31,6 +32,11 @@ class FlowFormatter {
 		$settings_display_service = new \DataMachine\Core\Steps\Settings\SettingsDisplayService();
 
 		foreach ( $flow_config as $flow_step_id => &$step_data ) {
+			// Derive singular fields for backward compatibility in API response.
+			// Data is normalized at the DB layer — handler_slugs/handler_configs are canonical.
+			$step_data['handler_slug']   = FlowStepHelpers::getPrimaryHandlerSlug( $step_data );
+			$step_data['handler_config'] = FlowStepHelpers::getPrimaryHandlerConfig( $step_data );
+
 			$step_type    = $step_data['step_type'] ?? '';
 			$handler_slug = $step_data['handler_slug'] ?? '';
 

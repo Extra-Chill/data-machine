@@ -37,13 +37,12 @@ class ToolExecutor
                 continue;
             }
 
-            // Resolve handler slugs (supports both singular and plural)
-            $handler_slugs      = $step_config['handler_slugs']
-            ?? ( isset($step_config['handler_slug']) ? array( $step_config['handler_slug'] ) : array() );
+            // Data is normalized at the DB layer — handler_slugs/handler_configs are canonical.
+            $handler_slugs       = $step_config['handler_slugs'] ?? array();
             $handler_configs_map = $step_config['handler_configs'] ?? array();
 
             foreach ( $handler_slugs as $slug ) {
-                $handler_config  = $handler_configs_map[ $slug ] ?? ( $step_config['handler_config'] ?? array() );
+                $handler_config  = $handler_configs_map[ $slug ] ?? array();
                 $tools           = apply_filters('chubes_ai_tools', array(), $slug, $handler_config, $engine_data);
                 $tools           = $tool_manager->resolveAllTools($tools);
                 $allowed         = self::getAllowedTools($tools, $slug, $current_pipeline_step_id, $tool_manager);

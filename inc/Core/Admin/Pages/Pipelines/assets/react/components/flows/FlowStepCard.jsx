@@ -65,13 +65,20 @@ export default function FlowStepCard( {
 		if ( isAiStep ) {
 			return flowStepConfig.user_message || '';
 		}
-		return flowStepConfig?.handler_config?.prompt || '';
-	}, [ isAiStep, flowStepConfig.user_message, flowStepConfig?.handler_config?.prompt ] );
+		// Use primary handler config from plural fields, fall back to singular.
+		const handlerSlugs = flowStepConfig?.handler_slugs || [];
+		const primarySlug = handlerSlugs[0];
+		const primaryConfig = primarySlug && flowStepConfig?.handler_configs?.[primarySlug];
+		return primaryConfig?.prompt || flowStepConfig?.handler_config?.prompt || '';
+	}, [ isAiStep, flowStepConfig.user_message, flowStepConfig?.handler_slugs, flowStepConfig?.handler_configs, flowStepConfig?.handler_config?.prompt ] );
 
 	// Determine if this step type shows a prompt field.
 	// AI steps always get it. Other steps get it if they have a prompt in handler_config
 	// or if queue is enabled/has items.
-	const hasPromptConfig = flowStepConfig?.handler_config?.prompt !== undefined;
+	const handlerSlugs = flowStepConfig?.handler_slugs || [];
+	const primarySlug = handlerSlugs[0];
+	const primaryConfig = primarySlug && flowStepConfig?.handler_configs?.[primarySlug];
+	const hasPromptConfig = (primaryConfig && primaryConfig.prompt !== undefined) || flowStepConfig?.handler_config?.prompt !== undefined;
 	const showPromptField = isAiStep || shouldShowQueue || hasPromptConfig;
 
 	// Fields to exclude from inline config (handled by QueueablePromptField).
@@ -88,7 +95,12 @@ export default function FlowStepCard( {
 			try {
 				const config = isAiStep
 					? { user_message: value }
-					: { handler_config: { ...( flowStepConfig?.handler_config || {} ), prompt: value } };
+					: {
+						handler_config: {
+							...(primaryConfig || flowStepConfig?.handler_config || {}),
+							prompt: value
+						}
+					};
 
 				const response = await updateFlowStepConfig( flowStepId, config );
 				if ( ! response?.success ) {
@@ -100,7 +112,7 @@ export default function FlowStepCard( {
 				setError( err.message || __( 'An error occurred', 'data-machine' ) );
 			}
 		},
-		[ flowStepId, isAiStep, flowStepConfig?.handler_config ]
+		[ flowStepId, isAiStep, primaryConfig, flowStepConfig?.handler_config ]
 	);
 
 	// Resolve handler info for settings display.

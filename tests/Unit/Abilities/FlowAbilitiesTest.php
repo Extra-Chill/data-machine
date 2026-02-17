@@ -163,12 +163,14 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 			'flow_config' => [
 				'step1' => [
 					'step_type'        => 'fetch',
-					'handler_slug'     => 'rss',
+					'handler_slugs'    => [ 'rss' ],
+					'handler_configs'  => [ 'rss' => [] ],
 					'pipeline_step_id' => 'step1',
 				],
 				'step2' => [
 					'step_type'        => 'publish',
-					'handler_slug'     => 'wordpress_publish',
+					'handler_slugs'    => [ 'wordpress_publish' ],
+					'handler_configs'  => [ 'wordpress_publish' => [] ],
 					'pipeline_step_id' => 'step2',
 				],
 			],

@@ -199,17 +199,14 @@ class ValidateFlowStepsConfigAbility {
 				}
 
 				if ( ! empty( $handler_slug ) ) {
-					$config_handler_slug  = $step_config['handler_slug'] ?? null;
-					$config_handler_slugs = $step_config['handler_slugs'] ?? array();
-					// Match on singular field OR presence in handler_slugs array.
-					if ( $config_handler_slug !== $handler_slug && ! in_array( $handler_slug, $config_handler_slugs, true ) ) {
+					if ( ! in_array( $handler_slug, $step_config['handler_slugs'] ?? array(), true ) ) {
 						continue;
 					}
 				}
 
 				++$total_matching_steps;
 
-				$existing_handler_slug  = $step_config['handler_slug'] ?? null;
+				$existing_handler_slug  = self::getPrimaryHandlerSlug( $step_config );
 				$effective_handler_slug = $target_handler_slug ?? $existing_handler_slug;
 
 				if ( empty( $effective_handler_slug ) ) {

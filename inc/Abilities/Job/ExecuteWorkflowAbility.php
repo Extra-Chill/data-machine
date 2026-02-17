@@ -480,13 +480,16 @@ class ExecuteWorkflowAbility {
 			$pipeline_step_id = "ephemeral_pipeline_{$index}";
 
 			// Flow config (instance-specific)
+			$handler_slug   = $step['handler_slug'] ?? '';
+			$handler_config = $step['handler_config'] ?? array();
+
 			$flow_config[ $step_id ] = array(
 				'flow_step_id'     => $step_id,
 				'pipeline_step_id' => $pipeline_step_id,
 				'step_type'        => $step['type'],
 				'execution_order'  => $index,
-				'handler_slug'     => $step['handler_slug'] ?? '',
-				'handler_config'   => $step['handler_config'] ?? array(),
+				'handler_slugs'    => ! empty( $handler_slug ) ? array( $handler_slug ) : array(),
+				'handler_configs'  => ! empty( $handler_slug ) ? array( $handler_slug => $handler_config ) : array(),
 				'user_message'     => $step['user_message'] ?? '',
 				'disabled_tools'   => $step['disabled_tools'] ?? array(),
 				'pipeline_id'      => 'direct',
