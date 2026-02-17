@@ -11,14 +11,14 @@
 /**
  * WordPress dependencies
  */
-import { useState, useCallback, useRef, useEffect } from '@wordpress/element';
+import { useState, useCallback, useRef, useEffect, useMemo } from '@wordpress/element';
 
 /**
  * Internal dependencies
  */
 import HandlerSettingField from '../modals/handler-settings/HandlerSettingField';
 import { useHandlerDetails } from '../../queries/handlers';
-import { updateFlowStepConfig } from '../../utils/api';
+import { useUpdateFlowStepConfig } from '../../queries/flows';
 import { AUTO_SAVE_DELAY } from '../../utils/constants';
 
 /**
@@ -30,6 +30,8 @@ import { AUTO_SAVE_DELAY } from '../../utils/constants';
  * @param {string}   props.handlerSlug   - Handler or step type slug.
  * @param {string[]} props.excludeFields - Field keys to exclude (e.g., 'prompt').
  * @param {Function} props.onError       - Error callback.
+ * @param {number}   props.pipelineId    - Pipeline ID (for cache invalidation).
+ * @param {number}   props.flowId        - Flow ID (for cache invalidation).
  * @return {JSX.Element|null} Inline config fields.
  */
 export default function InlineStepConfig( {
@@ -38,6 +40,8 @@ export default function InlineStepConfig( {
 	handlerSlug,
 	excludeFields = [],
 	onError,
+	pipelineId,
+	flowId,
 } ) {
 	// Fetch full field schema from handler details API.
 	const { data: handlerDetails } = useHandlerDetails( handlerSlug );
@@ -49,26 +53,34 @@ export default function InlineStepConfig( {
 			! excludeFields.includes( key ) && config.type !== 'info'
 	);
 
-	// Local state for field values.
-	const [ localValues, setLocalValues ] = useState( {} );
+	// Derive initial values from handlerConfig + field schema.
+	// Re-derives when handlerSlug, schema, or handlerConfig changes.
+	const initialValues = useMemo( () => {
+		if ( fieldEntries.length === 0 ) {
+			return {};
+		}
+		const values = {};
+		fieldEntries.forEach( ( [ key, config ] ) => {
+			values[ key ] =
+				handlerConfig[ key ] ?? config.current_value ?? config.default ?? '';
+		} );
+		return values;
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [ handlerSlug, fieldEntries.length, JSON.stringify( handlerConfig ) ] );
+
+	// Local state for controlled inputs, initialized from derived values.
+	const [ localValues, setLocalValues ] = useState( initialValues );
 	const saveTimeout = useRef( null );
 	const localValuesRef = useRef( localValues );
 
-	// Initialize local values from handler config.
-	// Depends on fieldEntries.length so values are set once the handler details schema loads
-	// (fixes race condition where handlerConfig arrives before the schema query resolves).
+	const updateConfigMutation = useUpdateFlowStepConfig();
+
+	// Reset local values when initialValues change (handler/config change).
 	useEffect( () => {
-		if ( fieldEntries.length === 0 ) {
-			return;
+		if ( Object.keys( initialValues ).length > 0 ) {
+			setLocalValues( initialValues );
 		}
-		const initial = {};
-		fieldEntries.forEach( ( [ key, config ] ) => {
-			initial[ key ] =
-				handlerConfig[ key ] ?? config.current_value ?? config.default ?? '';
-		} );
-		setLocalValues( initial );
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [ handlerSlug, fieldEntries.length, JSON.stringify( handlerConfig ) ] );
+	}, [ initialValues ] );
 
 	// Keep ref in sync.
 	useEffect( () => {
@@ -101,8 +113,11 @@ export default function InlineStepConfig( {
 						...localValuesRef.current,
 						[ fieldKey ]: value,
 					};
-					const response = await updateFlowStepConfig( flowStepId, {
-						handler_config: currentValues,
+					const response = await updateConfigMutation.mutateAsync( {
+						flowStepId,
+						config: { handler_config: currentValues },
+						pipelineId,
+						flowId,
 					} );
 					if ( ! response?.success && onError ) {
 						onError(
@@ -118,7 +133,7 @@ export default function InlineStepConfig( {
 				}
 			}, AUTO_SAVE_DELAY );
 		},
-		[ flowStepId, onError ]
+		[ flowStepId, pipelineId, flowId, onError, updateConfigMutation ]
 	);
 
 	// Don't render until we have the field schema.

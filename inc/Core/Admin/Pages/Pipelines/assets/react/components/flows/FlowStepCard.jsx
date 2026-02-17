@@ -172,6 +172,8 @@ export default function FlowStepCard( {
 							handlerSlug={ effectiveHandlerSlug }
 							excludeFields={ excludeFields }
 							onError={ setError }
+							pipelineId={ pipelineId }
+							flowId={ flowId }
 						/>
 					) }
 

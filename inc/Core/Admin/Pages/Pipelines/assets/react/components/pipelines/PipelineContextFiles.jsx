@@ -7,17 +7,17 @@
 /**
  * WordPress dependencies
  */
-import { useState, useEffect } from '@wordpress/element';
+import { useState } from '@wordpress/element';
 import { Notice } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
 import {
-	fetchContextFiles,
-	uploadContextFile,
-	deleteContextFile,
-} from '../../utils/api';
+	useContextFiles,
+	useUploadContextFile,
+	useDeleteContextFile,
+} from '../../queries/pipelines';
 import FileUploadDropzone from '../shared/FileUploadDropzone';
 import ContextFilesTable from './context-files/ContextFilesTable';
 
@@ -29,72 +29,39 @@ import ContextFilesTable from './context-files/ContextFilesTable';
  * @return {React.ReactElement} Context files section
  */
 export default function PipelineContextFiles( { pipelineId } ) {
-	const [ files, setFiles ] = useState( [] );
-	const [ loading, setLoading ] = useState( true );
-	const [ uploading, setUploading ] = useState( false );
-	const [ deleting, setDeleting ] = useState( false );
-	const [ error, setError ] = useState( null );
 	const [ success, setSuccess ] = useState( null );
+	const [ error, setError ] = useState( null );
 
-	/**
-	 * Load context files
-	 */
-	const loadFiles = async () => {
-		setLoading( true );
-		setError( null );
+	const {
+		data: files = [],
+		isLoading: loading,
+	} = useContextFiles( pipelineId );
 
-		try {
-			const response = await fetchContextFiles( pipelineId );
+	const uploadMutation = useUploadContextFile();
+	const deleteMutation = useDeleteContextFile();
 
-			if ( response.success ) {
-				setFiles( response.data || [] );
-			} else {
-				setError(
-					response.message ||
-						__( 'Failed to load context files', 'data-machine' )
-				);
-			}
-		} catch ( err ) {
-			console.error( 'Load files error:', err );
-			setError(
-				err.message ||
-					__(
-						'An error occurred while loading files',
-						'data-machine'
-					)
-			);
-		} finally {
-			setLoading( false );
-		}
-	};
-
-	/**
-	 * Load files on mount and when pipeline changes
-	 */
-	useEffect( () => {
-		if ( pipelineId ) {
-			loadFiles();
-		}
-	}, [ pipelineId ] );
+	const uploading = uploadMutation.isPending;
+	const deleting = deleteMutation.isPending;
 
 	/**
 	 * Handle file upload
-	 * @param file
+	 *
+	 * @param {File} file - File to upload
 	 */
 	const handleFileSelected = async ( file ) => {
-		setUploading( true );
 		setError( null );
 		setSuccess( null );
 
 		try {
-			const response = await uploadContextFile( pipelineId, file );
+			const response = await uploadMutation.mutateAsync( {
+				pipelineId,
+				file,
+			} );
 
 			if ( response.success ) {
 				setSuccess(
 					__( 'File uploaded successfully!', 'data-machine' )
 				);
-				// Reload files list
-				await loadFiles();
 			} else {
 				setError(
 					response.message ||
@@ -102,34 +69,31 @@ export default function PipelineContextFiles( { pipelineId } ) {
 				);
 			}
 		} catch ( err ) {
+			// eslint-disable-next-line no-console
 			console.error( 'Upload error:', err );
 			setError(
 				err.message ||
 					__( 'An error occurred during upload', 'data-machine' )
 			);
-		} finally {
-			setUploading( false );
 		}
 	};
 
 	/**
 	 * Handle file deletion
-	 * @param fileId
+	 *
+	 * @param {string} fileId - File ID to delete
 	 */
 	const handleDelete = async ( fileId ) => {
-		setDeleting( true );
 		setError( null );
 		setSuccess( null );
 
 		try {
-			const response = await deleteContextFile( fileId );
+			const response = await deleteMutation.mutateAsync( fileId );
 
 			if ( response.success ) {
 				setSuccess(
 					__( 'File deleted successfully!', 'data-machine' )
 				);
-				// Reload files list
-				await loadFiles();
 			} else {
 				setError(
 					response.message ||
@@ -137,13 +101,12 @@ export default function PipelineContextFiles( { pipelineId } ) {
 				);
 			}
 		} catch ( err ) {
+			// eslint-disable-next-line no-console
 			console.error( 'Delete error:', err );
 			setError(
 				err.message ||
 					__( 'An error occurred during deletion', 'data-machine' )
 			);
-		} finally {
-			setDeleting( false );
 		}
 	};
 

@@ -23,6 +23,7 @@ import {
 	removeFlowHandler,
 	updateUserMessage,
 	updateFlowSchedule,
+	updateFlowStepConfig,
 } from '../utils/api';
 import { isSameId, normalizeId } from '../utils/ids';
 
@@ -421,6 +422,33 @@ export const useRemoveFlowHandler = () => {
 		mutationFn: ( { flowStepId, handlerSlug } ) =>
 			removeFlowHandler( flowStepId, handlerSlug ),
 		onSuccess: ( response, variables ) => {
+			if ( variables.pipelineId ) {
+				const cachedPipelineId = normalizeId( variables.pipelineId );
+				queryClient.invalidateQueries( {
+					queryKey: [ 'flows', cachedPipelineId ],
+				} );
+			}
+			if ( variables.flowId ) {
+				const cachedFlowId = normalizeId( variables.flowId );
+				queryClient.invalidateQueries( {
+					queryKey: [ 'flows', 'single', cachedFlowId ],
+				} );
+			}
+		},
+	} );
+};
+
+export const useUpdateFlowStepConfig = () => {
+	const queryClient = useQueryClient();
+	return useMutation( {
+		mutationFn: ( { flowStepId, config } ) =>
+			updateFlowStepConfig( flowStepId, config ),
+		onSuccess: ( response, variables ) => {
+			if ( ! response?.success ) {
+				return;
+			}
+
+			// Invalidate flow queries to pick up updated config.
 			if ( variables.pipelineId ) {
 				const cachedPipelineId = normalizeId( variables.pipelineId );
 				queryClient.invalidateQueries( {

@@ -7,16 +7,14 @@
 /**
  * WordPress dependencies
  */
-import { useState, useEffect } from '@wordpress/element';
 import { Modal, Button, SelectControl } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
-import { getSchedulingIntervals } from '../../utils/api';
-import { updateFlowSchedule } from '../../utils/api';
 import { useUpdateFlowSchedule } from '../../queries/flows';
-import { useFormState, useAsyncOperation } from '../../hooks/useFormState';
+import { useSchedulingIntervals } from '../../queries/config';
+import { useFormState } from '../../hooks/useFormState';
 
 /**
  * Flow Schedule Modal Component
@@ -37,6 +35,11 @@ export default function FlowScheduleModal( {
 	onSuccess,
 } ) {
 	const updateScheduleMutation = useUpdateFlowSchedule();
+	const {
+		data: intervals = [],
+		isLoading: intervalsLoading,
+		error: intervalsError,
+	} = useSchedulingIntervals();
 
 	// Form state for interval selection
 	const formState = useFormState( {
@@ -60,31 +63,6 @@ export default function FlowScheduleModal( {
 		},
 	} );
 
-	// Async operation for loading intervals
-	const intervalsOperation = useAsyncOperation();
-
-	const [ intervals, setIntervals ] = useState( [] );
-
-	// Fetch intervals when modal opens
-	useEffect( () => {
-		if ( intervals.length === 0 ) {
-			intervalsOperation.execute( async () => {
-				const result = await getSchedulingIntervals();
-				if ( result.success && result.data ) {
-					setIntervals( result.data );
-				} else {
-					setIntervals( [] );
-					throw new Error(
-						__(
-							'Failed to load scheduling intervals. Please refresh the page and try again.',
-							'data-machine'
-						)
-					);
-				}
-			} );
-		}
-	}, [ intervals.length, intervalsOperation ] );
-
 	/**
 	 * Handle schedule save
 	 */
@@ -99,9 +77,15 @@ export default function FlowScheduleModal( {
 			className="datamachine-flow-schedule-modal"
 		>
 			<div className="datamachine-modal-content">
-				{ ( formState.error || intervalsOperation.error ) && (
+				{ ( formState.error || intervalsError ) && (
 					<div className="datamachine-modal-error notice notice-error">
-						<p>{ formState.error || intervalsOperation.error }</p>
+						<p>
+							{ formState.error ||
+								__(
+									'Failed to load scheduling intervals. Please refresh the page and try again.',
+									'data-machine'
+								) }
+						</p>
 					</div>
 				) }
 
@@ -117,9 +101,7 @@ export default function FlowScheduleModal( {
 					onChange={ ( value ) =>
 						formState.updateField( 'selectedInterval', value )
 					}
-					disabled={
-						intervalsOperation.isLoading || intervals.length === 0
-					}
+					disabled={ intervalsLoading || intervals.length === 0 }
 					help={ __(
 						'Choose how often this flow should run automatically.',
 						'data-machine'

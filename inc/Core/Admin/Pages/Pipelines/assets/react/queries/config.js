@@ -12,7 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 /**
  * Internal dependencies
  */
-import { getStepTypes, getTools } from '../utils/api';
+import { getStepTypes, getTools, getSchedulingIntervals } from '../utils/api';
 
 export const useStepTypes = () =>
 	useQuery( {
@@ -31,6 +31,16 @@ export const useGlobalSettings = () =>
 			return window.datamachineConfig?.globalSettings || {};
 		},
 		staleTime: 10 * 60 * 1000, // 10 minutes
+	} );
+
+export const useSchedulingIntervals = () =>
+	useQuery( {
+		queryKey: [ 'config', 'scheduling-intervals' ],
+		queryFn: async () => {
+			const result = await getSchedulingIntervals();
+			return result.success ? result.data : [];
+		},
+		staleTime: Infinity, // Scheduling intervals don't change
 	} );
 
 export const useTools = () =>
