@@ -185,9 +185,16 @@ class ImageGenerationTask extends SystemTask {
 			$image_file_path = get_attached_file( $attachment_id );
 		}
 
-		// If we have an attachment and a pipeline job context, try to set featured image
+		// Route based on mode: featured (default) or insert
 		if ( $attachment_id ) {
-			$this->trySetFeaturedImage( $jobId, $attachment_id, $params );
+			$context = $params['context'] ?? [];
+			$mode    = $context['mode'] ?? 'featured';
+
+			if ( 'insert' === $mode ) {
+				$this->insertImageInContent( $jobId, $attachment_id, $params );
+			} else {
+				$this->trySetFeaturedImage( $jobId, $attachment_id, $params );
+			}
 		}
 
 		// Complete job with success data
@@ -478,6 +485,167 @@ class ImageGenerationTask extends SystemTask {
 		);
 
 		return $converted['path'];
+	}
+
+	/**
+	 * Insert the generated image as a Gutenberg image block into post content.
+	 *
+	 * @param int   $jobId        System Agent job ID.
+	 * @param int   $attachmentId WordPress attachment ID.
+	 * @param array $params       Task params (contains context with post_id, position).
+	 */
+	protected function insertImageInContent( int $jobId, int $attachmentId, array $params ): void {
+		$context  = $params['context'] ?? [];
+		$post_id  = $context['post_id'] ?? 0;
+		$position = $context['position'] ?? 'after_intro';
+
+		// Also check pipeline job for post_id if not directly provided
+		if ( empty( $post_id ) ) {
+			$pipeline_job_id = $context['pipeline_job_id'] ?? 0;
+			if ( ! empty( $pipeline_job_id ) ) {
+				$pipeline_engine_data = datamachine_get_engine_data( (int) $pipeline_job_id );
+				$post_id = $pipeline_engine_data['post_id'] ?? 0;
+			}
+		}
+
+		if ( empty( $post_id ) ) {
+			do_action( 'datamachine_log', 'warning', "System Agent: Cannot insert image — no post_id available for job {$jobId}", [
+				'job_id'        => $jobId,
+				'attachment_id' => $attachmentId,
+				'agent_type'    => 'system',
+			] );
+			return;
+		}
+
+		$post = get_post( $post_id );
+		if ( ! $post ) {
+			do_action( 'datamachine_log', 'warning', "System Agent: Post #{$post_id} not found for image insert", [
+				'job_id'     => $jobId,
+				'agent_type' => 'system',
+			] );
+			return;
+		}
+
+		// Build the wp:image block
+		$image_block = $this->buildImageBlock( $attachmentId );
+		if ( empty( $image_block ) ) {
+			return;
+		}
+
+		// Attach image to the post
+		wp_update_post( [
+			'ID'          => $attachmentId,
+			'post_parent' => $post_id,
+		] );
+
+		// Parse existing content into blocks
+		$content = $post->post_content;
+		$blocks  = parse_blocks( $content );
+
+		// Find insertion index based on position
+		$insert_index = $this->findInsertionIndex( $blocks, $position );
+
+		// Splice the image block in
+		array_splice( $blocks, $insert_index, 0, [ $image_block ] );
+
+		// Serialize back to content
+		$new_content = serialize_blocks( $blocks );
+
+		wp_update_post( [
+			'ID'           => $post_id,
+			'post_content' => $new_content,
+		] );
+
+		do_action( 'datamachine_log', 'info', "System Agent: Image inserted into post #{$post_id} content at position '{$position}' (attachment #{$attachmentId})", [
+			'job_id'        => $jobId,
+			'post_id'       => $post_id,
+			'attachment_id' => $attachmentId,
+			'position'      => $position,
+			'insert_index'  => $insert_index,
+			'agent_type'    => 'system',
+		] );
+	}
+
+	/**
+	 * Build a Gutenberg image block array for the given attachment.
+	 *
+	 * @param int $attachmentId WordPress attachment ID.
+	 * @return array Parsed block array suitable for serialize_blocks().
+	 */
+	protected function buildImageBlock( int $attachmentId ): array {
+		$image_url = wp_get_attachment_image_url( $attachmentId, 'large' );
+		$alt_text  = get_post_meta( $attachmentId, '_wp_attachment_image_alt', true );
+
+		if ( empty( $alt_text ) ) {
+			$alt_text = get_the_title( $attachmentId );
+		}
+
+		if ( empty( $image_url ) ) {
+			return [];
+		}
+
+		$block_attrs = [
+			'id'              => $attachmentId,
+			'sizeSlug'        => 'large',
+			'linkDestination' => 'none',
+		];
+
+		$escaped_alt = esc_attr( $alt_text );
+		$escaped_url = esc_url( $image_url );
+
+		$inner_html = '<figure class="wp-block-image size-large"><img src="' . $escaped_url . '" alt="' . $escaped_alt . '" class="wp-image-' . $attachmentId . '"/></figure>';
+
+		return [
+			'blockName'    => 'core/image',
+			'attrs'        => $block_attrs,
+			'innerBlocks'  => [],
+			'innerHTML'    => $inner_html,
+			'innerContent' => [ $inner_html ],
+		];
+	}
+
+	/**
+	 * Find the block index to insert an image based on position strategy.
+	 *
+	 * @param array  $blocks   Parsed blocks array.
+	 * @param string $position Position strategy.
+	 * @return int Block index for insertion.
+	 */
+	protected function findInsertionIndex( array $blocks, string $position ): int {
+		// Handle index:N format
+		if ( str_starts_with( $position, 'index:' ) ) {
+			$index = (int) substr( $position, 6 );
+			return min( max( 0, $index ), count( $blocks ) );
+		}
+
+		switch ( $position ) {
+			case 'after_intro':
+				// After the first paragraph block
+				foreach ( $blocks as $i => $block ) {
+					if ( 'core/paragraph' === ( $block['blockName'] ?? '' ) ) {
+						return $i + 1;
+					}
+				}
+				// No paragraph found — insert at beginning
+				return 0;
+
+			case 'before_heading':
+				// Before the first H2 or H3 heading
+				foreach ( $blocks as $i => $block ) {
+					if ( 'core/heading' === ( $block['blockName'] ?? '' ) ) {
+						return $i;
+					}
+				}
+				// No heading found — insert after first paragraph
+				return $this->findInsertionIndex( $blocks, 'after_intro' );
+
+			case 'end':
+				return count( $blocks );
+
+			default:
+				// Default to after_intro
+				return $this->findInsertionIndex( $blocks, 'after_intro' );
+		}
 	}
 
 	/**

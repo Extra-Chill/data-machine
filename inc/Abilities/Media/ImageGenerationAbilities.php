@@ -101,6 +101,14 @@ class ImageGenerationAbilities {
 								'description' => 'Post ID to set the generated image as featured image (for standalone/direct calls).',
 							],
 
+							'mode'            => [
+								'type'        => 'string',
+								'description' => 'Post-sideload behavior: featured (set as featured image, default) or insert (insert image block into post content).',
+							],
+							'position'        => [
+								'type'        => 'string',
+								'description' => 'Where to insert image in content (insert mode only): after_intro (default), before_heading, end, or index:N.',
+							],
 							'post_context'    => [
 								'type'        => 'string',
 								'description' => 'Optional post content/excerpt for context-aware prompt refinement.',
@@ -221,6 +229,12 @@ class ImageGenerationAbilities {
 		}
 		if ( ! empty( $input['post_id'] ) ) {
 			$context['post_id'] = (int) $input['post_id'];
+		}
+		if ( ! empty( $input['mode'] ) ) {
+			$context['mode'] = sanitize_text_field( $input['mode'] );
+		}
+		if ( ! empty( $input['position'] ) ) {
+			$context['position'] = sanitize_text_field( $input['position'] );
 		}
 
 		$systemAgent = SystemAgent::getInstance();
