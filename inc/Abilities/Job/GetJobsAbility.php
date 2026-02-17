@@ -150,7 +150,8 @@ class GetJobsAbility {
 				);
 			}
 
-			$job = $this->addDisplayFields( $job );
+			$jobs_enriched = $this->enrichJobNames( array( $job ) );
+			$job           = $this->addDisplayFields( $jobs_enriched[0] );
 
 			return array(
 				'success'         => true,
@@ -194,6 +195,7 @@ class GetJobsAbility {
 		$jobs  = $this->db_jobs->get_jobs_for_list_table( $args );
 		$total = $this->db_jobs->get_jobs_count( $args );
 
+		$jobs = $this->enrichJobNames( $jobs );
 		$jobs = array_map( array( $this, 'addDisplayFields' ), $jobs );
 
 		return array(

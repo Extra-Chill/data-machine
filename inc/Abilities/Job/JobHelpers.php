@@ -15,6 +15,7 @@ use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Admin\DateFormatter;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 
 defined( 'ABSPATH' ) || exit;
@@ -23,11 +24,13 @@ trait JobHelpers {
 
 	protected Jobs $db_jobs;
 	protected Flows $db_flows;
+	protected Pipelines $db_pipelines;
 	protected ProcessedItems $db_processed_items;
 
 	protected function initDatabases(): void {
 		$this->db_jobs            = new Jobs();
 		$this->db_flows           = new Flows();
+		$this->db_pipelines       = new Pipelines();
 		$this->db_processed_items = new ProcessedItems();
 	}
 
@@ -38,6 +41,67 @@ trait JobHelpers {
 	 */
 	public function checkPermission(): bool {
 		return PermissionHelper::can_manage();
+	}
+
+	/**
+	 * Enrich jobs with pipeline_name and flow_name via batch lookup.
+	 *
+	 * The SQL JOIN in get_jobs_for_list_table should provide these, but if the
+	 * JOIN returns NULL (type mismatch, missing data, etc.) this fills them in
+	 * via direct lookups, batched to avoid N+1 queries.
+	 *
+	 * @param array $jobs Array of job rows.
+	 * @return array Jobs with pipeline_name and flow_name populated.
+	 */
+	protected function enrichJobNames( array $jobs ): array {
+		// Collect IDs that need lookup.
+		$pipeline_ids = array();
+		$flow_ids     = array();
+
+		foreach ( $jobs as $job ) {
+			if ( empty( $job['pipeline_name'] ) && ! empty( $job['pipeline_id'] ) && is_numeric( $job['pipeline_id'] ) ) {
+				$pipeline_ids[ (int) $job['pipeline_id'] ] = true;
+			}
+			if ( empty( $job['flow_name'] ) && ! empty( $job['flow_id'] ) && is_numeric( $job['flow_id'] ) ) {
+				$flow_ids[ (int) $job['flow_id'] ] = true;
+			}
+		}
+
+		// Nothing to look up — JOIN worked fine.
+		if ( empty( $pipeline_ids ) && empty( $flow_ids ) ) {
+			return $jobs;
+		}
+
+		// Batch-fetch pipeline names.
+		$pipeline_names = array();
+		foreach ( array_keys( $pipeline_ids ) as $pid ) {
+			$pipeline = $this->db_pipelines->get_pipeline( $pid );
+			if ( $pipeline ) {
+				$pipeline_names[ $pid ] = $pipeline['pipeline_name'] ?? '';
+			}
+		}
+
+		// Batch-fetch flow names.
+		$flow_names = array();
+		foreach ( array_keys( $flow_ids ) as $fid ) {
+			$flow = $this->db_flows->get_flow( $fid );
+			if ( $flow ) {
+				$flow_names[ $fid ] = $flow['flow_name'] ?? '';
+			}
+		}
+
+		// Apply lookups.
+		foreach ( $jobs as &$job ) {
+			if ( empty( $job['pipeline_name'] ) && isset( $pipeline_names[ (int) ( $job['pipeline_id'] ?? 0 ) ] ) ) {
+				$job['pipeline_name'] = $pipeline_names[ (int) $job['pipeline_id'] ];
+			}
+			if ( empty( $job['flow_name'] ) && isset( $flow_names[ (int) ( $job['flow_id'] ?? 0 ) ] ) ) {
+				$job['flow_name'] = $flow_names[ (int) $job['flow_id'] ];
+			}
+		}
+		unset( $job );
+
+		return $jobs;
 	}
 
 	/**
