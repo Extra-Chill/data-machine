@@ -30,8 +30,53 @@ import SettingsSaveBar, {
  */
 import ProviderModelSelector from '@shared/components/ai/ProviderModelSelector';
 
+const SOUL_SECTIONS = [
+	{
+		key: 'identity',
+		label: 'Identity',
+		description:
+			'Who is this agent? Name, role, personality. This is the core identity that shapes every response.',
+		placeholder:
+			'e.g. You are a helpful content assistant for our WordPress site…',
+		rows: 4,
+	},
+	{
+		key: 'voice',
+		label: 'Voice & Tone',
+		description:
+			'How should the agent communicate? Formal, casual, technical, friendly?',
+		placeholder:
+			'e.g. Write in a warm, conversational tone. Avoid jargon…',
+		rows: 3,
+	},
+	{
+		key: 'rules',
+		label: 'Rules',
+		description:
+			'Hard constraints the agent must follow. Safety guardrails, content policies, formatting requirements.',
+		placeholder:
+			'e.g. Never generate content about competitors. Always cite sources…',
+		rows: 4,
+	},
+	{
+		key: 'context',
+		label: 'Context',
+		description:
+			'Background knowledge the agent should always have. Brand info, audience details, domain expertise.',
+		placeholder:
+			'e.g. Our target audience is small business owners aged 25-45…',
+		rows: 4,
+	},
+];
+
 const DEFAULTS = {
 	disabled_tools: {},
+	agent_soul: {
+		identity: '',
+		voice: '',
+		rules: '',
+		context: '',
+	},
 	global_system_prompt: '',
 	default_provider: '',
 	default_model: '',
@@ -102,8 +147,15 @@ const AgentTab = () => {
 	// Sync server data → form state
 	useEffect( () => {
 		if ( data?.settings ) {
+			const serverSoul = data.settings.agent_soul || {};
 			form.reset( {
 				disabled_tools: data.settings.disabled_tools || {},
+				agent_soul: {
+					identity: serverSoul.identity || '',
+					voice: serverSoul.voice || '',
+					rules: serverSoul.rules || '',
+					context: serverSoul.context || '',
+				},
 				global_system_prompt:
 					data.settings.global_system_prompt || '',
 				default_provider: data.settings.default_provider || '',
@@ -278,31 +330,103 @@ const AgentTab = () => {
 					</tr>
 
 					<tr>
-						<th scope="row">
-							<label htmlFor="global_system_prompt">
-								Global System Prompt
-							</label>
-						</th>
+						<th scope="row">Agent Soul</th>
 						<td>
-							<textarea
-								id="global_system_prompt"
-								rows="8"
-								cols="70"
-								className="large-text code"
-								value={ form.data.global_system_prompt || '' }
-								onChange={ ( e ) =>
-									updateField(
-										'global_system_prompt',
-										e.target.value
-									)
-								}
-							/>
-							<p className="description">
-								Primary system message that sets the tone and
-								overall behavior for all AI agents. This is the
-								first and most important instruction that
-								influences every AI response in your workflows.
+							<p
+								className="description"
+								style={ {
+									marginTop: 0,
+									marginBottom: '16px',
+								} }
+							>
+								Define who this agent is across four tiers.
+								Each section is injected as a system directive
+								for every AI interaction — pipelines and chat.
 							</p>
+							{ SOUL_SECTIONS.map( ( section ) => (
+								<div
+									key={ section.key }
+									className="datamachine-soul-section"
+									style={ { marginBottom: '16px' } }
+								>
+									<label
+										htmlFor={ `agent_soul_${ section.key }` }
+										style={ {
+											fontWeight: 600,
+											display: 'block',
+											marginBottom: '4px',
+										} }
+									>
+										{ section.label }
+									</label>
+									<textarea
+										id={ `agent_soul_${ section.key }` }
+										rows={ section.rows }
+										cols="70"
+										className="large-text code"
+										placeholder={ section.placeholder }
+										value={
+											form.data.agent_soul?.[
+												section.key
+											] || ''
+										}
+										onChange={ ( e ) => {
+											form.updateData( {
+												agent_soul: {
+													...form.data.agent_soul,
+													[ section.key ]:
+														e.target.value,
+												},
+											} );
+											save.markChanged();
+										} }
+									/>
+									<p className="description">
+										{ section.description }
+									</p>
+								</div>
+							) ) }
+
+							{ form.data.global_system_prompt && (
+								<div
+									className="notice notice-warning inline"
+									style={ {
+										marginTop: '12px',
+										padding: '8px 12px',
+									} }
+								>
+									<p>
+										<strong>
+											Legacy prompt detected.
+										</strong>{ ' ' }
+										You have content in the old Global
+										System Prompt field. Move it into the
+										sections above for structured agent
+										behavior.
+									</p>
+									<details style={ { marginTop: '8px' } }>
+										<summary>
+											View legacy prompt
+										</summary>
+										<textarea
+											rows="4"
+											cols="70"
+											className="large-text code"
+											value={
+												form.data
+													.global_system_prompt || ''
+											}
+											onChange={ ( e ) =>
+												updateField(
+													'global_system_prompt',
+													e.target.value
+												)
+											}
+											style={ { marginTop: '8px' } }
+										/>
+									</details>
+								</div>
+							) }
 						</td>
 					</tr>
 
