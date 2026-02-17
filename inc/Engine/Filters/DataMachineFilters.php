@@ -50,22 +50,6 @@ datamachine_register_importexport_filters();
 function datamachine_register_utility_filters() {
 
 	add_filter(
-		'datamachine_auth_providers',
-		function ( $providers ) {
-			return $providers;
-		},
-		5,
-		1
-	);
-
-	add_filter(
-		'datamachine_step_settings',
-		function ( $configs ) {
-			return $configs;
-		},
-		5
-	);
-	add_filter(
 		'datamachine_generate_flow_step_id',
 		function ( $existing_id, $pipeline_step_id, $flow_id ) {
 			if ( empty( $pipeline_step_id ) || empty( $flow_id ) ) {

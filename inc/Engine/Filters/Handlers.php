@@ -10,33 +10,6 @@ if ( ! defined( 'WPINC' ) ) {
 }
 
 function datamachine_register_handler_filters() {
-	add_filter(
-		'datamachine_handlers',
-		function ( $handlers, $step_type = null ) {
-			return $handlers;
-		},
-		5,
-		2
-	);
-
-	add_filter(
-		'datamachine_handler_settings',
-		function ( $all_settings, $handler_slug = null ) {
-			return $all_settings;
-		},
-		5,
-		2
-	);
-
-	add_filter(
-		'datamachine_auth_providers',
-		function ( $providers, $step_type = null ) {
-			return $providers;
-		},
-		5,
-		2
-	);
-
 	/**
 	 * Dual-mode: null = discover options, string = convert to timestamp.
 	 */

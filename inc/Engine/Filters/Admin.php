@@ -22,15 +22,6 @@ function datamachine_register_admin_filters() {
 		delete_option( 'datamachine_page_configs' );
 	}
 
-	add_filter(
-		'datamachine_admin_pages',
-		function ( $pages ) {
-			return $pages;
-		},
-		5,
-		1
-	);
-
 	// Template rendering with dynamic discovery
 	add_filter(
 		'datamachine_render_template',
