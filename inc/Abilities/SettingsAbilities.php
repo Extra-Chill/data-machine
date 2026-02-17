@@ -114,7 +114,7 @@ class SettingsAbilities {
 						'default_provider'            => array( 'type' => 'string' ),
 						'default_model'               => array( 'type' => 'string' ),
 						'max_turns'                   => array( 'type' => 'integer' ),
-						'enabled_tools'               => array( 'type' => 'object' ),
+						'disabled_tools'              => array( 'type' => 'object' ),
 						'ai_provider_keys'            => array( 'type' => 'object' ),
 						'queue_tuning'                => array(
 							'type'        => 'object',
@@ -323,7 +323,7 @@ class SettingsAbilities {
 				'description'            => $tool_config['description'] ?? '',
 				'is_configured'          => $tool_manager->is_tool_configured( $tool_name ),
 				'requires_configuration' => $tool_manager->requires_configuration( $tool_name ),
-				'is_enabled'             => isset( $settings['enabled_tools'][ $tool_name ] ),
+				'is_enabled'             => ! isset( $settings['disabled_tools'][ $tool_name ] ),
 			);
 		}
 
@@ -363,7 +363,7 @@ class SettingsAbilities {
 				'default_provider'            => $settings['default_provider'] ?? '',
 				'default_model'               => $settings['default_model'] ?? '',
 				'max_turns'                   => $settings['max_turns'] ?? 12,
-				'enabled_tools'               => $settings['enabled_tools'] ?? array(),
+				'disabled_tools'              => $settings['disabled_tools'] ?? array(),
 				'ai_provider_keys'            => $masked_keys,
 				'queue_tuning'                => $settings['queue_tuning'] ?? array(
 					'concurrent_batches' => 3,
@@ -447,11 +447,11 @@ class SettingsAbilities {
 			$all_settings['max_turns'] = max( 1, min( 50, $turns ) );
 		}
 
-		if ( isset( $input['enabled_tools'] ) ) {
-			$all_settings['enabled_tools'] = array();
-			foreach ( $input['enabled_tools'] as $tool_id => $enabled ) {
-				if ( $enabled ) {
-					$all_settings['enabled_tools'][ sanitize_key( $tool_id ) ] = true;
+		if ( isset( $input['disabled_tools'] ) ) {
+			$all_settings['disabled_tools'] = array();
+			foreach ( $input['disabled_tools'] as $tool_id => $disabled ) {
+				if ( $disabled ) {
+					$all_settings['disabled_tools'][ sanitize_key( $tool_id ) ] = true;
 				}
 			}
 		}

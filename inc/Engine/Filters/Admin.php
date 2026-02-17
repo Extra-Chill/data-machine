@@ -170,11 +170,11 @@ function datamachine_get_enabled_global_tools() {
 		}
 	);
 
-	if ( empty( $settings['enabled_tools'] ) ) {
+	if ( empty( $settings['disabled_tools'] ) ) {
 		return $global_tools;
 	}
 
-	return array_intersect_key( $global_tools, array_filter( $settings['enabled_tools'] ) );
+	return array_diff_key( $global_tools, array_filter( $settings['disabled_tools'] ) );
 }
 
 /**

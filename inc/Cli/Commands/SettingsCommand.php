@@ -131,8 +131,8 @@ class SettingsCommand extends BaseCommand {
 				}
 			}
 
-			// Convenience format for enabled_tools: comma-separated list of tool IDs.
-			if ( 'enabled_tools' === $key && is_string( $value ) && '' !== trim( $value ) && ! str_contains( $value, '{' ) ) {
+			// Convenience format for disabled_tools: comma-separated list of tool IDs.
+			if ( 'disabled_tools' === $key && is_string( $value ) && '' !== trim( $value ) && ! str_contains( $value, '{' ) ) {
 				$tool_ids = array_filter( array_map( 'trim', explode( ',', $value ) ) );
 				if ( ! empty( $tool_ids ) ) {
 					$value = array_fill_keys( $tool_ids, true );

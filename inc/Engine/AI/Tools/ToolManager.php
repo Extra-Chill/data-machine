@@ -159,13 +159,13 @@ class ToolManager {
 	}
 
 	/**
-	 * Get globally enabled tools (opt-out pattern).
+	 * Get globally disabled tools (opt-out pattern).
 	 *
-	 * @return array Globally enabled tool IDs
+	 * @return array Globally disabled tool IDs
 	 */
-	public function get_globally_enabled_tools(): array {
-		$enabled_tools = PluginSettings::get( 'enabled_tools', array() );
-		return array_keys( $enabled_tools );
+	public function get_globally_disabled_tools(): array {
+		$disabled_tools = PluginSettings::get( 'disabled_tools', array() );
+		return array_keys( $disabled_tools );
 	}
 
 	// ============================================
@@ -209,15 +209,15 @@ class ToolManager {
 	 * @return bool True if globally enabled
 	 */
 	public function is_globally_enabled( string $tool_id ): bool {
-		$enabled_tools = PluginSettings::get( 'enabled_tools', array() );
+		$disabled_tools = PluginSettings::get( 'disabled_tools', array() );
 
-		// If settings never initialized, treat as opt-out (all configured tools enabled)
-		if ( empty( $enabled_tools ) ) {
-			return $this->is_tool_configured( $tool_id ) || ! $this->requires_configuration( $tool_id );
+		// Present in disabled_tools = disabled
+		if ( isset( $disabled_tools[ $tool_id ] ) ) {
+			return false;
 		}
 
-		// Present in settings = enabled (opt-out pattern)
-		return isset( $enabled_tools[ $tool_id ] );
+		// Not disabled — enabled if configured or doesn't require config
+		return $this->is_tool_configured( $tool_id ) || ! $this->requires_configuration( $tool_id );
 	}
 
 
@@ -352,7 +352,7 @@ class ToolManager {
 	 */
 	public function get_tools_for_step_modal( string $context_id ): array {
 		return array(
-			'global_enabled_tools' => $this->get_global_tools(),
+			'global_tools' => $this->get_global_tools(),
 			'modal_disabled_tools' => $this->get_step_disabled_tools( $context_id ),
 			'pipeline_step_id'     => $context_id,
 		);
@@ -401,25 +401,6 @@ class ToolManager {
 		}
 
 		return $formatted;
-	}
-
-	/**
-	 * Get opt-out defaults (configured tools).
-	 * Used for pre-populating settings.
-	 *
-	 * @return array Tool IDs that should be enabled by default
-	 */
-	public function get_opt_out_defaults(): array {
-		$tools    = $this->get_global_tools();
-		$defaults = array();
-
-		foreach ( $tools as $tool_id => $tool_config ) {
-			if ( $this->is_tool_configured( $tool_id ) ) {
-				$defaults[] = $tool_id;
-			}
-		}
-
-		return $defaults;
 	}
 
 	/**
