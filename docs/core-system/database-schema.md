@@ -221,14 +221,14 @@ $job_id = $db_jobs->create_job([
 ]);
 ```
 
-**Update Status**:
+**Fail Job**:
 ```php
 // Abilities API
 $ability = wp_get_ability( 'datamachine/fail-job' );
-$ability->execute( [ 'job_id' => $job_id, 'reason' => 'Success message' ] );
+$ability->execute( [ 'job_id' => $job_id, 'reason' => 'Processing failed: timeout exceeded' ] );
 
 // Action Hook (for extensibility)
-do_action('datamachine_update_job_status', $job_id, 'completed', 'Success message');
+do_action('datamachine_update_job_status', $job_id, 'failed', 'Processing failed: timeout exceeded');
 ```
 
 ### Processed Items
