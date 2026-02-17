@@ -47,7 +47,6 @@ export default function FlowStepCard( {
 } ) {
 	const { data: stepTypes = {} } = useStepTypes();
 	const stepTypeInfo = stepTypes[ pipelineStep.step_type ] || {};
-	const showSettingsDisplay = stepTypeInfo.show_settings_display !== false;
 
 	const isAiStep = pipelineStep.step_type === 'ai';
 	const aiConfig = isAiStep
@@ -148,8 +147,12 @@ export default function FlowStepCard( {
 						</div>
 					) }
 
-					{ /* Inline Config Fields (schema-driven from handler details API) */ }
-					{ showSettingsDisplay && effectiveHandlerSlug && (
+					{ /* Inline Config Fields (schema-driven from handler details API).
+					   Renders for any step type with registered fields — the component
+					   self-determines whether to render based on API response (returns
+					   null when no fields exist). Not gated by show_settings_display,
+					   which controls the PHP-side read-only summary, not the React editor. */ }
+					{ effectiveHandlerSlug && (
 						<InlineStepConfig
 							flowStepId={ flowStepId }
 							handlerConfig={ flowStepConfig?.handler_config || {} }
