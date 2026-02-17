@@ -190,6 +190,7 @@ export default function FlowStepCard( {
 							handlerSlug={ flowStepConfig.handler_slug || null }
 							handlerSlugs={ flowStepConfig.handler_slugs || null }
 							settingsDisplay={ flowStepConfig.settings_display || [] }
+							handlerSettingsDisplays={ flowStepConfig.handler_settings_displays || null }
 							onConfigure={ ( slug ) =>
 								onConfigure && onConfigure( flowStepId, slug )
 							}

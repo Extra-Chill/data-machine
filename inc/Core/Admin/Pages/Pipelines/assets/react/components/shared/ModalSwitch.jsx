@@ -54,6 +54,7 @@ export default function ModalSwitch( { activeModal, baseProps } ) {
 				<HandlerSelectionModal
 					{ ...baseProps }
 					handlers={ baseProps.handlers }
+					existingHandlerSlugs={ baseProps.addMode ? ( baseProps.handlerSlugs || [] ) : [] }
 				/>
 			);
 

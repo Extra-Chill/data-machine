@@ -28,6 +28,9 @@ class SettingsDisplayService {
 	/**
 	 * Get formatted settings display for a flow step.
 	 *
+	 * Returns the display for the primary (singular) handler. For multi-handler
+	 * display, use getDisplaySettingsForHandlers().
+	 *
 	 * @param string $flow_step_id Flow step ID to get settings for (format: {pipeline_step_id}_{flow_id})
 	 * @param string $step_type Step type (for step types with usesHandler: false)
 	 * @return array Formatted settings display array
@@ -53,11 +56,81 @@ class SettingsDisplayService {
 			$handler_slug = $step_type;
 		}
 
+		return $this->getDisplayForHandler( $handler_slug, $current_settings );
+	}
+
+	/**
+	 * Get formatted settings display for all handlers on a flow step.
+	 *
+	 * Returns an associative array keyed by handler slug, each containing the
+	 * display settings array for that handler. Falls back to the singular
+	 * handler_slug/handler_config when handler_configs is not populated.
+	 *
+	 * @param string $flow_step_id Flow step ID.
+	 * @param string $step_type    Step type slug.
+	 * @return array<string, array> Map of handler_slug => settings display array.
+	 */
+	public function getDisplaySettingsForHandlers( string $flow_step_id, string $step_type ): array {
+		if ( ! $this->shouldShowSettingsDisplay( $step_type ) ) {
+			return array();
+		}
+
+		$db_flows         = new \DataMachine\Core\Database\Flows\Flows();
+		$flow_step_config = $db_flows->get_flow_step_config( $flow_step_id );
+		if ( empty( $flow_step_config ) ) {
+			return array();
+		}
+
+		$handler_configs = $flow_step_config['handler_configs'] ?? array();
+		$handler_slugs   = $flow_step_config['handler_slugs'] ?? array();
+
+		// Fallback: build from singular fields when multi-handler data isn't populated.
+		if ( empty( $handler_configs ) ) {
+			$handler_slug     = $flow_step_config['handler_slug'] ?? '';
+			$current_settings = $flow_step_config['handler_config'] ?? array();
+
+			if ( empty( $handler_slug ) && ! empty( $step_type ) ) {
+				$handler_slug = $step_type;
+			}
+
+			if ( empty( $handler_slug ) ) {
+				return array();
+			}
+
+			$display = $this->getDisplayForHandler( $handler_slug, $current_settings );
+
+			return ! empty( $display ) ? array( $handler_slug => $display ) : array();
+		}
+
+		// Ensure handler_slugs is populated for ordering.
+		if ( empty( $handler_slugs ) ) {
+			$handler_slugs = array_keys( $handler_configs );
+		}
+
+		$result = array();
+		foreach ( $handler_slugs as $slug ) {
+			$settings = $handler_configs[ $slug ] ?? array();
+			$display  = $this->getDisplayForHandler( $slug, $settings );
+			if ( ! empty( $display ) ) {
+				$result[ $slug ] = $display;
+			}
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Build display array for a single handler slug and its settings.
+	 *
+	 * @param string $handler_slug Handler slug (or step_type for non-handler steps).
+	 * @param array  $current_settings Current settings values.
+	 * @return array Formatted settings display array.
+	 */
+	private function getDisplayForHandler( string $handler_slug, array $current_settings ): array {
 		if ( empty( $handler_slug ) || empty( $current_settings ) ) {
 			return array();
 		}
 
-		// Get handler Settings class via cached service
 		$handler_abilities = new HandlerAbilities();
 		$handler_settings  = $handler_abilities->getSettingsClass( $handler_slug );
 
@@ -65,7 +138,6 @@ class SettingsDisplayService {
 			return array();
 		}
 
-		// Get field definitions
 		$fields = $handler_settings::get_fields();
 
 		return $this->buildDisplayArray( $fields, $current_settings );

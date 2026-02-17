@@ -236,8 +236,10 @@ class ConfigureFlowStepsAbility {
 				}
 
 				if ( ! empty( $handler_slug ) ) {
-					$config_handler_slug = $step_config['handler_slug'] ?? null;
-					if ( $config_handler_slug !== $handler_slug ) {
+					$config_handler_slug  = $step_config['handler_slug'] ?? null;
+					$config_handler_slugs = $step_config['handler_slugs'] ?? array();
+					// Match on singular field OR presence in handler_slugs array.
+					if ( $config_handler_slug !== $handler_slug && ! in_array( $handler_slug, $config_handler_slugs, true ) ) {
 						continue;
 					}
 				}
@@ -712,8 +714,10 @@ class ConfigureFlowStepsAbility {
 					}
 				}
 
-				$config_handler_slug = $step_config['handler_slug'] ?? null;
-				if ( $config_handler_slug === $handler_slug ) {
+				$config_handler_slug  = $step_config['handler_slug'] ?? null;
+				$config_handler_slugs = $step_config['handler_slugs'] ?? array();
+				// Match on singular field OR presence in handler_slugs array.
+				if ( $config_handler_slug === $handler_slug || in_array( $handler_slug, $config_handler_slugs, true ) ) {
 					$matching_flows[] = array(
 						'flow'         => $flow,
 						'flow_step_id' => $flow_step_id,

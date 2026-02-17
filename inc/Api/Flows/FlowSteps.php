@@ -374,8 +374,9 @@ class FlowSteps {
 				$step_config['execution_order'] = $existing_step['execution_order'];
 			}
 
-			$service                  = new \DataMachine\Core\Steps\Settings\SettingsDisplayService();
-			$handler_settings_display = $service->getDisplaySettings( $flow_step_id, $step_type );
+			$service                   = new \DataMachine\Core\Steps\Settings\SettingsDisplayService();
+			$handler_settings_display  = $service->getDisplaySettings( $flow_step_id, $step_type );
+			$handler_settings_displays = $service->getDisplaySettingsForHandlers( $flow_step_id, $step_type );
 
 			$message = sprintf(
 				/* translators: %s: handler label */
@@ -393,7 +394,8 @@ class FlowSteps {
 						'flow_id'                  => $flow_id,
 						'pipeline_step_id'         => $pipeline_step_id,
 						'step_config'              => $step_config,
-						'handler_settings_display' => $handler_settings_display,
+						'handler_settings_display'  => $handler_settings_display,
+						'handler_settings_displays' => $handler_settings_displays,
 					),
 					'message' => $message,
 				)

@@ -31,17 +31,20 @@ export default function HandlerSelectionModal( {
 	stepType,
 	onSelectHandler,
 	handlers,
+	existingHandlerSlugs = [],
 } ) {
 	const [ error, setError ] = useState( null );
 	// Presentational: Receive handlers data as props
 
 	/**
-	 * Filter handlers by step type
+	 * Filter handlers by step type, excluding already-configured handlers.
 	 */
 	const { handlers: rawHandlers, getModel } = useHandlerContext() || {};
 
 	const filteredHandlers = Object.entries( rawHandlers || handlers ).filter(
-		( [ , handler ] ) => handler.type === stepType
+		( [ slug, handler ] ) =>
+			handler.type === stepType &&
+			! existingHandlerSlugs.includes( slug )
 	);
 
 	/**

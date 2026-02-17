@@ -305,6 +305,8 @@ export const useUpdateFlowHandler = () => {
 			const stepConfig = response.data.step_config;
 			const handlerSettingsDisplay =
 				response.data.handler_settings_display;
+			const handlerSettingsDisplays =
+				response.data.handler_settings_displays;
 
 			if ( ! flowId || ! flowStepId || ! stepConfig ) {
 				return;
@@ -319,6 +321,8 @@ export const useUpdateFlowHandler = () => {
 					...stepConfig,
 					settings_display:
 						handlerSettingsDisplay || existingStep.settings_display,
+					handler_settings_displays:
+						handlerSettingsDisplays || existingStep.handler_settings_displays,
 				} ),
 			} );
 		},
