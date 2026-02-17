@@ -497,7 +497,7 @@ class ImageGenerationTask extends SystemTask {
 	protected function insertImageInContent( int $jobId, int $attachmentId, array $params ): void {
 		$context  = $params['context'] ?? [];
 		$post_id  = $context['post_id'] ?? 0;
-		$position = $context['position'] ?? 'after_intro';
+		$position = $context['position'] ?? 'auto';
 
 		// Also check pipeline job for post_id if not directly provided
 		if ( empty( $post_id ) ) {
@@ -608,7 +608,7 @@ class ImageGenerationTask extends SystemTask {
 	 * Find the block index to insert an image based on position strategy.
 	 *
 	 * @param array  $blocks   Parsed blocks array.
-	 * @param string $position Position strategy.
+	 * @param string $position Position strategy: auto (default, finds largest gap between existing images), after_intro, before_heading, end, or index:N.
 	 * @return int Block index for insertion.
 	 */
 	protected function findInsertionIndex( array $blocks, string $position ): int {
@@ -642,9 +642,57 @@ class ImageGenerationTask extends SystemTask {
 			case 'end':
 				return count( $blocks );
 
+			case 'auto':
 			default:
-				// Default to after_intro
-				return $this->findInsertionIndex( $blocks, 'after_intro' );
+				// Find all existing image block positions.
+				$image_positions = [];
+				foreach ( $blocks as $i => $block ) {
+					if ( 'core/image' === ( $block['blockName'] ?? '' ) ) {
+						$image_positions[] = $i;
+					}
+				}
+
+				// No existing images — fall back to after_intro.
+				if ( empty( $image_positions ) ) {
+					return $this->findInsertionIndex( $blocks, 'after_intro' );
+				}
+
+				// Calculate gaps between images (and before first / after last).
+				$total_blocks = count( $blocks );
+				$gaps         = [];
+
+				// Gap before first image.
+				$gaps[] = [
+					'start' => 0,
+					'end'   => $image_positions[0],
+					'size'  => $image_positions[0],
+				];
+
+				// Gaps between consecutive images.
+				for ( $j = 0; $j < count( $image_positions ) - 1; $j++ ) {
+					$gaps[] = [
+						'start' => $image_positions[ $j ],
+						'end'   => $image_positions[ $j + 1 ],
+						'size'  => $image_positions[ $j + 1 ] - $image_positions[ $j ],
+					];
+				}
+
+				// Gap after last image.
+				$last   = end( $image_positions );
+				$gaps[] = [
+					'start' => $last,
+					'end'   => $total_blocks,
+					'size'  => $total_blocks - $last,
+				];
+
+				// Find largest gap.
+				usort( $gaps, fn( $a, $b ) => $b['size'] <=> $a['size'] );
+				$largest = $gaps[0];
+
+				// Insert in the middle of the largest gap.
+				$insert_at = $largest['start'] + (int) ceil( $largest['size'] / 2 );
+
+				return min( $insert_at, $total_blocks );
 		}
 	}
 
