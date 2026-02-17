@@ -99,7 +99,7 @@ class GitHubIssueTool extends BaseTool {
 			'class'       => __CLASS__,
 			'method'      => 'handle_tool_call',
 			'description' => 'Create a GitHub issue in a repository. Requires a GitHub PAT configured in settings. Use for bug reports, feature requests, and task tracking.',
-			'agent_types' => array( 'system' ),
+			'agent_types' => array( 'system', 'chat' ),
 			'parameters'  => array(
 				'title'  => array(
 					'type'        => 'string',
