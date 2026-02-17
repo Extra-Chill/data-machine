@@ -3,6 +3,7 @@
  *
  * Manages turn-by-turn chat execution for async responses.
  * Polls /chat/continue endpoint until conversation completes.
+ * Updates TanStack Query cache directly instead of using callbacks.
  *
  * @since 0.12.0
  */
@@ -19,6 +20,25 @@ import apiFetch from '@wordpress/api-fetch';
 import { useChatQueryInvalidation } from './useChatQueryInvalidation';
 
 /**
+ * Update chat session cache with new messages
+ *
+ * @param {Object} queryClient TanStack Query client
+ * @param {string} sessionId   Session ID
+ * @param {Array}  newMessages New messages to append
+ */
+function appendMessagesToCache( queryClient, sessionId, newMessages ) {
+	queryClient.setQueryData( [ 'chat-session', sessionId ], ( old ) => {
+		if ( ! old ) {
+			return old;
+		}
+		return {
+			...old,
+			conversation: [ ...( old.conversation || [] ), ...newMessages ],
+		};
+	} );
+}
+
+/**
  * Hook for managing turn-by-turn chat execution
  *
  * @return {Object} Turn management functions and state
@@ -32,13 +52,13 @@ export function useChatTurn() {
 	/**
 	 * Execute a single continuation turn
 	 *
-	 * @param {string}   sessionId          Session ID to continue
-	 * @param {Function} onNewMessages      Callback for new messages
-	 * @param {number}   selectedPipelineId Pipeline ID for context
+	 * @param {string} sessionId          Session ID to continue
+	 * @param {Object} queryClient        TanStack Query client
+	 * @param {number} selectedPipelineId Pipeline ID for context
 	 * @return {Object} API response
 	 */
 	const continueTurn = useCallback(
-		async ( sessionId, onNewMessages, selectedPipelineId ) => {
+		async ( sessionId, queryClient, selectedPipelineId ) => {
 			const response = await apiFetch( {
 				path: '/datamachine/v1/chat/continue',
 				method: 'POST',
@@ -54,9 +74,7 @@ export function useChatTurn() {
 			const data = response.data;
 
 			if ( data.new_messages?.length ) {
-				onNewMessages( data.new_messages );
-
-				// Invalidate queries for any mutations that occurred
+				appendMessagesToCache( queryClient, sessionId, data.new_messages );
 				invalidateFromToolCalls( data.tool_calls, selectedPipelineId );
 			}
 
@@ -68,14 +86,14 @@ export function useChatTurn() {
 	/**
 	 * Process turns until completion or max turns reached
 	 *
-	 * @param {string}   sessionId          Session ID to continue
-	 * @param {Function} onNewMessages      Callback for new messages (receives array)
-	 * @param {number}   maxTurns           Maximum turns from server response
-	 * @param {number}   selectedPipelineId Pipeline ID for context
+	 * @param {string} sessionId          Session ID to continue
+	 * @param {Object} queryClient        TanStack Query client
+	 * @param {number} maxTurns           Maximum turns from server response
+	 * @param {number} selectedPipelineId Pipeline ID for context
 	 * @return {Object} Result with completed status and turn count
 	 */
 	const processToCompletion = useCallback(
-		async ( sessionId, onNewMessages, maxTurns, selectedPipelineId ) => {
+		async ( sessionId, queryClient, maxTurns, selectedPipelineId ) => {
 			setProcessingSessionId( sessionId );
 			setIsProcessing( true );
 			setTurnCount( 0 );
@@ -88,7 +106,7 @@ export function useChatTurn() {
 				while ( ! completed && turns < effectiveMaxTurns ) {
 					const response = await continueTurn(
 						sessionId,
-						onNewMessages,
+						queryClient,
 						selectedPipelineId
 					);
 

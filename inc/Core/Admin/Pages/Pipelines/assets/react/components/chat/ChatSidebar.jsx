@@ -3,16 +3,20 @@
  *
  * Collapsible right sidebar for chat interface.
  * Manages conversation state, session switching, and API interactions.
- * Persists conversation across page refreshes via session storage.
+ * Uses TanStack Query cache as single source of truth for messages.
  */
 
 /**
  * WordPress dependencies
  */
-import { useState, useCallback, useEffect, useRef } from '@wordpress/element';
+import { useState, useCallback, useRef } from '@wordpress/element';
 import { Button } from '@wordpress/components';
 import { close, copy } from '@wordpress/icons';
 import { __ } from '@wordpress/i18n';
+/**
+ * External dependencies
+ */
+import { useQueryClient } from '@tanstack/react-query';
 /**
  * Internal dependencies
  */
@@ -73,7 +77,8 @@ export default function ChatSidebar() {
 		clearChatSession,
 		selectedPipelineId,
 	} = useUIStore();
-	const [ messages, setMessages ] = useState( [] );
+	const queryClient = useQueryClient();
+	const [ pendingUserMessage, setPendingUserMessage ] = useState( null );
 	const [ isCopied, setIsCopied ] = useState( false );
 	const [ view, setView ] = useState( 'chat' ); // 'chat' | 'sessions'
 	const chatMutation = useChatMutation();
@@ -88,18 +93,11 @@ export default function ChatSidebar() {
 	const isCreatingSessionRef = useRef( false );
 	const loadingSessionRef = useRef( null );
 
-	useEffect( () => {
-		if ( sessionQuery.data?.conversation ) {
-			setMessages( sessionQuery.data.conversation );
-		}
-	}, [ sessionQuery.data ] );
-
-	useEffect( () => {
-		if ( sessionQuery.error?.message?.includes( 'not found' ) ) {
-			clearChatSession();
-			setMessages( [] );
-		}
-	}, [ sessionQuery.error, clearChatSession ] );
+	// Messages from query cache, with pending message for new sessions
+	const cachedMessages = sessionQuery.data?.conversation ?? [];
+	const messages = pendingUserMessage
+		? [ ...cachedMessages, pendingUserMessage ]
+		: cachedMessages;
 
 	const handleSend = useCallback(
 		async ( message ) => {
@@ -115,7 +113,28 @@ export default function ChatSidebar() {
 			const requestId = generateRequestId();
 
 			const userMessage = { role: 'user', content: message };
-			setMessages( ( prev ) => [ ...prev, userMessage ] );
+
+			if ( isNewSession ) {
+				// No session yet — use temp pending state
+				setPendingUserMessage( userMessage );
+			} else {
+				// Optimistic update to query cache
+				queryClient.setQueryData(
+					[ 'chat-session', chatSessionId ],
+					( old ) => {
+						if ( ! old ) {
+							return old;
+						}
+						return {
+							...old,
+							conversation: [
+								...( old.conversation || [] ),
+								userMessage,
+							],
+						};
+					}
+				);
+			}
 
 			// Track which session is loading for session-aware UI
 			loadingSessionRef.current = chatSessionId || 'new';
@@ -129,15 +148,29 @@ export default function ChatSidebar() {
 					requestId,
 				} );
 
+				const responseSessionId = response.session_id;
+
 				if (
-					response.session_id &&
-					response.session_id !== chatSessionId
+					responseSessionId &&
+					responseSessionId !== chatSessionId
 				) {
-					setChatSessionId( response.session_id );
+					setChatSessionId( responseSessionId );
 				}
 
 				if ( response.conversation ) {
-					setMessages( response.conversation );
+					// Server returned full conversation — seed the cache
+					queryClient.setQueryData(
+						[ 'chat-session', responseSessionId ],
+						( old ) => ( {
+							...( old || {} ),
+							conversation: response.conversation,
+						} )
+					);
+				}
+
+				// Clear pending message now that session exists
+				if ( isNewSession ) {
+					setPendingUserMessage( null );
 				}
 
 				invalidateFromToolCalls(
@@ -146,14 +179,10 @@ export default function ChatSidebar() {
 				);
 
 				// Continue processing if not complete (turn-by-turn polling)
-				if ( ! response.completed && response.session_id ) {
+				if ( ! response.completed && responseSessionId ) {
 					await processToCompletion(
-						response.session_id,
-						( newMessages ) =>
-							setMessages( ( prev ) => [
-								...prev,
-								...newMessages,
-							] ),
+						responseSessionId,
+						queryClient,
 						response.max_turns,
 						selectedPipelineId
 					);
@@ -169,7 +198,30 @@ export default function ChatSidebar() {
 					role: 'assistant',
 					content: errorContent,
 				};
-				setMessages( ( prev ) => [ ...prev, errorMessage ] );
+
+				// Clear pending message on error
+				if ( isNewSession ) {
+					setPendingUserMessage( null );
+				}
+
+				const targetSessionId = chatSessionId;
+				if ( targetSessionId ) {
+					queryClient.setQueryData(
+						[ 'chat-session', targetSessionId ],
+						( old ) => {
+							if ( ! old ) {
+								return old;
+							}
+							return {
+								...old,
+								conversation: [
+									...( old.conversation || [] ),
+									errorMessage,
+								],
+							};
+						}
+					);
+				}
 
 				if ( error.message?.includes( 'not found' ) ) {
 					clearChatSession();
@@ -189,18 +241,20 @@ export default function ChatSidebar() {
 			selectedPipelineId,
 			invalidateFromToolCalls,
 			processToCompletion,
+			queryClient,
 		]
 	);
 
 	const handleNewConversation = useCallback( () => {
 		clearChatSession();
-		setMessages( [] );
+		setPendingUserMessage( null );
 		setView( 'chat' );
 	}, [ clearChatSession ] );
 
 	const handleSelectSession = useCallback(
 		( sessionId ) => {
 			setChatSessionId( sessionId );
+			setPendingUserMessage( null );
 			setView( 'chat' );
 		},
 		[ setChatSessionId ]
@@ -216,7 +270,7 @@ export default function ChatSidebar() {
 
 	const handleSessionDeleted = useCallback( () => {
 		clearChatSession();
-		setMessages( [] );
+		setPendingUserMessage( null );
 	}, [ clearChatSession ] );
 
 	const handleCopyChat = useCallback( () => {

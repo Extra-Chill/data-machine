@@ -288,14 +288,10 @@ class Chat {
 		$prompt  = sanitize_textarea_field( wp_unslash( $request->get_param( 'prompt' ) ?? '' ) );
 		$context = $request->get_param( 'context' ) ?? array();
 
-		AgentContext::set( AgentType::CHAT );
-
-		$provider  = PluginSettings::get( 'default_provider', '' );
-		$model     = PluginSettings::get( 'default_model', '' );
-		$max_turns = PluginSettings::get( 'max_turns', 12 );
+		$provider = PluginSettings::get( 'default_provider', '' );
+		$model    = PluginSettings::get( 'default_model', '' );
 
 		if ( empty( $provider ) || empty( $model ) ) {
-			AgentContext::clear();
 			return new WP_Error(
 				'provider_required',
 				__( 'Default AI provider and model must be configured.', 'data-machine' ),
@@ -329,7 +325,6 @@ class Chat {
 		);
 
 		if ( empty( $session_id ) ) {
-			AgentContext::clear();
 			return new WP_Error(
 				'session_creation_failed',
 				__( 'Failed to create chat session.', 'data-machine' ),
@@ -353,100 +348,26 @@ class Chat {
 			$model
 		);
 
-		$tool_manager = new ToolManager();
-		$all_tools    = $tool_manager->getAvailableToolsForChat();
-
-		try {
-			// Run FULL multi-turn loop (not single_turn) so the response is complete.
-			$loop        = new AIConversationLoop();
-			$loop_result = $loop->execute(
-				$messages,
-				$all_tools,
-				$provider,
-				$model,
-				AgentType::CHAT,
-				array( 'session_id' => $session_id ),
-				$max_turns,
-				false // multi-turn: run to completion
-			);
-
-			if ( isset( $loop_result['error'] ) ) {
-				$chat_db->update_session(
-					$session_id,
-					$messages,
-					array(
-						'status'        => 'error',
-						'error_message' => $loop_result['error'],
-						'last_activity' => current_time( 'mysql', true ),
-						'message_count' => count( $messages ),
-					),
-					$provider,
-					$model
-				);
-
-				do_action(
-					'datamachine_log',
-					'error',
-					'Chat ping AI loop returned error',
-					array(
-						'session_id' => $session_id,
-						'error'      => $loop_result['error'],
-						'agent_type' => AgentType::CHAT,
-					)
-				);
-
-				AgentContext::clear();
-				return new WP_Error(
-					'ping_ai_error',
-					$loop_result['error'],
-					array( 'status' => 500 )
-				);
-			}
-		} catch ( \Throwable $e ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				'Chat ping AI loop exception',
-				array(
-					'session_id' => $session_id,
-					'error'      => $e->getMessage(),
-					'agent_type' => AgentType::CHAT,
-				)
-			);
-
-			$chat_db->update_session(
-				$session_id,
-				$messages,
-				array(
-					'status'        => 'error',
-					'error_message' => $e->getMessage(),
-					'last_activity' => current_time( 'mysql', true ),
-					'message_count' => count( $messages ),
-				),
-				$provider,
-				$model
-			);
-
-			AgentContext::clear();
-			return new WP_Error(
-				'ping_error',
-				$e->getMessage(),
-				array( 'status' => 500 )
-			);
-		} finally {
-			AgentContext::clear();
-		}
-
-		$messages      = $loop_result['messages'];
-		$final_content = $loop_result['final_content'];
-
-		$chat_db->update_session(
+		$result = self::executeConversationTurn(
 			$session_id,
 			$messages,
+			$provider,
+			$model,
+			array( 'agent_type' => AgentType::CHAT )
+		);
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		// Update session to completed with ping source.
+		$chat_db->update_session(
+			$session_id,
+			$result['messages'],
 			array(
 				'status'        => 'completed',
 				'last_activity' => current_time( 'mysql', true ),
-				'message_count' => count( $messages ),
+				'message_count' => count( $result['messages'] ),
 				'source'        => 'ping',
 			),
 			$provider,
@@ -464,9 +385,9 @@ class Chat {
 			'info',
 			'Chat ping completed',
 			array(
-				'session_id'  => $session_id,
-				'turns'       => $loop_result['turn_count'] ?? 1,
-				'agent_type'  => AgentType::CHAT,
+				'session_id' => $session_id,
+				'turns'      => $result['turn_count'],
+				'agent_type' => AgentType::CHAT,
 			)
 		);
 
@@ -475,8 +396,8 @@ class Chat {
 				'success' => true,
 				'data'    => array(
 					'session_id' => $session_id,
-					'response'   => $final_content,
-					'turns'      => $loop_result['turn_count'] ?? 1,
+					'response'   => $result['final_content'],
+					'turns'      => $result['turn_count'],
 					'completed'  => true,
 				),
 			)
