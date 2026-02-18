@@ -43,7 +43,7 @@ const LogsTabs = () => {
 	} ) );
 
 	return (
-		<TabPanel className="datamachine-logs-tabs" tabs={ tabs }>
+		<TabPanel className="datamachine-tabs" tabs={ tabs }>
 			{ ( tab ) => (
 				<div className="datamachine-logs-tab-content">
 					<LogsControls

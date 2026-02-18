@@ -36,6 +36,11 @@ function datamachine_register_agent_admin_page_filters() {
 							'deps'  => array(),
 							'media' => 'all',
 						),
+						'datamachine-tabs'       => array(
+							'file'  => 'inc/Core/Admin/shared/styles/tabs.css',
+							'deps'  => array(),
+							'media' => 'all',
+						),
 						'datamachine-agent-page' => array(
 							'file'  => 'inc/Core/Admin/Pages/Agent/assets/css/agent-page.css',
 							'deps'  => array(),

@@ -133,22 +133,6 @@
     max-width: 1200px;
 }
 
-/* Tab navigation wrapper */
-.datamachine-nav-tab-wrapper {
-    margin: 20px 0 0 0;
-    border-bottom: 1px solid #ccd0d4;
-}
-
-/* Tab content containers */
-.datamachine-tab-content {
-    display: none;
-    padding-top: 20px;
-}
-
-.datamachine-tab-content.active {
-    display: block;
-}
-
 /* Form styling */
 .datamachine-settings-form {
     background: #fff;
@@ -166,51 +150,10 @@
     border-top: 1px solid #ddd;
 }
 
-/* Section headers within tabs */
-.datamachine-tab-content h3 {
-    margin-top: 0;
-    margin-bottom: 10px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #eee;
-    font-size: 16px;
-    color: #23282d;
-}
-
-/* Enhanced form table styling for tabs */
-.datamachine-tab-content .form-table {
-    margin-top: 0;
-}
-
-.datamachine-tab-content .form-table th {
-    padding-left: 0;
-    width: 200px;
-    vertical-align: top;
-}
-
-.datamachine-tab-content .form-table td {
-    padding-left: 20px;
-}
-
 /* Responsive design for smaller screens */
 @media screen and (max-width: 782px) {
-    .datamachine-nav-tab-wrapper .nav-tab {
-        margin-bottom: 5px;
-        margin-right: 5px;
-    }
-    
     .datamachine-settings-form {
         padding: 15px;
-    }
-    
-    .datamachine-tab-content .form-table th,
-    .datamachine-tab-content .form-table td {
-        width: auto;
-        padding: 10px 0;
-        display: block;
-    }
-    
-    .datamachine-tab-content .form-table td {
-        padding-left: 0;
     }
 }
 
@@ -253,34 +196,6 @@
 
 .datamachine-settings-app {
     margin-top: 20px;
-}
-
-.datamachine-settings-app .nav-tab-wrapper {
-    margin-bottom: 0;
-}
-
-.datamachine-settings-app .nav-tab {
-    cursor: pointer;
-    border: none;
-    background: transparent;
-}
-
-.datamachine-settings-app .nav-tab:hover {
-    background-color: #f0f0f1;
-}
-
-.datamachine-settings-app .nav-tab-active {
-    background: #fff;
-    border-bottom: 1px solid #fff;
-    margin-bottom: -1px;
-}
-
-.datamachine-settings-content {
-    background: #fff;
-    border: 1px solid #ccd0d4;
-    border-top: none;
-    padding: 20px;
-    min-height: 400px;
 }
 
 /* ========================================================================
@@ -472,7 +387,6 @@
 }
 
 .datamachine-general-tab-loading,
-.datamachine-agent-tab-loading,
 .datamachine-api-keys-tab-loading {
     display: flex;
     align-items: center;
@@ -497,34 +411,6 @@
 .datamachine-error-indicator {
     color: #d63638;
     font-size: 13px;
-}
-
-/* ========================================================================
-   AGENT TAB
-   ======================================================================== */
-
-.datamachine-agent-tab .datamachine-tool-config-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 16px;
-}
-
-.datamachine-agent-tab .datamachine-tool-config-item h4 {
-    margin: 0 0 4px 0;
-    font-size: 14px;
-}
-
-.datamachine-agent-tab .datamachine-tool-config-item .description {
-    margin: 0 0 8px 0;
-    font-size: 12px;
-    color: #646970;
-}
-
-.datamachine-agent-tab .datamachine-tool-controls {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px;
 }
 
 .datamachine-config-status {

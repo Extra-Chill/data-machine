@@ -40,7 +40,7 @@ const SettingsApp = () => {
 	return (
 		<div className="datamachine-settings-app">
 			<TabPanel
-				className="datamachine-settings-tabs"
+				className="datamachine-tabs"
 				tabs={ TABS }
 				initialTabName={ getInitialTab() }
 				onSelect={ handleSelect }

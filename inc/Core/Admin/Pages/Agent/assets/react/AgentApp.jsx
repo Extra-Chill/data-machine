@@ -36,7 +36,7 @@ const AgentApp = () => {
 				<h1 className="datamachine-agent-title">Agent</h1>
 			</div>
 			<TabPanel
-				className="datamachine-agent-tabs"
+				className="datamachine-tabs"
 				tabs={ TABS }
 			>
 				{ ( tab ) => {

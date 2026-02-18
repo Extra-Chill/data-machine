@@ -25,6 +25,16 @@ function datamachine_register_settings_admin_page_filters() {
 				'templates'  => DATAMACHINE_PATH . 'inc/Core/Admin/Settings/templates/',
 				'assets'     => array(
 					'css' => array(
+						'wp-components'             => array(
+							'file'  => null,
+							'deps'  => array(),
+							'media' => 'all',
+						),
+						'datamachine-tabs'          => array(
+							'file'  => 'inc/Core/Admin/shared/styles/tabs.css',
+							'deps'  => array(),
+							'media' => 'all',
+						),
 						'datamachine-settings-page' => array(
 							'file'  => 'inc/Core/Admin/Settings/assets/css/settings-page.css',
 							'deps'  => array(),

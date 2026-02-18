@@ -46,6 +46,11 @@ function datamachine_register_logs_admin_page_filters() {
 							'deps'  => array(),
 							'media' => 'all',
 						),
+						'datamachine-tabs'      => array(
+							'file'  => 'inc/Core/Admin/shared/styles/tabs.css',
+							'deps'  => array(),
+							'media' => 'all',
+						),
 						'datamachine-logs-page' => array(
 							'file'  => 'inc/Core/Admin/Pages/Logs/assets/css/logs-page.css',
 							'deps'  => array(),
