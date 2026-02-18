@@ -174,6 +174,47 @@ class Pipelines {
 				),
 			)
 		);
+
+		register_rest_route(
+			'datamachine/v1',
+			'/pipelines/(?P<pipeline_id>\d+)/memory-files',
+			array(
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( self::class, 'handle_get_memory_files' ),
+					'permission_callback' => array( self::class, 'check_permission' ),
+					'args'                => array(
+						'pipeline_id' => array(
+							'required'          => true,
+							'type'              => 'integer',
+							'sanitize_callback' => 'absint',
+							'description'       => __( 'Pipeline ID', 'data-machine' ),
+						),
+					),
+				),
+				array(
+					'methods'             => WP_REST_Server::EDITABLE,
+					'callback'            => array( self::class, 'handle_update_memory_files' ),
+					'permission_callback' => array( self::class, 'check_permission' ),
+					'args'                => array(
+						'pipeline_id'  => array(
+							'required'          => true,
+							'type'              => 'integer',
+							'sanitize_callback' => 'absint',
+							'description'       => __( 'Pipeline ID', 'data-machine' ),
+						),
+						'memory_files' => array(
+							'required'    => true,
+							'type'        => 'array',
+							'description' => __( 'Array of agent memory filenames', 'data-machine' ),
+							'items'       => array(
+								'type' => 'string',
+							),
+						),
+					),
+				),
+			)
+		);
 	}
 
 	/**
@@ -420,6 +461,81 @@ class Pipelines {
 					'pipeline_name' => $result['pipeline_name'],
 				),
 				'message' => $result['message'] ?? __( 'Pipeline title saved successfully', 'data-machine' ),
+			)
+		);
+	}
+
+	/**
+	 * Handle get memory files request
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return \WP_REST_Response|\WP_Error Response.
+	 */
+	public static function handle_get_memory_files( $request ) {
+		$pipeline_id = (int) $request->get_param( 'pipeline_id' );
+
+		$db_pipelines = new \DataMachine\Core\Database\Pipelines\Pipelines();
+		$pipeline     = $db_pipelines->get_pipeline( $pipeline_id );
+
+		if ( ! $pipeline ) {
+			return new \WP_Error(
+				'pipeline_not_found',
+				__( 'Pipeline not found.', 'data-machine' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		$memory_files = $db_pipelines->get_pipeline_memory_files( $pipeline_id );
+
+		return rest_ensure_response(
+			array(
+				'success' => true,
+				'data'    => $memory_files,
+			)
+		);
+	}
+
+	/**
+	 * Handle update memory files request
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return \WP_REST_Response|\WP_Error Response.
+	 */
+	public static function handle_update_memory_files( $request ) {
+		$pipeline_id  = (int) $request->get_param( 'pipeline_id' );
+		$params       = $request->get_json_params();
+		$memory_files = $params['memory_files'] ?? array();
+
+		$db_pipelines = new \DataMachine\Core\Database\Pipelines\Pipelines();
+		$pipeline     = $db_pipelines->get_pipeline( $pipeline_id );
+
+		if ( ! $pipeline ) {
+			return new \WP_Error(
+				'pipeline_not_found',
+				__( 'Pipeline not found.', 'data-machine' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		// Sanitize filenames.
+		$memory_files = array_map( 'sanitize_file_name', $memory_files );
+		$memory_files = array_values( array_filter( $memory_files ) );
+
+		$result = $db_pipelines->update_pipeline_memory_files( $pipeline_id, $memory_files );
+
+		if ( ! $result ) {
+			return new \WP_Error(
+				'update_failed',
+				__( 'Failed to update memory files.', 'data-machine' ),
+				array( 'status' => 500 )
+			);
+		}
+
+		return rest_ensure_response(
+			array(
+				'success' => true,
+				'data'    => $memory_files,
+				'message' => __( 'Memory files updated successfully.', 'data-machine' ),
 			)
 		);
 	}

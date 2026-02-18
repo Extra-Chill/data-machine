@@ -370,6 +370,43 @@ class Pipelines extends BaseRepository {
 	}
 
 	/**
+	 * Get pipeline memory files from pipeline config.
+	 *
+	 * @param int $pipeline_id Pipeline ID.
+	 * @return array Array of memory filenames.
+	 */
+	public function get_pipeline_memory_files( int $pipeline_id ): array {
+		$pipeline_config = $this->get_pipeline_config( $pipeline_id );
+		return $pipeline_config['memory_files'] ?? array();
+	}
+
+	/**
+	 * Update pipeline memory files in pipeline config.
+	 *
+	 * @param int   $pipeline_id  Pipeline ID.
+	 * @param array $memory_files Array of memory filenames.
+	 * @return bool True on success, false on failure.
+	 */
+	public function update_pipeline_memory_files( int $pipeline_id, array $memory_files ): bool {
+		if ( empty( $pipeline_id ) ) {
+			return false;
+		}
+
+		$pipeline_config                 = $this->get_pipeline_config( $pipeline_id );
+		$pipeline_config['memory_files'] = $memory_files;
+
+		$result = $this->wpdb->update(
+			$this->table_name,
+			array( 'pipeline_config' => wp_json_encode( $pipeline_config ) ),
+			array( 'pipeline_id' => $pipeline_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
+
+		return false !== $result;
+	}
+
+	/**
 	 * Create pipelines database table.
 	 */
 	/**

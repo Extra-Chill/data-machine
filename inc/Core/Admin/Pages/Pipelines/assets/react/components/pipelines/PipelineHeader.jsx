@@ -26,6 +26,7 @@ import { AUTO_SAVE_DELAY } from '../../utils/constants';
  * @param {Function} props.onNameChange       - Called after successful save
  * @param {Function} props.onDelete           - Called after successful deletion
  * @param {Function} props.onOpenContextFiles - Called when context files button clicked
+ * @param {Function} props.onOpenMemoryFiles  - Called when memory files button clicked
  * @return {React.ReactElement} Pipeline header
  */
 export default function PipelineHeader( {
@@ -34,6 +35,7 @@ export default function PipelineHeader( {
 	onNameChange,
 	onDelete,
 	onOpenContextFiles,
+	onOpenMemoryFiles,
 } ) {
 	const [ localName, setLocalName ] = useState( pipelineName );
 	const saveTimeout = useRef( null );
@@ -137,6 +139,12 @@ export default function PipelineHeader( {
 	return (
 		<div className="datamachine-pipeline-header">
 			<div className="datamachine-header--absolute-top-right datamachine-header--flex-start">
+				<Button
+					variant="secondary"
+					onClick={ onOpenMemoryFiles }
+					icon="database"
+					label={ __( 'Memory Files', 'data-machine' ) }
+				/>
 				<Button
 					variant="secondary"
 					onClick={ onOpenContextFiles }
