@@ -25,8 +25,6 @@ Directives are layered by priority (lowest number = highest priority) to create 
 8. **Priority 45** - Chat Pipelines Inventory (pipeline discovery)
 9. **Priority 50** - Site Context (WordPress metadata)
 
-## Specialized Directives
-
 ### ChatAgentDirective (Priority 15)
 Specialized directive for the conversational chat interface. It instructs the agent on discovery and configuration patterns, emphasizing querying existing workflows before creating new ones.
 
@@ -39,6 +37,15 @@ Injects agent memory files selected for a specific pipeline. Files are stored in
 ### ChatPipelinesDirective (Priority 45)
 Provides the conversational agent with an inventory of available pipelines. When a pipeline is selected in the UI, `selected_pipeline_id` is used to prioritize and expand context for that specific pipeline, including its flow summaries and handler configurations.
 
+## Memory System Integration
+
+The directive system integrates with Data Machine's file-based agent memory:
+
+- **SOUL.md** is always injected (Priority 20) for all agent types
+- **Pipeline Memory Files** (Priority 25) are selectable per-pipeline via the admin UI
+- Files are stored in `{wp-content}/uploads/datamachine-files/agent/`
+- SOUL.md is excluded from the pipeline memory file picker (it's always present)
+
 ## Registration
 
 Directives are registered via WordPress filters:
@@ -48,7 +55,7 @@ add_filter('datamachine_directives', function($directives) {
     $directives[] = [
         'class'       => MyCustomDirective::class,
         'priority'    => 25,
-        'agent_types' => ['pipeline'],
+        'agent_types' => ['pipeline', 'chat', 'all'],
     ];
     return $directives;
 });

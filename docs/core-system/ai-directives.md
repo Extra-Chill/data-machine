@@ -4,18 +4,19 @@ Data Machine uses a hierarchical directive system to provide contextual informat
 
 ## Directive Architecture
 
-### 5-Tier Priority System
+### 7-Tier Priority System
 
 Directives are applied in the following priority order (lowest number = highest priority):
 
 1. **Priority 10** - Plugin Core Directive (agent identity)
 2. **Priority 15** - Chat Agent Directive (chat-specific identity)
-3. **Priority 20** - Global System Prompt (global AI behavior)
-4. **Priority 30** - Pipeline System Prompt (pipeline instructions)
-5. **Priority 35** - Pipeline Context Files (reference materials)
-6. **Priority 40** - Tool Definitions (available tools and workflow)
-7. **Priority 45** - Chat Pipelines Inventory (pipeline discovery)
-8. **Priority 50** - Site Context (WordPress metadata)
+3. **Priority 20** - Agent SOUL.md (global AI personality from agent memory)
+4. **Priority 25** - Pipeline Memory Files (per-pipeline selected agent memory files)
+5. **Priority 30** - Pipeline System Prompt (pipeline instructions)
+6. **Priority 35** - Pipeline Context Files (reference materials)
+7. **Priority 40** - Tool Definitions (available tools and workflow)
+8. **Priority 45** - Chat Pipelines Inventory (pipeline discovery)
+9. **Priority 50** - Site Context (WordPress metadata)
 
 ## Individual Directives
 
@@ -42,11 +43,28 @@ When `selected_pipeline_id` is provided (e.g., from the Integrated Chat Sidebar)
 
 **Location**: `inc/Engine/AI/Directives/AgentSoulDirective.php`  
 **Agent Types**: All agents  
-**Purpose**: Injects user-configured global AI behavior
+**Purpose**: Injects the agent's persistent identity from SOUL.md
 
-Adds a system message containing the `global_system_prompt` setting from plugin configuration. This directive sets the overall tone, personality, and behavioral guidelines for ALL AI interactions across the entire system.
+Reads `SOUL.md` from the agent memory directory (`{wp-content}/uploads/datamachine-files/agent/SOUL.md`) and injects it as a system message. This defines the overall tone, personality, and behavioral guidelines for ALL AI interactions.
 
-**Configuration**: Set via `global_system_prompt` in plugin settings.
+**Configuration**: Edit SOUL.md via the Agent admin page file browser or REST API (`PUT /datamachine/v1/files/agent/SOUL.md`).
+
+**Migration**: Previously stored as `global_system_prompt` in plugin settings. Migrated to file-based storage via `AgentMemoryMigration` (v0.13.0+). SOUL.md is protected from deletion in the admin UI.
+
+### PipelineMemoryFilesDirective (Priority 25)
+
+**Location**: `inc/Core/Steps/AI/Directives/PipelineMemoryFilesDirective.php`  
+**Agent Types**: Pipeline agents  
+**Purpose**: Injects per-pipeline selected agent memory files
+
+Reads the pipeline's `memory_files` configuration (an array of filenames) and injects each file's content from the agent directory as a system message prefixed with `## Memory File: {filename}`.
+
+**Configuration**: Select memory files per-pipeline via the "Agent Memory Files" section in the pipeline settings UI. SOUL.md is excluded from the picker (it's always injected separately at Priority 20).
+
+**Features**:
+- Files sourced from the shared agent directory (`datamachine-files/agent/`)
+- Missing files logged as warnings but don't fail the request
+- Empty files are silently skipped
 
 ### PipelineContextDirective (Priority 35)
 
@@ -137,7 +155,8 @@ Directives maintain consistent message ordering by using `array_push()` to appen
 
 Several directives integrate with plugin settings:
 
-- **Global System Prompt**: `global_system_prompt` setting
+- **Agent SOUL.md**: File-based in agent memory directory (migrated from `global_system_prompt`)
+- **Pipeline Memory Files**: Per-pipeline `memory_files` array in pipeline config
 - **Site Context**: `site_context_enabled` toggle
 
 ### Filter Hooks
@@ -206,10 +225,13 @@ Directives include comprehensive error handling:
 ## Agent-Specific Behavior
 
 ### Pipeline Agents
-Receive directives: Core (10), Global Prompt (20), Pipeline Prompt (30), Pipeline Context (35), Tools (40), Site Context (50)
+Receive directives: Core (10), SOUL.md (20), Memory Files (25), Pipeline Prompt (30), Pipeline Context (35), Tools (40), Site Context (50)
 
 ### Chat Agents
-Receive directives: Core (10), Chat Agent (15), Global Prompt (20), Tools (40), Chat Pipelines (45), Site Context (50)
+Receive directives: Core (10), Chat Agent (15), SOUL.md (20), Tools (40), Chat Pipelines (45), Site Context (50)
+
+### System Agents
+Receive directives: Core (10), SOUL.md (20), Tools (40), Site Context (50)
 
 ### Universal Directives
-Global Prompt (20) and Site Context (50) apply to all agent types, ensuring consistent behavior across the system.
+SOUL.md (20) and Site Context (50) apply to all agent types, ensuring consistent behavior across the system.
