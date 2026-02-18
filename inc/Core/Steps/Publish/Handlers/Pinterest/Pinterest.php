@@ -51,6 +51,20 @@ class Pinterest extends PublishHandler {
 			PinterestSettings::class,
 			function ( $tools, $handler_slug, $handler_config ) {
 				if ( 'pinterest_publish' === $handler_slug ) {
+					$board_id_description = 'Pinterest board ID override (uses default if omitted)';
+
+					// Inject cached board names when AI decides mode is active.
+					$mode = $handler_config['board_selection_mode'] ?? 'pre_selected';
+					if ( 'ai_decides' === $mode ) {
+						$cached_boards = get_option( 'datamachine_pinterest_boards', array() );
+						if ( ! empty( $cached_boards ) ) {
+							$board_list = implode( ', ', array_map( function ( $b ) {
+								return $b['name'] . ' (' . $b['id'] . ')';
+							}, $cached_boards ) );
+							$board_id_description = "Pinterest board ID. Available boards: {$board_list}";
+						}
+					}
+
 					$tools['pinterest_publish'] = array(
 						'class'       => self::class,
 						'method'      => 'handle_tool_call',
@@ -69,7 +83,7 @@ class Pinterest extends PublishHandler {
 								),
 								'board_id'    => array(
 									'type'        => 'string',
-									'description' => 'Pinterest board ID override (uses default if omitted)',
+									'description' => $board_id_description,
 								),
 							),
 							'required'   => array( 'title', 'description' ),
@@ -149,7 +163,7 @@ class Pinterest extends PublishHandler {
 			return $this->errorResponse( 'Pinterest access token is empty', array(), 'critical' );
 		}
 
-		$board_id = $parameters['board_id'] ?? $handler_config['board_id'] ?? '';
+		$board_id = $this->resolve_board_id( $parameters, $handler_config, $engine );
 
 		if ( empty( $board_id ) ) {
 			return $this->errorResponse(
@@ -241,6 +255,163 @@ class Pinterest extends PublishHandler {
 				array( 'exception_type' => get_class( $e ) )
 			);
 		}
+	}
+
+	/**
+	 * Resolve the board ID using the configured selection mode.
+	 *
+	 * Resolution order:
+	 * 1. AI parameter board_id (from tool call)
+	 * 2. Category mapping lookup (post categories → board_id)
+	 * 3. Default board_id from handler config
+	 *
+	 * @since 0.3.0
+	 *
+	 * @param array           $parameters    Tool parameters.
+	 * @param array           $handler_config Handler configuration.
+	 * @param EngineData|null $engine         Engine data instance.
+	 * @return string|null Board ID or null if none resolved.
+	 */
+	public function resolve_board_id( array $parameters, array $handler_config, ?EngineData $engine ): ?string {
+		// 1. Explicit board_id from AI tool call.
+		if ( ! empty( $parameters['board_id'] ) ) {
+			$this->log( 'info', 'Pinterest: Board ID from AI parameter', array( 'board_id' => $parameters['board_id'] ) );
+			return $parameters['board_id'];
+		}
+
+		// 2. Mode-based resolution.
+		$mode = $handler_config['board_selection_mode'] ?? 'pre_selected';
+
+		if ( 'category_mapping' === $mode && $engine ) {
+			$post_id = null;
+			$source_url = $engine->getSourceUrl();
+			if ( ! empty( $source_url ) ) {
+				$post_id = url_to_postid( $source_url );
+			}
+
+			if ( $post_id > 0 ) {
+				$lines   = explode( "\n", $handler_config['board_mapping'] ?? '' );
+				$mapping = array();
+				foreach ( $lines as $line ) {
+					$line = trim( $line );
+					if ( empty( $line ) || strpos( $line, '=' ) === false ) {
+						continue;
+					}
+					[ $slug, $bid ] = array_map( 'trim', explode( '=', $line, 2 ) );
+					$mapping[ $slug ] = $bid;
+				}
+
+				if ( ! empty( $mapping ) ) {
+					$terms = get_the_terms( $post_id, 'category' );
+					if ( is_array( $terms ) ) {
+						foreach ( $terms as $term ) {
+							if ( isset( $mapping[ $term->slug ] ) ) {
+								$this->log(
+									'info',
+									'Pinterest: Board ID from category mapping',
+									array(
+										'category' => $term->slug,
+										'board_id' => $mapping[ $term->slug ],
+									)
+								);
+								return $mapping[ $term->slug ];
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// 3. Default fallback.
+		$default = $handler_config['board_id'] ?? '';
+		return ! empty( $default ) ? $default : null;
+	}
+
+	/**
+	 * Fetch all boards from Pinterest API v5 with pagination.
+	 *
+	 * @since 0.3.0
+	 *
+	 * @return array Array of boards with id, name, and description.
+	 */
+	public function fetch_boards(): array {
+		$auth = $this->get_auth();
+		if ( ! $auth ) {
+			$this->log( 'error', 'Pinterest: Cannot fetch boards — auth not available' );
+			return array();
+		}
+
+		$config = $auth->get_config();
+		$token  = $config['access_token'] ?? '';
+
+		if ( empty( $token ) ) {
+			$this->log( 'error', 'Pinterest: Cannot fetch boards — access token empty' );
+			return array();
+		}
+
+		$all_boards = array();
+		$bookmark   = null;
+
+		for ( $i = 0; $i < 10; $i++ ) {
+			$url = 'https://api.pinterest.com/v5/boards?page_size=100';
+			if ( $bookmark ) {
+				$url .= '&bookmark=' . urlencode( $bookmark );
+			}
+
+			$result = $this->httpGet( $url, array(
+				'headers' => array( 'Authorization' => 'Bearer ' . $token ),
+				'context' => 'Pinterest Board Sync',
+			) );
+
+			if ( ! $result['success'] ) {
+				$this->log( 'error', 'Pinterest: Board fetch failed', array( 'error' => $result['error'] ?? 'Unknown' ) );
+				break;
+			}
+
+			$data = json_decode( $result['data'], true );
+			foreach ( $data['items'] ?? array() as $board ) {
+				$all_boards[] = array(
+					'id'          => $board['id'],
+					'name'        => $board['name'] ?? '',
+					'description' => $board['description'] ?? '',
+				);
+			}
+
+			$bookmark = $data['bookmark'] ?? null;
+			if ( ! $bookmark ) {
+				break;
+			}
+		}
+
+		$this->log( 'info', 'Pinterest: Fetched boards', array( 'count' => count( $all_boards ) ) );
+
+		return $all_boards;
+	}
+
+	/**
+	 * Fetch and cache all Pinterest boards.
+	 *
+	 * @since 0.3.0
+	 *
+	 * @return array Array of cached boards.
+	 */
+	public function sync_boards(): array {
+		$boards = $this->fetch_boards();
+		update_option( 'datamachine_pinterest_boards', $boards );
+		update_option( 'datamachine_pinterest_boards_synced', time() );
+		$this->log( 'info', 'Pinterest: Boards synced', array( 'count' => count( $boards ) ) );
+		return $boards;
+	}
+
+	/**
+	 * Get cached Pinterest boards.
+	 *
+	 * @since 0.3.0
+	 *
+	 * @return array Array of cached boards.
+	 */
+	public function get_cached_boards(): array {
+		return get_option( 'datamachine_pinterest_boards', array() );
 	}
 
 	/**
