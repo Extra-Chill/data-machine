@@ -2,6 +2,31 @@
 
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
+## [0.27.0] - 2026-02-18
+
+### Added
+- Multi-handler steps — configure multiple publish handlers (WordPress + Pinterest) in a single pipeline step (#233)
+- Per-agent default provider/model configuration — assign different models to chat, pipeline, and system agents
+- Agent memory system — SOUL.md file-based identity, agent admin page with file browser/editor, settings migration (#279)
+- Pipeline memory file references — select agent memory files as AI context per-pipeline (#280)
+- Internal linking system agent task (#228)
+- Image generation insert mode with smart content-gap placement
+
+### Changed
+- Handler config normalized to handler_slugs/handler_configs as single source of truth (lazy migration, zero downtime)
+- Agent page consolidates memory files + configuration (tools, model, site context, max turns, webhook)
+- Settings page simplified — General, API Keys, Handler Defaults only
+- All tabbed admin pages now use @wordpress/components TabPanel
+- Frontend state management cleanup — eliminated local state mirroring in favor of TanStack Query
+
+### Fixed
+- Jobs page Unknown Pipeline/Flow resolved with fallback name lookup
+- InlineStepConfig race condition on initial page load
+- Non-handler step types (Agent Ping, Webhook Gate) preserve handler_config during normalization
+- Image generation sets featured image for standalone post_id calls
+- Empty prompt queue treated as skipped, not failure
+- Missing API endpoint registrations restored
+
 ## [0.26.0] - 2026-02-17
 
 ### Added
