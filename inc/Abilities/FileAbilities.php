@@ -1128,11 +1128,9 @@ class FileAbilities {
 		}
 
 		if ( 'SOUL.md' === $filename ) {
-			do_action(
-				'datamachine_log',
-				'warning',
-				'Agent SOUL.md is being deleted via abilities API.',
-				array( 'filename' => $filename )
+			return array(
+				'success' => false,
+				'error'   => 'SOUL.md cannot be deleted. It is a core agent file. Clear its contents instead.',
 			);
 		}
 
