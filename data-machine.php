@@ -136,6 +136,10 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/AgentPingAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/TaxonomyAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/InternalLinkingAbilities.php';
+	require_once __DIR__ . '/inc/Abilities/Content/BlockSanitizer.php';
+	require_once __DIR__ . '/inc/Abilities/Content/GetPostBlocksAbility.php';
+	require_once __DIR__ . '/inc/Abilities/Content/EditPostBlocksAbility.php';
+	require_once __DIR__ . '/inc/Abilities/Content/ReplacePostBlocksAbility.php';
 	// Defer ability instantiation to init so translations are loaded.
 	add_action( 'init', function () {
 		new \DataMachine\Abilities\AuthAbilities();
@@ -161,6 +165,9 @@ function datamachine_run_datamachine_plugin() {
 		new \DataMachine\Abilities\AgentPingAbilities();
 		new \DataMachine\Abilities\TaxonomyAbilities();
 		new \DataMachine\Abilities\InternalLinkingAbilities();
+		new \DataMachine\Abilities\Content\GetPostBlocksAbility();
+		new \DataMachine\Abilities\Content\EditPostBlocksAbility();
+		new \DataMachine\Abilities\Content\ReplacePostBlocksAbility();
 	} );
 }
 

@@ -34,3 +34,5 @@ WP_CLI::add_command( 'datamachine post', Commands\PostsCommand::class );
 WP_CLI::add_command( 'datamachine log', Commands\LogsCommand::class );
 WP_CLI::add_command( 'datamachine links', Commands\LinksCommand::class );
 WP_CLI::add_command( 'datamachine link', Commands\LinksCommand::class );
+WP_CLI::add_command( 'datamachine blocks', Commands\BlocksCommand::class );
+WP_CLI::add_command( 'datamachine block', Commands\BlocksCommand::class );
