@@ -14,8 +14,10 @@ use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
+use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Core\FilesRepository\FileCleanup;
 use DataMachine\Core\FilesRepository\FileStorage;
+use DataMachine\Core\FilesRepository\FilesystemHelper;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -70,7 +72,7 @@ class FileAbilities {
 			'datamachine/list-files',
 			array(
 				'label'               => __( 'List Files', 'data-machine' ),
-				'description'         => __( 'List files for a flow or pipeline context. Provide either flow_step_id for flow files or pipeline_id for pipeline context files.', 'data-machine' ),
+				'description'         => __( 'List files for a flow, pipeline context, or agent scope. Provide either flow_step_id, pipeline_id, or scope="agent".', 'data-machine' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -82,6 +84,10 @@ class FileAbilities {
 						'pipeline_id'  => array(
 							'type'        => array( 'integer', 'null' ),
 							'description' => __( 'Pipeline ID for pipeline context files', 'data-machine' ),
+						),
+						'scope'        => array(
+							'type'        => array( 'string', 'null' ),
+							'description' => __( 'Scope for file operations. Use "agent" for agent directory files.', 'data-machine' ),
 						),
 					),
 				),
@@ -127,6 +133,10 @@ class FileAbilities {
 							'type'        => array( 'integer', 'null' ),
 							'description' => __( 'Pipeline ID for pipeline context files', 'data-machine' ),
 						),
+						'scope'        => array(
+							'type'        => array( 'string', 'null' ),
+							'description' => __( 'Scope for file operations. Use "agent" for agent directory files.', 'data-machine' ),
+						),
 					),
 				),
 				'output_schema'       => array(
@@ -153,7 +163,7 @@ class FileAbilities {
 			'datamachine/delete-file',
 			array(
 				'label'               => __( 'Delete File', 'data-machine' ),
-				'description'         => __( 'Delete a specific file from flow or pipeline context.', 'data-machine' ),
+				'description'         => __( 'Delete a specific file from flow, pipeline context, or agent scope.', 'data-machine' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -170,6 +180,10 @@ class FileAbilities {
 						'pipeline_id'  => array(
 							'type'        => array( 'integer', 'null' ),
 							'description' => __( 'Pipeline ID for pipeline context files', 'data-machine' ),
+						),
+						'scope'        => array(
+							'type'        => array( 'string', 'null' ),
+							'description' => __( 'Scope for file operations. Use "agent" for agent directory files.', 'data-machine' ),
 						),
 					),
 				),
@@ -236,7 +250,7 @@ class FileAbilities {
 			'datamachine/upload-file',
 			array(
 				'label'               => __( 'Upload File', 'data-machine' ),
-				'description'         => __( 'Upload a file to flow or pipeline context.', 'data-machine' ),
+				'description'         => __( 'Upload a file to flow, pipeline context, or agent scope.', 'data-machine' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -260,6 +274,10 @@ class FileAbilities {
 						'pipeline_id'  => array(
 							'type'        => array( 'integer', 'null' ),
 							'description' => __( 'Pipeline ID for pipeline context files', 'data-machine' ),
+						),
+						'scope'        => array(
+							'type'        => array( 'string', 'null' ),
+							'description' => __( 'Scope for file operations. Use "agent" for agent directory files.', 'data-machine' ),
 						),
 					),
 				),
@@ -297,11 +315,16 @@ class FileAbilities {
 	public function executeListFiles( array $input ): array {
 		$flow_step_id = $input['flow_step_id'] ?? null;
 		$pipeline_id  = $input['pipeline_id'] ?? null;
+		$scope        = $input['scope'] ?? null;
+
+		if ( 'agent' === $scope ) {
+			return $this->listAgentFiles();
+		}
 
 		if ( ! $flow_step_id && ! $pipeline_id ) {
 			return array(
 				'success' => false,
-				'error'   => 'Must provide either flow_step_id or pipeline_id',
+				'error'   => 'Must provide either flow_step_id, pipeline_id, or scope="agent"',
 			);
 		}
 
@@ -329,6 +352,7 @@ class FileAbilities {
 		$filename     = $input['filename'] ?? null;
 		$flow_step_id = $input['flow_step_id'] ?? null;
 		$pipeline_id  = $input['pipeline_id'] ?? null;
+		$scope        = $input['scope'] ?? null;
 
 		if ( empty( $filename ) ) {
 			return array(
@@ -337,10 +361,16 @@ class FileAbilities {
 			);
 		}
 
+		$filename = sanitize_file_name( $filename );
+
+		if ( 'agent' === $scope ) {
+			return $this->getAgentFile( $filename );
+		}
+
 		if ( ! $flow_step_id && ! $pipeline_id ) {
 			return array(
 				'success' => false,
-				'error'   => 'Must provide either flow_step_id or pipeline_id',
+				'error'   => 'Must provide either flow_step_id, pipeline_id, or scope="agent"',
 			);
 		}
 
@@ -350,8 +380,6 @@ class FileAbilities {
 				'error'   => 'Cannot provide both flow_step_id and pipeline_id',
 			);
 		}
-
-		$filename = sanitize_file_name( $filename );
 
 		if ( $pipeline_id ) {
 			return $this->getFileFromPipeline( $filename, (int) $pipeline_id );
@@ -370,6 +398,7 @@ class FileAbilities {
 		$filename     = $input['filename'] ?? null;
 		$flow_step_id = $input['flow_step_id'] ?? null;
 		$pipeline_id  = $input['pipeline_id'] ?? null;
+		$scope        = $input['scope'] ?? null;
 
 		if ( empty( $filename ) ) {
 			return array(
@@ -378,10 +407,16 @@ class FileAbilities {
 			);
 		}
 
+		$filename = sanitize_file_name( $filename );
+
+		if ( 'agent' === $scope ) {
+			return $this->deleteAgentFile( $filename );
+		}
+
 		if ( ! $flow_step_id && ! $pipeline_id ) {
 			return array(
 				'success' => false,
-				'error'   => 'Must provide either flow_step_id or pipeline_id',
+				'error'   => 'Must provide either flow_step_id, pipeline_id, or scope="agent"',
 			);
 		}
 
@@ -391,8 +426,6 @@ class FileAbilities {
 				'error'   => 'Cannot provide both flow_step_id and pipeline_id',
 			);
 		}
-
-		$filename = sanitize_file_name( $filename );
 
 		if ( $pipeline_id ) {
 			return $this->deleteFileFromPipeline( $filename, (int) $pipeline_id );
@@ -499,11 +532,12 @@ class FileAbilities {
 		$file_data    = $input['file_data'] ?? array();
 		$flow_step_id = $input['flow_step_id'] ?? null;
 		$pipeline_id  = $input['pipeline_id'] ?? null;
+		$scope        = $input['scope'] ?? null;
 
-		if ( ! $flow_step_id && ! $pipeline_id ) {
+		if ( 'agent' !== $scope && ! $flow_step_id && ! $pipeline_id ) {
 			return array(
 				'success' => false,
-				'error'   => 'Must provide either flow_step_id or pipeline_id',
+				'error'   => 'Must provide either flow_step_id, pipeline_id, or scope="agent"',
 			);
 		}
 
@@ -561,6 +595,10 @@ class FileAbilities {
 				'success' => false,
 				'error'   => $validation_error,
 			);
+		}
+
+		if ( 'agent' === $scope ) {
+			return $this->uploadToAgent( $file );
 		}
 
 		if ( $pipeline_id ) {
@@ -992,6 +1030,157 @@ class FileAbilities {
 			'scope'   => 'flow',
 			'message' => sprintf( 'File %s deleted from flow step %s', $filename, $flow_step_id ),
 		);
+	}
+
+	/**
+	 * List files in the agent directory.
+	 *
+	 * @return array Result with files.
+	 */
+	private function listAgentFiles(): array {
+		$directory_manager = new DirectoryManager();
+		$agent_dir         = $directory_manager->get_agent_directory();
+
+		if ( ! file_exists( $agent_dir ) ) {
+			return array(
+				'success' => true,
+				'files'   => array(),
+				'scope'   => 'agent',
+			);
+		}
+
+		$files  = array();
+		$handle = opendir( $agent_dir );
+
+		if ( $handle ) {
+			while ( false !== ( $entry = readdir( $handle ) ) ) {
+				if ( '.' === $entry || '..' === $entry || 'index.php' === $entry ) {
+					continue;
+				}
+
+				$filepath = "{$agent_dir}/{$entry}";
+				if ( is_file( $filepath ) ) {
+					$files[] = array(
+						'filename' => $entry,
+						'size'     => filesize( $filepath ),
+						'modified' => filemtime( $filepath ),
+					);
+				}
+			}
+			closedir( $handle );
+		}
+
+		return array(
+			'success' => true,
+			'files'   => array_map( array( $this, 'sanitizeFileEntry' ), $files ),
+			'scope'   => 'agent',
+		);
+	}
+
+	/**
+	 * Get a file from the agent directory.
+	 *
+	 * @param string $filename Filename to retrieve.
+	 * @return array Result with file data.
+	 */
+	private function getAgentFile( string $filename ): array {
+		$directory_manager = new DirectoryManager();
+		$agent_dir         = $directory_manager->get_agent_directory();
+		$filepath          = "{$agent_dir}/{$filename}";
+
+		if ( ! file_exists( $filepath ) ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'File %s not found in agent directory', $filename ),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'file'    => $this->sanitizeFileEntry(
+				array(
+					'filename' => $filename,
+					'size'     => filesize( $filepath ),
+					'modified' => filemtime( $filepath ),
+					'content'  => file_get_contents( $filepath ),
+				)
+			),
+			'scope'   => 'agent',
+		);
+	}
+
+	/**
+	 * Delete a file from the agent directory.
+	 *
+	 * @param string $filename Filename to delete.
+	 * @return array Result with deletion status.
+	 */
+	private function deleteAgentFile( string $filename ): array {
+		$directory_manager = new DirectoryManager();
+		$agent_dir         = $directory_manager->get_agent_directory();
+		$filepath          = "{$agent_dir}/{$filename}";
+
+		if ( ! file_exists( $filepath ) ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'File %s not found in agent directory', $filename ),
+			);
+		}
+
+		if ( 'SOUL.md' === $filename ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Agent SOUL.md is being deleted via abilities API.',
+				array( 'filename' => $filename )
+			);
+		}
+
+		wp_delete_file( $filepath );
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Agent file deleted via ability',
+			array( 'filename' => $filename )
+		);
+
+		return array(
+			'success' => true,
+			'scope'   => 'agent',
+			'message' => sprintf( 'File %s deleted from agent directory', $filename ),
+		);
+	}
+
+	/**
+	 * Upload a file to the agent directory.
+	 *
+	 * @param array $file File data.
+	 * @return array Result with files list.
+	 */
+	private function uploadToAgent( array $file ): array {
+		$directory_manager = new DirectoryManager();
+		$agent_dir         = $directory_manager->get_agent_directory();
+
+		if ( ! $directory_manager->ensure_directory_exists( $agent_dir ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to create agent directory',
+			);
+		}
+
+		$destination = "{$agent_dir}/{$file['name']}";
+
+		$fs = FilesystemHelper::get();
+		if ( ! $fs || ! $fs->copy( $file['tmp_name'], $destination, true ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to store file in agent directory',
+			);
+		}
+
+		// Return updated file list.
+		return $this->listAgentFiles();
 	}
 
 	/**

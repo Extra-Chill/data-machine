@@ -11,6 +11,8 @@
 namespace DataMachine\Api;
 
 use DataMachine\Abilities\FileAbilities;
+use DataMachine\Core\FilesRepository\DirectoryManager;
+use DataMachine\Core\FilesRepository\FilesystemHelper;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -126,6 +128,77 @@ class Files {
 						'type'              => 'integer',
 						'sanitize_callback' => function ( $param ) {
 							return absint( $param );
+						},
+					),
+				),
+			)
+		);
+
+		// GET /files/agent - List agent files
+		register_rest_route(
+			'datamachine/v1',
+			'/files/agent',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( self::class, 'list_agent_files' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+			)
+		);
+
+		// GET /files/agent/{filename} - Get agent file content
+		register_rest_route(
+			'datamachine/v1',
+			'/files/agent/(?P<filename>[^/]+)',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( self::class, 'get_agent_file' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => array(
+					'filename' => array(
+						'required'          => true,
+						'type'              => 'string',
+						'sanitize_callback' => function ( $param ) {
+							return sanitize_file_name( $param );
+						},
+					),
+				),
+			)
+		);
+
+		// PUT /files/agent/{filename} - Write/update agent file content
+		register_rest_route(
+			'datamachine/v1',
+			'/files/agent/(?P<filename>[^/]+)',
+			array(
+				'methods'             => WP_REST_Server::EDITABLE,
+				'callback'            => array( self::class, 'put_agent_file' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => array(
+					'filename' => array(
+						'required'          => true,
+						'type'              => 'string',
+						'sanitize_callback' => function ( $param ) {
+							return sanitize_file_name( $param );
+						},
+					),
+				),
+			)
+		);
+
+		// DELETE /files/agent/{filename} - Delete agent file
+		register_rest_route(
+			'datamachine/v1',
+			'/files/agent/(?P<filename>[^/]+)',
+			array(
+				'methods'             => WP_REST_Server::DELETABLE,
+				'callback'            => array( self::class, 'delete_agent_file' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => array(
+					'filename' => array(
+						'required'          => true,
+						'type'              => 'string',
+						'sanitize_callback' => function ( $param ) {
+							return sanitize_file_name( $param );
 						},
 					),
 				),
@@ -293,6 +366,111 @@ class Files {
 				'data'    => array(
 					'scope' => $result['scope'],
 				),
+			)
+		);
+	}
+
+	/**
+	 * List agent files.
+	 */
+	public static function list_agent_files( WP_REST_Request $request ) {
+		$result = self::getAbilities()->executeListFiles( array( 'scope' => 'agent' ) );
+
+		if ( ! $result['success'] ) {
+			return new WP_Error( 'list_agent_files_error', $result['error'], array( 'status' => 500 ) );
+		}
+
+		return rest_ensure_response(
+			array(
+				'success' => true,
+				'data'    => $result['files'],
+			)
+		);
+	}
+
+	/**
+	 * Get agent file content.
+	 */
+	public static function get_agent_file( WP_REST_Request $request ) {
+		$filename = sanitize_file_name( wp_unslash( $request['filename'] ) );
+
+		$result = self::getAbilities()->executeGetFile(
+			array(
+				'filename' => $filename,
+				'scope'    => 'agent',
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			$status = false !== strpos( $result['error'] ?? '', 'not found' ) ? 404 : 400;
+			return new WP_Error( 'get_agent_file_error', $result['error'], array( 'status' => $status ) );
+		}
+
+		return rest_ensure_response(
+			array(
+				'success' => true,
+				'data'    => $result['file'],
+			)
+		);
+	}
+
+	/**
+	 * Write/update agent file content (accepts raw body as content).
+	 */
+	public static function put_agent_file( WP_REST_Request $request ) {
+		$filename = sanitize_file_name( wp_unslash( $request['filename'] ) );
+		$content  = $request->get_body();
+
+		$directory_manager = new DirectoryManager();
+		$agent_dir         = $directory_manager->get_agent_directory();
+
+		if ( ! $directory_manager->ensure_directory_exists( $agent_dir ) ) {
+			return new WP_Error( 'put_agent_file_error', 'Failed to create agent directory', array( 'status' => 500 ) );
+		}
+
+		$filepath = "{$agent_dir}/{$filename}";
+
+		$fs = FilesystemHelper::get();
+		if ( ! $fs ) {
+			return new WP_Error( 'put_agent_file_error', 'Filesystem not available', array( 'status' => 500 ) );
+		}
+
+		$written = $fs->put_contents( $filepath, $content, FS_CHMOD_FILE );
+
+		if ( ! $written ) {
+			return new WP_Error( 'put_agent_file_error', 'Failed to write file', array( 'status' => 500 ) );
+		}
+
+		return rest_ensure_response(
+			array(
+				'success'  => true,
+				'filename' => $filename,
+			)
+		);
+	}
+
+	/**
+	 * Delete agent file.
+	 */
+	public static function delete_agent_file( WP_REST_Request $request ) {
+		$filename = sanitize_file_name( wp_unslash( $request['filename'] ) );
+
+		$result = self::getAbilities()->executeDeleteFile(
+			array(
+				'filename' => $filename,
+				'scope'    => 'agent',
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			$status = false !== strpos( $result['error'] ?? '', 'not found' ) ? 404 : 400;
+			return new WP_Error( 'delete_agent_file_error', $result['error'], array( 'status' => $status ) );
+		}
+
+		return rest_ensure_response(
+			array(
+				'success' => true,
+				'data'    => array( 'scope' => $result['scope'] ),
 			)
 		);
 	}

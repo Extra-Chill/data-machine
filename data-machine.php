@@ -47,6 +47,9 @@ if ( ! class_exists( 'ActionScheduler' ) ) {
 
 function datamachine_run_datamachine_plugin() {
 
+	// Run agent memory migration on upgrade (version check).
+	\DataMachine\Core\FilesRepository\AgentMemoryMigration::maybe_run();
+
 	// Set Action Scheduler timeout to 10 minutes (600 seconds) for large tasks
 	add_filter(
 		'action_scheduler_timeout_period',
@@ -293,6 +296,9 @@ function datamachine_activate_plugin() {
 	if ( ! file_exists( $log_dir ) ) {
 		wp_mkdir_p( $log_dir );
 	}
+
+	// Run agent memory migration (SOUL.md to files repository).
+	\DataMachine\Core\FilesRepository\AgentMemoryMigration::maybe_run();
 
 	// Re-schedule any flows with non-manual scheduling
 	datamachine_activate_scheduled_flows();

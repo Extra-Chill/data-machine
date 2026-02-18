@@ -85,6 +85,17 @@ class DirectoryManager {
 	}
 
 	/**
+	 * Get agent directory path
+	 *
+	 * @return string Full path to agent directory
+	 */
+	public function get_agent_directory(): string {
+		$upload_dir = wp_upload_dir();
+		$base       = trailingslashit( $upload_dir['basedir'] ) . self::REPOSITORY_DIR;
+		return "{$base}/agent";
+	}
+
+	/**
 	 * Ensure directory exists
 	 *
 	 * @param string $directory Directory path

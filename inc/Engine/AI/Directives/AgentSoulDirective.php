@@ -2,12 +2,11 @@
 /**
  * Agent Soul Directive - Priority 20
  *
- * Injects structured agent identity (soul) as the second directive
- * in the 5-tier AI directive system. Defines WHO the agent is —
- * identity, voice, rules, and context — consistently across all interactions.
+ * Injects the agent soul from SOUL.md in the files repository as the second
+ * directive in the 5-tier AI directive system. Defines WHO the agent is.
  *
- * Replaces the former GlobalSystemPromptDirective. Falls back to the legacy
- * global_system_prompt setting if no structured soul sections are populated.
+ * Reads from the agent directory in the files repository. Migration from
+ * database storage is handled by AgentMemoryMigration.
  *
  * Priority Order in 5-Tier System:
  * 1. Priority 10 - Plugin Core Directive
@@ -19,58 +18,34 @@
 
 namespace DataMachine\Engine\AI\Directives;
 
-use DataMachine\Core\PluginSettings;
+use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Engine\AI\Directives\DirectiveInterface;
 
 defined( 'ABSPATH' ) || exit;
 
 class AgentSoulDirective implements DirectiveInterface {
 
-	/**
-	 * Section definitions: setting key => display header.
-	 */
-	private const SECTIONS = array(
-		'identity' => 'Identity',
-		'voice'    => 'Voice & Tone',
-		'rules'    => 'Rules',
-		'context'  => 'Context',
-	);
-
 	public static function get_outputs( string $provider_name, array $tools, ?string $step_id = null, array $payload = array() ): array {
-		$soul = PluginSettings::get( 'agent_soul', array() );
+		$directory_manager = new DirectoryManager();
+		$agent_dir         = $directory_manager->get_agent_directory();
+		$soul_path         = "{$agent_dir}/SOUL.md";
 
-		// Compose structured soul sections.
-		$parts = array();
-		if ( is_array( $soul ) ) {
-			foreach ( self::SECTIONS as $key => $header ) {
-				$value = trim( $soul[ $key ] ?? '' );
-				if ( '' !== $value ) {
-					$parts[] = "## {$header}\n{$value}";
-				}
-			}
+		if ( ! file_exists( $soul_path ) ) {
+			return array();
 		}
 
-		if ( ! empty( $parts ) ) {
-			return array(
-				array(
-					'type'    => 'system_text',
-					'content' => implode( "\n\n", $parts ),
-				),
-			);
+		$content = file_get_contents( $soul_path );
+
+		if ( empty( trim( $content ) ) ) {
+			return array();
 		}
 
-		// Backward compat: fall back to legacy global_system_prompt.
-		$legacy = PluginSettings::get( 'global_system_prompt', '' );
-		if ( ! empty( $legacy ) ) {
-			return array(
-				array(
-					'type'    => 'system_text',
-					'content' => trim( $legacy ),
-				),
-			);
-		}
-
-		return array();
+		return array(
+			array(
+				'type'    => 'system_text',
+				'content' => trim( $content ),
+			),
+		);
 	}
 }
 
