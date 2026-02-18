@@ -132,6 +132,7 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/Analytics/GoogleSearchConsoleAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/AgentPingAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/TaxonomyAbilities.php';
+	require_once __DIR__ . '/inc/Abilities/InternalLinkingAbilities.php';
 	// Defer ability instantiation to init so translations are loaded.
 	add_action( 'init', function () {
 		new \DataMachine\Abilities\AuthAbilities();
@@ -156,6 +157,7 @@ function datamachine_run_datamachine_plugin() {
 		new \DataMachine\Abilities\Analytics\GoogleSearchConsoleAbilities();
 		new \DataMachine\Abilities\AgentPingAbilities();
 		new \DataMachine\Abilities\TaxonomyAbilities();
+		new \DataMachine\Abilities\InternalLinkingAbilities();
 	} );
 }
 
