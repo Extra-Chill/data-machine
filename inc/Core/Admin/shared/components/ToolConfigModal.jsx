@@ -19,7 +19,7 @@ import {
 /**
  * Internal dependencies
  */
-import { useToolConfig, useSaveToolConfig } from '../queries/tools';
+import { useToolConfig, useSaveToolConfig } from '@shared/queries/tools';
 
 const ToolConfigModal = ( { toolId, isOpen, onRequestClose } ) => {
 	const {

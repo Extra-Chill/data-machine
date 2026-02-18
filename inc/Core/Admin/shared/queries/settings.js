@@ -1,13 +1,13 @@
 /**
- * Settings Query Hook
+ * Settings Query Hooks
  *
- * Shared TanStack Query hook for fetching plugin settings.
+ * Shared TanStack Query hooks for fetching and updating plugin settings.
  */
 
 /**
  * External dependencies
  */
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { client } from '@shared/utils/api';
 
 export const SETTINGS_KEY = [ 'settings' ];
@@ -29,3 +29,25 @@ export const useSettings = () =>
 		},
 		staleTime: 5 * 60 * 1000, // 5 minutes
 	} );
+
+/**
+ * Update settings (partial update)
+ */
+export const useUpdateSettings = () => {
+	const queryClient = useQueryClient();
+
+	return useMutation( {
+		mutationFn: async ( updates ) => {
+			const response = await client.patch( '/settings', updates );
+			if ( ! response.success ) {
+				throw new Error(
+					response.message || 'Failed to update settings'
+				);
+			}
+			return response;
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries( { queryKey: SETTINGS_KEY } );
+		},
+	} );
+};

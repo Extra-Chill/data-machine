@@ -297,3 +297,90 @@
 		min-height: 300px;
 	}
 }
+
+/* Agent Settings Section */
+.datamachine-agent-settings {
+	margin-top: 20px;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+	padding: 0 20px 20px;
+}
+
+.datamachine-agent-settings h2 {
+	font-size: 14px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	color: #1e1e1e;
+	padding: 15px 0;
+	margin: 0;
+	border-bottom: 1px solid #e0e0e0;
+}
+
+.datamachine-agent-settings .form-table th {
+	padding-left: 0;
+}
+
+.datamachine-agent-settings .datamachine-tool-config-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+	gap: 16px;
+}
+
+.datamachine-agent-settings .datamachine-tool-config-item {
+	padding: 12px;
+	border: 1px solid #e0e0e0;
+	border-radius: 4px;
+	background: #fafafa;
+}
+
+.datamachine-agent-settings .datamachine-tool-config-item h4 {
+	margin: 0 0 4px;
+	font-size: 13px;
+}
+
+.datamachine-agent-settings .datamachine-tool-controls {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 8px;
+	flex-wrap: wrap;
+}
+
+.datamachine-agent-settings .datamachine-config-status {
+	font-size: 11px;
+	padding: 2px 6px;
+	border-radius: 3px;
+}
+
+.datamachine-agent-settings .datamachine-config-status.configured {
+	background: #d4edda;
+	color: #155724;
+}
+
+.datamachine-agent-settings .datamachine-config-status.not-configured {
+	background: #fff3cd;
+	color: #856404;
+}
+
+.datamachine-agent-settings .datamachine-tool-enabled-toggle {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 12px;
+}
+
+.datamachine-agent-settings .datamachine-tool-disabled {
+	opacity: 0.5;
+}
+
+.datamachine-agent-settings .datamachine-ping-secret-section code {
+	background: #f0f0f0;
+	padding: 2px 6px;
+	border-radius: 3px;
+}
+
+.datamachine-agent-settings .datamachine-ai-provider-model-settings {
+	max-width: 500px;
+}

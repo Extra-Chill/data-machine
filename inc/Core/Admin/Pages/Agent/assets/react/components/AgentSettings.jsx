@@ -1,84 +1,24 @@
 /**
- * AgentTab Component
+ * AgentSettings Component
  *
- * AI agent settings including tools, system prompt, provider/model, and conversation limits.
- * Uses useFormState for form management and SettingsSaveBar for save UI.
+ * Agent configuration settings: tools, provider/model, site context, turns, webhook.
+ * Transplanted from the former Settings → Agent tab.
  */
 
-/**
- * WordPress dependencies
- */
 import { useState, useEffect, useCallback } from '@wordpress/element';
 import { Button } from '@wordpress/components';
-
-/**
- * Internal dependencies
- */
-import {
-	useSettings,
-	useUpdateSettings,
-} from '../../queries/settings';
+import { useSettings, useUpdateSettings } from '@shared/queries/settings';
 import { client } from '@shared/utils/api';
-import ToolConfigModal from '../ToolConfigModal';
+import ToolConfigModal from '@shared/components/ToolConfigModal';
 import { useFormState } from '@shared/hooks/useFormState';
 import SettingsSaveBar, {
 	useSaveStatus,
 } from '@shared/components/SettingsSaveBar';
-
-/**
- * External dependencies
- */
 import ProviderModelSelector from '@shared/components/ai/ProviderModelSelector';
 import { useProviders } from '@shared/queries/providers';
 
-const SOUL_SECTIONS = [
-	{
-		key: 'identity',
-		label: 'Identity',
-		description:
-			'Who is this agent? Name, role, personality. This is the core identity that shapes every response.',
-		placeholder:
-			'e.g. You are a helpful content assistant for our WordPress site…',
-		rows: 4,
-	},
-	{
-		key: 'voice',
-		label: 'Voice & Tone',
-		description:
-			'How should the agent communicate? Formal, casual, technical, friendly?',
-		placeholder:
-			'e.g. Write in a warm, conversational tone. Avoid jargon…',
-		rows: 3,
-	},
-	{
-		key: 'rules',
-		label: 'Rules',
-		description:
-			'Hard constraints the agent must follow. Safety guardrails, content policies, formatting requirements.',
-		placeholder:
-			'e.g. Never generate content about competitors. Always cite sources…',
-		rows: 4,
-	},
-	{
-		key: 'context',
-		label: 'Context',
-		description:
-			'Background knowledge the agent should always have. Brand info, audience details, domain expertise.',
-		placeholder:
-			'e.g. Our target audience is small business owners aged 25-45…',
-		rows: 4,
-	},
-];
-
 const DEFAULTS = {
 	disabled_tools: {},
-	agent_soul: {
-		identity: '',
-		voice: '',
-		rules: '',
-		context: '',
-	},
-	global_system_prompt: '',
 	default_provider: '',
 	default_model: '',
 	agent_models: {},
@@ -86,7 +26,7 @@ const DEFAULTS = {
 	max_turns: 12,
 };
 
-const AgentTab = () => {
+const AgentSettings = () => {
 	const { data, isLoading, error } = useSettings();
 	const { data: providersData } = useProviders();
 	const updateMutation = useUpdateSettings();
@@ -105,7 +45,6 @@ const AgentTab = () => {
 		onSave: () => form.submit(),
 	} );
 
-	// Sync ping secret from server data.
 	useEffect( () => {
 		if ( data?.settings?.chat_ping_secret ) {
 			setPingSecret( data.settings.chat_ping_secret );
@@ -133,7 +72,6 @@ const AgentTab = () => {
 				setPingSecretVisible( true );
 			}
 		} catch ( err ) {
-			// eslint-disable-next-line no-console
 			console.error( 'Failed to generate ping secret:', err );
 		} finally {
 			setPingGenerating( false );
@@ -147,20 +85,10 @@ const AgentTab = () => {
 		} );
 	}, [ pingSecret ] );
 
-	// Sync server data → form state
 	useEffect( () => {
 		if ( data?.settings ) {
-			const serverSoul = data.settings.agent_soul || {};
 			form.reset( {
 				disabled_tools: data.settings.disabled_tools || {},
-				agent_soul: {
-					identity: serverSoul.identity || '',
-					voice: serverSoul.voice || '',
-					rules: serverSoul.rules || '',
-					context: serverSoul.context || '',
-				},
-				global_system_prompt:
-					data.settings.global_system_prompt || '',
 				default_provider: data.settings.default_provider || '',
 				default_model: data.settings.default_model || '',
 				agent_models: data.settings.agent_models || {},
@@ -172,12 +100,6 @@ const AgentTab = () => {
 		}
 	}, [ data ] ); // eslint-disable-line react-hooks/exhaustive-deps
 
-	/**
-	 * Update a field and mark the form as changed.
-	 *
-	 * @param {string} field Field key
-	 * @param {*}      value New value
-	 */
 	const updateField = ( field, value ) => {
 		form.updateField( field, value );
 		save.markChanged();
@@ -204,7 +126,7 @@ const AgentTab = () => {
 
 	if ( isLoading ) {
 		return (
-			<div className="datamachine-agent-tab-loading">
+			<div className="datamachine-agent-settings-loading">
 				<span className="spinner is-active"></span>
 				<span>Loading agent settings...</span>
 			</div>
@@ -222,7 +144,9 @@ const AgentTab = () => {
 	const globalTools = data?.global_tools || {};
 
 	return (
-		<div className="datamachine-agent-tab">
+		<div className="datamachine-agent-settings">
+			<h2 className="datamachine-agent-settings-title">Configuration</h2>
+
 			{ openToolId && (
 				<ToolConfigModal
 					toolId={ openToolId }
@@ -329,107 +253,6 @@ const AgentTab = () => {
 								</div>
 							) : (
 								<p>No global tools are currently available.</p>
-							) }
-						</td>
-					</tr>
-
-					<tr>
-						<th scope="row">Agent Soul</th>
-						<td>
-							<p
-								className="description"
-								style={ {
-									marginTop: 0,
-									marginBottom: '16px',
-								} }
-							>
-								Define who this agent is across four tiers.
-								Each section is injected as a system directive
-								for every AI interaction — pipelines and chat.
-							</p>
-							{ SOUL_SECTIONS.map( ( section ) => (
-								<div
-									key={ section.key }
-									className="datamachine-soul-section"
-									style={ { marginBottom: '16px' } }
-								>
-									<label
-										htmlFor={ `agent_soul_${ section.key }` }
-										style={ {
-											fontWeight: 600,
-											display: 'block',
-											marginBottom: '4px',
-										} }
-									>
-										{ section.label }
-									</label>
-									<textarea
-										id={ `agent_soul_${ section.key }` }
-										rows={ section.rows }
-										cols="70"
-										className="large-text code"
-										placeholder={ section.placeholder }
-										value={
-											form.data.agent_soul?.[
-												section.key
-											] || ''
-										}
-										onChange={ ( e ) => {
-											form.updateData( {
-												agent_soul: {
-													...form.data.agent_soul,
-													[ section.key ]:
-														e.target.value,
-												},
-											} );
-											save.markChanged();
-										} }
-									/>
-									<p className="description">
-										{ section.description }
-									</p>
-								</div>
-							) ) }
-
-							{ form.data.global_system_prompt && (
-								<div
-									className="notice notice-warning inline"
-									style={ {
-										marginTop: '12px',
-										padding: '8px 12px',
-									} }
-								>
-									<p>
-										<strong>
-											Legacy prompt detected.
-										</strong>{ ' ' }
-										You have content in the old Global
-										System Prompt field. Move it into the
-										sections above for structured agent
-										behavior.
-									</p>
-									<details style={ { marginTop: '8px' } }>
-										<summary>
-											View legacy prompt
-										</summary>
-										<textarea
-											rows="4"
-											cols="70"
-											className="large-text code"
-											value={
-												form.data
-													.global_system_prompt || ''
-											}
-											onChange={ ( e ) =>
-												updateField(
-													'global_system_prompt',
-													e.target.value
-												)
-											}
-											style={ { marginTop: '8px' } }
-										/>
-									</details>
-								</div>
 							) }
 						</td>
 					</tr>
@@ -738,4 +561,4 @@ const AgentTab = () => {
 	);
 };
 
-export default AgentTab;
+export default AgentSettings;

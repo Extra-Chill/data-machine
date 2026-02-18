@@ -11,7 +11,7 @@ import { useState, useEffect } from '@wordpress/element';
 /**
  * Internal dependencies
  */
-import { useSettings, useUpdateSettings } from '../../queries/settings';
+import { useSettings, useUpdateSettings } from '@shared/queries/settings';
 /**
  * External dependencies
  */

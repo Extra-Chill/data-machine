@@ -19,6 +19,7 @@ const getConfig = () => {
 		window.dataMachineConfig ||
 		window.dataMachineLogsConfig ||
 		window.dataMachineSettingsConfig ||
+		window.dataMachineAgentConfig ||
 		{};
 	return {
 		restNamespace: config.restNamespace || 'datamachine/v1',

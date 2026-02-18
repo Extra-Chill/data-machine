@@ -13,7 +13,7 @@ import { useEffect } from '@wordpress/element';
 /**
  * Internal dependencies
  */
-import { useSettings, useUpdateSettings } from '../../queries/settings';
+import { useSettings, useUpdateSettings } from '@shared/queries/settings';
 import { useFormState } from '@shared/hooks/useFormState';
 import SettingsSaveBar, {
 	useSaveStatus,

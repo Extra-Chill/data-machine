@@ -16,6 +16,7 @@ import { useState } from '@wordpress/element';
 import AgentFileList from './components/AgentFileList';
 import AgentFileEditor from './components/AgentFileEditor';
 import AgentEmptyState from './components/AgentEmptyState';
+import AgentSettings from './components/AgentSettings';
 import { useAgentFiles } from './queries/agentFiles';
 
 const AgentApp = () => {
@@ -41,6 +42,7 @@ const AgentApp = () => {
 					) }
 				</div>
 			</div>
+			<AgentSettings />
 		</div>
 	);
 };

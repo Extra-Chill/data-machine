@@ -12,13 +12,11 @@ import { useState, useEffect } from '@wordpress/element';
  * Internal dependencies
  */
 import GeneralTab from './components/tabs/GeneralTab';
-import AgentTab from './components/tabs/AgentTab';
 import ApiKeysTab from './components/tabs/ApiKeysTab';
 import HandlerDefaultsTab from './components/tabs/HandlerDefaultsTab';
 
 const TABS = [
 	{ id: 'general', label: 'General' },
-	{ id: 'agent', label: 'Agent' },
 	{ id: 'api-keys', label: 'API Keys' },
 	{ id: 'handler-defaults', label: 'Handler Defaults' },
 ];
@@ -43,8 +41,6 @@ const SettingsApp = () => {
 		switch ( activeTab ) {
 			case 'general':
 				return <GeneralTab />;
-			case 'agent':
-				return <AgentTab />;
 			case 'api-keys':
 				return <ApiKeysTab />;
 			case 'handler-defaults':
