@@ -104,6 +104,25 @@ class AIStep extends Step {
 		if ( $queue_enabled ) {
 			$queue_result = $this->popFromQueueIfEmpty( '', true );
 			$user_message = $queue_result['value'];
+
+			// Queue is enabled but empty — skip cleanly instead of failing.
+			if ( empty( $user_message ) && empty( $configured_message ) ) {
+				do_action(
+					'datamachine_log',
+					'info',
+					'AI step skipped — queue enabled but empty, no configured message',
+					array(
+						'job_id'       => $this->job_id,
+						'flow_step_id' => $this->flow_step_id,
+					)
+				);
+
+				// Set status override so Engine completes with completed_no_items
+				// instead of treating empty data packets as a failure.
+				$this->engine->set( 'job_status', \DataMachine\Core\JobStatus::COMPLETED_NO_ITEMS );
+
+				return $this->dataPackets;
+			}
 		} else {
 			$user_message = $queued_prompt;
 		}

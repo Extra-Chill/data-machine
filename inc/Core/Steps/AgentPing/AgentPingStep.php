@@ -135,6 +135,23 @@ class AgentPingStep extends Step {
 			$queue_result = $this->popFromQueueIfEmpty( '', true );
 			$prompt       = $queue_result['value'];
 			$from_queue   = $queue_result['from_queue'];
+
+			// Queue is enabled but empty — skip cleanly instead of failing.
+			if ( empty( $prompt ) && empty( $configured_prompt ) ) {
+				do_action(
+					'datamachine_log',
+					'info',
+					'Agent ping step skipped — queue enabled but empty, no configured prompt',
+					array(
+						'job_id'       => $this->job_id,
+						'flow_step_id' => $this->flow_step_id,
+					)
+				);
+
+				$this->engine->set( 'job_status', \DataMachine\Core\JobStatus::COMPLETED_NO_ITEMS );
+
+				return $this->dataPackets;
+			}
 		} else {
 			$prompt = $queued_prompt;
 		}
