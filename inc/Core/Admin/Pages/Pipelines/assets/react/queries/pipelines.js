@@ -23,6 +23,9 @@ import {
 	fetchContextFiles,
 	uploadContextFile,
 	deleteContextFile,
+	fetchPipelineMemoryFiles,
+	updatePipelineMemoryFiles,
+	fetchAgentFiles,
 } from '../utils/api';
 import { isSameId } from '../utils/ids';
 
@@ -260,6 +263,38 @@ export const useDeleteContextFile = () => {
 		mutationFn: deleteContextFile,
 		onSuccess: () => {
 			queryClient.invalidateQueries( { queryKey: [ 'context-files' ] } );
+		},
+	} );
+};
+
+export const useAgentFiles = () =>
+	useQuery( {
+		queryKey: [ 'agent-files' ],
+		queryFn: async () => {
+			const response = await fetchAgentFiles();
+			return response.success ? response.data : [];
+		},
+	} );
+
+export const usePipelineMemoryFiles = ( pipelineId ) =>
+	useQuery( {
+		queryKey: [ 'pipeline-memory-files', pipelineId ],
+		queryFn: async () => {
+			const response = await fetchPipelineMemoryFiles( pipelineId );
+			return response.success ? response.data : [];
+		},
+		enabled: !! pipelineId,
+	} );
+
+export const useUpdatePipelineMemoryFiles = ( pipelineId ) => {
+	const queryClient = useQueryClient();
+	return useMutation( {
+		mutationFn: ( filenames ) =>
+			updatePipelineMemoryFiles( pipelineId, filenames ),
+		onSuccess: () => {
+			queryClient.invalidateQueries( {
+				queryKey: [ 'pipeline-memory-files', pipelineId ],
+			} );
 		},
 	} );
 };

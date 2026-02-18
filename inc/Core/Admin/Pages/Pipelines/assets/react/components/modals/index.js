@@ -13,3 +13,4 @@ export { default as HandlerSettingsModal } from './HandlerSettingsModal';
 export { default as ImportExportModal } from './ImportExportModal';
 export { default as OAuthAuthenticationModal } from './OAuthAuthenticationModal';
 export { default as ContextFilesModal } from './ContextFilesModal';
+export { default as MemoryFilesModal } from './MemoryFilesModal';

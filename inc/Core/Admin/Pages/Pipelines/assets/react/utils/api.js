@@ -425,6 +425,42 @@ export const deleteContextFile = async ( filename ) => {
 };
 
 /**
+ * Memory Files Operations
+ */
+
+/**
+ * Fetch memory files for a pipeline
+ *
+ * @param {number} pipelineId - Pipeline ID
+ * @return {Promise<Object>} Array of memory filenames
+ */
+export const fetchPipelineMemoryFiles = async ( pipelineId ) => {
+	return await client.get( `/pipelines/${ pipelineId }/memory-files` );
+};
+
+/**
+ * Update memory files for a pipeline
+ *
+ * @param {number}        pipelineId  - Pipeline ID
+ * @param {Array<string>} memoryFiles - Array of filenames
+ * @return {Promise<Object>} Update confirmation
+ */
+export const updatePipelineMemoryFiles = async ( pipelineId, memoryFiles ) => {
+	return await client.put( `/pipelines/${ pipelineId }/memory-files`, {
+		memory_files: memoryFiles,
+	} );
+};
+
+/**
+ * Fetch available agent files
+ *
+ * @return {Promise<Object>} Array of agent files
+ */
+export const fetchAgentFiles = async () => {
+	return await client.get( '/files/agent' );
+};
+
+/**
  * Fetch complete handler details
  *
  * @param {string} handlerSlug - Handler slug (e.g., 'twitter', 'wordpress_publish')

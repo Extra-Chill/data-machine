@@ -21,6 +21,7 @@ import {
 	HandlerSettingsModal,
 	OAuthAuthenticationModal,
 	ContextFilesModal,
+	MemoryFilesModal,
 } from '../modals';
 
 export default function ModalSwitch( { activeModal, baseProps } ) {
@@ -73,6 +74,9 @@ export default function ModalSwitch( { activeModal, baseProps } ) {
 
 		case MODAL_TYPES.CONTEXT_FILES:
 			return <ContextFilesModal { ...baseProps } />;
+
+		case MODAL_TYPES.MEMORY_FILES:
+			return <MemoryFilesModal { ...baseProps } />;
 
 		default:
 			console.warn( `Unknown modal type: ${ activeModal }` );

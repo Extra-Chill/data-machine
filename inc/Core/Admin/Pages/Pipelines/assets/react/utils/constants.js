@@ -18,6 +18,7 @@ export const MODAL_TYPES = {
 	OAUTH: 'oauth',
 	CONFIRM_DELETE: 'confirm-delete',
 	CONTEXT_FILES: 'context-files',
+	MEMORY_FILES: 'memory-files',
 };
 
 /**

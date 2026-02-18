@@ -127,6 +127,15 @@ export default function PipelineCard( {
 		} );
 	}, [ pipeline.pipeline_id, openModal ] );
 
+	/**
+	 * Handle memory files modal open
+	 */
+	const handleOpenMemoryFiles = useCallback( () => {
+		openModal( MODAL_TYPES.MEMORY_FILES, {
+			pipelineId: pipeline.pipeline_id,
+		} );
+	}, [ pipeline.pipeline_id, openModal ] );
+
 	return (
 		<Card className="datamachine-pipeline-card" size="large">
 			<CardBody>
@@ -136,6 +145,7 @@ export default function PipelineCard( {
 					onNameChange={ handleNameChange }
 					onDelete={ handleDelete }
 					onOpenContextFiles={ handleOpenContextFiles }
+					onOpenMemoryFiles={ handleOpenMemoryFiles }
 				/>
 
 				<CardDivider />
