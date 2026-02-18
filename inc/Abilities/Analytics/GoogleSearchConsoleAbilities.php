@@ -87,7 +87,15 @@ class GoogleSearchConsoleAbilities {
 						'properties' => [
 							'action'       => [
 								'type'        => 'string',
-								'description' => 'Analytics action: query_stats, page_stats, query_page_stats, date_stats.',
+								'description' => 'Action to perform: query_stats, page_stats, query_page_stats, date_stats, inspect_url, list_sitemaps, get_sitemap, submit_sitemap.',
+							],
+							'url'          => [
+								'type'        => 'string',
+								'description' => 'Full URL to inspect (required for inspect_url action).',
+							],
+							'sitemap_url'  => [
+								'type'        => 'string',
+								'description' => 'Sitemap URL (required for get_sitemap and submit_sitemap actions).',
 							],
 							'site_url'     => [
 								'type'        => 'string',
@@ -148,10 +156,14 @@ class GoogleSearchConsoleAbilities {
 	public static function fetchStats( array $input ): array {
 		$action = sanitize_text_field( $input['action'] ?? '' );
 
-		if ( empty( $action ) || ! isset( self::ACTION_DIMENSIONS[ $action ] ) ) {
+		$valid_actions = array_merge(
+			array_keys( self::ACTION_DIMENSIONS ),
+			[ 'inspect_url', 'list_sitemaps', 'get_sitemap', 'submit_sitemap' ]
+		);
+		if ( empty( $action ) || ! in_array( $action, $valid_actions, true ) ) {
 			return [
 				'success' => false,
-				'error'   => 'Invalid action. Must be one of: ' . implode( ', ', array_keys( self::ACTION_DIMENSIONS ) ),
+				'error'   => 'Invalid action. Must be one of: ' . implode( ', ', $valid_actions ),
 			];
 		}
 
@@ -182,7 +194,22 @@ class GoogleSearchConsoleAbilities {
 			];
 		}
 
-		$site_url   = ! empty( $input['site_url'] ) ? sanitize_text_field( $input['site_url'] ) : ( $config['site_url'] ?? '' );
+		$site_url = ! empty( $input['site_url'] ) ? sanitize_text_field( $input['site_url'] ) : ( $config['site_url'] ?? '' );
+
+		// Route to specialized handlers for non-analytics actions.
+		if ( 'inspect_url' === $action ) {
+			return self::inspectUrl( $input, $access_token, $site_url );
+		}
+		if ( 'list_sitemaps' === $action ) {
+			return self::listSitemaps( $access_token, $site_url );
+		}
+		if ( 'get_sitemap' === $action ) {
+			return self::getSitemap( $input, $access_token, $site_url );
+		}
+		if ( 'submit_sitemap' === $action ) {
+			return self::submitSitemap( $input, $access_token, $site_url );
+		}
+
 		$start_date = ! empty( $input['start_date'] ) ? sanitize_text_field( $input['start_date'] ) : gmdate( 'Y-m-d', strtotime( '-28 days' ) );
 		$end_date   = ! empty( $input['end_date'] ) ? sanitize_text_field( $input['end_date'] ) : gmdate( 'Y-m-d', strtotime( '-3 days' ) );
 		$limit      = ! empty( $input['limit'] ) ? min( (int) $input['limit'], self::MAX_LIMIT ) : self::DEFAULT_LIMIT;
@@ -278,6 +305,242 @@ class GoogleSearchConsoleAbilities {
 			'action'        => $action,
 			'results_count' => count( $rows ),
 			'results'       => $rows,
+		];
+	}
+
+	/**
+	 * Inspect a URL via the URL Inspection API.
+	 *
+	 * @param array  $input        Ability input containing 'url'.
+	 * @param string $access_token OAuth2 access token.
+	 * @param string $site_url     GSC property URL.
+	 * @return array
+	 */
+	private static function inspectUrl( array $input, string $access_token, string $site_url ): array {
+		$url = sanitize_text_field( $input['url'] ?? '' );
+		if ( empty( $url ) ) {
+			return [ 'success' => false, 'error' => 'URL is required for inspect_url action.' ];
+		}
+
+		$api_url = 'https://searchconsole.googleapis.com/v1/urlInspection/index:inspect';
+
+		$result = HttpClient::post(
+			$api_url,
+			[
+				'timeout' => 30,
+				'headers' => [
+					'Authorization' => 'Bearer ' . $access_token,
+					'Content-Type'  => 'application/json',
+				],
+				'body'    => wp_json_encode( [
+					'inspectionUrl' => $url,
+					'siteUrl'       => $site_url,
+					'languageCode'  => 'en-US',
+				] ),
+				'context' => 'Google Search Console URL Inspection',
+			]
+		);
+
+		if ( ! $result['success'] ) {
+			return [ 'success' => false, 'error' => 'URL Inspection API failed: ' . ( $result['error'] ?? 'Unknown error' ) ];
+		}
+
+		$data = json_decode( $result['data'], true );
+		if ( json_last_error() !== JSON_ERROR_NONE ) {
+			return [ 'success' => false, 'error' => 'Failed to parse URL Inspection response.' ];
+		}
+
+		if ( ! empty( $data['error'] ) ) {
+			return [ 'success' => false, 'error' => 'GSC API error: ' . ( $data['error']['message'] ?? 'Unknown' ) ];
+		}
+
+		$inspection   = $data['inspectionResult'] ?? [];
+		$index_status = $inspection['indexStatusResult'] ?? [];
+		$mobile       = $inspection['mobileUsabilityResult'] ?? [];
+		$rich_results = $inspection['richResultsResult'] ?? [];
+
+		return [
+			'success'          => true,
+			'action'           => 'inspect_url',
+			'url'              => $url,
+			'index_status'     => [
+				'verdict'          => $index_status['verdict'] ?? 'UNKNOWN',
+				'coverage_state'   => $index_status['coverageState'] ?? '',
+				'indexing_state'   => $index_status['indexingState'] ?? '',
+				'last_crawl_time'  => $index_status['lastCrawlTime'] ?? '',
+				'page_fetch_state' => $index_status['pageFetchState'] ?? '',
+				'google_canonical' => $index_status['googleCanonical'] ?? '',
+				'user_canonical'   => $index_status['userCanonical'] ?? '',
+				'crawled_as'       => $index_status['crawledAs'] ?? '',
+				'robots_txt_state' => $index_status['robotsTxtState'] ?? '',
+				'referring_urls'   => $index_status['referringUrls'] ?? [],
+				'sitemap'          => $index_status['sitemap'] ?? [],
+			],
+			'mobile_usability' => [
+				'verdict' => $mobile['verdict'] ?? 'UNKNOWN',
+				'issues'  => $mobile['issues'] ?? [],
+			],
+			'rich_results'     => [
+				'verdict'        => $rich_results['verdict'] ?? 'UNKNOWN',
+				'detected_items' => $rich_results['detectedItems'] ?? [],
+			],
+		];
+	}
+
+	/**
+	 * List all sitemaps for the configured site.
+	 *
+	 * @param string $access_token OAuth2 access token.
+	 * @param string $site_url     GSC property URL.
+	 * @return array
+	 */
+	private static function listSitemaps( string $access_token, string $site_url ): array {
+		$encoded = rawurlencode( $site_url );
+		$api_url = "https://www.googleapis.com/webmasters/v3/sites/{$encoded}/sitemaps";
+
+		$result = HttpClient::get(
+			$api_url,
+			[
+				'timeout' => 30,
+				'headers' => [ 'Authorization' => 'Bearer ' . $access_token ],
+				'context' => 'Google Search Console Sitemaps List',
+			]
+		);
+
+		if ( ! $result['success'] ) {
+			return [ 'success' => false, 'error' => 'Sitemaps API failed: ' . ( $result['error'] ?? 'Unknown error' ) ];
+		}
+
+		$data = json_decode( $result['data'], true );
+		if ( json_last_error() !== JSON_ERROR_NONE ) {
+			return [ 'success' => false, 'error' => 'Failed to parse Sitemaps response.' ];
+		}
+
+		if ( ! empty( $data['error'] ) ) {
+			return [ 'success' => false, 'error' => 'GSC API error: ' . ( $data['error']['message'] ?? 'Unknown' ) ];
+		}
+
+		$sitemaps = [];
+		foreach ( ( $data['sitemap'] ?? [] ) as $sm ) {
+			$sitemaps[] = [
+				'path'            => $sm['path'] ?? '',
+				'last_submitted'  => $sm['lastSubmitted'] ?? '',
+				'last_downloaded' => $sm['lastDownloaded'] ?? '',
+				'is_pending'      => $sm['isPending'] ?? false,
+				'warnings'        => $sm['warnings'] ?? 0,
+				'errors'          => $sm['errors'] ?? 0,
+				'contents'        => $sm['contents'] ?? [],
+			];
+		}
+
+		return [
+			'success'        => true,
+			'action'         => 'list_sitemaps',
+			'sitemaps_count' => count( $sitemaps ),
+			'sitemaps'       => $sitemaps,
+		];
+	}
+
+	/**
+	 * Get details for a specific sitemap.
+	 *
+	 * @param array  $input        Ability input containing 'sitemap_url'.
+	 * @param string $access_token OAuth2 access token.
+	 * @param string $site_url     GSC property URL.
+	 * @return array
+	 */
+	private static function getSitemap( array $input, string $access_token, string $site_url ): array {
+		$sitemap_url = sanitize_text_field( $input['sitemap_url'] ?? '' );
+		if ( empty( $sitemap_url ) ) {
+			return [ 'success' => false, 'error' => 'sitemap_url is required for get_sitemap action.' ];
+		}
+
+		$encoded_site    = rawurlencode( $site_url );
+		$encoded_sitemap = rawurlencode( $sitemap_url );
+		$api_url         = "https://www.googleapis.com/webmasters/v3/sites/{$encoded_site}/sitemaps/{$encoded_sitemap}";
+
+		$result = HttpClient::get(
+			$api_url,
+			[
+				'timeout' => 30,
+				'headers' => [ 'Authorization' => 'Bearer ' . $access_token ],
+				'context' => 'Google Search Console Sitemap Detail',
+			]
+		);
+
+		if ( ! $result['success'] ) {
+			return [ 'success' => false, 'error' => 'Sitemap API failed: ' . ( $result['error'] ?? 'Unknown error' ) ];
+		}
+
+		$data = json_decode( $result['data'], true );
+		if ( json_last_error() !== JSON_ERROR_NONE ) {
+			return [ 'success' => false, 'error' => 'Failed to parse Sitemap response.' ];
+		}
+
+		if ( ! empty( $data['error'] ) ) {
+			return [ 'success' => false, 'error' => 'GSC API error: ' . ( $data['error']['message'] ?? 'Unknown' ) ];
+		}
+
+		return [
+			'success'         => true,
+			'action'          => 'get_sitemap',
+			'path'            => $data['path'] ?? '',
+			'last_submitted'  => $data['lastSubmitted'] ?? '',
+			'last_downloaded' => $data['lastDownloaded'] ?? '',
+			'is_pending'      => $data['isPending'] ?? false,
+			'warnings'        => $data['warnings'] ?? 0,
+			'errors'          => $data['errors'] ?? 0,
+			'contents'        => $data['contents'] ?? [],
+		];
+	}
+
+	/**
+	 * Submit a sitemap to Google Search Console.
+	 *
+	 * @param array  $input        Ability input containing 'sitemap_url'.
+	 * @param string $access_token OAuth2 access token.
+	 * @param string $site_url     GSC property URL.
+	 * @return array
+	 */
+	private static function submitSitemap( array $input, string $access_token, string $site_url ): array {
+		$sitemap_url = sanitize_text_field( $input['sitemap_url'] ?? '' );
+		if ( empty( $sitemap_url ) ) {
+			return [ 'success' => false, 'error' => 'sitemap_url is required for submit_sitemap action.' ];
+		}
+
+		$encoded_site    = rawurlencode( $site_url );
+		$encoded_sitemap = rawurlencode( $sitemap_url );
+		$api_url         = "https://www.googleapis.com/webmasters/v3/sites/{$encoded_site}/sitemaps/{$encoded_sitemap}";
+
+		// Submit uses PUT with empty body.
+		$response = wp_remote_request(
+			$api_url,
+			[
+				'method'  => 'PUT',
+				'timeout' => 30,
+				'headers' => [
+					'Authorization' => 'Bearer ' . $access_token,
+					'Content-Type'  => 'application/json',
+				],
+				'body'    => '',
+			]
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return [ 'success' => false, 'error' => 'Sitemap submit failed: ' . $response->get_error_message() ];
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		if ( $code >= 400 ) {
+			$body = json_decode( wp_remote_retrieve_body( $response ), true );
+			return [ 'success' => false, 'error' => 'Sitemap submit returned HTTP ' . $code . ': ' . ( $body['error']['message'] ?? '' ) ];
+		}
+
+		return [
+			'success'     => true,
+			'action'      => 'submit_sitemap',
+			'sitemap_url' => $sitemap_url,
+			'message'     => 'Sitemap submitted successfully.',
 		];
 	}
 

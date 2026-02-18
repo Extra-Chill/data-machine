@@ -68,13 +68,23 @@ class GoogleSearchConsole extends BaseTool {
 		return [
 			'class'           => __CLASS__,
 			'method'          => 'handle_tool_call',
-			'description'     => 'Fetch search analytics data from Google Search Console. Returns query performance stats, page-level metrics, query+page combinations, or daily trends for the configured site. Use to analyze Google search visibility, top queries, CTR, and average position.',
+			'description'     => 'Interact with Google Search Console. Fetch search analytics (query stats, page metrics, daily trends), inspect URLs for index status and mobile usability, and manage sitemaps (list, get details, submit).',
 			'requires_config' => true,
 			'parameters'      => [
 				'action'       => [
 					'type'        => 'string',
 					'required'    => true,
-					'description' => 'Analytics action to perform: query_stats (top search queries), page_stats (per-page metrics), query_page_stats (query+page combos), date_stats (daily trends).',
+					'description' => 'Action to perform: query_stats (top search queries), page_stats (per-page metrics), query_page_stats (query+page combos), date_stats (daily trends), inspect_url (check index/crawl status for a URL), list_sitemaps (list all submitted sitemaps), get_sitemap (details for one sitemap), submit_sitemap (submit a sitemap to Google).',
+				],
+				'url'          => [
+					'type'        => 'string',
+					'required'    => false,
+					'description' => 'Full URL to inspect. Required for inspect_url action.',
+				],
+				'sitemap_url'  => [
+					'type'        => 'string',
+					'required'    => false,
+					'description' => 'Sitemap URL. Required for get_sitemap and submit_sitemap actions.',
 				],
 				'site_url'     => [
 					'type'        => 'string',
