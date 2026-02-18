@@ -23,6 +23,7 @@ export const useAgentFiles = () =>
 	useQuery( {
 		queryKey: KEYS.list,
 		queryFn: api.listAgentFiles,
+		select: ( response ) => response?.data ?? response ?? [],
 	} );
 
 export const useAgentFile = ( filename ) =>
@@ -30,6 +31,7 @@ export const useAgentFile = ( filename ) =>
 		queryKey: KEYS.detail( filename ),
 		queryFn: () => api.getAgentFile( filename ),
 		enabled: !! filename,
+		select: ( response ) => response?.data ?? response ?? {},
 	} );
 
 export const useSaveAgentFile = () => {
