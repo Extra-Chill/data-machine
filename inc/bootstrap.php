@@ -41,6 +41,7 @@ require_once __DIR__ . '/Core/Admin/Settings/SettingsFilters.php';
 require_once __DIR__ . '/Core/Admin/Modal/ModalFilters.php';
 require_once __DIR__ . '/Core/Admin/AdminRootFilters.php';
 require_once __DIR__ . '/Core/Admin/Pages/Pipelines/PipelinesFilters.php';
+require_once __DIR__ . '/Core/Admin/Pages/Agent/AgentFilters.php';
 require_once __DIR__ . '/Core/Admin/Pages/Logs/LogsFilters.php';
 require_once __DIR__ . '/Core/Admin/Pages/Jobs/JobsFilters.php';
 require_once __DIR__ . '/Api/Providers.php';

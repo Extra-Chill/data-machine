@@ -14,6 +14,7 @@ module.exports = {
 			'./inc/Core/Admin/Pages/Pipelines/assets/react/index.jsx',
 		'logs-react': './inc/Core/Admin/Pages/Logs/assets/react/index.jsx',
 		'settings-react': './inc/Core/Admin/Settings/assets/react/index.jsx',
+		'agent-react': './inc/Core/Admin/Pages/Agent/assets/react/index.jsx',
 		'jobs-react': './inc/Core/Admin/Pages/Jobs/assets/react/index.jsx',
 	},
 	output: {
