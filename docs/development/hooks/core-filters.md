@@ -298,7 +298,6 @@ $ai_response = RequestBuilder::build(
 **Pipeline Agent Directives**:
 - `PipelineCoreDirective` - Foundational agent identity with tool instructions (priority 10)
 - `PipelineSystemPromptDirective` - User-defined system prompts (priority 20)
-- `PipelineContextDirective` - Pipeline context files (priority 35)
 
 **Chat Agent Directives**:
 - `ChatAgentDirective` - Chat agent identity and capabilities

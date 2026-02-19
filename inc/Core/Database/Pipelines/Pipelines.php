@@ -407,46 +407,6 @@ class Pipelines extends BaseRepository {
 	}
 
 	/**
-	 * Create pipelines database table.
-	 */
-	/**
-	 * Get pipeline context files from pipeline config
-	 *
-	 * @param int $pipeline_id Pipeline ID
-	 * @return array Context files array
-	 */
-	public function get_pipeline_context_files( int $pipeline_id ): array {
-		$pipeline_config = $this->get_pipeline_config( $pipeline_id );
-		return $pipeline_config['context_files'] ?? array( 'uploaded_files' => array() );
-	}
-
-	/**
-	 * Update pipeline context files in pipeline config
-	 *
-	 * @param int   $pipeline_id Pipeline ID
-	 * @param array $files_data Context files data
-	 * @return bool True on success, false on failure
-	 */
-	public function update_pipeline_context_files( int $pipeline_id, array $files_data ): bool {
-		if ( empty( $pipeline_id ) ) {
-			return false;
-		}
-
-		$pipeline_config                  = $this->get_pipeline_config( $pipeline_id );
-		$pipeline_config['context_files'] = $files_data;
-
-		$result = $this->wpdb->update(
-			$this->table_name,
-			array( 'pipeline_config' => wp_json_encode( $pipeline_config ) ),
-			array( 'pipeline_id' => $pipeline_id ),
-			array( '%s' ),
-			array( '%d' )
-		);
-
-		return false !== $result;
-	}
-
-	/**
 	 * Get configuration for a specific pipeline step.
 	 *
 	 * Retrieves step configuration from pipeline config and adds pipeline_id.

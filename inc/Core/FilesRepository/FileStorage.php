@@ -84,74 +84,6 @@ class FileStorage {
 	}
 
 	/**
-	 * Store pipeline context file
-	 *
-	 * @param int    $pipeline_id Pipeline ID
-	 * @param string $pipeline_name Pipeline name
-	 * @param array  $file_data File data array (source_path, original_name)
-	 * @return array|false File information on success, false on failure
-	 */
-	public function store_pipeline_file( int $pipeline_id, string $pipeline_name, array $file_data ): array|false {
-		$directory = $this->directory_manager->get_pipeline_context_directory( $pipeline_id, $pipeline_name );
-
-		if ( ! $this->directory_manager->ensure_directory_exists( $directory ) ) {
-			return false;
-		}
-
-		$source_path = $file_data['source_path'] ?? '';
-		$filename    = $file_data['original_name'] ?? '';
-
-		if ( empty( $source_path ) || empty( $filename ) ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				'FileStorage: Missing required parameters for pipeline context.',
-				array(
-					'pipeline_id' => $pipeline_id,
-				)
-			);
-			return false;
-		}
-
-		if ( ! file_exists( $source_path ) ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				'FileStorage: Source file not found.',
-				array(
-					'source_path' => $source_path,
-				)
-			);
-			return false;
-		}
-
-		$safe_filename = sanitize_file_name( $filename );
-		$destination   = "{$directory}/{$safe_filename}";
-
-		$fs = FilesystemHelper::get();
-		if ( ! $fs || ! $fs->copy( $source_path, $destination, true ) ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				'FileStorage: Failed to store pipeline context file.',
-				array(
-					'source'      => $source_path,
-					'destination' => $destination,
-				)
-			);
-			return false;
-		}
-
-		return array(
-			'original_name'   => $filename,
-			'persistent_path' => $destination,
-			'size'            => filesize( $destination ),
-			'mime_type'       => mime_content_type( $destination ),
-			'uploaded_at'     => current_time( 'mysql', true ),
-		);
-	}
-
-	/**
 	 * Get all files in flow files directory
 	 *
 	 * @param array $context Context array with pipeline/flow metadata
@@ -162,43 +94,6 @@ class FileStorage {
 			$context['pipeline_id'],
 			$context['flow_id']
 		);
-
-		if ( ! is_dir( $directory ) ) {
-			return array();
-		}
-
-		$files     = glob( "{$directory}/*" );
-		$file_list = array();
-
-		foreach ( $files as $file_path ) {
-			if ( is_file( $file_path ) ) {
-				$filename = basename( $file_path );
-
-				if ( 'index.php' === $filename ) {
-					continue;
-				}
-
-				$file_list[] = array(
-					'filename' => $filename,
-					'path'     => $file_path,
-					'size'     => filesize( $file_path ),
-					'modified' => filemtime( $file_path ),
-				);
-			}
-		}
-
-		return $file_list;
-	}
-
-	/**
-	 * Get all files in pipeline context directory
-	 *
-	 * @param int    $pipeline_id Pipeline ID
-	 * @param string $pipeline_name Pipeline name
-	 * @return array Array of file information
-	 */
-	public function get_pipeline_files( int $pipeline_id, string $pipeline_name ): array {
-		$directory = $this->directory_manager->get_pipeline_context_directory( $pipeline_id, $pipeline_name );
 
 		if ( ! is_dir( $directory ) ) {
 			return array();

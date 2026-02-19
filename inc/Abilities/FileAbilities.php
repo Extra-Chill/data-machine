@@ -72,7 +72,7 @@ class FileAbilities {
 			'datamachine/list-files',
 			array(
 				'label'               => __( 'List Files', 'data-machine' ),
-				'description'         => __( 'List files for a flow, pipeline context, or agent scope. Provide either flow_step_id, pipeline_id, or scope="agent".', 'data-machine' ),
+				'description'         => __( 'List files for a flow or agent scope. Provide either flow_step_id or scope="agent".', 'data-machine' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -80,10 +80,6 @@ class FileAbilities {
 						'flow_step_id' => array(
 							'type'        => array( 'string', 'null' ),
 							'description' => __( 'Flow step ID for flow-level files (e.g., "1-2" for pipeline 1, flow 2)', 'data-machine' ),
-						),
-						'pipeline_id'  => array(
-							'type'        => array( 'integer', 'null' ),
-							'description' => __( 'Pipeline ID for pipeline context files', 'data-machine' ),
 						),
 						'scope'        => array(
 							'type'        => array( 'string', 'null' ),
@@ -129,10 +125,6 @@ class FileAbilities {
 							'type'        => array( 'string', 'null' ),
 							'description' => __( 'Flow step ID for flow-level files', 'data-machine' ),
 						),
-						'pipeline_id'  => array(
-							'type'        => array( 'integer', 'null' ),
-							'description' => __( 'Pipeline ID for pipeline context files', 'data-machine' ),
-						),
 						'scope'        => array(
 							'type'        => array( 'string', 'null' ),
 							'description' => __( 'Scope for file operations. Use "agent" for agent directory files.', 'data-machine' ),
@@ -163,7 +155,7 @@ class FileAbilities {
 			'datamachine/delete-file',
 			array(
 				'label'               => __( 'Delete File', 'data-machine' ),
-				'description'         => __( 'Delete a specific file from flow, pipeline context, or agent scope.', 'data-machine' ),
+				'description'         => __( 'Delete a specific file from flow or agent scope.', 'data-machine' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -176,10 +168,6 @@ class FileAbilities {
 						'flow_step_id' => array(
 							'type'        => array( 'string', 'null' ),
 							'description' => __( 'Flow step ID for flow-level files', 'data-machine' ),
-						),
-						'pipeline_id'  => array(
-							'type'        => array( 'integer', 'null' ),
-							'description' => __( 'Pipeline ID for pipeline context files', 'data-machine' ),
 						),
 						'scope'        => array(
 							'type'        => array( 'string', 'null' ),
@@ -250,7 +238,7 @@ class FileAbilities {
 			'datamachine/upload-file',
 			array(
 				'label'               => __( 'Upload File', 'data-machine' ),
-				'description'         => __( 'Upload a file to flow, pipeline context, or agent scope.', 'data-machine' ),
+				'description'         => __( 'Upload a file to flow or agent scope.', 'data-machine' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -270,10 +258,6 @@ class FileAbilities {
 						'flow_step_id' => array(
 							'type'        => array( 'string', 'null' ),
 							'description' => __( 'Flow step ID for flow-level files', 'data-machine' ),
-						),
-						'pipeline_id'  => array(
-							'type'        => array( 'integer', 'null' ),
-							'description' => __( 'Pipeline ID for pipeline context files', 'data-machine' ),
 						),
 						'scope'        => array(
 							'type'        => array( 'string', 'null' ),
@@ -314,29 +298,17 @@ class FileAbilities {
 	 */
 	public function executeListFiles( array $input ): array {
 		$flow_step_id = $input['flow_step_id'] ?? null;
-		$pipeline_id  = $input['pipeline_id'] ?? null;
 		$scope        = $input['scope'] ?? null;
 
 		if ( 'agent' === $scope ) {
 			return $this->listAgentFiles();
 		}
 
-		if ( ! $flow_step_id && ! $pipeline_id ) {
+		if ( ! $flow_step_id ) {
 			return array(
 				'success' => false,
-				'error'   => 'Must provide either flow_step_id, pipeline_id, or scope="agent"',
+				'error'   => 'Must provide either flow_step_id or scope="agent"',
 			);
-		}
-
-		if ( $flow_step_id && $pipeline_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'Cannot provide both flow_step_id and pipeline_id',
-			);
-		}
-
-		if ( $pipeline_id ) {
-			return $this->listPipelineFiles( (int) $pipeline_id );
 		}
 
 		return $this->listFlowFiles( $flow_step_id );
@@ -351,7 +323,6 @@ class FileAbilities {
 	public function executeGetFile( array $input ): array {
 		$filename     = $input['filename'] ?? null;
 		$flow_step_id = $input['flow_step_id'] ?? null;
-		$pipeline_id  = $input['pipeline_id'] ?? null;
 		$scope        = $input['scope'] ?? null;
 
 		if ( empty( $filename ) ) {
@@ -367,22 +338,11 @@ class FileAbilities {
 			return $this->getAgentFile( $filename );
 		}
 
-		if ( ! $flow_step_id && ! $pipeline_id ) {
+		if ( ! $flow_step_id ) {
 			return array(
 				'success' => false,
-				'error'   => 'Must provide either flow_step_id, pipeline_id, or scope="agent"',
+				'error'   => 'Must provide either flow_step_id or scope="agent"',
 			);
-		}
-
-		if ( $flow_step_id && $pipeline_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'Cannot provide both flow_step_id and pipeline_id',
-			);
-		}
-
-		if ( $pipeline_id ) {
-			return $this->getFileFromPipeline( $filename, (int) $pipeline_id );
 		}
 
 		return $this->getFileFromFlow( $filename, $flow_step_id );
@@ -397,7 +357,6 @@ class FileAbilities {
 	public function executeDeleteFile( array $input ): array {
 		$filename     = $input['filename'] ?? null;
 		$flow_step_id = $input['flow_step_id'] ?? null;
-		$pipeline_id  = $input['pipeline_id'] ?? null;
 		$scope        = $input['scope'] ?? null;
 
 		if ( empty( $filename ) ) {
@@ -413,22 +372,11 @@ class FileAbilities {
 			return $this->deleteAgentFile( $filename );
 		}
 
-		if ( ! $flow_step_id && ! $pipeline_id ) {
+		if ( ! $flow_step_id ) {
 			return array(
 				'success' => false,
-				'error'   => 'Must provide either flow_step_id, pipeline_id, or scope="agent"',
+				'error'   => 'Must provide either flow_step_id or scope="agent"',
 			);
-		}
-
-		if ( $flow_step_id && $pipeline_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'Cannot provide both flow_step_id and pipeline_id',
-			);
-		}
-
-		if ( $pipeline_id ) {
-			return $this->deleteFileFromPipeline( $filename, (int) $pipeline_id );
 		}
 
 		return $this->deleteFileFromFlow( $filename, $flow_step_id );
@@ -531,20 +479,12 @@ class FileAbilities {
 	public function executeUploadFile( array $input ): array {
 		$file_data    = $input['file_data'] ?? array();
 		$flow_step_id = $input['flow_step_id'] ?? null;
-		$pipeline_id  = $input['pipeline_id'] ?? null;
 		$scope        = $input['scope'] ?? null;
 
-		if ( 'agent' !== $scope && ! $flow_step_id && ! $pipeline_id ) {
+		if ( 'agent' !== $scope && ! $flow_step_id ) {
 			return array(
 				'success' => false,
-				'error'   => 'Must provide either flow_step_id, pipeline_id, or scope="agent"',
-			);
-		}
-
-		if ( $flow_step_id && $pipeline_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'Cannot provide both flow_step_id and pipeline_id',
+				'error'   => 'Must provide either flow_step_id or scope="agent"',
 			);
 		}
 
@@ -601,29 +541,7 @@ class FileAbilities {
 			return $this->uploadToAgent( $file );
 		}
 
-		if ( $pipeline_id ) {
-			return $this->uploadToPipeline( $file, (int) $pipeline_id );
-		}
-
 		return $this->uploadToFlow( $file, $flow_step_id );
-	}
-
-	/**
-	 * Upload file to pipeline context.
-	 *
-	 * @param array $file File data.
-	 * @param int   $pipeline_id Pipeline ID.
-	 * @return array Result with files list.
-	 */
-	private function uploadToPipeline( array $file, int $pipeline_id ): array {
-		$context_files  = $this->db_pipelines->get_pipeline_context_files( $pipeline_id );
-		$uploaded_files = $context_files['uploaded_files'] ?? array();
-
-		return array(
-			'success' => true,
-			'files'   => is_array( $uploaded_files ) ? array_map( array( $this, 'sanitizeFileEntry' ), $uploaded_files ) : array(),
-			'scope'   => 'pipeline',
-		);
 	}
 
 	/**
@@ -741,39 +659,6 @@ class FileAbilities {
 	}
 
 	/**
-	 * List files for pipeline context.
-	 *
-	 * @param int $pipeline_id Pipeline ID.
-	 * @return array Result with files.
-	 */
-	private function listPipelineFiles( int $pipeline_id ): array {
-		$pipeline = $this->db_pipelines->get_pipeline( $pipeline_id );
-
-		if ( ! $pipeline ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Pipeline %d not found', $pipeline_id ),
-			);
-		}
-
-		$pipeline_name = sanitize_text_field( $pipeline['pipeline_name'] ?? '' );
-		if ( '' === $pipeline_name ) {
-			return array(
-				'success' => false,
-				'error'   => 'Invalid pipeline name',
-			);
-		}
-
-		$files = $this->file_storage->get_pipeline_files( $pipeline_id, $pipeline_name );
-
-		return array(
-			'success' => true,
-			'files'   => array_map( array( $this, 'sanitizeFileEntry' ), $files ),
-			'scope'   => 'pipeline',
-		);
-	}
-
-	/**
 	 * List files for flow.
 	 *
 	 * @param string $flow_step_id Flow step ID.
@@ -811,49 +696,6 @@ class FileAbilities {
 			'success' => true,
 			'files'   => array_map( array( $this, 'sanitizeFileEntry' ), $files ),
 			'scope'   => 'flow',
-		);
-	}
-
-	/**
-	 * Get file from pipeline context.
-	 *
-	 * @param string $filename Filename to retrieve.
-	 * @param int    $pipeline_id Pipeline ID.
-	 * @return array Result with file metadata.
-	 */
-	private function getFileFromPipeline( string $filename, int $pipeline_id ): array {
-		$pipeline = $this->db_pipelines->get_pipeline( $pipeline_id );
-
-		if ( ! $pipeline ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Pipeline %d not found', $pipeline_id ),
-			);
-		}
-
-		$pipeline_name = sanitize_text_field( $pipeline['pipeline_name'] ?? '' );
-		if ( '' === $pipeline_name ) {
-			return array(
-				'success' => false,
-				'error'   => 'Invalid pipeline name',
-			);
-		}
-
-		$files = $this->file_storage->get_pipeline_files( $pipeline_id, $pipeline_name );
-
-		foreach ( $files as $file ) {
-			if ( ( $file['filename'] ?? '' ) === $filename ) {
-				return array(
-					'success' => true,
-					'file'    => $this->sanitizeFileEntry( $file ),
-					'scope'   => 'pipeline',
-				);
-			}
-		}
-
-		return array(
-			'success' => false,
-			'error'   => sprintf( 'File %s not found in pipeline %d', $filename, $pipeline_id ),
 		);
 	}
 
@@ -912,57 +754,6 @@ class FileAbilities {
 		return array(
 			'success' => false,
 			'error'   => sprintf( 'File %s not found in flow step %s', $filename, $flow_step_id ),
-		);
-	}
-
-	/**
-	 * Delete file from pipeline context.
-	 *
-	 * @param string $filename Filename to delete.
-	 * @param int    $pipeline_id Pipeline ID.
-	 * @return array Result with deletion status.
-	 */
-	private function deleteFileFromPipeline( string $filename, int $pipeline_id ): array {
-		$context_files  = $this->db_pipelines->get_pipeline_context_files( $pipeline_id );
-		$uploaded_files = $context_files['uploaded_files'] ?? array();
-		$found          = false;
-
-		foreach ( $uploaded_files as $index => $file ) {
-			if ( ( $file['original_name'] ?? '' ) === $filename ) {
-				$persistent_path = $file['persistent_path'] ?? '';
-				if ( $persistent_path && file_exists( $persistent_path ) ) {
-					wp_delete_file( $persistent_path );
-				}
-				unset( $uploaded_files[ $index ] );
-				$found = true;
-				break;
-			}
-		}
-
-		if ( ! $found ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'File %s not found in pipeline %d', $filename, $pipeline_id ),
-			);
-		}
-
-		$context_files['uploaded_files'] = array_values( $uploaded_files );
-		$this->db_pipelines->update_pipeline_context_files( $pipeline_id, $context_files );
-
-		do_action(
-			'datamachine_log',
-			'info',
-			'Pipeline file deleted via ability',
-			array(
-				'pipeline_id' => $pipeline_id,
-				'filename'    => $filename,
-			)
-		);
-
-		return array(
-			'success' => true,
-			'scope'   => 'pipeline',
-			'message' => sprintf( 'File %s deleted from pipeline %d', $filename, $pipeline_id ),
 		);
 	}
 

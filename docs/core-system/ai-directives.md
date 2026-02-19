@@ -4,7 +4,7 @@ Data Machine uses a hierarchical directive system to provide contextual informat
 
 ## Directive Architecture
 
-### 7-Tier Priority System
+### 6-Tier Priority System
 
 Directives are applied in the following priority order (lowest number = highest priority):
 
@@ -13,10 +13,9 @@ Directives are applied in the following priority order (lowest number = highest 
 3. **Priority 20** - Agent SOUL.md (global AI personality from agent memory)
 4. **Priority 25** - Pipeline Memory Files (per-pipeline selected agent memory files)
 5. **Priority 30** - Pipeline System Prompt (pipeline instructions)
-6. **Priority 35** - Pipeline Context Files (reference materials)
-7. **Priority 40** - Tool Definitions (available tools and workflow)
-8. **Priority 45** - Chat Pipelines Inventory (pipeline discovery)
-9. **Priority 50** - Site Context (WordPress metadata)
+6. **Priority 40** - Tool Definitions (available tools and workflow)
+7. **Priority 45** - Chat Pipelines Inventory (pipeline discovery)
+8. **Priority 50** - Site Context (WordPress metadata)
 
 ## Individual Directives
 
@@ -65,20 +64,6 @@ Reads the pipeline's `memory_files` configuration (an array of filenames) and in
 - Files sourced from the shared agent directory (`datamachine-files/agent/`)
 - Missing files logged as warnings but don't fail the request
 - Empty files are silently skipped
-
-### PipelineContextDirective (Priority 35)
-
-**Location**: `inc/Core/Steps/AI/Directives/PipelineContextDirective.php`  
-**Agent Types**: Pipeline agents  
-**Purpose**: Provides pipeline-specific reference materials
-
-Injects uploaded context files from pipeline configurations as file attachments in AI requests. Each file is added as a system message with proper MIME type handling.
-
-**Features**:
-- Retrieves context files from pipeline configuration
-- Validates file existence before injection
-- Supports multiple file formats
-- Logs injection activity for debugging
 
 ### SiteContextDirective (Priority 50)
 
@@ -218,14 +203,13 @@ do_action('datamachine_log', 'debug', 'Directive: Context files injected', [
 ### Error Handling
 
 Directives include comprehensive error handling:
-- File existence validation for context files
 - Empty content detection and logging
 - Graceful degradation when optional features fail
 
 ## Agent-Specific Behavior
 
 ### Pipeline Agents
-Receive directives: Core (10), SOUL.md (20), Memory Files (25), Pipeline Prompt (30), Pipeline Context (35), Tools (40), Site Context (50)
+Receive directives: Core (10), SOUL.md (20), Memory Files (25), Pipeline Prompt (30), Tools (40), Site Context (50)
 
 ### Chat Agents
 Receive directives: Core (10), Chat Agent (15), SOUL.md (20), Tools (40), Chat Pipelines (45), Site Context (50)

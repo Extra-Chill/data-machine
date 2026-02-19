@@ -61,19 +61,11 @@ class Files {
 							return sanitize_text_field( $param );
 						},
 					),
-					'pipeline_id'  => array(
-						'required'          => false,
-						'type'              => 'integer',
-						'description'       => __( 'Pipeline ID for pipeline context files', 'data-machine' ),
-						'sanitize_callback' => function ( $param ) {
-							return absint( $param );
-						},
-					),
 				),
 			)
 		);
 
-		// GET /files - List files (flow or pipeline context)
+		// GET /files - List files
 		register_rest_route(
 			'datamachine/v1',
 			'/files',
@@ -89,18 +81,11 @@ class Files {
 							return sanitize_text_field( $param );
 						},
 					),
-					'pipeline_id'  => array(
-						'required'          => false,
-						'type'              => 'integer',
-						'sanitize_callback' => function ( $param ) {
-							return absint( $param );
-						},
-					),
 				),
 			)
 		);
 
-		// DELETE /files/{filename} - Delete file (flow or pipeline context)
+		// DELETE /files/{filename} - Delete file
 		register_rest_route(
 			'datamachine/v1',
 			'/files/(?P<filename>[^/]+)',
@@ -121,13 +106,6 @@ class Files {
 						'type'              => 'string',
 						'sanitize_callback' => function ( $param ) {
 							return sanitize_text_field( $param );
-						},
-					),
-					'pipeline_id'  => array(
-						'required'          => false,
-						'type'              => 'integer',
-						'sanitize_callback' => function ( $param ) {
-							return absint( $param );
 						},
 					),
 				),
@@ -226,16 +204,11 @@ class Files {
 	 */
 	public static function list_files( WP_REST_Request $request ) {
 		$flow_step_id = $request->get_param( 'flow_step_id' );
-		$pipeline_id  = $request->get_param( 'pipeline_id' );
 
 		$input = array();
 
 		if ( $flow_step_id ) {
 			$input['flow_step_id'] = sanitize_text_field( $flow_step_id );
-		}
-
-		if ( $pipeline_id ) {
-			$input['pipeline_id'] = absint( $pipeline_id );
 		}
 
 		$result = self::getAbilities()->executeListFiles( $input );
@@ -267,7 +240,6 @@ class Files {
 	 */
 	public static function handle_upload( WP_REST_Request $request ) {
 		$flow_step_id = $request->get_param( 'flow_step_id' );
-		$pipeline_id  = $request->get_param( 'pipeline_id' );
 
 		$files = $request->get_file_params();
 		if ( empty( $files['file'] ) || ! is_array( $files['file'] ) ) {
@@ -291,10 +263,6 @@ class Files {
 
 		if ( $flow_step_id ) {
 			$input['flow_step_id'] = sanitize_text_field( $flow_step_id );
-		}
-
-		if ( $pipeline_id ) {
-			$input['pipeline_id'] = absint( $pipeline_id );
 		}
 
 		$result = self::getAbilities()->executeUploadFile( $input );
@@ -331,7 +299,6 @@ class Files {
 	public static function delete_file( WP_REST_Request $request ) {
 		$filename     = sanitize_file_name( wp_unslash( $request['filename'] ) );
 		$flow_step_id = $request->get_param( 'flow_step_id' );
-		$pipeline_id  = $request->get_param( 'pipeline_id' );
 
 		$input = array(
 			'filename' => $filename,
@@ -339,10 +306,6 @@ class Files {
 
 		if ( $flow_step_id ) {
 			$input['flow_step_id'] = sanitize_text_field( $flow_step_id );
-		}
-
-		if ( $pipeline_id ) {
-			$input['pipeline_id'] = absint( $pipeline_id );
 		}
 
 		$result = self::getAbilities()->executeDeleteFile( $input );

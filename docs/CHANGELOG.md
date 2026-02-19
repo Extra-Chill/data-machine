@@ -15,7 +15,7 @@ All notable changes to Data Machine will be documented in this file. Also viewab
 ### Changed
 - Shared TabPanel styles across all admin pages (Agent, Logs, Settings)
 - InternalLinkingTask refactored to use block-level abilities for granular paragraph editing
-- Agent SOUL.md directive docs updated for 7-tier system
+- Agent SOUL.md directive docs updated for 6-tier system
 
 ### Fixed
 - Agent page response shape — query hooks now unwrap { success, data } responses
