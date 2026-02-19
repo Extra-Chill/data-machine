@@ -31,7 +31,6 @@ $job_dir = $dir_manager->get_job_directory($pipeline_id, $flow_id, $job_id);
 - `get_flow_directory($pipeline_id, $flow_id)`: Get flow directory
 - `get_job_directory($pipeline_id, $flow_id, $job_id)`: Get job directory
 - `get_flow_files_directory($pipeline_id, $flow_id)`: Get flow file storage directory
-- `get_pipeline_context_directory($pipeline_id, $pipeline_name)`: Get pipeline context directory
 - `ensure_directory_exists($directory)`: Create directory if it does not exist
 
 ### FileStorage
@@ -52,9 +51,7 @@ $stored_path = $storage->store_file($source_path, $filename, $context);
 
 **Key Methods**:
 - `store_file($source_path, $filename, $context)`: Copy a local file into flow file storage
-- `store_pipeline_file($pipeline_id, $pipeline_name, $file_data)`: Store a pipeline context file
 - `get_all_files($context)`: List files for a flow
-- `get_pipeline_files($pipeline_id, $pipeline_name)`: List pipeline context files
 - `delete_file($filename, $context)`: Delete a stored file
 - `store_data_packet($data, $job_id, $context)`: Persist step data for a job
 - `retrieve_data_packet($reference)`: Read a persisted data packet

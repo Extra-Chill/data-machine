@@ -167,7 +167,6 @@ add_filter('datamachine_directives', function($directives) {
 **Pipeline Directives**:
 - `PipelineCoreDirective` - Foundational pipeline agent identity (priority 10)
 - `PipelineSystemPromptDirective` - User-defined pipeline prompts (priority 30)
-- `PipelineContextDirective` - Pipeline context files (priority 40)
 
 **Chat Directives**:
 - `ChatAgentDirective` - Chat agent identity and capabilities (priority 10)

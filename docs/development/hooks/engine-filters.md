@@ -78,11 +78,6 @@ add_filter('datamachine_directives', function($directives) {
 **Purpose**: User-defined pipeline system prompts
 **Agent Types**: `['pipeline']`
 
-#### PipelineContextDirective (Priority 40)
-**File**: `/inc/Core/Steps/AI/Directives/PipelineContextDirective.php`
-**Purpose**: Pipeline context files and workflow information
-**Agent Types**: `['pipeline']`
-
 #### ChatAgentDirective (Priority 10)
 **File**: `/inc/Api/Chat/ChatAgentDirective.php`
 **Purpose**: Chat agent identity and capabilities
@@ -192,26 +187,6 @@ add_filter('datamachine_agent_directives', function($request, $agent_type, $prov
     }
     return $request;
 }, 20, 5);
-```
-
-**PipelineContextDirective**
-**File**: `/inc/Core/Steps/AI/Directives/PipelineContextDirective.php`
-**Purpose**: Flow-specific context (flow name, pipeline step details, data packet information)
-**Behavior**: Provides AI with workflow context and data structure
-
-```php
-add_filter('datamachine_agent_directives', function($request, $agent_type, $provider, $tools, $context) {
-    if ($agent_type === 'pipeline') {
-        $request = PipelineContextDirective::inject(
-            $request,
-            $provider,
-            $tools,
-            $context['step_id'] ?? null,
-            $context['payload'] ?? []
-        );
-    }
-    return $request;
-}, 30, 5);
 ```
 
 #### Chat Directives
@@ -452,9 +427,6 @@ Unified Directive System (datamachine_directives filter):
 │
 ├── Priority 30-39: Agent-specific prompts
 │   └── PipelineSystemPromptDirective (Priority 30, pipeline only)
-│
-├── Priority 40-49: Context directives
-│   └── PipelineContextDirective (Priority 40, pipeline only)
 │
 └── Priority 50+: Site context
     └── SiteContextDirective (Priority 50, all agents)

@@ -31,7 +31,7 @@ class DeleteFile extends BaseTool {
 		return array(
 			'class'       => self::class,
 			'method'      => 'handle_tool_call',
-			'description' => 'Delete an uploaded file. Requires either flow_step_id or pipeline_id to identify the file scope.',
+			'description' => 'Delete an uploaded file. Requires flow_step_id to identify the file scope.',
 			'parameters'  => array(
 				'filename'     => array(
 					'type'        => 'string',
@@ -42,11 +42,6 @@ class DeleteFile extends BaseTool {
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'Flow step ID for flow-level files (e.g., "1-2" for pipeline 1, flow 2)',
-				),
-				'pipeline_id'  => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Pipeline ID for pipeline context files',
 				),
 			),
 		);
@@ -62,7 +57,6 @@ class DeleteFile extends BaseTool {
 	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
 		$filename     = $parameters['filename'] ?? null;
 		$flow_step_id = $parameters['flow_step_id'] ?? null;
-		$pipeline_id  = $parameters['pipeline_id'] ?? null;
 
 		if ( empty( $filename ) ) {
 			return array(
@@ -87,10 +81,6 @@ class DeleteFile extends BaseTool {
 
 		if ( $flow_step_id ) {
 			$input['flow_step_id'] = sanitize_text_field( $flow_step_id );
-		}
-
-		if ( $pipeline_id ) {
-			$input['pipeline_id'] = absint( $pipeline_id );
 		}
 
 		$result = $ability->execute( $input );

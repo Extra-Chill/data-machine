@@ -54,7 +54,6 @@ require_once __DIR__ . '/Engine/AI/Directives/SiteContext.php';
 require_once __DIR__ . '/Api/Chat/ChatAgentDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineCoreDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineSystemPromptDirective.php';
-require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineContextDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineMemoryFilesDirective.php';
 require_once __DIR__ . '/Core/FilesRepository/FileCleanup.php';
 require_once __DIR__ . '/Core/ActionScheduler/ClaimsCleanup.php';

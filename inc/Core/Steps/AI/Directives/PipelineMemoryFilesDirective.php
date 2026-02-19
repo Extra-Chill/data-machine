@@ -10,9 +10,8 @@
  * 2. Priority 20 - Agent SOUL.md (global AI behavior)
  * 3. Priority 25 - Pipeline Memory Files (THIS CLASS - agent memory references)
  * 4. Priority 30 - Pipeline System Prompt (pipeline instructions)
- * 5. Priority 35 - Pipeline Context Files (uploaded reference materials)
- * 6. Priority 40 - Tool Definitions (available tools and workflow)
- * 7. Priority 50 - Site Context (WordPress metadata)
+ * 5. Priority 40 - Tool Definitions (available tools and workflow)
+ * 6. Priority 50 - Site Context (WordPress metadata)
  *
  * @package DataMachine\Core\Steps\AI\Directives
  */
