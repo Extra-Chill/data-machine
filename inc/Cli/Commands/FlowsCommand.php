@@ -246,6 +246,36 @@ class FlowsCommand extends BaseCommand {
 			return;
 		}
 
+		// Handle 'add-handler' subcommand.
+		if ( ! empty( $args ) && 'add-handler' === $args[0] ) {
+			if ( ! isset( $args[1] ) ) {
+				WP_CLI::error( 'Usage: wp datamachine flows add-handler <flow_id> --handler=<slug> [--step=<flow_step_id>] [--config=<json>]' );
+				return;
+			}
+			$this->addHandler( (int) $args[1], $assoc_args );
+			return;
+		}
+
+		// Handle 'remove-handler' subcommand.
+		if ( ! empty( $args ) && 'remove-handler' === $args[0] ) {
+			if ( ! isset( $args[1] ) ) {
+				WP_CLI::error( 'Usage: wp datamachine flows remove-handler <flow_id> --handler=<slug> [--step=<flow_step_id>]' );
+				return;
+			}
+			$this->removeHandler( (int) $args[1], $assoc_args );
+			return;
+		}
+
+		// Handle 'list-handlers' subcommand.
+		if ( ! empty( $args ) && 'list-handlers' === $args[0] ) {
+			if ( ! isset( $args[1] ) ) {
+				WP_CLI::error( 'Usage: wp datamachine flows list-handlers <flow_id> [--step=<flow_step_id>]' );
+				return;
+			}
+			$this->listHandlers( (int) $args[1], $assoc_args );
+			return;
+		}
+
 		// Handle 'get'/'show' subcommand: `flows get 42` or `flows show 42`.
 		if ( ! empty( $args ) && ( 'get' === $args[0] || 'show' === $args[0] ) ) {
 			if ( isset( $args[1] ) ) {
@@ -708,6 +738,164 @@ class FlowsCommand extends BaseCommand {
 			'step_id' => $queueable[0],
 			'error'   => null,
 		);
+	}
+
+	/**
+	 * Add a handler to a flow step.
+	 *
+	 * @param int   $flow_id    Flow ID.
+	 * @param array $assoc_args Arguments (handler, step, config).
+	 */
+	private function addHandler( int $flow_id, array $assoc_args ): void {
+		$handler_slug = $assoc_args['handler'] ?? null;
+		$step_id      = $assoc_args['step'] ?? null;
+
+		if ( ! $handler_slug ) {
+			WP_CLI::error( 'Required: --handler=<slug>' );
+			return;
+		}
+
+		// Auto-resolve handler step if not specified.
+		if ( ! $step_id ) {
+			$resolved = $this->resolveHandlerStep( $flow_id );
+			if ( ! empty( $resolved['error'] ) ) {
+				WP_CLI::error( $resolved['error'] );
+				return;
+			}
+			$step_id = $resolved['step_id'];
+		}
+
+		$input = array(
+			'flow_step_id' => $step_id,
+			'add_handler'  => $handler_slug,
+		);
+
+		// Parse --config if provided.
+		if ( isset( $assoc_args['config'] ) ) {
+			$handler_config = json_decode( wp_unslash( $assoc_args['config'] ), true );
+			if ( json_last_error() !== JSON_ERROR_NONE ) {
+				WP_CLI::error( 'Invalid JSON in --config: ' . json_last_error_msg() );
+				return;
+			}
+			$input['add_handler_config'] = $handler_config;
+		}
+
+		$ability = new \DataMachine\Abilities\FlowStepAbilities();
+		$result  = $ability->executeUpdateFlowStep( $input );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to add handler' );
+			return;
+		}
+
+		WP_CLI::success( "Added handler '{$handler_slug}' to flow step {$step_id}" );
+	}
+
+	/**
+	 * Remove a handler from a flow step.
+	 *
+	 * @param int   $flow_id    Flow ID.
+	 * @param array $assoc_args Arguments (handler, step).
+	 */
+	private function removeHandler( int $flow_id, array $assoc_args ): void {
+		$handler_slug = $assoc_args['handler'] ?? null;
+		$step_id      = $assoc_args['step'] ?? null;
+
+		if ( ! $handler_slug ) {
+			WP_CLI::error( 'Required: --handler=<slug>' );
+			return;
+		}
+
+		if ( ! $step_id ) {
+			$resolved = $this->resolveHandlerStep( $flow_id );
+			if ( ! empty( $resolved['error'] ) ) {
+				WP_CLI::error( $resolved['error'] );
+				return;
+			}
+			$step_id = $resolved['step_id'];
+		}
+
+		$ability = new \DataMachine\Abilities\FlowStepAbilities();
+		$result  = $ability->executeUpdateFlowStep( array(
+			'flow_step_id'   => $step_id,
+			'remove_handler' => $handler_slug,
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to remove handler' );
+			return;
+		}
+
+		WP_CLI::success( "Removed handler '{$handler_slug}' from flow step {$step_id}" );
+	}
+
+	/**
+	 * List handlers on flow steps.
+	 *
+	 * @param int   $flow_id    Flow ID.
+	 * @param array $assoc_args Arguments (step, format).
+	 */
+	private function listHandlers( int $flow_id, array $assoc_args ): void {
+		$step_id = $assoc_args['step'] ?? null;
+
+		$db   = new \DataMachine\Core\Database\Flows\Flows();
+		$flow = $db->get_flow( $flow_id );
+
+		if ( ! $flow ) {
+			WP_CLI::error( "Flow {$flow_id} not found" );
+			return;
+		}
+
+		$config = $flow['flow_config'] ?? array();
+		$rows   = array();
+
+		foreach ( $config as $sid => $step ) {
+			if ( $step_id && $sid !== $step_id ) {
+				continue;
+			}
+
+			$step_type = $step['step_type'] ?? '';
+
+			$slugs   = $step['handler_slugs'] ?? array();
+			$configs = $step['handler_configs'] ?? array();
+
+			// Check for legacy single handler_slug.
+			if ( empty( $slugs ) ) {
+				$legacy = $step['handler_slug'] ?? '';
+				if ( $legacy ) {
+					$slugs = array( $legacy );
+				}
+			}
+
+			if ( empty( $slugs ) && ! $step_id ) {
+				continue; // Skip steps with no handlers unless specifically requested.
+			}
+
+			foreach ( $slugs as $slug ) {
+				$handler_config = $configs[ $slug ] ?? array();
+				$config_summary = array();
+				foreach ( $handler_config as $k => $v ) {
+					if ( is_string( $v ) && strlen( $v ) > 30 ) {
+						$v = substr( $v, 0, 27 ) . '...';
+					}
+					$config_summary[] = "{$k}=" . ( is_array( $v ) ? wp_json_encode( $v ) : $v );
+				}
+
+				$rows[] = array(
+					'flow_step_id' => $sid,
+					'step_type'    => $step_type,
+					'handler'      => $slug,
+					'config'       => implode( ', ', $config_summary ) ?: '(default)',
+				);
+			}
+		}
+
+		if ( empty( $rows ) ) {
+			WP_CLI::warning( 'No handlers found.' );
+			return;
+		}
+
+		$this->format_items( $rows, array( 'flow_step_id', 'step_type', 'handler', 'config' ), $assoc_args );
 	}
 
 	/**

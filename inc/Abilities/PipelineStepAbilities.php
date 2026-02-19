@@ -499,17 +499,23 @@ class PipelineStepAbilities {
 			);
 		}
 
-		$system_prompt   = $input['system_prompt'] ?? null;
-		$provider        = $input['provider'] ?? null;
-		$model           = $input['model'] ?? null;
-		$disabled_tools  = $input['disabled_tools'] ?? null;
-		$handler_slugs   = $input['handler_slugs'] ?? null;
-		$handler_configs = $input['handler_configs'] ?? null;
-
-		if ( null === $system_prompt && null === $provider && null === $model && null === $disabled_tools && null === $handler_slugs && null === $handler_configs ) {
+		// Reject handler fields — handlers are flow-scoped, not pipeline-scoped.
+		if ( isset( $input['handler_slugs'] ) || isset( $input['handler_configs'] ) ) {
 			return array(
 				'success' => false,
-				'error'   => 'At least one of system_prompt, provider, model, disabled_tools, handler_slugs, or handler_configs is required',
+				'error'   => 'handler_slugs and handler_configs are flow-scoped. Use datamachine/update-flow-step ability instead.',
+			);
+		}
+
+		$system_prompt  = $input['system_prompt'] ?? null;
+		$provider       = $input['provider'] ?? null;
+		$model          = $input['model'] ?? null;
+		$disabled_tools = $input['disabled_tools'] ?? null;
+
+		if ( null === $system_prompt && null === $provider && null === $model && null === $disabled_tools ) {
+			return array(
+				'success' => false,
+				'error'   => 'At least one of system_prompt, provider, model, or disabled_tools is required',
 			);
 		}
 
@@ -570,18 +576,6 @@ class PipelineStepAbilities {
 
 			$step_config_data['disabled_tools'] = $tools_manager->save_step_tool_selections( $pipeline_step_id, $sanitized_tool_ids );
 			$updated_fields[]                   = 'disabled_tools';
-		}
-
-		if ( null !== $handler_slugs && is_array( $handler_slugs ) ) {
-			$step_config_data['handler_slugs'] = array_map( 'sanitize_text_field', $handler_slugs );
-			$updated_fields[]                  = 'handler_slugs';
-		}
-
-		if ( null !== $handler_configs && is_array( $handler_configs ) ) {
-			// Merge with existing handler_configs, don't replace.
-			$existing_handler_configs          = $existing_config['handler_configs'] ?? array();
-			$step_config_data['handler_configs'] = array_merge( $existing_handler_configs, $handler_configs );
-			$updated_fields[]                  = 'handler_configs';
 		}
 
 		$pipeline_config[ $pipeline_step_id ] = array_merge( $existing_config, $step_config_data );

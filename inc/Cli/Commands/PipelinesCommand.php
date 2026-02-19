@@ -31,7 +31,7 @@ class PipelinesCommand extends BaseCommand {
 	 * ## OPTIONS
 	 *
 	 * [<args>...]
-	 * : Subcommand and arguments. Accepts: list [pipeline_id], get <pipeline_id>, create, update <pipeline_id>, delete <pipeline_id>, add-handler <pipeline_id>, remove-handler <pipeline_id>, list-handlers <pipeline_id>.
+	 * : Subcommand and arguments. Accepts: list [pipeline_id], get <pipeline_id>, create, update <pipeline_id>, delete <pipeline_id>.
 	 *
 	 * [--per_page=<number>]
 	 * : Number of pipelines to return.
@@ -77,10 +77,7 @@ class PipelinesCommand extends BaseCommand {
 	 *
 	 * [--step=<pipeline_step_id>]
 	 * : Target a specific pipeline step for system prompt update.
-	 *   Required for add-handler/remove-handler. Auto-resolves publish step if pipeline has exactly one.
-	 *
-	 * [--handler=<slug>]
-	 * : Handler slug for add-handler/remove-handler subcommands.
+	 *   Use --step to target a specific step when multiple exist.
 	 *
 	 * [--force]
 	 * : Skip confirmation prompt (delete subcommand).
@@ -142,17 +139,6 @@ class PipelinesCommand extends BaseCommand {
 	 *     # Delete a pipeline (skip confirmation)
 	 *     wp datamachine pipelines delete 5 --force
 	 *
-	 *     # List handlers on publish steps
-	 *     wp datamachine pipelines list-handlers 12
-	 *
-	 *     # Add a handler (auto-resolves publish step)
-	 *     wp datamachine pipelines add-handler 12 --handler=pinterest_publish --config='{"board_selection_mode":"ai_decides"}'
-	 *
-	 *     # Add handler to specific step
-	 *     wp datamachine pipelines add-handler 12 --step=12_549825db --handler=pinterest_publish
-	 *
-	 *     # Remove a handler
-	 *     wp datamachine pipelines remove-handler 12 --handler=pinterest_publish
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		$pipeline_id = null;
@@ -180,36 +166,6 @@ class PipelinesCommand extends BaseCommand {
 				return;
 			}
 			$this->deletePipeline( (int) $args[1], $assoc_args );
-			return;
-		}
-
-		// Handle 'add-handler' subcommand.
-		if ( ! empty( $args ) && 'add-handler' === $args[0] ) {
-			if ( ! isset( $args[1] ) ) {
-				WP_CLI::error( 'Usage: wp datamachine pipelines add-handler <pipeline_id> --step=<step_id> --handler=<slug> [--config=<json>]' );
-				return;
-			}
-			$this->addHandler( (int) $args[1], $assoc_args );
-			return;
-		}
-
-		// Handle 'remove-handler' subcommand.
-		if ( ! empty( $args ) && 'remove-handler' === $args[0] ) {
-			if ( ! isset( $args[1] ) ) {
-				WP_CLI::error( 'Usage: wp datamachine pipelines remove-handler <pipeline_id> --step=<step_id> --handler=<slug>' );
-				return;
-			}
-			$this->removeHandler( (int) $args[1], $assoc_args );
-			return;
-		}
-
-		// Handle 'list-handlers' subcommand.
-		if ( ! empty( $args ) && 'list-handlers' === $args[0] ) {
-			if ( ! isset( $args[1] ) ) {
-				WP_CLI::error( 'Usage: wp datamachine pipelines list-handlers <pipeline_id> [--step=<step_id>]' );
-				return;
-			}
-			$this->listHandlers( (int) $args[1], $assoc_args );
 			return;
 		}
 
@@ -737,277 +693,5 @@ class PipelinesCommand extends BaseCommand {
 		if ( 'json' === $format ) {
 			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT ) );
 		}
-	}
-
-	/**
-	 * Add a handler to a pipeline publish step.
-	 *
-	 * @param int   $pipeline_id Pipeline ID.
-	 * @param array $assoc_args  Arguments (step, handler, config).
-	 */
-	private function addHandler( int $pipeline_id, array $assoc_args ): void {
-		$handler_slug = $assoc_args['handler'] ?? null;
-		$step_id      = $assoc_args['step'] ?? null;
-
-		if ( ! $handler_slug ) {
-			WP_CLI::error( 'Required: --handler=<slug>' );
-			return;
-		}
-
-		// Auto-resolve publish step if not specified.
-		if ( ! $step_id ) {
-			$resolved = $this->resolvePublishStep( $pipeline_id );
-			if ( $resolved['error'] ) {
-				WP_CLI::error( $resolved['error'] );
-				return;
-			}
-			$step_id = $resolved['step_id'];
-		}
-
-		// Get current step config.
-		$ability = new \DataMachine\Abilities\PipelineAbilities();
-		$result  = $ability->executeGetPipelines( [
-			'pipeline_id' => $pipeline_id,
-			'output_mode' => 'full',
-		] );
-
-		if ( ! $result['success'] || empty( $result['pipelines'] ) ) {
-			WP_CLI::error( 'Pipeline not found' );
-			return;
-		}
-
-		$config      = $result['pipelines'][0]['pipeline_config'] ?? [];
-		$step_config = $config[ $step_id ] ?? null;
-
-		if ( ! $step_config ) {
-			WP_CLI::error( "Step '{$step_id}' not found in pipeline {$pipeline_id}" );
-			return;
-		}
-
-		$current_slugs   = $step_config['handler_slugs'] ?? [];
-		$current_configs = $step_config['handler_configs'] ?? [];
-
-		if ( in_array( $handler_slug, $current_slugs, true ) ) {
-			WP_CLI::warning( "Handler '{$handler_slug}' is already on this step." );
-			return;
-		}
-
-		$current_slugs[]                  = $handler_slug;
-		$current_configs[ $handler_slug ] = [];
-
-		// Parse --config if provided.
-		if ( isset( $assoc_args['config'] ) ) {
-			$handler_config = json_decode( wp_unslash( $assoc_args['config'] ), true );
-			if ( json_last_error() !== JSON_ERROR_NONE ) {
-				WP_CLI::error( 'Invalid JSON in --config: ' . json_last_error_msg() );
-				return;
-			}
-			$current_configs[ $handler_slug ] = $handler_config;
-		}
-
-		// Update via abilities.
-		$step_ability = new \DataMachine\Abilities\PipelineStepAbilities();
-		$update       = $step_ability->executeUpdatePipelineStep( [
-			'pipeline_id'      => $pipeline_id,
-			'pipeline_step_id' => $step_id,
-			'handler_slugs'    => $current_slugs,
-			'handler_configs'  => $current_configs,
-		] );
-
-		if ( ! $update['success'] ) {
-			WP_CLI::error( $update['error'] ?? 'Failed to add handler' );
-			return;
-		}
-
-		WP_CLI::success( "Added handler '{$handler_slug}' to step {$step_id}" );
-		WP_CLI::log( 'Handlers: ' . implode( ', ', $current_slugs ) );
-	}
-
-	/**
-	 * Remove a handler from a pipeline publish step.
-	 *
-	 * @param int   $pipeline_id Pipeline ID.
-	 * @param array $assoc_args  Arguments (step, handler).
-	 */
-	private function removeHandler( int $pipeline_id, array $assoc_args ): void {
-		$handler_slug = $assoc_args['handler'] ?? null;
-		$step_id      = $assoc_args['step'] ?? null;
-
-		if ( ! $handler_slug ) {
-			WP_CLI::error( 'Required: --handler=<slug>' );
-			return;
-		}
-
-		if ( ! $step_id ) {
-			$resolved = $this->resolvePublishStep( $pipeline_id );
-			if ( $resolved['error'] ) {
-				WP_CLI::error( $resolved['error'] );
-				return;
-			}
-			$step_id = $resolved['step_id'];
-		}
-
-		$ability = new \DataMachine\Abilities\PipelineAbilities();
-		$result  = $ability->executeGetPipelines( [
-			'pipeline_id' => $pipeline_id,
-			'output_mode' => 'full',
-		] );
-
-		if ( ! $result['success'] || empty( $result['pipelines'] ) ) {
-			WP_CLI::error( 'Pipeline not found' );
-			return;
-		}
-
-		$config      = $result['pipelines'][0]['pipeline_config'] ?? [];
-		$step_config = $config[ $step_id ] ?? null;
-
-		if ( ! $step_config ) {
-			WP_CLI::error( "Step '{$step_id}' not found in pipeline {$pipeline_id}" );
-			return;
-		}
-
-		$current_slugs   = $step_config['handler_slugs'] ?? [];
-		$current_configs = $step_config['handler_configs'] ?? [];
-
-		if ( ! in_array( $handler_slug, $current_slugs, true ) ) {
-			WP_CLI::warning( "Handler '{$handler_slug}' is not on this step." );
-			return;
-		}
-
-		$current_slugs = array_values( array_filter( $current_slugs, fn( $s ) => $s !== $handler_slug ) );
-		unset( $current_configs[ $handler_slug ] );
-
-		$step_ability = new \DataMachine\Abilities\PipelineStepAbilities();
-		$update       = $step_ability->executeUpdatePipelineStep( [
-			'pipeline_id'      => $pipeline_id,
-			'pipeline_step_id' => $step_id,
-			'handler_slugs'    => $current_slugs,
-			'handler_configs'  => $current_configs,
-		] );
-
-		if ( ! $update['success'] ) {
-			WP_CLI::error( $update['error'] ?? 'Failed to remove handler' );
-			return;
-		}
-
-		WP_CLI::success( "Removed handler '{$handler_slug}' from step {$step_id}" );
-		WP_CLI::log( 'Remaining handlers: ' . ( empty( $current_slugs ) ? '(none)' : implode( ', ', $current_slugs ) ) );
-	}
-
-	/**
-	 * List handlers on pipeline steps.
-	 *
-	 * @param int   $pipeline_id Pipeline ID.
-	 * @param array $assoc_args  Arguments (step, format).
-	 */
-	private function listHandlers( int $pipeline_id, array $assoc_args ): void {
-		$step_id = $assoc_args['step'] ?? null;
-
-		$ability = new \DataMachine\Abilities\PipelineAbilities();
-		$result  = $ability->executeGetPipelines( [
-			'pipeline_id' => $pipeline_id,
-			'output_mode' => 'full',
-		] );
-
-		if ( ! $result['success'] || empty( $result['pipelines'] ) ) {
-			WP_CLI::error( 'Pipeline not found' );
-			return;
-		}
-
-		$config = $result['pipelines'][0]['pipeline_config'] ?? [];
-		$rows   = [];
-
-		foreach ( $config as $sid => $step ) {
-			if ( $step_id && $sid !== $step_id ) {
-				continue;
-			}
-
-			$step_type = $step['step_type'] ?? '';
-			if ( 'publish' !== $step_type && ! $step_id ) {
-				continue; // Only show publish steps unless specific step requested.
-			}
-
-			$slugs   = $step['handler_slugs'] ?? [];
-			$configs = $step['handler_configs'] ?? [];
-
-			if ( empty( $slugs ) ) {
-				// Check for legacy single handler_slug.
-				$legacy = $step['handler_slug'] ?? '';
-				if ( $legacy ) {
-					$slugs = [ $legacy ];
-				}
-			}
-
-			foreach ( $slugs as $slug ) {
-				$handler_config = $configs[ $slug ] ?? [];
-				$config_summary = [];
-				foreach ( $handler_config as $k => $v ) {
-					if ( is_string( $v ) && strlen( $v ) > 30 ) {
-						$v = substr( $v, 0, 27 ) . '...';
-					}
-					$config_summary[] = "{$k}=" . ( is_array( $v ) ? wp_json_encode( $v ) : $v );
-				}
-
-				$rows[] = [
-					'step_id'   => $sid,
-					'step_type' => $step_type,
-					'handler'   => $slug,
-					'config'    => implode( ', ', $config_summary ) ?: '(default)',
-				];
-			}
-		}
-
-		if ( empty( $rows ) ) {
-			WP_CLI::warning( 'No handlers found.' );
-			return;
-		}
-
-		$this->format_items( $rows, [ 'step_id', 'step_type', 'handler', 'config' ], $assoc_args );
-	}
-
-	/**
-	 * Resolve the publish step for a pipeline.
-	 *
-	 * If the pipeline has exactly one publish step, returns its ID.
-	 * If multiple publish steps exist, returns an error listing available step IDs.
-	 *
-	 * @param int $pipeline_id Pipeline ID.
-	 * @return array{step_id?: string, error?: string}
-	 */
-	private function resolvePublishStep( int $pipeline_id ): array {
-		$ability = new \DataMachine\Abilities\PipelineAbilities();
-		$result  = $ability->executeGetPipelines( [
-			'pipeline_id' => $pipeline_id,
-			'output_mode' => 'full',
-		] );
-
-		if ( ! $result['success'] || empty( $result['pipelines'] ) ) {
-			return [ 'error' => 'Pipeline not found' ];
-		}
-
-		$config        = $result['pipelines'][0]['pipeline_config'] ?? [];
-		$publish_steps = [];
-
-		foreach ( $config as $step_id => $step ) {
-			if ( 'publish' === ( $step['step_type'] ?? '' ) ) {
-				$publish_steps[] = [
-					'id'    => $step_id,
-					'label' => $step['label'] ?? 'Publish',
-				];
-			}
-		}
-
-		if ( empty( $publish_steps ) ) {
-			return [ 'error' => 'Pipeline has no publish steps' ];
-		}
-
-		if ( count( $publish_steps ) > 1 ) {
-			$ids = array_map( fn( $s ) => sprintf( '  %s (%s)', $s['id'], $s['label'] ), $publish_steps );
-			return [
-				'error' => "Pipeline has multiple publish steps. Use --step=<pipeline_step_id> to target one:\n" . implode( "\n", $ids ),
-			];
-		}
-
-		return [ 'step_id' => $publish_steps[0]['id'] ];
 	}
 }
