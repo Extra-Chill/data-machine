@@ -82,11 +82,11 @@ class Chat extends BaseRepository {
 	}
 
 	/**
-	 * Get table name with prefix
+	 * Get table name with prefix (static context).
 	 *
 	 * @return string Full table name
 	 */
-	public static function get_table_name(): string {
+	public static function get_prefixed_table_name(): string {
 		global $wpdb;
 		return self::sanitize_table_name( $wpdb->prefix . self::TABLE_NAME );
 	}
@@ -102,7 +102,7 @@ class Chat extends BaseRepository {
 	 * Get sanitized table name for queries.
 	 */
 	private static function get_escaped_table_name(): string {
-		return esc_sql( self::get_table_name() );
+		return esc_sql( self::get_prefixed_table_name() );
 	}
 
 
@@ -122,7 +122,7 @@ class Chat extends BaseRepository {
 		global $wpdb;
 
 		$session_id = wp_generate_uuid4();
-		$table_name = self::get_table_name();
+		$table_name = self::get_prefixed_table_name();
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$result = $wpdb->insert(
@@ -177,7 +177,7 @@ class Chat extends BaseRepository {
 	public function get_session( string $session_id ): ?array {
 		global $wpdb;
 
-		$table_name = self::get_table_name();
+		$table_name = self::get_prefixed_table_name();
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$session = $wpdb->get_row(
@@ -218,7 +218,7 @@ class Chat extends BaseRepository {
 	): bool {
 		global $wpdb;
 
-		$table_name = self::get_table_name();
+		$table_name = self::get_prefixed_table_name();
 
 		$update_data = array(
 			'messages' => wp_json_encode( $messages ),
@@ -272,7 +272,7 @@ class Chat extends BaseRepository {
 	public function delete_session( string $session_id ): bool {
 		global $wpdb;
 
-		$table_name = self::get_table_name();
+		$table_name = self::get_prefixed_table_name();
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$result = $wpdb->delete(
@@ -316,7 +316,7 @@ class Chat extends BaseRepository {
 	public function cleanup_expired_sessions(): int {
 		global $wpdb;
 
-		$table_name = self::get_table_name();
+		$table_name = self::get_prefixed_table_name();
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$deleted = $wpdb->query(
@@ -359,7 +359,7 @@ class Chat extends BaseRepository {
 	): array {
 		global $wpdb;
 
-		$table_name = self::get_table_name();
+		$table_name = self::get_prefixed_table_name();
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$sessions = $wpdb->get_results(
@@ -415,7 +415,7 @@ class Chat extends BaseRepository {
 	): int {
 		global $wpdb;
 
-		$table_name = self::get_table_name();
+		$table_name = self::get_prefixed_table_name();
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$count = $wpdb->get_var(
@@ -456,7 +456,7 @@ class Chat extends BaseRepository {
 	): ?array {
 		global $wpdb;
 
-		$table_name  = self::get_table_name();
+		$table_name  = self::get_prefixed_table_name();
 		$cutoff_time = gmdate( 'Y-m-d H:i:s', time() - $seconds );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -501,7 +501,7 @@ class Chat extends BaseRepository {
 	public function update_title( string $session_id, string $title ): bool {
 		global $wpdb;
 
-		$table_name = self::get_table_name();
+		$table_name = self::get_prefixed_table_name();
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$result = $wpdb->update(
@@ -538,7 +538,7 @@ class Chat extends BaseRepository {
 	public function cleanup_old_sessions( int $retention_days ): int {
 		global $wpdb;
 
-		$table_name  = self::get_table_name();
+		$table_name  = self::get_prefixed_table_name();
 		$cutoff_date = gmdate( 'Y-m-d H:i:s', strtotime( "-{$retention_days} days" ) );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -584,7 +584,7 @@ class Chat extends BaseRepository {
 	public function cleanup_orphaned_sessions( int $hours = 1 ): int {
 		global $wpdb;
 
-		$table_name  = self::get_table_name();
+		$table_name  = self::get_prefixed_table_name();
 		$cutoff_time = gmdate( 'Y-m-d H:i:s', time() - ( $hours * 3600 ) );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
