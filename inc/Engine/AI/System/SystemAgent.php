@@ -253,17 +253,6 @@ class SystemAgent {
 		 * @param array $handlers Task type => handler class name mapping.
 		 */
 		$this->taskHandlers = apply_filters( 'datamachine_system_agent_tasks', [] );
-
-		do_action(
-			'datamachine_log',
-			'debug',
-			'System Agent task handlers loaded',
-			[
-				'handler_count' => count( $this->taskHandlers ),
-				'handlers'      => array_keys( $this->taskHandlers ),
-				'agent_type'    => 'system',
-			]
-		);
 	}
 
 	/**
