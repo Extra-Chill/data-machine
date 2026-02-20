@@ -177,11 +177,8 @@ function datamachine_run_datamachine_plugin() {
 // Plugin activation hook to initialize default settings
 register_activation_hook( __FILE__, 'datamachine_activate_plugin_defaults' );
 function datamachine_activate_plugin_defaults() {
-	$tool_manager     = new \DataMachine\Engine\AI\Tools\ToolManager();
-	$opt_out_defaults = $tool_manager->get_opt_out_defaults();
-
 	$default_settings = array(
-		'enabled_tools'               => array_fill_keys( $opt_out_defaults, true ),
+		'disabled_tools'              => array(), // Opt-out pattern: empty = all tools enabled
 		'enabled_pages'               => array(
 			'pipelines' => true,
 			'jobs'      => true,
