@@ -14,7 +14,7 @@ namespace DataMachine\Api\Flows;
 use DataMachine\Abilities\FlowStepAbilities;
 use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Abilities\StepTypeAbilities;
-use DataMachine\Abilities\FlowStep\FlowStepHelpers;
+use DataMachine\Abilities\FlowStep\FlowStepNormalizer;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;
@@ -363,7 +363,7 @@ class FlowSteps {
 			$existing_step = $flow_config[ $flow_step_id ] ?? array();
 
 			// Normalize the step config to use plural fields as source of truth.
-			$normalized_step = FlowStepHelpers::normalizeHandlerFields( $existing_step );
+			$normalized_step = FlowStepNormalizer::normalizeHandlerFields( $existing_step );
 
 			// Build step config for response (include both plural and singular for backward compatibility).
 			$step_config = array(
@@ -371,8 +371,8 @@ class FlowSteps {
 				'handler_slugs'    => $normalized_step['handler_slugs'] ?? array(),
 				'handler_configs'  => $normalized_step['handler_configs'] ?? array(),
 				// Backward compatibility: derive singular from plural.
-				'handler_slug'     => FlowStepHelpers::getPrimaryHandlerSlug( $normalized_step ),
-				'handler_config'   => FlowStepHelpers::getPrimaryHandlerConfig( $normalized_step ),
+				'handler_slug'     => FlowStepNormalizer::getPrimaryHandlerSlug( $normalized_step ),
+				'handler_config'   => FlowStepNormalizer::getPrimaryHandlerConfig( $normalized_step ),
 				'enabled'          => true,
 				'flow_id'          => $flow_id,
 				'pipeline_step_id' => $pipeline_step_id,

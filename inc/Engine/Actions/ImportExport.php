@@ -11,7 +11,7 @@
 
 namespace DataMachine\Engine\Actions;
 
-use DataMachine\Abilities\FlowStep\FlowStepHelpers;
+use DataMachine\Abilities\FlowStep\FlowStepNormalizer;
 
 // Prevent direct access
 if ( ! defined( 'WPINC' ) ) {
@@ -170,8 +170,8 @@ class ImportExport {
 					$flow_step    = $flow_config[ $flow_step_id ] ?? array();
 
 					// Normalize step data to ensure consistent format.
-					$normalized_step = FlowStepHelpers::normalizeHandlerFields( $flow_step );
-					$primary_handler = FlowStepHelpers::getPrimaryHandlerSlug( $normalized_step );
+					$normalized_step = FlowStepNormalizer::normalizeHandlerFields( $flow_step );
+					$primary_handler = FlowStepNormalizer::getPrimaryHandlerSlug( $normalized_step );
 
 					if ( ! empty( $primary_handler ) ) {
 						// Export both plural and singular formats for maximum compatibility.
@@ -180,7 +180,7 @@ class ImportExport {
 							'handler_slugs'  => $normalized_step['handler_slugs'] ?? array(),
 							'handler_configs' => $normalized_step['handler_configs'] ?? array(),
 							// Singular fields (backward compatibility).
-							'handler_config' => FlowStepHelpers::getPrimaryHandlerConfig( $normalized_step ),
+							'handler_config' => FlowStepNormalizer::getPrimaryHandlerConfig( $normalized_step ),
 						);
 
 						$csv_rows[] = array(

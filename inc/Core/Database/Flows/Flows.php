@@ -2,7 +2,7 @@
 
 namespace DataMachine\Core\Database\Flows;
 
-use DataMachine\Abilities\FlowStep\FlowStepHelpers;
+use DataMachine\Abilities\FlowStep\FlowStepNormalizer;
 use DataMachine\Core\Database\BaseRepository;
 
 /**
@@ -130,7 +130,7 @@ class Flows extends BaseRepository {
 	 */
 	private function normalizeFlowConfig( array $flow_config ): array {
 		foreach ( $flow_config as $step_id => $step_config ) {
-			$flow_config[ $step_id ] = FlowStepHelpers::normalizeHandlerFields( $step_config );
+			$flow_config[ $step_id ] = FlowStepNormalizer::normalizeHandlerFields( $step_config );
 		}
 		return $flow_config;
 	}
@@ -614,7 +614,7 @@ class Flows extends BaseRepository {
 			$flow_config = $engine_data['flow_config'] ?? array();
 			$step_config = $flow_config[ $flow_step_id ] ?? array();
 			if ( ! empty( $step_config ) ) {
-				return FlowStepHelpers::normalizeHandlerFields( $step_config );
+				return FlowStepNormalizer::normalizeHandlerFields( $step_config );
 			}
 
 			if ( $require_engine_data ) {

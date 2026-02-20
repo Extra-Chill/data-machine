@@ -12,7 +12,7 @@
 namespace DataMachine\Core\Steps\Settings;
 
 use DataMachine\Abilities\HandlerAbilities;
-use DataMachine\Abilities\FlowStep\FlowStepHelpers;
+use DataMachine\Abilities\FlowStep\FlowStepNormalizer;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -49,8 +49,8 @@ class SettingsDisplayService {
 		}
 
 		// Data is normalized at the DB layer.
-		$handler_slug     = FlowStepHelpers::getPrimaryHandlerSlug( $flow_step_config );
-		$current_settings = FlowStepHelpers::getPrimaryHandlerConfig( $flow_step_config );
+		$handler_slug     = FlowStepNormalizer::getPrimaryHandlerSlug( $flow_step_config );
+		$current_settings = FlowStepNormalizer::getPrimaryHandlerConfig( $flow_step_config );
 
 		// For step types with usesHandler: false, fall back to step_type as settings key
 		// This allows steps like agent_ping to display their config without a traditional handler
@@ -89,8 +89,8 @@ class SettingsDisplayService {
 
 		// Fallback: build from primary handler when configs are empty.
 		if ( empty( $handler_configs ) ) {
-			$handler_slug     = FlowStepHelpers::getPrimaryHandlerSlug( $flow_step_config );
-			$current_settings = FlowStepHelpers::getPrimaryHandlerConfig( $flow_step_config );
+			$handler_slug     = FlowStepNormalizer::getPrimaryHandlerSlug( $flow_step_config );
+			$current_settings = FlowStepNormalizer::getPrimaryHandlerConfig( $flow_step_config );
 
 			if ( empty( $handler_slug ) && ! empty( $step_type ) ) {
 				$handler_slug = $step_type;

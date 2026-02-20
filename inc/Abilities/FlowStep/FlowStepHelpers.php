@@ -32,72 +32,6 @@ trait FlowStepHelpers {
 	}
 
 	/**
-	 * Normalize flow step config to use handler_slugs/handler_configs as source of truth.
-	 * Migrates legacy singular handler_slug/handler_config to plural format.
-	 * Call this when reading step config from DB.
-	 *
-	 * @param array $step_config Step configuration array.
-	 * @return array Normalized step configuration.
-	 */
-	public static function normalizeHandlerFields( array $step_config ): array {
-		if ( ! empty( $step_config['handler_slugs'] ) && is_array( $step_config['handler_slugs'] ) ) {
-			// Already has plural — ensure handler_configs exists.
-			if ( empty( $step_config['handler_configs'] ) || ! is_array( $step_config['handler_configs'] ) ) {
-				$primary = $step_config['handler_slugs'][0] ?? '';
-				$config  = $step_config['handler_config'] ?? array();
-				$step_config['handler_configs'] = ! empty( $primary ) ? array( $primary => $config ) : array();
-			}
-			unset( $step_config['handler_slug'], $step_config['handler_config'] );
-			return $step_config;
-		}
-
-		// Legacy: only has singular fields.
-		$slug   = $step_config['handler_slug'] ?? '';
-		$config = $step_config['handler_config'] ?? array();
-
-		if ( ! empty( $slug ) ) {
-			$step_config['handler_slugs']  = array( $slug );
-			$step_config['handler_configs'] = array( $slug => $config );
-			unset( $step_config['handler_slug'], $step_config['handler_config'] );
-		} else {
-			$step_config['handler_slugs']  = array();
-			$step_config['handler_configs'] = array();
-			unset( $step_config['handler_slug'] );
-			// Preserve handler_config for non-handler step types (Agent Ping, Webhook Gate)
-			// that store settings directly in handler_config without a handler_slug.
-		}
-
-		return $step_config;
-	}
-
-	/**
-	 * Get the primary handler slug from a normalized step config.
-	 *
-	 * @param array $step_config Step configuration array.
-	 * @return string Primary handler slug.
-	 */
-	public static function getPrimaryHandlerSlug( array $step_config ): string {
-		if ( ! empty( $step_config['handler_slugs'] ) && is_array( $step_config['handler_slugs'] ) ) {
-			return $step_config['handler_slugs'][0] ?? '';
-		}
-		return $step_config['handler_slug'] ?? '';
-	}
-
-	/**
-	 * Get the primary handler config from a normalized step config.
-	 *
-	 * @param array $step_config Step configuration array.
-	 * @return array Primary handler configuration.
-	 */
-	public static function getPrimaryHandlerConfig( array $step_config ): array {
-		$slug = self::getPrimaryHandlerSlug( $step_config );
-		if ( ! empty( $slug ) && ! empty( $step_config['handler_configs'][ $slug ] ) ) {
-			return $step_config['handler_configs'][ $slug ];
-		}
-		return $step_config['handler_config'] ?? array();
-	}
-
-	/**
 	 * Permission callback for abilities.
 	 *
 	 * @return bool True if user has permission.
@@ -336,12 +270,12 @@ trait FlowStepHelpers {
 		}
 
 		// Normalize the existing step config to use plural fields as source of truth.
-		$flow_config[ $flow_step_id ] = self::normalizeHandlerFields( $flow_config[ $flow_step_id ] );
+		$flow_config[ $flow_step_id ] = FlowStepNormalizer::normalizeHandlerFields( $flow_config[ $flow_step_id ] );
 
 		// Priority: explicit handler_slug > existing handler_slugs[0] > step_type (for non-handler steps like agent_ping).
 		$effective_slug = ! empty( $handler_slug )
 			? $handler_slug
-			: ( self::getPrimaryHandlerSlug( $flow_config[ $flow_step_id ] )
+			: ( FlowStepNormalizer::getPrimaryHandlerSlug( $flow_config[ $flow_step_id ] )
 				?: ( $flow_config[ $flow_step_id ]['step_type'] ?? null ) );
 
 		if ( empty( $effective_slug ) ) {
@@ -364,7 +298,7 @@ trait FlowStepHelpers {
 		$existing_handler_config = $flow_config[ $flow_step_id ]['handler_configs'][ $effective_slug ] ?? array();
 
 		// If switching handlers, strip legacy config fields that don't belong to the new handler.
-		$current_primary = self::getPrimaryHandlerSlug( $flow_config[ $flow_step_id ] );
+		$current_primary = FlowStepNormalizer::getPrimaryHandlerSlug( $flow_config[ $flow_step_id ] );
 		if ( $current_primary !== $effective_slug ) {
 			$valid_fields = array_keys( $this->handler_abilities->getConfigFields( $effective_slug ) );
 			if ( ! empty( $valid_fields ) ) {
@@ -434,7 +368,7 @@ trait FlowStepHelpers {
 		}
 
 		// Normalize first to handle legacy data.
-		$flow_config[ $flow_step_id ] = self::normalizeHandlerFields( $flow_config[ $flow_step_id ] );
+		$flow_config[ $flow_step_id ] = FlowStepNormalizer::normalizeHandlerFields( $flow_config[ $flow_step_id ] );
 		$step = &$flow_config[ $flow_step_id ];
 
 		$existing_slugs = $step['handler_slugs'] ?? array();
@@ -509,7 +443,7 @@ trait FlowStepHelpers {
 		}
 
 		// Normalize first to handle legacy data.
-		$flow_config[ $flow_step_id ] = self::normalizeHandlerFields( $flow_config[ $flow_step_id ] );
+		$flow_config[ $flow_step_id ] = FlowStepNormalizer::normalizeHandlerFields( $flow_config[ $flow_step_id ] );
 		$step = &$flow_config[ $flow_step_id ];
 
 		$existing_slugs = $step['handler_slugs'] ?? array();
