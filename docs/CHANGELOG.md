@@ -2,6 +2,18 @@
 
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
+## [0.28.1] - 2026-02-20
+
+### Added
+- CLI commands for managing publish step handlers
+
+### Changed
+- Remove debug log for system agent task handlers loaded
+- Remove pipeline context files (replaced by memory system)
+
+### Fixed
+- extract FlowStepNormalizer from trait to fix PHP 8.x deprecation
+
 ## [0.28.0] - 2026-02-19
 
 ### Added
