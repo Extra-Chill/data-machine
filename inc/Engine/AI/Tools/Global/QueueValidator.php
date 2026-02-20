@@ -32,13 +32,64 @@ class QueueValidator extends BaseTool {
 	 * @var array
 	 */
 	const STOP_WORDS = array(
-		'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to',
-		'for', 'of', 'with', 'by', 'from', 'is', 'it', 'are', 'was',
-		'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do',
-		'does', 'did', 'will', 'would', 'could', 'should', 'may',
-		'might', 'shall', 'can', 'not', 'no', 'if', 'when', 'what',
-		'why', 'how', 'who', 'where', 'which', 'that', 'this', 'you',
-		'your', 'my', 'am', 'me', 'we', 'they', 'them', 'its',
+		'the',
+		'a',
+		'an',
+		'and',
+		'or',
+		'but',
+		'in',
+		'on',
+		'at',
+		'to',
+		'for',
+		'of',
+		'with',
+		'by',
+		'from',
+		'is',
+		'it',
+		'are',
+		'was',
+		'were',
+		'be',
+		'been',
+		'being',
+		'have',
+		'has',
+		'had',
+		'do',
+		'does',
+		'did',
+		'will',
+		'would',
+		'could',
+		'should',
+		'may',
+		'might',
+		'shall',
+		'can',
+		'not',
+		'no',
+		'if',
+		'when',
+		'what',
+		'why',
+		'how',
+		'who',
+		'where',
+		'which',
+		'that',
+		'this',
+		'you',
+		'your',
+		'my',
+		'am',
+		'me',
+		'we',
+		'they',
+		'them',
+		'its',
 	);
 
 	public function __construct() {
@@ -84,23 +135,23 @@ class QueueValidator extends BaseTool {
 				'info',
 				'Queue validator: DUPLICATE — similar published post found',
 				array(
-					'topic'      => $topic,
-					'match'      => $post_match,
+					'topic' => $topic,
+					'match' => $post_match,
 				)
 			);
 
 			return array(
-				'success'    => true,
-				'verdict'    => 'duplicate',
-				'source'     => 'published_post',
-				'topic'      => $topic,
-				'match'      => array(
+				'success'   => true,
+				'verdict'   => 'duplicate',
+				'source'    => 'published_post',
+				'topic'     => $topic,
+				'match'     => array(
 					'title'      => $post_match['title'],
 					'post_id'    => $post_match['post_id'],
 					'url'        => $post_match['url'],
 					'similarity' => $post_match['similarity'],
 				),
-				'reason'     => sprintf(
+				'reason'    => sprintf(
 					'Rejected: "%s" is %.0f%% similar to existing post "%s" (ID %d). Threshold: %.0f%%.',
 					$topic,
 					$post_match['similarity'] * 100,
@@ -108,7 +159,7 @@ class QueueValidator extends BaseTool {
 					$post_match['post_id'],
 					$threshold * 100
 				),
-				'tool_name'  => 'queue_validator',
+				'tool_name' => 'queue_validator',
 			);
 		}
 
@@ -133,16 +184,16 @@ class QueueValidator extends BaseTool {
 				);
 
 				return array(
-					'success'    => true,
-					'verdict'    => 'duplicate',
-					'source'     => 'queue',
-					'topic'      => $topic,
-					'match'      => array(
+					'success'   => true,
+					'verdict'   => 'duplicate',
+					'source'    => 'queue',
+					'topic'     => $topic,
+					'match'     => array(
 						'prompt'     => $queue_match['prompt'],
 						'index'      => $queue_match['index'],
 						'similarity' => $queue_match['similarity'],
 					),
-					'reason'     => sprintf(
+					'reason'    => sprintf(
 						'Rejected: "%s" is %.0f%% similar to queued item "%s" (index %d). Threshold: %.0f%%.',
 						$topic,
 						$queue_match['similarity'] * 100,
@@ -150,7 +201,7 @@ class QueueValidator extends BaseTool {
 						$queue_match['index'],
 						$threshold * 100
 					),
-					'tool_name'  => 'queue_validator',
+					'tool_name' => 'queue_validator',
 				);
 			}
 		}
@@ -265,9 +316,9 @@ class QueueValidator extends BaseTool {
 		$best_score  = 0.0;
 
 		foreach ( $prompt_queue as $index => $item ) {
-			$prompt      = $item['prompt'] ?? '';
-			$item_words  = $this->tokenize( $prompt );
-			$score       = $this->jaccard( $topic_words, $item_words );
+			$prompt     = $item['prompt'] ?? '';
+			$item_words = $this->tokenize( $prompt );
+			$score      = $this->jaccard( $topic_words, $item_words );
 
 			if ( $score > $best_score ) {
 				$best_score = $score;
@@ -411,4 +462,3 @@ class QueueValidator extends BaseTool {
 		);
 	}
 }
-

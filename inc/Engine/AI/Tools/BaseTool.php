@@ -222,21 +222,21 @@ abstract class BaseTool {
 	 * @param string $toolName   Tool name for the response.
 	 * @return array Pending response array.
 	 */
-	protected function buildPendingResponse( string $taskType, array $taskParams, array $context = [], string $toolName = '' ): array {
+	protected function buildPendingResponse( string $taskType, array $taskParams, array $context = array(), string $toolName = '' ): array {
 		$systemAgent = \DataMachine\Engine\AI\System\SystemAgent::getInstance();
-		$jobId = $systemAgent->scheduleTask( $taskType, $taskParams, $context );
+		$jobId       = $systemAgent->scheduleTask( $taskType, $taskParams, $context );
 
 		if ( ! $jobId ) {
 			return $this->buildErrorResponse( 'Failed to schedule async task.', $toolName );
 		}
 
-		return [
+		return array(
 			'success'   => true,
 			'pending'   => true,
 			'job_id'    => $jobId,
 			'task_type' => $taskType,
 			'message'   => "Task scheduled for background processing (Job #{$jobId}).",
 			'tool_name' => $toolName,
-		];
+		);
 	}
 }

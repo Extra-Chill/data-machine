@@ -397,12 +397,12 @@ class FlowSteps {
 				array(
 					'success' => true,
 					'data'    => array(
-						'handler_slug'             => $handler_slug,
-						'step_type'                => $step_type,
-						'flow_step_id'             => $flow_step_id,
-						'flow_id'                  => $flow_id,
-						'pipeline_step_id'         => $pipeline_step_id,
-						'step_config'              => $step_config,
+						'handler_slug'              => $handler_slug,
+						'step_type'                 => $step_type,
+						'flow_step_id'              => $flow_step_id,
+						'flow_id'                   => $flow_id,
+						'pipeline_step_id'          => $pipeline_step_id,
+						'step_config'               => $step_config,
 						'handler_settings_display'  => $handler_settings_display,
 						'handler_settings_displays' => $handler_settings_displays,
 					),

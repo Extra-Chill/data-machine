@@ -43,12 +43,12 @@ class ImageGenerationTask extends SystemTask {
 	 */
 	public function execute( int $jobId, array $params ): void {
 		$prediction_id = $params['prediction_id'] ?? '';
-		$model = $params['model'] ?? 'unknown';
+		$model         = $params['model'] ?? 'unknown';
 
 		// Read API key from tool config — never store secrets in engine_data
-		$config  = \DataMachine\Abilities\Media\ImageGenerationAbilities::get_config();
-		$api_key = $config['api_key'] ?? '';
-		$prompt = $params['prompt'] ?? '';
+		$config       = \DataMachine\Abilities\Media\ImageGenerationAbilities::get_config();
+		$api_key      = $config['api_key'] ?? '';
+		$prompt       = $params['prompt'] ?? '';
 		$aspect_ratio = $params['aspect_ratio'] ?? '';
 
 		if ( empty( $prediction_id ) ) {
@@ -62,9 +62,9 @@ class ImageGenerationTask extends SystemTask {
 		}
 
 		// Set max attempts in engine_data if not already set
-		$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
-		$job = $jobs_db->get_job( $jobId );
-		$engine_data = $job['engine_data'] ?? [];
+		$jobs_db     = new \DataMachine\Core\Database\Jobs\Jobs();
+		$job         = $jobs_db->get_job( $jobId );
+		$engine_data = $job['engine_data'] ?? array();
 		if ( ! isset( $engine_data['max_attempts'] ) ) {
 			$engine_data['max_attempts'] = self::MAX_ATTEMPTS;
 			$jobs_db->store_engine_data( $jobId, $engine_data );
@@ -73,13 +73,13 @@ class ImageGenerationTask extends SystemTask {
 		// Poll Replicate API for prediction status
 		$result = HttpClient::get(
 			"https://api.replicate.com/v1/predictions/{$prediction_id}",
-			[
+			array(
 				'timeout' => 15,
-				'headers' => [
+				'headers' => array(
 					'Authorization' => 'Token ' . $api_key,
-				],
+				),
 				'context' => 'System Agent Image Generation Poll',
-			]
+			)
 		);
 
 		if ( ! $result['success'] ) {
@@ -88,13 +88,13 @@ class ImageGenerationTask extends SystemTask {
 				'datamachine_log',
 				'warning',
 				"System Agent image generation HTTP error for job {$jobId}: " . ( $result['error'] ?? 'Unknown error' ),
-				[
+				array(
 					'job_id'        => $jobId,
 					'task_type'     => $this->getTaskType(),
 					'agent_type'    => 'system',
 					'prediction_id' => $prediction_id,
 					'error'         => $result['error'] ?? 'Unknown HTTP error',
-				]
+				)
 			);
 
 			$this->reschedule( $jobId, 5 ); // Try again in 5 seconds
@@ -102,7 +102,7 @@ class ImageGenerationTask extends SystemTask {
 		}
 
 		$status_data = json_decode( $result['data'], true );
-		$status = $status_data['status'] ?? '';
+		$status      = $status_data['status'] ?? '';
 
 		switch ( $status ) {
 			case 'succeeded':
@@ -165,13 +165,13 @@ class ImageGenerationTask extends SystemTask {
 				'datamachine_log',
 				'warning',
 				"System Agent: Image sideload failed for job {$jobId}: " . $sideload_result->get_error_message(),
-				[
+				array(
 					'job_id'     => $jobId,
 					'task_type'  => $this->getTaskType(),
 					'agent_type' => 'system',
 					'image_url'  => $image_url,
 					'error'      => $sideload_result->get_error_message(),
-				]
+				)
 			);
 			// Don't fail the job — we still have the remote URL
 		} else {
@@ -187,7 +187,7 @@ class ImageGenerationTask extends SystemTask {
 
 		// Route based on mode: featured (default) or insert
 		if ( $attachment_id ) {
-			$context = $params['context'] ?? [];
+			$context = $params['context'] ?? array();
 			$mode    = $context['mode'] ?? 'featured';
 
 			if ( 'insert' === $mode ) {
@@ -198,9 +198,9 @@ class ImageGenerationTask extends SystemTask {
 		}
 
 		// Complete job with success data
-		$result = [
+		$result = array(
 			'success'      => true,
-			'data'         => [
+			'data'         => array(
 				'message'         => "Image generated successfully using {$model}.",
 				'image_url'       => $image_url,
 				'attachment_id'   => $attachment_id,
@@ -209,10 +209,10 @@ class ImageGenerationTask extends SystemTask {
 				'prompt'          => $prompt,
 				'model'           => $model,
 				'aspect_ratio'    => $aspectRatio,
-			],
+			),
 			'tool_name'    => 'image_generation',
 			'completed_at' => current_time( 'mysql' ),
-		];
+		);
 
 		$this->completeJob( $jobId, $result );
 	}
@@ -229,7 +229,7 @@ class ImageGenerationTask extends SystemTask {
 	 * @param array $params       Task params (contains context.pipeline_job_id).
 	 */
 	protected function trySetFeaturedImage( int $jobId, int $attachmentId, array $params ): void {
-		$context         = $params['context'] ?? [];
+		$context         = $params['context'] ?? array();
 		$pipeline_job_id = $context['pipeline_job_id'] ?? 0;
 		$direct_post_id  = $context['post_id'] ?? 0;
 
@@ -257,12 +257,12 @@ class ImageGenerationTask extends SystemTask {
 				'datamachine_log',
 				'debug',
 				"System Agent: Post #{$post_id} already has a featured image, skipping",
-				[
+				array(
 					'job_id'        => $jobId,
 					'post_id'       => $post_id,
 					'attachment_id' => $attachmentId,
 					'agent_type'    => 'system',
-				]
+				)
 			);
 			return;
 		}
@@ -275,24 +275,24 @@ class ImageGenerationTask extends SystemTask {
 				'datamachine_log',
 				'info',
 				"System Agent: Featured image set on post #{$post_id} (attachment #{$attachmentId})",
-				[
+				array(
 					'job_id'        => $jobId,
 					'post_id'       => $post_id,
 					'attachment_id' => $attachmentId,
 					'agent_type'    => 'system',
-				]
+				)
 			);
 		} else {
 			do_action(
 				'datamachine_log',
 				'warning',
 				"System Agent: Failed to set featured image on post #{$post_id}",
-				[
+				array(
 					'job_id'        => $jobId,
 					'post_id'       => $post_id,
 					'attachment_id' => $attachmentId,
 					'agent_type'    => 'system',
-				]
+				)
 			);
 		}
 	}
@@ -314,11 +314,11 @@ class ImageGenerationTask extends SystemTask {
 		as_schedule_single_action(
 			time() + 15,
 			'datamachine_system_agent_set_featured_image',
-			[
+			array(
 				'attachment_id'   => $attachmentId,
 				'pipeline_job_id' => $pipelineJobId,
 				'attempt'         => 1,
-			],
+			),
 			'data-machine'
 		);
 
@@ -326,11 +326,11 @@ class ImageGenerationTask extends SystemTask {
 			'datamachine_log',
 			'debug',
 			"System Agent: Scheduled deferred featured image set (attachment #{$attachmentId}, pipeline job #{$pipelineJobId})",
-			[
+			array(
 				'attachment_id'   => $attachmentId,
 				'pipeline_job_id' => $pipelineJobId,
 				'agent_type'      => 'system',
-			]
+			)
 		);
 	}
 
@@ -375,10 +375,10 @@ class ImageGenerationTask extends SystemTask {
 		$slug     = sanitize_title( mb_substr( $prompt, 0, 80 ) );
 		$filename = "ai-generated-{$slug}.jpg";
 
-		$file_array = [
+		$file_array = array(
 			'name'     => $filename,
 			'tmp_name' => $tmp_file,
-		];
+		);
 
 		// Sideload into media library (parent_post_id = 0, unattached)
 		$attachment_id = media_handle_sideload( $file_array, 0 );
@@ -393,11 +393,11 @@ class ImageGenerationTask extends SystemTask {
 
 		// Set attachment metadata for traceability
 		$title = mb_substr( $prompt, 0, 200 );
-		wp_update_post( [
+		wp_update_post( array(
 			'ID'           => $attachment_id,
 			'post_title'   => $title,
 			'post_content' => $prompt,
-		] );
+		) );
 
 		update_post_meta( $attachment_id, '_datamachine_generated', true );
 		update_post_meta( $attachment_id, '_datamachine_generation_model', $model );
@@ -409,18 +409,18 @@ class ImageGenerationTask extends SystemTask {
 			'datamachine_log',
 			'info',
 			"System Agent: Image sideloaded to media library (attachment #{$attachment_id})",
-			[
+			array(
 				'attachment_id'  => $attachment_id,
 				'attachment_url' => $attachment_url,
 				'model'          => $model,
 				'agent_type'     => 'system',
-			]
+			)
 		);
 
-		return [
+		return array(
 			'attachment_id'  => $attachment_id,
 			'attachment_url' => $attachment_url,
-		];
+		);
 	}
 
 	/**
@@ -442,7 +442,7 @@ class ImageGenerationTask extends SystemTask {
 		}
 
 		// Already JPEG — nothing to do.
-		if ( in_array( $check, [ 'image/jpeg', 'image/jpg' ], true ) ) {
+		if ( in_array( $check, array( 'image/jpeg', 'image/jpg' ), true ) ) {
 			return $tmp_file;
 		}
 
@@ -465,7 +465,7 @@ class ImageGenerationTask extends SystemTask {
 				'datamachine_log',
 				'warning',
 				'System Agent: JPEG conversion failed, using original file: ' . $converted->get_error_message(),
-				[ 'agent_type' => 'system' ]
+				array( 'agent_type' => 'system' )
 			);
 			// Fall back to original file — non-critical failure.
 			return $tmp_file;
@@ -478,10 +478,10 @@ class ImageGenerationTask extends SystemTask {
 			'datamachine_log',
 			'debug',
 			"System Agent: Converted {$current_mime} to JPEG for sideload",
-			[
+			array(
 				'original_mime' => $current_mime,
 				'agent_type'    => 'system',
-			]
+			)
 		);
 
 		return $converted['path'];
@@ -495,7 +495,7 @@ class ImageGenerationTask extends SystemTask {
 	 * @param array $params       Task params (contains context with post_id, position).
 	 */
 	protected function insertImageInContent( int $jobId, int $attachmentId, array $params ): void {
-		$context  = $params['context'] ?? [];
+		$context  = $params['context'] ?? array();
 		$post_id  = $context['post_id'] ?? 0;
 		$position = $context['position'] ?? 'auto';
 
@@ -504,25 +504,25 @@ class ImageGenerationTask extends SystemTask {
 			$pipeline_job_id = $context['pipeline_job_id'] ?? 0;
 			if ( ! empty( $pipeline_job_id ) ) {
 				$pipeline_engine_data = datamachine_get_engine_data( (int) $pipeline_job_id );
-				$post_id = $pipeline_engine_data['post_id'] ?? 0;
+				$post_id              = $pipeline_engine_data['post_id'] ?? 0;
 			}
 		}
 
 		if ( empty( $post_id ) ) {
-			do_action( 'datamachine_log', 'warning', "System Agent: Cannot insert image — no post_id available for job {$jobId}", [
+			do_action( 'datamachine_log', 'warning', "System Agent: Cannot insert image — no post_id available for job {$jobId}", array(
 				'job_id'        => $jobId,
 				'attachment_id' => $attachmentId,
 				'agent_type'    => 'system',
-			] );
+			) );
 			return;
 		}
 
 		$post = get_post( $post_id );
 		if ( ! $post ) {
-			do_action( 'datamachine_log', 'warning', "System Agent: Post #{$post_id} not found for image insert", [
+			do_action( 'datamachine_log', 'warning', "System Agent: Post #{$post_id} not found for image insert", array(
 				'job_id'     => $jobId,
 				'agent_type' => 'system',
-			] );
+			) );
 			return;
 		}
 
@@ -533,10 +533,10 @@ class ImageGenerationTask extends SystemTask {
 		}
 
 		// Attach image to the post
-		wp_update_post( [
+		wp_update_post( array(
 			'ID'          => $attachmentId,
 			'post_parent' => $post_id,
-		] );
+		) );
 
 		// Parse existing content into blocks
 		$content = $post->post_content;
@@ -546,24 +546,24 @@ class ImageGenerationTask extends SystemTask {
 		$insert_index = $this->findInsertionIndex( $blocks, $position );
 
 		// Splice the image block in
-		array_splice( $blocks, $insert_index, 0, [ $image_block ] );
+		array_splice( $blocks, $insert_index, 0, array( $image_block ) );
 
 		// Serialize back to content
 		$new_content = serialize_blocks( $blocks );
 
-		wp_update_post( [
+		wp_update_post( array(
 			'ID'           => $post_id,
 			'post_content' => $new_content,
-		] );
+		) );
 
-		do_action( 'datamachine_log', 'info', "System Agent: Image inserted into post #{$post_id} content at position '{$position}' (attachment #{$attachmentId})", [
+		do_action( 'datamachine_log', 'info', "System Agent: Image inserted into post #{$post_id} content at position '{$position}' (attachment #{$attachmentId})", array(
 			'job_id'        => $jobId,
 			'post_id'       => $post_id,
 			'attachment_id' => $attachmentId,
 			'position'      => $position,
 			'insert_index'  => $insert_index,
 			'agent_type'    => 'system',
-		] );
+		) );
 	}
 
 	/**
@@ -581,27 +581,27 @@ class ImageGenerationTask extends SystemTask {
 		}
 
 		if ( empty( $image_url ) ) {
-			return [];
+			return array();
 		}
 
-		$block_attrs = [
+		$block_attrs = array(
 			'id'              => $attachmentId,
 			'sizeSlug'        => 'large',
 			'linkDestination' => 'none',
-		];
+		);
 
 		$escaped_alt = esc_attr( $alt_text );
 		$escaped_url = esc_url( $image_url );
 
 		$inner_html = '<figure class="wp-block-image size-large"><img src="' . $escaped_url . '" alt="' . $escaped_alt . '" class="wp-image-' . $attachmentId . '"/></figure>';
 
-		return [
+		return array(
 			'blockName'    => 'core/image',
 			'attrs'        => $block_attrs,
-			'innerBlocks'  => [],
+			'innerBlocks'  => array(),
 			'innerHTML'    => $inner_html,
-			'innerContent' => [ $inner_html ],
-		];
+			'innerContent' => array( $inner_html ),
+		);
 	}
 
 	/**
@@ -645,7 +645,7 @@ class ImageGenerationTask extends SystemTask {
 			case 'auto':
 			default:
 				// Find all existing image block positions.
-				$image_positions = [];
+				$image_positions = array();
 				foreach ( $blocks as $i => $block ) {
 					if ( 'core/image' === ( $block['blockName'] ?? '' ) ) {
 						$image_positions[] = $i;
@@ -659,31 +659,31 @@ class ImageGenerationTask extends SystemTask {
 
 				// Calculate gaps between images (and before first / after last).
 				$total_blocks = count( $blocks );
-				$gaps         = [];
+				$gaps         = array();
 
 				// Gap before first image.
-				$gaps[] = [
+				$gaps[] = array(
 					'start' => 0,
 					'end'   => $image_positions[0],
 					'size'  => $image_positions[0],
-				];
+				);
 
 				// Gaps between consecutive images.
 				for ( $j = 0; $j < count( $image_positions ) - 1; $j++ ) {
-					$gaps[] = [
+					$gaps[] = array(
 						'start' => $image_positions[ $j ],
 						'end'   => $image_positions[ $j + 1 ],
 						'size'  => $image_positions[ $j + 1 ] - $image_positions[ $j ],
-					];
+					);
 				}
 
 				// Gap after last image.
 				$last   = end( $image_positions );
-				$gaps[] = [
+				$gaps[] = array(
 					'start' => $last,
 					'end'   => $total_blocks,
 					'size'  => $total_blocks - $last,
-				];
+				);
 
 				// Find largest gap.
 				usort( $gaps, fn( $a, $b ) => $b['size'] <=> $a['size'] );

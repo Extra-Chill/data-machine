@@ -31,7 +31,7 @@ class SystemAgent {
 	 *
 	 * @var array<string, string> Task type => handler class name mapping.
 	 */
-	private array $taskHandlers = [];
+	private array $taskHandlers = array();
 
 	/**
 	 * Private constructor for singleton pattern.
@@ -64,59 +64,59 @@ class SystemAgent {
 	 * @param array  $context  Context for routing results back (origin, IDs, etc.).
 	 * @return int|false Job ID on success, false on failure.
 	 */
-	public function scheduleTask( string $taskType, array $params, array $context = [] ): int|false {
+	public function scheduleTask( string $taskType, array $params, array $context = array() ): int|false {
 		if ( ! isset( $this->taskHandlers[ $taskType ] ) ) {
 			do_action(
 				'datamachine_log',
 				'error',
 				"System Agent: Unknown task type '{$taskType}'",
-				[
+				array(
 					'task_type'  => $taskType,
 					'agent_type' => 'system',
 					'params'     => $params,
 					'context'    => $context,
-				]
+				)
 			);
 			return false;
 		}
 
 		// Create DM Job — matches Jobs::create_job() schema
 		$jobs_db = new Jobs();
-		$job_id = $jobs_db->create_job( [
+		$job_id  = $jobs_db->create_job( array(
 			'pipeline_id' => 'direct',
 			'flow_id'     => 'direct',
 			'source'      => 'system',
 			'label'       => ucfirst( str_replace( '_', ' ', $taskType ) ),
-		] );
+		) );
 
 		if ( ! $job_id ) {
 			do_action(
 				'datamachine_log',
 				'error',
 				'System Agent: Failed to create job for task',
-				[
+				array(
 					'task_type'  => $taskType,
 					'agent_type' => 'system',
-				]
+				)
 			);
 			return false;
 		}
 
 		// Store task params in engine_data
-		$jobs_db->store_engine_data( (int) $job_id, array_merge( $params, [
+		$jobs_db->store_engine_data( (int) $job_id, array_merge( $params, array(
 			'task_type'    => $taskType,
 			'context'      => $context,
 			'scheduled_at' => current_time( 'mysql' ),
-		] ) );
+		) ) );
 
 		// Mark job as processing
 		$jobs_db->start_job( (int) $job_id, JobStatus::PROCESSING );
 
 		// Schedule Action Scheduler action
 		if ( function_exists( 'as_schedule_single_action' ) ) {
-			$args = [
+			$args = array(
 				'job_id' => $job_id,
-			];
+			);
 
 			$action_id = as_schedule_single_action(
 				time(),
@@ -130,14 +130,14 @@ class SystemAgent {
 					'datamachine_log',
 					'info',
 					"System Agent task scheduled: {$taskType} (Job #{$job_id})",
-					[
+					array(
 						'job_id'     => $job_id,
 						'action_id'  => $action_id,
 						'task_type'  => $taskType,
 						'agent_type' => 'system',
 						'params'     => $params,
 						'context'    => $context,
-					]
+					)
 				);
 
 				return $job_id;
@@ -163,34 +163,34 @@ class SystemAgent {
 	 */
 	public function handleTask( int $jobId ): void {
 		$jobs_db = new Jobs();
-		$job = $jobs_db->get_job( $jobId );
+		$job     = $jobs_db->get_job( $jobId );
 
 		if ( ! $job ) {
 			do_action(
 				'datamachine_log',
 				'error',
 				"System Agent: Job {$jobId} not found",
-				[
+				array(
 					'job_id'     => $jobId,
 					'agent_type' => 'system',
-				]
+				)
 			);
 			return;
 		}
 
-		$engine_data = $job['engine_data'] ?? [];
-		$task_type = $engine_data['task_type'] ?? '';
+		$engine_data = $job['engine_data'] ?? array();
+		$task_type   = $engine_data['task_type'] ?? '';
 
 		if ( empty( $task_type ) ) {
 			do_action(
 				'datamachine_log',
 				'error',
 				"System Agent: No task type found in job {$jobId}",
-				[
-					'job_id'     => $jobId,
-					'agent_type' => 'system',
+				array(
+					'job_id'      => $jobId,
+					'agent_type'  => 'system',
 					'engine_data' => $engine_data,
-				]
+				)
 			);
 
 			$jobs_db->complete_job( $jobId, JobStatus::failed( 'No task type found' )->toString() );
@@ -202,11 +202,11 @@ class SystemAgent {
 				'datamachine_log',
 				'error',
 				"System Agent: Unknown task type '{$task_type}' for job {$jobId}",
-				[
+				array(
 					'job_id'     => $jobId,
 					'task_type'  => $task_type,
 					'agent_type' => 'system',
-				]
+				)
 			);
 
 			$jobs_db->complete_job( $jobId, JobStatus::failed( "Unknown task type: {$task_type}" )->toString() );
@@ -215,7 +215,7 @@ class SystemAgent {
 
 		// Instantiate and execute the task handler
 		$handler_class = $this->taskHandlers[ $task_type ];
-		
+
 		try {
 			$handler = new $handler_class();
 			$handler->execute( $jobId, $engine_data );
@@ -224,7 +224,7 @@ class SystemAgent {
 				'datamachine_log',
 				'error',
 				"System Agent task execution failed for job {$jobId}: " . $e->getMessage(),
-				[
+				array(
 					'job_id'         => $jobId,
 					'task_type'      => $task_type,
 					'agent_type'     => 'system',
@@ -232,7 +232,7 @@ class SystemAgent {
 					'exception'      => $e->getMessage(),
 					'exception_file' => $e->getFile(),
 					'exception_line' => $e->getLine(),
-				]
+				)
 			);
 
 			// Mark job as failed due to exception
@@ -252,7 +252,7 @@ class SystemAgent {
 		 *
 		 * @param array $handlers Task type => handler class name mapping.
 		 */
-		$this->taskHandlers = apply_filters( 'datamachine_system_agent_tasks', [] );
+		$this->taskHandlers = apply_filters( 'datamachine_system_agent_tasks', array() );
 	}
 
 	/**

@@ -348,10 +348,10 @@ add_action(
 			'error',
 			'AI Library Error: ' . $error_data['component'] . ' - ' . $error_data['message'],
 			array(
-				'component'  => $error_data['component'],
-				'message'    => $error_data['message'],
-				'context'    => $error_data['context'],
-				'timestamp'  => $error_data['timestamp'],
+				'component' => $error_data['component'],
+				'message'   => $error_data['message'],
+				'context'   => $error_data['context'],
+				'timestamp' => $error_data['timestamp'],
 			)
 		);
 	}

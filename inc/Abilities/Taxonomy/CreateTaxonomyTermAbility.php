@@ -60,7 +60,7 @@ class CreateTaxonomyTermAbility {
 								'description' => __( 'Parent term ID for hierarchical taxonomies', 'data-machine' ),
 							),
 						),
-						'required' => array( 'taxonomy', 'name' ),
+						'required'   => array( 'taxonomy', 'name' ),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',

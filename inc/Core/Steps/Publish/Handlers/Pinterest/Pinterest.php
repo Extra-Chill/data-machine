@@ -59,7 +59,7 @@ class Pinterest extends PublishHandler {
 					if ( 'ai_decides' === $mode ) {
 						$cached_boards = PinterestAbilities::get_cached_boards();
 						if ( ! empty( $cached_boards ) ) {
-							$board_list = implode( ', ', array_map( function ( $b ) {
+							$board_list           = implode( ', ', array_map( function ( $b ) {
 								return $b['name'] . ' (' . $b['id'] . ')';
 							}, $cached_boards ) );
 							$board_id_description = "Pinterest board ID. Available boards: {$board_list}";

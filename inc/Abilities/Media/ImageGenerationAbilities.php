@@ -51,7 +51,7 @@ class ImageGenerationAbilities {
 	 *
 	 * @var array
 	 */
-	const VALID_ASPECT_RATIOS = [ '1:1', '3:4', '4:3', '9:16', '16:9' ];
+	const VALID_ASPECT_RATIOS = array( '1:1', '3:4', '4:3', '9:16', '16:9' );
 
 	private static bool $registered = false;
 
@@ -72,64 +72,64 @@ class ImageGenerationAbilities {
 		$register_callback = function () {
 			wp_register_ability(
 				'datamachine/generate-image',
-				[
+				array(
 					'label'               => 'Generate Image',
 					'description'         => 'Generate an image using AI models via Replicate API',
 					'category'            => 'datamachine',
-					'input_schema'        => [
+					'input_schema'        => array(
 						'type'       => 'object',
-						'required'   => [ 'prompt' ],
-						'properties' => [
-							'prompt'          => [
+						'required'   => array( 'prompt' ),
+						'properties' => array(
+							'prompt'          => array(
 								'type'        => 'string',
 								'description' => 'Image generation prompt. If prompt refinement is enabled, this will be enriched by the AI before generation.',
-							],
-							'model'           => [
+							),
+							'model'           => array(
 								'type'        => 'string',
 								'description' => 'Replicate model identifier (default: google/imagen-4-fast).',
-							],
-							'aspect_ratio'    => [
+							),
+							'aspect_ratio'    => array(
 								'type'        => 'string',
 								'description' => 'Image aspect ratio: 1:1, 3:4, 4:3, 9:16, 16:9 (default: 3:4).',
-							],
-							'pipeline_job_id' => [
+							),
+							'pipeline_job_id' => array(
 								'type'        => 'integer',
 								'description' => 'Pipeline job ID for featured image assignment after publish.',
-							],
-							'post_id'         => [
+							),
+							'post_id'         => array(
 								'type'        => 'integer',
 								'description' => 'Post ID to set the generated image as featured image (for standalone/direct calls).',
-							],
+							),
 
-							'mode'            => [
+							'mode'            => array(
 								'type'        => 'string',
 								'description' => 'Post-sideload behavior: featured (set as featured image, default) or insert (insert image block into post content).',
-							],
-							'position'        => [
+							),
+							'position'        => array(
 								'type'        => 'string',
 								'description' => 'Where to insert image in content (insert mode only): after_intro (default), before_heading, end, or index:N.',
-							],
-							'post_context'    => [
+							),
+							'post_context'    => array(
 								'type'        => 'string',
 								'description' => 'Optional post content/excerpt for context-aware prompt refinement.',
-							],
-						],
-					],
-					'output_schema'       => [
+							),
+						),
+					),
+					'output_schema'       => array(
 						'type'       => 'object',
-						'properties' => [
-							'success'       => [ 'type' => 'boolean' ],
-							'pending'       => [ 'type' => 'boolean' ],
-							'job_id'        => [ 'type' => 'integer' ],
-							'prediction_id' => [ 'type' => 'string' ],
-							'message'       => [ 'type' => 'string' ],
-							'error'         => [ 'type' => 'string' ],
-						],
-					],
-					'execute_callback'    => [ self::class, 'generateImage' ],
+						'properties' => array(
+							'success'       => array( 'type' => 'boolean' ),
+							'pending'       => array( 'type' => 'boolean' ),
+							'job_id'        => array( 'type' => 'integer' ),
+							'prediction_id' => array( 'type' => 'string' ),
+							'message'       => array( 'type' => 'string' ),
+							'error'         => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'generateImage' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage(),
-					'meta'                => [ 'show_in_rest' => false ],
-				]
+					'meta'                => array( 'show_in_rest' => false ),
+				)
 			);
 		};
 
@@ -154,19 +154,19 @@ class ImageGenerationAbilities {
 		$prompt = sanitize_text_field( $input['prompt'] ?? '' );
 
 		if ( empty( $prompt ) ) {
-			return [
+			return array(
 				'success' => false,
 				'error'   => 'Image generation requires a prompt.',
-			];
+			);
 		}
 
 		$config = self::get_config();
 
 		if ( empty( $config['api_key'] ) ) {
-			return [
+			return array(
 				'success' => false,
 				'error'   => 'Image generation not configured. Add a Replicate API key in Settings.',
-			];
+			);
 		}
 
 		$original_prompt = $prompt;
@@ -193,37 +193,37 @@ class ImageGenerationAbilities {
 		// Start Replicate prediction.
 		$result = HttpClient::post(
 			"https://api.replicate.com/v1/models/{$model}/predictions",
-			[
+			array(
 				'timeout' => 30,
-				'headers' => [
+				'headers' => array(
 					'Authorization' => 'Token ' . $config['api_key'],
 					'Content-Type'  => 'application/json',
-				],
-				'body'    => wp_json_encode( [
+				),
+				'body'    => wp_json_encode( array(
 					'input' => $input_params,
-				] ),
+				) ),
 				'context' => 'Image Generation Ability',
-			]
+			)
 		);
 
 		if ( ! $result['success'] ) {
-			return [
+			return array(
 				'success' => false,
 				'error'   => 'Failed to start image generation: ' . ( $result['error'] ?? 'Unknown error' ),
-			];
+			);
 		}
 
 		$prediction = json_decode( $result['data'], true );
 
 		if ( json_last_error() !== JSON_ERROR_NONE || empty( $prediction['id'] ) ) {
-			return [
+			return array(
 				'success' => false,
 				'error'   => 'Invalid response from Replicate API.',
-			];
+			);
 		}
 
 		// Hand off to System Agent for async polling.
-		$context = [];
+		$context = array();
 		if ( ! empty( $input['pipeline_job_id'] ) ) {
 			$context['pipeline_job_id'] = (int) $input['pipeline_job_id'];
 		}
@@ -240,32 +240,32 @@ class ImageGenerationAbilities {
 		$systemAgent = SystemAgent::getInstance();
 		$jobId       = $systemAgent->scheduleTask(
 			'image_generation',
-			[
+			array(
 				'prediction_id'   => $prediction['id'],
 				'model'           => $model,
 				'prompt'          => $prompt,
 				'original_prompt' => $original_prompt,
 				'aspect_ratio'    => $aspect_ratio,
 				'prompt_refined'  => $prompt !== $original_prompt,
-			],
+			),
 			$context
 		);
 
 		if ( ! $jobId ) {
-			return [
+			return array(
 				'success' => false,
 				'error'   => 'Failed to schedule image generation task.',
-			];
+			);
 		}
 
-		return [
+		return array(
 			'success'       => true,
 			'pending'       => true,
 			'job_id'        => $jobId,
 			'prediction_id' => $prediction['id'],
 			'message'       => "Image generation scheduled (Job #{$jobId}). Model: {$model}, aspect ratio: {$aspect_ratio}."
 				. ( $prompt !== $original_prompt ? ' Prompt was refined by AI.' : '' ),
-		];
+		);
 	}
 
 	/**
@@ -280,7 +280,7 @@ class ImageGenerationAbilities {
 	 * @param array  $config       Image generation config.
 	 * @return string|null Refined prompt on success, null on failure.
 	 */
-	public static function refine_prompt( string $raw_prompt, string $post_context = '', array $config = [] ): ?string {
+	public static function refine_prompt( string $raw_prompt, string $post_context = '', array $config = array() ): ?string {
 		$system_defaults = PluginSettings::getAgentModel( 'system' );
 		$provider        = $system_defaults['provider'];
 		$model           = $system_defaults['model'];
@@ -290,7 +290,7 @@ class ImageGenerationAbilities {
 				'datamachine_log',
 				'debug',
 				'Image Generation: Prompt refinement skipped — no AI provider configured',
-				[ 'raw_prompt' => $raw_prompt ]
+				array( 'raw_prompt' => $raw_prompt )
 			);
 			return null;
 		}
@@ -307,24 +307,24 @@ class ImageGenerationAbilities {
 			$user_message .= "\n\n---\nArticle context:\n" . mb_substr( $post_context, 0, 1000 );
 		}
 
-		$messages = [
-			[
+		$messages = array(
+			array(
 				'role'    => 'system',
 				'content' => $style_guide,
-			],
-			[
+			),
+			array(
 				'role'    => 'user',
 				'content' => $user_message,
-			],
-		];
+			),
+		);
 
 		$response = RequestBuilder::build(
 			$messages,
 			$provider,
 			$model,
-			[], // No tools needed for prompt refinement.
+			array(), // No tools needed for prompt refinement.
 			'system',
-			[ 'purpose' => 'image_prompt_refinement' ]
+			array( 'purpose' => 'image_prompt_refinement' )
 		);
 
 		if ( empty( $response['success'] ) ) {
@@ -332,11 +332,11 @@ class ImageGenerationAbilities {
 				'datamachine_log',
 				'warning',
 				'Image Generation: Prompt refinement AI request failed',
-				[
+				array(
 					'error'      => $response['error'] ?? 'Unknown error',
 					'raw_prompt' => $raw_prompt,
 					'provider'   => $provider,
-				]
+				)
 			);
 			return null;
 		}
@@ -351,11 +351,11 @@ class ImageGenerationAbilities {
 			'datamachine_log',
 			'info',
 			'Image Generation: Prompt refined',
-			[
+			array(
 				'original' => $raw_prompt,
 				'refined'  => mb_substr( $refined, 0, 200 ),
 				'provider' => $provider,
-			]
+			)
 		);
 
 		return $refined;
@@ -370,7 +370,7 @@ class ImageGenerationAbilities {
 	 * @param array $config Image generation config.
 	 * @return bool
 	 */
-	public static function is_refinement_enabled( array $config = [] ): bool {
+	public static function is_refinement_enabled( array $config = array() ): bool {
 		if ( empty( $config ) ) {
 			$config = self::get_config();
 		}
@@ -397,7 +397,7 @@ class ImageGenerationAbilities {
 	 * @return string Default style guide.
 	 */
 	public static function get_default_style_guide(): string {
-		return implode( "\n", [
+		return implode( "\n", array(
 			'You are an expert at crafting image generation prompts. Transform the input into a detailed, vivid prompt for AI image generation models (Imagen, Flux, etc.).',
 			'',
 			'Your refined prompt should specify:',
@@ -413,7 +413,7 @@ class ImageGenerationAbilities {
 			'- Keep the prompt under 200 words but make it specific and evocative.',
 			'- If article context is provided, ensure the image captures the essence of the content.',
 			'- Output ONLY the refined prompt. No explanations, no prefixes, no labels.',
-		] );
+		) );
 	}
 
 	/**
@@ -426,22 +426,22 @@ class ImageGenerationAbilities {
 	 */
 	private static function buildInputParams( string $prompt, string $aspect_ratio, string $model ): array {
 		if ( false !== strpos( $model, 'imagen' ) ) {
-			return [
+			return array(
 				'prompt'              => $prompt,
 				'aspect_ratio'        => $aspect_ratio,
 				'output_format'       => 'jpg',
 				'safety_filter_level' => 'block_only_high',
-			];
+			);
 		}
 
 		// Flux and other models.
-		return [
+		return array(
 			'prompt'         => $prompt,
 			'num_outputs'    => 1,
 			'aspect_ratio'   => $aspect_ratio,
 			'output_format'  => 'webp',
 			'output_quality' => 90,
-		];
+		);
 	}
 
 	/**
@@ -460,6 +460,6 @@ class ImageGenerationAbilities {
 	 * @return array
 	 */
 	public static function get_config(): array {
-		return get_site_option( self::CONFIG_OPTION, [] );
+		return get_site_option( self::CONFIG_OPTION, array() );
 	}
 }

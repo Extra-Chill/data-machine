@@ -63,8 +63,8 @@ class OAuth2Handler {
 			$is_valid ? 'debug' : 'error',
 			'OAuth2: State verification',
 			array(
-				'provider'   => $provider_key,
-				'valid'      => $is_valid,
+				'provider' => $provider_key,
+				'valid'    => $is_valid,
 			)
 		);
 
@@ -134,8 +134,8 @@ class OAuth2Handler {
 				'error',
 				'OAuth2: Provider returned error',
 				array(
-					'provider'   => $provider_key,
-					'error'      => $error,
+					'provider' => $provider_key,
+					'error'    => $error,
 				)
 			);
 
@@ -150,7 +150,7 @@ class OAuth2Handler {
 				'error',
 				'OAuth2: State verification failed',
 				array(
-					'provider'   => $provider_key,
+					'provider' => $provider_key,
 				)
 			);
 
@@ -167,8 +167,8 @@ class OAuth2Handler {
 				'error',
 				'OAuth2: Token exchange failed',
 				array(
-					'provider'   => $provider_key,
-					'error'      => $token_data->get_error_message(),
+					'provider' => $provider_key,
+					'error'    => $token_data->get_error_message(),
 				)
 			);
 
@@ -186,8 +186,8 @@ class OAuth2Handler {
 					'error',
 					'OAuth2: Token transformation failed',
 					array(
-						'provider'   => $provider_key,
-						'error'      => $token_data->get_error_message(),
+						'provider' => $provider_key,
+						'error'    => $token_data->get_error_message(),
 					)
 				);
 
@@ -205,8 +205,8 @@ class OAuth2Handler {
 				'error',
 				'OAuth2: Failed to retrieve account details',
 				array(
-					'provider'   => $provider_key,
-					'error'      => $account_data->get_error_message(),
+					'provider' => $provider_key,
+					'error'    => $account_data->get_error_message(),
 				)
 			);
 
@@ -224,7 +224,7 @@ class OAuth2Handler {
 				'error',
 				'OAuth2: No storage callback provided',
 				array(
-					'provider'   => $provider_key,
+					'provider' => $provider_key,
 				)
 			);
 		}
@@ -235,7 +235,7 @@ class OAuth2Handler {
 				'error',
 				'OAuth2: Failed to store account data',
 				array(
-					'provider'   => $provider_key,
+					'provider' => $provider_key,
 				)
 			);
 

@@ -19,7 +19,7 @@ defined( 'ABSPATH' ) || exit;
 
 class AltTextAbilities {
 
-	private static bool $registered = false;
+	private static bool $registered       = false;
 	private static bool $hooks_registered = false;
 
 	public function __construct() {
@@ -66,14 +66,14 @@ class AltTextAbilities {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'         => array( 'type' => 'boolean' ),
-							'queued_count'    => array( 'type' => 'integer' ),
-							'attachment_ids'  => array(
+							'success'        => array( 'type' => 'boolean' ),
+							'queued_count'   => array( 'type' => 'integer' ),
+							'attachment_ids' => array(
 								'type'  => 'array',
 								'items' => array( 'type' => 'integer' ),
 							),
-							'message'         => array( 'type' => 'string' ),
-							'error'           => array( 'type' => 'string' ),
+							'message'        => array( 'type' => 'string' ),
+							'error'          => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( self::class, 'generateAltText' ),

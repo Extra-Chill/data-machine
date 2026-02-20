@@ -1,8 +1,8 @@
 /**
  * Flow step handler component.
  *
- * Supports displaying multiple handler badges when a step has more than one
- * handler assigned (multi-handler mode).
+ * Displays handler badges and provides individual configure buttons
+ * for each handler assigned to a flow step.
  */
 
 /**
@@ -102,40 +102,39 @@ export default function FlowStepHandler( {
 						const display = toDisplayMap( perHandlerDisplays[ slug ] || [] );
 						const hasDisplay = Object.keys( display ).length > 0;
 
-						return (
-							<div key={ slug } className="datamachine-handler-stack-row">
-								<div className="datamachine-handler-badges">
-									<div
-										className="datamachine-handler-tag datamachine-handler-badge"
-										onClick={ () => onConfigure && onConfigure( slug ) }
-										role="button"
-										tabIndex={ 0 }
-										onKeyDown={ ( e ) => {
-											if ( e.key === 'Enter' || e.key === ' ' ) {
-												onConfigure && onConfigure( slug );
-											}
-										} }
-									>
-										{ getLabel( slug ) }
-									</div>
-								</div>
-								{ hasDisplay && (
-									<div className="datamachine-handler-settings-display datamachine-handler-settings-display--inline">
-										{ Object.entries( display ).map(
-											( [ key, setting ] ) => (
-												<span
-													key={ key }
-													className="datamachine-handler-settings-entry datamachine-handler-settings-entry--inline"
-												>
-													<strong>{ setting.label }:</strong>{ ' ' }
-													{ setting.value }
-												</span>
-											)
-										) }
-									</div>
-								) }
-							</div>
-						);
+                return (
+                    <div key={ slug } className="datamachine-handler-stack-row">
+                        <div className="datamachine-handler-badges">
+                            <div className="datamachine-handler-tag datamachine-handler-badge">
+                                { getLabel( slug ) }
+                            </div>
+                        </div>
+                        { hasDisplay && (
+                            <div className="datamachine-handler-settings-display datamachine-handler-settings-display--inline">
+                                { Object.entries( display ).map(
+                                    ( [ key, setting ] ) => (
+                                        <span
+                                            key={ key }
+                                            className="datamachine-handler-settings-entry datamachine-handler-settings-entry--inline"
+                                        >
+                                            <strong>{ setting.label }:</strong>{ ' ' }
+                                            { setting.value }
+                                        </span>
+                                    )
+                                ) }
+                            </div>
+                        ) }
+                        { showConfigureButton && (
+                            <Button
+                                variant="secondary"
+                                size="small"
+                                onClick={ () => onConfigure && onConfigure( slug ) }
+                            >
+                                { __( 'Configure', 'data-machine' ) }
+                            </Button>
+                        ) }
+                    </div>
+                );
 					} ) }
 					{ onAddHandler && (
 						<button
@@ -151,36 +150,37 @@ export default function FlowStepHandler( {
 			) : (
 				/* Single handler (or legacy): badges row + flat settings */
 				<>
-					{ showBadge && (
-						<div className="datamachine-handler-badges">
-							{ slugs.map( ( slug ) => (
-								<div
-									key={ slug }
-									className="datamachine-handler-tag datamachine-handler-badge"
-									onClick={ () => onConfigure && onConfigure( slug ) }
-									role="button"
-									tabIndex={ 0 }
-									onKeyDown={ ( e ) => {
-										if ( e.key === 'Enter' || e.key === ' ' ) {
-											onConfigure && onConfigure( slug );
-										}
-									} }
-								>
-									{ getLabel( slug ) }
-								</div>
-							) ) }
-							{ onAddHandler && (
-								<button
-									type="button"
-									className="datamachine-handler-add-badge"
-									onClick={ onAddHandler }
-									title={ __( 'Add another handler', 'data-machine' ) }
-								>
-									+
-								</button>
-							) }
-						</div>
-					) }
+            { showBadge && (
+                <div className="datamachine-handler-badges">
+                    { slugs.map( ( slug ) => (
+                        <div
+                            key={ slug }
+                            className="datamachine-handler-tag datamachine-handler-badge"
+                        >
+                            { getLabel( slug ) }
+                        </div>
+                    ) ) }
+                    { onAddHandler && (
+                        <button
+                            type="button"
+                            className="datamachine-handler-add-badge"
+                            onClick={ onAddHandler }
+                            title={ __( 'Add another handler', 'data-machine' ) }
+                        >
+                            +
+                        </button>
+                    ) }
+                </div>
+            ) }
+            { showConfigureButton && slugs.length === 1 && (
+                <Button
+                    variant="secondary"
+                    size="small"
+                    onClick={ () => onConfigure && onConfigure( slugs[ 0 ] ) }
+                >
+                    { __( 'Configure', 'data-machine' ) }
+                </Button>
+            ) }
 
 					{ hasFlatSettings && (
 						<div className="datamachine-handler-settings-display">
@@ -197,18 +197,8 @@ export default function FlowStepHandler( {
 							) }
 						</div>
 					) }
-				</>
-			) }
-
-			{ showConfigureButton && (
-				<Button
-					variant="secondary"
-					size="small"
-					onClick={ () => onConfigure && onConfigure( slugs[ 0 ] ) }
-				>
-					{ __( 'Configure', 'data-machine' ) }
-				</Button>
-			) }
-		</div>
-	);
+            </>
+        ) }
+    </div>
+);
 }

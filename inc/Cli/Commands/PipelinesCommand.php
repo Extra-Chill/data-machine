@@ -497,9 +497,9 @@ class PipelinesCommand extends BaseCommand {
 
 				// Map known step config fields.
 				$field_map = array(
-					'system_prompt' => 'system_prompt',
-					'provider'      => 'provider',
-					'model'         => 'model',
+					'system_prompt'  => 'system_prompt',
+					'provider'       => 'provider',
+					'model'          => 'model',
 					'disabled_tools' => 'disabled_tools',
 				);
 
@@ -544,11 +544,11 @@ class PipelinesCommand extends BaseCommand {
 
 			$step_ability  = new \DataMachine\Abilities\PipelineStepAbilities();
 			$prompt_result = $step_ability->executeUpdatePipelineStep(
-				[
+				array(
 					'pipeline_id'      => $pipeline_id,
 					'pipeline_step_id' => $step_id,
 					'system_prompt'    => $system_prompt,
-				]
+				)
 			);
 
 			if ( ! $prompt_result['success'] ) {
@@ -602,40 +602,40 @@ class PipelinesCommand extends BaseCommand {
 	private function resolveAiStep( int $pipeline_id ): array {
 		$ability = new \DataMachine\Abilities\PipelineAbilities();
 		$result  = $ability->executeGetPipelines(
-			[
+			array(
 				'pipeline_id' => $pipeline_id,
 				'output_mode' => 'full',
-			]
+			)
 		);
 
 		if ( ! $result['success'] || empty( $result['pipelines'] ) ) {
-			return [ 'error' => 'Pipeline not found' ];
+			return array( 'error' => 'Pipeline not found' );
 		}
 
-		$config   = $result['pipelines'][0]['pipeline_config'] ?? [];
-		$ai_steps = [];
+		$config   = $result['pipelines'][0]['pipeline_config'] ?? array();
+		$ai_steps = array();
 
 		foreach ( $config as $step_id => $step ) {
 			if ( 'ai' === ( $step['step_type'] ?? '' ) ) {
-				$ai_steps[] = [
+				$ai_steps[] = array(
 					'id'    => $step_id,
 					'label' => $step['label'] ?? $step['step_type'] ?? 'AI',
-				];
+				);
 			}
 		}
 
 		if ( empty( $ai_steps ) ) {
-			return [ 'error' => 'Pipeline has no AI steps' ];
+			return array( 'error' => 'Pipeline has no AI steps' );
 		}
 
 		if ( count( $ai_steps ) > 1 ) {
 			$ids = array_map( fn( $s ) => sprintf( '  %s (%s)', $s['id'], $s['label'] ), $ai_steps );
-			return [
+			return array(
 				'error' => "Pipeline has multiple AI steps. Use --step=<pipeline_step_id> to target one:\n" . implode( "\n", $ids ),
-			];
+			);
 		}
 
-		return [ 'step_id' => $ai_steps[0]['id'] ];
+		return array( 'step_id' => $ai_steps[0]['id'] );
 	}
 
 	/**

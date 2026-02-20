@@ -55,12 +55,12 @@ abstract class SystemTask {
 			'datamachine_log',
 			'info',
 			"System Agent task completed successfully for job {$jobId}",
-			[
+			array(
 				'job_id'     => $jobId,
 				'task_type'  => $this->getTaskType(),
 				'agent_type' => 'system',
 				'result'     => $result,
-			]
+			)
 		);
 	}
 
@@ -76,11 +76,11 @@ abstract class SystemTask {
 		$jobs_db = new Jobs();
 
 		// Store error in engine_data
-		$error_data = [
-			'error'      => $reason,
-			'failed_at'  => current_time( 'mysql' ),
-			'task_type'  => $this->getTaskType(),
-		];
+		$error_data = array(
+			'error'     => $reason,
+			'failed_at' => current_time( 'mysql' ),
+			'task_type' => $this->getTaskType(),
+		);
 		$jobs_db->store_engine_data( $jobId, $error_data );
 
 		// Mark job as failed
@@ -90,12 +90,12 @@ abstract class SystemTask {
 			'datamachine_log',
 			'error',
 			"System Agent task failed for job {$jobId}: {$reason}",
-			[
+			array(
 				'job_id'     => $jobId,
 				'task_type'  => $this->getTaskType(),
 				'agent_type' => 'system',
 				'error'      => $reason,
-			]
+			)
 		);
 	}
 
@@ -118,8 +118,8 @@ abstract class SystemTask {
 			return;
 		}
 
-		$engine_data = $job['engine_data'] ?? [];
-		$attempts = ( $engine_data['attempts'] ?? 0 ) + 1;
+		$engine_data  = $job['engine_data'] ?? array();
+		$attempts     = ( $engine_data['attempts'] ?? 0 ) + 1;
 		$max_attempts = $engine_data['max_attempts'] ?? 24; // Default 24 attempts
 
 		// Check if we've exceeded max attempts
@@ -129,15 +129,15 @@ abstract class SystemTask {
 		}
 
 		// Update attempt count
-		$engine_data['attempts'] = $attempts;
+		$engine_data['attempts']     = $attempts;
 		$engine_data['last_attempt'] = current_time( 'mysql' );
 		$jobs_db->store_engine_data( $jobId, $engine_data );
 
 		// Schedule next execution
 		if ( function_exists( 'as_schedule_single_action' ) ) {
-			$args = [
+			$args = array(
 				'job_id' => $jobId,
-			];
+			);
 
 			as_schedule_single_action(
 				time() + $delaySeconds,
@@ -150,14 +150,14 @@ abstract class SystemTask {
 				'datamachine_log',
 				'debug',
 				"System Agent task rescheduled for job {$jobId} (attempt {$attempts}/{$max_attempts})",
-				[
+				array(
 					'job_id'        => $jobId,
 					'task_type'     => $this->getTaskType(),
 					'agent_type'    => 'system',
 					'attempts'      => $attempts,
 					'max_attempts'  => $max_attempts,
 					'delay_seconds' => $delaySeconds,
-				]
+				)
 			);
 		} else {
 			$this->failJob( $jobId, 'Action Scheduler not available for rescheduling' );

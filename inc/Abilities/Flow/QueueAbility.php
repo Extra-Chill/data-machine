@@ -1124,5 +1124,4 @@ class QueueAbility {
 			'step_config' => $step_config,
 		);
 	}
-
 }

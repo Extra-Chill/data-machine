@@ -40,11 +40,11 @@ class AltTextTask extends SystemTask {
 		}
 
 		if ( ! $force && ! $this->isAltTextMissing( $attachment_id ) ) {
-			$this->completeJob( $jobId, [
+			$this->completeJob( $jobId, array(
 				'skipped'       => true,
 				'attachment_id' => $attachment_id,
 				'reason'        => 'Alt text already exists',
-			] );
+			) );
 			return;
 		}
 
@@ -68,30 +68,30 @@ class AltTextTask extends SystemTask {
 		$mime_type = $file_info['type'] ?? '';
 
 		$prompt   = $this->buildPrompt( $attachment_id );
-		$messages = [
-			[
+		$messages = array(
+			array(
 				'role'    => 'user',
-				'content' => [
-					[
+				'content' => array(
+					array(
 						'type'      => 'file',
 						'file_path' => $file_path,
 						'mime_type' => $mime_type,
-					],
-				],
-			],
-			[
+					),
+				),
+			),
+			array(
 				'role'    => 'user',
 				'content' => $prompt,
-			],
-		];
+			),
+		);
 
 		$response = RequestBuilder::build(
 			$messages,
 			$provider,
 			$model,
-			[],
+			array(),
 			'system',
-			[ 'attachment_id' => $attachment_id ]
+			array( 'attachment_id' => $attachment_id )
 		);
 
 		if ( empty( $response['success'] ) ) {
@@ -116,11 +116,11 @@ class AltTextTask extends SystemTask {
 			return;
 		}
 
-		$this->completeJob( $jobId, [
+		$this->completeJob( $jobId, array(
 			'alt_text'      => $alt_text,
 			'attachment_id' => $attachment_id,
 			'completed_at'  => current_time( 'mysql' ),
-		] );
+		) );
 	}
 
 	/**
@@ -139,7 +139,7 @@ class AltTextTask extends SystemTask {
 	 * @return string Prompt text.
 	 */
 	private function buildPrompt( int $attachment_id ): string {
-		$context_lines = [];
+		$context_lines = array();
 
 		$title       = get_the_title( $attachment_id );
 		$caption     = wp_get_attachment_caption( $attachment_id );

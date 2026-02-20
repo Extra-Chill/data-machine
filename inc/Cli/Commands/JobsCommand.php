@@ -453,11 +453,11 @@ class JobsCommand extends BaseCommand {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$log = $wpdb->get_row(
 			$wpdb->prepare(
-				"SELECT message, log_date_gmt
+				'SELECT message, log_date_gmt
 				FROM %i
 				WHERE action_id = %d
 				ORDER BY log_id DESC
-				LIMIT 1",
+				LIMIT 1',
 				$logs_table,
 				$action->action_id
 			)

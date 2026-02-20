@@ -362,12 +362,12 @@ function datamachine_register_execution_engine() {
 						'datamachine_log',
 						'info',
 						'Pipeline parked in waiting state (webhook gate)',
-						[
+						array(
 							'job_id'       => $job_id,
 							'pipeline_id'  => $flow_step_config['pipeline_id'] ?? null,
 							'flow_id'      => $flow_id,
 							'flow_step_id' => $flow_step_id,
-						]
+						)
 					);
 				} elseif ( $status_override ) {
 					$complete_result = $db_jobs->complete_job( $job_id, $status_override );
@@ -602,7 +602,7 @@ function datamachine_register_execution_engine() {
 					'info',
 					'Flow schedule cleared (set to manual)',
 					array(
-						'flow_id'    => $flow_id,
+						'flow_id' => $flow_id,
 					)
 				);
 				return;

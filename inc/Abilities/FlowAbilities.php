@@ -206,5 +206,4 @@ class FlowAbilities {
 	public function executeQueueMove( array $input ): array {
 		return $this->queue->executeQueueMove( $input );
 	}
-
 }

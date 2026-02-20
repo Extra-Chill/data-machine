@@ -103,12 +103,12 @@ class InternalLinkingAbilities {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'            => array( 'type' => 'boolean' ),
-							'total_posts'        => array( 'type' => 'integer' ),
-							'posts_with_links'   => array( 'type' => 'integer' ),
+							'success'             => array( 'type' => 'boolean' ),
+							'total_posts'         => array( 'type' => 'integer' ),
+							'posts_with_links'    => array( 'type' => 'integer' ),
 							'posts_without_links' => array( 'type' => 'integer' ),
-							'avg_links_per_post' => array( 'type' => 'number' ),
-							'by_category'        => array(
+							'avg_links_per_post'  => array( 'type' => 'number' ),
+							'by_category'         => array(
 								'type'  => 'array',
 								'items' => array( 'type' => 'object' ),
 							),
@@ -169,11 +169,11 @@ class InternalLinkingAbilities {
 			}
 
 			$cat_posts = get_posts( array(
-				'post_type'      => 'post',
-				'post_status'    => 'publish',
-				'category'       => $term->term_id,
-				'fields'         => 'ids',
-				'numberposts'    => -1,
+				'post_type'   => 'post',
+				'post_status' => 'publish',
+				'category'    => $term->term_id,
+				'fields'      => 'ids',
+				'numberposts' => -1,
 			) );
 
 			$post_ids = array_merge( $post_ids, $cat_posts );

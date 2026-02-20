@@ -311,7 +311,12 @@ class Chat {
 		}
 
 		// Use admin user (ID 1) for session ownership since this is a system-level request.
-		$admin_users = get_users( array( 'role' => 'administrator', 'number' => 1, 'orderby' => 'ID', 'order' => 'ASC' ) );
+		$admin_users = get_users( array(
+			'role'    => 'administrator',
+			'number'  => 1,
+			'orderby' => 'ID',
+			'order'   => 'ASC',
+		) );
 		$user_id     = ! empty( $admin_users ) ? $admin_users[0]->ID : 1;
 
 		$chat_db    = new ChatDatabase();
@@ -668,7 +673,10 @@ class Chat {
 		// sessions when retries arrive during processing (transient timing fix).
 		if ( $request_id ) {
 			$cache_key = 'datamachine_chat_request_' . $request_id;
-			set_transient( $cache_key, array( 'session_id' => $session_id, 'pending' => true ), 60 );
+			set_transient( $cache_key, array(
+				'session_id' => $session_id,
+				'pending'    => true,
+			), 60 );
 		}
 
 		$result = self::executeConversationTurn(

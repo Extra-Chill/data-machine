@@ -10,6 +10,7 @@
  */
 
 namespace DataMachine\Abilities;
+
 use DataMachine\Abilities\PermissionHelper;
 
 use const DataMachine\Core\WordPress\DATAMACHINE_POST_HANDLER_META_KEY;

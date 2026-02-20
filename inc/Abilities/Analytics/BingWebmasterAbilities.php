@@ -30,12 +30,12 @@ class BingWebmasterAbilities {
 	 *
 	 * @var array
 	 */
-	const ACTION_ENDPOINTS = [
+	const ACTION_ENDPOINTS = array(
 		'query_stats'   => 'GetQueryStats',
 		'traffic_stats' => 'GetRankAndTrafficStats',
 		'page_stats'    => 'GetPageStats',
 		'crawl_stats'   => 'GetCrawlStats',
-	];
+	);
 
 	/**
 	 * Default result limit.
@@ -63,42 +63,42 @@ class BingWebmasterAbilities {
 		$register_callback = function () {
 			wp_register_ability(
 				'datamachine/bing-webmaster',
-				[
+				array(
 					'label'               => 'Bing Webmaster Tools',
 					'description'         => 'Fetch search analytics data from Bing Webmaster Tools API',
 					'category'            => 'datamachine',
-					'input_schema'        => [
+					'input_schema'        => array(
 						'type'       => 'object',
-						'required'   => [ 'action' ],
-						'properties' => [
-							'action'   => [
+						'required'   => array( 'action' ),
+						'properties' => array(
+							'action'   => array(
 								'type'        => 'string',
 								'description' => 'Analytics action: query_stats, traffic_stats, page_stats, crawl_stats.',
-							],
-							'site_url' => [
+							),
+							'site_url' => array(
 								'type'        => 'string',
 								'description' => 'Site URL to query (defaults to configured site URL).',
-							],
-							'limit'    => [
+							),
+							'limit'    => array(
 								'type'        => 'integer',
 								'description' => 'Maximum number of results to return (default: 20).',
-							],
-						],
-					],
-					'output_schema'       => [
+							),
+						),
+					),
+					'output_schema'       => array(
 						'type'       => 'object',
-						'properties' => [
-							'success'       => [ 'type' => 'boolean' ],
-							'action'        => [ 'type' => 'string' ],
-							'results_count' => [ 'type' => 'integer' ],
-							'results'       => [ 'type' => 'array' ],
-							'error'         => [ 'type' => 'string' ],
-						],
-					],
-					'execute_callback'    => [ self::class, 'fetchStats' ],
+						'properties' => array(
+							'success'       => array( 'type' => 'boolean' ),
+							'action'        => array( 'type' => 'string' ),
+							'results_count' => array( 'type' => 'integer' ),
+							'results'       => array( 'type' => 'array' ),
+							'error'         => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'fetchStats' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage(),
-					'meta'                => [ 'show_in_rest' => false ],
-				]
+					'meta'                => array( 'show_in_rest' => false ),
+				)
 			);
 		};
 
@@ -119,19 +119,19 @@ class BingWebmasterAbilities {
 		$action = sanitize_text_field( $input['action'] ?? '' );
 
 		if ( empty( $action ) || ! isset( self::ACTION_ENDPOINTS[ $action ] ) ) {
-			return [
+			return array(
 				'success' => false,
 				'error'   => 'Invalid action. Must be one of: ' . implode( ', ', array_keys( self::ACTION_ENDPOINTS ) ),
-			];
+			);
 		}
 
 		$config = self::get_config();
 
 		if ( empty( $config['api_key'] ) ) {
-			return [
+			return array(
 				'success' => false,
 				'error'   => 'Bing Webmaster Tools not configured. Add an API key in Settings.',
-			];
+			);
 		}
 
 		$site_url = ! empty( $input['site_url'] ) ? sanitize_text_field( $input['site_url'] ) : ( $config['site_url'] ?? get_site_url() );
@@ -139,52 +139,52 @@ class BingWebmasterAbilities {
 		$endpoint = self::ACTION_ENDPOINTS[ $action ];
 
 		$request_url = add_query_arg(
-			[
+			array(
 				'apikey'  => $config['api_key'],
 				'siteUrl' => $site_url,
-			],
+			),
 			'https://ssl.bing.com/webmaster/api.svc/json/' . $endpoint
 		);
 
 		$result = HttpClient::get(
 			$request_url,
-			[
+			array(
 				'timeout' => 15,
-				'headers' => [
+				'headers' => array(
 					'Accept' => 'application/json',
-				],
+				),
 				'context' => 'Bing Webmaster Tools Ability',
-			]
+			)
 		);
 
 		if ( ! $result['success'] ) {
-			return [
+			return array(
 				'success' => false,
 				'error'   => 'Failed to connect to Bing Webmaster API: ' . ( $result['error'] ?? 'Unknown error' ),
-			];
+			);
 		}
 
 		$data = json_decode( $result['data'], true );
 
 		if ( json_last_error() !== JSON_ERROR_NONE ) {
-			return [
+			return array(
 				'success' => false,
 				'error'   => 'Failed to parse Bing Webmaster API response.',
-			];
+			);
 		}
 
-		$results = $data['d'] ?? [];
+		$results = $data['d'] ?? array();
 
 		if ( is_array( $results ) && count( $results ) > $limit ) {
 			$results = array_slice( $results, 0, $limit );
 		}
 
-		return [
+		return array(
 			'success'       => true,
 			'action'        => $action,
 			'results_count' => is_array( $results ) ? count( $results ) : 0,
 			'results'       => $results,
-		];
+		);
 	}
 
 	/**
@@ -203,6 +203,6 @@ class BingWebmasterAbilities {
 	 * @return array
 	 */
 	public static function get_config(): array {
-		return get_site_option( self::CONFIG_OPTION, [] );
+		return get_site_option( self::CONFIG_OPTION, array() );
 	}
 }

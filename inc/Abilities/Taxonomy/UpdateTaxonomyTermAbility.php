@@ -64,19 +64,19 @@ class UpdateTaxonomyTermAbility {
 								'description' => __( 'New parent term ID for hierarchical taxonomies', 'data-machine' ),
 							),
 						),
-						'required' => array( 'term', 'taxonomy' ),
+						'required'   => array( 'term', 'taxonomy' ),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'     => array( 'type' => 'boolean' ),
-							'term_id'     => array( 'type' => 'integer' ),
-							'term_name'   => array( 'type' => 'string' ),
-							'term_slug'   => array( 'type' => 'string' ),
-							'taxonomy'    => array( 'type' => 'string' ),
-							'updated'     => array( 'type' => 'boolean' ),
-							'changes'     => array( 'type' => 'object' ),
-							'error'       => array( 'type' => 'string' ),
+							'success'   => array( 'type' => 'boolean' ),
+							'term_id'   => array( 'type' => 'integer' ),
+							'term_name' => array( 'type' => 'string' ),
+							'term_slug' => array( 'type' => 'string' ),
+							'taxonomy'  => array( 'type' => 'string' ),
+							'updated'   => array( 'type' => 'boolean' ),
+							'changes'   => array( 'type' => 'object' ),
+							'error'     => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'execute' ),
@@ -150,27 +150,27 @@ class UpdateTaxonomyTermAbility {
 		// Check if any updates are requested
 		if ( null === $name && null === $slug && null === $description && null === $parent ) {
 			return array(
-				'success' => true,
-				'term_id' => $term->term_id,
+				'success'   => true,
+				'term_id'   => $term->term_id,
 				'term_name' => $term->name,
 				'term_slug' => $term->slug,
-				'taxonomy' => $taxonomy,
-				'updated' => false,
-				'changes' => array(),
+				'taxonomy'  => $taxonomy,
+				'updated'   => false,
+				'changes'   => array(),
 			);
 		}
 
 		// Prepare update arguments
-		$args = array();
+		$args    = array();
 		$changes = array();
 
 		if ( null !== $name ) {
 			$sanitized_name = sanitize_text_field( wp_unslash( $name ) );
 			if ( $sanitized_name !== $term->name ) {
-				$args['name'] = $sanitized_name;
+				$args['name']    = $sanitized_name;
 				$changes['name'] = array(
 					'from' => $term->name,
-					'to' => $sanitized_name,
+					'to'   => $sanitized_name,
 				);
 			}
 		}
@@ -178,10 +178,10 @@ class UpdateTaxonomyTermAbility {
 		if ( null !== $slug ) {
 			$sanitized_slug = sanitize_title( wp_unslash( $slug ) );
 			if ( $sanitized_slug !== $term->slug ) {
-				$args['slug'] = $sanitized_slug;
+				$args['slug']    = $sanitized_slug;
 				$changes['slug'] = array(
 					'from' => $term->slug,
-					'to' => $sanitized_slug,
+					'to'   => $sanitized_slug,
 				);
 			}
 		}
@@ -189,10 +189,10 @@ class UpdateTaxonomyTermAbility {
 		if ( null !== $description ) {
 			$sanitized_description = sanitize_text_field( wp_unslash( $description ) );
 			if ( $sanitized_description !== $term->description ) {
-				$args['description'] = $sanitized_description;
+				$args['description']    = $sanitized_description;
 				$changes['description'] = array(
 					'from' => $term->description,
-					'to' => $sanitized_description,
+					'to'   => $sanitized_description,
 				);
 			}
 		}
@@ -200,10 +200,10 @@ class UpdateTaxonomyTermAbility {
 		if ( null !== $parent ) {
 			$sanitized_parent = absint( $parent );
 			if ( $sanitized_parent !== $term->parent ) {
-				$args['parent'] = $sanitized_parent;
+				$args['parent']    = $sanitized_parent;
 				$changes['parent'] = array(
 					'from' => $term->parent,
-					'to' => $sanitized_parent,
+					'to'   => $sanitized_parent,
 				);
 			}
 		}
@@ -211,13 +211,13 @@ class UpdateTaxonomyTermAbility {
 		// No changes needed
 		if ( empty( $args ) ) {
 			return array(
-				'success' => true,
-				'term_id' => $term->term_id,
+				'success'   => true,
+				'term_id'   => $term->term_id,
 				'term_name' => $term->name,
 				'term_slug' => $term->slug,
-				'taxonomy' => $taxonomy,
-				'updated' => false,
-				'changes' => array(),
+				'taxonomy'  => $taxonomy,
+				'updated'   => false,
+				'changes'   => array(),
 			);
 		}
 
@@ -253,13 +253,13 @@ class UpdateTaxonomyTermAbility {
 		);
 
 		return array(
-			'success' => true,
-			'term_id' => $updated_term->term_id,
+			'success'   => true,
+			'term_id'   => $updated_term->term_id,
 			'term_name' => $updated_term->name,
 			'term_slug' => $updated_term->slug,
-			'taxonomy' => $taxonomy,
-			'updated' => true,
-			'changes' => $changes,
+			'taxonomy'  => $taxonomy,
+			'updated'   => true,
+			'changes'   => $changes,
 		);
 	}
 

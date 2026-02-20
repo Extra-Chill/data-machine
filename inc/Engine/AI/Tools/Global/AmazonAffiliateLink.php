@@ -442,4 +442,3 @@ class AmazonAffiliateLink extends BaseTool {
 		);
 	}
 }
-

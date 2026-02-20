@@ -352,7 +352,7 @@ class ToolManager {
 	 */
 	public function get_tools_for_step_modal( string $context_id ): array {
 		return array(
-			'global_tools' => $this->get_global_tools(),
+			'global_tools'         => $this->get_global_tools(),
 			'modal_disabled_tools' => $this->get_step_disabled_tools( $context_id ),
 			'pipeline_step_id'     => $context_id,
 		);

@@ -311,7 +311,7 @@ trait FlowStepHelpers {
 		// Merge and store in handler_configs.
 		$merged_config = array_merge( $existing_handler_config, $handler_settings );
 		$flow_config[ $flow_step_id ]['handler_configs'][ $effective_slug ] = $this->handler_abilities->applyDefaults( $effective_slug, $merged_config );
-		$flow_config[ $flow_step_id ]['enabled'] = true;
+		$flow_config[ $flow_step_id ]['enabled']                            = true;
 
 		$success = $this->db_flows->update_flow(
 			$flow_id,
@@ -357,7 +357,10 @@ trait FlowStepHelpers {
 
 		$flow = $this->db_flows->get_flow( $flow_id );
 		if ( ! $flow ) {
-			do_action( 'datamachine_log', 'error', 'Flow not found for add handler', array( 'flow_id' => $flow_id, 'flow_step_id' => $flow_step_id ) );
+			do_action( 'datamachine_log', 'error', 'Flow not found for add handler', array(
+				'flow_id'      => $flow_id,
+				'flow_step_id' => $flow_step_id,
+			) );
 			return false;
 		}
 
@@ -369,13 +372,16 @@ trait FlowStepHelpers {
 
 		// Normalize first to handle legacy data.
 		$flow_config[ $flow_step_id ] = FlowStepNormalizer::normalizeHandlerFields( $flow_config[ $flow_step_id ] );
-		$step = &$flow_config[ $flow_step_id ];
+		$step                         = &$flow_config[ $flow_step_id ];
 
 		$existing_slugs = $step['handler_slugs'] ?? array();
 
 		// Don't add duplicates.
 		if ( in_array( $handler_slug, $existing_slugs, true ) ) {
-			do_action( 'datamachine_log', 'warning', 'Handler already exists on step', array( 'flow_step_id' => $flow_step_id, 'handler_slug' => $handler_slug ) );
+			do_action( 'datamachine_log', 'warning', 'Handler already exists on step', array(
+				'flow_step_id' => $flow_step_id,
+				'handler_slug' => $handler_slug,
+			) );
 			return true;
 		}
 
@@ -386,7 +392,7 @@ trait FlowStepHelpers {
 		$handler_configs = $step['handler_configs'] ?? array();
 
 		if ( ! empty( $handler_config ) ) {
-			$validated_config                = $this->handler_abilities->applyDefaults( $handler_slug, $handler_config );
+			$validated_config                 = $this->handler_abilities->applyDefaults( $handler_slug, $handler_config );
 			$handler_configs[ $handler_slug ] = $validated_config;
 		} else {
 			$handler_configs[ $handler_slug ] = $this->handler_abilities->applyDefaults( $handler_slug, array() );
@@ -400,7 +406,10 @@ trait FlowStepHelpers {
 		$success = $this->db_flows->update_flow( $flow_id, array( 'flow_config' => $flow_config ) );
 
 		if ( ! $success ) {
-			do_action( 'datamachine_log', 'error', 'Failed to add handler to flow step', array( 'flow_step_id' => $flow_step_id, 'handler_slug' => $handler_slug ) );
+			do_action( 'datamachine_log', 'error', 'Failed to add handler to flow step', array(
+				'flow_step_id' => $flow_step_id,
+				'handler_slug' => $handler_slug,
+			) );
 			return false;
 		}
 
@@ -444,7 +453,7 @@ trait FlowStepHelpers {
 
 		// Normalize first to handle legacy data.
 		$flow_config[ $flow_step_id ] = FlowStepNormalizer::normalizeHandlerFields( $flow_config[ $flow_step_id ] );
-		$step = &$flow_config[ $flow_step_id ];
+		$step                         = &$flow_config[ $flow_step_id ];
 
 		$existing_slugs = $step['handler_slugs'] ?? array();
 		$existing_slugs = array_values( array_filter( $existing_slugs, fn( $s ) => $s !== $handler_slug ) );

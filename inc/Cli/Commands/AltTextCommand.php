@@ -77,7 +77,6 @@ class AltTextCommand extends BaseCommand {
 			return;
 		}
 
-
 		$items   = array();
 		$items[] = array(
 			'mime_type'         => 'all',

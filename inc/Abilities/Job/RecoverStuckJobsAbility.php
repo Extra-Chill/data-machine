@@ -39,12 +39,12 @@ class RecoverStuckJobsAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'dry_run' => array(
+							'dry_run'       => array(
 								'type'        => 'boolean',
 								'default'     => false,
 								'description' => __( 'Preview what would be updated without making changes', 'data-machine' ),
 							),
-							'flow_id' => array(
+							'flow_id'       => array(
 								'type'        => array( 'integer', 'null' ),
 								'description' => __( 'Filter to recover jobs only for a specific flow ID', 'data-machine' ),
 							),

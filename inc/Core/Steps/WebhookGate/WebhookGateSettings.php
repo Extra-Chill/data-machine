@@ -22,21 +22,21 @@ class WebhookGateSettings extends SettingsHandler {
 	 * @return array
 	 */
 	public static function get_fields(): array {
-		return [
-			'timeout_hours' => [
+		return array(
+			'timeout_hours' => array(
 				'type'        => 'number',
 				'label'       => 'Timeout (hours)',
 				'description' => 'How long to wait for the webhook before failing the job. 0 = no timeout (defaults to 7-day token expiry).',
 				'default'     => 0,
 				'min'         => 0,
 				'max'         => 8760,
-			],
-			'description' => [
+			),
+			'description'   => array(
 				'type'        => 'text',
 				'label'       => 'Description',
 				'description' => 'Human-readable description of what this gate is waiting for.',
 				'default'     => '',
-			],
-		];
+			),
+		);
 	}
 }

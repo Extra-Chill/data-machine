@@ -44,7 +44,7 @@ class PinterestCommand extends BaseCommand {
 
 		if ( $result['success'] ) {
 			WP_CLI::success( "Synced {$result['count']} boards." );
-			$this->format_items( $result['boards'], [ 'id', 'name', 'description' ], $assoc_args );
+			$this->format_items( $result['boards'], array( 'id', 'name', 'description' ), $assoc_args );
 		} else {
 			WP_CLI::error( $result['error'] );
 		}
@@ -80,7 +80,7 @@ class PinterestCommand extends BaseCommand {
 			return;
 		}
 
-		$this->format_items( $boards, [ 'id', 'name', 'description' ], $assoc_args );
+		$this->format_items( $boards, array( 'id', 'name', 'description' ), $assoc_args );
 	}
 
 	/**

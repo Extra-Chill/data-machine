@@ -10,6 +10,7 @@
  */
 
 namespace DataMachine\Abilities\Pipeline;
+
 use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Abilities\HandlerAbilities;

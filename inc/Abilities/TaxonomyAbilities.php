@@ -10,6 +10,7 @@
  */
 
 namespace DataMachine\Abilities;
+
 use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Abilities\Taxonomy\GetTaxonomyTermsAbility;
@@ -35,11 +36,11 @@ class TaxonomyAbilities {
 			return;
 		}
 
-		$this->resolve_term          = new ResolveTermAbility();
-		$this->get_taxonomy_terms    = new GetTaxonomyTermsAbility();
-		$this->create_taxonomy_term  = new CreateTaxonomyTermAbility();
-		$this->update_taxonomy_term  = new UpdateTaxonomyTermAbility();
-		$this->delete_taxonomy_term  = new DeleteTaxonomyTermAbility();
+		$this->resolve_term         = new ResolveTermAbility();
+		$this->get_taxonomy_terms   = new GetTaxonomyTermsAbility();
+		$this->create_taxonomy_term = new CreateTaxonomyTermAbility();
+		$this->update_taxonomy_term = new UpdateTaxonomyTermAbility();
+		$this->delete_taxonomy_term = new DeleteTaxonomyTermAbility();
 
 		self::$registered = true;
 	}

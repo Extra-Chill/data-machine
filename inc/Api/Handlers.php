@@ -189,40 +189,40 @@ class Handlers {
 		// via datamachine_handler_settings but are not in the handlers list.
 		if ( ! $handler_info ) {
 			$settings_display_service = new \DataMachine\Core\Steps\Settings\SettingsDisplayService();
-			$field_state              = $settings_display_service->getFieldState( $handler_slug, [] );
+			$field_state              = $settings_display_service->getFieldState( $handler_slug, array() );
 
 			if ( ! empty( $field_state ) ) {
 				// Resolve label from step types registry.
-				$step_types = apply_filters( 'datamachine_step_types', [] );
+				$step_types = apply_filters( 'datamachine_step_types', array() );
 				$step_label = $step_types[ $handler_slug ]['label'] ?? $handler_slug;
 
 				return rest_ensure_response(
-					[
+					array(
 						'success' => true,
-						'data'    => [
+						'data'    => array(
 							'slug'     => $handler_slug,
-							'info'     => [
+							'info'     => array(
 								'label'       => $step_label,
 								'description' => $step_types[ $handler_slug ]['description'] ?? '',
 								'type'        => 'step_type',
-							],
+							),
 							'settings' => $field_state,
 							'ai_tool'  => null,
-						],
-					]
+						),
+					)
 				);
 			}
 
 			return new \WP_Error(
 				'handler_not_found',
 				__( 'Handler not found', 'data-machine' ),
-				[ 'status' => 404 ]
+				array( 'status' => 404 )
 			);
 		}
 
 		// Get site-wide handler defaults for this handler
 		$site_defaults    = $handler_abilities->getSiteDefaults();
-		$handler_defaults = $site_defaults[ $handler_slug ] ?? [];
+		$handler_defaults = $site_defaults[ $handler_slug ] ?? array();
 
 		// Get field state, using site-wide defaults as base settings
 		$settings_display_service = new \DataMachine\Core\Steps\Settings\SettingsDisplayService();

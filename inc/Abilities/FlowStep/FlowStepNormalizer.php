@@ -25,8 +25,8 @@ class FlowStepNormalizer {
 	public static function normalizeHandlerFields( array $step_config ): array {
 		if ( ! empty( $step_config['handler_slugs'] ) && is_array( $step_config['handler_slugs'] ) ) {
 			if ( empty( $step_config['handler_configs'] ) || ! is_array( $step_config['handler_configs'] ) ) {
-				$primary = $step_config['handler_slugs'][0] ?? '';
-				$config  = $step_config['handler_config'] ?? array();
+				$primary                        = $step_config['handler_slugs'][0] ?? '';
+				$config                         = $step_config['handler_config'] ?? array();
 				$step_config['handler_configs'] = ! empty( $primary ) ? array( $primary => $config ) : array();
 			}
 			unset( $step_config['handler_slug'], $step_config['handler_config'] );

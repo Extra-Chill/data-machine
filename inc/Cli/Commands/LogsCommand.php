@@ -308,7 +308,7 @@ class LogsCommand extends BaseCommand {
 			return;
 		}
 
-		$agent_type     = $args[0];
+		$agent_type      = $args[0];
 		$valid_for_clear = array_merge( $this->valid_agent_types, array( 'all' ) );
 
 		if ( ! in_array( $agent_type, $valid_for_clear, true ) ) {

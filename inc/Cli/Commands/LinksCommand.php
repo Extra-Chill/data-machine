@@ -94,12 +94,12 @@ class LinksCommand extends BaseCommand {
 
 		if ( $all ) {
 			$all_posts = get_posts( array(
-				'post_type'      => 'post',
-				'post_status'    => 'publish',
-				'fields'         => 'ids',
-				'numberposts'    => -1,
+				'post_type'   => 'post',
+				'post_status' => 'publish',
+				'fields'      => 'ids',
+				'numberposts' => -1,
 			) );
-			$post_ids = array_merge( $post_ids, $all_posts );
+			$post_ids  = array_merge( $post_ids, $all_posts );
 		}
 
 		if ( 0 === $post_id && empty( $category ) && ! $all ) {

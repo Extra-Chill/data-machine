@@ -181,9 +181,9 @@ class EditPostBlocksAbility {
 			);
 		}
 
-		$blocks        = parse_blocks( $post->post_content );
-		$total_blocks  = count( $blocks );
-		$changes       = array();
+		$blocks       = parse_blocks( $post->post_content );
+		$total_blocks = count( $blocks );
+		$changes      = array();
 
 		foreach ( $edits as $edit ) {
 			$block_index = $edit['block_index'] ?? null;
@@ -222,7 +222,7 @@ class EditPostBlocksAbility {
 				continue;
 			}
 
-			$new_html = str_replace( $find, $replace, $inner_html );
+			$new_html                            = str_replace( $find, $replace, $inner_html );
 			$blocks[ $block_index ]['innerHTML'] = $new_html;
 
 			// Also update innerContent entries that match.
@@ -239,11 +239,11 @@ class EditPostBlocksAbility {
 			}
 
 			$changes[] = array(
-				'block_index'  => $block_index,
-				'block_name'   => $blocks[ $block_index ]['blockName'] ?? 'unknown',
-				'find_length'  => strlen( $find ),
+				'block_index'    => $block_index,
+				'block_name'     => $blocks[ $block_index ]['blockName'] ?? 'unknown',
+				'find_length'    => strlen( $find ),
 				'replace_length' => strlen( $replace ),
-				'success'      => true,
+				'success'        => true,
 			);
 		}
 
@@ -294,5 +294,4 @@ class EditPostBlocksAbility {
 			'changes_applied' => $changes,
 		);
 	}
-
 }

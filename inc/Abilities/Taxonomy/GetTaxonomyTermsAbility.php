@@ -37,36 +37,36 @@ class GetTaxonomyTermsAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'taxonomy'    => array(
+							'taxonomy'   => array(
 								'type'        => 'string',
 								'description' => __( 'Taxonomy slug (category, post_tag, custom taxonomy)', 'data-machine' ),
 							),
-							'search'      => array(
+							'search'     => array(
 								'type'        => 'string',
 								'description' => __( 'Search term to filter terms by name', 'data-machine' ),
 							),
-							'parent'      => array(
+							'parent'     => array(
 								'type'        => 'integer',
 								'description' => __( 'Parent term ID to get child terms', 'data-machine' ),
 							),
-							'hide_empty'  => array(
+							'hide_empty' => array(
 								'type'        => 'boolean',
 								'description' => __( 'Hide terms with no posts (default: false)', 'data-machine' ),
 							),
-							'number'      => array(
+							'number'     => array(
 								'type'        => 'integer',
 								'description' => __( 'Maximum number of terms to return', 'data-machine' ),
 							),
-							'offset'      => array(
+							'offset'     => array(
 								'type'        => 'integer',
 								'description' => __( 'Number of terms to skip', 'data-machine' ),
 							),
-							'orderby'     => array(
+							'orderby'    => array(
 								'type'        => 'string',
 								'enum'        => array( 'name', 'slug', 'term_id', 'count' ),
 								'description' => __( 'Sort field (default: name)', 'data-machine' ),
 							),
-							'order'       => array(
+							'order'      => array(
 								'type'        => 'string',
 								'enum'        => array( 'ASC', 'DESC' ),
 								'description' => __( 'Sort order (default: ASC)', 'data-machine' ),

@@ -19,7 +19,7 @@ class GoogleSearchConsole extends BaseTool {
 
 	public function __construct() {
 		$this->registerConfigurationHandlers( 'google_search_console' );
-		$this->registerGlobalTool( 'google_search_console', [ $this, 'getToolDefinition' ] );
+		$this->registerGlobalTool( 'google_search_console', array( $this, 'getToolDefinition' ) );
 	}
 
 	/**
@@ -29,7 +29,7 @@ class GoogleSearchConsole extends BaseTool {
 	 * @param array $tool_def   Tool definition (unused).
 	 * @return array Result from the ability.
 	 */
-	public function handle_tool_call( array $parameters, array $tool_def = [] ): array {
+	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
 		$ability = wp_get_ability( 'datamachine/google-search-console' );
 
 		if ( ! $ability ) {
@@ -65,59 +65,59 @@ class GoogleSearchConsole extends BaseTool {
 	 * @return array Tool definition array.
 	 */
 	public function getToolDefinition(): array {
-		return [
+		return array(
 			'class'           => __CLASS__,
 			'method'          => 'handle_tool_call',
 			'description'     => 'Interact with Google Search Console. Fetch search analytics (query stats, page metrics, daily trends), inspect URLs for index status and mobile usability, and manage sitemaps (list, get details, submit).',
 			'requires_config' => true,
-			'parameters'      => [
-				'action'       => [
+			'parameters'      => array(
+				'action'       => array(
 					'type'        => 'string',
 					'required'    => true,
 					'description' => 'Action to perform: query_stats (top search queries), page_stats (per-page metrics), query_page_stats (query+page combos), date_stats (daily trends), inspect_url (check index/crawl status for a URL), list_sitemaps (list all submitted sitemaps), get_sitemap (details for one sitemap), submit_sitemap (submit a sitemap to Google).',
-				],
-				'url'          => [
+				),
+				'url'          => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'Full URL to inspect. Required for inspect_url action.',
-				],
-				'sitemap_url'  => [
+				),
+				'sitemap_url'  => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'Sitemap URL. Required for get_sitemap and submit_sitemap actions.',
-				],
-				'site_url'     => [
+				),
+				'site_url'     => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'Site URL (sc-domain: or https://). Defaults to the configured site URL.',
-				],
-				'start_date'   => [
+				),
+				'start_date'   => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'Start date in YYYY-MM-DD format (defaults to 28 days ago).',
-				],
-				'end_date'     => [
+				),
+				'end_date'     => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'End date in YYYY-MM-DD format (defaults to 3 days ago for final data).',
-				],
-				'limit'        => [
+				),
+				'limit'        => array(
 					'type'        => 'integer',
 					'required'    => false,
 					'description' => 'Row limit (default: 25, max: 25000).',
-				],
-				'url_filter'   => [
+				),
+				'url_filter'   => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'Filter results to URLs containing this string.',
-				],
-				'query_filter' => [
+				),
+				'query_filter' => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'Filter results to queries containing this string.',
-				],
-			],
-		];
+				),
+			),
+		);
 	}
 
 	/**
@@ -183,7 +183,7 @@ class GoogleSearchConsole extends BaseTool {
 		$site_url             = sanitize_text_field( $config_data['site_url'] ?? '' );
 
 		if ( empty( $service_account_json ) ) {
-			wp_send_json_error( [ 'message' => __( 'Service Account JSON is required', 'data-machine' ) ] );
+			wp_send_json_error( array( 'message' => __( 'Service Account JSON is required', 'data-machine' ) ) );
 			return;
 		}
 
@@ -191,32 +191,32 @@ class GoogleSearchConsole extends BaseTool {
 		$parsed = json_decode( $service_account_json, true );
 
 		if ( json_last_error() !== JSON_ERROR_NONE ) {
-			wp_send_json_error( [ 'message' => __( 'Invalid JSON in Service Account field', 'data-machine' ) ] );
+			wp_send_json_error( array( 'message' => __( 'Invalid JSON in Service Account field', 'data-machine' ) ) );
 			return;
 		}
 
 		if ( empty( $parsed['client_email'] ) || empty( $parsed['private_key'] ) ) {
-			wp_send_json_error( [ 'message' => __( 'Service Account JSON must contain client_email and private_key', 'data-machine' ) ] );
+			wp_send_json_error( array( 'message' => __( 'Service Account JSON must contain client_email and private_key', 'data-machine' ) ) );
 			return;
 		}
 
-		$config = [
+		$config = array(
 			'service_account_json' => $service_account_json,
 			'site_url'             => $site_url,
-		];
+		);
 
 		// Clear cached token when config changes.
 		delete_transient( GoogleSearchConsoleAbilities::TOKEN_TRANSIENT );
 
 		if ( update_site_option( GoogleSearchConsoleAbilities::CONFIG_OPTION, $config ) ) {
 			wp_send_json_success(
-				[
+				array(
 					'message'    => __( 'Google Search Console configuration saved successfully', 'data-machine' ),
 					'configured' => true,
-				]
+				)
 			);
 		} else {
-			wp_send_json_error( [ 'message' => __( 'Failed to save configuration', 'data-machine' ) ] );
+			wp_send_json_error( array( 'message' => __( 'Failed to save configuration', 'data-machine' ) ) );
 		}
 	}
 
@@ -227,27 +227,26 @@ class GoogleSearchConsole extends BaseTool {
 	 * @param string $tool_id Tool identifier.
 	 * @return array
 	 */
-	public function get_config_fields( $fields = [], $tool_id = '' ) {
+	public function get_config_fields( $fields = array(), $tool_id = '' ) {
 		if ( ! empty( $tool_id ) && 'google_search_console' !== $tool_id ) {
 			return $fields;
 		}
 
-		return [
-			'service_account_json' => [
+		return array(
+			'service_account_json' => array(
 				'type'        => 'textarea',
 				'label'       => __( 'Service Account JSON', 'data-machine' ),
 				'placeholder' => __( 'Paste your Google service account JSON key...', 'data-machine' ),
 				'required'    => true,
 				'description' => __( 'The full JSON key file contents for a service account with Search Console access.', 'data-machine' ),
-			],
-			'site_url'             => [
+			),
+			'site_url'             => array(
 				'type'        => 'text',
 				'label'       => __( 'Site URL', 'data-machine' ),
 				'placeholder' => 'sc-domain:example.com',
 				'required'    => false,
 				'description' => __( 'GSC property URL. Use sc-domain: prefix for domain properties.', 'data-machine' ),
-			],
-		];
+			),
+		);
 	}
 }
-

@@ -74,7 +74,7 @@ abstract class BaseRepository {
 			ARRAY_A
 		);
 
-		return $row ?: null;
+		return $row ? $row : null;
 	}
 
 	/**

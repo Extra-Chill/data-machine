@@ -10,6 +10,7 @@
  */
 
 namespace DataMachine\Abilities\Flow;
+
 use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Abilities\FlowStepAbilities;
@@ -374,12 +375,12 @@ trait FlowHelpers {
 			$override = $this->resolveOverride( $overrides, $step_type, $order );
 			if ( $override ) {
 				if ( ! empty( $override['handler_slug'] ) ) {
-					$new_step_config['handler_slugs'] = array( $override['handler_slug'] );
-					$handler_config                    = $override['handler_config'] ?? array();
+					$new_step_config['handler_slugs']   = array( $override['handler_slug'] );
+					$handler_config                     = $override['handler_config'] ?? array();
 					$new_step_config['handler_configs'] = array( $override['handler_slug'] => $handler_config );
 				} elseif ( ! empty( $override['handler_config'] ) && ! empty( $new_step_config['handler_slugs'] ) ) {
-					$primary_slug = $new_step_config['handler_slugs'][0];
-					$existing_config = $new_step_config['handler_configs'][ $primary_slug ] ?? array();
+					$primary_slug                                        = $new_step_config['handler_slugs'][0];
+					$existing_config                                     = $new_step_config['handler_configs'][ $primary_slug ] ?? array();
 					$new_step_config['handler_configs'][ $primary_slug ] = array_merge( $existing_config, $override['handler_config'] );
 				}
 				if ( ! empty( $override['user_message'] ) ) {

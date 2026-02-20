@@ -246,4 +246,3 @@ class GoogleSearch extends BaseTool {
 		);
 	}
 }
-

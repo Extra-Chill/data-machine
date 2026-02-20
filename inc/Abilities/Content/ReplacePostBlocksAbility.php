@@ -68,14 +68,14 @@ class ReplacePostBlocksAbility {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'          => array( 'type' => 'boolean' ),
-							'post_id'          => array( 'type' => 'integer' ),
-							'post_url'         => array( 'type' => 'string' ),
-							'blocks_replaced'  => array(
+							'success'         => array( 'type' => 'boolean' ),
+							'post_id'         => array( 'type' => 'integer' ),
+							'post_url'        => array( 'type' => 'string' ),
+							'blocks_replaced' => array(
 								'type'  => 'array',
 								'items' => array( 'type' => 'object' ),
 							),
-							'error'            => array( 'type' => 'string' ),
+							'error'           => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( self::class, 'execute' ),
@@ -216,17 +216,17 @@ class ReplacePostBlocksAbility {
 				foreach ( $blocks[ $block_index ]['innerContent'] as $i => $content ) {
 					if ( is_string( $content ) && ! $replaced_inner ) {
 						$blocks[ $block_index ]['innerContent'][ $i ] = $new_content;
-						$replaced_inner = true;
+						$replaced_inner                               = true;
 					}
 				}
 			}
 
 			$changes[] = array(
-				'block_index'       => $block_index,
-				'block_name'        => $blocks[ $block_index ]['blockName'] ?? 'unknown',
-				'old_length'        => strlen( $old_html ),
-				'new_length'        => strlen( $new_content ),
-				'success'           => true,
+				'block_index' => $block_index,
+				'block_name'  => $blocks[ $block_index ]['blockName'] ?? 'unknown',
+				'old_length'  => strlen( $old_html ),
+				'new_length'  => strlen( $new_content ),
+				'success'     => true,
 			);
 		}
 

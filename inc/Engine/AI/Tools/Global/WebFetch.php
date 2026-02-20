@@ -162,4 +162,3 @@ class WebFetch extends BaseTool {
 		);
 	}
 }
-

@@ -37,33 +37,33 @@ class DeleteTaxonomyTermAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'term'      => array(
+							'term'     => array(
 								'type'        => 'string',
 								'required'    => true,
 								'description' => __( 'Term identifier (ID, name, or slug)', 'data-machine' ),
 							),
-							'taxonomy'  => array(
+							'taxonomy' => array(
 								'type'        => 'string',
 								'required'    => true,
 								'description' => __( 'Taxonomy slug (category, post_tag, custom taxonomy)', 'data-machine' ),
 							),
-							'reassign'  => array(
+							'reassign' => array(
 								'type'        => 'integer',
 								'description' => __( 'Term ID to reassign posts to (optional)', 'data-machine' ),
 							),
 						),
-						'required' => array( 'term', 'taxonomy' ),
+						'required'   => array( 'term', 'taxonomy' ),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'     => array( 'type' => 'boolean' ),
-							'term_id'     => array( 'type' => 'integer' ),
-							'term_name'   => array( 'type' => 'string' ),
-							'taxonomy'    => array( 'type' => 'string' ),
-							'deleted'     => array( 'type' => 'boolean' ),
-							'reassigned'  => array( 'type' => 'integer' ),
-							'error'       => array( 'type' => 'string' ),
+							'success'    => array( 'type' => 'boolean' ),
+							'term_id'    => array( 'type' => 'integer' ),
+							'term_name'  => array( 'type' => 'string' ),
+							'taxonomy'   => array( 'type' => 'string' ),
+							'deleted'    => array( 'type' => 'boolean' ),
+							'reassigned' => array( 'type' => 'integer' ),
+							'error'      => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'execute' ),
@@ -185,11 +185,11 @@ class DeleteTaxonomyTermAbility {
 		);
 
 		return array(
-			'success'   => true,
-			'term_id'   => $term->term_id,
-			'term_name' => $term->name,
-			'taxonomy'  => $taxonomy,
-			'deleted'   => true,
+			'success'    => true,
+			'term_id'    => $term->term_id,
+			'term_name'  => $term->name,
+			'taxonomy'   => $taxonomy,
+			'deleted'    => true,
 			'reassigned' => null !== $reassign ? absint( $reassign ) : null,
 		);
 	}

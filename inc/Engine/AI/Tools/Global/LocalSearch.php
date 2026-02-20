@@ -113,4 +113,3 @@ class LocalSearch extends BaseTool {
 		return array_values( $post_types );
 	}
 }
-

@@ -115,7 +115,7 @@ class PipelineSystemPromptDirective implements \DataMachine\Engine\AI\Directives
 		ksort( $sorted_steps );
 
 		// Build workflow visualization
-		$workflow_parts = array();
+		$workflow_parts    = array();
 		$handler_abilities = new HandlerAbilities();
 
 		foreach ( $sorted_steps as $step_data ) {

@@ -149,7 +149,7 @@ MD;
 
 		// Try structured soul sections.
 		if ( is_array( $soul ) && ! empty( $soul ) ) {
-			$parts      = array();
+			$parts       = array();
 			$has_content = false;
 
 			foreach ( self::SECTIONS as $key => $header ) {

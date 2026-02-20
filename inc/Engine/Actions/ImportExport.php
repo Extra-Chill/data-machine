@@ -177,10 +177,10 @@ class ImportExport {
 						// Export both plural and singular formats for maximum compatibility.
 						$settings = array(
 							// Plural fields (source of truth).
-							'handler_slugs'  => $normalized_step['handler_slugs'] ?? array(),
+							'handler_slugs'   => $normalized_step['handler_slugs'] ?? array(),
 							'handler_configs' => $normalized_step['handler_configs'] ?? array(),
 							// Singular fields (backward compatibility).
-							'handler_config' => FlowStepNormalizer::getPrimaryHandlerConfig( $normalized_step ),
+							'handler_config'  => FlowStepNormalizer::getPrimaryHandlerConfig( $normalized_step ),
 						);
 
 						$csv_rows[] = array(

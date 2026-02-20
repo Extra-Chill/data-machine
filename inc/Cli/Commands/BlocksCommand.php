@@ -167,10 +167,10 @@ class BlocksCommand extends BaseCommand {
 				WP_CLI::warning( 'Find text not found in target block' );
 			} else {
 				$preview = str_replace( $find, $replace, $target_block['inner_html'] );
-				WP_CLI::log( "--- DRY RUN ---" );
+				WP_CLI::log( '--- DRY RUN ---' );
 				WP_CLI::log( "Block #{$block_index} ({$target_block['block_name']})" );
-				WP_CLI::log( "Before: " . mb_substr( strip_tags( $target_block['inner_html'] ), 0, 200 ) );
-				WP_CLI::log( "After:  " . mb_substr( strip_tags( $preview ), 0, 200 ) );
+				WP_CLI::log( 'Before: ' . mb_substr( strip_tags( $target_block['inner_html'] ), 0, 200 ) );
+				WP_CLI::log( 'After:  ' . mb_substr( strip_tags( $preview ), 0, 200 ) );
 			}
 			return;
 		}

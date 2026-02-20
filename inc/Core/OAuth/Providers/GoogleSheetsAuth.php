@@ -141,7 +141,7 @@ class GoogleSheetsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				'error',
 				'Google token refresh request failed.',
 				array(
-					'error'      => $result['error'],
+					'error' => $result['error'],
 				)
 			);
 			return new \WP_Error( 'googlesheets_refresh_failed', __( 'Failed to refresh Google Sheets access token.', 'data-machine' ) );
@@ -209,8 +209,8 @@ class GoogleSheetsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				'error',
 				'Google Sheets OAuth Error: Client ID not configured.',
 				array(
-					'handler'    => 'googlesheets',
-					'operation'  => 'get_authorization_url',
+					'handler'   => 'googlesheets',
+					'operation' => 'get_authorization_url',
 				)
 			);
 			return '';

@@ -65,36 +65,36 @@ class PinterestAbilities {
 		$register_callback = function () {
 			wp_register_ability(
 				'datamachine/pinterest-boards',
-				[
+				array(
 					'label'               => 'Pinterest Boards',
 					'description'         => 'Sync, list, and manage Pinterest boards',
 					'category'            => 'datamachine',
-					'input_schema'        => [
+					'input_schema'        => array(
 						'type'       => 'object',
-						'required'   => [ 'action' ],
-						'properties' => [
-							'action' => [
+						'required'   => array( 'action' ),
+						'properties' => array(
+							'action' => array(
 								'type'        => 'string',
 								'description' => 'Action: sync_boards, list_boards, status',
-							],
-						],
-					],
-					'output_schema'       => [
+							),
+						),
+					),
+					'output_schema'       => array(
 						'type'       => 'object',
-						'properties' => [
-							'success'       => [ 'type' => 'boolean' ],
-							'boards'        => [ 'type' => 'array' ],
-							'count'         => [ 'type' => 'integer' ],
-							'board_count'   => [ 'type' => 'integer' ],
-							'last_synced'   => [ 'type' => 'string' ],
-							'authenticated' => [ 'type' => 'boolean' ],
-							'error'         => [ 'type' => 'string' ],
-						],
-					],
-					'execute_callback'    => [ self::class, 'execute' ],
+						'properties' => array(
+							'success'       => array( 'type' => 'boolean' ),
+							'boards'        => array( 'type' => 'array' ),
+							'count'         => array( 'type' => 'integer' ),
+							'board_count'   => array( 'type' => 'integer' ),
+							'last_synced'   => array( 'type' => 'string' ),
+							'authenticated' => array( 'type' => 'boolean' ),
+							'error'         => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'execute' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage(),
-					'meta'                => [ 'show_in_rest' => false ],
-				]
+					'meta'                => array( 'show_in_rest' => false ),
+				)
 			);
 		};
 
@@ -119,7 +119,10 @@ class PinterestAbilities {
 				return self::sync_boards();
 
 			case 'list_boards':
-				return [ 'success' => true, 'boards' => self::get_cached_boards() ];
+				return array(
+					'success' => true,
+					'boards'  => self::get_cached_boards(),
+				);
 
 			case 'status':
 				$status                  = self::get_sync_status();
@@ -128,7 +131,10 @@ class PinterestAbilities {
 				return $status;
 
 			default:
-				return [ 'success' => false, 'error' => 'Invalid action. Must be: sync_boards, list_boards, status' ];
+				return array(
+					'success' => false,
+					'error'   => 'Invalid action. Must be: sync_boards, list_boards, status',
+				);
 		}
 	}
 
@@ -142,13 +148,16 @@ class PinterestAbilities {
 		$provider = $auth->getProvider( 'pinterest' );
 
 		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return [ 'success' => false, 'error' => 'Pinterest not authenticated' ];
+			return array(
+				'success' => false,
+				'error'   => 'Pinterest not authenticated',
+			);
 		}
 
 		$config = $provider->get_config();
 		$token  = $config['access_token'] ?? '';
 
-		$all_boards = [];
+		$all_boards = array();
 		$bookmark   = null;
 
 		for ( $i = 0; $i < 10; $i++ ) {
@@ -157,11 +166,11 @@ class PinterestAbilities {
 				$url .= '&bookmark=' . urlencode( $bookmark );
 			}
 
-			$result = HttpClient::get( $url, [
-				'headers' => [ 'Authorization' => 'Bearer ' . $token ],
+			$result = HttpClient::get( $url, array(
+				'headers' => array( 'Authorization' => 'Bearer ' . $token ),
 				'timeout' => 15,
 				'context' => 'Pinterest Board Sync',
-			] );
+			) );
 
 			if ( ! $result['success'] ) {
 				break;
@@ -169,12 +178,12 @@ class PinterestAbilities {
 
 			$data = json_decode( $result['data'], true );
 
-			foreach ( $data['items'] ?? [] as $board ) {
-				$all_boards[] = [
+			foreach ( $data['items'] ?? array() as $board ) {
+				$all_boards[] = array(
 					'id'          => $board['id'],
 					'name'        => $board['name'] ?? '',
 					'description' => $board['description'] ?? '',
-				];
+				);
 			}
 
 			$bookmark = $data['bookmark'] ?? null;
@@ -186,7 +195,11 @@ class PinterestAbilities {
 		update_option( self::BOARDS_OPTION, $all_boards );
 		update_option( self::BOARDS_SYNCED_OPTION, time() );
 
-		return [ 'success' => true, 'count' => count( $all_boards ), 'boards' => $all_boards ];
+		return array(
+			'success' => true,
+			'count'   => count( $all_boards ),
+			'boards'  => $all_boards,
+		);
 	}
 
 	/**
@@ -195,7 +208,7 @@ class PinterestAbilities {
 	 * @return array Array of cached boards.
 	 */
 	public static function get_cached_boards(): array {
-		return get_option( self::BOARDS_OPTION, [] );
+		return get_option( self::BOARDS_OPTION, array() );
 	}
 
 	/**
@@ -207,11 +220,11 @@ class PinterestAbilities {
 		$boards = self::get_cached_boards();
 		$synced = get_option( self::BOARDS_SYNCED_OPTION, 0 );
 
-		return [
-			'board_count'          => count( $boards ),
-			'last_synced'          => $synced ? gmdate( 'Y-m-d H:i:s', $synced ) : 'never',
+		return array(
+			'board_count'           => count( $boards ),
+			'last_synced'           => $synced ? gmdate( 'Y-m-d H:i:s', $synced ) : 'never',
 			'last_synced_timestamp' => $synced,
-		];
+		);
 	}
 
 	/**
@@ -226,14 +239,14 @@ class PinterestAbilities {
 
 		if ( 'category_mapping' === $mode && $post_id > 0 ) {
 			$lines   = explode( "\n", $handler_config['board_mapping'] ?? '' );
-			$mapping = [];
+			$mapping = array();
 
 			foreach ( $lines as $line ) {
 				$line = trim( $line );
 				if ( empty( $line ) || strpos( $line, '=' ) === false ) {
 					continue;
 				}
-				[ $slug, $bid ] = array_map( 'trim', explode( '=', $line, 2 ) );
+				[ $slug, $bid ]   = array_map( 'trim', explode( '=', $line, 2 ) );
 				$mapping[ $slug ] = $bid;
 			}
 

@@ -147,4 +147,3 @@ class WordPressPostReader extends BaseTool {
 		return self::is_configured();
 	}
 }
-

@@ -10,6 +10,7 @@
  */
 
 namespace DataMachine\Abilities\Job;
+
 use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Core\Admin\DateFormatter;

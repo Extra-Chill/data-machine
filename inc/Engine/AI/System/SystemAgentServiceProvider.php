@@ -38,7 +38,7 @@ class SystemAgentServiceProvider {
 	private function registerTaskHandlers(): void {
 		add_filter(
 			'datamachine_system_agent_tasks',
-			[ $this, 'getBuiltInTasks' ]
+			array( $this, 'getBuiltInTasks' )
 		);
 	}
 
@@ -76,12 +76,12 @@ class SystemAgentServiceProvider {
 	private function registerActionSchedulerHooks(): void {
 		add_action(
 			'datamachine_system_agent_handle_task',
-			[ $this, 'handleScheduledTask' ]
+			array( $this, 'handleScheduledTask' )
 		);
 
 		add_action(
 			'datamachine_system_agent_set_featured_image',
-			[ $this, 'handleDeferredFeaturedImage' ],
+			array( $this, 'handleDeferredFeaturedImage' ),
 			10,
 			3
 		);
@@ -123,11 +123,11 @@ class SystemAgentServiceProvider {
 					'datamachine_log',
 					'warning',
 					"System Agent: Gave up waiting for post_id after {$max_attempts} attempts (pipeline job #{$pipelineJobId})",
-					[
+					array(
 						'attachment_id'   => $attachmentId,
 						'pipeline_job_id' => $pipelineJobId,
 						'agent_type'      => 'system',
-					]
+					)
 				);
 				return;
 			}
@@ -137,11 +137,11 @@ class SystemAgentServiceProvider {
 				as_schedule_single_action(
 					time() + 15,
 					'datamachine_system_agent_set_featured_image',
-					[
+					array(
 						'attachment_id'   => $attachmentId,
 						'pipeline_job_id' => $pipelineJobId,
 						'attempt'         => $attempt + 1,
-					],
+					),
 					'data-machine'
 				);
 			}
@@ -161,13 +161,13 @@ class SystemAgentServiceProvider {
 			$result
 				? "System Agent: Deferred featured image set on post #{$post_id} (attempt #{$attempt})"
 				: "System Agent: Failed to set deferred featured image on post #{$post_id}",
-			[
+			array(
 				'post_id'         => $post_id,
 				'attachment_id'   => $attachmentId,
 				'pipeline_job_id' => $pipelineJobId,
 				'attempt'         => $attempt,
 				'agent_type'      => 'system',
-			]
+			)
 		);
 	}
 }

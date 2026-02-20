@@ -9,6 +9,7 @@
  */
 
 namespace DataMachine\Abilities;
+
 use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Core\PluginSettings;
@@ -92,15 +93,15 @@ class SettingsAbilities {
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
-						'cleanup_job_data_on_failure'     => array( 'type' => 'boolean' ),
-						'file_retention_days'             => array( 'type' => 'integer' ),
-						'chat_retention_days'             => array( 'type' => 'integer' ),
-						'chat_ai_titles_enabled'          => array( 'type' => 'boolean' ),
-						'alt_text_auto_generate_enabled'  => array( 'type' => 'boolean' ),
-						'problem_flow_threshold'          => array( 'type' => 'integer' ),
-						'flows_per_page'              => array( 'type' => 'integer' ),
-						'jobs_per_page'               => array( 'type' => 'integer' ),
-						'agent_soul'                 => array(
+						'cleanup_job_data_on_failure'    => array( 'type' => 'boolean' ),
+						'file_retention_days'            => array( 'type' => 'integer' ),
+						'chat_retention_days'            => array( 'type' => 'integer' ),
+						'chat_ai_titles_enabled'         => array( 'type' => 'boolean' ),
+						'alt_text_auto_generate_enabled' => array( 'type' => 'boolean' ),
+						'problem_flow_threshold'         => array( 'type' => 'integer' ),
+						'flows_per_page'                 => array( 'type' => 'integer' ),
+						'jobs_per_page'                  => array( 'type' => 'integer' ),
+						'agent_soul'                     => array(
 							'type'       => 'object',
 							'properties' => array(
 								'identity' => array( 'type' => 'string' ),
@@ -109,18 +110,18 @@ class SettingsAbilities {
 								'context'  => array( 'type' => 'string' ),
 							),
 						),
-						'global_system_prompt'        => array( 'type' => 'string' ),
-						'site_context_enabled'        => array( 'type' => 'boolean' ),
-						'default_provider'            => array( 'type' => 'string' ),
-						'default_model'               => array( 'type' => 'string' ),
-						'agent_models'                => array(
+						'global_system_prompt'           => array( 'type' => 'string' ),
+						'site_context_enabled'           => array( 'type' => 'boolean' ),
+						'default_provider'               => array( 'type' => 'string' ),
+						'default_model'                  => array( 'type' => 'string' ),
+						'agent_models'                   => array(
 							'type'        => 'object',
 							'description' => 'Per-agent-type provider/model overrides keyed by agent type id',
 						),
-						'max_turns'                   => array( 'type' => 'integer' ),
-						'disabled_tools'              => array( 'type' => 'object' ),
-						'ai_provider_keys'            => array( 'type' => 'object' ),
-						'queue_tuning'                => array(
+						'max_turns'                      => array( 'type' => 'integer' ),
+						'disabled_tools'                 => array( 'type' => 'object' ),
+						'ai_provider_keys'               => array( 'type' => 'object' ),
+						'queue_tuning'                   => array(
 							'type'        => 'object',
 							'description' => 'Action Scheduler queue tuning settings',
 							'properties'  => array(
@@ -354,23 +355,23 @@ class SettingsAbilities {
 				'chat_ai_titles_enabled'         => $settings['chat_ai_titles_enabled'] ?? true,
 				'alt_text_auto_generate_enabled' => $settings['alt_text_auto_generate_enabled'] ?? true,
 				'problem_flow_threshold'         => $settings['problem_flow_threshold'] ?? 3,
-				'flows_per_page'              => $settings['flows_per_page'] ?? 20,
-				'jobs_per_page'               => $settings['jobs_per_page'] ?? 50,
-				'agent_soul'                 => $settings['agent_soul'] ?? array(
+				'flows_per_page'                 => $settings['flows_per_page'] ?? 20,
+				'jobs_per_page'                  => $settings['jobs_per_page'] ?? 50,
+				'agent_soul'                     => $settings['agent_soul'] ?? array(
 					'identity' => '',
 					'voice'    => '',
 					'rules'    => '',
 					'context'  => '',
 				),
-				'global_system_prompt'        => $settings['global_system_prompt'] ?? '',
-				'site_context_enabled'        => $settings['site_context_enabled'] ?? false,
-				'default_provider'            => $settings['default_provider'] ?? '',
-				'default_model'               => $settings['default_model'] ?? '',
-				'agent_models'                => $settings['agent_models'] ?? array(),
-				'max_turns'                   => $settings['max_turns'] ?? 12,
-				'disabled_tools'              => $settings['disabled_tools'] ?? array(),
-				'ai_provider_keys'            => $masked_keys,
-				'queue_tuning'                => $settings['queue_tuning'] ?? array(
+				'global_system_prompt'           => $settings['global_system_prompt'] ?? '',
+				'site_context_enabled'           => $settings['site_context_enabled'] ?? false,
+				'default_provider'               => $settings['default_provider'] ?? '',
+				'default_model'                  => $settings['default_model'] ?? '',
+				'agent_models'                   => $settings['agent_models'] ?? array(),
+				'max_turns'                      => $settings['max_turns'] ?? 12,
+				'disabled_tools'                 => $settings['disabled_tools'] ?? array(),
+				'ai_provider_keys'               => $masked_keys,
+				'queue_tuning'                   => $settings['queue_tuning'] ?? array(
 					'concurrent_batches' => 3,
 					'batch_size'         => 25,
 					'time_limit'         => 60,
@@ -496,7 +497,7 @@ class SettingsAbilities {
 			$tuning = $all_settings['queue_tuning'] ?? array();
 
 			if ( isset( $input['queue_tuning']['concurrent_batches'] ) ) {
-				$batches                     = absint( $input['queue_tuning']['concurrent_batches'] );
+				$batches                      = absint( $input['queue_tuning']['concurrent_batches'] );
 				$tuning['concurrent_batches'] = max( 1, min( 10, $batches ) ); // 1-10 range
 			}
 

@@ -19,7 +19,7 @@ class BingWebmaster extends BaseTool {
 
 	public function __construct() {
 		$this->registerConfigurationHandlers( 'bing_webmaster' );
-		$this->registerGlobalTool( 'bing_webmaster', [ $this, 'getToolDefinition' ] );
+		$this->registerGlobalTool( 'bing_webmaster', array( $this, 'getToolDefinition' ) );
 	}
 
 	/**
@@ -29,7 +29,7 @@ class BingWebmaster extends BaseTool {
 	 * @param array $tool_def   Tool definition (unused).
 	 * @return array Result from the ability.
 	 */
-	public function handle_tool_call( array $parameters, array $tool_def = [] ): array {
+	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
 		$ability = wp_get_ability( 'datamachine/bing-webmaster' );
 
 		if ( ! $ability ) {
@@ -65,29 +65,29 @@ class BingWebmaster extends BaseTool {
 	 * @return array Tool definition array.
 	 */
 	public function getToolDefinition(): array {
-		return [
+		return array(
 			'class'           => __CLASS__,
 			'method'          => 'handle_tool_call',
 			'description'     => 'Fetch search analytics data from Bing Webmaster Tools. Returns query performance stats, traffic rankings, page-level stats, or crawl information for the configured site. Use to analyze search visibility, top queries, and crawl health on Bing.',
 			'requires_config' => true,
-			'parameters'      => [
-				'action'   => [
+			'parameters'      => array(
+				'action'   => array(
 					'type'        => 'string',
 					'required'    => true,
 					'description' => 'Analytics action to perform: query_stats (search query performance), traffic_stats (rank and traffic data), page_stats (per-page metrics), crawl_stats (crawl information).',
-				],
-				'site_url' => [
+				),
+				'site_url' => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'Site URL to query. Defaults to the configured site URL.',
-				],
-				'limit'    => [
+				),
+				'limit'    => array(
 					'type'        => 'integer',
 					'required'    => false,
 					'description' => 'Maximum number of results to return (default: 20).',
-				],
-			],
-		];
+				),
+			),
+		);
 	}
 
 	/**
@@ -153,24 +153,24 @@ class BingWebmaster extends BaseTool {
 		$site_url = esc_url_raw( $config_data['site_url'] ?? '' );
 
 		if ( empty( $api_key ) ) {
-			wp_send_json_error( [ 'message' => __( 'Bing Webmaster API key is required', 'data-machine' ) ] );
+			wp_send_json_error( array( 'message' => __( 'Bing Webmaster API key is required', 'data-machine' ) ) );
 			return;
 		}
 
-		$config = [
+		$config = array(
 			'api_key'  => $api_key,
 			'site_url' => $site_url,
-		];
+		);
 
 		if ( update_site_option( BingWebmasterAbilities::CONFIG_OPTION, $config ) ) {
 			wp_send_json_success(
-				[
+				array(
 					'message'    => __( 'Bing Webmaster Tools configuration saved successfully', 'data-machine' ),
 					'configured' => true,
-				]
+				)
 			);
 		} else {
-			wp_send_json_error( [ 'message' => __( 'Failed to save configuration', 'data-machine' ) ] );
+			wp_send_json_error( array( 'message' => __( 'Failed to save configuration', 'data-machine' ) ) );
 		}
 	}
 
@@ -181,27 +181,26 @@ class BingWebmaster extends BaseTool {
 	 * @param string $tool_id Tool identifier.
 	 * @return array
 	 */
-	public function get_config_fields( $fields = [], $tool_id = '' ) {
+	public function get_config_fields( $fields = array(), $tool_id = '' ) {
 		if ( ! empty( $tool_id ) && 'bing_webmaster' !== $tool_id ) {
 			return $fields;
 		}
 
-		return [
-			'api_key'  => [
+		return array(
+			'api_key'  => array(
 				'type'        => 'password',
 				'label'       => __( 'Bing Webmaster API Key', 'data-machine' ),
 				'placeholder' => __( 'Enter your Bing Webmaster API key', 'data-machine' ),
 				'required'    => true,
 				'description' => __( 'Get your API key from Bing Webmaster Tools → Settings → API Access', 'data-machine' ),
-			],
-			'site_url' => [
+			),
+			'site_url' => array(
 				'type'        => 'text',
 				'label'       => __( 'Site URL', 'data-machine' ),
 				'placeholder' => 'https://yoursite.com',
 				'required'    => false,
 				'description' => __( 'The site URL registered in Bing Webmaster Tools. Defaults to your WordPress site URL.', 'data-machine' ),
-			],
-		];
+			),
+		);
 	}
 }
-

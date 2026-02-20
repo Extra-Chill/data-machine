@@ -38,31 +38,31 @@ class UpdateFlowStepAbility {
 						'type'       => 'object',
 						'required'   => array( 'flow_step_id' ),
 						'properties' => array(
-							'flow_step_id'   => array(
+							'flow_step_id'       => array(
 								'type'        => 'string',
 								'description' => __( 'Flow step ID to update', 'data-machine' ),
 							),
-							'handler_slug'   => array(
+							'handler_slug'       => array(
 								'type'        => 'string',
 								'description' => __( 'Handler slug to set (uses existing if empty)', 'data-machine' ),
 							),
-							'handler_config' => array(
+							'handler_config'     => array(
 								'type'        => 'object',
 								'description' => __( 'Handler configuration settings to merge', 'data-machine' ),
 							),
-							'user_message'        => array(
+							'user_message'       => array(
 								'type'        => 'string',
 								'description' => __( 'User message for AI steps', 'data-machine' ),
 							),
-							'add_handler'         => array(
+							'add_handler'        => array(
 								'type'        => 'string',
 								'description' => __( 'Add an additional handler to this step (multi-handler mode). Provide handler slug.', 'data-machine' ),
 							),
-							'add_handler_config'  => array(
+							'add_handler_config' => array(
 								'type'        => 'object',
 								'description' => __( 'Configuration for the handler being added via add_handler.', 'data-machine' ),
 							),
-							'remove_handler'      => array(
+							'remove_handler'     => array(
 								'type'        => 'string',
 								'description' => __( 'Remove a handler from this step (multi-handler mode). Provide handler slug to remove.', 'data-machine' ),
 							),

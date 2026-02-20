@@ -55,9 +55,9 @@ class OAuth1Handler {
 					'error',
 					'OAuth1: Failed to get request token',
 					array(
-						'provider'   => $provider_key,
-						'http_code'  => $connection->getLastHttpCode(),
-						'response'   => $connection->getLastBody(),
+						'provider'  => $provider_key,
+						'http_code' => $connection->getLastHttpCode(),
+						'response'  => $connection->getLastBody(),
 					)
 				);
 
@@ -92,8 +92,8 @@ class OAuth1Handler {
 				'error',
 				'OAuth1: Exception getting request token',
 				array(
-					'provider'   => $provider_key,
-					'error'      => $e->getMessage(),
+					'provider' => $provider_key,
+					'error'    => $e->getMessage(),
 				)
 			);
 
@@ -164,7 +164,7 @@ class OAuth1Handler {
 				'error',
 				'OAuth1: Callback nonce verification failed',
 				array(
-					'provider'   => $provider_key,
+					'provider' => $provider_key,
 				)
 			);
 			$this->redirect_with_error( $provider_key, 'invalid_nonce' );
@@ -249,9 +249,9 @@ class OAuth1Handler {
 					'error',
 					'OAuth1: Failed to get access token',
 					array(
-						'provider'   => $provider_key,
-						'http_code'  => $connection->getLastHttpCode(),
-						'response'   => $connection->getLastBody(),
+						'provider'  => $provider_key,
+						'http_code' => $connection->getLastHttpCode(),
+						'response'  => $connection->getLastBody(),
 					)
 				);
 
@@ -272,7 +272,7 @@ class OAuth1Handler {
 					'error',
 					'OAuth1: No storage callback provided',
 					array(
-						'provider'   => $provider_key,
+						'provider' => $provider_key,
 					)
 				);
 			}
@@ -283,7 +283,7 @@ class OAuth1Handler {
 					'error',
 					'OAuth1: Failed to store account data',
 					array(
-						'provider'   => $provider_key,
+						'provider' => $provider_key,
 					)
 				);
 
@@ -296,8 +296,8 @@ class OAuth1Handler {
 				'info',
 				'OAuth1: Authentication successful',
 				array(
-					'provider'   => $provider_key,
-					'user_id'    => $account_data['user_id'] ?? 'unknown',
+					'provider' => $provider_key,
+					'user_id'  => $account_data['user_id'] ?? 'unknown',
 				)
 			);
 
@@ -310,8 +310,8 @@ class OAuth1Handler {
 				'error',
 				'OAuth1: Exception during callback',
 				array(
-					'provider'   => $provider_key,
-					'error'      => $e->getMessage(),
+					'provider' => $provider_key,
+					'error'    => $e->getMessage(),
 				)
 			);
 

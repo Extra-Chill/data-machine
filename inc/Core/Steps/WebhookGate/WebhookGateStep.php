@@ -42,12 +42,12 @@ class WebhookGateStep extends Step {
 			usesHandler: false,
 			hasPipelineConfig: false,
 			consumeAllPackets: false,
-			stepSettings: [
+			stepSettings: array(
 				'config_type' => 'inline',
 				'modal_type'  => 'configure-step',
 				'button_text' => 'Configure',
 				'label'       => 'Webhook Gate Configuration',
-			],
+			),
 			showSettingsDisplay: false
 		);
 
@@ -110,17 +110,20 @@ class WebhookGateStep extends Step {
 					'datamachine_fail_job',
 					$job_id,
 					'webhook_gate_timeout',
-					[
+					array(
 						'flow_step_id'  => '',
 						'error_message' => 'Webhook gate timed out waiting for inbound webhook.',
-					]
+					)
 				);
 
 				do_action(
 					'datamachine_log',
 					'warning',
 					"Webhook Gate: Timed out for job #{$job_id}",
-					[ 'job_id' => $job_id, 'token' => $token ]
+					array(
+						'job_id' => $job_id,
+						'token'  => $token,
+					)
 				);
 			},
 			10,
@@ -142,20 +145,20 @@ class WebhookGateStep extends Step {
 			register_rest_route(
 				'datamachine/v1',
 				'/webhook/(?P<token>[a-f0-9]{64})',
-				[
+				array(
 					'methods'             => 'POST',
-					'callback'            => [ __CLASS__, 'handleInboundWebhook' ],
+					'callback'            => array( __CLASS__, 'handleInboundWebhook' ),
 					'permission_callback' => '__return_true', // Auth is via the token itself
-					'args'                => [
-						'token' => [
+					'args'                => array(
+						'token' => array(
 							'required'          => true,
 							'type'              => 'string',
 							'validate_callback' => function ( $value ) {
 								return (bool) preg_match( '/^[a-f0-9]{64}$/', $value );
 							},
-						],
-					],
-				]
+						),
+					),
+				)
 			);
 		} );
 	}
@@ -187,28 +190,28 @@ class WebhookGateStep extends Step {
 		$timeout_hours  = (int) ( $handler_config['timeout_hours'] ?? 0 );
 
 		// Determine the next step ID for resumption.
-		$navigator      = new \DataMachine\Engine\StepNavigator();
-		$payload        = [
+		$navigator    = new \DataMachine\Engine\StepNavigator();
+		$payload      = array(
 			'job_id'       => $this->job_id,
 			'flow_step_id' => $this->flow_step_id,
 			'data'         => $this->dataPackets,
 			'engine'       => $this->engine,
-		];
-		$next_step_id   = $navigator->get_next_flow_step_id( $this->flow_step_id, $payload );
+		);
+		$next_step_id = $navigator->get_next_flow_step_id( $this->flow_step_id, $payload );
 
 		// Store webhook gate context in engine_data.
 		datamachine_merge_engine_data(
 			$this->job_id,
-			[
-				'webhook_gate' => [
-					'token'            => $token,
-					'flow_step_id'     => $this->flow_step_id,
+			array(
+				'webhook_gate' => array(
+					'token'             => $token,
+					'flow_step_id'      => $this->flow_step_id,
 					'next_flow_step_id' => $next_step_id,
-					'created_at'       => gmdate( 'Y-m-d\TH:i:s\Z' ),
-					'timeout_hours'    => $timeout_hours,
-					'status'           => 'waiting',
-				],
-			]
+					'created_at'        => gmdate( 'Y-m-d\TH:i:s\Z' ),
+					'timeout_hours'     => $timeout_hours,
+					'status'            => 'waiting',
+				),
+			)
 		);
 
 		// Store the token → job_id mapping in a transient for fast lookup.
@@ -221,7 +224,10 @@ class WebhookGateStep extends Step {
 			as_schedule_single_action(
 				time() + ( $timeout_hours * HOUR_IN_SECONDS ),
 				'datamachine_webhook_gate_timeout',
-				[ 'job_id' => $this->job_id, 'token' => $token ],
+				array(
+					'job_id' => $this->job_id,
+					'token'  => $token,
+				),
 				'data-machine'
 			);
 		}
@@ -230,7 +236,7 @@ class WebhookGateStep extends Step {
 		// and park the job without scheduling the next step.
 		datamachine_merge_engine_data(
 			$this->job_id,
-			[ 'job_status' => JobStatus::WAITING ]
+			array( 'job_status' => JobStatus::WAITING )
 		);
 
 		// Update the actual job status in the database.
@@ -242,28 +248,28 @@ class WebhookGateStep extends Step {
 		do_action(
 			'datamachine_log',
 			'info',
-			"Webhook Gate: Pipeline parked, waiting for webhook",
-			[
-				'job_id'       => $this->job_id,
-				'flow_step_id' => $this->flow_step_id,
-				'webhook_url'  => $webhook_url,
+			'Webhook Gate: Pipeline parked, waiting for webhook',
+			array(
+				'job_id'        => $this->job_id,
+				'flow_step_id'  => $this->flow_step_id,
+				'webhook_url'   => $webhook_url,
 				'timeout_hours' => $timeout_hours,
-			]
+			)
 		);
 
 		$result_packet = new DataPacket(
-			[
+			array(
 				'title'       => 'Webhook Gate Active',
 				'body'        => "Pipeline paused. Waiting for webhook at: {$webhook_url}",
 				'webhook_url' => $webhook_url,
 				'token'       => $token,
-			],
-			[
+			),
+			array(
 				'source_type'  => 'webhook_gate',
 				'flow_step_id' => $this->flow_step_id,
 				'success'      => true,
 				'waiting'      => true,
-			],
+			),
 			'webhook_gate_waiting'
 		);
 
@@ -284,7 +290,7 @@ class WebhookGateStep extends Step {
 			return new \WP_Error(
 				'invalid_token',
 				'Webhook token not found or expired.',
-				[ 'status' => 404 ]
+				array( 'status' => 404 )
 			);
 		}
 
@@ -298,19 +304,19 @@ class WebhookGateStep extends Step {
 			return new \WP_Error(
 				'job_not_waiting',
 				'Job is not in waiting status.',
-				[ 'status' => 409 ]
+				array( 'status' => 409 )
 			);
 		}
 
 		// Get the webhook gate context from engine_data.
 		$engine_data = datamachine_get_engine_data( $job_id );
-		$gate_data   = $engine_data['webhook_gate'] ?? [];
+		$gate_data   = $engine_data['webhook_gate'] ?? array();
 
 		if ( empty( $gate_data['next_flow_step_id'] ) ) {
 			return new \WP_Error(
 				'no_next_step',
 				'No next step configured for this webhook gate.',
-				[ 'status' => 500 ]
+				array( 'status' => 500 )
 			);
 		}
 
@@ -322,35 +328,35 @@ class WebhookGateStep extends Step {
 			$webhook_body = $request->get_body_params();
 		}
 		if ( empty( $webhook_body ) ) {
-			$webhook_body = [];
+			$webhook_body = array();
 		}
 
 		$webhook_packet = new DataPacket(
-			[
+			array(
 				'title' => 'Webhook Payload',
 				'body'  => $webhook_body,
-			],
-			[
+			),
+			array(
 				'source_type'  => 'webhook_gate_inbound',
 				'flow_step_id' => $gate_data['flow_step_id'] ?? '',
 				'received_at'  => gmdate( 'Y-m-d\TH:i:s\Z' ),
 				'remote_ip'    => $request->get_header( 'x-forwarded-for' ) ?? $_SERVER['REMOTE_ADDR'] ?? '',
-			],
+			),
 			'webhook_payload'
 		);
 
-		$data_packets = $webhook_packet->addTo( [] );
+		$data_packets = $webhook_packet->addTo( array() );
 
 		// Update engine_data: clear webhook_gate status, remove job_status override.
 		datamachine_merge_engine_data(
 			$job_id,
-			[
-				'webhook_gate' => array_merge( $gate_data, [
+			array(
+				'webhook_gate' => array_merge( $gate_data, array(
 					'status'      => 'received',
 					'received_at' => gmdate( 'Y-m-d\TH:i:s\Z' ),
-				] ),
+				) ),
 				'job_status'   => null, // Clear the status override so engine proceeds normally.
-			]
+			)
 		);
 
 		// Update job status back to processing.
@@ -365,21 +371,21 @@ class WebhookGateStep extends Step {
 		do_action(
 			'datamachine_log',
 			'info',
-			"Webhook Gate: Pipeline resumed via inbound webhook",
-			[
-				'job_id'        => $job_id,
-				'next_step_id'  => $next_step_id,
-				'payload_keys'  => array_keys( $webhook_body ),
-			]
+			'Webhook Gate: Pipeline resumed via inbound webhook',
+			array(
+				'job_id'       => $job_id,
+				'next_step_id' => $next_step_id,
+				'payload_keys' => array_keys( $webhook_body ),
+			)
 		);
 
 		return new \WP_REST_Response(
-			[
-				'success'       => true,
-				'job_id'        => $job_id,
-				'next_step_id'  => $next_step_id,
-				'message'       => 'Pipeline resumed.',
-			],
+			array(
+				'success'      => true,
+				'job_id'       => $job_id,
+				'next_step_id' => $next_step_id,
+				'message'      => 'Pipeline resumed.',
+			),
 			200
 		);
 	}
