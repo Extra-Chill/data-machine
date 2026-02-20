@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
+## [0.28.2] - 2026-02-20
+
+### Fixed
+- update activation hook for disabled_tools opt-out pattern
+
 ## [0.28.1] - 2026-02-20
 
 ### Added
