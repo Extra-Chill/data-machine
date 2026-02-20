@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
+## [0.28.3] - 2026-02-20
+
+### Fixed
+- update remaining self:: calls to FlowStepNormalizer in ability classes
+- rename Chat::get_table_name() to avoid static override conflict
+- update tests for disabled_tools opt-out pattern
+- Move handler CLI commands from pipelines to flows (correct scope)
+
 ## [0.28.2] - 2026-02-20
 
 ### Fixed
