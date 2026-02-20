@@ -33,21 +33,21 @@ class SettingsCommandTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'Error:', $output );
 	}
 
-	public function test_set_parses_enabled_tools_comma_list(): void {
+	public function test_set_parses_disabled_tools_comma_list(): void {
 		ob_start();
 
 		$command = new SettingsCommand();
-		$command->set( [ 'enabled_tools', 'example-tool-a,example-tool-b' ], [] );
+		$command->set( [ 'disabled_tools', 'example-tool-a,example-tool-b' ], [] );
 
 		$output = ob_get_clean();
 
 		$this->assertStringContainsString( 'Success:', $output );
 
 		$settings = get_option( 'datamachine_settings', [] );
-		$this->assertArrayHasKey( 'enabled_tools', $settings );
+		$this->assertArrayHasKey( 'disabled_tools', $settings );
 		$this->assertSame(
 			[ 'example-tool-a' => true, 'example-tool-b' => true ],
-			$settings['enabled_tools']
+			$settings['disabled_tools']
 		);
 	}
 }

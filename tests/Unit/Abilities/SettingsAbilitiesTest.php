@@ -101,7 +101,7 @@ class SettingsAbilitiesTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'default_provider', $settings );
 		$this->assertArrayHasKey( 'default_model', $settings );
 		$this->assertArrayHasKey( 'max_turns', $settings );
-		$this->assertArrayHasKey( 'enabled_tools', $settings );
+		$this->assertArrayHasKey( 'disabled_tools', $settings );
 		$this->assertArrayHasKey( 'ai_provider_keys', $settings );
 	}
 
