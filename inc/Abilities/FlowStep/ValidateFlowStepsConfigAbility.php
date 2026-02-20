@@ -206,7 +206,7 @@ class ValidateFlowStepsConfigAbility {
 
 				++$total_matching_steps;
 
-				$existing_handler_slug  = self::getPrimaryHandlerSlug( $step_config );
+				$existing_handler_slug  = FlowStepNormalizer::getPrimaryHandlerSlug( $step_config );
 				$effective_handler_slug = $target_handler_slug ?? $existing_handler_slug;
 
 				if ( empty( $effective_handler_slug ) ) {
