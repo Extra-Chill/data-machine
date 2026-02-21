@@ -38,9 +38,13 @@ define( 'DATAMACHINE_SOCIALS_URL', plugin_dir_url( __FILE__ ) );
 require_once __DIR__ . '/vendor/autoload.php';
 
 /**
- * Load and instantiate social media handlers - they self-register via constructors.
+ * Load and instantiate social media handlers and abilities.
  */
 function datamachine_socials_load_handlers() {
+	// Load Abilities (they self-register)
+	new \DataMachineSocials\Abilities\Pinterest\PinterestBoardsAbility();
+	new \DataMachineSocials\Abilities\Pinterest\PinterestPublishAbility();
+
 	// Social Publish Handlers
 	new \DataMachineSocials\Handlers\Twitter\Twitter();
 	new \DataMachineSocials\Handlers\Facebook\Facebook();
@@ -51,3 +55,11 @@ function datamachine_socials_load_handlers() {
 
 // Hook into plugins_loaded to ensure Data Machine core is loaded first
 add_action( 'plugins_loaded', 'datamachine_socials_load_handlers', 20 );
+
+/**
+ * Register WP-CLI commands.
+ */
+if ( defined( 'WP_CLI' ) && WP_CLI ) {
+	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/PinterestCommand.php';
+	WP_CLI::add_command( 'datamachine-socials pinterest', \DataMachineSocials\Cli\Commands\PinterestCommand::class );
+}
