@@ -1081,15 +1081,13 @@
 
 /* ===== URL LIST FIELD ===== */
 .datamachine-url-list-field__row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 8px;
 }
 
 .datamachine-url-list-field__row .components-text-control__input {
-    flex: 1;
-    margin-bottom: 0;
+	margin-bottom: 0;
 }
 
 .datamachine-url-list-field__help {
