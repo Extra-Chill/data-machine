@@ -131,10 +131,9 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/SystemAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Media/AltTextAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Media/ImageGenerationAbilities.php';
-	require_once __DIR__ . '/inc/Abilities/Analytics/BingWebmasterAbilities.php';
-	require_once __DIR__ . '/inc/Abilities/Analytics/GoogleSearchConsoleAbilities.php';
-	require_once __DIR__ . '/inc/Abilities/Pinterest/PinterestAbilities.php';
-	require_once __DIR__ . '/inc/Abilities/AgentPingAbilities.php';
+require_once __DIR__ . '/inc/Abilities/Analytics/BingWebmasterAbilities.php';
+require_once __DIR__ . '/inc/Abilities/Analytics/GoogleSearchConsoleAbilities.php';
+require_once __DIR__ . '/inc/Abilities/AgentPingAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/TaxonomyAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/InternalLinkingAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Content/BlockSanitizer.php';
@@ -161,10 +160,9 @@ function datamachine_run_datamachine_plugin() {
 		new \DataMachine\Engine\AI\System\SystemAgentServiceProvider();
 		new \DataMachine\Abilities\Media\AltTextAbilities();
 		new \DataMachine\Abilities\Media\ImageGenerationAbilities();
-		new \DataMachine\Abilities\Analytics\BingWebmasterAbilities();
-		new \DataMachine\Abilities\Analytics\GoogleSearchConsoleAbilities();
-		new \DataMachine\Abilities\Pinterest\PinterestAbilities();
-		new \DataMachine\Abilities\AgentPingAbilities();
+	new \DataMachine\Abilities\Analytics\BingWebmasterAbilities();
+	new \DataMachine\Abilities\Analytics\GoogleSearchConsoleAbilities();
+	new \DataMachine\Abilities\AgentPingAbilities();
 		new \DataMachine\Abilities\TaxonomyAbilities();
 		new \DataMachine\Abilities\InternalLinkingAbilities();
 		new \DataMachine\Abilities\Content\GetPostBlocksAbility();
