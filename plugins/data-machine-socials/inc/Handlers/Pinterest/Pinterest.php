@@ -15,7 +15,7 @@
 namespace DataMachineSocials\Handlers\Pinterest;
 
 use DataMachine\Abilities\AuthAbilities;
-use DataMachine\Abilities\Pinterest\PinterestAbilities;
+use DataMachineSocials\Abilities\Pinterest\PinterestBoardsAbility;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\Steps\Publish\Handlers\PublishHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
@@ -54,10 +54,10 @@ class Pinterest extends PublishHandler {
 				if ( 'pinterest_publish' === $handler_slug ) {
 					$board_id_description = 'Pinterest board ID override (uses default if omitted)';
 
-					// Inject cached board names when AI decides mode is active.
-					$mode = $handler_config['board_selection_mode'] ?? 'pre_selected';
-					if ( 'ai_decides' === $mode ) {
-						$cached_boards = PinterestAbilities::get_cached_boards();
+		// Inject cached board names when AI decides mode is active.
+		$mode = $handler_config['board_selection_mode'] ?? 'pre_selected';
+		if ( 'ai_decides' === $mode ) {
+			$cached_boards = PinterestBoardsAbility::get_cached_boards();
 						if ( ! empty( $cached_boards ) ) {
 							$board_list = implode( ', ', array_map( function ( $b ) {
 								return $b['name'] . ' (' . $b['id'] . ')';
@@ -289,7 +289,7 @@ class Pinterest extends PublishHandler {
 			}
 		}
 
-		$board_id = PinterestAbilities::resolve_board_id( $post_id, $handler_config );
+		$board_id = PinterestBoardsAbility::resolve_board_id( $post_id, $handler_config );
 		if ( $board_id ) {
 			$this->log( 'info', 'Pinterest: Board ID from abilities resolution', array( 'board_id' => $board_id ) );
 			return $board_id;
