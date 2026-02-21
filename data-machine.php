@@ -215,14 +215,9 @@ function datamachine_load_step_types() {
  * Clean, explicit approach using composer PSR-4 autoloading.
  */
 function datamachine_load_handlers() {
-	// Publish Handlers
+	// Publish Handlers (core only - social handlers moved to data-machine-socials plugin)
 	new \DataMachine\Core\Steps\Publish\Handlers\WordPress\WordPress();
-	new \DataMachine\Core\Steps\Publish\Handlers\Twitter\Twitter();
-	new \DataMachine\Core\Steps\Publish\Handlers\Facebook\Facebook();
 	new \DataMachine\Core\Steps\Publish\Handlers\GoogleSheets\GoogleSheets();
-	new \DataMachine\Core\Steps\Publish\Handlers\Threads\Threads();
-	new \DataMachine\Core\Steps\Publish\Handlers\Bluesky\Bluesky();
-	new \DataMachine\Core\Steps\Publish\Handlers\Pinterest\Pinterest();
 
 	// Fetch Handlers
 	new \DataMachine\Core\Steps\Fetch\Handlers\WordPress\WordPress();
