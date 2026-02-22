@@ -28,9 +28,9 @@ Data Machine turns WordPress into an AI-powered content automation hub:
 | Workflow | Steps |
 |----------|-------|
 | Content Syndication | RSS → AI rewrites → Publish to WordPress |
-| Social Automation | WordPress posts → AI summarizes → Post to Twitter |
 | Content Aggregation | Reddit/Sheets → AI filters → Create drafts |
 | Site Maintenance | Local posts → AI improves SEO → Update content |
+| Multi-platform Publishing | Content → AI optimizes → Publish to multiple destinations via extensions |
 
 ## For AI Agents
 
@@ -58,8 +58,19 @@ See [skills/data-machine/SKILL.md](skills/data-machine/SKILL.md) for agent integ
 | Type | Options |
 |------|---------|
 | **Fetch** | RSS, Reddit, Google Sheets, WordPress API, Files, Media |
-| **Publish** | WordPress, Twitter, Threads, Bluesky, Facebook, Sheets |
+| **Publish** | WordPress, Google Sheets |
 | **Update** | WordPress posts with AI enhancement |
+
+## Extensions
+
+Extend Data Machine with companion plugins:
+
+| Plugin | Description |
+|--------|-------------|
+| [data-machine-socials](https://github.com/Extra-Chill/data-machine-socials) | Publish to Twitter, Threads, Bluesky, Facebook, Pinterest |
+| [datamachine-events](https://github.com/Extra-Chill/datamachine-events) | Event data extraction and structured data processing |
+| [datamachine-recipes](https://github.com/Sarai-Chinwag/datamachine-recipes) | Recipe content extraction and schema processing |
+| [data-machine-quiz](https://github.com/Sarai-Chinwag/data-machine-quiz) | Quiz creation and management tools |
 
 ## AI Providers
 
