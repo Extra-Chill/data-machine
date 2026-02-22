@@ -142,7 +142,6 @@ require_once __DIR__ . '/inc/Abilities/Content/EditPostBlocksAbility.php';
 require_once __DIR__ . '/inc/Abilities/Content/ReplacePostBlocksAbility.php';
 require_once __DIR__ . '/inc/Abilities/Fetch/FetchRedditAbility.php';
 require_once __DIR__ . '/inc/Abilities/Fetch/FetchRssAbility.php';
-require_once __DIR__ . '/inc/Abilities/Fetch/FetchGoogleSheetsAbility.php';
 require_once __DIR__ . '/inc/Abilities/Publish/PublishWordPressAbility.php';
 // Defer ability instantiation to init so translations are loaded.
 add_action( 'init', function () {
@@ -174,7 +173,6 @@ add_action( 'init', function () {
 	new \DataMachine\Abilities\Content\ReplacePostBlocksAbility();
 	new \DataMachine\Abilities\Fetch\FetchRedditAbility();
 	new \DataMachine\Abilities\Fetch\FetchRssAbility();
-	new \DataMachine\Abilities\Fetch\FetchGoogleSheetsAbility();
 	new \DataMachine\Abilities\Publish\PublishWordPressAbility();
 } );
 }
