@@ -1,0 +1,20 @@
+{
+	"name": "extra-chill/data-machine-business",
+	"description": "Business and enterprise integrations for Data Machine",
+	"version": "0.1.0",
+	"license": "GPL-2.0-or-later",
+	"require": {
+		"php": ">=8.2"
+	},
+	"autoload": {
+		"psr-4": {
+			"DataMachineBusiness\\": "inc/"
+		}
+	},
+	"authors": [
+		{
+			"name": "Chris Huber",
+			"email": "chris@chubes.net"
+		}
+	]
+}
