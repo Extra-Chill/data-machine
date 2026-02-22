@@ -223,14 +223,12 @@ function datamachine_load_step_types() {
 function datamachine_load_handlers() {
 	// Publish Handlers (core only - social handlers moved to data-machine-socials plugin)
 	new \DataMachine\Core\Steps\Publish\Handlers\WordPress\WordPress();
-	new \DataMachine\Core\Steps\Publish\Handlers\GoogleSheets\GoogleSheets();
 
 	// Fetch Handlers
 	new \DataMachine\Core\Steps\Fetch\Handlers\WordPress\WordPress();
 	new \DataMachine\Core\Steps\Fetch\Handlers\WordPressAPI\WordPressAPI();
 	new \DataMachine\Core\Steps\Fetch\Handlers\WordPressMedia\WordPressMedia();
 	new \DataMachine\Core\Steps\Fetch\Handlers\Rss\Rss();
-	new \DataMachine\Core\Steps\Fetch\Handlers\GoogleSheets\GoogleSheetsFetch();
 	new \DataMachine\Core\Steps\Fetch\Handlers\Reddit\Reddit();
 	new \DataMachine\Core\Steps\Fetch\Handlers\Files\Files();
 
