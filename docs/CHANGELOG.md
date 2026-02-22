@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
+## Unreleased
+
+### Changed
+- Update documentation to reflect social media handler extraction
+
+### Removed
+- Extract social media handlers (Twitter, Facebook, Threads, Bluesky, Pinterest) to data-machine-socials plugin
+- Remove Pinterest abilities from core (moved to data-machine-socials plugin)
+
 ## [0.28.3] - 2026-02-20
 
 ### Fixed

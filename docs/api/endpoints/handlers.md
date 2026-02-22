@@ -67,34 +67,9 @@ curl https://example.com/wp-json/datamachine/v1/handlers?step_type=update \
       "auth_type": "oauth2",
       "auth_fields": ["client_id", "client_secret"],
       "callback_url": "https://example.com/wp-admin/admin.php?page=datamachine",
-      "is_authenticated": false
-    },
-    "twitter": {
-      "type": "publish",
-      "class": "DataMachine\\Core\\Steps\\Publish\\Handlers\\Twitter\\Twitter",
-      "label": "Twitter",
-      "description": "Post content to Twitter",
-      "requires_auth": true,
-      "auth_type": "oauth1",
-      "auth_fields": ["api_key", "api_secret"],
-      "callback_url": "https://example.com/wp-admin/admin.php?page=datamachine",
-      "is_authenticated": true,
-      "account_details": {
-        "username": "exampleuser",
-        "id": "1234567890"
-      }
-    },
-    "bluesky": {
-      "type": "publish",
-      "class": "DataMachine\\Core\\Steps\\Publish\\Handlers\\Bluesky\\Bluesky",
-      "label": "Bluesky",
-      "description": "Post content to Bluesky",
-      "requires_auth": true,
-      "auth_type": "app_password",
-      "auth_fields": ["handle", "password"],
-      "is_authenticated": false
-    },
-    "wordpress": {
+"is_authenticated": false
+},
+"wordpress": {
       "type": "publish",
       "class": "DataMachine\\Core\\Steps\\Publish\\Handlers\\WordPress\\WordPress",
       "label": "WordPress",
