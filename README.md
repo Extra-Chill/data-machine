@@ -96,3 +96,7 @@ homeboy lint data-machine   # PHPCS with WordPress standards
 - [skills/data-machine/SKILL.md](skills/data-machine/SKILL.md) — Agent integration patterns
 - [AGENTS.md](AGENTS.md) — Technical reference for contributors
 - [docs/CHANGELOG.md](docs/CHANGELOG.md) — Version history
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Extra-Chill/data-machine&type=date&legend=top-left)](https://www.star-history.com/#Extra-Chill/data-machine&type=date&legend=top-left)
