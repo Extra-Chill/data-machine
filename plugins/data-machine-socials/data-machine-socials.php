@@ -42,8 +42,21 @@ require_once __DIR__ . '/vendor/autoload.php';
  */
 function datamachine_socials_load_handlers() {
 	// Load Abilities (they self-register)
+	// Pinterest
 	new \DataMachineSocials\Abilities\Pinterest\PinterestBoardsAbility();
 	new \DataMachineSocials\Abilities\Pinterest\PinterestPublishAbility();
+
+	// Twitter
+	new \DataMachineSocials\Abilities\Twitter\TwitterPublishAbility();
+
+	// Facebook
+	new \DataMachineSocials\Abilities\Facebook\FacebookPublishAbility();
+
+	// Bluesky
+	new \DataMachineSocials\Abilities\Bluesky\BlueskyPublishAbility();
+
+	// Threads
+	new \DataMachineSocials\Abilities\Threads\ThreadsPublishAbility();
 
 	// Social Publish Handlers
 	new \DataMachineSocials\Handlers\Twitter\Twitter();

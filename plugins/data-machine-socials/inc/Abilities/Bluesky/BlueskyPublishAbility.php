@@ -1,0 +1,365 @@
+<?php
+/**
+ * Bluesky Publish Ability
+ *
+ * Primitive ability for publishing content to Bluesky via AT Protocol.
+ *
+ * @package DataMachineSocials\Abilities\Bluesky
+ * @since 0.1.0
+ */
+
+namespace DataMachineSocials\Abilities\Bluesky;
+
+use DataMachine\Abilities\AuthAbilities;
+use DataMachine\Abilities\PermissionHelper;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Bluesky Publish Ability
+ */
+class BlueskyPublishAbility {
+
+	/**
+	 * Whether the ability has been registered.
+	 *
+	 * @var bool
+	 */
+	private static bool $registered = false;
+
+	/**
+	 * Constructor.
+	 */
+	public function __construct() {
+		if ( self::$registered ) {
+			return;
+		}
+
+		$this->registerAbilities();
+		self::$registered = true;
+	}
+
+	/**
+	 * Register Bluesky publish ability.
+	 *
+	 * @return void
+	 */
+	private function registerAbilities(): void {
+		$register_callback = function () {
+			wp_register_ability(
+				'datamachine/bluesky-publish',
+				array(
+					'label' => __( 'Publish to Bluesky', 'data-machine-socials' ),
+					'description' => __( 'Post content to Bluesky with optional media', 'data-machine-socials' ),
+					'category' => 'datamachine',
+					'input_schema' => array(
+						'type' => 'object',
+						'required' => array( 'content' ),
+						'properties' => array(
+							'content' => array(
+								'type' => 'string',
+								'description' => 'Post content text',
+							),
+							'title' => array(
+								'type' => 'string',
+								'description' => 'Post title (optional)',
+							),
+							'image_url' => array(
+								'type' => 'string',
+								'description' => 'URL to image for the post',
+								'format' => 'uri',
+							),
+							'source_url' => array(
+								'type' => 'string',
+								'description' => 'Source URL to include',
+								'format' => 'uri',
+							),
+						),
+					),
+					'output_schema' => array(
+						'type' => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'post_id' => array( 'type' => 'string' ),
+							'post_url' => array( 'type' => 'string', 'format' => 'uri' ),
+							'error' => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback' => array( self::class, 'execute_publish' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta' => array( 'show_in_rest' => true ),
+				)
+			);
+
+			// Get account ability
+			wp_register_ability(
+				'datamachine/bluesky-account',
+				array(
+					'label' => __( 'Bluesky Account Info', 'data-machine-socials' ),
+					'description' => __( 'Get authenticated Bluesky account details', 'data-machine-socials' ),
+					'category' => 'datamachine',
+					'input_schema' => array(
+						'type' => 'object',
+						'properties' => array(),
+					),
+					'output_schema' => array(
+						'type' => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'handle' => array( 'type' => 'string' ),
+							'did' => array( 'type' => 'string' ),
+							'error' => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback' => array( self::class, 'get_account' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta' => array( 'show_in_rest' => true ),
+				)
+			);
+		};
+
+		if ( did_action( 'wp_abilities_api_init' ) ) {
+			$register_callback();
+		} else {
+			add_action( 'wp_abilities_api_init', $register_callback );
+		}
+	}
+
+	/**
+	 * Execute Bluesky publish.
+	 *
+	 * @param array $input Ability input with publish parameters.
+	 * @return array Response with post details or error.
+	 */
+	public static function execute_publish( array $input ): array {
+		$content = $input['content'] ?? '';
+		$title = $input['title'] ?? '';
+		$image_url = $input['image_url'] ?? '';
+		$source_url = $input['source_url'] ?? '';
+
+		if ( empty( $content ) ) {
+			return array(
+				'success' => false,
+				'error' => 'Content is required',
+			);
+		}
+
+		$auth = new AuthAbilities();
+		$provider = $auth->getProvider( 'bluesky' );
+
+		if ( ! $provider || ! $provider->is_authenticated() ) {
+			return array(
+				'success' => false,
+				'error' => 'Bluesky not authenticated',
+			);
+		}
+
+		$handle = $provider->get_handle();
+		$app_password = $provider->get_app_password();
+
+		// Get auth token
+		$token = self::get_auth_token( $handle, $app_password );
+		if ( is_wp_error( $token ) ) {
+			return array(
+				'success' => false,
+				'error' => $token->get_error_message(),
+			);
+		}
+
+		$did = $token['did'];
+		$access_token = $token['access_token'];
+
+		// Upload image if provided
+		$image_blob = null;
+		if ( ! empty( $image_url ) && filter_var( $image_url, FILTER_VALIDATE_URL ) ) {
+			$image_blob = self::upload_image( $access_token, $image_url );
+		}
+
+		// Build post record
+		$post_text = $title ? $title . "\n\n" . $content : $content;
+		if ( ! empty( $source_url ) ) {
+			$post_text .= "\n\n" . $source_url;
+		}
+
+		$record = array(
+			'\$type' => 'app.bsky.feed.post',
+			'text' => $post_text,
+			'createdAt' => gmdate( 'c' ),
+		);
+
+		if ( $image_blob ) {
+			$record['embed'] = array(
+				'\$type' => 'app.bsky.embed.images',
+				'images' => array(
+					array(
+						'alt' => $title ?: 'Image',
+						'image' => $image_blob,
+					),
+				),
+			);
+		}
+
+		// Create post
+		$response = wp_remote_post(
+			'https://bsky.social/xrpc/com.atproto.repo.createRecord',
+			array(
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $access_token,
+					'Content-Type' => 'application/json',
+				),
+				'body' => wp_json_encode( array(
+					'repo' => $did,
+					'collection' => 'app.bsky.feed.post',
+					'record' => $record,
+				) ),
+				'timeout' => 30,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return array(
+				'success' => false,
+				'error' => $response->get_error_message(),
+			);
+		}
+
+		$status_code = wp_remote_retrieve_response_code( $response );
+		$body = wp_remote_retrieve_body( $response );
+		$data = json_decode( $body, true );
+
+		if ( $status_code >= 200 && $status_code < 300 && isset( $data['uri'] ) ) {
+			$parts = explode( '/', $data['uri'] );
+			$post_id = end( $parts );
+			$post_url = "https://bsky.app/profile/{$handle}/post/{$post_id}";
+
+			return array(
+				'success' => true,
+				'post_id' => $post_id,
+				'post_url' => $post_url,
+			);
+		}
+
+		$error_msg = 'Bluesky API error';
+		if ( isset( $data['message'] ) ) {
+			$error_msg = $data['message'];
+		}
+
+		return array(
+			'success' => false,
+			'error' => $error_msg,
+		);
+	}
+
+	/**
+	 * Get Bluesky account details.
+	 *
+	 * @param array $input Ability input.
+	 * @return array Account details or error.
+	 */
+	public static function get_account( array $input ): array {
+		$auth = new AuthAbilities();
+		$provider = $auth->getProvider( 'bluesky' );
+
+		if ( ! $provider || ! $provider->is_authenticated() ) {
+			return array(
+				'success' => false,
+				'error' => 'Bluesky not authenticated',
+			);
+		}
+
+		$handle = $provider->get_handle();
+
+		return array(
+			'success' => true,
+			'handle' => $handle,
+			'did' => $provider->get_did() ?? '',
+		);
+	}
+
+	/**
+	 * Get authentication token from Bluesky.
+	 *
+	 * @param string $handle Bluesky handle.
+	 * @param string $app_password App password.
+	 * @return array|\WP_Error Token data or error.
+	 */
+	private static function get_auth_token( string $handle, string $app_password ) {
+		$response = wp_remote_post(
+			'https://bsky.social/xrpc/com.atproto.server.createSession',
+			array(
+				'body' => wp_json_encode( array(
+					'identifier' => $handle,
+					'password' => $app_password,
+				) ),
+				'headers' => array( 'Content-Type' => 'application/json' ),
+				timeout => 15,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$status_code = wp_remote_retrieve_response_code( $response );
+		$body = wp_remote_retrieve_body( $response );
+		$data = json_decode( $body, true );
+
+		if ( $status_code >= 200 && $status_code < 300 ) {
+			return array(
+				'did' => $data['did'],
+				'access_token' => $data['accessJwt'],
+				'refresh_token' => $data['refreshJwt'] ?? '',
+			);
+		}
+
+		return new \WP_Error(
+			'bluesky_auth_failed',
+			$data['message'] ?? 'Authentication failed'
+		);
+	}
+
+	/**
+	 * Upload image to Bluesky.
+	 *
+	 * @param string $access_token Access token.
+	 * @param string $image_url Image URL.
+	 * @return array|null Blob reference or null.
+	 */
+	private static function upload_image( string $access_token, string $image_url ): ?array {
+		// Download image
+		$response = wp_remote_get( $image_url, array( 'timeout' => 30 ) );
+		if ( is_wp_error( $response ) ) {
+			return null;
+		}
+
+		$image_data = wp_remote_retrieve_body( $response );
+		$content_type = wp_remote_retrieve_header( $response, 'content-type' );
+
+		// Upload blob
+		$response = wp_remote_post(
+			'https://bsky.social/xrpc/com.atproto.repo.uploadBlob',
+			array(
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $access_token,
+					'Content-Type' => $content_type ?: 'image/jpeg',
+				),
+				'body' => $image_data,
+				'timeout' => 30,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return null;
+		}
+
+		$status_code = wp_remote_retrieve_response_code( $response );
+		$body = wp_remote_retrieve_body( $response );
+		$data = json_decode( $body, true );
+
+		if ( $status_code >= 200 && $status_code < 300 && isset( $data['blob'] ) ) {
+			return $data['blob'];
+		}
+
+		return null;
+	}
+}
