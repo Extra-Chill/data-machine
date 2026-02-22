@@ -9,6 +9,7 @@
 namespace DataMachine\Core\Steps\Fetch\Handlers\GoogleSheets;
 
 use DataMachine\Abilities\AuthAbilities;
+use DataMachine\Abilities\Fetch\FetchGoogleSheetsAbility;
 use DataMachine\Core\ExecutionContext;
 use DataMachine\Core\Steps\Fetch\Handlers\FetchHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
@@ -57,8 +58,8 @@ class GoogleSheetsFetch extends FetchHandler {
 					'error',
 					'Google Sheets Handler: Authentication service not available',
 					array(
-						'handler'             => 'googlesheets',
-						'missing_service'     => 'googlesheets',
+						'handler' => 'googlesheets',
+						'missing_service' => 'googlesheets',
 						'available_providers' => array_keys( $auth_abilities->getAllProviders() ),
 					)
 				);
@@ -69,15 +70,84 @@ class GoogleSheetsFetch extends FetchHandler {
 
 	/**
 	 * Fetch Google Sheets data as structured rows.
-	 * No engine data stored (no URLs for spreadsheet data).
+	 *
+	 * Delegates to FetchGoogleSheetsAbility for core logic.
 	 */
 	protected function executeFetch( array $config, ExecutionContext $context ): array {
-		// Configuration validation
-		$spreadsheet_id = trim( $config['spreadsheet_id'] ?? '' );
-		if ( empty( $spreadsheet_id ) ) {
-			$context->log( 'error', 'GoogleSheets: Spreadsheet ID is required.' );
+		// Get Google Sheets authentication service
+		$auth_service = $this->get_auth_service();
+		if ( ! $auth_service ) {
+			$context->log( 'error', 'GoogleSheets: Authentication not configured' );
 			return array();
 		}
+
+		// Get authenticated access token
+		$access_token = $auth_service->get_service();
+		if ( is_wp_error( $access_token ) ) {
+			$context->log(
+				'error',
+				'GoogleSheets: Authentication failed.',
+				array(
+					'error' => $access_token->get_error_message(),
+				)
+			);
+			return array();
+		}
+
+		// Build processed items array from context
+		$processed_items = array();
+
+		// Delegate to ability
+		$ability_input = array(
+			'spreadsheet_id' => $config['spreadsheet_id'] ?? '',
+			'access_token' => $access_token,
+			'worksheet_name' => $config['worksheet_name'] ?? 'Sheet1',
+			'processing_mode' => $config['processing_mode'] ?? 'by_row',
+			'has_header_row' => ! empty( $config['has_header_row'] ),
+			'processed_items' => $processed_items,
+		);
+
+		$ability = new FetchGoogleSheetsAbility();
+		$result = $ability->execute( $ability_input );
+
+		// Log ability logs
+		if ( ! empty( $result['logs'] ) && is_array( $result['logs'] ) ) {
+			foreach ( $result['logs'] as $log_entry ) {
+				$context->log(
+					$log_entry['level'] ?? 'debug',
+					$log_entry['message'] ?? '',
+					$log_entry['data'] ?? array()
+				);
+			}
+		}
+
+		if ( ! $result['success'] ) {
+			return array();
+		}
+
+		// If no data returned, return empty
+		if ( empty( $result['data'] ) ) {
+			return array();
+		}
+
+		$data = $result['data'];
+		$item_identifier = $result['item_identifier'] ?? '';
+
+		// Mark item as processed
+		if ( $item_identifier ) {
+			$context->markItemProcessed( $item_identifier );
+		}
+
+		// Store empty engine data
+		$context->storeEngineData(
+			array(
+				'source_url' => '',
+				'image_url' => '',
+			)
+		);
+
+		return $data;
+	}
 
 		$worksheet_name  = trim( $config['worksheet_name'] ?? 'Sheet1' );
 		$processing_mode = $config['processing_mode'] ?? 'by_row';

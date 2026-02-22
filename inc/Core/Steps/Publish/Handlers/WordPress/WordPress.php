@@ -7,6 +7,7 @@
 
 namespace DataMachine\Core\Steps\Publish\Handlers\WordPress;
 
+use DataMachine\Abilities\Publish\PublishWordPressAbility;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\Steps\Publish\Handlers\PublishHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
@@ -83,202 +84,84 @@ class WordPress extends PublishHandler {
 	 * and source URL attribution. Uses configuration hierarchy where system defaults
 	 * override handler-specific settings.
 	 *
+	 * Delegates to PublishWordPressAbility for core logic.
+	 *
 	 * @param array $parameters Tool call parameters including title, content, job_id
 	 * @param array $handler_config Handler configuration
 	 * @return array Success status with post data or error information
 	 */
 	protected function executePublish( array $parameters, array $handler_config ): array {
-		if ( empty( $parameters['title'] ) || empty( $parameters['content'] ) ) {
-			return $this->errorResponse(
-				'WordPress tool call missing required parameters',
-				array(
-					'provided_parameters' => array_keys( $parameters ),
-					'required_parameters' => array( 'title', 'content' ),
-					'parameter_values'    => array(
-						'title'          => $parameters['title'] ?? 'NOT_PROVIDED',
-						'content_length' => isset( $parameters['content'] ) ? strlen( $parameters['content'] ) : 'NOT_PROVIDED',
-					),
-				)
-			);
-		}
-
 		$engine = $parameters['engine'] ?? null;
 		if ( ! $engine instanceof EngineData ) {
 			$engine = new EngineData( $parameters['engine_data'] ?? array(), $parameters['job_id'] ?? null );
 		}
 
-		$taxonomies        = get_taxonomies( array( 'public' => true ), 'names' );
-		$taxonomy_settings = array();
-		foreach ( $taxonomies as $taxonomy ) {
+		// Build taxonomies array from handler config
+		$taxonomies = array();
+		$taxonomy_names = get_taxonomies( array( 'public' => true ), 'names' );
+		foreach ( $taxonomy_names as $taxonomy ) {
 			if ( ! \DataMachine\Core\WordPress\TaxonomyHandler::shouldSkipTaxonomy( $taxonomy ) ) {
-				$field_key                      = "taxonomy_{$taxonomy}_selection";
-				$taxonomy_settings[ $taxonomy ] = $handler_config[ $field_key ] ?? 'NOT_SET';
+				$field_key = "taxonomy_{$taxonomy}_selection";
+				$selection = $handler_config[ $field_key ] ?? 'skip';
+				
+				if ( 'ai_decides' === $selection && ! empty( $parameters[ $taxonomy ] ) ) {
+					$taxonomies[ $taxonomy ] = $parameters[ $taxonomy ];
+				}
 			}
 		}
 
-		$this->log(
-			'debug',
-			'WordPress Tool: Handler configuration accessed',
-			array(
-				'taxonomy_settings' => $taxonomy_settings,
-				'config_keys_count' => count( $handler_config ),
-			)
+		// Delegate to ability
+		$ability_input = array(
+			'title' => $parameters['title'] ?? '',
+			'content' => $parameters['content'] ?? '',
+			'post_type' => $handler_config['post_type'] ?? '',
+			'post_status' => WordPressSettingsResolver::getPostStatus( $handler_config ),
+			'post_author' => WordPressSettingsResolver::getPostAuthor( $handler_config ),
+			'taxonomies' => $taxonomies,
+			'featured_image_path' => $engine->getImagePath(),
+			'source_url' => $engine->getSourceUrl(),
+			'add_source_attribution' => true,
+			'job_id' => $parameters['job_id'] ?? null,
 		);
 
-		if ( empty( $handler_config['post_type'] ) ) {
-			return $this->errorResponse(
-				'WordPress publish handler missing required post_type configuration',
-				array(
-					'handler_config_keys' => array_keys( $handler_config ),
-					'provided_post_type'  => $handler_config['post_type'] ?? 'NOT_SET',
-				)
-			);
-		}
+		$ability = new PublishWordPressAbility();
+		$result = $ability->execute( $ability_input );
 
-		$content = wp_unslash( $parameters['content'] );
-		$content = wp_filter_post_kses( $content );
-
-		if ( empty( trim( wp_strip_all_tags( $content ) ) ) ) {
-			return $this->errorResponse(
-				'Content was empty after sanitization',
-				array(
-					'original_content_length'  => strlen( $parameters['content'] ),
-					'sanitized_content_length' => strlen( $content ),
-				)
-			);
-		}
-
-		$content = WordPressPublishHelper::applySourceAttribution( $content, $engine->getSourceUrl(), $handler_config );
-
-		$post_data = array(
-			'post_title'   => sanitize_text_field( wp_unslash( $parameters['title'] ) ),
-			'post_content' => $content,
-			'post_status'  => WordPressSettingsResolver::getPostStatus( $handler_config ),
-			'post_type'    => $handler_config['post_type'],
-			'post_author'  => WordPressSettingsResolver::getPostAuthor( $handler_config ),
-		);
-
-		$this->log(
-			'debug',
-			'WordPress Tool: Final post data for wp_insert_post',
-			array(
-				'post_author'    => $post_data['post_author'],
-				'post_status'    => $post_data['post_status'],
-				'post_type'      => $post_data['post_type'],
-				'title_length'   => strlen( $post_data['post_title'] ),
-				'content_length' => strlen( $post_data['post_content'] ),
-			)
-		);
-
-		$post_id = wp_insert_post( $post_data );
-
-		if ( is_wp_error( $post_id ) ) {
-			return $this->errorResponse(
-				'WordPress post creation failed: ' . $post_id->get_error_message(),
-				array(
-					'post_data' => $post_data,
-					'wp_error'  => $post_id->get_error_data(),
-				)
-			);
-		}
-
-		$this->storePostTrackingMeta( $post_id, $handler_config );
-
-		$engine_data_array     = $engine instanceof EngineData ? $engine->all() : array();
-		$taxonomy_results      = $this->taxonomy_handler->processTaxonomies( $post_id, $parameters, $handler_config, $engine_data_array );
-		$featured_image_result = null;
-		$attachment_id         = WordPressPublishHelper::attachImageToPost( $post_id, $engine->getImagePath(), $handler_config );
-		if ( $attachment_id ) {
-			$featured_image_result = array(
-				'success'        => true,
-				'attachment_id'  => $attachment_id,
-				'attachment_url' => wp_get_attachment_url( $attachment_id ),
-			);
-		}
-
-		// Store post metadata in engine snapshot
-		$job_id = $parameters['job_id'] ?? null;
-		if ( $job_id ) {
-			datamachine_merge_engine_data(
-				(int) $job_id,
-				array(
-					'post_id'       => $post_id,
-					'published_url' => get_permalink( $post_id ),
-				)
-			);
-		}
-
-		$this->log(
-			'debug',
-			'WordPress Tool: Post created successfully',
-			array(
-				'post_id'               => $post_id,
-				'post_url'              => get_permalink( $post_id ),
-				'taxonomy_results'      => $taxonomy_results,
-				'featured_image_result' => $featured_image_result,
-			)
-		);
-
-		return $this->successResponse(
-			array(
-				'post_id'               => $post_id,
-				'post_title'            => $parameters['title'],
-				'post_url'              => get_permalink( $post_id ),
-				'taxonomy_results'      => $taxonomy_results,
-				'featured_image_result' => $featured_image_result,
-			)
-		);
-	}
-
-	/**
-	 * Build WordPress-specific dry-run preview.
-	 *
-	 * @param array      $parameters Tool parameters
-	 * @param array      $handler_config Handler configuration
-	 * @param EngineData $engine Engine data instance
-	 * @return array Dry-run preview response
-	 */
-	protected function buildDryRunPreview( array $parameters, array $handler_config, EngineData $engine ): array {
-		$this->log(
-			'info',
-			'WordPress Tool: Dry-run mode - returning preview without creating post',
-			array(
-				'post_title' => $parameters['title'] ?? '',
-				'post_type'  => $handler_config['post_type'] ?? '',
-			)
-		);
-
-		$content         = wp_unslash( $parameters['content'] ?? '' );
-		$content         = wp_filter_post_kses( $content );
-		$content_preview = strlen( $content ) > 500 ? substr( $content, 0, 500 ) . '...' : $content;
-
-		// Get taxonomy settings for preview
-		$taxonomies        = get_taxonomies( array( 'public' => true ), 'names' );
-		$taxonomy_settings = array();
-		foreach ( $taxonomies as $taxonomy ) {
-			if ( ! TaxonomyHandler::shouldSkipTaxonomy( $taxonomy ) ) {
-				$field_key                      = "taxonomy_{$taxonomy}_selection";
-				$taxonomy_settings[ $taxonomy ] = $handler_config[ $field_key ] ?? 'NOT_SET';
+		// Log ability logs
+		if ( ! empty( $result['logs'] ) && is_array( $result['logs'] ) ) {
+			foreach ( $result['logs'] as $log_entry ) {
+				$this->log(
+					$log_entry['level'] ?? 'debug',
+					$log_entry['message'] ?? '',
+					$log_entry['data'] ?? array()
+				);
 			}
+		}
+
+		if ( ! $result['success'] ) {
+			return $this->errorResponse(
+				$result['error'] ?? 'WordPress publish failed',
+				array( 'ability_result' => $result )
+			);
+		}
+
+		$post_id = $result['post_id'] ?? null;
+		
+		// Store post tracking meta
+		if ( $post_id ) {
+			$this->storePostTrackingMeta( $post_id, $handler_config );
 		}
 
 		return $this->successResponse(
 			array(
-				'dry_run'           => true,
-				'preview'           => array(
-					'post_title'   => sanitize_text_field( wp_unslash( $parameters['title'] ?? '' ) ),
-					'post_content' => $content_preview,
-					'post_type'    => $handler_config['post_type'] ?? '',
-					'post_status'  => WordPressSettingsResolver::getPostStatus( $handler_config ),
-					'post_author'  => WordPressSettingsResolver::getPostAuthor( $handler_config ),
-				),
-				'taxonomy_settings' => $taxonomy_settings,
-				'source_url'        => $engine->getSourceUrl(),
-				'image_path'        => $engine->getImagePath(),
+				'post_id' => $post_id,
+				'post_title' => $result['post_title'] ?? '',
+				'post_url' => $result['post_url'] ?? '',
+				'taxonomy_results' => $result['taxonomy_results'] ?? array(),
+				'featured_image_result' => $result['featured_image_result'] ?? null,
 			)
 		);
 	}
-
 	/**
 	 * Get the display label for the WordPress handler.
 	 *
