@@ -4,32 +4,6 @@ Publish handlers distribute processed content to external platforms using AI too
 
 ## Available Handlers
 
-### Social Media Platforms
-
-**Twitter** (`twitter`)
-- **Character Limit**: 280 characters
-- **Authentication**: OAuth 1.0a
-- **Features**: Media upload, URL replies, t.co link handling
-- **API**: Twitter API v2 for tweets, v1.1 for media
-
-**Bluesky** (`bluesky`)
-- **Character Limit**: 300 characters
-- **Authentication**: App Password (username/password)
-- **Features**: Media upload, AT Protocol integration
-- **API**: AT Protocol (Bluesky API)
-
-**Threads** (`threads`)
-- **Character Limit**: 500 characters
-- **Authentication**: OAuth2 (Facebook/Meta)
-- **Features**: Media upload, Instagram integration
-- **API**: Threads API (Meta)
-
-**Facebook** (`facebook`)
-- **Character Limit**: No limit
-- **Authentication**: OAuth2 (Facebook/Meta)
-- **Features**: Comment mode, link handling, page posting
-- **API**: Facebook Graph API
-
 ### Content Platforms
 
 **WordPress** (`wordpress_publish`)
@@ -55,26 +29,18 @@ Publish handlers distribute processed content to external platforms using AI too
 **Append Mode** (`link_handling: 'append'`):
 - Default behavior for most handlers
 - Source URL appended to content with platform-specific formatting
-- Character limits considered (Twitter: 24 chars, Bluesky: 22 chars)
-
-**Reply/Comment Mode**:
-- **Twitter** (`link_handling: 'reply'`): Separate reply tweet with source URL
-- **Facebook** (`link_handling: 'comment'`): Separate comment with source URL
 
 **None Mode** (`link_handling: 'none'`):
 - No source URL processing
-- Content posted without attribution
+- Content posted as-is
 - Available on all handlers
 
 ### Platform-Specific Implementation
 
 | Platform | Separator | Character Count | Special Features |
 |----------|-----------|-----------------|------------------|
-| Twitter | ` ` (space) | 24 chars (t.co) | Reply mode available |
-| Bluesky | `\n\n` | 22 chars | Auto-detected by platform |
-| Threads | `\n\n` | Full URL length | Simple truncation |
-| Facebook | `\n\n` | Full URL length | Comment mode available |
 | WordPress | Gutenberg blocks | No limit | Source attribution blocks |
+| Google Sheets | Cell-based | No limit | Data rows |
 
 ### Engine Data Access Pattern
 
@@ -141,17 +107,17 @@ Each handler registers its tool via filters:
 
 ```php
 add_filter('chubes_ai_tools', function($tools, $handler_slug = null, $handler_config = []) {
-    if ($handler_slug === 'twitter') {
-        $tools['twitter_publish'] = [
-            'class' => 'DataMachine\\Core\\Steps\\Publish\\Handlers\\Twitter\\Twitter',
+    if ($handler_slug === 'wordpress_publish') {
+        $tools['wordpress_publish'] = [
+            'class' => 'DataMachine\\Core\\Steps\\Publish\\Handlers\\WordPress\\WordPress',
             'method' => 'handle_tool_call',
-            'handler' => 'twitter',
-            'description' => 'Post content to Twitter (280 character limit)',
+            'handler' => 'wordpress_publish',
+            'description' => 'Publish content to WordPress',
             'parameters' => [
                 'content' => [
                     'type' => 'string',
                     'required' => true,
-                    'description' => 'Tweet content to post'
+                    'description' => 'Content to publish'
                 ]
             ],
             'handler_config' => $handler_config
@@ -185,8 +151,7 @@ $platform_config = $handler_config['platform_name'] ?? $handler_config;
 ### Content Processing
 
 **Character Limits**:
-- Automatic truncation with ellipsis (…)
-- URL space calculation (t.co links = 24 chars)
+- Automatic truncation with ellipsis (...)
 - Multi-byte string handling (UTF-8)
 
 **Media Handling**:
@@ -199,17 +164,15 @@ $platform_config = $handler_config['platform_name'] ?? $handler_config;
 
 **Source URL Options**:
 - Append to content (default)
-- Post as reply/comment
 - Include/exclude based on configuration
 
 **URL Processing**:
 - Validation via `filter_var(FILTER_VALIDATE_URL)`
 - Automatic shortening (platform-specific)
-- Reply thread creation
 
 ## Authentication Systems
 
-### OAuth 2.0 (Facebook, Threads, Google)
+### OAuth 2.0 (Google)
 
 **Required Credentials**:
 - Client ID
@@ -222,20 +185,6 @@ $platform_config = $handler_config['platform_name'] ?? $handler_config;
 2. User authorization via popup
 3. Token exchange
 4. Token storage and refresh
-
-### OAuth 1.0a (Twitter)
-
-**Required Credentials**:
-- Consumer Key
-- Consumer Secret
-- Access Token
-- Access Token Secret
-
-### App Passwords (Bluesky)
-
-**Required Credentials**:
-- Username (handle)
-- App Password (generated in Bluesky settings)
 
 ## Error Handling Patterns
 
@@ -272,7 +221,7 @@ if ($http_code !== 200) {
         'http_code' => $http_code,
         'response' => $api_response
     ]);
-    
+
     return [
         'success' => false,
         'error' => 'Platform API error: ' . $error_message,
@@ -282,35 +231,6 @@ if ($http_code !== 200) {
 ```
 
 ## Platform-Specific Features
-
-### Twitter
-
-**Unique Features**:
-- Chunked media upload (INIT→APPEND→FINALIZE)
-- Reply tweet creation for URLs
-- X API v2 integration
-- t.co link shortening
-
-**Configuration Options**:
-- `twitter_include_source` - Include source URLs
-- `twitter_enable_images` - Upload media files
-- `twitter_url_as_reply` - Post URLs as replies
-
-### Facebook
-
-**Unique Features**:
-- Page vs. personal posting
-- Link preview generation
-- Comment mode posting
-- No character limit
-
-### Bluesky
-
-**Unique Features**:
-- AT Protocol integration
-- Decentralized network support
-- Handle-based authentication
-- Rich text formatting
 
 ### WordPress
 
@@ -334,23 +254,21 @@ if ($http_code !== 200) {
 
 ## Multi-Platform Workflows
 
-### AI→Publish→AI→Publish Pattern
+### AI→Publish Pattern
 
 ```php
-// Pipeline configuration for multi-platform
+// Pipeline configuration
 $pipeline_steps = [
     'fetch_step' => ['handler' => 'rss'],
-    'ai_step_1' => ['handler' => null], // Twitter preparation
-    'publish_step_1' => ['handler' => 'twitter'],
-    'ai_step_2' => ['handler' => null], // Facebook preparation  
-    'publish_step_2' => ['handler' => 'facebook']
+    'ai_step' => ['handler' => null],
+    'publish_step' => ['handler' => 'wordpress_publish']
 ];
 ```
 
 **Benefits**:
-- Platform-specific content optimization
-- Different character limits and formats
-- Customized messaging per platform
+- AI-optimized content generation
+- Consistent publishing workflow
+- Configurable output formats
 
 ## Performance Considerations
 
@@ -370,8 +288,6 @@ $pipeline_steps = [
 ### API Rate Limiting
 
 **Platform Limits**:
-- Twitter: 300 requests per 15-minute window
-- Facebook: Varies by app review status
 - Google: 100 requests per 100 seconds per user
 
 **Handling Strategy**:
@@ -394,15 +310,15 @@ class CustomPublishHandler {
                 'tool_name' => 'custom_publish'
             ];
         }
-        
+
         // Get configuration
         $handler_config = $tool_def['handler_config'] ?? [];
         $custom_config = $handler_config['custom_platform'] ?? [];
-        
+
         // Publish to platform
         try {
             $result = $this->publish_to_platform($parameters['content'], $custom_config);
-            
+
             return [
                 'success' => true,
                 'data' => [

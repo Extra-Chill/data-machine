@@ -6,7 +6,7 @@
 
 ## Overview
 
-Auth endpoints manage OAuth accounts and handler authentication for social media platforms and external services.
+Auth endpoints manage OAuth accounts and handler authentication for external services.
 
 ## Authentication
 
@@ -34,15 +34,15 @@ Check OAuth authentication status for a handler.
 **Permission**: `manage_options` capability required
 
 **Parameters**:
-- `handler_slug` (string, required): Handler identifier (e.g., `twitter`, `facebook`, `reddit`)
+- `handler_slug` (string, required): Handler identifier (e.g., `reddit`, `google_sheets`)
 
 **Returns**: Authentication status, account details, and OAuth error/success states
 
 **Example Request**:
 
 ```bash
-curl https://example.com/wp-json/datamachine/v1/auth/twitter/status \
-  -u username:application_password
+curl https://example.com/wp-json/datamachine/v1/auth/reddit/status \
+-u username:application_password
 ```
 
 **Success Response - Authenticated (200 OK)**:
@@ -60,7 +60,7 @@ curl https://example.com/wp-json/datamachine/v1/auth/twitter/status \
       "api_key": "••••••••",
       "api_secret": "••••••••"
     },
-    "handler_slug": "twitter"
+    "handler_slug": "reddit"
   }
 }
 ```
@@ -77,7 +77,7 @@ curl https://example.com/wp-json/datamachine/v1/auth/twitter/status \
       "api_key": "",
       "api_secret": ""
     },
-    "handler_slug": "twitter"
+    "handler_slug": "reddit"
   }
 }
 ```
@@ -96,7 +96,7 @@ curl https://example.com/wp-json/datamachine/v1/auth/twitter/status \
       "api_key": "",
       "api_secret": ""
     },
-    "handler_slug": "twitter"
+    "handler_slug": "reddit"
   }
 }
 ```
@@ -122,30 +122,12 @@ Save authentication configuration for a handler.
 - Additional parameters vary by handler (e.g., `api_key`, `api_secret`, `client_id`, `client_secret`)
 
 **Storage Behavior**:
-- **OAuth providers** (Twitter, Reddit, Facebook, Threads, Google Sheets): Stored to `oauth_keys`
-- **Simple auth providers** (Bluesky): Stored to `oauth_account`
+- **OAuth providers** (Reddit, Google Sheets): Stored to `oauth_keys`
+- **Simple auth providers**: Stored to `oauth_account`
 
 **Example Requests**:
 
 ```bash
-# Save Twitter API keys
-curl -X PUT https://example.com/wp-json/datamachine/v1/auth/twitter \
-  -H "Content-Type: application/json" \
-  -u username:application_password \
-  -d '{
-    "consumer_key": "your_consumer_key",
-    "consumer_secret": "your_consumer_secret"
-  }'
-
-# Save Bluesky credentials
-curl -X PUT https://example.com/wp-json/datamachine/v1/auth/bluesky \
-  -H "Content-Type: application/json" \
-  -u username:application_password \
-  -d '{
-    "username": "user.bsky.social",
-    "app_password": "your_app_password"
-  }'
-
 # Save Reddit OAuth keys
 curl -X PUT https://example.com/wp-json/datamachine/v1/auth/reddit \
   -H "Content-Type: application/json" \

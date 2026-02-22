@@ -123,10 +123,6 @@ if ($include_images && $image_file_path) {
 
 All publish handlers extend PublishHandlerSettings:
 
-- Twitter
-- Bluesky
-- Facebook
-- Threads
 - WordPress Publish
 - Google Sheets Output
 
@@ -134,19 +130,9 @@ All publish handlers extend PublishHandlerSettings:
 
 Individual handlers add platform-specific fields:
 
-### Twitter
-- `twitter_include_source` - Twitter-specific URL handling
-- `twitter_url_as_reply` - Post URL as reply tweet
-- `twitter_enable_images` - Twitter-specific image settings
-
 ### WordPress
 - Post type, taxonomy, author, status settings
 - Featured image and content processing options
-
-### Social Media Platforms
-- Character limits and formatting options
-- Media upload settings
-- Authentication-specific configurations
 
 ## See Also
 
