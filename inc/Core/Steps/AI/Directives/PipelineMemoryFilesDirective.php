@@ -1,6 +1,6 @@
 <?php
 /**
- * Pipeline Memory Files Directive - Priority 25
+ * Pipeline Memory Files Directive - Priority 40
  *
  * Injects agent memory files referenced by pipeline configuration into AI context.
  * Memory files are stored in the shared agent/ directory and selected per-pipeline.
@@ -8,11 +8,12 @@
  * Priority Order in Directive System:
  * 1. Priority 10 - Plugin Core Directive (agent identity)
  * 2. Priority 20 - Agent SOUL.md (identity)
- * 3. Priority 22 - Agent MEMORY.md (knowledge)
- * 4. Priority 25 - Pipeline Memory Files (THIS CLASS - per-pipeline selectable)
- * 5. Priority 30 - Pipeline System Prompt (pipeline instructions)
- * 6. Priority 40 - Tool Definitions (available tools and workflow)
- * 7. Priority 50 - Site Context (WordPress metadata)
+ * 3. Priority 30 - Agent MEMORY.md (knowledge)
+ * 4. Priority 40 - Pipeline Memory Files (THIS CLASS - per-pipeline selectable)
+ * 5. Priority 50 - Pipeline System Prompt (pipeline instructions)
+ * 6. Priority 60 - Pipeline Context Files
+ * 7. Priority 70 - Tool Definitions (available tools and workflow)
+ * 8. Priority 80 - Site Context (WordPress metadata)
  *
  * @package DataMachine\Core\Steps\AI\Directives
  */
@@ -103,13 +104,13 @@ class PipelineMemoryFilesDirective implements \DataMachine\Engine\AI\Directives\
 	}
 }
 
-// Register at Priority 25 — between MEMORY.md (22) and pipeline system prompt (30).
+// Register at Priority 40 — between MEMORY.md (30) and pipeline system prompt (50).
 add_filter(
 	'datamachine_directives',
 	function ( $directives ) {
 		$directives[] = array(
 			'class'       => PipelineMemoryFilesDirective::class,
-			'priority'    => 25,
+			'priority'    => 40,
 			'agent_types' => array( 'pipeline' ),
 		);
 		return $directives;

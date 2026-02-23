@@ -1,6 +1,6 @@
 <?php
 /**
- * Pipeline System Prompt Directive - Priority 30
+ * Pipeline System Prompt Directive - Priority 50
  *
  * Injects user-configured task instructions and dynamic workflow visualization
  * as the third directive in the 5-tier AI directive system. Provides both workflow
@@ -9,10 +9,13 @@
  *
  * Priority Order in 5-Tier System:
  * 1. Priority 10 - Plugin Core Directive
- * 2. Priority 20 - Global System Prompt
- * 3. Priority 30 - Pipeline System Prompt (THIS CLASS)
- * 4. Priority 40 - Tool Definitions and Workflow Context
- * 5. Priority 50 - WordPress Site Context
+ * 2. Priority 20 - Agent SOUL.md (identity)
+ * 3. Priority 30 - Agent MEMORY.md (knowledge)
+ * 4. Priority 40 - Pipeline Memory Files (per-pipeline selectable)
+ * 5. Priority 50 - Pipeline System Prompt (THIS CLASS)
+ * 6. Priority 60 - Pipeline Context Files
+ * 7. Priority 70 - Tool Definitions and Workflow Context
+ * 8. Priority 80 - WordPress Site Context
  */
 
 namespace DataMachine\Core\Steps\AI\Directives;
@@ -152,13 +155,13 @@ class PipelineSystemPromptDirective implements \DataMachine\Engine\AI\Directives
 	}
 }
 
-// Register with universal agent directive system (Priority 30 = third in 5-tier directive system)
+// Register with universal agent directive system (Priority 50 = pipeline system prompt)
 add_filter(
 	'datamachine_directives',
 	function ( $directives ) {
 		$directives[] = array(
 			'class'       => PipelineSystemPromptDirective::class,
-			'priority'    => 30,
+			'priority'    => 50,
 			'agent_types' => array( 'pipeline' ),
 		);
 		return $directives;

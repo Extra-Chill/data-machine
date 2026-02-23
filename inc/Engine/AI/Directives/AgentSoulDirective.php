@@ -11,11 +11,12 @@
  * Priority Order in Directive System:
  * 1. Priority 10 - Plugin Core Directive
  * 2. Priority 20 - Agent Soul (THIS CLASS)
- * 3. Priority 22 - Agent Memory (MEMORY.md - knowledge)
- * 4. Priority 25 - Pipeline Memory Files (per-pipeline selectable)
- * 5. Priority 30 - Pipeline System Prompt
- * 6. Priority 40 - Tool Definitions and Workflow Context
- * 7. Priority 50 - WordPress Site Context
+ * 3. Priority 30 - Agent Memory (MEMORY.md - knowledge)
+ * 4. Priority 40 - Pipeline Memory Files (per-pipeline selectable)
+ * 5. Priority 50 - Pipeline System Prompt
+ * 6. Priority 60 - Pipeline Context Files
+ * 7. Priority 70 - Tool Definitions and Workflow Context
+ * 8. Priority 80 - WordPress Site Context
  */
 
 namespace DataMachine\Engine\AI\Directives;

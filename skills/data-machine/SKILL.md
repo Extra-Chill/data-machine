@@ -73,14 +73,14 @@ System prompts are injected in priority order into every AI call:
 |----------|-----------|-------|
 | 10 | Plugin Core | Hardcoded agent identity |
 | 20 | Agent SOUL.md | Global AI personality (identity, voice, rules) |
-| 22 | Agent MEMORY.md | Accumulated knowledge (state, lessons, context) |
-| 25 | Pipeline Memory Files | Per-pipeline selected memory files |
-| 30 | Pipeline System Prompt | Per-pipeline AI step instructions |
-| 35 | Pipeline Context Files | Uploaded reference materials |
-| 40 | Tool Definitions | Available tools and workflow context |
-| 50 | Site Context | WordPress metadata |
+| 30 | Agent MEMORY.md | Accumulated knowledge (state, lessons, context) |
+| 40 | Pipeline Memory Files | Per-pipeline selected memory files |
+| 50 | Pipeline System Prompt | Per-pipeline AI step instructions |
+| 60 | Pipeline Context Files | Uploaded reference materials (reserved) |
+| 70 | Tool Definitions | Available tools and workflow context (reserved) |
+| 80 | Site Context | WordPress metadata |
 
-**Key:** SOUL.md (Priority 20) and MEMORY.md (Priority 22) are always injected into every AI call. SOUL.md defines *who* the agent is. MEMORY.md defines *what* the agent knows. Other memory files are selectable per-pipeline via the admin UI.
+**Key:** SOUL.md (Priority 20) and MEMORY.md (Priority 30) are always injected into every AI call. SOUL.md defines *who* the agent is. MEMORY.md defines *what* the agent knows. Other memory files are selectable per-pipeline via the admin UI. Priorities are spaced by 10 to allow future additions (e.g., 15, 25, 35) without rebasing.
 
 ### Scheduling Options
 
@@ -103,8 +103,8 @@ Data Machine has file-based agent memory in `{wp-content}/uploads/datamachine-fi
 
 1. Files live in the agent directory (managed via Admin UI or REST API)
 2. **SOUL.md** is always injected at Priority 20 — defines agent identity, voice, and rules
-3. **MEMORY.md** is always injected at Priority 22 — accumulated state, lessons learned, and domain context
-4. Other files can be selected per-pipeline as memory file references (Priority 25)
+3. **MEMORY.md** is always injected at Priority 30 — accumulated state, lessons learned, and domain context
+4. Other files can be selected per-pipeline as memory file references (Priority 40)
 5. Selected files are injected as system context — the AI sees them every execution
 
 ### REST API
