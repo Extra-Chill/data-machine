@@ -97,13 +97,13 @@ class WordPress extends PublishHandler {
 		}
 
 		// Build taxonomies array from handler config
-		$taxonomies = array();
+		$taxonomies     = array();
 		$taxonomy_names = get_taxonomies( array( 'public' => true ), 'names' );
 		foreach ( $taxonomy_names as $taxonomy ) {
 			if ( ! \DataMachine\Core\WordPress\TaxonomyHandler::shouldSkipTaxonomy( $taxonomy ) ) {
 				$field_key = "taxonomy_{$taxonomy}_selection";
 				$selection = $handler_config[ $field_key ] ?? 'skip';
-				
+
 				if ( 'ai_decides' === $selection && ! empty( $parameters[ $taxonomy ] ) ) {
 					$taxonomies[ $taxonomy ] = $parameters[ $taxonomy ];
 				}
@@ -112,20 +112,20 @@ class WordPress extends PublishHandler {
 
 		// Delegate to ability
 		$ability_input = array(
-			'title' => $parameters['title'] ?? '',
-			'content' => $parameters['content'] ?? '',
-			'post_type' => $handler_config['post_type'] ?? '',
-			'post_status' => WordPressSettingsResolver::getPostStatus( $handler_config ),
-			'post_author' => WordPressSettingsResolver::getPostAuthor( $handler_config ),
-			'taxonomies' => $taxonomies,
-			'featured_image_path' => $engine->getImagePath(),
-			'source_url' => $engine->getSourceUrl(),
+			'title'                  => $parameters['title'] ?? '',
+			'content'                => $parameters['content'] ?? '',
+			'post_type'              => $handler_config['post_type'] ?? '',
+			'post_status'            => WordPressSettingsResolver::getPostStatus( $handler_config ),
+			'post_author'            => WordPressSettingsResolver::getPostAuthor( $handler_config ),
+			'taxonomies'             => $taxonomies,
+			'featured_image_path'    => $engine->getImagePath(),
+			'source_url'             => $engine->getSourceUrl(),
 			'add_source_attribution' => true,
-			'job_id' => $parameters['job_id'] ?? null,
+			'job_id'                 => $parameters['job_id'] ?? null,
 		);
 
 		$ability = new PublishWordPressAbility();
-		$result = $ability->execute( $ability_input );
+		$result  = $ability->execute( $ability_input );
 
 		// Log ability logs
 		if ( ! empty( $result['logs'] ) && is_array( $result['logs'] ) ) {
@@ -146,7 +146,7 @@ class WordPress extends PublishHandler {
 		}
 
 		$post_id = $result['post_id'] ?? null;
-		
+
 		// Store post tracking meta
 		if ( $post_id ) {
 			$this->storePostTrackingMeta( $post_id, $handler_config );
@@ -154,10 +154,10 @@ class WordPress extends PublishHandler {
 
 		return $this->successResponse(
 			array(
-				'post_id' => $post_id,
-				'post_title' => $result['post_title'] ?? '',
-				'post_url' => $result['post_url'] ?? '',
-				'taxonomy_results' => $result['taxonomy_results'] ?? array(),
+				'post_id'               => $post_id,
+				'post_title'            => $result['post_title'] ?? '',
+				'post_url'              => $result['post_url'] ?? '',
+				'taxonomy_results'      => $result['taxonomy_results'] ?? array(),
 				'featured_image_result' => $result['featured_image_result'] ?? null,
 			)
 		);

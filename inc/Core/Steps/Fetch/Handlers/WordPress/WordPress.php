@@ -63,12 +63,12 @@ class WordPress extends FetchHandler {
 	 */
 	private function fetch_single_post( string $source_url, ExecutionContext $context ): array {
 		$ability_input = array(
-			'source_url' => $source_url,
+			'source_url'        => $source_url,
 			'include_file_info' => true,
 		);
 
 		$ability = new GetWordPressPostAbility();
-		$result = $ability->execute( $ability_input );
+		$result  = $ability->execute( $ability_input );
 
 		// Log ability logs
 		if ( ! empty( $result['logs'] ) && is_array( $result['logs'] ) ) {
@@ -85,7 +85,7 @@ class WordPress extends FetchHandler {
 			return array();
 		}
 
-		$data = $result['data'];
+		$data    = $result['data'];
 		$post_id = $data['post_id'];
 
 		// Mark as processed
@@ -93,17 +93,17 @@ class WordPress extends FetchHandler {
 
 		// Build response for pipeline
 		$raw_data = array(
-			'title' => $data['title'],
-			'content' => $data['content'],
+			'title'    => $data['title'],
+			'content'  => $data['content'],
 			'metadata' => array(
-				'source_type' => 'wordpress_local',
+				'source_type'            => 'wordpress_local',
 				'item_identifier_to_log' => $post_id,
-				'original_id' => $post_id,
-				'original_title' => $data['title'],
-				'original_date_gmt' => $data['publish_date'],
-				'post_type' => $data['post_type'],
-				'post_status' => $data['post_status'],
-				'site_name' => $data['site_name'],
+				'original_id'            => $post_id,
+				'original_title'         => $data['title'],
+				'original_date_gmt'      => $data['publish_date'],
+				'post_type'              => $data['post_type'],
+				'post_status'            => $data['post_status'],
+				'site_name'              => $data['site_name'],
 			),
 		);
 
@@ -121,7 +121,7 @@ class WordPress extends FetchHandler {
 		$image_file_path = $data['file_info']['file_path'] ?? '';
 		$context->storeEngineData(
 			array(
-				'source_url' => $data['permalink'] ?? '',
+				'source_url'      => $data['permalink'] ?? '',
 				'image_file_path' => $image_file_path,
 			)
 		);
@@ -140,10 +140,10 @@ class WordPress extends FetchHandler {
 				$term_id = intval( $field_value );
 				if ( $term_id > 0 ) {
 					$taxonomy_slug = str_replace( array( 'taxonomy_', '_filter' ), '', $field_key );
-					$tax_query[] = array(
+					$tax_query[]   = array(
 						'taxonomy' => $taxonomy_slug,
-						'field' => 'term_id',
-						'terms' => array( $term_id ),
+						'field'    => 'term_id',
+						'terms'    => array( $term_id ),
 					);
 				}
 			}
@@ -151,18 +151,18 @@ class WordPress extends FetchHandler {
 
 		// Build ability input
 		$ability_input = array(
-			'post_type' => sanitize_text_field( $config['post_type'] ?? 'post' ),
-			'post_status' => sanitize_text_field( $config['post_status'] ?? 'publish' ),
-			'timeframe_limit' => $config['timeframe_limit'] ?? 'all_time',
-			'search' => trim( $config['search'] ?? '' ),
-			'randomize' => ! empty( $config['randomize_selection'] ),
-			'posts_per_page' => 10,
-			'tax_query' => $tax_query,
+			'post_type'         => sanitize_text_field( $config['post_type'] ?? 'post' ),
+			'post_status'       => sanitize_text_field( $config['post_status'] ?? 'publish' ),
+			'timeframe_limit'   => $config['timeframe_limit'] ?? 'all_time',
+			'search'            => trim( $config['search'] ?? '' ),
+			'randomize'         => ! empty( $config['randomize_selection'] ),
+			'posts_per_page'    => 10,
+			'tax_query'         => $tax_query,
 			'include_file_info' => true,
 		);
 
 		$ability = new QueryWordPressPostsAbility();
-		$result = $ability->execute( $ability_input );
+		$result  = $ability->execute( $ability_input );
 
 		// Log ability logs
 		if ( ! empty( $result['logs'] ) && is_array( $result['logs'] ) ) {
@@ -179,7 +179,7 @@ class WordPress extends FetchHandler {
 			return array();
 		}
 
-		$data = $result['data'];
+		$data    = $result['data'];
 		$post_id = $data['post_id'];
 
 		// Mark as processed
@@ -187,17 +187,17 @@ class WordPress extends FetchHandler {
 
 		// Build response for pipeline
 		$raw_data = array(
-			'title' => $data['title'],
-			'content' => $data['content'],
+			'title'    => $data['title'],
+			'content'  => $data['content'],
 			'metadata' => array(
-				'source_type' => 'wordpress_local',
+				'source_type'            => 'wordpress_local',
 				'item_identifier_to_log' => $post_id,
-				'original_id' => $post_id,
-				'original_title' => $data['original_title'],
-				'original_date_gmt' => $data['original_date_gmt'],
-				'post_type' => $data['post_type'],
-				'post_status' => $data['post_status'],
-				'site_name' => $data['site_name'],
+				'original_id'            => $post_id,
+				'original_title'         => $data['original_title'],
+				'original_date_gmt'      => $data['original_date_gmt'],
+				'post_type'              => $data['post_type'],
+				'post_status'            => $data['post_status'],
+				'site_name'              => $data['site_name'],
 			),
 		);
 
@@ -215,7 +215,7 @@ class WordPress extends FetchHandler {
 		$image_file_path = $data['file_info']['file_path'] ?? '';
 		$context->storeEngineData(
 			array(
-				'source_url' => $data['permalink'] ?? '',
+				'source_url'      => $data['permalink'] ?? '',
 				'image_file_path' => $image_file_path,
 			)
 		);

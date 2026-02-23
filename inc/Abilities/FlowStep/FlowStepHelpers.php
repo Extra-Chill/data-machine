@@ -434,7 +434,7 @@ trait FlowStepHelpers {
 	 * @param string $handler_slug Handler slug to remove.
 	 * @return bool Success status.
 	 */
-protected function removeHandler( string $flow_step_id, string $handler_slug ): bool {
+	protected function removeHandler( string $flow_step_id, string $handler_slug ): bool {
 		$parts = apply_filters( 'datamachine_split_flow_step_id', null, $flow_step_id );
 		if ( ! $parts ) {
 			return false;
@@ -453,7 +453,7 @@ protected function removeHandler( string $flow_step_id, string $handler_slug ): 
 
 		// Normalize first to handle legacy data.
 		$flow_config[ $flow_step_id ] = FlowStepNormalizer::normalizeHandlerFields( $flow_config[ $flow_step_id ] );
-		$step = &$flow_config[ $flow_step_id ];
+		$step                         = &$flow_config[ $flow_step_id ];
 
 		$existing_slugs = $step['handler_slugs'] ?? array();
 		$existing_slugs = array_values( array_filter( $existing_slugs, fn( $s ) => $s !== $handler_slug ) );

@@ -56,8 +56,8 @@ class Reddit extends FetchHandler {
 					'error',
 					'Reddit Handler: Authentication service not available',
 					array(
-						'handler' => 'reddit',
-						'missing_service' => 'reddit',
+						'handler'             => 'reddit',
+						'missing_service'     => 'reddit',
 						'available_providers' => array_keys( $auth_abilities->getAllProviders() ),
 					)
 				);
@@ -70,7 +70,7 @@ class Reddit extends FetchHandler {
 	 * Store Reddit image to file repository.
 	 */
 	private function store_reddit_image( string $image_url, ExecutionContext $context, string $item_id ): ?array {
-		$url_path = wp_parse_url( $image_url, PHP_URL_PATH );
+		$url_path  = wp_parse_url( $image_url, PHP_URL_PATH );
 		$extension = $url_path ? pathinfo( $url_path, PATHINFO_EXTENSION ) : 'jpg';
 		if ( empty( $extension ) ) {
 			$extension = 'jpg';
@@ -78,7 +78,7 @@ class Reddit extends FetchHandler {
 		$filename = "reddit_image_{$item_id}.{$extension}";
 
 		$options = array(
-			'timeout' => 30,
+			'timeout'    => 30,
 			'user_agent' => 'php:DataMachineWPPlugin:v' . DATAMACHINE_VERSION,
 		);
 
@@ -97,10 +97,10 @@ class Reddit extends FetchHandler {
 			return array();
 		}
 
-		$reddit_account = $oauth_reddit->get_account();
-		$access_token = $reddit_account['access_token'] ?? null;
+		$reddit_account   = $oauth_reddit->get_account();
+		$access_token     = $reddit_account['access_token'] ?? null;
 		$token_expires_at = $reddit_account['token_expires_at'] ?? 0;
-		$needs_refresh = empty( $access_token ) || time() >= ( $token_expires_at - 300 );
+		$needs_refresh    = empty( $access_token ) || time() >= ( $token_expires_at - 300 );
 
 		if ( $needs_refresh && empty( $reddit_account['refresh_token'] ) ) {
 			$context->log( 'error', 'Reddit: No refresh token available' );
@@ -136,22 +136,22 @@ class Reddit extends FetchHandler {
 
 		// Delegate to ability
 		$ability_input = array(
-			'subreddit' => $config['subreddit'] ?? '',
-			'access_token' => $access_token,
-			'sort_by' => $config['sort_by'] ?? 'hot',
-			'timeframe_limit' => $config['timeframe_limit'] ?? 'all_time',
-			'min_upvotes' => isset( $config['min_upvotes'] ) ? absint( $config['min_upvotes'] ) : 0,
+			'subreddit'         => $config['subreddit'] ?? '',
+			'access_token'      => $access_token,
+			'sort_by'           => $config['sort_by'] ?? 'hot',
+			'timeframe_limit'   => $config['timeframe_limit'] ?? 'all_time',
+			'min_upvotes'       => isset( $config['min_upvotes'] ) ? absint( $config['min_upvotes'] ) : 0,
 			'min_comment_count' => isset( $config['min_comment_count'] ) ? absint( $config['min_comment_count'] ) : 0,
-			'comment_count' => isset( $config['comment_count'] ) ? absint( $config['comment_count'] ) : 0,
-			'search' => $config['search'] ?? '',
-			'processed_items' => $processed_items,
-			'fetch_batch_size' => 100,
-			'max_pages' => 5,
-			'download_images' => true,
+			'comment_count'     => isset( $config['comment_count'] ) ? absint( $config['comment_count'] ) : 0,
+			'search'            => $config['search'] ?? '',
+			'processed_items'   => $processed_items,
+			'fetch_batch_size'  => 100,
+			'max_pages'         => 5,
+			'download_images'   => true,
 		);
 
 		$ability = new FetchRedditAbility();
-		$result = $ability->execute( $ability_input );
+		$result  = $ability->execute( $ability_input );
 
 		// Log ability logs
 		if ( ! empty( $result['logs'] ) && is_array( $result['logs'] ) ) {
@@ -173,7 +173,7 @@ class Reddit extends FetchHandler {
 			return array();
 		}
 
-		$data = $result['data'];
+		$data    = $result['data'];
 		$item_id = $result['item_id'] ?? ( $data['metadata']['original_id'] ?? '' );
 
 		// Mark item as processed
@@ -198,12 +198,12 @@ class Reddit extends FetchHandler {
 		// Store engine data
 		$context->storeEngineData(
 			array(
-				'source_url' => $result['source_url'] ?? '',
+				'source_url'      => $result['source_url'] ?? '',
 				'image_file_path' => $data['file_info']['file_path'] ?? '',
 			)
 		);
 
-	return $data;
+		return $data;
 	}
 
 	public static function get_label(): string {

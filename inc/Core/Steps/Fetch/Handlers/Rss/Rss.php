@@ -45,15 +45,15 @@ class Rss extends FetchHandler {
 	protected function executeFetch( array $config, ExecutionContext $context ): array {
 		// Delegate to ability
 		$ability_input = array(
-			'feed_url' => $config['feed_url'] ?? '',
+			'feed_url'        => $config['feed_url'] ?? '',
 			'timeframe_limit' => $config['timeframe_limit'] ?? 'all_time',
-			'search' => $config['search'] ?? '',
+			'search'          => $config['search'] ?? '',
 			'processed_items' => array(),
 			'download_images' => true,
 		);
 
 		$ability = new FetchRssAbility();
-		$result = $ability->execute( $ability_input );
+		$result  = $ability->execute( $ability_input );
 
 		// Log ability logs
 		if ( ! empty( $result['logs'] ) && is_array( $result['logs'] ) ) {
@@ -85,7 +85,7 @@ class Rss extends FetchHandler {
 
 		// Download image if present
 		if ( ! empty( $data['file_info'] ) && ! empty( $data['file_info']['url'] ) ) {
-			$filename = 'rss_image_' . time() . '_' . sanitize_file_name( basename( wp_parse_url( $data['file_info']['url'], PHP_URL_PATH ) ) );
+			$filename        = 'rss_image_' . time() . '_' . sanitize_file_name( basename( wp_parse_url( $data['file_info']['url'], PHP_URL_PATH ) ) );
 			$download_result = $context->downloadFile( $data['file_info']['url'], $filename );
 
 			if ( $download_result ) {
@@ -97,10 +97,10 @@ class Rss extends FetchHandler {
 					'debug',
 					'Rss: Downloaded remote image for AI processing',
 					array(
-						'guid' => $guid,
+						'guid'       => $guid,
 						'source_url' => $data['file_info']['url'] ?? '',
 						'local_path' => $download_result['path'],
-						'file_size' => $download_result['size'],
+						'file_size'  => $download_result['size'],
 					)
 				);
 			} else {
@@ -108,7 +108,7 @@ class Rss extends FetchHandler {
 					'warning',
 					'Rss: Failed to download remote image',
 					array(
-						'guid' => $guid,
+						'guid'          => $guid,
 						'enclosure_url' => $data['file_info']['url'] ?? '',
 					)
 				);

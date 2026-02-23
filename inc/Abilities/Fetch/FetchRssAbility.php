@@ -36,51 +36,51 @@ class FetchRssAbility {
 			wp_register_ability(
 				'datamachine/fetch-rss',
 				array(
-					'label' => __( 'Fetch RSS Feed', 'data-machine' ),
-					'description' => __( 'Fetch and parse RSS/Atom feeds with filtering', 'data-machine' ),
-					'category' => 'datamachine',
-					'input_schema' => array(
-						'type' => 'object',
-						'required' => array( 'feed_url' ),
+					'label'               => __( 'Fetch RSS Feed', 'data-machine' ),
+					'description'         => __( 'Fetch and parse RSS/Atom feeds with filtering', 'data-machine' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'feed_url' ),
 						'properties' => array(
-							'feed_url' => array(
-								'type' => 'string',
+							'feed_url'        => array(
+								'type'        => 'string',
 								'description' => __( 'URL of the RSS/Atom feed', 'data-machine' ),
 							),
 							'timeframe_limit' => array(
-								'type' => 'string',
-								'default' => 'all_time',
+								'type'        => 'string',
+								'default'     => 'all_time',
 								'description' => __( 'Timeframe filter (all_time, 24_hours, 7_days, 30_days, 90_days, 6_months, 1_year)', 'data-machine' ),
 							),
-							'search' => array(
-								'type' => 'string',
-								'default' => '',
+							'search'          => array(
+								'type'        => 'string',
+								'default'     => '',
 								'description' => __( 'Search term to filter items', 'data-machine' ),
 							),
 							'processed_items' => array(
-								'type' => 'array',
-								'default' => array(),
+								'type'        => 'array',
+								'default'     => array(),
 								'description' => __( 'Array of already processed item GUIDs to skip', 'data-machine' ),
 							),
 							'download_images' => array(
-								'type' => 'boolean',
-								'default' => true,
+								'type'        => 'boolean',
+								'default'     => true,
 								'description' => __( 'Whether to download enclosure images', 'data-machine' ),
 							),
 						),
 					),
-					'output_schema' => array(
-						'type' => 'object',
+					'output_schema'       => array(
+						'type'       => 'object',
 						'properties' => array(
 							'success' => array( 'type' => 'boolean' ),
-							'data' => array( 'type' => 'object' ),
-							'error' => array( 'type' => 'string' ),
-							'logs' => array( 'type' => 'array' ),
+							'data'    => array( 'type' => 'object' ),
+							'error'   => array( 'type' => 'string' ),
+							'logs'    => array( 'type' => 'array' ),
 						),
 					),
-					'execute_callback' => array( $this, 'execute' ),
+					'execute_callback'    => array( $this, 'execute' ),
 					'permission_callback' => array( $this, 'checkPermission' ),
-					'meta' => array( 'show_in_rest' => true ),
+					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
 		};
@@ -108,12 +108,12 @@ class FetchRssAbility {
 	 * @return array Result with fetched data or error.
 	 */
 	public function execute( array $input ): array {
-		$logs = array();
+		$logs   = array();
 		$config = $this->normalizeConfig( $input );
 
-		$feed_url = $config['feed_url'];
+		$feed_url        = $config['feed_url'];
 		$timeframe_limit = $config['timeframe_limit'];
-		$search = $config['search'];
+		$search          = $config['search'];
 		$processed_items = $config['processed_items'];
 		$download_images = $config['download_images'];
 
@@ -121,38 +121,38 @@ class FetchRssAbility {
 
 		if ( ! $result['success'] ) {
 			$logs[] = array(
-				'level' => 'error',
+				'level'   => 'error',
 				'message' => 'Rss: Failed to fetch RSS feed.',
-				'data' => array(
-					'error' => $result['error'],
+				'data'    => array(
+					'error'    => $result['error'],
 					'feed_url' => $feed_url,
 				),
 			);
 			return array(
 				'success' => false,
-				'error' => $result['error'],
-				'logs' => $logs,
+				'error'   => $result['error'],
+				'logs'    => $logs,
 			);
 		}
 
 		$feed_content = $result['data'];
 		if ( empty( $feed_content ) ) {
 			$logs[] = array(
-				'level' => 'error',
+				'level'   => 'error',
 				'message' => 'Rss: RSS feed content is empty.',
-				'data' => array( 'feed_url' => $feed_url ),
+				'data'    => array( 'feed_url' => $feed_url ),
 			);
 			return array(
 				'success' => false,
-				'error' => 'RSS feed content is empty',
-				'logs' => $logs,
+				'error'   => 'RSS feed content is empty',
+				'logs'    => $logs,
 			);
 		}
 
 		libxml_use_internal_errors( true );
 		$xml = simplexml_load_string( $feed_content );
 		if ( false === $xml ) {
-			$errors = libxml_get_errors();
+			$errors         = libxml_get_errors();
 			$error_messages = array_map(
 				function ( $error ) {
 					return trim( $error->message );
@@ -161,17 +161,17 @@ class FetchRssAbility {
 			);
 
 			$logs[] = array(
-				'level' => 'error',
+				'level'   => 'error',
 				'message' => 'Rss: Failed to parse RSS feed XML.',
-				'data' => array(
-					'feed_url' => $feed_url,
+				'data'    => array(
+					'feed_url'   => $feed_url,
 					'xml_errors' => implode( ', ', $error_messages ),
 				),
 			);
 			return array(
 				'success' => false,
-				'error' => 'Failed to parse RSS feed XML: ' . implode( ', ', $error_messages ),
-				'logs' => $logs,
+				'error'   => 'Failed to parse RSS feed XML: ' . implode( ', ', $error_messages ),
+				'logs'    => $logs,
 			);
 		}
 
@@ -185,22 +185,22 @@ class FetchRssAbility {
 			$items = $xml->entry;
 		} else {
 			$logs[] = array(
-				'level' => 'error',
+				'level'   => 'error',
 				'message' => 'Rss: Unsupported feed format or no items found in feed.',
-				'data' => array( 'feed_url' => $feed_url ),
+				'data'    => array( 'feed_url' => $feed_url ),
 			);
 			return array(
 				'success' => false,
-				'error' => 'Unsupported feed format or no items found',
-				'logs' => $logs,
+				'error'   => 'Unsupported feed format or no items found',
+				'logs'    => $logs,
 			);
 		}
 
 		if ( empty( $items ) ) {
 			return array(
 				'success' => true,
-				'data' => array(),
-				'logs' => $logs,
+				'data'    => array(),
+				'logs'    => $logs,
 			);
 		}
 
@@ -209,17 +209,17 @@ class FetchRssAbility {
 		foreach ( $items as $item ) {
 			++$total_checked;
 
-			$title = $this->extractItemTitle( $item );
+			$title       = $this->extractItemTitle( $item );
 			$description = $this->extractItemDescription( $item );
-			$link = $this->extractItemLink( $item );
-			$pub_date = $this->extractItemDate( $item );
-			$guid = $this->extractItemGuid( $item, $link );
+			$link        = $this->extractItemLink( $item );
+			$pub_date    = $this->extractItemDate( $item );
+			$guid        = $this->extractItemGuid( $item, $link );
 
 			if ( empty( $guid ) ) {
 				$logs[] = array(
-					'level' => 'warning',
+					'level'   => 'warning',
 					'message' => 'Rss: Skipping item without GUID.',
-					'data' => array( 'title' => $title ),
+					'data'    => array( 'title' => $title ),
 				);
 				continue;
 			}
@@ -232,10 +232,10 @@ class FetchRssAbility {
 				$item_timestamp = strtotime( $pub_date );
 				if ( false !== $item_timestamp && ! $this->applyTimeframeFilter( $item_timestamp, $timeframe_limit ) ) {
 					$logs[] = array(
-						'level' => 'debug',
+						'level'   => 'debug',
 						'message' => 'Rss: Skipping item outside timeframe.',
-						'data' => array(
-							'guid' => $guid,
+						'data'    => array(
+							'guid'     => $guid,
 							'pub_date' => $pub_date,
 						),
 					);
@@ -248,47 +248,47 @@ class FetchRssAbility {
 				continue;
 			}
 
-			$author = $this->extractItemAuthor( $item );
-			$categories = $this->extractItemCategories( $item );
+			$author        = $this->extractItemAuthor( $item );
+			$categories    = $this->extractItemCategories( $item );
 			$enclosure_url = $this->extractItemEnclosure( $item );
 
 			$content_data = array(
-				'title' => $title,
+				'title'   => $title,
 				'content' => $description,
 			);
 
 			$metadata = array(
-				'source_type' => 'rss',
+				'source_type'            => 'rss',
 				'item_identifier_to_log' => $guid,
-				'original_id' => $guid,
-				'original_title' => $title,
-				'original_date_gmt' => $pub_date ? gmdate( 'Y-m-d\TH:i:s\Z', strtotime( $pub_date ) ) : null,
-				'author' => $author,
-				'categories' => $categories,
+				'original_id'            => $guid,
+				'original_title'         => $title,
+				'original_date_gmt'      => $pub_date ? gmdate( 'Y-m-d\TH:i:s\Z', strtotime( $pub_date ) ) : null,
+				'author'                 => $author,
+				'categories'             => $categories,
 			);
 
 			$file_info = null;
 			if ( $download_images && ! empty( $enclosure_url ) ) {
 				$file_check = wp_check_filetype( $enclosure_url );
-				$mime_type = $file_check['type'] ? $file_check['type'] : 'application/octet-stream';
+				$mime_type  = $file_check['type'] ? $file_check['type'] : 'application/octet-stream';
 
 				if ( strpos( $mime_type, 'image/' ) === 0 && in_array( $mime_type, array( 'image/jpeg', 'image/png', 'image/gif', 'image/webp' ), true ) ) {
 					$file_info = array(
-						'type' => $mime_type,
+						'type'      => $mime_type,
 						'mime_type' => $mime_type,
-						'url' => $enclosure_url,
+						'url'       => $enclosure_url,
 					);
 				} else {
 					$file_info = array(
-						'type' => $mime_type,
+						'type'      => $mime_type,
 						'mime_type' => $mime_type,
 					);
 				}
 			}
 
 			$raw_data = array(
-				'title' => $content_data['title'],
-				'content' => $content_data['content'],
+				'title'    => $content_data['title'],
+				'content'  => $content_data['content'],
 				'metadata' => $metadata,
 			);
 
@@ -297,34 +297,34 @@ class FetchRssAbility {
 			}
 
 			$logs[] = array(
-				'level' => 'debug',
+				'level'   => 'debug',
 				'message' => 'Rss: Successfully parsed item.',
-				'data' => array(
-					'guid' => $guid,
-					'title' => $title,
+				'data'    => array(
+					'guid'      => $guid,
+					'title'     => $title,
 					'has_image' => ! empty( $file_info ) && isset( $file_info['url'] ),
 				),
 			);
 
 			return array(
-				'success' => true,
-				'data' => $raw_data,
-				'guid' => $guid,
+				'success'    => true,
+				'data'       => $raw_data,
+				'guid'       => $guid,
 				'source_url' => $link ? $link : '',
-				'logs' => $logs,
+				'logs'       => $logs,
 			);
 		}
 
 		$logs[] = array(
-			'level' => 'debug',
+			'level'   => 'debug',
 			'message' => 'Rss: No eligible items found in RSS feed.',
-			'data' => array( 'total_checked' => $total_checked ),
+			'data'    => array( 'total_checked' => $total_checked ),
 		);
 
 		return array(
 			'success' => true,
-			'data' => array(),
-			'logs' => $logs,
+			'data'    => array(),
+			'logs'    => $logs,
 		);
 	}
 
@@ -333,9 +333,9 @@ class FetchRssAbility {
 	 */
 	private function normalizeConfig( array $input ): array {
 		$defaults = array(
-			'feed_url' => '',
+			'feed_url'        => '',
 			'timeframe_limit' => 'all_time',
-			'search' => '',
+			'search'          => '',
 			'processed_items' => array(),
 			'download_images' => true,
 		);
@@ -356,17 +356,17 @@ class FetchRssAbility {
 		if ( is_wp_error( $response ) ) {
 			return array(
 				'success' => false,
-				'error' => $response->get_error_message(),
+				'error'   => $response->get_error_message(),
 			);
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
-		$body = wp_remote_retrieve_body( $response );
+		$body        = wp_remote_retrieve_body( $response );
 
 		return array(
-			'success' => $status_code >= 200 && $status_code < 300,
+			'success'     => $status_code >= 200 && $status_code < 300,
 			'status_code' => $status_code,
-			'data' => $body,
+			'data'        => $body,
 		);
 	}
 
@@ -502,7 +502,7 @@ class FetchRssAbility {
 			return true;
 		}
 
-		$now = time();
+		$now    = time();
 		$cutoff = 0;
 
 		switch ( $timeframe_limit ) {
@@ -540,7 +540,7 @@ class FetchRssAbility {
 			return true;
 		}
 
-		$terms = array_map( 'trim', explode( ',', $search_term ) );
+		$terms      = array_map( 'trim', explode( ',', $search_term ) );
 		$text_lower = strtolower( $text );
 
 		foreach ( $terms as $term ) {
