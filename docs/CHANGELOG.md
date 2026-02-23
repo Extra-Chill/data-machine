@@ -2,7 +2,7 @@
 
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
-## Unreleased
+## [0.29.0] - 2026-02-23
 
 ### Changed
 - Update documentation to reflect social media handler extraction
