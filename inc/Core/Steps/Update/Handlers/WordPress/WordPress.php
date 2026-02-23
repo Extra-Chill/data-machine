@@ -77,7 +77,17 @@ class WordPress extends UpdateHandler {
 			'job_id'        => $job_id,
 		);
 
-		$result = wp_execute_ability( 'datamachine/update-wordpress', $input );
+		$ability = wp_get_ability( 'datamachine/update-wordpress' );
+
+		if ( ! $ability ) {
+			return array(
+				'success'   => false,
+				'error'     => 'datamachine/update-wordpress ability not registered',
+				'tool_name' => 'wordpress_update',
+			);
+		}
+
+		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
 			do_action(
