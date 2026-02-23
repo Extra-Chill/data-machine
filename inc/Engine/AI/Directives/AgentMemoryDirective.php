@@ -1,17 +1,15 @@
 <?php
 /**
- * Agent Soul Directive - Priority 20
+ * Agent Memory Directive - Priority 22
  *
- * Injects the agent soul from SOUL.md in the files repository as the second
- * directive in the 5-tier AI directive system. Defines WHO the agent is.
- *
- * Reads from the agent directory in the files repository. Migration from
- * database storage is handled by AgentMemoryMigration.
+ * Injects the agent memory from MEMORY.md in the files repository as context
+ * for every AI call. Defines WHAT the agent knows — accumulated state, lessons,
+ * and evolving context.
  *
  * Priority Order in Directive System:
  * 1. Priority 10 - Plugin Core Directive
- * 2. Priority 20 - Agent Soul (THIS CLASS)
- * 3. Priority 22 - Agent Memory (MEMORY.md - knowledge)
+ * 2. Priority 20 - Agent SOUL.md (identity)
+ * 3. Priority 22 - Agent MEMORY.md (THIS CLASS - knowledge)
  * 4. Priority 25 - Pipeline Memory Files (per-pipeline selectable)
  * 5. Priority 30 - Pipeline System Prompt
  * 6. Priority 40 - Tool Definitions and Workflow Context
@@ -25,18 +23,18 @@ use DataMachine\Engine\AI\Directives\DirectiveInterface;
 
 defined( 'ABSPATH' ) || exit;
 
-class AgentSoulDirective implements DirectiveInterface {
+class AgentMemoryDirective implements DirectiveInterface {
 
 	public static function get_outputs( string $provider_name, array $tools, ?string $step_id = null, array $payload = array() ): array {
 		$directory_manager = new DirectoryManager();
 		$agent_dir         = $directory_manager->get_agent_directory();
-		$soul_path         = "{$agent_dir}/SOUL.md";
+		$memory_path       = "{$agent_dir}/MEMORY.md";
 
-		if ( ! file_exists( $soul_path ) ) {
+		if ( ! file_exists( $memory_path ) ) {
 			return array();
 		}
 
-		$content = file_get_contents( $soul_path );
+		$content = file_get_contents( $memory_path );
 
 		if ( empty( trim( $content ) ) ) {
 			return array();
@@ -51,13 +49,13 @@ class AgentSoulDirective implements DirectiveInterface {
 	}
 }
 
-// Self-register (Priority 20 = agent soul for all AI agents).
+// Self-register (Priority 22 = agent memory/knowledge for all AI agents).
 add_filter(
 	'datamachine_directives',
 	function ( $directives ) {
 		$directives[] = array(
-			'class'       => AgentSoulDirective::class,
-			'priority'    => 20,
+			'class'       => AgentMemoryDirective::class,
+			'priority'    => 22,
 			'agent_types' => array( 'all' ),
 		);
 		return $directives;

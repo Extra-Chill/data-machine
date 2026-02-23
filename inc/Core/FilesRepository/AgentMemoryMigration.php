@@ -28,7 +28,7 @@ class AgentMemoryMigration {
 	/**
 	 * Current migration version.
 	 */
-	private const CURRENT_VERSION = '1.0';
+	private const CURRENT_VERSION = '1.1';
 
 	/**
 	 * Section definitions matching the old AgentSoulDirective structure.
@@ -39,6 +39,22 @@ class AgentMemoryMigration {
 		'rules'    => 'Rules',
 		'context'  => 'Context',
 	);
+
+	/**
+	 * Default MEMORY.md template for fresh installs.
+	 */
+	private const DEFAULT_MEMORY_TEMPLATE = <<<'MD'
+# Agent Memory
+
+## State
+<!-- Current project state, active tasks, what's in progress -->
+
+## Lessons Learned
+<!-- What worked, what didn't, patterns to remember -->
+
+## Context
+<!-- Accumulated knowledge about the site, audience, domain -->
+MD;
 
 	/**
 	 * Default SOUL.md template for fresh installs.
@@ -84,12 +100,6 @@ MD;
 	private static function migrate(): void {
 		$directory_manager = new DirectoryManager();
 		$agent_dir         = $directory_manager->get_agent_directory();
-		$soul_path         = "{$agent_dir}/SOUL.md";
-
-		// Already migrated — skip.
-		if ( file_exists( $soul_path ) ) {
-			return;
-		}
 
 		// Ensure agent directory exists with index.php protection.
 		if ( ! $directory_manager->ensure_directory_exists( $agent_dir ) ) {
@@ -104,39 +114,76 @@ MD;
 
 		self::write_index_protection( $agent_dir );
 
+		// Create SOUL.md if it doesn't exist.
+		self::ensure_soul_file( $agent_dir );
+
+		// Create MEMORY.md if it doesn't exist.
+		self::ensure_memory_file( $agent_dir );
+
+		// Clean up old settings keys.
+		self::cleanup_old_settings();
+	}
+
+	/**
+	 * Create SOUL.md if it doesn't exist.
+	 *
+	 * @param string $agent_dir Agent directory path.
+	 * @return void
+	 */
+	private static function ensure_soul_file( string $agent_dir ): void {
+		$soul_path = "{$agent_dir}/SOUL.md";
+
+		if ( file_exists( $soul_path ) ) {
+			return;
+		}
+
 		$content = self::build_soul_content();
 
 		$fs = FilesystemHelper::get();
 		if ( ! $fs ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				'AgentMemoryMigration: Filesystem not available.'
-			);
 			return;
 		}
 
 		$written = $fs->put_contents( $soul_path, $content, FS_CHMOD_FILE );
 
-		if ( ! $written ) {
+		if ( $written ) {
 			do_action(
 				'datamachine_log',
-				'error',
-				'AgentMemoryMigration: Failed to write SOUL.md.',
+				'info',
+				'AgentMemoryMigration: Created SOUL.md.',
 				array( 'path' => $soul_path )
 			);
+		}
+	}
+
+	/**
+	 * Create MEMORY.md if it doesn't exist.
+	 *
+	 * @param string $agent_dir Agent directory path.
+	 * @return void
+	 */
+	private static function ensure_memory_file( string $agent_dir ): void {
+		$memory_path = "{$agent_dir}/MEMORY.md";
+
+		if ( file_exists( $memory_path ) ) {
 			return;
 		}
 
-		// Clean up old settings keys.
-		self::cleanup_old_settings();
+		$fs = FilesystemHelper::get();
+		if ( ! $fs ) {
+			return;
+		}
 
-		do_action(
-			'datamachine_log',
-			'info',
-			'AgentMemoryMigration: Successfully migrated agent soul to SOUL.md.',
-			array( 'path' => $soul_path )
-		);
+		$written = $fs->put_contents( $memory_path, self::DEFAULT_MEMORY_TEMPLATE . "\n", FS_CHMOD_FILE );
+
+		if ( $written ) {
+			do_action(
+				'datamachine_log',
+				'info',
+				'AgentMemoryMigration: Created MEMORY.md.',
+				array( 'path' => $memory_path )
+			);
+		}
 	}
 
 	/**
