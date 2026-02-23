@@ -4,12 +4,27 @@ All notable changes to Data Machine will be documented in this file. Also viewab
 
 ## [0.29.0] - 2026-02-23
 
-### Changed
-- Update documentation to reflect social media handler extraction
+### Added
+- Agent memory system — MEMORY.md auto-injected as directive at Priority 22
+- Fetch abilities for Reddit and RSS
+- WordPress post abilities (get, query, fetch media)
+- `--handler-config` flag for `flows update` CLI command
 
-### Removed
+### Changed
+- Handlers delegate to Abilities API for execution logic
+- Refactor UpdateWordPressAbility — delegate block operations to EditPostBlocksAbility, adopt HTML-attribute-safe text replace, use shared BlockSanitizer
+- Expose full tool schema (title, updates, block_updates, taxonomies) in wordpress_update pipeline handler
+- Rebase directive priorities with even spacing (10-80) for extensibility
 - Extract social media handlers (Twitter, Facebook, Threads, Bluesky, Pinterest) to data-machine-socials plugin
 - Remove Pinterest abilities from core (moved to data-machine-socials plugin)
+- Update documentation to reflect social media handler extraction
+
+### Fixed
+- WordPress update handler uses wp_get_ability instead of nonexistent wp_execute_ability
+- Register FetchWordPressMediaAbility and fix handler syntax errors
+- Add missing EngineData::set() method
+- Remove arbitrary limitation preventing last handler removal from flow steps
+- Remove Google Sheets handler references after extraction to data-machine-business
 
 ## [0.28.3] - 2026-02-20
 
