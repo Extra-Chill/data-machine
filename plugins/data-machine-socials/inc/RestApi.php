@@ -294,10 +294,9 @@ class RestApi {
 	 * Post to individual platform
 	 */
 	private static function post_to_platform( string $platform, array $images, string $caption, string $source_url ): array {
-		// Get the appropriate ability
 		$ability_slug = "datamachine/{$platform}-publish";
 
-		if ( ! function_exists( 'wp_abilities_api_init' ) ) {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
 			return array(
 				'platform' => $platform,
 				'success'  => false,
@@ -305,7 +304,16 @@ class RestApi {
 			);
 		}
 
-		// Extract image URLs
+		$ability = wp_get_ability( $ability_slug );
+
+		if ( ! $ability ) {
+			return array(
+				'platform' => $platform,
+				'success'  => false,
+				'error'    => "Ability {$ability_slug} not registered",
+			);
+		}
+
 		$image_urls = array_map(
 			function ( $img ) {
 				return $img['url'] ?? '';
@@ -313,8 +321,7 @@ class RestApi {
 			$images
 		);
 
-		// Call the ability
-		$result = do_action( 'wp_ability_execute', $ability_slug, array(
+		$result = $ability->execute( array(
 			'content'    => $caption,
 			'image_urls' => $image_urls,
 			'source_url' => $source_url,
@@ -328,7 +335,7 @@ class RestApi {
 			);
 		}
 
-		if ( $result['success'] ) {
+		if ( ! empty( $result['success'] ) ) {
 			return array(
 				'platform'  => $platform,
 				'success'   => true,
