@@ -121,6 +121,21 @@ class EngineData {
 	}
 
 	/**
+	 * Set a value in the engine data and persist it.
+	 *
+	 * @param string $key   Data key.
+	 * @param mixed  $value Value to set.
+	 * @return void
+	 */
+	public function set( string $key, $value ): void {
+		$this->data[ $key ] = $value;
+
+		if ( $this->job_id ) {
+			self::merge( (int) $this->job_id, array( $key => $value ) );
+		}
+	}
+
+	/**
 	 * Get a value from the engine data.
 	 *
 	 * @param string $key Data key.
