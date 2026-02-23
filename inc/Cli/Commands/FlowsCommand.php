@@ -94,8 +94,12 @@ class FlowsCommand extends BaseCommand {
 	 * [--set-prompt=<text>]
 	 * : Update the prompt for a handler step (requires handler step to exist).
 	 *
+	 * [--handler-config=<json>]
+	 * : JSON object of handler config key-value pairs to update (merged with existing config).
+	 *   Requires --step to identify the target flow step.
+	 *
 	 * [--step=<flow_step_id>]
-	 * : Target a specific flow step for prompt update (auto-resolved if flow has exactly one handler step).
+	 * : Target a specific flow step for prompt update or handler config update (auto-resolved if flow has exactly one handler step).
 	 *   Also used for queue subcommands (auto-resolved if flow has exactly one queueable step).
 	 *
 	 * [--dry-run]
@@ -185,6 +189,12 @@ class FlowsCommand extends BaseCommand {
 	 *     # Update prompt for specific step (multi-step flows)
 	 *     wp datamachine flows update 42 --step=flow-42-step-abc123 --set-prompt="Step-specific prompt"
 	 *
+	 *     # Update handler config (merged with existing config)
+	 *     wp datamachine flows update 29 --step=flow-29-step-abc123 --handler-config='{"board_selection_mode":"category_mapping","board_mapping":"birds=123\nanimals=456"}'
+	 *
+	 *     # Update handler config (auto-resolves step if flow has one handler step)
+	 *     wp datamachine flows update 29 --handler-config='{"board_selection_mode":"category_mapping"}'
+	 *
 	 *     # Add a prompt to the queue (--step auto-resolved if flow has one queueable step)
 	 *     wp datamachine flows queue add 42 "Generate a blog post about AI"
 	 *
@@ -239,7 +249,7 @@ class FlowsCommand extends BaseCommand {
 		// Handle 'update' subcommand: `flows update 42 --name="New Name"`.
 		if ( ! empty( $args ) && 'update' === $args[0] ) {
 			if ( ! isset( $args[1] ) ) {
-				WP_CLI::error( 'Usage: wp datamachine flows update <flow_id> [--name=<name>] [--scheduling=<interval>] [--set-prompt=<text>] [--step=<flow_step_id>]' );
+				WP_CLI::error( 'Usage: wp datamachine flows update <flow_id> [--name=<name>] [--scheduling=<interval>] [--set-prompt=<text>] [--handler-config=<json>] [--step=<flow_step_id>]' );
 				return;
 			}
 			$this->updateFlow( (int) $args[1], $assoc_args );
@@ -546,15 +556,23 @@ class FlowsCommand extends BaseCommand {
 			return;
 		}
 
-		$name       = $assoc_args['name'] ?? null;
-		$scheduling = $assoc_args['scheduling'] ?? null;
-		$prompt     = isset( $assoc_args['set-prompt'] )
+		$name           = $assoc_args['name'] ?? null;
+		$scheduling     = $assoc_args['scheduling'] ?? null;
+		$prompt         = isset( $assoc_args['set-prompt'] )
 			? wp_kses_post( wp_unslash( $assoc_args['set-prompt'] ) )
 			: null;
-		$step       = $assoc_args['step'] ?? null;
+		$handler_config = isset( $assoc_args['handler-config'] )
+			? json_decode( wp_unslash( $assoc_args['handler-config'] ), true )
+			: null;
+		$step           = $assoc_args['step'] ?? null;
 
-		if ( null === $name && null === $scheduling && null === $prompt ) {
-			WP_CLI::error( 'Must provide --name, --scheduling, or --set-prompt to update' );
+		if ( null !== $handler_config && ! is_array( $handler_config ) ) {
+			WP_CLI::error( 'Invalid JSON in --handler-config. Must be a JSON object.' );
+			return;
+		}
+
+		if ( null === $name && null === $scheduling && null === $prompt && null === $handler_config ) {
+			WP_CLI::error( 'Must provide --name, --scheduling, --set-prompt, or --handler-config to update' );
 			return;
 		}
 
@@ -585,16 +603,19 @@ class FlowsCommand extends BaseCommand {
 			}
 		}
 
-		if ( null !== $prompt ) {
-			if ( null === $step ) {
-				$resolved = $this->resolveHandlerStep( $flow_id );
-				if ( $resolved['error'] ) {
-					WP_CLI::error( $resolved['error'] );
-					return;
-				}
-				$step = $resolved['step_id'];
-			}
+		// Resolve step for prompt and/or handler-config updates.
+		$needs_step = null !== $prompt || null !== $handler_config;
 
+		if ( $needs_step && null === $step ) {
+			$resolved = $this->resolveHandlerStep( $flow_id );
+			if ( $resolved['error'] ) {
+				WP_CLI::error( $resolved['error'] );
+				return;
+			}
+			$step = $resolved['step_id'];
+		}
+
+		if ( null !== $prompt ) {
 			$step_ability = new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility();
 			$step_result  = $step_ability->execute(
 				array(
@@ -609,6 +630,24 @@ class FlowsCommand extends BaseCommand {
 			}
 
 			WP_CLI::success( 'Prompt updated for step: ' . $step );
+		}
+
+		if ( null !== $handler_config ) {
+			$step_ability = new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility();
+			$step_result  = $step_ability->execute(
+				array(
+					'flow_step_id'   => $step,
+					'handler_config' => $handler_config,
+				)
+			);
+
+			if ( ! $step_result['success'] ) {
+				WP_CLI::error( $step_result['error'] ?? 'Failed to update handler config' );
+				return;
+			}
+
+			$updated_keys = implode( ', ', array_keys( $handler_config ) );
+			WP_CLI::success( sprintf( 'Handler config updated for step %s: %s', $step, $updated_keys ) );
 		}
 	}
 
