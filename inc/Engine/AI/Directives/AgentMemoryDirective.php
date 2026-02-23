@@ -1,6 +1,6 @@
 <?php
 /**
- * Agent Memory Directive - Priority 22
+ * Agent Memory Directive - Priority 30
  *
  * Injects the agent memory from MEMORY.md in the files repository as context
  * for every AI call. Defines WHAT the agent knows — accumulated state, lessons,
@@ -9,11 +9,12 @@
  * Priority Order in Directive System:
  * 1. Priority 10 - Plugin Core Directive
  * 2. Priority 20 - Agent SOUL.md (identity)
- * 3. Priority 22 - Agent MEMORY.md (THIS CLASS - knowledge)
- * 4. Priority 25 - Pipeline Memory Files (per-pipeline selectable)
- * 5. Priority 30 - Pipeline System Prompt
- * 6. Priority 40 - Tool Definitions and Workflow Context
- * 7. Priority 50 - WordPress Site Context
+ * 3. Priority 30 - Agent MEMORY.md (THIS CLASS - knowledge)
+ * 4. Priority 40 - Pipeline Memory Files (per-pipeline selectable)
+ * 5. Priority 50 - Pipeline System Prompt
+ * 6. Priority 60 - Pipeline Context Files
+ * 7. Priority 70 - Tool Definitions and Workflow Context
+ * 8. Priority 80 - WordPress Site Context
  */
 
 namespace DataMachine\Engine\AI\Directives;
@@ -49,13 +50,13 @@ class AgentMemoryDirective implements DirectiveInterface {
 	}
 }
 
-// Self-register (Priority 22 = agent memory/knowledge for all AI agents).
+// Self-register (Priority 30 = agent memory/knowledge for all AI agents).
 add_filter(
 	'datamachine_directives',
 	function ( $directives ) {
 		$directives[] = array(
 			'class'       => AgentMemoryDirective::class,
-			'priority'    => 22,
+			'priority'    => 30,
 			'agent_types' => array( 'all' ),
 		);
 		return $directives;
