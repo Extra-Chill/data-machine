@@ -110,6 +110,55 @@ Configure via `--scheduling` flag on flow create/update:
 
 ---
 
+## Directive System (8-Tier)
+
+System prompts are injected in priority order into every AI call:
+
+| Priority | Directive | Scope |
+|----------|-----------|-------|
+| 10 | Plugin Core | Hardcoded agent identity |
+| 20 | Agent SOUL.md | Global AI personality (identity, voice, rules) |
+| 30 | Agent MEMORY.md | Accumulated knowledge (state, lessons, context) |
+| 40 | Pipeline Memory Files | Per-pipeline selected memory files |
+| 50 | Pipeline System Prompt | Per-pipeline AI step instructions |
+| 60 | Pipeline Context Files | Uploaded reference materials |
+| 70 | Tool Definitions | Available tools and workflow context |
+| 80 | Site Context | WordPress metadata |
+
+**Key:** SOUL.md (Priority 20) and MEMORY.md (Priority 30) are always injected into every AI call. SOUL.md defines *who* the agent is. MEMORY.md defines *what* the agent knows. Other memory files are selectable per-pipeline via the admin UI. Priorities are spaced by 10 to allow future additions without rebasing.
+
+---
+
+## Memory System
+
+Data Machine has file-based agent memory in `{wp-content}/uploads/datamachine-files/agent/`. Files here provide persistent context to AI agents across all executions.
+
+### How It Works
+
+1. Files live in the agent directory (managed via Admin UI or REST API)
+2. **SOUL.md** is always injected at Priority 20 — defines agent identity, voice, and rules
+3. **MEMORY.md** is always injected at Priority 30 — accumulated state, lessons learned, and domain context
+4. Other files can be selected per-pipeline as memory file references (Priority 40)
+5. Selected files are injected as system context — the AI sees them every execution
+6. SOUL.md and MEMORY.md are protected from deletion (clear contents instead)
+
+### REST API
+
+```
+GET    /datamachine/v1/files/agent           — List all agent files
+GET    /datamachine/v1/files/agent/{filename} — Read file content
+PUT    /datamachine/v1/files/agent/{filename} — Write/update file (raw body)
+DELETE /datamachine/v1/files/agent/{filename} — Delete file (blocked for SOUL.md/MEMORY.md)
+```
+
+### Pipeline Memory File Selection
+
+Each pipeline can select which agent memory files to include in its AI context. Configure via the "Agent Memory Files" section in the pipeline settings UI. SOUL.md and MEMORY.md are excluded from the picker since they're always injected.
+
+This enables different pipelines to see different context — an ideation pipeline might reference a strategy doc, while a generation pipeline might reference style guidelines.
+
+---
+
 ## CLI Reference
 
 **Note:** All commands accept `--allow-root` when running as root. Singular and plural aliases work interchangeably (`flow`/`flows`, `job`/`jobs`, `pipeline`/`pipelines`, `post`/`posts`, `block`/`blocks`, `link`/`links`, `log`/`logs`).
