@@ -1,0 +1,6 @@
+/**
+ * Internal dependencies
+ */
+import type { ColorPickerProps, LegacyProps } from './types';
+export declare function useDeprecatedProps(props: LegacyProps | ColorPickerProps): ColorPickerProps;
+//# sourceMappingURL=use-deprecated-props.d.ts.map

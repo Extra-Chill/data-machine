@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../src/types.ts"],
+  "sourcesContent": ["/**\n * External dependencies\n */\ndeclare global {\n\tinterface Window {\n\t\t// Silence the warning for `window.wp` in Playwright's evaluate functions.\n\t\twp: any;\n\t\t// Helper function added by Metrics fixture for web-vitals.js.\n\t\t__reportVitals__: ( data: string ) => void;\n\t}\n}\n\nexport {};\n"],
+  "mappings": ";;;;;;;;;;;;;;;;AAAA;AAAA;",
+  "names": []
+}

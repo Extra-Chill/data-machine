@@ -1,0 +1,1 @@
+{"version":3,"file":"site-editor.d.ts","sourceRoot":"","sources":["../../src/editor/site-editor.ts"],"names":[],"mappings":"AAAA;;GAEG;AACH,OAAO,KAAK,EAAE,MAAM,EAAE,MAAM,SAAS,CAAC;AAEtC,UAAU,OAAO;IAEhB,wBAAwB,CAAC,EAAE,OAAO,CAAC;CACnC;AAED;;;;;GAKG;AACH,wBAAsB,sBAAsB,CAC3C,IAAI,EAAE,MAAM,EACZ,OAAO,GAAE,OAAY,iBAoCrB"}

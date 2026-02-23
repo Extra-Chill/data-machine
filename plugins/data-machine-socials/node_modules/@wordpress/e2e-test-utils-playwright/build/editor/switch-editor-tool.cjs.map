@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/editor/switch-editor-tool.ts"],
+  "sourcesContent": ["/**\n * Internal dependencies\n */\nimport type { Editor } from './index';\n\n/**\n * Switch the editor tool being used.\n *\n * @param this\n * @param label The text string of the button label.\n */\nexport async function switchEditorTool( this: Editor, label: string ) {\n\tconst toolsToolbar = this.page.getByRole( 'toolbar', {\n\t\tname: 'Document tools',\n\t} );\n\tawait toolsToolbar\n\t\t.getByRole( 'button', {\n\t\t\tname: 'Tools',\n\t\t} )\n\t\t.click();\n\tconst menu = this.page.getByRole( 'menu', {\n\t\tname: 'Tools',\n\t} );\n\tawait menu\n\t\t.getByRole( 'menuitemradio', {\n\t\t\tname: label,\n\t\t} )\n\t\t.click();\n\tawait toolsToolbar\n\t\t.getByRole( 'button', {\n\t\t\tname: 'Tools',\n\t\t} )\n\t\t.click();\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAWA,eAAsB,iBAAgC,OAAgB;AACrE,QAAM,eAAe,KAAK,KAAK,UAAW,WAAW;AAAA,IACpD,MAAM;AAAA,EACP,CAAE;AACF,QAAM,aACJ,UAAW,UAAU;AAAA,IACrB,MAAM;AAAA,EACP,CAAE,EACD,MAAM;AACR,QAAM,OAAO,KAAK,KAAK,UAAW,QAAQ;AAAA,IACzC,MAAM;AAAA,EACP,CAAE;AACF,QAAM,KACJ,UAAW,iBAAiB;AAAA,IAC5B,MAAM;AAAA,EACP,CAAE,EACD,MAAM;AACR,QAAM,aACJ,UAAW,UAAU;AAAA,IACrB,MAAM;AAAA,EACP,CAAE,EACD,MAAM;AACT;",
+  "names": []
+}

@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/editor/click-block-toolbar-button.ts"],
+  "sourcesContent": ["/**\n * Internal dependencies\n */\nimport type { Editor } from './index';\n\n/**\n * Clicks a block toolbar button.\n *\n * @param this\n * @param label The text string of the button label.\n */\nexport async function clickBlockToolbarButton( this: Editor, label: string ) {\n\tawait this.showBlockToolbar();\n\n\tconst blockToolbar = this.page.locator(\n\t\t'role=toolbar[name=\"Block tools\"i]'\n\t);\n\tconst button = blockToolbar.locator( `role=button[name=\"${ label }\"]` );\n\n\tawait button.click();\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAWA,eAAsB,wBAAuC,OAAgB;AAC5E,QAAM,KAAK,iBAAiB;AAE5B,QAAM,eAAe,KAAK,KAAK;AAAA,IAC9B;AAAA,EACD;AACA,QAAM,SAAS,aAAa,QAAS,qBAAsB,KAAM,IAAK;AAEtE,QAAM,OAAO,MAAM;AACpB;",
+  "names": []
+}

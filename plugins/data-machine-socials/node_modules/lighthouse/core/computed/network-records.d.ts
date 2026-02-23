@@ -1,0 +1,13 @@
+export { NetworkRecordsComputed as NetworkRecords };
+declare const NetworkRecordsComputed: typeof NetworkRecords & {
+    request: (dependencies: LH.DevtoolsLog, context: LH.Artifacts.ComputedContext) => Promise<import("../lib/network-request.js").NetworkRequest[]>;
+};
+declare class NetworkRecords {
+    /**
+     * @param {LH.DevtoolsLog} devtoolsLog
+     * @return {Promise<Array<LH.Artifacts.NetworkRequest>>} networkRecords
+     */
+    static compute_(devtoolsLog: LH.DevtoolsLog): Promise<Array<LH.Artifacts.NetworkRequest>>;
+}
+import * as LH from '../../types/lh.js';
+//# sourceMappingURL=network-records.d.ts.map

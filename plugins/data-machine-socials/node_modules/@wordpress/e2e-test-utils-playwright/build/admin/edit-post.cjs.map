@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/admin/edit-post.ts"],
+  "sourcesContent": ["/**\n * Internal dependencies\n */\nimport type { Admin } from '.';\n\n/**\n * Open the post with given ID in the editor.\n *\n * @param this\n * @param postId Post ID to visit.\n */\nexport async function editPost( this: Admin, postId: string | number ) {\n\tconst query = new URLSearchParams();\n\n\tquery.set( 'post', String( postId ) );\n\tquery.set( 'action', 'edit' );\n\n\tawait this.visitAdminPage( 'post.php', query.toString() );\n\n\tawait this.editor.setPreferences( 'core/edit-post', {\n\t\twelcomeGuide: false,\n\t\tfullscreenMode: false,\n\t} );\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAWA,eAAsB,SAAuB,QAA0B;AACtE,QAAM,QAAQ,IAAI,gBAAgB;AAElC,QAAM,IAAK,QAAQ,OAAQ,MAAO,CAAE;AACpC,QAAM,IAAK,UAAU,MAAO;AAE5B,QAAM,KAAK,eAAgB,YAAY,MAAM,SAAS,CAAE;AAExD,QAAM,KAAK,OAAO,eAAgB,kBAAkB;AAAA,IACnD,cAAc;AAAA,IACd,gBAAgB;AAAA,EACjB,CAAE;AACH;",
+  "names": []
+}

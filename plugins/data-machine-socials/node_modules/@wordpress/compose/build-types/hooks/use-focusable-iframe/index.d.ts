@@ -1,0 +1,12 @@
+/**
+ * External dependencies
+ */
+import type { RefCallback } from 'react';
+/**
+ * Dispatches a bubbling focus event when the iframe receives focus. Use
+ * `onFocus` as usual on the iframe or a parent element.
+ *
+ * @return Ref to pass to the iframe.
+ */
+export default function useFocusableIframe(): RefCallback<HTMLIFrameElement>;
+//# sourceMappingURL=index.d.ts.map

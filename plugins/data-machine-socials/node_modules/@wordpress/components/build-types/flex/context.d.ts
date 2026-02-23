@@ -1,0 +1,8 @@
+/// <reference types="react" />
+export declare const FlexContext: import("react").Context<{
+    flexItemDisplay: 'block' | undefined;
+}>;
+export declare const useFlexContext: () => {
+    flexItemDisplay: 'block' | undefined;
+};
+//# sourceMappingURL=context.d.ts.map

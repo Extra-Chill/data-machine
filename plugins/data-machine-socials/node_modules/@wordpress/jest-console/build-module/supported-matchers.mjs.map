@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../src/supported-matchers.ts"],
+  "sourcesContent": ["const supportedMatchers: Record< string, string > = {\n\terror: 'toHaveErrored',\n\tinfo: 'toHaveInformed',\n\tlog: 'toHaveLogged',\n\twarn: 'toHaveWarned',\n};\n\nexport default supportedMatchers;\n"],
+  "mappings": ";AAAA,IAAM,oBAA8C;AAAA,EACnD,OAAO;AAAA,EACP,MAAM;AAAA,EACN,KAAK;AAAA,EACL,MAAM;AACP;AAEA,IAAO,6BAAQ;",
+  "names": []
+}

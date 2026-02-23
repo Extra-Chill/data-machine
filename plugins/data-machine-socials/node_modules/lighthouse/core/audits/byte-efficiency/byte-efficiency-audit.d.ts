@@ -1,0 +1,74 @@
+export type ByteEfficiencyProduct = {
+    items: Array<LH.Audit.ByteEfficiencyItem>;
+    wastedBytesByUrl?: Map<string, number> | undefined;
+    headings: LH.Audit.Details.Opportunity["headings"];
+    displayValue?: import("../../index.js").IcuMessage | undefined;
+    explanation?: import("../../index.js").IcuMessage | undefined;
+    warnings?: (string | import("../../index.js").IcuMessage)[] | undefined;
+    sortedBy?: string[] | undefined;
+};
+/**
+ * @typedef {object} ByteEfficiencyProduct
+ * @property {Array<LH.Audit.ByteEfficiencyItem>} items
+ * @property {Map<string, number>=} wastedBytesByUrl
+ * @property {LH.Audit.Details.Opportunity['headings']} headings
+ * @property {LH.IcuMessage} [displayValue]
+ * @property {LH.IcuMessage} [explanation]
+ * @property {Array<string | LH.IcuMessage>} [warnings]
+ * @property {Array<string>} [sortedBy]
+ */
+/**
+ * @overview Used as the base for all byte efficiency audits. Computes total bytes
+ *    and estimated time saved. Subclass and override `audit_` to return results.
+ */
+export class ByteEfficiencyAudit extends Audit {
+    /**
+     * Creates a score based on the wastedMs value using log-normal distribution scoring. A negative
+     * wastedMs will be scored as 1, assuming time is not being wasted with respect to the opportunity
+     * being measured.
+     *
+     * @param {number} wastedMs
+     * @return {number}
+     */
+    static scoreForWastedMs(wastedMs: number): number;
+    /**
+     * @param {LH.Artifacts} artifacts
+     * @param {LH.Audit.Context} context
+     * @return {Promise<LH.Audit.Product>}
+     */
+    static audit(artifacts: LH.Artifacts, context: LH.Audit.Context): Promise<LH.Audit.Product>;
+    /**
+     * Computes the estimated effect of all the byte savings on the provided graph.
+     *
+     * @param {Array<LH.Audit.ByteEfficiencyItem>} results The array of byte savings results per resource
+     * @param {LH.Gatherer.Simulation.GraphNode} graph
+     * @param {LH.Gatherer.Simulation.Simulator} simulator
+     * @param {{label?: string, providedWastedBytesByUrl?: Map<string, number>}=} options
+     * @return {{savings: number, simulationBeforeChanges: LH.Gatherer.Simulation.Result, simulationAfterChanges: LH.Gatherer.Simulation.Result}}
+     */
+    static computeWasteWithGraph(results: Array<LH.Audit.ByteEfficiencyItem>, graph: LH.Gatherer.Simulation.GraphNode, simulator: LH.Gatherer.Simulation.Simulator, options?: {
+        label?: string;
+        providedWastedBytesByUrl?: Map<string, number>;
+    } | undefined): {
+        savings: number;
+        simulationBeforeChanges: LH.Gatherer.Simulation.Result;
+        simulationAfterChanges: LH.Gatherer.Simulation.Result;
+    };
+    /**
+     * @param {ByteEfficiencyProduct} result
+     * @param {LH.Gatherer.Simulation.Simulator} simulator
+     * @param {LH.Artifacts.MetricComputationDataInput} metricComputationInput
+     * @param {LH.Audit.Context} context
+     * @return {Promise<LH.Audit.Product>}
+     */
+    static createAuditProduct(result: ByteEfficiencyProduct, simulator: LH.Gatherer.Simulation.Simulator, metricComputationInput: LH.Artifacts.MetricComputationDataInput, context: LH.Audit.Context): Promise<LH.Audit.Product>;
+    /**
+     * @param {LH.Artifacts} artifacts
+     * @param {Array<LH.Artifacts.NetworkRequest>} networkRecords
+     * @param {LH.Audit.Context} context
+     * @return {ByteEfficiencyProduct|Promise<ByteEfficiencyProduct>}
+     */
+    static audit_(artifacts: LH.Artifacts, networkRecords: Array<LH.Artifacts.NetworkRequest>, context: LH.Audit.Context): ByteEfficiencyProduct | Promise<ByteEfficiencyProduct>;
+}
+import { Audit } from '../audit.js';
+//# sourceMappingURL=byte-efficiency-audit.d.ts.map

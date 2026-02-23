@@ -1,0 +1,106 @@
+export type PreparedAssets = {
+    traceData?: import("../index.js").Trace | undefined;
+    devtoolsLog?: import("../index.js").DevtoolsLog | undefined;
+};
+/**
+ * Save artifacts object mostly to single file located at basePath/artifacts.json.
+ * Also save the traces & devtoolsLogs to their own files, with optional compression.
+ * @param {LH.Artifacts} artifacts
+ * @param {string} basePath
+ * @param {{gzip?: boolean}} options
+ * @return {Promise<void>}
+ */
+export function saveArtifacts(artifacts: LH.Artifacts, basePath: string, options?: {
+    gzip?: boolean;
+}): Promise<void>;
+/**
+ * Saves flow artifacts with the following file structure:
+ *   flow/                             --  Directory specified by `basePath`.
+ *     options.json                    --  Flow options (e.g. flow name, flags).
+ *     step0/                          --  Directory containing artifacts for the first step.
+ *       options.json                  --  First step's options (e.g. step flags).
+ *       artifacts.json                --  First step's artifacts except the DevTools log and trace.
+ *       defaultPass.devtoolslog.json  --  First step's DevTools log.
+ *       defaultPass.trace.json        --  First step's trace.
+ *     step1/                          --  Directory containing artifacts for the second step.
+ *
+ * @param {LH.UserFlow.FlowArtifacts} flowArtifacts
+ * @param {string} basePath
+ * @return {Promise<void>}
+ */
+export function saveFlowArtifacts(flowArtifacts: LH.UserFlow.FlowArtifacts, basePath: string): Promise<void>;
+/**
+ * Save LHR to file located at basePath/lhr.report.json.
+ * @param {LH.Result} lhr
+ * @param {string} basePath
+ */
+export function saveLhr(lhr: LH.Result, basePath: string): void;
+/**
+ * Load artifacts object from files located within basePath
+ * Also save the traces to their own files
+ * @param {string} basePath
+ * @return {LH.Artifacts}
+ */
+export function loadArtifacts(basePath: string): LH.Artifacts;
+/**
+ * @param {string} basePath
+ * @return {LH.UserFlow.FlowArtifacts}
+ */
+export function loadFlowArtifacts(basePath: string): LH.UserFlow.FlowArtifacts;
+/**
+ * Writes trace(s) and associated asset(s) to disk.
+ * @param {LH.Artifacts} artifacts
+ * @param {LH.Result['audits']} audits
+ * @param {string} pathWithBasename
+ * @return {Promise<void>}
+ */
+export function saveAssets(artifacts: LH.Artifacts, audits: LH.Result["audits"], pathWithBasename: string): Promise<void>;
+/**
+ * @param {LH.Artifacts} artifacts
+ * @param {LH.Result['audits']} [audits]
+ * @return {Promise<Array<PreparedAssets>>}
+ */
+export function prepareAssets(artifacts: LH.Artifacts, audits?: LH.Result["audits"]): Promise<Array<PreparedAssets>>;
+/**
+ * Save a trace as JSON by streaming to disk at traceFilename.
+ * @param {LH.Trace} traceData
+ * @param {string} traceFilename
+ * @param {{gzip?: boolean}=} options
+ * @return {Promise<void>}
+ */
+export function saveTrace(traceData: LH.Trace, traceFilename: string, options?: {
+    gzip?: boolean;
+} | undefined): Promise<void>;
+/**
+ * Save a devtoolsLog as JSON by streaming to disk at devtoolLogFilename.
+ * @param {LH.DevtoolsLog} devtoolsLog
+ * @param {string} devtoolLogFilename
+ * @param {{gzip?: boolean}=} options
+ * @return {Promise<void>}
+ */
+export function saveDevtoolsLog(devtoolsLog: LH.DevtoolsLog, devtoolLogFilename: string, options?: {
+    gzip?: boolean;
+} | undefined): Promise<void>;
+/**
+ * @param {LH.DevtoolsLog} devtoolsLog
+ * @param {string} outputPath
+ * @return {Promise<void>}
+ */
+export function saveLanternNetworkData(devtoolsLog: LH.DevtoolsLog, outputPath: string): Promise<void>;
+/**
+ * A replacer function for JSON.stingify of the artifacts. Used to serialize objects that
+ * JSON won't normally handle.
+ * @param {string} key
+ * @param {any} value
+ */
+export function stringifyReplacer(key: string, value: any): any;
+/**
+ * Normalize timing data so it doesn't change every update.
+ * @param {LH.Result.MeasureEntry[]} timings
+ */
+export function normalizeTimingEntries(timings: LH.Result.MeasureEntry[]): void;
+/**
+ * @param {LH.Result} lhr
+ */
+export function elideLhrErrorStacks(lhr: LH.Result): void;
+//# sourceMappingURL=asset-saver.d.ts.map

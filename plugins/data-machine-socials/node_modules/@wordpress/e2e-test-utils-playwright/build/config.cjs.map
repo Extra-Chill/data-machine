@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../src/config.ts"],
+  "sourcesContent": ["const {\n\tWP_USERNAME = 'admin',\n\tWP_PASSWORD = 'password',\n\tWP_BASE_URL = 'http://localhost:8889',\n} = process.env;\n\nconst WP_ADMIN_USER = {\n\tusername: WP_USERNAME,\n\tpassword: WP_PASSWORD,\n} as const;\n\nexport { WP_ADMIN_USER, WP_USERNAME, WP_PASSWORD, WP_BASE_URL };\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA,IAAM;AAAA,EACL,cAAc;AAAA,EACd,cAAc;AAAA,EACd,cAAc;AACf,IAAI,QAAQ;AAEZ,IAAM,gBAAgB;AAAA,EACrB,UAAU;AAAA,EACV,UAAU;AACX;",
+  "names": []
+}

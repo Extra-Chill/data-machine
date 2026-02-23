@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/editor/open-document-settings-sidebar.ts"],
+  "sourcesContent": ["/**\n * Internal dependencies\n */\nimport type { Editor } from './index';\n\n/**\n * Clicks on the button in the header which opens Document Settings sidebar when\n * it is closed.\n *\n * @param this\n */\nexport async function openDocumentSettingsSidebar( this: Editor ) {\n\tconst toggleButton = this.page\n\t\t.getByRole( 'region', { name: 'Editor top bar' } )\n\t\t.getByRole( 'button', {\n\t\t\tname: 'Settings',\n\t\t\texact: true,\n\t\t\tdisabled: false,\n\t\t} );\n\n\tconst isClosed =\n\t\t( await toggleButton.getAttribute( 'aria-expanded' ) ) === 'false';\n\n\tif ( isClosed ) {\n\t\tawait toggleButton.click();\n\t\tawait this.page\n\t\t\t.getByRole( 'region', { name: 'Editor settings' } )\n\t\t\t.getByRole( 'button', { name: 'Close Settings' } )\n\t\t\t.waitFor();\n\t}\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAWA,eAAsB,8BAA4C;AACjE,QAAM,eAAe,KAAK,KACxB,UAAW,UAAU,EAAE,MAAM,iBAAiB,CAAE,EAChD,UAAW,UAAU;AAAA,IACrB,MAAM;AAAA,IACN,OAAO;AAAA,IACP,UAAU;AAAA,EACX,CAAE;AAEH,QAAM,WACH,MAAM,aAAa,aAAc,eAAgB,MAAQ;AAE5D,MAAK,UAAW;AACf,UAAM,aAAa,MAAM;AACzB,UAAM,KAAK,KACT,UAAW,UAAU,EAAE,MAAM,kBAAkB,CAAE,EACjD,UAAW,UAAU,EAAE,MAAM,iBAAiB,CAAE,EAChD,QAAQ;AAAA,EACX;AACD;",
+  "names": []
+}

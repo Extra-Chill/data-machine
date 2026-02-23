@@ -1,0 +1,10 @@
+/**
+ * Internal dependencies
+ */
+import type { Screen, MatchParams } from '../types';
+export declare function patternMatch(path: string, screens: Screen[]): {
+    params: MatchParams;
+    id: string;
+} | undefined;
+export declare function findParent(path: string, screens: Screen[]): string | undefined;
+//# sourceMappingURL=router.d.ts.map

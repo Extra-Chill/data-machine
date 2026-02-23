@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/editor/get-edited-post-content.ts"],
+  "sourcesContent": ["/**\n * Internal dependencies\n */\nimport type { Editor } from './index';\n\n/**\n * Returns a promise which resolves with the edited post content (HTML string).\n *\n * @param this\n *\n * @return Promise resolving with post content markup.\n */\nexport async function getEditedPostContent( this: Editor ) {\n\tawait this.page.waitForFunction( () => window?.wp?.data );\n\n\treturn await this.page.evaluate( () =>\n\t\twindow.wp.data.select( 'core/editor' ).getEditedPostContent()\n\t);\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAYA,eAAsB,uBAAqC;AAC1D,QAAM,KAAK,KAAK,gBAAiB,MAAM,QAAQ,IAAI,IAAK;AAExD,SAAO,MAAM,KAAK,KAAK;AAAA,IAAU,MAChC,OAAO,GAAG,KAAK,OAAQ,aAAc,EAAE,qBAAqB;AAAA,EAC7D;AACD;",
+  "names": []
+}

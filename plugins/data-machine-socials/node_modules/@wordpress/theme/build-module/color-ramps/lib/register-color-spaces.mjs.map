@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../../src/color-ramps/lib/register-color-spaces.ts"],
+  "sourcesContent": ["/**\n * External dependencies\n */\nimport { ColorSpace, OKLCH, P3, sRGB, HSL } from 'colorjs.io/fn';\n\n// Ensures that all color spaces used in color ramps are registered globally, a\n// requirement for using colorjs.io's procedural API.\n//\n// See: https://colorjs.io/docs/procedural\nColorSpace.register( sRGB );\nColorSpace.register( OKLCH );\nColorSpace.register( P3 );\nColorSpace.register( HSL );\n"],
+  "mappings": ";AAGA,SAAS,YAAY,OAAO,IAAI,MAAM,WAAW;AAMjD,WAAW,SAAU,IAAK;AAC1B,WAAW,SAAU,KAAM;AAC3B,WAAW,SAAU,EAAG;AACxB,WAAW,SAAU,GAAI;",
+  "names": []
+}

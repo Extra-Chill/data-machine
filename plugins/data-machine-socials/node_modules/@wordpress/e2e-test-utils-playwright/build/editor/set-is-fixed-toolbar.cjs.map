@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/editor/set-is-fixed-toolbar.ts"],
+  "sourcesContent": ["/**\n * Internal dependencies\n */\nimport type { Editor } from './index';\n\n/**\n * Toggles the fixed toolbar option.\n *\n * @param this\n * @param isFixed Boolean value true/false for on/off.\n */\nexport async function setIsFixedToolbar( this: Editor, isFixed: boolean ) {\n\tawait this.page.waitForFunction( () => window?.wp?.data );\n\n\tawait this.page.evaluate( ( _isFixed ) => {\n\t\twindow.wp.data\n\t\t\t.dispatch( 'core/preferences' )\n\t\t\t.set( 'core', 'fixedToolbar', _isFixed );\n\t}, isFixed );\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAWA,eAAsB,kBAAiC,SAAmB;AACzE,QAAM,KAAK,KAAK,gBAAiB,MAAM,QAAQ,IAAI,IAAK;AAExD,QAAM,KAAK,KAAK,SAAU,CAAE,aAAc;AACzC,WAAO,GAAG,KACR,SAAU,kBAAmB,EAC7B,IAAK,QAAQ,gBAAgB,QAAS;AAAA,EACzC,GAAG,OAAQ;AACZ;",
+  "names": []
+}

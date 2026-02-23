@@ -1,0 +1,32 @@
+export default Redirects;
+declare class Redirects extends Audit {
+    /**
+     * This method generates the document request chain including client-side and server-side redirects.
+     *
+     * Example:
+     *    GET /requestedUrl => 302 /firstRedirect
+     *    GET /firstRedirect => 200 /firstRedirect, window.location = '/secondRedirect'
+     *    GET /secondRedirect => 302 /thirdRedirect
+     *    GET /thirdRedirect => 302 /mainDocumentUrl
+     *    GET /mainDocumentUrl => 200 /mainDocumentUrl
+     *
+     * Returns network records [/requestedUrl, /firstRedirect, /secondRedirect, /thirdRedirect, /mainDocumentUrl]
+     *
+     * @param {Array<LH.Artifacts.NetworkRequest>} networkRecords
+     * @param {LH.Artifacts.ProcessedTrace} processedTrace
+     * @return {Array<LH.Artifacts.NetworkRequest>}
+     */
+    static getDocumentRequestChain(networkRecords: Array<LH.Artifacts.NetworkRequest>, processedTrace: LH.Artifacts.ProcessedTrace): Array<LH.Artifacts.NetworkRequest>;
+    /**
+     * @param {LH.Artifacts} artifacts
+     * @param {LH.Audit.Context} context
+     * @return {Promise<LH.Audit.Product>}
+     */
+    static audit(artifacts: LH.Artifacts, context: LH.Audit.Context): Promise<LH.Audit.Product>;
+}
+export namespace UIStrings {
+    let title: string;
+    let description: string;
+}
+import { Audit } from './audit.js';
+//# sourceMappingURL=redirects.d.ts.map

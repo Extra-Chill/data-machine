@@ -1,0 +1,52 @@
+export default DevtoolsLog;
+declare class DevtoolsLog extends BaseGatherer {
+    static symbol: symbol;
+    _messageLog: DevtoolsMessageLog;
+    /** @param {LH.Protocol.RawEventMessage} e */
+    _onProtocolMessage: (e: LH.Protocol.RawEventMessage) => void;
+    /**
+     * @param {LH.Gatherer.Context} passContext
+     */
+    startSensitiveInstrumentation({ driver }: LH.Gatherer.Context): Promise<void>;
+    /**
+     * @param {LH.Gatherer.Context} passContext
+     */
+    stopSensitiveInstrumentation({ driver }: LH.Gatherer.Context): Promise<void>;
+    /**
+     * @return {LH.Artifacts['DevtoolsLog']}
+     */
+    getDebugData(): LH.Artifacts["DevtoolsLog"];
+    /**
+     * @return {Promise<LH.Artifacts['DevtoolsLog']>}
+     */
+    getArtifact(): Promise<LH.Artifacts["DevtoolsLog"]>;
+}
+/**
+ * This class saves all protocol messages whose method match a particular
+ * regex filter. Used when saving assets for later analysis by another tool such as
+ * Webpagetest.
+ */
+export class DevtoolsMessageLog {
+    /**
+     * @param {RegExp=} regexFilter
+     */
+    constructor(regexFilter?: RegExp | undefined);
+    _filter: RegExp | undefined;
+    /** @type {LH.DevtoolsLog} */
+    _messages: LH.DevtoolsLog;
+    _isRecording: boolean;
+    /**
+     * @return {LH.DevtoolsLog}
+     */
+    get messages(): LH.DevtoolsLog;
+    reset(): void;
+    beginRecording(): void;
+    endRecording(): void;
+    /**
+     * Records a message if method matches filter and recording has been started.
+     * @param {LH.Protocol.RawEventMessage} message
+     */
+    record(message: LH.Protocol.RawEventMessage): void;
+}
+import BaseGatherer from '../base-gatherer.js';
+//# sourceMappingURL=devtools-log.d.ts.map

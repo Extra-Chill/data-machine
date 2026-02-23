@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/editor/preview.ts"],
+  "sourcesContent": ["/**\n * External dependencies\n */\nimport type { Page } from '@playwright/test';\n\n/**\n * Internal dependencies\n */\nimport type { Editor } from './index';\n\n/**\n * Opens the preview page of an edited post.\n *\n * @param this\n *\n * @return preview page.\n */\nexport async function openPreviewPage( this: Editor ): Promise< Page > {\n\tconst editorTopBar = this.page.locator(\n\t\t'role=region[name=\"Editor top bar\"i]'\n\t);\n\tconst previewButton = editorTopBar.locator( 'role=button[name=\"View\"i]' );\n\n\tawait previewButton.click();\n\n\tconst [ previewPage ] = await Promise.all( [\n\t\tthis.context.waitForEvent( 'page' ),\n\t\tthis.page.click( 'role=menuitem[name=\"Preview in new tab\"i]' ),\n\t] );\n\n\treturn previewPage;\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAiBA,eAAsB,kBAAiD;AACtE,QAAM,eAAe,KAAK,KAAK;AAAA,IAC9B;AAAA,EACD;AACA,QAAM,gBAAgB,aAAa,QAAS,2BAA4B;AAExE,QAAM,cAAc,MAAM;AAE1B,QAAM,CAAE,WAAY,IAAI,MAAM,QAAQ,IAAK;AAAA,IAC1C,KAAK,QAAQ,aAAc,MAAO;AAAA,IAClC,KAAK,KAAK,MAAO,2CAA4C;AAAA,EAC9D,CAAE;AAEF,SAAO;AACR;",
+  "names": []
+}

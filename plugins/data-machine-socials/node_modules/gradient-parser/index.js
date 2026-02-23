@@ -1,0 +1,1 @@
+exports.parse = (GradientParser || {}).parse;

@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../src/types.ts"],
+  "sourcesContent": ["/**\n * External dependencies\n */\nimport type { Mock } from 'jest-mock';\n\n/**\n * Interface for the extended Jest Mock that includes the assertionsNumber property\n */\nexport interface ExtendedMock extends Mock {\n\tassertionsNumber: number;\n}\n\n/**\n * Interface for the matcher result object\n */\nexport interface MatcherResult {\n\tpass: boolean;\n\tmessage: () => string;\n}\n\n/**\n * Interface for the matcher function\n */\nexport type MatcherFunction = (\n\treceived: Record< string, Mock >\n) => MatcherResult;\n\n/**\n * Interface for the matcher function with arguments\n */\nexport type MatcherWithArgsFunction = (\n\treceived: Record< string, Mock >,\n\t...expected: unknown[]\n) => MatcherResult;\n"],
+  "mappings": ";;;;;;;;;;;;;;;;AAAA;AAAA;",
+  "names": []
+}

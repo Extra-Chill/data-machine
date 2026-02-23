@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../src/private-apis.ts"],
+  "sourcesContent": ["/**\n * Internal dependencies\n */\nimport { lock } from './lock-unlock';\nimport { ThemeProvider } from './theme-provider';\nimport { useThemeProviderStyles } from './use-theme-provider-styles';\n\nexport const privateApis = {};\nlock( privateApis, {\n\tThemeProvider,\n\tuseThemeProviderStyles,\n} );\n"],
+  "mappings": ";AAGA,SAAS,YAAY;AACrB,SAAS,qBAAqB;AAC9B,SAAS,8BAA8B;AAEhC,IAAM,cAAc,CAAC;AAC5B,KAAM,aAAa;AAAA,EAClB;AAAA,EACA;AACD,CAAE;",
+  "names": []
+}

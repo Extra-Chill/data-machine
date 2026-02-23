@@ -1,0 +1,23 @@
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _primitives = require("@wordpress/primitives");
+var _jsxRuntime = require("react/jsx-runtime");
+/**
+ * WordPress dependencies
+ */
+
+const caution = /*#__PURE__*/(0, _jsxRuntime.jsx)(_primitives.SVG, {
+  viewBox: "0 0 24 24",
+  xmlns: "http://www.w3.org/2000/svg",
+  children: /*#__PURE__*/(0, _jsxRuntime.jsx)(_primitives.Path, {
+    fillRule: "evenodd",
+    clipRule: "evenodd",
+    d: "M5.5 12a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0ZM12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16Zm-.75 12v-1.5h1.5V16h-1.5Zm0-8v5h1.5V8h-1.5Z"
+  })
+});
+var _default = exports.default = caution;
+//# sourceMappingURL=caution.js.map

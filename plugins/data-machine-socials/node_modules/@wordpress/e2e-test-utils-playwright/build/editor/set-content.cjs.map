@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/editor/set-content.ts"],
+  "sourcesContent": ["/**\n * Internal dependencies\n */\nimport type { Editor } from './index';\n\n/**\n * Set the content of the editor.\n *\n * @param this\n * @param html Serialized block HTML.\n */\nasync function setContent( this: Editor, html: string ) {\n\tawait this.page.waitForFunction(\n\t\t() => window?.wp?.blocks && window?.wp?.data\n\t);\n\n\tawait this.page.evaluate( ( _html ) => {\n\t\tconst blocks = window.wp.blocks.parse( _html );\n\n\t\twindow.wp.data.dispatch( 'core/block-editor' ).resetBlocks( blocks );\n\t}, html );\n}\n\nexport { setContent };\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAWA,eAAe,WAA0B,MAAe;AACvD,QAAM,KAAK,KAAK;AAAA,IACf,MAAM,QAAQ,IAAI,UAAU,QAAQ,IAAI;AAAA,EACzC;AAEA,QAAM,KAAK,KAAK,SAAU,CAAE,UAAW;AACtC,UAAM,SAAS,OAAO,GAAG,OAAO,MAAO,KAAM;AAE7C,WAAO,GAAG,KAAK,SAAU,mBAAoB,EAAE,YAAa,MAAO;AAAA,EACpE,GAAG,IAAK;AACT;",
+  "names": []
+}

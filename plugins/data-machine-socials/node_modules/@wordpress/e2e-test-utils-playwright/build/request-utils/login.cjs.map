@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/request-utils/login.ts"],
+  "sourcesContent": ["/**\n * Internal dependencies\n */\nimport type { RequestUtils } from './index';\n\nexport interface User {\n\tusername: string;\n\tpassword: string;\n}\n\nasync function login( this: RequestUtils, user: User = this.user ) {\n\t// Login to admin using request context.\n\tlet response = await this.request.post( 'wp-login.php', {\n\t\tfailOnStatusCode: true,\n\t\tform: {\n\t\t\tlog: user.username,\n\t\t\tpwd: user.password,\n\t\t},\n\t} );\n\tawait response.dispose();\n\n\t// Get the nonce.\n\tresponse = await this.request.get(\n\t\t'wp-admin/admin-ajax.php?action=rest-nonce',\n\t\t{\n\t\t\tfailOnStatusCode: true,\n\t\t}\n\t);\n\tconst nonce = await response.text();\n\n\treturn nonce;\n}\n\nexport { login };\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAUA,eAAe,MAA2B,OAAa,KAAK,MAAO;AAElE,MAAI,WAAW,MAAM,KAAK,QAAQ,KAAM,gBAAgB;AAAA,IACvD,kBAAkB;AAAA,IAClB,MAAM;AAAA,MACL,KAAK,KAAK;AAAA,MACV,KAAK,KAAK;AAAA,IACX;AAAA,EACD,CAAE;AACF,QAAM,SAAS,QAAQ;AAGvB,aAAW,MAAM,KAAK,QAAQ;AAAA,IAC7B;AAAA,IACA;AAAA,MACC,kBAAkB;AAAA,IACnB;AAAA,EACD;AACA,QAAM,QAAQ,MAAM,SAAS,KAAK;AAElC,SAAO;AACR;",
+  "names": []
+}

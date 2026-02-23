@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/request-utils/preferences.ts"],
+  "sourcesContent": ["/**\n * Internal dependencies\n */\nimport type { RequestUtils } from './index';\n\n/**\n * Reset user preferences\n *\n * @param this Request utils.\n */\nexport async function resetPreferences( this: RequestUtils ) {\n\tawait this.rest( {\n\t\tpath: '/wp/v2/users/me',\n\t\tmethod: 'PUT',\n\t\tdata: {\n\t\t\tmeta: {\n\t\t\t\tpersisted_preferences: {},\n\t\t\t},\n\t\t},\n\t} );\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAUA,eAAsB,mBAAuC;AAC5D,QAAM,KAAK,KAAM;AAAA,IAChB,MAAM;AAAA,IACN,QAAQ;AAAA,IACR,MAAM;AAAA,MACL,MAAM;AAAA,QACL,uBAAuB,CAAC;AAAA,MACzB;AAAA,IACD;AAAA,EACD,CAAE;AACH;",
+  "names": []
+}

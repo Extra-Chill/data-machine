@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/page-utils/is-current-url.ts"],
+  "sourcesContent": ["/**\n * Internal dependencies\n */\nimport { WP_BASE_URL } from '../config';\nimport type { PageUtils } from './';\n\n/**\n * Checks if current path of the URL matches the provided path.\n *\n * @param this\n * @param path String to be serialized as pathname.\n *\n * @return Boolean represents whether current URL is or not a WordPress path.\n */\nexport function isCurrentURL( this: PageUtils, path: string ) {\n\tconst currentURL = new URL( this.page.url() );\n\tconst expectedURL = new URL( path, WP_BASE_URL );\n\n\treturn expectedURL.pathname === currentURL.pathname;\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAGA,oBAA4B;AAWrB,SAAS,aAA+B,MAAe;AAC7D,QAAM,aAAa,IAAI,IAAK,KAAK,KAAK,IAAI,CAAE;AAC5C,QAAM,cAAc,IAAI,IAAK,MAAM,yBAAY;AAE/C,SAAO,YAAY,aAAa,WAAW;AAC5C;",
+  "names": []
+}

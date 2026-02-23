@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/editor/save-draft.ts"],
+  "sourcesContent": ["/**\n * Internal dependencies\n */\nimport type { Editor } from './index';\n\n/**\n * Saves the post as a draft, resolving once the request is complete (once a notice\n * is displayed).\n */\nexport async function saveDraft( this: Editor ) {\n\tawait this.page\n\t\t.getByRole( 'region', { name: 'Editor top bar' } )\n\t\t.getByRole( 'button', { name: 'Save draft' } )\n\t\t.click();\n\n\tawait this.page\n\t\t.getByRole( 'button', { name: 'Dismiss this notice' } )\n\t\t.filter( { hasText: 'Draft saved' } )\n\t\t.waitFor();\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AASA,eAAsB,YAA0B;AAC/C,QAAM,KAAK,KACT,UAAW,UAAU,EAAE,MAAM,iBAAiB,CAAE,EAChD,UAAW,UAAU,EAAE,MAAM,aAAa,CAAE,EAC5C,MAAM;AAER,QAAM,KAAK,KACT,UAAW,UAAU,EAAE,MAAM,sBAAsB,CAAE,EACrD,OAAQ,EAAE,SAAS,cAAc,CAAE,EACnC,QAAQ;AACX;",
+  "names": []
+}

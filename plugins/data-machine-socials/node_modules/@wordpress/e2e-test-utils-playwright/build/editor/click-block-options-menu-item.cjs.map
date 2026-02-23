@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/editor/click-block-options-menu-item.ts"],
+  "sourcesContent": ["/**\n * Internal dependencies\n */\nimport type { Editor } from './index';\n\n/**\n * Clicks a block toolbar button.\n *\n * @param this\n * @param label The text string of the button label.\n */\nexport async function clickBlockOptionsMenuItem( this: Editor, label: string ) {\n\tawait this.clickBlockToolbarButton( 'Options' );\n\tawait this.page\n\t\t.getByRole( 'menu', { name: 'Options' } )\n\t\t.getByRole( 'menuitem', { name: label } )\n\t\t.click();\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAWA,eAAsB,0BAAyC,OAAgB;AAC9E,QAAM,KAAK,wBAAyB,SAAU;AAC9C,QAAM,KAAK,KACT,UAAW,QAAQ,EAAE,MAAM,UAAU,CAAE,EACvC,UAAW,YAAY,EAAE,MAAM,MAAM,CAAE,EACvC,MAAM;AACT;",
+  "names": []
+}

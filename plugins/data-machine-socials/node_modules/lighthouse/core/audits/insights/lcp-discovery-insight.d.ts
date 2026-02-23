@@ -1,0 +1,11 @@
+export default LCPDiscoveryInsight;
+declare class LCPDiscoveryInsight extends Audit {
+    /**
+     * @param {LH.Artifacts} artifacts
+     * @param {LH.Audit.Context} context
+     * @return {Promise<LH.Audit.Product>}
+     */
+    static audit(artifacts: LH.Artifacts, context: LH.Audit.Context): Promise<LH.Audit.Product>;
+}
+import { Audit } from '../audit.js';
+//# sourceMappingURL=lcp-discovery-insight.d.ts.map

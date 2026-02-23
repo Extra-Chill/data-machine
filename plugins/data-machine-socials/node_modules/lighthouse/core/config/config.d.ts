@@ -1,0 +1,27 @@
+/**
+ * @param {LH.Config|undefined} config
+ * @param {{configPath?: string}} context
+ * @return {{configWorkingCopy: LH.Config, configDir?: string, configPath?: string}}
+ */
+export function resolveWorkingCopy(config: LH.Config | undefined, context: {
+    configPath?: string;
+}): {
+    configWorkingCopy: LH.Config;
+    configDir?: string;
+    configPath?: string;
+};
+/**
+ * @param {LH.Gatherer.GatherMode} gatherMode
+ * @param {LH.Config=} config
+ * @param {LH.Flags=} flags
+ * @return {Promise<{resolvedConfig: LH.Config.ResolvedConfig}>}
+ */
+export function initializeConfig(gatherMode: LH.Gatherer.GatherMode, config?: LH.Config | undefined, flags?: LH.Flags | undefined): Promise<{
+    resolvedConfig: LH.Config.ResolvedConfig;
+}>;
+/**
+ * @param {LH.Config.ResolvedConfig} resolvedConfig
+ * @return {string}
+ */
+export function getConfigDisplayString(resolvedConfig: LH.Config.ResolvedConfig): string;
+//# sourceMappingURL=config.d.ts.map

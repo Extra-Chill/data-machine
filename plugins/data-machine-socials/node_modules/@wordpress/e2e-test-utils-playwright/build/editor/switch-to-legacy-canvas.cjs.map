@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/editor/switch-to-legacy-canvas.ts"],
+  "sourcesContent": ["/**\n * Internal dependencies\n */\nimport type { Editor } from './index';\n\n/**\n * Switches to legacy (non-iframed) canvas.\n *\n * @param this\n */\nexport async function switchToLegacyCanvas( this: Editor ) {\n\tawait this.page.waitForFunction( () => window?.wp?.blocks );\n\n\tawait this.page.evaluate( () => {\n\t\twindow.wp.blocks.registerBlockType( 'test/v2', {\n\t\t\tapiVersion: '2',\n\t\t\ttitle: 'test',\n\t\t} );\n\t} );\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAUA,eAAsB,uBAAqC;AAC1D,QAAM,KAAK,KAAK,gBAAiB,MAAM,QAAQ,IAAI,MAAO;AAE1D,QAAM,KAAK,KAAK,SAAU,MAAM;AAC/B,WAAO,GAAG,OAAO,kBAAmB,WAAW;AAAA,MAC9C,YAAY;AAAA,MACZ,OAAO;AAAA,IACR,CAAE;AAAA,EACH,CAAE;AACH;",
+  "names": []
+}

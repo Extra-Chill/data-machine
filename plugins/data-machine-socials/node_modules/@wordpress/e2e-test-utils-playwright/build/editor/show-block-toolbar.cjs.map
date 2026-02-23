@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/editor/show-block-toolbar.ts"],
+  "sourcesContent": ["/**\n * Internal dependencies\n */\nimport type { Editor } from './index';\n\n/**\n * The block toolbar is not always visible while typing.\n * Call this function to reveal it.\n *\n * @param this\n */\nexport async function showBlockToolbar( this: Editor ) {\n\t// Move the mouse to disable the isTyping mode. We need at least three\n\t// mousemove events for it to work across windows (iframe). With three\n\t// moves, it's a guarantee that at least two will be in the same window.\n\t// Two events are required for the flag to be unset.\n\tawait this.page.mouse.move( 50, 50 );\n\tawait this.page.mouse.move( 75, 75 );\n\tawait this.page.mouse.move( 100, 100 );\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAWA,eAAsB,mBAAiC;AAKtD,QAAM,KAAK,KAAK,MAAM,KAAM,IAAI,EAAG;AACnC,QAAM,KAAK,KAAK,MAAM,KAAM,IAAI,EAAG;AACnC,QAAM,KAAK,KAAK,MAAM,KAAM,KAAK,GAAI;AACtC;",
+  "names": []
+}

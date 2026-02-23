@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/editor/set-preferences.ts"],
+  "sourcesContent": ["/**\n * Internal dependencies\n */\nimport type { Editor } from './index';\n\ntype PreferencesContext =\n\t| 'core/edit-post'\n\t| 'core/edit-site'\n\t| 'core/customize-widgets';\n\n/**\n * Set the preferences of the editor.\n *\n * @param this\n * @param context     Context to set preferences for.\n * @param preferences Preferences to set.\n */\nexport async function setPreferences(\n\tthis: Editor,\n\tcontext: PreferencesContext,\n\tpreferences: Record< string, any >\n) {\n\tawait this.page.waitForFunction( () => window?.wp?.data );\n\n\tawait this.page.evaluate(\n\t\tasync ( props ) => {\n\t\t\tfor ( const [ key, value ] of Object.entries(\n\t\t\t\tprops.preferences\n\t\t\t) ) {\n\t\t\t\tawait window.wp.data\n\t\t\t\t\t.dispatch( 'core/preferences' )\n\t\t\t\t\t.set( props.context, key, value );\n\t\t\t}\n\t\t},\n\t\t{ context, preferences }\n\t);\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAiBA,eAAsB,eAErB,SACA,aACC;AACD,QAAM,KAAK,KAAK,gBAAiB,MAAM,QAAQ,IAAI,IAAK;AAExD,QAAM,KAAK,KAAK;AAAA,IACf,OAAQ,UAAW;AAClB,iBAAY,CAAE,KAAK,KAAM,KAAK,OAAO;AAAA,QACpC,MAAM;AAAA,MACP,GAAI;AACH,cAAM,OAAO,GAAG,KACd,SAAU,kBAAmB,EAC7B,IAAK,MAAM,SAAS,KAAK,KAAM;AAAA,MAClC;AAAA,IACD;AAAA,IACA,EAAE,SAAS,YAAY;AAAA,EACxB;AACD;",
+  "names": []
+}

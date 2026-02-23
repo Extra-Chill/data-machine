@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/request-utils/patterns.ts"],
+  "sourcesContent": ["/**\n * Internal dependencies\n */\nimport type { RequestUtils } from './index';\n\n/**\n * Delete all pattern categories using REST API.\n *\n * @see https://developer.wordpress.org/rest-api/reference/categories/#list-categories\n * @param this\n */\nexport async function deleteAllPatternCategories( this: RequestUtils ) {\n\t// List all pattern categories.\n\t// https://developer.wordpress.org/rest-api/reference/categories/#list-categories\n\tconst categories = await this.rest( {\n\t\tpath: '/wp/v2/wp_pattern_category',\n\t\tparams: {\n\t\t\tper_page: 100,\n\t\t},\n\t} );\n\n\t// Delete pattern categories.\n\t// https://developer.wordpress.org/rest-api/reference/categories/#delete-a-category\n\t// \"/wp/v2/category\" does not yet supports batch requests.\n\tawait this.batchRest(\n\t\tcategories.map( ( category: { id: number } ) => ( {\n\t\t\tmethod: 'DELETE',\n\t\t\tpath: `/wp/v2/wp_pattern_category/${ category.id }?force=true`,\n\t\t} ) )\n\t);\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAWA,eAAsB,6BAAiD;AAGtE,QAAM,aAAa,MAAM,KAAK,KAAM;AAAA,IACnC,MAAM;AAAA,IACN,QAAQ;AAAA,MACP,UAAU;AAAA,IACX;AAAA,EACD,CAAE;AAKF,QAAM,KAAK;AAAA,IACV,WAAW,IAAK,CAAE,cAAgC;AAAA,MACjD,QAAQ;AAAA,MACR,MAAM,8BAA+B,SAAS,EAAG;AAAA,IAClD,EAAI;AAAA,EACL;AACD;",
+  "names": []
+}

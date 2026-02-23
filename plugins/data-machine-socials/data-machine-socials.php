@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Data Machine Socials
  * Plugin URI: https://github.com/Extra-Chill/data-machine-socials
- * Description: Social media publishing extension for Data Machine. Adds support for Twitter, Facebook, Bluesky, Threads, and Pinterest.
+ * Description: Social media publishing extension for Data Machine. Adds support for Instagram, Twitter, Facebook, Bluesky, Threads, and Pinterest.
  * Version: 0.1.0
  * Requires at least: 6.9
  * Requires PHP: 8.2
@@ -30,7 +30,7 @@ if ( ! class_exists( 'DataMachine\Core\Steps\Publish\Handlers\PublishHandler' ) 
 	return;
 }
 
-define( 'DATAMACHINE_SOCIALS_VERSION', '0.1.0' );
+define( 'DATAMACHINE_SOCIALS_VERSION', '0.2.0' );
 define( 'DATAMACHINE_SOCIALS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_SOCIALS_URL', plugin_dir_url( __FILE__ ) );
 
@@ -58,16 +58,77 @@ function datamachine_socials_load_handlers() {
 	// Threads
 	new \DataMachineSocials\Abilities\Threads\ThreadsPublishAbility();
 
+	// Instagram
+	new \DataMachineSocials\Abilities\Instagram\InstagramPublishAbility();
+
 	// Social Publish Handlers
 	new \DataMachineSocials\Handlers\Twitter\Twitter();
 	new \DataMachineSocials\Handlers\Facebook\Facebook();
 	new \DataMachineSocials\Handlers\Threads\Threads();
 	new \DataMachineSocials\Handlers\Bluesky\Bluesky();
 	new \DataMachineSocials\Handlers\Pinterest\Pinterest();
+	new \DataMachineSocials\Handlers\Instagram\Instagram();
 }
 
 // Hook into plugins_loaded to ensure Data Machine core is loaded first
 add_action( 'plugins_loaded', 'datamachine_socials_load_handlers', 20 );
+
+// Register REST API
+require_once DATAMACHINE_SOCIALS_PATH . 'inc/RestApi.php';
+add_action( 'plugins_loaded', array( 'DataMachineSocials\RestApi', 'register' ), 25 );
+
+/**
+ * Enqueue Gutenberg sidebar assets
+ */
+function datamachine_socials_enqueue_assets( $hook ) {
+	// Only load on post edit screens
+	if ( ! in_array( $hook, array( 'post.php', 'post-new.php' ), true ) ) {
+		return;
+	}
+
+	$asset_file = DATAMACHINE_SOCIALS_PATH . 'build/index.asset.php';
+
+	if ( ! file_exists( $asset_file ) ) {
+		return;
+	}
+
+	$asset = require $asset_file;
+
+	wp_enqueue_script(
+		'data-machine-socials-editor',
+		DATAMACHINE_SOCIALS_URL . 'build/index.js',
+		$asset['dependencies'],
+		$asset['version'],
+		true
+	);
+
+	wp_enqueue_style(
+		'data-machine-socials-editor',
+		DATAMACHINE_SOCIALS_URL . 'build/style-index.css',
+		array(),
+		$asset['version']
+	);
+
+	// Pass data to JavaScript
+	$post_id = get_the_ID();
+	$featured_image = wp_get_attachment_image_src( get_post_thumbnail_id( $post_id ), 'full' );
+
+	wp_localize_script(
+		'data-machine-socials-editor',
+		'dmsData',
+		array(
+			'postId'      => $post_id,
+			'restNonce'   => wp_create_nonce( 'wp_rest' ),
+			'featuredImage' => $featured_image ? array(
+				'id'     => get_post_thumbnail_id( $post_id ),
+				'url'    => $featured_image[0],
+				'width'  => $featured_image[1],
+				'height' => $featured_image[2],
+			) : null,
+		)
+	);
+}
+add_action( 'admin_enqueue_scripts', 'datamachine_socials_enqueue_assets' );
 
 /**
  * Register WP-CLI commands.

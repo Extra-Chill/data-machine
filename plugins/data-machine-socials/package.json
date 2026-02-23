@@ -1,0 +1,46 @@
+{
+  "name": "data-machine-socials",
+  "version": "0.2.0",
+  "description": "Social media publishing extension for Data Machine with unified Gutenberg interface",
+  "scripts": {
+    "build": "wp-scripts build",
+    "start": "wp-scripts start",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint:js": "wp-scripts lint-js",
+    "lint:css": "wp-scripts lint-style",
+    "format": "wp-scripts format"
+  },
+  "keywords": [
+    "wordpress",
+    "social-media",
+    "gutenberg",
+    "instagram",
+    "twitter",
+    "facebook",
+    "bluesky",
+    "threads",
+    "pinterest"
+  ],
+  "author": "Chris Huber <chris@chubes.net>",
+  "license": "GPL-2.0-or-later",
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@wordpress/scripts": "^30.7.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "@wordpress/api-fetch": "^6.49.0",
+    "@wordpress/components": "^27.0.0",
+    "@wordpress/compose": "^6.32.0",
+    "@wordpress/data": "^9.25.0",
+    "@wordpress/edit-post": "^7.32.0",
+    "@wordpress/element": "^5.32.0",
+    "@wordpress/i18n": "^4.55.0",
+    "@wordpress/icons": "^10.25.0",
+    "@wordpress/plugins": "^6.23.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-easy-crop": "^5.4.2"
+  }
+}

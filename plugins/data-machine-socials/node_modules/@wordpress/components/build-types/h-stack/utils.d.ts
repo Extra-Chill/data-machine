@@ -1,0 +1,11 @@
+/**
+ * External dependencies
+ */
+import type { CSSProperties } from 'react';
+/**
+ * Internal dependencies
+ */
+import type { FlexDirection } from '../flex/types';
+import type { HStackAlignment, AlignmentProps } from './types';
+export declare function getAlignmentProps(alignment: HStackAlignment | CSSProperties['alignItems'], direction?: FlexDirection): AlignmentProps;
+//# sourceMappingURL=utils.d.ts.map

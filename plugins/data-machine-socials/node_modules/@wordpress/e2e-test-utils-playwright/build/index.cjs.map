@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../src/index.ts"],
+  "sourcesContent": ["export type * from './types';\nexport { Admin } from './admin';\nexport { Editor } from './editor';\nexport { PageUtils } from './page-utils';\nexport { RequestUtils } from './request-utils';\nexport { Metrics } from './metrics';\nexport { Lighthouse } from './lighthouse';\nexport { test, expect } from './test';\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AACA,mBAAsB;AACtB,oBAAuB;AACvB,wBAA0B;AAC1B,2BAA6B;AAC7B,qBAAwB;AACxB,wBAA2B;AAC3B,kBAA6B;",
+  "names": []
+}

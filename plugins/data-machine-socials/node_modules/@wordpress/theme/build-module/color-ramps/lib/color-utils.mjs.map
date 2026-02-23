@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../../src/color-ramps/lib/color-utils.ts"],
+  "sourcesContent": ["/**\n * External dependencies\n */\nimport {\n\tto,\n\ttoGamut,\n\tserialize,\n\tcontrastWCAG21,\n\tsRGB,\n\tOKLCH,\n\ttype ColorTypes,\n} from 'colorjs.io/fn';\n\n/**\n * Internal dependencies\n */\nimport './register-color-spaces';\n\n/**\n * Get string representation of a color\n * @param color Color object to stringify\n * @return String representation\n */\nexport function getColorString( color: ColorTypes ): string {\n\tconst rgbRounded = serialize( to( color, sRGB ) );\n\treturn serialize( rgbRounded, { format: 'hex' } );\n}\n\n/**\n * Get contrast value between two colors\n * @param colorA First color\n * @param colorB Second color\n * @return WCAG 2.1 contrast ratio\n */\nexport function getContrast( colorA: ColorTypes, colorB: ColorTypes ): number {\n\treturn contrastWCAG21( colorA, colorB );\n}\n\n/**\n * Make sure that a color is valid in the sRGB gamut and convert it to OKLCH.\n * @param c\n */\nexport function clampToGamut( c: ColorTypes ) {\n\t// map into sRGB using CSS OKLCH method\n\treturn to( toGamut( c, { space: sRGB, method: 'css' } ), OKLCH );\n}\n"],
+  "mappings": ";AAGA;AAAA,EACC;AAAA,EACA;AAAA,EACA;AAAA,EACA;AAAA,EACA;AAAA,EACA;AAAA,OAEM;AAKP,OAAO;AAOA,SAAS,eAAgB,OAA4B;AAC3D,QAAM,aAAa,UAAW,GAAI,OAAO,IAAK,CAAE;AAChD,SAAO,UAAW,YAAY,EAAE,QAAQ,MAAM,CAAE;AACjD;AAQO,SAAS,YAAa,QAAoB,QAA6B;AAC7E,SAAO,eAAgB,QAAQ,MAAO;AACvC;AAMO,SAAS,aAAc,GAAgB;AAE7C,SAAO,GAAI,QAAS,GAAG,EAAE,OAAO,MAAM,QAAQ,MAAM,CAAE,GAAG,KAAM;AAChE;",
+  "names": []
+}

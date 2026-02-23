@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Build files (keep build/ for distribution)
+# Uncomment if you want to exclude build files from git:
+# build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# WordPress
+*.log
+wp-config.php
+wp-content/uploads/
+
+# Temporary files
+*.tmp
+*.temp

@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../src/context.ts"],
+  "sourcesContent": ["/**\n * WordPress dependencies\n */\nimport { createContext } from '@wordpress/element';\n\n/**\n * Internal dependencies\n */\nimport type { ThemeProviderSettings } from './types';\n\ninterface ThemeContextType {\n\tresolvedSettings: ThemeProviderSettings;\n}\n\nexport const ThemeContext = createContext< ThemeContextType >( {\n\tresolvedSettings: {\n\t\tcolor: {},\n\t},\n} );\n"],
+  "mappings": ";AAGA,SAAS,qBAAqB;AAWvB,IAAM,eAAe,cAAmC;AAAA,EAC9D,kBAAkB;AAAA,IACjB,OAAO,CAAC;AAAA,EACT;AACD,CAAE;",
+  "names": []
+}

@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/editor/transform-block-to.ts"],
+  "sourcesContent": ["/**\n * Internal dependencies\n */\nimport type { Editor } from './index';\n\n/**\n * Clicks the default block appender.\n *\n * @param this\n * @param name Block name.\n */\nexport async function transformBlockTo( this: Editor, name: string ) {\n\tawait this.page.waitForFunction(\n\t\t() => window?.wp?.blocks && window?.wp?.data\n\t);\n\n\tawait this.page.evaluate(\n\t\t( [ blockName ] ) => {\n\t\t\tconst clientIds = window.wp.data\n\t\t\t\t.select( 'core/block-editor' )\n\t\t\t\t.getSelectedBlockClientIds();\n\t\t\tconst blocks = window.wp.data\n\t\t\t\t.select( 'core/block-editor' )\n\t\t\t\t.getBlocksByClientId( clientIds );\n\t\t\twindow.wp.data\n\t\t\t\t.dispatch( 'core/block-editor' )\n\t\t\t\t.replaceBlocks(\n\t\t\t\t\tclientIds,\n\t\t\t\t\twindow.wp.blocks.switchToBlockType( blocks, blockName )\n\t\t\t\t);\n\t\t},\n\t\t[ name ]\n\t);\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAWA,eAAsB,iBAAgC,MAAe;AACpE,QAAM,KAAK,KAAK;AAAA,IACf,MAAM,QAAQ,IAAI,UAAU,QAAQ,IAAI;AAAA,EACzC;AAEA,QAAM,KAAK,KAAK;AAAA,IACf,CAAE,CAAE,SAAU,MAAO;AACpB,YAAM,YAAY,OAAO,GAAG,KAC1B,OAAQ,mBAAoB,EAC5B,0BAA0B;AAC5B,YAAM,SAAS,OAAO,GAAG,KACvB,OAAQ,mBAAoB,EAC5B,oBAAqB,SAAU;AACjC,aAAO,GAAG,KACR,SAAU,mBAAoB,EAC9B;AAAA,QACA;AAAA,QACA,OAAO,GAAG,OAAO,kBAAmB,QAAQ,SAAU;AAAA,MACvD;AAAA,IACF;AAAA,IACA,CAAE,IAAK;AAAA,EACR;AACD;",
+  "names": []
+}

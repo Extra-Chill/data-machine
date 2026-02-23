@@ -1,0 +1,21 @@
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _primitives = require("@wordpress/primitives");
+var _jsxRuntime = require("react/jsx-runtime");
+/**
+ * WordPress dependencies
+ */
+
+const postCommentsForm = /*#__PURE__*/(0, _jsxRuntime.jsx)(_primitives.SVG, {
+  xmlns: "http://www.w3.org/2000/svg",
+  viewBox: "0 0 24 24",
+  children: /*#__PURE__*/(0, _jsxRuntime.jsx)(_primitives.Path, {
+    d: "M13 8H4v1.5h9V8zM4 4v1.5h16V4H4zm9 8H5c-.6 0-1 .4-1 1v8.3c0 .3.2.7.6.8.1.1.2.1.3.1.2 0 .5-.1.6-.3l1.8-1.8H13c.6 0 1-.4 1-1V13c0-.6-.4-1-1-1zm-.5 6.6H6.7l-1.2 1.2v-6.3h7v5.1z"
+  })
+});
+var _default = exports.default = postCommentsForm;
+//# sourceMappingURL=post-comments-form.js.map

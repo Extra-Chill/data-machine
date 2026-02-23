@@ -1,0 +1,21 @@
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _primitives = require("@wordpress/primitives");
+var _jsxRuntime = require("react/jsx-runtime");
+/**
+ * WordPress dependencies
+ */
+
+const lockOutline = /*#__PURE__*/(0, _jsxRuntime.jsx)(_primitives.SVG, {
+  viewBox: "0 0 24 24",
+  xmlns: "http://www.w3.org/2000/svg",
+  children: /*#__PURE__*/(0, _jsxRuntime.jsx)(_primitives.Path, {
+    d: "M17 10h-1.2V7c0-2.1-1.7-3.8-3.8-3.8-2.1 0-3.8 1.7-3.8 3.8v3H7c-.6 0-1 .4-1 1v8c0 .6.4 1 1 1h10c.6 0 1-.4 1-1v-8c0-.6-.4-1-1-1zM9.8 7c0-1.2 1-2.2 2.2-2.2 1.2 0 2.2 1 2.2 2.2v3H9.8V7zm6.7 11.5h-9v-7h9v7z"
+  })
+});
+var _default = exports.default = lockOutline;
+//# sourceMappingURL=lock-outline.js.map

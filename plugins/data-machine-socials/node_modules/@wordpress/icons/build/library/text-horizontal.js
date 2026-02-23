@@ -1,0 +1,21 @@
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _primitives = require("@wordpress/primitives");
+var _jsxRuntime = require("react/jsx-runtime");
+/**
+ * WordPress dependencies
+ */
+
+const textHorizontal = /*#__PURE__*/(0, _jsxRuntime.jsx)(_primitives.SVG, {
+  xmlns: "http://www.w3.org/2000/svg",
+  viewBox: "0 0 24 24",
+  children: /*#__PURE__*/(0, _jsxRuntime.jsx)(_primitives.Path, {
+    d: "M8.2 14.4h3.9L13 17h1.7L11 6.5H9.3L5.6 17h1.7l.9-2.6zm2-5.5 1.4 4H8.8l1.4-4zm7.4 7.5-1.3.8.8 1.4H5.5V20h14.3l-2.2-3.6z"
+  })
+});
+var _default = exports.default = textHorizontal;
+//# sourceMappingURL=text-horizontal.js.map
