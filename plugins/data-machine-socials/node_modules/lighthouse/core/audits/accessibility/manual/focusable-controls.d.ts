@@ -1,8 +1,0 @@
-export default FocusableControls;
-/**
- * @fileoverview Manual A11y audit for focusable controls.
- */
-declare class FocusableControls extends ManualAudit {
-}
-import ManualAudit from '../../manual/manual-audit.js';
-//# sourceMappingURL=focusable-controls.d.ts.map

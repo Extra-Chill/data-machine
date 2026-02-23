@@ -1,6 +1,0 @@
-/**
- * External dependencies
- */
-import type { CSSProperties } from 'react';
-export declare const visuallyHidden: CSSProperties;
-//# sourceMappingURL=styles.d.ts.map

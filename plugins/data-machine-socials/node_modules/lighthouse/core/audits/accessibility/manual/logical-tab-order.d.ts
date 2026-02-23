@@ -1,8 +1,0 @@
-export default LogicalTabOrder;
-/**
- * @fileoverview Manual A11y audit for tab order that follows DOM order.
- */
-declare class LogicalTabOrder extends ManualAudit {
-}
-import ManualAudit from '../../manual/manual-audit.js';
-//# sourceMappingURL=logical-tab-order.d.ts.map

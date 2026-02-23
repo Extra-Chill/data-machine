@@ -1,5 +1,0 @@
-export default defaultConfig;
-/** @type {LH.Config} */
-declare const defaultConfig: LH.Config;
-import * as LH from '../../types/lh.js';
-//# sourceMappingURL=default-config.d.ts.map

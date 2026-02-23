@@ -1,4 +1,0 @@
-export function useBoundaryStyle({ record }: {
-    record: any;
-}): import("react").MutableRefObject<undefined>;
-//# sourceMappingURL=use-boundary-style.d.ts.map

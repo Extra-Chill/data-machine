@@ -1,8 +1,0 @@
-export default ManagedFocus;
-/**
- * @fileoverview Manual A11y audit for focusing new content that's added to the page.
- */
-declare class ManagedFocus extends ManualAudit {
-}
-import ManualAudit from '../../manual/manual-audit.js';
-//# sourceMappingURL=managed-focus.d.ts.map

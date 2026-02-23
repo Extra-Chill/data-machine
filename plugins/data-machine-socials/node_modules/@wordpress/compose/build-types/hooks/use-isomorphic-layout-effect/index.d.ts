@@ -1,9 +1,0 @@
-export default useIsomorphicLayoutEffect;
-/**
- * Preferred over direct usage of `useLayoutEffect` when supporting
- * server rendered components (SSR) because currently React
- * throws a warning when using useLayoutEffect in that environment.
- */
-declare const useIsomorphicLayoutEffect: typeof useEffect;
-import { useEffect } from '@wordpress/element';
-//# sourceMappingURL=index.d.ts.map
