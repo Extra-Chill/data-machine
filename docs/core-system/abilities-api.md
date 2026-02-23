@@ -6,7 +6,7 @@ WordPress 6.9 Abilities API provides standardized capability discovery and execu
 
 The Abilities API in `inc/Abilities/` provides a unified interface for Data Machine operations. Each ability implements `execute_callback` with `permission_callback` for consistent access control across REST API, CLI commands, and Chat tools.
 
-**Total registered abilities**: 79
+**Total registered abilities**: 87
 
 ## Registered Abilities
 
@@ -193,6 +193,20 @@ The Abilities API in `inc/Abilities/` provides a unified interface for Data Mach
 |---------|-------------|----------|
 | `datamachine/generate-session-title` | Generate descriptive titles for chat sessions | `SystemAbilities.php` |
 | `datamachine/system-health-check` | Run system health diagnostics | `SystemAbilities.php` |
+
+### Handler Execution (8 abilities)
+
+| Ability | Description | Location |
+|---------|-------------|----------|
+| `datamachine/fetch-reddit` | Fetch posts from Reddit API | `FetchRedditAbility.php` |
+| `datamachine/fetch-rss` | Fetch items from RSS/Atom feeds | `FetchRssAbility.php` |
+| `datamachine/fetch-files` | Process uploaded files | `FetchFilesAbility.php` |
+| `datamachine/fetch-wordpress-api` | Fetch posts from WordPress REST API | `FetchWordPressApiAbility.php` |
+| `datamachine/fetch-wordpress-media` | Query WordPress media library | `FetchWordPressMediaAbility.php` |
+| `datamachine/get-wordpress-post` | Retrieve single WordPress post by ID/URL | `GetWordPressPostAbility.php` |
+| `datamachine/query-wordpress-posts` | Query WordPress posts with filters | `QueryWordPressPostsAbility.php` |
+| `datamachine/publish-wordpress` | Create WordPress posts | `PublishWordPressAbility.php` |
+| `datamachine/update-wordpress` | Update existing WordPress posts | `UpdateWordPressAbility.php` |
 
 ## Category Registration
 
