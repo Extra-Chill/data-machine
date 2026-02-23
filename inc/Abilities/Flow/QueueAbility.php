@@ -12,6 +12,7 @@
 namespace DataMachine\Abilities\Flow;
 
 use DataMachine\Core\Database\Flows\Flows as DB_Flows;
+use DataMachine\Engine\AI\Tools\Global\QueueValidator;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -76,6 +77,10 @@ class QueueAbility {
 							'type'        => 'string',
 							'description' => __( 'Prompt text to queue', 'data-machine' ),
 						),
+						'skip_validation' => array(
+							'type'        => 'boolean',
+							'description' => __( 'Skip duplicate validation (default: false). Use only when intentionally re-adding a known prompt.', 'data-machine' ),
+						),
 					),
 				),
 				'output_schema'       => array(
@@ -87,6 +92,9 @@ class QueueAbility {
 						'queue_length' => array( 'type' => 'integer' ),
 						'message'      => array( 'type' => 'string' ),
 						'error'        => array( 'type' => 'string' ),
+						'reason'       => array( 'type' => 'string' ),
+						'match'        => array( 'type' => 'object' ),
+						'source'       => array( 'type' => 'string' ),
 					),
 				),
 				'execute_callback'    => array( $this, 'executeQueueAdd' ),
@@ -428,6 +436,35 @@ class QueueAbility {
 		$flow_config  = $validation['flow_config'];
 		$step_config  = $validation['step_config'];
 		$prompt_queue = $step_config['prompt_queue'];
+
+		// Duplicate validation (unless explicitly skipped).
+		$skip_validation = ! empty( $input['skip_validation'] );
+		if ( ! $skip_validation ) {
+			$validator = new QueueValidator();
+
+			// Check against published posts.
+			$post_match = $validator->handle_tool_call( array(
+				'topic'         => $prompt,
+				'flow_id'       => $flow_id,
+				'flow_step_id'  => $flow_step_id,
+			) );
+
+			if ( ! empty( $post_match['verdict'] ) && 'duplicate' === $post_match['verdict'] ) {
+				return array(
+					'success'  => false,
+					'error'    => 'duplicate_rejected',
+					'reason'   => $post_match['reason'] ?? 'Duplicate detected',
+					'match'    => $post_match['match'] ?? array(),
+					'source'   => $post_match['source'] ?? 'unknown',
+					'flow_id'  => $flow_id,
+					'message'  => sprintf(
+						'Rejected: "%s" is a duplicate. %s',
+						$prompt,
+						$post_match['reason'] ?? ''
+					),
+				);
+			}
+		}
 
 		$prompt_queue[] = array(
 			'prompt'   => $prompt,
