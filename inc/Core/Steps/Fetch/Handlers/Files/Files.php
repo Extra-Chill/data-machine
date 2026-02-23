@@ -95,6 +95,4 @@ class Files extends FetchHandler {
 
 		return $data;
 	}
-
 }
-

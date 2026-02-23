@@ -39,16 +39,63 @@ class WordPress extends UpdateHandler {
 				'class'       => self::class,
 				'method'      => 'handle_tool_call',
 				'handler'     => 'wordpress_update',
-				'description' => 'Update an existing WordPress post. Requires source_url from previous fetch step.',
+				'description' => 'Update an existing WordPress post. Supports surgical text find/replace, block-level edits by index, full content replacement, title updates, and taxonomy assignment. Requires source_url from previous fetch step.',
 				'parameters'  => array(
 					'type'       => 'object',
 					'properties' => array(
-						'content' => array(
+						'content'       => array(
 							'type'        => 'string',
-							'description' => 'The new content to update the post with',
+							'description' => 'Full content replacement (replaces entire post content)',
+						),
+						'title'         => array(
+							'type'        => 'string',
+							'description' => 'New post title',
+						),
+						'updates'       => array(
+							'type'        => 'array',
+							'description' => 'Surgical find/replace operations on post content text (HTML-attribute-safe)',
+							'items'       => array(
+								'type'       => 'object',
+								'properties' => array(
+									'find'    => array(
+										'type'        => 'string',
+										'description' => 'Text to find in post content',
+									),
+									'replace' => array(
+										'type'        => 'string',
+										'description' => 'Replacement text',
+									),
+								),
+								'required'   => array( 'find', 'replace' ),
+							),
+						),
+						'block_updates' => array(
+							'type'        => 'array',
+							'description' => 'Block-level find/replace targeting specific Gutenberg blocks by zero-based index',
+							'items'       => array(
+								'type'       => 'object',
+								'properties' => array(
+									'block_index' => array(
+										'type'        => 'integer',
+										'description' => 'Zero-based index of the block to edit',
+									),
+									'find'        => array(
+										'type'        => 'string',
+										'description' => 'Text to find within the block',
+									),
+									'replace'     => array(
+										'type'        => 'string',
+										'description' => 'Replacement text',
+									),
+								),
+								'required'   => array( 'block_index', 'find', 'replace' ),
+							),
+						),
+						'taxonomies'    => array(
+							'type'        => 'object',
+							'description' => 'Taxonomy terms to assign (e.g. {"category": "News", "post_tag": ["update", "fix"]})',
 						),
 					),
-					'required'   => array( 'content' ),
 				),
 			);
 		}

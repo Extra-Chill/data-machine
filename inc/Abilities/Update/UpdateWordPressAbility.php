@@ -3,13 +3,16 @@
  * Update WordPress Ability
  *
  * Abilities API primitive for updating WordPress posts.
- * Centralizes surgical updates, block updates, and full content replacement.
+ * Handles surgical text updates, title changes, full content replacement,
+ * and taxonomy assignment. Block-level updates delegate to EditPostBlocksAbility.
  *
  * @package DataMachine\Abilities\Update
  */
 
 namespace DataMachine\Abilities\Update;
 
+use DataMachine\Abilities\Content\BlockSanitizer;
+use DataMachine\Abilities\Content\EditPostBlocksAbility;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\WordPress\TaxonomyHandler;
 
@@ -40,7 +43,7 @@ class UpdateWordPressAbility {
 				'datamachine/update-wordpress',
 				array(
 					'label'               => __( 'Update WordPress Post', 'data-machine' ),
-					'description'         => __( 'Update WordPress posts with surgical, block-level, or full content replacement', 'data-machine' ),
+					'description'         => __( 'Update WordPress posts with surgical text edits, block-level edits, or full content replacement', 'data-machine' ),
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -60,7 +63,7 @@ class UpdateWordPressAbility {
 							),
 							'updates'       => array(
 								'type'        => 'array',
-								'description' => __( 'Surgical find/replace updates', 'data-machine' ),
+								'description' => __( 'Surgical find/replace updates (HTML-attribute-safe)', 'data-machine' ),
 								'items'       => array(
 									'type'       => 'object',
 									'properties' => array(
@@ -203,36 +206,103 @@ class UpdateWordPressAbility {
 		$all_changes      = array();
 		$original_content = $existing_post->post_content;
 
-		// Apply surgical updates
+		// Apply surgical updates (HTML-attribute-safe text replacement).
 		if ( ! empty( $updates ) ) {
 			$result                         = $this->applySurgicalUpdates( $original_content, $updates, $logs );
-			$post_data['post_content']      = $this->sanitizeBlockContent( $result['content'] );
+			$post_data['post_content']      = BlockSanitizer::sanitizeAndSerialize( parse_blocks( $result['content'] ) );
 			$all_changes['content_updates'] = $result['changes'];
 		}
 
-		// Apply block-level updates
+		// Delegate block-level updates to EditPostBlocksAbility.
 		if ( ! empty( $block_updates ) ) {
-			$working_content              = $post_data['post_content'] ?? $original_content;
-			$result                       = $this->applyBlockUpdates( $working_content, $block_updates, $logs );
-			$post_data['post_content']    = $this->sanitizeBlockContent( $result['content'] );
-			$all_changes['block_updates'] = $result['changes'];
+			$block_result = EditPostBlocksAbility::execute(
+				array(
+					'post_id' => $post_id,
+					'edits'   => $block_updates,
+				)
+			);
+
+			$all_changes['block_updates'] = $block_result['changes_applied'] ?? array();
+
+			if ( ! $block_result['success'] ) {
+				$logs[] = array(
+					'level'   => 'warning',
+					'message' => 'WordPress Update: Block updates failed',
+					'data'    => array( 'error' => $block_result['error'] ?? 'Unknown' ),
+				);
+			} else {
+				$logs[] = array(
+					'level'   => 'debug',
+					'message' => 'WordPress Update: Block updates applied via EditPostBlocksAbility',
+					'data'    => $block_result['changes_applied'] ?? array(),
+				);
+
+				// Re-read post content since EditPostBlocksAbility saved directly.
+				$refreshed_post = get_post( $post_id );
+				if ( $refreshed_post ) {
+					$original_content = $refreshed_post->post_content;
+				}
+			}
 		}
 
-		// Apply full content replacement
+		// Apply full content replacement.
 		if ( ! empty( $content ) ) {
-			$post_data['post_content']               = $this->sanitizeBlockContent( wp_unslash( $content ) );
+			$post_data['post_content']               = BlockSanitizer::sanitizeAndSerialize( parse_blocks( wp_unslash( $content ) ) );
 			$all_changes['full_content_replacement'] = true;
 		}
 
-		// Apply title update
+		// Apply title update.
 		if ( ! empty( $title ) ) {
 			$post_data['post_title']     = sanitize_text_field( wp_unslash( $title ) );
 			$all_changes['title_update'] = true;
 		}
 
-		$has_updates = count( $post_data ) > 1;
+		// Determine if we need to call wp_update_post.
+		// Block updates already saved via EditPostBlocksAbility, so only save
+		// if there are additional changes (title, surgical, full content).
+		$has_post_data_updates = count( $post_data ) > 1;
 
-		if ( ! $has_updates ) {
+		if ( $has_post_data_updates ) {
+			$logs[] = array(
+				'level'   => 'debug',
+				'message' => 'WordPress Update: Applying changes',
+				'data'    => array(
+					'updating_title'   => isset( $post_data['post_title'] ),
+					'updating_content' => isset( $post_data['post_content'] ),
+				),
+			);
+
+			$result = wp_update_post( $post_data, true );
+
+			if ( is_wp_error( $result ) ) {
+				$logs[] = array(
+					'level'   => 'error',
+					'message' => 'WordPress Update: wp_update_post failed',
+					'data'    => array( 'error' => $result->get_error_message() ),
+				);
+				return array(
+					'success' => false,
+					'error'   => 'WordPress post update failed: ' . $result->get_error_message(),
+					'logs'    => $logs,
+				);
+			}
+
+			if ( 0 === $result ) {
+				$logs[] = array(
+					'level'   => 'error',
+					'message' => 'WordPress Update: wp_update_post returned 0',
+				);
+				return array(
+					'success' => false,
+					'error'   => 'WordPress post update failed: wp_update_post returned 0',
+					'logs'    => $logs,
+				);
+			}
+		}
+
+		$has_any_changes = ! empty( $all_changes );
+
+		if ( ! $has_any_changes ) {
 			$logs[] = array(
 				'level'   => 'info',
 				'message' => 'WordPress Update: No updates to apply',
@@ -246,43 +316,7 @@ class UpdateWordPressAbility {
 			);
 		}
 
-		$logs[] = array(
-			'level'   => 'debug',
-			'message' => 'WordPress Update: Applying changes',
-			'data'    => array(
-				'updating_title'   => isset( $post_data['post_title'] ),
-				'updating_content' => isset( $post_data['post_content'] ),
-			),
-		);
-
-		$result = wp_update_post( $post_data, true );
-
-		if ( is_wp_error( $result ) ) {
-			$logs[] = array(
-				'level'   => 'error',
-				'message' => 'WordPress Update: wp_update_post failed',
-				'data'    => array( 'error' => $result->get_error_message() ),
-			);
-			return array(
-				'success' => false,
-				'error'   => 'WordPress post update failed: ' . $result->get_error_message(),
-				'logs'    => $logs,
-			);
-		}
-
-		if ( 0 === $result ) {
-			$logs[] = array(
-				'level'   => 'error',
-				'message' => 'WordPress Update: wp_update_post returned 0',
-			);
-			return array(
-				'success' => false,
-				'error'   => 'WordPress post update failed: wp_update_post returned 0',
-				'logs'    => $logs,
-			);
-		}
-
-		// Process taxonomies
+		// Process taxonomies.
 		$taxonomy_results = array();
 		if ( ! empty( $taxonomies ) ) {
 			$taxonomy_handler = new TaxonomyHandler();
@@ -298,8 +332,8 @@ class UpdateWordPressAbility {
 			'level'   => 'info',
 			'message' => 'WordPress Update: Post updated successfully',
 			'data'    => array(
-				'post_url'       => get_permalink( $post_id ),
-				'updated_fields' => array_diff( array_keys( $post_data ), array( 'ID' ) ),
+				'post_url'        => get_permalink( $post_id ),
+				'changes_applied' => array_keys( $all_changes ),
 			),
 		);
 
@@ -331,7 +365,11 @@ class UpdateWordPressAbility {
 	}
 
 	/**
-	 * Apply surgical find-and-replace updates with change tracking.
+	 * Apply surgical find-and-replace updates with HTML-attribute-safe replacement.
+	 *
+	 * Splits content by HTML tags before performing text replacement so that
+	 * text inside tag attributes (href, class, src, etc.) is never modified.
+	 * Adapted from Wordsurf's smart_text_replace pattern.
 	 *
 	 * @param string $original_content Original content.
 	 * @param array  $updates Array of update operations.
@@ -356,23 +394,7 @@ class UpdateWordPressAbility {
 			$find    = $update['find'];
 			$replace = $update['replace'];
 
-			if ( strpos( $working_content, $find ) !== false ) {
-				$working_content = str_replace( $find, $replace, $working_content );
-				$changes_made[]  = array(
-					'found'         => $find,
-					'replaced_with' => $replace,
-					'success'       => true,
-				);
-				$logs[]          = array(
-					'level'   => 'debug',
-					'message' => 'WordPress Update: Surgical update applied',
-					'data'    => array(
-						'find_length'       => strlen( $find ),
-						'replace_length'    => strlen( $replace ),
-						'change_successful' => true,
-					),
-				);
-			} else {
+			if ( strpos( $working_content, $find ) === false ) {
 				$changes_made[] = array(
 					'found'         => $find,
 					'replaced_with' => $replace,
@@ -387,7 +409,23 @@ class UpdateWordPressAbility {
 						'content_length' => strlen( $working_content ),
 					),
 				);
+				continue;
 			}
+
+			$working_content = self::smartTextReplace( $working_content, $find, $replace );
+			$changes_made[]  = array(
+				'found'         => $find,
+				'replaced_with' => $replace,
+				'success'       => true,
+			);
+			$logs[]          = array(
+				'level'   => 'debug',
+				'message' => 'WordPress Update: Surgical update applied',
+				'data'    => array(
+					'find_length'    => strlen( $find ),
+					'replace_length' => strlen( $replace ),
+				),
+			);
 		}
 
 		return array(
@@ -397,127 +435,32 @@ class UpdateWordPressAbility {
 	}
 
 	/**
-	 * Apply targeted updates to specific Gutenberg blocks by index.
+	 * HTML-attribute-safe text replacement.
 	 *
-	 * @param string $original_content Original content.
-	 * @param array  $block_updates Array of block update operations.
-	 * @param array  $logs Log array to append to.
-	 * @return array Array with 'content' and 'changes' keys.
+	 * Splits content by HTML tags so only visible text nodes are modified.
+	 * HTML tag internals (attributes, URLs, class names) are never touched.
+	 *
+	 * @param string $content  Full content string.
+	 * @param string $find     Text to find.
+	 * @param string $replace  Replacement text.
+	 * @return string Content with replacements applied to text nodes only.
 	 */
-	private function applyBlockUpdates( string $original_content, array $block_updates, array &$logs ): array {
-		$blocks       = parse_blocks( $original_content );
-		$changes_made = array();
+	public static function smartTextReplace( string $content, string $find, string $replace ): string {
+		if ( strpos( $content, '<' ) === false ) {
+			return str_replace( $find, $replace, $content );
+		}
 
-		foreach ( $block_updates as $update ) {
-			if ( ! isset( $update['block_index'] ) || ! isset( $update['find'] ) || ! isset( $update['replace'] ) ) {
-				$changes_made[] = array(
-					'block_index'   => $update['block_index'] ?? 'unknown',
-					'found'         => $update['find'] ?? '',
-					'replaced_with' => $update['replace'] ?? '',
-					'success'       => false,
-					'error'         => 'Missing required parameters (block_index, find, replace)',
-				);
-				continue;
-			}
+		$parts  = preg_split( '/(<[^>]+>)/', $content, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY );
+		$result = '';
 
-			$target_index = $update['block_index'];
-			$find         = $update['find'];
-			$replace      = $update['replace'];
-
-			if ( isset( $blocks[ $target_index ] ) ) {
-				$old_content = $blocks[ $target_index ]['innerHTML'] ?? '';
-
-				if ( strpos( $old_content, $find ) !== false ) {
-					$blocks[ $target_index ]['innerHTML'] = str_replace( $find, $replace, $old_content );
-					$changes_made[]                       = array(
-						'block_index'   => $target_index,
-						'found'         => $find,
-						'replaced_with' => $replace,
-						'success'       => true,
-					);
-					$logs[]                               = array(
-						'level'   => 'debug',
-						'message' => 'WordPress Update: Block update applied',
-						'data'    => array(
-							'block_index'    => $target_index,
-							'block_type'     => $blocks[ $target_index ]['blockName'] ?? 'unknown',
-							'find_length'    => strlen( $find ),
-							'replace_length' => strlen( $replace ),
-						),
-					);
-				} else {
-					$changes_made[] = array(
-						'block_index'   => $target_index,
-						'found'         => $find,
-						'replaced_with' => $replace,
-						'success'       => false,
-						'error'         => 'Target text not found in block',
-					);
-					$logs[]         = array(
-						'level'   => 'warning',
-						'message' => 'WordPress Update: Block update target not found',
-						'data'    => array(
-							'block_index' => $target_index,
-							'block_type'  => $blocks[ $target_index ]['blockName'] ?? 'unknown',
-							'find_text'   => substr( $find, 0, 100 ) . ( strlen( $find ) > 100 ? '...' : '' ),
-						),
-					);
-				}
+		foreach ( $parts as $part ) {
+			if ( isset( $part[0] ) && '<' === $part[0] && '>' === substr( $part, -1 ) ) {
+				$result .= $part;
 			} else {
-				$changes_made[] = array(
-					'block_index'   => $target_index,
-					'found'         => $find,
-					'replaced_with' => $replace,
-					'success'       => false,
-					'error'         => 'Block index does not exist',
-				);
-				$logs[]         = array(
-					'level'   => 'warning',
-					'message' => 'WordPress Update: Block index out of range',
-					'data'    => array(
-						'requested_index' => $target_index,
-						'total_blocks'    => count( $blocks ),
-					),
-				);
+				$result .= str_replace( $find, $replace, $part );
 			}
 		}
 
-		return array(
-			'content' => serialize_blocks( $blocks ),
-			'changes' => $changes_made,
-		);
-	}
-
-	/**
-	 * Sanitize Gutenberg blocks recursively.
-	 *
-	 * @param string $content Content with Gutenberg blocks.
-	 * @return string Sanitized content.
-	 */
-	private function sanitizeBlockContent( string $content ): string {
-		$blocks = parse_blocks( $content );
-
-		$filtered = array_map(
-			function ( $block ) {
-				if ( isset( $block['innerHTML'] ) && '' !== $block['innerHTML'] ) {
-					$block['innerHTML'] = wp_kses_post( $block['innerHTML'] );
-				}
-				if ( ! empty( $block['innerBlocks'] ) && is_array( $block['innerBlocks'] ) ) {
-					$block['innerBlocks'] = array_map(
-						function ( $inner ) {
-							if ( isset( $inner['innerHTML'] ) && '' !== $inner['innerHTML'] ) {
-								$inner['innerHTML'] = wp_kses_post( $inner['innerHTML'] );
-							}
-							return $inner;
-						},
-						$block['innerBlocks']
-					);
-				}
-				return $block;
-			},
-			$blocks
-		);
-
-		return serialize_blocks( $filtered );
+		return $result;
 	}
 }
