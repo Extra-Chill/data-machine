@@ -14,11 +14,18 @@ namespace DataMachine\Engine\AI\System;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Engine\AI\System\Tasks\AltTextTask;
+use DataMachine\Engine\AI\System\Tasks\DailyMemoryTask;
 use DataMachine\Engine\AI\System\Tasks\GitHubIssueTask;
 use DataMachine\Engine\AI\System\Tasks\ImageGenerationTask;
 use DataMachine\Engine\AI\System\Tasks\InternalLinkingTask;
+use DataMachine\Core\PluginSettings;
 
 class SystemAgentServiceProvider {
+
+	/**
+	 * Action Scheduler hook name for daily memory generation.
+	 */
+	const DAILY_MEMORY_HOOK = 'datamachine_system_agent_daily_memory';
 
 	/**
 	 * Constructor - registers all System Agent components.
@@ -27,6 +34,7 @@ class SystemAgentServiceProvider {
 		$this->registerTaskHandlers();
 		$this->instantiateSystemAgent();
 		$this->registerActionSchedulerHooks();
+		$this->manageDailyMemorySchedule();
 	}
 
 	/**
@@ -49,10 +57,11 @@ class SystemAgentServiceProvider {
 	 * @return array Task handlers including built-in ones.
 	 */
 	public function getBuiltInTasks( array $tasks ): array {
-		$tasks['image_generation']    = ImageGenerationTask::class;
-		$tasks['alt_text_generation'] = AltTextTask::class;
-		$tasks['github_create_issue'] = GitHubIssueTask::class;
-		$tasks['internal_linking']    = InternalLinkingTask::class;
+		$tasks['image_generation']        = ImageGenerationTask::class;
+		$tasks['alt_text_generation']     = AltTextTask::class;
+		$tasks['github_create_issue']     = GitHubIssueTask::class;
+		$tasks['internal_linking']        = InternalLinkingTask::class;
+		$tasks['daily_memory_generation'] = DailyMemoryTask::class;
 
 		return $tasks;
 	}
@@ -85,6 +94,58 @@ class SystemAgentServiceProvider {
 			10,
 			3
 		);
+
+		add_action(
+			self::DAILY_MEMORY_HOOK,
+			array( $this, 'handleDailyMemoryGeneration' )
+		);
+	}
+
+	/**
+	 * Manage the daily memory recurring schedule.
+	 *
+	 * Ensures the recurring Action Scheduler action exists when enabled
+	 * and is removed when disabled. Runs on every page load but the
+	 * as_next_scheduled_action check is fast.
+	 *
+	 * @since 0.32.0
+	 */
+	private function manageDailyMemorySchedule(): void {
+		if ( ! function_exists( 'as_next_scheduled_action' ) ) {
+			return;
+		}
+
+		$enabled       = (bool) PluginSettings::get( 'daily_memory_enabled', false );
+		$next_scheduled = as_next_scheduled_action( self::DAILY_MEMORY_HOOK, array(), 'data-machine' );
+
+		if ( $enabled && ! $next_scheduled ) {
+			// Schedule daily at midnight UTC.
+			$midnight = strtotime( 'tomorrow midnight' );
+			as_schedule_recurring_action(
+				$midnight,
+				DAY_IN_SECONDS,
+				self::DAILY_MEMORY_HOOK,
+				array(),
+				'data-machine'
+			);
+		} elseif ( ! $enabled && $next_scheduled ) {
+			as_unschedule_all_actions( self::DAILY_MEMORY_HOOK, array(), 'data-machine' );
+		}
+	}
+
+	/**
+	 * Handle the daily memory generation Action Scheduler callback.
+	 *
+	 * Delegates to SystemAgent::scheduleTask() which creates a job
+	 * and executes the DailyMemoryTask.
+	 *
+	 * @since 0.32.0
+	 */
+	public function handleDailyMemoryGeneration(): void {
+		$system_agent = SystemAgent::getInstance();
+		$system_agent->scheduleTask( 'daily_memory_generation', array(
+			'date' => gmdate( 'Y-m-d' ),
+		) );
 	}
 
 	/**

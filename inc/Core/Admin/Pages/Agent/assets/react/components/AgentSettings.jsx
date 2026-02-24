@@ -23,7 +23,6 @@ const DEFAULTS = {
 	default_model: '',
 	agent_models: {},
 	site_context_enabled: false,
-	daily_memory_enabled: false,
 	max_turns: 12,
 };
 
@@ -95,8 +94,6 @@ const AgentSettings = () => {
 				agent_models: data.settings.agent_models || {},
 				site_context_enabled:
 					data.settings.site_context_enabled ?? false,
-				daily_memory_enabled:
-					data.settings.daily_memory_enabled ?? false,
 				max_turns: data.settings.max_turns ?? 12,
 			} );
 			save.setHasChanges( false );
@@ -414,36 +411,6 @@ const AgentSettings = () => {
 									Automatically provides site information
 									(post types, taxonomies, user stats) to AI
 									agents for better context awareness.
-								</p>
-							</fieldset>
-						</td>
-					</tr>
-
-					<tr>
-						<th scope="row">Daily memory</th>
-						<td>
-							<fieldset>
-								<label htmlFor="daily_memory_enabled">
-									<input
-										type="checkbox"
-										id="daily_memory_enabled"
-										checked={
-											form.data.daily_memory_enabled
-										}
-										onChange={ ( e ) =>
-											updateField(
-												'daily_memory_enabled',
-												e.target.checked
-											)
-										}
-									/>
-									Enable daily memory files
-								</label>
-								<p className="description">
-									Automatically create daily memory files
-									(YYYY/MM/DD.md) for agent session history.
-									Daily memory is append-only cognitive
-									history — not logs.
 								</p>
 							</fieldset>
 						</td>

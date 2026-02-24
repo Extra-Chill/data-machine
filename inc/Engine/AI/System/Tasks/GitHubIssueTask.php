@@ -112,4 +112,16 @@ class GitHubIssueTask extends SystemTask {
 	public function getTaskType(): string {
 		return 'github_create_issue';
 	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public static function getTaskMeta(): array {
+		return array(
+			'label'           => 'GitHub Issue Creation',
+			'description'     => 'Create GitHub issues via the GitHub REST API.',
+			'setting_key'     => null,
+			'default_enabled' => true,
+		);
+	}
 }
