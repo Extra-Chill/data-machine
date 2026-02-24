@@ -319,9 +319,8 @@ function datamachine_activate_plugin() {
 /**
  * Create default agent memory files if they don't exist.
  *
- * Called on activation to ensure fresh installs have starter SOUL.md and
- * MEMORY.md templates. Existing files are never overwritten. USER.md is
- * intentionally omitted — it's a registered slot the user creates.
+ * Called on activation to ensure fresh installs have starter templates
+ * for all default memory files. Existing files are never overwritten.
  *
  * @since 0.30.0
  */
@@ -354,6 +353,18 @@ Write in a clear, helpful tone.
 
 ## Context
 <!-- Add background about your site, audience, brand, or domain expertise here -->
+MD,
+		'USER.md'   => <<<'MD'
+# User Profile
+
+## About
+<!-- Who you are — name, role, what you do -->
+
+## Preferences
+<!-- Communication style, formatting preferences, things to remember -->
+
+## Goals
+<!-- What you're working toward with this site or project -->
 MD,
 		'MEMORY.md' => <<<'MD'
 # Agent Memory
