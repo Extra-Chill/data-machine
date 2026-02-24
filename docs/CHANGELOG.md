@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Data Machine will be documented in this file. Also viewable at: 
+All notable changes to Data Machine will be documented in this file.
 
 ## [0.30.0] - 2026-02-24
 
