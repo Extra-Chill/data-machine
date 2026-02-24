@@ -2,6 +2,20 @@
 
 All notable changes to Data Machine will be documented in this file. Also viewable at: 
 
+## [0.30.0] - 2026-02-24
+
+### Added
+- Workspace file operations with security hardening (read, write, edit, ls)
+- Validate containment for workspace file paths
+
+### Changed
+- Comprehensive documentation audit and updates for v0.29.0 codebase
+- New documentation: WordPress as persistent memory for AI agents guide
+- Documented new abilities: analytics, content, internal linking, media, system
+
+### Fixed
+- Rename dm_ prefix to datamachine_ across all post meta and transients (#327)
+
 ## [0.29.0] - 2026-02-23
 
 ### Added
