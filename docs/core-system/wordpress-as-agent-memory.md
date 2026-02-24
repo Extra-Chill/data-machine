@@ -31,7 +31,7 @@ Data Machine ships with three core memory files, each with a distinct purpose:
 
 **SOUL.md** — Agent identity. Who the agent is, how it communicates, what rules it follows. Injected into every AI request. Rarely changes.
 
-**USER.md** — Information about the human. Timezone, preferences, communication style, background. A registered slot the user creates — Data Machine doesn't generate a default template. Injected into every AI request when present.
+**USER.md** — Information about the human. Timezone, preferences, communication style, background. Created on activation with a starter template. Injected into every AI request.
 
 **MEMORY.md** — Accumulated knowledge. Facts, decisions, lessons learned, project state. Grows and changes over time as the agent learns. Injected into every AI request.
 
@@ -44,8 +44,7 @@ All three are loaded by the **MemoryFileRegistry** and injected as a group via t
 - CRUD via REST API: `GET/PUT/DELETE /datamachine/v1/files/agent/{filename}`
 - Editable through the WordPress admin Agent page
 - No serialization — plain markdown, human-readable, git-friendly
-- SOUL.md and MEMORY.md created on activation with starter templates
-- USER.md is a registered slot — created by the user when ready
+- All three core files created on activation with starter templates
 
 ### 2. Chat Sessions — Conversation Memory
 
@@ -103,20 +102,19 @@ USER.md holds **information about the human the agent works with.** This is sepa
 - **Background** — relevant context about the human's expertise or role
 - **Working patterns** — night owl, prefers async, etc.
 
-USER.md is **not created automatically.** It's a registered slot in the MemoryFileRegistry — when the file exists on disk, it's injected. When it doesn't, the directive silently skips it.
+Created on activation with a starter template, same as SOUL.md and MEMORY.md.
 
 ```markdown
 # User
 
 ## About
-- Name: Chris
-- Timezone: Central (Austin, TX)
-- Night owl — stays up late
+<!-- Name, timezone, location, background -->
 
 ## Preferences
-- Concise updates over detailed reports
-- Prefers bullet points and tables
-- Wants options presented before action on ambiguous requests
+<!-- Communication style, update format, decision-making approach -->
+
+## Working Patterns
+<!-- Schedule, availability, things the agent should know about how you work -->
 ```
 
 ### MEMORY.md — What the Agent Knows
@@ -322,9 +320,7 @@ The most effective pattern is **agent writes, human reviews** — the agent appe
 
 ### Creation
 
-- **SOUL.md**: Created on plugin activation with a starter template
-- **MEMORY.md**: Created on plugin activation with a starter template
-- **USER.md**: Created by the user when ready (registered slot, no auto-creation)
+- **SOUL.md, USER.md, MEMORY.md**: Created on plugin activation with starter templates. Existing files are never overwritten.
 - **Additional files**: Created via REST API, admin UI, or by the agent itself
 - **Chat sessions**: Created on first message in a conversation
 - **Job data**: Created during pipeline execution
