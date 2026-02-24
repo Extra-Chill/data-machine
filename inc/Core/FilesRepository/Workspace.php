@@ -17,6 +17,11 @@ defined( 'ABSPATH' ) || exit;
 class Workspace {
 
 	/**
+	 * Maximum file size for reading (1 MB).
+	 */
+	const MAX_READ_SIZE = 1048576;
+
+	/**
 	 * @var DirectoryManager
 	 */
 	private DirectoryManager $directory_manager;
@@ -240,25 +245,16 @@ class Workspace {
 		}
 
 		// Safety: ensure path is within workspace.
-		$real_workspace = realpath( $this->workspace_path );
-		$real_repo      = realpath( $repo_path );
-
-		if ( false === $real_workspace || false === $real_repo ) {
+		$validation = $this->validate_containment( $repo_path, $this->workspace_path );
+		if ( ! $validation['valid'] ) {
 			return array(
 				'success' => false,
-				'message' => 'Could not resolve path. Refusing to remove.',
-			);
-		}
-
-		if ( 0 !== strpos( $real_repo, $real_workspace . '/' ) ) {
-			return array(
-				'success' => false,
-				'message' => 'Path traversal detected. Refusing to remove.',
+				'message' => $validation['message'],
 			);
 		}
 
 		// Remove recursively.
-		$escaped = escapeshellarg( $real_repo );
+		$escaped = escapeshellarg( $validation['real_path'] );
 		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
 		exec( sprintf( 'rm -rf %s 2>&1', $escaped ), $output, $exit_code );
 
@@ -275,9 +271,85 @@ class Workspace {
 		);
 	}
 
+	/**
+	 * Show detailed info about a workspace repo.
+	 *
+	 * @param string $name Repository directory name.
+	 * @return array{success: bool, name?: string, path?: string, branch?: string, remote?: string, commit?: string, dirty?: int, message?: string}
+	 */
+	public function show_repo( string $name ): array {
+		$name      = $this->sanitize_name( $name );
+		$repo_path = $this->workspace_path . '/' . $name;
+
+		if ( ! is_dir( $repo_path ) ) {
+			return array(
+				'success' => false,
+				'message' => sprintf( 'Repository "%s" not found in workspace.', $name ),
+			);
+		}
+
+		$escaped = escapeshellarg( $repo_path );
+
+		// phpcs:disable WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
+		$branch = trim( (string) exec( sprintf( 'git -C %s rev-parse --abbrev-ref HEAD 2>/dev/null', $escaped ) ) );
+		$remote = trim( (string) exec( sprintf( 'git -C %s config --get remote.origin.url 2>/dev/null', $escaped ) ) );
+		$commit = trim( (string) exec( sprintf( 'git -C %s log -1 --format="%%h %%s" 2>/dev/null', $escaped ) ) );
+		$status = trim( (string) exec( sprintf( 'git -C %s status --porcelain 2>/dev/null | wc -l', $escaped ) ) );
+		// phpcs:enable
+
+		return array(
+			'success' => true,
+			'name'    => $name,
+			'path'    => $repo_path,
+			'branch'  => $branch ?: null,
+			'remote'  => $remote ?: null,
+			'commit'  => $commit ?: null,
+			'dirty'   => (int) $status,
+		);
+	}
+
 	// =========================================================================
 	// Internal helpers
 	// =========================================================================
+
+	/**
+	 * Validate that a target path is contained within a parent directory.
+	 *
+	 * Public security primitive — used by WorkspaceReader and WorkspaceWriter
+	 * to enforce path containment before (and after) file I/O. Uses realpath()
+	 * for symlink-safe resolution, so the target must exist on disk.
+	 *
+	 * For pre-write validation of non-existent files, use has_traversal()
+	 * checks on the relative path first, then call this method post-write
+	 * to verify the file landed where expected.
+	 *
+	 * @param string $target    Path to validate.
+	 * @param string $container Parent directory that must contain the target.
+	 * @return array{valid: bool, real_path?: string, message?: string}
+	 */
+	public function validate_containment( string $target, string $container ): array {
+		$real_container = realpath( $container );
+		$real_target    = realpath( $target );
+
+		if ( false === $real_container || false === $real_target ) {
+			return array(
+				'valid'   => false,
+				'message' => 'Path does not exist.',
+			);
+		}
+
+		if ( 0 !== strpos( $real_target, $real_container . '/' ) && $real_target !== $real_container ) {
+			return array(
+				'valid'   => false,
+				'message' => 'Path traversal detected. Access denied.',
+			);
+		}
+
+		return array(
+			'valid'     => true,
+			'real_path' => $real_target,
+		);
+	}
 
 	/**
 	 * Derive a repo name from a git URL.
