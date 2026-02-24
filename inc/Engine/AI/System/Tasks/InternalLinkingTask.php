@@ -46,7 +46,7 @@ class InternalLinkingTask extends SystemTask {
 
 		// Check if already processed.
 		if ( ! $force ) {
-			$existing_links = get_post_meta( $post_id, '_dm_internal_links', true );
+			$existing_links = get_post_meta( $post_id, '_datamachine_internal_links', true );
 			if ( ! empty( $existing_links ) ) {
 				$this->completeJob( $jobId, array(
 					'skipped' => true,
@@ -201,7 +201,7 @@ class InternalLinkingTask extends SystemTask {
 			'links'        => $inserted_links,
 			'job_id'       => $jobId,
 		);
-		update_post_meta( $post_id, '_dm_internal_links', $link_tracking );
+		update_post_meta( $post_id, '_datamachine_internal_links', $link_tracking );
 
 		$this->completeJob( $jobId, array(
 			'post_id'        => $post_id,
