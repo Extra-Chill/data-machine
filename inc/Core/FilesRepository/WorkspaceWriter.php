@@ -35,7 +35,8 @@ class WorkspaceWriter {
 	 * Write (create or overwrite) a file in a workspace repo.
 	 *
 	 * Creates parent directories as needed. Path traversal is blocked
-	 * by rejecting ".." and "." components in the path.
+	 * by rejecting ".." and "." components pre-write, then verified
+	 * post-write via realpath()-based containment check (catches symlinks).
 	 *
 	 * @param string $name    Repository directory name.
 	 * @param string $path    Relative file path within the repo.
@@ -92,6 +93,20 @@ class WorkspaceWriter {
 			return array(
 				'success' => false,
 				'message' => sprintf( 'Failed to write file: %s', $path ),
+			);
+		}
+
+		// Belt-and-suspenders: verify the written file actually landed inside
+		// the repo. has_traversal() catches simple "../" tricks, but symlinks
+		// or creative encoding could slip past. realpath() now works because
+		// the file exists on disk.
+		$containment = $this->workspace->validate_containment( $file_path, $repo_path );
+		if ( ! $containment['valid'] ) {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+			@unlink( $file_path );
+			return array(
+				'success' => false,
+				'message' => 'Path traversal detected. Written file removed.',
 			);
 		}
 

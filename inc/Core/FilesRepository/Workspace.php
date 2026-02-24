@@ -315,8 +315,13 @@ class Workspace {
 	/**
 	 * Validate that a target path is contained within a parent directory.
 	 *
-	 * Uses realpath to resolve symlinks and ".." traversal, then checks
-	 * that the resolved target starts with the container path.
+	 * Public security primitive — used by WorkspaceReader and WorkspaceWriter
+	 * to enforce path containment before (and after) file I/O. Uses realpath()
+	 * for symlink-safe resolution, so the target must exist on disk.
+	 *
+	 * For pre-write validation of non-existent files, use has_traversal()
+	 * checks on the relative path first, then call this method post-write
+	 * to verify the file landed where expected.
 	 *
 	 * @param string $target    Path to validate.
 	 * @param string $container Parent directory that must contain the target.
