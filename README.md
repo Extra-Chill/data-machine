@@ -36,6 +36,7 @@ An integrated conversational AI that lives in wp-admin. It can create pipelines,
 Persistent markdown files that define who your agent is and what it knows:
 
 - **SOUL.md** — Identity, voice, rules
+- **USER.md** — Information about the site owner
 - **MEMORY.md** — Accumulated knowledge, structured by section
 - **Daily memory** — Automatic YYYY/MM/DD.md journal files
 
