@@ -309,8 +309,75 @@ function datamachine_activate_plugin() {
 		wp_mkdir_p( $log_dir );
 	}
 
+	// Ensure default agent memory files exist.
+	datamachine_ensure_default_memory_files();
+
 	// Re-schedule any flows with non-manual scheduling
 	datamachine_activate_scheduled_flows();
+}
+
+/**
+ * Create default agent memory files if they don't exist.
+ *
+ * Called on activation to ensure fresh installs have starter SOUL.md and
+ * MEMORY.md templates. Existing files are never overwritten. USER.md is
+ * intentionally omitted — it's a registered slot the user creates.
+ *
+ * @since 0.30.0
+ */
+function datamachine_ensure_default_memory_files() {
+	$directory_manager = new \DataMachine\Core\FilesRepository\DirectoryManager();
+	$agent_dir         = $directory_manager->get_agent_directory();
+
+	if ( ! $directory_manager->ensure_directory_exists( $agent_dir ) ) {
+		return;
+	}
+
+	$fs = \DataMachine\Core\FilesRepository\FilesystemHelper::get();
+	if ( ! $fs ) {
+		return;
+	}
+
+	$defaults = array(
+		'SOUL.md'   => <<<'MD'
+# Agent Soul
+
+## Identity
+You are an AI assistant.
+
+## Voice & Tone
+Write in a clear, helpful tone.
+
+## Rules
+- Follow the site's content guidelines
+- Ask for clarification when instructions are ambiguous
+
+## Context
+<!-- Add background about your site, audience, brand, or domain expertise here -->
+MD,
+		'MEMORY.md' => <<<'MD'
+# Agent Memory
+
+## State
+<!-- Current project state, active tasks, what's in progress -->
+
+## Lessons Learned
+<!-- What worked, what didn't, patterns to remember -->
+
+## Context
+<!-- Accumulated knowledge about the site, audience, domain -->
+MD,
+	);
+
+	foreach ( $defaults as $filename => $content ) {
+		$filepath = "{$agent_dir}/{$filename}";
+
+		if ( file_exists( $filepath ) ) {
+			continue;
+		}
+
+		$fs->put_contents( $filepath, $content . "\n", FS_CHMOD_FILE );
+	}
 }
 
 /**
