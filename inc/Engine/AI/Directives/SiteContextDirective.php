@@ -3,18 +3,17 @@
  * Site Context Directive - Priority 80 (Lowest Priority)
  *
  * Injects WordPress site context information as the final directive in the
- * 5-tier AI directive system. Provides comprehensive site metadata including
+ * AI directive system. Provides comprehensive site metadata including
  * posts, taxonomies, users, and configuration. Toggleable via settings.
  *
- * Priority Order in 5-Tier System:
+ * Priority Order in Directive System:
  * 1. Priority 10 - Plugin Core Directive
- * 2. Priority 20 - Agent SOUL.md (identity)
- * 3. Priority 30 - Agent MEMORY.md (knowledge)
- * 4. Priority 40 - Pipeline Memory Files (per-pipeline selectable)
- * 5. Priority 50 - Pipeline System Prompt
- * 6. Priority 60 - Pipeline Context Files
- * 7. Priority 70 - Tool Definitions and Workflow Context
- * 8. Priority 80 - WordPress Site Context (THIS CLASS)
+ * 2. Priority 20 - Core Memory Files (SOUL.md, USER.md, MEMORY.md, etc.)
+ * 3. Priority 40 - Pipeline Memory Files (per-pipeline selectable)
+ * 4. Priority 50 - Pipeline System Prompt
+ * 5. Priority 60 - Pipeline Context Files
+ * 6. Priority 70 - Tool Definitions and Workflow Context
+ * 7. Priority 80 - WordPress Site Context (THIS CLASS)
  */
 
 namespace DataMachine\Engine\AI\Directives;

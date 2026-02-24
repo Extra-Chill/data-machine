@@ -103,7 +103,7 @@ class WebhookGateStep extends Step {
 				}
 
 				// Clean up the transient.
-				delete_transient( 'dm_webhook_gate_' . $token );
+				delete_transient( 'datamachine_webhook_gate_' . $token );
 
 				// Fail the job.
 				do_action(
@@ -217,7 +217,7 @@ class WebhookGateStep extends Step {
 		// Store the token → job_id mapping in a transient for fast lookup.
 		// Expires based on timeout or defaults to 7 days.
 		$expiry = $timeout_hours > 0 ? $timeout_hours * HOUR_IN_SECONDS : 7 * DAY_IN_SECONDS;
-		set_transient( 'dm_webhook_gate_' . $token, $this->job_id, $expiry );
+		set_transient( 'datamachine_webhook_gate_' . $token, $this->job_id, $expiry );
 
 		// Schedule timeout action if configured.
 		if ( $timeout_hours > 0 && function_exists( 'as_schedule_single_action' ) ) {
@@ -284,7 +284,7 @@ class WebhookGateStep extends Step {
 	 */
 	public static function handleInboundWebhook( \WP_REST_Request $request ) {
 		$token  = $request->get_param( 'token' );
-		$job_id = get_transient( 'dm_webhook_gate_' . $token );
+		$job_id = get_transient( 'datamachine_webhook_gate_' . $token );
 
 		if ( ! $job_id ) {
 			return new \WP_Error(
@@ -363,7 +363,7 @@ class WebhookGateStep extends Step {
 		$db_jobs->update_job_status( $job_id, JobStatus::PROCESSING );
 
 		// Clean up the transient.
-		delete_transient( 'dm_webhook_gate_' . $token );
+		delete_transient( 'datamachine_webhook_gate_' . $token );
 
 		// Resume the pipeline by scheduling the next step.
 		do_action( 'datamachine_schedule_next_step', $job_id, $next_step_id, $data_packets );

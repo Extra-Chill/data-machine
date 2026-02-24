@@ -7,15 +7,14 @@
  * context (step order and handlers) and clean user instructions defining what
  * the AI should accomplish for this pipeline.
  *
- * Priority Order in 5-Tier System:
+ * Priority Order in Directive System:
  * 1. Priority 10 - Plugin Core Directive
- * 2. Priority 20 - Agent SOUL.md (identity)
- * 3. Priority 30 - Agent MEMORY.md (knowledge)
- * 4. Priority 40 - Pipeline Memory Files (per-pipeline selectable)
- * 5. Priority 50 - Pipeline System Prompt (THIS CLASS)
- * 6. Priority 60 - Pipeline Context Files
- * 7. Priority 70 - Tool Definitions and Workflow Context
- * 8. Priority 80 - WordPress Site Context
+ * 2. Priority 20 - Core Memory Files (SOUL.md, USER.md, MEMORY.md, etc.)
+ * 3. Priority 40 - Pipeline Memory Files (per-pipeline selectable)
+ * 4. Priority 50 - Pipeline System Prompt (THIS CLASS)
+ * 5. Priority 60 - Pipeline Context Files
+ * 6. Priority 70 - Tool Definitions and Workflow Context
+ * 7. Priority 80 - WordPress Site Context
  */
 
 namespace DataMachine\Core\Steps\AI\Directives;
