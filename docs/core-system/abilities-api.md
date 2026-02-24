@@ -249,6 +249,48 @@ Chat Tool → Ability → (Service layer used during migration) → Database
 
 Note: many ability implementations are already self-contained and do not call service managers. Where services remain, they are transitional and will be migrated into abilities per the migration plan.
 
+### Analytics Abilities (2 abilities)
+
+| Ability | Description | Location |
+|---------|-------------|----------|
+| `datamachine/bing-webmaster` | Fetch search analytics from Bing Webmaster Tools API | `inc/Abilities/Analytics/BingWebmasterAbilities.php` |
+| `datamachine/google-search-console` | Fetch search analytics from Google Search Console API | `inc/Abilities/Analytics/GoogleSearchConsoleAbilities.php` |
+
+**Bing Webmaster** (`datamachine/bing-webmaster`):
+- Actions: `query_stats`, `traffic_stats`, `page_stats`, `crawl_stats`
+- Requires API key configuration
+
+**Google Search Console** (`datamachine/google-search-console`):
+- Actions: `search_analytics`, `sitemaps`, `url_inspection`
+- Requires OAuth configuration
+
+### Content Abilities (3 abilities)
+
+| Ability | Description | Location |
+|---------|-------------|----------|
+| `datamachine/get-post-blocks` | Get Gutenberg blocks from a post | `inc/Abilities/Content/GetPostBlocksAbility.php` |
+| `datamachine/edit-post-blocks` | Update Gutenberg blocks in a post | `inc/Abilities/Content/EditPostBlocksAbility.php` |
+| `datamachine/replace-post-blocks` | Replace specific blocks in a post | `inc/Abilities/Content/ReplacePostBlocksAbility.php` |
+
+### Internal Linking Abilities (2 abilities)
+
+| Ability | Description | Location |
+|---------|-------------|----------|
+| `datamachine/internal-linking` | Build internal links between posts | `inc/Abilities/InternalLinkingAbilities.php` |
+| `datamachine/diagnose-internal-links` | Analyze and report broken/missing internal links | `inc/Abilities/InternalLinkingAbilities.php` |
+
+### Media Abilities (1 ability)
+
+| Ability | Description | Location |
+|---------|-------------|----------|
+| `datamachine/generate-image` | Generate images using AI | `inc/Abilities/Media/ImageGenerationAbilities.php` |
+
+### System Abilities (1 ability)
+
+| Ability | Description | Location |
+|---------|-------------|----------|
+| `datamachine/create-github-issue` | Create GitHub issues programmatically | `inc/Abilities/SystemAbilities.php` |
+
 ### Ability Registration
 
 Each abilities class registers abilities on the `wp_abilities_api_init` hook:
