@@ -188,6 +188,12 @@ class WebhookTrigger {
 			);
 		}
 
+		// Check rate limit before executing.
+		$rate_limit_error = self::check_rate_limit( $flow_id, $scheduling_config, $request );
+		if ( $rate_limit_error ) {
+			return $rate_limit_error;
+		}
+
 		// Auth passed — execute the flow.
 		// Instantiate directly to bypass the Abilities API permission check.
 		// The webhook trigger has already authenticated via Bearer token.
@@ -259,6 +265,91 @@ class WebhookTrigger {
 				'message'   => $result['message'] ?? __( 'Flow triggered successfully', 'data-machine' ),
 			)
 		);
+	}
+
+	/**
+	 * Default rate limit: max requests per window.
+	 *
+	 * @var int
+	 */
+	const DEFAULT_RATE_LIMIT_MAX = 60;
+
+	/**
+	 * Default rate limit window in seconds.
+	 *
+	 * @var int
+	 */
+	const DEFAULT_RATE_LIMIT_WINDOW = 60;
+
+	/**
+	 * Check rate limit for a webhook trigger request.
+	 *
+	 * Uses WordPress transients as a simple fixed-window counter.
+	 * Each flow gets its own counter that resets after the window expires.
+	 *
+	 * @param int              $flow_id          Flow ID.
+	 * @param array            $scheduling_config Flow scheduling config.
+	 * @param \WP_REST_Request $request          REST request for logging.
+	 * @return \WP_Error|null Error if rate limited, null if allowed.
+	 */
+	private static function check_rate_limit( int $flow_id, array $scheduling_config, \WP_REST_Request $request ): ?\WP_Error {
+		$rate_config = $scheduling_config['webhook_rate_limit'] ?? array();
+		$max         = (int) ( $rate_config['max'] ?? self::DEFAULT_RATE_LIMIT_MAX );
+		$window      = (int) ( $rate_config['window'] ?? self::DEFAULT_RATE_LIMIT_WINDOW );
+
+		// Rate limiting disabled if max is 0.
+		if ( $max <= 0 ) {
+			return null;
+		}
+
+		$transient_key = 'dm_webhook_rate_' . $flow_id;
+		$current_count = (int) get_transient( $transient_key );
+
+		if ( $current_count >= $max ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Webhook trigger: Rate limit exceeded',
+				array(
+					'flow_id'   => $flow_id,
+					'remote_ip' => self::get_remote_ip( $request ),
+					'limit'     => $max,
+					'window'    => $window,
+				)
+			);
+
+			$response = new \WP_Error(
+				'rate_limit_exceeded',
+				sprintf(
+					'Rate limit exceeded. Maximum %d requests per %d seconds.',
+					$max,
+					$window
+				),
+				array( 'status' => 429 )
+			);
+
+			// Add Retry-After header hint.
+			add_filter(
+				'rest_post_dispatch',
+				function ( $result ) use ( $window ) {
+					if ( $result instanceof \WP_REST_Response ) {
+						$result->header( 'Retry-After', (string) $window );
+					}
+					return $result;
+				}
+			);
+
+			return $response;
+		}
+
+		// Increment counter (set with TTL on first request in window).
+		if ( 0 === $current_count ) {
+			set_transient( $transient_key, 1, $window );
+		} else {
+			set_transient( $transient_key, $current_count + 1, $window );
+		}
+
+		return null;
 	}
 
 	/**

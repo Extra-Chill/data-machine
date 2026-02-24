@@ -140,6 +140,52 @@ class WebhookTriggerAbility {
 			);
 
 			wp_register_ability(
+				'datamachine/webhook-trigger-rate-limit',
+				array(
+					'label'               => __( 'Configure Webhook Rate Limit', 'data-machine' ),
+					'description'         => __( 'Set rate limiting for a flow webhook trigger. Limits the number of requests per time window.', 'data-machine' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'flow_id' ),
+						'properties' => array(
+							'flow_id' => array(
+								'type'        => 'integer',
+								'description' => __( 'Flow ID to configure rate limit for', 'data-machine' ),
+							),
+							'max'     => array(
+								'type'        => 'integer',
+								'description' => __( 'Maximum requests per window. Set to 0 to disable rate limiting.', 'data-machine' ),
+							),
+							'window'  => array(
+								'type'        => 'integer',
+								'description' => __( 'Time window in seconds.', 'data-machine' ),
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'    => array( 'type' => 'boolean' ),
+							'flow_id'    => array( 'type' => 'integer' ),
+							'rate_limit' => array(
+								'type'       => 'object',
+								'properties' => array(
+									'max'    => array( 'type' => 'integer' ),
+									'window' => array( 'type' => 'integer' ),
+								),
+							),
+							'message'    => array( 'type' => 'string' ),
+							'error'      => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( $this, 'executeSetRateLimit' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			wp_register_ability(
 				'datamachine/webhook-trigger-status',
 				array(
 					'label'               => __( 'Webhook Trigger Status', 'data-machine' ),
@@ -375,12 +421,112 @@ class WebhookTriggerAbility {
 	}
 
 	/**
+	 * Set rate limit configuration for a flow webhook trigger.
+	 *
+	 * @param array $input Input with flow_id, max, window.
+	 * @return array Result with updated rate limit config.
+	 */
+	public function executeSetRateLimit( array $input ): array {
+		$flow_id = (int) ( $input['flow_id'] ?? 0 );
+
+		if ( $flow_id <= 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_id must be a positive integer',
+			);
+		}
+
+		$flow = $this->db_flows->get_flow( $flow_id );
+		if ( ! $flow ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Flow %d not found', $flow_id ),
+			);
+		}
+
+		$scheduling_config = $flow['scheduling_config'] ?? array();
+
+		if ( empty( $scheduling_config['webhook_enabled'] ) ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Webhook trigger is not enabled for flow %d. Enable it first.', $flow_id ),
+			);
+		}
+
+		$rate_config = $scheduling_config['webhook_rate_limit'] ?? array();
+
+		if ( isset( $input['max'] ) ) {
+			$max = (int) $input['max'];
+			if ( $max < 0 ) {
+				return array(
+					'success' => false,
+					'error'   => 'max must be a non-negative integer (0 to disable)',
+				);
+			}
+			$rate_config['max'] = $max;
+		}
+
+		if ( isset( $input['window'] ) ) {
+			$window = (int) $input['window'];
+			if ( $window < 1 ) {
+				return array(
+					'success' => false,
+					'error'   => 'window must be a positive integer (seconds)',
+				);
+			}
+			$rate_config['window'] = $window;
+		}
+
+		$scheduling_config['webhook_rate_limit'] = $rate_config;
+
+		$updated = $this->db_flows->update_flow( $flow_id, array( 'scheduling_config' => $scheduling_config ) );
+
+		if ( ! $updated ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to update flow scheduling config',
+			);
+		}
+
+		// Clear any existing rate limit counter so new config takes effect immediately.
+		delete_transient( 'dm_webhook_rate_' . $flow_id );
+
+		$effective_max    = $rate_config['max'] ?? \DataMachine\Api\WebhookTrigger::DEFAULT_RATE_LIMIT_MAX;
+		$effective_window = $rate_config['window'] ?? \DataMachine\Api\WebhookTrigger::DEFAULT_RATE_LIMIT_WINDOW;
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Webhook rate limit updated for flow',
+			array(
+				'flow_id' => $flow_id,
+				'max'     => $effective_max,
+				'window'  => $effective_window,
+			)
+		);
+
+		$message = 0 === $effective_max
+			? sprintf( 'Rate limiting disabled for flow %d.', $flow_id )
+			: sprintf( 'Rate limit set to %d requests per %d seconds for flow %d.', $effective_max, $effective_window, $flow_id );
+
+		return array(
+			'success'    => true,
+			'flow_id'    => $flow_id,
+			'rate_limit' => array(
+				'max'    => $effective_max,
+				'window' => $effective_window,
+			),
+			'message'    => $message,
+		);
+	}
+
+	/**
 	 * Get webhook trigger status for a flow.
 	 *
 	 * Does NOT return the token — use enable/regenerate for that.
 	 *
 	 * @param array $input Input with flow_id.
-	 * @return array Result with webhook status.
+	 * @return array Result with webhook status including rate limit config.
 	 */
 	public function executeStatus( array $input ): array {
 		$flow_id = (int) ( $input['flow_id'] ?? 0 );
@@ -413,6 +559,12 @@ class WebhookTriggerAbility {
 		if ( $enabled ) {
 			$result['webhook_url'] = self::get_webhook_url( $flow_id );
 			$result['created_at']  = $scheduling_config['webhook_created_at'] ?? '';
+
+			$rate_config          = $scheduling_config['webhook_rate_limit'] ?? array();
+			$result['rate_limit'] = array(
+				'max'    => $rate_config['max'] ?? \DataMachine\Api\WebhookTrigger::DEFAULT_RATE_LIMIT_MAX,
+				'window' => $rate_config['window'] ?? \DataMachine\Api\WebhookTrigger::DEFAULT_RATE_LIMIT_WINDOW,
+			);
 		}
 
 		return $result;

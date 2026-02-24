@@ -6,15 +6,15 @@
  * Wraps FlowAbilities API primitive.
  *
  * Queue and webhook subcommands are handled by dedicated command classes:
- * - FlowsQueueCommand (flows queue)
- * - FlowsWebhookCommand (flows webhook)
+ * - QueueCommand (flows queue)
+ * - WebhookCommand (flows webhook)
  *
- * @package DataMachine\Cli\Commands
+ * @package DataMachine\Cli\Commands\Flows
  * @since 0.15.3 Added create subcommand.
  * @since 0.31.0 Extracted queue and webhook to dedicated command classes.
  */
 
-namespace DataMachine\Cli\Commands;
+namespace DataMachine\Cli\Commands\Flows;
 
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
@@ -161,16 +161,16 @@ class FlowsCommand extends BaseCommand {
 			return;
 		}
 
-		// Delegate 'queue' subcommand to FlowsQueueCommand.
+		// Delegate 'queue' subcommand to QueueCommand.
 		if ( ! empty( $args ) && 'queue' === $args[0] ) {
-			$queue = new FlowsQueueCommand();
+			$queue = new QueueCommand();
 			$queue->dispatch( array_slice( $args, 1 ), $assoc_args );
 			return;
 		}
 
-		// Delegate 'webhook' subcommand to FlowsWebhookCommand.
+		// Delegate 'webhook' subcommand to WebhookCommand.
 		if ( ! empty( $args ) && 'webhook' === $args[0] ) {
-			$webhook = new FlowsWebhookCommand();
+			$webhook = new WebhookCommand();
 			$webhook->dispatch( array_slice( $args, 1 ), $assoc_args );
 			return;
 		}

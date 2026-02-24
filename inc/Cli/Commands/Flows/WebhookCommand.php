@@ -5,19 +5,19 @@
  * Manages webhook triggers for flows.
  * Extracted from FlowsCommand to follow the focused command pattern.
  *
- * @package DataMachine\Cli\Commands
+ * @package DataMachine\Cli\Commands\Flows
  * @since 0.31.0
  * @see https://github.com/Extra-Chill/data-machine/issues/345
  */
 
-namespace DataMachine\Cli\Commands;
+namespace DataMachine\Cli\Commands\Flows;
 
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 
 defined( 'ABSPATH' ) || exit;
 
-class FlowsWebhookCommand extends BaseCommand {
+class WebhookCommand extends BaseCommand {
 
 	/**
 	 * Dispatch a webhook subcommand.
@@ -29,7 +29,7 @@ class FlowsWebhookCommand extends BaseCommand {
 	 */
 	public function dispatch( array $args, array $assoc_args ): void {
 		if ( empty( $args ) ) {
-			WP_CLI::error( 'Usage: wp datamachine flows webhook <enable|disable|regenerate|status|list> [flow_id]' );
+			WP_CLI::error( 'Usage: wp datamachine flows webhook <enable|disable|regenerate|status|list|rate-limit> [flow_id]' );
 			return;
 		}
 
@@ -52,8 +52,11 @@ class FlowsWebhookCommand extends BaseCommand {
 			case 'list':
 				$this->list_webhooks( $remaining, $assoc_args );
 				break;
+			case 'rate-limit':
+				$this->rate_limit( $remaining, $assoc_args );
+				break;
 			default:
-				WP_CLI::error( "Unknown webhook action: {$action}. Use: enable, disable, regenerate, status, list" );
+				WP_CLI::error( "Unknown webhook action: {$action}. Use: enable, disable, regenerate, status, list, rate-limit" );
 		}
 	}
 
@@ -306,5 +309,94 @@ class FlowsWebhookCommand extends BaseCommand {
 
 		$this->format_items( $webhook_flows, array( 'flow_id', 'flow_name', 'webhook_url', 'created_at' ), $assoc_args, 'flow_id' );
 		WP_CLI::log( sprintf( 'Total: %d flow(s) with webhook triggers enabled.', count( $webhook_flows ) ) );
+	}
+
+	/**
+	 * Configure rate limiting for a flow webhook trigger.
+	 *
+	 * When called without --max or --window, shows the current config.
+	 * Set --max=0 to disable rate limiting.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <flow_id>
+	 * : The flow ID to configure.
+	 *
+	 * [--max=<number>]
+	 * : Maximum requests per window. Set to 0 to disable rate limiting.
+	 *
+	 * [--window=<seconds>]
+	 * : Time window in seconds.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # View current rate limit
+	 *     wp datamachine flows webhook rate-limit 42
+	 *
+	 *     # Set custom limit
+	 *     wp datamachine flows webhook rate-limit 42 --max=100 --window=120
+	 *
+	 *     # Disable rate limiting
+	 *     wp datamachine flows webhook rate-limit 42 --max=0
+	 *
+	 * @subcommand rate-limit
+	 */
+	public function rate_limit( array $args, array $assoc_args ): void {
+		if ( empty( $args ) ) {
+			WP_CLI::error( 'Usage: wp datamachine flows webhook rate-limit <flow_id> [--max=<number>] [--window=<seconds>]' );
+			return;
+		}
+
+		$flow_id = (int) $args[0];
+		if ( $flow_id <= 0 ) {
+			WP_CLI::error( 'flow_id must be a positive integer' );
+			return;
+		}
+
+		// If no --max or --window provided, show current config.
+		if ( ! isset( $assoc_args['max'] ) && ! isset( $assoc_args['window'] ) ) {
+			$ability = new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
+			$result  = $ability->executeStatus( array( 'flow_id' => $flow_id ) );
+
+			if ( ! $result['success'] ) {
+				WP_CLI::error( $result['error'] ?? 'Failed to get webhook status' );
+				return;
+			}
+
+			if ( empty( $result['webhook_enabled'] ) ) {
+				WP_CLI::error( sprintf( 'Webhook trigger is not enabled for flow %d.', $flow_id ) );
+				return;
+			}
+
+			$rate_limit = $result['rate_limit'] ?? array();
+			$max        = $rate_limit['max'] ?? \DataMachine\Api\WebhookTrigger::DEFAULT_RATE_LIMIT_MAX;
+			$window     = $rate_limit['window'] ?? \DataMachine\Api\WebhookTrigger::DEFAULT_RATE_LIMIT_WINDOW;
+
+			if ( 0 === $max ) {
+				WP_CLI::log( sprintf( 'Flow %d: Rate limiting disabled.', $flow_id ) );
+			} else {
+				WP_CLI::log( sprintf( 'Flow %d: %d requests per %d seconds.', $flow_id, $max, $window ) );
+			}
+			return;
+		}
+
+		$input = array( 'flow_id' => $flow_id );
+
+		if ( isset( $assoc_args['max'] ) ) {
+			$input['max'] = (int) $assoc_args['max'];
+		}
+		if ( isset( $assoc_args['window'] ) ) {
+			$input['window'] = (int) $assoc_args['window'];
+		}
+
+		$ability = new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
+		$result  = $ability->executeSetRateLimit( $input );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to set rate limit' );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] );
 	}
 }
