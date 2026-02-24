@@ -28,7 +28,7 @@ class AgentMemoryMigration {
 	/**
 	 * Current migration version.
 	 */
-	private const CURRENT_VERSION = '1.1';
+	private const CURRENT_VERSION = '1.2';
 
 	/**
 	 * Section definitions matching the old AgentSoulDirective structure.
@@ -54,6 +54,22 @@ class AgentMemoryMigration {
 
 ## Context
 <!-- Accumulated knowledge about the site, audience, domain -->
+MD;
+
+	/**
+	 * Default USER.md template for fresh installs.
+	 */
+	private const DEFAULT_USER_TEMPLATE = <<<'MD'
+# User Context
+
+## About
+<!-- Who is the human behind this site? Name, role, background. -->
+
+## Preferences
+<!-- Communication style, workflow preferences, what matters to them. -->
+
+## Goals
+<!-- What are they building? What are they working toward? -->
 MD;
 
 	/**
@@ -117,6 +133,9 @@ MD;
 		// Create SOUL.md if it doesn't exist.
 		self::ensure_soul_file( $agent_dir );
 
+		// Create USER.md if it doesn't exist.
+		self::ensure_user_file( $agent_dir );
+
 		// Create MEMORY.md if it doesn't exist.
 		self::ensure_memory_file( $agent_dir );
 
@@ -152,6 +171,36 @@ MD;
 				'info',
 				'AgentMemoryMigration: Created SOUL.md.',
 				array( 'path' => $soul_path )
+			);
+		}
+	}
+
+	/**
+	 * Create USER.md if it doesn't exist.
+	 *
+	 * @param string $agent_dir Agent directory path.
+	 * @return void
+	 */
+	private static function ensure_user_file( string $agent_dir ): void {
+		$user_path = "{$agent_dir}/USER.md";
+
+		if ( file_exists( $user_path ) ) {
+			return;
+		}
+
+		$fs = FilesystemHelper::get();
+		if ( ! $fs ) {
+			return;
+		}
+
+		$written = $fs->put_contents( $user_path, self::DEFAULT_USER_TEMPLATE . "\n", FS_CHMOD_FILE );
+
+		if ( $written ) {
+			do_action(
+				'datamachine_log',
+				'info',
+				'AgentMemoryMigration: Created USER.md.',
+				array( 'path' => $user_path )
 			);
 		}
 	}

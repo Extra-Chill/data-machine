@@ -50,6 +50,7 @@ require_once __DIR__ . '/Api/Handlers.php';
 require_once __DIR__ . '/Api/Tools.php';
 require_once __DIR__ . '/Api/Chat/ChatFilters.php';
 require_once __DIR__ . '/Engine/AI/Directives/AgentSoulDirective.php';
+require_once __DIR__ . '/Engine/AI/Directives/AgentUserDirective.php';
 require_once __DIR__ . '/Engine/AI/Directives/AgentMemoryDirective.php';
 require_once __DIR__ . '/Engine/AI/Directives/SiteContext.php';
 require_once __DIR__ . '/Api/Chat/ChatAgentDirective.php';

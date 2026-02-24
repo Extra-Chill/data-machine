@@ -918,7 +918,7 @@ class FileAbilities {
 			);
 		}
 
-		if ( in_array( $filename, array( 'SOUL.md', 'MEMORY.md' ), true ) ) {
+		if ( in_array( $filename, array( 'SOUL.md', 'USER.md', 'MEMORY.md' ), true ) ) {
 			return array(
 				'success' => false,
 				'error'   => sprintf( '%s cannot be deleted. It is a core agent file. Clear its contents instead.', $filename ),

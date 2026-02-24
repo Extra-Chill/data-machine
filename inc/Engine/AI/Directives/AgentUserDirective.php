@@ -1,16 +1,19 @@
 <?php
 /**
- * Agent Memory Directive - Priority 30
+ * Agent User Directive - Priority 25
  *
- * Injects the agent memory from MEMORY.md in the files repository as context
- * for every AI call. Defines WHAT the agent knows — accumulated state, lessons,
- * and evolving context.
+ * Injects the user context from USER.md in the files repository. Defines
+ * WHO the agent is serving — the human behind the site, their preferences,
+ * goals, and working context.
+ *
+ * Sits between SOUL (who the agent is) and MEMORY (what the agent knows)
+ * because understanding the user is foundational to applying knowledge.
  *
  * Priority Order in Directive System:
  * 1. Priority 10 - Plugin Core Directive
  * 2. Priority 20 - Agent SOUL.md (identity)
- * 3. Priority 25 - Agent USER.md (user context)
- * 4. Priority 30 - Agent MEMORY.md (THIS CLASS - knowledge)
+ * 3. Priority 25 - Agent USER.md (THIS CLASS - user context)
+ * 4. Priority 30 - Agent MEMORY.md (knowledge)
  * 5. Priority 40 - Pipeline Memory Files (per-pipeline selectable)
  * 6. Priority 50 - Pipeline System Prompt
  * 7. Priority 60 - Pipeline Context Files
@@ -25,18 +28,18 @@ use DataMachine\Engine\AI\Directives\DirectiveInterface;
 
 defined( 'ABSPATH' ) || exit;
 
-class AgentMemoryDirective implements DirectiveInterface {
+class AgentUserDirective implements DirectiveInterface {
 
 	public static function get_outputs( string $provider_name, array $tools, ?string $step_id = null, array $payload = array() ): array {
 		$directory_manager = new DirectoryManager();
 		$agent_dir         = $directory_manager->get_agent_directory();
-		$memory_path       = "{$agent_dir}/MEMORY.md";
+		$user_path         = "{$agent_dir}/USER.md";
 
-		if ( ! file_exists( $memory_path ) ) {
+		if ( ! file_exists( $user_path ) ) {
 			return array();
 		}
 
-		$content = file_get_contents( $memory_path );
+		$content = file_get_contents( $user_path );
 
 		if ( empty( trim( $content ) ) ) {
 			return array();
@@ -51,13 +54,13 @@ class AgentMemoryDirective implements DirectiveInterface {
 	}
 }
 
-// Self-register (Priority 30 = agent memory/knowledge for all AI agents).
+// Self-register (Priority 25 = user context for all AI agents).
 add_filter(
 	'datamachine_directives',
 	function ( $directives ) {
 		$directives[] = array(
-			'class'       => AgentMemoryDirective::class,
-			'priority'    => 30,
+			'class'       => AgentUserDirective::class,
+			'priority'    => 25,
 			'agent_types' => array( 'all' ),
 		);
 		return $directives;
