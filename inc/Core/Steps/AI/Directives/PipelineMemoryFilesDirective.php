@@ -7,13 +7,12 @@
  *
  * Priority Order in Directive System:
  * 1. Priority 10 - Plugin Core Directive (agent identity)
- * 2. Priority 20 - Agent SOUL.md (identity)
- * 3. Priority 30 - Agent MEMORY.md (knowledge)
- * 4. Priority 40 - Pipeline Memory Files (THIS CLASS - per-pipeline selectable)
- * 5. Priority 50 - Pipeline System Prompt (pipeline instructions)
- * 6. Priority 60 - Pipeline Context Files
- * 7. Priority 70 - Tool Definitions (available tools and workflow)
- * 8. Priority 80 - Site Context (WordPress metadata)
+ * 2. Priority 20 - Core Memory Files (SOUL.md, USER.md, MEMORY.md, etc.)
+ * 3. Priority 40 - Pipeline Memory Files (THIS CLASS - per-pipeline selectable)
+ * 4. Priority 50 - Pipeline System Prompt (pipeline instructions)
+ * 5. Priority 60 - Pipeline Context Files
+ * 6. Priority 70 - Tool Definitions (available tools and workflow)
+ * 7. Priority 80 - Site Context (WordPress metadata)
  *
  * @package DataMachine\Core\Steps\AI\Directives
  */
@@ -104,7 +103,7 @@ class PipelineMemoryFilesDirective implements \DataMachine\Engine\AI\Directives\
 	}
 }
 
-// Register at Priority 40 — between MEMORY.md (30) and pipeline system prompt (50).
+// Register at Priority 40 — between core memory files (20) and pipeline system prompt (50).
 add_filter(
 	'datamachine_directives',
 	function ( $directives ) {
