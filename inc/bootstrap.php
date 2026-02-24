@@ -50,6 +50,20 @@ require_once __DIR__ . '/Api/Handlers.php';
 require_once __DIR__ . '/Api/Tools.php';
 require_once __DIR__ . '/Api/Chat/ChatFilters.php';
 require_once __DIR__ . '/Engine/AI/Directives/CoreMemoryFilesDirective.php';
+
+/*
+|--------------------------------------------------------------------------
+| Default memory file registrations
+|--------------------------------------------------------------------------
+| These register through the same API any plugin or theme would use.
+| Nothing special about them — they're just the defaults.
+*/
+
+use DataMachine\Engine\AI\MemoryFileRegistry;
+
+MemoryFileRegistry::register( 'SOUL.md', 10 );
+MemoryFileRegistry::register( 'USER.md', 20 );
+MemoryFileRegistry::register( 'MEMORY.md', 30 );
 require_once __DIR__ . '/Engine/AI/Directives/SiteContext.php';
 require_once __DIR__ . '/Api/Chat/ChatAgentDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineCoreDirective.php';
