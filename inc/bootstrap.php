@@ -59,11 +59,9 @@ require_once __DIR__ . '/Engine/AI/Directives/CoreMemoryFilesDirective.php';
 | Nothing special about them — they're just the defaults.
 */
 
-use DataMachine\Engine\AI\MemoryFileRegistry;
-
-MemoryFileRegistry::register( 'SOUL.md', 10 );
-MemoryFileRegistry::register( 'USER.md', 20 );
-MemoryFileRegistry::register( 'MEMORY.md', 30 );
+\DataMachine\Engine\AI\MemoryFileRegistry::register( 'SOUL.md', 10 );
+\DataMachine\Engine\AI\MemoryFileRegistry::register( 'USER.md', 20 );
+\DataMachine\Engine\AI\MemoryFileRegistry::register( 'MEMORY.md', 30 );
 require_once __DIR__ . '/Engine/AI/Directives/SiteContext.php';
 require_once __DIR__ . '/Api/Chat/ChatAgentDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineCoreDirective.php';

@@ -3,7 +3,7 @@
  * Site Context Directive - Priority 80 (Lowest Priority)
  *
  * Injects WordPress site context information as the final directive in the
- * 5-tier AI directive system. Provides comprehensive site metadata including
+ * AI directive system. Provides comprehensive site metadata including
  * posts, taxonomies, users, and configuration. Toggleable via settings.
  *
  * Priority Order in Directive System:
