@@ -5,16 +5,41 @@ All notable changes to Data Machine will be documented in this file. Also viewab
 ## [0.30.0] - 2026-02-24
 
 ### Added
-- Workspace file operations with security hardening (read, write, edit, ls)
+- Inbound webhook trigger for flow execution (#342)
+- Webhook rate limiting (#351)
+- Agent workspace for managed repo operations (#337)
+- Agent memory read/write as first-class ability (#332)
+- Expose agent memory as global AI tool
+- Agent Ping Callback API (#309)
+- Daily memory system — YYYY/MM/DD.md files for agent cognitive history (#348, #352)
+- System Tasks tab on Agent page with daily memory generation (#358)
+- Jobs delete CLI command
+- Workspace file operations with security hardening — read, write, edit, ls (#360)
 - Validate containment for workspace file paths
+- Support pre-authenticated context in PermissionHelper for webhook triggers (#356)
+- Default memory file creation on activation (SOUL.md, MEMORY.md, USER.md)
+- Enforce duplicate validation on queue-add ability (#326)
 
 ### Changed
+- Extract FlowsQueueCommand and FlowsWebhookCommand from FlowsCommand (#349)
+- Move flows commands to Commands/Flows/ namespace
+- Rename agent CLI namespace to memory (#354)
+- Replace filter-based registry with OOP MemoryFileRegistry
+- Replace individual memory directives with CoreMemoryFilesDirective (#330)
+- Extract QueueValidator::validate() as shared API
+- Wire daily_memory_enabled to job lifecycle and ability gate (#355)
 - Comprehensive documentation audit and updates for v0.29.0 codebase
 - New documentation: WordPress as persistent memory for AI agents guide
 - Documented new abilities: analytics, content, internal linking, media, system
 
 ### Fixed
 - Rename dm_ prefix to datamachine_ across all post meta and transients (#327)
+- Use UTC timestamps consistently in AgentPing (#336)
+- Fix conversation loop completing after first handler in multi-handler steps (#334)
+- Remove duplicate set() method in EngineData
+- Remove dead settings, stale comments, style cleanup
+- Remove AgentMemoryMigration (superseded by MemoryFileRegistry)
+- Remove uploads fallback for workspace directory (#362)
 
 ## [0.29.0] - 2026-02-23
 
