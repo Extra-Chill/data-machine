@@ -24,6 +24,7 @@ WP_CLI::add_command( 'datamachine jobs', Commands\JobsCommand::class );
 WP_CLI::add_command( 'datamachine pipelines', Commands\PipelinesCommand::class );
 WP_CLI::add_command( 'datamachine posts', Commands\PostsCommand::class );
 WP_CLI::add_command( 'datamachine logs', Commands\LogsCommand::class );
+WP_CLI::add_command( 'datamachine agent', Commands\AgentCommand::class );
 
 // Aliases for AI agent compatibility (singular/plural variants).
 WP_CLI::add_command( 'datamachine setting', Commands\SettingsCommand::class );
