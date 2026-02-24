@@ -493,3 +493,60 @@ done
 **Permission**: `manage_options` capability required
 **Implementation**: `inc/Api/Auth.php`
 **OAuth URLs**: `/datamachine-auth/{handler}/`
+
+## Additional Endpoints
+
+### GET /auth/{handler_slug}
+
+Get authentication details for a handler. Similar to /status but returns full configuration.
+
+**Permission**: `manage_options` capability required
+
+**Parameters**:
+- `handler_slug` (string, required): Handler identifier
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "handler_slug": "reddit",
+    "authenticated": true,
+    "account_details": {...},
+    "config_status": {...}
+  }
+}
+```
+
+### PUT /auth/{handler_slug}
+
+Update authentication credentials for a handler.
+
+**Permission**: `manage_options` capability required
+
+**Parameters**:
+- `handler_slug` (string, required): Handler identifier
+- `credentials` (object, required): Handler-specific credentials
+
+**Example**:
+```bash
+curl -X PUT https://example.com/wp-json/datamachine/v1/auth/reddit \
+  -H "Content-Type: application/json" \
+  -u username:application_password \
+  -d '{"credentials": {"client_id": "...", "client_secret": "..."}}'
+```
+
+### DELETE /auth/{handler_slug}
+
+Remove authentication for a handler (disconnect OAuth).
+
+**Permission**: `manage_options` capability required
+
+**Parameters**:
+- `handler_slug` (string, required): Handler identifier
+
+**Example**:
+```bash
+curl -X DELETE https://example.com/wp-json/datamachine/v1/auth/reddit \
+  -u username:application_password
+```

@@ -254,7 +254,7 @@ Registered via `datamachine_global_tools` filter:
 ```php
 add_filter('datamachine_global_tools', function($tools) {
     $tools['my_tool'] = [
-        'class' => 'MyNamespace\\MyTool',
+        'class' => 'MyExtension\\Tools\\MyTool',
         'method' => 'execute',
         'description' => 'Tool description',
         'parameters' => [

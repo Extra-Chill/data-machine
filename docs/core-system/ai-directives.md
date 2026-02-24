@@ -61,7 +61,7 @@ Reads the pipeline's `memory_files` configuration (an array of filenames) and in
 **Configuration**: Select memory files per-pipeline via the "Agent Memory Files" section in the pipeline settings UI. SOUL.md is excluded from the picker (it's always injected separately at Priority 20).
 
 **Features**:
-- Files sourced from the shared agent directory (`datamachine-files/agent/`)
+- Files sourced from the shared agent directory (`wp-content/uploads/datamachine-files/agent/`)
 - Missing files logged as warnings but don't fail the request
 - Empty files are silently skipped
 

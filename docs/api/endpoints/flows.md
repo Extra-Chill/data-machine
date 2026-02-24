@@ -443,3 +443,112 @@ const deletedJobs = await deleteFlow(flowId);
 **Base URL**: `/wp-json/datamachine/v1/flows`
 **Permission**: `manage_options` capability required
 **Implementation**: `/inc/Api/Flows/` (Flows.php, FlowSteps.php)
+
+## Flow Queue Endpoints
+
+Flow queues enable step-level prompt queues for varied task instructions per execution.
+
+### GET /flows/{flow_id}/queue
+
+Get the queue for a flow.
+
+**Permission**: `manage_options` capability required
+
+**Parameters**:
+- `flow_id` (integer, required): Flow ID
+
+**Response**:
+```json
+{
+  "success": true,
+  "queue": ["First task", "Second task"],
+  "count": 2
+}
+```
+
+### POST /flows/{flow_id}/queue
+
+Add items to the flow queue.
+
+**Permission**: `manage_options` capability required
+
+**Parameters**:
+- `flow_id` (integer, required): Flow ID
+- `items` (array, required): Queue items to add
+- `position` (string, optional): "start" or "end" (default: "end")
+
+**Example**:
+```bash
+curl -X POST https://example.com/wp-json/datamachine/v1/flows/5/queue \
+  -H "Content-Type: application/json" \
+  -u username:application_password \
+  -d '{"items": ["Task 1", "Task 2"]}'
+```
+
+### DELETE /flows/{flow_id}/queue
+
+Clear all items from the flow queue.
+
+**Permission**: `manage_options` capability required
+
+**Parameters**:
+- `flow_id` (integer, required): Flow ID
+
+### GET /flows/{flow_id}/queue/{index}
+
+Get a specific queue item.
+
+**Permission**: `manage_options` capability required
+
+**Parameters**:
+- `flow_id` (integer, required): Flow ID
+- `index` (integer, required): Queue position (0-based)
+
+### PUT /flows/{flow_id}/queue/{index}
+
+Update a specific queue item.
+
+**Permission**: `manage_options` capability required
+
+**Parameters**:
+- `flow_id` (integer, required): Flow ID
+- `index` (integer, required): Queue position
+- `item` (string, required): New item content
+
+### DELETE /flows/{flow_id}/queue/{index}
+
+Remove a specific queue item.
+
+**Permission**: `manage_options` capability required
+
+**Parameters**:
+- `flow_id` (integer, required): Flow ID
+- `index` (integer, required): Queue position
+
+### GET /flows/{flow_id}/queue/settings
+
+Get queue settings for a flow.
+
+**Permission**: `manage_options` capability required
+
+**Response**:
+```json
+{
+  "success": true,
+  "settings": {
+    "enabled": true,
+    "mode": "sequential"
+  }
+}
+```
+
+### PUT /flows/{flow_id}/queue/settings
+
+Update queue settings for a flow.
+
+**Permission**: `manage_options` capability required
+
+**Parameters**:
+- `flow_id` (integer, required): Flow ID
+- `enabled` (boolean, optional): Enable/disable queue
+- `mode` (string, optional): "sequential" or "random"

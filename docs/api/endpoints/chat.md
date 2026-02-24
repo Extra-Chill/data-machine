@@ -545,3 +545,74 @@ AI: [Guides through configuration, saves settings]
 **Implementation**: `inc/Api/Chat/Chat.php`
 **Session Storage**: `wp_datamachine_chat_sessions` table
 **Session Expiration**: Not enforced by default (table supports an `expires_at` column for optional cleanup)
+
+## Additional Endpoints
+
+### POST /chat/continue
+
+Continue a chat session with additional context from external triggers (webhooks, scheduled jobs, etc.).
+
+**Permission**: `manage_options` capability required
+
+**Parameters**:
+- `session_id` (string, required): Session ID to continue
+- `message` (string, required): Message to send
+- `provider` (string, optional): AI provider
+- `model` (string, optional): Model identifier
+
+**Example**:
+```bash
+curl -X POST https://example.com/wp-json/datamachine/v1/chat/continue \
+  -H "Content-Type: application/json" \
+  -u username:application_password \
+  -d '{"session_id": "abc123", "message": "Process new RSS items"}'
+```
+
+### GET /chat/{session_id}
+
+Retrieve a chat session with its conversation history.
+
+**Permission**: `manage_options` capability required
+
+**Parameters**:
+- `session_id` (string, required): Session ID to retrieve
+
+**Response**:
+```json
+{
+  "id": "abc123",
+  "user_id": 1,
+  "session_id": "abc123",
+  "provider": "anthropic",
+  "model": "claude-sonnet-4",
+  "messages": [
+    {"role": "user", "content": "Hello"},
+    {"role": "assistant", "content": "Hi! How can I help?"}
+  ],
+  "message_count": 2,
+  "created_at": "2024-01-01 12:00:00",
+  "last_activity": "2024-01-01 12:05:00"
+}
+```
+
+### POST /chat/ping
+
+Receive external pings to trigger AI responses. Used for scheduled/recurring workflows.
+
+**Permission**: `manage_options` capability required
+
+**Parameters**:
+- `session_id` (string, required): Session ID to ping
+- `message` (string, required): Message to send
+- `provider` (string, optional): AI provider
+- `model` (string, optional): Model identifier
+
+**Use case**: Set up scheduled pings to trigger flow executions or periodic reviews.
+
+**Example**:
+```bash
+curl -X POST https://example.com/wp-json/datamachine/v1/chat/ping \
+  -H "Content-Type: application/json" \
+  -u username:application_password \
+  -d '{"session_id": "abc123", "message": "Check for new RSS items and publish"}'
+```

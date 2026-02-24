@@ -342,3 +342,58 @@ done
 **Permission**: `manage_options` capability required
 **Implementation**: `inc/Api/Files.php`
 **Max File Size**: 32MB
+
+## Additional Endpoints
+
+### GET /files/{filename}
+
+Download a file by filename.
+
+**Permission**: `manage_options` capability required
+
+**Parameters**:
+- `filename` (string, required): File to retrieve
+- `pipeline_id` (integer, optional): Filter by pipeline
+- `flow_id` (integer, optional): Filter by flow
+- `flow_step_id` (string, optional): Filter by flow step
+
+**Response**: Returns the file content directly.
+
+### DELETE /files/{filename}
+
+Delete a file by filename.
+
+**Permission**: `manage_options` capability required
+
+**Parameters**:
+- `filename` (string, required): File to delete
+- `pipeline_id` (integer, optional): Filter by pipeline
+- `flow_id` (integer, optional): Filter by flow
+- `flow_step_id` (string, optional): Filter by flow step
+
+### GET /files/agent/{filename}
+
+Download agent memory files (SOUL.md, MEMORY.md).
+
+**Permission**: `manage_options` capability required
+
+**Parameters**:
+- `filename` (string, required): Agent memory file (e.g., `SOUL.md`, `MEMORY.md`)
+
+### PUT /files/agent/{filename}
+
+Update agent memory files.
+
+**Permission**: `manage_options` capability required
+
+**Parameters**:
+- `filename` (string, required): Agent memory file
+- `content` (string, required): New file content
+
+**Example**:
+```bash
+curl -X PUT https://example.com/wp-json/datamachine/v1/files/agent/MEMORY.md \
+  -H "Content-Type: application/json" \
+  -u username:application_password \
+  -d '{"content": "# Agent Memory\n\nI know how to..."}'
+```

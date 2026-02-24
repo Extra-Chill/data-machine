@@ -177,7 +177,7 @@ Handlers self-register via filter pattern:
 add_filter('datamachine_handlers', function($handlers) {
     $handlers['my_handler'] = [
         'type' => 'publish',
-        'class' => 'MyNamespace\\MyHandler',
+        'class' => 'MyExtension\\Handlers\\MyHandler',
         'label' => __('My Handler', 'textdomain'),
         'description' => __('Handler description', 'textdomain'),
         'requires_auth' => true

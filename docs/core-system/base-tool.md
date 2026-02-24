@@ -75,7 +75,7 @@ Build standardized error response with classification.
 
 ```php
 <?php
-namespace DataMachine\Engine\AI\Tools\Global;
+namespace MyExtension\Tools;
 
 use DataMachine\Engine\AI\Tools\BaseTool;
 
