@@ -102,10 +102,17 @@ class DirectoryManager {
 	 * Path resolution order:
 	 * 1. DATAMACHINE_WORKSPACE_PATH constant (if defined)
 	 * 2. /var/lib/datamachine/workspace (if writable or creatable)
-	 * 3. Fallback: wp-content/uploads/datamachine-files/workspace
+	 *
+	 * The workspace must be outside the web root. No uploads fallback is
+	 * provided because the workspace supports write operations — placing
+	 * writable agent files inside wp-content/uploads would create a
+	 * remote code execution risk.
+	 *
+	 * If neither option resolves, an empty string is returned and
+	 * Workspace::ensure_exists() will fail with a clear error.
 	 *
 	 * @since 0.31.0
-	 * @return string Full path to workspace directory.
+	 * @return string Full path to workspace directory, or empty string if unavailable.
 	 */
 	public function get_workspace_directory(): string {
 		// 1. Explicit constant override.
@@ -120,10 +127,15 @@ class DirectoryManager {
 			return $system_path;
 		}
 
-		// 3. Fallback inside uploads (shared hosting, restricted permissions).
-		$upload_dir = wp_upload_dir();
-		$base       = trailingslashit( $upload_dir['basedir'] ) . self::REPOSITORY_DIR;
-		return "{$base}/workspace";
+		// No fallback. Log the issue so admins know how to fix it.
+		do_action(
+			'datamachine_log',
+			'error',
+			'Workspace unavailable: /var/lib/datamachine/ is not writable. Define DATAMACHINE_WORKSPACE_PATH in wp-config.php to set a custom path outside the web root.',
+			array()
+		);
+
+		return '';
 	}
 
 	/**

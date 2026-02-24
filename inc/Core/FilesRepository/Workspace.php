@@ -58,6 +58,14 @@ class Workspace {
 	public function ensure_exists(): array {
 		$path = $this->workspace_path;
 
+		if ( '' === $path ) {
+			return array(
+				'success' => false,
+				'path'    => '',
+				'message' => 'Workspace unavailable: no writable path outside the web root. Define DATAMACHINE_WORKSPACE_PATH in wp-config.php or ensure /var/lib/datamachine/ is writable.',
+			);
+		}
+
 		if ( is_dir( $path ) ) {
 			return array(
 				'success' => true,
