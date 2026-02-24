@@ -167,7 +167,7 @@ class AgentPing {
 		if ( 0 === $ttl ) {
 			$ttl = self::CALLBACK_TTL;
 		}
-		$data['created_at'] = current_time( 'mysql' );
+		$data['created_at'] = gmdate( 'Y-m-d H:i:s' );
 		$data['expires_at'] = gmdate( 'Y-m-d H:i:s', time() + $ttl );
 
 		return set_transient( "datamachine_agent_ping_cb_{$callback_id}", $data, $ttl );
@@ -228,7 +228,7 @@ class AgentPing {
 		$callback_data['status']          = $status;
 		$callback_data['message_preview'] = $message_preview;
 		$callback_data['error_message']   = $error_message;
-		$callback_data['processed_at']    = current_time( 'mysql' );
+		$callback_data['processed_at']    = gmdate( 'Y-m-d H:i:s' );
 
 		// Re-store with remaining TTL (or a short grace period for polling).
 		set_transient( "datamachine_agent_ping_cb_{$callback_id}", $callback_data, 15 * MINUTE_IN_SECONDS );
