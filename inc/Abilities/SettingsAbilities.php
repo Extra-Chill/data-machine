@@ -102,6 +102,7 @@ class SettingsAbilities {
 						'flows_per_page'                 => array( 'type' => 'integer' ),
 						'jobs_per_page'                  => array( 'type' => 'integer' ),
 						'site_context_enabled'           => array( 'type' => 'boolean' ),
+						'daily_memory_enabled'           => array( 'type' => 'boolean' ),
 						'default_provider'               => array( 'type' => 'string' ),
 						'default_model'                  => array( 'type' => 'string' ),
 						'agent_models'                   => array(
@@ -348,6 +349,7 @@ class SettingsAbilities {
 				'flows_per_page'                 => $settings['flows_per_page'] ?? 20,
 				'jobs_per_page'                  => $settings['jobs_per_page'] ?? 50,
 				'site_context_enabled'           => $settings['site_context_enabled'] ?? false,
+				'daily_memory_enabled'           => $settings['daily_memory_enabled'] ?? false,
 				'default_provider'               => $settings['default_provider'] ?? '',
 				'default_model'                  => $settings['default_model'] ?? '',
 				'agent_models'                   => $settings['agent_models'] ?? array(),
@@ -406,6 +408,10 @@ class SettingsAbilities {
 
 		if ( isset( $input['site_context_enabled'] ) ) {
 			$all_settings['site_context_enabled'] = (bool) $input['site_context_enabled'];
+		}
+
+		if ( isset( $input['daily_memory_enabled'] ) ) {
+			$all_settings['daily_memory_enabled'] = (bool) $input['daily_memory_enabled'];
 		}
 
 		if ( isset( $input['default_provider'] ) ) {

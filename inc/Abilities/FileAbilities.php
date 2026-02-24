@@ -14,6 +14,7 @@ use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
+use DataMachine\Core\FilesRepository\DailyMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Core\FilesRepository\FileCleanup;
 use DataMachine\Core\FilesRepository\FileStorage;
@@ -855,10 +856,30 @@ class FileAbilities {
 						'filename' => $entry,
 						'size'     => filesize( $filepath ),
 						'modified' => filemtime( $filepath ),
+						'type'     => 'core',
 					);
 				}
 			}
 			closedir( $handle );
+		}
+
+		// Include daily memory summary if the directory exists.
+		$daily        = new DailyMemory();
+		$daily_result = $daily->list_all();
+
+		if ( ! empty( $daily_result['months'] ) ) {
+			$total_days = 0;
+			foreach ( $daily_result['months'] as $days ) {
+				$total_days += count( $days );
+			}
+
+			$files[] = array(
+				'filename'    => 'daily',
+				'type'        => 'daily_summary',
+				'month_count' => count( $daily_result['months'] ),
+				'day_count'   => $total_days,
+				'months'      => $daily_result['months'],
+			);
 		}
 
 		return array(

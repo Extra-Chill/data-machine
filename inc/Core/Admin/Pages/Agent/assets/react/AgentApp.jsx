@@ -25,6 +25,12 @@ const TABS = [
 	{ name: 'configuration', title: 'Configuration' },
 ];
 
+/**
+ * Selection model:
+ * - Core file: { type: 'core', filename: 'MEMORY.md' }
+ * - Daily file: { type: 'daily', year: '2026', month: '02', day: '24' }
+ * - null: nothing selected
+ */
 const AgentApp = () => {
 	const [ selectedFile, setSelectedFile ] = useState( null );
 	const { data: files } = useAgentFiles();
@@ -50,7 +56,7 @@ const AgentApp = () => {
 								<div className="datamachine-agent-editor-panel">
 									{ selectedFile ? (
 										<AgentFileEditor
-											filename={ selectedFile }
+											selectedFile={ selectedFile }
 										/>
 									) : (
 										<AgentEmptyState
