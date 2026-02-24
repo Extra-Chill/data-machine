@@ -43,3 +43,37 @@ export const deleteAgentFile = async ( filename ) => {
 		method: 'DELETE',
 	} );
 };
+
+// Daily memory file operations.
+
+export const listDailyFiles = async () => {
+	const config = getConfig();
+	return apiFetch( {
+		path: `/${ config.restNamespace }/files/agent/daily`,
+	} );
+};
+
+export const getDailyFile = async ( year, month, day ) => {
+	const config = getConfig();
+	return apiFetch( {
+		path: `/${ config.restNamespace }/files/agent/daily/${ year }/${ month }/${ day }`,
+	} );
+};
+
+export const putDailyFile = async ( year, month, day, content ) => {
+	const config = getConfig();
+	return apiFetch( {
+		path: `/${ config.restNamespace }/files/agent/daily/${ year }/${ month }/${ day }`,
+		method: 'PUT',
+		body: content,
+		headers: { 'Content-Type': 'text/plain' },
+	} );
+};
+
+export const deleteDailyFile = async ( year, month, day ) => {
+	const config = getConfig();
+	return apiFetch( {
+		path: `/${ config.restNamespace }/files/agent/daily/${ year }/${ month }/${ day }`,
+		method: 'DELETE',
+	} );
+};

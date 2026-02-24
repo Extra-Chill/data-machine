@@ -1,7 +1,10 @@
 /**
  * AgentFileList Component
  *
- * Sidebar listing agent memory files with add/delete controls.
+ * Sidebar listing agent memory files in two sections:
+ * - Core files (SOUL.md, MEMORY.md, etc.) with add/delete controls
+ * - Daily memory files grouped by month, collapsible
+ *
  * SOUL.md is pinned to top and cannot be deleted from the UI.
  */
 
@@ -14,7 +17,11 @@ import { Button, Spinner } from '@wordpress/components';
 /**
  * Internal dependencies
  */
-import { useAgentFiles, useSaveAgentFile, useDeleteAgentFile } from '../queries/agentFiles';
+import {
+	useAgentFiles,
+	useSaveAgentFile,
+	useDeleteAgentFile,
+} from '../queries/agentFiles';
 
 const SOUL_FILE = 'SOUL.md';
 
@@ -25,6 +32,9 @@ const SOUL_FILE = 'SOUL.md';
  * @return {string} Formatted size string.
  */
 const formatSize = ( bytes ) => {
+	if ( ! bytes && bytes !== 0 ) {
+		return '';
+	}
 	if ( bytes < 1024 ) {
 		return `${ bytes } B`;
 	}
@@ -68,6 +78,21 @@ const formatDate = ( dateStr ) => {
 };
 
 /**
+ * Format month key (YYYY/MM) to a readable label.
+ *
+ * @param {string} monthKey e.g. '2026/02'
+ * @return {string} e.g. 'February 2026'
+ */
+const formatMonthLabel = ( monthKey ) => {
+	const [ year, month ] = monthKey.split( '/' );
+	const date = new Date( parseInt( year, 10 ), parseInt( month, 10 ) - 1 );
+	return date.toLocaleDateString( undefined, {
+		year: 'numeric',
+		month: 'long',
+	} );
+};
+
+/**
  * Validate a filename for creation.
  *
  * @param {string} name Raw filename input.
@@ -86,6 +111,31 @@ const validateFilename = ( name ) => {
 	return null;
 };
 
+/**
+ * Check if a selection matches a given file.
+ *
+ * @param {Object|null} selected Current selection.
+ * @param {string}      type     'core' or 'daily'.
+ * @param {Object}      compare  Values to compare.
+ * @return {boolean} True if selected.
+ */
+const isSelected = ( selected, type, compare ) => {
+	if ( ! selected || selected.type !== type ) {
+		return false;
+	}
+	if ( type === 'core' ) {
+		return selected.filename === compare.filename;
+	}
+	if ( type === 'daily' ) {
+		return (
+			selected.year === compare.year &&
+			selected.month === compare.month &&
+			selected.day === compare.day
+		);
+	}
+	return false;
+};
+
 const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 	const { data: files, isLoading, error } = useAgentFiles();
 	const saveMutation = useSaveAgentFile();
@@ -95,6 +145,7 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 	const [ newFilename, setNewFilename ] = useState( '' );
 	const [ addError, setAddError ] = useState( null );
 	const [ deleteConfirm, setDeleteConfirm ] = useState( null );
+	const [ expandedMonths, setExpandedMonths ] = useState( {} );
 
 	const handleAddNew = useCallback( () => {
 		setIsAdding( true );
@@ -119,8 +170,9 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 			name += '.md';
 		}
 
-		// Check for duplicates.
-		if ( files?.some( ( f ) => f.filename === name ) ) {
+		// Check for duplicates among core files.
+		const coreFiles = files?.filter( ( f ) => f.type !== 'daily_summary' ) ?? [];
+		if ( coreFiles.some( ( f ) => f.filename === name ) ) {
 			setAddError( 'A file with this name already exists.' );
 			return;
 		}
@@ -130,7 +182,7 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 			setIsAdding( false );
 			setNewFilename( '' );
 			setAddError( null );
-			onSelectFile( name );
+			onSelectFile( { type: 'core', filename: name } );
 		} catch {
 			setAddError( 'Failed to create file.' );
 		}
@@ -152,7 +204,10 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 			try {
 				await deleteMutation.mutateAsync( filename );
 				setDeleteConfirm( null );
-				if ( selectedFile === filename ) {
+				if (
+					selectedFile?.type === 'core' &&
+					selectedFile?.filename === filename
+				) {
 					onSelectFile( null );
 				}
 			} catch {
@@ -162,18 +217,29 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 		[ deleteMutation, selectedFile, onSelectFile ]
 	);
 
-	// Sort files: SOUL.md first, then alphabetical.
-	const sortedFiles = files
-		? [ ...files ].sort( ( a, b ) => {
-				if ( a.filename === SOUL_FILE ) {
-					return -1;
-				}
-				if ( b.filename === SOUL_FILE ) {
-					return 1;
-				}
-				return a.filename.localeCompare( b.filename );
-		  } )
+	const toggleMonth = useCallback( ( monthKey ) => {
+		setExpandedMonths( ( prev ) => ( {
+			...prev,
+			[ monthKey ]: ! prev[ monthKey ],
+		} ) );
+	}, [] );
+
+	// Separate core files from daily summary.
+	const coreFiles = files
+		? files.filter( ( f ) => f.type !== 'daily_summary' )
 		: [];
+	const dailySummary = files?.find( ( f ) => f.type === 'daily_summary' );
+
+	// Sort core files: SOUL.md first, then alphabetical.
+	const sortedCoreFiles = [ ...coreFiles ].sort( ( a, b ) => {
+		if ( a.filename === SOUL_FILE ) {
+			return -1;
+		}
+		if ( b.filename === SOUL_FILE ) {
+			return 1;
+		}
+		return a.filename.localeCompare( b.filename );
+	} );
 
 	if ( isLoading ) {
 		return (
@@ -256,22 +322,36 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 			) }
 
 			<div className="datamachine-agent-file-items">
-				{ sortedFiles.map( ( file ) => {
+				{ /* Core files section */ }
+				{ sortedCoreFiles.map( ( file ) => {
 					const isSoul = file.filename === SOUL_FILE;
-					const isSelected = selectedFile === file.filename;
+					const selected = isSelected( selectedFile, 'core', {
+						filename: file.filename,
+					} );
 
 					return (
 						<div
 							key={ file.filename }
 							className={ `datamachine-agent-file-item${
-								isSelected ? ' is-selected' : ''
+								selected ? ' is-selected' : ''
 							}${ isSoul ? ' is-soul' : '' }` }
-							onClick={ () => onSelectFile( file.filename ) }
+							onClick={ () =>
+								onSelectFile( {
+									type: 'core',
+									filename: file.filename,
+								} )
+							}
 							role="button"
 							tabIndex={ 0 }
 							onKeyDown={ ( e ) => {
-								if ( e.key === 'Enter' || e.key === ' ' ) {
-									onSelectFile( file.filename );
+								if (
+									e.key === 'Enter' ||
+									e.key === ' '
+								) {
+									onSelectFile( {
+										type: 'core',
+										filename: file.filename,
+									} );
 								}
 							} }
 						>
@@ -282,7 +362,7 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 											className="datamachine-agent-file-soul-badge"
 											title="Agent identity"
 										>
-											🧠
+											&#x1f9e0;
 										</span>
 									) }
 									{ file.filename }
@@ -290,7 +370,7 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 								<span className="datamachine-agent-file-item-meta">
 									{ formatSize( file.size ) }
 									{ file.modified &&
-										` · ${ formatDate(
+										` \u00b7 ${ formatDate(
 											file.modified
 										) }` }
 								</span>
@@ -304,18 +384,146 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 										setDeleteConfirm( file.filename );
 									} }
 								>
-									🗑
+									&#x1f5d1;
 								</button>
 							) }
 						</div>
 					);
 				} ) }
 
-				{ sortedFiles.length === 0 && ! isAdding && (
+				{ sortedCoreFiles.length === 0 && ! isAdding && (
 					<div className="datamachine-agent-file-list-empty">
 						No files yet.
 					</div>
 				) }
+
+				{ /* Daily memory section */ }
+				{ dailySummary &&
+					dailySummary.months &&
+					Object.keys( dailySummary.months ).length > 0 && (
+						<div className="datamachine-agent-daily-section">
+							<div className="datamachine-agent-daily-header">
+								<span className="datamachine-agent-daily-title">
+									&#x1f4c5; Daily Memory
+								</span>
+								<span className="datamachine-agent-daily-count">
+									{ dailySummary.day_count } day
+									{ dailySummary.day_count !== 1
+										? 's'
+										: '' }
+								</span>
+							</div>
+							{ Object.entries( dailySummary.months ).map(
+								( [ monthKey, days ] ) => {
+									const isExpanded =
+										expandedMonths[ monthKey ] ?? false;
+									return (
+										<div
+											key={ monthKey }
+											className="datamachine-agent-daily-month"
+										>
+											<button
+												className="datamachine-agent-daily-month-toggle"
+												onClick={ () =>
+													toggleMonth( monthKey )
+												}
+											>
+												<span
+													className={ `datamachine-agent-daily-chevron${
+														isExpanded
+															? ' is-expanded'
+															: ''
+													}` }
+												>
+													&#x25b6;
+												</span>
+												<span>
+													{ formatMonthLabel(
+														monthKey
+													) }
+												</span>
+												<span className="datamachine-agent-daily-month-count">
+													{ days.length }
+												</span>
+											</button>
+											{ isExpanded && (
+												<div className="datamachine-agent-daily-days">
+													{ [ ...days ]
+														.reverse()
+														.map( ( day ) => {
+															const [
+																year,
+																month,
+															] =
+																monthKey.split(
+																	'/'
+																);
+															const sel =
+																isSelected(
+																	selectedFile,
+																	'daily',
+																	{
+																		year,
+																		month,
+																		day,
+																	}
+																);
+															return (
+																<div
+																	key={ day }
+																	className={ `datamachine-agent-file-item datamachine-agent-daily-item${
+																		sel
+																			? ' is-selected'
+																			: ''
+																	}` }
+																	onClick={ () =>
+																		onSelectFile(
+																			{
+																				type: 'daily',
+																				year,
+																				month,
+																				day,
+																			}
+																		)
+																	}
+																	role="button"
+																	tabIndex={
+																		0
+																	}
+																	onKeyDown={ (
+																		e
+																	) => {
+																		if (
+																			e.key ===
+																				'Enter' ||
+																			e.key ===
+																				' '
+																		) {
+																			onSelectFile(
+																				{
+																					type: 'daily',
+																					year,
+																					month,
+																					day,
+																				}
+																			);
+																		}
+																	} }
+																>
+																	<span className="datamachine-agent-file-item-name">
+																		{ year }-{ month }-{ day }
+																	</span>
+																</div>
+															);
+														} ) }
+												</div>
+											) }
+										</div>
+									);
+								}
+							) }
+						</div>
+					) }
 			</div>
 
 			{ deleteConfirm && (

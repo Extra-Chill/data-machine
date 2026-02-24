@@ -57,3 +57,53 @@ export const useDeleteAgentFile = () => {
 		},
 	} );
 };
+
+// Daily memory hooks.
+
+const DAILY_KEYS = {
+	list: [ 'daily-files' ],
+	detail: ( year, month, day ) => [ 'daily-files', year, month, day ],
+};
+
+export const useDailyFiles = () =>
+	useQuery( {
+		queryKey: DAILY_KEYS.list,
+		queryFn: api.listDailyFiles,
+		select: ( response ) => response?.data ?? response ?? {},
+	} );
+
+export const useDailyFile = ( year, month, day ) =>
+	useQuery( {
+		queryKey: DAILY_KEYS.detail( year, month, day ),
+		queryFn: () => api.getDailyFile( year, month, day ),
+		enabled: !! year && !! month && !! day,
+		select: ( response ) => response?.data ?? response ?? {},
+	} );
+
+export const useSaveDailyFile = () => {
+	const queryClient = useQueryClient();
+	return useMutation( {
+		mutationFn: ( { year, month, day, content } ) =>
+			api.putDailyFile( year, month, day, content ),
+		onSuccess: ( _data, { year, month, day } ) => {
+			queryClient.invalidateQueries( { queryKey: DAILY_KEYS.list } );
+			queryClient.invalidateQueries( {
+				queryKey: DAILY_KEYS.detail( year, month, day ),
+			} );
+			// Also refresh the agent files list (includes daily summary).
+			queryClient.invalidateQueries( { queryKey: KEYS.list } );
+		},
+	} );
+};
+
+export const useDeleteDailyFile = () => {
+	const queryClient = useQueryClient();
+	return useMutation( {
+		mutationFn: ( { year, month, day } ) =>
+			api.deleteDailyFile( year, month, day ),
+		onSuccess: () => {
+			queryClient.invalidateQueries( { queryKey: DAILY_KEYS.list } );
+			queryClient.invalidateQueries( { queryKey: KEYS.list } );
+		},
+	} );
+};

@@ -11,6 +11,7 @@
 namespace DataMachine\Api;
 
 use DataMachine\Abilities\FileAbilities;
+use DataMachine\Core\FilesRepository\DailyMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Core\FilesRepository\FilesystemHelper;
 use WP_Error;
@@ -180,6 +181,78 @@ class Files {
 						},
 					),
 				),
+			)
+		);
+
+		// Daily memory file routes (YYYY/MM/DD convention).
+		$daily_date_args = array(
+			'year'  => array(
+				'required'          => true,
+				'type'              => 'string',
+				'validate_callback' => function ( $value ) {
+					return (bool) preg_match( '/^\d{4}$/', $value );
+				},
+			),
+			'month' => array(
+				'required'          => true,
+				'type'              => 'string',
+				'validate_callback' => function ( $value ) {
+					return (bool) preg_match( '/^\d{2}$/', $value ) && (int) $value >= 1 && (int) $value <= 12;
+				},
+			),
+			'day'   => array(
+				'required'          => true,
+				'type'              => 'string',
+				'validate_callback' => function ( $value ) {
+					return (bool) preg_match( '/^\d{2}$/', $value ) && (int) $value >= 1 && (int) $value <= 31;
+				},
+			),
+		);
+
+		// GET /files/agent/daily - List daily memory files
+		register_rest_route(
+			'datamachine/v1',
+			'/files/agent/daily',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( self::class, 'list_daily_files' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+			)
+		);
+
+		// GET /files/agent/daily/{year}/{month}/{day} - Read daily file
+		register_rest_route(
+			'datamachine/v1',
+			'/files/agent/daily/(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( self::class, 'get_daily_file' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => $daily_date_args,
+			)
+		);
+
+		// PUT /files/agent/daily/{year}/{month}/{day} - Write daily file
+		register_rest_route(
+			'datamachine/v1',
+			'/files/agent/daily/(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})',
+			array(
+				'methods'             => WP_REST_Server::EDITABLE,
+				'callback'            => array( self::class, 'put_daily_file' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => $daily_date_args,
+			)
+		);
+
+		// DELETE /files/agent/daily/{year}/{month}/{day} - Delete daily file
+		register_rest_route(
+			'datamachine/v1',
+			'/files/agent/daily/(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})',
+			array(
+				'methods'             => WP_REST_Server::DELETABLE,
+				'callback'            => array( self::class, 'delete_daily_file' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => $daily_date_args,
 			)
 		);
 	}
@@ -434,6 +507,107 @@ class Files {
 			array(
 				'success' => true,
 				'data'    => array( 'scope' => $result['scope'] ),
+			)
+		);
+	}
+
+	// =========================================================================
+	// Daily Memory Handlers
+	// =========================================================================
+
+	/**
+	 * List all daily memory files grouped by month.
+	 *
+	 * @since 0.32.0
+	 */
+	public static function list_daily_files( WP_REST_Request $request ) {
+		$daily  = new DailyMemory();
+		$result = $daily->list_all();
+
+		return rest_ensure_response(
+			array(
+				'success' => true,
+				'data'    => $result['months'],
+			)
+		);
+	}
+
+	/**
+	 * Get a daily memory file's content.
+	 *
+	 * @since 0.32.0
+	 */
+	public static function get_daily_file( WP_REST_Request $request ) {
+		$year  = $request['year'];
+		$month = $request['month'];
+		$day   = $request['day'];
+
+		$daily  = new DailyMemory();
+		$result = $daily->read( $year, $month, $day );
+
+		if ( ! $result['success'] ) {
+			return new WP_Error( 'daily_file_not_found', $result['message'], array( 'status' => 404 ) );
+		}
+
+		return rest_ensure_response(
+			array(
+				'success' => true,
+				'data'    => array(
+					'date'    => $result['date'],
+					'content' => $result['content'],
+				),
+			)
+		);
+	}
+
+	/**
+	 * Write/update a daily memory file (accepts raw body as content).
+	 *
+	 * @since 0.32.0
+	 */
+	public static function put_daily_file( WP_REST_Request $request ) {
+		$year    = $request['year'];
+		$month   = $request['month'];
+		$day     = $request['day'];
+		$content = $request->get_body();
+
+		$daily  = new DailyMemory();
+		$result = $daily->write( $year, $month, $day, $content );
+
+		if ( ! $result['success'] ) {
+			return new WP_Error( 'daily_file_write_error', $result['message'], array( 'status' => 500 ) );
+		}
+
+		return rest_ensure_response(
+			array(
+				'success' => true,
+				'date'    => "{$year}-{$month}-{$day}",
+				'message' => $result['message'],
+			)
+		);
+	}
+
+	/**
+	 * Delete a daily memory file.
+	 *
+	 * @since 0.32.0
+	 */
+	public static function delete_daily_file( WP_REST_Request $request ) {
+		$year  = $request['year'];
+		$month = $request['month'];
+		$day   = $request['day'];
+
+		$daily  = new DailyMemory();
+		$result = $daily->delete( $year, $month, $day );
+
+		if ( ! $result['success'] ) {
+			return new WP_Error( 'daily_file_delete_error', $result['message'], array( 'status' => 404 ) );
+		}
+
+		return rest_ensure_response(
+			array(
+				'success' => true,
+				'message' => $result['message'],
 			)
 		);
 	}

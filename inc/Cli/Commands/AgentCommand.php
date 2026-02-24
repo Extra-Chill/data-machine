@@ -14,6 +14,7 @@ namespace DataMachine\Cli\Commands;
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\AgentMemoryAbilities;
+use DataMachine\Core\FilesRepository\DailyMemory;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -182,5 +183,236 @@ class AgentCommand extends BaseCommand {
 		}
 
 		WP_CLI::success( $result['message'] );
+	}
+
+	/**
+	 * Daily memory operations.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <action>
+	 * : Action to perform: list, read, write, append, delete.
+	 *
+	 * [<date>]
+	 * : Date in YYYY-MM-DD format. Defaults to today for write/append.
+	 *
+	 * [<content>]
+	 * : Content for write/append actions.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # List all daily memory files
+	 *     wp datamachine agent daily list
+	 *
+	 *     # Read today's daily memory
+	 *     wp datamachine agent daily read
+	 *
+	 *     # Read a specific date
+	 *     wp datamachine agent daily read 2026-02-24
+	 *
+	 *     # Write to today's daily memory (replaces content)
+	 *     wp datamachine agent daily write "## Session notes\n- Built daily memory feature"
+	 *
+	 *     # Append to a specific date
+	 *     wp datamachine agent daily append 2026-02-24 "- Additional discovery"
+	 *
+	 *     # Delete a daily file
+	 *     wp datamachine agent daily delete 2026-02-24
+	 *
+	 * @subcommand daily
+	 */
+	public function daily( array $args, array $assoc_args ): void {
+		if ( empty( $args ) ) {
+			WP_CLI::error( 'Usage: wp datamachine agent daily <list|read|write|append|delete> [date] [content]' );
+			return;
+		}
+
+		$action = $args[0];
+		$daily  = new DailyMemory();
+
+		switch ( $action ) {
+			case 'list':
+				$this->daily_list( $daily, $assoc_args );
+				break;
+			case 'read':
+				$date = $args[1] ?? gmdate( 'Y-m-d' );
+				$this->daily_read( $daily, $date );
+				break;
+			case 'write':
+				$this->daily_write( $daily, $args );
+				break;
+			case 'append':
+				$this->daily_append( $daily, $args );
+				break;
+			case 'delete':
+				$date = $args[1] ?? null;
+				if ( ! $date ) {
+					WP_CLI::error( 'Date is required for delete. Usage: wp datamachine agent daily delete 2026-02-24' );
+					return;
+				}
+				$this->daily_delete( $daily, $date );
+				break;
+			default:
+				WP_CLI::error( "Unknown daily action: {$action}. Use: list, read, write, append, delete" );
+		}
+	}
+
+	/**
+	 * List daily memory files.
+	 */
+	private function daily_list( DailyMemory $daily, array $assoc_args ): void {
+		$result = $daily->list_all();
+		$months = $result['months'];
+
+		if ( empty( $months ) ) {
+			WP_CLI::log( 'No daily memory files found.' );
+			return;
+		}
+
+		$items = array();
+		foreach ( $months as $month_key => $days ) {
+			foreach ( $days as $day ) {
+				list( $year, $month ) = explode( '/', $month_key );
+				$items[] = array(
+					'date'  => "{$year}-{$month}-{$day}",
+					'month' => $month_key,
+				);
+			}
+		}
+
+		// Sort descending by date.
+		usort(
+			$items,
+			function ( $a, $b ) {
+				return strcmp( $b['date'], $a['date'] );
+			}
+		);
+
+		$this->format_items( $items, array( 'date', 'month' ), $assoc_args );
+		WP_CLI::log( sprintf( 'Total: %d daily memory file(s).', count( $items ) ) );
+	}
+
+	/**
+	 * Read a daily memory file.
+	 */
+	private function daily_read( DailyMemory $daily, string $date ): void {
+		$parts = $this->parse_date( $date );
+		if ( ! $parts ) {
+			return;
+		}
+
+		$result = $daily->read( $parts['year'], $parts['month'], $parts['day'] );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['message'] );
+			return;
+		}
+
+		WP_CLI::log( $result['content'] );
+	}
+
+	/**
+	 * Write (replace) a daily memory file.
+	 */
+	private function daily_write( DailyMemory $daily, array $args ): void {
+		// write [date] <content> — date defaults to today.
+		if ( count( $args ) < 2 ) {
+			WP_CLI::error( 'Content is required. Usage: wp datamachine agent daily write [date] <content>' );
+			return;
+		}
+
+		// If 3 args: write date content. If 2 args: write content (today).
+		if ( count( $args ) >= 3 ) {
+			$date    = $args[1];
+			$content = $args[2];
+		} else {
+			$date    = gmdate( 'Y-m-d' );
+			$content = $args[1];
+		}
+
+		$parts = $this->parse_date( $date );
+		if ( ! $parts ) {
+			return;
+		}
+
+		$result = $daily->write( $parts['year'], $parts['month'], $parts['day'], $content );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['message'] );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] );
+	}
+
+	/**
+	 * Append to a daily memory file.
+	 */
+	private function daily_append( DailyMemory $daily, array $args ): void {
+		// append [date] <content> — date defaults to today.
+		if ( count( $args ) < 2 ) {
+			WP_CLI::error( 'Content is required. Usage: wp datamachine agent daily append [date] <content>' );
+			return;
+		}
+
+		if ( count( $args ) >= 3 ) {
+			$date    = $args[1];
+			$content = $args[2];
+		} else {
+			$date    = gmdate( 'Y-m-d' );
+			$content = $args[1];
+		}
+
+		$parts = $this->parse_date( $date );
+		if ( ! $parts ) {
+			return;
+		}
+
+		$result = $daily->append( $parts['year'], $parts['month'], $parts['day'], $content );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['message'] );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] );
+	}
+
+	/**
+	 * Delete a daily memory file.
+	 */
+	private function daily_delete( DailyMemory $daily, string $date ): void {
+		$parts = $this->parse_date( $date );
+		if ( ! $parts ) {
+			return;
+		}
+
+		$result = $daily->delete( $parts['year'], $parts['month'], $parts['day'] );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['message'] );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] );
+	}
+
+	/**
+	 * Parse a YYYY-MM-DD date string into parts.
+	 *
+	 * @param string $date Date string.
+	 * @return array{year: string, month: string, day: string}|null Parsed parts or null on error.
+	 */
+	private function parse_date( string $date ): ?array {
+		if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $date, $matches ) ) {
+			WP_CLI::error( sprintf( 'Invalid date format: %s. Use YYYY-MM-DD.', $date ) );
+			return null;
+		}
+
+		return array(
+			'year'  => $matches[1],
+			'month' => $matches[2],
+			'day'   => $matches[3],
+		);
 	}
 }
