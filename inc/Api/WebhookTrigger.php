@@ -16,7 +16,7 @@
 
 namespace DataMachine\Api;
 
-use DataMachine\Abilities\Job\ExecuteWorkflowAbility;
+use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Database\Flows\Flows;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -194,10 +194,26 @@ class WebhookTrigger {
 			return $rate_limit_error;
 		}
 
-		// Auth passed — execute the flow.
-		// Instantiate directly to bypass the Abilities API permission check.
-		// The webhook trigger has already authenticated via Bearer token.
-		$ability = new ExecuteWorkflowAbility();
+		// Auth passed — execute the flow via the Abilities API.
+		// Use run_as_authenticated() so the ability's permission callback
+		// recognizes this as a pre-authenticated context (Bearer token validated above).
+		// See https://github.com/Extra-Chill/data-machine/issues/346
+		$ability = wp_get_ability( 'datamachine/execute-workflow' );
+
+		if ( ! $ability ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Webhook trigger: execute-workflow ability not registered',
+				array( 'flow_id' => $flow_id )
+			);
+
+			return new \WP_Error(
+				'ability_not_found',
+				__( 'Execute workflow ability not available.', 'data-machine' ),
+				array( 'status' => 500 )
+			);
+		}
 
 		// Build webhook payload from request body.
 		$webhook_body = $request->get_json_params();
@@ -221,7 +237,30 @@ class WebhookTrigger {
 			),
 		);
 
-		$result = $ability->execute( $input );
+		$result = PermissionHelper::run_as_authenticated(
+			function () use ( $ability, $input ) {
+				return $ability->execute( $input );
+			}
+		);
+
+		// WP_Ability::execute() returns WP_Error on permission/validation failure.
+		if ( is_wp_error( $result ) ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Webhook trigger: Ability execution error',
+				array(
+					'flow_id' => $flow_id,
+					'error'   => $result->get_error_message(),
+				)
+			);
+
+			return new \WP_Error(
+				'execution_failed',
+				$result->get_error_message(),
+				array( 'status' => 500 )
+			);
+		}
 
 		if ( ! ( $result['success'] ?? false ) ) {
 			$error = $result['error'] ?? __( 'Flow execution failed', 'data-machine' );
