@@ -133,6 +133,18 @@ class AltTextTask extends SystemTask {
 	}
 
 	/**
+	 * {@inheritDoc}
+	 */
+	public static function getTaskMeta(): array {
+		return array(
+			'label'           => 'Alt Text Generation',
+			'description'     => 'Automatically generate alt text for uploaded images using AI vision.',
+			'setting_key'     => 'alt_text_auto_generate_enabled',
+			'default_enabled' => true,
+		);
+	}
+
+	/**
 	 * Build the AI prompt with contextual information.
 	 *
 	 * @param int $attachment_id Attachment ID.

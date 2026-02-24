@@ -35,6 +35,24 @@ abstract class SystemTask {
 	abstract public function getTaskType(): string;
 
 	/**
+	 * Get task metadata for UI display.
+	 *
+	 * Override in concrete tasks to provide label, description, and
+	 * optional setting key for the System Tasks admin tab.
+	 *
+	 * @return array{label: string, description: string, setting_key: ?string, default_enabled: bool}
+	 * @since 0.32.0
+	 */
+	public static function getTaskMeta(): array {
+		return array(
+			'label'           => '',
+			'description'     => '',
+			'setting_key'     => null,
+			'default_enabled' => true,
+		);
+	}
+
+	/**
 	 * Complete a job with successful results.
 	 *
 	 * Updates the job's engine_data with the result and marks it as completed.

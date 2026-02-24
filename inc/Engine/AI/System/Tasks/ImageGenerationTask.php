@@ -704,4 +704,16 @@ class ImageGenerationTask extends SystemTask {
 	public function getTaskType(): string {
 		return 'image_generation';
 	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public static function getTaskMeta(): array {
+		return array(
+			'label'           => 'Image Generation',
+			'description'     => 'Generate images via Replicate API and assign as featured images or insert into content.',
+			'setting_key'     => null,
+			'default_enabled' => true,
+		);
+	}
 }

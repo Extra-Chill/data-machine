@@ -24,7 +24,6 @@ const DEFAULTS = {
 	file_retention_days: 7,
 	chat_retention_days: 90,
 	chat_ai_titles_enabled: true,
-	alt_text_auto_generate_enabled: true,
 	flows_per_page: 20,
 	jobs_per_page: 50,
 	queue_tuning: {
@@ -77,9 +76,7 @@ const GeneralTab = () => {
 					data.settings.chat_retention_days ?? DEFAULTS.chat_retention_days,
 				chat_ai_titles_enabled:
 					data.settings.chat_ai_titles_enabled ?? DEFAULTS.chat_ai_titles_enabled,
-				alt_text_auto_generate_enabled:
-					data.settings.alt_text_auto_generate_enabled ?? DEFAULTS.alt_text_auto_generate_enabled,
-				flows_per_page:
+			flows_per_page:
 					data.settings.flows_per_page ?? DEFAULTS.flows_per_page,
 				jobs_per_page:
 					data.settings.jobs_per_page ?? DEFAULTS.jobs_per_page,
@@ -249,33 +246,6 @@ const GeneralTab = () => {
 									Disable to reduce API costs. Titles will use
 									the first message instead.
 								</p>
-							</fieldset>
-						</td>
-					</tr>
-
-					<tr>
-						<th scope="row">Auto-generate image alt text</th>
-						<td>
-							<fieldset>
-								<label htmlFor="alt_text_auto_generate_enabled">
-									<input
-										type="checkbox"
-										id="alt_text_auto_generate_enabled"
-										checked={
-											form.data
-												.alt_text_auto_generate_enabled
-										}
-										onChange={ ( e ) =>
-											updateField(
-												'alt_text_auto_generate_enabled',
-												e.target.checked
-											)
-										}
-									/>
-									Automatically generate AI-powered alt text
-									when images are uploaded. Disable to reduce
-									API costs or for manual control.
-								</label>
 							</fieldset>
 						</td>
 					</tr>

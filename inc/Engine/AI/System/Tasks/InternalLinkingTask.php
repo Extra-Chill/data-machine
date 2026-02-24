@@ -221,6 +221,18 @@ class InternalLinkingTask extends SystemTask {
 	}
 
 	/**
+	 * {@inheritDoc}
+	 */
+	public static function getTaskMeta(): array {
+		return array(
+			'label'           => 'Internal Linking',
+			'description'     => 'Semantically weave internal links into published post content using AI.',
+			'setting_key'     => null,
+			'default_enabled' => true,
+		);
+	}
+
+	/**
 	 * Find the best candidate paragraph block for a related post link.
 	 *
 	 * Scores paragraphs by title word matches, tag overlap, and keyword

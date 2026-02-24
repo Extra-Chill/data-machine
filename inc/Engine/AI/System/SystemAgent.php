@@ -263,4 +263,50 @@ class SystemAgent {
 	public function getTaskHandlers(): array {
 		return $this->taskHandlers;
 	}
+
+	/**
+	 * Get the full task registry with metadata for the admin UI.
+	 *
+	 * Iterates registered handlers, reads static getTaskMeta() from each,
+	 * and merges with current enabled state from PluginSettings.
+	 *
+	 * @return array<string, array> Task type => metadata array.
+	 * @since 0.32.0
+	 */
+	public function getTaskRegistry(): array {
+		$registry = array();
+
+		foreach ( $this->taskHandlers as $task_type => $handler_class ) {
+			$meta = array(
+				'label'           => '',
+				'description'     => '',
+				'setting_key'     => null,
+				'default_enabled' => true,
+			);
+
+			if ( method_exists( $handler_class, 'getTaskMeta' ) ) {
+				$meta = array_merge( $meta, $handler_class::getTaskMeta() );
+			}
+
+			// Resolve current enabled state from settings.
+			$enabled = true;
+			if ( ! empty( $meta['setting_key'] ) ) {
+				$enabled = (bool) \DataMachine\Core\PluginSettings::get(
+					$meta['setting_key'],
+					$meta['default_enabled']
+				);
+			}
+
+			$registry[ $task_type ] = array(
+				'task_type'       => $task_type,
+				'label'           => $meta['label'] ?: ucfirst( str_replace( '_', ' ', $task_type ) ),
+				'description'     => $meta['description'],
+				'setting_key'     => $meta['setting_key'],
+				'default_enabled' => $meta['default_enabled'],
+				'enabled'         => $enabled,
+			);
+		}
+
+		return $registry;
+	}
 }
