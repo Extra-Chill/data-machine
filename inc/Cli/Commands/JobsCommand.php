@@ -675,4 +675,86 @@ class JobsCommand extends BaseCommand {
 			WP_CLI::log( 'Prompt was requeued to the flow.' );
 		}
 	}
+
+	/**
+	 * Delete jobs by type.
+	 *
+	 * Removes job records from the database. Supports deleting all jobs
+	 * or only failed jobs. Optionally cleans up processed items tracking
+	 * for the deleted jobs.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--type=<type>]
+	 * : Which jobs to delete.
+	 * ---
+	 * default: failed
+	 * options:
+	 *   - all
+	 *   - failed
+	 * ---
+	 *
+	 * [--cleanup-processed]
+	 * : Also clear processed items tracking for deleted jobs.
+	 *
+	 * [--yes]
+	 * : Skip confirmation prompt.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Delete failed jobs
+	 *     wp datamachine jobs delete
+	 *
+	 *     # Delete all jobs
+	 *     wp datamachine jobs delete --type=all
+	 *
+	 *     # Delete failed jobs and cleanup processed items
+	 *     wp datamachine jobs delete --cleanup-processed
+	 *
+	 *     # Delete all jobs without confirmation
+	 *     wp datamachine jobs delete --type=all --yes
+	 *
+	 * @subcommand delete
+	 */
+	public function delete( array $args, array $assoc_args ): void {
+		$type              = $assoc_args['type'] ?? 'failed';
+		$cleanup_processed = isset( $assoc_args['cleanup-processed'] );
+		$skip_confirm      = isset( $assoc_args['yes'] );
+
+		if ( ! in_array( $type, array( 'all', 'failed' ), true ) ) {
+			WP_CLI::error( 'type must be "all" or "failed"' );
+			return;
+		}
+
+		// Require confirmation for destructive operations.
+		if ( ! $skip_confirm ) {
+			$message = 'all' === $type
+				? 'Delete ALL jobs? This cannot be undone.'
+				: 'Delete all FAILED jobs?';
+
+			if ( $cleanup_processed ) {
+				$message .= ' Processed items tracking will also be cleared.';
+			}
+
+			WP_CLI::confirm( $message );
+		}
+
+		$result = $this->abilities->executeDeleteJobs(
+			array(
+				'type'              => $type,
+				'cleanup_processed' => $cleanup_processed,
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to delete jobs' );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] );
+
+		if ( $cleanup_processed && ( $result['processed_items_cleaned'] ?? 0 ) > 0 ) {
+			WP_CLI::log( sprintf( 'Processed items cleaned: %d', $result['processed_items_cleaned'] ) );
+		}
+	}
 }
