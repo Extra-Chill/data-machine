@@ -76,7 +76,7 @@ const GeneralTab = () => {
 					data.settings.chat_retention_days ?? DEFAULTS.chat_retention_days,
 				chat_ai_titles_enabled:
 					data.settings.chat_ai_titles_enabled ?? DEFAULTS.chat_ai_titles_enabled,
-			flows_per_page:
+				flows_per_page:
 					data.settings.flows_per_page ?? DEFAULTS.flows_per_page,
 				jobs_per_page:
 					data.settings.jobs_per_page ?? DEFAULTS.jobs_per_page,

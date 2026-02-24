@@ -92,8 +92,8 @@ const AgentSettings = () => {
 				default_provider: data.settings.default_provider || '',
 				default_model: data.settings.default_model || '',
 				agent_models: data.settings.agent_models || {},
-			site_context_enabled:
-				data.settings.site_context_enabled ?? false,
+				site_context_enabled:
+					data.settings.site_context_enabled ?? false,
 				max_turns: data.settings.max_turns ?? 12,
 			} );
 			save.setHasChanges( false );

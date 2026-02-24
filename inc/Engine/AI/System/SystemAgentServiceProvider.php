@@ -23,13 +23,13 @@ use DataMachine\Core\PluginSettings;
 class SystemAgentServiceProvider {
 
 	/**
-	 * Constructor - registers all System Agent components.
-	 */
-	/**
 	 * Action Scheduler hook name for daily memory generation.
 	 */
 	const DAILY_MEMORY_HOOK = 'datamachine_system_agent_daily_memory';
 
+	/**
+	 * Constructor - registers all System Agent components.
+	 */
 	public function __construct() {
 		$this->registerTaskHandlers();
 		$this->instantiateSystemAgent();

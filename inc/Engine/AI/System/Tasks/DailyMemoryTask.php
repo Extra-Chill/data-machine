@@ -85,9 +85,10 @@ class DailyMemoryTask extends SystemTask {
 			return;
 		}
 
-		// Write to today's daily memory file.
+		// Write to the target date's daily memory file.
+		$date  = $params['date'] ?? gmdate( 'Y-m-d' );
 		$daily = new DailyMemory();
-		$parts = explode( '-', gmdate( 'Y-m-d' ) );
+		$parts = explode( '-', $date );
 
 		$result = $daily->append( $parts[0], $parts[1], $parts[2], $content . "\n" );
 
@@ -97,7 +98,7 @@ class DailyMemoryTask extends SystemTask {
 		}
 
 		$this->completeJob( $jobId, array(
-			'date'           => gmdate( 'Y-m-d' ),
+			'date'           => $date,
 			'content_length' => strlen( $content ),
 		) );
 	}
