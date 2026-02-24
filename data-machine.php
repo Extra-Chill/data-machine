@@ -90,6 +90,7 @@ function datamachine_run_datamachine_plugin() {
 	\DataMachine\Engine\AI\Tools\ToolServiceProvider::register();
 
 	\DataMachine\Api\Execute::register();
+	\DataMachine\Api\WebhookTrigger::register();
 	\DataMachine\Api\Pipelines\Pipelines::register();
 	\DataMachine\Api\Pipelines\PipelineSteps::register();
 	\DataMachine\Api\Pipelines\PipelineFlows::register();

@@ -219,6 +219,21 @@ class FlowsCommand extends BaseCommand {
 	 *     # Move a prompt from index 2 to index 0 (front of queue)
 	 *     wp datamachine flows queue move 42 2 0
 	 *
+	 *     # Enable webhook trigger for a flow
+	 *     wp datamachine flows webhook enable 42
+	 *
+	 *     # Disable webhook trigger
+	 *     wp datamachine flows webhook disable 42
+	 *
+	 *     # Regenerate webhook token (invalidates old token)
+	 *     wp datamachine flows webhook regenerate 42
+	 *
+	 *     # Check webhook trigger status
+	 *     wp datamachine flows webhook status 42
+	 *
+	 *     # List all flows with webhook triggers enabled
+	 *     wp datamachine flows webhook list
+	 *
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		$flow_id     = null;
@@ -227,6 +242,12 @@ class FlowsCommand extends BaseCommand {
 		// Handle 'create' subcommand: `flows create --pipeline_id=3 --name="Test"`.
 		if ( ! empty( $args ) && 'create' === $args[0] ) {
 			$this->createFlow( $assoc_args );
+			return;
+		}
+
+		// Handle 'webhook' subcommand: `flows webhook enable|disable|regenerate|status|list <flow_id>`.
+		if ( ! empty( $args ) && 'webhook' === $args[0] ) {
+			$this->handleWebhook( array_slice( $args, 1 ), $assoc_args );
 			return;
 		}
 
@@ -1545,5 +1566,213 @@ class FlowsCommand extends BaseCommand {
 			}
 			WP_CLI::log( '' );
 		}
+	}
+
+	/**
+	 * Handle webhook subcommands.
+	 *
+	 * @param array $args       Positional arguments (action, flow_id).
+	 * @param array $assoc_args Associative arguments.
+	 */
+	private function handleWebhook( array $args, array $assoc_args ): void {
+		if ( empty( $args ) ) {
+			WP_CLI::error( 'Usage: wp datamachine flows webhook <enable|disable|regenerate|status|list> [flow_id]' );
+			return;
+		}
+
+		$action = $args[0] ?? '';
+
+		switch ( $action ) {
+			case 'enable':
+				$this->webhookEnable( array_slice( $args, 1 ), $assoc_args );
+				break;
+			case 'disable':
+				$this->webhookDisable( array_slice( $args, 1 ), $assoc_args );
+				break;
+			case 'regenerate':
+				$this->webhookRegenerate( array_slice( $args, 1 ), $assoc_args );
+				break;
+			case 'status':
+				$this->webhookStatus( array_slice( $args, 1 ), $assoc_args );
+				break;
+			case 'list':
+				$this->webhookList( $assoc_args );
+				break;
+			default:
+				WP_CLI::error( "Unknown webhook action: {$action}. Use: enable, disable, regenerate, status, list" );
+		}
+	}
+
+	/**
+	 * Enable webhook trigger for a flow.
+	 *
+	 * @param array $args       Positional arguments (flow_id).
+	 * @param array $assoc_args Associative arguments.
+	 */
+	private function webhookEnable( array $args, array $assoc_args ): void {
+		if ( empty( $args ) ) {
+			WP_CLI::error( 'Usage: wp datamachine flows webhook enable <flow_id>' );
+			return;
+		}
+
+		$flow_id = (int) $args[0];
+		if ( $flow_id <= 0 ) {
+			WP_CLI::error( 'flow_id must be a positive integer' );
+			return;
+		}
+
+		$ability = new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
+		$result  = $ability->executeEnable( array( 'flow_id' => $flow_id ) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to enable webhook trigger' );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] );
+		WP_CLI::log( sprintf( 'URL:   %s', $result['webhook_url'] ) );
+		WP_CLI::log( sprintf( 'Token: %s', $result['token'] ) );
+		WP_CLI::log( '' );
+		WP_CLI::log( 'Usage:' );
+		WP_CLI::log( sprintf( '  curl -X POST %s \\', $result['webhook_url'] ) );
+		WP_CLI::log( sprintf( '    -H "Authorization: Bearer %s" \\', $result['token'] ) );
+		WP_CLI::log( '    -H "Content-Type: application/json" \\' );
+		WP_CLI::log( '    -d \'{"key": "value"}\'' );
+	}
+
+	/**
+	 * Disable webhook trigger for a flow.
+	 *
+	 * @param array $args       Positional arguments (flow_id).
+	 * @param array $assoc_args Associative arguments.
+	 */
+	private function webhookDisable( array $args, array $assoc_args ): void {
+		if ( empty( $args ) ) {
+			WP_CLI::error( 'Usage: wp datamachine flows webhook disable <flow_id>' );
+			return;
+		}
+
+		$flow_id = (int) $args[0];
+		if ( $flow_id <= 0 ) {
+			WP_CLI::error( 'flow_id must be a positive integer' );
+			return;
+		}
+
+		$ability = new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
+		$result  = $ability->executeDisable( array( 'flow_id' => $flow_id ) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to disable webhook trigger' );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] );
+	}
+
+	/**
+	 * Regenerate webhook token for a flow.
+	 *
+	 * @param array $args       Positional arguments (flow_id).
+	 * @param array $assoc_args Associative arguments.
+	 */
+	private function webhookRegenerate( array $args, array $assoc_args ): void {
+		if ( empty( $args ) ) {
+			WP_CLI::error( 'Usage: wp datamachine flows webhook regenerate <flow_id>' );
+			return;
+		}
+
+		$flow_id = (int) $args[0];
+		if ( $flow_id <= 0 ) {
+			WP_CLI::error( 'flow_id must be a positive integer' );
+			return;
+		}
+
+		$ability = new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
+		$result  = $ability->executeRegenerate( array( 'flow_id' => $flow_id ) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to regenerate webhook token' );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] );
+		WP_CLI::log( sprintf( 'URL:       %s', $result['webhook_url'] ) );
+		WP_CLI::log( sprintf( 'New Token: %s', $result['token'] ) );
+		WP_CLI::warning( 'Update any external services using the old token.' );
+	}
+
+	/**
+	 * Show webhook trigger status for a flow.
+	 *
+	 * @param array $args       Positional arguments (flow_id).
+	 * @param array $assoc_args Associative arguments.
+	 */
+	private function webhookStatus( array $args, array $assoc_args ): void {
+		if ( empty( $args ) ) {
+			WP_CLI::error( 'Usage: wp datamachine flows webhook status <flow_id>' );
+			return;
+		}
+
+		$flow_id = (int) $args[0];
+		if ( $flow_id <= 0 ) {
+			WP_CLI::error( 'flow_id must be a positive integer' );
+			return;
+		}
+
+		$format = $assoc_args['format'] ?? 'table';
+
+		$ability = new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
+		$result  = $ability->executeStatus( array( 'flow_id' => $flow_id ) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to get webhook status' );
+			return;
+		}
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			return;
+		}
+
+		WP_CLI::log( sprintf( 'Flow:    %d — %s', $result['flow_id'], $result['flow_name'] ) );
+		WP_CLI::log( sprintf( 'Webhook: %s', $result['webhook_enabled'] ? 'enabled' : 'disabled' ) );
+
+		if ( $result['webhook_enabled'] ) {
+			WP_CLI::log( sprintf( 'URL:     %s', $result['webhook_url'] ) );
+			WP_CLI::log( sprintf( 'Created: %s', $result['created_at'] ?? 'unknown' ) );
+		}
+	}
+
+	/**
+	 * List all flows with webhook triggers enabled.
+	 *
+	 * @param array $assoc_args Associative arguments (--format).
+	 */
+	private function webhookList( array $assoc_args ): void {
+		$format = $assoc_args['format'] ?? 'table';
+
+		$db_flows = new \DataMachine\Core\Database\Flows\Flows();
+		$flows    = $db_flows->get_all_flows();
+
+		$webhook_flows = array();
+		foreach ( $flows as $flow ) {
+			$config = $flow['scheduling_config'] ?? array();
+			if ( ! empty( $config['webhook_enabled'] ) ) {
+				$webhook_flows[] = array(
+					'flow_id'     => $flow['flow_id'],
+					'flow_name'   => $flow['flow_name'],
+					'webhook_url' => \DataMachine\Abilities\Flow\WebhookTriggerAbility::get_webhook_url( (int) $flow['flow_id'] ),
+					'created_at'  => $config['webhook_created_at'] ?? '',
+				);
+			}
+		}
+
+		if ( empty( $webhook_flows ) ) {
+			WP_CLI::log( 'No flows have webhook triggers enabled.' );
+			return;
+		}
+
+		$this->format_items( $webhook_flows, array( 'flow_id', 'flow_name', 'webhook_url', 'created_at' ), $assoc_args, 'flow_id' );
+		WP_CLI::log( sprintf( 'Total: %d flow(s) with webhook triggers enabled.', count( $webhook_flows ) ) );
 	}
 }

@@ -19,6 +19,7 @@ use DataMachine\Abilities\Flow\UpdateFlowAbility;
 use DataMachine\Abilities\Flow\DeleteFlowAbility;
 use DataMachine\Abilities\Flow\DuplicateFlowAbility;
 use DataMachine\Abilities\Flow\QueueAbility;
+use DataMachine\Abilities\Flow\WebhookTriggerAbility;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -32,6 +33,7 @@ class FlowAbilities {
 	private DeleteFlowAbility $delete_flow;
 	private DuplicateFlowAbility $duplicate_flow;
 	private QueueAbility $queue;
+	private WebhookTriggerAbility $webhook_trigger;
 
 	public function __construct() {
 		// Always initialize queue - CLI commands need it regardless of WP_Ability
@@ -43,11 +45,12 @@ class FlowAbilities {
 
 		$this->registerCategory();
 
-		$this->get_flows      = new GetFlowsAbility();
-		$this->create_flow    = new CreateFlowAbility();
-		$this->update_flow    = new UpdateFlowAbility();
-		$this->delete_flow    = new DeleteFlowAbility();
-		$this->duplicate_flow = new DuplicateFlowAbility();
+		$this->get_flows       = new GetFlowsAbility();
+		$this->create_flow     = new CreateFlowAbility();
+		$this->update_flow     = new UpdateFlowAbility();
+		$this->delete_flow     = new DeleteFlowAbility();
+		$this->duplicate_flow  = new DuplicateFlowAbility();
+		$this->webhook_trigger = new WebhookTriggerAbility();
 
 		self::$registered = true;
 	}
