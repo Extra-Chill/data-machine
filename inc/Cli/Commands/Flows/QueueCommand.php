@@ -5,19 +5,19 @@
  * Manages the prompt queue for flow steps.
  * Extracted from FlowsCommand to follow the focused command pattern.
  *
- * @package DataMachine\Cli\Commands
+ * @package DataMachine\Cli\Commands\Flows
  * @since 0.31.0
  * @see https://github.com/Extra-Chill/data-machine/issues/345
  */
 
-namespace DataMachine\Cli\Commands;
+namespace DataMachine\Cli\Commands\Flows;
 
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 
 defined( 'ABSPATH' ) || exit;
 
-class FlowsQueueCommand extends BaseCommand {
+class QueueCommand extends BaseCommand {
 
 	/**
 	 * Dispatch a queue subcommand.
