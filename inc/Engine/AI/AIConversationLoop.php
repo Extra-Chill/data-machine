@@ -62,6 +62,13 @@ class AIConversationLoop {
 		$last_tool_calls        = array();
 		$tool_execution_results = array();
 
+		// Track which handler tools have been executed for multi-handler support.
+		// In pipeline mode, conversation should only complete when ALL configured
+		// handlers have fired, not just the first one.
+		$executed_handler_slugs = array();
+		$flow_step_config       = $payload['flow_step_config'] ?? array();
+		$configured_handlers    = $flow_step_config['handler_slugs'] ?? array();
+
 		// Build base log context from payload for consistent logging
 		$base_log_context = array_filter(
 			array(
@@ -227,21 +234,64 @@ class AIConversationLoop {
 					$tool_def        = $tools[ $tool_name ] ?? null;
 					$is_handler_tool = $tool_def && isset( $tool_def['handler'] );
 
-					// Force conversation completion if a handler tool was successfully executed in pipeline mode
+					// Track handler tool execution in pipeline mode.
+					// Only complete when ALL configured handlers have fired (multi-handler support).
 					if ( 'pipeline' === $agent_type && $is_handler_tool && ( $tool_result['success'] ?? false ) ) {
-						$conversation_complete = true;
-						do_action(
-							'datamachine_log',
-							'debug',
-							'AIConversationLoop: Handler tool executed successfully, ending conversation',
-							array_merge(
-								$base_log_context,
-								array(
-									'tool_name'  => $tool_name,
-									'turn_count' => $turn_count,
+						$handler_slug = $tool_def['handler'] ?? null;
+						if ( $handler_slug ) {
+							$executed_handler_slugs[] = $handler_slug;
+						}
+
+						// If we know which handlers are configured, wait for all of them.
+						// Otherwise fall back to completing on first handler (backward compat).
+						if ( ! empty( $configured_handlers ) ) {
+							$remaining = array_diff( $configured_handlers, array_unique( $executed_handler_slugs ) );
+							if ( empty( $remaining ) ) {
+								$conversation_complete = true;
+								do_action(
+									'datamachine_log',
+									'debug',
+									'AIConversationLoop: All configured handlers executed, ending conversation',
+									array_merge(
+										$base_log_context,
+										array(
+											'tool_name'          => $tool_name,
+											'turn_count'         => $turn_count,
+											'executed_handlers'  => array_unique( $executed_handler_slugs ),
+											'configured_handlers' => $configured_handlers,
+										)
+									)
+								);
+							} else {
+								do_action(
+									'datamachine_log',
+									'debug',
+									'AIConversationLoop: Handler executed, waiting for remaining handlers',
+									array_merge(
+										$base_log_context,
+										array(
+											'tool_name'          => $tool_name,
+											'remaining_handlers' => array_values( $remaining ),
+										)
+									)
+								);
+							}
+						} else {
+							// No handler list available — legacy behavior: complete on first handler
+							$conversation_complete = true;
+							do_action(
+								'datamachine_log',
+								'debug',
+								'AIConversationLoop: Handler tool executed (legacy mode), ending conversation',
+								array_merge(
+									$base_log_context,
+									array(
+										'tool_name'  => $tool_name,
+										'turn_count' => $turn_count,
+									)
 								)
-							)
-						);
+							);
+						}
 					}
 
 					// Store tool execution result separately for data packet processing
