@@ -156,17 +156,6 @@ class EngineData {
 	}
 
 	/**
-	 * Set a value in the engine data.
-	 *
-	 * @param string $key Data key.
-	 * @param mixed $value Value to set.
-	 * @return void
-	 */
-	public function set( string $key, $value ): void {
-		$this->data[ $key ] = $value;
-	}
-
-	/**
 	 * Get the Source URL.
 	 *
 	 * @return string|null Source URL or null.
