@@ -261,7 +261,7 @@ class InternalLinkingAbilities {
 				 AND p.post_status = %s
 				 AND m.meta_value != ''
 				 AND m.meta_value IS NOT NULL",
-				'_dm_internal_links',
+				'_datamachine_internal_links',
 				'post',
 				'publish'
 			)
@@ -279,7 +279,7 @@ class InternalLinkingAbilities {
 				 WHERE p.post_type = %s
 				 AND p.post_status = %s
 				 AND m.meta_value != ''",
-				'_dm_internal_links',
+				'_datamachine_internal_links',
 				'post',
 				'publish'
 			)
@@ -334,7 +334,7 @@ class InternalLinkingAbilities {
 						 AND tt.term_id = %d
 						 AND m.meta_value != ''
 						 AND m.meta_value IS NOT NULL",
-						'_dm_internal_links',
+						'_datamachine_internal_links',
 						'post',
 						'publish',
 						'category',
