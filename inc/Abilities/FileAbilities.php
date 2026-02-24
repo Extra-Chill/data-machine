@@ -24,6 +24,13 @@ defined( 'ABSPATH' ) || exit;
 
 class FileAbilities {
 
+	/**
+	 * Core agent identity files that cannot be deleted.
+	 *
+	 * @var string[]
+	 */
+	const PROTECTED_FILES = array( 'SOUL.md', 'MEMORY.md' );
+
 	private static bool $registered = false;
 
 	private FileStorage $file_storage;
@@ -53,6 +60,7 @@ class FileAbilities {
 		$register_callback = function () {
 			$this->registerListFiles();
 			$this->registerGetFile();
+			$this->registerWriteAgentFile();
 			$this->registerDeleteFile();
 			$this->registerCleanupFiles();
 			$this->registerUploadFile();
@@ -142,6 +150,45 @@ class FileAbilities {
 					),
 				),
 				'execute_callback'    => array( $this, 'executeGetFile' ),
+				'permission_callback' => array( $this, 'checkPermission' ),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	/**
+	 * Register datamachine/write-agent-file ability.
+	 */
+	private function registerWriteAgentFile(): void {
+		wp_register_ability(
+			'datamachine/write-agent-file',
+			array(
+				'label'               => __( 'Write Agent File', 'data-machine' ),
+				'description'         => __( 'Write or update content for an agent memory file. Protected files cannot be blanked.', 'data-machine' ),
+				'category'            => 'datamachine',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'filename', 'content' ),
+					'properties' => array(
+						'filename' => array(
+							'type'        => 'string',
+							'description' => __( 'Name of the agent file to write', 'data-machine' ),
+						),
+						'content'  => array(
+							'type'        => 'string',
+							'description' => __( 'Content to write to the file', 'data-machine' ),
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'  => array( 'type' => 'boolean' ),
+						'filename' => array( 'type' => 'string' ),
+						'error'    => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeWriteAgentFile' ),
 				'permission_callback' => array( $this, 'checkPermission' ),
 				'meta'                => array( 'show_in_rest' => true ),
 			)
@@ -347,6 +394,35 @@ class FileAbilities {
 		}
 
 		return $this->getFileFromFlow( $filename, $flow_step_id );
+	}
+
+	/**
+	 * Execute write-agent-file ability.
+	 *
+	 * @param array $input Input parameters with 'filename' and 'content'.
+	 * @return array Result with write status.
+	 */
+	public function executeWriteAgentFile( array $input ): array {
+		$filename = $input['filename'] ?? null;
+		$content  = $input['content'] ?? null;
+
+		if ( empty( $filename ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'filename is required',
+			);
+		}
+
+		if ( null === $content ) {
+			return array(
+				'success' => false,
+				'error'   => 'content is required',
+			);
+		}
+
+		$filename = sanitize_file_name( $filename );
+
+		return $this->writeAgentFile( $filename, $content );
 	}
 
 	/**
@@ -928,6 +1004,13 @@ class FileAbilities {
 	 * @return array Result with deletion status.
 	 */
 	private function deleteAgentFile( string $filename ): array {
+		if ( in_array( $filename, self::PROTECTED_FILES, true ) ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Cannot delete protected file: %s', $filename ),
+			);
+		}
+
 		$directory_manager = new DirectoryManager();
 		$agent_dir         = $directory_manager->get_agent_directory();
 		$filepath          = "{$agent_dir}/{$filename}";
@@ -952,6 +1035,65 @@ class FileAbilities {
 			'success' => true,
 			'scope'   => 'agent',
 			'message' => sprintf( 'File %s deleted from agent directory', $filename ),
+		);
+	}
+
+	/**
+	 * Write content to an agent file.
+	 *
+	 * Protected files (SOUL.md, MEMORY.md) cannot be blanked with empty content.
+	 *
+	 * @param string $filename Filename to write.
+	 * @param string $content  Content to write.
+	 * @return array Result with write status.
+	 */
+	private function writeAgentFile( string $filename, string $content ): array {
+		if ( in_array( $filename, self::PROTECTED_FILES, true ) && '' === trim( $content ) ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Cannot write empty content to protected file: %s', $filename ),
+			);
+		}
+
+		$directory_manager = new DirectoryManager();
+		$agent_dir         = $directory_manager->get_agent_directory();
+
+		if ( ! $directory_manager->ensure_directory_exists( $agent_dir ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to create agent directory',
+			);
+		}
+
+		$filepath = "{$agent_dir}/{$filename}";
+
+		$fs = FilesystemHelper::get();
+		if ( ! $fs ) {
+			return array(
+				'success' => false,
+				'error'   => 'Filesystem not available',
+			);
+		}
+
+		$written = $fs->put_contents( $filepath, $content, FS_CHMOD_FILE );
+
+		if ( ! $written ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to write file',
+			);
+		}
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Agent file written via ability',
+			array( 'filename' => $filename )
+		);
+
+		return array(
+			'success'  => true,
+			'filename' => $filename,
 		);
 	}
 

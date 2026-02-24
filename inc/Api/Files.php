@@ -10,10 +10,8 @@
 
 namespace DataMachine\Api;
 
+use DataMachine\Abilities\DailyMemoryAbilities;
 use DataMachine\Abilities\FileAbilities;
-use DataMachine\Core\FilesRepository\DailyMemory;
-use DataMachine\Core\FilesRepository\DirectoryManager;
-use DataMachine\Core\FilesRepository\FilesystemHelper;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -452,44 +450,51 @@ class Files {
 
 	/**
 	 * Write/update agent file content (accepts raw body as content).
+	 * Delegates to FileAbilities::executeWriteAgentFile().
 	 */
 	public static function put_agent_file( WP_REST_Request $request ) {
 		$filename = sanitize_file_name( wp_unslash( $request['filename'] ) );
 		$content  = $request->get_body();
 
-		$directory_manager = new DirectoryManager();
-		$agent_dir         = $directory_manager->get_agent_directory();
+		$result = self::getAbilities()->executeWriteAgentFile(
+			array(
+				'filename' => $filename,
+				'content'  => $content,
+			)
+		);
 
-		if ( ! $directory_manager->ensure_directory_exists( $agent_dir ) ) {
-			return new WP_Error( 'put_agent_file_error', 'Failed to create agent directory', array( 'status' => 500 ) );
-		}
-
-		$filepath = "{$agent_dir}/{$filename}";
-
-		$fs = FilesystemHelper::get();
-		if ( ! $fs ) {
-			return new WP_Error( 'put_agent_file_error', 'Filesystem not available', array( 'status' => 500 ) );
-		}
-
-		$written = $fs->put_contents( $filepath, $content, FS_CHMOD_FILE );
-
-		if ( ! $written ) {
-			return new WP_Error( 'put_agent_file_error', 'Failed to write file', array( 'status' => 500 ) );
+		if ( ! $result['success'] ) {
+			$status = 400;
+			if ( false !== strpos( $result['error'] ?? '', 'Filesystem' ) || false !== strpos( $result['error'] ?? '', 'Failed' ) ) {
+				$status = 500;
+			}
+			return new WP_Error( 'put_agent_file_error', $result['error'], array( 'status' => $status ) );
 		}
 
 		return rest_ensure_response(
 			array(
 				'success'  => true,
-				'filename' => $filename,
+				'filename' => $result['filename'],
 			)
 		);
 	}
 
 	/**
 	 * Delete agent file.
+	 *
+	 * Defense-in-depth: checks protected files at REST layer before delegating to abilities.
 	 */
 	public static function delete_agent_file( WP_REST_Request $request ) {
 		$filename = sanitize_file_name( wp_unslash( $request['filename'] ) );
+
+		// Defense-in-depth: block deletion of protected files at the REST layer too.
+		if ( in_array( $filename, FileAbilities::PROTECTED_FILES, true ) ) {
+			return new WP_Error(
+				'delete_agent_file_error',
+				sprintf( 'Cannot delete protected file: %s', $filename ),
+				array( 'status' => 403 )
+			);
+		}
 
 		$result = self::getAbilities()->executeDeleteFile(
 			array(
@@ -517,12 +522,12 @@ class Files {
 
 	/**
 	 * List all daily memory files grouped by month.
+	 * Delegates to DailyMemoryAbilities::listDaily().
 	 *
 	 * @since 0.32.0
 	 */
 	public static function list_daily_files( WP_REST_Request $request ) {
-		$daily  = new DailyMemory();
-		$result = $daily->list_all();
+		$result = DailyMemoryAbilities::listDaily( array() );
 
 		return rest_ensure_response(
 			array(
@@ -534,16 +539,13 @@ class Files {
 
 	/**
 	 * Get a daily memory file's content.
+	 * Delegates to DailyMemoryAbilities::readDaily().
 	 *
 	 * @since 0.32.0
 	 */
 	public static function get_daily_file( WP_REST_Request $request ) {
-		$year  = $request['year'];
-		$month = $request['month'];
-		$day   = $request['day'];
-
-		$daily  = new DailyMemory();
-		$result = $daily->read( $year, $month, $day );
+		$date   = sprintf( '%s-%s-%s', $request['year'], $request['month'], $request['day'] );
+		$result = DailyMemoryAbilities::readDaily( array( 'date' => $date ) );
 
 		if ( ! $result['success'] ) {
 			return new WP_Error( 'daily_file_not_found', $result['message'], array( 'status' => 404 ) );
@@ -562,26 +564,33 @@ class Files {
 
 	/**
 	 * Write/update a daily memory file (accepts raw body as content).
+	 * Delegates to DailyMemoryAbilities::writeDaily().
+	 *
+	 * Respects the daily_memory_enabled setting via the abilities layer.
 	 *
 	 * @since 0.32.0
 	 */
 	public static function put_daily_file( WP_REST_Request $request ) {
-		$year    = $request['year'];
-		$month   = $request['month'];
-		$day     = $request['day'];
+		$date    = sprintf( '%s-%s-%s', $request['year'], $request['month'], $request['day'] );
 		$content = $request->get_body();
 
-		$daily  = new DailyMemory();
-		$result = $daily->write( $year, $month, $day, $content );
+		$result = DailyMemoryAbilities::writeDaily(
+			array(
+				'date'    => $date,
+				'content' => $content,
+				'mode'    => 'write',
+			)
+		);
 
 		if ( ! $result['success'] ) {
-			return new WP_Error( 'daily_file_write_error', $result['message'], array( 'status' => 500 ) );
+			$status = false !== strpos( $result['message'] ?? '', 'disabled' ) ? 403 : 500;
+			return new WP_Error( 'daily_file_write_error', $result['message'], array( 'status' => $status ) );
 		}
 
 		return rest_ensure_response(
 			array(
 				'success' => true,
-				'date'    => "{$year}-{$month}-{$day}",
+				'date'    => $date,
 				'message' => $result['message'],
 			)
 		);
@@ -589,19 +598,19 @@ class Files {
 
 	/**
 	 * Delete a daily memory file.
+	 * Delegates to DailyMemoryAbilities::deleteDaily().
+	 *
+	 * Respects the daily_memory_enabled setting via the abilities layer.
 	 *
 	 * @since 0.32.0
 	 */
 	public static function delete_daily_file( WP_REST_Request $request ) {
-		$year  = $request['year'];
-		$month = $request['month'];
-		$day   = $request['day'];
-
-		$daily  = new DailyMemory();
-		$result = $daily->delete( $year, $month, $day );
+		$date   = sprintf( '%s-%s-%s', $request['year'], $request['month'], $request['day'] );
+		$result = DailyMemoryAbilities::deleteDaily( array( 'date' => $date ) );
 
 		if ( ! $result['success'] ) {
-			return new WP_Error( 'daily_file_delete_error', $result['message'], array( 'status' => 404 ) );
+			$status = false !== strpos( $result['message'] ?? '', 'disabled' ) ? 403 : 404;
+			return new WP_Error( 'daily_file_delete_error', $result['message'], array( 'status' => $status ) );
 		}
 
 		return rest_ensure_response(
