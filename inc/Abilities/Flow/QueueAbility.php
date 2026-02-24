@@ -441,27 +441,21 @@ class QueueAbility {
 		$skip_validation = ! empty( $input['skip_validation'] );
 		if ( ! $skip_validation ) {
 			$validator = new QueueValidator();
-
-			// Check against published posts.
-			$post_match = $validator->handle_tool_call( array(
-				'topic'         => $prompt,
-				'flow_id'       => $flow_id,
-				'flow_step_id'  => $flow_step_id,
+			$result    = $validator->validate( array(
+				'topic'        => $prompt,
+				'flow_id'      => $flow_id,
+				'flow_step_id' => $flow_step_id,
 			) );
 
-			if ( ! empty( $post_match['verdict'] ) && 'duplicate' === $post_match['verdict'] ) {
+			if ( 'duplicate' === $result['verdict'] ) {
 				return array(
-					'success'  => false,
-					'error'    => 'duplicate_rejected',
-					'reason'   => $post_match['reason'] ?? 'Duplicate detected',
-					'match'    => $post_match['match'] ?? array(),
-					'source'   => $post_match['source'] ?? 'unknown',
-					'flow_id'  => $flow_id,
-					'message'  => sprintf(
-						'Rejected: "%s" is a duplicate. %s',
-						$prompt,
-						$post_match['reason'] ?? ''
-					),
+					'success' => false,
+					'error'   => 'duplicate_rejected',
+					'reason'  => $result['reason'],
+					'match'   => $result['match'] ?? array(),
+					'source'  => $result['source'] ?? 'unknown',
+					'flow_id' => $flow_id,
+					'message' => sprintf( 'Rejected: "%s" is a duplicate. %s', $prompt, $result['reason'] ),
 				);
 			}
 		}

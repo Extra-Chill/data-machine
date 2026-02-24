@@ -103,17 +103,37 @@ class QueueValidator extends BaseTool {
 	 * @param array $tool_def   Tool definition (unused).
 	 * @return array Validation result with verdict and match details.
 	 */
-	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
-		if ( empty( $parameters['topic'] ) ) {
-			return $this->buildErrorResponse(
-				'Queue validator requires a topic parameter.',
-				'queue_validator'
+	/**
+	 * Core duplicate-check logic. Returns a structured result usable by
+	 * both the AI tool interface and the queue-add ability.
+	 *
+	 * @param array $params {
+	 *     @type string $topic          Topic to validate (required).
+	 *     @type float  $threshold      Similarity threshold (optional, uses default).
+	 *     @type string $post_type      Post type to check (default: 'post').
+	 *     @type int    $flow_id        Flow ID for queue check (optional).
+	 *     @type string $flow_step_id   Flow step ID for queue check (optional).
+	 * }
+	 * @return array {
+	 *     @type string $verdict  'clear' or 'duplicate'.
+	 *     @type string $topic    The checked topic.
+	 *     @type string $source   'published_post', 'queue', or null if clear.
+	 *     @type array  $match    Match details (if duplicate).
+	 *     @type string $reason   Human-readable explanation.
+	 * }
+	 */
+	public function validate( array $params ): array {
+		$topic     = sanitize_text_field( $params['topic'] ?? '' );
+		$threshold = $this->resolveThreshold( $params );
+		$post_type = ! empty( $params['post_type'] ) ? sanitize_text_field( $params['post_type'] ) : 'post';
+
+		if ( empty( $topic ) ) {
+			return array(
+				'verdict' => 'error',
+				'topic'   => '',
+				'reason'  => 'Queue validator requires a topic parameter.',
 			);
 		}
-
-		$topic     = sanitize_text_field( $parameters['topic'] );
-		$threshold = $this->resolveThreshold( $parameters );
-		$post_type = ! empty( $parameters['post_type'] ) ? sanitize_text_field( $parameters['post_type'] ) : 'post';
 
 		do_action(
 			'datamachine_log',
@@ -141,17 +161,16 @@ class QueueValidator extends BaseTool {
 			);
 
 			return array(
-				'success'   => true,
-				'verdict'   => 'duplicate',
-				'source'    => 'published_post',
-				'topic'     => $topic,
-				'match'     => array(
+				'verdict' => 'duplicate',
+				'source'  => 'published_post',
+				'topic'   => $topic,
+				'match'   => array(
 					'title'      => $post_match['title'],
 					'post_id'    => $post_match['post_id'],
 					'url'        => $post_match['url'],
 					'similarity' => $post_match['similarity'],
 				),
-				'reason'    => sprintf(
+				'reason'  => sprintf(
 					'Rejected: "%s" is %.0f%% similar to existing post "%s" (ID %d). Threshold: %.0f%%.',
 					$topic,
 					$post_match['similarity'] * 100,
@@ -159,17 +178,16 @@ class QueueValidator extends BaseTool {
 					$post_match['post_id'],
 					$threshold * 100
 				),
-				'tool_name' => 'queue_validator',
 			);
 		}
 
 		// Check 2: Queue items (if flow_id and flow_step_id provided).
-		if ( ! empty( $parameters['flow_id'] ) && ! empty( $parameters['flow_step_id'] ) ) {
+		if ( ! empty( $params['flow_id'] ) && ! empty( $params['flow_step_id'] ) ) {
 			$queue_match = $this->checkQueueItems(
 				$topic,
 				$threshold,
-				(int) $parameters['flow_id'],
-				sanitize_text_field( $parameters['flow_step_id'] )
+				(int) $params['flow_id'],
+				sanitize_text_field( $params['flow_step_id'] )
 			);
 
 			if ( null !== $queue_match ) {
@@ -184,16 +202,15 @@ class QueueValidator extends BaseTool {
 				);
 
 				return array(
-					'success'   => true,
-					'verdict'   => 'duplicate',
-					'source'    => 'queue',
-					'topic'     => $topic,
-					'match'     => array(
+					'verdict' => 'duplicate',
+					'source'  => 'queue',
+					'topic'   => $topic,
+					'match'   => array(
 						'prompt'     => $queue_match['prompt'],
 						'index'      => $queue_match['index'],
 						'similarity' => $queue_match['similarity'],
 					),
-					'reason'    => sprintf(
+					'reason'  => sprintf(
 						'Rejected: "%s" is %.0f%% similar to queued item "%s" (index %d). Threshold: %.0f%%.',
 						$topic,
 						$queue_match['similarity'] * 100,
@@ -201,7 +218,6 @@ class QueueValidator extends BaseTool {
 						$queue_match['index'],
 						$threshold * 100
 					),
-					'tool_name' => 'queue_validator',
 				);
 			}
 		}
@@ -214,11 +230,25 @@ class QueueValidator extends BaseTool {
 		);
 
 		return array(
-			'success'   => true,
-			'verdict'   => 'clear',
-			'topic'     => $topic,
-			'reason'    => sprintf( 'No duplicates found for "%s".', $topic ),
-			'tool_name' => 'queue_validator',
+			'verdict' => 'clear',
+			'topic'   => $topic,
+			'reason'  => sprintf( 'No duplicates found for "%s".', $topic ),
+		);
+	}
+
+	/**
+	 * AI tool interface. Wraps validate() with tool-specific response shape.
+	 */
+	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
+		$result = $this->validate( $parameters );
+
+		if ( 'error' === $result['verdict'] ) {
+			return $this->buildErrorResponse( $result['reason'], 'queue_validator' );
+		}
+
+		return array_merge(
+			array( 'success' => true, 'tool_name' => 'queue_validator' ),
+			$result
 		);
 	}
 
