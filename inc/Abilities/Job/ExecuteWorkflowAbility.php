@@ -67,7 +67,7 @@ class ExecuteWorkflowAbility {
 							),
 							'initial_data' => array(
 								'type'        => 'object',
-								'description' => __( 'Optional initial engine data to merge before workflow execution (ephemeral only)', 'data-machine' ),
+								'description' => __( 'Optional initial engine data to merge before workflow execution. For database flows, stored as engine_data on the job. For ephemeral workflows, merged into the engine data alongside configs.', 'data-machine' ),
 							),
 							'dry_run'      => array(
 								'type'        => 'boolean',
@@ -146,7 +146,7 @@ class ExecuteWorkflowAbility {
 	/**
 	 * Execute a database flow.
 	 *
-	 * @param array $input Input parameters with flow_id, optional count and timestamp.
+	 * @param array $input Input parameters with flow_id, optional count, timestamp, and initial_data.
 	 * @return array Result with job_id(s) and execution info.
 	 */
 	private function executeDatabaseFlow( array $input ): array {
@@ -162,6 +162,7 @@ class ExecuteWorkflowAbility {
 		$flow_id        = (int) $flow_id;
 		$count          = max( 1, min( 10, (int) ( $input['count'] ?? 1 ) ) );
 		$timestamp      = $input['timestamp'] ?? null;
+		$initial_data   = $input['initial_data'] ?? null;
 		$execution_type = 'immediate';
 
 		if ( ! empty( $timestamp ) && is_numeric( $timestamp ) && (int) $timestamp > time() ) {
@@ -201,6 +202,11 @@ class ExecuteWorkflowAbility {
 					);
 				}
 				break;
+			}
+
+			// Store initial data in engine_data if provided (e.g. webhook payload).
+			if ( ! empty( $initial_data ) && is_array( $initial_data ) ) {
+				$this->db_jobs->store_engine_data( $job_id, $initial_data );
 			}
 
 			$schedule_time = $timestamp ?? time();
