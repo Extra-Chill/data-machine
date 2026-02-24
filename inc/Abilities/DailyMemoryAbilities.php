@@ -14,6 +14,7 @@ namespace DataMachine\Abilities;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\FilesRepository\DailyMemory;
+use DataMachine\Core\PluginSettings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -166,6 +167,13 @@ class DailyMemoryAbilities {
 	 * @return array Result.
 	 */
 	public static function writeDaily( array $input ): array {
+		if ( ! PluginSettings::get( 'daily_memory_enabled', false ) ) {
+			return array(
+				'success' => false,
+				'message' => 'Daily memory is disabled. Enable it in Agent > Configuration.',
+			);
+		}
+
 		$daily   = new DailyMemory();
 		$content = $input['content'];
 		$date    = $input['date'] ?? gmdate( 'Y-m-d' );
