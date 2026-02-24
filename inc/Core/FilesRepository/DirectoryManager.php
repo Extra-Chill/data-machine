@@ -96,6 +96,37 @@ class DirectoryManager {
 	}
 
 	/**
+	 * Get workspace directory path.
+	 *
+	 * Returns the managed workspace for agent file operations (cloning repos, etc.).
+	 * Path resolution order:
+	 * 1. DATAMACHINE_WORKSPACE_PATH constant (if defined)
+	 * 2. /var/lib/datamachine/workspace (if writable or creatable)
+	 * 3. Fallback: wp-content/uploads/datamachine-files/workspace
+	 *
+	 * @since 0.31.0
+	 * @return string Full path to workspace directory.
+	 */
+	public function get_workspace_directory(): string {
+		// 1. Explicit constant override.
+		if ( defined( 'DATAMACHINE_WORKSPACE_PATH' ) ) {
+			return rtrim( DATAMACHINE_WORKSPACE_PATH, '/' );
+		}
+
+		// 2. System-level default (outside web root).
+		$system_path = '/var/lib/datamachine/workspace';
+		$system_base = dirname( $system_path );
+		if ( is_writable( $system_base ) || ( ! file_exists( $system_base ) && is_writable( dirname( $system_base ) ) ) ) {
+			return $system_path;
+		}
+
+		// 3. Fallback inside uploads (shared hosting, restricted permissions).
+		$upload_dir = wp_upload_dir();
+		$base       = trailingslashit( $upload_dir['basedir'] ) . self::REPOSITORY_DIR;
+		return "{$base}/workspace";
+	}
+
+	/**
 	 * Ensure directory exists
 	 *
 	 * @param string $directory Directory path

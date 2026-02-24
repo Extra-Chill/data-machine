@@ -134,6 +134,7 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/AgentPingAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/TaxonomyAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/AgentMemoryAbilities.php';
+	require_once __DIR__ . '/inc/Abilities/WorkspaceAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/InternalLinkingAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Content/BlockSanitizer.php';
 	require_once __DIR__ . '/inc/Abilities/Content/GetPostBlocksAbility.php';
@@ -173,6 +174,7 @@ function datamachine_run_datamachine_plugin() {
 		new \DataMachine\Abilities\AgentPingAbilities();
 		new \DataMachine\Abilities\TaxonomyAbilities();
 		new \DataMachine\Abilities\AgentMemoryAbilities();
+		new \DataMachine\Abilities\WorkspaceAbilities();
 		new \DataMachine\Abilities\InternalLinkingAbilities();
 		new \DataMachine\Abilities\Content\GetPostBlocksAbility();
 		new \DataMachine\Abilities\Content\EditPostBlocksAbility();
