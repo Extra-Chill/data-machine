@@ -307,6 +307,92 @@ class PostsCommand extends BaseCommand {
 	}
 
 	/**
+	 * List recently published posts managed by Data Machine.
+	 *
+	 * Queries across all post types — shows any post with DM tracking meta,
+	 * ordered by publish date (newest first).
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--post_type=<post_type>]
+	 * : Filter by post type.
+	 * ---
+	 * default: any
+	 * ---
+	 *
+	 * [--post_status=<status>]
+	 * : Post status to query.
+	 * ---
+	 * default: publish
+	 * ---
+	 *
+	 * [--limit=<number>]
+	 * : Number of posts to return.
+	 * ---
+	 * default: 20
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - csv
+	 *   - yaml
+	 *   - ids
+	 *   - count
+	 * ---
+	 *
+	 * [--fields=<fields>]
+	 * : Limit output to specific fields (comma-separated).
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Show 20 most recent DM posts
+	 *     wp datamachine posts recent
+	 *
+	 *     # Show 5 most recent
+	 *     wp datamachine posts recent --limit=5
+	 *
+	 *     # Filter by post type
+	 *     wp datamachine posts recent --post_type=recipe
+	 *
+	 *     # JSON output
+	 *     wp datamachine posts recent --format=json
+	 *
+	 *     # Include drafts
+	 *     wp datamachine posts recent --post_status=any
+	 *
+	 * @subcommand recent
+	 */
+	public function recent( array $args, array $assoc_args ): void {
+		$post_type   = $assoc_args['post_type'] ?? 'any';
+		$post_status = $assoc_args['post_status'] ?? 'publish';
+		$per_page    = (int) ( $assoc_args['limit'] ?? 20 );
+		$format      = $assoc_args['format'] ?? 'table';
+
+		if ( $per_page < 1 ) {
+			$per_page = 20;
+		}
+		if ( $per_page > 100 ) {
+			$per_page = 100;
+		}
+
+		$ability = new \DataMachine\Abilities\PostQueryAbilities();
+		$result  = $ability->executeQueryRecentPosts(
+			array(
+				'post_type'   => $post_type,
+				'post_status' => $post_status,
+				'per_page'    => $per_page,
+			)
+		);
+
+		$this->outputPostResult( $result, $assoc_args, $format );
+	}
+
+	/**
 	 * Output post query result using standardized formatting.
 	 *
 	 * @param array  $result     Query result from ability.
