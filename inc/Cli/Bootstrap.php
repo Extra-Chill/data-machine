@@ -41,3 +41,4 @@ WP_CLI::add_command( 'datamachine links', Commands\LinksCommand::class );
 WP_CLI::add_command( 'datamachine link', Commands\LinksCommand::class );
 WP_CLI::add_command( 'datamachine blocks', Commands\BlocksCommand::class );
 WP_CLI::add_command( 'datamachine block', Commands\BlocksCommand::class );
+WP_CLI::add_command( 'datamachine analytics', Commands\AnalyticsCommand::class );
