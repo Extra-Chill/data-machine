@@ -184,6 +184,9 @@ class InternalLinkingTask extends SystemTask {
 			return;
 		}
 
+		// Capture pre-modification revision for undo support.
+		$revision_id = wp_save_post_revision( $post_id );
+
 		// Apply all block replacements at once.
 		$replace_result = ReplacePostBlocksAbility::execute( array(
 			'post_id'      => $post_id,
@@ -196,6 +199,7 @@ class InternalLinkingTask extends SystemTask {
 		}
 
 		// Track which links were added.
+		$existing_meta = get_post_meta( $post_id, '_datamachine_internal_links', true );
 		$link_tracking = array(
 			'processed_at' => current_time( 'mysql' ),
 			'links'        => $inserted_links,
@@ -203,10 +207,31 @@ class InternalLinkingTask extends SystemTask {
 		);
 		update_post_meta( $post_id, '_datamachine_internal_links', $link_tracking );
 
+		// Build standardized effects array for undo.
+		$effects = array();
+
+		if ( ! empty( $revision_id ) && ! is_wp_error( $revision_id ) ) {
+			$effects[] = array(
+				'type'        => 'post_content_modified',
+				'target'      => array( 'post_id' => $post_id ),
+				'revision_id' => $revision_id,
+			);
+		}
+
+		$effects[] = array(
+			'type'           => 'post_meta_set',
+			'target'         => array(
+				'post_id'  => $post_id,
+				'meta_key' => '_datamachine_internal_links',
+			),
+			'previous_value' => ! empty( $existing_meta ) ? $existing_meta : null,
+		);
+
 		$this->completeJob( $jobId, array(
 			'post_id'        => $post_id,
 			'links_inserted' => count( $inserted_links ),
 			'links'          => $inserted_links,
+			'effects'        => $effects,
 			'completed_at'   => current_time( 'mysql' ),
 		) );
 	}
@@ -218,6 +243,17 @@ class InternalLinkingTask extends SystemTask {
 	 */
 	public function getTaskType(): string {
 		return 'internal_linking';
+	}
+
+	/**
+	 * Internal linking supports undo — restores pre-modification revision
+	 * and removes the _datamachine_internal_links tracking meta.
+	 *
+	 * @return bool
+	 * @since 0.33.0
+	 */
+	public function supportsUndo(): bool {
+		return true;
 	}
 
 	/**
