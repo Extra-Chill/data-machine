@@ -2,6 +2,9 @@
 /**
  * Uninstall Data Machine Plugin
  *
+ * Handles cleanup for both single-site and multisite installations.
+ * On multisite network uninstall, iterates all subsites.
+ *
  * @package Data_Machine
  */
 
@@ -10,75 +13,135 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
-// Delete authentication data (unified datamachine_oauth system)
-$datamachine_auth_providers = array( 'twitter', 'facebook', 'threads', 'googlesheets', 'reddit', 'bluesky', 'wordpress_publish', 'wordpress_posts' );
-foreach ( $datamachine_auth_providers as $datamachine_provider ) {
-	delete_option( "{$datamachine_provider}_auth_data" );
-}
-
-// Note: AI HTTP Client library shared API keys preserved for other plugins using the library
-
-// Delete options from different storage system
-delete_option( 'datamachine_openai_api_key' );
-delete_option( 'datamachine_openai_user_meta' );
-delete_option( 'datamachine_bluesky_user_meta' );
-delete_option( 'datamachine_twitter_user_meta' );
-delete_option( 'datamachine_reddit_user_meta' );
-delete_option( 'datamachine_threads_user_meta' );
-delete_option( 'datamachine_facebook_user_meta' );
-
-// Delete user meta for all users - WordPress compliant approach
-global $wpdb;
-// Use prepared statement for security and WordPress compliance
-$datamachine_pattern = 'datamachine_%';
-$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->usermeta} WHERE meta_key LIKE %s", $datamachine_pattern ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-
-// Clear any related caches
-wp_cache_flush();
-
-// Drop custom tables - WordPress compliant approach
-// Check for proper capabilities (should be admin-only in uninstall context)
-if ( current_user_can( 'delete_plugins' ) || defined( 'WP_UNINSTALL_PLUGIN' ) ) {
-
-	// Drop tables in reverse dependency order
-	$datamachine_tables_to_drop = array(
-		$wpdb->prefix . 'datamachine_processed_items',
-		$wpdb->prefix . 'datamachine_jobs',
-		$wpdb->prefix . 'datamachine_flows',
-		$wpdb->prefix . 'datamachine_pipelines',
-	);
-
-	foreach ( $datamachine_tables_to_drop as $datamachine_table_name ) {
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $datamachine_table_name ) );
+if ( is_multisite() ) {
+	// Clean up every subsite on the network.
+	$datamachine_sites = get_sites( array( 'fields' => 'ids' ) );
+	foreach ( $datamachine_sites as $datamachine_blog_id ) {
+		switch_to_blog( $datamachine_blog_id );
+		datamachine_uninstall_site();
+		restore_current_blog();
 	}
 
-	// Clear all WordPress caches to ensure clean state
+	// Clean up network-wide options (stored via get_site_option / update_site_option).
+	datamachine_uninstall_network_options();
+} else {
+	datamachine_uninstall_site();
+}
+
+/**
+ * Clean up all Data Machine data for a single site.
+ *
+ * Deletes options, tables, user meta, files, transients, and scheduled actions.
+ */
+function datamachine_uninstall_site() {
+	global $wpdb;
+
+	// --- Options ---
+
+	// Core plugin settings.
+	delete_option( 'datamachine_settings' );
+	delete_option( 'datamachine_handler_defaults' );
+	delete_option( 'datamachine_agent_ping_callback_token' );
+	delete_option( 'datamachine_page_hook_suffixes' );
+
+	// Unified auth data.
+	delete_option( 'datamachine_auth_data' );
+
+	// Legacy per-provider auth data.
+	$datamachine_auth_providers = array( 'twitter', 'facebook', 'threads', 'googlesheets', 'reddit', 'bluesky', 'wordpress_publish', 'wordpress_posts' );
+	foreach ( $datamachine_auth_providers as $datamachine_provider ) {
+		delete_option( "{$datamachine_provider}_auth_data" );
+	}
+
+	// Legacy meta/key options.
+	delete_option( 'datamachine_openai_api_key' );
+	delete_option( 'datamachine_openai_user_meta' );
+	delete_option( 'datamachine_bluesky_user_meta' );
+	delete_option( 'datamachine_twitter_user_meta' );
+	delete_option( 'datamachine_reddit_user_meta' );
+	delete_option( 'datamachine_threads_user_meta' );
+	delete_option( 'datamachine_facebook_user_meta' );
+
+	// Log level options.
+	$datamachine_log_types = array( 'pipeline', 'system', 'chat' );
+	foreach ( $datamachine_log_types as $datamachine_log_type ) {
+		delete_option( "datamachine_log_level_{$datamachine_log_type}" );
+	}
+
+	// --- User meta ---
+
+	$datamachine_pattern = 'datamachine_%';
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+	$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->usermeta} WHERE meta_key LIKE %s", $datamachine_pattern ) );
+
+	// --- Database tables ---
+
+	if ( current_user_can( 'delete_plugins' ) || defined( 'WP_UNINSTALL_PLUGIN' ) ) {
+		// Drop tables in reverse dependency order.
+		$datamachine_tables_to_drop = array(
+			$wpdb->prefix . 'datamachine_processed_items',
+			$wpdb->prefix . 'datamachine_jobs',
+			$wpdb->prefix . 'datamachine_flows',
+			$wpdb->prefix . 'datamachine_pipelines',
+			$wpdb->prefix . 'datamachine_chat_sessions',
+		);
+
+		foreach ( $datamachine_tables_to_drop as $datamachine_table_name ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $datamachine_table_name ) );
+		}
+	}
+
+	// --- Files ---
+
+	$datamachine_upload_dir = wp_upload_dir();
+
+	// Agent files, pipeline files, context files.
+	$datamachine_files_dir = trailingslashit( $datamachine_upload_dir['basedir'] ) . 'datamachine-files';
+	if ( is_dir( $datamachine_files_dir ) ) {
+		datamachine_recursive_delete( $datamachine_files_dir );
+	}
+
+	// Log files.
+	$datamachine_logs_dir = trailingslashit( $datamachine_upload_dir['basedir'] ) . 'datamachine-logs';
+	if ( is_dir( $datamachine_logs_dir ) ) {
+		datamachine_recursive_delete( $datamachine_logs_dir );
+	}
+
+	// --- Scheduled actions ---
+
+	if ( function_exists( 'as_unschedule_all_actions' ) ) {
+		as_unschedule_all_actions( '', array(), 'data-machine' );
+	}
+
+	// --- Transients ---
+
+	delete_transient( 'datamachine_activation_notice' );
+
+	// --- Cache ---
+
 	wp_cache_flush();
 }
 
-// Delete files repository (uploads/datamachine-files/)
-$datamachine_upload_dir = wp_upload_dir();
-$datamachine_files_dir  = trailingslashit( $datamachine_upload_dir['basedir'] ) . 'datamachine-files';
+/**
+ * Clean up network-wide options on multisite.
+ *
+ * These are stored via get_site_option() / update_site_option() and shared
+ * across all subsites on the network.
+ */
+function datamachine_uninstall_network_options() {
+	$datamachine_network_options = array(
+		'datamachine_image_generation_config',
+		'datamachine_bing_webmaster_config',
+		'datamachine_gsc_config',
+		'datamachine_search_config',
+		'datamachine_amazon_config',
+	);
 
-if ( is_dir( $datamachine_files_dir ) ) {
-	datamachine_recursive_delete( $datamachine_files_dir );
+	foreach ( $datamachine_network_options as $datamachine_option ) {
+		delete_site_option( $datamachine_option );
+	}
 }
-
-// Delete log files (uploads/datamachine-logs/)
-$datamachine_logs_dir = trailingslashit( $datamachine_upload_dir['basedir'] ) . 'datamachine-logs';
-
-if ( is_dir( $datamachine_logs_dir ) ) {
-	datamachine_recursive_delete( $datamachine_logs_dir );
-}
-
-// Clear Action Scheduler jobs if available
-if ( function_exists( 'as_unschedule_all_actions' ) ) {
-	as_unschedule_all_actions( '', array(), 'data-machine' );
-}
-
-// Clear transients
-delete_transient( 'datamachine_activation_notice' );
 
 /**
  * Recursively delete a directory and its contents using WP_Filesystem.
