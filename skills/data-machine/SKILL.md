@@ -15,7 +15,7 @@ Use this skill when:
 - Creating self-scheduling patterns (reminders, recurring tasks)
 - Building multi-phase projects with queued task progression
 - Configuring Agent Ping webhooks to trigger external agents
-- Managing content blocks, internal links, alt text, or Pinterest integration
+- Managing content blocks, internal links, alt text, or image generation
 - Debugging failed jobs or recovering stuck pipelines
 
 ---
@@ -34,7 +34,7 @@ Data Machine is designed with AI agents as primary users. It functions as a **re
 
 | Role | How It Works |
 |------|--------------|
-| **Reminder System** | Flows run on schedules (daily, hourly, cron) and ping the agent |
+| **Reminder System** | Flows run on schedules (daily, hourly, weekly, etc.) and ping the agent |
 | **Task Manager** | Queues hold task backlog; each run pops the next task |
 | **Workflow Executor** | Pipeline steps execute work (AI generation, publishing, API calls) |
 
@@ -68,10 +68,9 @@ Pipeline (template) → Flow (instance) → Job (execution)
 | Handler | Source |
 |---------|--------|
 | `rss` | RSS/Atom feeds |
-| `google_sheets` | Google Sheets |
 | `files` | Local/remote files |
 | `reddit` | Reddit posts/comments |
-| `wordpress` | WordPress posts (local) |
+| `wordpress_posts` | WordPress posts (local) |
 | `wordpress_api` | WordPress REST API (remote) |
 | `wordpress_media` | WordPress media library |
 
@@ -80,18 +79,14 @@ Pipeline (template) → Flow (instance) → Job (execution)
 | Handler | Destination |
 |---------|------------|
 | `wordpress_publish` | WordPress posts |
-| `pinterest_publish` | Pinterest pins |
-| `twitter` | Twitter/X posts |
-| `bluesky` | Bluesky posts |
-| `facebook` | Facebook posts |
-| `threads` | Threads posts |
-| `google_sheets` | Google Sheets |
+
+**Note:** Social publish handlers (Pinterest, Twitter, Bluesky, Facebook, Threads) are available in the separate `data-machine-socials` plugin.
 
 ### Update Handlers
 
 | Handler | Target |
 |---------|--------|
-| `wordpress` | WordPress post content |
+| `wordpress_update` | WordPress post content |
 
 ### Webhook Gate
 
@@ -103,29 +98,39 @@ Configure via `--scheduling` flag on flow create/update:
 
 | Interval | Behavior |
 |----------|----------|
-| `manual` | Only runs when triggered via UI or CLI |
-| `daily` | Runs once per day |
+| `manual` | Only runs when triggered via UI, CLI, or webhook |
+| `one_time` | Runs once at a specified timestamp |
+| `every_5_minutes` | Runs every 5 minutes |
 | `hourly` | Runs once per hour |
-| Cron expression | e.g., `0 9 * * 1` for Mondays at 9am |
+| `every_2_hours` | Runs every 2 hours |
+| `every_4_hours` | Runs every 4 hours |
+| `qtrdaily` | Runs every 6 hours |
+| `twicedaily` | Runs twice per day |
+| `daily` | Runs once per day |
+| `every_3_days` | Runs every 3 days |
+| `weekly` | Runs once per week |
+| `monthly` | Runs once per month |
+
+Intervals are filterable via `datamachine_scheduler_intervals`.
 
 ---
 
-## Directive System (8-Tier)
+## Directive System
 
-System prompts are injected in priority order into every AI call:
+System prompts are injected in priority order into every AI call. Different agent types (pipeline, chat, system) have different directive sets:
 
-| Priority | Directive | Scope |
-|----------|-----------|-------|
-| 10 | Plugin Core | Hardcoded agent identity |
-| 20 | Agent SOUL.md | Global AI personality (identity, voice, rules) |
-| 30 | Agent MEMORY.md | Accumulated knowledge (state, lessons, context) |
-| 40 | Pipeline Memory Files | Per-pipeline selected memory files |
-| 50 | Pipeline System Prompt | Per-pipeline AI step instructions |
-| 60 | Pipeline Context Files | Uploaded reference materials |
-| 70 | Tool Definitions | Available tools and workflow context |
-| 80 | Site Context | WordPress metadata |
+| Priority | Directive | Agent Types | Purpose |
+|----------|-----------|-------------|---------|
+| 10 | Pipeline Core | pipeline | Hardcoded pipeline agent identity |
+| 15 | Chat Agent | chat | Chat agent identity and tool instructions |
+| 20 | Core Memory Files | all | SOUL.md, USER.md, MEMORY.md (always injected) |
+| 20 | System Agent | system | System agent identity (alt text, linking, etc.) |
+| 40 | Pipeline Memory Files | pipeline | Per-pipeline selected memory files |
+| 45 | Chat Pipelines | chat | Available pipeline context for chat |
+| 50 | Pipeline System Prompt | pipeline | Per-pipeline AI step instructions |
+| 80 | Site Context | all | WordPress metadata (site name, URL, post types) |
 
-**Key:** SOUL.md (Priority 20) and MEMORY.md (Priority 30) are always injected into every AI call. SOUL.md defines *who* the agent is. MEMORY.md defines *what* the agent knows. Other memory files are selectable per-pipeline via the admin UI. Priorities are spaced by 10 to allow future additions without rebasing.
+**Key:** Core Memory Files (Priority 20) injects three files in order: **SOUL.md** (file priority 10) defines *who* the agent is, **USER.md** (file priority 20) defines *who the user is*, and **MEMORY.md** (file priority 30) defines *what the agent knows*. All three are always injected into every AI call. Additional memory files are selectable per-pipeline via the admin UI (Priority 40).
 
 ---
 
@@ -135,12 +140,13 @@ Data Machine has file-based agent memory in `{wp-content}/uploads/datamachine-fi
 
 ### How It Works
 
-1. Files live in the agent directory (managed via Admin UI or REST API)
-2. **SOUL.md** is always injected at Priority 20 — defines agent identity, voice, and rules
-3. **MEMORY.md** is always injected at Priority 30 — accumulated state, lessons learned, and domain context
-4. Other files can be selected per-pipeline as memory file references (Priority 40)
-5. Selected files are injected as system context — the AI sees them every execution
-6. SOUL.md and MEMORY.md are protected from deletion (clear contents instead)
+1. Files live in the agent directory (managed via Admin UI, REST API, or CLI)
+2. **SOUL.md** — always injected, defines agent identity, voice, and rules
+3. **USER.md** — always injected, defines who the human user is (preferences, goals, context)
+4. **MEMORY.md** — always injected, accumulated state, lessons learned, and domain context
+5. Other files can be selected per-pipeline as memory file references (Priority 40)
+6. Selected files are injected as system context — the AI sees them every execution
+7. SOUL.md, USER.md, and MEMORY.md are protected from deletion (clear contents instead)
 
 ### REST API
 
@@ -396,18 +402,55 @@ wp datamachine alt-text diagnose [--format=table|json|csv]
 wp datamachine alt-text generate [--attachment_id=<id>] [--post_id=<id>] [--force]
 ```
 
-### Pinterest
+### Memory (Agent files)
 
 ```bash
-# Check Pinterest integration status
-wp datamachine pinterest status
+# Read a memory file
+wp datamachine memory read <filename>
 
-# List cached boards
-wp datamachine pinterest list-boards [--format=table|json|csv]
+# List sections in a memory file
+wp datamachine memory sections <filename>
 
-# Sync boards from API
-wp datamachine pinterest sync-boards
+# Write/update a memory file
+wp datamachine memory write <filename> --content="..."
+
+# Search across memory files
+wp datamachine memory search <query>
+
+# Daily memory (date-based logs at YYYY/MM/DD.md)
+wp datamachine memory daily list [--limit=<n>]
+wp datamachine memory daily read [<date>]
+wp datamachine memory daily write <date> --content="..."
+wp datamachine memory daily append <date> --content="..."
+wp datamachine memory daily delete <date>
+wp datamachine memory daily search <query>
 ```
+
+**Alias:** `wp datamachine agent` is a backward-compatible alias for `wp datamachine memory`.
+
+### Webhook Triggers
+
+```bash
+# Enable webhook trigger for a flow (generates URL + token)
+wp datamachine flows webhook enable <flow_id>
+
+# Disable webhook trigger
+wp datamachine flows webhook disable <flow_id>
+
+# Regenerate the trigger token
+wp datamachine flows webhook regenerate <flow_id>
+
+# Check trigger status for a flow
+wp datamachine flows webhook status <flow_id>
+
+# List all flows with webhook triggers enabled
+wp datamachine flows webhook list
+
+# Configure rate limiting
+wp datamachine flows webhook rate-limit <flow_id> --requests=<n> --window=<seconds>
+```
+
+Webhook triggers allow external systems to fire flows via `POST /datamachine/v1/trigger/{flow_id}` with Bearer token authentication.
 
 ---
 
@@ -447,7 +490,7 @@ Flow: Content Generation (queue-driven)
 Flow: Content Ideation (daily)
   → Agent Ping: "Review analytics, add topics to content queue"
 
-Flow: Weekly Review (cron: Monday 9am)
+Flow: Weekly Review (weekly)
   → Agent Ping: "Analyze last week's performance"
 
 Flow: Coding Tasks (manual, queue-driven)
@@ -473,10 +516,30 @@ Agent Ping steps send webhooks to external agent frameworks (OpenClaw, LangChain
 
 ### Webhook Payload
 
-The ping includes:
-- Flow and job context
-- The prompt (from config or queue)
-- Any data from previous steps
+The ping POST body includes:
+
+```json
+{
+  "prompt": "Task instruction",
+  "context": {
+    "flow_id": 7,
+    "pipeline_id": 3,
+    "job_id": 1234,
+    "post_id": 5678,
+    "post_type": "post",
+    "published_url": "https://example.com/my-post/",
+    "data_packets": [...],
+    "engine_data": {...},
+    "from_queue": false,
+    "site_url": "https://example.com",
+    "wp_path": "/var/www/html/"
+  },
+  "reply_to": "channel_id",
+  "timestamp": "2026-02-25T03:00:00+00:00"
+}
+```
+
+`post_id`, `post_type`, and `published_url` are surfaced as top-level context fields for convenience (also available inside `engine_data`). Discord webhook URLs receive a simplified plaintext format instead.
 
 **Note**: Data Machine is agent-agnostic. It sends webhooks — whatever listens on the URL handles the prompt.
 
@@ -488,16 +551,18 @@ Data Machine exposes a comprehensive Chat API at `/wp-json/datamachine/v1/chat/`
 
 Key ability groups:
 - **Flow management**: Create, list, update, delete, duplicate, run flows
-- **Pipeline management**: Create, list, update, delete, duplicate pipelines
+- **Pipeline management**: Create, list, update, delete, duplicate, import/export pipelines
 - **Queue management**: Add, list, clear queue items
 - **Job management**: List, show, fail, retry, recover-stuck, summary, delete jobs
-- **Content**: Get/edit/replace post blocks
+- **Content**: Get/edit/replace post blocks, query posts
 - **Taxonomy**: Get, create, update, delete, merge, resolve terms
+- **Memory**: Read/write/search agent memory files, daily memory
 - **Logs**: Read, manage log entries
 - **System**: Health check, problem flows detection
-- **Pinterest**: Board management, pin operations
 - **Analytics**: Bing Webmaster, Google Search Console queries
+- **Media**: Image generation, alt text generation
 - **Settings**: Read/update plugin settings
+- **Chat sessions**: Create, get, list, delete sessions
 
 The REST API also has dedicated endpoints for flows, flow steps, flow queues, pipelines, pipeline steps, jobs, settings, logs, and more under `/wp-json/datamachine/v1/`.
 
@@ -529,6 +594,25 @@ When `ai_decides` is set:
 
 ## Key AI Tools
 
+Tools available to the AI during pipeline execution. Global tools are available in every AI step; handler tools are injected by adjacent steps.
+
+### Global Tools
+
+| Tool | Purpose |
+|------|---------|
+| `local_search` | Search site content (duplicate detection, research) |
+| `skip_item` | Skip items that shouldn't be processed (sets `agent_skipped` status) |
+| `image_generation` | Generate images via Replicate API (featured images, illustrations) |
+| `agent_memory` | Read/write agent memory files during execution |
+| `web_fetch` | Fetch content from external URLs |
+| `wordpress_post_reader` | Read full post content by ID |
+| `google_search` | Web search via Google Custom Search API |
+| `google_search_console` | Query GSC analytics data |
+| `bing_webmaster` | Query Bing Webmaster analytics data |
+| `amazon_affiliate_link` | Generate Amazon affiliate links |
+| `queue_validator` | Validate and manage queue state |
+| `github_create_issue` | File GitHub issues from within pipelines |
+
 ### skip_item
 
 Allows AI to skip items that shouldn't be processed:
@@ -551,6 +635,16 @@ local_search(query="topic name", title_only=true)
 ```
 
 **Tip**: Search for core topic, not exact title. "pelicans dangerous" catches "Are Australian Pelicans Dangerous?"
+
+### image_generation
+
+Generate images via Replicate API. When called from a pipeline with a published post, the image is automatically set as the featured image.
+
+```
+image_generation(prompt="A serene mountain lake at sunset", aspect_ratio="16:9")
+```
+
+Image generation is asynchronous — the System Agent handles polling and attachment creation in the background.
 
 ---
 
@@ -668,10 +762,18 @@ wp datamachine posts by-flow 29 --per_page=50
 For contributors working on Data Machine itself:
 
 - Steps: `inc/Core/Steps/` (AI, AgentPing, Fetch, Publish, Update, WebhookGate)
-- Abilities: `inc/Abilities/`
+- Abilities: `inc/Abilities/` (Engine, Chat, Flow, Pipeline, Job, Media, Publish, etc.)
+- Engine Abilities: `inc/Abilities/Engine/` (RunFlow, ExecuteStep, ScheduleFlow, ScheduleNextStep)
+- Chat Abilities: `inc/Abilities/Chat/` (Session CRUD)
+- Chat Orchestrator: `inc/Api/Chat/ChatOrchestrator.php`
+- Chat REST: `inc/Api/Chat/Chat.php` (thin controller)
+- Chat Tools: `inc/Api/Chat/Tools/`
 - CLI: `inc/Cli/Commands/`
 - REST API: `inc/Api/`
-- Chat Tools: `inc/Api/Chat/Tools/`
+- Directives: `inc/Engine/AI/Directives/`
+- Global AI Tools: `inc/Engine/AI/Tools/Global/`
+- Memory Registry: `inc/Engine/AI/MemoryFileRegistry.php`
+- File Management: `inc/Core/FilesRepository/` (Workspace, DailyMemory, AgentMemory)
 - Taxonomy Handler: `inc/Core/WordPress/TaxonomyHandler.php`
 - Queueable Trait: `inc/Core/Steps/QueueableTrait.php`
 - React UI: `inc/Core/Admin/Pages/Pipelines/assets/react/`
