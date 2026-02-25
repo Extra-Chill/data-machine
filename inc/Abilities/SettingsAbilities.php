@@ -12,6 +12,7 @@ namespace DataMachine\Abilities;
 
 use DataMachine\Abilities\PermissionHelper;
 
+use DataMachine\Core\NetworkSettings;
 use DataMachine\Core\PluginSettings;
 
 defined( 'ABSPATH' ) || exit;
@@ -120,6 +121,10 @@ class SettingsAbilities {
 								'batch_size'         => array( 'type' => 'integer' ),
 								'time_limit'         => array( 'type' => 'integer' ),
 							),
+						),
+						'network_settings'               => array(
+							'type'        => 'object',
+							'description' => 'Network-wide defaults (multisite). Keys: default_provider, default_model, agent_models.',
 						),
 					),
 				),
@@ -337,9 +342,11 @@ class SettingsAbilities {
 			}
 		}
 
+		$network_defaults = NetworkSettings::all();
+
 		return array(
-			'success'      => true,
-			'settings'     => array(
+			'success'          => true,
+			'settings'         => array(
 				'cleanup_job_data_on_failure'    => $settings['cleanup_job_data_on_failure'] ?? true,
 				'file_retention_days'            => $settings['file_retention_days'] ?? 7,
 				'chat_retention_days'            => $settings['chat_retention_days'] ?? 90,
@@ -362,7 +369,12 @@ class SettingsAbilities {
 					'time_limit'         => 60,
 				),
 			),
-			'global_tools' => $tools_keyed,
+			'network_settings' => array(
+				'default_provider' => $network_defaults['default_provider'] ?? '',
+				'default_model'    => $network_defaults['default_model'] ?? '',
+				'agent_models'     => $network_defaults['agent_models'] ?? array(),
+			),
+			'global_tools'     => $tools_keyed,
 		);
 	}
 
@@ -486,6 +498,39 @@ class SettingsAbilities {
 			}
 
 			$all_settings['queue_tuning'] = $tuning;
+		}
+
+		// Network-wide defaults (requires super admin on multisite).
+		if ( isset( $input['network_settings'] ) && is_array( $input['network_settings'] ) ) {
+			if ( ! is_multisite() || is_super_admin() ) {
+				$network_values = array();
+
+				if ( isset( $input['network_settings']['default_provider'] ) ) {
+					$network_values['default_provider'] = sanitize_text_field( $input['network_settings']['default_provider'] );
+				}
+
+				if ( isset( $input['network_settings']['default_model'] ) ) {
+					$network_values['default_model'] = sanitize_text_field( $input['network_settings']['default_model'] );
+				}
+
+				if ( isset( $input['network_settings']['agent_models'] ) && is_array( $input['network_settings']['agent_models'] ) ) {
+					$valid_agent_ids      = array_column( PluginSettings::getAgentTypes(), 'id' );
+					$network_agent_models = array();
+					foreach ( $input['network_settings']['agent_models'] as $agent_type => $config ) {
+						if ( in_array( $agent_type, $valid_agent_ids, true ) && is_array( $config ) ) {
+							$network_agent_models[ $agent_type ] = array(
+								'provider' => sanitize_text_field( $config['provider'] ?? '' ),
+								'model'    => sanitize_text_field( $config['model'] ?? '' ),
+							);
+						}
+					}
+					$network_values['agent_models'] = $network_agent_models;
+				}
+
+				if ( ! empty( $network_values ) ) {
+					NetworkSettings::update( $network_values );
+				}
+			}
 		}
 
 		update_option( 'datamachine_settings', $all_settings );

@@ -137,6 +137,7 @@ function datamachine_uninstall_network_options() {
 		'datamachine_search_config',
 		'datamachine_amazon_config',
 		'datamachine_auth_data',
+		'datamachine_network_settings',
 	);
 
 	foreach ( $datamachine_network_options as $datamachine_option ) {
