@@ -360,37 +360,58 @@ class InternalLinkingAbilities {
 			);
 		}
 
-		$systemAgent = SystemAgent::getInstance();
-		$queued      = array();
-
+		// Filter to eligible posts.
+		$eligible = array();
 		foreach ( $post_ids as $pid ) {
 			$post = get_post( $pid );
-			if ( ! $post || 'publish' !== $post->post_status ) {
-				continue;
+			if ( $post && 'publish' === $post->post_status ) {
+				$eligible[] = $pid;
 			}
+		}
 
-			$jobId = $systemAgent->scheduleTask(
-				'internal_linking',
-				array(
-					'post_id'        => $pid,
-					'links_per_post' => $links_per_post,
-					'force'          => $force,
-					'source'         => 'ability',
-				)
+		if ( empty( $eligible ) ) {
+			return array(
+				'success'      => true,
+				'queued_count' => 0,
+				'post_ids'     => array(),
+				'message'      => 'No eligible published posts found.',
 			);
+		}
 
-			if ( $jobId ) {
-				$queued[] = $pid;
-			}
+		// Build per-item params for batch scheduling.
+		$item_params = array();
+		foreach ( $eligible as $pid ) {
+			$item_params[] = array(
+				'post_id'        => $pid,
+				'links_per_post' => $links_per_post,
+				'force'          => $force,
+				'source'         => 'ability',
+			);
+		}
+
+		$systemAgent = SystemAgent::getInstance();
+		$batch       = $systemAgent->scheduleBatch( 'internal_linking', $item_params );
+
+		if ( false === $batch ) {
+			return array(
+				'success'      => false,
+				'queued_count' => 0,
+				'post_ids'     => array(),
+				'message'      => 'Failed to schedule batch.',
+				'error'        => 'System Agent batch scheduling failed.',
+			);
 		}
 
 		return array(
 			'success'      => true,
-			'queued_count' => count( $queued ),
-			'post_ids'     => $queued,
-			'message'      => ! empty( $queued )
-				? sprintf( 'Internal linking queued for %d post(s) via System Agent.', count( $queued ) )
-				: 'No posts queued (already processed or ineligible).',
+			'queued_count' => count( $eligible ),
+			'post_ids'     => $eligible,
+			'batch_id'     => $batch['batch_id'] ?? null,
+			'message'      => sprintf(
+				'Internal linking batch scheduled for %d post(s) (chunks of %d).',
+				count( $eligible ),
+				$batch['chunk_size'] ?? SystemAgent::BATCH_CHUNK_SIZE
+			),
 		);
 	}
 

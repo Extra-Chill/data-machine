@@ -89,6 +89,11 @@ class SystemAgentServiceProvider {
 		);
 
 		add_action(
+			'datamachine_system_agent_process_batch',
+			array( $this, 'handleBatchChunk' )
+		);
+
+		add_action(
 			'datamachine_system_agent_set_featured_image',
 			array( $this, 'handleDeferredFeaturedImage' ),
 			10,
@@ -159,6 +164,21 @@ class SystemAgentServiceProvider {
 	public function handleScheduledTask( int $jobId ): void {
 		$systemAgent = SystemAgent::getInstance();
 		$systemAgent->handleTask( $jobId );
+	}
+
+	/**
+	 * Handle a batch chunk (Action Scheduler callback).
+	 *
+	 * Processes the next chunk of items from a batch and schedules
+	 * the following chunk if items remain.
+	 *
+	 * @since 0.32.0
+	 *
+	 * @param string $batchId Batch identifier.
+	 */
+	public function handleBatchChunk( string $batchId ): void {
+		$systemAgent = SystemAgent::getInstance();
+		$systemAgent->processBatchChunk( $batchId );
 	}
 
 	/**
