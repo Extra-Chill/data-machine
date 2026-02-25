@@ -111,6 +111,7 @@ function datamachine_run_datamachine_plugin() {
 	\DataMachine\Api\StepTypes::register();
 	\DataMachine\Api\Tools::register();
 	\DataMachine\Api\Providers::register();
+	\DataMachine\Api\Analytics::register();
 
 	// Load abilities
 	require_once __DIR__ . '/inc/Abilities/AuthAbilities.php';
