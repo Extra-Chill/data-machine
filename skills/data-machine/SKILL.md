@@ -159,6 +159,69 @@ This enables different pipelines to see different context — an ideation pipeli
 
 ---
 
+## Workspace (Repository Access)
+
+Data Machine provides a managed workspace for cloned repositories at `/var/lib/datamachine/workspace/`. **Always use the workspace CLI** rather than direct filesystem access — the CLI enforces path sanitization, containment checks, and works through the Abilities API.
+
+### Reading Files
+
+```bash
+# List cloned repos
+wp datamachine workspace list
+
+# Show repo details (path, remote, branch)
+wp datamachine workspace show <repo>
+
+# List files in a repo directory
+wp datamachine workspace ls <repo> [path]
+
+# Read file contents
+wp datamachine workspace read <repo> <path>
+```
+
+### Writing Files
+
+```bash
+# Write with content flag
+wp datamachine workspace write <repo> <path> --content="file contents"
+
+# Write from a local file (@ syntax — avoids shell escaping)
+wp datamachine workspace write <repo> <path> --content=@/tmp/staged-code.rs
+
+# Write from stdin
+cat local-file.rs | wp datamachine workspace write <repo> <path>
+```
+
+### Editing Files
+
+```bash
+# Find-and-replace
+wp datamachine workspace edit <repo> <path> --old="old text" --new="new text"
+
+# Replace all occurrences
+wp datamachine workspace edit <repo> <path> --old="v1" --new="v2" --replace-all
+
+# Use @ syntax for complex replacements
+wp datamachine workspace edit <repo> <path> --old=@/tmp/old.txt --new=@/tmp/new.txt
+```
+
+### Managing Repos
+
+```bash
+# Clone a repo into workspace
+wp datamachine workspace clone <git_url>
+
+# Remove a repo from workspace
+wp datamachine workspace remove <repo>
+
+# Get the workspace base path
+wp datamachine workspace path
+```
+
+**Why CLI over direct access:** Agents spawned via DM pipelines (non-root) may not have direct filesystem access. The workspace CLI enforces security boundaries and provides a consistent interface regardless of where the workspace physically lives.
+
+---
+
 ## CLI Reference
 
 **Note:** All commands accept `--allow-root` when running as root. Singular and plural aliases work interchangeably (`flow`/`flows`, `job`/`jobs`, `pipeline`/`pipelines`, `post`/`posts`, `block`/`blocks`, `link`/`links`, `log`/`logs`).
@@ -287,6 +350,9 @@ wp datamachine logs clear <agent_type|all> [--yes]
 ### Posts (Query by Data Machine metadata)
 
 ```bash
+# List recently published DM posts (all post types)
+wp datamachine posts recent [--post_type=<type>] [--post_status=<status>] [--limit=<n>] [--format=table|json|csv|yaml|ids|count]
+
 # Query posts created by a specific flow
 wp datamachine posts by-flow <flow_id> [--post_type=<type>] [--post_status=<status>] [--per_page=<n>] [--format=table|json|csv|yaml|ids|count]
 
@@ -587,6 +653,9 @@ wp datamachine alt-text diagnose
 
 # Generate alt text for a post's images
 wp datamachine alt-text generate --post_id=123
+
+# Review recent DM posts across all types
+wp datamachine posts recent --limit=10
 
 # Review what a flow has produced
 wp datamachine posts by-flow 29 --per_page=50
