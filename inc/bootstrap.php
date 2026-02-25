@@ -62,7 +62,8 @@ require_once __DIR__ . '/Engine/AI/Directives/CoreMemoryFilesDirective.php';
 \DataMachine\Engine\AI\MemoryFileRegistry::register( 'SOUL.md', 10 );
 \DataMachine\Engine\AI\MemoryFileRegistry::register( 'USER.md', 20 );
 \DataMachine\Engine\AI\MemoryFileRegistry::register( 'MEMORY.md', 30 );
-require_once __DIR__ . '/Engine/AI/Directives/SiteContext.php';
+// SiteContext is autoloaded (Core\WordPress\SiteContext) — register its cache invalidation hook here.
+add_action( 'init', array( \DataMachine\Core\WordPress\SiteContext::class, 'register_cache_invalidation' ) );
 require_once __DIR__ . '/Api/Chat/ChatAgentDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineCoreDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineSystemPromptDirective.php';

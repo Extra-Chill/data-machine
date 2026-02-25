@@ -297,8 +297,9 @@ class MemoryCommand extends BaseCommand {
 	 * Read a daily memory file.
 	 */
 	private function daily_read( DailyMemory $daily, string $date ): void {
-		$parts = $this->parse_date( $date );
+		$parts = DailyMemory::parse_date( $date );
 		if ( ! $parts ) {
+			WP_CLI::error( sprintf( 'Invalid date format: %s. Use YYYY-MM-DD.', $date ) );
 			return;
 		}
 
@@ -331,8 +332,9 @@ class MemoryCommand extends BaseCommand {
 			$content = $args[1];
 		}
 
-		$parts = $this->parse_date( $date );
+		$parts = DailyMemory::parse_date( $date );
 		if ( ! $parts ) {
+			WP_CLI::error( sprintf( 'Invalid date format: %s. Use YYYY-MM-DD.', $date ) );
 			return;
 		}
 
@@ -364,8 +366,9 @@ class MemoryCommand extends BaseCommand {
 			$content = $args[1];
 		}
 
-		$parts = $this->parse_date( $date );
+		$parts = DailyMemory::parse_date( $date );
 		if ( ! $parts ) {
+			WP_CLI::error( sprintf( 'Invalid date format: %s. Use YYYY-MM-DD.', $date ) );
 			return;
 		}
 
@@ -383,8 +386,9 @@ class MemoryCommand extends BaseCommand {
 	 * Delete a daily memory file.
 	 */
 	private function daily_delete( DailyMemory $daily, string $date ): void {
-		$parts = $this->parse_date( $date );
+		$parts = DailyMemory::parse_date( $date );
 		if ( ! $parts ) {
+			WP_CLI::error( sprintf( 'Invalid date format: %s. Use YYYY-MM-DD.', $date ) );
 			return;
 		}
 
@@ -398,22 +402,4 @@ class MemoryCommand extends BaseCommand {
 		WP_CLI::success( $result['message'] );
 	}
 
-	/**
-	 * Parse a YYYY-MM-DD date string into parts.
-	 *
-	 * @param string $date Date string.
-	 * @return array{year: string, month: string, day: string}|null Parsed parts or null on error.
-	 */
-	private function parse_date( string $date ): ?array {
-		if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $date, $matches ) ) {
-			WP_CLI::error( sprintf( 'Invalid date format: %s. Use YYYY-MM-DD.', $date ) );
-			return null;
-		}
-
-		return array(
-			'year'  => $matches[1],
-			'month' => $matches[2],
-			'day'   => $matches[3],
-		);
-	}
 }

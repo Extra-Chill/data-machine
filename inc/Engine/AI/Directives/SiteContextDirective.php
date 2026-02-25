@@ -19,6 +19,7 @@
 namespace DataMachine\Engine\AI\Directives;
 
 use DataMachine\Core\PluginSettings;
+use DataMachine\Core\WordPress\SiteContext;
 use DataMachine\Engine\AI\Directives\DirectiveInterface;
 
 defined( 'ABSPATH' ) || exit;
