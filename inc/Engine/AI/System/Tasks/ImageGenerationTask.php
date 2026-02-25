@@ -185,15 +185,30 @@ class ImageGenerationTask extends SystemTask {
 			$image_file_path = get_attached_file( $attachment_id );
 		}
 
+		// Build standardized effects array for undo.
+		$effects = array();
+
+		// Track attachment creation (undo deletes the attachment + its file).
+		if ( $attachment_id ) {
+			$effects[] = array(
+				'type'   => 'attachment_created',
+				'target' => array( 'attachment_id' => $attachment_id ),
+			);
+		}
+
 		// Route based on mode: featured (default) or insert
 		if ( $attachment_id ) {
 			$context = $params['context'] ?? array();
 			$mode    = $context['mode'] ?? 'featured';
 
 			if ( 'insert' === $mode ) {
-				$this->insertImageInContent( $jobId, $attachment_id, $params );
+				$mode_effects = $this->insertImageInContent( $jobId, $attachment_id, $params );
 			} else {
-				$this->trySetFeaturedImage( $jobId, $attachment_id, $params );
+				$mode_effects = $this->trySetFeaturedImage( $jobId, $attachment_id, $params );
+			}
+
+			if ( ! empty( $mode_effects ) ) {
+				$effects = array_merge( $effects, $mode_effects );
 			}
 		}
 
@@ -211,6 +226,7 @@ class ImageGenerationTask extends SystemTask {
 				'aspect_ratio'    => $aspectRatio,
 			),
 			'tool_name'    => 'image_generation',
+			'effects'      => $effects,
 			'completed_at' => current_time( 'mysql' ),
 		);
 
@@ -227,8 +243,9 @@ class ImageGenerationTask extends SystemTask {
 	 * @param int   $jobId        System Agent job ID.
 	 * @param int   $attachmentId WordPress attachment ID.
 	 * @param array $params       Task params (contains context.pipeline_job_id).
+	 * @return array Standardized effects for undo (empty if no action taken).
 	 */
-	protected function trySetFeaturedImage( int $jobId, int $attachmentId, array $params ): void {
+	protected function trySetFeaturedImage( int $jobId, int $attachmentId, array $params ): array {
 		$context         = $params['context'] ?? array();
 		$pipeline_job_id = $context['pipeline_job_id'] ?? 0;
 		$direct_post_id  = $context['post_id'] ?? 0;
@@ -242,14 +259,17 @@ class ImageGenerationTask extends SystemTask {
 			$post_id              = $pipeline_engine_data['post_id'] ?? 0;
 
 			if ( empty( $post_id ) ) {
-				// Post hasn’t been published yet — schedule a deferred attempt
+				// Post hasn't been published yet — schedule a deferred attempt
 				$this->scheduleFeaturedImageRetry( $attachmentId, $pipeline_job_id );
-				return;
+				return array();
 			}
 		} else {
 			// No pipeline context and no direct post_id — nothing to do
-			return;
+			return array();
 		}
+
+		// Capture current thumbnail for undo support.
+		$previous_thumbnail = get_post_thumbnail_id( $post_id );
 
 		// Check if post already has a featured image
 		if ( has_post_thumbnail( $post_id ) ) {
@@ -264,7 +284,7 @@ class ImageGenerationTask extends SystemTask {
 					'agent_type'    => 'system',
 				)
 			);
-			return;
+			return array();
 		}
 
 		// Set the featured image
@@ -282,19 +302,29 @@ class ImageGenerationTask extends SystemTask {
 					'agent_type'    => 'system',
 				)
 			);
-		} else {
-			do_action(
-				'datamachine_log',
-				'warning',
-				"System Agent: Failed to set featured image on post #{$post_id}",
+
+			return array(
 				array(
-					'job_id'        => $jobId,
-					'post_id'       => $post_id,
-					'attachment_id' => $attachmentId,
-					'agent_type'    => 'system',
-				)
+					'type'           => 'featured_image_set',
+					'target'         => array( 'post_id' => $post_id ),
+					'previous_value' => $previous_thumbnail ?: 0,
+				),
 			);
 		}
+
+		do_action(
+			'datamachine_log',
+			'warning',
+			"System Agent: Failed to set featured image on post #{$post_id}",
+			array(
+				'job_id'        => $jobId,
+				'post_id'       => $post_id,
+				'attachment_id' => $attachmentId,
+				'agent_type'    => 'system',
+			)
+		);
+
+		return array();
 	}
 
 	/**
@@ -493,8 +523,9 @@ class ImageGenerationTask extends SystemTask {
 	 * @param int   $jobId        System Agent job ID.
 	 * @param int   $attachmentId WordPress attachment ID.
 	 * @param array $params       Task params (contains context with post_id, position).
+	 * @return array Standardized effects for undo (empty if no action taken).
 	 */
-	protected function insertImageInContent( int $jobId, int $attachmentId, array $params ): void {
+	protected function insertImageInContent( int $jobId, int $attachmentId, array $params ): array {
 		$context  = $params['context'] ?? array();
 		$post_id  = $context['post_id'] ?? 0;
 		$position = $context['position'] ?? 'auto';
@@ -514,7 +545,7 @@ class ImageGenerationTask extends SystemTask {
 				'attachment_id' => $attachmentId,
 				'agent_type'    => 'system',
 			) );
-			return;
+			return array();
 		}
 
 		$post = get_post( $post_id );
@@ -523,13 +554,13 @@ class ImageGenerationTask extends SystemTask {
 				'job_id'     => $jobId,
 				'agent_type' => 'system',
 			) );
-			return;
+			return array();
 		}
 
 		// Build the wp:image block
 		$image_block = $this->buildImageBlock( $attachmentId );
 		if ( empty( $image_block ) ) {
-			return;
+			return array();
 		}
 
 		// Attach image to the post
@@ -537,6 +568,9 @@ class ImageGenerationTask extends SystemTask {
 			'ID'          => $attachmentId,
 			'post_parent' => $post_id,
 		) );
+
+		// Capture pre-modification revision for undo support.
+		$revision_id = wp_save_post_revision( $post_id );
 
 		// Parse existing content into blocks
 		$content = $post->post_content;
@@ -564,6 +598,19 @@ class ImageGenerationTask extends SystemTask {
 			'insert_index'  => $insert_index,
 			'agent_type'    => 'system',
 		) );
+
+		// Build effects for undo.
+		$effects = array();
+
+		if ( ! empty( $revision_id ) && ! is_wp_error( $revision_id ) ) {
+			$effects[] = array(
+				'type'        => 'post_content_modified',
+				'target'      => array( 'post_id' => $post_id ),
+				'revision_id' => $revision_id,
+			);
+		}
+
+		return $effects;
 	}
 
 	/**
@@ -715,5 +762,15 @@ class ImageGenerationTask extends SystemTask {
 			'setting_key'     => null,
 			'default_enabled' => true,
 		);
+	}
+
+	/**
+	 * Image generation supports undo — deletes attachment, reverts featured image and content.
+	 *
+	 * @return bool
+	 * @since 0.33.0
+	 */
+	public function supportsUndo(): bool {
+		return true;
 	}
 }
