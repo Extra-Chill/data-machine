@@ -5,6 +5,10 @@
  * Abstract base class for all authentication providers.
  * Centralizes option storage, retrieval, and common configuration logic.
  *
+ * Auth data is stored via get_site_option()/update_site_option() so credentials
+ * are shared across all subsites on a multisite network. On single-site installs,
+ * these behave identically to get_option()/update_option().
+ *
  * @package DataMachine
  * @subpackage Core\OAuth
  * @since 0.2.6
@@ -71,7 +75,7 @@ abstract class BaseAuthProvider {
 	 * @return array Account data or empty array
 	 */
 	public function get_account(): array {
-		$all_auth_data = get_option( 'datamachine_auth_data', array() );
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
 		return $all_auth_data[ $this->provider_slug ]['account'] ?? array();
 	}
 
@@ -81,7 +85,7 @@ abstract class BaseAuthProvider {
 	 * @return array Configuration data or empty array
 	 */
 	public function get_config(): array {
-		$all_auth_data = get_option( 'datamachine_auth_data', array() );
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
 		return $all_auth_data[ $this->provider_slug ]['config'] ?? array();
 	}
 
@@ -92,12 +96,12 @@ abstract class BaseAuthProvider {
 	 * @return bool True on success
 	 */
 	public function save_account( array $data ): bool {
-		$all_auth_data = get_option( 'datamachine_auth_data', array() );
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
 		if ( ! isset( $all_auth_data[ $this->provider_slug ] ) ) {
 			$all_auth_data[ $this->provider_slug ] = array();
 		}
 		$all_auth_data[ $this->provider_slug ]['account'] = $data;
-		return update_option( 'datamachine_auth_data', $all_auth_data );
+		return update_site_option( 'datamachine_auth_data', $all_auth_data );
 	}
 
 	/**
@@ -107,12 +111,12 @@ abstract class BaseAuthProvider {
 	 * @return bool True on success
 	 */
 	public function save_config( array $data ): bool {
-		$all_auth_data = get_option( 'datamachine_auth_data', array() );
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
 		if ( ! isset( $all_auth_data[ $this->provider_slug ] ) ) {
 			$all_auth_data[ $this->provider_slug ] = array();
 		}
 		$all_auth_data[ $this->provider_slug ]['config'] = $data;
-		return update_option( 'datamachine_auth_data', $all_auth_data );
+		return update_site_option( 'datamachine_auth_data', $all_auth_data );
 	}
 
 	/**
@@ -121,10 +125,10 @@ abstract class BaseAuthProvider {
 	 * @return bool True on success
 	 */
 	public function clear_account(): bool {
-		$all_auth_data = get_option( 'datamachine_auth_data', array() );
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
 		if ( isset( $all_auth_data[ $this->provider_slug ]['account'] ) ) {
 			unset( $all_auth_data[ $this->provider_slug ]['account'] );
-			return update_option( 'datamachine_auth_data', $all_auth_data );
+			return update_site_option( 'datamachine_auth_data', $all_auth_data );
 		}
 		return true;
 	}
