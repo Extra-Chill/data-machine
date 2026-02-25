@@ -307,8 +307,7 @@ class PublishWordPressAbility {
 		}
 
 		if ( $job_id ) {
-			do_action(
-				'datamachine_merge_engine_data',
+			datamachine_merge_engine_data(
 				$job_id,
 				array(
 					'post_id'       => $post_id,
