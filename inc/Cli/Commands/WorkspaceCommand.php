@@ -474,12 +474,16 @@ class WorkspaceCommand extends BaseCommand {
 	 * : Relative file path within the repo.
 	 *
 	 * [--content=<content>]
-	 * : File content to write. If omitted, reads from stdin.
+	 * : File content to write. Prefix with @ to read from a local file (e.g. --content=@/tmp/code.rs).
+	 * : If omitted, reads from stdin.
 	 *
 	 * ## EXAMPLES
 	 *
 	 *     # Write with content flag
 	 *     wp datamachine workspace write homeboy src/new.rs --content="fn main() {}"
+	 *
+	 *     # Write from a local file (@ syntax)
+	 *     wp datamachine workspace write homeboy src/main.rs --content=@/tmp/staged-code.rs
 	 *
 	 *     # Write from stdin
 	 *     cat local-file.rs | wp datamachine workspace write homeboy src/main.rs
@@ -499,6 +503,11 @@ class WorkspaceCommand extends BaseCommand {
 		}
 
 		$content = $assoc_args['content'] ?? null;
+
+		// Resolve @file syntax — read content from a local file.
+		if ( null !== $content ) {
+			$content = $this->resolveAtFile( $content );
+		}
 
 		// Read from stdin if --content not provided.
 		if ( null === $content ) {
@@ -549,10 +558,10 @@ class WorkspaceCommand extends BaseCommand {
 	 * : Relative file path within the repo.
 	 *
 	 * --old=<string>
-	 * : Text to find.
+	 * : Text to find. Prefix with @ to read from a local file (e.g. --old=@/tmp/old.txt).
 	 *
 	 * --new=<string>
-	 * : Replacement text.
+	 * : Replacement text. Prefix with @ to read from a local file (e.g. --new=@/tmp/new.txt).
 	 *
 	 * [--replace-all]
 	 * : Replace all occurrences instead of requiring a unique match.
@@ -561,6 +570,9 @@ class WorkspaceCommand extends BaseCommand {
 	 *
 	 *     # Replace a single occurrence
 	 *     wp datamachine workspace edit homeboy src/main.rs --old="old_func" --new="new_func"
+	 *
+	 *     # Replace using @ file syntax
+	 *     wp datamachine workspace edit homeboy src/main.rs --old=@/tmp/old.txt --new=@/tmp/new.txt
 	 *
 	 *     # Replace all occurrences
 	 *     wp datamachine workspace edit homeboy src/main.rs --old="v1" --new="v2" --replace-all
@@ -587,8 +599,8 @@ class WorkspaceCommand extends BaseCommand {
 		$input = array(
 			'repo'       => $args[0],
 			'path'       => $args[1],
-			'old_string' => $assoc_args['old'],
-			'new_string' => $assoc_args['new'],
+			'old_string' => $this->resolveAtFile( $assoc_args['old'] ),
+			'new_string' => $this->resolveAtFile( $assoc_args['new'] ),
 		);
 
 		if ( ! empty( $assoc_args['replace-all'] ) ) {
@@ -614,5 +626,43 @@ class WorkspaceCommand extends BaseCommand {
 			$count,
 			1 === $count ? '' : 's'
 		) );
+	}
+
+	/**
+	 * Resolve @file syntax — if a string starts with @, read file contents.
+	 *
+	 * Mirrors curl's -d @filename convention. If the value doesn't start
+	 * with @, it's returned unchanged.
+	 *
+	 * @param string $value Raw CLI argument value.
+	 * @return string Resolved content (file contents or original value).
+	 */
+	private function resolveAtFile( string $value ): string {
+		if ( 0 !== strpos( $value, '@' ) ) {
+			return $value;
+		}
+
+		$file_path = substr( $value, 1 );
+
+		if ( empty( $file_path ) ) {
+			WP_CLI::error( 'Empty file path after @. Usage: --content=@/path/to/file' );
+		}
+
+		if ( ! file_exists( $file_path ) ) {
+			WP_CLI::error( sprintf( 'File not found: %s', $file_path ) );
+		}
+
+		if ( ! is_readable( $file_path ) ) {
+			WP_CLI::error( sprintf( 'File not readable: %s', $file_path ) );
+		}
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		$content = file_get_contents( $file_path );
+
+		if ( false === $content ) {
+			WP_CLI::error( sprintf( 'Failed to read file: %s', $file_path ) );
+		}
+
+		return $content;
 	}
 }
