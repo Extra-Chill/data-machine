@@ -398,10 +398,19 @@ class JobsCommand extends BaseCommand {
 			WP_CLI::log( '' );
 			WP_CLI::log( 'Engine Data:' );
 
-			$summary = $this->extractEngineDataSummary( $engine_data );
+			$summary    = $this->extractEngineDataSummary( $engine_data );
+			$has_nested = false;
 
 			foreach ( $summary as $key => $value ) {
 				WP_CLI::log( sprintf( '  %s: %s', $key, $value ) );
+				if ( str_starts_with( $value, 'array (' ) ) {
+					$has_nested = true;
+				}
+			}
+
+			if ( $has_nested ) {
+				WP_CLI::log( '' );
+				WP_CLI::log( '  Use --format=json for full engine data.' );
 			}
 		}
 	}
@@ -492,30 +501,34 @@ class JobsCommand extends BaseCommand {
 	}
 
 	/**
-	 * Extract key fields from engine_data for table display.
+	 * Extract a summary of engine_data for CLI display.
+	 *
+	 * Iterates all top-level keys and formats each value by type:
+	 * scalars display directly (strings truncated at 120 chars),
+	 * arrays show item count and serialized size, bools/nulls display
+	 * as literals. No hardcoded key list — works for any job type.
 	 *
 	 * @param array $engine_data Full engine data array.
 	 * @return array Key-value pairs for display.
 	 */
 	private function extractEngineDataSummary( array $engine_data ): array {
-		$summary      = array();
-		$display_keys = array(
-			'source_url'   => 'Source URL',
-			'image_url'    => 'Image URL',
-			'post_id'      => 'Post ID',
-			'job_status'   => 'Job Status',
-			'current_step' => 'Current Step',
-			'skip_reason'  => 'Skip Reason',
-		);
+		$summary = array();
 
-		foreach ( $display_keys as $key => $label ) {
-			if ( isset( $engine_data[ $key ] ) && '' !== $engine_data[ $key ] ) {
-				$value = $engine_data[ $key ];
+		foreach ( $engine_data as $key => $value ) {
+			$label = ucwords( str_replace( '_', ' ', $key ) );
 
-				if ( is_array( $value ) ) {
-					$value = wp_json_encode( $value );
-				}
-
+			if ( is_array( $value ) ) {
+				$count             = count( $value );
+				$json              = wp_json_encode( $value );
+				$size              = strlen( $json );
+				$summary[ $label ] = sprintf( 'array (%d items, %s)', $count, size_format( $size ) );
+			} elseif ( is_bool( $value ) ) {
+				$summary[ $label ] = $value ? 'true' : 'false';
+			} elseif ( is_null( $value ) ) {
+				$summary[ $label ] = '(null)';
+			} elseif ( is_string( $value ) && strlen( $value ) > 120 ) {
+				$summary[ $label ] = substr( $value, 0, 117 ) . '...';
+			} else {
 				$summary[ $label ] = (string) $value;
 			}
 		}
