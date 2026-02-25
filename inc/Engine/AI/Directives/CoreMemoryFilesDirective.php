@@ -21,6 +21,7 @@
 
 namespace DataMachine\Engine\AI\Directives;
 
+use DataMachine\Core\FilesRepository\AgentMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Engine\AI\MemoryFileRegistry;
 
@@ -53,6 +54,26 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 
 			if ( ! file_exists( $filepath ) ) {
 				continue;
+			}
+
+			$file_size = filesize( $filepath );
+
+			if ( $file_size > AgentMemory::MAX_FILE_SIZE ) {
+				do_action(
+					'datamachine_log',
+					'warning',
+					sprintf(
+						'Memory file %s exceeds recommended size for context injection: %s (threshold %s)',
+						$filename,
+						size_format( $file_size ),
+						size_format( AgentMemory::MAX_FILE_SIZE )
+					),
+					array(
+						'filename' => $filename,
+						'size'     => $file_size,
+						'max'      => AgentMemory::MAX_FILE_SIZE,
+					)
+				);
 			}
 
 			$content = file_get_contents( $filepath );
