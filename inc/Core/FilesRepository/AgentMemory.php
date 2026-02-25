@@ -39,6 +39,9 @@ class AgentMemory {
 		$this->directory_manager = new DirectoryManager();
 		$agent_dir               = $this->directory_manager->get_agent_directory();
 		$this->file_path         = "{$agent_dir}/MEMORY.md";
+
+		// Self-heal: ensure agent files exist on first use.
+		DirectoryManager::ensure_agent_files();
 	}
 
 	/**
@@ -367,13 +370,32 @@ class AgentMemory {
 
 	/**
 	 * Ensure the memory file and directory exist.
+	 *
+	 * Uses scaffold defaults when available instead of a bare stub,
+	 * so a recreated MEMORY.md includes the standard sections.
 	 */
 	private function ensure_file_exists(): void {
 		$agent_dir = $this->directory_manager->get_agent_directory();
 		$this->directory_manager->ensure_directory_exists( $agent_dir );
 
 		if ( ! file_exists( $this->file_path ) ) {
-			file_put_contents( $this->file_path, "# Agent Memory\n" );
+			$content = "# Agent Memory\n";
+
+			if ( function_exists( 'datamachine_get_scaffold_defaults' ) ) {
+				$defaults = datamachine_get_scaffold_defaults();
+				if ( isset( $defaults['MEMORY.md'] ) ) {
+					$content = $defaults['MEMORY.md'] . "\n";
+				}
+			}
+
+			file_put_contents( $this->file_path, $content );
+
+			do_action(
+				'datamachine_log',
+				'notice',
+				'Self-healing: created missing MEMORY.md on write path.',
+				array()
+			);
 		}
 	}
 

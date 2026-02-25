@@ -45,6 +45,9 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 			return array();
 		}
 
+		// Self-heal: ensure agent files exist before reading.
+		DirectoryManager::ensure_agent_files();
+
 		$directory_manager = new DirectoryManager();
 		$agent_dir         = $directory_manager->get_agent_directory();
 		$outputs           = array();
@@ -53,6 +56,12 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 			$filepath = "{$agent_dir}/{$filename}";
 
 			if ( ! file_exists( $filepath ) ) {
+				do_action(
+					'datamachine_log',
+					'warning',
+					sprintf( 'Core memory file %s missing from agent directory after scaffolding check.', $filename ),
+					array( 'filename' => $filename )
+				);
 				continue;
 			}
 
