@@ -116,9 +116,22 @@ class AltTextTask extends SystemTask {
 			return;
 		}
 
+		// Build standardized effects array for undo.
+		$effects = array(
+			array(
+				'type'           => 'post_meta_set',
+				'target'         => array(
+					'post_id'  => $attachment_id,
+					'meta_key' => '_wp_attachment_image_alt',
+				),
+				'previous_value' => ! empty( $current_alt ) ? $current_alt : null,
+			),
+		);
+
 		$this->completeJob( $jobId, array(
 			'alt_text'      => $alt_text,
 			'attachment_id' => $attachment_id,
+			'effects'       => $effects,
 			'completed_at'  => current_time( 'mysql' ),
 		) );
 	}
@@ -142,6 +155,16 @@ class AltTextTask extends SystemTask {
 			'setting_key'     => 'alt_text_auto_generate_enabled',
 			'default_enabled' => true,
 		);
+	}
+
+	/**
+	 * Alt text generation supports undo — restores previous alt text value.
+	 *
+	 * @return bool
+	 * @since 0.33.0
+	 */
+	public function supportsUndo(): bool {
+		return true;
 	}
 
 	/**
