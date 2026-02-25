@@ -570,8 +570,9 @@ MD;
 /**
  * Create default agent memory files if they don't exist.
  *
- * Called on activation to ensure fresh installs have starter templates
- * for all default memory files. Existing files are never overwritten.
+ * Called on activation and lazily on any request that reads agent files
+ * (via DirectoryManager::ensure_agent_files()). Existing files are never
+ * overwritten — only missing files are recreated from scaffold defaults.
  *
  * @since 0.30.0
  */
@@ -598,6 +599,13 @@ function datamachine_ensure_default_memory_files() {
 		}
 
 		$fs->put_contents( $filepath, $content . "\n", FS_CHMOD_FILE );
+
+		do_action(
+			'datamachine_log',
+			'notice',
+			sprintf( 'Self-healing: created missing agent file %s with scaffold defaults.', $filename ),
+			array( 'filename' => $filename )
+		);
 	}
 }
 

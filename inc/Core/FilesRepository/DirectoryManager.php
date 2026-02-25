@@ -24,6 +24,49 @@ class DirectoryManager {
 	private const REPOSITORY_DIR = 'datamachine-files';
 
 	/**
+	 * Whether agent file scaffolding has been verified this request.
+	 *
+	 * @var bool
+	 */
+	private static bool $agent_files_ensured = false;
+
+	/**
+	 * Ensure default agent files exist (SOUL.md, USER.md, MEMORY.md).
+	 *
+	 * Lazy self-healing: runs at most once per PHP request on the first
+	 * call. If any registered memory files are missing, recreates them
+	 * from scaffold defaults without overwriting existing files.
+	 *
+	 * Call this from any read path that depends on agent files existing
+	 * (directives, REST API, CLI, etc.). The static flag makes repeated
+	 * calls free.
+	 *
+	 * @since 0.32.0
+	 * @return void
+	 */
+	public static function ensure_agent_files(): void {
+		if ( self::$agent_files_ensured ) {
+			return;
+		}
+
+		self::$agent_files_ensured = true;
+
+		if ( function_exists( 'datamachine_ensure_default_memory_files' ) ) {
+			datamachine_ensure_default_memory_files();
+		}
+	}
+
+	/**
+	 * Reset the ensure-agent-files flag. For testing only.
+	 *
+	 * @since 0.32.0
+	 * @return void
+	 */
+	public static function reset_ensure_flag(): void {
+		self::$agent_files_ensured = false;
+	}
+
+	/**
 	 * Get pipeline directory path
 	 *
 	 * @param int|string $pipeline_id Pipeline ID or 'direct' for direct execution

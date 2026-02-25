@@ -906,6 +906,9 @@ class FileAbilities {
 	 * @return array Result with files.
 	 */
 	private function listAgentFiles(): array {
+		// Self-heal: ensure agent files exist before listing.
+		DirectoryManager::ensure_agent_files();
+
 		$directory_manager = new DirectoryManager();
 		$agent_dir         = $directory_manager->get_agent_directory();
 
@@ -972,6 +975,9 @@ class FileAbilities {
 	 * @return array Result with file data.
 	 */
 	private function getAgentFile( string $filename ): array {
+		// Self-heal: ensure agent files exist before retrieval.
+		DirectoryManager::ensure_agent_files();
+
 		$directory_manager = new DirectoryManager();
 		$agent_dir         = $directory_manager->get_agent_directory();
 		$filepath          = "{$agent_dir}/{$filename}";
