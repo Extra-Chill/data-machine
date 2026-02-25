@@ -87,8 +87,8 @@ class InternalLinkingTask extends SystemTask {
 
 		$paragraph_blocks = $blocks_result['blocks'];
 
-		// Find related posts scored by taxonomy overlap.
-		$related = $this->findRelatedPosts( $post_id, $categories, $tags, $links_per_post );
+		// Find related posts scored by taxonomy overlap + title similarity.
+		$related = $this->findRelatedPosts( $post_id, $post->post_title, $categories, $tags, $links_per_post );
 
 		// Filter out posts already linked in any paragraph block.
 		$all_block_html = implode( "\n", array_column( $paragraph_blocks, 'inner_html' ) );
@@ -361,15 +361,38 @@ class InternalLinkingTask extends SystemTask {
 	}
 
 	/**
-	 * Find related posts by shared taxonomy terms, scored by overlap.
+	 * Minimum relevance score a candidate must reach to be considered.
 	 *
-	 * @param int   $post_id    Current post ID to exclude.
-	 * @param array $categories Category term IDs.
-	 * @param array $tags       Tag term IDs.
-	 * @param int   $limit      Maximum related posts to return.
+	 * Prevents linking to posts that only share a broad category with no
+	 * other semantic signal. A single shared tag (3) or two title word
+	 * matches (10) clears the threshold.
+	 *
+	 * @var int
+	 */
+	private const MIN_RELEVANCE_SCORE = 3;
+
+	/**
+	 * Find related posts scored by taxonomy overlap and title similarity.
+	 *
+	 * Taxonomy provides the candidate pool. Title word overlap between the
+	 * source and candidate posts is the primary relevance signal — it catches
+	 * topical affinity that broad categories miss.
+	 *
+	 * Scoring weights:
+	 * - Shared categories: ×1 (broad, low signal)
+	 * - Shared tags:       ×3 (specific, moderate signal)
+	 * - Title word overlap: ×5 (strongest signal for topical relevance)
+	 *
+	 * Candidates below MIN_RELEVANCE_SCORE are discarded entirely.
+	 *
+	 * @param int    $post_id      Current post ID to exclude.
+	 * @param string $source_title Source post title for similarity scoring.
+	 * @param array  $categories   Category term IDs.
+	 * @param array  $tags         Tag term IDs.
+	 * @param int    $limit        Maximum related posts to return.
 	 * @return array Array of related post data [{id, url, title, excerpt, score}].
 	 */
-	private function findRelatedPosts( int $post_id, array $categories, array $tags, int $limit ): array {
+	private function findRelatedPosts( int $post_id, string $source_title, array $categories, array $tags, int $limit ): array {
 		$tax_query = array( 'relation' => 'OR' );
 
 		if ( ! empty( $categories ) ) {
@@ -402,7 +425,10 @@ class InternalLinkingTask extends SystemTask {
 			return array();
 		}
 
-		// Score each candidate by taxonomy overlap.
+		// Extract meaningful words (3+ chars) from source title for matching.
+		$source_words = $this->extractTitleWords( $source_title );
+
+		// Score each candidate by taxonomy overlap + title similarity.
 		$scored = array();
 
 		foreach ( $query->posts as $candidate_id ) {
@@ -410,13 +436,22 @@ class InternalLinkingTask extends SystemTask {
 			$candidate_cats = wp_get_post_categories( $candidate_id, array( 'fields' => 'ids' ) );
 			$candidate_tags = wp_get_post_tags( $candidate_id, array( 'fields' => 'ids' ) );
 
+			// Taxonomy overlap.
 			$shared_cats = array_intersect( $categories, $candidate_cats );
 			$shared_tags = array_intersect( $tags, $candidate_tags );
 
 			$score += count( $shared_cats ) * 1;
-			$score += count( $shared_tags ) * 2;
+			$score += count( $shared_tags ) * 3;
 
-			if ( $score > 0 ) {
+			// Title word overlap — strongest relevance signal.
+			$candidate_title = get_the_title( $candidate_id );
+			$candidate_words = $this->extractTitleWords( $candidate_title );
+			$shared_words    = array_intersect( $source_words, $candidate_words );
+
+			$score += count( $shared_words ) * 5;
+
+			// Enforce minimum relevance threshold.
+			if ( $score >= self::MIN_RELEVANCE_SCORE ) {
 				$scored[ $candidate_id ] = $score;
 			}
 		}
@@ -440,6 +475,35 @@ class InternalLinkingTask extends SystemTask {
 		}
 
 		return $related;
+	}
+
+	/**
+	 * Extract meaningful words from a title for similarity matching.
+	 *
+	 * Strips common stop words and short tokens to focus on
+	 * topically significant terms.
+	 *
+	 * @param string $title Post title.
+	 * @return array Lowercase words (3+ chars, no stop words).
+	 */
+	private function extractTitleWords( string $title ): array {
+		$stop_words = array(
+			'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all',
+			'can', 'had', 'her', 'was', 'one', 'our', 'out', 'has',
+			'his', 'how', 'its', 'may', 'new', 'now', 'old', 'see',
+			'way', 'who', 'did', 'get', 'let', 'say', 'she', 'too',
+			'use', 'what', 'when', 'where', 'which', 'why', 'will',
+			'with', 'this', 'that', 'from', 'they', 'been', 'have',
+			'many', 'some', 'them', 'than', 'each', 'make', 'like',
+			'into', 'over', 'such', 'your', 'about', 'their', 'would',
+			'could', 'other', 'these', 'there', 'after', 'being',
+		);
+
+		$words = preg_split( '/[\s\-—:,.|]+/', strtolower( $title ) );
+		$words = array_filter( $words, fn( $w ) => strlen( $w ) >= 3 );
+		$words = array_diff( $words, $stop_words );
+
+		return array_values( $words );
 	}
 
 	/**
