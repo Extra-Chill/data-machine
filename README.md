@@ -7,8 +7,8 @@ AI-first WordPress automation and agent self-orchestration platform — pipeline
 Data Machine turns WordPress into an AI-powered automation and agent platform:
 
 - **Visual pipeline builder** — Create multi-step workflows without code
-- **Chat agent** — Conversational AI interface with 30+ specialized tools for managing workflows, content, and site operations
-- **Agent memory** — Persistent SOUL.md, MEMORY.md, and daily memory files that survive across sessions
+- **Chat agent** — Conversational AI interface with specialized tools for managing workflows, content, and site operations
+- **Agent memory** — Persistent SOUL.md, USER.md, MEMORY.md, and daily memory files that survive across sessions
 - **Workspace** — Managed directory for repo clones and file operations with security sandboxing
 - **Self-scheduling orchestration** — AI agents schedule recurring tasks for themselves using Agent Pings and prompt queues
 - **Webhook triggers** — Inbound REST endpoints to trigger flows from external systems
@@ -42,6 +42,40 @@ Persistent markdown files that define who your agent is and what it knows:
 
 Memory files are injected as AI directives, so every conversation starts with context.
 
+## Agents
+
+Data Machine runs three distinct AI agents, each configurable with its own provider and model:
+
+| Agent | Purpose | Tools |
+|-------|---------|-------|
+| **Pipeline** | Automated workflow execution — processes content through pipeline steps | Per-step AI processing with handler-specific context |
+| **Chat** | Conversational interface in wp-admin — manages workflows, content, and site operations | 30+ specialized tools (ApiQuery, CreateFlow, RunFlow, ManageLogs, etc.) |
+| **System** | Background infrastructure tasks triggered by hooks | Alt text generation, daily memory, image generation, internal linking, GitHub issues |
+
+Configure provider and model per agent type in Settings. Each agent type falls back to the global default if no override is set.
+
+## Step Types & Handlers
+
+Pipelines are built from **step types**. Some step types use pluggable **handlers** — interchangeable implementations that define *how* the step operates. Others are self-contained.
+
+### Steps with handlers
+
+| Step Type | Handlers |
+|-----------|----------|
+| **Fetch** | RSS, Reddit, WordPress (local posts), WordPress API (remote), WordPress Media, Files |
+| **Publish** | WordPress |
+| **Update** | WordPress posts with AI enhancement |
+
+Additional handlers available via [extensions](#extensions) (Google Sheets, social platforms, etc.).
+
+### Self-contained steps
+
+| Step Type | Description |
+|-----------|-------------|
+| **AI** | Process content with the configured AI provider |
+| **Agent Ping** | Outbound webhook to trigger external agents |
+| **Webhook Gate** | Pause pipeline mid-execution until an external webhook callback fires |
+
 ## Example Workflows
 
 | Workflow | Steps |
@@ -59,7 +93,7 @@ Data Machine is a **self-scheduling execution layer** for autonomous AI agents.
 
 1. **Flows run on schedules** — Daily, hourly, or cron expressions
 2. **Prompts are queueable** — Both AI and Agent Ping steps pop from queues
-3. **Agent Ping triggers external agents** — Webhook fires after pipeline completion
+3. **Agent Ping triggers external agents** — Outbound webhook fires with context for the receiving agent
 4. **Webhook triggers fire flows** — `POST /datamachine/v1/trigger/{flow_id}` with Bearer token auth starts flows from external systems
 5. **Webhook Gate pauses pipelines** — Mid-pipeline pause/resume awaiting an external webhook callback
 
@@ -74,26 +108,6 @@ The prompt queue is your **persistent project memory**. Multi-phase work survive
 
 See [skills/data-machine/SKILL.md](skills/data-machine/SKILL.md) for agent integration patterns.
 
-## Handlers & Step Types
-
-### Handlers
-
-| Type | Options |
-|------|---------|
-| **Fetch** | RSS, Reddit, WordPress (local posts), WordPress API (remote), WordPress Media, Files |
-| **Publish** | WordPress |
-| **Update** | WordPress posts with AI enhancement |
-
-Additional handlers available via [extensions](#extensions) (Google Sheets, social platforms, etc.).
-
-### Step Types
-
-| Step | Description |
-|------|-------------|
-| **AI** | Process content with any configured AI provider |
-| **Agent Ping** | Outbound webhook to trigger external agents after pipeline completion |
-| **Webhook Gate** | Pause pipeline mid-execution until an external webhook fires |
-
 ## AI Tools
 
 Global tools available to the chat agent and system agent:
@@ -101,15 +115,15 @@ Global tools available to the chat agent and system agent:
 | Tool | Description |
 |------|-------------|
 | **Web Fetch** | Fetch and parse web content |
+| **Google Search** | Web search |
 | **Google Search Console** | Search analytics and performance data |
 | **Bing Webmaster** | Bing search analytics |
-| **Image Generation** | AI image creation via Replicate with smart content-gap placement |
-| **Internal Linking** | AI-powered internal link insertion and diagnostics |
+| **Image Generation** | AI image creation with smart content-gap placement |
 | **Local Search** | WordPress site search |
-| **Post Reader** | Read and inspect WordPress post content |
-| **Block Editor** | Get, edit, and replace Gutenberg blocks in posts |
+| **WordPress Post Reader** | Read and inspect WordPress post content |
 | **Agent Memory** | Read and write agent memory sections |
-| **Amazon Affiliate** | Generate affiliate links |
+| **Queue Validator** | Validate and inspect prompt queues |
+| **Amazon Affiliate Link** | Generate affiliate links |
 
 ## WP-CLI
 
@@ -153,7 +167,7 @@ Extend Data Machine with companion plugins:
 
 ## AI Providers
 
-OpenAI, Anthropic, Google, Grok, OpenRouter — configure per-site or per-pipeline.
+OpenAI, Anthropic, Google, Grok, OpenRouter — configure a global default per-site, with per-agent-type overrides for chat, pipeline, and system agents.
 
 ## Requirements
 
