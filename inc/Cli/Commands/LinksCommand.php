@@ -234,4 +234,206 @@ class LinksCommand extends BaseCommand {
 
 		$this->format_items( $items, array( 'category', 'total_posts', 'with_links', 'without_links', 'avg_links' ), $assoc_args );
 	}
+
+	/**
+	 * Audit internal links by scanning actual post content.
+	 *
+	 * Scans post HTML for <a> tags pointing to internal URLs, builds
+	 * a link graph, identifies orphaned posts, and optionally detects
+	 * broken links.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--post_type=<type>]
+	 * : Post type to audit.
+	 * ---
+	 * default: post
+	 * ---
+	 *
+	 * [--category=<slug>]
+	 * : Limit audit to a specific category.
+	 *
+	 * [--post_id=<id>]
+	 * : Audit specific post IDs (comma-separated).
+	 *
+	 * [--detect-broken]
+	 * : Check if linked URLs return 404.
+	 *
+	 * [--show=<section>]
+	 * : Which section to display: summary, orphans, broken, top.
+	 * ---
+	 * default: summary
+	 * options:
+	 *   - summary
+	 *   - orphans
+	 *   - broken
+	 *   - top
+	 *   - all
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - csv
+	 * ---
+	 *
+	 * [--fields=<fields>]
+	 * : Limit output to specific fields (comma-separated).
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Full audit of all posts
+	 *     wp datamachine links audit
+	 *
+	 *     # Audit a specific category
+	 *     wp datamachine links audit --category=tutorials
+	 *
+	 *     # Show orphaned posts (no inbound links)
+	 *     wp datamachine links audit --show=orphans
+	 *
+	 *     # Detect broken internal links
+	 *     wp datamachine links audit --detect-broken --show=broken
+	 *
+	 *     # Show top linked posts
+	 *     wp datamachine links audit --show=top
+	 *
+	 *     # Full JSON output
+	 *     wp datamachine links audit --show=all --format=json
+	 *
+	 * @subcommand audit
+	 */
+	public function audit( array $args, array $assoc_args ): void {
+		$format        = $assoc_args['format'] ?? 'table';
+		$show          = $assoc_args['show'] ?? 'summary';
+		$detect_broken = isset( $assoc_args['detect-broken'] );
+		$post_type     = $assoc_args['post_type'] ?? 'post';
+		$category      = $assoc_args['category'] ?? '';
+
+		$post_ids = array();
+		if ( isset( $assoc_args['post_id'] ) ) {
+			$post_ids = array_map( 'absint', explode( ',', $assoc_args['post_id'] ) );
+		}
+
+		WP_CLI::log( 'Scanning post content for internal links...' );
+
+		$result = InternalLinkingAbilities::auditInternalLinks( array(
+			'post_type'     => $post_type,
+			'category'      => $category,
+			'post_ids'      => $post_ids,
+			'detect_broken' => $detect_broken,
+		) );
+
+		if ( empty( $result['success'] ) ) {
+			WP_CLI::error( $result['error'] ?? 'Audit failed.' );
+			return;
+		}
+
+		if ( 'json' === $format && 'all' === $show ) {
+			WP_CLI::line( \wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			return;
+		}
+
+		$total   = (int) ( $result['total_scanned'] ?? 0 );
+		$links   = (int) ( $result['total_links'] ?? 0 );
+		$orphans = (int) ( $result['orphaned_count'] ?? 0 );
+		$broken  = (int) ( $result['broken_count'] ?? 0 );
+
+		// Summary.
+		if ( 'summary' === $show || 'all' === $show ) {
+			if ( 'json' === $format ) {
+				WP_CLI::line(
+					\wp_json_encode(
+						array(
+							'total_scanned'  => $total,
+							'total_links'    => $links,
+							'orphaned_count' => $orphans,
+							'broken_count'   => $broken,
+							'avg_outbound'   => $result['avg_outbound'] ?? 0,
+							'avg_inbound'    => $result['avg_inbound'] ?? 0,
+						),
+						JSON_PRETTY_PRINT
+					)
+				);
+			} else {
+				$items = array(
+					array(
+						'metric' => 'Posts scanned',
+						'value'  => $total,
+					),
+					array(
+						'metric' => 'Internal links found',
+						'value'  => $links,
+					),
+					array(
+						'metric' => 'Avg outbound per post',
+						'value'  => $result['avg_outbound'] ?? 0,
+					),
+					array(
+						'metric' => 'Avg inbound per post',
+						'value'  => $result['avg_inbound'] ?? 0,
+					),
+					array(
+						'metric' => 'Orphaned posts (0 inbound)',
+						'value'  => $orphans,
+					),
+					array(
+						'metric' => 'Broken links',
+						'value'  => $detect_broken ? $broken : 'skipped (use --detect-broken)',
+					),
+				);
+
+				$this->format_items( $items, array( 'metric', 'value' ), $assoc_args );
+			}
+		}
+
+		// Orphaned posts.
+		if ( ( 'orphans' === $show || 'all' === $show ) && ! empty( $result['orphaned_posts'] ) ) {
+			if ( 'all' === $show && 'table' === $format ) {
+				WP_CLI::log( '' );
+				WP_CLI::log( '--- Orphaned Posts (no inbound internal links) ---' );
+			}
+
+			$this->format_items(
+				$result['orphaned_posts'],
+				array( 'post_id', 'title', 'outbound', 'permalink' ),
+				$assoc_args
+			);
+		}
+
+		// Broken links.
+		if ( ( 'broken' === $show || 'all' === $show ) && ! empty( $result['broken_links'] ) ) {
+			if ( 'all' === $show && 'table' === $format ) {
+				WP_CLI::log( '' );
+				WP_CLI::log( '--- Broken Internal Links ---' );
+			}
+
+			$this->format_items(
+				$result['broken_links'],
+				array( 'source_id', 'source_title', 'broken_url', 'status_code' ),
+				$assoc_args
+			);
+		}
+
+		// Top linked.
+		if ( ( 'top' === $show || 'all' === $show ) && ! empty( $result['top_linked'] ) ) {
+			if ( 'all' === $show && 'table' === $format ) {
+				WP_CLI::log( '' );
+				WP_CLI::log( '--- Top Linked Posts (most inbound) ---' );
+			}
+
+			$this->format_items(
+				$result['top_linked'],
+				array( 'post_id', 'title', 'inbound', 'outbound' ),
+				$assoc_args
+			);
+		}
+
+		if ( 'table' === $format ) {
+			WP_CLI::success( sprintf( 'Audit complete: %d posts scanned, %d internal links found.', $total, $links ) );
+		}
+	}
 }
