@@ -114,7 +114,7 @@ class FileStorage {
 					'filename' => $filename,
 					'path'     => $file_path,
 					'size'     => filesize( $file_path ),
-					'modified' => filemtime( $file_path ),
+					'modified' => gmdate( 'c', filemtime( $file_path ) ),
 				);
 			}
 		}
