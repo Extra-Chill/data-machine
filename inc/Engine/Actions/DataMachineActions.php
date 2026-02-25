@@ -46,6 +46,7 @@ if ( ! defined( 'WPINC' ) ) {
 require_once __DIR__ . '/ImportExport.php';
 require_once __DIR__ . '/Engine.php';
 
+use DataMachine\Abilities\EngineAbilities;
 use DataMachine\Engine\Actions\Handlers\MarkItemProcessedHandler;
 use DataMachine\Engine\Actions\Handlers\FailJobHandler;
 use DataMachine\Engine\Actions\Handlers\JobCompleteHandler;
@@ -84,5 +85,8 @@ function datamachine_register_core_actions() {
 	);
 
 	\DataMachine\Engine\Actions\ImportExport::register();
+
+	// Register engine abilities (business logic) before hook bridges.
+	new EngineAbilities();
 	datamachine_register_execution_engine();
 }
