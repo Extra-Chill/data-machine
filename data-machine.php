@@ -199,7 +199,18 @@ function datamachine_run_datamachine_plugin() {
 
 // Plugin activation hook to initialize default settings
 register_activation_hook( __FILE__, 'datamachine_activate_plugin_defaults' );
-function datamachine_activate_plugin_defaults() {
+function datamachine_activate_plugin_defaults( $network_wide = false ) {
+	if ( is_multisite() && $network_wide ) {
+		datamachine_for_each_site( 'datamachine_activate_defaults_for_site' );
+	} else {
+		datamachine_activate_defaults_for_site();
+	}
+}
+
+/**
+ * Set default settings for a single site.
+ */
+function datamachine_activate_defaults_for_site() {
 	$default_settings = array(
 		'disabled_tools'              => array(), // Opt-out pattern: empty = all tools enabled
 		'enabled_pages'               => array(
@@ -295,9 +306,25 @@ function datamachine_deactivate_plugin() {
  *
  * Creates database tables, log directory, and re-schedules any flows
  * with non-manual scheduling intervals.
+ *
+ * @param bool $network_wide Whether the plugin is being network-activated.
  */
-function datamachine_activate_plugin() {
+function datamachine_activate_plugin( $network_wide = false ) {
+	if ( is_multisite() && $network_wide ) {
+		datamachine_for_each_site( 'datamachine_activate_for_site' );
+	} else {
+		datamachine_activate_for_site();
+	}
+}
 
+/**
+ * Run activation tasks for a single site.
+ *
+ * Creates tables, log directory, default memory files, and re-schedules flows.
+ * Called directly on single-site, or per-site during network activation and
+ * new site creation.
+ */
+function datamachine_activate_for_site() {
 	$db_pipelines = new \DataMachine\Core\Database\Pipelines\Pipelines();
 	$db_pipelines->create_table();
 
@@ -325,6 +352,42 @@ function datamachine_activate_plugin() {
 	// Re-schedule any flows with non-manual scheduling
 	datamachine_activate_scheduled_flows();
 }
+
+/**
+ * Run a callback for every site on the network.
+ *
+ * Switches to each site, runs the callback, then restores. Used by
+ * activation hooks and new site hooks to ensure per-site setup.
+ *
+ * @param callable $callback Function to call in each site context.
+ */
+function datamachine_for_each_site( callable $callback ) {
+	$sites = get_sites( array( 'fields' => 'ids' ) );
+	foreach ( $sites as $blog_id ) {
+		switch_to_blog( $blog_id );
+		$callback();
+		restore_current_blog();
+	}
+}
+
+/**
+ * Create Data Machine tables and defaults when a new site is added to the network.
+ *
+ * Only runs if Data Machine is network-active.
+ *
+ * @param WP_Site $new_site New site object.
+ */
+function datamachine_on_new_site( \WP_Site $new_site ) {
+	if ( ! is_plugin_active_for_network( plugin_basename( __FILE__ ) ) ) {
+		return;
+	}
+
+	switch_to_blog( $new_site->blog_id );
+	datamachine_activate_defaults_for_site();
+	datamachine_activate_for_site();
+	restore_current_blog();
+}
+add_action( 'wp_initialize_site', 'datamachine_on_new_site', 200 );
 
 /**
  * Create default agent memory files if they don't exist.
