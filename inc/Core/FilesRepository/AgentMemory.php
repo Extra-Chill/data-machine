@@ -161,11 +161,7 @@ class AgentMemory {
 		);
 
 		if ( $file_size > self::MAX_FILE_SIZE ) {
-			$result['warning'] = sprintf(
-				'Memory file size (%s) exceeds recommended threshold (%s). Consider archiving older content to daily memory.',
-				size_format( $file_size ),
-				size_format( self::MAX_FILE_SIZE )
-			);
+			$result['warning'] = self::size_warning( $file_size );
 		}
 
 		return $result;
@@ -206,14 +202,28 @@ class AgentMemory {
 		);
 
 		if ( $file_size > self::MAX_FILE_SIZE ) {
-			$result['warning'] = sprintf(
-				'Memory file size (%s) exceeds recommended threshold (%s). Consider archiving older content to daily memory.',
-				size_format( $file_size ),
-				size_format( self::MAX_FILE_SIZE )
-			);
+			$result['warning'] = self::size_warning( $file_size );
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Build a size warning message with actionable recommendations.
+	 *
+	 * @param int $file_size Current file size in bytes.
+	 * @return string Warning message with specific remediation steps.
+	 */
+	private static function size_warning( int $file_size ): string {
+		return sprintf(
+			'Memory file size (%s) exceeds recommended threshold (%s). '
+			. 'This file is injected into every AI context window. To reduce token usage: '
+			. '(1) Condense verbose sections — tighten bullet points, remove redundancy. '
+			. '(2) Move historical/temporal content to daily memory (wp datamachine memory daily append). '
+			. '(3) Split domain-specific knowledge into dedicated memory files that are only loaded by relevant pipelines.',
+			size_format( $file_size ),
+			size_format( self::MAX_FILE_SIZE )
+		);
 	}
 
 	// =========================================================================
