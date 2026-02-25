@@ -395,6 +395,172 @@ function datamachine_on_new_site( \WP_Site $new_site ) {
 add_action( 'wp_initialize_site', 'datamachine_on_new_site', 200 );
 
 /**
+ * Build scaffold defaults for agent memory files using WordPress site data.
+ *
+ * Gathers site metadata, admin info, active plugins, content types, and
+ * environment details to populate agent files with useful context instead
+ * of empty placeholder comments.
+ *
+ * @since 0.32.0
+ *
+ * @return array<string, string> Filename => content map for SOUL.md, USER.md, MEMORY.md.
+ */
+function datamachine_get_scaffold_defaults(): array {
+	// --- Site metadata ---
+	$site_name    = get_bloginfo( 'name' ) ?: 'WordPress Site';
+	$site_tagline = get_bloginfo( 'description' );
+	$site_url     = home_url();
+	$timezone     = wp_timezone_string();
+
+	// --- Active theme ---
+	$theme      = wp_get_theme();
+	$theme_name = $theme->get( 'Name' ) ?: 'Unknown';
+
+	// --- Active plugins (exclude Data Machine itself) ---
+	$active_plugins = get_option( 'active_plugins', array() );
+	$plugin_names   = array();
+
+	foreach ( $active_plugins as $plugin_file ) {
+		if ( 0 === strpos( $plugin_file, 'data-machine/' ) ) {
+			continue;
+		}
+
+		$plugin_path = WP_PLUGIN_DIR . '/' . $plugin_file;
+		if ( function_exists( 'get_plugin_data' ) && file_exists( $plugin_path ) ) {
+			$plugin_data  = get_plugin_data( $plugin_path, false, false );
+			$plugin_names[] = ! empty( $plugin_data['Name'] ) ? $plugin_data['Name'] : dirname( $plugin_file );
+		} else {
+			$dir = dirname( $plugin_file );
+			$plugin_names[] = '.' === $dir ? str_replace( '.php', '', basename( $plugin_file ) ) : $dir;
+		}
+	}
+
+	// --- Content types with counts ---
+	$content_lines = array();
+	$post_types    = get_post_types( array( 'public' => true ), 'objects' );
+
+	foreach ( $post_types as $pt ) {
+		$count     = wp_count_posts( $pt->name );
+		$published = isset( $count->publish ) ? (int) $count->publish : 0;
+
+		if ( $published > 0 || in_array( $pt->name, array( 'post', 'page' ), true ) ) {
+			$content_lines[] = sprintf( '%s: %d published', $pt->label, $published );
+		}
+	}
+
+	// --- Multisite ---
+	$multisite_line = '';
+	if ( is_multisite() ) {
+		$site_count     = get_blog_count();
+		$multisite_line = sprintf(
+			"\n- **Network:** WordPress Multisite with %d site%s",
+			$site_count,
+			1 === $site_count ? '' : 's'
+		);
+	}
+
+	// --- Admin user ---
+	$admin_email = get_option( 'admin_email', '' );
+	$admin_user  = $admin_email ? get_user_by( 'email', $admin_email ) : null;
+	$admin_name  = $admin_user ? $admin_user->display_name : '';
+
+	// --- Versions ---
+	$wp_version  = get_bloginfo( 'version' );
+	$php_version = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '.' . PHP_RELEASE_VERSION;
+	$dm_version  = defined( 'DATAMACHINE_VERSION' ) ? DATAMACHINE_VERSION : 'unknown';
+	$created     = wp_date( 'Y-m-d' );
+
+	// --- Build SOUL.md context lines ---
+	$context_items   = array();
+	$context_items[] = sprintf( '- **Site:** %s', $site_name );
+
+	if ( $site_tagline ) {
+		$context_items[] = sprintf( '- **Tagline:** %s', $site_tagline );
+	}
+
+	$context_items[] = sprintf( '- **URL:** %s', $site_url );
+	$context_items[] = sprintf( '- **Theme:** %s', $theme_name );
+
+	if ( $plugin_names ) {
+		$context_items[] = sprintf( '- **Plugins:** %s', implode( ', ', $plugin_names ) );
+	}
+
+	if ( $content_lines ) {
+		$context_items[] = sprintf( '- **Content:** %s', implode( ' · ', $content_lines ) );
+	}
+
+	$context_items[] = sprintf( '- **Timezone:** %s', $timezone );
+
+	$soul_context = implode( "\n", $context_items ) . $multisite_line;
+
+	// --- SOUL.md ---
+	$soul = <<<MD
+# Agent Soul
+
+## Identity
+You are an AI assistant managing {$site_name}.
+
+## Voice & Tone
+Write in a clear, helpful tone.
+
+## Rules
+- Follow the site's content guidelines
+- Ask for clarification when instructions are ambiguous
+
+## Context
+{$soul_context}
+
+## Continuity
+SOUL.md (this file) defines who you are. USER.md profiles your human. MEMORY.md tracks persistent knowledge. Daily memory files (daily/YYYY/MM/DD.md) capture session activity — the system generates daily summaries automatically. Keep MEMORY.md lean: persistent facts only, not session logs.
+MD;
+
+	// --- USER.md ---
+	$user_lines   = array();
+	if ( $admin_name ) {
+		$user_lines[] = sprintf( '- **Name:** %s', $admin_name );
+	}
+	if ( $admin_email ) {
+		$user_lines[] = sprintf( '- **Email:** %s', $admin_email );
+	}
+	$user_lines[] = '- **Role:** Site Administrator';
+	$user_about   = implode( "\n", $user_lines );
+
+	$user = <<<MD
+# User Profile
+
+## About
+{$user_about}
+
+## Preferences
+<!-- Communication style, formatting preferences, things to remember -->
+
+## Goals
+<!-- What you're working toward with this site or project -->
+MD;
+
+	// --- MEMORY.md ---
+	$memory = <<<MD
+# Agent Memory
+
+## State
+- Data Machine v{$dm_version} activated on {$created}
+- WordPress {$wp_version}, PHP {$php_version}
+
+## Lessons Learned
+<!-- What worked, what didn't, patterns to remember -->
+
+## Context
+<!-- Accumulated knowledge about the site, audience, domain -->
+MD;
+
+	return array(
+		'SOUL.md'   => $soul,
+		'USER.md'   => $user,
+		'MEMORY.md' => $memory,
+	);
+}
+
+/**
  * Create default agent memory files if they don't exist.
  *
  * Called on activation to ensure fresh installs have starter templates
@@ -415,51 +581,7 @@ function datamachine_ensure_default_memory_files() {
 		return;
 	}
 
-	$defaults = array(
-		'SOUL.md'   => <<<'MD'
-# Agent Soul
-
-## Identity
-You are an AI assistant.
-
-## Voice & Tone
-Write in a clear, helpful tone.
-
-## Rules
-- Follow the site's content guidelines
-- Ask for clarification when instructions are ambiguous
-
-## Context
-<!-- Add background about your site, audience, brand, or domain expertise here -->
-
-## Continuity
-SOUL.md (this file) defines who you are. USER.md profiles your human. MEMORY.md tracks persistent knowledge. Daily memory files (daily/YYYY/MM/DD.md) capture session activity — the system generates daily summaries automatically. Keep MEMORY.md lean: persistent facts only, not session logs.
-MD,
-		'USER.md'   => <<<'MD'
-# User Profile
-
-## About
-<!-- Who you are — name, role, what you do -->
-
-## Preferences
-<!-- Communication style, formatting preferences, things to remember -->
-
-## Goals
-<!-- What you're working toward with this site or project -->
-MD,
-		'MEMORY.md' => <<<'MD'
-# Agent Memory
-
-## State
-<!-- Current project state, active tasks, what's in progress -->
-
-## Lessons Learned
-<!-- What worked, what didn't, patterns to remember -->
-
-## Context
-<!-- Accumulated knowledge about the site, audience, domain -->
-MD,
-	);
+	$defaults = datamachine_get_scaffold_defaults();
 
 	foreach ( $defaults as $filename => $content ) {
 		$filepath = "{$agent_dir}/{$filename}";
