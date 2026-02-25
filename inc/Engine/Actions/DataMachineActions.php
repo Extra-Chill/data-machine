@@ -65,6 +65,24 @@ function datamachine_register_core_actions() {
 	add_action( 'datamachine_log', array( LogHandler::class, 'handle' ), 10, 3 );
 	add_action( 'datamachine_log_manage', array( LogManageHandler::class, 'handle' ), 10, 4 );
 
+	// AI library error logging — universal handler for all AI interactions (pipeline agents, chat agents).
+	add_action(
+		'chubes_ai_library_error',
+		function ( $error_data ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'AI Library Error: ' . $error_data['component'] . ' - ' . $error_data['message'],
+				array(
+					'component' => $error_data['component'],
+					'message'   => $error_data['message'],
+					'context'   => $error_data['context'],
+					'timestamp' => $error_data['timestamp'],
+				)
+			);
+		}
+	);
+
 	\DataMachine\Engine\Actions\ImportExport::register();
 	datamachine_register_execution_engine();
 }

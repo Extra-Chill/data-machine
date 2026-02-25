@@ -3,7 +3,7 @@
  * Cached WordPress site metadata for AI context injection.
  */
 
-namespace DataMachine\Engine\AI\Directives;
+namespace DataMachine\Core\WordPress;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -177,5 +177,3 @@ class SiteContext {
 		add_action( 'update_option_siteurl', array( __CLASS__, 'clear_cache' ) );
 	}
 }
-
-add_action( 'init', array( SiteContext::class, 'register_cache_invalidation' ) );

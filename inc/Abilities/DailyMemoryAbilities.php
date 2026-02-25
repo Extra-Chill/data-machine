@@ -149,7 +149,7 @@ class DailyMemoryAbilities {
 		$daily = new DailyMemory();
 		$date  = $input['date'] ?? gmdate( 'Y-m-d' );
 
-		$parts = self::parseDate( $date );
+		$parts = DailyMemory::parse_date( $date );
 		if ( ! $parts ) {
 			return array(
 				'success' => false,
@@ -179,7 +179,7 @@ class DailyMemoryAbilities {
 		$date    = $input['date'] ?? gmdate( 'Y-m-d' );
 		$mode    = $input['mode'] ?? 'append';
 
-		$parts = self::parseDate( $date );
+		$parts = DailyMemory::parse_date( $date );
 		if ( ! $parts ) {
 			return array(
 				'success' => false,
@@ -203,23 +203,5 @@ class DailyMemoryAbilities {
 	public static function listDaily( array $input ): array {
 		$daily = new DailyMemory();
 		return $daily->list_all();
-	}
-
-	/**
-	 * Parse a YYYY-MM-DD date string.
-	 *
-	 * @param string $date Date string.
-	 * @return array{year: string, month: string, day: string}|null
-	 */
-	private static function parseDate( string $date ): ?array {
-		if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $date, $matches ) ) {
-			return null;
-		}
-
-		return array(
-			'year'  => $matches[1],
-			'month' => $matches[2],
-			'day'   => $matches[3],
-		);
 	}
 }
