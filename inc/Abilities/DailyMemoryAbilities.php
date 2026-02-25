@@ -130,6 +130,34 @@ class DailyMemoryAbilities {
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
+
+			wp_register_ability(
+				'datamachine/daily-memory-delete',
+				array(
+					'label'               => 'Delete Daily Memory',
+					'description'         => 'Delete a daily memory file by date.',
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'date' => array(
+								'type'        => 'string',
+								'description' => 'Date in YYYY-MM-DD format. Defaults to today.',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'message' => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'deleteDaily' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
 		};
 
 		if ( did_action( 'wp_abilities_api_init' ) ) {
@@ -203,5 +231,35 @@ class DailyMemoryAbilities {
 	public static function listDaily( array $input ): array {
 		$daily = new DailyMemory();
 		return $daily->list_all();
+	}
+
+	/**
+	 * Delete a daily memory file.
+	 *
+	 * Respects the daily_memory_enabled setting.
+	 *
+	 * @param array $input Input parameters.
+	 * @return array Result.
+	 */
+	public static function deleteDaily( array $input ): array {
+		if ( ! PluginSettings::get( 'daily_memory_enabled', false ) ) {
+			return array(
+				'success' => false,
+				'message' => 'Daily memory is disabled. Enable it in Agent > Configuration.',
+			);
+		}
+
+		$daily = new DailyMemory();
+		$date  = $input['date'] ?? gmdate( 'Y-m-d' );
+
+		$parts = DailyMemory::parse_date( $date );
+		if ( ! $parts ) {
+			return array(
+				'success' => false,
+				'message' => sprintf( 'Invalid date format: %s. Use YYYY-MM-DD.', $date ),
+			);
+		}
+
+		return $daily->delete( $parts['year'], $parts['month'], $parts['day'] );
 	}
 }
