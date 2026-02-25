@@ -24,6 +24,7 @@ use DataMachine\Engine\AI\Tools\Global\GoogleSearch;
 use DataMachine\Engine\AI\Tools\Global\GoogleSearchConsole;
 use DataMachine\Engine\AI\Tools\Global\PageSpeed;
 use DataMachine\Engine\AI\Tools\Global\ImageGeneration;
+use DataMachine\Engine\AI\Tools\Global\InternalLinkAudit;
 use DataMachine\Engine\AI\Tools\Global\LocalSearch;
 use DataMachine\Engine\AI\Tools\Global\QueueValidator;
 use DataMachine\Engine\AI\Tools\Global\WebFetch;
@@ -92,6 +93,7 @@ class ToolServiceProvider {
 		new GoogleSearchConsole();
 		new PageSpeed();
 		new ImageGeneration();
+		new InternalLinkAudit();
 		new LocalSearch();
 		new QueueValidator();
 		new WebFetch();

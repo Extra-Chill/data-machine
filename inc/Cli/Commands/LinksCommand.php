@@ -5,6 +5,13 @@
  * Provides CLI access to internal linking diagnostics and cross-linking.
  * Wraps InternalLinkingAbilities API primitives.
  *
+ * Subcommands:
+ * - crosslink — Queue system agent link insertion.
+ * - diagnose  — Meta-based coverage report.
+ * - audit     — Scan content, build + cache link graph.
+ * - orphans   — List orphaned posts (zero inbound links).
+ * - broken    — HTTP HEAD checks for broken internal links.
+ *
  * @package DataMachine\Cli\Commands
  * @since 0.24.0
  */
@@ -93,12 +100,14 @@ class LinksCommand extends BaseCommand {
 		}
 
 		if ( $all ) {
-			$all_posts = get_posts( array(
-				'post_type'   => 'post',
-				'post_status' => 'publish',
-				'fields'      => 'ids',
-				'numberposts' => -1,
-			) );
+			$all_posts = get_posts(
+				array(
+					'post_type'   => 'post',
+					'post_status' => 'publish',
+					'fields'      => 'ids',
+					'numberposts' => -1,
+				)
+			);
 			$post_ids  = array_merge( $post_ids, $all_posts );
 		}
 
@@ -107,13 +116,15 @@ class LinksCommand extends BaseCommand {
 			return;
 		}
 
-		$result = InternalLinkingAbilities::queueInternalLinking( array(
-			'post_ids'       => $post_ids,
-			'category'       => $category,
-			'links_per_post' => $links_per_post,
-			'dry_run'        => $dry_run,
-			'force'          => $force,
-		) );
+		$result = InternalLinkingAbilities::queueInternalLinking(
+			array(
+				'post_ids'       => $post_ids,
+				'category'       => $category,
+				'links_per_post' => $links_per_post,
+				'dry_run'        => $dry_run,
+				'force'          => $force,
+			)
+		);
 
 		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to queue internal linking.' );
@@ -233,5 +244,391 @@ class LinksCommand extends BaseCommand {
 		}
 
 		$this->format_items( $items, array( 'category', 'total_posts', 'with_links', 'without_links', 'avg_links' ), $assoc_args );
+	}
+
+	/**
+	 * Audit internal links by scanning actual post content.
+	 *
+	 * Scans post HTML for <a> tags pointing to internal URLs, builds
+	 * a link graph, and caches results (24hr TTL). Use --show to
+	 * display specific sections of the audit.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--post_type=<type>]
+	 * : Post type to audit.
+	 * ---
+	 * default: post
+	 * ---
+	 *
+	 * [--category=<slug>]
+	 * : Limit audit to a specific category.
+	 *
+	 * [--post_id=<id>]
+	 * : Audit specific post IDs (comma-separated).
+	 *
+	 * [--force]
+	 * : Force rebuild even if cached graph exists.
+	 *
+	 * [--show=<section>]
+	 * : Which section to display: summary, orphans, top, all.
+	 * ---
+	 * default: summary
+	 * options:
+	 *   - summary
+	 *   - orphans
+	 *   - top
+	 *   - all
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - csv
+	 * ---
+	 *
+	 * [--fields=<fields>]
+	 * : Limit output to specific fields (comma-separated).
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Full audit of all posts
+	 *     wp datamachine links audit
+	 *
+	 *     # Audit a specific category
+	 *     wp datamachine links audit --category=tutorials
+	 *
+	 *     # Show orphaned posts (no inbound links)
+	 *     wp datamachine links audit --show=orphans
+	 *
+	 *     # Show top linked posts
+	 *     wp datamachine links audit --show=top
+	 *
+	 *     # Force rebuild, full JSON output
+	 *     wp datamachine links audit --force --show=all --format=json
+	 *
+	 * @subcommand audit
+	 */
+	public function audit( array $args, array $assoc_args ): void {
+		$format    = $assoc_args['format'] ?? 'table';
+		$show      = $assoc_args['show'] ?? 'summary';
+		$post_type = $assoc_args['post_type'] ?? 'post';
+		$category  = $assoc_args['category'] ?? '';
+		$force     = isset( $assoc_args['force'] );
+
+		$post_ids = array();
+		if ( isset( $assoc_args['post_id'] ) ) {
+			$post_ids = array_map( 'absint', explode( ',', $assoc_args['post_id'] ) );
+		}
+
+		WP_CLI::log( 'Scanning post content for internal links...' );
+
+		$result = InternalLinkingAbilities::auditInternalLinks(
+			array(
+				'post_type' => $post_type,
+				'category'  => $category,
+				'post_ids'  => $post_ids,
+				'force'     => $force,
+			)
+		);
+
+		if ( empty( $result['success'] ) ) {
+			WP_CLI::error( $result['error'] ?? 'Audit failed.' );
+			return;
+		}
+
+		if ( ! empty( $result['cached'] ) ) {
+			WP_CLI::log( 'Using cached link graph (use --force to rebuild).' );
+		}
+
+		// Strip internal keys from JSON output.
+		$clean_result = array_filter(
+			$result,
+			fn( $key ) => 0 !== strpos( $key, '_' ),
+			ARRAY_FILTER_USE_KEY
+		);
+
+		if ( 'json' === $format && 'all' === $show ) {
+			WP_CLI::line( \wp_json_encode( $clean_result, JSON_PRETTY_PRINT ) );
+			return;
+		}
+
+		$total   = (int) ( $result['total_scanned'] ?? 0 );
+		$links   = (int) ( $result['total_links'] ?? 0 );
+		$orphans = (int) ( $result['orphaned_count'] ?? 0 );
+
+		// Summary.
+		if ( 'summary' === $show || 'all' === $show ) {
+			if ( 'json' === $format ) {
+				WP_CLI::line(
+					\wp_json_encode(
+						array(
+							'total_scanned'  => $total,
+							'total_links'    => $links,
+							'orphaned_count' => $orphans,
+							'avg_outbound'   => $result['avg_outbound'] ?? 0,
+							'avg_inbound'    => $result['avg_inbound'] ?? 0,
+							'cached'         => $result['cached'] ?? false,
+						),
+						JSON_PRETTY_PRINT
+					)
+				);
+			} else {
+				$items = array(
+					array(
+						'metric' => 'Posts scanned',
+						'value'  => $total,
+					),
+					array(
+						'metric' => 'Internal links found',
+						'value'  => $links,
+					),
+					array(
+						'metric' => 'Avg outbound per post',
+						'value'  => $result['avg_outbound'] ?? 0,
+					),
+					array(
+						'metric' => 'Avg inbound per post',
+						'value'  => $result['avg_inbound'] ?? 0,
+					),
+					array(
+						'metric' => 'Orphaned posts (0 inbound)',
+						'value'  => $orphans,
+					),
+				);
+
+				$this->format_items( $items, array( 'metric', 'value' ), $assoc_args );
+			}
+		}
+
+		// Orphaned posts.
+		if ( ( 'orphans' === $show || 'all' === $show ) && ! empty( $result['orphaned_posts'] ) ) {
+			if ( 'all' === $show && 'table' === $format ) {
+				WP_CLI::log( '' );
+				WP_CLI::log( '--- Orphaned Posts (no inbound internal links) ---' );
+			}
+
+			$this->format_items(
+				$result['orphaned_posts'],
+				array( 'post_id', 'title', 'outbound', 'permalink' ),
+				$assoc_args
+			);
+		}
+
+		// Top linked.
+		if ( ( 'top' === $show || 'all' === $show ) && ! empty( $result['top_linked'] ) ) {
+			if ( 'all' === $show && 'table' === $format ) {
+				WP_CLI::log( '' );
+				WP_CLI::log( '--- Top Linked Posts (most inbound) ---' );
+			}
+
+			$this->format_items(
+				$result['top_linked'],
+				array( 'post_id', 'title', 'inbound', 'outbound' ),
+				$assoc_args
+			);
+		}
+
+		if ( 'table' === $format ) {
+			WP_CLI::success( sprintf( 'Audit complete: %d posts scanned, %d internal links found.', $total, $links ) );
+		}
+	}
+
+	/**
+	 * List orphaned posts with zero inbound internal links.
+	 *
+	 * Reads from the cached link graph. Runs a full audit automatically
+	 * if no cache exists.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--post_type=<type>]
+	 * : Post type to check.
+	 * ---
+	 * default: post
+	 * ---
+	 *
+	 * [--limit=<number>]
+	 * : Maximum orphaned posts to return.
+	 * ---
+	 * default: 50
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - csv
+	 * ---
+	 *
+	 * [--fields=<fields>]
+	 * : Limit output to specific fields (comma-separated).
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # List orphaned posts
+	 *     wp datamachine links orphans
+	 *
+	 *     # Limit to 10 results
+	 *     wp datamachine links orphans --limit=10
+	 *
+	 *     # JSON output
+	 *     wp datamachine links orphans --format=json
+	 *
+	 * @subcommand orphans
+	 */
+	public function orphans( array $args, array $assoc_args ): void {
+		$format    = $assoc_args['format'] ?? 'table';
+		$post_type = $assoc_args['post_type'] ?? 'post';
+		$limit     = absint( $assoc_args['limit'] ?? 50 );
+
+		$result = InternalLinkingAbilities::getOrphanedPosts(
+			array(
+				'post_type' => $post_type,
+				'limit'     => $limit,
+			)
+		);
+
+		if ( empty( $result['success'] ) ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to get orphaned posts.' );
+			return;
+		}
+
+		$orphaned_count = (int) ( $result['orphaned_count'] ?? 0 );
+		$total_scanned  = (int) ( $result['total_scanned'] ?? 0 );
+		$from_cache     = $result['from_cache'] ?? false;
+
+		if ( $from_cache ) {
+			WP_CLI::log( 'Reading from cached link graph.' );
+		} else {
+			WP_CLI::log( 'No cache found — ran full audit.' );
+		}
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( \wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			return;
+		}
+
+		if ( empty( $result['orphaned_posts'] ) ) {
+			WP_CLI::success( sprintf( 'No orphaned posts found out of %d scanned.', $total_scanned ) );
+			return;
+		}
+
+		$this->format_items(
+			$result['orphaned_posts'],
+			array( 'post_id', 'title', 'outbound', 'permalink' ),
+			$assoc_args
+		);
+
+		WP_CLI::success( sprintf( '%d orphaned post(s) out of %d scanned.', $orphaned_count, $total_scanned ) );
+	}
+
+	/**
+	 * Check for broken internal links via HTTP HEAD requests.
+	 *
+	 * Reads link URLs from the cached graph and performs HTTP HEAD
+	 * requests to detect broken links. Expensive operation.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--post_type=<type>]
+	 * : Post type scope.
+	 * ---
+	 * default: post
+	 * ---
+	 *
+	 * [--limit=<number>]
+	 * : Maximum unique URLs to check.
+	 * ---
+	 * default: 200
+	 * ---
+	 *
+	 * [--timeout=<seconds>]
+	 * : HTTP timeout per request in seconds.
+	 * ---
+	 * default: 5
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - csv
+	 * ---
+	 *
+	 * [--fields=<fields>]
+	 * : Limit output to specific fields (comma-separated).
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Check for broken links
+	 *     wp datamachine links broken
+	 *
+	 *     # Limit to 50 URL checks
+	 *     wp datamachine links broken --limit=50
+	 *
+	 *     # JSON output
+	 *     wp datamachine links broken --format=json
+	 *
+	 * @subcommand broken
+	 */
+	public function broken( array $args, array $assoc_args ): void {
+		$format    = $assoc_args['format'] ?? 'table';
+		$post_type = $assoc_args['post_type'] ?? 'post';
+		$limit     = absint( $assoc_args['limit'] ?? 200 );
+		$timeout   = absint( $assoc_args['timeout'] ?? 5 );
+
+		WP_CLI::log( sprintf( 'Checking up to %d unique URLs for broken links...', $limit ) );
+
+		$result = InternalLinkingAbilities::checkBrokenLinks(
+			array(
+				'post_type' => $post_type,
+				'limit'     => $limit,
+				'timeout'   => $timeout,
+			)
+		);
+
+		if ( empty( $result['success'] ) ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to check broken links.' );
+			return;
+		}
+
+		$urls_checked = (int) ( $result['urls_checked'] ?? 0 );
+		$broken_count = (int) ( $result['broken_count'] ?? 0 );
+		$from_cache   = $result['from_cache'] ?? false;
+
+		if ( $from_cache ) {
+			WP_CLI::log( 'Link graph loaded from cache.' );
+		} else {
+			WP_CLI::log( 'No cache found — ran full audit first.' );
+		}
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( \wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			return;
+		}
+
+		if ( empty( $result['broken_links'] ) ) {
+			WP_CLI::success( sprintf( 'No broken links found (%d URLs checked).', $urls_checked ) );
+			return;
+		}
+
+		$this->format_items(
+			$result['broken_links'],
+			array( 'source_id', 'source_title', 'broken_url', 'status_code' ),
+			$assoc_args
+		);
+
+		WP_CLI::warning( sprintf( '%d broken link(s) found across %d URLs checked.', $broken_count, $urls_checked ) );
 	}
 }
