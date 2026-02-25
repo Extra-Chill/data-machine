@@ -418,7 +418,14 @@ function datamachine_get_scaffold_defaults(): array {
 
 	// --- Active plugins (exclude Data Machine itself) ---
 	$active_plugins = get_option( 'active_plugins', array() );
-	$plugin_names   = array();
+
+	// On multisite, include network-activated plugins too.
+	if ( is_multisite() ) {
+		$network_plugins = array_keys( get_site_option( 'active_sitewide_plugins', array() ) );
+		$active_plugins  = array_unique( array_merge( $active_plugins, $network_plugins ) );
+	}
+
+	$plugin_names = array();
 
 	foreach ( $active_plugins as $plugin_file ) {
 		if ( 0 === strpos( $plugin_file, 'data-machine/' ) ) {
