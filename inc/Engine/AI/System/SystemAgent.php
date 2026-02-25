@@ -154,6 +154,238 @@ class SystemAgent {
 	}
 
 	/**
+	 * Default chunk size for batch scheduling.
+	 *
+	 * Controls how many individual tasks are created per batch cycle.
+	 * Between cycles, other task types can run in Action Scheduler.
+	 */
+	const BATCH_CHUNK_SIZE = 10;
+
+	/**
+	 * Delay in seconds between batch chunks.
+	 *
+	 * Gives Action Scheduler time to process other pending actions
+	 * between bulk task chunks.
+	 */
+	const BATCH_CHUNK_DELAY = 30;
+
+	/**
+	 * Schedule a batch of tasks with chunked execution.
+	 *
+	 * Instead of creating hundreds of AS actions at once, stores all items
+	 * in a transient and processes them in chunks. Between chunks, other
+	 * task types can run — preventing queue flooding.
+	 *
+	 * @since 0.32.0
+	 *
+	 * @param string $taskType   Task type identifier (must be registered).
+	 * @param array  $itemParams Array of parameter arrays, one per task.
+	 * @param array  $context    Shared context for all tasks in the batch.
+	 * @param int    $chunkSize  Items per chunk (default: BATCH_CHUNK_SIZE).
+	 * @return array{batch_id: string, total: int, chunk_size: int}|false Batch info or false on failure.
+	 */
+	public function scheduleBatch( string $taskType, array $itemParams, array $context = array(), int $chunkSize = 0 ): array|false {
+		if ( ! isset( $this->taskHandlers[ $taskType ] ) ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				"System Agent: Cannot schedule batch for unknown task type '{$taskType}'",
+				array(
+					'task_type'  => $taskType,
+					'agent_type' => 'system',
+					'count'      => count( $itemParams ),
+				)
+			);
+			return false;
+		}
+
+		if ( empty( $itemParams ) ) {
+			return false;
+		}
+
+		if ( $chunkSize <= 0 ) {
+			$chunkSize = self::BATCH_CHUNK_SIZE;
+		}
+
+		// If small enough, just schedule directly — no batch overhead.
+		if ( count( $itemParams ) <= $chunkSize ) {
+			$job_ids = array();
+			foreach ( $itemParams as $params ) {
+				$job_id = $this->scheduleTask( $taskType, $params, $context );
+				if ( $job_id ) {
+					$job_ids[] = $job_id;
+				}
+			}
+			return array(
+				'batch_id'   => 'direct',
+				'total'      => count( $itemParams ),
+				'scheduled'  => count( $job_ids ),
+				'chunk_size' => $chunkSize,
+				'job_ids'    => $job_ids,
+			);
+		}
+
+		// Generate batch ID and store items in transient.
+		$batch_id      = 'dm_batch_' . wp_generate_uuid4();
+		$transient_key = 'datamachine_batch_' . md5( $batch_id );
+
+		$batch_data = array(
+			'batch_id'   => $batch_id,
+			'task_type'  => $taskType,
+			'context'    => $context,
+			'items'      => $itemParams,
+			'chunk_size' => $chunkSize,
+			'offset'     => 0,
+			'total'      => count( $itemParams ),
+			'created_at' => current_time( 'mysql' ),
+		);
+
+		// Store with 4 hour TTL — enough time for large batches to complete.
+		set_transient( $transient_key, $batch_data, 4 * HOUR_IN_SECONDS );
+
+		// Schedule first chunk.
+		if ( ! function_exists( 'as_schedule_single_action' ) ) {
+			delete_transient( $transient_key );
+			return false;
+		}
+
+		$action_id = as_schedule_single_action(
+			time(),
+			'datamachine_system_agent_process_batch',
+			array( 'batch_id' => $batch_id ),
+			'data-machine'
+		);
+
+		if ( ! $action_id ) {
+			delete_transient( $transient_key );
+			return false;
+		}
+
+		do_action(
+			'datamachine_log',
+			'info',
+			sprintf(
+				'System Agent batch scheduled: %s (%d items in chunks of %d)',
+				$taskType,
+				count( $itemParams ),
+				$chunkSize
+			),
+			array(
+				'batch_id'   => $batch_id,
+				'task_type'  => $taskType,
+				'agent_type' => 'system',
+				'total'      => count( $itemParams ),
+				'chunk_size' => $chunkSize,
+			)
+		);
+
+		return array(
+			'batch_id'   => $batch_id,
+			'total'      => count( $itemParams ),
+			'scheduled'  => 0, // Actual scheduling happens in chunks.
+			'chunk_size' => $chunkSize,
+		);
+	}
+
+	/**
+	 * Process a batch chunk (Action Scheduler callback).
+	 *
+	 * Pulls the next chunk of items from the batch transient, schedules
+	 * individual tasks for each, then schedules the next chunk (if any)
+	 * with a delay to allow other task types to execute between chunks.
+	 *
+	 * @since 0.32.0
+	 *
+	 * @param string $batchId Batch identifier.
+	 */
+	public function processBatchChunk( string $batchId ): void {
+		$transient_key = 'datamachine_batch_' . md5( $batchId );
+		$batch_data    = get_transient( $transient_key );
+
+		if ( false === $batch_data || ! is_array( $batch_data ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				"System Agent: Batch {$batchId} not found or expired",
+				array(
+					'batch_id'   => $batchId,
+					'agent_type' => 'system',
+				)
+			);
+			return;
+		}
+
+		$task_type  = $batch_data['task_type'];
+		$context    = $batch_data['context'] ?? array();
+		$items      = $batch_data['items'] ?? array();
+		$chunk_size = $batch_data['chunk_size'] ?? self::BATCH_CHUNK_SIZE;
+		$offset     = $batch_data['offset'] ?? 0;
+		$total      = $batch_data['total'] ?? count( $items );
+
+		// Get current chunk.
+		$chunk     = array_slice( $items, $offset, $chunk_size );
+		$scheduled = 0;
+
+		foreach ( $chunk as $params ) {
+			$job_id = $this->scheduleTask( $task_type, $params, $context );
+			if ( $job_id ) {
+				++$scheduled;
+			}
+		}
+
+		$new_offset = $offset + $chunk_size;
+
+		do_action(
+			'datamachine_log',
+			'info',
+			sprintf(
+				'System Agent batch chunk processed: %s (%d/%d, scheduled %d)',
+				$task_type,
+				min( $new_offset, $total ),
+				$total,
+				$scheduled
+			),
+			array(
+				'batch_id'   => $batchId,
+				'task_type'  => $task_type,
+				'agent_type' => 'system',
+				'offset'     => $offset,
+				'chunk_size' => $chunk_size,
+				'scheduled'  => $scheduled,
+				'remaining'  => max( 0, $total - $new_offset ),
+			)
+		);
+
+		// Schedule next chunk if items remain.
+		if ( $new_offset < $total ) {
+			$batch_data['offset'] = $new_offset;
+			set_transient( $transient_key, $batch_data, 4 * HOUR_IN_SECONDS );
+
+			as_schedule_single_action(
+				time() + self::BATCH_CHUNK_DELAY,
+				'datamachine_system_agent_process_batch',
+				array( 'batch_id' => $batchId ),
+				'data-machine'
+			);
+		} else {
+			// Batch complete — clean up transient.
+			delete_transient( $transient_key );
+
+			do_action(
+				'datamachine_log',
+				'info',
+				sprintf( 'System Agent batch complete: %s (%d items)', $task_type, $total ),
+				array(
+					'batch_id'   => $batchId,
+					'task_type'  => $task_type,
+					'agent_type' => 'system',
+					'total'      => $total,
+				)
+			);
+		}
+	}
+
+	/**
 	 * Handle a scheduled task (Action Scheduler callback).
 	 *
 	 * Loads the job, determines the task type, and delegates to the

@@ -208,9 +208,8 @@ class AltTextAbilities {
 			);
 		}
 
-		$systemAgent = SystemAgent::getInstance();
-		$queued      = array();
-
+		// Filter to eligible images.
+		$eligible = array();
 		foreach ( $attachment_ids as $id ) {
 			if ( ! wp_attachment_is_image( $id ) ) {
 				continue;
@@ -220,27 +219,51 @@ class AltTextAbilities {
 				continue;
 			}
 
-			$jobId = $systemAgent->scheduleTask(
-				'alt_text_generation',
-				array(
-					'attachment_id' => $id,
-					'force'         => $force,
-					'source'        => 'ability',
-				)
-			);
+			$eligible[] = $id;
+		}
 
-			if ( $jobId ) {
-				$queued[] = $id;
-			}
+		if ( empty( $eligible ) ) {
+			return array(
+				'success'        => true,
+				'queued_count'   => 0,
+				'attachment_ids' => array(),
+				'message'        => 'No attachments queued (alt text already present or no eligible images).',
+			);
+		}
+
+		// Build per-item params for batch scheduling.
+		$item_params = array();
+		foreach ( $eligible as $id ) {
+			$item_params[] = array(
+				'attachment_id' => $id,
+				'force'         => $force,
+				'source'        => 'ability',
+			);
+		}
+
+		$systemAgent = SystemAgent::getInstance();
+		$batch       = $systemAgent->scheduleBatch( 'alt_text_generation', $item_params );
+
+		if ( false === $batch ) {
+			return array(
+				'success'        => false,
+				'queued_count'   => 0,
+				'attachment_ids' => array(),
+				'message'        => 'Failed to schedule batch.',
+				'error'          => 'System Agent batch scheduling failed.',
+			);
 		}
 
 		return array(
 			'success'        => true,
-			'queued_count'   => count( $queued ),
-			'attachment_ids' => $queued,
-			'message'        => ! empty( $queued )
-				? sprintf( 'Alt text generation queued for %d attachment(s) via System Agent.', count( $queued ) )
-				: 'No attachments queued (alt text already present or no eligible images).',
+			'queued_count'   => count( $eligible ),
+			'attachment_ids' => $eligible,
+			'batch_id'       => $batch['batch_id'] ?? null,
+			'message'        => sprintf(
+				'Alt text generation batch scheduled for %d attachment(s) (chunks of %d).',
+				count( $eligible ),
+				$batch['chunk_size'] ?? SystemAgent::BATCH_CHUNK_SIZE
+			),
 		);
 	}
 
