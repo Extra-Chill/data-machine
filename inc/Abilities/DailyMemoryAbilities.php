@@ -132,6 +132,56 @@ class DailyMemoryAbilities {
 			);
 
 			wp_register_ability(
+				'datamachine/search-daily-memory',
+				array(
+					'label'               => 'Search Daily Memory',
+					'description'         => 'Search across daily memory files with optional date range. Returns matching lines with context.',
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'query' ),
+						'properties' => array(
+							'query' => array(
+								'type'        => 'string',
+								'description' => 'Search term (case-insensitive substring match).',
+							),
+							'from'  => array(
+								'type'        => 'string',
+								'description' => 'Start date (YYYY-MM-DD, inclusive). Omit for no lower bound.',
+							),
+							'to'    => array(
+								'type'        => 'string',
+								'description' => 'End date (YYYY-MM-DD, inclusive). Omit for no upper bound.',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'     => array( 'type' => 'boolean' ),
+							'query'       => array( 'type' => 'string' ),
+							'match_count' => array( 'type' => 'integer' ),
+							'matches'     => array(
+								'type'  => 'array',
+								'items' => array(
+									'type'       => 'object',
+									'properties' => array(
+										'date'    => array( 'type' => 'string' ),
+										'line'    => array( 'type' => 'integer' ),
+										'content' => array( 'type' => 'string' ),
+										'context' => array( 'type' => 'string' ),
+									),
+								),
+							),
+						),
+					),
+					'execute_callback'    => array( self::class, 'searchDaily' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			wp_register_ability(
 				'datamachine/daily-memory-delete',
 				array(
 					'label'               => 'Delete Daily Memory',
@@ -231,6 +281,21 @@ class DailyMemoryAbilities {
 	public static function listDaily( array $input ): array {
 		$daily = new DailyMemory();
 		return $daily->list_all();
+	}
+
+	/**
+	 * Search across daily memory files.
+	 *
+	 * @param array $input Input parameters with 'query', optional 'from' and 'to'.
+	 * @return array Search results.
+	 */
+	public static function searchDaily( array $input ): array {
+		$daily = new DailyMemory();
+		$query = $input['query'];
+		$from  = $input['from'] ?? null;
+		$to    = $input['to'] ?? null;
+
+		return $daily->search( $query, $from, $to );
 	}
 
 	/**

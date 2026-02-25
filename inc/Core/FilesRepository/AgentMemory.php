@@ -184,6 +184,66 @@ class AgentMemory {
 		);
 	}
 
+	/**
+	 * Search memory file content for a query string.
+	 *
+	 * Case-insensitive substring search with surrounding context lines.
+	 * Results are grouped by section and capped at 50 matches.
+	 *
+	 * @param string      $query         Search term.
+	 * @param string|null $section       Optional section filter (exact name without ##).
+	 * @param int         $context_lines Number of context lines above/below each match.
+	 * @return array{success: bool, query: string, matches: array, match_count: int}
+	 */
+	public function search( string $query, ?string $section = null, int $context_lines = 2 ): array {
+		if ( ! file_exists( $this->file_path ) ) {
+			return array(
+				'success'     => false,
+				'message'     => 'Memory file does not exist.',
+				'matches'     => array(),
+				'match_count' => 0,
+			);
+		}
+
+		$content       = file_get_contents( $this->file_path );
+		$lines         = explode( "\n", $content );
+		$matches       = array();
+		$current_section = null;
+		$query_lower   = mb_strtolower( $query );
+		$line_count    = count( $lines );
+
+		foreach ( $lines as $index => $line ) {
+			if ( preg_match( '/^## (.+)$/', $line, $header_match ) ) {
+				$current_section = trim( $header_match[1] );
+			}
+
+			// Skip if section filter is set and doesn't match.
+			if ( null !== $section && $current_section !== $section ) {
+				continue;
+			}
+
+			if ( false !== mb_strpos( mb_strtolower( $line ), $query_lower ) ) {
+				$ctx_start = max( 0, $index - $context_lines );
+				$ctx_end   = min( $line_count - 1, $index + $context_lines );
+				$context   = array_slice( $lines, $ctx_start, $ctx_end - $ctx_start + 1 );
+
+				$matches[] = array(
+					'section' => $current_section ?? '(top-level)',
+					'line'    => $index + 1,
+					'content' => $line,
+					'context' => implode( "\n", $context ),
+				);
+			}
+		}
+
+		return array(
+			'success'     => true,
+			'query'       => $query,
+			'matches'     => array_slice( $matches, 0, 50 ),
+			'match_count' => count( $matches ),
+		);
+	}
+
 	// =========================================================================
 	// Internal Parsing
 	// =========================================================================
