@@ -2,6 +2,35 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.31.0] - 2026-02-25
+
+### Added
+- Google Analytics (GA4) and PageSpeed Insights integrations with CLI and REST layers
+- Chat sessions abilities API (create, get, list, delete)
+- Engine abilities API — migrate execution actions to abilities layer
+- Memory search ability for agent and daily memory files
+- Agent memory file size guardrails with actionable warnings
+- Posts recent CLI command (wp datamachine posts recent)
+- Workspace @file syntax for write and edit commands
+- Post context (post_id, post_type, published_url) in agent ping payload
+- Multisite support for plugin activation and new site creation
+- Comprehensive uninstall cleanup with multisite support
+
+### Changed
+- Decompose Chat.php god file into abilities + ChatOrchestrator
+- Route all file endpoints through abilities layer
+- Condense SKILL.md for agent operators (784 → 289 lines)
+- Comprehensive SKILL.md audit and rewrite
+- Update README to reflect current plugin scope and features
+
+### Fixed
+- Conversation loop multi-handler bug (#328)
+- PageSpeed category casing and guard page_filter for non-pagePath actions
+- Use direct function call for engine data merge in publish ability
+- Protect agent files from deletion
+- Clean up file-level side effects, misplaced namespace, and duplicated date parsing
+- Exclude all core memory files from pipeline memory picker
+
 ## [0.30.0] - 2026-02-24
 
 ### Added
