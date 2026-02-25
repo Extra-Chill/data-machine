@@ -85,6 +85,11 @@ class DailyMemoryTask extends SystemTask {
 			return;
 		}
 
+		// Normalize literal \n sequences to actual newlines. LLMs sometimes output
+		// the two-character string \n instead of a real newline when generating
+		// structured text — this is model behavior, not a serialization bug.
+		$content = str_replace( '\n', "\n", $content );
+
 		// Write to the target date's daily memory file.
 		$date  = $params['date'] ?? gmdate( 'Y-m-d' );
 		$daily = new DailyMemory();

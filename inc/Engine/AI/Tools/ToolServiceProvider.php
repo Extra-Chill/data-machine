@@ -15,6 +15,7 @@ namespace DataMachine\Engine\AI\Tools;
 defined( 'ABSPATH' ) || exit;
 
 // Global tools.
+use DataMachine\Engine\AI\Tools\Global\AgentDailyMemory;
 use DataMachine\Engine\AI\Tools\Global\AgentMemory;
 use DataMachine\Engine\AI\Tools\Global\AmazonAffiliateLink;
 use DataMachine\Engine\AI\Tools\Global\BingWebmaster;
@@ -82,6 +83,7 @@ class ToolServiceProvider {
 	 * These tools are available to all agent types (pipeline, system, chat).
 	 */
 	private static function registerGlobalTools(): void {
+		new AgentDailyMemory();
 		new AgentMemory();
 		new AmazonAffiliateLink();
 		new BingWebmaster();

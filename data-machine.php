@@ -431,6 +431,9 @@ Write in a clear, helpful tone.
 
 ## Context
 <!-- Add background about your site, audience, brand, or domain expertise here -->
+
+## Continuity
+SOUL.md (this file) defines who you are. USER.md profiles your human. MEMORY.md tracks persistent knowledge. Daily memory files (daily/YYYY/MM/DD.md) capture session activity — the system generates daily summaries automatically. Keep MEMORY.md lean: persistent facts only, not session logs.
 MD,
 		'USER.md'   => <<<'MD'
 # User Profile

@@ -931,7 +931,7 @@ class FileAbilities {
 					$files[] = array(
 						'filename' => $entry,
 						'size'     => filesize( $filepath ),
-						'modified' => filemtime( $filepath ),
+						'modified' => gmdate( 'c', filemtime( $filepath ) ),
 						'type'     => 'core',
 					);
 				}
@@ -989,7 +989,7 @@ class FileAbilities {
 				array(
 					'filename' => $filename,
 					'size'     => filesize( $filepath ),
-					'modified' => filemtime( $filepath ),
+					'modified' => gmdate( 'c', filemtime( $filepath ) ),
 					'content'  => file_get_contents( $filepath ),
 				)
 			),

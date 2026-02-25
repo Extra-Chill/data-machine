@@ -187,7 +187,7 @@ class AgentMemory extends BaseTool {
 		return array(
 			'class'           => __CLASS__,
 			'method'          => 'handle_tool_call',
-			'description'     => 'Manage persistent agent memory that survives across sessions. Memory is stored as markdown sections (## headers) in MEMORY.md. Use "list_sections" to see what exists, "get" to read content, and "update" to write. Use "append" mode to add new information without losing existing content. Use "set" mode to replace a section entirely.',
+			'description'     => 'Manage persistent agent memory (MEMORY.md) — long-lived knowledge that survives across sessions. Stored as markdown sections (## headers). Use "list_sections" to see what exists, "get" to read content, and "update" to write. Use "append" mode to add new information without losing existing content. Use "set" mode to replace a section entirely. For session activity and temporal events, use agent_daily_memory instead.',
 			'requires_config' => false,
 			'parameters'      => array(
 				'action'  => array(
