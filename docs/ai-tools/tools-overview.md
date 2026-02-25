@@ -37,6 +37,33 @@ Available to all AI agents (pipeline + chat) via `datamachine_global_tools` filt
 - **Use Cases**: Correcting venue details, updating artist bios, managing taxonomy hierarchies.
 - **Documentation**: [Update Taxonomy Term](update-taxonomy-term.md)
 
+**Google Search Console** (`google_search_console`) (@since v0.25.0)
+- **Purpose**: Fetch search analytics from Google Search Console — query performance, page stats, URL inspection, and sitemap management.
+- **Configuration**: Service account JSON + site URL required
+- **Features**: 8 actions (query_stats, page_stats, query_page_stats, date_stats, inspect_url, list_sitemaps, get_sitemap, submit_sitemap), URL and query filters, date range control
+- **Use Cases**: SEO monitoring, indexing verification, search performance analysis
+- **Documentation**: [Google Search Console](google-search-console.md)
+
+**Bing Webmaster Tools** (`bing_webmaster`) (@since v0.23.0)
+- **Purpose**: Fetch search analytics from Bing Webmaster Tools — query stats, traffic stats, page stats, and crawl stats.
+- **Configuration**: API key required
+- **Features**: 4 actions (query_stats, traffic_stats, page_stats, crawl_stats), configurable result limits
+- **Use Cases**: Bing search performance, crawl monitoring, multi-engine SEO
+- **Documentation**: [Bing Webmaster Tools](bing-webmaster.md)
+
+**Google Analytics** (`google_analytics`) (@since v0.31.0)
+- **Purpose**: Fetch visitor analytics from Google Analytics (GA4) — page performance, traffic sources, daily trends, real-time users, top events, demographics.
+- **Configuration**: Service account JSON + GA4 property ID required (can reuse GSC service account)
+- **Features**: 6 actions (page_stats, traffic_sources, date_stats, realtime, top_events, user_demographics), date range control, page path filtering
+- **Use Cases**: Traffic analysis, content performance, visitor behavior, real-time monitoring
+- **Documentation**: [Google Analytics (GA4)](google-analytics.md)
+
+**PageSpeed Insights** (`pagespeed`) (@since v0.31.0)
+- **Purpose**: Run Lighthouse audits via PageSpeed Insights API — performance scores, Core Web Vitals, accessibility, SEO, and optimization opportunities.
+- **Configuration**: None required (optional API key for higher rate limits)
+- **Features**: 3 actions (analyze, performance, opportunities), mobile/desktop strategies, any public URL
+- **Use Cases**: Performance auditing, Core Web Vitals monitoring, optimization planning
+- **Documentation**: [PageSpeed Insights](pagespeed-insights.md)
 
 ### Chat-Specific Tools
 
@@ -147,6 +174,16 @@ Global tools are located in `/inc/Engine/AI/Tools/Global/`:
 - `LocalSearch.php` - WordPress internal search
 - `WebFetch.php` - Web page content retrieval
 - `WordPressPostReader.php` - Single post analysis
+- `GoogleSearchConsole.php` - Google Search Console analytics (delegates to `GoogleSearchConsoleAbilities`)
+- `BingWebmaster.php` - Bing Webmaster Tools analytics (delegates to `BingWebmasterAbilities`)
+- `GoogleAnalytics.php` - Google Analytics GA4 data (delegates to `GoogleAnalyticsAbilities`)
+- `PageSpeed.php` - PageSpeed Insights Lighthouse audits (delegates to `PageSpeedAbilities`)
+
+Analytics abilities are located in `/inc/Abilities/Analytics/`:
+- `GoogleSearchConsoleAbilities.php` - GSC API integration and JWT auth
+- `BingWebmasterAbilities.php` - Bing Webmaster API integration
+- `GoogleAnalyticsAbilities.php` - GA4 Data API integration and JWT auth
+- `PageSpeedAbilities.php` - PageSpeed Insights API integration
 
 Chat-specific tools at `/inc/Api/Chat/Tools/`:
 - `ExecuteWorkflowTool.php` - Direct workflow execution with Execute API delegation
