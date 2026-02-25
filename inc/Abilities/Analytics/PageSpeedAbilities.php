@@ -170,7 +170,7 @@ class PageSpeedAbilities {
 
 		// Add all categories for analyze/opportunities, only performance for performance action.
 		if ( 'performance' === $action ) {
-			$query_args['category'] = 'PERFORMANCE';
+			$query_args['category'] = 'performance';
 		} else {
 			// Multiple categories need to be added as repeated params.
 			// We'll build the URL manually for this.
@@ -186,7 +186,7 @@ class PageSpeedAbilities {
 
 		if ( isset( $categories ) ) {
 			foreach ( $categories as $cat ) {
-				$api_url .= '&category=' . strtoupper( rawurlencode( $cat ) );
+				$api_url .= '&category=' . rawurlencode( $cat );
 			}
 		}
 

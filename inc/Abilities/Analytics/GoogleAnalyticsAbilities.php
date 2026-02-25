@@ -269,8 +269,8 @@ class GoogleAnalyticsAbilities {
 			'limit'      => $limit,
 		);
 
-		// Build dimension filter if page_filter provided.
-		if ( ! empty( $input['page_filter'] ) ) {
+		// Build dimension filter if page_filter provided and action includes pagePath.
+		if ( ! empty( $input['page_filter'] ) && in_array( 'pagePath', $report_config['dimensions'], true ) ) {
 			$request_body['dimensionFilter'] = array(
 				'filter' => array(
 					'fieldName'    => 'pagePath',
