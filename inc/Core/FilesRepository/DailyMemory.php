@@ -288,6 +288,75 @@ class DailyMemory {
 		);
 	}
 
+	/**
+	 * Search across daily memory files for a query string.
+	 *
+	 * Case-insensitive substring search with surrounding context lines.
+	 * Optional date range filtering. Results capped at 50 matches.
+	 *
+	 * @param string      $query         Search term.
+	 * @param string|null $from          Start date (YYYY-MM-DD, inclusive). Null for no lower bound.
+	 * @param string|null $to            End date (YYYY-MM-DD, inclusive). Null for no upper bound.
+	 * @param int         $context_lines Number of context lines above/below each match.
+	 * @return array{success: bool, query: string, matches: array, match_count: int}
+	 */
+	public function search( string $query, ?string $from = null, ?string $to = null, int $context_lines = 2 ): array {
+		$all         = $this->list_all();
+		$matches     = array();
+		$query_lower = mb_strtolower( $query );
+
+		foreach ( $all['months'] as $month_key => $days ) {
+			list( $year, $month ) = explode( '/', $month_key );
+
+			foreach ( $days as $day ) {
+				$date = "{$year}-{$month}-{$day}";
+
+				// Apply date range filter.
+				if ( null !== $from && $date < $from ) {
+					continue;
+				}
+				if ( null !== $to && $date > $to ) {
+					continue;
+				}
+
+				$result = $this->read( $year, $month, $day );
+				if ( ! $result['success'] ) {
+					continue;
+				}
+
+				$lines      = explode( "\n", $result['content'] );
+				$line_count = count( $lines );
+
+				foreach ( $lines as $index => $line ) {
+					if ( false !== mb_strpos( mb_strtolower( $line ), $query_lower ) ) {
+						$ctx_start = max( 0, $index - $context_lines );
+						$ctx_end   = min( $line_count - 1, $index + $context_lines );
+						$context   = array_slice( $lines, $ctx_start, $ctx_end - $ctx_start + 1 );
+
+						$matches[] = array(
+							'date'    => $date,
+							'line'    => $index + 1,
+							'content' => $line,
+							'context' => implode( "\n", $context ),
+						);
+					}
+				}
+
+				// Early exit if we've hit the cap.
+				if ( count( $matches ) >= 50 ) {
+					break 2;
+				}
+			}
+		}
+
+		return array(
+			'success'     => true,
+			'query'       => $query,
+			'matches'     => array_slice( $matches, 0, 50 ),
+			'match_count' => count( $matches ),
+		);
+	}
+
 	// =========================================================================
 	// Internal Helpers
 	// =========================================================================

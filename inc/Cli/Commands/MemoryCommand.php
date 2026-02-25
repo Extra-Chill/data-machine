@@ -187,12 +187,68 @@ class MemoryCommand extends BaseCommand {
 	}
 
 	/**
+	 * Search agent memory content.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <query>
+	 * : Search term (case-insensitive).
+	 *
+	 * [--section=<section>]
+	 * : Limit search to a specific section.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Search all memory
+	 *     wp datamachine memory search "homeboy"
+	 *
+	 *     # Search within a section
+	 *     wp datamachine memory search "docker" --section="Lessons Learned"
+	 *
+	 * @subcommand search
+	 */
+	public function search( array $args, array $assoc_args ): void {
+		if ( empty( $args[0] ) ) {
+			WP_CLI::error( 'Search query is required.' );
+			return;
+		}
+
+		$query   = $args[0];
+		$section = $assoc_args['section'] ?? null;
+
+		$result = AgentMemoryAbilities::searchMemory(
+			array(
+				'query'   => $query,
+				'section' => $section,
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['message'] ?? 'Search failed.' );
+			return;
+		}
+
+		if ( empty( $result['matches'] ) ) {
+			WP_CLI::log( sprintf( 'No matches for "%s" in agent memory.', $query ) );
+			return;
+		}
+
+		foreach ( $result['matches'] as $match ) {
+			WP_CLI::log( sprintf( '--- [%s] line %d ---', $match['section'], $match['line'] ) );
+			WP_CLI::log( $match['context'] );
+			WP_CLI::log( '' );
+		}
+
+		WP_CLI::success( sprintf( '%d match(es) found.', $result['match_count'] ) );
+	}
+
+	/**
 	 * Daily memory operations.
 	 *
 	 * ## OPTIONS
 	 *
 	 * <action>
-	 * : Action to perform: list, read, write, append, delete.
+	 * : Action to perform: list, read, write, append, delete, search.
 	 *
 	 * [<date>]
 	 * : Date in YYYY-MM-DD format. Defaults to today for write/append.
@@ -219,6 +275,12 @@ class MemoryCommand extends BaseCommand {
 	 *
 	 *     # Delete a daily file
 	 *     wp datamachine memory daily delete 2026-02-24
+	 *
+	 *     # Search daily memory
+	 *     wp datamachine memory daily search "homeboy"
+	 *
+	 *     # Search with date range
+	 *     wp datamachine memory daily search "deploy" --from=2026-02-01 --to=2026-02-28
 	 *
 	 * @subcommand daily
 	 */
@@ -253,8 +315,16 @@ class MemoryCommand extends BaseCommand {
 				}
 				$this->daily_delete( $daily, $date );
 				break;
+			case 'search':
+				$search_query = $args[1] ?? null;
+				if ( ! $search_query ) {
+					WP_CLI::error( 'Search query is required. Usage: wp datamachine memory daily search "query" [--from=...] [--to=...]' );
+					return;
+				}
+				$this->daily_search( $daily, $search_query, $assoc_args );
+				break;
 			default:
-				WP_CLI::error( "Unknown daily action: {$action}. Use: list, read, write, append, delete" );
+				WP_CLI::error( "Unknown daily action: {$action}. Use: list, read, write, append, delete, search" );
 		}
 	}
 
@@ -380,6 +450,29 @@ class MemoryCommand extends BaseCommand {
 		}
 
 		WP_CLI::success( $result['message'] );
+	}
+
+	/**
+	 * Search daily memory files.
+	 */
+	private function daily_search( DailyMemory $daily, string $query, array $assoc_args ): void {
+		$from = $assoc_args['from'] ?? null;
+		$to   = $assoc_args['to'] ?? null;
+
+		$result = $daily->search( $query, $from, $to );
+
+		if ( empty( $result['matches'] ) ) {
+			WP_CLI::log( sprintf( 'No matches for "%s" in daily memory.', $query ) );
+			return;
+		}
+
+		foreach ( $result['matches'] as $match ) {
+			WP_CLI::log( sprintf( '--- [%s] line %d ---', $match['date'], $match['line'] ) );
+			WP_CLI::log( $match['context'] );
+			WP_CLI::log( '' );
+		}
+
+		WP_CLI::success( sprintf( '%d match(es) found.', $result['match_count'] ) );
 	}
 
 	/**

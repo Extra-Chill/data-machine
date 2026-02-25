@@ -108,6 +108,52 @@ class AgentMemoryAbilities {
 			);
 
 			wp_register_ability(
+				'datamachine/search-agent-memory',
+				array(
+					'label'               => 'Search Agent Memory',
+					'description'         => 'Search across agent memory content. Returns matching lines with context, grouped by section.',
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'query' ),
+						'properties' => array(
+							'query'   => array(
+								'type'        => 'string',
+								'description' => 'Search term (case-insensitive substring match).',
+							),
+							'section' => array(
+								'type'        => 'string',
+								'description' => 'Optional section name to limit search to (without ##).',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'     => array( 'type' => 'boolean' ),
+							'query'       => array( 'type' => 'string' ),
+							'match_count' => array( 'type' => 'integer' ),
+							'matches'     => array(
+								'type'  => 'array',
+								'items' => array(
+									'type'       => 'object',
+									'properties' => array(
+										'section' => array( 'type' => 'string' ),
+										'line'    => array( 'type' => 'integer' ),
+										'content' => array( 'type' => 'string' ),
+										'context' => array( 'type' => 'string' ),
+									),
+								),
+							),
+						),
+					),
+					'execute_callback'    => array( self::class, 'searchMemory' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			wp_register_ability(
 				'datamachine/list-agent-memory-sections',
 				array(
 					'label'               => 'List Agent Memory Sections',
@@ -176,6 +222,20 @@ class AgentMemoryAbilities {
 		}
 
 		return $memory->set_section( $section, $content );
+	}
+
+	/**
+	 * Search agent memory content.
+	 *
+	 * @param array $input Input parameters with 'query' and optional 'section'.
+	 * @return array Search results.
+	 */
+	public static function searchMemory( array $input ): array {
+		$memory  = new AgentMemory();
+		$query   = $input['query'];
+		$section = $input['section'] ?? null;
+
+		return $memory->search( $query, $section );
 	}
 
 	/**
