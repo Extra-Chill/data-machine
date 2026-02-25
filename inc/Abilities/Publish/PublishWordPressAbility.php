@@ -311,6 +311,7 @@ class PublishWordPressAbility {
 				$job_id,
 				array(
 					'post_id'       => $post_id,
+					'post_type'     => $post_type,
 					'published_url' => get_permalink( $post_id ),
 				)
 			);
