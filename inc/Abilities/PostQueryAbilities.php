@@ -166,6 +166,50 @@ class PostQueryAbilities {
 		);
 	}
 
+	/**
+	 * Query recent posts managed by Data Machine across all post types.
+	 *
+	 * No filter required — returns any post with DM tracking meta.
+	 *
+	 * @param array $input Query parameters (post_type, post_status, per_page, offset).
+	 * @return array Result with posts array and total count.
+	 */
+	public function executeQueryRecentPosts( array $input ): array {
+		$post_type   = $input['post_type'] ?? 'any';
+		$post_status = $input['post_status'] ?? 'publish';
+		$per_page    = (int) ( $input['per_page'] ?? self::DEFAULT_PER_PAGE );
+		$offset      = (int) ( $input['offset'] ?? 0 );
+
+		$args = array(
+			'post_type'      => $post_type,
+			'post_status'    => $post_status,
+			'posts_per_page' => $per_page,
+			'offset'         => $offset,
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+			'meta_query'     => array(
+				array(
+					'key'     => DATAMACHINE_POST_HANDLER_META_KEY,
+					'compare' => 'EXISTS',
+				),
+			),
+		);
+
+		$query = new \WP_Query( $args );
+
+		$posts = array();
+		foreach ( $query->posts as $post ) {
+			$posts[] = $this->format_post_result( $post );
+		}
+
+		return array(
+			'posts'    => $posts,
+			'total'    => $query->found_posts,
+			'per_page' => $per_page,
+			'offset'   => $offset,
+		);
+	}
+
 	public function executeQueryPosts( array $input ): array {
 		$filter_by    = $input['filter_by'] ?? '';
 		$filter_value = $input['filter_value'] ?? '';
