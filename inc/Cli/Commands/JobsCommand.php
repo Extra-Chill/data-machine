@@ -14,6 +14,8 @@ namespace DataMachine\Cli\Commands;
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\JobAbilities;
+use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Engine\AI\System\SystemAgent;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -769,5 +771,202 @@ class JobsCommand extends BaseCommand {
 		if ( $cleanup_processed && ( $result['processed_items_cleaned'] ?? 0 ) > 0 ) {
 			WP_CLI::log( sprintf( 'Processed items cleaned: %d', $result['processed_items_cleaned'] ) );
 		}
+	}
+
+	/**
+	 * Undo a completed job by reversing its recorded effects.
+	 *
+	 * Reads the standardized effects array from the job's engine_data and
+	 * reverses each effect (restore content revision, delete meta, remove
+	 * attachments, etc.). Only works on jobs whose task type supports undo.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [<job_id>]
+	 * : Specific job ID to undo.
+	 *
+	 * [--task-type=<type>]
+	 * : Undo all completed jobs of this task type (e.g. internal_linking).
+	 *
+	 * [--dry-run]
+	 * : Preview what would be undone without making changes.
+	 *
+	 * [--force]
+	 * : Re-undo a job even if it was already undone.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Undo a single job
+	 *     wp datamachine jobs undo 1632
+	 *
+	 *     # Preview batch undo of all internal linking jobs
+	 *     wp datamachine jobs undo --task-type=internal_linking --dry-run
+	 *
+	 *     # Batch undo all internal linking jobs
+	 *     wp datamachine jobs undo --task-type=internal_linking
+	 *
+	 * @subcommand undo
+	 */
+	public function undo( array $args, array $assoc_args ): void {
+		$job_id    = ! empty( $args[0] ) && is_numeric( $args[0] ) ? (int) $args[0] : 0;
+		$task_type = $assoc_args['task-type'] ?? '';
+		$dry_run   = isset( $assoc_args['dry-run'] );
+		$force     = isset( $assoc_args['force'] );
+
+		if ( $job_id <= 0 && empty( $task_type ) ) {
+			WP_CLI::error( 'Provide a job ID or --task-type to undo.' );
+			return;
+		}
+
+		// Resolve jobs to undo.
+		$jobs_db = new Jobs();
+		$jobs    = array();
+
+		if ( $job_id > 0 ) {
+			$job = $jobs_db->get_job( $job_id );
+			if ( ! $job ) {
+				WP_CLI::error( "Job #{$job_id} not found." );
+				return;
+			}
+			$jobs[] = $job;
+		} else {
+			$jobs = $this->findJobsByTaskType( $jobs_db, $task_type );
+			if ( empty( $jobs ) ) {
+				WP_CLI::warning( "No completed jobs found for task type '{$task_type}'." );
+				return;
+			}
+			WP_CLI::log( sprintf( 'Found %d completed %s job(s).', count( $jobs ), $task_type ) );
+		}
+
+		// Resolve task handlers.
+		$system_agent = SystemAgent::getInstance();
+		$handlers     = $system_agent->getTaskHandlers();
+
+		$total_reverted = 0;
+		$total_skipped  = 0;
+		$total_failed   = 0;
+
+		foreach ( $jobs as $job ) {
+			$jid         = $job['job_id'] ?? 0;
+			$engine_data = $job['engine_data'] ?? array();
+			$jtype       = $engine_data['task_type'] ?? '';
+
+			// Check if already undone.
+			if ( ! $force && ! empty( $engine_data['undo'] ) ) {
+				WP_CLI::log( sprintf( '  Job #%d: already undone (use --force to re-undo).', $jid ) );
+				++$total_skipped;
+				continue;
+			}
+
+			// Check task supports undo.
+			if ( ! isset( $handlers[ $jtype ] ) ) {
+				WP_CLI::warning( sprintf( 'Job #%d: unknown task type "%s".', $jid, $jtype ) );
+				++$total_skipped;
+				continue;
+			}
+
+			$task = new $handlers[ $jtype ]();
+
+			if ( ! $task->supportsUndo() ) {
+				WP_CLI::log( sprintf( '  Job #%d: task type "%s" does not support undo.', $jid, $jtype ) );
+				++$total_skipped;
+				continue;
+			}
+
+			$effects = $engine_data['effects'] ?? array();
+			if ( empty( $effects ) ) {
+				WP_CLI::log( sprintf( '  Job #%d: no effects recorded.', $jid ) );
+				++$total_skipped;
+				continue;
+			}
+
+			// Dry run — just describe what would happen.
+			if ( $dry_run ) {
+				WP_CLI::log( sprintf( '  Job #%d (%s): would undo %d effect(s):', $jid, $jtype, count( $effects ) ) );
+				foreach ( $effects as $effect ) {
+					$type   = $effect['type'] ?? 'unknown';
+					$target = $effect['target'] ?? array();
+					WP_CLI::log( sprintf( '    - %s → %s', $type, wp_json_encode( $target ) ) );
+				}
+				continue;
+			}
+
+			// Execute undo.
+			WP_CLI::log( sprintf( '  Job #%d (%s): undoing %d effect(s)...', $jid, $jtype, count( $effects ) ) );
+			$result = $task->undo( $jid, $engine_data );
+
+			foreach ( $result['reverted'] as $r ) {
+				WP_CLI::log( sprintf( '    ✓ %s reverted', $r['type'] ) );
+			}
+			foreach ( $result['skipped'] as $s ) {
+				WP_CLI::log( sprintf( '    - %s skipped: %s', $s['type'], $s['reason'] ?? '' ) );
+			}
+			foreach ( $result['failed'] as $f ) {
+				WP_CLI::warning( sprintf( '    ✗ %s failed: %s', $f['type'], $f['reason'] ?? '' ) );
+			}
+
+			$total_reverted += count( $result['reverted'] );
+			$total_skipped  += count( $result['skipped'] );
+			$total_failed   += count( $result['failed'] );
+
+			// Record undo metadata in engine_data.
+			$engine_data['undo'] = array(
+				'undone_at'        => current_time( 'mysql' ),
+				'effects_reverted' => count( $result['reverted'] ),
+				'effects_skipped'  => count( $result['skipped'] ),
+				'effects_failed'   => count( $result['failed'] ),
+			);
+			$jobs_db->store_engine_data( $jid, $engine_data );
+		}
+
+		if ( $dry_run ) {
+			WP_CLI::success( sprintf( 'Dry run complete. %d job(s) would be undone.', count( $jobs ) ) );
+			return;
+		}
+
+		WP_CLI::success( sprintf(
+			'Undo complete: %d effect(s) reverted, %d skipped, %d failed.',
+			$total_reverted,
+			$total_skipped,
+			$total_failed
+		) );
+	}
+
+	/**
+	 * Find completed jobs by task type.
+	 *
+	 * @param Jobs   $jobs_db  Jobs database instance.
+	 * @param string $task_type Task type to filter by.
+	 * @return array Array of job records.
+	 */
+	private function findJobsByTaskType( Jobs $jobs_db, string $task_type ): array {
+		global $wpdb;
+		$table = $wpdb->prefix . 'datamachine_jobs';
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT job_id FROM {$table}
+				WHERE status LIKE %s
+				AND engine_data LIKE %s
+				ORDER BY job_id DESC",
+				'completed%',
+				'%"task_type":"' . $wpdb->esc_like( $task_type ) . '"%'
+			)
+		);
+
+		if ( empty( $rows ) ) {
+			return array();
+		}
+
+		$jobs = array();
+		foreach ( $rows as $row ) {
+			$job = $jobs_db->get_job( (int) $row->job_id );
+			if ( $job ) {
+				$jobs[] = $job;
+			}
+		}
+
+		return $jobs;
 	}
 }
