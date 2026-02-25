@@ -115,12 +115,6 @@ if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR
 	\WP_CLI::add_command( 'datamachine-events test-dice-fm', \DataMachineEvents\Cli\DiceFmTestCommand::class );
 }
 
-if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/AddCityCommand.php' ) ) {
-	require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/AddCityCommand.php';
-	\WP_CLI::add_command( 'datamachine-events add-city', \DataMachineEvents\Cli\AddCityCommand::class );
-}
-
-
 /**
  * Main Data Machine Events plugin class
  *
@@ -279,11 +273,6 @@ class DATAMACHINE_Events {
 		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/DiceFmTest.php' ) ) {
 			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/DiceFmTest.php';
 			new \DataMachineEvents\Abilities\DiceFmTest();
-		}
-
-		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/CityAbilities.php' ) ) {
-			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/CityAbilities.php';
-			new \DataMachineEvents\Abilities\CityAbilities();
 		}
 
 		$this->registerSystemHealthChecks();
