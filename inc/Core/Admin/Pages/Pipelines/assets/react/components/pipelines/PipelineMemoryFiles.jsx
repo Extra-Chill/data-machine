@@ -23,7 +23,7 @@ import {
 /**
  * Files to exclude from the memory files picker (always injected separately).
  */
-const EXCLUDED_FILES = [ 'SOUL.md' ];
+const EXCLUDED_FILES = [ 'SOUL.md', 'USER.md', 'MEMORY.md' ];
 
 /**
  * Pipeline Memory Files Component

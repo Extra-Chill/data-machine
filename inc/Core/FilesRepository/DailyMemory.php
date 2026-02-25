@@ -293,6 +293,24 @@ class DailyMemory {
 	// =========================================================================
 
 	/**
+	 * Parse a YYYY-MM-DD date string into year/month/day components.
+	 *
+	 * @param string $date Date string (e.g. '2026-02-24').
+	 * @return array{year: string, month: string, day: string}|null Parsed parts or null if invalid.
+	 */
+	public static function parse_date( string $date ): ?array {
+		if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $date, $matches ) ) {
+			return null;
+		}
+
+		return array(
+			'year'  => $matches[1],
+			'month' => $matches[2],
+			'day'   => $matches[3],
+		);
+	}
+
+	/**
 	 * Scan a directory for sorted subdirectory names.
 	 *
 	 * @param string $path Directory to scan.
