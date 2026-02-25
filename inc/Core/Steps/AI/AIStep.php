@@ -192,6 +192,21 @@ class AIStep extends Step {
 		$next_flow_step_id = $navigator->get_next_flow_step_id( $this->flow_step_id, $payload );
 		$next_step_config  = $next_flow_step_id ? $this->engine->getFlowStepConfig( $next_flow_step_id ) : null;
 
+		// Collect handler slugs from adjacent steps for multi-handler tracking.
+		$all_handler_slugs = array();
+		foreach ( array( $previous_step_config, $next_step_config ) as $adj_step_config ) {
+			if ( ! $adj_step_config ) {
+				continue;
+			}
+			$handler_slugs     = $adj_step_config['handler_slugs'] ?? array();
+			$all_handler_slugs = array_merge( $all_handler_slugs, $handler_slugs );
+		}
+		if ( ! empty( $all_handler_slugs ) ) {
+			$payload['flow_step_config'] = array(
+				'handler_slugs' => array_unique( $all_handler_slugs ),
+			);
+		}
+
 		$engine_data     = $this->engine->all();
 		$available_tools = ToolExecutor::getAvailableTools( $previous_step_config, $next_step_config, $pipeline_step_id, $engine_data );
 
