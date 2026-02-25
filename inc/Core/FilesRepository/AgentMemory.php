@@ -16,6 +16,16 @@ defined( 'ABSPATH' ) || exit;
 class AgentMemory {
 
 	/**
+	 * Recommended maximum file size for agent memory files (8KB ≈ 2K tokens).
+	 *
+	 * Writes are not blocked when exceeded — a warning is logged and returned
+	 * so the agent and admin are aware of context window budget impact.
+	 *
+	 * @var int
+	 */
+	const MAX_FILE_SIZE = 8192;
+
+	/**
 	 * @var DirectoryManager
 	 */
 	private DirectoryManager $directory_manager;
@@ -142,12 +152,23 @@ class AgentMemory {
 			$file_content = $this->replace_section_content( $file_content, $section_pos, $content );
 		}
 
-		$this->write_file( $file_content );
+		$file_size = $this->write_file( $file_content );
 
-		return array(
-			'success' => true,
-			'message' => sprintf( 'Section "%s" updated.', $section_name ),
+		$result = array(
+			'success'   => true,
+			'message'   => sprintf( 'Section "%s" updated.', $section_name ),
+			'file_size' => $file_size,
 		);
+
+		if ( $file_size > self::MAX_FILE_SIZE ) {
+			$result['warning'] = sprintf(
+				'Memory file size (%s) exceeds recommended threshold (%s). Consider archiving older content to daily memory.',
+				size_format( $file_size ),
+				size_format( self::MAX_FILE_SIZE )
+			);
+		}
+
+		return $result;
 	}
 
 	/**
@@ -176,12 +197,23 @@ class AgentMemory {
 			$file_content = $this->replace_section_content( $file_content, $section_pos, $merged );
 		}
 
-		$this->write_file( $file_content );
+		$file_size = $this->write_file( $file_content );
 
-		return array(
-			'success' => true,
-			'message' => sprintf( 'Content appended to section "%s".', $section_name ),
+		$result = array(
+			'success'   => true,
+			'message'   => sprintf( 'Content appended to section "%s".', $section_name ),
+			'file_size' => $file_size,
 		);
+
+		if ( $file_size > self::MAX_FILE_SIZE ) {
+			$result['warning'] = sprintf(
+				'Memory file size (%s) exceeds recommended threshold (%s). Consider archiving older content to daily memory.',
+				size_format( $file_size ),
+				size_format( self::MAX_FILE_SIZE )
+			);
+		}
+
+		return $result;
 	}
 
 	// =========================================================================
@@ -278,9 +310,33 @@ class AgentMemory {
 	/**
 	 * Write content to the memory file.
 	 *
+	 * Logs a warning if the resulting file exceeds MAX_FILE_SIZE.
+	 *
 	 * @param string $content File content.
+	 * @return int Written file size in bytes.
 	 */
-	private function write_file( string $content ): void {
+	private function write_file( string $content ): int {
 		file_put_contents( $this->file_path, $content );
+		$size = strlen( $content );
+
+		if ( $size > self::MAX_FILE_SIZE ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				sprintf(
+					'Agent memory file exceeds recommended size: %s (%s, threshold %s)',
+					basename( $this->file_path ),
+					size_format( $size ),
+					size_format( self::MAX_FILE_SIZE )
+				),
+				array(
+					'file' => basename( $this->file_path ),
+					'size' => $size,
+					'max'  => self::MAX_FILE_SIZE,
+				)
+			);
+		}
+
+		return $size;
 	}
 }
