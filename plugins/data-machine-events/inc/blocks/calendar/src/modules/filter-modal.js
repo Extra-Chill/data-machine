@@ -1,5 +1,9 @@
 /**
- * Taxonomy filter modal UI with REST API integration for dynamic filter loading.
+ * Inline collapsible taxonomy filter UI with REST API integration.
+ *
+ * Replaces the previous modal-based filter with an inline collapsible panel
+ * that slides open below the filter bar. Loads filter options via REST API
+ * with cross-filtering support.
  */
 
 /**
@@ -9,68 +13,48 @@ import { fetchFilters } from './api-client.js';
 import { getFilterState } from './filter-state.js';
 
 export function initFilterModal(calendar, onApply, onReset) {
-    const modal = calendar.querySelector('.datamachine-taxonomy-modal');
-    if (!modal) {return;}
+    const filtersPanel = calendar.querySelector('.datamachine-taxonomy-filters-inline');
+    if (!filtersPanel) {return;}
 
-    if (modal.dataset.dmListenersAttached === 'true') {return;}
-    modal.dataset.dmListenersAttached = 'true';
+    if (filtersPanel.dataset.dmListenersAttached === 'true') {return;}
+    filtersPanel.dataset.dmListenersAttached = 'true';
 
     const filterState = getFilterState(calendar);
 
-    const modalContainer = modal.querySelector('.datamachine-taxonomy-modal-container');
-    if (modalContainer) {
-        modalContainer.setAttribute('role', 'dialog');
-        modalContainer.setAttribute('aria-modal', 'true');
-    }
+    const filterBtn = calendar.querySelector('.datamachine-taxonomy-toggle, .datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .datamachine-events-filter-btn');
+    const applyBtn = filtersPanel.querySelector('.datamachine-apply-filters');
+    const resetBtn = filtersPanel.querySelector('.datamachine-clear-all-filters');
 
-    const filterBtn = calendar.querySelector('.datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .datamachine-events-filter-btn');
-    const closeBtns = modal.querySelectorAll('.datamachine-modal-close, .datamachine-taxonomy-modal-close');
-    const applyBtn = modal.querySelector('.datamachine-apply-filters');
-    const resetBtn = modal.querySelector('.datamachine-clear-all-filters, .datamachine-reset-filters');
+    const archiveContext = getArchiveContextFromPanel(filtersPanel);
 
-    const closeModal = function() {
-        modal.classList.remove('datamachine-modal-active');
-        document.body.classList.remove('datamachine-modal-active');
-        if (filterBtn) {
-            filterBtn.focus();
-            filterBtn.setAttribute('aria-expanded', 'false');
-        }
-    };
+    const toggleHandler = async function() {
+        const isExpanded = !filtersPanel.hidden;
 
-    const archiveContext = getArchiveContextFromModal(modal);
-
-    const openModalHandler = async function() {
-        modal.classList.add('datamachine-modal-active');
-        document.body.classList.add('datamachine-modal-active');
-        filterBtn.setAttribute('aria-expanded', 'true');
-        
-        await loadFilters(
-            modal, 
-            filterState.getTaxFilters(), 
-            filterState.getDateContext(), 
-            archiveContext
-        );
-    };
-
-    const closeModalHandler = function() {
-        closeModal();
-    };
-
-    const overlayClickHandler = function(e) {
-        if (e.target === modal || e.target.classList.contains('datamachine-taxonomy-modal-overlay')) {
-            closeModal();
-        }
-    };
-
-    const escapeHandler = function(e) {
-        if ((e.key === 'Escape' || e.key === 'Esc') && modal.classList.contains('datamachine-modal-active')) {
-            closeModal();
+        if (isExpanded) {
+            // Collapse
+            filtersPanel.hidden = true;
+            if (filterBtn) {
+                filterBtn.setAttribute('aria-expanded', 'false');
+            }
+        } else {
+            // Expand and load filters
+            filtersPanel.hidden = false;
+            if (filterBtn) {
+                filterBtn.setAttribute('aria-expanded', 'true');
+            }
+            
+            await loadFilters(
+                filtersPanel, 
+                filterState.getTaxFilters(), 
+                filterState.getDateContext(), 
+                archiveContext,
+                filterState.getGeoContext()
+            );
         }
     };
 
     const applyHandler = function() {
         if (onApply) {onApply();}
-        closeModal();
         filterState.updateFilterCountBadge();
     };
 
@@ -78,7 +62,7 @@ export function initFilterModal(calendar, onApply, onReset) {
         filterState.clearStorage();
         window.history.pushState({}, '', window.location.pathname);
 
-        const checkboxes = modal.querySelectorAll('input[type="checkbox"]:checked');
+        const checkboxes = filtersPanel.querySelectorAll('input[type="checkbox"]:checked');
         checkboxes.forEach(checkbox => {
             checkbox.checked = false;
         });
@@ -86,95 +70,79 @@ export function initFilterModal(calendar, onApply, onReset) {
         filterState.updateFilterCountBadge();
 
         if (onReset) {onReset(new URLSearchParams());}
-        closeModal();
+        filtersPanel.hidden = true;
+        if (filterBtn) {
+            filterBtn.setAttribute('aria-expanded', 'false');
+        }
     };
 
     if (filterBtn) {
-        const modalId = modal.id || '';
-        filterBtn.setAttribute('aria-controls', modalId);
-        filterBtn.setAttribute('aria-expanded', 'false');
-        filterBtn.addEventListener('click', openModalHandler);
-        modal._openModalHandler = openModalHandler;
+        const panelId = filtersPanel.id || '';
+        filterBtn.setAttribute('aria-controls', panelId);
+        filterBtn.setAttribute('aria-expanded', filtersPanel.hidden ? 'false' : 'true');
+        filterBtn.addEventListener('click', toggleHandler);
+        filtersPanel._toggleHandler = toggleHandler;
     }
-
-    closeBtns.forEach(function(btn) {
-        btn.addEventListener('click', closeModalHandler);
-    });
-    modal._closeModalHandler = closeModalHandler;
-    modal._closeBtns = closeBtns;
-
-    modal.addEventListener('click', overlayClickHandler);
-    modal._overlayClickHandler = overlayClickHandler;
-
-    document.addEventListener('keydown', escapeHandler);
-    modal._escapeHandler = escapeHandler;
 
     if (applyBtn) {
         applyBtn.addEventListener('click', applyHandler);
-        modal._applyHandler = applyHandler;
-        modal._applyBtn = applyBtn;
+        filtersPanel._applyHandler = applyHandler;
+        filtersPanel._applyBtn = applyBtn;
     }
 
     if (resetBtn) {
         resetBtn.addEventListener('click', resetHandler);
-        modal._resetHandler = resetHandler;
-        modal._resetBtn = resetBtn;
+        filtersPanel._resetHandler = resetHandler;
+        filtersPanel._resetBtn = resetBtn;
     }
 
     filterState.updateFilterCountBadge();
+
+    // If filters are already active (panel starts expanded), load them
+    if (!filtersPanel.hidden) {
+        loadFilters(
+            filtersPanel,
+            filterState.getTaxFilters(),
+            filterState.getDateContext(),
+            archiveContext,
+            filterState.getGeoContext()
+        );
+    }
 }
 
 export function destroyFilterModal(calendar) {
-    const modal = calendar.querySelector('.datamachine-taxonomy-modal');
-    if (!modal) {return;}
+    const filtersPanel = calendar.querySelector('.datamachine-taxonomy-filters-inline');
+    if (!filtersPanel) {return;}
 
-    if (modal.dataset.dmListenersAttached !== 'true') {return;}
+    if (filtersPanel.dataset.dmListenersAttached !== 'true') {return;}
 
-    const filterBtn = calendar.querySelector('.datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .datamachine-events-filter-btn');
+    const filterBtn = calendar.querySelector('.datamachine-taxonomy-toggle, .datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .datamachine-events-filter-btn');
 
-    if (filterBtn && modal._openModalHandler) {
-        filterBtn.removeEventListener('click', modal._openModalHandler);
+    if (filterBtn && filtersPanel._toggleHandler) {
+        filterBtn.removeEventListener('click', filtersPanel._toggleHandler);
     }
 
-    if (modal._closeBtns && modal._closeModalHandler) {
-        modal._closeBtns.forEach(function(btn) {
-            btn.removeEventListener('click', modal._closeModalHandler);
-        });
+    if (filtersPanel._applyBtn && filtersPanel._applyHandler) {
+        filtersPanel._applyBtn.removeEventListener('click', filtersPanel._applyHandler);
     }
 
-    if (modal._overlayClickHandler) {
-        modal.removeEventListener('click', modal._overlayClickHandler);
+    if (filtersPanel._resetBtn && filtersPanel._resetHandler) {
+        filtersPanel._resetBtn.removeEventListener('click', filtersPanel._resetHandler);
     }
 
-    if (modal._escapeHandler) {
-        document.removeEventListener('keydown', modal._escapeHandler);
-    }
+    delete filtersPanel._toggleHandler;
+    delete filtersPanel._applyHandler;
+    delete filtersPanel._applyBtn;
+    delete filtersPanel._resetHandler;
+    delete filtersPanel._resetBtn;
 
-    if (modal._applyBtn && modal._applyHandler) {
-        modal._applyBtn.removeEventListener('click', modal._applyHandler);
-    }
-
-    if (modal._resetBtn && modal._resetHandler) {
-        modal._resetBtn.removeEventListener('click', modal._resetHandler);
-    }
-
-    delete modal._openModalHandler;
-    delete modal._closeModalHandler;
-    delete modal._closeBtns;
-    delete modal._overlayClickHandler;
-    delete modal._escapeHandler;
-    delete modal._applyHandler;
-    delete modal._applyBtn;
-    delete modal._resetHandler;
-    delete modal._resetBtn;
-
-    modal.dataset.dmListenersAttached = 'false';
+    filtersPanel.dataset.dmListenersAttached = 'false';
 }
 
-function getArchiveContextFromModal(modal) {
-    const taxonomy = modal.dataset.archiveTaxonomy || '';
-    const termId = parseInt(modal.dataset.archiveTermId, 10) || 0;
-    const termName = modal.dataset.archiveTermName || '';
+function getArchiveContextFromPanel(panel) {
+    const taxonomy = panel.dataset.archiveTaxonomy || '';
+    const termId = parseInt(panel.dataset.archiveTermId, 10) || 0;
+    const termName = panel.dataset.archiveTermName || '';
     
     if (taxonomy && termId) {
         return { taxonomy, term_id: termId, term_name: termName };
@@ -182,24 +150,27 @@ function getArchiveContextFromModal(modal) {
     return {};
 }
 
-async function loadFilters(modal, activeFilters = {}, dateContext = {}, archiveContext = {}) {
-    const container = modal.querySelector('.datamachine-filter-taxonomies');
-    const loading = modal.querySelector('.datamachine-filter-loading');
+async function loadFilters(panel, activeFilters = {}, dateContext = {}, archiveContext = {}, geoContext = {}) {
+    const container = panel.querySelector('.datamachine-filter-taxonomies');
+    const loading = panel.querySelector('.datamachine-taxonomy-filters-loading');
+    const actions = panel.querySelector('.datamachine-taxonomy-filters-actions');
     
     if (!container) {return;}
     
     if (loading) {loading.style.display = 'flex';}
+    if (actions) {actions.hidden = true;}
     container.innerHTML = '';
     
     try {
-        const data = await fetchFilters(activeFilters, dateContext, archiveContext);
+        const data = await fetchFilters(activeFilters, dateContext, archiveContext, geoContext);
         
         if (!data.success) {
             throw new Error('API returned unsuccessful response');
         }
         
         renderTaxonomies(container, data.taxonomies, activeFilters, data.archive_context || {});
-        attachFilterChangeListeners(modal, dateContext, archiveContext);
+        attachFilterChangeListeners(panel, dateContext, archiveContext, geoContext);
+        if (actions) {actions.hidden = false;}
         
     } catch (error) {
         container.innerHTML = '<div class="datamachine-filter-error"><p>Error loading filters. Please try again.</p></div>';
@@ -302,20 +273,20 @@ function flattenHierarchy(terms, level = 0) {
     return flat;
 }
 
-function attachFilterChangeListeners(modal, dateContext = {}, archiveContext = {}) {
-    const checkboxes = modal.querySelectorAll('input[type="checkbox"]:not([data-locked="true"])');
+function attachFilterChangeListeners(panel, dateContext = {}, archiveContext = {}, geoContext = {}) {
+    const checkboxes = panel.querySelectorAll('input[type="checkbox"]:not([data-locked="true"])');
     
     checkboxes.forEach(checkbox => {
         checkbox.addEventListener('change', async () => {
-            const activeFilters = getCheckedFilters(modal);
-            await loadFilters(modal, activeFilters, dateContext, archiveContext);
+            const activeFilters = getCheckedFilters(panel);
+            await loadFilters(panel, activeFilters, dateContext, archiveContext, geoContext);
         });
     });
 }
 
-function getCheckedFilters(modal) {
+function getCheckedFilters(panel) {
     const filters = {};
-    const checkboxes = modal.querySelectorAll('input[type="checkbox"]:checked');
+    const checkboxes = panel.querySelectorAll('input[type="checkbox"]:checked');
     
     checkboxes.forEach(checkbox => {
         const taxonomy = checkbox.dataset.taxonomy;

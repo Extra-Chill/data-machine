@@ -344,33 +344,175 @@ class Venue_Taxonomy {
 	/**
 	 * Geocode an address using Nominatim API
 	 *
+	 * Tries multiple query strategies to handle messy address data from imports.
+	 * Falls back to venue name + city if structured address queries fail.
+	 *
 	 * @param array $venue_data Venue data with address fields
 	 * @return string|null Coordinates as "lat,lng" or null on failure
 	 */
 	public static function geocode_address( $venue_data ) {
-		$query_parts = array();
+		$queries = self::build_geocode_queries( $venue_data );
 
-		if ( ! empty( $venue_data['address'] ) ) {
-			$query_parts[] = $venue_data['address'];
-		}
-		if ( ! empty( $venue_data['city'] ) ) {
-			$query_parts[] = $venue_data['city'];
-		}
-		if ( ! empty( $venue_data['state'] ) ) {
-			$query_parts[] = $venue_data['state'];
-		}
-		if ( ! empty( $venue_data['zip'] ) ) {
-			$query_parts[] = $venue_data['zip'];
-		}
-		if ( ! empty( $venue_data['country'] ) ) {
-			$query_parts[] = $venue_data['country'];
-		}
-
-		if ( empty( $query_parts ) ) {
+		if ( empty( $queries ) ) {
 			return null;
 		}
 
-		$query = implode( ', ', $query_parts );
+		foreach ( $queries as $strategy => $query ) {
+			$coordinates = self::query_nominatim( $query );
+
+			if ( $coordinates ) {
+				do_action(
+					'datamachine_log',
+					'info',
+					'Geocoding succeeded',
+					array(
+						'strategy' => $strategy,
+						'query'    => $query,
+						'result'   => $coordinates,
+						'name'     => $venue_data['name'] ?? '',
+					)
+				);
+				return $coordinates;
+			}
+		}
+
+		do_action(
+			'datamachine_log',
+			'warning',
+			'Geocoding failed all strategies',
+			array(
+				'queries' => $queries,
+				'name'    => $venue_data['name'] ?? '',
+			)
+		);
+
+		return null;
+	}
+
+	/**
+	 * Build ordered list of geocoding query strategies
+	 *
+	 * Handles common import data issues:
+	 * - Address field containing full address with city/state/zip already embedded
+	 * - Suite/unit numbers that confuse Nominatim
+	 * - HTML entities in venue names
+	 * - Written-out numbers (e.g., "One Lincoln Financial Way")
+	 *
+	 * @param array $venue_data Venue data with address fields
+	 * @return array Ordered queries keyed by strategy name
+	 */
+	private static function build_geocode_queries( array $venue_data ): array {
+		$address = html_entity_decode( trim( $venue_data['address'] ?? '' ) );
+		$city    = html_entity_decode( trim( $venue_data['city'] ?? '' ) );
+		$state   = trim( $venue_data['state'] ?? '' );
+		$zip     = trim( $venue_data['zip'] ?? '' );
+		$country = trim( $venue_data['country'] ?? '' );
+		$name    = html_entity_decode( trim( $venue_data['name'] ?? '' ) );
+
+		$queries = array();
+
+		if ( empty( $address ) && empty( $city ) && empty( $name ) ) {
+			return $queries;
+		}
+
+		// Detect if address already contains city/state/zip (common with imports)
+		$address_has_city = ! empty( $city ) && false !== stripos( $address, $city );
+
+		// Clean the street portion of the address
+		$street = $address;
+
+		if ( $address_has_city ) {
+			// Extract just the street part before the city
+			$street = self::extract_street_from_address( $address, $city );
+		}
+
+		// Strip suite/unit/apartment suffixes that confuse Nominatim
+		$street = preg_replace( '/,?\s*(?:Suite|Ste|Unit|Apt|#|Room|Rm)\s*[\w\-#]+.*/i', '', $street );
+		// Strip "Located in: ..." annotations
+		$street = preg_replace( '/,?\s*Located in:.*$/i', '', $street );
+		$street = trim( $street, ', ' );
+
+		// Strategy 1: Cleaned street + city + state + zip
+		if ( ! empty( $street ) && ! empty( $city ) ) {
+			$parts = array_filter( array( $street, $city, $state, $zip ) );
+			$query = implode( ', ', $parts );
+			if ( ! empty( $query ) ) {
+				$queries['cleaned_address'] = $query;
+			}
+		}
+
+		// Strategy 2: Street + city + state (no zip — zip sometimes causes false negatives)
+		if ( ! empty( $street ) && ! empty( $city ) && ! empty( $state ) ) {
+			$query = implode( ', ', array( $street, $city, $state ) );
+			if ( ! isset( $queries['cleaned_address'] ) || $query !== $queries['cleaned_address'] ) {
+				$queries['no_zip'] = $query;
+			}
+		}
+
+		// Strategy 3: Venue name + city + state (Nominatim indexes many POIs by name)
+		if ( ! empty( $name ) && ! empty( $city ) ) {
+			$parts = array_filter( array( $name, $city, $state ) );
+			$queries['name_lookup'] = implode( ', ', $parts );
+		}
+
+		// Strategy 4: Raw address field as-is (in case it's already a complete, well-formatted address)
+		if ( ! empty( $address ) && $address !== ( $queries['cleaned_address'] ?? '' ) ) {
+			$queries['raw_address'] = html_entity_decode( $address );
+		}
+
+		return $queries;
+	}
+
+	/**
+	 * Extract just the street address from a full address string that contains city info
+	 *
+	 * @param string $address Full address string
+	 * @param string $city City name to find
+	 * @return string Street portion of the address
+	 */
+	private static function extract_street_from_address( string $address, string $city ): string {
+		$parts       = preg_split( '/,\s*/', $address );
+		$street_parts = array();
+
+		foreach ( $parts as $part ) {
+			$part = trim( $part );
+
+			// Stop if this part contains the city name
+			if ( false !== stripos( $part, $city ) ) {
+				break;
+			}
+
+			// Stop if this part looks like a state abbreviation
+			if ( preg_match( '/^[A-Z]{2}$/', $part ) ) {
+				break;
+			}
+
+			// Stop if this part looks like a zip code
+			if ( preg_match( '/^\d{5}(-\d{4})?$/', $part ) ) {
+				break;
+			}
+
+			// Stop if this part is a country
+			if ( in_array( strtoupper( $part ), array( 'US', 'USA', 'UNITED STATES' ), true ) ) {
+				break;
+			}
+
+			$street_parts[] = $part;
+		}
+
+		return ! empty( $street_parts ) ? implode( ', ', $street_parts ) : $address;
+	}
+
+	/**
+	 * Query Nominatim API for coordinates
+	 *
+	 * @param string $query Search query string
+	 * @return string|null Coordinates as "lat,lng" or null on failure
+	 */
+	public static function query_nominatim( string $query ): ?string {
+		if ( empty( $query ) ) {
+			return null;
+		}
 
 		$url = add_query_arg(
 			array(
@@ -412,10 +554,10 @@ class Venue_Taxonomy {
 			return null;
 		}
 
-		$result = $data[0];
+		$nominatim_result = $data[0];
 
-		if ( isset( $result['lat'] ) && isset( $result['lon'] ) ) {
-			return $result['lat'] . ',' . $result['lon'];
+		if ( isset( $nominatim_result['lat'] ) && isset( $nominatim_result['lon'] ) ) {
+			return $nominatim_result['lat'] . ',' . $nominatim_result['lon'];
 		}
 
 		return null;

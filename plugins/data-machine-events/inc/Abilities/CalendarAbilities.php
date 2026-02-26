@@ -179,6 +179,10 @@ class CalendarAbilities {
 			'archive_term_id'    => $archive_term_id,
 			'source'             => 'ability',
 			'user_date_range'    => ! empty( $user_date_start ) || ! empty( $user_date_end ),
+			'geo_lat'            => $input['geo_lat'] ?? '',
+			'geo_lng'            => $input['geo_lng'] ?? '',
+			'geo_radius'         => $input['geo_radius'] ?? 25,
+			'geo_radius_unit'    => $input['geo_radius_unit'] ?? 'mi',
 		);
 
 		$date_data         = Calendar_Query::get_unique_event_dates( $base_params );
