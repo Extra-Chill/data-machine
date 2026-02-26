@@ -17,6 +17,5 @@
     }
   ],
   "changelog_target": "docs/CHANGELOG.md",
-  "build_command": "npm run build",
   "auto_cleanup": false
 }
