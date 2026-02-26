@@ -80,6 +80,22 @@ function datamachine_socials_load_handlers() {
 // Hook into plugins_loaded to ensure Data Machine core is loaded first
 add_action( 'plugins_loaded', 'datamachine_socials_load_handlers', 20 );
 
+/**
+ * Register image generation templates with Data Machine core.
+ *
+ * Templates are registered via filter so core's TemplateRegistry can
+ * discover and instantiate them. Runs on plugins_loaded after handlers.
+ */
+function datamachine_socials_register_image_templates() {
+	add_filter( 'datamachine/image_generation/templates', function ( array $templates ): array {
+		$templates['quote_card'] = \DataMachineSocials\ImageGeneration\Templates\QuoteCard::class;
+		$templates['chart']     = \DataMachineSocials\ImageGeneration\Templates\ChartTemplate::class;
+		$templates['diagram']   = \DataMachineSocials\ImageGeneration\Templates\DiagramTemplate::class;
+		return $templates;
+	} );
+}
+add_action( 'plugins_loaded', 'datamachine_socials_register_image_templates', 21 );
+
 // Register REST API
 require_once DATAMACHINE_SOCIALS_PATH . 'inc/RestApi.php';
 add_action( 'plugins_loaded', array( 'DataMachineSocials\RestApi', 'register' ), 25 );
