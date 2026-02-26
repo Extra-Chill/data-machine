@@ -112,6 +112,38 @@ class RestApi {
 				'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
 			)
 		);
+
+		// Instagram: list media or get single post
+		register_rest_route(
+			self::NAMESPACE,
+			'/instagram/media',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( __CLASS__, 'instagram_read' ),
+				'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+				'args'                => array(
+					'action'   => array(
+						'type'              => 'string',
+						'default'           => 'list',
+						'enum'              => array( 'list', 'get', 'comments' ),
+						'sanitize_callback' => 'sanitize_text_field',
+					),
+					'media_id' => array(
+						'type'              => 'string',
+						'sanitize_callback' => 'sanitize_text_field',
+					),
+					'limit'    => array(
+						'type'              => 'integer',
+						'default'           => 25,
+						'sanitize_callback' => 'absint',
+					),
+					'after'    => array(
+						'type'              => 'string',
+						'sanitize_callback' => 'sanitize_text_field',
+					),
+				),
+			)
+		);
 	}
 
 	/**
@@ -412,6 +444,54 @@ class RestApi {
 		$url = $upload_dir['baseurl'] . '/dms-temp/' . $filename;
 
 		return new \WP_REST_Response( array( 'url' => $url ) );
+	}
+
+	/**
+	 * Instagram read: list media, get single post, or get comments.
+	 *
+	 * Delegates to the datamachine/instagram-read ability.
+	 */
+	public static function instagram_read( \WP_REST_Request $request ) {
+		$action   = $request->get_param( 'action' ) ?? 'list';
+		$media_id = $request->get_param( 'media_id' );
+
+		// Validate action-specific requirements.
+		if ( in_array( $action, array( 'get', 'comments' ), true ) && empty( $media_id ) ) {
+			return new \WP_REST_Response(
+				array(
+					'success' => false,
+					'error'   => "media_id is required for the {$action} action",
+				),
+				400
+			);
+		}
+
+		$ability_instance = new \DataMachineSocials\Abilities\Instagram\InstagramReadAbility();
+		$input            = array(
+			'action' => $action,
+		);
+
+		if ( ! empty( $media_id ) ) {
+			$input['media_id'] = $media_id;
+		}
+
+		$limit = $request->get_param( 'limit' );
+		if ( $limit ) {
+			$input['limit'] = absint( $limit );
+		}
+
+		$after = $request->get_param( 'after' );
+		if ( $after ) {
+			$input['after'] = $after;
+		}
+
+		$result = $ability_instance->execute( $input );
+
+		if ( ! $result['success'] ) {
+			return new \WP_REST_Response( $result, 500 );
+		}
+
+		return new \WP_REST_Response( $result );
 	}
 
 	/**
