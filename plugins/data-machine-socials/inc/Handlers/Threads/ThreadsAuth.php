@@ -62,68 +62,45 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	}
 
 	/**
-	* Check if admin has valid Threads authentication
+	* Perform Threads-specific token refresh.
 	*
-	* @return bool True if authenticated
-	*/
-	public function is_authenticated(): bool {
-		$account = $this->get_account();
-		if ( empty( $account ) || ! is_array( $account ) ) {
-			return false;
-		}
-
-		if ( empty( $account['access_token'] ) ) {
-			return false;
-		}
-
-		if ( isset( $account['token_expires_at'] ) && time() > $account['token_expires_at'] ) {
-			return false;
-		}
-
-		return true;
-	}
-
-	/**
-	* Get access token with automatic refresh (Threads-specific)
+	* Threads long-lived tokens are refreshed via the th_refresh_token grant.
+	* Delegates to BaseOAuth2Provider::get_valid_access_token() for on-demand
+	* refresh with 7-day buffer (inherited default).
 	*
-	* @return string|null Access token or null
+	* @since 0.3.0
+	* @param string $current_token The current access token to refresh.
+	* @return array|\WP_Error|null Token data on success, WP_Error on failure.
 	*/
-	public function get_access_token(): ?string {
-		$account = $this->get_account();
-		if ( empty( $account ) || ! is_array( $account ) || empty( $account['access_token'] ) ) {
-			return null;
+	protected function do_refresh_token( string $current_token ): array|\WP_Error|null {
+		$params = array(
+			'grant_type'   => 'th_refresh_token',
+			'access_token' => $current_token,
+		);
+		$url = self::REFRESH_URL . '?' . http_build_query( $params );
+
+		$result = HttpClient::get( $url, array( 'context' => 'Threads OAuth' ) );
+
+		if ( ! $result['success'] ) {
+			return new \WP_Error( 'threads_refresh_http_error', $result['error'] );
 		}
 
-		// Check if token needs refresh (expires within the next 7 days)
-		$needs_refresh = false;
-		if ( isset( $account['token_expires_at'] ) ) {
-			$expiry_timestamp = intval( $account['token_expires_at'] );
-			$seven_days_in_seconds = 7 * 24 * 60 * 60;
-			if ( time() > $expiry_timestamp ) {
-				$needs_refresh = true;
-			} elseif ( ( $expiry_timestamp - time() ) < $seven_days_in_seconds ) {
-				$needs_refresh = true;
-			}
+		$body      = $result['data'];
+		$data      = json_decode( $body, true );
+		$http_code = $result['status_code'];
+
+		if ( 200 !== $http_code || empty( $data['access_token'] ) ) {
+			$error_message = $data['error']['message'] ?? $data['error_description'] ?? 'Failed to refresh Threads access token.';
+			return new \WP_Error( 'threads_refresh_api_error', $error_message, $data );
 		}
 
-		$current_token = $account['access_token'];
+		$expires_in = $data['expires_in'] ?? 3600 * 24 * 60;
+		$expires_at = time() + intval( $expires_in );
 
-		if ( $needs_refresh ) {
-			$refreshed_data = $this->refresh_access_token( $current_token );
-			if ( ! is_wp_error( $refreshed_data ) ) {
-				$account['access_token'] = $refreshed_data['access_token'];
-				$account['token_expires_at'] = $refreshed_data['expires_at'];
-				$this->save_account( $account );
-				return $refreshed_data['access_token'];
-			} else {
-				if ( isset( $account['token_expires_at'] ) && time() > intval( $account['token_expires_at'] ) ) {
-					return null;
-				}
-				return $current_token;
-			}
-		}
-
-		return $current_token;
+		return array(
+			'access_token' => $data['access_token'],
+			'expires_at'   => $expires_at,
+		);
 	}
 
 	/**
@@ -180,7 +157,7 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			),
 			function ( $long_lived_token_data ) {
 				// Build account data from long-lived token
-				$access_token = $long_lived_token_data['access_token'];
+				$access_token     = $long_lived_token_data['access_token'];
 				$token_expires_at = $long_lived_token_data['expires_at'];
 
 				// Fetch posting entity info
@@ -193,10 +170,10 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				}
 
 				return array(
-					'access_token' => $access_token,
-					'token_type' => 'bearer',
-					'page_id' => $posting_entity_info['id'],
-					'page_name' => $posting_entity_info['name'] ?? 'Unknown Page/User',
+					'access_token'     => $access_token,
+					'token_type'       => 'bearer',
+					'page_id'          => $posting_entity_info['id'],
+					'page_name'        => $posting_entity_info['name'] ?? 'Unknown Page/User',
 					'authenticated_at' => time(),
 					'token_expires_at' => $token_expires_at,
 				);
@@ -208,7 +185,10 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 					$config
 				);
 			},
-			array( $this, 'save_account' )
+			function ( $account_data ) {
+				$this->save_account( $account_data );
+				$this->schedule_proactive_refresh();
+			}
 		);
 	}
 
@@ -320,43 +300,6 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
 		do_action( 'datamachine_log', 'debug', 'Threads OAuth: Profile fetched successfully', array( 'profile_id' => $data['id'] ) );
 		return $data;
-	}
-
-	/**
-	* Refresh long-lived Threads access token (Threads-specific)
-	*
-	* @param string $access_token Current long-lived token
-	* @return array|\WP_Error ['access_token' => ..., 'expires_at' => ...] or error
-	*/
-	private function refresh_access_token( string $access_token ): array|\WP_Error {
-		$params = array(
-			'grant_type' => 'th_refresh_token',
-			'access_token' => $access_token,
-		);
-		$url = self::REFRESH_URL . '?' . http_build_query( $params );
-
-		$result = HttpClient::get( $url, array( 'context' => 'Threads OAuth' ) );
-
-		if ( ! $result['success'] ) {
-			return new \WP_Error( 'threads_refresh_http_error', $result['error'] );
-		}
-
-		$body = $result['data'];
-		$data = json_decode( $body, true );
-		$http_code = $result['status_code'];
-
-		if ( 200 !== $http_code || empty( $data['access_token'] ) ) {
-			$error_message = $data['error']['message'] ?? $data['error_description'] ?? 'Failed to refresh Threads access token.';
-			return new \WP_Error( 'threads_refresh_api_error', $error_message, $data );
-		}
-
-		$expires_in = $data['expires_in'] ?? 3600 * 24 * 60;
-		$expires_at = time() + intval( $expires_in );
-
-		return array(
-			'access_token' => $data['access_token'],
-			'expires_at' => $expires_at,
-		);
 	}
 
 	/**
