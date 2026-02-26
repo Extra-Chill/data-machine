@@ -2,6 +2,33 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.32.0] - 2026-02-26
+
+### Added
+- System Task Runner step type (#277)
+- add parent_job_id column for first-class job hierarchy
+- batch tracking with parent jobs, cancellation, and CLI commands
+- backfill undo support to AltTextTask and ImageGenerationTask
+- Generic job undo system with effects tracking (#425)
+- self-healing scaffolding — recreate missing agent files on first read
+
+### Changed
+- Add batch scheduling to prevent Action Scheduler flooding (#417)
+- Split audit into focused abilities with caching, REST API, and chat tool
+- Add internal link audit ability: scan content, build link graph, find orphans
+- Add NetworkSettings for network-wide defaults with per-site override cascade
+- Add BaseAuthProvider tests covering site-level option storage
+- Share auth provider credentials across multisite network
+- Include network-activated plugins in multisite scaffolding
+- Populate agent scaffolding with WordPress site data instead of empty placeholders
+
+### Fixed
+- ability registration timing for CLI context (#430)
+- add skip_default_flow to create-pipeline ability (#429)
+- internal linking scores by title similarity, not just taxonomy (#416) (#426)
+- jobs show displays engine data for all job types (#422) (#423)
+- memory system improvements — date bug, \n escaping, daily memory tool, SOUL.md guidance (#406)
+
 ## [0.31.0] - 2026-02-25
 
 ### Added
