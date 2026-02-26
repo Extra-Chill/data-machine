@@ -294,6 +294,48 @@ class PinterestCommand {
 		return new \DataMachineSocials\Abilities\Pinterest\PinterestReadAbility();
 	}
 
+	private function get_update_ability() {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/pinterest-update' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/pinterest-update ability not registered.' );
+		}
+
+		return new \DataMachineSocials\Abilities\Pinterest\PinterestUpdateAbility();
+	}
+
+	/**
+	 * Delete a Pinterest pin.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <pin_id>
+	 * : The Pinterest pin ID to delete.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials pinterest delete 1234567890
+	 */
+	public function delete( $args, $assoc_args ) {
+		$pin_id = $args[0];
+		$ability = $this->get_update_ability();
+
+		$result = $ability->execute( array(
+			'action' => 'delete',
+			'pin_id'  => $pin_id,
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Pin deleted successfully!' );
+		WP_CLI::log( 'Pin ID: ' . $result['data']['pin_id'] );
+	}
+
 	/**
 	 * Format items for output.
 	 *

@@ -276,4 +276,46 @@ class ThreadsCommand {
 
 		return new \DataMachineSocials\Abilities\Threads\ThreadsReadAbility();
 	}
+
+	private function get_update_ability() {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/threads-update' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/threads-update ability not registered.' );
+		}
+
+		return new \DataMachineSocials\Abilities\Threads\ThreadsUpdateAbility();
+	}
+
+	/**
+	 * Delete a Threads post.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <thread_id>
+	 * : The Threads thread ID to delete.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials threads delete 1234567890
+	 */
+	public function delete( $args, $assoc_args ) {
+		$thread_id = $args[0];
+		$ability   = $this->get_update_ability();
+
+		$result = $ability->execute( array(
+			'action'    => 'delete',
+			'thread_id' => $thread_id,
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Thread deleted successfully!' );
+		WP_CLI::log( 'Thread ID: ' . $result['data']['thread_id'] );
+	}
 }

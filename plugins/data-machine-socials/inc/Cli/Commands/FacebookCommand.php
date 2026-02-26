@@ -277,4 +277,112 @@ class FacebookCommand {
 
 		return new \DataMachineSocials\Abilities\Facebook\FacebookReadAbility();
 	}
+
+	private function get_update_ability() {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/facebook-update' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/facebook-update ability not registered.' );
+		}
+
+		return new \DataMachineSocials\Abilities\Facebook\FacebookUpdateAbility();
+	}
+
+	/**
+	 * Edit a Facebook post message.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <post_id>
+	 * : The Facebook post ID.
+	 *
+	 * <message>
+	 * : New message text.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials facebook edit 123456789 "New message"
+	 */
+	public function edit( $args, $assoc_args ) {
+		$post_id  = $args[0];
+		$message  = $args[1] ?? '';
+		$ability  = $this->get_update_ability();
+
+		if ( empty( $message ) ) {
+			WP_CLI::error( 'Message is required.' );
+		}
+
+		$result = $ability->execute( array(
+			'action'  => 'edit',
+			'post_id' => $post_id,
+			'message' => $message,
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Post updated successfully!' );
+		WP_CLI::log( 'Post ID: ' . $result['data']['post_id'] );
+	}
+
+	/**
+	 * Hide a Facebook post.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <post_id>
+	 * : The Facebook post ID to hide.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials facebook hide 123456789
+	 */
+	public function hide( $args, $assoc_args ) {
+		$post_id = $args[0];
+		$ability = $this->get_update_ability();
+
+		$result = $ability->execute( array(
+			'action'  => 'hide',
+			'post_id' => $post_id,
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Post hidden successfully!' );
+	}
+
+	/**
+	 * Delete a Facebook post.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <post_id>
+	 * : The Facebook post ID to delete.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials facebook delete 123456789
+	 */
+	public function delete( $args, $assoc_args ) {
+		$post_id = $args[0];
+		$ability = $this->get_update_ability();
+
+		$result = $ability->execute( array(
+			'action'  => 'delete',
+			'post_id' => $post_id,
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Post deleted successfully!' );
+		WP_CLI::log( 'Post ID: ' . $result['data']['post_id'] );
+	}
 }

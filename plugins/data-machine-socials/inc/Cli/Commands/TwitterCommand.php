@@ -246,6 +246,91 @@ class TwitterCommand {
 		WP_CLI::log( 'Auth type:     OAuth 1.0a (tokens do not expire)' );
 	}
 
+	/**
+	 * Delete a tweet.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <tweet_id>
+	 * : The tweet ID to delete.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials twitter delete 1234567890
+	 */
+	public function delete( $args, $assoc_args ) {
+		$tweet_id = $args[0];
+		$ability  = $this->get_update_ability();
+
+		$result = $ability->execute( array(
+			'action'   => 'delete',
+			'tweet_id' => $tweet_id,
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Tweet deleted successfully!' );
+		WP_CLI::log( 'Tweet ID: ' . $result['data']['tweet_id'] );
+	}
+
+	/**
+	 * Retweet a tweet.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <tweet_id>
+	 * : The tweet ID to retweet.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials twitter retweet 1234567890
+	 */
+	public function retweet( $args, $assoc_args ) {
+		$tweet_id = $args[0];
+		$ability  = $this->get_update_ability();
+
+		$result = $ability->execute( array(
+			'action'   => 'retweet',
+			'tweet_id' => $tweet_id,
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Retweeted successfully!' );
+	}
+
+	/**
+	 * Like a tweet.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <tweet_id>
+	 * : The tweet ID to like.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials twitter like 1234567890
+	 */
+	public function like( $args, $assoc_args ) {
+		$tweet_id = $args[0];
+		$ability  = $this->get_update_ability();
+
+		$result = $ability->execute( array(
+			'action'   => 'like',
+			'tweet_id' => $tweet_id,
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Tweet liked successfully!' );
+	}
+
 	private function get_ability() {
 		if ( ! function_exists( 'wp_get_ability' ) ) {
 			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
@@ -257,5 +342,18 @@ class TwitterCommand {
 		}
 
 		return new \DataMachineSocials\Abilities\Twitter\TwitterReadAbility();
+	}
+
+	private function get_update_ability() {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/twitter-update' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/twitter-update ability not registered.' );
+		}
+
+		return new \DataMachineSocials\Abilities\Twitter\TwitterUpdateAbility();
 	}
 }

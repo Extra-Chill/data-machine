@@ -49,25 +49,31 @@ function datamachine_socials_load_handlers() {
 	// Twitter
 	new \DataMachineSocials\Abilities\Twitter\TwitterPublishAbility();
 	new \DataMachineSocials\Abilities\Twitter\TwitterReadAbility();
+	new \DataMachineSocials\Abilities\Twitter\TwitterUpdateAbility();
 
 	// Facebook
 	new \DataMachineSocials\Abilities\Facebook\FacebookPublishAbility();
 	new \DataMachineSocials\Abilities\Facebook\FacebookReadAbility();
+	new \DataMachineSocials\Abilities\Facebook\FacebookUpdateAbility();
 
 	// Bluesky
 	new \DataMachineSocials\Abilities\Bluesky\BlueskyPublishAbility();
 	new \DataMachineSocials\Abilities\Bluesky\BlueskyReadAbility();
+	new \DataMachineSocials\Abilities\Bluesky\BlueskyUpdateAbility();
 
 	// Threads
 	new \DataMachineSocials\Abilities\Threads\ThreadsPublishAbility();
 	new \DataMachineSocials\Abilities\Threads\ThreadsReadAbility();
+	new \DataMachineSocials\Abilities\Threads\ThreadsUpdateAbility();
 
 	// Instagram
 	new \DataMachineSocials\Abilities\Instagram\InstagramPublishAbility();
 	new \DataMachineSocials\Abilities\Instagram\InstagramReadAbility();
+	new \DataMachineSocials\Abilities\Instagram\InstagramUpdateAbility();
 
 	// Pinterest
 	new \DataMachineSocials\Abilities\Pinterest\PinterestReadAbility();
+	new \DataMachineSocials\Abilities\Pinterest\PinterestUpdateAbility();
 
 	// Reddit (Fetch)
 	new \DataMachineSocials\Abilities\Reddit\FetchRedditAbility();
@@ -193,10 +199,16 @@ function datamachine_socials_load_chat_tools() {
 
 	new \DataMachineSocials\Chat\Tools\FetchReddit();
 	new \DataMachineSocials\Chat\Tools\ReadInstagram();
+	new \DataMachineSocials\Chat\Tools\UpdateInstagram();
 	new \DataMachineSocials\Chat\Tools\ReadThreads();
 	new \DataMachineSocials\Chat\Tools\ReadFacebook();
+	new \DataMachineSocials\Chat\Tools\UpdateFacebook();
 	new \DataMachineSocials\Chat\Tools\ReadTwitter();
+	new \DataMachineSocials\Chat\Tools\UpdateTwitter();
 	new \DataMachineSocials\Chat\Tools\ReadBluesky();
+	new \DataMachineSocials\Chat\Tools\UpdateBluesky();
 	new \DataMachineSocials\Chat\Tools\ReadPinterest();
+	new \DataMachineSocials\Chat\Tools\UpdatePinterest();
+	new \DataMachineSocials\Chat\Tools\UpdateThreads();
 }
 add_action( 'plugins_loaded', 'datamachine_socials_load_chat_tools', 25 );

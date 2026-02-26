@@ -138,6 +138,17 @@ class RestApi {
 			'args'                => self::read_endpoint_args( array( 'list', 'get', 'comments' ), 'post_id' ),
 		) );
 
+		register_rest_route( self::NAMESPACE, '/facebook/update', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'platform_update' ),
+			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			'args'                => array(
+				'action'  => array( 'type' => 'string', 'required' => true, 'enum' => array( 'edit', 'hide', 'unhide', 'delete' ), 'sanitize_callback' => 'sanitize_text_field' ),
+				'post_id' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
+				'message' => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
+			),
+		) );
+
 		register_rest_route( self::NAMESPACE, '/twitter/tweets', array(
 			'methods'             => 'GET',
 			'callback'            => array( __CLASS__, 'platform_read' ),
@@ -147,6 +158,16 @@ class RestApi {
 				'tweet_id'         => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
 				'limit'            => array( 'type' => 'integer', 'default' => 25, 'sanitize_callback' => 'absint' ),
 				'pagination_token' => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
+			),
+		) );
+
+		register_rest_route( self::NAMESPACE, '/twitter/update', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'platform_update' ),
+			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			'args'                => array(
+				'action'   => array( 'type' => 'string', 'required' => true, 'enum' => array( 'delete', 'retweet', 'unretweet', 'like', 'unlike' ), 'sanitize_callback' => 'sanitize_text_field' ),
+				'tweet_id' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
 			),
 		) );
 
@@ -172,6 +193,51 @@ class RestApi {
 				'board_id' => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
 				'limit'    => array( 'type' => 'integer', 'default' => 25, 'sanitize_callback' => 'absint' ),
 				'bookmark' => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
+			),
+		) );
+
+		register_rest_route( self::NAMESPACE, '/threads/update', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'platform_update' ),
+			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			'args'                => array(
+				'action'    => array( 'type' => 'string', 'required' => true, 'enum' => array( 'delete' ), 'sanitize_callback' => 'sanitize_text_field' ),
+				'thread_id' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
+			),
+		) );
+
+		register_rest_route( self::NAMESPACE, '/bluesky/update', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'platform_update' ),
+			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			'args'                => array(
+				'action'   => array( 'type' => 'string', 'required' => true, 'enum' => array( 'delete', 'like', 'unlike' ), 'sanitize_callback' => 'sanitize_text_field' ),
+				'post_uri' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
+			),
+		) );
+
+		register_rest_route( self::NAMESPACE, '/pinterest/update', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'platform_update' ),
+			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			'args'                => array(
+				'action' => array( 'type' => 'string', 'required' => true, 'enum' => array( 'delete' ), 'sanitize_callback' => 'sanitize_text_field' ),
+				'pin_id' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
+			),
+		) );
+
+		// =====================================================================
+		// Platform Update Endpoints
+		// =====================================================================
+
+		register_rest_route( self::NAMESPACE, '/instagram/update', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'platform_update' ),
+			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			'args'                => array(
+				'action'   => array( 'type' => 'string', 'required' => true, 'enum' => array( 'edit', 'delete', 'archive' ), 'sanitize_callback' => 'sanitize_text_field' ),
+				'media_id' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
+				'caption'  => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
 			),
 		) );
 	}
@@ -219,6 +285,77 @@ class RestApi {
 		$ability = new $ability_map[ $platform ]();
 		$input   = array_filter( $params, function ( $v ) { return '' !== $v && null !== $v; } );
 		$result  = $ability->execute( $input );
+
+		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
+	}
+
+	/**
+	 * Generic platform update handler — routes to the correct ability by URL.
+	 */
+	public static function platform_update( \WP_REST_Request $request ) {
+		$route = $request->get_route();
+		$params = $request->get_json_params() ?: $request->get_body_params();
+
+		$ability_map = array(
+			'instagram' => \DataMachineSocials\Abilities\Instagram\InstagramUpdateAbility::class,
+			'twitter'   => \DataMachineSocials\Abilities\Twitter\TwitterUpdateAbility::class,
+			'facebook'  => \DataMachineSocials\Abilities\Facebook\FacebookUpdateAbility::class,
+			'threads'   => \DataMachineSocials\Abilities\Threads\ThreadsUpdateAbility::class,
+			'bluesky'   => \DataMachineSocials\Abilities\Bluesky\BlueskyUpdateAbility::class,
+			'pinterest' => \DataMachineSocials\Abilities\Pinterest\PinterestUpdateAbility::class,
+		);
+
+		$platform = null;
+		foreach ( $ability_map as $key => $class ) {
+			if ( strpos( $route, "/{$key}/" ) !== false ) {
+				$platform = $key;
+				break;
+			}
+		}
+
+		if ( ! $platform || ! isset( $ability_map[ $platform ] ) ) {
+			return new \WP_REST_Response( array( 'success' => false, 'error' => 'Unknown platform or update not supported' ), 400 );
+		}
+
+		// Validate required params.
+		if ( empty( $params['action'] ) ) {
+			return new \WP_REST_Response( array( 'success' => false, 'error' => 'action is required' ), 400 );
+		}
+
+		// Build input based on platform - different platforms use different ID fields.
+		$id_field = 'media_id'; // Default for Instagram.
+		if ( 'twitter' === $platform ) {
+			$id_field = 'tweet_id';
+		} elseif ( 'facebook' === $platform ) {
+			$id_field = 'post_id';
+		} elseif ( 'threads' === $platform ) {
+			$id_field = 'thread_id';
+		} elseif ( 'bluesky' === $platform ) {
+			$id_field = 'post_uri';
+		} elseif ( 'pinterest' === $platform ) {
+			$id_field = 'pin_id';
+		}
+
+		if ( empty( $params[ $id_field ] ) ) {
+			return new \WP_REST_Response( array( 'success' => false, 'error' => "{$id_field} is required" ), 400 );
+		}
+
+		$ability = new $ability_map[ $platform ]();
+		$input   = array(
+			'action'   => sanitize_text_field( $params['action'] ),
+			$id_field => sanitize_text_field( $params[ $id_field ] ),
+		);
+
+		if ( ! empty( $params['caption'] ) ) {
+			$input['caption'] = sanitize_text_field( $params['caption'] );
+		}
+
+		// Handle message field for Facebook.
+		if ( ! empty( $params['message'] ) && 'facebook' === $platform ) {
+			$input['message'] = sanitize_text_field( $params['message'] );
+		}
+
+		$result = $ability->execute( $input );
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
 	}
