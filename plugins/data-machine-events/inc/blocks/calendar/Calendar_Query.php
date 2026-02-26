@@ -346,8 +346,9 @@ class Calendar_Query {
 		$venue_term = $venue_terms[0];
 		$venue_data = Venue_Taxonomy::get_venue_data( $venue_term->term_id );
 
-		$event_data['venue']   = $venue_data['name'];
-		$event_data['address'] = Venue_Taxonomy::get_formatted_address( $venue_term->term_id, $venue_data );
+		$event_data['venue']         = $venue_data['name'];
+		$event_data['venue_term_id'] = $venue_term->term_id;
+		$event_data['address']       = Venue_Taxonomy::get_formatted_address( $venue_term->term_id, $venue_data );
 
 		if ( ! empty( $venue_data['timezone'] ) ) {
 			$event_data['venueTimezone'] = $venue_data['timezone'];
@@ -634,7 +635,7 @@ class Calendar_Query {
 	 * @param array $display_context Optional display context for multi-day events
 	 * @return array Display variables
 	 */
-	public static function build_display_vars( array $event_data, array $display_context = array() ): array {
+	public static function build_display_vars( array $event_data, array $display_context = array(), array $venue_distance_map = array(), string $distance_unit = 'mi' ): array {
 		$start_date = $event_data['startDate'] ?? '';
 		$start_time = $event_data['startTime'] ?? '';
 		$end_date   = $event_data['endDate'] ?? '';
@@ -669,6 +670,14 @@ class Calendar_Query {
 			}
 		}
 
+		// Distance from user's location (when geo filter is active).
+		$venue_term_id  = $event_data['venue_term_id'] ?? 0;
+		$venue_distance = null;
+
+		if ( $venue_term_id && ! empty( $venue_distance_map ) ) {
+			$venue_distance = $venue_distance_map[ $venue_term_id ] ?? null;
+		}
+
 		return array(
 			'formatted_time_display' => $formatted_time_display,
 			'venue_name'             => self::decode_unicode( $event_data['venue'] ?? '' ),
@@ -680,6 +689,8 @@ class Calendar_Query {
 			'multi_day_label'        => $multi_day_label,
 			'is_continuation'        => $display_context['is_continuation'] ?? false,
 			'is_multi_day'           => $display_context['is_multi_day'] ?? false,
+			'venue_distance'         => $venue_distance,
+			'distance_unit'          => $distance_unit,
 		);
 	}
 
@@ -789,7 +800,9 @@ class Calendar_Query {
 	public static function render_date_groups(
 		array $paged_date_groups,
 		array $gaps_detected = array(),
-		bool $include_gaps = true
+		bool $include_gaps = true,
+		array $venue_distance_map = array(),
+		string $distance_unit = 'mi'
 	): string {
 		if ( empty( $paged_date_groups ) ) {
 			ob_start();
@@ -839,7 +852,7 @@ class Calendar_Query {
 					$post = $event_post;
 					setup_postdata( $post );
 
-					$display_vars = self::build_display_vars( $event_data, $display_context );
+					$display_vars = self::build_display_vars( $event_data, $display_context, $venue_distance_map, $distance_unit );
 
 					if ( $event_index < LAZY_RENDER_THRESHOLD ) {
 						Template_Loader::include_template(
