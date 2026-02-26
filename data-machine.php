@@ -635,12 +635,6 @@ function datamachine_activate_scheduled_flows() {
 		return;
 	}
 
-	if ( ! function_exists( 'datamachine_get_default_scheduler_intervals' ) ) {
-		return;
-	}
-
-	$intervals = apply_filters( 'datamachine_scheduler_intervals', datamachine_get_default_scheduler_intervals() );
-
 	$scheduled_count = 0;
 
 	foreach ( $flows as $flow ) {
@@ -657,35 +651,16 @@ function datamachine_activate_scheduled_flows() {
 			continue;
 		}
 
-		// Clear any existing scheduled actions for this flow
-		if ( function_exists( 'as_unschedule_all_actions' ) ) {
-			as_unschedule_all_actions( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
-		}
-
-		// Handle one-time scheduling
-		if ( 'one_time' === $interval ) {
-			$timestamp = $scheduling_config['timestamp'] ?? null;
-			if ( $timestamp && $timestamp > time() ) {
-				as_schedule_single_action( $timestamp, 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
-				++$scheduled_count;
-			}
-			continue;
-		}
-
-		// Handle recurring scheduling
-		$interval_seconds = $intervals[ $interval ]['seconds'] ?? null;
-		if ( ! $interval_seconds ) {
-			continue;
-		}
-
-		as_schedule_recurring_action(
-			time() + $interval_seconds,
-			$interval_seconds,
-			'datamachine_run_flow_now',
-			array( $flow_id ),
-			'data-machine'
+		// Delegate to FlowScheduling — single source of truth for scheduling
+		// logic including stagger offsets, interval validation, and AS registration.
+		$result = \DataMachine\Api\Flows\FlowScheduling::handle_scheduling_update(
+			$flow_id,
+			$scheduling_config
 		);
-		++$scheduled_count;
+
+		if ( ! is_wp_error( $result ) ) {
+			++$scheduled_count;
+		}
 	}
 
 	if ( $scheduled_count > 0 ) {

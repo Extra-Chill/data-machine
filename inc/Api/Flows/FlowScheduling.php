@@ -17,6 +17,35 @@ if ( ! defined( 'ABSPATH' ) ) {
 class FlowScheduling {
 
 	/**
+	 * Maximum stagger offset in seconds.
+	 *
+	 * Caps the spread so flows don't wait unreasonably long for their first run,
+	 * even with large intervals like weekly or monthly.
+	 */
+	private const MAX_STAGGER_SECONDS = 3600;
+
+	/**
+	 * Calculate a deterministic stagger offset for a flow.
+	 *
+	 * Uses the flow ID as a seed to produce a consistent offset so the same
+	 * flow always lands on the same position within the interval window.
+	 * This prevents all flows with the same interval from firing simultaneously.
+	 *
+	 * @param int $flow_id          Flow ID used as seed.
+	 * @param int $interval_seconds Interval in seconds.
+	 * @return int Offset in seconds (0 to min(interval, MAX_STAGGER_SECONDS)).
+	 */
+	public static function calculate_stagger_offset( int $flow_id, int $interval_seconds ): int {
+		$max_offset = min( $interval_seconds, self::MAX_STAGGER_SECONDS );
+		if ( $max_offset <= 0 ) {
+			return 0;
+		}
+
+		// Deterministic hash based on flow ID — same flow always gets same offset.
+		return absint( crc32( 'dm_stagger_' . $flow_id ) ) % $max_offset;
+	}
+
+	/**
 	 * Handle scheduling configuration updates for a flow.
 	 *
 	 * scheduling_config now only contains scheduling data (interval, timestamps).
@@ -113,8 +142,12 @@ class FlowScheduling {
 			as_unschedule_all_actions( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
 		}
 
+		// Stagger the first run so flows with the same interval don't all fire at once.
+		$stagger_offset = self::calculate_stagger_offset( $flow_id, $interval_seconds );
+		$first_run_time = time() + $stagger_offset;
+
 		as_schedule_recurring_action(
-			time() + $interval_seconds,
+			$first_run_time,
 			$interval_seconds,
 			'datamachine_run_flow_now',
 			array( $flow_id ),
@@ -126,7 +159,7 @@ class FlowScheduling {
 			array(
 				'interval'         => $interval,
 				'interval_seconds' => $interval_seconds,
-				'first_run'        => wp_date( 'c', time() + $interval_seconds ),
+				'first_run'        => wp_date( 'c', $first_run_time ),
 			)
 		);
 		return true;
