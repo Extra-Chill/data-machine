@@ -24,12 +24,13 @@ class TestableImageGenerationTask extends ImageGenerationTask {
 		];
 	}
 
-	protected function trySetFeaturedImage( int $jobId, int $attachmentId, array $params ): void {
+	protected function trySetFeaturedImage( int $jobId, int $attachmentId, array $params ): array {
 		$this->set_featured_image_calls[] = [
 			'job_id'         => $jobId,
 			'attachment_id'  => $attachmentId,
 			'params'         => $params,
 		];
+		return [];
 	}
 }
 
