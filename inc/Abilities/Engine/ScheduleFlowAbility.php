@@ -190,72 +190,38 @@ class ScheduleFlowAbility {
 	/**
 	 * Schedule recurring execution at a defined interval.
 	 *
+	 * Delegates to FlowScheduling::handle_scheduling_update() which is the
+	 * single source of truth for recurring scheduling logic (including stagger).
+	 *
 	 * @param int    $flow_id  Flow ID.
 	 * @param string $interval Interval key from datamachine_scheduler_intervals filter.
 	 * @return array Result.
 	 */
 	private function scheduleRecurring( int $flow_id, string $interval ): array {
-		$intervals        = apply_filters( 'datamachine_scheduler_intervals', array() );
-		$interval_seconds = $intervals[ $interval ]['seconds'] ?? null;
+		$result = \DataMachine\Api\Flows\FlowScheduling::handle_scheduling_update(
+			$flow_id,
+			array( 'interval' => $interval )
+		);
 
-		if ( ! $interval_seconds ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				'Invalid schedule interval',
-				array(
-					'flow_id'             => $flow_id,
-					'interval'            => $interval,
-					'available_intervals' => array_keys( $intervals ),
-				)
-			);
+		if ( is_wp_error( $result ) ) {
 			return array(
 				'success' => false,
-				'error'   => sprintf( 'Invalid interval: %s', $interval ),
+				'error'   => $result->get_error_message(),
 			);
 		}
 
-		if ( ! function_exists( 'as_schedule_recurring_action' ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Action Scheduler not available.',
-			);
+		// Read back the scheduling config to get the computed first_run.
+		$flow = $this->db_flows->get_flow( $flow_id );
+		$scheduling_config = array();
+		if ( $flow ) {
+			$scheduling_config = json_decode( $flow['scheduling_config'] ?? '{}', true );
 		}
-
-		$action_id = as_schedule_recurring_action(
-			time() + $interval_seconds,
-			$interval_seconds,
-			'datamachine_run_flow_now',
-			array( $flow_id ),
-			'data-machine'
-		);
-
-		$scheduling_config = array(
-			'interval'         => $interval,
-			'interval_seconds' => $interval_seconds,
-			'first_run'        => wp_date( 'c', time() + $interval_seconds ),
-		);
-		$this->db_flows->update_flow_scheduling( $flow_id, $scheduling_config );
-
-		do_action(
-			'datamachine_log',
-			'info',
-			'Flow scheduled for recurring execution',
-			array(
-				'flow_id'          => $flow_id,
-				'interval'         => $interval,
-				'interval_seconds' => $interval_seconds,
-				'first_run'        => wp_date( 'c', time() + $interval_seconds ),
-				'action_id'        => $action_id,
-			)
-		);
 
 		return array(
 			'success'        => true,
 			'flow_id'        => $flow_id,
 			'schedule_type'  => 'recurring',
-			'action_id'      => $action_id,
-			'scheduled_time' => wp_date( 'c', time() + $interval_seconds ),
+			'scheduled_time' => $scheduling_config['first_run'] ?? null,
 		);
 	}
 }
