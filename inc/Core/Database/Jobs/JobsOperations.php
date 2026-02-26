@@ -61,6 +61,8 @@ class JobsOperations extends BaseRepository {
 
 		$label = isset( $job_data['label'] ) ? sanitize_text_field( $job_data['label'] ) : null;
 
+		$parent_job_id = isset( $job_data['parent_job_id'] ) ? absint( $job_data['parent_job_id'] ) : 0;
+
 		$data = array(
 			'pipeline_id' => $pipeline_id,
 			'flow_id'     => $flow_id,
@@ -70,6 +72,11 @@ class JobsOperations extends BaseRepository {
 		);
 
 		$format = array( '%s', '%s', '%s', '%s', '%s' );
+
+		if ( $parent_job_id > 0 ) {
+			$data['parent_job_id'] = $parent_job_id;
+			$format[]              = '%d';
+		}
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$inserted = $this->wpdb->insert( $this->table_name, $data, $format );

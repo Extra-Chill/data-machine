@@ -59,13 +59,13 @@ class SystemAgent {
 	 * Creates a DM Job record and schedules an Action Scheduler action for
 	 * task execution. Returns the job ID for tracking purposes.
 	 *
-	 * @param string $taskType Task type identifier.
-	 * @param array  $params   Task parameters to store in engine_data.
-	 * @param array  $context  Context for routing results back (origin, IDs, etc.).
-	 * @param array  $meta     Additional metadata merged into engine_data (e.g. batch_job_id).
+	 * @param string $taskType    Task type identifier.
+	 * @param array  $params      Task parameters to store in engine_data.
+	 * @param array  $context     Context for routing results back (origin, IDs, etc.).
+	 * @param int    $parentJobId Parent job ID for hierarchy (batch parent, pipeline parent).
 	 * @return int|false Job ID on success, false on failure.
 	 */
-	public function scheduleTask( string $taskType, array $params, array $context = array(), array $meta = array() ): int|false {
+	public function scheduleTask( string $taskType, array $params, array $context = array(), int $parentJobId = 0 ): int|false {
 		if ( ! isset( $this->taskHandlers[ $taskType ] ) ) {
 			do_action(
 				'datamachine_log',
@@ -82,13 +82,19 @@ class SystemAgent {
 		}
 
 		// Create DM Job — matches Jobs::create_job() schema
-		$jobs_db = new Jobs();
-		$job_id  = $jobs_db->create_job( array(
+		$jobs_db  = new Jobs();
+		$job_data = array(
 			'pipeline_id' => 'direct',
 			'flow_id'     => 'direct',
 			'source'      => 'system',
 			'label'       => ucfirst( str_replace( '_', ' ', $taskType ) ),
-		) );
+		);
+
+		if ( $parentJobId > 0 ) {
+			$job_data['parent_job_id'] = $parentJobId;
+		}
+
+		$job_id = $jobs_db->create_job( $job_data );
 
 		if ( ! $job_id ) {
 			do_action(
@@ -108,7 +114,7 @@ class SystemAgent {
 			'task_type'    => $taskType,
 			'context'      => $context,
 			'scheduled_at' => current_time( 'mysql' ),
-		), $meta ) );
+		) ) );
 
 		// Mark job as processing
 		$jobs_db->start_job( (int) $job_id, JobStatus::PROCESSING );
@@ -387,18 +393,12 @@ class SystemAgent {
 			}
 		}
 
-		// Build child job metadata for linking back to parent batch.
-		$child_meta = array();
-		if ( $batch_job_id > 0 ) {
-			$child_meta['batch_job_id'] = $batch_job_id;
-		}
-
 		// Get current chunk.
 		$chunk     = array_slice( $items, $offset, $chunk_size );
 		$scheduled = 0;
 
 		foreach ( $chunk as $params ) {
-			$job_id = $this->scheduleTask( $task_type, $params, $context, $child_meta );
+			$job_id = $this->scheduleTask( $task_type, $params, $context, $batch_job_id );
 			if ( $job_id ) {
 				++$scheduled;
 			}
@@ -503,7 +503,7 @@ class SystemAgent {
 			return null;
 		}
 
-		// Count child jobs by status.
+		// Count child jobs by status via parent_job_id column.
 		global $wpdb;
 		$table = $wpdb->prefix . 'datamachine_jobs';
 		$child_stats = $wpdb->get_row(
@@ -515,9 +515,9 @@ class SystemAgent {
 					SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) as processing,
 					SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending
 				FROM {$table}
-				WHERE engine_data LIKE %s",
+				WHERE parent_job_id = %d",
 				'failed%',
-				'%"batch_job_id":' . $batchJobId . '%'
+				$batchJobId
 			),
 			ARRAY_A
 		);
