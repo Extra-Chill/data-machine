@@ -151,7 +151,7 @@ class ThreadsPublishAbility {
 		}
 
 		$user_id = $provider->get_user_id();
-		$access_token = $provider->get_access_token();
+		$access_token = $provider->get_valid_access_token();
 
 		if ( empty( $user_id ) || empty( $access_token ) ) {
 			return array(

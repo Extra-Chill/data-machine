@@ -63,7 +63,10 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	}
 
 	/**
-	* Check if admin has valid Facebook authentication
+	* Check if admin has valid Facebook authentication.
+	*
+	* Facebook uses a dual token system (user + page), so we override
+	* the base class to check both tokens exist.
 	*
 	* @return bool True if authenticated
 	*/
@@ -85,17 +88,158 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	}
 
 	/**
-	* Get stored Page access token (Facebook-specific)
+	* Perform Facebook-specific token refresh.
+	*
+	* Facebook long-lived user tokens are refreshed via the fb_exchange_token grant,
+	* which requires client_id and client_secret. After refreshing the user token,
+	* we also re-fetch page credentials since the page token depends on the user token.
+	*
+	* Note: The base class calls this with the `access_token` key from stored data.
+	* Facebook stores user token as `user_access_token`, so we override
+	* get_valid_access_token() to bridge the key difference.
+	*
+	* @since 0.3.0
+	* @param string $current_token The current user access token to refresh.
+	* @return array|\WP_Error|null Token data on success, WP_Error on failure.
+	*/
+	protected function do_refresh_token( string $current_token ): array|\WP_Error|null {
+		$config = $this->get_config();
+		if ( empty( $config['app_id'] ) || empty( $config['app_secret'] ) ) {
+			return new \WP_Error( 'facebook_refresh_missing_config', 'Facebook OAuth configuration is incomplete.' );
+		}
+
+		$params = array(
+			'grant_type'        => 'fb_exchange_token',
+			'client_id'         => $config['app_id'],
+			'client_secret'     => $config['app_secret'],
+			'fb_exchange_token' => $current_token,
+		);
+		$url = self::TOKEN_URL . '?' . http_build_query( $params );
+
+		$result = HttpClient::get( $url, array( 'context' => 'Facebook OAuth' ) );
+
+		if ( ! $result['success'] ) {
+			return new \WP_Error( 'facebook_refresh_http_error', $result['error'] );
+		}
+
+		$body      = $result['data'];
+		$data      = json_decode( $body, true );
+		$http_code = $result['status_code'];
+
+		if ( 200 !== $http_code || empty( $data['access_token'] ) ) {
+			$error_message = $data['error']['message'] ?? $data['error_description'] ?? 'Failed to refresh Facebook access token.';
+			return new \WP_Error( 'facebook_refresh_api_error', $error_message, $data );
+		}
+
+		$new_user_token = $data['access_token'];
+		$expires_in     = $data['expires_in'] ?? 3600 * 24 * 60;
+		$expires_at     = time() + intval( $expires_in );
+
+		// Re-fetch page credentials with the new user token.
+		$page_credentials = $this->get_page_credentials( $new_user_token );
+		if ( is_wp_error( $page_credentials ) ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Facebook: Page credential refresh failed after user token refresh',
+				array( 'error' => $page_credentials->get_error_message() )
+			);
+			// Return the refreshed user token even if page refresh fails — page token may still work.
+		}
+
+		// Build return data — the base class will store access_token + expires_at.
+		// We also need to update the Facebook-specific fields, so we do a full
+		// account update here rather than relying solely on the base class.
+		$account = $this->get_account();
+		$account['user_access_token'] = $new_user_token;
+		$account['token_expires_at']  = $expires_at;
+		$account['last_refreshed_at'] = time();
+
+		if ( ! is_wp_error( $page_credentials ) ) {
+			$account['page_access_token'] = $page_credentials['access_token'];
+			$account['page_id']           = $page_credentials['id'];
+			$account['page_name']         = $page_credentials['name'];
+		}
+
+		$this->save_account( $account );
+		$this->schedule_proactive_refresh();
+
+		return array(
+			'access_token' => $new_user_token,
+			'expires_at'   => $expires_at,
+		);
+	}
+
+	/**
+	* Get a valid user access token, refreshing if close to expiry.
+	*
+	* Overrides the base class because Facebook stores the user token as
+	* `user_access_token` instead of the standard `access_token` key.
+	*
+	* @since 0.3.0
+	* @return string|null Valid user access token, or null if unavailable/expired.
+	*/
+	public function get_valid_user_access_token(): ?string {
+		$account = $this->get_account();
+		if ( empty( $account ) || ! is_array( $account ) || empty( $account['user_access_token'] ) ) {
+			return null;
+		}
+
+		$current_token = $account['user_access_token'];
+		$needs_refresh = false;
+
+		if ( isset( $account['token_expires_at'] ) ) {
+			$expiry_timestamp = intval( $account['token_expires_at'] );
+			$buffer           = $this->get_refresh_buffer_seconds();
+
+			if ( time() > $expiry_timestamp ) {
+				$needs_refresh = true;
+			} elseif ( ( $expiry_timestamp - time() ) < $buffer ) {
+				$needs_refresh = true;
+			}
+		}
+
+		if ( $needs_refresh ) {
+			$refreshed = $this->do_refresh_token( $current_token );
+
+			if ( null === $refreshed ) {
+				if ( isset( $account['token_expires_at'] ) && time() > intval( $account['token_expires_at'] ) ) {
+					return null;
+				}
+				return $current_token;
+			}
+
+			if ( ! is_wp_error( $refreshed ) && ! empty( $refreshed['access_token'] ) ) {
+				return $refreshed['access_token'];
+			}
+
+			// Refresh failed — return current if not hard-expired.
+			if ( isset( $account['token_expires_at'] ) && time() > intval( $account['token_expires_at'] ) ) {
+				return null;
+			}
+			return $current_token;
+		}
+
+		return $current_token;
+	}
+
+	/**
+	* Get a valid page access token, refreshing the user token if needed.
+	*
+	* If the user token needs refresh, do_refresh_token() will also re-fetch
+	* the page token. After refresh, the stored page_access_token is current.
 	*
 	* @return string|null Page access token or null
 	*/
 	public function get_page_access_token(): ?string {
-		$account = $this->get_account();
-		if ( empty( $account ) || ! is_array( $account ) || empty( $account['page_access_token'] ) ) {
+		// Trigger user token refresh if needed (which also refreshes page token).
+		$user_token = $this->get_valid_user_access_token();
+		if ( null === $user_token ) {
 			return null;
 		}
 
-		if ( isset( $account['token_expires_at'] ) && time() > $account['token_expires_at'] ) {
+		$account = $this->get_account();
+		if ( empty( $account ) || ! is_array( $account ) || empty( $account['page_access_token'] ) ) {
 			return null;
 		}
 
@@ -103,21 +247,12 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	}
 
 	/**
-	* Get stored User access token (Facebook-specific)
+	* Get a valid user access token with automatic refresh.
 	*
 	* @return string|null User access token or null
 	*/
 	public function get_user_access_token(): ?string {
-		$account = $this->get_account();
-		if ( empty( $account ) || ! is_array( $account ) || empty( $account['user_access_token'] ) ) {
-			return null;
-		}
-
-		if ( isset( $account['token_expires_at'] ) && time() > $account['token_expires_at'] ) {
-			return null;
-		}
-
-		return $account['user_access_token'];
+		return $this->get_valid_user_access_token();
 	}
 
 	/**
@@ -211,7 +346,10 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 					$config
 				);
 			},
-			array( $this, 'save_account' )
+			function ( $account_data ) {
+				$this->save_account( $account_data );
+				$this->schedule_proactive_refresh();
+			}
 		);
 	}
 
