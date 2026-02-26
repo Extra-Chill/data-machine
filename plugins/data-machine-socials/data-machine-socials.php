@@ -59,10 +59,12 @@ function datamachine_socials_load_handlers() {
 	// Bluesky
 	new \DataMachineSocials\Abilities\Bluesky\BlueskyPublishAbility();
 	new \DataMachineSocials\Abilities\Bluesky\BlueskyReadAbility();
+	new \DataMachineSocials\Abilities\Bluesky\BlueskyUpdateAbility();
 
 	// Threads
 	new \DataMachineSocials\Abilities\Threads\ThreadsPublishAbility();
 	new \DataMachineSocials\Abilities\Threads\ThreadsReadAbility();
+	new \DataMachineSocials\Abilities\Threads\ThreadsUpdateAbility();
 
 	// Instagram
 	new \DataMachineSocials\Abilities\Instagram\InstagramPublishAbility();
@@ -71,6 +73,7 @@ function datamachine_socials_load_handlers() {
 
 	// Pinterest
 	new \DataMachineSocials\Abilities\Pinterest\PinterestReadAbility();
+	new \DataMachineSocials\Abilities\Pinterest\PinterestUpdateAbility();
 
 	// Reddit (Fetch)
 	new \DataMachineSocials\Abilities\Reddit\FetchRedditAbility();
@@ -203,6 +206,9 @@ function datamachine_socials_load_chat_tools() {
 	new \DataMachineSocials\Chat\Tools\ReadTwitter();
 	new \DataMachineSocials\Chat\Tools\UpdateTwitter();
 	new \DataMachineSocials\Chat\Tools\ReadBluesky();
+	new \DataMachineSocials\Chat\Tools\UpdateBluesky();
 	new \DataMachineSocials\Chat\Tools\ReadPinterest();
+	new \DataMachineSocials\Chat\Tools\UpdatePinterest();
+	new \DataMachineSocials\Chat\Tools\UpdateThreads();
 }
 add_action( 'plugins_loaded', 'datamachine_socials_load_chat_tools', 25 );

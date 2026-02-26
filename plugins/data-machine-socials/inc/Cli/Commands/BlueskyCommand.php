@@ -245,4 +245,74 @@ class BlueskyCommand {
 
 		return new \DataMachineSocials\Abilities\Bluesky\BlueskyReadAbility();
 	}
+
+	private function get_update_ability() {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/bluesky-update' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/bluesky-update ability not registered.' );
+		}
+
+		return new \DataMachineSocials\Abilities\Bluesky\BlueskyUpdateAbility();
+	}
+
+	/**
+	 * Delete a Bluesky post.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <post_uri>
+	 * : The Bluesky post URI (at://did/rkey).
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials bluesky delete "at://did:plc:xxx/app.bsky.feed.post/abc123"
+	 */
+	public function delete( $args, $assoc_args ) {
+		$post_uri = $args[0];
+		$ability  = $this->get_update_ability();
+
+		$result = $ability->execute( array(
+			'action'   => 'delete',
+			'post_uri' => $post_uri,
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Post deleted successfully!' );
+		WP_CLI::log( 'Post URI: ' . $result['data']['post_uri'] );
+	}
+
+	/**
+	 * Like a Bluesky post.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <post_uri>
+	 * : The Bluesky post URI to like.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials bluesky like "at://did:plc:xxx/app.bsky.feed.post/abc123"
+	 */
+	public function like( $args, $assoc_args ) {
+		$post_uri = $args[0];
+		$ability  = $this->get_update_ability();
+
+		$result = $ability->execute( array(
+			'action'   => 'like',
+			'post_uri' => $post_uri,
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Post liked successfully!' );
+	}
 }

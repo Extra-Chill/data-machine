@@ -196,6 +196,36 @@ class RestApi {
 			),
 		) );
 
+		register_rest_route( self::NAMESPACE, '/threads/update', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'platform_update' ),
+			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			'args'                => array(
+				'action'    => array( 'type' => 'string', 'required' => true, 'enum' => array( 'delete' ), 'sanitize_callback' => 'sanitize_text_field' ),
+				'thread_id' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
+			),
+		) );
+
+		register_rest_route( self::NAMESPACE, '/bluesky/update', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'platform_update' ),
+			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			'args'                => array(
+				'action'   => array( 'type' => 'string', 'required' => true, 'enum' => array( 'delete', 'like', 'unlike' ), 'sanitize_callback' => 'sanitize_text_field' ),
+				'post_uri' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
+			),
+		) );
+
+		register_rest_route( self::NAMESPACE, '/pinterest/update', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'platform_update' ),
+			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			'args'                => array(
+				'action' => array( 'type' => 'string', 'required' => true, 'enum' => array( 'delete' ), 'sanitize_callback' => 'sanitize_text_field' ),
+				'pin_id' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
+			),
+		) );
+
 		// =====================================================================
 		// Platform Update Endpoints
 		// =====================================================================
@@ -270,6 +300,9 @@ class RestApi {
 			'instagram' => \DataMachineSocials\Abilities\Instagram\InstagramUpdateAbility::class,
 			'twitter'   => \DataMachineSocials\Abilities\Twitter\TwitterUpdateAbility::class,
 			'facebook'  => \DataMachineSocials\Abilities\Facebook\FacebookUpdateAbility::class,
+			'threads'   => \DataMachineSocials\Abilities\Threads\ThreadsUpdateAbility::class,
+			'bluesky'   => \DataMachineSocials\Abilities\Bluesky\BlueskyUpdateAbility::class,
+			'pinterest' => \DataMachineSocials\Abilities\Pinterest\PinterestUpdateAbility::class,
 		);
 
 		$platform = null;
@@ -295,6 +328,12 @@ class RestApi {
 			$id_field = 'tweet_id';
 		} elseif ( 'facebook' === $platform ) {
 			$id_field = 'post_id';
+		} elseif ( 'threads' === $platform ) {
+			$id_field = 'thread_id';
+		} elseif ( 'bluesky' === $platform ) {
+			$id_field = 'post_uri';
+		} elseif ( 'pinterest' === $platform ) {
+			$id_field = 'pin_id';
 		}
 
 		if ( empty( $params[ $id_field ] ) ) {
