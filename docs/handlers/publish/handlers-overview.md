@@ -12,12 +12,6 @@ Publish handlers distribute processed content to external platforms using AI too
 - **Features**: Modular handler architecture with `WordPressPublishHelper`, `TaxonomyHandler`, `WordPressSettingsResolver`, configuration hierarchy, Gutenberg blocks
 - **API**: WordPress core functions
 
-**Google Sheets** (`googlesheets_output`)
-- **Character Limit**: No limit
-- **Authentication**: OAuth2 (Google)
-- **Features**: Row insertion, cell targeting, spreadsheet creation
-- **API**: Google Sheets API
-
 ## Source URL Attribution
 
 **Purpose**: All publish handlers support automatic source URL attribution for link attribution and content sourcing.
@@ -40,7 +34,6 @@ Publish handlers distribute processed content to external platforms using AI too
 | Platform | Separator | Character Count | Special Features |
 |----------|-----------|-----------------|------------------|
 | WordPress | Gutenberg blocks | No limit | Source attribution blocks |
-| Google Sheets | Cell-based | No limit | Data rows |
 
 ### Engine Data Access Pattern
 

@@ -148,7 +148,6 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/Content/EditPostBlocksAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Content/ReplacePostBlocksAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Fetch/FetchFilesAbility.php';
-	require_once __DIR__ . '/inc/Abilities/Fetch/FetchRedditAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Fetch/FetchRssAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Fetch/FetchWordPressApiAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Fetch/FetchWordPressMediaAbility.php';
@@ -191,7 +190,6 @@ function datamachine_run_datamachine_plugin() {
 		new \DataMachine\Abilities\Content\EditPostBlocksAbility();
 		new \DataMachine\Abilities\Content\ReplacePostBlocksAbility();
 		new \DataMachine\Abilities\Fetch\FetchFilesAbility();
-		new \DataMachine\Abilities\Fetch\FetchRedditAbility();
 		new \DataMachine\Abilities\Fetch\FetchRssAbility();
 		new \DataMachine\Abilities\Fetch\FetchWordPressApiAbility();
 		new \DataMachine\Abilities\Fetch\FetchWordPressMediaAbility();
@@ -264,7 +262,6 @@ function datamachine_load_handlers() {
 	new \DataMachine\Core\Steps\Fetch\Handlers\WordPressAPI\WordPressAPI();
 	new \DataMachine\Core\Steps\Fetch\Handlers\WordPressMedia\WordPressMedia();
 	new \DataMachine\Core\Steps\Fetch\Handlers\Rss\Rss();
-	new \DataMachine\Core\Steps\Fetch\Handlers\Reddit\Reddit();
 	new \DataMachine\Core\Steps\Fetch\Handlers\Files\Files();
 
 	// Update Handlers
