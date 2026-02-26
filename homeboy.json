@@ -1,10 +1,22 @@
 {
+  "modules": {
+    "wordpress": {}
+  },
   "version_targets": [
     {
       "file": "data-machine.php",
       "pattern": "(?m)^\\s*\\*?\\s*Version:\\s*([0-9.]+)"
+    },
+    {
+      "file": "readme.txt",
+      "pattern": "(?m)^Stable tag:\\s*([0-9.]+)"
+    },
+    {
+      "file": "package.json",
+      "pattern": "\"version\":\\s*\"([0-9.]+)\""
     }
   ],
   "changelog_target": "docs/CHANGELOG.md",
+  "build_command": "npm run build",
   "auto_cleanup": false
 }
