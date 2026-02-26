@@ -144,7 +144,7 @@ class RestApi {
 
 		$statuses = array();
 
-		$platforms = array( 'instagram', 'twitter', 'facebook', 'bluesky', 'threads', 'pinterest' );
+		$platforms = array( 'instagram', 'twitter', 'facebook', 'bluesky', 'threads', 'pinterest', 'reddit' );
 
 		foreach ( $platforms as $platform ) {
 			$provider = $providers[ $platform ] ?? null;
@@ -212,6 +212,12 @@ class RestApi {
 				'defaultAspectRatio' => '2:3',
 				'charLimit'        => 500,
 				'supportsCarousel' => false,
+			),
+			'reddit'    => array(
+				'label'      => 'Reddit',
+				'type'       => 'fetch',
+				'charLimit'  => 40000,
+				'scopes'     => 'identity read',
 			),
 		);
 

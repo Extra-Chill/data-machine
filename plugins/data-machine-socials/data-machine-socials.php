@@ -141,5 +141,22 @@ add_action( 'admin_enqueue_scripts', 'datamachine_socials_enqueue_assets' );
  */
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/PinterestCommand.php';
+	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/RedditCommand.php';
 	WP_CLI::add_command( 'datamachine-socials pinterest', \DataMachineSocials\Cli\Commands\PinterestCommand::class );
+	WP_CLI::add_command( 'datamachine-socials reddit', \DataMachineSocials\Cli\Commands\RedditCommand::class );
 }
+
+/**
+ * Register chat tools.
+ *
+ * Chat tools extend BaseTool from core and self-register via filters.
+ * Only load when Data Machine core's AI engine is available.
+ */
+function datamachine_socials_load_chat_tools() {
+	if ( ! class_exists( 'DataMachine\Engine\AI\Tools\BaseTool' ) ) {
+		return;
+	}
+
+	new \DataMachineSocials\Chat\Tools\FetchReddit();
+}
+add_action( 'plugins_loaded', 'datamachine_socials_load_chat_tools', 25 );
