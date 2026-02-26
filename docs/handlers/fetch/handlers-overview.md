@@ -38,18 +38,6 @@ Fetch handlers retrieve content from various sources and convert it into standar
 - **Data Source**: XML feed parsing
 - **Key Features**: Automatic deduplication, feed validation
 
-**Reddit** (`reddit`)
-- **Purpose**: Fetch posts from Reddit subreddits
-- **Authentication**: OAuth2 (client_id, client_secret)
-- **Data Source**: Reddit API
-- **Key Features**: Subreddit filtering, comment retrieval
-
-**Google Sheets** (`googlesheets_fetch`)
-- **Purpose**: Extract data from Google Sheets
-- **Authentication**: OAuth2 (client_id, client_secret)
-- **Data Source**: Google Sheets API
-- **Key Features**: Specific cell/range access, structured data extraction
-
 **WordPress API** (`wordpress_api`)
 - **Purpose**: Fetch content from external WordPress sites
 - **Authentication**: None (public REST API)
