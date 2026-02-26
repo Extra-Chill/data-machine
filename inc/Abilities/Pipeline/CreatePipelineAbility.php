@@ -59,6 +59,10 @@ class CreatePipelineAbility {
 								'type'        => 'object',
 								'description' => __( 'Shared config for bulk mode applied to all pipelines: {steps, scheduling_config}', 'data-machine' ),
 							),
+							'skip_default_flow' => array(
+								'type'        => 'boolean',
+								'description' => __( 'Skip automatic default flow creation. Use when the caller creates its own flows.', 'data-machine' ),
+							),
 							'validate_only' => array(
 								'type'        => 'boolean',
 								'description' => __( 'Dry-run mode: validate without executing', 'data-machine' ),
@@ -92,9 +96,9 @@ class CreatePipelineAbility {
 			);
 		};
 
-		if ( did_action( 'wp_abilities_api_init' ) ) {
+		if ( doing_action( 'wp_abilities_api_init' ) ) {
 			$register_callback();
-		} else {
+		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', $register_callback );
 		}
 	}
@@ -210,28 +214,33 @@ class CreatePipelineAbility {
 			}
 		}
 
-		$flow_name         = $flow_config['flow_name'] ?? $pipeline_name;
-		$scheduling_config = $flow_config['scheduling_config'] ?? array( 'interval' => 'manual' );
+		$skip_default_flow = ! empty( $input['skip_default_flow'] );
+		$flow_result       = null;
+		$flow_name         = null;
+		$flow_step_ids     = array();
 
-		$create_flow_ability = wp_get_ability( 'datamachine/create-flow' );
-		$flow_result         = null;
-		if ( $create_flow_ability ) {
-			$flow_result = $create_flow_ability->execute(
-				array(
-					'pipeline_id'       => $pipeline_id,
-					'flow_name'         => $flow_name,
-					'scheduling_config' => $scheduling_config,
-				)
-			);
-		}
+		if ( ! $skip_default_flow ) {
+			$flow_name         = $flow_config['flow_name'] ?? $pipeline_name;
+			$scheduling_config = $flow_config['scheduling_config'] ?? array( 'interval' => 'manual' );
 
-		if ( ! $flow_result || ! $flow_result['success'] ) {
-			do_action( 'datamachine_log', 'error', "Failed to create flow for pipeline {$pipeline_id}" );
-		}
+			$create_flow_ability = wp_get_ability( 'datamachine/create-flow' );
+			if ( $create_flow_ability ) {
+				$flow_result = $create_flow_ability->execute(
+					array(
+						'pipeline_id'       => $pipeline_id,
+						'flow_name'         => $flow_name,
+						'scheduling_config' => $scheduling_config,
+					)
+				);
+			}
 
-		$flow_step_ids = array();
-		if ( $flow_result && $flow_result['success'] && ! empty( $flow_result['flow_data']['flow_config'] ) ) {
-			$flow_step_ids = array_keys( $flow_result['flow_data']['flow_config'] );
+			if ( ! $flow_result || ! $flow_result['success'] ) {
+				do_action( 'datamachine_log', 'error', "Failed to create flow for pipeline {$pipeline_id}" );
+			}
+
+			if ( $flow_result && $flow_result['success'] && ! empty( $flow_result['flow_data']['flow_config'] ) ) {
+				$flow_step_ids = array_keys( $flow_result['flow_data']['flow_config'] );
+			}
 		}
 
 		do_action(
@@ -365,22 +374,30 @@ class CreatePipelineAbility {
 		$created_count = 0;
 		$failed_count  = 0;
 
+		$top_level_skip_flow = ! empty( $input['skip_default_flow'] );
+
 		foreach ( $pipelines as $index => $pipeline_config ) {
 			$name              = $pipeline_config['name'];
 			$steps             = ! empty( $pipeline_config['steps'] ) ? $pipeline_config['steps'] : $template_steps;
 			$flow_name         = $pipeline_config['flow_name'] ?? $name;
 			$scheduling_config = $pipeline_config['scheduling_config'] ?? ( $template['scheduling_config'] ?? array( 'interval' => 'manual' ) );
+			$skip_flow         = $top_level_skip_flow || ! empty( $pipeline_config['skip_default_flow'] );
 
-			$single_result = $this->executeSingle(
-				array(
-					'pipeline_name' => $name,
-					'steps'         => $steps,
-					'flow_config'   => array(
-						'flow_name'         => $flow_name,
-						'scheduling_config' => $scheduling_config,
-					),
-				)
+			$single_input = array(
+				'pipeline_name' => $name,
+				'steps'         => $steps,
 			);
+
+			if ( $skip_flow ) {
+				$single_input['skip_default_flow'] = true;
+			} else {
+				$single_input['flow_config'] = array(
+					'flow_name'         => $flow_name,
+					'scheduling_config' => $scheduling_config,
+				);
+			}
+
+			$single_result = $this->executeSingle( $single_input );
 
 			if ( $single_result['success'] ) {
 				++$created_count;
