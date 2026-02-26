@@ -509,7 +509,7 @@ class Venue_Taxonomy {
 	 * @param string $query Search query string
 	 * @return string|null Coordinates as "lat,lng" or null on failure
 	 */
-	private static function query_nominatim( string $query ): ?string {
+	public static function query_nominatim( string $query ): ?string {
 		if ( empty( $query ) ) {
 			return null;
 		}
