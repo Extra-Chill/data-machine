@@ -150,6 +150,16 @@ class RestApi {
 			),
 		) );
 
+		register_rest_route( self::NAMESPACE, '/twitter/update', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'platform_update' ),
+			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			'args'                => array(
+				'action'   => array( 'type' => 'string', 'required' => true, 'enum' => array( 'delete', 'retweet', 'unretweet', 'like', 'unlike' ), 'sanitize_callback' => 'sanitize_text_field' ),
+				'tweet_id' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
+			),
+		) );
+
 		register_rest_route( self::NAMESPACE, '/bluesky/posts', array(
 			'methods'             => 'GET',
 			'callback'            => array( __CLASS__, 'platform_read' ),
@@ -247,6 +257,7 @@ class RestApi {
 
 		$ability_map = array(
 			'instagram' => \DataMachineSocials\Abilities\Instagram\InstagramUpdateAbility::class,
+			'twitter'   => \DataMachineSocials\Abilities\Twitter\TwitterUpdateAbility::class,
 		);
 
 		$platform = null;
@@ -266,14 +277,20 @@ class RestApi {
 			return new \WP_REST_Response( array( 'success' => false, 'error' => 'action is required' ), 400 );
 		}
 
-		if ( empty( $params['media_id'] ) ) {
-			return new \WP_REST_Response( array( 'success' => false, 'error' => 'media_id is required' ), 400 );
+		// Build input based on platform - different platforms use different ID fields.
+		$id_field = 'media_id'; // Default for Instagram.
+		if ( 'twitter' === $platform ) {
+			$id_field = 'tweet_id';
+		}
+
+		if ( empty( $params[ $id_field ] ) ) {
+			return new \WP_REST_Response( array( 'success' => false, 'error' => "{$id_field} is required" ), 400 );
 		}
 
 		$ability = new $ability_map[ $platform ]();
 		$input   = array(
 			'action'   => sanitize_text_field( $params['action'] ),
-			'media_id' => sanitize_text_field( $params['media_id'] ),
+			$id_field => sanitize_text_field( $params[ $id_field ] ),
 		);
 
 		if ( ! empty( $params['caption'] ) ) {

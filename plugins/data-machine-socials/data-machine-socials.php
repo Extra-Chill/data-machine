@@ -49,6 +49,7 @@ function datamachine_socials_load_handlers() {
 	// Twitter
 	new \DataMachineSocials\Abilities\Twitter\TwitterPublishAbility();
 	new \DataMachineSocials\Abilities\Twitter\TwitterReadAbility();
+	new \DataMachineSocials\Abilities\Twitter\TwitterUpdateAbility();
 
 	// Facebook
 	new \DataMachineSocials\Abilities\Facebook\FacebookPublishAbility();
@@ -198,6 +199,7 @@ function datamachine_socials_load_chat_tools() {
 	new \DataMachineSocials\Chat\Tools\ReadThreads();
 	new \DataMachineSocials\Chat\Tools\ReadFacebook();
 	new \DataMachineSocials\Chat\Tools\ReadTwitter();
+	new \DataMachineSocials\Chat\Tools\UpdateTwitter();
 	new \DataMachineSocials\Chat\Tools\ReadBluesky();
 	new \DataMachineSocials\Chat\Tools\ReadPinterest();
 }
