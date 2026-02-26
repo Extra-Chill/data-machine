@@ -48,19 +48,26 @@ function datamachine_socials_load_handlers() {
 
 	// Twitter
 	new \DataMachineSocials\Abilities\Twitter\TwitterPublishAbility();
+	new \DataMachineSocials\Abilities\Twitter\TwitterReadAbility();
 
 	// Facebook
 	new \DataMachineSocials\Abilities\Facebook\FacebookPublishAbility();
+	new \DataMachineSocials\Abilities\Facebook\FacebookReadAbility();
 
 	// Bluesky
 	new \DataMachineSocials\Abilities\Bluesky\BlueskyPublishAbility();
+	new \DataMachineSocials\Abilities\Bluesky\BlueskyReadAbility();
 
 	// Threads
 	new \DataMachineSocials\Abilities\Threads\ThreadsPublishAbility();
+	new \DataMachineSocials\Abilities\Threads\ThreadsReadAbility();
 
 	// Instagram
 	new \DataMachineSocials\Abilities\Instagram\InstagramPublishAbility();
 	new \DataMachineSocials\Abilities\Instagram\InstagramReadAbility();
+
+	// Pinterest
+	new \DataMachineSocials\Abilities\Pinterest\PinterestReadAbility();
 
 	// Reddit (Fetch)
 	new \DataMachineSocials\Abilities\Reddit\FetchRedditAbility();
@@ -144,9 +151,17 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/PinterestCommand.php';
 	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/RedditCommand.php';
 	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/InstagramCommand.php';
+	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/ThreadsCommand.php';
+	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/FacebookCommand.php';
+	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/TwitterCommand.php';
+	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/BlueskyCommand.php';
 	WP_CLI::add_command( 'datamachine-socials pinterest', \DataMachineSocials\Cli\Commands\PinterestCommand::class );
 	WP_CLI::add_command( 'datamachine-socials reddit', \DataMachineSocials\Cli\Commands\RedditCommand::class );
 	WP_CLI::add_command( 'datamachine-socials instagram', \DataMachineSocials\Cli\Commands\InstagramCommand::class );
+	WP_CLI::add_command( 'datamachine-socials threads', \DataMachineSocials\Cli\Commands\ThreadsCommand::class );
+	WP_CLI::add_command( 'datamachine-socials facebook', \DataMachineSocials\Cli\Commands\FacebookCommand::class );
+	WP_CLI::add_command( 'datamachine-socials twitter', \DataMachineSocials\Cli\Commands\TwitterCommand::class );
+	WP_CLI::add_command( 'datamachine-socials bluesky', \DataMachineSocials\Cli\Commands\BlueskyCommand::class );
 }
 
 /**
@@ -162,5 +177,10 @@ function datamachine_socials_load_chat_tools() {
 
 	new \DataMachineSocials\Chat\Tools\FetchReddit();
 	new \DataMachineSocials\Chat\Tools\ReadInstagram();
+	new \DataMachineSocials\Chat\Tools\ReadThreads();
+	new \DataMachineSocials\Chat\Tools\ReadFacebook();
+	new \DataMachineSocials\Chat\Tools\ReadTwitter();
+	new \DataMachineSocials\Chat\Tools\ReadBluesky();
+	new \DataMachineSocials\Chat\Tools\ReadPinterest();
 }
 add_action( 'plugins_loaded', 'datamachine_socials_load_chat_tools', 25 );

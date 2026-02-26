@@ -105,6 +105,196 @@ class PinterestCommand {
 	}
 
 	/**
+	 * List your recent pins.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--limit=<limit>]
+	 * : Number of pins to return.
+	 * ---
+	 * default: 25
+	 * ---
+	 *
+	 * [--bookmark=<bookmark>]
+	 * : Pagination bookmark for next page.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials pinterest pins
+	 *     wp datamachine-socials pinterest pins --limit=10 --format=json
+	 */
+	public function pins( $args, $assoc_args ) {
+		$ability = $this->get_read_ability();
+
+		$result = $ability->execute( array(
+			'action'   => 'pins',
+			'limit'    => absint( $assoc_args['limit'] ?? 25 ),
+			'bookmark' => $assoc_args['bookmark'] ?? '',
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		$data   = $result['data'];
+		$pins   = $data['pins'] ?? array();
+		$format = $assoc_args['format'] ?? 'table';
+
+		if ( empty( $pins ) ) {
+			WP_CLI::warning( 'No pins found.' );
+			return;
+		}
+
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		WP_CLI::success( "Found {$data['count']} pins" );
+		WP_CLI::log( '' );
+
+		foreach ( $pins as $pin ) {
+			$title = mb_substr( $pin['title'] ?? '(no title)', 0, 50 );
+			$desc  = mb_substr( $pin['description'] ?? '', 0, 40 );
+			$id    = $pin['id'] ?? '';
+
+			WP_CLI::log( sprintf( '  %s  %s  %s', $id, $title, $desc ) );
+		}
+
+		if ( $data['has_next'] && ! empty( $data['bookmark'] ) ) {
+			WP_CLI::log( '' );
+			WP_CLI::log( "Next page: --bookmark={$data['bookmark']}" );
+		}
+	}
+
+	/**
+	 * Get details for a specific pin.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <pin_id>
+	 * : The Pinterest pin ID.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: json
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 */
+	public function pin( $args, $assoc_args ) {
+		$pin_id  = $args[0];
+		$ability = $this->get_read_ability();
+
+		$result = $ability->execute( array(
+			'action' => 'pin',
+			'pin_id' => $pin_id,
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::log( wp_json_encode( $result['data'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+	}
+
+	/**
+	 * List pins from a specific board.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <board_id>
+	 * : The Pinterest board ID.
+	 *
+	 * [--limit=<limit>]
+	 * : Number of pins to return.
+	 * ---
+	 * default: 25
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials pinterest board-pins 123456789
+	 *
+	 * @subcommand board-pins
+	 */
+	public function board_pins( $args, $assoc_args ) {
+		$board_id = $args[0];
+		$ability  = $this->get_read_ability();
+
+		$result = $ability->execute( array(
+			'action'   => 'board_pins',
+			'board_id' => $board_id,
+			'limit'    => absint( $assoc_args['limit'] ?? 25 ),
+			'bookmark' => $assoc_args['bookmark'] ?? '',
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		$data   = $result['data'];
+		$format = $assoc_args['format'] ?? 'table';
+
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		$pins = $data['pins'] ?? array();
+		if ( empty( $pins ) ) {
+			WP_CLI::warning( 'No pins found on this board.' );
+			return;
+		}
+
+		WP_CLI::success( "Found {$data['count']} pins" );
+		WP_CLI::log( '' );
+
+		foreach ( $pins as $pin ) {
+			$title = mb_substr( $pin['title'] ?? '(no title)', 0, 50 );
+			WP_CLI::log( sprintf( '  %s  %s', $pin['id'] ?? '', $title ) );
+		}
+	}
+
+	/**
+	 * Get the Pinterest read ability.
+	 *
+	 * @return \DataMachineSocials\Abilities\Pinterest\PinterestReadAbility
+	 */
+	private function get_read_ability() {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/pinterest-read' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/pinterest-read ability not registered.' );
+		}
+
+		return new \DataMachineSocials\Abilities\Pinterest\PinterestReadAbility();
+	}
+
+	/**
 	 * Format items for output.
 	 *
 	 * @param array  $items      Items to format.
