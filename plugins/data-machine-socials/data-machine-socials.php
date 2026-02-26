@@ -60,6 +60,7 @@ function datamachine_socials_load_handlers() {
 
 	// Instagram
 	new \DataMachineSocials\Abilities\Instagram\InstagramPublishAbility();
+	new \DataMachineSocials\Abilities\Instagram\InstagramReadAbility();
 
 	// Reddit (Fetch)
 	new \DataMachineSocials\Abilities\Reddit\FetchRedditAbility();
@@ -142,8 +143,10 @@ add_action( 'admin_enqueue_scripts', 'datamachine_socials_enqueue_assets' );
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/PinterestCommand.php';
 	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/RedditCommand.php';
+	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/InstagramCommand.php';
 	WP_CLI::add_command( 'datamachine-socials pinterest', \DataMachineSocials\Cli\Commands\PinterestCommand::class );
 	WP_CLI::add_command( 'datamachine-socials reddit', \DataMachineSocials\Cli\Commands\RedditCommand::class );
+	WP_CLI::add_command( 'datamachine-socials instagram', \DataMachineSocials\Cli\Commands\InstagramCommand::class );
 }
 
 /**
@@ -158,5 +161,6 @@ function datamachine_socials_load_chat_tools() {
 	}
 
 	new \DataMachineSocials\Chat\Tools\FetchReddit();
+	new \DataMachineSocials\Chat\Tools\ReadInstagram();
 }
 add_action( 'plugins_loaded', 'datamachine_socials_load_chat_tools', 25 );
