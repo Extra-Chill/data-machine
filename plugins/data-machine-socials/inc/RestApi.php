@@ -138,6 +138,17 @@ class RestApi {
 			'args'                => self::read_endpoint_args( array( 'list', 'get', 'comments' ), 'post_id' ),
 		) );
 
+		register_rest_route( self::NAMESPACE, '/facebook/update', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'platform_update' ),
+			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			'args'                => array(
+				'action'  => array( 'type' => 'string', 'required' => true, 'enum' => array( 'edit', 'hide', 'unhide', 'delete' ), 'sanitize_callback' => 'sanitize_text_field' ),
+				'post_id' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
+				'message' => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
+			),
+		) );
+
 		register_rest_route( self::NAMESPACE, '/twitter/tweets', array(
 			'methods'             => 'GET',
 			'callback'            => array( __CLASS__, 'platform_read' ),
@@ -258,6 +269,7 @@ class RestApi {
 		$ability_map = array(
 			'instagram' => \DataMachineSocials\Abilities\Instagram\InstagramUpdateAbility::class,
 			'twitter'   => \DataMachineSocials\Abilities\Twitter\TwitterUpdateAbility::class,
+			'facebook'  => \DataMachineSocials\Abilities\Facebook\FacebookUpdateAbility::class,
 		);
 
 		$platform = null;
@@ -281,6 +293,8 @@ class RestApi {
 		$id_field = 'media_id'; // Default for Instagram.
 		if ( 'twitter' === $platform ) {
 			$id_field = 'tweet_id';
+		} elseif ( 'facebook' === $platform ) {
+			$id_field = 'post_id';
 		}
 
 		if ( empty( $params[ $id_field ] ) ) {
@@ -295,6 +309,11 @@ class RestApi {
 
 		if ( ! empty( $params['caption'] ) ) {
 			$input['caption'] = sanitize_text_field( $params['caption'] );
+		}
+
+		// Handle message field for Facebook.
+		if ( ! empty( $params['message'] ) && 'facebook' === $platform ) {
+			$input['message'] = sanitize_text_field( $params['message'] );
 		}
 
 		$result = $ability->execute( $input );

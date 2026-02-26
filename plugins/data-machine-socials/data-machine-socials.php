@@ -54,6 +54,7 @@ function datamachine_socials_load_handlers() {
 	// Facebook
 	new \DataMachineSocials\Abilities\Facebook\FacebookPublishAbility();
 	new \DataMachineSocials\Abilities\Facebook\FacebookReadAbility();
+	new \DataMachineSocials\Abilities\Facebook\FacebookUpdateAbility();
 
 	// Bluesky
 	new \DataMachineSocials\Abilities\Bluesky\BlueskyPublishAbility();
@@ -198,6 +199,7 @@ function datamachine_socials_load_chat_tools() {
 	new \DataMachineSocials\Chat\Tools\UpdateInstagram();
 	new \DataMachineSocials\Chat\Tools\ReadThreads();
 	new \DataMachineSocials\Chat\Tools\ReadFacebook();
+	new \DataMachineSocials\Chat\Tools\UpdateFacebook();
 	new \DataMachineSocials\Chat\Tools\ReadTwitter();
 	new \DataMachineSocials\Chat\Tools\UpdateTwitter();
 	new \DataMachineSocials\Chat\Tools\ReadBluesky();
