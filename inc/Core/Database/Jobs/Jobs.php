@@ -105,6 +105,7 @@ class Jobs {
             flow_id varchar(20) NOT NULL,
             source varchar(50) NOT NULL DEFAULT 'pipeline',
             label varchar(255) NULL DEFAULT NULL,
+            parent_job_id bigint(20) unsigned NULL DEFAULT NULL,
             status varchar(255) NOT NULL,
             engine_data longtext NULL,
             created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -113,7 +114,8 @@ class Jobs {
             KEY status (status),
             KEY pipeline_id (pipeline_id),
             KEY flow_id (flow_id),
-            KEY source (source)
+            KEY source (source),
+            KEY parent_job_id (parent_job_id)
         ) $charset_collate;";
 
 		dbDelta( $sql );
@@ -151,7 +153,7 @@ class Jobs {
 				"SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH 
                  FROM information_schema.COLUMNS 
                  WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s 
-                 AND COLUMN_NAME IN ('status', 'pipeline_id', 'flow_id', 'source')",
+                 AND COLUMN_NAME IN ('status', 'pipeline_id', 'flow_id', 'source', 'parent_job_id')",
 				DB_NAME,
 				$table_name
 			),
@@ -238,6 +240,25 @@ class Jobs {
 				'Added source and label columns to jobs table for pipeline decoupling',
 				array( 'table_name' => $table_name )
 			);
+		}
+
+		// Add parent_job_id column for job hierarchy (batch parents, pipeline sub-jobs).
+		if ( ! isset( $columns['parent_job_id'] ) ) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$result = $wpdb->query(
+				"ALTER TABLE {$table_name}
+				 ADD COLUMN parent_job_id bigint(20) unsigned NULL DEFAULT NULL AFTER label,
+				 ADD KEY parent_job_id (parent_job_id)"
+			);
+
+			if ( false !== $result ) {
+				do_action(
+					'datamachine_log',
+					'info',
+					'Added parent_job_id column to jobs table for job hierarchy',
+					array( 'table_name' => $table_name )
+				);
+			}
 		}
 	}
 }
