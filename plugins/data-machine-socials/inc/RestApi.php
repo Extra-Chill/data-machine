@@ -113,37 +113,114 @@ class RestApi {
 			)
 		);
 
-		// Instagram: list media or get single post
-		register_rest_route(
-			self::NAMESPACE,
-			'/instagram/media',
-			array(
-				'methods'             => 'GET',
-				'callback'            => array( __CLASS__, 'instagram_read' ),
-				'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
-				'args'                => array(
-					'action'   => array(
-						'type'              => 'string',
-						'default'           => 'list',
-						'enum'              => array( 'list', 'get', 'comments' ),
-						'sanitize_callback' => 'sanitize_text_field',
-					),
-					'media_id' => array(
-						'type'              => 'string',
-						'sanitize_callback' => 'sanitize_text_field',
-					),
-					'limit'    => array(
-						'type'              => 'integer',
-						'default'           => 25,
-						'sanitize_callback' => 'absint',
-					),
-					'after'    => array(
-						'type'              => 'string',
-						'sanitize_callback' => 'sanitize_text_field',
-					),
-				),
-			)
+		// =====================================================================
+		// Platform Read Endpoints
+		// =====================================================================
+
+		register_rest_route( self::NAMESPACE, '/instagram/media', array(
+			'methods'             => 'GET',
+			'callback'            => array( __CLASS__, 'platform_read' ),
+			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			'args'                => self::read_endpoint_args( array( 'list', 'get', 'comments' ), 'media_id' ),
+		) );
+
+		register_rest_route( self::NAMESPACE, '/threads/posts', array(
+			'methods'             => 'GET',
+			'callback'            => array( __CLASS__, 'platform_read' ),
+			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			'args'                => self::read_endpoint_args( array( 'list', 'get', 'replies' ), 'thread_id' ),
+		) );
+
+		register_rest_route( self::NAMESPACE, '/facebook/posts', array(
+			'methods'             => 'GET',
+			'callback'            => array( __CLASS__, 'platform_read' ),
+			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			'args'                => self::read_endpoint_args( array( 'list', 'get', 'comments' ), 'post_id' ),
+		) );
+
+		register_rest_route( self::NAMESPACE, '/twitter/tweets', array(
+			'methods'             => 'GET',
+			'callback'            => array( __CLASS__, 'platform_read' ),
+			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			'args'                => array(
+				'action'           => array( 'type' => 'string', 'default' => 'list', 'enum' => array( 'list', 'get', 'mentions' ), 'sanitize_callback' => 'sanitize_text_field' ),
+				'tweet_id'         => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
+				'limit'            => array( 'type' => 'integer', 'default' => 25, 'sanitize_callback' => 'absint' ),
+				'pagination_token' => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
+			),
+		) );
+
+		register_rest_route( self::NAMESPACE, '/bluesky/posts', array(
+			'methods'             => 'GET',
+			'callback'            => array( __CLASS__, 'platform_read' ),
+			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			'args'                => array(
+				'action'   => array( 'type' => 'string', 'default' => 'list', 'enum' => array( 'list', 'get', 'profile' ), 'sanitize_callback' => 'sanitize_text_field' ),
+				'post_uri' => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
+				'limit'    => array( 'type' => 'integer', 'default' => 25, 'sanitize_callback' => 'absint' ),
+				'cursor'   => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
+			),
+		) );
+
+		register_rest_route( self::NAMESPACE, '/pinterest/read', array(
+			'methods'             => 'GET',
+			'callback'            => array( __CLASS__, 'platform_read' ),
+			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			'args'                => array(
+				'action'   => array( 'type' => 'string', 'default' => 'pins', 'enum' => array( 'pins', 'pin', 'boards', 'board_pins' ), 'sanitize_callback' => 'sanitize_text_field' ),
+				'pin_id'   => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
+				'board_id' => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
+				'limit'    => array( 'type' => 'integer', 'default' => 25, 'sanitize_callback' => 'absint' ),
+				'bookmark' => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
+			),
+		) );
+	}
+
+	/**
+	 * Standard args for read endpoints with cursor-based pagination.
+	 */
+	private static function read_endpoint_args( array $actions, string $id_param ): array {
+		return array(
+			'action'  => array( 'type' => 'string', 'default' => $actions[0], 'enum' => $actions, 'sanitize_callback' => 'sanitize_text_field' ),
+			$id_param => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
+			'limit'   => array( 'type' => 'integer', 'default' => 25, 'sanitize_callback' => 'absint' ),
+			'after'   => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
 		);
+	}
+
+	/**
+	 * Generic platform read handler — routes to the correct ability by URL.
+	 */
+	public static function platform_read( \WP_REST_Request $request ) {
+		$route = $request->get_route();
+		$params = $request->get_params();
+
+		$ability_map = array(
+			'instagram' => \DataMachineSocials\Abilities\Instagram\InstagramReadAbility::class,
+			'threads'   => \DataMachineSocials\Abilities\Threads\ThreadsReadAbility::class,
+			'facebook'  => \DataMachineSocials\Abilities\Facebook\FacebookReadAbility::class,
+			'twitter'   => \DataMachineSocials\Abilities\Twitter\TwitterReadAbility::class,
+			'bluesky'   => \DataMachineSocials\Abilities\Bluesky\BlueskyReadAbility::class,
+			'pinterest' => \DataMachineSocials\Abilities\Pinterest\PinterestReadAbility::class,
+		);
+
+		$platform = null;
+		foreach ( $ability_map as $key => $class ) {
+			if ( strpos( $route, "/{$key}/" ) !== false ) {
+				$platform = $key;
+				break;
+			}
+		}
+
+		if ( ! $platform || ! isset( $ability_map[ $platform ] ) ) {
+			return new \WP_REST_Response( array( 'success' => false, 'error' => 'Unknown platform' ), 400 );
+		}
+
+		$ability = new $ability_map[ $platform ]();
+		$input   = array_filter( $params, function ( $v ) { return '' !== $v && null !== $v; } );
+		$result  = $ability->execute( $input );
+
+		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
 	}
 
 	/**
@@ -444,54 +521,6 @@ class RestApi {
 		$url = $upload_dir['baseurl'] . '/dms-temp/' . $filename;
 
 		return new \WP_REST_Response( array( 'url' => $url ) );
-	}
-
-	/**
-	 * Instagram read: list media, get single post, or get comments.
-	 *
-	 * Delegates to the datamachine/instagram-read ability.
-	 */
-	public static function instagram_read( \WP_REST_Request $request ) {
-		$action   = $request->get_param( 'action' ) ?? 'list';
-		$media_id = $request->get_param( 'media_id' );
-
-		// Validate action-specific requirements.
-		if ( in_array( $action, array( 'get', 'comments' ), true ) && empty( $media_id ) ) {
-			return new \WP_REST_Response(
-				array(
-					'success' => false,
-					'error'   => "media_id is required for the {$action} action",
-				),
-				400
-			);
-		}
-
-		$ability_instance = new \DataMachineSocials\Abilities\Instagram\InstagramReadAbility();
-		$input            = array(
-			'action' => $action,
-		);
-
-		if ( ! empty( $media_id ) ) {
-			$input['media_id'] = $media_id;
-		}
-
-		$limit = $request->get_param( 'limit' );
-		if ( $limit ) {
-			$input['limit'] = absint( $limit );
-		}
-
-		$after = $request->get_param( 'after' );
-		if ( $after ) {
-			$input['after'] = $after;
-		}
-
-		$result = $ability_instance->execute( $input );
-
-		if ( ! $result['success'] ) {
-			return new \WP_REST_Response( $result, 500 );
-		}
-
-		return new \WP_REST_Response( $result );
 	}
 
 	/**

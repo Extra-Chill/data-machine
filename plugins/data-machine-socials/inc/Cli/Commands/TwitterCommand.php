@@ -1,0 +1,261 @@
+<?php
+/**
+ * WP-CLI Twitter Command
+ *
+ * @package    DataMachineSocials
+ * @subpackage Cli\Commands
+ * @since      0.3.0
+ */
+
+namespace DataMachineSocials\Cli\Commands;
+
+use WP_CLI;
+use DataMachine\Abilities\AuthAbilities;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Manage Twitter/X integration for Data Machine Socials.
+ *
+ * ## EXAMPLES
+ *
+ *     wp datamachine-socials twitter tweets
+ *     wp datamachine-socials twitter tweet 1234567890
+ *     wp datamachine-socials twitter mentions
+ *     wp datamachine-socials twitter status
+ */
+class TwitterCommand {
+
+	/**
+	 * List recent tweets from your timeline.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--limit=<limit>]
+	 * : Number of tweets to return (min 5, max 100).
+	 * ---
+	 * default: 25
+	 * ---
+	 *
+	 * [--pagination-token=<token>]
+	 * : Pagination token for next page.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 */
+	public function tweets( $args, $assoc_args ) {
+		$ability = $this->get_ability();
+
+		$result = $ability->execute( array(
+			'action'           => 'list',
+			'limit'            => absint( $assoc_args['limit'] ?? 25 ),
+			'pagination_token' => $assoc_args['pagination-token'] ?? '',
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		$data   = $result['data'];
+		$tweets = $data['tweets'] ?? array();
+		$format = $assoc_args['format'] ?? 'table';
+
+		if ( empty( $tweets ) ) {
+			WP_CLI::warning( 'No tweets found.' );
+			return;
+		}
+
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		WP_CLI::success( "Found {$data['count']} tweets" );
+		WP_CLI::log( '' );
+
+		foreach ( $tweets as $tweet ) {
+			$text = mb_substr( $tweet['text'] ?? '', 0, 60 );
+			if ( mb_strlen( $tweet['text'] ?? '' ) > 60 ) {
+				$text .= '...';
+			}
+			$metrics = $tweet['public_metrics'] ?? array();
+			$likes   = $metrics['like_count'] ?? 0;
+			$rts     = $metrics['retweet_count'] ?? 0;
+			$date    = isset( $tweet['created_at'] ) ? wp_date( 'Y-m-d', strtotime( $tweet['created_at'] ) ) : '';
+
+			WP_CLI::log( sprintf( '  %s  %s  %d likes  %d RTs  %s', $tweet['id'], $date, $likes, $rts, $text ) );
+		}
+
+		if ( $data['has_next'] && ! empty( $data['next_token'] ) ) {
+			WP_CLI::log( '' );
+			WP_CLI::log( "Next page: --pagination-token={$data['next_token']}" );
+		}
+	}
+
+	/**
+	 * Get details for a specific tweet.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <tweet_id>
+	 * : The tweet ID.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 */
+	public function tweet( $args, $assoc_args ) {
+		$tweet_id = $args[0];
+		$ability  = $this->get_ability();
+
+		$result = $ability->execute( array(
+			'action'   => 'get',
+			'tweet_id' => $tweet_id,
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		$data   = $result['data'];
+		$format = $assoc_args['format'] ?? 'table';
+
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		$metrics = $data['public_metrics'] ?? array();
+
+		WP_CLI::success( "Tweet {$tweet_id}" );
+		WP_CLI::log( '' );
+		WP_CLI::log( 'ID:         ' . ( $data['id'] ?? '' ) );
+		WP_CLI::log( 'Date:       ' . ( $data['created_at'] ?? '' ) );
+		WP_CLI::log( 'Likes:      ' . ( $metrics['like_count'] ?? 0 ) );
+		WP_CLI::log( 'Retweets:   ' . ( $metrics['retweet_count'] ?? 0 ) );
+		WP_CLI::log( 'Replies:    ' . ( $metrics['reply_count'] ?? 0 ) );
+		WP_CLI::log( 'Impressions:' . ( $metrics['impression_count'] ?? 0 ) );
+		WP_CLI::log( '' );
+		WP_CLI::log( 'Text:' );
+		WP_CLI::log( $data['text'] ?? '' );
+	}
+
+	/**
+	 * List recent mentions.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--limit=<limit>]
+	 * : Number of mentions to return (min 5, max 100).
+	 * ---
+	 * default: 25
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 */
+	public function mentions( $args, $assoc_args ) {
+		$ability = $this->get_ability();
+
+		$result = $ability->execute( array(
+			'action' => 'mentions',
+			'limit'  => absint( $assoc_args['limit'] ?? 25 ),
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		$data     = $result['data'];
+		$mentions = $data['mentions'] ?? array();
+		$format   = $assoc_args['format'] ?? 'table';
+
+		if ( empty( $mentions ) ) {
+			WP_CLI::warning( 'No mentions found.' );
+			return;
+		}
+
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		WP_CLI::success( "Found {$data['count']} mentions" );
+		WP_CLI::log( '' );
+
+		foreach ( $mentions as $tweet ) {
+			$text = mb_substr( $tweet['text'] ?? '', 0, 60 );
+			if ( mb_strlen( $tweet['text'] ?? '' ) > 60 ) {
+				$text .= '...';
+			}
+			$date = isset( $tweet['created_at'] ) ? wp_date( 'Y-m-d', strtotime( $tweet['created_at'] ) ) : '';
+
+			WP_CLI::log( sprintf( '  %s  %s  %s', $tweet['id'], $date, $text ) );
+		}
+	}
+
+	/**
+	 * Show Twitter authentication status.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials twitter status
+	 */
+	public function status( $args, $assoc_args ) {
+		$auth_abilities = new AuthAbilities();
+		$provider       = $auth_abilities->getProvider( 'twitter' );
+
+		WP_CLI::log( 'Twitter / X Integration Status' );
+		WP_CLI::log( '---' );
+
+		if ( ! $provider ) {
+			WP_CLI::log( 'Provider:      Not found' );
+			return;
+		}
+
+		$authenticated = $provider->is_authenticated();
+		WP_CLI::log( 'Authenticated: ' . ( $authenticated ? 'Yes' : 'No' ) );
+
+		$details = $provider->get_account_details();
+		if ( $details ) {
+			if ( ! empty( $details['screen_name'] ) ) {
+				WP_CLI::log( 'Handle:        @' . $details['screen_name'] );
+			}
+			if ( ! empty( $details['user_id'] ) ) {
+				WP_CLI::log( 'User ID:       ' . $details['user_id'] );
+			}
+		}
+
+		WP_CLI::log( 'Auth type:     OAuth 1.0a (tokens do not expire)' );
+	}
+
+	private function get_ability() {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/twitter-read' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/twitter-read ability not registered.' );
+		}
+
+		return new \DataMachineSocials\Abilities\Twitter\TwitterReadAbility();
+	}
+}
