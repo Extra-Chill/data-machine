@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Data Machine Socials
  * Plugin URI: https://github.com/Extra-Chill/data-machine-socials
- * Description: Social media publishing extension for Data Machine. Adds support for Instagram, Twitter, Facebook, Bluesky, Threads, and Pinterest.
+ * Description: Social media extension for Data Machine. Adds support for Instagram, Twitter, Facebook, Bluesky, Threads, Pinterest, and Reddit.
  * Version: 0.1.0
  * Requires at least: 6.9
  * Requires PHP: 8.2
@@ -61,13 +61,19 @@ function datamachine_socials_load_handlers() {
 	// Instagram
 	new \DataMachineSocials\Abilities\Instagram\InstagramPublishAbility();
 
-	// Social Publish Handlers
+	// Reddit (Fetch)
+	new \DataMachineSocials\Abilities\Reddit\FetchRedditAbility();
+
+	// Social Handlers
 	new \DataMachineSocials\Handlers\Twitter\Twitter();
 	new \DataMachineSocials\Handlers\Facebook\Facebook();
 	new \DataMachineSocials\Handlers\Threads\Threads();
 	new \DataMachineSocials\Handlers\Bluesky\Bluesky();
 	new \DataMachineSocials\Handlers\Pinterest\Pinterest();
 	new \DataMachineSocials\Handlers\Instagram\Instagram();
+
+	// Reddit (Fetch)
+	new \DataMachineSocials\Handlers\Reddit\Reddit();
 }
 
 // Hook into plugins_loaded to ensure Data Machine core is loaded first
