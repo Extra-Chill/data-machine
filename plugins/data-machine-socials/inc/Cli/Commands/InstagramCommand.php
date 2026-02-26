@@ -312,6 +312,102 @@ class InstagramCommand {
 	}
 
 	/**
+	 * Edit caption of an Instagram post.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <media_id>
+	 * : The Instagram media ID.
+	 *
+	 * <caption>
+	 * : New caption text.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials instagram edit-caption 17891234567890 "New caption here"
+	 */
+	public function edit_caption( $args, $assoc_args ) {
+		$media_id = $args[0];
+		$caption  = $args[1] ?? '';
+		$ability  = $this->get_update_ability();
+
+		if ( empty( $caption ) ) {
+			WP_CLI::error( 'Caption is required.' );
+		}
+
+		$result = $ability->execute( array(
+			'action'   => 'edit',
+			'media_id' => $media_id,
+			'caption'  => $caption,
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Caption updated successfully!' );
+		WP_CLI::log( 'Media ID: ' . $result['data']['media_id'] );
+	}
+
+	/**
+	 * Delete an Instagram post.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <media_id>
+	 * : The Instagram media ID to delete.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials instagram delete 17891234567890
+	 */
+	public function delete( $args, $assoc_args ) {
+		$media_id = $args[0];
+		$ability  = $this->get_update_ability();
+
+		$result = $ability->execute( array(
+			'action'   => 'delete',
+			'media_id' => $media_id,
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Post deleted successfully!' );
+		WP_CLI::log( 'Media ID: ' . $result['data']['media_id'] );
+	}
+
+	/**
+	 * Archive an Instagram post (hide from profile).
+	 *
+	 * ## OPTIONS
+	 *
+	 * <media_id>
+	 * : The Instagram media ID to archive.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials instagram archive 17891234567890
+	 */
+	public function archive( $args, $assoc_args ) {
+		$media_id = $args[0];
+		$ability  = $this->get_update_ability();
+
+		$result = $ability->execute( array(
+			'action'   => 'archive',
+			'media_id' => $media_id,
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Post archived successfully!' );
+		WP_CLI::log( 'Media ID: ' . $result['data']['media_id'] );
+	}
+
+	/**
 	 * Get the Instagram read ability.
 	 *
 	 * @return \DataMachineSocials\Abilities\Instagram\InstagramReadAbility
@@ -327,5 +423,23 @@ class InstagramCommand {
 		}
 
 		return new \DataMachineSocials\Abilities\Instagram\InstagramReadAbility();
+	}
+
+	/**
+	 * Get the Instagram update ability.
+	 *
+	 * @return \DataMachineSocials\Abilities\Instagram\InstagramUpdateAbility
+	 */
+	private function get_update_ability() {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/instagram-update' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/instagram-update ability not registered.' );
+		}
+
+		return new \DataMachineSocials\Abilities\Instagram\InstagramUpdateAbility();
 	}
 }

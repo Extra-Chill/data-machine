@@ -174,6 +174,21 @@ class RestApi {
 				'bookmark' => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
 			),
 		) );
+
+		// =====================================================================
+		// Platform Update Endpoints
+		// =====================================================================
+
+		register_rest_route( self::NAMESPACE, '/instagram/update', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'platform_update' ),
+			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			'args'                => array(
+				'action'   => array( 'type' => 'string', 'required' => true, 'enum' => array( 'edit', 'delete', 'archive' ), 'sanitize_callback' => 'sanitize_text_field' ),
+				'media_id' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
+				'caption'  => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
+			),
+		) );
 	}
 
 	/**
@@ -219,6 +234,53 @@ class RestApi {
 		$ability = new $ability_map[ $platform ]();
 		$input   = array_filter( $params, function ( $v ) { return '' !== $v && null !== $v; } );
 		$result  = $ability->execute( $input );
+
+		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
+	}
+
+	/**
+	 * Generic platform update handler — routes to the correct ability by URL.
+	 */
+	public static function platform_update( \WP_REST_Request $request ) {
+		$route = $request->get_route();
+		$params = $request->get_json_params() ?: $request->get_body_params();
+
+		$ability_map = array(
+			'instagram' => \DataMachineSocials\Abilities\Instagram\InstagramUpdateAbility::class,
+		);
+
+		$platform = null;
+		foreach ( $ability_map as $key => $class ) {
+			if ( strpos( $route, "/{$key}/" ) !== false ) {
+				$platform = $key;
+				break;
+			}
+		}
+
+		if ( ! $platform || ! isset( $ability_map[ $platform ] ) ) {
+			return new \WP_REST_Response( array( 'success' => false, 'error' => 'Unknown platform or update not supported' ), 400 );
+		}
+
+		// Validate required params.
+		if ( empty( $params['action'] ) ) {
+			return new \WP_REST_Response( array( 'success' => false, 'error' => 'action is required' ), 400 );
+		}
+
+		if ( empty( $params['media_id'] ) ) {
+			return new \WP_REST_Response( array( 'success' => false, 'error' => 'media_id is required' ), 400 );
+		}
+
+		$ability = new $ability_map[ $platform ]();
+		$input   = array(
+			'action'   => sanitize_text_field( $params['action'] ),
+			'media_id' => sanitize_text_field( $params['media_id'] ),
+		);
+
+		if ( ! empty( $params['caption'] ) ) {
+			$input['caption'] = sanitize_text_field( $params['caption'] );
+		}
+
+		$result = $ability->execute( $input );
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
 	}
