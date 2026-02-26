@@ -295,6 +295,11 @@ class DATAMACHINE_Events {
 			new \DataMachineEvents\Abilities\FilterAbilities();
 		}
 
+		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/SettingsAbilities.php' ) ) {
+			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/SettingsAbilities.php';
+			new \DataMachineEvents\Abilities\SettingsAbilities();
+		}
+
 		$this->registerSystemHealthChecks();
 	}
 

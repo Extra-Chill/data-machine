@@ -50,6 +50,7 @@ class GeocodingAbilities {
 	private function registerAbilities(): void {
 		$register_callback = function () {
 			$this->registerGeocodeAddressAbility();
+			$this->registerGeocodeSearchAbility();
 			$this->registerGeocodeVenuesAbility();
 			$this->registerAuditVenuesAbility();
 		};
@@ -147,6 +148,133 @@ class GeocodingAbilities {
 		set_transient( $cache_key, $result, self::CACHE_TTL );
 
 		return $result;
+	}
+
+	// -------------------------------------------------------------------------
+	// Ability: geocode-search
+	// -------------------------------------------------------------------------
+
+	private function registerGeocodeSearchAbility(): void {
+		wp_register_ability(
+			'datamachine-events/geocode-search',
+			array(
+				'label'               => __( 'Geocode Search', 'datamachine-events' ),
+				'description'         => __( 'Search for addresses via Nominatim and return multiple results with full address details. Used for autocomplete UIs.', 'datamachine-events' ),
+				'category'            => 'datamachine',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'query' ),
+					'properties' => array(
+						'query'        => array(
+							'type'        => 'string',
+							'description' => 'Search query (address, city, or place name)',
+						),
+						'limit'        => array(
+							'type'        => 'integer',
+							'description' => 'Max results to return (default: 5, max: 10)',
+						),
+						'countrycodes' => array(
+							'type'        => 'string',
+							'description' => 'Comma-separated country codes to restrict results (e.g., "us" or "us,ca")',
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success' => array( 'type' => 'boolean' ),
+						'results' => array(
+							'type'        => 'array',
+							'description' => 'Array of Nominatim results with lat, lon, display_name, address details',
+						),
+						'error'   => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeGeocodeSearch' ),
+				'permission_callback' => '__return_true',
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	/**
+	 * Execute geocode-search ability.
+	 *
+	 * Multi-result Nominatim search with address details.
+	 * Unlike geocode-address (single result, cached, for backend),
+	 * this returns multiple results for UI autocomplete.
+	 *
+	 * @param array $input Input with 'query', optional 'limit' and 'countrycodes'.
+	 * @return array Results array.
+	 */
+	public function executeGeocodeSearch( array $input ): array {
+		$query = trim( $input['query'] ?? '' );
+
+		if ( empty( $query ) || strlen( $query ) < 3 ) {
+			return array(
+				'success' => false,
+				'error'   => 'Query must be at least 3 characters.',
+				'results' => array(),
+			);
+		}
+
+		$query = sanitize_text_field( $query );
+		$query = substr( $query, 0, 500 );
+		$limit = min( max( 1, (int) ( $input['limit'] ?? 5 ) ), 10 );
+
+		$url_args = array(
+			'format'         => 'json',
+			'addressdetails' => '1',
+			'limit'          => (string) $limit,
+			'q'              => $query,
+		);
+
+		if ( ! empty( $input['countrycodes'] ) ) {
+			$url_args['countrycodes'] = sanitize_text_field( $input['countrycodes'] );
+		}
+
+		$url = add_query_arg( $url_args, 'https://nominatim.openstreetmap.org/search' );
+
+		$response = wp_remote_get(
+			$url,
+			array(
+				'timeout'    => 10,
+				'user-agent' => 'DataMachineEvents/1.0 (https://extrachill.com)',
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Nominatim request failed: ' . $response->get_error_message(),
+				'results' => array(),
+			);
+		}
+
+		$status_code = wp_remote_retrieve_response_code( $response );
+		if ( 200 !== $status_code ) {
+			return array(
+				'success' => false,
+				'error'   => 'Nominatim returned status ' . $status_code,
+				'results' => array(),
+			);
+		}
+
+		$body = wp_remote_retrieve_body( $response );
+		$data = json_decode( $body, true );
+
+		if ( ! is_array( $data ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Invalid response from Nominatim.',
+				'results' => array(),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'results' => $data,
+		);
 	}
 
 	// -------------------------------------------------------------------------

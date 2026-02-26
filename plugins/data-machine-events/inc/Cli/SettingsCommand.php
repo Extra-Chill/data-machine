@@ -2,7 +2,8 @@
 /**
  * WP-CLI Settings Command
  *
- * Provides CLI access to Data Machine Events plugin settings.
+ * Thin wrapper around SettingsAbilities for CLI access.
+ * All business logic delegated to SettingsAbilities.
  *
  * @package DataMachineEvents\Cli
  * @since 0.9.6
@@ -12,7 +13,7 @@ namespace DataMachineEvents\Cli;
 
 use WP_CLI;
 use WP_CLI_Command;
-use DataMachineEvents\Admin\Settings_Page;
+use DataMachineEvents\Abilities\SettingsAbilities;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -33,8 +34,6 @@ if ( ! defined( 'ABSPATH' ) ) {
  *     wp datamachine-events settings list
  */
 class SettingsCommand extends WP_CLI_Command {
-
-	private const OPTION_NAME = 'datamachine_events_settings';
 
 	/**
 	 * Get a setting value.
@@ -65,11 +64,14 @@ class SettingsCommand extends WP_CLI_Command {
 		$key    = $args[0];
 		$format = $assoc_args['format'] ?? 'value';
 
-		$value = Settings_Page::get_setting( $key );
+		$abilities = new SettingsAbilities();
+		$result    = $abilities->executeGetSettings( array( 'key' => $key ) );
 
-		if ( null === $value ) {
-			WP_CLI::error( "Setting '{$key}' is not set." );
+		if ( ! empty( $result['error'] ) ) {
+			WP_CLI::error( $result['error'] );
 		}
+
+		$value = $result['value'];
 
 		if ( 'json' === $format ) {
 			WP_CLI::log(
@@ -82,7 +84,7 @@ class SettingsCommand extends WP_CLI_Command {
 				)
 			);
 		} elseif ( is_array( $value ) || is_object( $value ) ) {
-				WP_CLI::log( wp_json_encode( $value, JSON_PRETTY_PRINT ) );
+			WP_CLI::log( wp_json_encode( $value, JSON_PRETTY_PRINT ) );
 		} elseif ( is_bool( $value ) ) {
 			WP_CLI::log( $value ? 'true' : 'false' );
 		} else {
@@ -114,24 +116,22 @@ class SettingsCommand extends WP_CLI_Command {
 		$key   = $args[0];
 		$value = $args[1];
 
-		if ( 'true' === $value ) {
-			$value = true;
-		} elseif ( 'false' === $value ) {
-			$value = false;
+		$abilities = new SettingsAbilities();
+		$result    = $abilities->executeUpdateSetting(
+			array(
+				'key'   => $key,
+				'value' => $value,
+			)
+		);
+
+		if ( ! empty( $result['error'] ) ) {
+			WP_CLI::error( $result['error'] );
 		}
 
-		$settings         = get_option( self::OPTION_NAME, array() );
-		$old_value        = $settings[ $key ] ?? null;
-		$settings[ $key ] = $value;
-
-		$result = update_option( self::OPTION_NAME, $settings );
-
-		if ( $result ) {
-			WP_CLI::success( "Updated '{$key}': " . $this->format_value( $old_value ) . ' → ' . $this->format_value( $value ) );
-		} elseif ( $old_value === $value ) {
-				WP_CLI::warning( "Setting '{$key}' already has value: " . $this->format_value( $value ) );
-		} else {
-			WP_CLI::error( "Failed to update setting '{$key}'." );
+		if ( $result['success'] ) {
+			WP_CLI::success(
+				"Updated '{$key}': " . $this->format_value( $result['old_value'] ) . ' → ' . $this->format_value( $result['new_value'] )
+			);
 		}
 	}
 
@@ -158,8 +158,16 @@ class SettingsCommand extends WP_CLI_Command {
 	 * @param array $assoc_args Associative arguments.
 	 */
 	public function list( array $args, array $assoc_args ): void {
-		$format   = $assoc_args['format'] ?? 'table';
-		$settings = get_option( self::OPTION_NAME, array() );
+		$format = $assoc_args['format'] ?? 'table';
+
+		$abilities = new SettingsAbilities();
+		$result    = $abilities->executeGetSettings( array() );
+
+		if ( ! empty( $result['error'] ) ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		$settings = $result['settings'];
 
 		if ( empty( $settings ) ) {
 			WP_CLI::warning( 'No settings configured.' );
