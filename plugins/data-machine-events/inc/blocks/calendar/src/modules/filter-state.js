@@ -3,12 +3,13 @@
  *
  * Source of truth hierarchy:
  * 1. URL params (explicit, shareable)
- * 2. localStorage (persistence for taxonomy filters only)
+ * 2. localStorage (persistence for taxonomy filters + geo location)
  *
  * Archive context is read from DOM data attributes (page-level, not user state).
  */
 
 const STORAGE_KEY = 'datamachine_events_calendar_state';
+const GEO_STORAGE_KEY = 'datamachine_events_geo_state';
 
 class FilterStateManager {
     constructor(calendar) {
@@ -75,6 +76,50 @@ class FilterStateManager {
     }
 
     /**
+     * Get geo context from URL, falling back to data attributes, then localStorage
+     * @return {Object} { lat, lng, radius, radius_unit }
+     */
+    getGeoContext() {
+        const params = new URLSearchParams(window.location.search);
+        
+        // Priority 1: URL params (shareable links)
+        const urlLat = params.get('lat') || '';
+        const urlLng = params.get('lng') || '';
+        if (urlLat && urlLng) {
+            return {
+                lat: urlLat,
+                lng: urlLng,
+                radius: parseInt(params.get('radius'), 10) || 25,
+                radius_unit: params.get('radius_unit') || 'mi'
+            };
+        }
+
+        // Priority 2: Server-rendered data attributes
+        const dataLat = this.calendar.dataset.geoLat || '';
+        const dataLng = this.calendar.dataset.geoLng || '';
+        if (dataLat && dataLng) {
+            return {
+                lat: dataLat,
+                lng: dataLng,
+                radius: parseInt(this.calendar.dataset.geoRadius, 10) || 25,
+                radius_unit: this.calendar.dataset.geoRadiusUnit || 'mi'
+            };
+        }
+
+        // Priority 3: localStorage (persisted user preference)
+        return this.getStoredGeo();
+    }
+
+    /**
+     * Check if geo filter is active
+     * @return {boolean}
+     */
+    hasGeoFilter() {
+        const geo = this.getGeoContext();
+        return !!(geo.lat && geo.lng);
+    }
+
+    /**
      * Get search query from URL
      * @return {string}
      */
@@ -115,7 +160,7 @@ class FilterStateManager {
 
     /**
      * Build URLSearchParams from current UI state
-     * Reads from: search input, date picker, modal checkboxes
+     * Reads from: search input, date picker, filter checkboxes, location input
      * @param {Object|null} datePicker - Flatpickr instance
      * @return {URLSearchParams}
      */
@@ -141,9 +186,11 @@ class FilterStateManager {
             }
         }
         
-        const modal = this.calendar.querySelector('.datamachine-taxonomy-modal');
-        if (modal) {
-            const checkboxes = modal.querySelectorAll('input[type="checkbox"]:checked');
+        // Taxonomy filters — read from inline collapsible (or modal for backward compat)
+        const filtersContainer = this.calendar.querySelector('.datamachine-taxonomy-filters-inline')
+            || this.calendar.querySelector('.datamachine-taxonomy-modal');
+        if (filtersContainer) {
+            const checkboxes = filtersContainer.querySelectorAll('input[type="checkbox"]:checked');
             checkboxes.forEach(checkbox => {
                 const taxonomy = checkbox.dataset.taxonomy;
                 const termId = checkbox.value;
@@ -152,12 +199,29 @@ class FilterStateManager {
                 }
             });
         }
+
+        // Geo location — read from location input data attributes
+        const locationInput = this.calendar.querySelector('.datamachine-events-location-search');
+        if (locationInput) {
+            const lat = locationInput.dataset.geoLat || '';
+            const lng = locationInput.dataset.geoLng || '';
+            if (lat && lng) {
+                params.set('lat', lat);
+                params.set('lng', lng);
+
+                const radiusSelect = this.calendar.querySelector('.datamachine-events-radius-select');
+                if (radiusSelect) {
+                    params.set('radius', radiusSelect.value);
+                    params.set('radius_unit', radiusSelect.dataset.radiusUnit || 'mi');
+                }
+            }
+        }
         
         return params;
     }
 
     /**
-     * Update URL via History API and save taxonomy filters to localStorage
+     * Update URL via History API and save state to localStorage
      * @param {URLSearchParams} params
      */
     updateUrl(params) {
@@ -171,7 +235,7 @@ class FilterStateManager {
     }
 
     /**
-     * Save ONLY taxonomy filters to localStorage (not dates)
+     * Save taxonomy filters to localStorage (not dates or geo — geo has its own storage)
      * @param {URLSearchParams} params
      */
     saveToStorage(params) {
@@ -191,6 +255,49 @@ class FilterStateManager {
             } else {
                 localStorage.removeItem(STORAGE_KEY);
             }
+        } catch (e) {
+            // localStorage unavailable
+        }
+    }
+
+    /**
+     * Save geo state to localStorage
+     * @param {Object} geo { lat, lng, radius, radius_unit, label }
+     */
+    saveGeoToStorage(geo) {
+        try {
+            if (geo.lat && geo.lng) {
+                localStorage.setItem(GEO_STORAGE_KEY, JSON.stringify(geo));
+            } else {
+                localStorage.removeItem(GEO_STORAGE_KEY);
+            }
+        } catch (e) {
+            // localStorage unavailable
+        }
+    }
+
+    /**
+     * Get stored geo state from localStorage
+     * @return {Object} { lat, lng, radius, radius_unit, label }
+     */
+    getStoredGeo() {
+        try {
+            const stored = localStorage.getItem(GEO_STORAGE_KEY);
+            if (stored) {
+                return JSON.parse(stored);
+            }
+        } catch (e) {
+            // localStorage unavailable or corrupted
+        }
+        return { lat: '', lng: '', radius: 25, radius_unit: 'mi', label: '' };
+    }
+
+    /**
+     * Clear geo state from localStorage
+     */
+    clearGeoStorage() {
+        try {
+            localStorage.removeItem(GEO_STORAGE_KEY);
         } catch (e) {
             // localStorage unavailable
         }
@@ -240,7 +347,7 @@ class FilterStateManager {
      */
     updateFilterCountBadge() {
         const filterBtn = this.calendar.querySelector(
-            '.datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .datamachine-events-filter-btn'
+            '.datamachine-taxonomy-toggle, .datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .datamachine-events-filter-btn'
         );
         const countBadge = filterBtn?.querySelector('.datamachine-filter-count');
         

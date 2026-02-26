@@ -52,6 +52,10 @@ class Calendar_Query {
 			'archive_term_id'    => 0,
 			'source'             => 'unknown',
 			'user_date_range'    => false,
+			'geo_lat'            => '',
+			'geo_lng'            => '',
+			'geo_radius'         => 25,
+			'geo_radius_unit'    => 'mi',
 		);
 
 		$params = wp_parse_args( $params, $defaults );
@@ -134,6 +138,40 @@ class Calendar_Query {
 
 		if ( $params['tax_query_override'] ) {
 			$query_args['tax_query'] = $params['tax_query_override'];
+		}
+
+		// Geo-filter: find venues within radius and inject as tax_query constraint.
+		if ( ! empty( $params['geo_lat'] ) && ! empty( $params['geo_lng'] ) ) {
+			$geo_lat    = (float) $params['geo_lat'];
+			$geo_lng    = (float) $params['geo_lng'];
+			$geo_radius = (float) ( $params['geo_radius'] ?? 25 );
+			$geo_unit   = $params['geo_radius_unit'] ?? 'mi';
+
+			if ( Geo_Query::validate_params( $geo_lat, $geo_lng, $geo_radius ) ) {
+				$nearby_venue_ids = Geo_Query::get_venue_ids_within_radius( $geo_lat, $geo_lng, $geo_radius, $geo_unit );
+
+				$tax_query = isset( $query_args['tax_query'] ) ? $query_args['tax_query'] : array();
+				$tax_query['relation'] = 'AND';
+
+				if ( ! empty( $nearby_venue_ids ) ) {
+					$tax_query[] = array(
+						'taxonomy' => 'venue',
+						'field'    => 'term_id',
+						'terms'    => $nearby_venue_ids,
+						'operator' => 'IN',
+					);
+				} else {
+					// No venues within radius — force empty result set.
+					$tax_query[] = array(
+						'taxonomy' => 'venue',
+						'field'    => 'term_id',
+						'terms'    => array( 0 ),
+						'operator' => 'IN',
+					);
+				}
+
+				$query_args['tax_query'] = $tax_query;
+			}
 		}
 
 		if ( ! empty( $params['tax_filters'] ) && is_array( $params['tax_filters'] ) ) {

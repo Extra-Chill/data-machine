@@ -4,6 +4,7 @@
  *
  * Renders events calendar with filtering and pagination.
  * Uses CalendarAbilities for event data and HTML generation.
+ * Uses FilterAbilities for filter-bar visibility logic.
  *
  * @var array $attributes Block attributes
  * @var string $content Block inner content
@@ -15,6 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 use DataMachineEvents\Abilities\CalendarAbilities;
+use DataMachineEvents\Abilities\FilterAbilities;
 use DataMachineEvents\Blocks\Calendar\Taxonomy_Helper;
 
 if ( wp_is_json_request() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
@@ -35,6 +37,10 @@ $show_past = isset( $_GET['past'] ) && '1' === $_GET['past'];
 $search_query    = isset( $_GET['event_search'] ) ? sanitize_text_field( wp_unslash( $_GET['event_search'] ) ) : '';
 $date_start      = isset( $_GET['date_start'] ) ? sanitize_text_field( wp_unslash( $_GET['date_start'] ) ) : '';
 $date_end        = isset( $_GET['date_end'] ) ? sanitize_text_field( wp_unslash( $_GET['date_end'] ) ) : '';
+$geo_lat         = isset( $_GET['lat'] ) ? sanitize_text_field( wp_unslash( $_GET['lat'] ) ) : '';
+$geo_lng         = isset( $_GET['lng'] ) ? sanitize_text_field( wp_unslash( $_GET['lng'] ) ) : '';
+$geo_radius      = isset( $_GET['radius'] ) ? absint( $_GET['radius'] ) : 25;
+$geo_radius_unit = isset( $_GET['radius_unit'] ) ? sanitize_key( wp_unslash( $_GET['radius_unit'] ) ) : 'mi';
 $tax_filters_raw = isset( $_GET['tax_filter'] ) ? wp_unslash( $_GET['tax_filter'] ) : array();
 $tax_filters     = array();
 
@@ -83,6 +89,10 @@ $result    = $abilities->executeGetCalendarPage(
 		'tax_filter'       => $tax_filters,
 		'archive_taxonomy' => $archive_context['taxonomy'],
 		'archive_term_id'  => $archive_context['term_id'],
+		'geo_lat'          => $geo_lat,
+		'geo_lng'          => $geo_lng,
+		'geo_radius'       => $geo_radius,
+		'geo_radius_unit'  => $geo_radius_unit,
 		'include_html'     => true,
 		'include_gaps'     => true,
 	)
@@ -100,15 +110,50 @@ $date_context = array(
 	'past'       => $show_past ? '1' : '',
 );
 
-$tax_query_override = null;
-if ( ! empty( $archive_context['taxonomy'] ) && ! empty( $archive_context['term_id'] ) ) {
-	$tax_query_override = array(
+// Use FilterAbilities to determine filter-bar visibility on archive pages.
+$hide_filter_button_when_inactive = false;
+$filter_count = ! empty( $tax_filters ) ? array_sum( array_map( 'count', $tax_filters ) ) : 0;
+
+if ( ! empty( $archive_context['taxonomy'] ) && ! empty( $archive_context['term_id'] ) && 0 === $filter_count ) {
+	$filter_abilities = new FilterAbilities();
+	$filter_result    = $filter_abilities->executeGetFilterOptions(
 		array(
-			'taxonomy' => $archive_context['taxonomy'],
-			'field'    => 'term_id',
-			'terms'    => $archive_context['term_id'],
-		),
+			'active_filters'   => $tax_filters,
+			'date_context'     => $date_context,
+			'archive_taxonomy' => $archive_context['taxonomy'],
+			'archive_term_id'  => $archive_context['term_id'],
+			'geo_lat'          => $geo_lat,
+			'geo_lng'          => $geo_lng,
+			'geo_radius'       => $geo_radius,
+			'geo_radius_unit'  => $geo_radius_unit,
+		)
 	);
+
+	$taxonomies_with_counts = $filter_result['taxonomies'] ?? array();
+
+	$has_other_taxonomy_options = false;
+	foreach ( $taxonomies_with_counts as $taxonomy_slug => $taxonomy_data ) {
+		if ( $taxonomy_slug === $archive_context['taxonomy'] ) {
+			continue;
+		}
+		if ( ! empty( $taxonomy_data['terms'] ) ) {
+			$has_other_taxonomy_options = true;
+			break;
+		}
+	}
+
+	$has_other_archive_taxonomy_terms = false;
+	if ( isset( $taxonomies_with_counts[ $archive_context['taxonomy'] ] ) ) {
+		$archive_terms = Taxonomy_Helper::flatten_hierarchy( $taxonomies_with_counts[ $archive_context['taxonomy'] ]['terms'] ?? array() );
+		foreach ( $archive_terms as $term_data ) {
+			if ( (int) ( $term_data['term_id'] ?? 0 ) !== (int) $archive_context['term_id'] ) {
+				$has_other_archive_taxonomy_terms = true;
+				break;
+			}
+		}
+	}
+
+	$hide_filter_button_when_inactive = ! $has_other_taxonomy_options && ! $has_other_archive_taxonomy_terms;
 }
 
 \DataMachineEvents\Blocks\Calendar\Template_Loader::init();
@@ -130,42 +175,21 @@ if ( ! empty( $archive_context['taxonomy'] ) ) {
 		esc_attr( $archive_context['term_name'] )
 	);
 }
+
+$geo_data_attrs = '';
+if ( ! empty( $geo_lat ) && ! empty( $geo_lng ) ) {
+	$geo_data_attrs = sprintf(
+		' data-geo-lat="%s" data-geo-lng="%s" data-geo-radius="%s" data-geo-radius-unit="%s"',
+		esc_attr( $geo_lat ),
+		esc_attr( $geo_lng ),
+		esc_attr( $geo_radius ),
+		esc_attr( $geo_radius_unit )
+	);
+}
 ?>
 
-<div data-instance-id="<?php echo esc_attr( $instance_id ); ?>"<?php echo $archive_data_attrs; ?> <?php echo $wrapper_attributes; ?>>
+<div data-instance-id="<?php echo esc_attr( $instance_id ); ?>"<?php echo $archive_data_attrs; ?><?php echo $geo_data_attrs; ?> <?php echo $wrapper_attributes; ?>>
 	<?php
-	$filter_count = ! empty( $tax_filters ) ? array_sum( array_map( 'count', $tax_filters ) ) : 0;
-
-	$hide_filter_button_when_inactive = false;
-	if ( ! empty( $archive_context['taxonomy'] ) && ! empty( $archive_context['term_id'] ) && 0 === $filter_count ) {
-		$taxonomies_with_counts = Taxonomy_Helper::get_all_taxonomies_with_counts( $tax_filters, $date_context, $tax_query_override );
-
-		$has_other_taxonomy_options = false;
-		foreach ( $taxonomies_with_counts as $taxonomy_slug => $taxonomy_data ) {
-			if ( $taxonomy_slug === $archive_context['taxonomy'] ) {
-				continue;
-			}
-
-			if ( ! empty( $taxonomy_data['terms'] ) ) {
-				$has_other_taxonomy_options = true;
-				break;
-			}
-		}
-
-		$has_other_archive_taxonomy_terms = false;
-		if ( isset( $taxonomies_with_counts[ $archive_context['taxonomy'] ] ) ) {
-			$archive_terms = Taxonomy_Helper::flatten_hierarchy( $taxonomies_with_counts[ $archive_context['taxonomy'] ]['terms'] ?? array() );
-			foreach ( $archive_terms as $term_data ) {
-				if ( (int) ( $term_data['term_id'] ?? 0 ) !== (int) $archive_context['term_id'] ) {
-					$has_other_archive_taxonomy_terms = true;
-					break;
-				}
-			}
-		}
-
-		$hide_filter_button_when_inactive = ! $has_other_taxonomy_options && ! $has_other_archive_taxonomy_terms;
-	}
-
 	\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template(
 		'filter-bar',
 		array(
@@ -178,6 +202,10 @@ if ( ! empty( $archive_context['taxonomy'] ) ) {
 			'filter_count'                     => $filter_count,
 			'archive_context'                  => $archive_context,
 			'hide_filter_button_when_inactive' => $hide_filter_button_when_inactive,
+			'geo_lat'                          => $geo_lat,
+			'geo_lng'                          => $geo_lng,
+			'geo_radius'                       => $geo_radius,
+			'geo_radius_unit'                  => $geo_radius_unit,
 		)
 	);
 	?>

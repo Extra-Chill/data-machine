@@ -172,6 +172,280 @@
     transform: translateY(-1px);
 }
 
+/* ================================
+   LOCATION INPUT STYLES
+   ================================ */
+
+.datamachine-events-location-row {
+    margin-bottom: 1rem;
+}
+
+.datamachine-events-location-input {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    position: relative;
+}
+
+.datamachine-events-location-field {
+    display: flex;
+    align-items: center;
+    position: relative;
+    flex: 1;
+    background: var(--datamachine-background-light);
+    border-radius: var(--datamachine-border-radius);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), inset 0 0 0 1px var(--datamachine-border-light);
+    transition: all 0.2s ease;
+}
+
+.datamachine-events-location-field:focus-within {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), inset 0 0 0 2px var(--datamachine-border-focus);
+}
+
+.datamachine-events-location-field > .dashicons-location {
+    position: absolute;
+    left: 12px;
+    color: var(--datamachine-text-muted);
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    pointer-events: none;
+}
+
+.datamachine-events-calendar .datamachine-events-filter-bar .datamachine-events-location-field input.datamachine-events-location-search {
+    flex: 1;
+    padding: 0.875rem 1.25rem;
+    padding-left: 2.5rem;
+    border: none;
+    border-radius: var(--datamachine-border-radius);
+    font-size: 0.95rem;
+    font-weight: 400;
+    background: transparent;
+    color: var(--datamachine-text-primary);
+    margin: 0;
+    line-height: normal;
+    min-width: 0;
+}
+
+.datamachine-events-calendar .datamachine-events-filter-bar .datamachine-events-location-field input.datamachine-events-location-search:focus {
+    outline: none;
+}
+
+.datamachine-events-nearme-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.5rem 0.875rem;
+    margin-right: 0.5rem;
+    border: 1px solid var(--datamachine-border-light);
+    border-radius: var(--datamachine-border-radius);
+    background: var(--datamachine-background-light);
+    color: var(--datamachine-text-secondary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.datamachine-events-nearme-btn:hover {
+    background: var(--datamachine-background-hover);
+    border-color: var(--datamachine-border-hover);
+    color: var(--datamachine-text-primary);
+}
+
+.datamachine-events-nearme-btn .dashicons {
+    width: 14px;
+    height: 14px;
+    font-size: 14px;
+}
+
+.datamachine-events-nearme-btn.datamachine-nearme-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.datamachine-events-location-clear-btn {
+    position: absolute;
+    right: 8px;
+    background: none;
+    border: none;
+    color: var(--datamachine-text-muted);
+    cursor: pointer;
+    padding: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.datamachine-events-location-clear-btn:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+    border-radius: var(--datamachine-border-radius);
+}
+
+/* Autocomplete Dropdown */
+.datamachine-events-location-autocomplete {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: var(--datamachine-background-primary);
+    border: 1px solid var(--datamachine-border-light);
+    border-radius: var(--datamachine-border-radius);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    margin-top: 4px;
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.datamachine-events-location-autocomplete-item {
+    display: block;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: none;
+    background: none;
+    text-align: left;
+    font-size: 0.9rem;
+    color: var(--datamachine-text-primary);
+    cursor: pointer;
+    transition: background 0.15s ease;
+    line-height: 1.4;
+}
+
+.datamachine-events-location-autocomplete-item:hover {
+    background: var(--datamachine-background-hover);
+}
+
+.datamachine-events-location-autocomplete-item + .datamachine-events-location-autocomplete-item {
+    border-top: 1px solid var(--datamachine-border-light);
+}
+
+/* Radius Selector */
+.datamachine-events-radius-selector {
+    flex-shrink: 0;
+}
+
+.datamachine-events-radius-select {
+    padding: 0.75rem 0.875rem;
+    border: 1px solid var(--datamachine-border-light);
+    border-radius: var(--datamachine-border-radius);
+    background: var(--datamachine-background-light);
+    color: var(--datamachine-text-primary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.datamachine-events-radius-select:hover {
+    border-color: var(--datamachine-border-hover);
+}
+
+.datamachine-events-radius-select:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--datamachine-border-focus);
+}
+
+/* ================================
+   INLINE COLLAPSIBLE FILTER STYLES
+   ================================ */
+
+.datamachine-taxonomy-filters-inline {
+    margin-top: 1rem;
+    padding: 1.25rem;
+    background: var(--datamachine-background-light);
+    border: 1px solid var(--datamachine-border-light);
+    border-radius: var(--datamachine-border-radius);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.datamachine-taxonomy-filters-inline[hidden] {
+    display: none;
+}
+
+.datamachine-taxonomy-filters-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    color: var(--datamachine-text-secondary);
+}
+
+.datamachine-taxonomy-filters-loading .spinner {
+    float: none;
+}
+
+.datamachine-taxonomy-filters-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--datamachine-border-light);
+}
+
+.datamachine-taxonomy-filters-actions[hidden] {
+    display: none;
+}
+
+/* Filter Count Badge */
+.datamachine-filter-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.35rem;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.datamachine-filter-count:empty {
+    display: none;
+}
+
+.datamachine-filters-active .datamachine-filter-count {
+    background: rgba(255, 255, 255, 0.3);
+    color: white;
+}
+
+/* Responsive: Location Row */
+@media (max-width: 768px) {
+    .datamachine-events-location-input {
+        flex-direction: column;
+    }
+
+    .datamachine-events-location-field {
+        width: 100%;
+    }
+
+    .datamachine-events-radius-selector {
+        width: 100%;
+    }
+
+    .datamachine-events-radius-select {
+        width: 100%;
+    }
+
+    .datamachine-taxonomy-filters-inline {
+        padding: 1rem;
+    }
+
+    .datamachine-taxonomy-filters-actions {
+        flex-direction: column;
+    }
+}
+
 /* Content Area */
 .datamachine-events-content {
     position: relative;

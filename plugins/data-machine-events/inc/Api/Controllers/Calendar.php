@@ -36,6 +36,10 @@ class Calendar {
 				'tax_filter'       => $request->get_param( 'tax_filter' ) ?? array(),
 				'archive_taxonomy' => $request->get_param( 'archive_taxonomy' ) ?? '',
 				'archive_term_id'  => $request->get_param( 'archive_term_id' ) ?? 0,
+				'geo_lat'          => $request->get_param( 'lat' ) ?? '',
+				'geo_lng'          => $request->get_param( 'lng' ) ?? '',
+				'geo_radius'       => $request->get_param( 'radius' ) ?? 25,
+				'geo_radius_unit'  => $request->get_param( 'radius_unit' ) ?? 'mi',
 				'include_html'     => true,
 				'include_gaps'     => true,
 			)

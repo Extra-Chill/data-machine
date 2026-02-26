@@ -290,6 +290,11 @@ class DATAMACHINE_Events {
 			new \DataMachineEvents\Abilities\GeocodingAbilities();
 		}
 
+		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/FilterAbilities.php' ) ) {
+			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/FilterAbilities.php';
+			new \DataMachineEvents\Abilities\FilterAbilities();
+		}
+
 		$this->registerSystemHealthChecks();
 	}
 

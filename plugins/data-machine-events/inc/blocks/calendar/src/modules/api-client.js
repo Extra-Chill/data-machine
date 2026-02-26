@@ -47,14 +47,15 @@ export async function fetchCalendarEvents(calendar, params, archiveContext = {})
 }
 
 /**
- * Fetch filter options from REST API with active filters, date context, and archive context
+ * Fetch filter options from REST API with active filters, date context, archive context, and geo context
  *
  * @param {Object} activeFilters  Current filter selections keyed by taxonomy slug
  * @param {Object} dateContext    Date filtering context (date_start, date_end, past)
  * @param {Object} archiveContext Archive page context (taxonomy, term_id, term_name)
+ * @param {Object} geoContext     Geo filtering context (lat, lng, radius, radius_unit)
  * @return {Promise<Object>} Filter data with taxonomies and meta
  */
-export async function fetchFilters(activeFilters = {}, dateContext = {}, archiveContext = {}) {
+export async function fetchFilters(activeFilters = {}, dateContext = {}, archiveContext = {}, geoContext = {}) {
     const params = new URLSearchParams();
     
     Object.entries(activeFilters).forEach(([taxonomy, termIds]) => {
@@ -78,6 +79,18 @@ export async function fetchFilters(activeFilters = {}, dateContext = {}, archive
     if (archiveContext.taxonomy && archiveContext.term_id) {
         params.set('archive_taxonomy', archiveContext.taxonomy);
         params.set('archive_term_id', archiveContext.term_id);
+    }
+
+    // Geo params — scope filter counts to nearby venues
+    if (geoContext.lat && geoContext.lng) {
+        params.set('lat', geoContext.lat);
+        params.set('lng', geoContext.lng);
+        if (geoContext.radius) {
+            params.set('radius', geoContext.radius);
+        }
+        if (geoContext.radius_unit) {
+            params.set('radius_unit', geoContext.radius_unit);
+        }
     }
 
     const apiUrl = `/wp-json/datamachine/v1/events/filters?${params.toString()}`;
