@@ -34,7 +34,7 @@ class CreatePipelineAbility {
 				'datamachine/create-pipeline',
 				array(
 					'label'               => __( 'Create Pipeline', 'data-machine' ),
-					'description'         => __( 'Create a new pipeline with optional steps and flow configuration. Supports bulk mode via pipelines array.', 'data-machine' ),
+					'description'         => __( 'Create a new pipeline with optional steps. Pass flow_config to also create a flow; omit it for pipeline-only creation. Supports bulk mode via pipelines array.', 'data-machine' ),
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -59,14 +59,10 @@ class CreatePipelineAbility {
 								'type'        => 'object',
 								'description' => __( 'Shared config for bulk mode applied to all pipelines: {steps, scheduling_config}', 'data-machine' ),
 							),
-							'skip_default_flow' => array(
-								'type'        => 'boolean',
-								'description' => __( 'Skip automatic default flow creation. Use when the caller creates its own flows.', 'data-machine' ),
-							),
-							'validate_only' => array(
-								'type'        => 'boolean',
-								'description' => __( 'Dry-run mode: validate without executing', 'data-machine' ),
-							),
+						'validate_only' => array(
+							'type'        => 'boolean',
+							'description' => __( 'Dry-run mode: validate without executing', 'data-machine' ),
+						),
 						),
 					),
 					'output_schema'       => array(
@@ -214,12 +210,11 @@ class CreatePipelineAbility {
 			}
 		}
 
-		$skip_default_flow = ! empty( $input['skip_default_flow'] );
-		$flow_result       = null;
-		$flow_name         = null;
-		$flow_step_ids     = array();
+		$flow_result   = null;
+		$flow_name     = null;
+		$flow_step_ids = array();
 
-		if ( ! $skip_default_flow ) {
+		if ( ! empty( $flow_config ) ) {
 			$flow_name         = $flow_config['flow_name'] ?? $pipeline_name;
 			$scheduling_config = $flow_config['scheduling_config'] ?? array( 'interval' => 'manual' );
 
@@ -346,17 +341,22 @@ class CreatePipelineAbility {
 		if ( $validate_only ) {
 			$preview = array();
 			foreach ( $pipelines as $index => $pipeline_config ) {
-				$name              = $pipeline_config['name'];
-				$steps             = ! empty( $pipeline_config['steps'] ) ? $pipeline_config['steps'] : $template_steps;
-				$flow_name         = $pipeline_config['flow_name'] ?? $name;
-				$scheduling_config = $pipeline_config['scheduling_config'] ?? ( $template['scheduling_config'] ?? array( 'interval' => 'manual' ) );
+				$name  = $pipeline_config['name'];
+				$steps = ! empty( $pipeline_config['steps'] ) ? $pipeline_config['steps'] : $template_steps;
 
-				$preview[] = array(
-					'name'       => $name,
-					'flow_name'  => $flow_name,
-					'steps'      => count( $steps ),
-					'scheduling' => $scheduling_config['interval'] ?? 'manual',
+				$preview_item = array(
+					'name'  => $name,
+					'steps' => count( $steps ),
 				);
+
+				$has_flow = isset( $pipeline_config['flow_name'] ) || isset( $pipeline_config['scheduling_config'] ) || isset( $template['scheduling_config'] );
+				if ( $has_flow ) {
+					$scheduling_config             = $pipeline_config['scheduling_config'] ?? ( $template['scheduling_config'] ?? array( 'interval' => 'manual' ) );
+					$preview_item['flow_name']  = $pipeline_config['flow_name'] ?? $name;
+					$preview_item['scheduling'] = $scheduling_config['interval'] ?? 'manual';
+				}
+
+				$preview[] = $preview_item;
 			}
 
 			return array(
@@ -374,26 +374,21 @@ class CreatePipelineAbility {
 		$created_count = 0;
 		$failed_count  = 0;
 
-		$top_level_skip_flow = ! empty( $input['skip_default_flow'] );
-
 		foreach ( $pipelines as $index => $pipeline_config ) {
-			$name              = $pipeline_config['name'];
-			$steps             = ! empty( $pipeline_config['steps'] ) ? $pipeline_config['steps'] : $template_steps;
-			$flow_name         = $pipeline_config['flow_name'] ?? $name;
-			$scheduling_config = $pipeline_config['scheduling_config'] ?? ( $template['scheduling_config'] ?? array( 'interval' => 'manual' ) );
-			$skip_flow         = $top_level_skip_flow || ! empty( $pipeline_config['skip_default_flow'] );
+			$name  = $pipeline_config['name'];
+			$steps = ! empty( $pipeline_config['steps'] ) ? $pipeline_config['steps'] : $template_steps;
 
 			$single_input = array(
 				'pipeline_name' => $name,
 				'steps'         => $steps,
 			);
 
-			if ( $skip_flow ) {
-				$single_input['skip_default_flow'] = true;
-			} else {
+			// Only create a flow if flow_name or scheduling_config is explicitly provided.
+			$has_flow_config = isset( $pipeline_config['flow_name'] ) || isset( $pipeline_config['scheduling_config'] ) || isset( $template['scheduling_config'] );
+			if ( $has_flow_config ) {
 				$single_input['flow_config'] = array(
-					'flow_name'         => $flow_name,
-					'scheduling_config' => $scheduling_config,
+					'flow_name'         => $pipeline_config['flow_name'] ?? $name,
+					'scheduling_config' => $pipeline_config['scheduling_config'] ?? ( $template['scheduling_config'] ?? array( 'interval' => 'manual' ) ),
 				);
 			}
 
