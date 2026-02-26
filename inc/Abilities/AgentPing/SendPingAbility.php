@@ -99,9 +99,9 @@ class SendPingAbility {
 			);
 		};
 
-		if ( did_action( 'wp_abilities_api_init' ) ) {
+		if ( doing_action( 'wp_abilities_api_init' ) ) {
 			$register_callback();
-		} else {
+		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', $register_callback );
 		}
 	}
