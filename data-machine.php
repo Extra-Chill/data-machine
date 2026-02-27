@@ -148,6 +148,7 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/Content/GetPostBlocksAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Content/EditPostBlocksAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Content/ReplacePostBlocksAbility.php';
+	require_once __DIR__ . '/inc/Abilities/Fetch/GitHubAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Fetch/FetchFilesAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Fetch/FetchRssAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Fetch/FetchWordPressApiAbility.php';
@@ -191,6 +192,7 @@ function datamachine_run_datamachine_plugin() {
 		new \DataMachine\Abilities\Content\GetPostBlocksAbility();
 		new \DataMachine\Abilities\Content\EditPostBlocksAbility();
 		new \DataMachine\Abilities\Content\ReplacePostBlocksAbility();
+		new \DataMachine\Abilities\Fetch\GitHubAbilities();
 		new \DataMachine\Abilities\Fetch\FetchFilesAbility();
 		new \DataMachine\Abilities\Fetch\FetchRssAbility();
 		new \DataMachine\Abilities\Fetch\FetchWordPressApiAbility();
@@ -265,6 +267,7 @@ function datamachine_load_handlers() {
 	new \DataMachine\Core\Steps\Fetch\Handlers\WordPressMedia\WordPressMedia();
 	new \DataMachine\Core\Steps\Fetch\Handlers\Rss\Rss();
 	new \DataMachine\Core\Steps\Fetch\Handlers\Files\Files();
+	new \DataMachine\Core\Steps\Fetch\Handlers\GitHub\GitHub();
 
 	// Update Handlers
 	new \DataMachine\Core\Steps\Update\Handlers\WordPress\WordPress();
