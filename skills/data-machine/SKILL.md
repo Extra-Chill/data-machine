@@ -57,9 +57,9 @@ GET/PUT/DELETE  /datamachine/v1/files/agent/{filename}
 Date-based logs at `YYYY/MM/DD.md` — useful for per-run notes, progress tracking.
 
 ```bash
-wp datamachine memory daily list
-wp datamachine memory daily read [<date>]
-wp datamachine memory daily append <date> --content="..."
+wp datamachine agent daily list
+wp datamachine agent daily read [<date>]
+wp datamachine agent daily append <date> --content="..."
 ```
 
 ---
@@ -138,19 +138,23 @@ wp datamachine jobs retry <id> [--force]
 wp datamachine jobs recover-stuck [--dry-run] [--flow=<id>]
 ```
 
-### Memory
+### Agent
 
 ```bash
-wp datamachine memory read <filename>
-wp datamachine memory write <filename> --content="..."
-wp datamachine memory search <query>
-wp datamachine memory sections <filename>
+wp datamachine agent read <filename>
+wp datamachine agent write <filename> --content="..."
+wp datamachine agent search <query>
+wp datamachine agent sections <filename>
+wp datamachine agent files list
+wp datamachine agent files read <filename>
+wp datamachine agent files write <filename>       # from stdin
+wp datamachine agent files check [--days=<n>]
 # Daily: list, read, write, append, delete, search
-wp datamachine memory daily list [--limit=<n>]
-wp datamachine memory daily append <date> --content="..."
+wp datamachine agent daily list [--limit=<n>]
+wp datamachine agent daily append <date> --content="..."
 ```
 
-Alias: `wp datamachine agent` = `wp datamachine memory`
+Alias: `wp datamachine memory` = `wp datamachine agent`
 
 ### Posts
 
