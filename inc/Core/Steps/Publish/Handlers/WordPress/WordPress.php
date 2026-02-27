@@ -11,6 +11,7 @@ use DataMachine\Abilities\Publish\PublishWordPressAbility;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\Steps\Publish\Handlers\PublishHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
+use DataMachine\Core\Selection\SelectionMode;
 use DataMachine\Core\WordPress\TaxonomyHandler;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
 use DataMachine\Core\WordPress\WordPressPublishHelper;
@@ -100,11 +101,11 @@ class WordPress extends PublishHandler {
 		$taxonomies     = array();
 		$taxonomy_names = get_taxonomies( array( 'public' => true ), 'names' );
 		foreach ( $taxonomy_names as $taxonomy ) {
-			if ( ! \DataMachine\Core\WordPress\TaxonomyHandler::shouldSkipTaxonomy( $taxonomy ) ) {
+			if ( ! TaxonomyHandler::shouldSkipTaxonomy( $taxonomy ) ) {
 				$field_key = "taxonomy_{$taxonomy}_selection";
-				$selection = $handler_config[ $field_key ] ?? 'skip';
+				$selection = $handler_config[ $field_key ] ?? SelectionMode::SKIP;
 
-				if ( 'ai_decides' === $selection && ! empty( $parameters[ $taxonomy ] ) ) {
+				if ( SelectionMode::isAiDecides( $selection ) && ! empty( $parameters[ $taxonomy ] ) ) {
 					$taxonomies[ $taxonomy ] = $parameters[ $taxonomy ];
 				}
 			}

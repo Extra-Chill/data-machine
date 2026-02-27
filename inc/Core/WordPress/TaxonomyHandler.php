@@ -13,6 +13,7 @@
 namespace DataMachine\Core\WordPress;
 
 use DataMachine\Abilities\Taxonomy\ResolveTermAbility;
+use DataMachine\Core\Selection\SelectionMode;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -98,14 +99,16 @@ class TaxonomyHandler {
 				)
 			);
 
-			if ( 'skip' === $selection ) {
+			$mode = SelectionMode::detect( $selection );
+
+			if ( SelectionMode::SKIP === $mode ) {
 				continue;
-			} elseif ( $this->isAiDecidedTaxonomy( $selection ) ) {
+			} elseif ( SelectionMode::AI_DECIDES === $mode ) {
 				$result = $this->processAiDecidedTaxonomy( $post_id, $taxonomy, $parameters, $engine_data, $handler_config );
 				if ( $result ) {
 					$taxonomy_results[ $taxonomy->name ] = $result;
 				}
-			} elseif ( $this->isPreSelectedTaxonomy( $selection ) ) {
+			} elseif ( SelectionMode::PRE_SELECTED === $mode ) {
 				$result = $this->processPreSelectedTaxonomy( $post_id, $taxonomy->name, $selection, $engine_data );
 				if ( $result ) {
 					$taxonomy_results[ $taxonomy->name ] = $result;
@@ -145,12 +148,12 @@ class TaxonomyHandler {
 			$field_key = "taxonomy_{$taxonomy->name}_selection";
 			$selection = $handler_config[ $field_key ] ?? 'skip';
 
-			if ( 'ai_decides' !== $selection ) {
+			if ( ! SelectionMode::isAiDecides( $selection ) ) {
 				continue;
 			}
 
 			// Map taxonomy name to parameter name (category -> category, post_tag -> tags)
-			$param_name = $taxonomy->name === 'post_tag' ? 'tags' : $taxonomy->name;
+			$param_name = 'post_tag' === $taxonomy->name ? 'tags' : $taxonomy->name;
 
 			// Get taxonomy label
 			$taxonomy_label = ( is_object( $taxonomy->labels ) && isset( $taxonomy->labels->name ) )
@@ -204,14 +207,6 @@ class TaxonomyHandler {
 	public static function getTermName( int $term_id, string $taxonomy ): ?string {
 		$term = get_term( $term_id, $taxonomy );
 		return ( ! is_wp_error( $term ) && $term ) ? $term->name : null;
-	}
-
-	private function isAiDecidedTaxonomy( string $selection ): bool {
-		return 'ai_decides' === $selection;
-	}
-
-	private function isPreSelectedTaxonomy( string $selection ): bool {
-		return ! empty( $selection ) && 'skip' !== $selection && 'ai_decides' !== $selection;
 	}
 
 	/**
