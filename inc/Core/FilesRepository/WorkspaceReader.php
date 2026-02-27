@@ -30,14 +30,12 @@ class WorkspaceReader {
 	/**
 	 * Read a file from a workspace repo.
 	 *
-	 * @param string     $name     Repository directory name.
-	 * @param string     $path     Relative file path within the repo.
-	 * @param int        $max_size Maximum file size in bytes.
-	 * @param int|null   $offset   Line number to start reading from (1-indexed).
-	 * @param int|null   $limit    Maximum number of lines to return.
-	 * @return array{success: bool, content?: string, path?: string, size?: int, message?: string, lines_read?: int, offset?: int}
+	 * @param string $name     Repository directory name.
+	 * @param string $path     Relative file path within the repo.
+	 * @param int    $max_size Maximum file size in bytes.
+	 * @return array{success: bool, content?: string, path?: string, size?: int, message?: string}
 	 */
-	public function read_file( string $name, string $path, int $max_size = Workspace::MAX_READ_SIZE, ?int $offset = null, ?int $limit = null ): array {
+	public function read_file( string $name, string $path, int $max_size = Workspace::MAX_READ_SIZE ): array {
 		$repo_path = $this->workspace->get_repo_path( $name );
 		$path      = ltrim( $path, '/' );
 
@@ -107,39 +105,12 @@ class WorkspaceReader {
 			);
 		}
 
-		// Apply line offset and limit if specified.
-		$lines_read = 0;
-		$start_line = 1;
-		if ( null !== $offset || null !== $limit ) {
-			$lines = explode( "\n", $content );
-			$total_lines = count( $lines );
-
-			if ( null !== $offset ) {
-				$start_line = max( 1, $offset );
-				$lines = array_slice( $lines, $start_line - 1 );
-			}
-
-			if ( null !== $limit ) {
-				$lines = array_slice( $lines, 0, $limit );
-			}
-
-			$content = implode( "\n", $lines );
-			$lines_read = count( $lines );
-		}
-
-		$result = array(
-			'success'   => true,
-			'content'   => $content,
-			'path'      => $path,
-			'size'      => $size,
+		return array(
+			'success' => true,
+			'content' => $content,
+			'path'    => $path,
+			'size'    => $size,
 		);
-
-		if ( null !== $offset || null !== $limit ) {
-			$result['lines_read'] = $lines_read;
-			$result['offset']     = $start_line;
-		}
-
-		return $result;
 	}
 
 	/**

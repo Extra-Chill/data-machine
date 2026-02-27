@@ -304,8 +304,7 @@ class WorkspaceCommand extends BaseCommand {
 	 *
 	 * Reads text file contents from a cloned repository in the workspace.
 	 * Binary files are detected and rejected. Large files are limited by
-	 * --max-size (default 1 MB). Use --offset and --limit to read specific
-	 * line ranges.
+	 * --max-size (default 1 MB).
 	 *
 	 * ## OPTIONS
 	 *
@@ -321,12 +320,6 @@ class WorkspaceCommand extends BaseCommand {
 	 * default: 1048576
 	 * ---
 	 *
-	 * [--offset=<line>]
-	 * : Line number to start reading from (1-indexed).
-	 *
-	 * [--limit=<lines>]
-	 * : Maximum number of lines to return.
-	 *
 	 * ## EXAMPLES
 	 *
 	 *     # Read a file
@@ -334,9 +327,6 @@ class WorkspaceCommand extends BaseCommand {
 	 *
 	 *     # Read with custom size limit
 	 *     wp datamachine workspace read homeboy Cargo.toml --max-size=2097152
-	 *
-	 *     # Read lines 100-130 from a file
-	 *     wp datamachine workspace read extrachill style.css --offset=100 --limit=30
 	 *
 	 * @subcommand read
 	 */
@@ -359,14 +349,6 @@ class WorkspaceCommand extends BaseCommand {
 
 		if ( isset( $assoc_args['max-size'] ) ) {
 			$input['max_size'] = (int) $assoc_args['max-size'];
-		}
-
-		if ( isset( $assoc_args['offset'] ) ) {
-			$input['offset'] = (int) $assoc_args['offset'];
-		}
-
-		if ( isset( $assoc_args['limit'] ) ) {
-			$input['limit'] = (int) $assoc_args['limit'];
 		}
 
 		$result = $ability->execute( $input );

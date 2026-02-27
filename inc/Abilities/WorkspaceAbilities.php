@@ -147,7 +147,6 @@ class WorkspaceAbilities {
 
 			// -----------------------------------------------------------------
 			// File reading abilities (show_in_rest = true).
-			// File reading abilities (show_in_rest = true).
 			// -----------------------------------------------------------------
 
 			wp_register_ability(
@@ -159,11 +158,11 @@ class WorkspaceAbilities {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'repo'   => array(
+							'repo'     => array(
 								'type'        => 'string',
 								'description' => 'Repository directory name.',
 							),
-							'path'   => array(
+							'path'     => array(
 								'type'        => 'string',
 								'description' => 'Relative file path within the repo.',
 							),
@@ -171,26 +170,16 @@ class WorkspaceAbilities {
 								'type'        => 'integer',
 								'description' => 'Maximum file size in bytes (default 1 MB).',
 							),
-							'offset' => array(
-								'type'        => 'integer',
-								'description' => 'Line number to start reading from (1-indexed).',
-							),
-							'limit'  => array(
-								'type'        => 'integer',
-								'description' => 'Maximum number of lines to return.',
-							),
 						),
 						'required'   => array( 'repo', 'path' ),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'    => array( 'type' => 'boolean' ),
-							'content'    => array( 'type' => 'string' ),
-							'path'       => array( 'type' => 'string' ),
-							'size'       => array( 'type' => 'integer' ),
-							'lines_read' => array( 'type' => 'integer' ),
-							'offset'     => array( 'type' => 'integer' ),
+							'success' => array( 'type' => 'boolean' ),
+							'content' => array( 'type' => 'string' ),
+							'path'    => array( 'type' => 'string' ),
+							'size'    => array( 'type' => 'integer' ),
 						),
 					),
 					'execute_callback'    => array( self::class, 'readFile' ),
@@ -461,20 +450,23 @@ class WorkspaceAbilities {
 	/**
 	 * Read a file from a workspace repo.
 	 *
-	 * @param array $input Input parameters with 'repo', 'path', optional 'max_size', 'offset', 'limit'.
+	 * @param array $input Input parameters with 'repo', 'path', optional 'max_size'.
 	 * @return array Result.
 	 */
 	public static function readFile( array $input ): array {
 		$workspace = new Workspace();
 		$reader    = new WorkspaceReader( $workspace );
 
-		return $reader->read_file(
+		$args = array(
 			$input['repo'] ?? '',
 			$input['path'] ?? '',
-			isset( $input['max_size'] ) ? (int) $input['max_size'] : Workspace::MAX_READ_SIZE,
-			isset( $input['offset'] ) ? (int) $input['offset'] : null,
-			isset( $input['limit'] ) ? (int) $input['limit'] : null
 		);
+
+		if ( isset( $input['max_size'] ) ) {
+			$args[] = (int) $input['max_size'];
+		}
+
+		return $reader->read_file( ...$args );
 	}
 
 	/**

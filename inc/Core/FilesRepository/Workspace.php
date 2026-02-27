@@ -89,9 +89,6 @@ class Workspace {
 			);
 		}
 
-		// Set permissions for multi-user access (web server group).
-		$this->ensure_group_permissions( $path );
-
 		// Add .htaccess to block web access if inside web root.
 		$this->protect_directory( $path );
 
@@ -403,42 +400,6 @@ class Workspace {
 		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
 		$branch = exec( sprintf( 'git -C %s rev-parse --abbrev-ref HEAD 2>/dev/null', $escaped ) );
 		return ( '' !== $branch ) ? $branch : null;
-	}
-
-	/**
-	 * Ensure the workspace directory is group-writable.
-	 *
-	 * Sets group ownership to www-data (or the web server's group) and
-	 * permissions to 775 so that non-root users (e.g., coding agents) can
-	 * write to the workspace.
-	 *
-	 * @param string $path Directory path.
-	 */
-	private function ensure_group_permissions( string $path ): void {
-		// Determine the web server group. Try common groups in order of likelihood.
-		$groups = array( 'www-data', 'apache', 'nginx', 'http' );
-		$web_group = null;
-
-		foreach ( $groups as $group ) {
-			// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
-			$exists = exec( sprintf( 'getent group %s >/dev/null 2>&1 && echo 1 || echo 0', escapeshellarg( $group ) ) );
-			if ( '1' === trim( $exists ) ) {
-				$web_group = $group;
-				break;
-			}
-		}
-
-		if ( null === $web_group ) {
-			return;
-		}
-
-		// Set group ownership.
-		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
-		exec( sprintf( 'chgrp %s %s 2>/dev/null', escapeshellarg( $web_group ), escapeshellarg( $path ) ) );
-
-		// Set permissions to 775 (rwxrwrx).
-		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
-		exec( sprintf( 'chmod 775 %s 2>/dev/null', escapeshellarg( $path ) ) );
 	}
 
 	/**
