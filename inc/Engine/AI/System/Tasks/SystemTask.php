@@ -91,8 +91,8 @@ abstract class SystemTask {
 
 		if ( empty( $effects ) ) {
 			return array(
-				'success' => false,
-				'error'   => 'No effects recorded for this job',
+				'success'  => false,
+				'error'    => 'No effects recorded for this job',
 				'reverted' => array(),
 				'skipped'  => array(),
 				'failed'   => array(),

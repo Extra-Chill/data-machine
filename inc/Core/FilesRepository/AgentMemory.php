@@ -250,12 +250,12 @@ class AgentMemory {
 			);
 		}
 
-		$content       = file_get_contents( $this->file_path );
-		$lines         = explode( "\n", $content );
-		$matches       = array();
+		$content         = file_get_contents( $this->file_path );
+		$lines           = explode( "\n", $content );
+		$matches         = array();
 		$current_section = null;
-		$query_lower   = mb_strtolower( $query );
-		$line_count    = count( $lines );
+		$query_lower     = mb_strtolower( $query );
+		$line_count      = count( $lines );
 
 		foreach ( $lines as $index => $line ) {
 			if ( preg_match( '/^## (.+)$/', $line, $header_match ) ) {

@@ -33,7 +33,7 @@ class Workspace {
 
 	public function __construct() {
 		$this->directory_manager = new DirectoryManager();
-		$this->workspace_path   = $this->directory_manager->get_workspace_directory();
+		$this->workspace_path    = $this->directory_manager->get_workspace_directory();
 	}
 
 	/**
@@ -304,9 +304,9 @@ class Workspace {
 			'success' => true,
 			'name'    => $name,
 			'path'    => $repo_path,
-			'branch'  => $branch ?: null,
-			'remote'  => $remote ?: null,
-			'commit'  => $commit ?: null,
+			'branch'  => $branch ? $branch : null,
+			'remote'  => $remote ? $remote : null,
+			'commit'  => $commit ? $commit : null,
 			'dirty'   => (int) $status,
 		);
 	}
@@ -416,7 +416,7 @@ class Workspace {
 	 */
 	private function ensure_group_permissions( string $path ): void {
 		// Determine the web server group. Try common groups in order of likelihood.
-		$groups = array( 'www-data', 'apache', 'nginx', 'http' );
+		$groups    = array( 'www-data', 'apache', 'nginx', 'http' );
 		$web_group = null;
 
 		foreach ( $groups as $group ) {

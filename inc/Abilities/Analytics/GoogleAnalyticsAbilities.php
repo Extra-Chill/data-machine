@@ -67,19 +67,19 @@ class GoogleAnalyticsAbilities {
 	 * @var array
 	 */
 	const ACTION_REPORTS = array(
-		'page_stats'       => array(
+		'page_stats'        => array(
 			'dimensions' => array( 'pagePath', 'pageTitle' ),
 			'metrics'    => array( 'screenPageViews', 'sessions', 'bounceRate', 'averageSessionDuration', 'activeUsers' ),
 		),
-		'traffic_sources'  => array(
+		'traffic_sources'   => array(
 			'dimensions' => array( 'sessionSource', 'sessionMedium' ),
 			'metrics'    => array( 'sessions', 'activeUsers', 'screenPageViews', 'bounceRate' ),
 		),
-		'date_stats'       => array(
+		'date_stats'        => array(
 			'dimensions' => array( 'date' ),
 			'metrics'    => array( 'sessions', 'screenPageViews', 'activeUsers', 'bounceRate', 'averageSessionDuration' ),
 		),
-		'top_events'       => array(
+		'top_events'        => array(
 			'dimensions' => array( 'eventName' ),
 			'metrics'    => array( 'eventCount', 'eventCountPerUser' ),
 		),

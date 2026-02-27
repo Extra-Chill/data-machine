@@ -161,7 +161,7 @@ class BatchCommand extends BaseCommand {
 		WP_CLI::log( sprintf( '  Total items:    %d', $status['total_items'] ) );
 		WP_CLI::log( sprintf( '  Scheduled:      %d', $status['tasks_scheduled'] ) );
 		WP_CLI::log( sprintf( '  Chunk size:     %d', $status['chunk_size'] ) );
-		WP_CLI::log( sprintf( '  Started:        %s', $status['started_at'] ?: 'N/A' ) );
+		WP_CLI::log( sprintf( '  Started:        %s', $status['started_at'] ? $status['started_at'] : 'N/A' ) );
 
 		if ( ! empty( $status['completed_at'] ) ) {
 			WP_CLI::log( sprintf( '  Completed:      %s', $status['completed_at'] ) );

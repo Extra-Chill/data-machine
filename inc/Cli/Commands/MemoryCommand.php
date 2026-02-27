@@ -350,7 +350,7 @@ class MemoryCommand extends BaseCommand {
 		foreach ( $months as $month_key => $days ) {
 			foreach ( $days as $day ) {
 				list( $year, $month ) = explode( '/', $month_key );
-				$items[] = array(
+				$items[]              = array(
 					'date'  => "{$year}-{$month}-{$day}",
 					'month' => $month_key,
 				);
@@ -767,7 +767,6 @@ class MemoryCommand extends BaseCommand {
 	private function list_agent_filenames(): array {
 		$agent_dir = $this->get_agent_dir();
 		$files     = glob( $agent_dir . '/*.md' );
-		return array_map( 'basename', $files ?: array() );
+		return array_map( 'basename', $files ? $files : array() );
 	}
-
 }

@@ -65,15 +65,15 @@ class QueueAbility {
 					'type'       => 'object',
 					'required'   => array( 'flow_id', 'flow_step_id', 'prompt' ),
 					'properties' => array(
-						'flow_id'      => array(
+						'flow_id'         => array(
 							'type'        => 'integer',
 							'description' => __( 'Flow ID to add prompt to', 'data-machine' ),
 						),
-						'flow_step_id' => array(
+						'flow_step_id'    => array(
 							'type'        => 'string',
 							'description' => __( 'Flow step ID to add prompt to', 'data-machine' ),
 						),
-						'prompt'       => array(
+						'prompt'          => array(
 							'type'        => 'string',
 							'description' => __( 'Prompt text to queue', 'data-machine' ),
 						),

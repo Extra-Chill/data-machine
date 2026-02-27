@@ -156,8 +156,8 @@ class SystemTaskStep extends Step {
 		$handler_class = $handlers[ $task_type ];
 
 		// Create a child job for independent tracking.
-		$jobs_db     = new Jobs();
-		$job_context = $this->engine->getJobContext();
+		$jobs_db      = new Jobs();
+		$job_context  = $this->engine->getJobContext();
 		$child_job_id = $jobs_db->create_job(
 			array(
 				'pipeline_id'   => $job_context['pipeline_id'] ?? 'direct',
@@ -209,8 +209,8 @@ class SystemTaskStep extends Step {
 		);
 
 		// Execute the task synchronously.
-		$success    = true;
-		$error_msg  = '';
+		$success   = true;
+		$error_msg = '';
 
 		try {
 			$handler = new $handler_class();

@@ -111,27 +111,27 @@ class WorkspaceReader {
 		$lines_read = 0;
 		$start_line = 1;
 		if ( null !== $offset || null !== $limit ) {
-			$lines = explode( "\n", $content );
+			$lines       = explode( "\n", $content );
 			$total_lines = count( $lines );
 
 			if ( null !== $offset ) {
 				$start_line = max( 1, $offset );
-				$lines = array_slice( $lines, $start_line - 1 );
+				$lines      = array_slice( $lines, $start_line - 1 );
 			}
 
 			if ( null !== $limit ) {
 				$lines = array_slice( $lines, 0, $limit );
 			}
 
-			$content = implode( "\n", $lines );
+			$content    = implode( "\n", $lines );
 			$lines_read = count( $lines );
 		}
 
 		$result = array(
-			'success'   => true,
-			'content'   => $content,
-			'path'      => $path,
-			'size'      => $size,
+			'success' => true,
+			'content' => $content,
+			'path'    => $path,
+			'size'    => $size,
 		);
 
 		if ( null !== $offset || null !== $limit ) {

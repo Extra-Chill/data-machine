@@ -132,8 +132,8 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 			}
 
 			if ( ! is_wp_error( $refreshed ) && ! empty( $refreshed['access_token'] ) ) {
-				$account['access_token']    = $refreshed['access_token'];
-				$account['token_expires_at'] = $refreshed['expires_at'] ?? $account['token_expires_at'];
+				$account['access_token']      = $refreshed['access_token'];
+				$account['token_expires_at']  = $refreshed['expires_at'] ?? $account['token_expires_at'];
 				$account['last_refreshed_at'] = time();
 				$this->save_account( $account );
 
@@ -241,8 +241,8 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 			return false;
 		}
 
-		$expiry    = intval( $account['token_expires_at'] );
-		$buffer    = $this->get_refresh_buffer_seconds();
+		$expiry     = intval( $account['token_expires_at'] );
+		$buffer     = $this->get_refresh_buffer_seconds();
 		$refresh_at = $expiry - $buffer;
 
 		// Only schedule if the refresh time is in the future.

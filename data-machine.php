@@ -435,10 +435,10 @@ function datamachine_get_scaffold_defaults(): array {
 
 		$plugin_path = WP_PLUGIN_DIR . '/' . $plugin_file;
 		if ( function_exists( 'get_plugin_data' ) && file_exists( $plugin_path ) ) {
-			$plugin_data  = get_plugin_data( $plugin_path, false, false );
+			$plugin_data    = get_plugin_data( $plugin_path, false, false );
 			$plugin_names[] = ! empty( $plugin_data['Name'] ) ? $plugin_data['Name'] : dirname( $plugin_file );
 		} else {
-			$dir = dirname( $plugin_file );
+			$dir            = dirname( $plugin_file );
 			$plugin_names[] = '.' === $dir ? str_replace( '.php', '', basename( $plugin_file ) ) : $dir;
 		}
 	}
@@ -523,7 +523,7 @@ SOUL.md (this file) defines who you are. USER.md profiles your human. MEMORY.md 
 MD;
 
 	// --- USER.md ---
-	$user_lines   = array();
+	$user_lines = array();
 	if ( $admin_name ) {
 		$user_lines[] = sprintf( '- **Name:** %s', $admin_name );
 	}

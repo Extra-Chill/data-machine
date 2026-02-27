@@ -211,7 +211,7 @@ class ScheduleFlowAbility {
 		}
 
 		// Read back the scheduling config to get the computed first_run.
-		$flow = $this->db_flows->get_flow( $flow_id );
+		$flow              = $this->db_flows->get_flow( $flow_id );
 		$scheduling_config = array();
 		if ( $flow ) {
 			$scheduling_config = json_decode( $flow['scheduling_config'] ?? '{}', true );

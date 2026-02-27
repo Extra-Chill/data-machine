@@ -307,7 +307,7 @@ class ImageGenerationTask extends SystemTask {
 				array(
 					'type'           => 'featured_image_set',
 					'target'         => array( 'post_id' => $post_id ),
-					'previous_value' => $previous_thumbnail ?: 0,
+					'previous_value' => $previous_thumbnail ? $previous_thumbnail : 0,
 				),
 			);
 		}

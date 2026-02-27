@@ -258,7 +258,7 @@ class GDRenderer {
 		}
 
 		// System fallback.
-		$fallback = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf';
+		$fallback             = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf';
 		$this->fonts[ $name ] = $fallback;
 
 		do_action(
@@ -660,8 +660,8 @@ class GDRenderer {
 
 		$colors = array();
 		for ( $i = 0; $i < $count; $i++ ) {
-			$rgb   = $palette[ $i % count( $palette ) ];
-			$name  = "chart_{$i}";
+			$rgb      = $palette[ $i % count( $palette ) ];
+			$name     = "chart_{$i}";
 			$colors[] = $this->color( $name, $rgb[0], $rgb[1], $rgb[2] );
 		}
 
@@ -687,7 +687,7 @@ class GDRenderer {
 		$this->draw_line( $x1, $y1, $x2, $y2, $color, $width );
 
 		// Calculate arrowhead.
-		$angle = atan2( $y2 - $y1, $x2 - $x1 );
+		$angle     = atan2( $y2 - $y1, $x2 - $x1 );
 		$arrow_len = 12;
 
 		$arrow_x1 = $x2 - $arrow_len * cos( $angle - M_PI / 6 );
@@ -743,10 +743,14 @@ class GDRenderer {
 		$half_h = (int) ( $height / 2 );
 
 		$points = array(
-			$center_x, $center_y - $half_h,           // Top.
-			$center_x + $half_w, $center_y,            // Right.
-			$center_x, $center_y + $half_h,            // Bottom.
-			$center_x - $half_w, $center_y,            // Left.
+			$center_x,
+			$center_y - $half_h,           // Top.
+			$center_x + $half_w,
+			$center_y,            // Right.
+			$center_x,
+			$center_y + $half_h,            // Bottom.
+			$center_x - $half_w,
+			$center_y,            // Left.
 		);
 
 		if ( $filled ) {
@@ -822,7 +826,7 @@ class GDRenderer {
 
 		@unlink( $temp_path );
 
-		return $stored_path ?: null;
+		return $stored_path ? $stored_path : null;
 	}
 
 	/**

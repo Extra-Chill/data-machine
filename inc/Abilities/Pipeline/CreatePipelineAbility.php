@@ -59,10 +59,10 @@ class CreatePipelineAbility {
 								'type'        => 'object',
 								'description' => __( 'Shared config for bulk mode applied to all pipelines: {steps, scheduling_config}', 'data-machine' ),
 							),
-						'validate_only' => array(
-							'type'        => 'boolean',
-							'description' => __( 'Dry-run mode: validate without executing', 'data-machine' ),
-						),
+							'validate_only' => array(
+								'type'        => 'boolean',
+								'description' => __( 'Dry-run mode: validate without executing', 'data-machine' ),
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -351,7 +351,7 @@ class CreatePipelineAbility {
 
 				$has_flow = isset( $pipeline_config['flow_name'] ) || isset( $pipeline_config['scheduling_config'] ) || isset( $template['scheduling_config'] );
 				if ( $has_flow ) {
-					$scheduling_config             = $pipeline_config['scheduling_config'] ?? ( $template['scheduling_config'] ?? array( 'interval' => 'manual' ) );
+					$scheduling_config          = $pipeline_config['scheduling_config'] ?? ( $template['scheduling_config'] ?? array( 'interval' => 'manual' ) );
 					$preview_item['flow_name']  = $pipeline_config['flow_name'] ?? $name;
 					$preview_item['scheduling'] = $scheduling_config['interval'] ?? 'manual';
 				}
