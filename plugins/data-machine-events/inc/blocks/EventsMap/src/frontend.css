@@ -1,0 +1,39 @@
+/**
+ * Events Map Block Frontend Styles
+ *
+ * @package DataMachineEvents
+ * @since 0.13.0
+ */
+
+.datamachine-events-map .venue-popup {
+	font-size: var(--font-size-sm, 0.8125rem);
+	line-height: var(--line-height-base, 1.5);
+}
+
+.datamachine-events-map .venue-popup a {
+	color: var(--text-color, #000);
+	text-decoration: none;
+}
+
+.datamachine-events-map .venue-popup a:hover {
+	text-decoration: underline;
+}
+
+.datamachine-events-map-summary {
+	margin: var(--spacing-sm, 0.5rem) 0 0;
+	font-size: var(--font-size-sm, 0.8125rem);
+	color: var(--muted-text, #6b7280);
+	text-align: center;
+}
+
+@media (max-width: 768px) {
+	.datamachine-events-map {
+		border-radius: var(--border-radius-md, 8px);
+	}
+}
+
+@media (max-width: 480px) {
+	.datamachine-events-map {
+		border-radius: 0;
+	}
+}

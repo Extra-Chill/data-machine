@@ -439,6 +439,7 @@ class DATAMACHINE_Events {
 
 		$allowed_block_types[] = 'datamachine-events/event-details';
 		$allowed_block_types[] = 'datamachine-events/calendar';
+		$allowed_block_types[] = 'datamachine-events/events-map';
 
 		return $allowed_block_types;
 	}
@@ -446,6 +447,18 @@ class DATAMACHINE_Events {
 	public function register_blocks() {
 		register_block_type( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/Calendar' );
 		register_block_type( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/EventDetails' );
+		register_block_type( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/EventsMap' );
+
+		// Register Leaflet and events-map scripts so block.json viewScript can reference them.
+		wp_register_style( 'leaflet', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css', array(), '1.9.4' );
+		wp_register_script( 'leaflet', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', array(), '1.9.4', true );
+		wp_register_script(
+			'datamachine-events-map',
+			DATAMACHINE_EVENTS_PLUGIN_URL . 'assets/js/events-map.js',
+			array( 'leaflet' ),
+			filemtime( DATAMACHINE_EVENTS_PLUGIN_DIR . 'assets/js/events-map.js' ),
+			true
+		);
 
 		// Initialize calendar cache invalidation hooks
 		\DataMachineEvents\Blocks\Calendar\Cache_Invalidator::init();
@@ -456,7 +469,7 @@ class DATAMACHINE_Events {
 	}
 
 	public function enqueue_root_styles() {
-		if ( has_block( 'datamachine-events/calendar' ) || has_block( 'datamachine-events/event-details' ) || is_singular( \DataMachineEvents\Core\Event_Post_Type::POST_TYPE ) ) {
+		if ( has_block( 'datamachine-events/calendar' ) || has_block( 'datamachine-events/event-details' ) || has_block( 'datamachine-events/events-map' ) || is_singular( \DataMachineEvents\Core\Event_Post_Type::POST_TYPE ) ) {
 			wp_enqueue_style(
 				'datamachine-events-root',
 				DATAMACHINE_EVENTS_PLUGIN_URL . 'inc/Blocks/root.css',
@@ -467,26 +480,17 @@ class DATAMACHINE_Events {
 			wp_enqueue_style( 'dashicons' );
 		}
 
-		// Enqueue Leaflet map assets for Event Details block
+		// Enqueue Leaflet assets for blocks that use maps.
+		$needs_leaflet = has_block( 'datamachine-events/event-details' )
+			|| has_block( 'datamachine-events/events-map' )
+			|| is_singular( \DataMachineEvents\Core\Event_Post_Type::POST_TYPE );
+
+		if ( $needs_leaflet ) {
+			wp_enqueue_style( 'leaflet' );
+		}
+
 		if ( has_block( 'datamachine-events/event-details' ) || is_singular( \DataMachineEvents\Core\Event_Post_Type::POST_TYPE ) ) {
-			// Leaflet CSS
-			wp_enqueue_style(
-				'leaflet',
-				'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-				array(),
-				'1.9.4'
-			);
-
-			// Leaflet JS
-			wp_enqueue_script(
-				'leaflet',
-				'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-				array(),
-				'1.9.4',
-				true
-			);
-
-			// Custom venue map initialization
+			// Custom venue map initialization (single venue maps).
 			wp_enqueue_script(
 				'datamachine-events-venue-map',
 				DATAMACHINE_EVENTS_PLUGIN_URL . 'assets/js/venue-map.js',

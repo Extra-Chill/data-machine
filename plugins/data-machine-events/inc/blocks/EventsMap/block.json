@@ -1,0 +1,39 @@
+{
+    "$schema": "https://schemas.wp.org/trunk/block.json",
+    "apiVersion": 3,
+    "name": "datamachine-events/events-map",
+    "version": "0.1.0",
+    "title": "Events Map",
+    "category": "datamachine-events",
+    "icon": "location-alt",
+    "description": "Display an interactive map of event venues. Auto-detects archive context or accepts manual filters.",
+    "keywords": ["events", "map", "venues", "leaflet", "location"],
+    "textdomain": "datamachine-events",
+    "attributes": {
+        "height": {
+            "type": "number",
+            "default": 400
+        },
+        "zoom": {
+            "type": "number",
+            "default": 12
+        },
+        "mapType": {
+            "type": "string",
+            "default": "osm-standard"
+        }
+    },
+    "supports": {
+        "html": false,
+        "align": ["wide", "full"],
+        "spacing": {
+            "margin": true,
+            "padding": false
+        }
+    },
+    "render": "file:./render.php",
+    "editorScript": "file:./build/index.js",
+    "style": "file:./style.css",
+    "viewStyle": "file:./build/frontend.css",
+    "viewScript": ["leaflet", "datamachine-events-map"]
+}

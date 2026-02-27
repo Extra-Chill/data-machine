@@ -1,0 +1,18 @@
+{
+  "name": "dm-events-events-map",
+  "version": "0.1.0",
+  "description": "Events Map block for Data Machine Events plugin",
+  "main": "build/index.js",
+  "scripts": {
+    "build": "wp-scripts build",
+    "start": "wp-scripts start"
+  },
+  "devDependencies": {
+    "@wordpress/scripts": "31.1.0"
+  },
+  "overrides": {
+    "rimraf": "^4.4.1",
+    "glob": "^9.3.5",
+    "eslint": "^9.0.0"
+  }
+}
