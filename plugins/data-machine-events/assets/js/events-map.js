@@ -36,6 +36,10 @@
         var venuesJson = container.getAttribute('data-venues') || '[]';
         var hasCenter = !isNaN(centerLat) && !isNaN(centerLon);
 
+        var userLat = parseFloat(container.getAttribute('data-user-lat'));
+        var userLon = parseFloat(container.getAttribute('data-user-lon'));
+        var hasUserLocation = !isNaN(userLat) && !isNaN(userLon);
+
         var venues = [];
         try {
             venues = JSON.parse(venuesJson);
@@ -104,6 +108,19 @@
                 marker.bindPopup(popup);
                 markers.push(marker);
             });
+
+            // Add user location marker (blue dot).
+            if (hasUserLocation) {
+                var userIcon = L.divIcon({
+                    html: '<span class="user-location-dot"></span>',
+                    className: 'user-location-marker',
+                    iconSize: [16, 16],
+                    iconAnchor: [8, 8],
+                });
+                var userMarker = L.marker([userLat, userLon], { icon: userIcon }).addTo(map);
+                userMarker.bindPopup('<div class="venue-popup"><span class="venue-popup-name">You are here</span></div>');
+                markers.push(userMarker);
+            }
 
             // Auto-fit bounds to show all markers.
             if (markers.length > 1) {

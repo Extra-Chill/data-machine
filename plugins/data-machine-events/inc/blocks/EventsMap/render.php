@@ -155,6 +155,16 @@ foreach ( $venues as $venue ) {
  */
 $summary = apply_filters( 'datamachine_events_map_summary', '', $venues, $context );
 
+/**
+ * Filter user location for the map. Returns array with lat/lon or null.
+ *
+ * When set, the map renders a blue "you are here" marker.
+ *
+ * @param array|null $user_location Array with 'lat' and 'lon' keys, or null.
+ * @param array      $context       Map context.
+ */
+$user_location = apply_filters( 'datamachine_events_map_user_location', null, $context );
+
 $map_id    = wp_unique_id( 'dm-events-map-' );
 $wrapper   = get_block_wrapper_attributes( array(
 	'class' => 'datamachine-events-map-block',
@@ -171,6 +181,10 @@ $wrapper   = get_block_wrapper_attributes( array(
 		data-zoom="<?php echo esc_attr( $zoom ); ?>"
 		data-map-type="<?php echo esc_attr( $map_type ); ?>"
 		data-venues="<?php echo esc_attr( wp_json_encode( $venue_data ) ); ?>"
+		<?php if ( $user_location ) : ?>
+		data-user-lat="<?php echo esc_attr( $user_location['lat'] ); ?>"
+		data-user-lon="<?php echo esc_attr( $user_location['lon'] ); ?>"
+		<?php endif; ?>
 	></div>
 	<?php if ( ! empty( $summary ) ) : ?>
 		<p class="datamachine-events-map-summary"><?php echo wp_kses_post( $summary ); ?></p>

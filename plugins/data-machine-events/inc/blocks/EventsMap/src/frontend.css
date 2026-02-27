@@ -65,6 +65,22 @@ a.venue-popup-name:hover {
 	line-height: 1.4;
 }
 
+/* User location marker (blue dot) */
+.datamachine-events-map .user-location-marker {
+	background: none;
+	border: none;
+}
+
+.datamachine-events-map .user-location-dot {
+	display: block;
+	width: 16px;
+	height: 16px;
+	background: #3b82f6;
+	border: 3px solid #fff;
+	border-radius: 50%;
+	box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4), 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
 /* Summary below map */
 .datamachine-events-map-summary {
 	margin: 0.5rem 0 0;
