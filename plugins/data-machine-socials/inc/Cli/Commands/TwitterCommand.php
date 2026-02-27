@@ -260,10 +260,9 @@ class TwitterCommand {
 	 */
 	public function delete( $args, $assoc_args ) {
 		$tweet_id = $args[0];
-		$ability  = $this->get_update_ability();
+		$ability  = $this->get_delete_ability();
 
 		$result = $ability->execute( array(
-			'action'   => 'delete',
 			'tweet_id' => $tweet_id,
 		) );
 
@@ -355,5 +354,18 @@ class TwitterCommand {
 		}
 
 		return new \DataMachineSocials\Abilities\Twitter\TwitterUpdateAbility();
+	}
+
+	private function get_delete_ability() {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/twitter-delete' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/twitter-delete ability not registered.' );
+		}
+
+		return new \DataMachineSocials\Abilities\Twitter\TwitterDeleteAbility();
 	}
 }

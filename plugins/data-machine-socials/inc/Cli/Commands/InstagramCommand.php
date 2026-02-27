@@ -363,10 +363,9 @@ class InstagramCommand {
 	 */
 	public function delete( $args, $assoc_args ) {
 		$media_id = $args[0];
-		$ability  = $this->get_update_ability();
+		$ability  = $this->get_delete_ability();
 
 		$result = $ability->execute( array(
-			'action'   => 'delete',
 			'media_id' => $media_id,
 		) );
 
@@ -441,5 +440,23 @@ class InstagramCommand {
 		}
 
 		return new \DataMachineSocials\Abilities\Instagram\InstagramUpdateAbility();
+	}
+
+	/**
+	 * Get the Instagram delete ability.
+	 *
+	 * @return \DataMachineSocials\Abilities\Instagram\InstagramDeleteAbility
+	 */
+	private function get_delete_ability() {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/instagram-delete' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/instagram-delete ability not registered.' );
+		}
+
+		return new \DataMachineSocials\Abilities\Instagram\InstagramDeleteAbility();
 	}
 }
