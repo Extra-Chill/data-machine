@@ -89,12 +89,15 @@
 
                 var popup = '<div class="venue-popup">';
                 if (venue.url) {
-                    popup += '<strong><a href="' + escapeHtml(venue.url) + '">' + escapeHtml(venue.name) + '</a></strong>';
+                    popup += '<a href="' + escapeHtml(venue.url) + '" class="venue-popup-name">' + escapeHtml(venue.name) + '</a>';
                 } else {
-                    popup += '<strong>' + escapeHtml(venue.name) + '</strong>';
+                    popup += '<span class="venue-popup-name">' + escapeHtml(venue.name) + '</span>';
+                }
+                if (venue.event_count > 0) {
+                    popup += '<span class="venue-popup-events">' + venue.event_count + ' upcoming event' + (venue.event_count !== 1 ? 's' : '') + '</span>';
                 }
                 if (venue.address) {
-                    popup += '<br><small>' + escapeHtml(venue.address) + '</small>';
+                    popup += '<span class="venue-popup-address">' + escapeHtml(venue.address) + '</span>';
                 }
                 popup += '</div>';
 

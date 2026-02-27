@@ -131,15 +131,16 @@ if ( empty( $venues ) ) {
 	return '';
 }
 
-// Build venue data for JS (strip internal fields).
+// Build venue data for JS.
 $venue_data = array();
 foreach ( $venues as $venue ) {
 	$venue_data[] = array(
-		'name'    => $venue['name'],
-		'lat'     => $venue['lat'],
-		'lon'     => $venue['lon'],
-		'address' => $venue['address'],
-		'url'     => is_string( $venue['url'] ) ? $venue['url'] : '',
+		'name'        => $venue['name'],
+		'lat'         => $venue['lat'],
+		'lon'         => $venue['lon'],
+		'address'     => $venue['address'],
+		'url'         => is_string( $venue['url'] ) ? $venue['url'] : '',
+		'event_count' => $venue['event_count'] ?? 0,
 	);
 }
 

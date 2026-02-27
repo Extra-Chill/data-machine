@@ -5,20 +5,66 @@
  * @since 0.13.0
  */
 
-.datamachine-events-map .venue-popup {
-	font-size: var(--font-size-sm, 0.8125rem);
+/* Leaflet popup overrides — use theme variables */
+.datamachine-events-map .leaflet-popup-content-wrapper {
+	background: var(--card-background, #fff);
+	color: var(--text-color, #1a1a1a);
+	border-radius: var(--border-radius-md, 8px);
+	box-shadow: var(--card-shadow, 0 2px 8px rgba(0, 0, 0, 0.15));
+	padding: 0;
+}
+
+.datamachine-events-map .leaflet-popup-content {
+	margin: 0;
 	line-height: var(--line-height-base, 1.5);
 }
 
-.datamachine-events-map .venue-popup a {
-	color: var(--text-color, #000);
-	text-decoration: none;
+.datamachine-events-map .leaflet-popup-tip {
+	background: var(--card-background, #fff);
 }
 
-.datamachine-events-map .venue-popup a:hover {
+.datamachine-events-map .leaflet-popup-close-button {
+	color: var(--muted-text, #6b7280);
+}
+
+.datamachine-events-map .leaflet-popup-close-button:hover {
+	color: var(--text-color, #1a1a1a);
+}
+
+/* Venue popup card */
+.datamachine-events-map .venue-popup {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	padding: 0.75rem 1rem;
+	min-width: 180px;
+}
+
+.datamachine-events-map .venue-popup-name {
+	font-size: var(--font-size-sm, 0.875rem);
+	font-weight: 600;
+	color: var(--text-color, #1a1a1a);
+	text-decoration: none;
+	line-height: 1.3;
+}
+
+a.venue-popup-name:hover {
 	text-decoration: underline;
 }
 
+.datamachine-events-map .venue-popup-events {
+	font-size: var(--font-size-xs, 0.75rem);
+	color: var(--accent, #53940b);
+	font-weight: 500;
+}
+
+.datamachine-events-map .venue-popup-address {
+	font-size: var(--font-size-xs, 0.75rem);
+	color: var(--muted-text, #6b7280);
+	line-height: 1.4;
+}
+
+/* Summary below map */
 .datamachine-events-map-summary {
 	margin: var(--spacing-sm, 0.5rem) 0 0;
 	font-size: var(--font-size-sm, 0.8125rem);
@@ -26,6 +72,7 @@
 	text-align: center;
 }
 
+/* Responsive */
 @media (max-width: 768px) {
 	.datamachine-events-map {
 		border-radius: var(--border-radius-md, 8px);
