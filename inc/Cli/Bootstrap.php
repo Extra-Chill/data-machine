@@ -24,10 +24,10 @@ WP_CLI::add_command( 'datamachine jobs', Commands\JobsCommand::class );
 WP_CLI::add_command( 'datamachine pipelines', Commands\PipelinesCommand::class );
 WP_CLI::add_command( 'datamachine posts', Commands\PostsCommand::class );
 WP_CLI::add_command( 'datamachine logs', Commands\LogsCommand::class );
-WP_CLI::add_command( 'datamachine memory', Commands\MemoryCommand::class );
-
-// Backwards-compatible alias: `wp datamachine agent` → MemoryCommand.
 WP_CLI::add_command( 'datamachine agent', Commands\MemoryCommand::class );
+
+// Backwards-compatible alias: `wp datamachine memory` → agent.
+WP_CLI::add_command( 'datamachine memory', Commands\MemoryCommand::class );
 WP_CLI::add_command( 'datamachine workspace', Commands\WorkspaceCommand::class );
 WP_CLI::add_command( 'datamachine batch', Commands\BatchCommand::class );
 

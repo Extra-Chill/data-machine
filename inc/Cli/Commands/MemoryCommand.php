@@ -1,13 +1,18 @@
 <?php
 /**
- * WP-CLI Memory Command
+ * WP-CLI Agent Command
  *
- * Provides CLI access to the agent Memory Library — core memory files
- * (SOUL.md, MEMORY.md, USER.md) and daily memory (YYYY/MM/DD.md).
+ * Provides CLI access to the agent Memory Library — core agent files
+ * (SOUL.md, USER.md, MEMORY.md), MEMORY.md section operations, and
+ * daily memory (YYYY/MM/DD.md).
+ *
+ * Primary command: `wp datamachine agent`.
+ * Backwards-compatible alias: `wp datamachine memory`.
  *
  * @package DataMachine\Cli\Commands
  * @since 0.30.0 Originally as AgentCommand.
  * @since 0.32.0 Renamed to MemoryCommand, registered as `wp datamachine memory`.
+ * @since 0.33.0 Primary namespace changed to `wp datamachine agent`, `memory` kept as alias.
  */
 
 namespace DataMachine\Cli\Commands;
@@ -40,13 +45,13 @@ class MemoryCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Read full memory file
-	 *     wp datamachine memory read
+	 *     wp datamachine agent read
 	 *
 	 *     # Read a specific section
-	 *     wp datamachine memory read "Fleet"
+	 *     wp datamachine agent read "Fleet"
 	 *
 	 *     # Read lessons learned
-	 *     wp datamachine memory read "Lessons Learned"
+	 *     wp datamachine agent read "Lessons Learned"
 	 *
 	 * @subcommand read
 	 */
@@ -91,10 +96,10 @@ class MemoryCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # List memory sections
-	 *     wp datamachine memory sections
+	 *     wp datamachine agent sections
 	 *
 	 *     # List as JSON
-	 *     wp datamachine memory sections --format=json
+	 *     wp datamachine agent sections --format=json
 	 *
 	 * @subcommand sections
 	 */
@@ -146,13 +151,13 @@ class MemoryCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Replace a section
-	 *     wp datamachine memory write "State" "- Data Machine v0.30.0 installed"
+	 *     wp datamachine agent write "State" "- Data Machine v0.30.0 installed"
 	 *
 	 *     # Append to a section
-	 *     wp datamachine memory write "Lessons Learned" "- Always check file permissions" --mode=append
+	 *     wp datamachine agent write "Lessons Learned" "- Always check file permissions" --mode=append
 	 *
 	 *     # Create a new section
-	 *     wp datamachine memory write "New Section" "Initial content"
+	 *     wp datamachine agent write "New Section" "Initial content"
 	 *
 	 * @subcommand write
 	 */
@@ -201,10 +206,10 @@ class MemoryCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Search all memory
-	 *     wp datamachine memory search "homeboy"
+	 *     wp datamachine agent search "homeboy"
 	 *
 	 *     # Search within a section
-	 *     wp datamachine memory search "docker" --section="Lessons Learned"
+	 *     wp datamachine agent search "docker" --section="Lessons Learned"
 	 *
 	 * @subcommand search
 	 */
@@ -260,34 +265,34 @@ class MemoryCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # List all daily memory files
-	 *     wp datamachine memory daily list
+	 *     wp datamachine agent daily list
 	 *
 	 *     # Read today's daily memory
-	 *     wp datamachine memory daily read
+	 *     wp datamachine agent daily read
 	 *
 	 *     # Read a specific date
-	 *     wp datamachine memory daily read 2026-02-24
+	 *     wp datamachine agent daily read 2026-02-24
 	 *
 	 *     # Write to today's daily memory (replaces content)
-	 *     wp datamachine memory daily write "## Session notes"
+	 *     wp datamachine agent daily write "## Session notes"
 	 *
 	 *     # Append to a specific date
-	 *     wp datamachine memory daily append 2026-02-24 "- Additional discovery"
+	 *     wp datamachine agent daily append 2026-02-24 "- Additional discovery"
 	 *
 	 *     # Delete a daily file
-	 *     wp datamachine memory daily delete 2026-02-24
+	 *     wp datamachine agent daily delete 2026-02-24
 	 *
 	 *     # Search daily memory
-	 *     wp datamachine memory daily search "homeboy"
+	 *     wp datamachine agent daily search "homeboy"
 	 *
 	 *     # Search with date range
-	 *     wp datamachine memory daily search "deploy" --from=2026-02-01 --to=2026-02-28
+	 *     wp datamachine agent daily search "deploy" --from=2026-02-01 --to=2026-02-28
 	 *
 	 * @subcommand daily
 	 */
 	public function daily( array $args, array $assoc_args ): void {
 		if ( empty( $args ) ) {
-			WP_CLI::error( 'Usage: wp datamachine memory daily <list|read|write|append|delete> [date] [content]' );
+			WP_CLI::error( 'Usage: wp datamachine agent daily <list|read|write|append|delete> [date] [content]' );
 			return;
 		}
 
@@ -311,7 +316,7 @@ class MemoryCommand extends BaseCommand {
 			case 'delete':
 				$date = $args[1] ?? null;
 				if ( ! $date ) {
-					WP_CLI::error( 'Date is required for delete. Usage: wp datamachine memory daily delete 2026-02-24' );
+					WP_CLI::error( 'Date is required for delete. Usage: wp datamachine agent daily delete 2026-02-24' );
 					return;
 				}
 				$this->daily_delete( $daily, $date );
@@ -319,7 +324,7 @@ class MemoryCommand extends BaseCommand {
 			case 'search':
 				$search_query = $args[1] ?? null;
 				if ( ! $search_query ) {
-					WP_CLI::error( 'Search query is required. Usage: wp datamachine memory daily search "query" [--from=...] [--to=...]' );
+					WP_CLI::error( 'Search query is required. Usage: wp datamachine agent daily search "query" [--from=...] [--to=...]' );
 					return;
 				}
 				$this->daily_search( $daily, $search_query, $assoc_args );
@@ -390,7 +395,7 @@ class MemoryCommand extends BaseCommand {
 	private function daily_write( DailyMemory $daily, array $args ): void {
 		// write [date] <content> — date defaults to today.
 		if ( count( $args ) < 2 ) {
-			WP_CLI::error( 'Content is required. Usage: wp datamachine memory daily write [date] <content>' );
+			WP_CLI::error( 'Content is required. Usage: wp datamachine agent daily write [date] <content>' );
 			return;
 		}
 
@@ -425,7 +430,7 @@ class MemoryCommand extends BaseCommand {
 	private function daily_append( DailyMemory $daily, array $args ): void {
 		// append [date] <content> — date defaults to today.
 		if ( count( $args ) < 2 ) {
-			WP_CLI::error( 'Content is required. Usage: wp datamachine memory daily append [date] <content>' );
+			WP_CLI::error( 'Content is required. Usage: wp datamachine agent daily append [date] <content>' );
 			return;
 		}
 
