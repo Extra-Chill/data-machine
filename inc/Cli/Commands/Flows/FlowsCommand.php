@@ -91,10 +91,7 @@ class FlowsCommand extends BaseCommand {
 	 * : JSON object with step configurations keyed by step_type (create subcommand).
 	 *
 	 * [--scheduling=<interval>]
-	 * : Scheduling interval (manual, hourly, daily, etc.) (create subcommand).
-	 * ---
-	 * default: manual
-	 * ---
+	 * : Scheduling interval (manual, hourly, daily, etc.).
 	 *
 	 * [--set-prompt=<text>]
 	 * : Update the prompt for a handler step (requires handler step to exist).
@@ -515,6 +512,19 @@ class FlowsCommand extends BaseCommand {
 			return;
 		}
 
+		// Validate step resolution BEFORE any writes (atomic: fail fast, change nothing).
+		$needs_step = null !== $prompt || null !== $handler_config;
+
+		if ( $needs_step && null === $step ) {
+			$resolved = $this->resolveHandlerStep( $flow_id );
+			if ( $resolved['error'] ) {
+				WP_CLI::error( $resolved['error'] );
+				return;
+			}
+			$step = $resolved['step_id'];
+		}
+
+		// Phase 1: Flow-level updates (name, scheduling).
 		$input = array( 'flow_id' => $flow_id );
 
 		if ( null !== $name ) {
@@ -542,18 +552,7 @@ class FlowsCommand extends BaseCommand {
 			}
 		}
 
-		// Resolve step for prompt and/or handler-config updates.
-		$needs_step = null !== $prompt || null !== $handler_config;
-
-		if ( $needs_step && null === $step ) {
-			$resolved = $this->resolveHandlerStep( $flow_id );
-			if ( $resolved['error'] ) {
-				WP_CLI::error( $resolved['error'] );
-				return;
-			}
-			$step = $resolved['step_id'];
-		}
-
+		// Phase 2: Step-level updates (prompt, handler config).
 		if ( null !== $prompt ) {
 			$step_ability = new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility();
 			$step_result  = $step_ability->execute(
@@ -851,7 +850,7 @@ class FlowsCommand extends BaseCommand {
 
 		$handler_steps = array();
 		foreach ( $flow_config as $step_id => $step_data ) {
-			if ( ! empty( $step_data['handler_slugs'] ) ) {
+			if ( $this->stepHasHandlerConfig( $step_data ) ) {
 				$handler_steps[] = $step_id;
 			}
 		}
@@ -859,7 +858,7 @@ class FlowsCommand extends BaseCommand {
 		if ( empty( $handler_steps ) ) {
 			return array(
 				'step_id' => null,
-				'error'   => 'Flow has no handler steps',
+				'error'   => 'Flow has no configurable steps (no handler_slugs, handler_slug, handler_config, or step_type with config found)',
 			);
 		}
 
@@ -867,7 +866,7 @@ class FlowsCommand extends BaseCommand {
 			return array(
 				'step_id' => null,
 				'error'   => sprintf(
-					'Flow has multiple handler steps. Use --step=<id> to specify. Available: %s',
+					'Flow has multiple configurable steps. Use --step=<id> to specify. Available: %s',
 					implode( ', ', $handler_steps )
 				),
 			);
@@ -877,5 +876,45 @@ class FlowsCommand extends BaseCommand {
 			'step_id' => $handler_steps[0],
 			'error'   => null,
 		);
+	}
+
+	/**
+	 * Check if a step has handler configuration (modern, legacy, or non-handler step with config).
+	 *
+	 * Detects:
+	 * - handler_slugs (modern plural format)
+	 * - handler_slug (legacy singular format)
+	 * - handler_config / handler_configs (step with config but no explicit handler slug, e.g. agent_ping)
+	 * - step_type that matches a registered handler settings provider (e.g. agent_ping)
+	 *
+	 * @param array $step_data Step configuration data.
+	 * @return bool True if the step has configurable handler settings.
+	 */
+	private function stepHasHandlerConfig( array $step_data ): bool {
+		// Modern plural format.
+		if ( ! empty( $step_data['handler_slugs'] ) ) {
+			return true;
+		}
+
+		// Legacy singular format.
+		if ( ! empty( $step_data['handler_slug'] ) ) {
+			return true;
+		}
+
+		// Step has handler config directly (e.g. agent_ping stores config without handler_slug).
+		if ( ! empty( $step_data['handler_config'] ) || ! empty( $step_data['handler_configs'] ) ) {
+			return true;
+		}
+
+		// Non-handler step types that register their own settings (e.g. agent_ping).
+		$step_type = $step_data['step_type'] ?? '';
+		if ( ! empty( $step_type ) ) {
+			$all_settings = apply_filters( 'datamachine_handler_settings', array(), $step_type );
+			if ( isset( $all_settings[ $step_type ] ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 }
