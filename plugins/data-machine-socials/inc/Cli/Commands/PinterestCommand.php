@@ -307,6 +307,19 @@ class PinterestCommand {
 		return new \DataMachineSocials\Abilities\Pinterest\PinterestUpdateAbility();
 	}
 
+	private function get_delete_ability() {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/pinterest-delete' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/pinterest-delete ability not registered.' );
+		}
+
+		return new \DataMachineSocials\Abilities\Pinterest\PinterestDeleteAbility();
+	}
+
 	/**
 	 * Delete a Pinterest pin.
 	 *
@@ -321,11 +334,10 @@ class PinterestCommand {
 	 */
 	public function delete( $args, $assoc_args ) {
 		$pin_id = $args[0];
-		$ability = $this->get_update_ability();
+		$ability = $this->get_delete_ability();
 
 		$result = $ability->execute( array(
-			'action' => 'delete',
-			'pin_id'  => $pin_id,
+			'pin_id' => $pin_id,
 		) );
 
 		if ( ! $result['success'] ) {

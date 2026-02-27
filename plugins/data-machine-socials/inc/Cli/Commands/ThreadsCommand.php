@@ -290,6 +290,19 @@ class ThreadsCommand {
 		return new \DataMachineSocials\Abilities\Threads\ThreadsUpdateAbility();
 	}
 
+	private function get_delete_ability() {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/threads-delete' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/threads-delete ability not registered.' );
+		}
+
+		return new \DataMachineSocials\Abilities\Threads\ThreadsDeleteAbility();
+	}
+
 	/**
 	 * Delete a Threads post.
 	 *
@@ -304,10 +317,9 @@ class ThreadsCommand {
 	 */
 	public function delete( $args, $assoc_args ) {
 		$thread_id = $args[0];
-		$ability   = $this->get_update_ability();
+		$ability   = $this->get_delete_ability();
 
 		$result = $ability->execute( array(
-			'action'    => 'delete',
 			'thread_id' => $thread_id,
 		) );
 
