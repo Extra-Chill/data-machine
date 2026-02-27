@@ -12,6 +12,8 @@
 
 namespace DataMachine\Core\WordPress;
 
+use DataMachine\Core\Selection\SelectionMode;
+
 defined( 'ABSPATH' ) || exit;
 
 class WordPressSettingsHandler {
@@ -61,18 +63,16 @@ class WordPressSettingsHandler {
 				? $taxonomy->labels->name
 				: ( isset( $taxonomy->label ) ? $taxonomy->label : $taxonomy->name );
 
-			// Build options with configured first options, formatting any placeholders with taxonomy label
-			$options = array();
+			// Build mode options, formatting any placeholders with taxonomy label.
+			$mode_options = array();
 			foreach ( $config['first_options'] as $key => $label ) {
 				/* translators: %s: Taxonomy label */
-				$options[ $key ] = sprintf( $label, $taxonomy_label );
+				$mode_options[ $key ] = sprintf( $label, $taxonomy_label );
 			}
 
-			// Add visual separator after system options
-			$options['separator'] = '──────────';
-
-			// Get terms for this taxonomy
-			$terms = get_terms(
+			// Get terms for this taxonomy as pre-select values.
+			$value_options = array();
+			$terms         = get_terms(
 				array(
 					'taxonomy'   => $taxonomy_slug,
 					'hide_empty' => false,
@@ -80,9 +80,12 @@ class WordPressSettingsHandler {
 			);
 			if ( ! is_wp_error( $terms ) && ! empty( $terms ) ) {
 				foreach ( $terms as $term ) {
-					$options[ $term->term_id ] = $term->name;
+					$value_options[ $term->term_id ] = $term->name;
 				}
 			}
+
+			// Build combined options via SelectionMode.
+			$options = SelectionMode::buildOptions( $mode_options, $value_options );
 
 			// Generate field definition
 			$field_key                     = "taxonomy_{$taxonomy_slug}{$config['field_suffix']}";
@@ -139,31 +142,24 @@ class WordPressSettingsHandler {
 			$field_key = "taxonomy_{$taxonomy->name}{$config['field_suffix']}";
 			$raw_value = $raw_settings[ $field_key ] ?? $config['default_value'];
 
-			// Check if value is one of the allowed string values
-			if ( in_array( $raw_value, $config['allowed_values'], true ) ) {
-				$sanitized[ $field_key ] = $raw_value;
-			} else {
-				// First try as numeric term ID
-				$term_id = absint( $raw_value );
-				if ( $term_id > 0 ) {
-					$term_name = TaxonomyHandler::getTermName( $term_id, $taxonomy->name );
-					if ( null !== $term_name ) {
-						$sanitized[ $field_key ] = $term_id;
-					} else {
-						// Invalid term ID - use default
-						$sanitized[ $field_key ] = $config['default_value'];
+			// Use SelectionMode::sanitize with a taxonomy-specific validator.
+			$taxonomy_name           = $taxonomy->name;
+			$sanitized[ $field_key ] = SelectionMode::sanitize(
+				$raw_value,
+				function ( $value ) use ( $taxonomy_name ) {
+					// Try as numeric term ID.
+					$term_id = absint( $value );
+					if ( $term_id > 0 ) {
+						$term_name = TaxonomyHandler::getTermName( $term_id, $taxonomy_name );
+						return null !== $term_name ? $term_id : null;
 					}
-				} else {
-					// Try to resolve as term name or slug (case-insensitive)
-					$resolved_term = self::resolve_term_by_name_or_slug( $raw_value, $taxonomy->name );
-					if ( $resolved_term ) {
-						$sanitized[ $field_key ] = $resolved_term->term_id;
-					} else {
-						// Invalid value - use default
-						$sanitized[ $field_key ] = $config['default_value'];
-					}
-				}
-			}
+
+					// Try to resolve as term name or slug.
+					$resolved_term = self::resolve_term_by_name_or_slug( $value, $taxonomy_name );
+					return $resolved_term ? $resolved_term->term_id : null;
+				},
+				$config['default_value']
+			);
 		}
 
 		return $sanitized;
