@@ -58,7 +58,20 @@
 
             var map = L.map(container.id, {
                 scrollWheelZoom: false,
+                boxZoom: true,
             }).setView([initialLat, initialLon], zoom);
+
+            // Enable scroll zoom only while holding Ctrl/Cmd.
+            container.addEventListener('wheel', function(e) {
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    map.scrollWheelZoom.enable();
+                }
+            }, { passive: false });
+
+            map.on('mouseout', function() {
+                map.scrollWheelZoom.disable();
+            });
 
             var tileConfigs = {
                 'osm-standard': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',

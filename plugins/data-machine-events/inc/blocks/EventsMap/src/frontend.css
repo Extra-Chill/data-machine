@@ -32,6 +32,59 @@
 	color: var(--datamachine-text-primary);
 }
 
+/* Zoom controls */
+.datamachine-events-map .leaflet-control-zoom {
+	border: 1px solid var(--datamachine-border-default);
+	border-radius: var(--datamachine-border-radius, 8px);
+	overflow: hidden;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.datamachine-events-map .leaflet-control-zoom a {
+	background: var(--datamachine-background-primary);
+	color: var(--datamachine-text-primary);
+	border-color: var(--datamachine-border-default);
+	width: 32px;
+	height: 32px;
+	line-height: 32px;
+	font-size: 16px;
+	font-weight: 600;
+	text-decoration: none;
+	transition: background 0.15s ease, color 0.15s ease;
+}
+
+.datamachine-events-map .leaflet-control-zoom a:hover {
+	background: var(--datamachine-background-hover);
+	color: var(--datamachine-text-primary);
+}
+
+.datamachine-events-map .leaflet-control-zoom a.leaflet-disabled {
+	background: var(--datamachine-background-secondary);
+	color: var(--datamachine-text-muted);
+	cursor: default;
+}
+
+.datamachine-events-map .leaflet-control-zoom-in {
+	border-bottom: 1px solid var(--datamachine-border-default) !important;
+	border-radius: var(--datamachine-border-radius, 8px) var(--datamachine-border-radius, 8px) 0 0;
+}
+
+.datamachine-events-map .leaflet-control-zoom-out {
+	border-radius: 0 0 var(--datamachine-border-radius, 8px) var(--datamachine-border-radius, 8px);
+}
+
+/* Leaflet attribution */
+.datamachine-events-map .leaflet-control-attribution {
+	background: var(--datamachine-background-primary);
+	color: var(--datamachine-text-muted);
+	font-size: 0.6875rem;
+	opacity: 0.7;
+}
+
+.datamachine-events-map .leaflet-control-attribution a {
+	color: var(--datamachine-text-accent);
+}
+
 /* Venue popup card */
 .datamachine-events-map .venue-popup {
 	display: flex;
