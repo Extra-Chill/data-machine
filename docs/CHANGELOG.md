@@ -2,6 +2,28 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.33.0] - 2026-02-27
+
+### Added
+- agent files CLI and namespace refactor (#454)
+- add GD template image generation engine for branded social graphics
+- add token lifecycle management to BaseOAuth2Provider
+- deterministic scheduling stagger + consolidate scheduling code paths
+
+### Changed
+- temporary revert for PR
+- remove Reddit handler and dead docs from core
+- Add BaseOAuth2Provider test coverage for token lifecycle management
+- BaseOAuth2Provider token lifecycle management
+- remove default flow auto-creation from create-pipeline
+- remove dead build_command — wordpress module handles builds
+
+### Fixed
+- Fix workspace read offset/limit and directory permissions (#453)
+- Fix workspace read offset/limit and directory permissions
+- sync version targets and add modules to homeboy.json (#436)
+- match trySetFeaturedImage return type with parent class (#434)
+
 ## [0.32.0] - 2026-02-26
 
 ### Added
