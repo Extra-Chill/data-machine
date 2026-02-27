@@ -3,7 +3,7 @@
  * WP-CLI Memory Command
  *
  * Provides CLI access to the agent Memory Library — core memory files
- * (SOUL.md, MEMORY.md) and daily memory (YYYY/MM/DD.md).
+ * (SOUL.md, MEMORY.md, USER.md) and daily memory (YYYY/MM/DD.md).
  *
  * @package DataMachine\Cli\Commands
  * @since 0.30.0 Originally as AgentCommand.
@@ -16,6 +16,7 @@ use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\AgentMemoryAbilities;
 use DataMachine\Core\FilesRepository\DailyMemory;
+use DataMachine\Core\FilesRepository\DirectoryManager;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -493,6 +494,275 @@ class MemoryCommand extends BaseCommand {
 		}
 
 		WP_CLI::success( $result['message'] );
+	}
+
+	// =========================================================================
+	// Agent Files — multi-file operations (SOUL.md, USER.md, MEMORY.md, etc.)
+	// =========================================================================
+
+	/**
+	 * Agent files operations.
+	 *
+	 * Manage all agent memory files (SOUL.md, USER.md, MEMORY.md, etc.).
+	 * Supports listing, reading, writing, and staleness detection.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <action>
+	 * : Action to perform: list, read, write, check.
+	 *
+	 * [<filename>]
+	 * : Filename for read/write actions (e.g., SOUL.md, USER.md).
+	 *
+	 * [--days=<days>]
+	 * : Staleness threshold in days for the check action.
+	 * ---
+	 * default: 7
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format for list/check actions.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - csv
+	 *   - yaml
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # List all agent files with timestamps and sizes
+	 *     wp datamachine agent files list
+	 *
+	 *     # Read an agent file
+	 *     wp datamachine agent files read SOUL.md
+	 *
+	 *     # Write to an agent file via stdin
+	 *     cat new-soul.md | wp datamachine agent files write SOUL.md
+	 *
+	 *     # Check for stale files (not updated in 7 days)
+	 *     wp datamachine agent files check
+	 *
+	 *     # Check with custom threshold
+	 *     wp datamachine agent files check --days=14
+	 *
+	 * @subcommand files
+	 */
+	public function files( array $args, array $assoc_args ): void {
+		if ( empty( $args ) ) {
+			WP_CLI::error( 'Usage: wp datamachine agent files <list|read|write|check> [filename]' );
+			return;
+		}
+
+		$action = $args[0];
+
+		switch ( $action ) {
+			case 'list':
+				$this->files_list( $assoc_args );
+				break;
+			case 'read':
+				$filename = $args[1] ?? null;
+				if ( ! $filename ) {
+					WP_CLI::error( 'Filename is required. Usage: wp datamachine agent files read <filename>' );
+					return;
+				}
+				$this->files_read( $filename );
+				break;
+			case 'write':
+				$filename = $args[1] ?? null;
+				if ( ! $filename ) {
+					WP_CLI::error( 'Filename is required. Usage: wp datamachine agent files write <filename>' );
+					return;
+				}
+				$this->files_write( $filename );
+				break;
+			case 'check':
+				$this->files_check( $assoc_args );
+				break;
+			default:
+				WP_CLI::error( "Unknown files action: {$action}. Use: list, read, write, check" );
+		}
+	}
+
+	/**
+	 * List all agent files with metadata.
+	 *
+	 * @param array $assoc_args Command arguments.
+	 */
+	private function files_list( array $assoc_args ): void {
+		$agent_dir = $this->get_agent_dir();
+
+		if ( ! is_dir( $agent_dir ) ) {
+			WP_CLI::error( 'Agent directory does not exist.' );
+			return;
+		}
+
+		$files = glob( $agent_dir . '/*.md' );
+
+		if ( empty( $files ) ) {
+			WP_CLI::log( 'No agent files found.' );
+			return;
+		}
+
+		$items = array();
+		$now   = time();
+
+		foreach ( $files as $file ) {
+			$mtime    = filemtime( $file );
+			$age_days = floor( ( $now - $mtime ) / 86400 );
+
+			$items[] = array(
+				'file'     => basename( $file ),
+				'size'     => size_format( filesize( $file ) ),
+				'modified' => wp_date( 'Y-m-d H:i:s', $mtime ),
+				'age'      => $age_days . 'd',
+			);
+		}
+
+		$this->format_items( $items, array( 'file', 'size', 'modified', 'age' ), $assoc_args );
+	}
+
+	/**
+	 * Read an agent file by name.
+	 *
+	 * @param string $filename File name (e.g., SOUL.md).
+	 */
+	private function files_read( string $filename ): void {
+		$agent_dir = $this->get_agent_dir();
+		$filepath  = $agent_dir . '/' . $this->sanitize_agent_filename( $filename );
+
+		if ( ! file_exists( $filepath ) ) {
+			$available = $this->list_agent_filenames();
+			WP_CLI::error( sprintf( 'File "%s" not found. Available files: %s', $filename, implode( ', ', $available ) ) );
+			return;
+		}
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		WP_CLI::log( file_get_contents( $filepath ) );
+	}
+
+	/**
+	 * Write to an agent file from stdin.
+	 *
+	 * @param string $filename File name (e.g., SOUL.md).
+	 */
+	private function files_write( string $filename ): void {
+		$safe_name = $this->sanitize_agent_filename( $filename );
+
+		// Only allow .md files.
+		if ( '.md' !== substr( $safe_name, -3 ) ) {
+			WP_CLI::error( 'Only .md files can be written to the agent directory.' );
+			return;
+		}
+
+		$agent_dir = $this->get_agent_dir();
+		$filepath  = $agent_dir . '/' . $safe_name;
+
+		// Read from stdin.
+		$content = file_get_contents( 'php://stdin' );
+
+		if ( false === $content || '' === trim( $content ) ) {
+			WP_CLI::error( 'No content received from stdin. Pipe content in: echo "content" | wp datamachine agent files write SOUL.md' );
+			return;
+		}
+
+		$directory_manager = new DirectoryManager();
+		$directory_manager->ensure_directory_exists( $agent_dir );
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+		$written = file_put_contents( $filepath, $content );
+
+		if ( false === $written ) {
+			WP_CLI::error( sprintf( 'Failed to write file: %s', $safe_name ) );
+			return;
+		}
+
+		WP_CLI::success( sprintf( 'Wrote %s (%s).', $safe_name, size_format( $written ) ) );
+	}
+
+	/**
+	 * Check agent files for staleness.
+	 *
+	 * @param array $assoc_args Command arguments.
+	 */
+	private function files_check( array $assoc_args ): void {
+		$agent_dir      = $this->get_agent_dir();
+		$threshold_days = (int) ( $assoc_args['days'] ?? 7 );
+
+		if ( ! is_dir( $agent_dir ) ) {
+			WP_CLI::error( 'Agent directory does not exist.' );
+			return;
+		}
+
+		$files = glob( $agent_dir . '/*.md' );
+
+		if ( empty( $files ) ) {
+			WP_CLI::log( 'No agent files found.' );
+			return;
+		}
+
+		$items     = array();
+		$now       = time();
+		$threshold = $now - ( $threshold_days * 86400 );
+		$stale     = 0;
+
+		foreach ( $files as $file ) {
+			$mtime    = filemtime( $file );
+			$age_days = floor( ( $now - $mtime ) / 86400 );
+			$is_stale = $mtime < $threshold;
+
+			if ( $is_stale ) {
+				++$stale;
+			}
+
+			$items[] = array(
+				'file'     => basename( $file ),
+				'modified' => wp_date( 'Y-m-d H:i:s', $mtime ),
+				'age'      => $age_days . 'd',
+				'status'   => $is_stale ? 'STALE' : 'OK',
+			);
+		}
+
+		$this->format_items( $items, array( 'file', 'modified', 'age', 'status' ), $assoc_args );
+
+		if ( $stale > 0 ) {
+			WP_CLI::warning( sprintf( '%d file(s) not updated in %d+ days. Review for accuracy.', $stale, $threshold_days ) );
+		} else {
+			WP_CLI::success( sprintf( 'All %d file(s) updated within the last %d days.', count( $files ), $threshold_days ) );
+		}
+	}
+
+	/**
+	 * Get the agent directory path.
+	 *
+	 * @return string
+	 */
+	private function get_agent_dir(): string {
+		$directory_manager = new DirectoryManager();
+		return $directory_manager->get_agent_directory();
+	}
+
+	/**
+	 * Sanitize an agent filename (allow only alphanumeric, hyphens, underscores, dots).
+	 *
+	 * @param string $filename Raw filename.
+	 * @return string Sanitized filename.
+	 */
+	private function sanitize_agent_filename( string $filename ): string {
+		return preg_replace( '/[^a-zA-Z0-9._-]/', '', basename( $filename ) );
+	}
+
+	/**
+	 * List available agent filenames.
+	 *
+	 * @return string[]
+	 */
+	private function list_agent_filenames(): array {
+		$agent_dir = $this->get_agent_dir();
+		$files     = glob( $agent_dir . '/*.md' );
+		return array_map( 'basename', $files ?: array() );
 	}
 
 }
