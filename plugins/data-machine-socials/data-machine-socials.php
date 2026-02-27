@@ -50,30 +50,36 @@ function datamachine_socials_load_handlers() {
 	new \DataMachineSocials\Abilities\Twitter\TwitterPublishAbility();
 	new \DataMachineSocials\Abilities\Twitter\TwitterReadAbility();
 	new \DataMachineSocials\Abilities\Twitter\TwitterUpdateAbility();
+	new \DataMachineSocials\Abilities\Twitter\TwitterDeleteAbility();
 
 	// Facebook
 	new \DataMachineSocials\Abilities\Facebook\FacebookPublishAbility();
 	new \DataMachineSocials\Abilities\Facebook\FacebookReadAbility();
 	new \DataMachineSocials\Abilities\Facebook\FacebookUpdateAbility();
+	new \DataMachineSocials\Abilities\Facebook\FacebookDeleteAbility();
 
 	// Bluesky
 	new \DataMachineSocials\Abilities\Bluesky\BlueskyPublishAbility();
 	new \DataMachineSocials\Abilities\Bluesky\BlueskyReadAbility();
 	new \DataMachineSocials\Abilities\Bluesky\BlueskyUpdateAbility();
+	new \DataMachineSocials\Abilities\Bluesky\BlueskyDeleteAbility();
 
 	// Threads
 	new \DataMachineSocials\Abilities\Threads\ThreadsPublishAbility();
 	new \DataMachineSocials\Abilities\Threads\ThreadsReadAbility();
 	new \DataMachineSocials\Abilities\Threads\ThreadsUpdateAbility();
+	new \DataMachineSocials\Abilities\Threads\ThreadsDeleteAbility();
 
 	// Instagram
 	new \DataMachineSocials\Abilities\Instagram\InstagramPublishAbility();
 	new \DataMachineSocials\Abilities\Instagram\InstagramReadAbility();
 	new \DataMachineSocials\Abilities\Instagram\InstagramUpdateAbility();
+	new \DataMachineSocials\Abilities\Instagram\InstagramDeleteAbility();
 
 	// Pinterest
 	new \DataMachineSocials\Abilities\Pinterest\PinterestReadAbility();
 	new \DataMachineSocials\Abilities\Pinterest\PinterestUpdateAbility();
+	new \DataMachineSocials\Abilities\Pinterest\PinterestDeleteAbility();
 
 	// Reddit (Fetch)
 	new \DataMachineSocials\Abilities\Reddit\FetchRedditAbility();
@@ -210,5 +216,13 @@ function datamachine_socials_load_chat_tools() {
 	new \DataMachineSocials\Chat\Tools\ReadPinterest();
 	new \DataMachineSocials\Chat\Tools\UpdatePinterest();
 	new \DataMachineSocials\Chat\Tools\UpdateThreads();
+
+	// Delete chat tools
+	new \DataMachineSocials\Chat\Tools\DeleteInstagram();
+	new \DataMachineSocials\Chat\Tools\DeleteTwitter();
+	new \DataMachineSocials\Chat\Tools\DeleteFacebook();
+	new \DataMachineSocials\Chat\Tools\DeleteThreads();
+	new \DataMachineSocials\Chat\Tools\DeleteBluesky();
+	new \DataMachineSocials\Chat\Tools\DeletePinterest();
 }
 add_action( 'plugins_loaded', 'datamachine_socials_load_chat_tools', 25 );
