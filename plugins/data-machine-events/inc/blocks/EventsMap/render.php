@@ -189,4 +189,16 @@ $wrapper   = get_block_wrapper_attributes( array(
 	<?php if ( ! empty( $summary ) ) : ?>
 		<p class="datamachine-events-map-summary"><?php echo wp_kses_post( $summary ); ?></p>
 	<?php endif; ?>
+	<?php
+	/**
+	 * Fires after the map summary, inside the block wrapper.
+	 *
+	 * Use this to render controls (radius selector, reset link, etc.)
+	 * that relate to the map but need form elements not allowed by wp_kses_post.
+	 *
+	 * @param array $venues  Venue data array.
+	 * @param array $context Map context.
+	 */
+	do_action( 'datamachine_events_map_after_summary', $venues, $context );
+	?>
 </div>
