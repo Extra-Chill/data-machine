@@ -17,7 +17,6 @@ import './flatpickr-theme.css';
 import { initCarousel, destroyCarousel } from './modules/carousel.js';
 import { initDatePicker, destroyDatePicker, getDatePicker } from './modules/date-picker.js';
 import { initFilterModal, destroyFilterModal } from './modules/filter-modal.js';
-import { initLocationInput, destroyLocationInput } from './modules/location-input.js';
 import { initNavigation } from './modules/navigation.js';
 import { getFilterState, destroyFilterState } from './modules/filter-state.js';
 import { initLazyRender, destroyLazyRender } from './modules/lazy-render.js';
@@ -46,10 +45,6 @@ function initCalendarInstance(calendar) {
         function() { handleFilterChange(calendar); },
         function(params) { navigateToUrl(params); }
     );
-
-    initLocationInput(calendar, function() {
-        handleFilterChange(calendar);
-    });
 
     initNavigation(calendar, function(params) {
         navigateToUrl(params);
@@ -114,6 +109,5 @@ window.addEventListener('beforeunload', function() {
         destroyCarousel(calendar);
         destroyLazyRender(calendar);
         destroyFilterState(calendar);
-        destroyLocationInput(calendar);
     });
 });
