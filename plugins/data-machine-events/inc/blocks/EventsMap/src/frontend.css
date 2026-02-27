@@ -1,34 +1,35 @@
 /**
  * Events Map Block Frontend Styles
  *
+ * Uses datamachine-* design tokens from root.css for theme agnosticism.
+ *
  * @package DataMachineEvents
  * @since 0.13.0
  */
 
-/* Leaflet popup overrides — use theme variables */
+/* Leaflet popup overrides — use datamachine design tokens */
 .datamachine-events-map .leaflet-popup-content-wrapper {
-	background: var(--card-background, #fff);
-	color: var(--text-color, #1a1a1a);
-	border-radius: var(--border-radius-md, 8px);
-	box-shadow: var(--card-shadow, 0 2px 8px rgba(0, 0, 0, 0.15));
+	background: var(--datamachine-background-primary);
+	color: var(--datamachine-text-primary);
+	border-radius: var(--datamachine-border-radius, 8px);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 	padding: 0;
 }
 
 .datamachine-events-map .leaflet-popup-content {
 	margin: 0;
-	line-height: var(--line-height-base, 1.5);
 }
 
 .datamachine-events-map .leaflet-popup-tip {
-	background: var(--card-background, #fff);
+	background: var(--datamachine-background-primary);
 }
 
 .datamachine-events-map .leaflet-popup-close-button {
-	color: var(--muted-text, #6b7280);
+	color: var(--datamachine-text-muted);
 }
 
 .datamachine-events-map .leaflet-popup-close-button:hover {
-	color: var(--text-color, #1a1a1a);
+	color: var(--datamachine-text-primary);
 }
 
 /* Venue popup card */
@@ -41,9 +42,9 @@
 }
 
 .datamachine-events-map .venue-popup-name {
-	font-size: var(--font-size-sm, 0.875rem);
+	font-size: 0.875rem;
 	font-weight: 600;
-	color: var(--text-color, #1a1a1a);
+	color: var(--datamachine-text-primary);
 	text-decoration: none;
 	line-height: 1.3;
 }
@@ -53,29 +54,29 @@ a.venue-popup-name:hover {
 }
 
 .datamachine-events-map .venue-popup-events {
-	font-size: var(--font-size-xs, 0.75rem);
-	color: var(--accent, #53940b);
+	font-size: 0.8125rem;
+	color: var(--datamachine-text-accent);
 	font-weight: 500;
 }
 
 .datamachine-events-map .venue-popup-address {
-	font-size: var(--font-size-xs, 0.75rem);
-	color: var(--muted-text, #6b7280);
+	font-size: 0.8125rem;
+	color: var(--datamachine-text-muted);
 	line-height: 1.4;
 }
 
 /* Summary below map */
 .datamachine-events-map-summary {
-	margin: var(--spacing-sm, 0.5rem) 0 0;
-	font-size: var(--font-size-sm, 0.8125rem);
-	color: var(--muted-text, #6b7280);
+	margin: 0.5rem 0 0;
+	font-size: 0.8125rem;
+	color: var(--datamachine-text-muted);
 	text-align: center;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
 	.datamachine-events-map {
-		border-radius: var(--border-radius-md, 8px);
+		border-radius: var(--datamachine-border-radius, 8px);
 	}
 }
 
