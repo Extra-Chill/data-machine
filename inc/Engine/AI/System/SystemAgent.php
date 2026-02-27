@@ -262,7 +262,7 @@ class SystemAgent {
 
 		$batch_data = array(
 			'batch_id'     => $batch_id,
-			'batch_job_id' => $batch_job_id ?: 0,
+			'batch_job_id' => $batch_job_id ? $batch_job_id : 0,
 			'task_type'    => $taskType,
 			'context'      => $context,
 			'items'        => $itemParams,
@@ -411,7 +411,7 @@ class SystemAgent {
 			if ( ! isset( $jobs_db ) ) {
 				$jobs_db = new Jobs();
 			}
-			$parent_data = $jobs_db->retrieve_engine_data( $batch_job_id );
+			$parent_data                    = $jobs_db->retrieve_engine_data( $batch_job_id );
 			$parent_data['offset']          = min( $new_offset, $total );
 			$parent_data['tasks_scheduled'] = ( $parent_data['tasks_scheduled'] ?? 0 ) + $scheduled;
 			$jobs_db->store_engine_data( $batch_job_id, $parent_data );
@@ -505,7 +505,7 @@ class SystemAgent {
 
 		// Count child jobs by status via parent_job_id column.
 		global $wpdb;
-		$table = $wpdb->prefix . 'datamachine_jobs';
+		$table       = $wpdb->prefix . 'datamachine_jobs';
 		$child_stats = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT
@@ -771,7 +771,7 @@ class SystemAgent {
 
 			$registry[ $task_type ] = array(
 				'task_type'       => $task_type,
-				'label'           => $meta['label'] ?: ucfirst( str_replace( '_', ' ', $task_type ) ),
+				'label'           => $meta['label'] ? $meta['label'] : ucfirst( str_replace( '_', ' ', $task_type ) ),
 				'description'     => $meta['description'],
 				'setting_key'     => $meta['setting_key'],
 				'default_enabled' => $meta['default_enabled'],

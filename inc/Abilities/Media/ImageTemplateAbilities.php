@@ -144,7 +144,7 @@ class ImageTemplateAbilities {
 				'message' => sprintf(
 					'Template "%s" not found. Available templates: %s',
 					$template_id,
-					$available ?: 'none registered'
+					$available ? $available : 'none registered'
 				),
 			);
 		}

@@ -159,11 +159,11 @@ class WorkspaceAbilities {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'repo'   => array(
+							'repo'     => array(
 								'type'        => 'string',
 								'description' => 'Repository directory name.',
 							),
-							'path'   => array(
+							'path'     => array(
 								'type'        => 'string',
 								'description' => 'Relative file path within the repo.',
 							),
@@ -171,11 +171,11 @@ class WorkspaceAbilities {
 								'type'        => 'integer',
 								'description' => 'Maximum file size in bytes (default 1 MB).',
 							),
-							'offset' => array(
+							'offset'   => array(
 								'type'        => 'integer',
 								'description' => 'Line number to start reading from (1-indexed).',
 							),
-							'limit'  => array(
+							'limit'    => array(
 								'type'        => 'integer',
 								'description' => 'Maximum number of lines to return.',
 							),

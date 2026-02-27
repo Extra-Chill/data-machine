@@ -120,7 +120,7 @@ class SystemAgentServiceProvider {
 			return;
 		}
 
-		$enabled       = (bool) PluginSettings::get( 'daily_memory_enabled', false );
+		$enabled        = (bool) PluginSettings::get( 'daily_memory_enabled', false );
 		$next_scheduled = as_next_scheduled_action( self::DAILY_MEMORY_HOOK, array(), 'data-machine' );
 
 		if ( $enabled && ! $next_scheduled ) {

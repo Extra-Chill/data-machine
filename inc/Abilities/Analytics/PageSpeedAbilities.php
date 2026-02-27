@@ -57,11 +57,11 @@ class PageSpeedAbilities {
 	 * @var array
 	 */
 	const PERFORMANCE_METRICS = array(
-		'FIRST_CONTENTFUL_PAINT'   => 'first_contentful_paint',
-		'LARGEST_CONTENTFUL_PAINT' => 'largest_contentful_paint',
-		'TOTAL_BLOCKING_TIME'      => 'total_blocking_time',
-		'CUMULATIVE_LAYOUT_SHIFT'  => 'cumulative_layout_shift',
-		'SPEED_INDEX'              => 'speed_index',
+		'FIRST_CONTENTFUL_PAINT'    => 'first_contentful_paint',
+		'LARGEST_CONTENTFUL_PAINT'  => 'largest_contentful_paint',
+		'TOTAL_BLOCKING_TIME'       => 'total_blocking_time',
+		'CUMULATIVE_LAYOUT_SHIFT'   => 'cumulative_layout_shift',
+		'SPEED_INDEX'               => 'speed_index',
 		'INTERACTION_TO_NEXT_PAINT' => 'interaction_to_next_paint',
 	);
 
@@ -380,17 +380,17 @@ class PageSpeedAbilities {
 		$metrics = array();
 
 		foreach ( self::PERFORMANCE_METRICS as $audit_key => $metric_key ) {
-			$audit_id  = strtolower( str_replace( '_', '-', $audit_key ) );
-			$audit     = $audits[ $audit_id ] ?? null;
+			$audit_id = strtolower( str_replace( '_', '-', $audit_key ) );
+			$audit    = $audits[ $audit_id ] ?? null;
 
 			if ( ! $audit ) {
 				continue;
 			}
 
 			$metrics[ $metric_key ] = array(
-				'value'        => $audit['displayValue'] ?? null,
-				'numeric'      => $audit['numericValue'] ?? null,
-				'score'        => isset( $audit['score'] ) ? (int) round( $audit['score'] * 100 ) : null,
+				'value'   => $audit['displayValue'] ?? null,
+				'numeric' => $audit['numericValue'] ?? null,
+				'score'   => isset( $audit['score'] ) ? (int) round( $audit['score'] * 100 ) : null,
 			);
 		}
 

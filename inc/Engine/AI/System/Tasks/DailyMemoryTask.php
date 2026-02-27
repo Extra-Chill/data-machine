@@ -181,9 +181,9 @@ class DailyMemoryTask extends SystemTask {
 
 		$lines = array();
 		foreach ( $jobs as $job ) {
-			$label  = $job['label'] ?: "Job #{$job['job_id']}";
-			$status = $job['status'];
-			$source = $job['source'];
+			$label   = $job['label'] ? $job['label'] : "Job #{$job['job_id']}";
+			$status  = $job['status'];
+			$source  = $job['source'];
 			$lines[] = "- [{$source}] {$label}: {$status}";
 		}
 
@@ -228,8 +228,8 @@ class DailyMemoryTask extends SystemTask {
 
 		$lines = array();
 		foreach ( $sessions as $session ) {
-			$title = $session['title'] ?: 'Untitled session';
-			$type  = $session['agent_type'] ?? 'chat';
+			$title   = $session['title'] ? $session['title'] : 'Untitled session';
+			$type    = $session['agent_type'] ?? 'chat';
 			$lines[] = "- [{$type}] {$title}";
 		}
 

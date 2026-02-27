@@ -247,7 +247,10 @@ class QueueValidator extends BaseTool {
 		}
 
 		return array_merge(
-			array( 'success' => true, 'tool_name' => 'queue_validator' ),
+			array(
+				'success'   => true,
+				'tool_name' => 'queue_validator',
+			),
 			$result
 		);
 	}

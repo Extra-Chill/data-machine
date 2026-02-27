@@ -255,9 +255,9 @@ class AIConversationLoop {
 									array_merge(
 										$base_log_context,
 										array(
-											'tool_name'          => $tool_name,
-											'turn_count'         => $turn_count,
-											'executed_handlers'  => array_unique( $executed_handler_slugs ),
+											'tool_name'  => $tool_name,
+											'turn_count' => $turn_count,
+											'executed_handlers' => array_unique( $executed_handler_slugs ),
 											'configured_handlers' => $configured_handlers,
 										)
 									)
@@ -270,7 +270,7 @@ class AIConversationLoop {
 									array_merge(
 										$base_log_context,
 										array(
-											'tool_name'          => $tool_name,
+											'tool_name' => $tool_name,
 											'remaining_handlers' => array_values( $remaining ),
 										)
 									)

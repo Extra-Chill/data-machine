@@ -59,13 +59,13 @@ class AgentPing {
 				'callback'            => array( self::class, 'handle_confirm' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
-					'callback_id' => array(
+					'callback_id'     => array(
 						'required'          => true,
 						'type'              => 'string',
 						'sanitize_callback' => 'sanitize_text_field',
 						'description'       => __( 'Unique callback ID from the original ping', 'data-machine' ),
 					),
-					'status'      => array(
+					'status'          => array(
 						'required'          => true,
 						'type'              => 'string',
 						'validate_callback' => function ( $param ) {
@@ -79,7 +79,7 @@ class AgentPing {
 						'sanitize_callback' => 'sanitize_textarea_field',
 						'description'       => __( 'Preview of agent response/message', 'data-machine' ),
 					),
-					'error_message' => array(
+					'error_message'   => array(
 						'required'          => false,
 						'type'              => 'string',
 						'sanitize_callback' => 'sanitize_textarea_field',
@@ -290,15 +290,15 @@ class AgentPing {
 
 		return rest_ensure_response(
 			array(
-				'callback_id'    => $callback_id,
-				'job_id'         => $callback_data['job_id'] ?? null,
-				'flow_step_id'   => $callback_data['flow_step_id'] ?? null,
-				'status'         => $callback_data['status'] ?? 'pending',
+				'callback_id'     => $callback_id,
+				'job_id'          => $callback_data['job_id'] ?? null,
+				'flow_step_id'    => $callback_data['flow_step_id'] ?? null,
+				'status'          => $callback_data['status'] ?? 'pending',
 				'message_preview' => $callback_data['message_preview'] ?? '',
-				'error_message'  => $callback_data['error_message'] ?? '',
-				'processed_at'   => $callback_data['processed_at'] ?? null,
-				'created_at'     => $callback_data['created_at'] ?? null,
-				'expires_at'     => $callback_data['expires_at'] ?? null,
+				'error_message'   => $callback_data['error_message'] ?? '',
+				'processed_at'    => $callback_data['processed_at'] ?? null,
+				'created_at'      => $callback_data['created_at'] ?? null,
+				'expires_at'      => $callback_data['expires_at'] ?? null,
 			)
 		);
 	}
