@@ -135,8 +135,13 @@
                 markers.push(userMarker);
             }
 
-            // Auto-fit bounds to show all markers.
-            if (markers.length > 1) {
+            // Set map view.
+            if (hasUserLocation && markers.length > 1) {
+                // Near-me mode: center on user, tight zoom so nearby venues
+                // are visible without the map feeling too zoomed out.
+                map.setView([userLat, userLon], 13);
+            } else if (markers.length > 1) {
+                // Location archive: fit all markers.
                 var group = L.featureGroup(markers);
                 map.fitBounds(group.getBounds().pad(0.1));
             } else if (markers.length === 1 && !hasCenter) {
