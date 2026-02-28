@@ -1,8 +1,10 @@
 /**
  * Data Machine Events Calendar Frontend
  *
- * Module orchestration for calendar blocks with URL-based filtering.
- * All filter/pagination changes trigger full page navigation.
+ * Module orchestration for calendar blocks. Supports two modes:
+ * - Page navigation (default): filter/pagination changes trigger full reload
+ * - Geo sync (automatic): when an events-map block is present on the page,
+ *   the calendar listens for map bounds changes and re-fetches via REST API
  */
 
 /**
@@ -25,6 +27,7 @@ import { initFilterModal, destroyFilterModal } from './modules/filter-modal';
 import { initNavigation } from './modules/navigation';
 import { getFilterState, destroyFilterState } from './modules/filter-state';
 import { initLazyRender, destroyLazyRender } from './modules/lazy-render';
+import { initGeoSync, destroyGeoSync } from './modules/geo-sync';
 
 import type { FlatpickrInstance } from './types';
 
@@ -66,6 +69,11 @@ function initCalendarInstance( calendar: HTMLElement ): void {
 	} );
 
 	initSearchInput( calendar );
+
+	// Auto-detect map block on page and enable geo sync.
+	if ( hasMapBlockOnPage() ) {
+		initGeoSync( calendar );
+	}
 
 	filterState.updateFilterCountBadge();
 }
@@ -127,6 +135,14 @@ function navigateToUrl( params: URLSearchParams ): void {
 	window.location.href = newUrl;
 }
 
+/**
+ * Check if an events-map block exists on the current page.
+ * When present, the calendar auto-enables geo sync mode.
+ */
+function hasMapBlockOnPage(): boolean {
+	return document.querySelector( '.datamachine-events-map-root' ) !== null;
+}
+
 window.addEventListener( 'beforeunload', function () {
 	document
 		.querySelectorAll< HTMLElement >( '.datamachine-events-calendar' )
@@ -134,6 +150,7 @@ window.addEventListener( 'beforeunload', function () {
 			destroyDatePicker( calendar );
 			destroyCarousel( calendar );
 			destroyLazyRender( calendar );
+			destroyGeoSync( calendar );
 			destroyFilterState( calendar );
 		} );
 } );
