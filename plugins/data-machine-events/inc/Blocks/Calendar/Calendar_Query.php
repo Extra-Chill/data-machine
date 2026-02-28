@@ -117,11 +117,24 @@ class Calendar_Query {
 		}
 
 		if ( ! empty( $params['date_start'] ) ) {
+			// Include events that START on/after the page boundary OR that END on/after it.
+			// This ensures multi-day events that started before the page boundary
+			// but span into it are still returned (e.g. a Feb 27-Mar 1 festival
+			// must appear on a page starting Feb 28).
 			$meta_query[] = array(
-				'key'     => EVENT_DATETIME_META_KEY,
-				'value'   => $params['date_start'] . ' 00:00:00',
-				'compare' => '>=',
-				'type'    => 'DATETIME',
+				'relation' => 'OR',
+				array(
+					'key'     => EVENT_DATETIME_META_KEY,
+					'value'   => $params['date_start'] . ' 00:00:00',
+					'compare' => '>=',
+					'type'    => 'DATETIME',
+				),
+				array(
+					'key'     => EVENT_END_DATETIME_META_KEY,
+					'value'   => $params['date_start'] . ' 00:00:00',
+					'compare' => '>=',
+					'type'    => 'DATETIME',
+				),
 			);
 		}
 
