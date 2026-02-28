@@ -31,12 +31,10 @@ use DataMachine\Core\Steps\Update\Handlers\UpdateHandler;
 use DataMachine\Core\WordPress\TaxonomyHandler;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
 use DataMachine\Core\WordPress\WordPressPublishHelper;
-use DataMachine\Core\WordPress\PostTrackingTrait;
 
 defined( 'ABSPATH' ) || exit;
 
 class EventUpsert extends UpdateHandler {
-	use PostTrackingTrait;
 
 	protected $taxonomy_handler;
 
@@ -779,8 +777,6 @@ class EventUpsert extends UpdateHandler {
 			return $post_id;
 		}
 
-		$this->storePostTrackingMeta( $post_id, $handler_config );
-
 		$this->processEventFeaturedImage( $post_id, $handler_config, $engine );
 		$this->processVenue( $post_id, $parameters, $engine );
 		$this->processPromoter( $post_id, $parameters, $engine, $handler_config );
@@ -829,8 +825,6 @@ class EventUpsert extends UpdateHandler {
 				'post_content' => $this->generate_event_block_content( $event_data, $parameters ),
 			)
 		);
-
-		$this->storePostTrackingMeta( $post_id, $handler_config );
 
 		$this->processEventFeaturedImage( $post_id, $handler_config, $engine );
 		$this->processVenue( $post_id, $parameters, $engine );
