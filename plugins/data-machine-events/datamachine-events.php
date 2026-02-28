@@ -75,9 +75,15 @@ if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR
 	\WP_CLI::add_command( 'datamachine-events get-venue-events', \DataMachineEvents\Cli\GetVenueEventsCommand::class );
 }
 
-if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/HealthCheckCommand.php' ) ) {
-	require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/HealthCheckCommand.php';
-	\WP_CLI::add_command( 'datamachine-events health-check', \DataMachineEvents\Cli\HealthCheckCommand::class );
+// check subcommands (replaces health-check monolith)
+if ( defined( 'WP_CLI' ) && WP_CLI ) {
+	\WP_CLI::add_command( 'datamachine-events check times', \DataMachineEvents\Cli\Check\CheckTimesCommand::class );
+	\WP_CLI::add_command( 'datamachine-events check venues', \DataMachineEvents\Cli\Check\CheckVenuesCommand::class );
+	\WP_CLI::add_command( 'datamachine-events check encoding', \DataMachineEvents\Cli\Check\CheckEncodingCommand::class );
+	\WP_CLI::add_command( 'datamachine-events check meta-sync', \DataMachineEvents\Cli\Check\CheckMetaSyncCommand::class );
+	\WP_CLI::add_command( 'datamachine-events check duration', \DataMachineEvents\Cli\Check\CheckDurationCommand::class );
+	\WP_CLI::add_command( 'datamachine-events check duplicates', \DataMachineEvents\Cli\Check\CheckDuplicatesCommand::class );
+	\WP_CLI::add_command( 'datamachine-events check all', \DataMachineEvents\Cli\Check\CheckAllCommand::class );
 }
 
 if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/UpdateEventCommand.php' ) ) {
@@ -123,11 +129,6 @@ if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR
 if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/AuditVenuesCommand.php' ) ) {
 	require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/AuditVenuesCommand.php';
 	\WP_CLI::add_command( 'datamachine-events audit-venues', \DataMachineEvents\Cli\AuditVenuesCommand::class );
-}
-
-if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/CheckDurationCommand.php' ) ) {
-	require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/CheckDurationCommand.php';
-	\WP_CLI::add_command( 'datamachine-events check-duration', \DataMachineEvents\Cli\CheckDurationCommand::class );
 }
 
 /**

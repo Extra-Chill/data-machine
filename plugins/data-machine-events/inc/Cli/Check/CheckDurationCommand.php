@@ -7,17 +7,17 @@
  * occurrenceDates should be used instead of a start/end range.
  *
  * Usage examples:
- *   wp datamachine-events check-duration
- *   wp datamachine-events check-duration --max-days=7
- *   wp datamachine-events check-duration --scope=all
- *   wp datamachine-events check-duration --trash
- *   wp datamachine-events check-duration --format=json
+ *   wp datamachine-events check duration
+ *   wp datamachine-events check duration --max-days=7
+ *   wp datamachine-events check duration --scope=all
+ *   wp datamachine-events check duration --trash
+ *   wp datamachine-events check duration --format=json
  *
- * @package DataMachineEvents\Cli
- * @since 0.13.1
+ * @package DataMachineEvents\Cli\Check
+ * @since   0.14.0
  */
 
-namespace DataMachineEvents\Cli;
+namespace DataMachineEvents\Cli\Check;
 
 use DataMachineEvents\Core\Event_Post_Type;
 
