@@ -1,1145 +1,169 @@
 <?php
 /**
- * Calendar Query Builder
+ * Calendar Query — Facade
  *
- * Single source of truth for calendar event queries. Used by both render.php (initial load)
- * and Calendar REST controller (REST API filtering) to ensure consistent behavior.
+ * Thin delegation layer preserving the existing public API while
+ * forwarding all work to focused modules. CalendarAbilities and any
+ * other callers continue to use Calendar_Query::method() unchanged.
+ *
+ * Phase 2 will have callers use the modules directly, at which point
+ * this file can be deleted.
  *
  * @package DataMachineEvents\Blocks\Calendar
+ * @since   0.14.0
+ * @see     Query\EventQueryBuilder
+ * @see     Data\EventHydrator
+ * @see     Grouping\DateGrouper
+ * @see     Grouping\MultiDayResolver
+ * @see     Display\DisplayVars
+ * @see     Display\EventRenderer
+ * @see     Pagination\PageBoundary
+ * @see     Cache\CalendarCache
  */
 
 namespace DataMachineEvents\Blocks\Calendar;
 
 use WP_Query;
-use DateTime;
-use DateTimeZone;
-use DataMachineEvents\Core\Event_Post_Type;
-use DataMachineEvents\Core\Venue_Taxonomy;
-use DataMachineEvents\Core\Promoter_Taxonomy;
-use DataMachineEvents\Admin\Settings_Page;
-use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
-use const DataMachineEvents\Core\EVENT_END_DATETIME_META_KEY;
+use DataMachineEvents\Blocks\Calendar\Query\EventQueryBuilder;
+use DataMachineEvents\Blocks\Calendar\Data\EventHydrator;
+use DataMachineEvents\Blocks\Calendar\Grouping\DateGrouper;
+use DataMachineEvents\Blocks\Calendar\Display\DisplayVars;
+use DataMachineEvents\Blocks\Calendar\Display\EventRenderer;
+use DataMachineEvents\Blocks\Calendar\Pagination\PageBoundary;
+use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-const DAYS_PER_PAGE             = 5;
-const MIN_EVENTS_FOR_PAGINATION = 20;
-const CACHE_TTL_DATES           = 5 * MINUTE_IN_SECONDS;
-const CACHE_TTL_COUNTS          = 10 * MINUTE_IN_SECONDS;
-const LAZY_RENDER_THRESHOLD     = 5;
-
 class Calendar_Query {
 
+	/**
+	 * Cache key prefix — kept for backward compatibility with Cache_Invalidator.
+	 *
+	 * @deprecated Use CalendarCache::PREFIX directly.
+	 */
 	const CACHE_PREFIX = 'datamachine_cal_';
 
 	/**
-	 * Build WP_Query arguments for calendar events
+	 * Build WP_Query arguments for calendar events.
 	 *
-	 * @param array $params Query parameters
-	 * @return array WP_Query arguments
+	 * @param array $params Query parameters.
+	 * @return array WP_Query arguments.
 	 */
 	public static function build_query_args( array $params ): array {
-		$defaults = array(
-			'show_past'          => false,
-			'search_query'       => '',
-			'date_start'         => '',
-			'date_end'           => '',
-			'tax_filters'        => array(),
-			'tax_query_override' => null,
-			'archive_taxonomy'   => '',
-			'archive_term_id'    => 0,
-			'source'             => 'unknown',
-			'user_date_range'    => false,
-			'geo_lat'            => '',
-			'geo_lng'            => '',
-			'geo_radius'         => 25,
-			'geo_radius_unit'    => 'mi',
-		);
-
-		$params = wp_parse_args( $params, $defaults );
-
-		/**
-		 * Filter the base query constraint for calendar events.
-		 *
-		 * Allows plugins to modify or replace the archive-based constraint
-		 * before user filters are applied. This filter runs on both initial
-		 * page load and REST API requests.
-		 *
-		 * @param array|null $tax_query_override The base tax_query constraint (null if none).
-		 * @param array      $context {
-		 *     Context information about the request.
-		 *
-		 *     @type string $archive_taxonomy Taxonomy slug from archive page (empty if not archive).
-		 *     @type int    $archive_term_id  Term ID from archive page (0 if not archive).
-		 *     @type string $source           'render' for initial load, 'rest' for API requests.
-		 * }
-		 * @return array|null Modified tax_query constraint or null to remove constraint.
-		 */
-		$params['tax_query_override'] = apply_filters(
-			'datamachine_events_calendar_base_query',
-			$params['tax_query_override'],
-			array(
-				'archive_taxonomy' => $params['archive_taxonomy'],
-				'archive_term_id'  => $params['archive_term_id'],
-				'source'           => $params['source'],
-			)
-		);
-
-		$query_args = array(
-			'post_type'      => Event_Post_Type::POST_TYPE,
-			'post_status'    => 'publish',
-			'posts_per_page' => -1,
-			'meta_key'       => EVENT_DATETIME_META_KEY,
-			'orderby'        => 'meta_value',
-			'order'          => $params['show_past'] ? 'DESC' : 'ASC',
-		);
-
-		$meta_query       = array( 'relation' => 'AND' );
-		$current_datetime = current_time( 'mysql' );
-		$has_date_range   = ! empty( $params['date_start'] ) || ! empty( $params['date_end'] );
-
-		if ( $params['show_past'] && ! $params['user_date_range'] ) {
-			$meta_query[] = array(
-				'key'     => EVENT_END_DATETIME_META_KEY,
-				'value'   => $current_datetime,
-				'compare' => '<',
-				'type'    => 'DATETIME',
-			);
-		} elseif ( ! $params['show_past'] && ! $params['user_date_range'] ) {
-			$meta_query[] = array(
-				'key'     => EVENT_END_DATETIME_META_KEY,
-				'value'   => $current_datetime,
-				'compare' => '>=',
-				'type'    => 'DATETIME',
-			);
-		}
-
-		if ( ! empty( $params['date_start'] ) ) {
-			// Include events that START on/after the page boundary OR that END on/after it.
-			// This ensures multi-day events that started before the page boundary
-			// but span into it are still returned (e.g. a Feb 27-Mar 1 festival
-			// must appear on a page starting Feb 28).
-			$meta_query[] = array(
-				'relation' => 'OR',
-				array(
-					'key'     => EVENT_DATETIME_META_KEY,
-					'value'   => $params['date_start'] . ' 00:00:00',
-					'compare' => '>=',
-					'type'    => 'DATETIME',
-				),
-				array(
-					'key'     => EVENT_END_DATETIME_META_KEY,
-					'value'   => $params['date_start'] . ' 00:00:00',
-					'compare' => '>=',
-					'type'    => 'DATETIME',
-				),
-			);
-		}
-
-		if ( ! empty( $params['date_end'] ) ) {
-			$meta_query[] = array(
-				'key'     => EVENT_DATETIME_META_KEY,
-				'value'   => $params['date_end'] . ' 23:59:59',
-				'compare' => '<=',
-				'type'    => 'DATETIME',
-			);
-		}
-
-		$query_args['meta_query'] = $meta_query;
-
-		if ( $params['tax_query_override'] ) {
-			$query_args['tax_query'] = $params['tax_query_override'];
-		}
-
-		// Geo-filter: find venues within radius and inject as tax_query constraint.
-		if ( ! empty( $params['geo_lat'] ) && ! empty( $params['geo_lng'] ) ) {
-			$geo_lat    = (float) $params['geo_lat'];
-			$geo_lng    = (float) $params['geo_lng'];
-			$geo_radius = (float) ( $params['geo_radius'] ?? 25 );
-			$geo_unit   = $params['geo_radius_unit'] ?? 'mi';
-
-			if ( Geo_Query::validate_params( $geo_lat, $geo_lng, $geo_radius ) ) {
-				$nearby_venue_ids = Geo_Query::get_venue_ids_within_radius( $geo_lat, $geo_lng, $geo_radius, $geo_unit );
-
-				$tax_query = isset( $query_args['tax_query'] ) ? $query_args['tax_query'] : array();
-				$tax_query['relation'] = 'AND';
-
-				if ( ! empty( $nearby_venue_ids ) ) {
-					$tax_query[] = array(
-						'taxonomy' => 'venue',
-						'field'    => 'term_id',
-						'terms'    => $nearby_venue_ids,
-						'operator' => 'IN',
-					);
-				} else {
-					// No venues within radius — force empty result set.
-					$tax_query[] = array(
-						'taxonomy' => 'venue',
-						'field'    => 'term_id',
-						'terms'    => array( 0 ),
-						'operator' => 'IN',
-					);
-				}
-
-				$query_args['tax_query'] = $tax_query;
-			}
-		}
-
-		if ( ! empty( $params['tax_filters'] ) && is_array( $params['tax_filters'] ) ) {
-			$tax_query             = isset( $query_args['tax_query'] ) ? $query_args['tax_query'] : array();
-			$tax_query['relation'] = 'AND';
-
-			foreach ( $params['tax_filters'] as $taxonomy => $term_ids ) {
-				$term_ids    = is_array( $term_ids ) ? $term_ids : array( $term_ids );
-				$tax_query[] = array(
-					'taxonomy' => sanitize_key( $taxonomy ),
-					'field'    => 'term_id',
-					'terms'    => array_map( 'absint', $term_ids ),
-					'operator' => 'IN',
-				);
-			}
-
-			$query_args['tax_query'] = $tax_query;
-		}
-
-		if ( ! empty( $params['search_query'] ) ) {
-			$query_args['s'] = $params['search_query'];
-		}
-
-		return apply_filters( 'datamachine_events_calendar_query_args', $query_args, $params );
+		return EventQueryBuilder::build_query_args( $params );
 	}
 
 	/**
-	 * Get past and future event counts
-	 *
-	 * Results are cached for CACHE_TTL_COUNTS seconds.
+	 * Get past and future event counts.
 	 *
 	 * @return array ['past' => int, 'future' => int]
 	 */
 	public static function get_event_counts(): array {
-		$cache_key = self::CACHE_PREFIX . 'counts';
-		$cached    = get_transient( $cache_key );
-
-		if ( false !== $cached ) {
-			return $cached;
-		}
-
-		$result = self::compute_event_counts();
-
-		set_transient( $cache_key, $result, CACHE_TTL_COUNTS );
-
-		return $result;
-	}
-
-	/**
-	 * Compute past and future event counts (uncached)
-	 *
-	 * @return array ['past' => int, 'future' => int]
-	 */
-	private static function compute_event_counts(): array {
-		$current_datetime = current_time( 'mysql' );
-
-		$future_query = new WP_Query(
-			array(
-				'post_type'      => Event_Post_Type::POST_TYPE,
-				'post_status'    => 'publish',
-				'fields'         => 'ids',
-				'posts_per_page' => 1,
-				'meta_query'     => array(
-					array(
-						'key'     => EVENT_END_DATETIME_META_KEY,
-						'value'   => $current_datetime,
-						'compare' => '>=',
-						'type'    => 'DATETIME',
-					),
-				),
-			)
-		);
-
-		$past_query = new WP_Query(
-			array(
-				'post_type'      => Event_Post_Type::POST_TYPE,
-				'post_status'    => 'publish',
-				'fields'         => 'ids',
-				'posts_per_page' => 1,
-				'meta_query'     => array(
-					array(
-						'key'     => EVENT_END_DATETIME_META_KEY,
-						'value'   => $current_datetime,
-						'compare' => '<',
-						'type'    => 'DATETIME',
-					),
-				),
-			)
-		);
-
-		return array(
-			'past'   => $past_query->found_posts,
-			'future' => $future_query->found_posts,
-		);
+		return EventQueryBuilder::get_event_counts();
 	}
 
 	/**
 	 * Parse event data from post, hydrating from authoritative sources.
 	 *
-	 * Combines block attributes with post meta (datetime) and taxonomy terms
-	 * (venue, promoter) to return complete, authoritative event data.
-	 *
-	 * @param \WP_Post $post Post object
-	 * @return array|null Event data array or null if not found
+	 * @param \WP_Post $post Post object.
+	 * @return array|null Event data array or null if not found.
 	 */
 	public static function parse_event_data( \WP_Post $post ): ?array {
-		$blocks     = parse_blocks( $post->post_content );
-		$event_data = array();
-
-		foreach ( $blocks as $block ) {
-			if ( 'datamachine-events/event-details' === $block['blockName'] ) {
-				$event_data = $block['attrs'] ?? array();
-				break;
-			}
-		}
-
-		self::hydrate_datetime_from_meta( $post->ID, $event_data );
-		self::hydrate_venue_from_taxonomy( $post->ID, $event_data );
-		self::hydrate_promoter_from_taxonomy( $post->ID, $event_data );
-
-		return ! empty( $event_data['startDate'] ) ? $event_data : null;
+		return EventHydrator::parse_event_data( $post );
 	}
 
 	/**
-	 * Hydrate datetime fields from post meta.
+	 * Build paged events array from WP_Query.
 	 *
-	 * Post meta is the source of truth for datetime.
-	 * When meta values exist, they override any block attribute values.
-	 *
-	 * @param int $post_id Post ID
-	 * @param array $event_data Event data array (modified by reference)
-	 */
-	private static function hydrate_datetime_from_meta( int $post_id, array &$event_data ): void {
-		$start_datetime = get_post_meta( $post_id, EVENT_DATETIME_META_KEY, true );
-		if ( $start_datetime ) {
-			$date_obj = date_create( $start_datetime );
-			if ( $date_obj ) {
-				$event_data['startDate'] = $date_obj->format( 'Y-m-d' );
-				$event_data['startTime'] = $date_obj->format( 'H:i:s' );
-			}
-		}
-
-		$end_datetime = get_post_meta( $post_id, EVENT_END_DATETIME_META_KEY, true );
-		if ( $end_datetime ) {
-			$date_obj = date_create( $end_datetime );
-			if ( $date_obj ) {
-				$event_data['endDate'] = $date_obj->format( 'Y-m-d' );
-				$end_time_from_meta    = $date_obj->format( 'H:i:s' );
-				// Only set if not the sentinel value (23:59:59 means "no end time provided")
-				if ( '23:59:59' !== $end_time_from_meta ) {
-					$event_data['endTime'] = $end_time_from_meta;
-				}
-			}
-		}
-	}
-
-	/**
-	 * Hydrate venue fields from taxonomy.
-	 *
-	 * Venue taxonomy is the source of truth. If event has an assigned venue
-	 * term, its name, formatted address, and timezone override any block attribute values.
-	 *
-	 * @param int $post_id Post ID
-	 * @param array $event_data Event data array (modified by reference)
-	 */
-	private static function hydrate_venue_from_taxonomy( int $post_id, array &$event_data ): void {
-		$venue_terms = get_the_terms( $post_id, 'venue' );
-		if ( ! $venue_terms || is_wp_error( $venue_terms ) ) {
-			return;
-		}
-
-		$venue_term = $venue_terms[0];
-		$venue_data = Venue_Taxonomy::get_venue_data( $venue_term->term_id );
-
-		$event_data['venue']   = $venue_data['name'];
-		$event_data['address'] = Venue_Taxonomy::get_formatted_address( $venue_term->term_id, $venue_data );
-
-		if ( ! empty( $venue_data['timezone'] ) ) {
-			$event_data['venueTimezone'] = $venue_data['timezone'];
-		}
-	}
-
-	/**
-	 * Hydrate promoter/organizer fields from taxonomy.
-	 *
-	 * Promoter taxonomy is the source of truth. If event has an assigned
-	 * promoter term, its data overrides any block attribute values.
-	 *
-	 * @param int $post_id Post ID
-	 * @param array $event_data Event data array (modified by reference)
-	 */
-	private static function hydrate_promoter_from_taxonomy( int $post_id, array &$event_data ): void {
-		$promoter_terms = get_the_terms( $post_id, 'promoter' );
-		if ( ! $promoter_terms || is_wp_error( $promoter_terms ) ) {
-			return;
-		}
-
-		$promoter_term = $promoter_terms[0];
-		$promoter_data = Promoter_Taxonomy::get_promoter_data( $promoter_term->term_id );
-
-		$event_data['organizer'] = $promoter_data['name'];
-		if ( ! empty( $promoter_data['url'] ) ) {
-			$event_data['organizerUrl'] = $promoter_data['url'];
-		}
-		if ( ! empty( $promoter_data['type'] ) ) {
-			$event_data['organizerType'] = $promoter_data['type'];
-		}
-	}
-
-	/**
-	 * Build paged events array from WP_Query
-	 *
-	 * @param WP_Query $query Events query
-	 * @return array Array of event items with post, datetime, and event_data
+	 * @param WP_Query $query Events query.
+	 * @return array Array of event items.
 	 */
 	public static function build_paged_events( WP_Query $query ): array {
-		$paged_events = array();
-
-		if ( ! $query->have_posts() ) {
-			return $paged_events;
-		}
-
-		while ( $query->have_posts() ) {
-			$query->the_post();
-			$event_post = get_post();
-			$event_data = self::parse_event_data( $event_post );
-
-			if ( $event_data ) {
-				$start_time     = $event_data['startTime'] ?? '00:00:00';
-				$event_tz       = self::get_event_timezone( $event_data );
-				$event_datetime = new DateTime(
-					$event_data['startDate'] . ' ' . $start_time,
-					$event_tz
-				);
-
-				$paged_events[] = array(
-					'post'       => $event_post,
-					'datetime'   => $event_datetime,
-					'event_data' => $event_data,
-				);
-			}
-		}
-
-		wp_reset_postdata();
-
-		return $paged_events;
+		return DateGrouper::build_paged_events( $query );
 	}
 
 	/**
-	 * Get DateTimeZone for an event.
+	 * Group events by date, expanding multi-day events.
 	 *
-	 * Uses venue timezone if available, falls back to WordPress site timezone.
-	 *
-	 * @param array $event_data Event data array
-	 * @return DateTimeZone Timezone for the event
-	 */
-	private static function get_event_timezone( array $event_data ): DateTimeZone {
-		$tz_string = $event_data['venueTimezone'] ?? '';
-
-		if ( ! empty( $tz_string ) ) {
-			try {
-				return new DateTimeZone( $tz_string );
-			} catch ( \Exception $e ) {
-				// Invalid timezone, fall through to default
-			}
-		}
-
-		return wp_timezone();
-	}
-
-	/**
-	 * Check if an event spans multiple days
-	 *
-	 * Events ending before the next_day_cutoff time on the following day
-	 * are treated as single-day events (typical late-night shows).
-	 *
-	 * @param array $event_data Event data array
-	 * @return bool True if event spans multiple days
-	 */
-	private static function is_multi_day_event( array $event_data ): bool {
-		$start_date = $event_data['startDate'] ?? '';
-		$end_date   = $event_data['endDate'] ?? '';
-		$end_time   = $event_data['endTime'] ?? '';
-
-		if ( empty( $start_date ) || empty( $end_date ) ) {
-			return false;
-		}
-
-		if ( $start_date === $end_date ) {
-			return false;
-		}
-
-		$start = new DateTime( $start_date );
-		$end   = new DateTime( $end_date );
-		$diff  = $start->diff( $end )->days;
-
-		if ( 1 === $diff && ! empty( $end_time ) ) {
-			$cutoff         = Settings_Page::get_next_day_cutoff();
-			$cutoff_parts   = explode( ':', $cutoff );
-			$cutoff_seconds = ( (int) $cutoff_parts[0] * 3600 ) + ( (int) ( $cutoff_parts[1] ?? 0 ) * 60 );
-
-			$end_time_parts = explode( ':', $end_time );
-			$end_seconds    = ( (int) $end_time_parts[0] * 3600 ) + ( (int) ( $end_time_parts[1] ?? 0 ) * 60 );
-
-			if ( $end_seconds < $cutoff_seconds ) {
-				return false;
-			}
-		}
-
-		return true;
-	}
-
-	/**
-	 * Generate all dates an event spans
-	 *
-	 * @param string $start_date Start date (Y-m-d)
-	 * @param string $end_date End date (Y-m-d)
-	 * @param DateTimeZone $event_tz Event timezone
-	 * @return array Array of date strings (Y-m-d)
-	 */
-	private static function get_event_date_range( string $start_date, string $end_date, DateTimeZone $event_tz ): array {
-		$dates = array();
-
-		$start = new DateTime( $start_date, $event_tz );
-		$end   = new DateTime( $end_date, $event_tz );
-
-		$max_days  = 90;
-		$day_count = 0;
-
-		while ( $start <= $end && $day_count < $max_days ) {
-			$dates[] = $start->format( 'Y-m-d' );
-			$start->modify( '+1 day' );
-			++$day_count;
-		}
-
-		return $dates;
-	}
-
-	/**
-	 * Group events by date, expanding multi-day events across their date range
-	 *
-	 * @param array  $paged_events Array of event items
-	 * @param bool   $show_past Whether showing past events (affects sort order)
-	 * @param string $date_start Optional start date boundary (Y-m-d) to filter occurrence dates
-	 * @param string $date_end Optional end date boundary (Y-m-d) to filter occurrence dates
-	 * @return array Date-grouped events
+	 * @param array  $paged_events Array of event items.
+	 * @param bool   $show_past    Whether showing past events.
+	 * @param string $date_start   Optional start date boundary.
+	 * @param string $date_end     Optional end date boundary.
+	 * @return array Date-grouped events.
 	 */
 	public static function group_events_by_date( array $paged_events, bool $show_past = false, string $date_start = '', string $date_end = '' ): array {
-		$date_groups = array();
-
-		foreach ( $paged_events as $event_item ) {
-			$event_data = $event_item['event_data'];
-			$start_date = $event_data['startDate'] ?? '';
-			$end_date   = $event_data['endDate'] ?? $start_date;
-
-			if ( empty( $start_date ) ) {
-				continue;
-			}
-
-			$event_tz     = self::get_event_timezone( $event_data );
-			$is_multi_day = self::is_multi_day_event( $event_data );
-
-			// Use explicit occurrence dates if provided, otherwise expand full range
-			$occurrence_dates     = $event_data['occurrenceDates'] ?? array();
-			$has_occurrence_dates = ! empty( $occurrence_dates ) && is_array( $occurrence_dates );
-
-			if ( $has_occurrence_dates ) {
-				$event_dates = $occurrence_dates;
-			} elseif ( $is_multi_day ) {
-				$event_dates = self::get_event_date_range( $start_date, $end_date, $event_tz );
-			} else {
-				$event_dates = array( $start_date );
-			}
-
-			// Filter out past dates when show_past is false.
-			// Applies to both explicit occurrence dates and multi-day date range expansions
-			// so that yesterday's entry for an ongoing multi-day event doesn't appear.
-			if ( ! $show_past && ( $has_occurrence_dates || $is_multi_day ) ) {
-				$current_date = current_time( 'Y-m-d' );
-				$event_dates  = array_filter(
-					$event_dates,
-					function ( $date ) use ( $current_date ) {
-						return $date >= $current_date;
-					}
-				);
-			}
-
-			// Filter to page date boundaries if provided
-			if ( $date_start || $date_end ) {
-				$event_dates = array_filter(
-					$event_dates,
-					function ( $date ) use ( $date_start, $date_end ) {
-						if ( $date_start && $date < $date_start ) {
-							return false;
-						}
-						if ( $date_end && $date > $date_end ) {
-							return false;
-						}
-						return true;
-					}
-				);
-			}
-
-			foreach ( $event_dates as $index => $date_key ) {
-				$display_datetime_obj = new DateTime( $date_key . ' 00:00:00', $event_tz );
-
-				if ( ! isset( $date_groups[ $date_key ] ) ) {
-					$date_groups[ $date_key ] = array(
-						'date_obj' => $display_datetime_obj,
-						'events'   => array(),
-					);
-				}
-
-				// Events with explicit occurrence dates are NOT continuations - each is a discrete showing
-				$is_continuation = $has_occurrence_dates ? false : ( $date_key !== $start_date );
-
-				$display_item                    = $event_item;
-				$display_item['display_context'] = array(
-					'is_multi_day'        => $has_occurrence_dates ? false : $is_multi_day,
-					'is_start_day'        => $has_occurrence_dates ? true : ( $date_key === $start_date ),
-					'is_end_day'          => $has_occurrence_dates ? true : ( $date_key === $end_date ),
-					'is_continuation'     => $is_continuation,
-					'display_date'        => $date_key,
-					'original_start_date' => $start_date,
-					'original_end_date'   => $end_date,
-					'day_number'          => $index + 1,
-					'total_days'          => count( $event_dates ),
-				);
-
-				$date_groups[ $date_key ]['events'][] = $display_item;
-			}
-		}
-
-		// Allow reordering events within each day group.
-		foreach ( $date_groups as $date_key => &$date_group ) {
-			$date_group['events'] = apply_filters(
-				'datamachine_events_day_group_events',
-				$date_group['events'],
-				$date_key,
-				array(
-					'date_obj'  => $date_group['date_obj'],
-					'show_past' => $show_past,
-				)
-			);
-		}
-		unset( $date_group );
-
-		uksort(
-			$date_groups,
-			function ( $a, $b ) use ( $show_past ) {
-				return $show_past ? strcmp( $b, $a ) : strcmp( $a, $b );
-			}
-		);
-
-		return $date_groups;
+		return DateGrouper::group_events_by_date( $paged_events, $show_past, $date_start, $date_end );
 	}
 
 	/**
-	 * Build display variables for an event
+	 * Build display variables for an event.
 	 *
-	 * @param array $event_data Event data from block attributes
-	 * @param array $display_context Optional display context for multi-day events
-	 * @return array Display variables
+	 * @param array $event_data      Event data from block attributes.
+	 * @param array $display_context Optional display context.
+	 * @return array Display variables.
 	 */
 	public static function build_display_vars( array $event_data, array $display_context = array() ): array {
-		$start_date = $event_data['startDate'] ?? '';
-		$start_time = $event_data['startTime'] ?? '';
-		$end_date   = $event_data['endDate'] ?? '';
-		$end_time   = $event_data['endTime'] ?? '';
-
-		$formatted_time_display = '';
-		$iso_start_date         = '';
-		$multi_day_label        = '';
-
-		if ( $start_date ) {
-			$event_tz           = self::get_event_timezone( $event_data );
-			$start_datetime_obj = new DateTime( $start_date . ' ' . $start_time, $event_tz );
-			$iso_start_date     = $start_datetime_obj->format( 'c' );
-
-			$is_multi_day    = ! empty( $display_context['is_multi_day'] );
-			$is_continuation = ! empty( $display_context['is_continuation'] );
-
-			if ( $is_multi_day && ! empty( $end_date ) ) {
-				$end_datetime_obj = new DateTime( $end_date, $event_tz );
-
-				if ( $is_continuation ) {
-					$formatted_time_display = sprintf(
-						/* translators: 1: start date, 2: end date. Example: "Feb 27 – Mar 1" */
-						__( '%1$s – %2$s', 'datamachine-events' ),
-						$start_datetime_obj->format( 'M j' ),
-						$end_datetime_obj->format( 'M j' )
-					);
-				} else {
-					$multi_day_label = sprintf(
-						__( 'through %s', 'datamachine-events' ),
-						$end_datetime_obj->format( 'M j' )
-					);
-					$formatted_time_display = self::format_time_range( $start_datetime_obj, $end_date, $end_time, $event_tz );
-				}
-			} else {
-				$formatted_time_display = self::format_time_range( $start_datetime_obj, $end_date, $end_time, $event_tz );
-			}
-		}
-
-		return array(
-			'formatted_time_display' => $formatted_time_display,
-			'venue_name'             => self::decode_unicode( $event_data['venue'] ?? '' ),
-			'performer_name'         => self::decode_unicode( $event_data['performer'] ?? '' ),
-			'iso_start_date'         => $iso_start_date,
-			'show_performer'         => false,
-			'show_price'             => $event_data['showPrice'] ?? true,
-			'show_ticket_link'       => $event_data['showTicketLink'] ?? true,
-			'multi_day_label'        => $multi_day_label,
-			'is_continuation'        => $display_context['is_continuation'] ?? false,
-			'is_multi_day'           => $display_context['is_multi_day'] ?? false,
-		);
+		return DisplayVars::build( $event_data, $display_context );
 	}
 
 	/**
-	 * Format time range for display
+	 * Decode unicode escape sequences in strings.
 	 *
-	 * Formats start and end times into a readable range. When both times share
-	 * the same AM/PM period, only shows the period once (e.g., "7:30 - 10:00 PM").
-	 *
-	 * @param DateTime $start_datetime_obj Start datetime object
-	 * @param string $end_date End date (Y-m-d format)
-	 * @param string $end_time End time (H:i:s format)
-	 * @param DateTimeZone $event_tz Event timezone
-	 * @return string Formatted time display
-	 */
-	private static function format_time_range( DateTime $start_datetime_obj, string $end_date, string $end_time, \DateTimeZone $event_tz ): string {
-		$start_formatted_full = $start_datetime_obj->format( 'g:i A' );
-
-		if ( empty( $end_date ) || empty( $end_time ) || self::isSentinelEndTime( $end_time ) ) {
-			return $start_formatted_full;
-		}
-
-		$end_datetime_obj = new DateTime( $end_date . ' ' . $end_time, $event_tz );
-
-		$is_same_day = $start_datetime_obj->format( 'Y-m-d' ) === $end_datetime_obj->format( 'Y-m-d' );
-		if ( ! $is_same_day ) {
-			return $start_formatted_full;
-		}
-
-		$start_period = $start_datetime_obj->format( 'A' );
-		$end_period   = $end_datetime_obj->format( 'A' );
-
-		if ( $start_period === $end_period ) {
-			$start_time_only    = $start_datetime_obj->format( 'g:i' );
-			$end_formatted_full = $end_datetime_obj->format( 'g:i A' );
-			return $start_time_only . ' - ' . $end_formatted_full;
-		}
-
-		$end_formatted_full = $end_datetime_obj->format( 'g:i A' );
-		return $start_formatted_full . ' - ' . $end_formatted_full;
-	}
-
-	/**
-	 * Check if end time is the sentinel value used for SQL date range queries.
-	 *
-	 * When events have endDate but no endTime, meta-storage.php stores 23:59:59
-	 * to ensure proper date range filtering. This should not display to users.
-	 *
-	 * @param string $time Time string in HH:MM or HH:MM:SS format
-	 * @return bool True if time is the 23:59 sentinel value
-	 */
-	private static function isSentinelEndTime( string $time ): bool {
-		$normalized = substr( $time, 0, 5 );
-		return '23:59' === $normalized;
-	}
-
-	/**
-	 * Decode unicode escape sequences in strings
-	 *
-	 * @param string $str Input string
-	 * @return string Decoded string
+	 * @param string $str Input string.
+	 * @return string Decoded string.
 	 */
 	public static function decode_unicode( string $str ): string {
-		return html_entity_decode(
-			preg_replace( '/\\\\u([0-9a-fA-F]{4})/', '&#x$1;', $str ),
-			ENT_NOQUOTES,
-			'UTF-8'
-		);
+		return DisplayVars::decode_unicode( $str );
 	}
 
 	/**
-	 * Detect time gaps between date groups for carousel mode
+	 * Detect time gaps between date groups.
 	 *
-	 * @param array $date_groups Date-grouped events
-	 * @return array Map of date_key => gap_days for gaps >= 2 days
+	 * @param array $date_groups Date-grouped events.
+	 * @return array Map of date_key => gap_days.
 	 */
 	public static function detect_time_gaps( array $date_groups ): array {
-		$gaps          = array();
-		$previous_date = null;
-
-		foreach ( $date_groups as $date_key => $date_group ) {
-			if ( null !== $previous_date ) {
-				$current_date = new DateTime( $date_key, wp_timezone() );
-				$days_diff    = $current_date->diff( $previous_date )->days;
-
-				if ( $days_diff > 1 ) {
-					$gaps[ $date_key ] = $days_diff;
-				}
-			}
-			$previous_date = new DateTime( $date_key, wp_timezone() );
-		}
-
-		return $gaps;
+		return DateGrouper::detect_time_gaps( $date_groups );
 	}
 
 	/**
-	 * Render date groups as HTML
+	 * Render date groups as HTML.
 	 *
-	 * Used by CalendarAbilities for HTML generation. Iterates through date groups,
-	 * rendering time-gap separators and event items using templates.
-	 *
-	 * @param array $paged_date_groups Date-grouped events from group_events_by_date()
-	 * @param array $gaps_detected Time gaps from detect_time_gaps()
-	 * @param bool  $include_gaps Whether to render time-gap separators
-	 * @return string Rendered HTML
+	 * @param array $paged_date_groups Date-grouped events.
+	 * @param array $gaps_detected     Time gaps.
+	 * @param bool  $include_gaps      Whether to render gap separators.
+	 * @return string Rendered HTML.
 	 */
 	public static function render_date_groups(
 		array $paged_date_groups,
 		array $gaps_detected = array(),
 		bool $include_gaps = true
 	): string {
-		if ( empty( $paged_date_groups ) ) {
-			ob_start();
-			Template_Loader::include_template( 'no-events' );
-			return ob_get_clean();
-		}
-
-		ob_start();
-
-		foreach ( $paged_date_groups as $date_key => $date_group ) {
-			$date_obj        = $date_group['date_obj'];
-			$events_for_date = $date_group['events'];
-
-			if ( $include_gaps && isset( $gaps_detected[ $date_key ] ) ) {
-				Template_Loader::include_template(
-					'time-gap-separator',
-					array(
-						'gap_days' => $gaps_detected[ $date_key ],
-					)
-				);
-			}
-
-			$day_of_week          = strtolower( $date_obj->format( 'l' ) );
-			$formatted_date_label = $date_obj->format( 'l, F jS' );
-
-			Template_Loader::include_template(
-				'date-group',
-				array(
-					'date_obj'             => $date_obj,
-					'day_of_week'          => $day_of_week,
-					'formatted_date_label' => $formatted_date_label,
-					'events_count'         => count( $events_for_date ),
-				)
-			);
-			?>
-
-			<div class="datamachine-events-wrapper">
-				<?php
-				$event_index = 0;
-				foreach ( $events_for_date as $event_item ) {
-					$event_post      = $event_item['post'];
-					$event_data      = $event_item['event_data'];
-					$display_context = $event_item['display_context'] ?? array();
-
-					global $post;
-					// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Required for setup_postdata()
-					$post = $event_post;
-					setup_postdata( $post );
-
-					$display_vars = self::build_display_vars( $event_data, $display_context );
-
-					if ( $event_index < LAZY_RENDER_THRESHOLD ) {
-						Template_Loader::include_template(
-							'event-item',
-							array(
-								'event_post'   => $event_post,
-								'event_data'   => $event_data,
-								'display_vars' => $display_vars,
-							)
-						);
-					} else {
-						self::render_event_placeholder( $event_post, $event_data, $display_vars, $display_context );
-					}
-					++$event_index;
-				}
-				?>
-			</div><!-- .datamachine-events-wrapper -->
-			<?php
-			echo '</div><!-- .datamachine-date-group -->';
-		}
-
-		return ob_get_clean();
+		return EventRenderer::render_date_groups( $paged_date_groups, $gaps_detected, $include_gaps );
 	}
 
 	/**
-	 * Render an event placeholder for lazy loading
+	 * Get unique event dates for pagination calculations.
 	 *
-	 * Outputs a skeleton placeholder with JSON data for client-side hydration.
-	 *
-	 * @param \WP_Post $event_post    Event post object
-	 * @param array    $event_data    Event data from block attributes
-	 * @param array    $display_vars  Processed display variables
-	 * @param array    $display_context Display context for multi-day events
-	 */
-	private static function render_event_placeholder(
-		\WP_Post $event_post,
-		array $event_data,
-		array $display_vars,
-		array $display_context
-	): void {
-		$placeholder_data = array(
-			'id'              => $event_post->ID,
-			'title'           => get_the_title( $event_post ),
-			'permalink'       => get_the_permalink( $event_post ),
-			'event_data'      => $event_data,
-			'display_vars'    => $display_vars,
-			'display_context' => $display_context,
-			'badges_html'     => Taxonomy_Badges::render_taxonomy_badges( $event_post->ID ),
-			'button_classes'  => implode( ' ', apply_filters( 'datamachine_events_more_info_button_classes', array( 'datamachine-more-info-button' ) ) ),
-		);
-
-		$item_classes = array( 'datamachine-event-item', 'datamachine-event-placeholder' );
-		if ( ! empty( $display_vars['is_continuation'] ) ) {
-			$item_classes[] = 'datamachine-event-continuation';
-		}
-		if ( ! empty( $display_vars['is_multi_day'] ) ) {
-			$item_classes[] = 'datamachine-event-multi-day';
-		}
-
-		printf(
-			'<div class="%s" data-event-json="%s">
-				<div class="datamachine-placeholder-skeleton">
-					<div class="datamachine-skeleton-badges"></div>
-					<div class="datamachine-skeleton-title"></div>
-					<div class="datamachine-skeleton-meta"></div>
-					<div class="datamachine-skeleton-button"></div>
-				</div>
-			</div>',
-			esc_attr( implode( ' ', $item_classes ) ),
-			esc_attr( wp_json_encode( $placeholder_data ) )
-		);
-	}
-
-	/**
-	 * Generate cache key from query parameters
-	 *
-	 * @param array  $params Query parameters
-	 * @param string $prefix Cache key prefix
-	 * @return string Cache key
-	 */
-	private static function generate_cache_key( array $params, string $prefix ): string {
-		$key_data = array(
-			'show_past'    => $params['show_past'] ?? false,
-			'search_query' => $params['search_query'] ?? '',
-			'date_start'   => $params['date_start'] ?? '',
-			'date_end'     => $params['date_end'] ?? '',
-			'tax_filters'  => $params['tax_filters'] ?? array(),
-			'archive_tax'  => $params['archive_taxonomy'] ?? '',
-			'archive_term' => $params['archive_term_id'] ?? 0,
-		);
-
-		return self::CACHE_PREFIX . $prefix . '_' . md5( wp_json_encode( $key_data ) );
-	}
-
-	/**
-	 * Get unique event dates for pagination calculations
-	 *
-	 * Expands multi-day events to count on each day they span.
-	 * Results are cached for CACHE_TTL_DATES seconds.
-	 *
-	 * @param array $params Query parameters (show_past, search_query, tax_filters, etc.)
-	 * @return array {
-	 *     @type array $dates        Ordered array of unique date strings (Y-m-d)
-	 *     @type int   $total_events Total number of matching events
-	 * }
+	 * @param array $params Query parameters.
+	 * @return array Event dates data.
 	 */
 	public static function get_unique_event_dates( array $params ): array {
-		$cache_key = self::generate_cache_key( $params, 'dates' );
-		$cached    = get_transient( $cache_key );
-
-		if ( false !== $cached ) {
-			return $cached;
-		}
-
-		$result = self::compute_unique_event_dates( $params );
-
-		set_transient( $cache_key, $result, CACHE_TTL_DATES );
-
-		return $result;
+		return PageBoundary::get_unique_event_dates( $params );
 	}
 
 	/**
-	 * Compute unique event dates (uncached)
+	 * Get date boundaries for a specific page.
 	 *
-	 * @param array $params Query parameters
-	 * @return array Event dates data
-	 */
-	private static function compute_unique_event_dates( array $params ): array {
-		$query_args           = self::build_query_args( $params );
-		$query_args['fields'] = 'ids';
-
-		$query           = new WP_Query( $query_args );
-		$total_events    = $query->found_posts;
-		$events_per_date = array();
-
-		if ( $query->have_posts() ) {
-			foreach ( $query->posts as $post_id ) {
-				$start_datetime = get_post_meta( $post_id, EVENT_DATETIME_META_KEY, true );
-				$end_datetime   = get_post_meta( $post_id, EVENT_END_DATETIME_META_KEY, true );
-
-				if ( ! $start_datetime ) {
-					continue;
-				}
-
-				$start_date = date( 'Y-m-d', strtotime( $start_datetime ) );
-				$end_date   = $end_datetime ? date( 'Y-m-d', strtotime( $end_datetime ) ) : $start_date;
-
-				// Check for explicit occurrence dates in block attributes
-				$post             = get_post( $post_id );
-				$event_data       = self::parse_event_data( $post );
-				$occurrence_dates = is_array( $event_data ) ? ( $event_data['occurrenceDates'] ?? array() ) : array();
-
-				if ( ! empty( $occurrence_dates ) && is_array( $occurrence_dates ) ) {
-					$event_dates = $occurrence_dates;
-				} elseif ( $start_date !== $end_date ) {
-					$event_dates = self::get_event_date_range( $start_date, $end_date, wp_timezone() );
-				} else {
-					$event_dates = array( $start_date );
-				}
-
-				// Filter out past dates when show_past is false.
-				// Applies to both explicit occurrence dates and multi-day date range expansions.
-				$show_past_param = $params['show_past'] ?? false;
-				$is_expanded     = ( ! empty( $occurrence_dates ) && is_array( $occurrence_dates ) ) || ( $start_date !== $end_date );
-				if ( ! $show_past_param && $is_expanded ) {
-					$current_date = current_time( 'Y-m-d' );
-					$event_dates  = array_filter(
-						$event_dates,
-						function ( $date ) use ( $current_date ) {
-							return $date >= $current_date;
-						}
-					);
-				}
-
-				foreach ( $event_dates as $date ) {
-					if ( isset( $events_per_date[ $date ] ) ) {
-						++$events_per_date[ $date ];
-					} else {
-						$events_per_date[ $date ] = 1;
-					}
-				}
-			}
-		}
-
-		if ( $params['show_past'] ?? false ) {
-			krsort( $events_per_date );
-		} else {
-			ksort( $events_per_date );
-		}
-
-		$dates = array_keys( $events_per_date );
-
-		return array(
-			'dates'           => $dates,
-			'total_events'    => $total_events,
-			'events_per_date' => $events_per_date,
-		);
-	}
-
-	/**
-	 * Get date boundaries for a specific page
-	 *
-	 * Pages must contain at least DAYS_PER_PAGE (5) days AND at least
-	 * MIN_EVENTS_FOR_PAGINATION (20) events. Days are added beyond the
-	 * minimum until the event threshold is met. The day that crosses
-	 * the 20-event threshold is included in full (never split days).
-	 *
-	 * If total_events is below the threshold, all dates are shown on one page.
-	 *
-	 * @param array $unique_dates Ordered array of unique dates
-	 * @param int $page Page number (1-based)
-	 * @param int $total_events Total event count for pagination threshold check
-	 * @param array $events_per_date Event counts keyed by date ['Y-m-d' => count]
-	 * @return array ['start_date' => 'Y-m-d', 'end_date' => 'Y-m-d', 'max_pages' => int]
+	 * @param array $unique_dates    Ordered array of unique dates.
+	 * @param int   $page            Page number (1-based).
+	 * @param int   $total_events    Total event count.
+	 * @param array $events_per_date Event counts keyed by date.
+	 * @return array Date boundaries.
 	 */
 	public static function get_date_boundaries_for_page( array $unique_dates, int $page, int $total_events = 0, array $events_per_date = array() ): array {
-		$total_days = count( $unique_dates );
-
-		if ( 0 === $total_days ) {
-			return array(
-				'start_date' => '',
-				'end_date'   => '',
-				'max_pages'  => 0,
-			);
-		}
-
-		if ( $total_events > 0 && $total_events < MIN_EVENTS_FOR_PAGINATION ) {
-			return array(
-				'start_date' => $unique_dates[0],
-				'end_date'   => $unique_dates[ $total_days - 1 ],
-				'max_pages'  => 1,
-			);
-		}
-
-		if ( empty( $events_per_date ) ) {
-			$max_pages = (int) ceil( $total_days / DAYS_PER_PAGE );
-			$page      = max( 1, min( $page, $max_pages ) );
-
-			$start_index = ( $page - 1 ) * DAYS_PER_PAGE;
-			$end_index   = min( $start_index + DAYS_PER_PAGE - 1, $total_days - 1 );
-
-			return array(
-				'start_date' => $unique_dates[ $start_index ],
-				'end_date'   => $unique_dates[ $end_index ],
-				'max_pages'  => $max_pages,
-			);
-		}
-
-		$page_boundaries      = array();
-		$current_page_start   = 0;
-		$cumulative_events    = 0;
-		$days_in_current_page = 0;
-
-		for ( $i = 0; $i < $total_days; $i++ ) {
-			$date               = $unique_dates[ $i ];
-			$cumulative_events += $events_per_date[ $date ] ?? 0;
-			++$days_in_current_page;
-
-			$is_last_date   = ( $i === $total_days - 1 );
-			$meets_minimums = ( $days_in_current_page >= DAYS_PER_PAGE && $cumulative_events >= MIN_EVENTS_FOR_PAGINATION );
-
-			if ( $meets_minimums || $is_last_date ) {
-				$page_boundaries[]    = array(
-					'start' => $current_page_start,
-					'end'   => $i,
-				);
-				$current_page_start   = $i + 1;
-				$cumulative_events    = 0;
-				$days_in_current_page = 0;
-			}
-		}
-
-		$max_pages = count( $page_boundaries );
-		$page      = max( 1, min( $page, $max_pages ) );
-		$boundary  = $page_boundaries[ $page - 1 ];
-
-		return array(
-			'start_date' => $unique_dates[ $boundary['start'] ],
-			'end_date'   => $unique_dates[ $boundary['end'] ],
-			'max_pages'  => $max_pages,
-		);
+		return PageBoundary::get_date_boundaries_for_page( $unique_dates, $page, $total_events, $events_per_date );
 	}
 }
