@@ -12,7 +12,6 @@ namespace DataMachineEvents\Abilities;
 
 use WP_Query;
 use DataMachineEvents\Blocks\Calendar\Calendar_Query;
-use DataMachineEvents\Blocks\Calendar\Geo_Query;
 use DataMachineEvents\Blocks\Calendar\Pagination;
 use DataMachineEvents\Blocks\Calendar\Template_Loader;
 
@@ -235,20 +234,6 @@ class CalendarAbilities {
 			$gaps_detected = Calendar_Query::detect_time_gaps( $paged_date_groups );
 		}
 
-		// Build venue distance map when geo filter is active.
-		$venue_distance_map = array();
-		$geo_lat            = $base_params['geo_lat'] ?? '';
-		$geo_lng            = $base_params['geo_lng'] ?? '';
-
-		if ( ! empty( $geo_lat ) && ! empty( $geo_lng ) ) {
-			$geo_radius = (float) ( $base_params['geo_radius'] ?? 25 );
-			$geo_unit   = $base_params['geo_radius_unit'] ?? 'mi';
-
-			if ( Geo_Query::validate_params( (float) $geo_lat, (float) $geo_lng, $geo_radius ) ) {
-				$venue_distance_map = Geo_Query::get_venue_distance_map( (float) $geo_lat, (float) $geo_lng, $geo_radius, $geo_unit );
-			}
-		}
-
 		$result = array(
 			'paged_date_groups' => $this->serializeDateGroups( $paged_date_groups ),
 			'gaps_detected'     => $gaps_detected,
@@ -278,9 +263,7 @@ class CalendarAbilities {
 				$date_boundaries,
 				$events_query->post_count,
 				$total_event_count,
-				$event_counts,
-				$venue_distance_map,
-				$base_params['geo_radius_unit'] ?? 'mi'
+				$event_counts
 			);
 		}
 
@@ -343,11 +326,9 @@ class CalendarAbilities {
 		array $date_boundaries,
 		int $event_count,
 		int $total_event_count,
-		array $event_counts,
-		array $venue_distance_map = array(),
-		string $distance_unit = 'mi'
+		array $event_counts
 	): array {
-		$events_html = Calendar_Query::render_date_groups( $paged_date_groups, $gaps_detected, $include_gaps, $venue_distance_map, $distance_unit );
+		$events_html = Calendar_Query::render_date_groups( $paged_date_groups, $gaps_detected, $include_gaps );
 
 		$pagination_html = Pagination::render_pagination( $current_page, $max_pages, $show_past );
 

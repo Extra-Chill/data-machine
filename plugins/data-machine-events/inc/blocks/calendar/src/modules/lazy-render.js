@@ -86,8 +86,6 @@ function hydratePlaceholder(placeholder) {
     const isoStartDate = displayVars.iso_start_date || '';
     const ticketUrl = displayVars.ticket_url || '';
     const showTicketLink = displayVars.show_ticket_link !== false;
-    const venueDistance = displayVars.venue_distance;
-    const distanceUnit = displayVars.distance_unit || 'mi';
 
     const itemClasses = ['datamachine-event-item'];
     if (displayVars.is_continuation) {
@@ -108,15 +106,6 @@ function hydratePlaceholder(placeholder) {
         timeHtml += '</div>';
     }
 
-    let distanceHtml = '';
-    if (venueDistance != null) {
-        var unitLabel = distanceUnit === 'km' ? 'km' : 'mi';
-        distanceHtml = '<div class="datamachine-event-distance">' +
-            '<span class="dashicons dashicons-location"></span>' +
-            escapeHtml(venueDistance + ' ' + unitLabel) +
-            '</div>';
-    }
-
     let performerHtml = '';
     if (showPerformer && performerName) {
         performerHtml = '<div class="datamachine-event-performer">' +
@@ -134,7 +123,6 @@ function hydratePlaceholder(placeholder) {
         '</h4>' +
         '<div class="datamachine-event-meta">' +
             timeHtml +
-            distanceHtml +
             performerHtml +
             '<a href="' + escapeAttr(data.permalink) + '" class="' + escapeAttr(data.button_classes || 'datamachine-more-info-button') + '">More Info</a>' +
         '</div>' +

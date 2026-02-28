@@ -277,7 +277,6 @@
 /* Event Meta Information */
 .datamachine-event-date,
 .datamachine-event-time,
-.datamachine-event-distance,
 .datamachine-event-artist,
 .datamachine-event-address {
     display: flex;
@@ -286,18 +285,6 @@
     font-size: 0.9rem;
     color: var(--datamachine-text-secondary);
     line-height: 1.4;
-}
-
-.datamachine-event-distance {
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--datamachine-text-muted);
-}
-
-.datamachine-event-distance .dashicons {
-    font-size: 14px;
-    width: 14px;
-    height: 14px;
 }
 
 .datamachine-event-date-icon,
@@ -507,7 +494,7 @@
 
 /* 480px breakpoint reserved for future mobile refinements */
 
-/* ========== Taxonomy Filter Styles ========== */
+/* ========== Taxonomy Filter Modal Styles ========== */
 
 /* Filter Button */
 .datamachine-events-taxonomy-filter {
@@ -558,6 +545,123 @@
     width: 16px;
     height: 16px;
     font-size: 16px;
+}
+
+/* Custom Modal Structure */
+.datamachine-taxonomy-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 999999999999999999999999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.datamachine-taxonomy-modal.datamachine-modal-active {
+    display: flex;
+}
+
+.datamachine-taxonomy-modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    cursor: pointer;
+}
+
+.datamachine-taxonomy-modal-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: var(--datamachine-background-primary);
+    border-radius: var(--datamachine-border-radius);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow: hidden;
+    z-index: 1;
+}
+
+.datamachine-taxonomy-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--datamachine-border-light);
+    background: var(--datamachine-background-secondary);
+    flex-shrink: 0;
+}
+
+.datamachine-taxonomy-modal-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--datamachine-text-primary);
+}
+
+.datamachine-taxonomy-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    color: var(--datamachine-text-secondary);
+    transition: color 0.2s ease;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.datamachine-taxonomy-modal-close:hover {
+    color: var(--datamachine-text-primary);
+}
+
+.datamachine-taxonomy-modal-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    min-height: 0;
+    max-height: calc(80vh - 160px);
+}
+
+.datamachine-taxonomy-modal-footer {
+    flex-shrink: 0;
+    background: var(--datamachine-background-secondary);
+    border-top: 1px solid var(--datamachine-border-light);
+}
+
+.datamachine-taxonomy-filter-content {
+    padding: 1.5rem;
+}
+
+/* Filter Loading State */
+.datamachine-filter-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 3rem 1.5rem;
+    color: var(--datamachine-text-secondary);
+}
+
+.datamachine-filter-loading .datamachine-filter-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--datamachine-border-light);
+    border-top-color: var(--datamachine-accent);
+    border-radius: 50%;
+    animation: datamachine-spin 0.8s linear infinite;
+}
+
+@keyframes datamachine-spin {
+    to { transform: rotate(360deg); }
 }
 
 .datamachine-filter-error {
@@ -665,11 +769,62 @@
     border-top: 1px solid var(--datamachine-border-light);
 }
 
+/* Modal Actions */
+.datamachine-modal-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    background: var(--datamachine-background-secondary);
+}
+
+.datamachine-modal-actions-left,
+.datamachine-modal-actions-right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+/* Modal Button Sizing */
+.datamachine-modal-actions .datamachine-button {
+    padding: 0.625rem 1.25rem;
+    font-size: 0.9rem;
+    min-height: 2.5rem;
+    cursor: pointer;
+}
+
+/* No Taxonomies State */
+.datamachine-no-taxonomies {
+    padding: 2rem;
+    text-align: center;
+}
+
+.datamachine-no-taxonomies p {
+    margin: 0;
+    color: var(--datamachine-text-secondary);
+    font-size: 0.95rem;
+}
+
 /* Responsive Styles */
 @media (max-width: 768px) {
     .datamachine-events-filter-row {
         grid-template-columns: 1fr;
         gap: 1rem;
+    }
+    
+    .datamachine-taxonomy-filter-content {
+        padding: 1rem;
+    }
+    
+    .datamachine-modal-actions {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+    
+    .datamachine-modal-actions-left,
+    .datamachine-modal-actions-right {
+        justify-content: center;
     }
 }
 

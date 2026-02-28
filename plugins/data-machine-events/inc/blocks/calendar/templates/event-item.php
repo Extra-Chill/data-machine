@@ -23,11 +23,9 @@ $show_performer   = $display_vars['show_performer'] ?? true;
 $show_price       = $display_vars['show_price'] ?? true;
 $show_ticket_link = $display_vars['show_ticket_link'] ?? true;
 
-$multi_day_label  = $display_vars['multi_day_label'] ?? '';
-$is_continuation  = $display_vars['is_continuation'] ?? false;
-$is_multi_day     = $display_vars['is_multi_day'] ?? false;
-$venue_distance   = $display_vars['venue_distance'] ?? null;
-$distance_unit    = $display_vars['distance_unit'] ?? 'mi';
+$multi_day_label = $display_vars['multi_day_label'] ?? '';
+$is_continuation = $display_vars['is_continuation'] ?? false;
+$is_multi_day    = $display_vars['is_multi_day'] ?? false;
 
 $item_classes = array( 'datamachine-event-item' );
 if ( $is_continuation ) {
@@ -64,16 +62,6 @@ if ( $is_multi_day ) {
 					<?php if ( ! empty( $multi_day_label ) ) : ?>
 						<span class="datamachine-event-multi-day-label"><?php echo esc_html( $multi_day_label ); ?></span>
 					<?php endif; ?>
-				</div>
-			<?php endif; ?>
-
-			<?php if ( null !== $venue_distance ) : ?>
-				<div class="datamachine-event-distance">
-					<span class="dashicons dashicons-location"></span>
-					<?php
-					$unit_label = 'km' === $distance_unit ? 'km' : 'mi';
-					echo esc_html( $venue_distance . ' ' . $unit_label );
-					?>
 				</div>
 			<?php endif; ?>
 
