@@ -2,6 +2,37 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## Unreleased
+
+### Added
+- Public venue REST endpoint (`GET /datamachine/v1/events/venues`) for map rendering with geo proximity and bounds filtering
+- Events-map block rewritten as headless React/TypeScript component with Leaflet bundled via webpack
+- Two map loading modes: static (server-rendered venues, zero REST calls) and dynamic (fetches on pan/zoom)
+- Events-map block emits `datamachine-map-bounds-changed` custom events for inter-block communication
+- Unicode dash normalization in dedup — en dash, em dash, and other variants now match ASCII hyphen
+- Affiliate ticket URL unwrapping for dedup comparison (affiliate links preserved in storage)
+- `datamachine_extract_ticket_identity()` and `datamachine_unwrap_affiliate_url()` utility functions
+- Venue-agnostic fuzzy title+date matching as 4th dedup strategy
+- Fuzzy venue name comparison and slug-based venue term lookup fallback in dedup
+
+### Fixed
+- Multi-day events showing past days on calendar (e.g. Feb 27 entry for ongoing Feb 27-Mar 1 festival)
+- Multi-day events excluded from paginated calendar pages when start date precedes page boundary
+- PSR-4 autoload fatal: `inc/blocks/` renamed to `inc/Blocks/` to match namespace casing on Linux
+- Cross-source duplicate detection failing on venue name mismatches and missing venue-agnostic fallback
+- Duplicate events from unicode dash variants in titles (e.g. `-` vs `–`)
+- Duplicate events from affiliate vs direct ticket URLs for same Ticketmaster event
+
+### Changed
+- Calendar block frontend migrated from JavaScript to TypeScript
+- Events-map block: vanilla JS IIFE replaced with React/TypeScript, Leaflet bundled instead of CDN
+- Leaflet CDN assets only enqueued for event-details block (events-map bundles its own)
+
+### Removed
+- `assets/js/events-map.js` — replaced by React/TypeScript `frontend.tsx`
+- `PostTrackingTrait` usage in EventUpsert — tracking now automatic in base handler
+- Dead code: unused `state.ts` module, `NominatimResult` type
+
 ## [0.12.8] - 2026-02-13
 
 ### Fixed
