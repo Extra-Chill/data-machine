@@ -2,11 +2,11 @@
     "$schema": "https://schemas.wp.org/trunk/block.json",
     "apiVersion": 3,
     "name": "datamachine-events/events-map",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "title": "Events Map",
     "category": "datamachine-events",
     "icon": "location-alt",
-    "description": "Display an interactive map of event venues. Auto-detects archive context or accepts manual filters.",
+    "description": "Display an interactive map of event venues. Supports static and dynamic (REST API) loading modes.",
     "keywords": ["events", "map", "venues", "leaflet", "location"],
     "textdomain": "datamachine-events",
     "attributes": {
@@ -21,6 +21,10 @@
         "mapType": {
             "type": "string",
             "default": "osm-standard"
+        },
+        "dynamic": {
+            "type": "boolean",
+            "default": false
         }
     },
     "supports": {
@@ -35,5 +39,5 @@
     "editorScript": "file:./build/index.js",
     "style": "file:./style.css",
     "viewStyle": "file:./build/frontend.css",
-    "viewScript": ["leaflet", "datamachine-events-map"]
+    "viewScript": "file:./build/frontend.js"
 }

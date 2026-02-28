@@ -7,7 +7,11 @@
     "build": "wp-scripts build",
     "start": "wp-scripts start"
   },
+  "dependencies": {
+    "leaflet": "^1.9.4"
+  },
   "devDependencies": {
+    "@types/leaflet": "^1.9.17",
     "@wordpress/scripts": "31.1.0"
   },
   "overrides": {
