@@ -227,7 +227,9 @@ class EventHealthAbilities {
 			}
 		}
 
-		$ability = wp_get_ability( 'datamachine-events/find-broken-timezone-events' );
+		$broken_timezone = array();
+		$no_venue_count  = 0;
+		$ability         = wp_get_ability( 'datamachine-events/find-broken-timezone-events' );
 		if ( $ability ) {
 			$result = $ability->execute(
 				array(
@@ -236,17 +238,20 @@ class EventHealthAbilities {
 				)
 			);
 
-			$broken_timezone = $result['broken_events'] ?? array();
-			$no_venue_count  = $result['no_venue_count'] ?? 0;
-		} else {
-			$broken_timezone = array();
+			if ( ! is_wp_error( $result ) ) {
+				$broken_timezone = $result['broken_events'] ?? array();
+				$no_venue_count  = $result['no_venue_count'] ?? 0;
+			}
 		}
 
 		$missing_meta_sync = array();
 		$meta_sync_ability = wp_get_ability( 'datamachine-events/find-missing-meta-sync' );
 		if ( $meta_sync_ability ) {
-			$meta_sync_result  = $meta_sync_ability->execute( array( 'limit' => $limit ) );
-			$missing_meta_sync = $meta_sync_result['events'] ?? array();
+			$meta_sync_result = $meta_sync_ability->execute( array( 'limit' => $limit ) );
+
+			if ( ! is_wp_error( $meta_sync_result ) ) {
+				$missing_meta_sync = $meta_sync_result['events'] ?? array();
+			}
 		}
 
 		$total = count( $events );
