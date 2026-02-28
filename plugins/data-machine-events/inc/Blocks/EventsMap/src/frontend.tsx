@@ -128,7 +128,6 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		height,
 		zoom,
 		mapType,
-		dynamic,
 		centerLat,
 		centerLon,
 		userLat,
@@ -229,19 +228,14 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 
 		mapRef.current = map;
 
-		// Listen for move/zoom when dynamic loading is enabled.
-		if ( dynamic ) {
-			map.on( 'moveend', () => debouncedFetch( map ) );
-		} else {
-			// Static mode: still dispatch bounds changed events.
-			map.on( 'moveend', () => dispatchBoundsChanged( map ) );
-		}
+		// Fetch venues on pan/zoom and dispatch bounds-changed events.
+		map.on( 'moveend', () => debouncedFetch( map ) );
 
 		// Force a resize check after mount.
 		setTimeout( () => map.invalidateSize(), 100 );
 
-		// If dynamic mode and no initial venues, fetch on mount.
-		if ( dynamic && initialVenues.length === 0 ) {
+		// Fetch venues on mount.
+		if ( initialVenues.length === 0 ) {
 			// Small delay so map is fully sized first.
 			setTimeout( () => {
 				const bounds = getBoundsFromMap( map );
@@ -306,15 +300,15 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 
 		markersRef.current = newMarkers;
 
-		// Fit bounds to markers (only on non-dynamic or first load).
-		if ( ! dynamic || initialVenues.length > 0 ) {
+		// Fit bounds on first load when we have a user location or
+		// initial venues (before the user has interacted with the map).
+		if ( initialVenues.length > 0 ) {
 			const allMarkers = [
 				...newMarkers,
 				...( userMarkerRef.current ? [ userMarkerRef.current ] : [] ),
 			];
 
 			if ( hasUserLocation && allMarkers.length > 1 ) {
-				// Near-me mode: center on user at zoom 13.
 				map.setView( [ userLat!, userLon! ], 13 );
 			} else if ( allMarkers.length > 1 ) {
 				const group = L.featureGroup( allMarkers );
@@ -379,24 +373,16 @@ function parseMapProps( container: HTMLElement ): MapProps {
 		return isNaN( n ) ? null : n;
 	};
 
-	let initialVenues: Venue[] = [];
-	try {
-		initialVenues = JSON.parse( data.venues || '[]' );
-	} catch {
-		initialVenues = [];
-	}
-
 	return {
 		containerId: container.id || `dm-events-map-${ Date.now() }`,
 		height: parseInt( data.height || '400', 10 ),
 		zoom: parseInt( data.zoom || '12', 10 ),
 		mapType: ( data.mapType || 'osm-standard' ) as MapType,
-		dynamic: data.dynamic === '1' || data.dynamic === 'true',
 		centerLat: parseOptionalFloat( data.centerLat ),
 		centerLon: parseOptionalFloat( data.centerLon ),
 		userLat: parseOptionalFloat( data.userLat ),
 		userLon: parseOptionalFloat( data.userLon ),
-		venues: initialVenues,
+		venues: [],
 		taxonomy: data.taxonomy || '',
 		termId: parseInt( data.termId || '0', 10 ),
 		restUrl: data.restUrl || '',

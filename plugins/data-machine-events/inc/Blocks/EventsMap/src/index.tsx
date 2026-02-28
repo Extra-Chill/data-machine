@@ -18,7 +18,6 @@ import {
 	PanelBody,
 	RangeControl,
 	SelectControl,
-	ToggleControl,
 } from '@wordpress/components';
 
 import type { MapAttributes, MapType } from './types';
@@ -38,7 +37,7 @@ const MAP_STYLE_OPTIONS: { label: string; value: MapType }[] = [
 
 registerBlockType<MapAttributes>( 'datamachine-events/events-map', {
 	edit: function Edit( { attributes, setAttributes }: EditProps ) {
-		const { height, zoom, mapType, dynamic } = attributes;
+		const { height, zoom, mapType } = attributes;
 		const blockProps = useBlockProps( {
 			className: 'datamachine-events-map-block',
 		} );
@@ -69,25 +68,14 @@ registerBlockType<MapAttributes>( 'datamachine-events/events-map', {
 							min={ 4 }
 							max={ 18 }
 						/>
-						<SelectControl
-							label={ __( 'Map Style', 'datamachine-events' ) }
-							value={ mapType }
-							options={ MAP_STYLE_OPTIONS }
-							onChange={ ( value ) =>
-								setAttributes( { mapType: value as MapType } )
-							}
-						/>
-						<ToggleControl
-							label={ __( 'Dynamic Loading', 'datamachine-events' ) }
-							help={ __(
-								'Fetch venues via REST API as the user pans/zooms instead of loading all at once.',
-								'datamachine-events',
-							) }
-							checked={ dynamic }
-							onChange={ ( value ) =>
-								setAttributes( { dynamic: value } )
-							}
-						/>
+					<SelectControl
+						label={ __( 'Map Style', 'datamachine-events' ) }
+						value={ mapType }
+						options={ MAP_STYLE_OPTIONS }
+						onChange={ ( value ) =>
+							setAttributes( { mapType: value as MapType } )
+						}
+					/>
 					</PanelBody>
 				</InspectorControls>
 
