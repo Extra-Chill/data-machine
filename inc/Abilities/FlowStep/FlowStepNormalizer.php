@@ -36,9 +36,13 @@ class FlowStepNormalizer {
 		$slug   = $step_config['handler_slug'] ?? '';
 		$config = $step_config['handler_config'] ?? array();
 
-		if ( ! empty( $slug ) ) {
-			$step_config['handler_slugs']   = array( $slug );
-			$step_config['handler_configs'] = array( $slug => $config );
+		// Resolve effective slug: explicit handler_slug, or step_type for non-handler
+		// steps that store config directly (e.g. agent_ping).
+		$effective_slug = ! empty( $slug ) ? $slug : ( $step_config['step_type'] ?? '' );
+
+		if ( ! empty( $effective_slug ) && ( ! empty( $slug ) || ! empty( $config ) ) ) {
+			$step_config['handler_slugs']   = array( $effective_slug );
+			$step_config['handler_configs'] = array( $effective_slug => $config );
 			unset( $step_config['handler_slug'], $step_config['handler_config'] );
 		} else {
 			$step_config['handler_slugs']   = array();
