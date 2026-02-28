@@ -204,8 +204,20 @@ class EventUpsert extends UpdateHandler {
 			}
 		}
 
-		// Fall back to exact title matching
-		return $this->findEventByExactTitle( $title, $venue, $startDate );
+		// Try exact title matching (with venue confirmation)
+		$exact_match = $this->findEventByExactTitle( $title, $venue, $startDate );
+		if ( $exact_match ) {
+			return $exact_match;
+		}
+
+		// Final safety net: fuzzy title + date search without venue constraint.
+		// Catches cross-source duplicates where venue names differ between scrapers
+		// (e.g. "Come and Take It Live" vs "Come and Take It Productions").
+		if ( ! empty( $startDate ) ) {
+			return $this->findEventByDateAndFuzzyTitle( $title, $startDate );
+		}
+
+		return null;
 	}
 
 	/**
@@ -220,13 +232,18 @@ class EventUpsert extends UpdateHandler {
 	 * @return int|null Post ID if fuzzy match found, null otherwise
 	 */
 	private function findEventByVenueDateAndFuzzyTitle( string $title, string $venue, string $startDate ): ?int {
-		// Find venue term
+		// Find venue term — try exact name first, then slug-based lookup
 		$venue_term = get_term_by( 'name', $venue, 'venue' );
+		if ( ! $venue_term ) {
+			// Try slug-based lookup to catch minor name variations
+			$venue_slug = sanitize_title( $venue );
+			$venue_term = get_term_by( 'slug', $venue_slug, 'venue' );
+		}
 		if ( ! $venue_term ) {
 			do_action(
 				'datamachine_log',
-				'warning',
-				'Event Upsert: Venue term not found, skipping fuzzy title matching',
+				'debug',
+				'Event Upsert: Venue term not found for fuzzy title matching, will try venue-agnostic fallback',
 				array(
 					'venue_name' => $venue,
 					'title'      => $title,
@@ -348,7 +365,12 @@ class EventUpsert extends UpdateHandler {
 	}
 
 	/**
-	 * Find event by exact title match (original behavior)
+	 * Find event by exact title match with venue confirmation
+	 *
+	 * Matches are returned when:
+	 * - No incoming venue (can't verify, trust the title+date match)
+	 * - Existing post has no venue assigned (can't verify, trust the match)
+	 * - Venues match exactly OR fuzzy-match (normalized comparison)
 	 *
 	 * @param string $title Event title
 	 * @param string $venue Venue name
@@ -377,17 +399,40 @@ class EventUpsert extends UpdateHandler {
 		$posts = get_posts( $args );
 
 		if ( ! empty( $posts ) ) {
-			if ( ! empty( $venue ) ) {
-				$post_id     = $posts[0];
-				$venue_terms = wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'names' ) );
+			$post_id = $posts[0];
 
-				if ( ! empty( $venue_terms ) && in_array( $venue, $venue_terms, true ) ) {
-					return $post_id;
-				} elseif ( empty( $venue_terms ) ) {
+			// No incoming venue — trust the title+date match
+			if ( empty( $venue ) ) {
+				return $post_id;
+			}
+
+			$venue_terms = wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'names' ) );
+
+			// Existing post has no venue — trust the title+date match
+			if ( empty( $venue_terms ) ) {
+				return $post_id;
+			}
+
+			// Check venue: exact match first, then normalized comparison
+			foreach ( $venue_terms as $existing_venue ) {
+				if ( $venue === $existing_venue ) {
 					return $post_id;
 				}
-			} else {
-				return $posts[0];
+
+				if ( $this->venueNamesMatch( $venue, $existing_venue ) ) {
+					do_action(
+						'datamachine_log',
+						'info',
+						'Event Upsert: Fuzzy venue match in exact title search',
+						array(
+							'incoming_venue' => $venue,
+							'existing_venue' => $existing_venue,
+							'post_id'        => $post_id,
+							'title'          => $title,
+						)
+					);
+					return $post_id;
+				}
 			}
 		}
 
@@ -452,6 +497,121 @@ class EventUpsert extends UpdateHandler {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Find event by date and fuzzy title without venue constraint
+	 *
+	 * Last-resort deduplication for cross-source imports where the same event
+	 * appears with different venue names (e.g. "Come and Take It Live" vs
+	 * "Come and Take It Productions") or where one source omits the venue entirely.
+	 *
+	 * Queries all events on a given date and compares titles using core extraction.
+	 * More permissive than venue-scoped fuzzy matching — only fires as a final
+	 * fallback after ticket URL, venue+fuzzy, and exact title strategies all fail.
+	 *
+	 * @param string $title Event title to match
+	 * @param string $startDate Start date (YYYY-MM-DD)
+	 * @return int|null Post ID if fuzzy match found, null otherwise
+	 */
+	private function findEventByDateAndFuzzyTitle( string $title, string $startDate ): ?int {
+		$args = array(
+			'post_type'      => Event_Post_Type::POST_TYPE,
+			'posts_per_page' => 20,
+			'post_status'    => array( 'publish', 'draft', 'pending' ),
+			'meta_query'     => array(
+				array(
+					'key'     => EVENT_DATETIME_META_KEY,
+					'value'   => $startDate,
+					'compare' => 'LIKE',
+				),
+			),
+		);
+
+		$candidates = get_posts( $args );
+
+		if ( empty( $candidates ) ) {
+			return null;
+		}
+
+		foreach ( $candidates as $candidate ) {
+			if ( ! EventIdentifierGenerator::titlesMatch( $title, $candidate->post_title ) ) {
+				continue;
+			}
+
+			$existing_datetime = get_post_meta( $candidate->ID, EVENT_DATETIME_META_KEY, true );
+			if ( ! $this->isWithinTimeWindow( $startDate, $existing_datetime ) ) {
+				continue;
+			}
+
+			do_action(
+				'datamachine_log',
+				'info',
+				'Event Upsert: Cross-source fuzzy match (venue-agnostic) found duplicate',
+				array(
+					'incoming_title' => $title,
+					'matched_title'  => $candidate->post_title,
+					'post_id'        => $candidate->ID,
+					'date'           => $startDate,
+				)
+			);
+			return $candidate->ID;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Compare two venue names for semantic equivalence
+	 *
+	 * Handles common variations between sources:
+	 * - Article differences: "The Continental Club" vs "Continental Club"
+	 * - Suffix differences: "Come and Take It Live" vs "Come and Take It Productions"
+	 * - Case differences: "STUBBS" vs "Stubb's"
+	 *
+	 * Uses the same normalization as EventIdentifierGenerator::normalize_text()
+	 * for consistent behavior across the dedup pipeline.
+	 *
+	 * @param string $venue1 First venue name
+	 * @param string $venue2 Second venue name
+	 * @return bool True if venues likely refer to the same place
+	 */
+	private function venueNamesMatch( string $venue1, string $venue2 ): bool {
+		$norm1 = $this->normalizeVenueName( $venue1 );
+		$norm2 = $this->normalizeVenueName( $venue2 );
+
+		// Exact match after normalization
+		if ( $norm1 === $norm2 ) {
+			return true;
+		}
+
+		// One contains the other (handles suffix variations like "Live" vs "Productions")
+		if ( ! empty( $norm1 ) && ! empty( $norm2 ) ) {
+			if ( str_contains( $norm1, $norm2 ) || str_contains( $norm2, $norm1 ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Normalize venue name for comparison
+	 *
+	 * @param string $venue Venue name
+	 * @return string Normalized venue name
+	 */
+	private function normalizeVenueName( string $venue ): string {
+		$text = strtolower( $venue );
+		$text = trim( preg_replace( '/\s+/', ' ', $text ) );
+
+		// Remove leading articles
+		$text = preg_replace( '/^(the|a|an)\s+/i', '', $text );
+
+		// Remove non-alphanumeric (keep spaces)
+		$text = preg_replace( '/[^a-z0-9\s]/', '', $text );
+
+		return trim( $text );
 	}
 
 	/**
