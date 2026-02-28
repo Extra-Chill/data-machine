@@ -111,7 +111,13 @@ class CheckDuplicatesCommand {
 				continue;
 			}
 
-			// Compare all pairs of events on the same date
+			// Pre-fetch venue names for all events on this date.
+			$venue_cache = array();
+			foreach ( $date_events as $event ) {
+				$venue_cache[ $event->ID ] = $this->get_venue_name( $event->ID );
+			}
+
+			// Compare all pairs of events on the same date.
 			$matched_ids = array();
 
 			for ( $i = 0, $count = count( $date_events ); $i < $count; $i++ ) {
@@ -127,8 +133,14 @@ class CheckDuplicatesCommand {
 						continue;
 					}
 
-					$venue_a = $this->get_venue_name( $event_a->ID );
-					$venue_b = $this->get_venue_name( $event_b->ID );
+					$venue_a = $venue_cache[ $event_a->ID ];
+					$venue_b = $venue_cache[ $event_b->ID ];
+
+					// Require same or similar venue to avoid false positives
+					// (e.g. "Free Week" events at different venues are NOT duplicates).
+					if ( ! EventIdentifierGenerator::venuesMatch( $venue_a, $venue_b ) ) {
+						continue;
+					}
 
 					$duplicate_groups[] = array(
 						'date'    => $date,
