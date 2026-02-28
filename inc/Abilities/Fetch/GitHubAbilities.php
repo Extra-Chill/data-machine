@@ -336,6 +336,64 @@ class GitHubAbilities {
 		}
 	}
 
+	/**
+	 * Permission callback for abilities.
+	 *
+	 * @return bool True if user has permission.
+	 */
+	public function checkPermission(): bool {
+		return PermissionHelper::can_manage();
+	}
+
+	/**
+	 * Execute a GitHub ability by name.
+	 *
+	 * Dispatches to the appropriate static method based on the ability_name input.
+	 *
+	 * @param array $input Input parameters including 'ability_name' for dispatch.
+	 * @return array Result array.
+	 */
+	public function execute( array $input ): array {
+		$ability = $input['ability_name'] ?? 'list_issues';
+		$config  = $this->normalizeConfig( $input );
+
+		return match ( $ability ) {
+			'list_issues'    => self::listIssues( $config ),
+			'get_issue'      => self::getIssue( $config ),
+			'update_issue'   => self::updateIssue( $config ),
+			'comment'        => self::commentOnIssue( $config ),
+			'list_pulls'     => self::listPulls( $config ),
+			'list_repos'     => self::listRepos( $config ),
+			default          => array(
+				'success' => false,
+				'error'   => "Unknown GitHub ability: {$ability}",
+			),
+		};
+	}
+
+	/**
+	 * Normalize input configuration with defaults.
+	 *
+	 * @param array $input Raw input.
+	 * @return array Normalized config.
+	 */
+	private function normalizeConfig( array $input ): array {
+		$defaults = array(
+			'repo'         => '',
+			'owner'        => '',
+			'state'        => 'open',
+			'per_page'     => self::DEFAULT_PER_PAGE,
+			'page'         => 1,
+			'labels'       => '',
+			'assignee'     => '',
+			'since'        => '',
+			'issue_number' => 0,
+			'sort'         => 'updated',
+		);
+
+		return array_merge( $defaults, $input );
+	}
+
 	// -------------------------------------------------------------------------
 	// Ability Callbacks
 	// -------------------------------------------------------------------------

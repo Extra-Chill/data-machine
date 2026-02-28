@@ -30,6 +30,53 @@ class GitHubTools extends BaseTool {
 		$this->registerGlobalTool( 'list_github_repos', array( $this, 'getListReposDefinition' ) );
 	}
 
+	/**
+	 * Handle tool call — dispatches to the appropriate handler based on tool_def.
+	 *
+	 * @param array $parameters Tool parameters.
+	 * @param array $tool_def   Tool definition with 'method' key.
+	 * @return array
+	 */
+	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
+		$method = $tool_def['method'] ?? 'handleListIssues';
+		if ( method_exists( $this, $method ) ) {
+			return $this->{$method}( $parameters, $tool_def );
+		}
+		return $this->buildErrorResponse( "Unknown method: {$method}", 'github_tools' );
+	}
+
+	/**
+	 * Check if GitHub tools are properly configured.
+	 *
+	 * @param bool   $configured Current configuration status.
+	 * @param string $tool_id    Tool identifier to check.
+	 * @return bool True if configured.
+	 */
+	public function check_configuration( $configured, $tool_id ) {
+		$github_tools = array(
+			'list_github_issues',
+			'get_github_issue',
+			'manage_github_issue',
+			'list_github_pulls',
+			'list_github_repos',
+		);
+		if ( ! in_array( $tool_id, $github_tools, true ) ) {
+			return $configured;
+		}
+		return GitHubAbilities::isConfigured();
+	}
+
+	/**
+	 * Get tool definition — returns the primary tool definition (list issues).
+	 *
+	 * Individual tools use their own definition methods via registerGlobalTool.
+	 *
+	 * @return array Tool definition array.
+	 */
+	public function getToolDefinition(): array {
+		return $this->getListIssuesDefinition();
+	}
+
 	// -------------------------------------------------------------------------
 	// List Issues
 	// -------------------------------------------------------------------------
