@@ -12,8 +12,7 @@
 		"outDir": "./build",
 		"rootDir": "./src",
 		"declaration": false,
-		"noEmit": true,
-		"types": ["wordpress__blocks", "wordpress__block-editor", "wordpress__components", "wordpress__i18n"]
+		"noEmit": true
 	},
 	"include": ["src/**/*.ts", "src/**/*.tsx"],
 	"exclude": ["node_modules", "build"]

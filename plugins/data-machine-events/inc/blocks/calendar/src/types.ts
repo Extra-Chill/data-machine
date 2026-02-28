@@ -67,17 +67,6 @@ export interface TaxonomyData {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Nominatim                                                          */
-/* ------------------------------------------------------------------ */
-
-export interface NominatimResult {
-	lat: string;
-	lon: string;
-	display_name: string;
-	address?: Record<string, string>;
-}
-
-/* ------------------------------------------------------------------ */
 /*  REST API responses                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -121,7 +110,7 @@ export interface EventPlaceholderData {
 	permalink: string;
 	badges_html: string;
 	button_classes: string;
-	display_vars: EventDisplayVars;
+	display_vars?: EventDisplayVars;
 }
 
 /* ------------------------------------------------------------------ */

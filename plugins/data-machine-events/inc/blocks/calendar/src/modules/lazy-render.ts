@@ -5,7 +5,7 @@
  * approach the viewport during horizontal scroll.
  */
 
-import type { EventPlaceholderData } from '../types';
+import type { EventDisplayVars, EventPlaceholderData } from '../types';
 
 interface LazyObserverEntry {
 	observer: IntersectionObserver;
@@ -94,7 +94,7 @@ function hydratePlaceholder( placeholder: HTMLElement ): void {
 		return;
 	}
 
-	const displayVars = data.display_vars || ( {} as EventPlaceholderData[ 'display_vars' ] );
+	const displayVars: Partial< EventDisplayVars > = data.display_vars || {};
 	const formattedTimeDisplay = displayVars.formatted_time_display || '';
 	const performerName = displayVars.performer_name || '';
 	const showPerformer = displayVars.show_performer !== false;
