@@ -6,11 +6,11 @@
  * attributes exist but post meta sync failed, and repairs them.
  *
  * Usage examples:
- *   wp datamachine-events resync-meta 4222
- *   wp datamachine-events resync-meta 4222,4223,4224
- *   wp datamachine-events resync-meta 4222 --dry-run
- *   wp datamachine-events resync-meta --all-broken
- *   wp datamachine-events resync-meta --all-broken --execute
+ *   wp data-machine-events resync-meta 4222
+ *   wp data-machine-events resync-meta 4222,4223,4224
+ *   wp data-machine-events resync-meta 4222 --dry-run
+ *   wp data-machine-events resync-meta --all-broken
+ *   wp data-machine-events resync-meta --all-broken --execute
  *
  * @package DataMachineEvents\Cli
  * @since 0.11.3
@@ -57,22 +57,22 @@ class ResyncMetaCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Preview fixing a single event (dry run)
-	 *     $ wp datamachine-events resync-meta 4222 --dry-run
+	 *     $ wp data-machine-events resync-meta 4222 --dry-run
 	 *
 	 *     # Fix a single event
-	 *     $ wp datamachine-events resync-meta 4222 --execute
+	 *     $ wp data-machine-events resync-meta 4222 --execute
 	 *
 	 *     # Fix multiple specific events
-	 *     $ wp datamachine-events resync-meta 4222,4223,4224 --execute
+	 *     $ wp data-machine-events resync-meta 4222,4223,4224 --execute
 	 *
 	 *     # Find all broken events (detection only)
-	 *     $ wp datamachine-events resync-meta --all-broken --dry-run
+	 *     $ wp data-machine-events resync-meta --all-broken --dry-run
 	 *
 	 *     # Fix all broken events
-	 *     $ wp datamachine-events resync-meta --all-broken --execute
+	 *     $ wp data-machine-events resync-meta --all-broken --execute
 	 *
 	 *     # JSON output for scripting
-	 *     $ wp datamachine-events resync-meta --all-broken --format=json
+	 *     $ wp data-machine-events resync-meta --all-broken --format=json
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Associative arguments.

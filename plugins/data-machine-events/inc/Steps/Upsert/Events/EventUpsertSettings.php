@@ -41,26 +41,26 @@ class EventUpsertSettings {
 		$fields = array(
 			'post_status'    => array(
 				'type'        => 'select',
-				'label'       => __( 'Post Status', 'datamachine-events' ),
-				'description' => __( 'Select the status for created/updated events.', 'datamachine-events' ),
+				'label'       => __( 'Post Status', 'data-machine-events' ),
+				'description' => __( 'Select the status for created/updated events.', 'data-machine-events' ),
 				'options'     => array(
-					'draft'   => __( 'Draft', 'datamachine-events' ),
-					'publish' => __( 'Publish', 'datamachine-events' ),
-					'pending' => __( 'Pending Review', 'datamachine-events' ),
-					'private' => __( 'Private', 'datamachine-events' ),
+					'draft'   => __( 'Draft', 'data-machine-events' ),
+					'publish' => __( 'Publish', 'data-machine-events' ),
+					'pending' => __( 'Pending Review', 'data-machine-events' ),
+					'private' => __( 'Private', 'data-machine-events' ),
 				),
 				'default'     => 'draft',
 			),
 			'include_images' => array(
 				'type'        => 'checkbox',
-				'label'       => __( 'Include Images', 'datamachine-events' ),
-				'description' => __( 'Automatically set featured images for events when image URLs are provided by import handlers.', 'datamachine-events' ),
+				'label'       => __( 'Include Images', 'data-machine-events' ),
+				'description' => __( 'Automatically set featured images for events when image URLs are provided by import handlers.', 'data-machine-events' ),
 				'default'     => false,
 			),
 			'post_author'    => array(
 				'type'        => 'select',
-				'label'       => __( 'Post Author', 'datamachine-events' ),
-				'description' => __( 'Select which WordPress user to publish events under.', 'datamachine-events' ),
+				'label'       => __( 'Post Author', 'data-machine-events' ),
+				'description' => __( 'Select which WordPress user to publish events under.', 'data-machine-events' ),
 				'options'     => $user_options,
 				'default'     => ! empty( $user_options ) ? array_key_first( $user_options ) : null,
 			),
@@ -75,17 +75,17 @@ class EventUpsertSettings {
 				'exclude_taxonomies'   => array( 'venue', 'category', 'post_tag' ),
 				'field_suffix'         => '_selection',
 				'first_options'        => array(
-					'skip'       => __( 'Skip', 'datamachine-events' ),
-					'ai_decides' => __( 'AI Decides', 'datamachine-events' ),
+					'skip'       => __( 'Skip', 'data-machine-events' ),
+					'ai_decides' => __( 'AI Decides', 'data-machine-events' ),
 				),
-				'description_template' => __( 'Configure %1$s assignment: Skip to exclude from AI instructions, let AI choose, or select specific %2$s.', 'datamachine-events' ),
+				'description_template' => __( 'Configure %1$s assignment: Skip to exclude from AI instructions, let AI choose, or select specific %2$s.', 'data-machine-events' ),
 				'default'              => 'skip',
 			)
 		);
 
 		// Ensure promoter taxonomy follows the same selection behavior as other taxonomies
 		if ( isset( $taxonomy_fields['taxonomy_promoter_selection'] ) ) {
-			$taxonomy_fields['taxonomy_promoter_selection']['description'] = __( 'Configure promoter assignment: Skip to exclude, let AI choose based on organizer data, or select a specific promoter term.', 'datamachine-events' );
+			$taxonomy_fields['taxonomy_promoter_selection']['description'] = __( 'Configure promoter assignment: Skip to exclude, let AI choose based on organizer data, or select a specific promoter term.', 'data-machine-events' );
 		}
 
 		return array_merge( $fields, $taxonomy_fields );

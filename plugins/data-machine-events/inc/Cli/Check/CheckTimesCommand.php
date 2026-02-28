@@ -6,9 +6,9 @@
  * late-night start (00:01–03:59), and suspicious 11:59 PM end time.
  *
  * Usage:
- *   wp datamachine-events check times
- *   wp datamachine-events check times --scope=all --limit=50
- *   wp datamachine-events check times --format=json
+ *   wp data-machine-events check times
+ *   wp data-machine-events check times --scope=all --limit=50
+ *   wp data-machine-events check times --format=json
  *
  * @package DataMachineEvents\Cli\Check
  * @since   0.14.0
@@ -66,9 +66,9 @@ class CheckTimesCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine-events check times
-	 *     wp datamachine-events check times --scope=all --limit=50
-	 *     wp datamachine-events check times --format=json
+	 *     wp data-machine-events check times
+	 *     wp data-machine-events check times --scope=all --limit=50
+	 *     wp data-machine-events check times --format=json
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Named arguments.

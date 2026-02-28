@@ -26,8 +26,8 @@ class EventScraperTest {
 				wp_register_ability(
 					'datamachine/test-event-scraper',
 					array(
-						'label'               => __( 'Test Event Scraper', 'datamachine-events' ),
-						'description'         => __( 'Test universal web scraper compatibility with a target URL', 'datamachine-events' ),
+						'label'               => __( 'Test Event Scraper', 'data-machine-events' ),
+						'description'         => __( 'Test universal web scraper compatibility with a target URL', 'data-machine-events' ),
 						'category'            => 'datamachine',
 						'input_schema'        => array(
 							'type'       => 'object',

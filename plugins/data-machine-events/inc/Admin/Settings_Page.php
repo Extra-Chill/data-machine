@@ -19,9 +19,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Settings_Page {
 
-	const OPTION_KEY = 'datamachine_events_settings';
+	const OPTION_KEY = 'data_machine_events_settings';
 
-	const PAGE_SLUG = 'datamachine-events-settings';
+	const PAGE_SLUG = 'data-machine-events-settings';
 
 	private $defaults = array(
 		'include_in_archives'  => false,
@@ -34,12 +34,12 @@ class Settings_Page {
 
 	public function __construct() {
 		add_action( 'admin_init', array( $this, 'init_settings' ) );
-		add_filter( 'datamachine_events_post_type_menu_items', array( $this, 'add_settings_menu_item' ) );
+		add_filter( 'data_machine_events_post_type_menu_items', array( $this, 'add_settings_menu_item' ) );
 
 		add_action( 'pre_get_posts', array( $this, 'control_archive_queries' ) );
 
 		// Register filter for theme integration
-		add_filter( 'datamachine_events_main_page_url', array( $this, 'provide_main_events_url' ) );
+		add_filter( 'data_machine_events_main_page_url', array( $this, 'provide_main_events_url' ) );
 	}
 
 	public function add_settings_menu_item( $allowed_items ) {
@@ -54,8 +54,8 @@ class Settings_Page {
 	public function add_settings_submenu() {
 		add_submenu_page(
 			'edit.php?post_type=' . Event_Post_Type::POST_TYPE,
-			__( 'Event Settings', 'datamachine-events' ),
-			__( 'Settings', 'datamachine-events' ),
+			__( 'Event Settings', 'data-machine-events' ),
+			__( 'Settings', 'data-machine-events' ),
 			'manage_options',
 			self::PAGE_SLUG,
 			array( $this, 'render_settings_page' )
@@ -64,7 +64,7 @@ class Settings_Page {
 
 	public function init_settings() {
 		register_setting(
-			'datamachine_events_settings_group',
+			'data_machine_events_settings_group',
 			self::OPTION_KEY,
 			array(
 				'sanitize_callback' => array( $this, 'sanitize_settings' ),
@@ -75,14 +75,14 @@ class Settings_Page {
 
 	public function render_settings_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'datamachine-events' ) );
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'data-machine-events' ) );
 		}
 
-		$template_path = DATAMACHINE_EVENTS_PLUGIN_DIR . 'templates/admin/settings-page.php';
+		$template_path = DATA_MACHINE_EVENTS_PLUGIN_DIR . 'templates/admin/settings-page.php';
 
 		if ( ! file_exists( $template_path ) ) {
 			echo '<div class="notice notice-error"><p>';
-			echo esc_html( sprintf( __( 'Settings template not found: %s', 'datamachine-events' ), $template_path ) );
+			echo esc_html( sprintf( __( 'Settings template not found: %s', 'data-machine-events' ), $template_path ) );
 			echo '</p></div>';
 			return;
 		}

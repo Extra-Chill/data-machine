@@ -17,7 +17,7 @@ export async function fetchCalendarEvents(
 	archiveContext: Partial< ArchiveContext > = {}
 ): Promise< CalendarResponse > {
 	const content = calendar.querySelector< HTMLElement >(
-		'.datamachine-events-content'
+		'.data-machine-events-content'
 	);
 
 	if ( ! content ) {
@@ -58,7 +58,7 @@ export async function fetchCalendarEvents(
 	} catch ( error ) {
 		console.error( 'Error fetching filtered events:', error );
 		content.innerHTML =
-			'<div class="datamachine-events-error"><p>Error loading events. Please try again.</p></div>';
+			'<div class="data-machine-events-error"><p>Error loading events. Please try again.</p></div>';
 		return {
 			success: false,
 			html: '',
@@ -142,7 +142,7 @@ function updatePagination(
 	pagination: { html: string } | null
 ): void {
 	const paginationContainer = calendar.querySelector(
-		'.datamachine-events-pagination'
+		'.data-machine-events-pagination'
 	);
 
 	if ( pagination?.html ) {
@@ -150,7 +150,7 @@ function updatePagination(
 			paginationContainer.outerHTML = pagination.html;
 		} else {
 			const content = calendar.querySelector(
-				'.datamachine-events-content'
+				'.data-machine-events-content'
 			);
 			content?.insertAdjacentHTML( 'afterend', pagination.html );
 		}
@@ -165,7 +165,7 @@ function updateCounter(
 	counter: string | null
 ): void {
 	const counterContainer = calendar.querySelector(
-		'.datamachine-events-results-counter'
+		'.data-machine-events-results-counter'
 	);
 
 	if ( counterContainer && counter ) {
@@ -181,7 +181,7 @@ function updateNavigation(
 	navigation: { html: string } | null
 ): void {
 	const navigationContainer = calendar.querySelector(
-		'.datamachine-events-past-navigation'
+		'.data-machine-events-past-navigation'
 	);
 
 	if ( navigationContainer && navigation?.html ) {

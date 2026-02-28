@@ -40,16 +40,16 @@ class GeocodeVenuesCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Geocode all venues missing coordinates
-	 *     wp datamachine-events geocode-venues
+	 *     wp data-machine-events geocode-venues
 	 *
 	 *     # Geocode a specific venue
-	 *     wp datamachine-events geocode-venues --venue-id=3597
+	 *     wp data-machine-events geocode-venues --venue-id=3597
 	 *
 	 *     # Dry run to see what would be processed
-	 *     wp datamachine-events geocode-venues --dry-run
+	 *     wp data-machine-events geocode-venues --dry-run
 	 *
 	 *     # Force re-geocode all venues
-	 *     wp datamachine-events geocode-venues --force --limit=10
+	 *     wp data-machine-events geocode-venues --force --limit=10
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Associative arguments.

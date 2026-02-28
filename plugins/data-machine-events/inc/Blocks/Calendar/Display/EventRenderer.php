@@ -76,7 +76,7 @@ class EventRenderer {
 			);
 			?>
 
-			<div class="datamachine-events-wrapper">
+			<div class="data-machine-events-wrapper">
 				<?php
 				$event_index = 0;
 				foreach ( $events_for_date as $event_item ) {
@@ -106,7 +106,7 @@ class EventRenderer {
 					++$event_index;
 				}
 				?>
-			</div><!-- .datamachine-events-wrapper -->
+			</div><!-- .data-machine-events-wrapper -->
 			<?php
 			echo '</div><!-- .datamachine-date-group -->';
 		}
@@ -138,7 +138,7 @@ class EventRenderer {
 			'display_vars'    => $display_vars,
 			'display_context' => $display_context,
 			'badges_html'     => Taxonomy_Badges::render_taxonomy_badges( $event_post->ID ),
-			'button_classes'  => implode( ' ', apply_filters( 'datamachine_events_more_info_button_classes', array( 'datamachine-more-info-button' ) ) ),
+			'button_classes'  => implode( ' ', apply_filters( 'data_machine_events_more_info_button_classes', array( 'datamachine-more-info-button' ) ) ),
 		);
 
 		$item_classes = array( 'datamachine-event-item', 'datamachine-event-placeholder' );

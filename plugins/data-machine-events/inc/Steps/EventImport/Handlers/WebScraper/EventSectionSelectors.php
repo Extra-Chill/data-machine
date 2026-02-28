@@ -174,6 +174,6 @@ final class EventSectionSelectors {
 		 *
 		 * @param array<int, array{xpath: string, enable_table_row_date_filter: bool}> $rules
 		 */
-		return apply_filters( 'datamachine_events_universal_web_scraper_selector_rules', $rules );
+		return apply_filters( 'data_machine_events_universal_web_scraper_selector_rules', $rules );
 	}
 }

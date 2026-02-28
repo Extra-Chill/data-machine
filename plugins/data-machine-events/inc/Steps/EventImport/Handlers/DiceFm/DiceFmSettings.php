@@ -30,9 +30,9 @@ class DiceFmSettings {
 		$handler_fields = array(
 			'city' => array(
 				'type'        => 'text',
-				'label'       => __( 'City', 'datamachine-events' ),
-				'description' => __( 'City name to search for events (required). This is the primary filter for Dice.fm API.', 'datamachine-events' ),
-				'placeholder' => __( 'Charleston', 'datamachine-events' ),
+				'label'       => __( 'City', 'data-machine-events' ),
+				'description' => __( 'City name to search for events (required). This is the primary filter for Dice.fm API.', 'data-machine-events' ),
+				'placeholder' => __( 'Charleston', 'data-machine-events' ),
 				'required'    => true,
 			),
 		);
@@ -40,16 +40,16 @@ class DiceFmSettings {
 		$filter_fields = array(
 			'search'           => array(
 				'type'        => 'text',
-				'label'       => __( 'Include Keywords', 'datamachine-events' ),
-				'description' => __( 'Only import events containing any of these keywords (comma-separated). Leave empty to import all.', 'datamachine-events' ),
-				'placeholder' => __( 'concert, live music, band', 'datamachine-events' ),
+				'label'       => __( 'Include Keywords', 'data-machine-events' ),
+				'description' => __( 'Only import events containing any of these keywords (comma-separated). Leave empty to import all.', 'data-machine-events' ),
+				'placeholder' => __( 'concert, live music, band', 'data-machine-events' ),
 				'required'    => false,
 			),
 			'exclude_keywords' => array(
 				'type'        => 'text',
-				'label'       => __( 'Exclude Keywords', 'datamachine-events' ),
-				'description' => __( 'Skip events containing any of these keywords (comma-separated).', 'datamachine-events' ),
-				'placeholder' => __( 'trivia, karaoke, brunch, bingo', 'datamachine-events' ),
+				'label'       => __( 'Exclude Keywords', 'data-machine-events' ),
+				'description' => __( 'Skip events containing any of these keywords (comma-separated).', 'data-machine-events' ),
+				'placeholder' => __( 'trivia, karaoke, brunch, bingo', 'data-machine-events' ),
 				'required'    => false,
 			),
 		);

@@ -23,16 +23,16 @@ class Venues {
 		if ( empty( $term_id ) ) {
 			return new \WP_Error(
 				'missing_term_id',
-				__( 'Venue ID is required', 'datamachine-events' ),
+				__( 'Venue ID is required', 'data-machine-events' ),
 				array( 'status' => 400 )
 			);
 		}
 
-		$ability = wp_get_ability( 'datamachine-events/get-venue' );
+		$ability = wp_get_ability( 'data-machine-events/get-venue' );
 		if ( ! $ability ) {
 			return new \WP_Error(
 				'ability_not_found',
-				__( 'Ability not available', 'datamachine-events' ),
+				__( 'Ability not available', 'data-machine-events' ),
 				array( 'status' => 500 )
 			);
 		}
@@ -68,16 +68,16 @@ class Venues {
 		if ( empty( $venue_name ) ) {
 			return new \WP_Error(
 				'missing_venue_name',
-				__( 'Venue name is required', 'datamachine-events' ),
+				__( 'Venue name is required', 'data-machine-events' ),
 				array( 'status' => 400 )
 			);
 		}
 
-		$ability = wp_get_ability( 'datamachine-events/check-duplicate-venue' );
+		$ability = wp_get_ability( 'data-machine-events/check-duplicate-venue' );
 		if ( ! $ability ) {
 			return new \WP_Error(
 				'ability_not_found',
-				__( 'Ability not available', 'datamachine-events' ),
+				__( 'Ability not available', 'data-machine-events' ),
 				array( 'status' => 500 )
 			);
 		}

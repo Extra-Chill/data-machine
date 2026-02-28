@@ -3,7 +3,7 @@
 WP-CLI command for testing the Universal Web Scraper handler with any target URL. Supports web pages, ICS feeds, and JSON APIs.
 
 ```bash
-wp datamachine-events test-event-scraper --target_url=<url>
+wp data-machine-events test-event-scraper --target_url=<url>
 ```
 
 ## Parameters
@@ -16,17 +16,17 @@ wp datamachine-events test-event-scraper --target_url=<url>
 
 ### Web Page Scraping
 ```bash
-wp datamachine-events test-event-scraper --target_url=https://example.com/events
+wp data-machine-events test-event-scraper --target_url=https://example.com/events
 ```
 
 ### ICS Calendar Feeds
 ```bash
-wp datamachine-events test-event-scraper --target_url=https://tockify.com/api/feeds/ics/calendar-name
+wp data-machine-events test-event-scraper --target_url=https://tockify.com/api/feeds/ics/calendar-name
 ```
 
 ### Google Calendar Export
 ```bash
-wp datamachine-events test-event-scraper --target_url=webcal://calendar.google.com/calendar/ical/...
+wp data-machine-events test-event-scraper --target_url=webcal://calendar.google.com/calendar/ical/...
 ```
 
 ## Output
@@ -86,13 +86,13 @@ The Universal Web Scraper now directly supports ICS/iCal feed URLs, replacing th
 The legacy **ICS Calendar** handler is deprecated. Migrate existing flows using:
 
 ```bash
-wp datamachine-events migrate-handlers --handler=ics_calendar --dry-run
+wp data-machine-events migrate-handlers --handler=ics_calendar --dry-run
 ```
 
 To perform the migration:
 
 ```bash
-wp datamachine-events migrate-handlers --handler=ics_calendar
+wp data-machine-events migrate-handlers --handler=ics_calendar
 ```
 
 The migration tool automatically:

@@ -20,12 +20,12 @@ interface EditProps {
 	setAttributes: ( attrs: Partial< CalendarBlockAttributes > ) => void;
 }
 
-registerBlockType( 'datamachine-events/calendar', {
+registerBlockType( 'data-machine-events/calendar', {
 	edit: function Edit( { attributes, setAttributes }: EditProps ) {
 		const { defaultView, showSearch } = attributes;
 
 		const blockProps = useBlockProps( {
-			className: 'datamachine-events-calendar-editor',
+			className: 'data-machine-events-calendar-editor',
 		} );
 
 		return (
@@ -34,27 +34,27 @@ registerBlockType( 'datamachine-events/calendar', {
 					<PanelBody
 						title={ __(
 							'Display Settings',
-							'datamachine-events'
+							'data-machine-events'
 						) }
 					>
 						<SelectControl
 							label={ __(
 								'Default View',
-								'datamachine-events'
+								'data-machine-events'
 							) }
 							value={ defaultView }
 							options={ [
 								{
 									label: __(
 										'List View',
-										'datamachine-events'
+										'data-machine-events'
 									),
 									value: 'list',
 								},
 								{
 									label: __(
 										'Grid View',
-										'datamachine-events'
+										'data-machine-events'
 									),
 									value: 'grid',
 								},
@@ -67,7 +67,7 @@ registerBlockType( 'datamachine-events/calendar', {
 						<ToggleControl
 							label={ __(
 								'Show Search Box',
-								'datamachine-events'
+								'data-machine-events'
 							) }
 							checked={ showSearch }
 							onChange={ ( value ) =>
@@ -78,34 +78,34 @@ registerBlockType( 'datamachine-events/calendar', {
 				</InspectorControls>
 
 				<div { ...blockProps }>
-					<div className="datamachine-events-calendar-placeholder">
-						<div className="datamachine-events-calendar-icon">
+					<div className="data-machine-events-calendar-placeholder">
+						<div className="data-machine-events-calendar-icon">
 							{ '\uD83D\uDCC5' }
 						</div>
 						<h3>
 							{ __(
 								'Data Machine Events Calendar',
-								'datamachine-events'
+								'data-machine-events'
 							) }
 						</h3>
 						<p>
 							{ __(
 								'Displaying upcoming events in',
-								'datamachine-events'
+								'data-machine-events'
 							) }{ ' ' }
 							{ defaultView }{ ' ' }
 							{ __(
 								'view with chronological pagination',
-								'datamachine-events'
+								'data-machine-events'
 							) }
 						</p>
 						{ showSearch && (
-							<div className="datamachine-events-calendar-filters-preview">
+							<div className="data-machine-events-calendar-filters-preview">
 								<p>
 									<strong>
 										{ __(
 											'Search enabled for filtering events',
-											'datamachine-events'
+											'data-machine-events'
 										) }
 									</strong>
 								</p>

@@ -23,7 +23,7 @@ class EventQueryAbilitiesTest extends WP_UnitTestCase {
 		parent::setUp();
 
 		// Ensure post type and taxonomies are registered
-		if ( ! post_type_exists( 'datamachine_events' ) ) {
+		if ( ! post_type_exists( 'data_machine_events' ) ) {
 			Event_Post_Type::register();
 		}
 		if ( ! taxonomy_exists( 'venue' ) ) {
@@ -87,7 +87,7 @@ class EventQueryAbilitiesTest extends WP_UnitTestCase {
 			$post_id = wp_insert_post(
 				array(
 					'post_title'  => "Event $i " . uniqid(),
-					'post_type'   => 'datamachine_events',
+					'post_type'   => 'data_machine_events',
 					'post_status' => 'publish',
 				)
 			);
@@ -116,7 +116,7 @@ class EventQueryAbilitiesTest extends WP_UnitTestCase {
 		$published_id = wp_insert_post(
 			array(
 				'post_title'  => 'Published Event ' . uniqid(),
-				'post_type'   => 'datamachine_events',
+				'post_type'   => 'data_machine_events',
 				'post_status' => 'publish',
 			)
 		);
@@ -126,7 +126,7 @@ class EventQueryAbilitiesTest extends WP_UnitTestCase {
 		$draft_id = wp_insert_post(
 			array(
 				'post_title'  => 'Draft Event ' . uniqid(),
-				'post_type'   => 'datamachine_events',
+				'post_type'   => 'data_machine_events',
 				'post_status' => 'draft',
 			)
 		);

@@ -157,7 +157,7 @@ class DateGrouper {
 		// Allow reordering events within each day group.
 		foreach ( $date_groups as $date_key => &$date_group ) {
 			$date_group['events'] = apply_filters(
-				'datamachine_events_day_group_events',
+				'data_machine_events_day_group_events',
 				$date_group['events'],
 				$date_key,
 				array(

@@ -76,7 +76,7 @@
 					setIsLoading( false );
 				} )
 				.catch( function() {
-					setError( __( 'Failed to load address suggestions', 'datamachine-events' ) );
+					setError( __( 'Failed to load address suggestions', 'data-machine-events' ) );
 					setSuggestions( [] );
 					setIsLoading( false );
 				} );
@@ -237,7 +237,7 @@
 					createElement(
 						'div',
 						{ className: 'venue-autocomplete-error' },
-						__( 'No addresses found. Try a different search.', 'datamachine-events' )
+						__( 'No addresses found. Try a different search.', 'data-machine-events' )
 					)
 				),
 				error && createElement(
@@ -253,7 +253,7 @@
 			createElement(
 				'p',
 				{ className: 'address-autocomplete-attribution' },
-				__( 'Address data', 'datamachine-events' ) + ' ',
+				__( 'Address data', 'data-machine-events' ) + ' ',
 				createElement(
 					'a',
 					{
@@ -278,7 +278,7 @@
 
 	addFilter(
 		'datamachine.handlerSettings.fieldComponent',
-		'datamachine-events/address-autocomplete',
+		'data-machine-events/address-autocomplete',
 		function( component, fieldType, fieldKey, handlerSlug ) {
 			if ( fieldType === 'address-autocomplete' ) {
 				return AddressAutocompleteField;

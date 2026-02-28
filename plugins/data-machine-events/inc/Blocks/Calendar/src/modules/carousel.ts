@@ -17,7 +17,7 @@ export function initCarousel( calendar: HTMLElement ): void {
 
 	groups.forEach( function ( group ) {
 		const wrapper = group.querySelector< HTMLElement >(
-			'.datamachine-events-wrapper'
+			'.data-machine-events-wrapper'
 		);
 		if ( ! wrapper ) {
 			return;

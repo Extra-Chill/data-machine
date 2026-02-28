@@ -656,7 +656,7 @@ class EventUpsert extends UpdateHandler {
 		$blocks = parse_blocks( $post->post_content );
 
 		foreach ( $blocks as $block ) {
-			if ( 'datamachine-events/event-details' === $block['blockName'] ) {
+			if ( 'data-machine-events/event-details' === $block['blockName'] ) {
 				return $block['attrs'] ?? array();
 			}
 		}
@@ -1068,11 +1068,11 @@ class EventUpsert extends UpdateHandler {
 
 		$inner_blocks = $this->generate_description_blocks( $description );
 
-		return '<!-- wp:datamachine-events/event-details ' . $block_json . ' -->' . "\n" .
-				'<div class="wp-block-datamachine-events-event-details">' .
+		return '<!-- wp:data-machine-events/event-details ' . $block_json . ' -->' . "\n" .
+				'<div class="wp-block-data-machine-events-event-details">' .
 				( $inner_blocks ? "\n" . $inner_blocks . "\n" : '' ) .
 				'</div>' . "\n" .
-				'<!-- /wp:datamachine-events/event-details -->';
+				'<!-- /wp:data-machine-events/event-details -->';
 	}
 
 	/**
@@ -1294,7 +1294,7 @@ class EventUpsert extends UpdateHandler {
 		return array(
 			'success'   => true,
 			'data'      => $data,
-			'tool_name' => 'datamachine_events',
+			'tool_name' => 'data_machine_events',
 		);
 	}
 

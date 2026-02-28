@@ -1,14 +1,14 @@
 {
     "$schema": "https://schemas.wp.org/trunk/block.json",
     "apiVersion": 3,
-    "name": "datamachine-events/events-map",
+    "name": "data-machine-events/events-map",
     "version": "0.2.0",
     "title": "Events Map",
-    "category": "datamachine-events",
+    "category": "data-machine-events",
     "icon": "location-alt",
     "description": "Display an interactive map of event venues. Fetches venues dynamically via REST API.",
     "keywords": ["events", "map", "venues", "leaflet", "location"],
-    "textdomain": "datamachine-events",
+    "textdomain": "data-machine-events",
     "attributes": {
         "height": {
             "type": "number",

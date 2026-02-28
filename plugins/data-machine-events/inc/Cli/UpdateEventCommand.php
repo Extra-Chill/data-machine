@@ -26,7 +26,7 @@ class UpdateEventCommand {
 		$event_ids_raw = $args[0] ?? '';
 
 		if ( empty( $event_ids_raw ) ) {
-			\WP_CLI::error( 'Missing required event ID(s). Usage: wp datamachine-events update-event <event_ids> [--startTime=<time>]' );
+			\WP_CLI::error( 'Missing required event ID(s). Usage: wp data-machine-events update-event <event_ids> [--startTime=<time>]' );
 		}
 
 		$event_ids = $this->parseEventIds( $event_ids_raw );

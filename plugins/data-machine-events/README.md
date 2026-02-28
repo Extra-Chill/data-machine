@@ -83,7 +83,7 @@ cd inc/Blocks/Calendar && npm ci && npm run build
 cd ../EventDetails && npm ci && npm run build
 
 # Package for distribution
-./build.sh  # Creates /dist/datamachine-events.zip
+./build.sh  # Creates /dist/data-machine-events.zip
 ```
 
 ## Documentation

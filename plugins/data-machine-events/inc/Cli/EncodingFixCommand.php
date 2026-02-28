@@ -6,9 +6,9 @@
  * repair of events with escaped unicode sequences in block attributes.
  *
  * Usage examples:
- *   wp datamachine-events fix-encoding --dry-run
- *   wp datamachine-events fix-encoding --execute
- *   wp datamachine-events fix-encoding --scope=all --execute
+ *   wp data-machine-events fix-encoding --dry-run
+ *   wp data-machine-events fix-encoding --execute
+ *   wp data-machine-events fix-encoding --scope=all --execute
  *
  * @package DataMachineEvents\Cli
  * @since 0.10.10
@@ -52,16 +52,16 @@ class EncodingFixCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Preview encoding fixes for upcoming events
-	 *     $ wp datamachine-events fix-encoding --dry-run
+	 *     $ wp data-machine-events fix-encoding --dry-run
 	 *
 	 *     # Apply fixes to first 10 events
-	 *     $ wp datamachine-events fix-encoding --execute --limit=10
+	 *     $ wp data-machine-events fix-encoding --execute --limit=10
 	 *
 	 *     # Check all events (past and future)
-	 *     $ wp datamachine-events fix-encoding --scope=all --dry-run
+	 *     $ wp data-machine-events fix-encoding --scope=all --dry-run
 	 *
 	 *     # Get JSON output for scripting
-	 *     $ wp datamachine-events fix-encoding --scope=upcoming --format=json
+	 *     $ wp data-machine-events fix-encoding --scope=upcoming --format=json
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Associative arguments.

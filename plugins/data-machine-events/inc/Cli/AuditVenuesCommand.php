@@ -31,13 +31,13 @@ class AuditVenuesCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Quick summary
-	 *     wp datamachine-events audit-venues
+	 *     wp data-machine-events audit-venues
 	 *
 	 *     # Detailed table with venue lists
-	 *     wp datamachine-events audit-venues --format=table
+	 *     wp data-machine-events audit-venues --format=table
 	 *
 	 *     # JSON output for automation
-	 *     wp datamachine-events audit-venues --format=json
+	 *     wp data-machine-events audit-venues --format=json
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Associative arguments.

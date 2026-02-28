@@ -178,7 +178,7 @@
      */
     function showLoadingState() {
         const indicator = document.createElement('div');
-        indicator.className = 'datamachine-events-loading';
+        indicator.className = 'data-machine-events-loading';
         indicator.innerHTML = '<span class="spinner is-active"></span> Loading venue data...';
         indicator.style.cssText = 'padding: 10px; background: #f0f0f1; border-left: 4px solid #72aee6; margin: 10px 0;';
 

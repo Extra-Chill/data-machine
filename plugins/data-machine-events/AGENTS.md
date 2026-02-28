@@ -50,7 +50,7 @@ Carousel List display with day grouping, time-gap separators, pagination, filter
 
 **Template Helpers:** `Template_Loader`, `Taxonomy_Helper`, and `Taxonomy_Badges` sanitize variables, build taxonomy hierarchies, and render badges with filters for wrapper/classes and button styles.
 
-**JavaScript Modules:** `src/frontend.js` initializes `.datamachine-events-calendar` instances and orchestrates:
+**JavaScript Modules:** `src/frontend.js` initializes `.data-machine-events-calendar` instances and orchestrates:
 - `modules/api-client.js` — REST communication
 - `modules/carousel.js` — Carousel controls
 - `modules/date-picker.js` — Flatpickr integration
@@ -68,8 +68,8 @@ Provides 15+ attributes (dates, venue, pricing, performer/organizer metadata, st
 ## Project Structure
 
 ```
-datamachine-events/
-├── datamachine-events.php           # Bootstraps constants, loads meta storage, registers REST routes
+data-machine-events/
+├── data-machine-events.php           # Bootstraps constants, loads meta storage, registers REST routes
 ├── inc/
 │   ├── Admin/                       # Settings page, admin bar, capability checks
 │   ├── Api/                         # Routes + controllers (Calendar, Venues, Filters, Geocoding)

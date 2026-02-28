@@ -35,10 +35,10 @@ class FilterAbilities {
 	private function registerAbilities(): void {
 		$register_callback = function () {
 			wp_register_ability(
-				'datamachine-events/get-filter-options',
+				'data-machine-events/get-filter-options',
 				array(
-					'label'               => __( 'Get Filter Options', 'datamachine-events' ),
-					'description'         => __( 'Get available taxonomy filter options with event counts, supporting geo-filtering, cross-filtering, and archive context', 'datamachine-events' ),
+					'label'               => __( 'Get Filter Options', 'data-machine-events' ),
+					'description'         => __( 'Get available taxonomy filter options with event counts, supporting geo-filtering, cross-filtering, and archive context', 'data-machine-events' ),
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',

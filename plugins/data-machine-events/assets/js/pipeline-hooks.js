@@ -85,7 +85,7 @@
 	 */
 	addFilter(
 		'datamachine.handlerSettings.init',
-		'datamachine-events/venue-enrichment',
+		'data-machine-events/venue-enrichment',
 		async function( settingsPromise, handlerSlug, fieldsSchema ) {
 			const settings = await settingsPromise;
 
@@ -115,7 +115,7 @@
 	 */
 	addFilter(
 		'datamachine.handlerSettings.fieldChange',
-		'datamachine-events/venue-change',
+		'data-machine-events/venue-change',
 		async function( changesPromise, fieldKey, value, handlerSlug, currentData ) {
 			const changes = await changesPromise;
 

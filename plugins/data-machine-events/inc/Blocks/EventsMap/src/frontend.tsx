@@ -202,16 +202,16 @@ function LocationSearch( {
 	);
 
 	return (
-		<div className="datamachine-events-map-location-search">
+		<div className="data-machine-events-map-location-search">
 			<form
-				className="datamachine-events-map-location-form"
+				className="data-machine-events-map-location-form"
 				onSubmit={ handleSubmit }
 				role="search"
 				aria-label="Change location"
 			>
 				<input
 					type="text"
-					className="datamachine-events-map-location-input"
+					className="data-machine-events-map-location-input"
 					placeholder={ placeholder }
 					aria-label="City or address"
 					autoComplete="off"
@@ -221,7 +221,7 @@ function LocationSearch( {
 				/>
 				<button
 					type="submit"
-					className="datamachine-events-map-location-btn"
+					className="data-machine-events-map-location-btn"
 					aria-label="Search location"
 					disabled={ loading || ! query.trim() }
 				>
@@ -229,7 +229,7 @@ function LocationSearch( {
 				</button>
 			</form>
 			{ error && (
-				<span className="datamachine-events-map-location-error">
+				<span className="data-machine-events-map-location-error">
 					{ error }
 				</span>
 			) }
@@ -492,7 +492,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 			<div
 				id={ containerId }
 				ref={ containerRef }
-				className="datamachine-events-map"
+				className="data-machine-events-map"
 				style={ { height: `${ height }px` } }
 				aria-label="Events map"
 				role="application"
@@ -539,7 +539,7 @@ function parseMapProps( container: HTMLElement ): MapProps {
 
 function initEventsMap(): void {
 	const containers = document.querySelectorAll<HTMLElement>(
-		'.datamachine-events-map-root',
+		'.data-machine-events-map-root',
 	);
 
 	containers.forEach( ( container ) => {
@@ -560,6 +560,6 @@ if ( document.readyState === 'loading' ) {
 }
 
 // Re-initialize for dynamically injected content.
-document.addEventListener( 'datamachine-events-loaded', () => {
+document.addEventListener( 'data-machine-events-loaded', () => {
 	initEventsMap();
 } );

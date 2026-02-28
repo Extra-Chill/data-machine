@@ -25,9 +25,9 @@ class EventFlyerSettings {
 		$event_fields = array(
 			'title' => array(
 				'type'        => 'text',
-				'label'       => __( 'Event Title', 'datamachine-events' ),
-				'description' => __( 'Leave blank for AI to extract from flyer.', 'datamachine-events' ),
-				'placeholder' => __( 'AI extracts from flyer', 'datamachine-events' ),
+				'label'       => __( 'Event Title', 'data-machine-events' ),
+				'description' => __( 'Leave blank for AI to extract from flyer.', 'data-machine-events' ),
+				'placeholder' => __( 'AI extracts from flyer', 'data-machine-events' ),
 			),
 		);
 
@@ -36,39 +36,39 @@ class EventFlyerSettings {
 		$time_fields = array(
 			'startDate' => array(
 				'type'        => 'text',
-				'label'       => __( 'Start Date', 'datamachine-events' ),
-				'description' => __( 'YYYY-MM-DD format. Leave blank for AI to extract from flyer.', 'datamachine-events' ),
-				'placeholder' => __( 'AI extracts from flyer', 'datamachine-events' ),
+				'label'       => __( 'Start Date', 'data-machine-events' ),
+				'description' => __( 'YYYY-MM-DD format. Leave blank for AI to extract from flyer.', 'data-machine-events' ),
+				'placeholder' => __( 'AI extracts from flyer', 'data-machine-events' ),
 			),
 			'startTime' => array(
 				'type'        => 'text',
-				'label'       => __( 'Start Time', 'datamachine-events' ),
-				'description' => __( 'HH:MM format. Leave blank for AI to extract from flyer.', 'datamachine-events' ),
-				'placeholder' => __( 'AI extracts from flyer', 'datamachine-events' ),
+				'label'       => __( 'Start Time', 'data-machine-events' ),
+				'description' => __( 'HH:MM format. Leave blank for AI to extract from flyer.', 'data-machine-events' ),
+				'placeholder' => __( 'AI extracts from flyer', 'data-machine-events' ),
 			),
 			'endTime'   => array(
 				'type'        => 'text',
-				'label'       => __( 'End Time', 'datamachine-events' ),
-				'description' => __( 'HH:MM format. Leave blank for AI to extract from flyer.', 'datamachine-events' ),
-				'placeholder' => __( 'AI extracts from flyer', 'datamachine-events' ),
+				'label'       => __( 'End Time', 'data-machine-events' ),
+				'description' => __( 'HH:MM format. Leave blank for AI to extract from flyer.', 'data-machine-events' ),
+				'placeholder' => __( 'AI extracts from flyer', 'data-machine-events' ),
 			),
 			'price'     => array(
 				'type'        => 'text',
-				'label'       => __( 'Price', 'datamachine-events' ),
-				'description' => __( 'Leave blank for AI to extract from flyer.', 'datamachine-events' ),
-				'placeholder' => __( 'AI extracts from flyer', 'datamachine-events' ),
+				'label'       => __( 'Price', 'data-machine-events' ),
+				'description' => __( 'Leave blank for AI to extract from flyer.', 'data-machine-events' ),
+				'placeholder' => __( 'AI extracts from flyer', 'data-machine-events' ),
 			),
 			'ticketUrl' => array(
 				'type'        => 'text',
-				'label'       => __( 'Ticket URL', 'datamachine-events' ),
-				'description' => __( 'Leave blank for AI to extract from flyer.', 'datamachine-events' ),
-				'placeholder' => __( 'AI extracts from flyer', 'datamachine-events' ),
+				'label'       => __( 'Ticket URL', 'data-machine-events' ),
+				'description' => __( 'Leave blank for AI to extract from flyer.', 'data-machine-events' ),
+				'placeholder' => __( 'AI extracts from flyer', 'data-machine-events' ),
 			),
 			'performer' => array(
 				'type'        => 'text',
-				'label'       => __( 'Performer(s)', 'datamachine-events' ),
-				'description' => __( 'Supporting acts or additional performers. Leave blank for AI to extract from flyer.', 'datamachine-events' ),
-				'placeholder' => __( 'AI extracts from flyer', 'datamachine-events' ),
+				'label'       => __( 'Performer(s)', 'data-machine-events' ),
+				'description' => __( 'Supporting acts or additional performers. Leave blank for AI to extract from flyer.', 'data-machine-events' ),
+				'placeholder' => __( 'AI extracts from flyer', 'data-machine-events' ),
 			),
 		);
 

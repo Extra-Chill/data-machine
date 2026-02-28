@@ -131,7 +131,7 @@ $venue_id = VenueService::get_or_create_venue($normalized_data);
 ### Custom Meta Fields
 ```php
 // Add custom venue meta field
-add_action('datamachine_events_venue_meta_fields', function($fields) {
+add_action('data_machine_events_venue_meta_fields', function($fields) {
     $fields['custom_field'] = [
         'label' => 'Custom Field',
         'type' => 'text',
@@ -144,7 +144,7 @@ add_action('datamachine_events_venue_meta_fields', function($fields) {
 ### Map Customization
 ```php
 // Custom map tile layer
-add_filter('datamachine_events_map_tile_layers', function($layers) {
+add_filter('data_machine_events_map_tile_layers', function($layers) {
     $layers['custom_layer'] = [
         'name' => 'Custom Tiles',
         'url' => 'https://example.com/tiles/{z}/{x}/{y}.png',

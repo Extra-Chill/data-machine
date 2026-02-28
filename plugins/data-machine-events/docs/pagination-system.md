@@ -107,13 +107,13 @@ fetch('/wp-json/datamachine/v1/events/calendar?' + new URLSearchParams({
 .then(response => response.json())
 .then(data => {
     // Update calendar content
-    document.querySelector('.datamachine-events-content').innerHTML = data.html;
+    document.querySelector('.data-machine-events-content').innerHTML = data.html;
     
     // Update pagination
-    document.querySelector('.datamachine-events-pagination').outerHTML = data.pagination.html;
+    document.querySelector('.data-machine-events-pagination').outerHTML = data.pagination.html;
     
     // Update results counter
-    document.querySelector('.datamachine-events-results-counter').outerHTML = data.counter;
+    document.querySelector('.data-machine-events-results-counter').outerHTML = data.counter;
 });
 ```
 
@@ -142,7 +142,7 @@ fetch('/wp-json/datamachine/v1/events/calendar?' + new URLSearchParams({
 ### Pagination Filters
 ```php
 // Customize pagination arguments
-add_filter('datamachine_events_pagination_args', function($args, $current_page, $max_pages, $show_past) {
+add_filter('data_machine_events_pagination_args', function($args, $current_page, $max_pages, $show_past) {
     // Custom prev/next text
     $args['prev_text'] = '← Previous 5 Days';
     $args['next_text'] = 'Next 5 Days →';
@@ -151,7 +151,7 @@ add_filter('datamachine_events_pagination_args', function($args, $current_page, 
 }, 10, 4);
 
 // Customize pagination wrapper classes
-add_filter('datamachine_events_pagination_wrapper_classes', function($classes, $current_page, $max_pages, $show_past) {
+add_filter('data_machine_events_pagination_wrapper_classes', function($classes, $current_page, $max_pages, $show_past) {
     $classes[] = 'custom-pagination-class';
     return $classes;
 }, 10, 4);
@@ -160,7 +160,7 @@ add_filter('datamachine_events_pagination_wrapper_classes', function($classes, $
 ### Query Customization
 ```php
 // Modify calendar query arguments
-add_filter('datamachine_events_calendar_query_args', function($args, $params) {
+add_filter('data_machine_events_calendar_query_args', function($args, $params) {
     // Add custom meta query conditions
     return $args;
 }, 10, 2);
@@ -181,7 +181,7 @@ add_filter('datamachine_events_calendar_query_args', function($args, $params) {
 
 ### ARIA Support
 ```html
-<nav class="datamachine-events-pagination" aria-label="Events pagination">
+<nav class="data-machine-events-pagination" aria-label="Events pagination">
     <ul class="page-numbers">
         <li><a class="prev page-numbers" href="?paged=1">« Previous</a></li>
         <li><span aria-current="page" class="page-numbers current">2</span></li>

@@ -1,0 +1,581 @@
+<?php
+/**
+ * Plugin Name: Data Machine Events
+ * Plugin URI: https://chubes.net
+ * Description: WordPress events plugin with block-first architecture. Features AI-driven event creation via Data Machine integration, Event Details blocks for data storage, Calendar blocks for display, and venue taxonomy management.
+ * Version: 0.13.1
+ * Author: Chris Huber
+ * Author URI: https://chubes.net
+ * License: GPL v2 or later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain: data-machine-events
+ * Domain Path: /languages
+ * Requires at least: 6.9
+ * Tested up to: 6.9
+ * Requires PHP: 8.2
+ * Requires Plugins: data-machine
+ * Network: false
+ *
+ * @package DataMachineEvents
+ * @author Chris Huber
+ * @since 0.1.0
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+if ( file_exists( __DIR__ . '/vendor/autoload.php' ) ) {
+	require_once __DIR__ . '/vendor/autoload.php';
+}
+define( 'DATA_MACHINE_EVENTS_VERSION', '0.13.1' );
+define( 'DATA_MACHINE_EVENTS_PLUGIN_FILE', __FILE__ );
+define( 'DATA_MACHINE_EVENTS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'DATA_MACHINE_EVENTS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+define( 'DATA_MACHINE_EVENTS_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
+define( 'DATA_MACHINE_EVENTS_PATH', plugin_dir_path( __FILE__ ) );
+
+if ( ! function_exists( 'data_machine_events_sanitize_query_params' ) ) {
+	/**
+	 * Recursively sanitize query parameters while preserving nested structure
+	 *
+	 * @param mixed $value
+	 * @return mixed
+	 */
+	function data_machine_events_sanitize_query_params( $value ) {
+		if ( is_array( $value ) ) {
+			return array_map( 'data_machine_events_sanitize_query_params', $value );
+		}
+
+		return is_scalar( $value ) ? sanitize_text_field( $value ) : $value;
+	}
+}
+
+// Load core meta storage (monitors Event Details block saves)
+require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/meta-storage.php';
+
+	// Load REST API routes (modular)
+if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php' ) ) {
+	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php';
+}
+
+	// WP-CLI commands (optional)
+if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/UniversalWebScraperTestCommand.php' ) ) {
+	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/UniversalWebScraperTestCommand.php';
+	\WP_CLI::add_command( 'data-machine-events test-event-scraper', \DataMachineEvents\Cli\UniversalWebScraperTestCommand::class );
+}
+
+if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/SettingsCommand.php' ) ) {
+	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/SettingsCommand.php';
+	\WP_CLI::add_command( 'data-machine-events settings', \DataMachineEvents\Cli\SettingsCommand::class );
+}
+
+if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/GetVenueEventsCommand.php' ) ) {
+	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/GetVenueEventsCommand.php';
+	\WP_CLI::add_command( 'data-machine-events get-venue-events', \DataMachineEvents\Cli\GetVenueEventsCommand::class );
+}
+
+// check subcommands (replaces health-check monolith)
+if ( defined( 'WP_CLI' ) && WP_CLI ) {
+	\WP_CLI::add_command( 'data-machine-events check times', \DataMachineEvents\Cli\Check\CheckTimesCommand::class );
+	\WP_CLI::add_command( 'data-machine-events check venues', \DataMachineEvents\Cli\Check\CheckVenuesCommand::class );
+	\WP_CLI::add_command( 'data-machine-events check encoding', \DataMachineEvents\Cli\Check\CheckEncodingCommand::class );
+	\WP_CLI::add_command( 'data-machine-events check meta-sync', \DataMachineEvents\Cli\Check\CheckMetaSyncCommand::class );
+	\WP_CLI::add_command( 'data-machine-events check duration', \DataMachineEvents\Cli\Check\CheckDurationCommand::class );
+	\WP_CLI::add_command( 'data-machine-events check duplicates', \DataMachineEvents\Cli\Check\CheckDuplicatesCommand::class );
+	\WP_CLI::add_command( 'data-machine-events check all', \DataMachineEvents\Cli\Check\CheckAllCommand::class );
+}
+
+if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/UpdateEventCommand.php' ) ) {
+	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/UpdateEventCommand.php';
+	\WP_CLI::add_command( 'data-machine-events update-event', \DataMachineEvents\Cli\UpdateEventCommand::class );
+}
+
+if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/BatchTimeFixCommand.php' ) ) {
+	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/BatchTimeFixCommand.php';
+	\WP_CLI::add_command( 'data-machine-events batch-time-fix', \DataMachineEvents\Cli\BatchTimeFixCommand::class );
+}
+
+if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/EncodingFixCommand.php' ) ) {
+	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/EncodingFixCommand.php';
+	\WP_CLI::add_command( 'data-machine-events fix-encoding', \DataMachineEvents\Cli\EncodingFixCommand::class );
+}
+
+if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/TicketUrlResyncCommand.php' ) ) {
+	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/TicketUrlResyncCommand.php';
+	\WP_CLI::add_command( 'data-machine-events resync-ticket-urls', \DataMachineEvents\Cli\TicketUrlResyncCommand::class );
+}
+
+if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/ResyncMetaCommand.php' ) ) {
+	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/ResyncMetaCommand.php';
+	\WP_CLI::add_command( 'data-machine-events resync-meta', \DataMachineEvents\Cli\ResyncMetaCommand::class );
+}
+
+if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/TicketmasterTestCommand.php' ) ) {
+	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/TicketmasterTestCommand.php';
+	\WP_CLI::add_command( 'data-machine-events test-ticketmaster', \DataMachineEvents\Cli\TicketmasterTestCommand::class );
+}
+
+if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/DiceFmTestCommand.php' ) ) {
+	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/DiceFmTestCommand.php';
+	\WP_CLI::add_command( 'data-machine-events test-dice-fm', \DataMachineEvents\Cli\DiceFmTestCommand::class );
+}
+
+if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/GeocodeVenuesCommand.php' ) ) {
+	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/GeocodeVenuesCommand.php';
+	\WP_CLI::add_command( 'data-machine-events geocode-venues', \DataMachineEvents\Cli\GeocodeVenuesCommand::class );
+}
+
+if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/AuditVenuesCommand.php' ) ) {
+	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/AuditVenuesCommand.php';
+	\WP_CLI::add_command( 'data-machine-events audit-venues', \DataMachineEvents\Cli\AuditVenuesCommand::class );
+}
+
+/**
+ * Main Data Machine Events plugin class
+ *
+ * Handles plugin initialization, component loading, and hook registration.
+ *
+ * @since 0.1.0
+ */
+class DATAMACHINE_Events {
+
+	private static $instance = null;
+
+	public static function get_instance() {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+		return self::$instance;
+	}
+
+	private function __construct() {
+		add_action( 'init', array( $this, 'init' ), 0 );
+		add_action( 'plugins_loaded', array( $this, 'load_textdomain' ) );
+	}
+
+	public function init() {
+		$this->init_hooks();
+		$this->register_post_types();
+		add_action( 'init', array( $this, 'register_taxonomies' ), 20 );
+		add_action( 'init', array( $this, 'register_blocks' ), 15 );
+
+		add_filter( 'block_categories_all', array( $this, 'register_block_category' ), 10, 2 );
+		add_filter( 'allowed_block_types_all', array( $this, 'filter_allowed_block_types' ), 10, 2 );
+
+		if ( is_admin() ) {
+			$this->init_admin();
+
+			// Instantiate Settings_Page to register its hooks
+			if ( class_exists( 'DataMachineEvents\\Admin\\Settings_Page' ) ) {
+				new \DataMachineEvents\Admin\Settings_Page();
+			}
+		}
+
+		add_action( 'init', array( $this, 'init_data_machine_integration' ), 25 );
+
+		// Initialize admin bar for all logged-in users
+		if ( class_exists( 'DataMachineEvents\\Admin\\Admin_Bar' ) ) {
+			new \DataMachineEvents\Admin\Admin_Bar();
+		}
+	}
+
+	private function init_hooks() {
+		register_activation_hook( DATA_MACHINE_EVENTS_PLUGIN_FILE, array( $this, 'activate' ) );
+		register_deactivation_hook( DATA_MACHINE_EVENTS_PLUGIN_FILE, array( $this, 'deactivate' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
+	}
+
+	private function init_admin() {
+		// Admin components are bootstrapped individually where required.
+	}
+
+	public function init_data_machine_integration() {
+		if ( ! defined( 'DATAMACHINE_VERSION' ) ) {
+			return;
+		}
+
+		$this->load_data_machine_components();
+	}
+
+	private function load_data_machine_components() {
+		// Load step type - self-registers via constructor using StepTypeRegistrationTrait
+		new \DataMachineEvents\Steps\EventImport\EventImportStep();
+
+		// Load EventImportFilters for admin asset enqueuing
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Steps/EventImport/EventImportFilters.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Steps/EventImport/EventImportFilters.php';
+		}
+
+		$this->load_event_import_handlers();
+		$this->load_upsert_handlers();
+
+		// Instantiate EventUpsert handler
+		if ( class_exists( 'DataMachineEvents\\Steps\\Upsert\\Events\\EventUpsert' ) ) {
+			new \DataMachineEvents\Steps\Upsert\Events\EventUpsert();
+		}
+
+		// Load chat tools - self-register via ToolRegistrationTrait
+		new \DataMachineEvents\Api\Chat\Tools\VenueHealthCheck();
+		new \DataMachineEvents\Api\Chat\Tools\UpdateVenue();
+		new \DataMachineEvents\Api\Chat\Tools\EventHealthCheck();
+		new \DataMachineEvents\Api\Chat\Tools\UpdateEvent();
+		new \DataMachineEvents\Api\Chat\Tools\GetVenueEvents();
+		new \DataMachineEvents\Api\Chat\Tools\FindBrokenTimezoneEvents();
+		new \DataMachineEvents\Api\Chat\Tools\FixEventTimezone();
+		new \DataMachineEvents\Api\Chat\Tools\TestEventScraper();
+
+		// Load abilities - self-register ability + tool
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventScraperTest.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventScraperTest.php';
+			new \DataMachineEvents\Abilities\EventScraperTest();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TimezoneAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TimezoneAbilities.php';
+			new \DataMachineEvents\Abilities\TimezoneAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventQueryAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventQueryAbilities.php';
+			new \DataMachineEvents\Abilities\EventQueryAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventHealthAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventHealthAbilities.php';
+			new \DataMachineEvents\Abilities\EventHealthAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventUpdateAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventUpdateAbilities.php';
+			new \DataMachineEvents\Abilities\EventUpdateAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/BatchTimeFixAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/BatchTimeFixAbilities.php';
+			new \DataMachineEvents\Abilities\BatchTimeFixAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EncodingFixAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EncodingFixAbilities.php';
+			new \DataMachineEvents\Abilities\EncodingFixAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/VenueAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/VenueAbilities.php';
+			new \DataMachineEvents\Abilities\VenueAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/VenueMapAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/VenueMapAbilities.php';
+			new \DataMachineEvents\Abilities\VenueMapAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/CalendarAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/CalendarAbilities.php';
+			new \DataMachineEvents\Abilities\CalendarAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TicketUrlResyncAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TicketUrlResyncAbilities.php';
+			new \DataMachineEvents\Abilities\TicketUrlResyncAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/MetaSyncAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/MetaSyncAbilities.php';
+			new \DataMachineEvents\Abilities\MetaSyncAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TicketmasterTest.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TicketmasterTest.php';
+			new \DataMachineEvents\Abilities\TicketmasterTest();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/DiceFmTest.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/DiceFmTest.php';
+			new \DataMachineEvents\Abilities\DiceFmTest();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/GeocodingAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/GeocodingAbilities.php';
+			new \DataMachineEvents\Abilities\GeocodingAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/FilterAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/FilterAbilities.php';
+			new \DataMachineEvents\Abilities\FilterAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/SettingsAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/SettingsAbilities.php';
+			new \DataMachineEvents\Abilities\SettingsAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/DuplicateDetectionAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/DuplicateDetectionAbilities.php';
+			new \DataMachineEvents\Abilities\DuplicateDetectionAbilities();
+		}
+
+		$this->registerSystemHealthChecks();
+	}
+
+	/**
+	 * Register event extension health checks with the unified system health check.
+	 *
+	 * @since 0.10.10
+	 */
+	private function registerSystemHealthChecks(): void {
+		add_filter(
+			'datamachine_system_health_checks',
+			function ( $checks ) {
+				$checks['events'] = array(
+					'label'    => __( 'Event Health', 'data-machine-events' ),
+					'callback' => function ( $options ) {
+						$abilities = new \DataMachineEvents\Abilities\EventHealthAbilities();
+						return $abilities->executeHealthCheck( $options );
+					},
+					'default'  => true,
+				);
+
+				$checks['venues'] = array(
+					'label'    => __( 'Venue Health', 'data-machine-events' ),
+					'callback' => function ( $options ) {
+						$abilities = new \DataMachineEvents\Abilities\VenueAbilities();
+						return $abilities->executeHealthCheck( $options );
+					},
+					'default'  => true,
+				);
+
+				$checks['handlers'] = array(
+					'label'    => __( 'Handler Test', 'data-machine-events' ),
+					'callback' => function ( $options ) {
+						$url = $options['url'] ?? '';
+						if ( empty( $url ) ) {
+							return array( 'error' => 'URL required for handler testing' );
+						}
+						$abilities = new \DataMachineEvents\Abilities\EventScraperTest();
+						return $abilities->test( $url );
+					},
+					'default'  => false,
+				);
+
+				return $checks;
+			}
+		);
+	}
+
+	private function load_event_import_handlers() {
+		$handlers = array(
+			'DataMachineEvents\\Steps\\EventImport\\Handlers\\Ticketmaster\\Ticketmaster',
+			'DataMachineEvents\\Steps\\EventImport\\Handlers\\DiceFm\\DiceFm',
+			'DataMachineEvents\\Steps\\EventImport\\Handlers\\WebScraper\\UniversalWebScraper',
+			'DataMachineEvents\\Steps\\EventImport\\Handlers\\EventFlyer\\EventFlyer',
+			'DataMachineEvents\\Steps\\EventImport\\Handlers\\SingleRecurring\\SingleRecurring',
+		);
+
+		foreach ( $handlers as $handler_class ) {
+			if ( class_exists( $handler_class ) ) {
+				new $handler_class();
+			}
+		}
+	}
+
+	private function load_upsert_handlers() {
+		$upsert_handler_path = DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Steps/Upsert/Events/';
+		if ( is_dir( $upsert_handler_path ) ) {
+			// Load Filters
+			foreach ( glob( $upsert_handler_path . '*Filters.php' ) as $file ) {
+				if ( file_exists( $file ) ) {
+					require_once $file;
+				}
+			}
+		}
+	}
+
+	public function load_textdomain() {
+		load_plugin_textdomain(
+			'data-machine-events',
+			false,
+			dirname( DATA_MACHINE_EVENTS_PLUGIN_BASENAME ) . '/languages'
+		);
+	}
+
+
+	/**
+	 * @param string $hook Current admin page hook
+	 */
+	public function enqueue_admin_assets( $hook ) {
+		if ( strpos( $hook, 'data-machine-events' ) === false ) {
+			return;
+		}
+
+		$css_file = DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/css/admin.css';
+
+		if ( file_exists( $css_file ) ) {
+			wp_enqueue_style(
+				'data-machine-events-admin',
+				DATA_MACHINE_EVENTS_PLUGIN_URL . 'assets/css/admin.css',
+				array(),
+				filemtime( $css_file )
+			);
+		}
+	}
+
+	public function activate() {
+		$this->register_post_types();
+		$this->register_taxonomies();
+		flush_rewrite_rules();
+	}
+
+	public function deactivate() {
+		flush_rewrite_rules();
+	}
+
+	public function register_post_types() {
+		\DataMachineEvents\Core\Event_Post_Type::register();
+	}
+
+	public function register_taxonomies() {
+		\DataMachineEvents\Core\Venue_Taxonomy::register();
+		\DataMachineEvents\Core\Promoter_Taxonomy::register();
+	}
+	/**
+	 * @param array|null $allowed_block_types Current allowed block types
+	 * @param WP_Block_Editor_Context $block_editor_context Block editor context
+	 * @return array|null Modified allowed block types
+	 */
+	public function filter_allowed_block_types( $allowed_block_types, $block_editor_context ) {
+		if ( ! isset( $block_editor_context->post ) || ! isset( $block_editor_context->post->post_type ) ) {
+			return $allowed_block_types;
+		}
+
+		if ( ! is_array( $allowed_block_types ) ) {
+			return $allowed_block_types;
+		}
+
+		$allowed_block_types[] = 'data-machine-events/event-details';
+		$allowed_block_types[] = 'data-machine-events/calendar';
+		$allowed_block_types[] = 'data-machine-events/events-map';
+
+		return $allowed_block_types;
+	}
+
+	public function register_blocks() {
+		register_block_type( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/Calendar' );
+		register_block_type( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/EventDetails' );
+		register_block_type( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/EventsMap' );
+
+		// Register Leaflet CDN assets for blocks that still use them (event-details).
+		// The events-map block bundles Leaflet via webpack and no longer needs these handles.
+		wp_register_style( 'leaflet', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css', array(), '1.9.4' );
+		wp_register_script( 'leaflet', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', array(), '1.9.4', true );
+
+		// Initialize calendar cache invalidation hooks
+		\DataMachineEvents\Blocks\Calendar\Cache_Invalidator::init();
+
+		// Enqueue root CSS custom properties when any block is present
+		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_root_styles' ) );
+		add_action( 'enqueue_block_assets', array( $this, 'enqueue_root_styles' ) );
+	}
+
+	public function enqueue_root_styles() {
+		if ( has_block( 'data-machine-events/calendar' ) || has_block( 'data-machine-events/event-details' ) || has_block( 'data-machine-events/events-map' ) || is_singular( \DataMachineEvents\Core\Event_Post_Type::POST_TYPE ) ) {
+			wp_enqueue_style(
+				'data-machine-events-root',
+				DATA_MACHINE_EVENTS_PLUGIN_URL . 'inc/Blocks/root.css',
+				array(),
+				filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/root.css' )
+			);
+
+			wp_enqueue_style( 'dashicons' );
+		}
+
+		// Enqueue Leaflet CDN assets for event-details block (single venue maps).
+		// The events-map block bundles Leaflet via webpack and does not need CDN assets.
+		$needs_leaflet = has_block( 'data-machine-events/event-details' )
+			|| is_singular( \DataMachineEvents\Core\Event_Post_Type::POST_TYPE );
+
+		if ( $needs_leaflet ) {
+			wp_enqueue_style( 'leaflet' );
+		}
+
+		if ( has_block( 'data-machine-events/event-details' ) || is_singular( \DataMachineEvents\Core\Event_Post_Type::POST_TYPE ) ) {
+			// Custom venue map initialization (single venue maps).
+			wp_enqueue_script(
+				'data-machine-events-venue-map',
+				DATA_MACHINE_EVENTS_PLUGIN_URL . 'assets/js/venue-map.js',
+				array( 'leaflet' ),
+				filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/venue-map.js' ),
+				true
+			);
+		}
+	}
+
+	public function register_block_category( $block_categories, $editor_context ) {
+		if ( ! empty( $editor_context->post ) ) {
+			array_unshift(
+				$block_categories,
+				array(
+					'slug'  => 'data-machine-events',
+					'title' => __( 'Data Machine Events', 'data-machine-events' ),
+					'icon'  => 'calendar-alt',
+				)
+			);
+		}
+
+		return $block_categories;
+	}
+}
+
+function data_machine_events() {
+	return DATAMACHINE_Events::get_instance();
+}
+
+data_machine_events();
+
+/**
+ * Generate excerpt from Event Details block for data_machine_events posts
+ *
+ * Extracts paragraph text from the Event Details block's inner blocks
+ * when no manual excerpt is set.
+ *
+ * @param string $excerpt Current excerpt
+ * @param WP_Post $post Post object
+ * @return string Generated excerpt or original
+ */
+add_filter(
+	'get_the_excerpt',
+	function ( $excerpt, $post ) {
+		if ( 'data_machine_events' !== $post->post_type ) {
+			return $excerpt;
+		}
+
+		if ( ! empty( trim( $excerpt ) ) ) {
+			return $excerpt;
+		}
+
+		$blocks = parse_blocks( $post->post_content );
+
+		foreach ( $blocks as $block ) {
+			if ( 'data-machine-events/event-details' !== $block['blockName'] ) {
+				continue;
+			}
+
+			$text_parts = array();
+			foreach ( $block['innerBlocks'] as $inner ) {
+				if ( 'core/paragraph' === $inner['blockName'] && ! empty( $inner['innerHTML'] ) ) {
+					$text_parts[] = wp_strip_all_tags( $inner['innerHTML'] );
+				}
+			}
+
+			if ( ! empty( $text_parts ) ) {
+				$full_text = implode( ' ', $text_parts );
+				return wp_trim_words( $full_text, 55, '...' );
+			}
+		}
+
+		return $excerpt;
+	},
+	10,
+	2
+);

@@ -6,9 +6,9 @@
  * and events at venues without geocoded coordinates.
  *
  * Usage:
- *   wp datamachine-events check venues
- *   wp datamachine-events check venues --scope=all
- *   wp datamachine-events check venues --format=json
+ *   wp data-machine-events check venues
+ *   wp data-machine-events check venues --scope=all
+ *   wp data-machine-events check venues --format=json
  *
  * @package DataMachineEvents\Cli\Check
  * @since   0.14.0
@@ -68,8 +68,8 @@ class CheckVenuesCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine-events check venues
-	 *     wp datamachine-events check venues --scope=all
+	 *     wp data-machine-events check venues
+	 *     wp data-machine-events check venues --scope=all
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Named arguments.
@@ -104,7 +104,7 @@ class CheckVenuesCommand {
 		// Broken timezone: delegate to existing ability if available
 		$broken_timezone = array();
 		$no_venue_count  = 0;
-		$ability         = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine-events/find-broken-timezone-events' ) : null;
+		$ability         = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'data-machine-events/find-broken-timezone-events' ) : null;
 		if ( $ability ) {
 			$result = $ability->execute(
 				array(

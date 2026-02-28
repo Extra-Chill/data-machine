@@ -23,10 +23,10 @@ export function initDatePicker(
 ): FlatpickrInstance | null {
 	const dateRangeInput =
 		calendar.querySelector< HTMLInputElement >(
-			'.datamachine-events-date-range-input'
+			'.data-machine-events-date-range-input'
 		) ||
 		calendar.querySelector< HTMLInputElement >(
-			'[id^="datamachine-events-date-range-"]'
+			'[id^="data-machine-events-date-range-"]'
 		);
 
 	if ( ! dateRangeInput ) {
@@ -34,7 +34,7 @@ export function initDatePicker(
 	}
 
 	const clearBtn = calendar.querySelector< HTMLElement >(
-		'.datamachine-events-date-clear-btn'
+		'.data-machine-events-date-clear-btn'
 	);
 
 	const initialStart = dateRangeInput.getAttribute( 'data-date-start' );

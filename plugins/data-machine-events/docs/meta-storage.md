@@ -31,12 +31,12 @@ Parses Gutenberg blocks to extract datetime information from Event Details block
 
 ## Key Function
 
-### `datamachine_events_sync_datetime_meta(int $post_id, WP_Post $post, bool $update): void`
+### `data_machine_events_sync_datetime_meta(int $post_id, WP_Post $post, bool $update): void`
 
 Syncs event datetime to post meta on save.
 
 **Process:**
-1. Validates post type is `datamachine_events`
+1. Validates post type is `data_machine_events`
 2. Skips autosave operations
 3. Parses blocks to find Event Details blocks
 4. Extracts start/end dates and times from block attributes
@@ -63,7 +63,7 @@ Syncs event datetime to post meta on save.
 // Find events starting today
 $today = date('Y-m-d');
 $args = [
-    'post_type' => 'datamachine_events',
+    'post_type' => 'data_machine_events',
     'meta_query' => [
         [
             'key' => '_datamachine_event_datetime',
@@ -79,7 +79,7 @@ $events = get_posts($args);
 
 ```php
 $args = [
-    'post_type' => 'datamachine_events',
+    'post_type' => 'data_machine_events',
     'meta_key' => '_datamachine_event_datetime',
     'orderby' => 'meta_value',
     'order' => 'ASC'

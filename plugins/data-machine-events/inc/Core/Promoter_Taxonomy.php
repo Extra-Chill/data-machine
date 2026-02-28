@@ -42,15 +42,15 @@ class Promoter_Taxonomy {
 				array(
 					'hierarchical'      => false,
 					'labels'            => array(
-						'name'          => _x( 'Promoters', 'taxonomy general name', 'datamachine-events' ),
-						'singular_name' => _x( 'Promoter', 'taxonomy singular name', 'datamachine-events' ),
-						'search_items'  => __( 'Search Promoters', 'datamachine-events' ),
-						'all_items'     => __( 'All Promoters', 'datamachine-events' ),
-						'edit_item'     => __( 'Edit Promoter', 'datamachine-events' ),
-						'update_item'   => __( 'Update Promoter', 'datamachine-events' ),
-						'add_new_item'  => __( 'Add New Promoter', 'datamachine-events' ),
-						'new_item_name' => __( 'New Promoter Name', 'datamachine-events' ),
-						'menu_name'     => __( 'Promoters', 'datamachine-events' ),
+						'name'          => _x( 'Promoters', 'taxonomy general name', 'data-machine-events' ),
+						'singular_name' => _x( 'Promoter', 'taxonomy singular name', 'data-machine-events' ),
+						'search_items'  => __( 'Search Promoters', 'data-machine-events' ),
+						'all_items'     => __( 'All Promoters', 'data-machine-events' ),
+						'edit_item'     => __( 'Edit Promoter', 'data-machine-events' ),
+						'update_item'   => __( 'Update Promoter', 'data-machine-events' ),
+						'add_new_item'  => __( 'Add New Promoter', 'data-machine-events' ),
+						'new_item_name' => __( 'New Promoter Name', 'data-machine-events' ),
+						'menu_name'     => __( 'Promoters', 'data-machine-events' ),
 					),
 					'show_ui'           => true,
 					'show_in_menu'      => true,
@@ -271,18 +271,18 @@ class Promoter_Taxonomy {
 	public static function add_promoter_form_fields( $taxonomy ) {
 		?>
 		<div class="form-field">
-			<label for="_promoter_url"><?php esc_html_e( 'Website', 'datamachine-events' ); ?></label>
+			<label for="_promoter_url"><?php esc_html_e( 'Website', 'data-machine-events' ); ?></label>
 			<input type="url" name="_promoter_url" id="_promoter_url" value="" class="regular-text" />
-			<p class="description"><?php esc_html_e( 'The promoter website URL.', 'datamachine-events' ); ?></p>
+			<p class="description"><?php esc_html_e( 'The promoter website URL.', 'data-machine-events' ); ?></p>
 		</div>
 		<div class="form-field">
-			<label for="_promoter_type"><?php esc_html_e( 'Type', 'datamachine-events' ); ?></label>
+			<label for="_promoter_type"><?php esc_html_e( 'Type', 'data-machine-events' ); ?></label>
 			<select name="_promoter_type" id="_promoter_type">
 				<?php foreach ( self::$type_options as $value => $label ) : ?>
 					<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
 				<?php endforeach; ?>
 			</select>
-			<p class="description"><?php esc_html_e( 'Organization or Person (for Schema.org).', 'datamachine-events' ); ?></p>
+			<p class="description"><?php esc_html_e( 'Organization or Person (for Schema.org).', 'data-machine-events' ); ?></p>
 		</div>
 		<?php
 	}
@@ -292,21 +292,21 @@ class Promoter_Taxonomy {
 		$type = get_term_meta( $term->term_id, '_promoter_type', true );
 		?>
 		<tr class="form-field">
-			<th scope="row"><label for="_promoter_url"><?php esc_html_e( 'Website', 'datamachine-events' ); ?></label></th>
+			<th scope="row"><label for="_promoter_url"><?php esc_html_e( 'Website', 'data-machine-events' ); ?></label></th>
 			<td>
 				<input type="url" name="_promoter_url" id="_promoter_url" value="<?php echo esc_url( $url ); ?>" class="regular-text" />
-				<p class="description"><?php esc_html_e( 'The promoter website URL.', 'datamachine-events' ); ?></p>
+				<p class="description"><?php esc_html_e( 'The promoter website URL.', 'data-machine-events' ); ?></p>
 			</td>
 		</tr>
 		<tr class="form-field">
-			<th scope="row"><label for="_promoter_type"><?php esc_html_e( 'Type', 'datamachine-events' ); ?></label></th>
+			<th scope="row"><label for="_promoter_type"><?php esc_html_e( 'Type', 'data-machine-events' ); ?></label></th>
 			<td>
 				<select name="_promoter_type" id="_promoter_type">
 					<?php foreach ( self::$type_options as $value => $label ) : ?>
 						<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $type, $value ); ?>><?php echo esc_html( $label ); ?></option>
 					<?php endforeach; ?>
 				</select>
-				<p class="description"><?php esc_html_e( 'Organization or Person (for Schema.org).', 'datamachine-events' ); ?></p>
+				<p class="description"><?php esc_html_e( 'Organization or Person (for Schema.org).', 'data-machine-events' ); ?></p>
 			</td>
 		</tr>
 		<?php

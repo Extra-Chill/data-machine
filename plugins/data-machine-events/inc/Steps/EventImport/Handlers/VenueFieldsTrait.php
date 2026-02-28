@@ -39,7 +39,7 @@ trait VenueFieldsTrait {
 			}
 		);
 
-		$venue_options = array( '' => __( '-- Create New Venue --', 'datamachine-events' ) );
+		$venue_options = array( '' => __( '-- Create New Venue --', 'data-machine-events' ) );
 		foreach ( $all_venues as $venue ) {
 			$venue_options[ $venue['term_id'] ] = $venue['name'];
 		}
@@ -47,72 +47,72 @@ trait VenueFieldsTrait {
 		return array(
 			'venue'          => array(
 				'type'        => 'select',
-				'label'       => __( 'Venue', 'datamachine-events' ),
-				'description' => __( 'Select an existing venue or choose "Create New Venue" to add a new one.', 'datamachine-events' ),
+				'label'       => __( 'Venue', 'data-machine-events' ),
+				'description' => __( 'Select an existing venue or choose "Create New Venue" to add a new one.', 'data-machine-events' ),
 				'options'     => $venue_options,
 				'required'    => false,
 			),
 			'venue_name'     => array(
 				'type'        => 'text',
-				'label'       => __( 'Venue Name', 'datamachine-events' ),
-				'description' => __( 'Required when creating a new venue.', 'datamachine-events' ),
-				'placeholder' => __( 'The Royal American', 'datamachine-events' ),
+				'label'       => __( 'Venue Name', 'data-machine-events' ),
+				'description' => __( 'Required when creating a new venue.', 'data-machine-events' ),
+				'placeholder' => __( 'The Royal American', 'data-machine-events' ),
 				'required'    => false,
 			),
 			'venue_address'  => array(
 				'type'        => 'address-autocomplete',
-				'label'       => __( 'Venue Address', 'datamachine-events' ),
-				'description' => __( 'Start typing to search. Auto-fills city, state, zip, country.', 'datamachine-events' ),
-				'placeholder' => __( '970 Morrison Drive', 'datamachine-events' ),
+				'label'       => __( 'Venue Address', 'data-machine-events' ),
+				'description' => __( 'Start typing to search. Auto-fills city, state, zip, country.', 'data-machine-events' ),
+				'placeholder' => __( '970 Morrison Drive', 'data-machine-events' ),
 				'required'    => false,
 			),
 			'venue_city'     => array(
 				'type'        => 'text',
-				'label'       => __( 'City', 'datamachine-events' ),
-				'description' => __( 'Auto-filled from address selection.', 'datamachine-events' ),
-				'placeholder' => __( 'Charleston', 'datamachine-events' ),
+				'label'       => __( 'City', 'data-machine-events' ),
+				'description' => __( 'Auto-filled from address selection.', 'data-machine-events' ),
+				'placeholder' => __( 'Charleston', 'data-machine-events' ),
 				'required'    => false,
 			),
 			'venue_state'    => array(
 				'type'        => 'text',
-				'label'       => __( 'State', 'datamachine-events' ),
-				'description' => __( 'Auto-filled from address selection.', 'datamachine-events' ),
-				'placeholder' => __( 'South Carolina', 'datamachine-events' ),
+				'label'       => __( 'State', 'data-machine-events' ),
+				'description' => __( 'Auto-filled from address selection.', 'data-machine-events' ),
+				'placeholder' => __( 'South Carolina', 'data-machine-events' ),
 				'required'    => false,
 			),
 			'venue_zip'      => array(
 				'type'        => 'text',
-				'label'       => __( 'ZIP Code', 'datamachine-events' ),
-				'description' => __( 'Auto-filled from address selection.', 'datamachine-events' ),
-				'placeholder' => __( '29403', 'datamachine-events' ),
+				'label'       => __( 'ZIP Code', 'data-machine-events' ),
+				'description' => __( 'Auto-filled from address selection.', 'data-machine-events' ),
+				'placeholder' => __( '29403', 'data-machine-events' ),
 				'required'    => false,
 			),
 			'venue_country'  => array(
 				'type'        => 'text',
-				'label'       => __( 'Country', 'datamachine-events' ),
-				'description' => __( 'Auto-filled from address selection. Two-letter country code.', 'datamachine-events' ),
-				'placeholder' => __( 'US', 'datamachine-events' ),
+				'label'       => __( 'Country', 'data-machine-events' ),
+				'description' => __( 'Auto-filled from address selection. Two-letter country code.', 'data-machine-events' ),
+				'placeholder' => __( 'US', 'data-machine-events' ),
 				'required'    => false,
 			),
 			'venue_phone'    => array(
 				'type'        => 'text',
-				'label'       => __( 'Phone', 'datamachine-events' ),
-				'description' => __( 'Venue phone number.', 'datamachine-events' ),
-				'placeholder' => __( '(843) 817-6925', 'datamachine-events' ),
+				'label'       => __( 'Phone', 'data-machine-events' ),
+				'description' => __( 'Venue phone number.', 'data-machine-events' ),
+				'placeholder' => __( '(843) 817-6925', 'data-machine-events' ),
 				'required'    => false,
 			),
 			'venue_website'  => array(
 				'type'        => 'url',
-				'label'       => __( 'Website', 'datamachine-events' ),
-				'description' => __( 'Venue website URL.', 'datamachine-events' ),
-				'placeholder' => __( 'https://www.theroyalamerican.com', 'datamachine-events' ),
+				'label'       => __( 'Website', 'data-machine-events' ),
+				'description' => __( 'Venue website URL.', 'data-machine-events' ),
+				'placeholder' => __( 'https://www.theroyalamerican.com', 'data-machine-events' ),
 				'required'    => false,
 			),
 			'venue_capacity' => array(
 				'type'        => 'number',
-				'label'       => __( 'Capacity', 'datamachine-events' ),
-				'description' => __( 'Maximum venue capacity.', 'datamachine-events' ),
-				'placeholder' => __( '500', 'datamachine-events' ),
+				'label'       => __( 'Capacity', 'data-machine-events' ),
+				'description' => __( 'Maximum venue capacity.', 'data-machine-events' ),
+				'placeholder' => __( '500', 'data-machine-events' ),
 				'required'    => false,
 			),
 		);

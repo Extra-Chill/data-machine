@@ -37,7 +37,7 @@ Data Machine Events exposes a focused REST surface under the `datamachine/v1` na
   - `context` (string): Defaults to `modal`.
   - `date_start` / `date_end` (string)
   - `past` (string)
-- **Behavior**: Sanitizes keys/values, computes term counts for the current calendar context, respects `datamachine_events_excluded_taxonomies`, and responds with structured metadata used by the Calendar block modal.
+- **Behavior**: Sanitizes keys/values, computes term counts for the current calendar context, respects `data_machine_events_excluded_taxonomies`, and responds with structured metadata used by the Calendar block modal.
 
 ### GET `/wp-json/datamachine/v1/events/venues/{id}`
 - **Purpose**: Returns venue description plus nine meta fields for admin editors and pipeline components.

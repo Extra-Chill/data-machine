@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class EventUpdateAbilities {
 
-	private const BLOCK_NAME = 'datamachine-events/event-details';
+	private const BLOCK_NAME = 'data-machine-events/event-details';
 
 	private const UPDATABLE_FIELDS = array(
 		'startDate',
@@ -58,10 +58,10 @@ class EventUpdateAbilities {
 	private function registerAbility(): void {
 		$register_callback = function () {
 			wp_register_ability(
-				'datamachine-events/update-event',
+				'data-machine-events/update-event',
 				array(
-					'label'               => __( 'Update Event', 'datamachine-events' ),
-					'description'         => __( 'Update event details including dates, times, venue, and metadata', 'datamachine-events' ),
+					'label'               => __( 'Update Event', 'data-machine-events' ),
+					'description'         => __( 'Update event details including dates, times, venue, and metadata', 'data-machine-events' ),
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -537,13 +537,13 @@ class EventUpdateAbilities {
 	private function updateBlockInnerBlocks( array &$block, array $inner_blocks ): void {
 		$block['innerBlocks'] = $inner_blocks;
 
-		$inner_content = array( '<div class="wp-block-datamachine-events-event-details">' );
+		$inner_content = array( '<div class="wp-block-data-machine-events-event-details">' );
 		foreach ( $inner_blocks as $_ ) {
 			$inner_content[] = null;
 		}
 		$inner_content[] = '</div>';
 
 		$block['innerContent'] = $inner_content;
-		$block['innerHTML']    = '<div class="wp-block-datamachine-events-event-details"></div>';
+		$block['innerHTML']    = '<div class="wp-block-data-machine-events-event-details"></div>';
 	}
 }

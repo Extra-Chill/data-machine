@@ -40,8 +40,8 @@ class BlockRegistrationTest extends WP_UnitTestCase {
 		$this->assertTrue( current_user_can( 'read' ), 'Current user should be initialized' );
 
 		$block_registry = \WP_Block_Type_Registry::get_instance();
-		$calendar_block = $block_registry->get_registered( 'datamachine-events/calendar' );
-		$event_details_block = $block_registry->get_registered( 'datamachine-events/event-details' );
+		$calendar_block = $block_registry->get_registered( 'data-machine-events/calendar' );
+		$event_details_block = $block_registry->get_registered( 'data-machine-events/event-details' );
 
 		$this->assertNotNull( $calendar_block, 'Calendar block should be registered' );
 		$this->assertNotNull( $event_details_block, 'Event Details block should be registered' );
@@ -49,7 +49,7 @@ class BlockRegistrationTest extends WP_UnitTestCase {
 
 	public function test_calendar_block_has_required_metadata() {
 		$block_registry = \WP_Block_Type_Registry::get_instance();
-		$block = $block_registry->get_registered( 'datamachine-events/calendar' );
+		$block = $block_registry->get_registered( 'data-machine-events/calendar' );
 
 		$this->assertNotNull( $block, 'Calendar block should be registered' );
 		$this->assertEquals( 'widgets', $block->category, 'Block should be in widgets category' );
@@ -57,7 +57,7 @@ class BlockRegistrationTest extends WP_UnitTestCase {
 
 	public function test_event_details_block_has_required_metadata() {
 		$block_registry = \WP_Block_Type_Registry::get_instance();
-		$block = $block_registry->get_registered( 'datamachine-events/event-details' );
+		$block = $block_registry->get_registered( 'data-machine-events/event-details' );
 
 		$this->assertNotNull( $block, 'Event Details block should be registered' );
 		$this->assertEquals( 'widgets', $block->category, 'Block should be in widgets category' );

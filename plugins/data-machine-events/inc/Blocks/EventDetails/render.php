@@ -63,7 +63,7 @@ if ( $end_date ) {
 $upcoming_occurrences = array();
 if ( ! empty( $occurrence_dates ) && is_array( $occurrence_dates ) ) {
 	$current_date = current_time( 'Y-m-d' );
-	$max_display  = apply_filters( 'datamachine_events_max_occurrence_display', 5 );
+	$max_display  = apply_filters( 'data_machine_events_max_occurrence_display', 5 );
 
 	// Filter to future dates only and limit count.
 	$upcoming_occurrences = array_slice(
@@ -85,7 +85,7 @@ if ( ! empty( $attributes['align'] ) ) {
 }
 $block_class = implode( ' ', $block_classes );
 
-$non_ticket_patterns = apply_filters( 'datamachine_events_non_ticket_price_patterns', array( 'free', 'tbd', 'no cover' ) );
+$non_ticket_patterns = apply_filters( 'data_machine_events_non_ticket_price_patterns', array( 'free', 'tbd', 'no cover' ) );
 $price_lower         = strtolower( trim( $price ) );
 $is_non_ticket_price = empty( $price ) || array_reduce(
 	$non_ticket_patterns,
@@ -95,8 +95,8 @@ $is_non_ticket_price = empty( $price ) || array_reduce(
 	false
 );
 $ticket_button_text  = $is_non_ticket_price
-	? __( 'Event Link', 'datamachine-events' )
-	: __( 'Get Tickets', 'datamachine-events' );
+	? __( 'Event Link', 'data-machine-events' )
+	: __( 'Get Tickets', 'data-machine-events' );
 
 
 $event_schema     = null;
@@ -133,14 +133,14 @@ $event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_
 				</span>
 				<?php if ( ! empty( $upcoming_occurrences ) ) : ?>
 					<div class="occurrence-dates">
-						<small><?php esc_html_e( 'Also showing:', 'datamachine-events' ); ?></small>
+						<small><?php esc_html_e( 'Also showing:', 'data-machine-events' ); ?></small>
 						<ul>
 							<?php foreach ( $upcoming_occurrences as $occ_date ) : ?>
 								<li><?php echo esc_html( date_i18n( get_option( 'date_format' ), strtotime( $occ_date ) ) ); ?></li>
 							<?php endforeach; ?>
 						</ul>
 						<?php if ( $has_more_occurrences ) : ?>
-							<small class="more-dates"><?php esc_html_e( '+ more dates', 'datamachine-events' ); ?></small>
+							<small class="more-dates"><?php esc_html_e( '+ more dates', 'data-machine-events' ); ?></small>
 						<?php endif; ?>
 					</div>
 				<?php endif; ?>
@@ -156,10 +156,10 @@ $event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_
 						<br><small><?php echo esc_html( $address ); ?></small>
 					<?php endif; ?>
 					<?php if ( $venue_data && ! empty( $venue_data['phone'] ) ) : ?>
-						<br><small><?php printf( __( 'Phone: %s', 'datamachine-events' ), esc_html( $venue_data['phone'] ) ); ?></small>
+						<br><small><?php printf( __( 'Phone: %s', 'data-machine-events' ), esc_html( $venue_data['phone'] ) ); ?></small>
 					<?php endif; ?>
 					<?php if ( $venue_data && ! empty( $venue_data['website'] ) ) : ?>
-						<br><small><a href="<?php echo esc_url( $venue_data['website'] ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Venue Website', 'datamachine-events' ); ?></a></small>
+						<br><small><a href="<?php echo esc_url( $venue_data['website'] ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Venue Website', 'data-machine-events' ); ?></a></small>
 					<?php endif; ?>
 				</span>
 			</div>
@@ -180,14 +180,14 @@ $event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_
 			 * @param int    $post_id Current event post ID.
 			 * @param string $price   Event price string (may be empty).
 			 */
-			do_action( 'datamachine_events_after_price_display', $post_id, $price );
+			do_action( 'data_machine_events_after_price_display', $post_id, $price );
 			?>
 		</div>
 	</div>
 
 	<div class="event-action-buttons">
 		<?php if ( $ticket_url ) : ?>
-			<a href="<?php echo esc_url( $ticket_url ); ?>" class="<?php echo esc_attr( implode( ' ', apply_filters( 'datamachine_events_ticket_button_classes', array( 'ticket-button' ) ) ) ); ?>" target="_blank" rel="noopener">
+			<a href="<?php echo esc_url( $ticket_url ); ?>" class="<?php echo esc_attr( implode( ' ', apply_filters( 'data_machine_events_ticket_button_classes', array( 'ticket-button' ) ) ) ); ?>" target="_blank" rel="noopener">
 				<?php echo esc_html( $ticket_button_text ); ?>
 			</a>
 		<?php endif; ?>
@@ -201,7 +201,7 @@ $event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_
 		 * @param int $post_id Current event post ID
 		 * @param string $ticket_url Ticket URL if available (empty string if not)
 		 */
-		do_action( 'datamachine_events_action_buttons', $post_id, $ticket_url );
+		do_action( 'data_machine_events_action_buttons', $post_id, $ticket_url );
 		?>
 	</div>
 
@@ -222,7 +222,7 @@ $event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_
 				}
 				?>
 				<div class="datamachine-venue-map-section">
-					<h3 class="venue-map-title"><?php echo esc_html__( 'Venue Location', 'datamachine-events' ); ?></h3>
+					<h3 class="venue-map-title"><?php echo esc_html__( 'Venue Location', 'data-machine-events' ); ?></h3>
 					<div
 						id="venue-map-<?php echo esc_attr( $post_id ); ?>"
 						class="datamachine-venue-map"
@@ -236,7 +236,7 @@ $event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_
 						<small>
 							<?php
 							printf(
-								esc_html__( 'Map data © %s contributors', 'datamachine-events' ),
+								esc_html__( 'Map data © %s contributors', 'data-machine-events' ),
 								'<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
 							);
 							?>

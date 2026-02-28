@@ -50,11 +50,11 @@ class Admin_Bar {
 
 		$wp_admin_bar->add_menu(
 			array(
-				'id'    => 'datamachine-events',
-				'title' => __( 'View Events', 'datamachine-events' ),
+				'id'    => 'data-machine-events',
+				'title' => __( 'View Events', 'data-machine-events' ),
 				'href'  => $events_url,
 				'meta'  => array(
-					'title'  => __( 'View Events Calendar', 'datamachine-events' ),
+					'title'  => __( 'View Events Calendar', 'data-machine-events' ),
 					'target' => '_blank',
 				),
 			)

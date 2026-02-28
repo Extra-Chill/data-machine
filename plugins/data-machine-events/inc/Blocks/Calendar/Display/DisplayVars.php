@@ -53,13 +53,13 @@ class DisplayVars {
 				if ( $is_continuation ) {
 					$formatted_time_display = sprintf(
 						/* translators: 1: start date, 2: end date. Example: "Feb 27 – Mar 1" */
-						__( '%1$s – %2$s', 'datamachine-events' ),
+						__( '%1$s – %2$s', 'data-machine-events' ),
 						$start_datetime_obj->format( 'M j' ),
 						$end_datetime_obj->format( 'M j' )
 					);
 				} else {
 					$multi_day_label = sprintf(
-						__( 'through %s', 'datamachine-events' ),
+						__( 'through %s', 'data-machine-events' ),
 						$end_datetime_obj->format( 'M j' )
 					);
 					$formatted_time_display = self::format_time_range( $start_datetime_obj, $end_date, $end_time, $event_tz );

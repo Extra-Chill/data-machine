@@ -174,8 +174,8 @@ function datamachine_unwrap_affiliate_url( string $url ): string {
  * @param WP_Post $post    Post object.
  * @param bool    $update  Whether this is an update.
  */
-function datamachine_events_sync_datetime_meta( $post_id, $post, $update ) {
-	// Only for datamachine_events post type.
+function data_machine_events_sync_datetime_meta( $post_id, $post, $update ) {
+	// Only for data_machine_events post type.
 	if ( Event_Post_Type::POST_TYPE !== $post->post_type ) {
 		return;
 	}
@@ -189,7 +189,7 @@ function datamachine_events_sync_datetime_meta( $post_id, $post, $update ) {
 	$blocks = parse_blocks( $post->post_content );
 
 	foreach ( $blocks as $block ) {
-		if ( 'datamachine-events/event-details' === $block['blockName'] ) {
+		if ( 'data-machine-events/event-details' === $block['blockName'] ) {
 			$start_date = $block['attrs']['startDate'] ?? '';
 			$start_time = $block['attrs']['startTime'] ?? '00:00:00';
 			$end_date   = $block['attrs']['endDate'] ?? '';
@@ -240,4 +240,4 @@ function datamachine_events_sync_datetime_meta( $post_id, $post, $update ) {
 		}
 	}
 }
-add_action( 'save_post', __NAMESPACE__ . '\\datamachine_events_sync_datetime_meta', 10, 3 );
+add_action( 'save_post', __NAMESPACE__ . '\\data_machine_events_sync_datetime_meta', 10, 3 );

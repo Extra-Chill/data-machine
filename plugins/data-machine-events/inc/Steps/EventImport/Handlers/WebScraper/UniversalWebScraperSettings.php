@@ -30,23 +30,23 @@ class UniversalWebScraperSettings {
 		$handler_fields = array(
 			'source_url'       => array(
 				'type'        => 'url',
-				'label'       => __( 'Scraper Source URL', 'datamachine-events' ),
-				'description' => __( 'The specific webpage the AI should analyze to extract events.', 'datamachine-events' ),
+				'label'       => __( 'Scraper Source URL', 'data-machine-events' ),
+				'description' => __( 'The specific webpage the AI should analyze to extract events.', 'data-machine-events' ),
 				'placeholder' => 'https://venue.com/events',
 				'required'    => true,
 			),
 			'search'           => array(
 				'type'        => 'text',
-				'label'       => __( 'Include Keywords', 'datamachine-events' ),
-				'description' => __( 'Only import events containing any of these keywords (comma-separated). Leave empty to import all.', 'datamachine-events' ),
-				'placeholder' => __( 'concert, live music, band', 'datamachine-events' ),
+				'label'       => __( 'Include Keywords', 'data-machine-events' ),
+				'description' => __( 'Only import events containing any of these keywords (comma-separated). Leave empty to import all.', 'data-machine-events' ),
+				'placeholder' => __( 'concert, live music, band', 'data-machine-events' ),
 				'required'    => false,
 			),
 			'exclude_keywords' => array(
 				'type'        => 'text',
-				'label'       => __( 'Exclude Keywords', 'datamachine-events' ),
-				'description' => __( 'Skip events containing any of these keywords (comma-separated).', 'datamachine-events' ),
-				'placeholder' => __( 'trivia, karaoke, brunch, bingo', 'datamachine-events' ),
+				'label'       => __( 'Exclude Keywords', 'data-machine-events' ),
+				'description' => __( 'Skip events containing any of these keywords (comma-separated).', 'data-machine-events' ),
+				'placeholder' => __( 'trivia, karaoke, brunch, bingo', 'data-machine-events' ),
 				'required'    => false,
 			),
 		);

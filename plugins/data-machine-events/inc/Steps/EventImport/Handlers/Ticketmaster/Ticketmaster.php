@@ -40,8 +40,8 @@ class Ticketmaster extends EventImportHandler {
 			'ticketmaster',
 			'event_import',
 			self::class,
-			__( 'Ticketmaster Events', 'datamachine-events' ),
-			__( 'Import events from Ticketmaster Discovery API with venue data', 'datamachine-events' ),
+			__( 'Ticketmaster Events', 'data-machine-events' ),
+			__( 'Import events from Ticketmaster Discovery API with venue data', 'data-machine-events' ),
 			true,
 			TicketmasterAuth::class,
 			TicketmasterSettings::class,
@@ -269,7 +269,7 @@ class Ticketmaster extends EventImportHandler {
 	 * Get event type classifications with 24-hour caching
 	 */
 	public static function get_classifications( $api_key = '' ) {
-		$cache_key              = 'datamachine_events_ticketmaster_classifications';
+		$cache_key              = 'data_machine_events_ticketmaster_classifications';
 		$cached_classifications = get_transient( $cache_key );
 
 		if ( false !== $cached_classifications ) {
@@ -344,11 +344,11 @@ class Ticketmaster extends EventImportHandler {
 
 	private static function get_fallback_classifications() {
 		return array(
-			'music'        => __( 'Music', 'datamachine-events' ),
-			'sports'       => __( 'Sports', 'datamachine-events' ),
-			'arts-theatre' => __( 'Arts & Theatre', 'datamachine-events' ),
-			'film'         => __( 'Film', 'datamachine-events' ),
-			'family'       => __( 'Family', 'datamachine-events' ),
+			'music'        => __( 'Music', 'data-machine-events' ),
+			'sports'       => __( 'Sports', 'data-machine-events' ),
+			'arts-theatre' => __( 'Arts & Theatre', 'data-machine-events' ),
+			'film'         => __( 'Film', 'data-machine-events' ),
+			'family'       => __( 'Family', 'data-machine-events' ),
 		);
 	}
 

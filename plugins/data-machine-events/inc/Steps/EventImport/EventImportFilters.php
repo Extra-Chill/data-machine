@@ -36,25 +36,25 @@ add_action(
 
 		// Enqueue venue autocomplete JavaScript
 		wp_enqueue_script(
-			'datamachine-events-venue-autocomplete',
-			DATAMACHINE_EVENTS_PLUGIN_URL . 'assets/js/venue-autocomplete.js',
+			'data-machine-events-venue-autocomplete',
+			DATA_MACHINE_EVENTS_PLUGIN_URL . 'assets/js/venue-autocomplete.js',
 			array( 'jquery' ),
-			filemtime( DATAMACHINE_EVENTS_PLUGIN_DIR . 'assets/js/venue-autocomplete.js' ),
+			filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/venue-autocomplete.js' ),
 			true
 		);
 
 		// Enqueue venue selector JavaScript
 		wp_enqueue_script(
-			'datamachine-events-venue-selector',
-			DATAMACHINE_EVENTS_PLUGIN_URL . 'assets/js/venue-selector.js',
-			array( 'jquery', 'datamachine-events-venue-autocomplete' ),
-			filemtime( DATAMACHINE_EVENTS_PLUGIN_DIR . 'assets/js/venue-selector.js' ),
+			'data-machine-events-venue-selector',
+			DATA_MACHINE_EVENTS_PLUGIN_URL . 'assets/js/venue-selector.js',
+			array( 'jquery', 'data-machine-events-venue-autocomplete' ),
+			filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/venue-selector.js' ),
 			true
 		);
 
 		// Localize script with REST API configuration
 		wp_localize_script(
-			'datamachine-events-venue-selector',
+			'data-machine-events-venue-selector',
 			'dmEventsVenue',
 			array(
 				'restUrl' => rest_url( API_NAMESPACE ),
@@ -64,27 +64,27 @@ add_action(
 
 		// Enqueue CSS
 		wp_enqueue_style(
-			'datamachine-events-venue-autocomplete',
-			DATAMACHINE_EVENTS_PLUGIN_URL . 'assets/css/venue-autocomplete.css',
+			'data-machine-events-venue-autocomplete',
+			DATA_MACHINE_EVENTS_PLUGIN_URL . 'assets/css/venue-autocomplete.css',
 			array(),
-			filemtime( DATAMACHINE_EVENTS_PLUGIN_DIR . 'assets/css/venue-autocomplete.css' )
+			filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/css/venue-autocomplete.css' )
 		);
 
 		// Enqueue pipeline hooks JavaScript (extends core React via @wordpress/hooks)
 		wp_enqueue_script(
-			'datamachine-events-pipeline-hooks',
-			DATAMACHINE_EVENTS_PLUGIN_URL . 'assets/js/pipeline-hooks.js',
+			'data-machine-events-pipeline-hooks',
+			DATA_MACHINE_EVENTS_PLUGIN_URL . 'assets/js/pipeline-hooks.js',
 			array( 'datamachine-pipelines-react', 'wp-hooks', 'wp-api-fetch' ),
-			filemtime( DATAMACHINE_EVENTS_PLUGIN_DIR . 'assets/js/pipeline-hooks.js' ),
+			filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/pipeline-hooks.js' ),
 			true
 		);
 
 		// Enqueue pipeline React components (custom field types like address-autocomplete)
 		wp_enqueue_script(
-			'datamachine-events-pipeline-components',
-			DATAMACHINE_EVENTS_PLUGIN_URL . 'assets/js/pipeline-components.js',
+			'data-machine-events-pipeline-components',
+			DATA_MACHINE_EVENTS_PLUGIN_URL . 'assets/js/pipeline-components.js',
 			array( 'datamachine-pipelines-react', 'wp-element', 'wp-components', 'wp-hooks', 'wp-i18n' ),
-			filemtime( DATAMACHINE_EVENTS_PLUGIN_DIR . 'assets/js/pipeline-components.js' ),
+			filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/pipeline-components.js' ),
 			true
 		);
 	}

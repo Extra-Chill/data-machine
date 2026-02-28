@@ -6,9 +6,9 @@
  * correction of events with systematic timezone or offset issues.
  *
  * Usage examples:
- *   wp datamachine-events batch-time-fix --venue="Armadillo Den" --before="2026-01-15" --offset="+6h" --dry-run
- *   wp datamachine-events batch-time-fix --venue="Continental Club,Starlight" --after="2025-12-01" --offset="-1h"
- *   wp datamachine-events batch-time-fix --venue="Venue Name" --before="2026-01-01" --where-time="01:00" --new-time="19:00"
+ *   wp data-machine-events batch-time-fix --venue="Armadillo Den" --before="2026-01-15" --offset="+6h" --dry-run
+ *   wp data-machine-events batch-time-fix --venue="Continental Club,Starlight" --after="2025-12-01" --offset="-1h"
+ *   wp data-machine-events batch-time-fix --venue="Venue Name" --before="2026-01-01" --where-time="01:00" --new-time="19:00"
  *
  * @package DataMachineEvents\Cli
  * @since 0.9.16
@@ -67,16 +67,16 @@ class BatchTimeFixCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Preview fixes for events at Armadillo Den imported before Jan 15, applying +6h offset
-	 *     $ wp datamachine-events batch-time-fix --venue="Armadillo Den" --before="2026-01-15" --offset="+6h" --dry-run
+	 *     $ wp data-machine-events batch-time-fix --venue="Armadillo Den" --before="2026-01-15" --offset="+6h" --dry-run
 	 *
 	 *     # Fix multiple venues with same offset
-	 *     $ wp datamachine-events batch-time-fix --venue="Armadillo Den,Continental Club" --before="2026-01-15" --offset="+6h" --execute
+	 *     $ wp data-machine-events batch-time-fix --venue="Armadillo Den,Continental Club" --before="2026-01-15" --offset="+6h" --execute
 	 *
 	 *     # Filter by source URL pattern (ICS feeds)
-	 *     $ wp datamachine-events batch-time-fix --venue="Starlight Motor Inn" --before="2026-01-15" --source-pattern="%.ics" --offset="+6h"
+	 *     $ wp data-machine-events batch-time-fix --venue="Starlight Motor Inn" --before="2026-01-15" --source-pattern="%.ics" --offset="+6h"
 	 *
 	 *     # Replace specific time with explicit value
-	 *     $ wp datamachine-events batch-time-fix --venue="Some Venue" --before="2026-01-01" --where-time="01:00" --new-time="19:00" --execute
+	 *     $ wp data-machine-events batch-time-fix --venue="Some Venue" --before="2026-01-01" --where-time="01:00" --new-time="19:00" --execute
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Associative arguments.

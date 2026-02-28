@@ -23,7 +23,7 @@ class EventUpsertTest extends WP_UnitTestCase {
 		parent::setUp();
 
 		// Ensure post type and taxonomies are registered
-		if ( ! post_type_exists( 'datamachine_events' ) ) {
+		if ( ! post_type_exists( 'data_machine_events' ) ) {
 			Event_Post_Type::register();
 		}
 		if ( ! taxonomy_exists( 'venue' ) ) {
@@ -67,7 +67,7 @@ class EventUpsertTest extends WP_UnitTestCase {
 		$post_id = wp_insert_post(
 			array(
 				'post_title'  => 'Test Event ' . uniqid(),
-				'post_type'   => 'datamachine_events',
+				'post_type'   => 'data_machine_events',
 				'post_status' => 'publish',
 			)
 		);
@@ -75,7 +75,7 @@ class EventUpsertTest extends WP_UnitTestCase {
 		$this->assertGreaterThan( 0, $post_id );
 
 		$post = get_post( $post_id );
-		$this->assertEquals( 'datamachine_events', $post->post_type );
+		$this->assertEquals( 'data_machine_events', $post->post_type );
 
 		// Cleanup
 		wp_delete_post( $post_id, true );
@@ -85,7 +85,7 @@ class EventUpsertTest extends WP_UnitTestCase {
 		$post_id = wp_insert_post(
 			array(
 				'post_title'  => 'DateTime Test Event ' . uniqid(),
-				'post_type'   => 'datamachine_events',
+				'post_type'   => 'data_machine_events',
 				'post_status' => 'publish',
 			)
 		);
@@ -110,7 +110,7 @@ class EventUpsertTest extends WP_UnitTestCase {
 		$post_id = wp_insert_post(
 			array(
 				'post_title'  => 'Venue Test Event ' . uniqid(),
-				'post_type'   => 'datamachine_events',
+				'post_type'   => 'data_machine_events',
 				'post_status' => 'publish',
 			)
 		);

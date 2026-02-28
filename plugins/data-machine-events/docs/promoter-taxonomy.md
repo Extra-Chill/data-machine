@@ -14,7 +14,7 @@ The `Promoter_Taxonomy` class provides a hierarchical taxonomy for event promote
 
 ### Taxonomy Registration
 
-- Registers `promoter` taxonomy for `datamachine_events` post type
+- Registers `promoter` taxonomy for `data_machine_events` post type
 - Non-hierarchical (tag-like) taxonomy
 - REST API enabled
 - Admin interface with custom metadata fields

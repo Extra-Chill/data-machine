@@ -15,7 +15,7 @@ function initPastUpcomingButtons(
 	onNavigate: ( params: URLSearchParams ) => void
 ): void {
 	const navContainer = calendar.querySelector< HTMLElement >(
-		'.datamachine-events-past-navigation'
+		'.data-machine-events-past-navigation'
 	);
 	if ( ! navContainer ) {
 		return;
@@ -23,9 +23,9 @@ function initPastUpcomingButtons(
 
 	navContainer.addEventListener( 'click', function ( e: Event ) {
 		const target = e.target as HTMLElement;
-		const pastBtn = target.closest( '.datamachine-events-past-btn' );
+		const pastBtn = target.closest( '.data-machine-events-past-btn' );
 		const upcomingBtn = target.closest(
-			'.datamachine-events-upcoming-btn'
+			'.data-machine-events-upcoming-btn'
 		);
 
 		if ( pastBtn || upcomingBtn ) {
@@ -52,7 +52,7 @@ function initPaginationLinks(
 	onNavigate: ( params: URLSearchParams ) => void
 ): void {
 	const paginationContainer = calendar.querySelector< HTMLElement >(
-		'.datamachine-events-pagination'
+		'.data-machine-events-pagination'
 	);
 	if ( ! paginationContainer ) {
 		return;

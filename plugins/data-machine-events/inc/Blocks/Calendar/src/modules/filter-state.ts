@@ -17,8 +17,8 @@ import type {
 	TaxFilters,
 } from '../types';
 
-const STORAGE_KEY = 'datamachine_events_calendar_state';
-const GEO_STORAGE_KEY = 'datamachine_events_geo_state';
+const STORAGE_KEY = 'data_machine_events_calendar_state';
+const GEO_STORAGE_KEY = 'data_machine_events_geo_state';
 
 class FilterStateManager {
 	private calendar: HTMLElement;
@@ -183,7 +183,7 @@ class FilterStateManager {
 
 		const searchInput =
 			this.calendar.querySelector< HTMLInputElement >(
-				'.datamachine-events-search-input'
+				'.data-machine-events-search-input'
 			);
 		if ( searchInput?.value ) {
 			params.set( 'event_search', searchInput.value );
@@ -234,7 +234,7 @@ class FilterStateManager {
 
 		// Geo location — read from location input data attributes
 		const locationInput = this.calendar.querySelector< HTMLInputElement >(
-			'.datamachine-events-location-search'
+			'.data-machine-events-location-search'
 		);
 		if ( locationInput ) {
 			const lat = locationInput.dataset.geoLat || '';
@@ -245,7 +245,7 @@ class FilterStateManager {
 
 				const radiusSelect =
 					this.calendar.querySelector< HTMLSelectElement >(
-						'.datamachine-events-radius-select'
+						'.data-machine-events-radius-select'
 					);
 				if ( radiusSelect ) {
 					params.set( 'radius', radiusSelect.value );
@@ -394,7 +394,7 @@ class FilterStateManager {
 	 */
 	updateFilterCountBadge(): void {
 		const filterBtn = this.calendar.querySelector< HTMLElement >(
-			'.datamachine-taxonomy-toggle, .datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .datamachine-events-filter-btn'
+			'.datamachine-taxonomy-toggle, .datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .data-machine-events-filter-btn'
 		);
 		const countBadge = filterBtn?.querySelector< HTMLElement >(
 			'.datamachine-filter-count'

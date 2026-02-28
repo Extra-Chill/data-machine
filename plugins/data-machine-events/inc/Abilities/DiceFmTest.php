@@ -25,10 +25,10 @@ class DiceFmTest {
 		if ( ! self::$registered ) {
 			$register_callback = function () {
 				wp_register_ability(
-					'datamachine-events/test-dice-fm',
+					'data-machine-events/test-dice-fm',
 					array(
-						'label'               => __( 'Test Dice FM', 'datamachine-events' ),
-						'description'         => __( 'Test Dice FM API handler with raw response data', 'datamachine-events' ),
+						'label'               => __( 'Test Dice FM', 'data-machine-events' ),
+						'description'         => __( 'Test Dice FM API handler with raw response data', 'data-machine-events' ),
 						'category'            => 'datamachine',
 						'input_schema'        => array(
 							'type'       => 'object',

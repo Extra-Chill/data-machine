@@ -44,10 +44,10 @@ class VenueMapAbilities {
 
 	private function registerListVenuesAbility(): void {
 		wp_register_ability(
-			'datamachine-events/list-venues',
+			'data-machine-events/list-venues',
 			array(
-				'label'               => __( 'List Venues', 'datamachine-events' ),
-				'description'         => __( 'List venues with coordinates for map rendering. Supports geo proximity and viewport bounds filtering.', 'datamachine-events' ),
+				'label'               => __( 'List Venues', 'data-machine-events' ),
+				'description'         => __( 'List venues with coordinates for map rendering. Supports geo proximity and viewport bounds filtering.', 'data-machine-events' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',

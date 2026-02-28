@@ -11,11 +11,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 ?>
 
-<div class="datamachine-events-no-events">
-	<p><?php esc_html_e( 'No events found.', 'datamachine-events' ); ?></p>
+<div class="data-machine-events-no-events">
+	<p><?php esc_html_e( 'No events found.', 'data-machine-events' ); ?></p>
 	<p>
-		<button type="button" class="datamachine-events-no-events-today-link">
-			<?php esc_html_e( 'Show events from Today', 'datamachine-events' ); ?>
+		<button type="button" class="data-machine-events-no-events-today-link">
+			<?php esc_html_e( 'Show events from Today', 'data-machine-events' ); ?>
 		</button>
 	</p>
 </div>

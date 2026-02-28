@@ -26,7 +26,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class EncodingFixAbilities {
 
 	private const DEFAULT_LIMIT = 100;
-	private const BLOCK_NAME    = 'datamachine-events/event-details';
+	private const BLOCK_NAME    = 'data-machine-events/event-details';
 
 	private static bool $registered = false;
 
@@ -40,10 +40,10 @@ class EncodingFixAbilities {
 	private function registerAbility(): void {
 		$register_callback = function () {
 			wp_register_ability(
-				'datamachine-events/fix-encoding',
+				'data-machine-events/fix-encoding',
 				array(
-					'label'               => __( 'Fix Encoding', 'datamachine-events' ),
-					'description'         => __( 'Fix Unicode encoding issues in event block attributes', 'datamachine-events' ),
+					'label'               => __( 'Fix Encoding', 'data-machine-events' ),
+					'description'         => __( 'Fix Unicode encoding issues in event block attributes', 'data-machine-events' ),
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',

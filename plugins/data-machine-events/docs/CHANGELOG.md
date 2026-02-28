@@ -218,7 +218,7 @@ All notable changes to Data Machine Events will be documented in this file.
 
 ## [0.10.6] - 2026-01-25
 
-- Fixed hook placement for datamachine_events_after_price_display to render inside .event-price div
+- Fixed hook placement for data_machine_events_after_price_display to render inside .event-price div
 
 ## [0.10.5] - 2026-01-25
 
@@ -228,7 +228,7 @@ All notable changes to Data Machine Events will be documented in this file.
 ## [0.10.4] - 2026-01-25
 
 ### Added
-- Action hook after price display for extensibility (datamachine_events_after_price_display)
+- Action hook after price display for extensibility (data_machine_events_after_price_display)
 
 ## [0.10.3] - 2026-01-24
 
@@ -351,7 +351,7 @@ Added deprecation notices to IcsCalendar handler and settings classes. Existing 
 
 - Add `next_day_cutoff` setting for multi-day event detection - events ending before this time (default 5:00 AM) on the following day are treated as single-day events.
 - Add Calendar Display Settings section to admin settings page.
-- Add `datamachine-events settings` WP-CLI command for managing plugin settings.
+- Add `data-machine-events settings` WP-CLI command for managing plugin settings.
 
 ## [0.9.6] - 2026-01-15
 
@@ -435,7 +435,7 @@ Added deprecation notices to IcsCalendar handler and settings classes. Existing 
 ## [0.8.39] - 2026-01-07
 
 ### Added
-- **Ticket URL Indexing Migration**: Added `DataMachineEvents\Admin\TicketUrlMigration`, a one-time admin-triggered migration that backfills `_datamachine_ticket_url` post meta from `datamachine-events/event-details` block `ticketUrl` attributes for existing events.
+- **Ticket URL Indexing Migration**: Added `DataMachineEvents\Admin\TicketUrlMigration`, a one-time admin-triggered migration that backfills `_datamachine_ticket_url` post meta from `data-machine-events/event-details` block `ticketUrl` attributes for existing events.
 
 ### Changed
 - **Ticket URL Meta Sync**: Event Details block saves now sync a normalized ticket URL into `_datamachine_ticket_url` (query params stripped; trailing slash trimmed) for consistent lookups.
@@ -452,7 +452,7 @@ Added deprecation notices to IcsCalendar handler and settings classes. Existing 
 - **Music Item Extractor**: Added `MusicItemExtractor` to the Universal Web Scraper to extract events from `.music__item` / `.music__artist` HTML patterns.
 
 ### Changed
-- **Update Event Description Storage**: Updated the `UpdateEvent` AI chat tool to write `description` updates into `core/paragraph` InnerBlocks inside the `datamachine-events/event-details` block (instead of treating description as a block attribute).
+- **Update Event Description Storage**: Updated the `UpdateEvent` AI chat tool to write `description` updates into `core/paragraph` InnerBlocks inside the `data-machine-events/event-details` block (instead of treating description as a block attribute).
 - **Event Health Check Description Detection**: Updated the `EventHealthCheck` AI chat tool to derive the event description from the Event Details block InnerBlocks (paragraph content) rather than a non-existent `description` attribute.
 - **Venue Address Parsing**: Enhanced `PageVenueExtractor::extractStreetAddress()` to better detect real street addresses (supports `610-A` / `123B` patterns and tighter fallback matching) while reducing false positives.
 - **Universal Web Scraper Pipeline**: Added `MusicItemExtractor` to the extraction priority list.
@@ -543,7 +543,7 @@ Added deprecation notices to IcsCalendar handler and settings classes. Existing 
   - Provides consistent sanitization and image resolution helpers
   - Implemented by all specialized extractors (18+ handlers)
 - **Universal Web Scraper Test Command**: WP-CLI command to test extraction against a target URL
-  - Registers `datamachine-events scrape-test` invokable
+  - Registers `data-machine-events scrape-test` invokable
   - Supports `--upsert` flag to validate end-to-end venue/event creation
 - **Venue Admin Enhancements**:
   - Added address autocomplete to venue term creation/edit screens
@@ -937,7 +937,7 @@ Added deprecation notices to IcsCalendar handler and settings classes. Existing 
 
 ### Fixed
 - **Query Parameter Sanitization**: Improved nested array sanitization to properly handle multi-dimensional query parameters
-  - New `datamachine_events_sanitize_query_params()` global function for recursive sanitization
+  - New `data_machine_events_sanitize_query_params()` global function for recursive sanitization
   - Updated `Pagination::sanitize_query_params()` to use same recursive logic
   - Preserves array structure while sanitizing all scalar values
   - Fixes taxonomy filter parameters with indexed arrays (e.g., `tax_filter[genre][0]`)
@@ -961,7 +961,7 @@ Added deprecation notices to IcsCalendar handler and settings classes. Existing 
 
 ### Technical Details
 - **Pagination Refactoring**: Removed scalar value iteration from `Pagination.php`, using recursive function instead
-- **Navigation Template**: Updated to use global `datamachine_events_sanitize_query_params()` function
+- **Navigation Template**: Updated to use global `data_machine_events_sanitize_query_params()` function
 - **Code Quality**: Minor whitespace cleanup for consistency
 
 ### Changed
@@ -1318,7 +1318,7 @@ Added deprecation notices to IcsCalendar handler and settings classes. Existing 
 
 - **Taxonomy Dependencies System** - Support for dependent taxonomy relationships
   - Child taxonomies only show terms relevant to parent selections
-  - Configurable dependency mappings via `datamachine_events_taxonomy_dependencies` filter
+  - Configurable dependency mappings via `data_machine_events_taxonomy_dependencies` filter
   - Automatic dependency resolution in filter modal and API responses
 
 - **Enhanced Taxonomy Helper** - Improved taxonomy data processing with filter support
@@ -1528,7 +1528,7 @@ Added deprecation notices to IcsCalendar handler and settings classes. Existing 
 - **Modal Layout Architecture** - Taxonomy filter modal refactored with flexbox and sticky footer:
   - Modal footer moved from `taxonomy-filter.php` to `filter-bar.php` for proper sticky positioning
   - Body section uses `flex: 1 1 auto` with `overflow-y: auto` for scrollable content while footer stays fixed
-- **EventUpsert Block Generation** - `generate_block_content()` now properly wraps InnerBlocks in `<div class="wp-block-datamachine-events-event-details">` and generates separate paragraph blocks for multi-paragraph HTML descriptions via new `generate_description_blocks()` method
+- **EventUpsert Block Generation** - `generate_block_content()` now properly wraps InnerBlocks in `<div class="wp-block-data-machine-events-event-details">` and generates separate paragraph blocks for multi-paragraph HTML descriptions via new `generate_description_blocks()` method
 - **Compact Layout CSS** - Removed 44 lines of duplicated compact layout styles (now inherits from base `.event-info-grid` styles)
 - **Dark Mode CSS** - Reduced EventDetails dark mode overrides from 18 lines to 4 lines (inherits from root.css CSS custom properties)
 
@@ -1653,14 +1653,14 @@ Added deprecation notices to IcsCalendar handler and settings classes. Existing 
 ## [0.3.3] - 2025-11-25
 
 ### Changed
-- **Taxonomy Exclusion Filter Enhancement** - Added `$context` parameter to `datamachine_events_excluded_taxonomies` filter
+- **Taxonomy Exclusion Filter Enhancement** - Added `$context` parameter to `data_machine_events_excluded_taxonomies` filter
   - Filter now passes context identifier: `'badge'` for taxonomy badges, `'modal'` for filter modal
   - Callbacks can exclude taxonomies from specific contexts or all contexts (no context check = exclude from all)
   - Removed hardcoded venue exclusion from `Taxonomy_Helper::get_all_taxonomies_with_counts()`
   - Centralized taxonomy visibility control through single filter for both badges and modal
 - **Event Card Link Structure** - Refactored event item template for better accessibility and UX
   - Changed from full-card link wrapper to individual links for title and "More Info" button
-  - Added `datamachine_events_more_info_button_classes` filter for button customization
+  - Added `data_machine_events_more_info_button_classes` filter for button customization
   - Taxonomy badges now render as clickable links to term archive pages
 - **EventUpsertSettings Cleanup** - Simplified user options retrieval using `WordPressSettingsHandler::get_user_options()`
 
@@ -1699,19 +1699,19 @@ Added deprecation notices to IcsCalendar handler and settings classes. Existing 
 - Themes have full control over event presentation layout
 - Event Details block remains self-contained and provides all event data rendering
 
-**Removed Action Hooks** (previously in `templates/single-datamachine_events.php`):
-- `datamachine_events_before_single_event` - Use theme's `single.php` or template parts
-- `datamachine_events_after_single_event` - Use theme's `single.php` or template parts
-- `datamachine_events_related_events` - Implement in theme's `single.php` for `datamachine_events` post type
-- `datamachine_events_after_event_article` - Use theme's `single.php` or template parts
+**Removed Action Hooks** (previously in `templates/single-data_machine_events.php`):
+- `data_machine_events_before_single_event` - Use theme's `single.php` or template parts
+- `data_machine_events_after_single_event` - Use theme's `single.php` or template parts
+- `data_machine_events_related_events` - Implement in theme's `single.php` for `data_machine_events` post type
+- `data_machine_events_after_event_article` - Use theme's `single.php` or template parts
 
 **Removed Filter Hook**:
-- `datamachine_events_breadcrumbs` - Use theme's breadcrumb system (Yoast, Rank Math, custom theme breadcrumbs)
+- `data_machine_events_breadcrumbs` - Use theme's breadcrumb system (Yoast, Rank Math, custom theme breadcrumbs)
 
 **Taxonomy_Badges Namespace Change**:
 - Moved from `DataMachineEvents\Core\Taxonomy_Badges` to `DataMachineEvents\Blocks\Calendar\Taxonomy_Badges`
 - Plugins/themes using `class_exists('DataMachineEvents\Core\Taxonomy_Badges')` must update to new namespace
-- All filter hooks preserved and unchanged (`datamachine_events_badge_wrapper_classes`, `datamachine_events_badge_classes`, `datamachine_events_excluded_taxonomies`)
+- All filter hooks preserved and unchanged (`data_machine_events_badge_wrapper_classes`, `data_machine_events_badge_classes`, `data_machine_events_excluded_taxonomies`)
 
 ### Changed
 - **Taxonomy_Badges**: Moved from `inc/Core/` to `inc/Blocks/Calendar/` for self-contained block architecture
@@ -1721,7 +1721,7 @@ Added deprecation notices to IcsCalendar handler and settings classes. Existing 
   - Location: `inc/Blocks/Calendar/Taxonomy_Badges.php`
 
 ### Removed
-- **Single Post Template**: Deleted `templates/single-datamachine_events.php` (93 lines)
+- **Single Post Template**: Deleted `templates/single-data_machine_events.php` (93 lines)
   - Events now use theme's default `single.php` template
   - Allows themes full control over event presentation
   - Aligns with WordPress block-first architecture (blocks provide data, themes provide presentation)

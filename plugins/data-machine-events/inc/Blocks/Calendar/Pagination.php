@@ -3,13 +3,13 @@
  * Calendar Block Pagination System
  *
  * Self-contained pagination rendering for Calendar block. Provides extensibility
- * filters for themes/plugins (datamachine_events_pagination_wrapper_classes,
- * datamachine_events_pagination_args) while keeping pagination logic within Calendar block.
+ * filters for themes/plugins (data_machine_events_pagination_wrapper_classes,
+ * data_machine_events_pagination_args) while keeping pagination logic within Calendar block.
  * Allows complete customization of pagination styling and behavior through WordPress filters.
  *
  * Available Filters:
- * - datamachine_events_pagination_wrapper_classes: Modify CSS classes on <nav> wrapper
- * - datamachine_events_pagination_args: Customize paginate_links() arguments
+ * - data_machine_events_pagination_wrapper_classes: Modify CSS classes on <nav> wrapper
+ * - data_machine_events_pagination_args: Customize paginate_links() arguments
  *
  * @package DataMachineEvents\Blocks\Calendar
  */
@@ -44,8 +44,8 @@ class Pagination {
 			'format'    => '',
 			'current'   => $current_page,
 			'total'     => $max_pages,
-			'prev_text' => __( '« Previous', 'datamachine-events' ),
-			'next_text' => __( 'Next »', 'datamachine-events' ),
+			'prev_text' => __( '« Previous', 'data-machine-events' ),
+			'next_text' => __( 'Next »', 'data-machine-events' ),
 			'type'      => 'list',
 			'end_size'  => 1,
 			'mid_size'  => 2,
@@ -67,7 +67,7 @@ class Pagination {
 		 * @param bool $show_past Whether showing past events
 		 */
 		$pagination_args = apply_filters(
-			'datamachine_events_pagination_args',
+			'data_machine_events_pagination_args',
 			$pagination_args,
 			$current_page,
 			$max_pages,
@@ -83,8 +83,8 @@ class Pagination {
 
 		// Build wrapper classes with filter
 		$wrapper_classes = apply_filters(
-			'datamachine_events_pagination_wrapper_classes',
-			array( 'datamachine-events-pagination' ),
+			'data_machine_events_pagination_wrapper_classes',
+			array( 'data-machine-events-pagination' ),
 			$current_page,
 			$max_pages,
 			$show_past
@@ -93,7 +93,7 @@ class Pagination {
 		$output = sprintf(
 			'<nav class="%s" aria-label="%s">%s</nav>',
 			esc_attr( implode( ' ', $wrapper_classes ) ),
-			esc_attr__( 'Events pagination', 'datamachine-events' ),
+			esc_attr__( 'Events pagination', 'data-machine-events' ),
 			wp_kses_post( $pagination_links )
 		);
 
