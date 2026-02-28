@@ -546,8 +546,10 @@ class Calendar_Query {
 				$event_dates = array( $start_date );
 			}
 
-			// Filter out past occurrence dates when show_past is false.
-			if ( ! $show_past && $has_occurrence_dates ) {
+			// Filter out past dates when show_past is false.
+			// Applies to both explicit occurrence dates and multi-day date range expansions
+			// so that yesterday's entry for an ongoing multi-day event doesn't appear.
+			if ( ! $show_past && ( $has_occurrence_dates || $is_multi_day ) ) {
 				$current_date = current_time( 'Y-m-d' );
 				$event_dates  = array_filter(
 					$event_dates,
@@ -1000,9 +1002,11 @@ class Calendar_Query {
 					$event_dates = array( $start_date );
 				}
 
-				// Filter out past occurrence dates when show_past is false.
+				// Filter out past dates when show_past is false.
+				// Applies to both explicit occurrence dates and multi-day date range expansions.
 				$show_past_param = $params['show_past'] ?? false;
-				if ( ! $show_past_param && ! empty( $occurrence_dates ) && is_array( $occurrence_dates ) ) {
+				$is_expanded     = ( ! empty( $occurrence_dates ) && is_array( $occurrence_dates ) ) || ( $start_date !== $end_date );
+				if ( ! $show_past_param && $is_expanded ) {
 					$current_date = current_time( 'Y-m-d' );
 					$event_dates  = array_filter(
 						$event_dates,
