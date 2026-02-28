@@ -125,6 +125,11 @@ if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR
 	\WP_CLI::add_command( 'datamachine-events audit-venues', \DataMachineEvents\Cli\AuditVenuesCommand::class );
 }
 
+if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/CheckDurationCommand.php' ) ) {
+	require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/CheckDurationCommand.php';
+	\WP_CLI::add_command( 'datamachine-events check-duration', \DataMachineEvents\Cli\CheckDurationCommand::class );
+}
+
 /**
  * Main Data Machine Events plugin class
  *
