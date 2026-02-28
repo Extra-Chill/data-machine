@@ -1,0 +1,20 @@
+{
+	"compilerOptions": {
+		"target": "es2020",
+		"module": "esnext",
+		"moduleResolution": "bundler",
+		"jsx": "react-jsx",
+		"strict": true,
+		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true,
+		"forceConsistentCasingInFileNames": true,
+		"skipLibCheck": true,
+		"outDir": "./build",
+		"rootDir": "./src",
+		"declaration": false,
+		"noEmit": true,
+		"types": ["wordpress__blocks", "wordpress__block-editor", "wordpress__components", "wordpress__i18n"]
+	},
+	"include": ["src/**/*.ts", "src/**/*.tsx"],
+	"exclude": ["node_modules", "build"]
+}
