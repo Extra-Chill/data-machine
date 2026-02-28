@@ -311,6 +311,11 @@ class DATAMACHINE_Events {
 			new \DataMachineEvents\Abilities\SettingsAbilities();
 		}
 
+		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/DuplicateDetectionAbilities.php' ) ) {
+			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/DuplicateDetectionAbilities.php';
+			new \DataMachineEvents\Abilities\DuplicateDetectionAbilities();
+		}
+
 		$this->registerSystemHealthChecks();
 	}
 

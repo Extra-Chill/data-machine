@@ -212,8 +212,9 @@ class EventUpsert extends UpdateHandler {
 		// Final safety net: fuzzy title + date search without venue constraint.
 		// Catches cross-source duplicates where venue names differ between scrapers
 		// (e.g. "Come and Take It Live" vs "Come and Take It Productions").
+		// Venue is passed for confirmation when both sides have it.
 		if ( ! empty( $startDate ) ) {
-			return $this->findEventByDateAndFuzzyTitle( $title, $startDate );
+			return $this->findEventByDateAndFuzzyTitle( $title, $startDate, $venue );
 		}
 
 		return null;
@@ -418,7 +419,7 @@ class EventUpsert extends UpdateHandler {
 					return $post_id;
 				}
 
-				if ( $this->venueNamesMatch( $venue, $existing_venue ) ) {
+				if ( EventIdentifierGenerator::venuesMatch( $venue, $existing_venue ) ) {
 					do_action(
 						'datamachine_log',
 						'info',
@@ -561,11 +562,16 @@ class EventUpsert extends UpdateHandler {
 	 * More permissive than venue-scoped fuzzy matching — only fires as a final
 	 * fallback after ticket URL, venue+fuzzy, and exact title strategies all fail.
 	 *
+	 * When both the incoming event and a candidate have venue data, venue matching
+	 * is required to prevent false positives (e.g. "Open Mic Night" at two
+	 * different bars on the same date).
+	 *
 	 * @param string $title Event title to match
 	 * @param string $startDate Start date (YYYY-MM-DD)
+	 * @param string $venue Incoming venue name for confirmation (may be empty)
 	 * @return int|null Post ID if fuzzy match found, null otherwise
 	 */
-	private function findEventByDateAndFuzzyTitle( string $title, string $startDate ): ?int {
+	private function findEventByDateAndFuzzyTitle( string $title, string $startDate, string $venue = '' ): ?int {
 		$args = array(
 			'post_type'      => Event_Post_Type::POST_TYPE,
 			'posts_per_page' => 20,
@@ -595,6 +601,29 @@ class EventUpsert extends UpdateHandler {
 				continue;
 			}
 
+			// When both sides have venue data, require venue match to avoid
+			// false positives on generic titles at different venues.
+			if ( ! empty( $venue ) ) {
+				$candidate_venues = wp_get_post_terms( $candidate->ID, 'venue', array( 'fields' => 'names' ) );
+				$candidate_venue  = ( ! is_wp_error( $candidate_venues ) && ! empty( $candidate_venues ) ) ? $candidate_venues[0] : '';
+
+				if ( ! empty( $candidate_venue ) && ! EventIdentifierGenerator::venuesMatch( $venue, $candidate_venue ) ) {
+					do_action(
+						'datamachine_log',
+						'debug',
+						'Event Upsert: Title matched but venues differ in venue-agnostic fallback',
+						array(
+							'incoming_title' => $title,
+							'matched_title'  => $candidate->post_title,
+							'incoming_venue' => $venue,
+							'existing_venue' => $candidate_venue,
+							'post_id'        => $candidate->ID,
+						)
+					);
+					continue;
+				}
+			}
+
 			do_action(
 				'datamachine_log',
 				'info',
@@ -610,59 +639,6 @@ class EventUpsert extends UpdateHandler {
 		}
 
 		return null;
-	}
-
-	/**
-	 * Compare two venue names for semantic equivalence
-	 *
-	 * Handles common variations between sources:
-	 * - Article differences: "The Continental Club" vs "Continental Club"
-	 * - Suffix differences: "Come and Take It Live" vs "Come and Take It Productions"
-	 * - Case differences: "STUBBS" vs "Stubb's"
-	 *
-	 * Uses the same normalization as EventIdentifierGenerator::normalize_text()
-	 * for consistent behavior across the dedup pipeline.
-	 *
-	 * @param string $venue1 First venue name
-	 * @param string $venue2 Second venue name
-	 * @return bool True if venues likely refer to the same place
-	 */
-	private function venueNamesMatch( string $venue1, string $venue2 ): bool {
-		$norm1 = $this->normalizeVenueName( $venue1 );
-		$norm2 = $this->normalizeVenueName( $venue2 );
-
-		// Exact match after normalization
-		if ( $norm1 === $norm2 ) {
-			return true;
-		}
-
-		// One contains the other (handles suffix variations like "Live" vs "Productions")
-		if ( ! empty( $norm1 ) && ! empty( $norm2 ) ) {
-			if ( str_contains( $norm1, $norm2 ) || str_contains( $norm2, $norm1 ) ) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	/**
-	 * Normalize venue name for comparison
-	 *
-	 * @param string $venue Venue name
-	 * @return string Normalized venue name
-	 */
-	private function normalizeVenueName( string $venue ): string {
-		$text = strtolower( $venue );
-		$text = trim( preg_replace( '/\s+/', ' ', $text ) );
-
-		// Remove leading articles
-		$text = preg_replace( '/^(the|a|an)\s+/i', '', $text );
-
-		// Remove non-alphanumeric (keep spaces)
-		$text = preg_replace( '/[^a-z0-9\s]/', '', $text );
-
-		return trim( $text );
 	}
 
 	/**
