@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.13.1] - 2026-02-28
+
+### Fixed
+- Multi-day event continuation display: shows "Feb 27 – Mar 1" date range instead of misleading "All Day through Mar 1"
+- Removed confusing ↳ arrow pseudo-element on continuation event items
+- WP_Error crash in health-check command when timezone or meta-sync abilities return errors
+
+### Added
+- `check-duration` CLI command for detecting events with abnormal date spans
+
 ## [0.13.0] - 2026-02-28
 
 ### Added
