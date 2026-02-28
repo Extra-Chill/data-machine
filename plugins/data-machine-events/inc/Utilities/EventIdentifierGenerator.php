@@ -55,6 +55,9 @@ class EventIdentifierGenerator {
 	 * @return string Normalized text
 	 */
 	private static function normalize_text( string $text ): string {
+		// Normalize unicode dashes to ASCII hyphen
+		$text = self::normalize_dashes( $text );
+
 		// Lowercase
 		$text = strtolower( $text );
 
@@ -65,6 +68,33 @@ class EventIdentifierGenerator {
 		$text = preg_replace( '/^(the|a|an)\s+/i', '', $text );
 
 		return $text;
+	}
+
+	/**
+	 * Normalize unicode dash characters to ASCII hyphen
+	 *
+	 * Scraped titles commonly use en dashes (–), em dashes (—), or other
+	 * unicode dash variants interchangeably with ASCII hyphens (-).
+	 * Normalizing prevents false dedup mismatches like:
+	 * "bbno$ - The Internet Explorer Tour" vs "bbno$ – The Internet Explorer Tour"
+	 *
+	 * @param string $text Input text
+	 * @return string Text with all dashes normalized to ASCII hyphen
+	 */
+	private static function normalize_dashes( string $text ): string {
+		$unicode_dashes = array(
+			"\u{2010}", // hyphen
+			"\u{2011}", // non-breaking hyphen
+			"\u{2012}", // figure dash
+			"\u{2013}", // en dash
+			"\u{2014}", // em dash
+			"\u{2015}", // horizontal bar
+			"\u{FE58}", // small em dash
+			"\u{FE63}", // small hyphen-minus
+			"\u{FF0D}", // fullwidth hyphen-minus
+		);
+
+		return str_replace( $unicode_dashes, '-', $text );
 	}
 
 	/**
@@ -82,7 +112,7 @@ class EventIdentifierGenerator {
 	 * @return string Core title for comparison
 	 */
 	public static function extractCoreTitle( string $title ): string {
-		$text = strtolower( $title );
+		$text = strtolower( self::normalize_dashes( $title ) );
 
 		// Split on common delimiters that typically separate main event from tour/opener info
 		// Note: standalone hyphen omitted to preserve band names like "Run-DMC"

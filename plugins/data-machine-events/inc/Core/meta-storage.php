@@ -71,6 +71,103 @@ function datamachine_normalize_ticket_url( string $url ): string {
 }
 
 /**
+ * Extract the canonical ticket identifier URL for dedup comparison.
+ *
+ * Unlike datamachine_normalize_ticket_url() which preserves affiliate links
+ * for storage, this function unwraps affiliate/redirect wrappers to extract
+ * the underlying ticket platform URL. This allows matching:
+ * - ticketmaster.evyy.net/c/.../4272?u=<ticketmaster_url>  (affiliate)
+ * - www.ticketmaster.com/event/...                          (direct)
+ *
+ * The result is normalized (scheme + host + path, no query params) for comparison.
+ *
+ * @param string $url Ticket URL (may be affiliate-wrapped or direct)
+ * @return string Canonical URL for dedup comparison
+ */
+function datamachine_extract_ticket_identity( string $url ): string {
+	if ( empty( $url ) ) {
+		return '';
+	}
+
+	// Unwrap affiliate redirect URLs to get the canonical ticket URL.
+	$canonical = datamachine_unwrap_affiliate_url( $url );
+
+	// Normalize to scheme + host + path (strip query params for comparison)
+	$parsed = wp_parse_url( $canonical );
+	if ( ! $parsed || empty( $parsed['host'] ) ) {
+		return '';
+	}
+
+	$scheme     = $parsed['scheme'] ?? 'https';
+	$normalized = $scheme . '://' . $parsed['host'];
+
+	if ( ! empty( $parsed['path'] ) ) {
+		$normalized .= $parsed['path'];
+	}
+
+	return rtrim( $normalized, '/' );
+}
+
+/**
+ * Unwrap affiliate/redirect URLs to extract the canonical ticket URL.
+ *
+ * Known affiliate wrappers:
+ * - evyy.net (Ticketmaster affiliate): ?u=<encoded_url>
+ * - redirect.viglink.com: ?u=<encoded_url>
+ * - click.linksynergy.com: ?u=<encoded_url>
+ *
+ * @param string $url Possibly wrapped URL
+ * @return string Unwrapped URL, or original if not an affiliate wrapper
+ */
+function datamachine_unwrap_affiliate_url( string $url ): string {
+	$parsed = wp_parse_url( $url );
+	if ( ! $parsed || empty( $parsed['host'] ) || empty( $parsed['query'] ) ) {
+		return $url;
+	}
+
+	// Known affiliate/redirect hosts that wrap ticket URLs in a ?u= parameter
+	$affiliate_hosts = array(
+		'evyy.net',
+		'viglink.com',
+		'linksynergy.com',
+		'shareasale.com',
+		'anrdoezrs.net',
+		'jdoqocy.com',
+		'dpbolvw.net',
+		'kqzyfj.com',
+		'tkqlhce.com',
+	);
+
+	$host = strtolower( $parsed['host'] );
+	$is_affiliate = false;
+	foreach ( $affiliate_hosts as $affiliate_host ) {
+		if ( $host === $affiliate_host || str_ends_with( $host, '.' . $affiliate_host ) ) {
+			$is_affiliate = true;
+			break;
+		}
+	}
+
+	if ( ! $is_affiliate ) {
+		return $url;
+	}
+
+	parse_str( $parsed['query'], $query_params );
+
+	// Try common redirect parameter names
+	foreach ( array( 'u', 'url', 'murl', 'destination' ) as $param ) {
+		if ( ! empty( $query_params[ $param ] ) ) {
+			$inner_url = urldecode( $query_params[ $param ] );
+			// Validate it looks like a URL
+			if ( filter_var( $inner_url, FILTER_VALIDATE_URL ) ) {
+				return $inner_url;
+			}
+		}
+	}
+
+	return $url;
+}
+
+/**
  * Sync event datetime to post meta on save
  *
  * @param int     $post_id Post ID.

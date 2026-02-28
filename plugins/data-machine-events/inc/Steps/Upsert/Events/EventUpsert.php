@@ -26,6 +26,7 @@ use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
 use const DataMachineEvents\Core\EVENT_END_DATETIME_META_KEY;
 use const DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY;
 use function DataMachineEvents\Core\datamachine_normalize_ticket_url;
+use function DataMachineEvents\Core\datamachine_extract_ticket_identity;
 use DataMachine\Core\Steps\Update\Handlers\UpdateHandler;
 use DataMachine\Core\WordPress\TaxonomyHandler;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
@@ -459,6 +460,7 @@ class EventUpsert extends UpdateHandler {
 			return null;
 		}
 
+		// Strategy A: exact match on stored normalized URL
 		$args = array(
 			'post_type'      => Event_Post_Type::POST_TYPE,
 			'posts_per_page' => 1,
@@ -485,7 +487,7 @@ class EventUpsert extends UpdateHandler {
 			do_action(
 				'datamachine_log',
 				'info',
-				'Event Upsert: Found duplicate by ticket URL',
+				'Event Upsert: Found duplicate by ticket URL (exact)',
 				array(
 					'ticket_url'      => $ticketUrl,
 					'normalized_url'  => $normalized_url,
@@ -494,6 +496,57 @@ class EventUpsert extends UpdateHandler {
 				)
 			);
 			return $posts[0];
+		}
+
+		// Strategy B: match on canonical ticket identity (unwraps affiliate URLs).
+		// This catches cases where one source provides an affiliate link and another
+		// provides the direct URL for the same event.
+		$canonical_identity = datamachine_extract_ticket_identity( $ticketUrl );
+		if ( empty( $canonical_identity ) || $canonical_identity === $normalized_url ) {
+			return null; // No different identity to check
+		}
+
+		// Search all events on the same date and compare their canonical identities
+		$date_args = array(
+			'post_type'      => Event_Post_Type::POST_TYPE,
+			'posts_per_page' => 50,
+			'post_status'    => array( 'publish', 'draft', 'pending' ),
+			'fields'         => 'ids',
+			'meta_query'     => array(
+				'relation' => 'AND',
+				array(
+					'key'     => EVENT_TICKET_URL_META_KEY,
+					'compare' => 'EXISTS',
+				),
+				array(
+					'key'     => EVENT_DATETIME_META_KEY,
+					'value'   => $startDate,
+					'compare' => 'LIKE',
+				),
+			),
+		);
+
+		$candidates = get_posts( $date_args );
+
+		foreach ( $candidates as $candidate_id ) {
+			$stored_url       = get_post_meta( $candidate_id, EVENT_TICKET_URL_META_KEY, true );
+			$stored_canonical = datamachine_extract_ticket_identity( $stored_url );
+
+			if ( $stored_canonical === $canonical_identity ) {
+				do_action(
+					'datamachine_log',
+					'info',
+					'Event Upsert: Found duplicate by ticket canonical identity',
+					array(
+						'ticket_url'         => $ticketUrl,
+						'canonical_identity' => $canonical_identity,
+						'stored_url'         => $stored_url,
+						'matched_post_id'    => $candidate_id,
+						'date'               => $startDate,
+					)
+				);
+				return $candidate_id;
+			}
 		}
 
 		return null;
