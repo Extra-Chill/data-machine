@@ -5,8 +5,9 @@
  * EventsMap block and re-fetches the calendar via REST API, swapping the
  * DOM in-place without a page reload.
  *
- * This enables reactive map ↔ calendar sync: pan/zoom the map and the
- * event list updates automatically.
+ * The map viewport IS the radius. When the user zooms in/out, the radius
+ * is derived from the viewport bounds (center-to-corner distance). No
+ * separate radius control is needed — the map zoom level is the control.
  *
  * @package DataMachineEvents
  * @since 0.14.0
@@ -120,14 +121,14 @@ function createBoundsHandler(
 		clearTimeout( debounceTimer );
 
 		debounceTimer = setTimeout( () => {
-			const filterState = getFilterState( calendar );
-			const existingGeo = filterState.getGeoContext();
+			// Derive radius from viewport bounds — the map zoom IS the radius.
+			const radius = boundsToRadius( detail.bounds, detail.center );
 
 			const geo: GeoContext = {
 				lat: String( detail.center.lat ),
 				lng: String( detail.center.lng ),
-				radius: existingGeo.radius || 25,
-				radius_unit: existingGeo.radius_unit || 'mi',
+				radius,
+				radius_unit: 'mi',
 			};
 
 			const state = instances.get( calendar );
@@ -211,6 +212,43 @@ async function fetchAndUpdate(
 
 	// Re-bind pagination links for REST fetching.
 	rebindPagination( calendar, geo );
+}
+
+/**
+ * Derive a radius (in miles) from map viewport bounds.
+ *
+ * Calculates the haversine distance from the center to the NE corner
+ * of the bounding box. This makes the calendar query match the map
+ * viewport — the map zoom IS the radius.
+ */
+function boundsToRadius(
+	bounds: BoundsChangedDetail[ 'bounds' ],
+	center: BoundsChangedDetail[ 'center' ]
+): number {
+	if ( ! bounds || ! center ) {
+		return 25;
+	}
+
+	const toRad = ( deg: number ): number => ( deg * Math.PI ) / 180;
+
+	const lat1 = toRad( center.lat );
+	const lat2 = toRad( bounds.neLat );
+	const dLat = toRad( bounds.neLat - center.lat );
+	const dLng = toRad( bounds.neLng - center.lng );
+
+	const a =
+		Math.sin( dLat / 2 ) * Math.sin( dLat / 2 ) +
+		Math.cos( lat1 ) *
+			Math.cos( lat2 ) *
+			Math.sin( dLng / 2 ) *
+			Math.sin( dLng / 2 );
+	const c = 2 * Math.atan2( Math.sqrt( a ), Math.sqrt( 1 - a ) );
+
+	const EARTH_RADIUS_MI = 3959;
+	const distance = EARTH_RADIUS_MI * c;
+
+	// Clamp to reasonable range.
+	return Math.max( 1, Math.min( 500, Math.round( distance ) ) );
 }
 
 /**
