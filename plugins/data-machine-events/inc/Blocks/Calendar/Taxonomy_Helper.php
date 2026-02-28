@@ -140,7 +140,7 @@ class Taxonomy_Helper {
 		$where_clauses = '';
 		$params        = array( $taxonomy_slug, $post_type );
 
-		// Date context filtering - uses EVENT_END_DATETIME to match Calendar_Query behavior
+		// Date context filtering - uses EVENT_END_DATETIME to match EventQueryBuilder behavior
 		if ( ! empty( $date_context ) ) {
 			$joins         .= " INNER JOIN {$wpdb->postmeta} pm_date ON p.ID = pm_date.post_id";
 			$where_clauses .= ' AND pm_date.meta_key = %s';

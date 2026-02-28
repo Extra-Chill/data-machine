@@ -11,8 +11,12 @@
 namespace DataMachineEvents\Abilities;
 
 use WP_Query;
-use DataMachineEvents\Blocks\Calendar\Calendar_Query;
+use DataMachineEvents\Blocks\Calendar\Query\EventQueryBuilder;
+use DataMachineEvents\Blocks\Calendar\Data\EventHydrator;
+use DataMachineEvents\Blocks\Calendar\Grouping\DateGrouper;
+use DataMachineEvents\Blocks\Calendar\Display\EventRenderer;
 use DataMachineEvents\Blocks\Calendar\Pagination;
+use DataMachineEvents\Blocks\Calendar\Pagination\PageBoundary;
 use DataMachineEvents\Blocks\Calendar\Template_Loader;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -185,12 +189,12 @@ class CalendarAbilities {
 			'geo_radius_unit'    => $input['geo_radius_unit'] ?? 'mi',
 		);
 
-		$date_data         = Calendar_Query::get_unique_event_dates( $base_params );
+		$date_data         = PageBoundary::get_unique_event_dates( $base_params );
 		$unique_dates      = $date_data['dates'];
 		$total_event_count = $date_data['total_events'];
 		$events_per_date   = $date_data['events_per_date'];
 
-		$date_boundaries = Calendar_Query::get_date_boundaries_for_page(
+		$date_boundaries = PageBoundary::get_date_boundaries_for_page(
 			$unique_dates,
 			$current_page,
 			$total_event_count,
@@ -216,13 +220,13 @@ class CalendarAbilities {
 			}
 		}
 
-		$query_args   = Calendar_Query::build_query_args( $query_params );
+		$query_args   = EventQueryBuilder::build_query_args( $query_params );
 		$events_query = new WP_Query( $query_args );
 
-		$event_counts = Calendar_Query::get_event_counts();
+		$event_counts = EventQueryBuilder::get_event_counts();
 
-		$paged_events      = Calendar_Query::build_paged_events( $events_query );
-		$paged_date_groups = Calendar_Query::group_events_by_date(
+		$paged_events      = DateGrouper::build_paged_events( $events_query );
+		$paged_date_groups = DateGrouper::group_events_by_date(
 			$paged_events,
 			$show_past,
 			$range_start,
@@ -231,7 +235,7 @@ class CalendarAbilities {
 
 		$gaps_detected = array();
 		if ( $include_gaps && ! empty( $paged_date_groups ) ) {
-			$gaps_detected = Calendar_Query::detect_time_gaps( $paged_date_groups );
+			$gaps_detected = DateGrouper::detect_time_gaps( $paged_date_groups );
 		}
 
 		$result = array(
@@ -328,7 +332,7 @@ class CalendarAbilities {
 		int $total_event_count,
 		array $event_counts
 	): array {
-		$events_html = Calendar_Query::render_date_groups( $paged_date_groups, $gaps_detected, $include_gaps );
+		$events_html = EventRenderer::render_date_groups( $paged_date_groups, $gaps_detected, $include_gaps );
 
 		$pagination_html = Pagination::render_pagination( $current_page, $max_pages, $show_past );
 
