@@ -2,7 +2,7 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
-## Unreleased
+## [0.13.0] - 2026-02-28
 
 ### Added
 - Public venue REST endpoint (`GET /datamachine/v1/events/venues`) for map rendering with geo proximity and bounds filtering
