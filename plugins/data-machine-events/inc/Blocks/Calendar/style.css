@@ -1395,12 +1395,6 @@
     opacity: 0.85;
 }
 
-.datamachine-event-continuation .datamachine-event-title::before {
-    content: '\21B3 ';
-    color: var(--datamachine-text-muted);
-    font-weight: normal;
-}
-
 .datamachine-event-multi-day:not(.datamachine-event-continuation) .datamachine-event-multi-day-label {
     background: var(--datamachine-background-hover);
     padding: 0.15rem 0.4rem;

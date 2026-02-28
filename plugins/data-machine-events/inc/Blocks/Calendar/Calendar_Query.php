@@ -669,14 +669,19 @@ class Calendar_Query {
 
 			if ( $is_multi_day && ! empty( $end_date ) ) {
 				$end_datetime_obj = new DateTime( $end_date, $event_tz );
-				$multi_day_label  = sprintf(
-					__( 'through %s', 'datamachine-events' ),
-					$end_datetime_obj->format( 'M j' )
-				);
 
 				if ( $is_continuation ) {
-					$formatted_time_display = __( 'All Day', 'datamachine-events' );
+					$formatted_time_display = sprintf(
+						/* translators: 1: start date, 2: end date. Example: "Feb 27 – Mar 1" */
+						__( '%1$s – %2$s', 'datamachine-events' ),
+						$start_datetime_obj->format( 'M j' ),
+						$end_datetime_obj->format( 'M j' )
+					);
 				} else {
+					$multi_day_label = sprintf(
+						__( 'through %s', 'datamachine-events' ),
+						$end_datetime_obj->format( 'M j' )
+					);
 					$formatted_time_display = self::format_time_range( $start_datetime_obj, $end_date, $end_time, $event_tz );
 				}
 			} else {
