@@ -15,7 +15,6 @@ use DataMachine\Core\Selection\SelectionMode;
 use DataMachine\Core\WordPress\TaxonomyHandler;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
 use DataMachine\Core\WordPress\WordPressPublishHelper;
-use DataMachine\Core\WordPress\PostTrackingTrait;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -23,7 +22,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class WordPress extends PublishHandler {
 	use HandlerRegistrationTrait;
-	use PostTrackingTrait;
 
 	protected $taxonomy_handler;
 
@@ -147,11 +145,6 @@ class WordPress extends PublishHandler {
 		}
 
 		$post_id = $result['post_id'] ?? null;
-
-		// Store post tracking meta
-		if ( $post_id ) {
-			$this->storePostTrackingMeta( $post_id, $handler_config );
-		}
 
 		return $this->successResponse(
 			array(
