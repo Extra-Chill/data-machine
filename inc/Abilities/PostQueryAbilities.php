@@ -12,10 +12,7 @@
 namespace DataMachine\Abilities;
 
 use DataMachine\Abilities\PermissionHelper;
-
-use const DataMachine\Core\WordPress\DATAMACHINE_POST_HANDLER_META_KEY;
-use const DataMachine\Core\WordPress\DATAMACHINE_POST_FLOW_ID_META_KEY;
-use const DataMachine\Core\WordPress\DATAMACHINE_POST_PIPELINE_ID_META_KEY;
+use DataMachine\Core\WordPress\PostTracking;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -25,20 +22,22 @@ class PostQueryAbilities {
 
 	private static bool $registered = false;
 
-	private const FILTER_TYPES = array(
-		'handler'  => array(
-			'meta_key'   => DATAMACHINE_POST_HANDLER_META_KEY,
-			'value_type' => 'string',
-		),
-		'flow'     => array(
-			'meta_key'   => DATAMACHINE_POST_FLOW_ID_META_KEY,
-			'value_type' => 'integer',
-		),
-		'pipeline' => array(
-			'meta_key'   => DATAMACHINE_POST_PIPELINE_ID_META_KEY,
-			'value_type' => 'integer',
-		),
-	);
+	private static function get_filter_types(): array {
+		return array(
+			'handler'  => array(
+				'meta_key'   => PostTracking::HANDLER_META_KEY,
+				'value_type' => 'string',
+			),
+			'flow'     => array(
+				'meta_key'   => PostTracking::FLOW_ID_META_KEY,
+				'value_type' => 'integer',
+			),
+			'pipeline' => array(
+				'meta_key'   => PostTracking::PIPELINE_ID_META_KEY,
+				'value_type' => 'integer',
+			),
+		);
+	}
 
 	public function __construct() {
 		if ( ! class_exists( 'WP_Ability' ) ) {
@@ -189,7 +188,7 @@ class PostQueryAbilities {
 			'order'          => 'DESC',
 			'meta_query'     => array(
 				array(
-					'key'     => DATAMACHINE_POST_HANDLER_META_KEY,
+					'key'     => PostTracking::HANDLER_META_KEY,
 					'compare' => 'EXISTS',
 				),
 			),
@@ -218,15 +217,17 @@ class PostQueryAbilities {
 		$per_page     = (int) ( $input['per_page'] ?? self::DEFAULT_PER_PAGE );
 		$offset       = (int) ( $input['offset'] ?? 0 );
 
-		if ( ! isset( self::FILTER_TYPES[ $filter_by ] ) ) {
+		$filter_types = self::get_filter_types();
+
+		if ( ! isset( $filter_types[ $filter_by ] ) ) {
 			return array(
 				'posts' => array(),
 				'total' => 0,
-				'error' => sprintf( 'Invalid filter_by value. Must be one of: %s', implode( ', ', array_keys( self::FILTER_TYPES ) ) ),
+				'error' => sprintf( 'Invalid filter_by value. Must be one of: %s', implode( ', ', array_keys( $filter_types ) ) ),
 			);
 		}
 
-		$filter_config = self::FILTER_TYPES[ $filter_by ];
+		$filter_config = $filter_types[ $filter_by ];
 		$meta_key      = $filter_config['meta_key'];
 		$value_type    = $filter_config['value_type'];
 
@@ -308,9 +309,9 @@ class PostQueryAbilities {
 			'post_date'     => $post->post_date,
 			'post_date_gmt' => $post->post_date_gmt,
 			'post_modified' => $post->post_modified,
-			'handler_slug'  => get_post_meta( $post->ID, DATAMACHINE_POST_HANDLER_META_KEY, true ),
-			'flow_id'       => (int) get_post_meta( $post->ID, DATAMACHINE_POST_FLOW_ID_META_KEY, true ),
-			'pipeline_id'   => (int) get_post_meta( $post->ID, DATAMACHINE_POST_PIPELINE_ID_META_KEY, true ),
+			'handler_slug'  => get_post_meta( $post->ID, PostTracking::HANDLER_META_KEY, true ),
+			'flow_id'       => (int) get_post_meta( $post->ID, PostTracking::FLOW_ID_META_KEY, true ),
+			'pipeline_id'   => (int) get_post_meta( $post->ID, PostTracking::PIPELINE_ID_META_KEY, true ),
 			'post_url'      => get_permalink( $post->ID ),
 		);
 	}

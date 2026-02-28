@@ -23,14 +23,14 @@ use DataMachine\Core\Database\Jobs\Jobs;
 
 defined( 'ABSPATH' ) || exit;
 
-const DATAMACHINE_POST_HANDLER_META_KEY     = '_datamachine_post_handler';
-const DATAMACHINE_POST_FLOW_ID_META_KEY     = '_datamachine_post_flow_id';
-const DATAMACHINE_POST_PIPELINE_ID_META_KEY = '_datamachine_post_pipeline_id';
-
 /**
  * Static utility for post origin tracking.
  */
 class PostTracking {
+
+	public const HANDLER_META_KEY     = '_datamachine_post_handler';
+	public const FLOW_ID_META_KEY     = '_datamachine_post_flow_id';
+	public const PIPELINE_ID_META_KEY = '_datamachine_post_pipeline_id';
 
 	/**
 	 * Store post tracking metadata from tool call context.
@@ -63,15 +63,15 @@ class PostTracking {
 		}
 
 		if ( ! empty( $handler_slug ) ) {
-			update_post_meta( $post_id, DATAMACHINE_POST_HANDLER_META_KEY, sanitize_text_field( $handler_slug ) );
+			update_post_meta( $post_id, self::HANDLER_META_KEY, sanitize_text_field( $handler_slug ) );
 		}
 
 		if ( $flow_id > 0 ) {
-			update_post_meta( $post_id, DATAMACHINE_POST_FLOW_ID_META_KEY, $flow_id );
+			update_post_meta( $post_id, self::FLOW_ID_META_KEY, $flow_id );
 		}
 
 		if ( $pipeline_id > 0 ) {
-			update_post_meta( $post_id, DATAMACHINE_POST_PIPELINE_ID_META_KEY, $pipeline_id );
+			update_post_meta( $post_id, self::PIPELINE_ID_META_KEY, $pipeline_id );
 		}
 
 		do_action(
