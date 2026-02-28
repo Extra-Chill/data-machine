@@ -256,6 +256,32 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [] );
 
+	/* --- listen for external recenter requests --- */
+	useEffect( () => {
+		const handler = ( e: Event ) => {
+			const map = mapRef.current;
+			if ( ! map ) return;
+
+			const detail = ( e as CustomEvent< {
+				lat: number;
+				lng: number;
+				zoom?: number;
+			} > ).detail;
+
+			if ( ! detail?.lat || ! detail?.lng ) return;
+
+			map.setView(
+				[ detail.lat, detail.lng ],
+				detail.zoom ?? map.getZoom(),
+			);
+		};
+
+		document.addEventListener( 'datamachine-map-recenter', handler );
+		return () => {
+			document.removeEventListener( 'datamachine-map-recenter', handler );
+		};
+	}, [] );
+
 	/* --- update markers when venues change --- */
 	useEffect( () => {
 		const map = mapRef.current;
