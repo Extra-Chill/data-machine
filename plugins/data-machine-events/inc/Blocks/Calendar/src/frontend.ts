@@ -33,7 +33,7 @@ import type { FlatpickrInstance } from './types';
 
 document.addEventListener( 'DOMContentLoaded', function () {
 	document
-		.querySelectorAll< HTMLElement >( '.datamachine-events-calendar' )
+		.querySelectorAll< HTMLElement >( '.data-machine-events-calendar' )
 		.forEach( initCalendarInstance );
 } );
 
@@ -81,10 +81,10 @@ function initCalendarInstance( calendar: HTMLElement ): void {
 function initSearchInput( calendar: HTMLElement ): void {
 	const searchInput =
 		calendar.querySelector< HTMLInputElement >(
-			'.datamachine-events-search-input'
+			'.data-machine-events-search-input'
 		) ||
 		calendar.querySelector< HTMLInputElement >(
-			'[id^="datamachine-events-search-"]'
+			'[id^="data-machine-events-search-"]'
 		);
 
 	if ( ! searchInput ) {
@@ -100,7 +100,7 @@ function initSearchInput( calendar: HTMLElement ): void {
 	} );
 
 	const searchBtn = calendar.querySelector< HTMLElement >(
-		'.datamachine-events-search-btn'
+		'.data-machine-events-search-btn'
 	);
 	if ( searchBtn ) {
 		searchBtn.addEventListener( 'click', function () {
@@ -140,12 +140,12 @@ function navigateToUrl( params: URLSearchParams ): void {
  * When present, the calendar auto-enables geo sync mode.
  */
 function hasMapBlockOnPage(): boolean {
-	return document.querySelector( '.datamachine-events-map-root' ) !== null;
+	return document.querySelector( '.data-machine-events-map-root' ) !== null;
 }
 
 window.addEventListener( 'beforeunload', function () {
 	document
-		.querySelectorAll< HTMLElement >( '.datamachine-events-calendar' )
+		.querySelectorAll< HTMLElement >( '.data-machine-events-calendar' )
 		.forEach( function ( calendar ) {
 			destroyDatePicker( calendar );
 			destroyCarousel( calendar );

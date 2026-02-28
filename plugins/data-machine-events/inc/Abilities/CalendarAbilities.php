@@ -37,10 +37,10 @@ class CalendarAbilities {
 	private function registerAbility(): void {
 		$register_callback = function () {
 			wp_register_ability(
-				'datamachine-events/get-calendar-page',
+				'data-machine-events/get-calendar-page',
 				array(
-					'label'               => __( 'Get Calendar Page', 'datamachine-events' ),
-					'description'         => __( 'Query paginated calendar events with optional filtering and HTML rendering', 'datamachine-events' ),
+					'label'               => __( 'Get Calendar Page', 'data-machine-events' ),
+					'description'         => __( 'Query paginated calendar events with optional filtering and HTML rendering', 'data-machine-events' ),
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',

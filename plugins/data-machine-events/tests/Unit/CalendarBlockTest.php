@@ -18,14 +18,14 @@ class CalendarBlockTest extends WP_UnitTestCase {
 
 	public function test_calendar_block_registered() {
 		$block_registry = \WP_Block_Type_Registry::get_instance();
-		$block = $block_registry->get_registered( 'datamachine-events/calendar' );
+		$block = $block_registry->get_registered( 'data-machine-events/calendar' );
 
 		$this->assertNotNull( $block, 'Calendar block should be registered' );
 	}
 
 	public function test_calendar_block_has_render_callback() {
 		$block_registry = \WP_Block_Type_Registry::get_instance();
-		$block = $block_registry->get_registered( 'datamachine-events/calendar' );
+		$block = $block_registry->get_registered( 'data-machine-events/calendar' );
 
 		$this->assertNotNull( $block );
 		$this->assertNotNull( $block->render_callback, 'Block should have render callback' );
@@ -63,23 +63,23 @@ class CalendarBlockTest extends WP_UnitTestCase {
 		$modified = false;
 
 		add_filter(
-			'datamachine_events_calendar_query_args',
+			'data_machine_events_calendar_query_args',
 			function ( $args ) use ( &$modified ) {
 				$modified = true;
 				return $args;
 			}
 		);
 
-		$args = apply_filters( 'datamachine_events_calendar_query_args', array( 'post_type' => 'datamachine_events' ) );
+		$args = apply_filters( 'data_machine_events_calendar_query_args', array( 'post_type' => 'data_machine_events' ) );
 
 		$this->assertTrue( $modified );
-		$this->assertEquals( 'datamachine_events', $args['post_type'] );
+		$this->assertEquals( 'data_machine_events', $args['post_type'] );
 	}
 
 	public function test_calendar_renders_no_events_state() {
 		// Create a mock render with no events
 		$block_registry = \WP_Block_Type_Registry::get_instance();
-		$block = $block_registry->get_registered( 'datamachine-events/calendar' );
+		$block = $block_registry->get_registered( 'data-machine-events/calendar' );
 
 		if ( $block && $block->render_callback ) {
 			$output = call_user_func( $block->render_callback, array(), '', $block );
@@ -92,25 +92,25 @@ class CalendarBlockTest extends WP_UnitTestCase {
 	}
 
 	public function test_event_item_template_exists() {
-		$template_path = DATAMACHINE_EVENTS_PATH . 'inc/Blocks/Calendar/templates/event-item.php';
+		$template_path = DATA_MACHINE_EVENTS_PATH . 'inc/Blocks/Calendar/templates/event-item.php';
 
 		$this->assertFileExists( $template_path, 'Event item template should exist' );
 	}
 
 	public function test_date_group_template_exists() {
-		$template_path = DATAMACHINE_EVENTS_PATH . 'inc/Blocks/Calendar/templates/date-group.php';
+		$template_path = DATA_MACHINE_EVENTS_PATH . 'inc/Blocks/Calendar/templates/date-group.php';
 
 		$this->assertFileExists( $template_path, 'Date group template should exist' );
 	}
 
 	public function test_pagination_template_exists() {
-		$template_path = DATAMACHINE_EVENTS_PATH . 'inc/Blocks/Calendar/templates/pagination.php';
+		$template_path = DATA_MACHINE_EVENTS_PATH . 'inc/Blocks/Calendar/templates/pagination.php';
 
 		$this->assertFileExists( $template_path, 'Pagination template should exist' );
 	}
 
 	public function test_no_events_template_exists() {
-		$template_path = DATAMACHINE_EVENTS_PATH . 'inc/Blocks/Calendar/templates/no-events.php';
+		$template_path = DATA_MACHINE_EVENTS_PATH . 'inc/Blocks/Calendar/templates/no-events.php';
 
 		$this->assertFileExists( $template_path, 'No events template should exist' );
 	}

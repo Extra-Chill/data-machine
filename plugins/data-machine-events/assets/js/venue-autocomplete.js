@@ -15,7 +15,7 @@
     const NOMINATIM_API = 'https://nominatim.openstreetmap.org/search';
     const USER_AGENT = 'ExtraChill-Events/1.0 (https://extrachill.com)';
     const DEBOUNCE_DELAY = 1000; // 1 second (Nominatim usage policy)
-    const CACHE_KEY = 'datamachine_events_venue_autocomplete_cache';
+    const CACHE_KEY = 'data_machine_events_venue_autocomplete_cache';
     const CACHE_EXPIRY = 3600000; // 1 hour in milliseconds
 
     let debounceTimer = null;

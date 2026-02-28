@@ -32,7 +32,7 @@ const ALLOWED_BLOCKS = [
 ];
 
 const DESCRIPTION_TEMPLATE = [
-    ['core/paragraph', { placeholder: __('Add event description…', 'datamachine-events') }]
+    ['core/paragraph', { placeholder: __('Add event description…', 'data-machine-events') }]
 ];
 
 /**
@@ -40,7 +40,7 @@ const DESCRIPTION_TEMPLATE = [
  *
  * Block for event data storage with InnerBlocks support.
  */
-registerBlockType('datamachine-events/event-details', {
+registerBlockType('data-machine-events/event-details', {
     /**
      * Block editor component with comprehensive event data fields and InnerBlocks support
      * @param root0
@@ -85,7 +85,7 @@ registerBlockType('datamachine-events/event-details', {
             <div {...blockProps}>
                     <div className="datamachine-event-details-editor">
                         <div className="event-description-area">
-                            <h4>{__('Event Description', 'datamachine-events')}</h4>
+                            <h4>{__('Event Description', 'data-machine-events')}</h4>
                             <div className="event-description-inner">
                                 <InnerBlocks
                                     allowedBlocks={ALLOWED_BLOCKS}
@@ -96,10 +96,10 @@ registerBlockType('datamachine-events/event-details', {
                         </div>
                         
                         <div className="event-dates">
-                            <h4>{__('Event Dates & Times', 'datamachine-events')}</h4>
+                            <h4>{__('Event Dates & Times', 'data-machine-events')}</h4>
                             <div className="date-time-grid">
                                 <div className="date-time-field">
-                                    <label>{__('Start Date', 'datamachine-events')}</label>
+                                    <label>{__('Start Date', 'data-machine-events')}</label>
                                     <input
                                         type="date"
                                         value={startDate}
@@ -107,7 +107,7 @@ registerBlockType('datamachine-events/event-details', {
                                     />
                                 </div>
                                 <div className="date-time-field">
-                                    <label>{__('Start Time', 'datamachine-events')}</label>
+                                    <label>{__('Start Time', 'data-machine-events')}</label>
                                     <input
                                         type="time"
                                         value={startTime}
@@ -115,7 +115,7 @@ registerBlockType('datamachine-events/event-details', {
                                     />
                                 </div>
                                 <div className="date-time-field">
-                                    <label>{__('End Date', 'datamachine-events')}</label>
+                                    <label>{__('End Date', 'data-machine-events')}</label>
                                     <input
                                         type="date"
                                         value={endDate}
@@ -123,7 +123,7 @@ registerBlockType('datamachine-events/event-details', {
                                     />
                                 </div>
                                 <div className="date-time-field">
-                                    <label>{__('End Time', 'datamachine-events')}</label>
+                                    <label>{__('End Time', 'data-machine-events')}</label>
                                     <input
                                         type="time"
                                         value={endTime}
@@ -134,28 +134,28 @@ registerBlockType('datamachine-events/event-details', {
                         </div>
 
                         <div className="event-location">
-                            <h4>{__('Location', 'datamachine-events')}</h4>
+                            <h4>{__('Location', 'data-machine-events')}</h4>
                             <TextControl
-                                label={__('Venue', 'datamachine-events')}
+                                label={__('Venue', 'data-machine-events')}
                                 value={venue}
                                 onChange={(value) => setAttributes({ venue: value })}
                             />
                             <TextControl
-                                label={__('Address', 'datamachine-events')}
+                                label={__('Address', 'data-machine-events')}
                                 value={address}
                                 onChange={(value) => setAttributes({ address: value })}
                             />
                         </div>
 
                         <div className="event-details">
-                            <h4>{__('Event Details', 'datamachine-events')}</h4>
+                            <h4>{__('Event Details', 'data-machine-events')}</h4>
                             <TextControl
-                                label={__('Price', 'datamachine-events')}
+                                label={__('Price', 'data-machine-events')}
                                 value={price}
                                 onChange={(value) => handleAttributeChange('price', value)}
                             />
                             <TextControl
-                                label={__('Ticket URL', 'datamachine-events')}
+                                label={__('Ticket URL', 'data-machine-events')}
                                 value={ticketUrl}
                                 onChange={(value) => handleAttributeChange('ticketUrl', value)}
                                 type="url"
@@ -163,30 +163,30 @@ registerBlockType('datamachine-events/event-details', {
                         </div>
 
                         <div className="event-schema">
-                            <h4>{__('Schema Information', 'datamachine-events')}</h4>
+                            <h4>{__('Schema Information', 'data-machine-events')}</h4>
                             <TextControl
-                                label={__('Performer/Artist', 'datamachine-events')}
+                                label={__('Performer/Artist', 'data-machine-events')}
                                 value={performer}
                                 onChange={(value) => setAttributes({ performer: value })}
-                                help={__('Name of the performing artist or group', 'datamachine-events')}
+                                help={__('Name of the performing artist or group', 'data-machine-events')}
                             />
                             <TextControl
-                                label={__('Organizer', 'datamachine-events')}
+                                label={__('Organizer', 'data-machine-events')}
                                 value={organizer}
                                 onChange={(value) => setAttributes({ organizer: value })}
-                                help={__('Name of the event organizer', 'datamachine-events')}
+                                help={__('Name of the event organizer', 'data-machine-events')}
                             />
                             <TextControl
-                                label={__('Organizer URL', 'datamachine-events')}
+                                label={__('Organizer URL', 'data-machine-events')}
                                 value={organizerUrl}
                                 onChange={(value) => setAttributes({ organizerUrl: value })}
                                 type="url"
-                                help={__('Website of the event organizer', 'datamachine-events')}
+                                help={__('Website of the event organizer', 'data-machine-events')}
                             />
                         </div>
 
                         <Notice status="info" isDismissible={false}>
-                            {__('This block is the primary data store for event information. Changes here are automatically saved to the event.', 'datamachine-events')}
+                            {__('This block is the primary data store for event information. Changes here are automatically saved to the event.', 'data-machine-events')}
                         </Notice>
                     </div>
                 </div>

@@ -27,7 +27,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class BatchTimeFixAbilities {
 
 	private const DEFAULT_LIMIT = 100;
-	private const BLOCK_NAME    = 'datamachine-events/event-details';
+	private const BLOCK_NAME    = 'data-machine-events/event-details';
 
 	private static bool $registered = false;
 
@@ -41,10 +41,10 @@ class BatchTimeFixAbilities {
 	private function registerAbility(): void {
 		$register_callback = function () {
 			wp_register_ability(
-				'datamachine-events/batch-time-fix',
+				'data-machine-events/batch-time-fix',
 				array(
-					'label'               => __( 'Batch Time Fix', 'datamachine-events' ),
-					'description'         => __( 'Batch fix event times with offset correction or explicit replacement', 'datamachine-events' ),
+					'label'               => __( 'Batch Time Fix', 'data-machine-events' ),
+					'description'         => __( 'Batch fix event times with offset correction or explicit replacement', 'data-machine-events' ),
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',

@@ -160,7 +160,7 @@ $normalized_date = $startDate; // Date already normalized
 
 // Search for existing event with same identity
 $args = [
-    'post_type' => 'datamachine_events',
+    'post_type' => 'data_machine_events',
     'meta_query' => [
         [
             'key' => '_datamachine_event_identifier',

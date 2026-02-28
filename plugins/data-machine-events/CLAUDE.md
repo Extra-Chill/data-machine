@@ -6,10 +6,10 @@ Technical guidance for Claude Code when working with the **Data Machine Events**
 
 ## Plugin Bootstrap
 
-- **Entry point**: `datamachine-events.php` defines constants (`DATAMACHINE_EVENTS_VERSION`, plugin paths), loads `inc/Core/meta-storage.php`, and requires `inc/Api/Routes.php` when the file exists.
-- **`DATAMACHINE_Events` class**: Singleton bootstrapped via `init`, it registers the `datamachine_events` post type, `venue`/`promoter` taxonomies, enqueues admin assets, and registers Calendar/Event Details blocks. It also adds root styles, Leaflet assets, and the venue map script whenever a block or singular event is rendered.
-- **Block registration**: `register_block_type()` reads `inc/Blocks/Calendar/block.json` and `inc/Blocks/EventDetails/block.json`, enqueues shared `inc/Blocks/root.css`, and hooks `enqueue_root_styles()` to `wp_enqueue_scripts`/`enqueue_block_assets`. Leaflet CSS/JS plus `assets/js/venue-map.js` are enqueued only when the Event Details block or a `datamachine_events` post is present.
-- **Query Parameter Sanitization**: `datamachine_events_sanitize_query_params()` recursively sanitizes nested query arrays while preserving structure, enabling safe handling of multi-dimensional filter parameters (e.g., `tax_filter[genre][0]`). Used in `Pagination::sanitize_query_params()` and the navigation template.
+- **Entry point**: `data-machine-events.php` defines constants (`DATA_MACHINE_EVENTS_VERSION`, plugin paths), loads `inc/Core/meta-storage.php`, and requires `inc/Api/Routes.php` when the file exists.
+- **`DATAMACHINE_Events` class**: Singleton bootstrapped via `init`, it registers the `data_machine_events` post type, `venue`/`promoter` taxonomies, enqueues admin assets, and registers Calendar/Event Details blocks. It also adds root styles, Leaflet assets, and the venue map script whenever a block or singular event is rendered.
+- **Block registration**: `register_block_type()` reads `inc/Blocks/Calendar/block.json` and `inc/Blocks/EventDetails/block.json`, enqueues shared `inc/Blocks/root.css`, and hooks `enqueue_root_styles()` to `wp_enqueue_scripts`/`enqueue_block_assets`. Leaflet CSS/JS plus `assets/js/venue-map.js` are enqueued only when the Event Details block or a `data_machine_events` post is present.
+- **Query Parameter Sanitization**: `data_machine_events_sanitize_query_params()` recursively sanitizes nested query arrays while preserving structure, enabling safe handling of multi-dimensional filter parameters (e.g., `tax_filter[genre][0]`). Used in `Pagination::sanitize_query_params()` and the navigation template.
 
 ## Data Machine Integration
 
@@ -40,15 +40,15 @@ Technical guidance for Claude Code when working with the **Data Machine Events**
 - `EventIdentifierGenerator`: Normalizes event identity by lowercasing, trimming, collapsing whitespace, removing articles, and hashing `(title, startDate, venue)` to prevent duplicates.
 - `EventSchemaProvider`: Defines `getCoreToolParameters()`, `getSchemaToolParameters()`, `getFieldKeys()`, and `generateSchemaOrg()` so Schema.org JSON-LD merges block attributes, venue meta, and taxonomy data.
 - `Template_Loader`: Offers helpers for the Calendar templates (`get_template()`, `include_template()`, `template_exists()`, `get_template_path()`).
-- `Taxonomy_Helper` and `Taxonomy_Badges`: Build hierarchical filter data, term counts, and render badge HTML. Filters such as `datamachine_events_badge_wrapper_classes`, `datamachine_events_badge_classes`, and `datamachine_events_more_info_button_classes` customize badge markup and CTA styling.
+- `Taxonomy_Helper` and `Taxonomy_Badges`: Build hierarchical filter data, term counts, and render badge HTML. Filters such as `data_machine_events_badge_wrapper_classes`, `data_machine_events_badge_classes`, and `data_machine_events_more_info_button_classes` customize badge markup and CTA styling.
 
 ## Blocks & Frontend
 
 - **Calendar block** (`inc/Blocks/Calendar`): CSS-driven Carousel List with day grouping, time-gap separators, pagination, and server-rendered HTML. Templates include `event-item`, `date-group`, `navigation`, `results-counter`, `pagination`, `no-events`, `filter-bar`, `time-gap-separator`, and `modal/taxonomy-filter`.
-- **JavaScript modules**: `src/frontend.js` bootstraps `.datamachine-events-calendar` instances and wires `modules/api-client.js`, `modules/carousel.js`, `modules/date-picker.js`, `modules/filter-modal.js`, `modules/filter-state.js`, `modules/navigation.js`, and `modules/state.js` for REST calls, carousel scrolling, Flatpickr integration, modal accessibility, filter state management, navigation updates, and History API-aware state management (including 500ms debounced search). `FilterStateManager` centralizes URL, localStorage, and DOM-based state with regex support for both indexed (`tax_filter[taxonomy][0]`) and non-indexed (`tax_filter[taxonomy][]`) array syntax.
+- **JavaScript modules**: `src/frontend.js` bootstraps `.data-machine-events-calendar` instances and wires `modules/api-client.js`, `modules/carousel.js`, `modules/date-picker.js`, `modules/filter-modal.js`, `modules/filter-state.js`, `modules/navigation.js`, and `modules/state.js` for REST calls, carousel scrolling, Flatpickr integration, modal accessibility, filter state management, navigation updates, and History API-aware state management (including 500ms debounced search). `FilterStateManager` centralizes URL, localStorage, and DOM-based state with regex support for both indexed (`tax_filter[taxonomy][0]`) and non-indexed (`tax_filter[taxonomy][]`) array syntax.
 - **Progressive enhancement**: Server-rendered fragments allow the block to work without JavaScript, while REST API responses enrich filtering, pagination, search, and URL state when scripts are active.
 - **Event Details block** (`inc/Blocks/EventDetails`): 15+ attributes (dates/times, venue, address, price, priceCurrency, offerAvailability, ticketUrl, performer, performerType, organizer, organizerType, organizerUrl, eventStatus, previousStartDate, showVenue, showPrice, showTicketLink) plus InnerBlocks for rich content. Attributes persist to the block and sync `_datamachine_event_datetime` via `inc/Core/meta-storage.php` for performant queries. InnerBlocks content extracts to plain text for Schema.org `description` field via `wp_strip_all_tags()`, improving structured data quality.
-- **Schema & maps**: `enqueue_root_styles()` loads `leaflet.css`, `leaflet.js`, and `assets/js/venue-map.js` when Event Details or `datamachine_events` posts are present so Leaflet maps render with consistent markers and controls.
+- **Schema & maps**: `enqueue_root_styles()` loads `leaflet.css`, `leaflet.js`, and `assets/js/venue-map.js` when Event Details or `data_machine_events` posts are present so Leaflet maps render with consistent markers and controls.
 
 ## REST API
 
@@ -86,10 +86,10 @@ class ExampleAbilities {
             'wp_abilities_api_init',
             function () {
                 wp_register_ability(
-                    'datamachine-events/ability-slug',
+                    'data-machine-events/ability-slug',
                     array(
-                        'label'               => __( 'Ability Name', 'datamachine-events' ),
-                        'description'         => __( 'What this ability does', 'datamachine-events' ),
+                        'label'               => __( 'Ability Name', 'data-machine-events' ),
+                        'description'         => __( 'What this ability does', 'data-machine-events' ),
                         'category'            => 'datamachine',
                         'input_schema'        => array( /* JSON Schema */ ),
                         'output_schema'       => array( /* JSON Schema */ ),
@@ -116,11 +116,11 @@ Key integration points:
 ### Available Abilities
 
 - **EventScraperTest**: Tests universal web scraper compatibility with a target URL. Ability: `datamachine/test-event-scraper`. Chat tool: `test_event_scraper`.
-- **TimezoneAbilities**: Finds events with missing venue timezone and fixes them with geocoding support. Abilities: `datamachine-events/find-broken-timezone-events`, `datamachine-events/fix-event-timezone`. Chat tools: `find_broken_timezone_events`, `fix_event_timezone`.
-- **EventQueryAbilities**: Query events by venue with filtering options. Ability: `datamachine-events/get-venue-events`. Chat tool wrapper in `inc/Api/Chat/Tools/GetVenueEvents.php`.
-- **EventHealthAbilities**: Scans events for data quality issues (missing time, suspicious midnight, late night times, missing venue, etc.). Ability: `datamachine-events/event-health-check`. CLI wrapper: `wp datamachine-events health-check`.
-- **EventUpdateAbilities**: Updates event block attributes and venue assignment, supporting single or batch updates. Ability: `datamachine-events/update-event`. CLI wrapper: `wp datamachine-events update-event`.
-- **BatchTimeFixAbilities** (@since 0.9.16): Batch correction for events with systematic timezone/offset issues. Filters by venue (required), date range, and optionally source URL pattern. Supports offset-based fixes (`+6h`, `-1h`) or explicit time replacement. Ability: `datamachine-events/batch-time-fix`. CLI wrapper: `wp datamachine-events batch-time-fix`.
+- **TimezoneAbilities**: Finds events with missing venue timezone and fixes them with geocoding support. Abilities: `data-machine-events/find-broken-timezone-events`, `data-machine-events/fix-event-timezone`. Chat tools: `find_broken_timezone_events`, `fix_event_timezone`.
+- **EventQueryAbilities**: Query events by venue with filtering options. Ability: `data-machine-events/get-venue-events`. Chat tool wrapper in `inc/Api/Chat/Tools/GetVenueEvents.php`.
+- **EventHealthAbilities**: Scans events for data quality issues (missing time, suspicious midnight, late night times, missing venue, etc.). Ability: `data-machine-events/event-health-check`. CLI wrapper: `wp data-machine-events health-check`.
+- **EventUpdateAbilities**: Updates event block attributes and venue assignment, supporting single or batch updates. Ability: `data-machine-events/update-event`. CLI wrapper: `wp data-machine-events update-event`.
+- **BatchTimeFixAbilities** (@since 0.9.16): Batch correction for events with systematic timezone/offset issues. Filters by venue (required), date range, and optionally source URL pattern. Supports offset-based fixes (`+6h`, `-1h`) or explicit time replacement. Ability: `data-machine-events/batch-time-fix`. CLI wrapper: `wp data-machine-events batch-time-fix`.
 
 ## AI Chat Tools
 
@@ -136,7 +136,7 @@ Chat tools in `inc/Api/Chat/Tools` provide AI-driven venue and event management 
 
 - `Template_Loader` renders the eight modular Calendar templates and ensures variable hygiene.
 - `Taxonomy_Helper` builds taxonomy hierarchies and counts; `Taxonomy_Badges` renders badges with consistent color classes.
-- Pagination (five days per page) lives in `inc/Blocks/Calendar/Pagination.php` and respects `datamachine_events_pagination_wrapper_classes` and `datamachine_events_pagination_args` filters.
+- Pagination (five days per page) lives in `inc/Blocks/Calendar/Pagination.php` and respects `data_machine_events_pagination_wrapper_classes` and `data_machine_events_pagination_args` filters.
 
 ## Geocoding & Maps
 
@@ -146,18 +146,18 @@ Chat tools in `inc/Api/Chat/Tools` provide AI-driven venue and event management 
 
 ## Filters & Hooks
 
-- `datamachine_events_calendar_query_args`: Modify calendar WP_Query arguments before template rendering.
-- `datamachine_events_excluded_taxonomies`: Control taxonomies excluded from badge lists or filter modals.
-- Badge/action filters: `datamachine_events_badge_wrapper_classes`, `datamachine_events_badge_classes`, `datamachine_events_more_info_button_classes`, `datamachine_events_ticket_button_classes`, and `datamachine_events_action_buttons` customize badge/CTA markup.
-- Pagination filters: `datamachine_events_pagination_wrapper_classes`, `datamachine_events_pagination_args` customize pagination markup.
+- `data_machine_events_calendar_query_args`: Modify calendar WP_Query arguments before template rendering.
+- `data_machine_events_excluded_taxonomies`: Control taxonomies excluded from badge lists or filter modals.
+- Badge/action filters: `data_machine_events_badge_wrapper_classes`, `data_machine_events_badge_classes`, `data_machine_events_more_info_button_classes`, `data_machine_events_ticket_button_classes`, and `data_machine_events_action_buttons` customize badge/CTA markup.
+- Pagination filters: `data_machine_events_pagination_wrapper_classes`, `data_machine_events_pagination_args` customize pagination markup.
 
 ## WP-CLI Commands
 
-- **Test Event Scraper Command** (`wp datamachine-events test-event-scraper`): `inc/Cli/UniversalWebScraperTestCommand.php` runs the `WebScraper\\UniversalWebScraper` handler against a `--target_url`, creates a job record for context, prints a packet summary (structured vs HTML fallback), and can optionally run `EventUpsert` (`--upsert`) to validate end-to-end venue coverage. Aligns with ability (`datamachine/test-event-scraper`) and chat tool (`test_event_scraper`) naming.
-- **Get Venue Events Command**: `inc/Cli/GetVenueEventsCommand.php` queries events for a specific venue. Wraps `EventQueryAbilities::executeGetVenueEvents()`. Usage: `wp datamachine-events get-venue-events <venue>` or `--venue=<venue>`. Options: `--limit` (default 25, max 100), `--status` (any/publish/future/draft/pending/private), `--published_before`, `--published_after`.
-- **Health Check Command**: `inc/Cli/HealthCheckCommand.php` scans events for data quality issues. Wraps `EventHealthCheck` chat tool. Usage: `wp datamachine-events health-check`. Options: `--scope` (upcoming/all/past, default: upcoming), `--days_ahead` (default: 90), `--limit` (default: 25), `--category` (late_night_time/midnight_time/missing_time/suspicious_end_time/missing_venue/missing_description/broken_timezone), `--format` (table/json, default: table).
-- **Update Event Command**: `inc/Cli/UpdateEventCommand.php` updates event details. Wraps `UpdateEvent` chat tool. Usage: `wp datamachine-events update-event <event_ids> [--startTime=<time>]`. Accepts single ID or comma-separated IDs. Options: `--startDate`, `--startTime`, `--endDate`, `--endTime`, `--venue`, `--price`, `--ticketUrl`, `--performer`, `--performerType`, `--eventStatus`, `--eventType`, `--description`, `--format` (table/json, default: table).
-- **Batch Time Fix Command** (@since 0.9.16): `inc/Cli/BatchTimeFixCommand.php` batch-fixes event times with offset correction or explicit replacement. Wraps `BatchTimeFixAbilities`. Usage: `wp datamachine-events batch-time-fix --venue=<venues> --offset=<offset>`. Required: `--venue` (comma-separated), at least one of `--before`/`--after`. Fix modes: `--offset` (e.g., `+6h`, `-1h`, `+30m`) or `--new-time` (requires `--where-time`). Options: `--source-pattern` (SQL LIKE, e.g., `%.ics`), `--where-time` (filter by current time), `--limit` (default: 100), `--dry-run` (preview, default), `--execute` (apply changes), `--format` (table/json).
+- **Test Event Scraper Command** (`wp data-machine-events test-event-scraper`): `inc/Cli/UniversalWebScraperTestCommand.php` runs the `WebScraper\\UniversalWebScraper` handler against a `--target_url`, creates a job record for context, prints a packet summary (structured vs HTML fallback), and can optionally run `EventUpsert` (`--upsert`) to validate end-to-end venue coverage. Aligns with ability (`datamachine/test-event-scraper`) and chat tool (`test_event_scraper`) naming.
+- **Get Venue Events Command**: `inc/Cli/GetVenueEventsCommand.php` queries events for a specific venue. Wraps `EventQueryAbilities::executeGetVenueEvents()`. Usage: `wp data-machine-events get-venue-events <venue>` or `--venue=<venue>`. Options: `--limit` (default 25, max 100), `--status` (any/publish/future/draft/pending/private), `--published_before`, `--published_after`.
+- **Health Check Command**: `inc/Cli/HealthCheckCommand.php` scans events for data quality issues. Wraps `EventHealthCheck` chat tool. Usage: `wp data-machine-events health-check`. Options: `--scope` (upcoming/all/past, default: upcoming), `--days_ahead` (default: 90), `--limit` (default: 25), `--category` (late_night_time/midnight_time/missing_time/suspicious_end_time/missing_venue/missing_description/broken_timezone), `--format` (table/json, default: table).
+- **Update Event Command**: `inc/Cli/UpdateEventCommand.php` updates event details. Wraps `UpdateEvent` chat tool. Usage: `wp data-machine-events update-event <event_ids> [--startTime=<time>]`. Accepts single ID or comma-separated IDs. Options: `--startDate`, `--startTime`, `--endDate`, `--endTime`, `--venue`, `--price`, `--ticketUrl`, `--performer`, `--performerType`, `--eventStatus`, `--eventType`, `--description`, `--format` (table/json, default: table).
+- **Batch Time Fix Command** (@since 0.9.16): `inc/Cli/BatchTimeFixCommand.php` batch-fixes event times with offset correction or explicit replacement. Wraps `BatchTimeFixAbilities`. Usage: `wp data-machine-events batch-time-fix --venue=<venues> --offset=<offset>`. Required: `--venue` (comma-separated), at least one of `--before`/`--after`. Fix modes: `--offset` (e.g., `+6h`, `-1h`, `+30m`) or `--new-time` (requires `--where-time`). Options: `--source-pattern` (SQL LIKE, e.g., `%.ics`), `--where-time` (filter by current time), `--limit` (default: 100), `--dry-run` (preview, default), `--execute` (apply changes), `--format` (table/json).
 
 ## Build Commands
 

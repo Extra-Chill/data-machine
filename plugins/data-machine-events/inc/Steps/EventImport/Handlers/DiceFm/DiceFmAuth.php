@@ -37,16 +37,16 @@ class DiceFmAuth extends BaseAuthProvider {
 	public function get_config_fields(): array {
 		return array(
 			'api_key'    => array(
-				'label'       => __( 'API Key', 'datamachine-events' ),
+				'label'       => __( 'API Key', 'data-machine-events' ),
 				'type'        => 'password',
 				'required'    => true,
-				'description' => __( 'Your Dice.fm API key from dice.fm developer portal', 'datamachine-events' ),
+				'description' => __( 'Your Dice.fm API key from dice.fm developer portal', 'data-machine-events' ),
 			),
 			'partner_id' => array(
-				'label'       => __( 'Partner ID', 'datamachine-events' ),
+				'label'       => __( 'Partner ID', 'data-machine-events' ),
 				'type'        => 'text',
 				'required'    => false,
-				'description' => __( 'Optional Partner ID for enhanced API access', 'datamachine-events' ),
+				'description' => __( 'Optional Partner ID for enhanced API access', 'data-machine-events' ),
 			),
 		);
 	}
@@ -82,8 +82,8 @@ class DiceFmAuth extends BaseAuthProvider {
 
 		$config  = $this->get_account();
 		$details = array(
-			'display_name' => __( 'Dice.fm API', 'datamachine-events' ),
-			'type'         => __( 'API Key Authentication', 'datamachine-events' ),
+			'display_name' => __( 'Dice.fm API', 'data-machine-events' ),
+			'type'         => __( 'API Key Authentication', 'data-machine-events' ),
 		);
 
 		if ( ! empty( $config['partner_id'] ) ) {

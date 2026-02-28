@@ -3,7 +3,7 @@
  * Shared helpers for check subcommands.
  *
  * Provides event querying, block attribute extraction, and common CLI output
- * patterns used across all `wp datamachine-events check *` commands.
+ * patterns used across all `wp data-machine-events check *` commands.
  *
  * @package DataMachineEvents\Cli\Check
  * @since   0.14.0
@@ -76,7 +76,7 @@ trait EventQueryTrait {
 		$blocks = parse_blocks( $post->post_content );
 
 		foreach ( $blocks as $block ) {
-			if ( 'datamachine-events/event-details' === $block['blockName'] ) {
+			if ( 'data-machine-events/event-details' === $block['blockName'] ) {
 				return $block['attrs'] ?? array();
 			}
 		}

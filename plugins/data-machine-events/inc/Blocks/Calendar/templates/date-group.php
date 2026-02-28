@@ -37,7 +37,7 @@ $events_count = $events_count ?? 0;
 			<?php
 			printf(
 				/* translators: %d: number of events */
-				esc_html( _n( '%d event', '%d events', $events_count, 'datamachine-events' ) ),
+				esc_html( _n( '%d event', '%d events', $events_count, 'data-machine-events' ) ),
 				(int) $events_count
 			);
 			?>

@@ -22,7 +22,7 @@ export function initLazyRender( calendar: HTMLElement ): void {
 	}
 
 	const wrappers = calendar.querySelectorAll< HTMLElement >(
-		'.datamachine-events-wrapper'
+		'.data-machine-events-wrapper'
 	);
 
 	wrappers.forEach( function ( wrapper ) {

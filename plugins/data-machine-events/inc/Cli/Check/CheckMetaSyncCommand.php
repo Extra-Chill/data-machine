@@ -7,8 +7,8 @@
  * This command finds events where the block has dates but meta is missing.
  *
  * Usage:
- *   wp datamachine-events check meta-sync
- *   wp datamachine-events check meta-sync --format=json
+ *   wp data-machine-events check meta-sync
+ *   wp data-machine-events check meta-sync --format=json
  *
  * @package DataMachineEvents\Cli\Check
  * @since   0.14.0
@@ -53,9 +53,9 @@ class CheckMetaSyncCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine-events check meta-sync
-	 *     wp datamachine-events check meta-sync --fix
-	 *     wp datamachine-events check meta-sync --format=json
+	 *     wp data-machine-events check meta-sync
+	 *     wp data-machine-events check meta-sync --fix
+	 *     wp data-machine-events check meta-sync --format=json
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Named arguments.
@@ -105,7 +105,7 @@ class CheckMetaSyncCommand {
 		if ( $fix ) {
 			$this->resync_meta( $missing );
 		} else {
-			\WP_CLI::log( 'Run with --fix to resync meta, or use: wp datamachine-events resync-meta' );
+			\WP_CLI::log( 'Run with --fix to resync meta, or use: wp data-machine-events resync-meta' );
 		}
 	}
 

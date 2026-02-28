@@ -38,10 +38,10 @@ class TicketmasterAuth extends BaseAuthProvider {
 	public function get_config_fields(): array {
 		return array(
 			'api_key' => array(
-				'label'       => __( 'API Key', 'datamachine-events' ),
+				'label'       => __( 'API Key', 'data-machine-events' ),
 				'type'        => 'password',
 				'required'    => true,
-				'description' => __( 'Your Ticketmaster Discovery API Consumer Key from developer.ticketmaster.com', 'datamachine-events' ),
+				'description' => __( 'Your Ticketmaster Discovery API Consumer Key from developer.ticketmaster.com', 'data-machine-events' ),
 			),
 		);
 	}
@@ -67,8 +67,8 @@ class TicketmasterAuth extends BaseAuthProvider {
 		}
 
 		return array(
-			'display_name' => __( 'Ticketmaster API', 'datamachine-events' ),
-			'type'         => __( 'API Key Authentication', 'datamachine-events' ),
+			'display_name' => __( 'Ticketmaster API', 'data-machine-events' ),
+			'type'         => __( 'API Key Authentication', 'data-machine-events' ),
 		);
 	}
 }

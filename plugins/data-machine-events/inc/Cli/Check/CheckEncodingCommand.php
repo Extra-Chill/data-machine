@@ -6,9 +6,9 @@
  * rendered as actual characters.
  *
  * Usage:
- *   wp datamachine-events check encoding
- *   wp datamachine-events check encoding --scope=all
- *   wp datamachine-events check encoding --format=json
+ *   wp data-machine-events check encoding
+ *   wp data-machine-events check encoding --scope=all
+ *   wp data-machine-events check encoding --format=json
  *
  * @package DataMachineEvents\Cli\Check
  * @since   0.14.0
@@ -66,8 +66,8 @@ class CheckEncodingCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine-events check encoding
-	 *     wp datamachine-events check encoding --scope=all --format=json
+	 *     wp data-machine-events check encoding
+	 *     wp data-machine-events check encoding --scope=all --format=json
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Named arguments.
@@ -142,7 +142,7 @@ class CheckEncodingCommand {
 
 		\WP_CLI::log( '' );
 		\WP_CLI::warning( sprintf( '%d event(s) with encoding issues.', count( $invalid_encoding ) ) );
-		\WP_CLI::log( 'Fix with: wp datamachine-events fix-encoding' );
+		\WP_CLI::log( 'Fix with: wp data-machine-events fix-encoding' );
 	}
 
 	/**

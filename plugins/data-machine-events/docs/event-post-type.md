@@ -4,7 +4,7 @@ Custom post type registration and management for Data Machine Events with select
 
 ## Overview
 
-The `Event_Post_Type` class handles the complete registration and management of the `datamachine_events` custom post type. It provides enhanced admin interface features including custom columns for event dates, selective taxonomy menu control, and proper menu highlighting.
+The `Event_Post_Type` class handles the complete registration and management of the `data_machine_events` custom post type. It provides enhanced admin interface features including custom columns for event dates, selective taxonomy menu control, and proper menu highlighting.
 
 ## Location
 
@@ -14,7 +14,7 @@ The `Event_Post_Type` class handles the complete registration and management of 
 
 ### Custom Post Type Registration
 
-- Registers `datamachine_events` post type with full WordPress features
+- Registers `data_machine_events` post type with full WordPress features
 - Supports all standard post features (title, editor, excerpt, thumbnail, etc.)
 - REST API enabled with custom controller
 - Publicly queryable with custom rewrite slug `/events`
@@ -28,7 +28,7 @@ The `Event_Post_Type` class handles the complete registration and management of 
 
 ### Constants
 
-- `POST_TYPE`: `'datamachine_events'` - The post type slug
+- `POST_TYPE`: `'data_machine_events'` - The post type slug
 - `EVENT_DATE_META_KEY`: `'_datamachine_event_datetime'` - Meta key for event datetime
 
 ## Key Methods
@@ -55,16 +55,16 @@ Handles the actual sorting by event date when the column header is clicked.
 
 ### `control_taxonomy_menus(): void`
 
-Manages which taxonomy menus are displayed in the admin, based on the `datamachine_events_post_type_menu_items` filter.
+Manages which taxonomy menus are displayed in the admin, based on the `data_machine_events_post_type_menu_items` filter.
 
 ## Admin Menu Control
 
 The class provides selective control over which taxonomies appear in the admin menu for the events post type. By default, only `venue` and `promoter` taxonomies are shown, with `settings` as an additional menu item.
 
-This is controlled via the `datamachine_events_post_type_menu_items` filter:
+This is controlled via the `data_machine_events_post_type_menu_items` filter:
 
 ```php
-add_filter('datamachine_events_post_type_menu_items', function($items) {
+add_filter('data_machine_events_post_type_menu_items', function($items) {
     return [
         'venue' => true,
         'promoter' => true,

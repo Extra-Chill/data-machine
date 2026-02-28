@@ -6,9 +6,9 @@
  * Consolidates all Nominatim geocoding into the Abilities API as the universal primitive.
  *
  * Abilities:
- * - datamachine-events/geocode-address  — Geocode an arbitrary address string
- * - datamachine-events/geocode-venues   — Batch geocode venues missing coordinates
- * - datamachine-events/audit-venues     — Audit venue data quality and geocoding coverage
+ * - data-machine-events/geocode-address  — Geocode an arbitrary address string
+ * - data-machine-events/geocode-venues   — Batch geocode venues missing coordinates
+ * - data-machine-events/audit-venues     — Audit venue data quality and geocoding coverage
  *
  * @package DataMachineEvents\Abilities
  */
@@ -68,10 +68,10 @@ class GeocodingAbilities {
 
 	private function registerGeocodeAddressAbility(): void {
 		wp_register_ability(
-			'datamachine-events/geocode-address',
+			'data-machine-events/geocode-address',
 			array(
-				'label'               => __( 'Geocode Address', 'datamachine-events' ),
-				'description'         => __( 'Geocode an address string to lat/lng coordinates via OpenStreetMap Nominatim. Results are cached for 30 days.', 'datamachine-events' ),
+				'label'               => __( 'Geocode Address', 'data-machine-events' ),
+				'description'         => __( 'Geocode an address string to lat/lng coordinates via OpenStreetMap Nominatim. Results are cached for 30 days.', 'data-machine-events' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -156,10 +156,10 @@ class GeocodingAbilities {
 
 	private function registerGeocodeSearchAbility(): void {
 		wp_register_ability(
-			'datamachine-events/geocode-search',
+			'data-machine-events/geocode-search',
 			array(
-				'label'               => __( 'Geocode Search', 'datamachine-events' ),
-				'description'         => __( 'Search for addresses via Nominatim and return multiple results with full address details. Used for autocomplete UIs.', 'datamachine-events' ),
+				'label'               => __( 'Geocode Search', 'data-machine-events' ),
+				'description'         => __( 'Search for addresses via Nominatim and return multiple results with full address details. Used for autocomplete UIs.', 'data-machine-events' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -283,10 +283,10 @@ class GeocodingAbilities {
 
 	private function registerGeocodeVenuesAbility(): void {
 		wp_register_ability(
-			'datamachine-events/geocode-venues',
+			'data-machine-events/geocode-venues',
 			array(
-				'label'               => __( 'Geocode Venues', 'datamachine-events' ),
-				'description'         => __( 'Batch geocode venues that have an address but are missing coordinates. Respects Nominatim rate limits.', 'datamachine-events' ),
+				'label'               => __( 'Geocode Venues', 'data-machine-events' ),
+				'description'         => __( 'Batch geocode venues that have an address but are missing coordinates. Respects Nominatim rate limits.', 'data-machine-events' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -465,10 +465,10 @@ class GeocodingAbilities {
 
 	private function registerAuditVenuesAbility(): void {
 		wp_register_ability(
-			'datamachine-events/audit-venues',
+			'data-machine-events/audit-venues',
 			array(
-				'label'               => __( 'Audit Venues', 'datamachine-events' ),
-				'description'         => __( 'Audit venue data quality: geocoding coverage, missing addresses, missing timezones. Returns a comprehensive data quality report.', 'datamachine-events' ),
+				'label'               => __( 'Audit Venues', 'data-machine-events' ),
+				'description'         => __( 'Audit venue data quality: geocoding coverage, missing addresses, missing timezones. Returns a comprehensive data quality report.', 'data-machine-events' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',

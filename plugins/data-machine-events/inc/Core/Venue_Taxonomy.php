@@ -64,15 +64,15 @@ class Venue_Taxonomy {
 				array(
 					'hierarchical'      => false,
 					'labels'            => array(
-						'name'          => _x( 'Venues', 'taxonomy general name', 'datamachine-events' ),
-						'singular_name' => _x( 'Venue', 'taxonomy singular name', 'datamachine-events' ),
-						'search_items'  => __( 'Search Venues', 'datamachine-events' ),
-						'all_items'     => __( 'All Venues', 'datamachine-events' ),
-						'edit_item'     => __( 'Edit Venue', 'datamachine-events' ),
-						'update_item'   => __( 'Update Venue', 'datamachine-events' ),
-						'add_new_item'  => __( 'Add New Venue', 'datamachine-events' ),
-						'new_item_name' => __( 'New Venue Name', 'datamachine-events' ),
-						'menu_name'     => __( 'Venues', 'datamachine-events' ),
+						'name'          => _x( 'Venues', 'taxonomy general name', 'data-machine-events' ),
+						'singular_name' => _x( 'Venue', 'taxonomy singular name', 'data-machine-events' ),
+						'search_items'  => __( 'Search Venues', 'data-machine-events' ),
+						'all_items'     => __( 'All Venues', 'data-machine-events' ),
+						'edit_item'     => __( 'Edit Venue', 'data-machine-events' ),
+						'update_item'   => __( 'Update Venue', 'data-machine-events' ),
+						'add_new_item'  => __( 'Add New Venue', 'data-machine-events' ),
+						'new_item_name' => __( 'New Venue Name', 'data-machine-events' ),
+						'menu_name'     => __( 'Venues', 'data-machine-events' ),
 					),
 					'show_ui'           => true,
 					'show_admin_column' => true,
@@ -111,7 +111,7 @@ class Venue_Taxonomy {
 		}
 
 		// Allow normalization of venue name (e.g. aliases, corrections)
-		$venue_name = apply_filters( 'datamachine_events_normalize_venue_name', $venue_name );
+		$venue_name = apply_filters( 'data_machine_events_normalize_venue_name', $venue_name );
 
 		// Check if venue already exists by name
 		$existing = get_term_by( 'name', $venue_name, 'venue' );
@@ -854,18 +854,18 @@ class Venue_Taxonomy {
 		}
 
 		wp_enqueue_script(
-			'datamachine-events-venue-autocomplete',
-			DATAMACHINE_EVENTS_PLUGIN_URL . 'assets/js/venue-autocomplete.js',
+			'data-machine-events-venue-autocomplete',
+			DATA_MACHINE_EVENTS_PLUGIN_URL . 'assets/js/venue-autocomplete.js',
 			array(),
-			filemtime( DATAMACHINE_EVENTS_PLUGIN_DIR . 'assets/js/venue-autocomplete.js' ),
+			filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/venue-autocomplete.js' ),
 			true
 		);
 
 		wp_enqueue_style(
-			'datamachine-events-venue-autocomplete',
-			DATAMACHINE_EVENTS_PLUGIN_URL . 'assets/css/venue-autocomplete.css',
+			'data-machine-events-venue-autocomplete',
+			DATA_MACHINE_EVENTS_PLUGIN_URL . 'assets/css/venue-autocomplete.css',
 			array(),
-			filemtime( DATAMACHINE_EVENTS_PLUGIN_DIR . 'assets/css/venue-autocomplete.css' )
+			filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/css/venue-autocomplete.css' )
 		);
 	}
 }

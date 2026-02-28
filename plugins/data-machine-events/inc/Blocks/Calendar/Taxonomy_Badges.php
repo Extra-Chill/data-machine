@@ -3,11 +3,11 @@
  * Calendar Block Taxonomy Badge System
  *
  * Self-contained badge rendering for Calendar block event items. Provides extensibility
- * filters for themes/plugins (datamachine_events_badge_wrapper_classes, datamachine_events_badge_classes,
- * datamachine_events_excluded_taxonomies) while keeping badge logic within Calendar block.
+ * filters for themes/plugins (data_machine_events_badge_wrapper_classes, data_machine_events_badge_classes,
+ * data_machine_events_excluded_taxonomies) while keeping badge logic within Calendar block.
  * Supports hash-based color classes for consistent styling.
  *
- * Filter: datamachine_events_excluded_taxonomies
+ * Filter: data_machine_events_excluded_taxonomies
  * @param array  $excluded Array of taxonomy slugs to exclude
  * @param string $context  Context identifier: 'badge', 'modal', or empty for all contexts
  *
@@ -41,7 +41,7 @@ class Taxonomy_Badges {
 
 		$taxonomy_data = array();
 
-		$excluded_taxonomies = apply_filters( 'datamachine_events_excluded_taxonomies', array(), 'badge' );
+		$excluded_taxonomies = apply_filters( 'data_machine_events_excluded_taxonomies', array(), 'badge' );
 
 		foreach ( $all_taxonomies as $taxonomy_slug => $taxonomy_object ) {
 			if ( in_array( $taxonomy_slug, $excluded_taxonomies, true ) ) {
@@ -78,7 +78,7 @@ class Taxonomy_Badges {
 		$venue_name  = ( $venue_terms && ! is_wp_error( $venue_terms ) ) ? $venue_terms[0]->name : '';
 
 		$wrapper_classes = apply_filters(
-			'datamachine_events_badge_wrapper_classes',
+			'data_machine_events_badge_wrapper_classes',
 			array(
 				'datamachine-taxonomy-badges',
 			),
@@ -102,7 +102,7 @@ class Taxonomy_Badges {
 					'datamachine-term-' . esc_attr( $term->slug ),
 				);
 
-				$badge_classes = apply_filters( 'datamachine_events_badge_classes', $badge_classes, $taxonomy_slug, $term, $post_id );
+				$badge_classes = apply_filters( 'data_machine_events_badge_classes', $badge_classes, $taxonomy_slug, $term, $post_id );
 
 				$term_link = get_term_link( $term, $taxonomy_slug );
 
@@ -133,12 +133,12 @@ class Taxonomy_Badges {
 	}
 
 	/**
-	 * @return array Taxonomies with slug and label, filtered by datamachine_events_excluded_taxonomies
+	 * @return array Taxonomies with slug and label, filtered by data_machine_events_excluded_taxonomies
 	 */
 	public static function get_used_taxonomies() {
 		global $wpdb;
 
-		$excluded_taxonomies = apply_filters( 'datamachine_events_excluded_taxonomies', array(), 'badge' );
+		$excluded_taxonomies = apply_filters( 'data_machine_events_excluded_taxonomies', array(), 'badge' );
 
 		$base_query = "
 			SELECT DISTINCT tt.taxonomy, t.name

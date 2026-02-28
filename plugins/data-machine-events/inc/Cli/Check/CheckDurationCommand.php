@@ -7,11 +7,11 @@
  * occurrenceDates should be used instead of a start/end range.
  *
  * Usage examples:
- *   wp datamachine-events check duration
- *   wp datamachine-events check duration --max-days=7
- *   wp datamachine-events check duration --scope=all
- *   wp datamachine-events check duration --trash
- *   wp datamachine-events check duration --format=json
+ *   wp data-machine-events check duration
+ *   wp data-machine-events check duration --max-days=7
+ *   wp data-machine-events check duration --scope=all
+ *   wp data-machine-events check duration --trash
+ *   wp data-machine-events check duration --format=json
  *
  * @package DataMachineEvents\Cli\Check
  * @since   0.14.0
@@ -73,19 +73,19 @@ class CheckDurationCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Find events spanning more than 14 days
-	 *     wp datamachine-events check-duration
+	 *     wp data-machine-events check-duration
 	 *
 	 *     # Stricter: flag anything over 7 days
-	 *     wp datamachine-events check-duration --max-days=7
+	 *     wp data-machine-events check-duration --max-days=7
 	 *
 	 *     # Scan all events (including past)
-	 *     wp datamachine-events check-duration --scope=all
+	 *     wp data-machine-events check-duration --scope=all
 	 *
 	 *     # Output as JSON for scripting
-	 *     wp datamachine-events check-duration --format=json
+	 *     wp data-machine-events check-duration --format=json
 	 *
 	 *     # Trash all flagged events without prompts
-	 *     wp datamachine-events check-duration --trash-all
+	 *     wp data-machine-events check-duration --trash-all
 	 *
 	 * @param array $args Positional arguments.
 	 * @param array $assoc_args Named arguments.

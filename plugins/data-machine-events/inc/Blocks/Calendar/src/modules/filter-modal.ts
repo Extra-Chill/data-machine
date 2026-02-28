@@ -59,7 +59,7 @@ export function initFilterModal(
 	}
 
 	const filterBtn = calendar.querySelector< HTMLElement >(
-		'.datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .datamachine-events-filter-btn'
+		'.datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .data-machine-events-filter-btn'
 	);
 	const closeBtns = modal.querySelectorAll< HTMLElement >(
 		'.datamachine-modal-close, .datamachine-taxonomy-modal-close'
@@ -195,7 +195,7 @@ export function destroyFilterModal( calendar: HTMLElement ): void {
 	}
 
 	const filterBtn = calendar.querySelector< HTMLElement >(
-		'.datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .datamachine-events-filter-btn'
+		'.datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .data-machine-events-filter-btn'
 	);
 
 	if ( filterBtn && modal._openModalHandler ) {

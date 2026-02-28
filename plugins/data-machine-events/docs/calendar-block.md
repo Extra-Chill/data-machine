@@ -12,7 +12,7 @@ The Calendar block renders a Carousel List of events with progressive enhancemen
 ## Server Templates & Helpers
 
 - `event-item.php`, `date-group.php`, `navigation.php`, `pagination.php`, `results-counter.php`, `no-events.php`, `filter-bar.php`, `time-gap-separator.php`, and `modal/taxonomy-filter.php` live under `inc/Blocks/Calendar/templates` and are orchestrated by `inc/Core/Template_Loader`.
-- `inc/Core/Taxonomy_Helper` builds hierarchical term data and counts for each template, while `Taxonomy_Badges` renders badge markup that respects `datamachine_events_badge_wrapper_classes`, `datamachine_events_badge_classes`, and `datamachine_events_more_info_button_classes` filters.
+- `inc/Core/Taxonomy_Helper` builds hierarchical term data and counts for each template, while `Taxonomy_Badges` renders badge markup that respects `data_machine_events_badge_wrapper_classes`, `data_machine_events_badge_classes`, and `data_machine_events_more_info_button_classes` filters.
 - The filter modal uses taxonomy helpers to surface dynamic dependencies, counts, and active state indicators before handing control to the filter modal module.
 
 ## REST API Support
@@ -23,7 +23,7 @@ The Calendar block renders a Carousel List of events with progressive enhancemen
 
 ## JavaScript Modules
 
-- `inc/Blocks/Calendar/src/frontend.js` bootstraps each `.datamachine-events-calendar`, wiring the following modules:
+- `inc/Blocks/Calendar/src/frontend.js` bootstraps each `.data-machine-events-calendar`, wiring the following modules:
   - `modules/api-client.js` handles REST requests and swaps fragments.
   - `modules/carousel.js` detects overflow, updates dots, and powers chevrons (with click-and-hold support).
   - `modules/date-picker.js` integrates Flatpickr for date range filters.
@@ -34,12 +34,12 @@ The Calendar block renders a Carousel List of events with progressive enhancemen
 
 ## Filter Modal & Taxonomy Helpers
 
-The modal is populated via `Taxonomy_Helper`, which computes term hierarchies, counts, and `datamachine_events_excluded_taxonomies` filters, ensuring the modal only shows the taxonomies the block exposes. When filters change, the modal calls the API client to refresh fragments without reloading the page.
+The modal is populated via `Taxonomy_Helper`, which computes term hierarchies, counts, and `data_machine_events_excluded_taxonomies` filters, ensuring the modal only shows the taxonomies the block exposes. When filters change, the modal calls the API client to refresh fragments without reloading the page.
 
 ## Pagination
 
 - Day-based pagination lives in `inc/Blocks/Calendar/Pagination.php` and produces five full days per page.
-- Filters `datamachine_events_pagination_wrapper_classes` and `datamachine_events_pagination_args` allow theme or plugin code to modify wrapper classes or pass additional `paginate_links` arguments.
+- Filters `data_machine_events_pagination_wrapper_classes` and `data_machine_events_pagination_args` allow theme or plugin code to modify wrapper classes or pass additional `paginate_links` arguments.
 - Pagination fragments come from the REST calendar response so the JavaScript can replace controls while keeping server-rendered markup for non-JS contexts.
 
 ## Progressive Enhancement

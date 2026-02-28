@@ -35,22 +35,22 @@ const MAP_STYLE_OPTIONS: { label: string; value: MapType }[] = [
 	{ label: 'Humanitarian', value: 'humanitarian' },
 ];
 
-registerBlockType<MapAttributes>( 'datamachine-events/events-map', {
+registerBlockType<MapAttributes>( 'data-machine-events/events-map', {
 	edit: function Edit( { attributes, setAttributes }: EditProps ) {
 		const { height, zoom, mapType } = attributes;
 		const blockProps = useBlockProps( {
-			className: 'datamachine-events-map-block',
+			className: 'data-machine-events-map-block',
 		} );
 
 		return (
 			<>
 				<InspectorControls>
 					<PanelBody
-						title={ __( 'Map Settings', 'datamachine-events' ) }
+						title={ __( 'Map Settings', 'data-machine-events' ) }
 						initialOpen
 					>
 						<RangeControl
-							label={ __( 'Height (px)', 'datamachine-events' ) }
+							label={ __( 'Height (px)', 'data-machine-events' ) }
 							value={ height }
 							onChange={ ( value ) =>
 								setAttributes( { height: value } )
@@ -60,7 +60,7 @@ registerBlockType<MapAttributes>( 'datamachine-events/events-map', {
 							step={ 50 }
 						/>
 						<RangeControl
-							label={ __( 'Default Zoom', 'datamachine-events' ) }
+							label={ __( 'Default Zoom', 'data-machine-events' ) }
 							value={ zoom }
 							onChange={ ( value ) =>
 								setAttributes( { zoom: value } )
@@ -69,7 +69,7 @@ registerBlockType<MapAttributes>( 'datamachine-events/events-map', {
 							max={ 18 }
 						/>
 					<SelectControl
-						label={ __( 'Map Style', 'datamachine-events' ) }
+						label={ __( 'Map Style', 'data-machine-events' ) }
 						value={ mapType }
 						options={ MAP_STYLE_OPTIONS }
 						onChange={ ( value ) =>
@@ -81,7 +81,7 @@ registerBlockType<MapAttributes>( 'datamachine-events/events-map', {
 
 				<div { ...blockProps }>
 					<div
-						className="datamachine-events-map"
+						className="data-machine-events-map"
 						style={ {
 							height: height + 'px',
 							background: '#e5e7eb',
@@ -99,7 +99,7 @@ registerBlockType<MapAttributes>( 'datamachine-events/events-map', {
 						>
 							{ __(
 								'Events Map — renders on the frontend',
-								'datamachine-events',
+								'data-machine-events',
 							) }
 						</span>
 					</div>

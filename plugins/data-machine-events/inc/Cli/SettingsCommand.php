@@ -25,13 +25,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  * ## EXAMPLES
  *
  *     # Get a setting
- *     wp datamachine-events settings get next_day_cutoff
+ *     wp data-machine-events settings get next_day_cutoff
  *
  *     # Set a setting
- *     wp datamachine-events settings set next_day_cutoff 05:00
+ *     wp data-machine-events settings set next_day_cutoff 05:00
  *
  *     # List all settings
- *     wp datamachine-events settings list
+ *     wp data-machine-events settings list
  */
 class SettingsCommand extends WP_CLI_Command {
 
@@ -54,8 +54,8 @@ class SettingsCommand extends WP_CLI_Command {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine-events settings get next_day_cutoff
-	 *     wp datamachine-events settings get map_display_type --format=json
+	 *     wp data-machine-events settings get next_day_cutoff
+	 *     wp data-machine-events settings get map_display_type --format=json
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Associative arguments.
@@ -105,9 +105,9 @@ class SettingsCommand extends WP_CLI_Command {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine-events settings set next_day_cutoff 05:00
-	 *     wp datamachine-events settings set map_display_type carto-positron
-	 *     wp datamachine-events settings set include_in_search true
+	 *     wp data-machine-events settings set next_day_cutoff 05:00
+	 *     wp data-machine-events settings set map_display_type carto-positron
+	 *     wp data-machine-events settings set include_in_search true
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Associative arguments.
@@ -151,8 +151,8 @@ class SettingsCommand extends WP_CLI_Command {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine-events settings list
-	 *     wp datamachine-events settings list --format=json
+	 *     wp data-machine-events settings list
+	 *     wp data-machine-events settings list --format=json
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Associative arguments.

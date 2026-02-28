@@ -28,7 +28,7 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		do_action( 'rest_api_init' );
 
 		// Ensure post type and taxonomies are registered
-		if ( ! post_type_exists( 'datamachine_events' ) ) {
+		if ( ! post_type_exists( 'data_machine_events' ) ) {
 			Event_Post_Type::register();
 		}
 		if ( ! taxonomy_exists( 'venue' ) ) {
@@ -81,7 +81,7 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		$post_id = wp_insert_post(
 			array(
 				'post_title'  => 'REST Test Event ' . uniqid(),
-				'post_type'   => 'datamachine_events',
+				'post_type'   => 'data_machine_events',
 				'post_status' => 'publish',
 			)
 		);
@@ -108,7 +108,7 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		$post_id = wp_insert_post(
 			array(
 				'post_title'  => "Event with $unique_term",
-				'post_type'   => 'datamachine_events',
+				'post_type'   => 'data_machine_events',
 				'post_status' => 'publish',
 			)
 		);

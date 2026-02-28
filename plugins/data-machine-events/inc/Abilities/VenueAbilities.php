@@ -77,10 +77,10 @@ class VenueAbilities {
 
 	private function registerHealthCheckAbility(): void {
 		wp_register_ability(
-			'datamachine-events/venue-health-check',
+			'data-machine-events/venue-health-check',
 			array(
-				'label'               => __( 'Venue Health Check', 'datamachine-events' ),
-				'description'         => __( 'Scan venues for data quality issues: missing address, coordinates, timezone, or website. Also detects suspicious websites where a ticket URL was mistakenly stored as venue website.', 'datamachine-events' ),
+				'label'               => __( 'Venue Health Check', 'data-machine-events' ),
+				'description'         => __( 'Scan venues for data quality issues: missing address, coordinates, timezone, or website. Also detects suspicious websites where a ticket URL was mistakenly stored as venue website.', 'data-machine-events' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -144,10 +144,10 @@ class VenueAbilities {
 
 	private function registerUpdateVenueAbility(): void {
 		wp_register_ability(
-			'datamachine-events/update-venue',
+			'data-machine-events/update-venue',
 			array(
-				'label'               => __( 'Update Venue', 'datamachine-events' ),
-				'description'         => __( 'Update a venue name and/or meta fields. Address changes trigger automatic geocoding.', 'datamachine-events' ),
+				'label'               => __( 'Update Venue', 'data-machine-events' ),
+				'description'         => __( 'Update a venue name and/or meta fields. Address changes trigger automatic geocoding.', 'data-machine-events' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -229,10 +229,10 @@ class VenueAbilities {
 
 	private function registerGetVenueAbility(): void {
 		wp_register_ability(
-			'datamachine-events/get-venue',
+			'data-machine-events/get-venue',
 			array(
-				'label'               => __( 'Get Venue', 'datamachine-events' ),
-				'description'         => __( 'Get venue details by term ID', 'datamachine-events' ),
+				'label'               => __( 'Get Venue', 'data-machine-events' ),
+				'description'         => __( 'Get venue details by term ID', 'data-machine-events' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -275,10 +275,10 @@ class VenueAbilities {
 
 	private function registerCheckDuplicateAbility(): void {
 		wp_register_ability(
-			'datamachine-events/check-duplicate-venue',
+			'data-machine-events/check-duplicate-venue',
 			array(
-				'label'               => __( 'Check Duplicate Venue', 'datamachine-events' ),
-				'description'         => __( 'Check if a venue with the given name already exists', 'datamachine-events' ),
+				'label'               => __( 'Check Duplicate Venue', 'data-machine-events' ),
+				'description'         => __( 'Check if a venue with the given name already exists', 'data-machine-events' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -586,7 +586,7 @@ class VenueAbilities {
 					'existing_venue_name' => $existing_term->name,
 					'message'             => sprintf(
 						/* translators: %s: venue name */
-						__( 'A venue named "%s" with this address already exists.', 'datamachine-events' ),
+						__( 'A venue named "%s" with this address already exists.', 'data-machine-events' ),
 						esc_html( $existing_term->name )
 					),
 				);
@@ -599,7 +599,7 @@ class VenueAbilities {
 			'existing_venue_name' => $existing_term->name,
 			'message'             => sprintf(
 				/* translators: %s: venue name */
-				__( 'A venue named "%s" already exists. Consider using a more specific name or check if this is the same venue.', 'datamachine-events' ),
+				__( 'A venue named "%s" already exists. Consider using a more specific name or check if this is the same venue.', 'data-machine-events' ),
 				esc_html( $existing_term->name )
 			),
 		);

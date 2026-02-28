@@ -25,7 +25,7 @@ class GetVenueEventsCommand {
 		$venue = trim( $venue );
 
 		if ( empty( $venue ) ) {
-			\WP_CLI::error( 'Missing required venue parameter. Use: wp datamachine-events get-venue-events <venue> or --venue=<venue>' );
+			\WP_CLI::error( 'Missing required venue parameter. Use: wp data-machine-events get-venue-events <venue> or --venue=<venue>' );
 		}
 
 		$include_description = isset( $assoc_args['include-description'] );

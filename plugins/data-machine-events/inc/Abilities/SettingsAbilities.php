@@ -6,8 +6,8 @@
  * Single source of truth for plugin settings access.
  *
  * Abilities:
- * - datamachine-events/get-settings    — Read all settings or a specific key
- * - datamachine-events/update-setting  — Update a single setting value
+ * - data-machine-events/get-settings    — Read all settings or a specific key
+ * - data-machine-events/update-setting  — Update a single setting value
  *
  * @package DataMachineEvents\Abilities
  */
@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class SettingsAbilities {
 
-	private const OPTION_KEY = 'datamachine_events_settings';
+	private const OPTION_KEY = 'data_machine_events_settings';
 
 	private const DEFAULTS = array(
 		'include_in_archives'  => false,
@@ -69,10 +69,10 @@ class SettingsAbilities {
 
 	private function registerGetSettingsAbility(): void {
 		wp_register_ability(
-			'datamachine-events/get-settings',
+			'data-machine-events/get-settings',
 			array(
-				'label'               => __( 'Get Settings', 'datamachine-events' ),
-				'description'         => __( 'Read plugin settings. Returns all settings or a specific key.', 'datamachine-events' ),
+				'label'               => __( 'Get Settings', 'data-machine-events' ),
+				'description'         => __( 'Read plugin settings. Returns all settings or a specific key.', 'data-machine-events' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -135,10 +135,10 @@ class SettingsAbilities {
 
 	private function registerUpdateSettingAbility(): void {
 		wp_register_ability(
-			'datamachine-events/update-setting',
+			'data-machine-events/update-setting',
 			array(
-				'label'               => __( 'Update Setting', 'datamachine-events' ),
-				'description'         => __( 'Update a single plugin setting. Validates and sanitizes the value.', 'datamachine-events' ),
+				'label'               => __( 'Update Setting', 'data-machine-events' ),
+				'description'         => __( 'Update a single plugin setting. Validates and sanitizes the value.', 'data-machine-events' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',

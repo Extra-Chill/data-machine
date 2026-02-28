@@ -41,9 +41,9 @@ class TicketmasterTestCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine-events test-ticketmaster --classification_type=music
-	 *     wp datamachine-events test-ticketmaster --classification_type=music --location="32.7765,-79.9311" --radius=25
-	 *     wp datamachine-events test-ticketmaster --classification_type=music --venue_id=KovZpZAJledA
+	 *     wp data-machine-events test-ticketmaster --classification_type=music
+	 *     wp data-machine-events test-ticketmaster --classification_type=music --location="32.7765,-79.9311" --radius=25
+	 *     wp data-machine-events test-ticketmaster --classification_type=music --venue_id=KovZpZAJledA
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Associative arguments.

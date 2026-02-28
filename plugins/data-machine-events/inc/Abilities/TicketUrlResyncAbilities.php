@@ -27,7 +27,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class TicketUrlResyncAbilities {
 
 	private const DEFAULT_LIMIT = -1;
-	private const BLOCK_NAME    = 'datamachine-events/event-details';
+	private const BLOCK_NAME    = 'data-machine-events/event-details';
 
 	private static bool $registered = false;
 
@@ -41,10 +41,10 @@ class TicketUrlResyncAbilities {
 	private function registerAbility(): void {
 		$register_callback = function () {
 			wp_register_ability(
-				'datamachine-events/resync-ticket-urls',
+				'data-machine-events/resync-ticket-urls',
 				array(
-					'label'               => __( 'Resync Ticket URLs', 'datamachine-events' ),
-					'description'         => __( 'Re-normalize ticket URL meta from block content', 'datamachine-events' ),
+					'label'               => __( 'Resync Ticket URLs', 'data-machine-events' ),
+					'description'         => __( 'Re-normalize ticket URL meta from block content', 'data-machine-events' ),
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',

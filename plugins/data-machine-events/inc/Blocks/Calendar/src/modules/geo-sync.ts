@@ -260,7 +260,7 @@ function rebindPagination(
 	geo: GeoContext
 ): void {
 	const paginationContainer = calendar.querySelector< HTMLElement >(
-		'.datamachine-events-pagination'
+		'.data-machine-events-pagination'
 	);
 	if ( ! paginationContainer ) {
 		return;

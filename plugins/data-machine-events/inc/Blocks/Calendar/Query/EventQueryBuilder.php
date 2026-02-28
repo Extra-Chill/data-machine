@@ -58,7 +58,7 @@ class EventQueryBuilder {
 		 * @return array|null Modified tax_query constraint or null to remove constraint.
 		 */
 		$params['tax_query_override'] = apply_filters(
-			'datamachine_events_calendar_base_query',
+			'data_machine_events_calendar_base_query',
 			$params['tax_query_override'],
 			array(
 				'archive_taxonomy' => $params['archive_taxonomy'],
@@ -187,7 +187,7 @@ class EventQueryBuilder {
 			$query_args['s'] = $params['search_query'];
 		}
 
-		return apply_filters( 'datamachine_events_calendar_query_args', $query_args, $params );
+		return apply_filters( 'data_machine_events_calendar_query_args', $query_args, $params );
 	}
 
 	/**

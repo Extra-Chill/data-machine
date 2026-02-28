@@ -26,10 +26,10 @@ class TicketmasterTest {
 		if ( ! self::$registered ) {
 			$register_callback = function () {
 				wp_register_ability(
-					'datamachine-events/test-ticketmaster',
+					'data-machine-events/test-ticketmaster',
 					array(
-						'label'               => __( 'Test Ticketmaster', 'datamachine-events' ),
-						'description'         => __( 'Test Ticketmaster API handler with raw response data', 'datamachine-events' ),
+						'label'               => __( 'Test Ticketmaster', 'data-machine-events' ),
+						'description'         => __( 'Test Ticketmaster API handler with raw response data', 'data-machine-events' ),
 						'category'            => 'datamachine',
 						'input_schema'        => array(
 							'type'       => 'object',

@@ -36,10 +36,10 @@ class MetaSyncAbilities {
 	private function registerAbilities(): void {
 		$register_callback = function () {
 			wp_register_ability(
-				'datamachine-events/find-missing-meta-sync',
+				'data-machine-events/find-missing-meta-sync',
 				array(
-					'label'               => __( 'Find Missing Meta Sync', 'datamachine-events' ),
-					'description'         => __( 'Detect events where block has data but meta sync failed', 'datamachine-events' ),
+					'label'               => __( 'Find Missing Meta Sync', 'data-machine-events' ),
+					'description'         => __( 'Detect events where block has data but meta sync failed', 'data-machine-events' ),
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -78,10 +78,10 @@ class MetaSyncAbilities {
 			);
 
 			wp_register_ability(
-				'datamachine-events/resync-event-meta',
+				'data-machine-events/resync-event-meta',
 				array(
-					'label'               => __( 'Resync Event Meta', 'datamachine-events' ),
-					'description'         => __( 'Re-trigger meta sync for specified events', 'datamachine-events' ),
+					'label'               => __( 'Resync Event Meta', 'data-machine-events' ),
+					'description'         => __( 'Re-trigger meta sync for specified events', 'data-machine-events' ),
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -280,7 +280,7 @@ class MetaSyncAbilities {
 			);
 
 			if ( ! $dry_run ) {
-				\DataMachineEvents\Core\datamachine_events_sync_datetime_meta( $event_id, $post, true );
+				\DataMachineEvents\Core\data_machine_events_sync_datetime_meta( $event_id, $post, true );
 			}
 
 			$after_datetime   = $dry_run ? $this->calculateExpectedDatetime( $block_attrs ) : get_post_meta( $event_id, Event_Post_Type::EVENT_DATE_META_KEY, true );
@@ -335,7 +335,7 @@ class MetaSyncAbilities {
 		$blocks = parse_blocks( $post->post_content );
 
 		foreach ( $blocks as $block ) {
-			if ( 'datamachine-events/event-details' === $block['blockName'] ) {
+			if ( 'data-machine-events/event-details' === $block['blockName'] ) {
 				return $block['attrs'] ?? array();
 			}
 		}

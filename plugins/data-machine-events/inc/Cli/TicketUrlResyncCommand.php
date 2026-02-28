@@ -6,10 +6,10 @@
  * meta from block content to recover from the v0.8.39 normalization bug.
  *
  * Usage examples:
- *   wp datamachine-events resync-ticket-urls
- *   wp datamachine-events resync-ticket-urls --execute
- *   wp datamachine-events resync-ticket-urls --future-only --execute
- *   wp datamachine-events resync-ticket-urls --limit=50 --execute
+ *   wp data-machine-events resync-ticket-urls
+ *   wp data-machine-events resync-ticket-urls --execute
+ *   wp data-machine-events resync-ticket-urls --future-only --execute
+ *   wp data-machine-events resync-ticket-urls --limit=50 --execute
  *
  * @package DataMachineEvents\Cli
  * @since 0.10.11
@@ -50,19 +50,19 @@ class TicketUrlResyncCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Preview what would change (dry run)
-	 *     $ wp datamachine-events resync-ticket-urls
+	 *     $ wp data-machine-events resync-ticket-urls
 	 *
 	 *     # Apply changes to all events
-	 *     $ wp datamachine-events resync-ticket-urls --execute
+	 *     $ wp data-machine-events resync-ticket-urls --execute
 	 *
 	 *     # Only fix future events
-	 *     $ wp datamachine-events resync-ticket-urls --future-only --execute
+	 *     $ wp data-machine-events resync-ticket-urls --future-only --execute
 	 *
 	 *     # Test with limited batch
-	 *     $ wp datamachine-events resync-ticket-urls --limit=50 --execute
+	 *     $ wp data-machine-events resync-ticket-urls --limit=50 --execute
 	 *
 	 *     # JSON output for scripting
-	 *     $ wp datamachine-events resync-ticket-urls --format=json
+	 *     $ wp data-machine-events resync-ticket-urls --format=json
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Associative arguments.

@@ -6,14 +6,14 @@ defined( 'ABSPATH' ) || exit;
 const API_NAMESPACE = 'datamachine/v1';
 
 // Ensure controllers are loaded when composer autoloader is not present
-if ( defined( 'DATAMACHINE_EVENTS_PLUGIN_DIR' ) ) {
+if ( defined( 'DATA_MACHINE_EVENTS_PLUGIN_DIR' ) ) {
 	$controllers = array(
-		DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Calendar.php',
-		DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Venues.php',
-		DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Events.php',
-		DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Filters.php',
-		DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Geocoding.php',
-		DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/VenueMap.php',
+		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Calendar.php',
+		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Venues.php',
+		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Events.php',
+		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Filters.php',
+		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Geocoding.php',
+		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/VenueMap.php',
 	);
 	foreach ( $controllers as $file ) {
 		if ( file_exists( $file ) ) {

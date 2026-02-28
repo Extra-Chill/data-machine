@@ -6,9 +6,9 @@
  * probable duplicates that slipped through the dedup pipeline.
  *
  * Usage:
- *   wp datamachine-events check duplicates
- *   wp datamachine-events check duplicates --scope=all
- *   wp datamachine-events check duplicates --format=json
+ *   wp data-machine-events check duplicates
+ *   wp data-machine-events check duplicates --scope=all
+ *   wp data-machine-events check duplicates --format=json
  *
  * @package DataMachineEvents\Cli\Check
  * @since   0.14.0
@@ -69,9 +69,9 @@ class CheckDuplicatesCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine-events check duplicates
-	 *     wp datamachine-events check duplicates --scope=all
-	 *     wp datamachine-events check duplicates --format=json
+	 *     wp data-machine-events check duplicates
+	 *     wp data-machine-events check duplicates --scope=all
+	 *     wp data-machine-events check duplicates --format=json
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Named arguments.

@@ -73,8 +73,8 @@ if ( $is_multi_day ) {
 			<?php endif; ?>
 
 			<a href="<?php echo esc_url( get_the_permalink() ); ?>" 
-				class="<?php echo esc_attr( implode( ' ', apply_filters( 'datamachine_events_more_info_button_classes', array( 'datamachine-more-info-button' ) ) ) ); ?>">
-				<?php esc_html_e( 'More Info', 'datamachine-events' ); ?>
+				class="<?php echo esc_attr( implode( ' ', apply_filters( 'data_machine_events_more_info_button_classes', array( 'datamachine-more-info-button' ) ) ) ); ?>">
+				<?php esc_html_e( 'More Info', 'data-machine-events' ); ?>
 			</a>
 		</div>
 

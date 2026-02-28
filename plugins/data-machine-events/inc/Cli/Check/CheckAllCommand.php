@@ -5,8 +5,8 @@
  * Delegates to each individual check subcommand and aggregates results.
  *
  * Usage:
- *   wp datamachine-events check all
- *   wp datamachine-events check all --scope=all
+ *   wp data-machine-events check all
+ *   wp data-machine-events check all --scope=all
  *
  * @package DataMachineEvents\Cli\Check
  * @since   0.14.0
@@ -52,8 +52,8 @@ class CheckAllCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine-events check all
-	 *     wp datamachine-events check all --scope=all --limit=5
+	 *     wp data-machine-events check all
+	 *     wp data-machine-events check all --scope=all --limit=5
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Named arguments.
@@ -100,7 +100,7 @@ class CheckAllCommand {
 
 			try {
 				\WP_CLI::runcommand(
-					"datamachine-events check {$subcommand} " . $this->build_flag_string( $run_args ),
+					"data-machine-events check {$subcommand} " . $this->build_flag_string( $run_args ),
 					array(
 						'return'     => false,
 						'launch'     => false,

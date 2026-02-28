@@ -34,10 +34,10 @@ class TimezoneAbilities {
 	private function registerAbility(): void {
 		$register_callback = function () {
 			wp_register_ability(
-				'datamachine-events/find-broken-timezone-events',
+				'data-machine-events/find-broken-timezone-events',
 				array(
-					'label'               => __( 'Find Events with Missing Timezone', 'datamachine-events' ),
-					'description'         => __( 'Find events where venue has no timezone or coordinates', 'datamachine-events' ),
+					'label'               => __( 'Find Events with Missing Timezone', 'data-machine-events' ),
+					'description'         => __( 'Find events where venue has no timezone or coordinates', 'data-machine-events' ),
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -107,10 +107,10 @@ class TimezoneAbilities {
 			);
 
 			wp_register_ability(
-				'datamachine-events/fix-event-timezone',
+				'data-machine-events/fix-event-timezone',
 				array(
-					'label'               => __( 'Fix Event Timezone', 'datamachine-events' ),
-					'description'         => __( 'Update venue timezone with geocoding support. Supports batch updates with inline errors.', 'datamachine-events' ),
+					'label'               => __( 'Fix Event Timezone', 'data-machine-events' ),
+					'description'         => __( 'Update venue timezone with geocoding support. Supports batch updates with inline errors.', 'data-machine-events' ),
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -485,7 +485,7 @@ class TimezoneAbilities {
 		$blocks = parse_blocks( $post->post_content );
 
 		foreach ( $blocks as $block ) {
-			if ( 'datamachine-events/event-details' === $block['blockName'] ) {
+			if ( 'data-machine-events/event-details' === $block['blockName'] ) {
 				return $block['attrs'] ?? array();
 			}
 		}

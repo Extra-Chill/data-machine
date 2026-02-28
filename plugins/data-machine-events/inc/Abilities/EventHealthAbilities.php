@@ -37,10 +37,10 @@ class EventHealthAbilities {
 	private function registerAbility(): void {
 		$register_callback = function () {
 			wp_register_ability(
-				'datamachine-events/event-health-check',
+				'data-machine-events/event-health-check',
 				array(
-					'label'               => __( 'Event Health Check', 'datamachine-events' ),
-					'description'         => __( 'Scan events for data quality issues', 'datamachine-events' ),
+					'label'               => __( 'Event Health Check', 'data-machine-events' ),
+					'description'         => __( 'Scan events for data quality issues', 'data-machine-events' ),
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -229,7 +229,7 @@ class EventHealthAbilities {
 
 		$broken_timezone = array();
 		$no_venue_count  = 0;
-		$ability         = wp_get_ability( 'datamachine-events/find-broken-timezone-events' );
+		$ability         = wp_get_ability( 'data-machine-events/find-broken-timezone-events' );
 		if ( $ability ) {
 			$result = $ability->execute(
 				array(
@@ -245,7 +245,7 @@ class EventHealthAbilities {
 		}
 
 		$missing_meta_sync = array();
-		$meta_sync_ability = wp_get_ability( 'datamachine-events/find-missing-meta-sync' );
+		$meta_sync_ability = wp_get_ability( 'data-machine-events/find-missing-meta-sync' );
 		if ( $meta_sync_ability ) {
 			$meta_sync_result = $meta_sync_ability->execute( array( 'limit' => $limit ) );
 
@@ -411,7 +411,7 @@ class EventHealthAbilities {
 		$blocks = parse_blocks( $post->post_content );
 
 		foreach ( $blocks as $block ) {
-			if ( 'datamachine-events/event-details' === $block['blockName'] ) {
+			if ( 'data-machine-events/event-details' === $block['blockName'] ) {
 				return $block['attrs'] ?? array();
 			}
 		}
@@ -437,7 +437,7 @@ class EventHealthAbilities {
 		$blocks = parse_blocks( $post->post_content );
 
 		foreach ( $blocks as $block ) {
-			if ( 'datamachine-events/event-details' !== $block['blockName'] ) {
+			if ( 'data-machine-events/event-details' !== $block['blockName'] ) {
 				continue;
 			}
 

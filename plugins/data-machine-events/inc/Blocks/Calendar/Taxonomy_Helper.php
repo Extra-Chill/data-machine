@@ -35,7 +35,7 @@ class Taxonomy_Helper {
 			return $taxonomies_data;
 		}
 
-		$excluded_taxonomies = apply_filters( 'datamachine_events_excluded_taxonomies', array(), 'modal' );
+		$excluded_taxonomies = apply_filters( 'data_machine_events_excluded_taxonomies', array(), 'modal' );
 
 		foreach ( $taxonomies as $taxonomy ) {
 			if ( in_array( $taxonomy->name, $excluded_taxonomies, true ) || ! $taxonomy->public ) {

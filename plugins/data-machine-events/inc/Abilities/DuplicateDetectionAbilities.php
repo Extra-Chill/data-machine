@@ -52,10 +52,10 @@ class DuplicateDetectionAbilities {
 
 	private function registerTitlesMatchAbility(): void {
 		wp_register_ability(
-			'datamachine-events/titles-match',
+			'data-machine-events/titles-match',
 			array(
-				'label'               => __( 'Titles Match', 'datamachine-events' ),
-				'description'         => __( 'Compare two event titles for semantic equivalence. Strips tour names, supporting acts, and normalizes for fuzzy comparison.', 'datamachine-events' ),
+				'label'               => __( 'Titles Match', 'data-machine-events' ),
+				'description'         => __( 'Compare two event titles for semantic equivalence. Strips tour names, supporting acts, and normalizes for fuzzy comparison.', 'data-machine-events' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -109,10 +109,10 @@ class DuplicateDetectionAbilities {
 
 	private function registerVenuesMatchAbility(): void {
 		wp_register_ability(
-			'datamachine-events/venues-match',
+			'data-machine-events/venues-match',
 			array(
-				'label'               => __( 'Venues Match', 'datamachine-events' ),
-				'description'         => __( 'Compare two venue names for semantic equivalence. Handles HTML entities, parenthetical stage names, dash-separated qualifiers, and article removal.', 'datamachine-events' ),
+				'label'               => __( 'Venues Match', 'data-machine-events' ),
+				'description'         => __( 'Compare two venue names for semantic equivalence. Handles HTML entities, parenthetical stage names, dash-separated qualifiers, and article removal.', 'data-machine-events' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -162,10 +162,10 @@ class DuplicateDetectionAbilities {
 
 	private function registerFindDuplicateEventAbility(): void {
 		wp_register_ability(
-			'datamachine-events/find-duplicate-event',
+			'data-machine-events/find-duplicate-event',
 			array(
-				'label'               => __( 'Find Duplicate Event', 'datamachine-events' ),
-				'description'         => __( 'Search for an existing event that matches the given title, venue, and date using fuzzy matching. Returns the matching post ID or null.', 'datamachine-events' ),
+				'label'               => __( 'Find Duplicate Event', 'data-machine-events' ),
+				'description'         => __( 'Search for an existing event that matches the given title, venue, and date using fuzzy matching. Returns the matching post ID or null.', 'data-machine-events' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',

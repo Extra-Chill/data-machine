@@ -58,15 +58,15 @@ if ( is_tax() ) {
 // Map center (optional — plugins can set via filter).
 $center = null;
 
-/** @see datamachine_events_map_center */
-$center = apply_filters( 'datamachine_events_map_center', $center, $context );
+/** @see data_machine_events_map_center */
+$center = apply_filters( 'data_machine_events_map_center', $center, $context );
 
 // User location (optional — plugins can set via filter).
-$user_location = apply_filters( 'datamachine_events_map_user_location', null, $context );
+$user_location = apply_filters( 'data_machine_events_map_user_location', null, $context );
 
 $map_id  = wp_unique_id( 'dm-events-map-' );
 $wrapper = get_block_wrapper_attributes( array(
-	'class' => 'datamachine-events-map-block',
+	'class' => 'data-machine-events-map-block',
 ) );
 
 // REST URL for venue fetching.
@@ -82,19 +82,19 @@ $show_location_search = (bool) ( $attributes['showLocationSearch'] ?? false );
  * @param bool  $show    Whether to show the location search input.
  * @param array $context Map context with taxonomy/term info.
  */
-$show_location_search = apply_filters( 'datamachine_events_map_show_location_search', $show_location_search, $context );
+$show_location_search = apply_filters( 'data_machine_events_map_show_location_search', $show_location_search, $context );
 
 // Geocode REST URL (only needed when location search is enabled).
 $geocode_rest_url = $show_location_search ? rest_url( 'datamachine/v1/events/geocode/search' ) : '';
 
 // Summary (plugins can filter to show venue/event counts).
-$summary = apply_filters( 'datamachine_events_map_summary', '', array(), $context );
+$summary = apply_filters( 'data_machine_events_map_summary', '', array(), $context );
 
 ?>
 <div <?php echo $wrapper; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
 	<div
 		id="<?php echo esc_attr( $map_id ); ?>"
-		class="datamachine-events-map-root"
+		class="data-machine-events-map-root"
 		data-height="<?php echo esc_attr( $height ); ?>"
 		data-zoom="<?php echo esc_attr( $zoom ); ?>"
 		data-map-type="<?php echo esc_attr( $map_type ); ?>"
@@ -114,7 +114,7 @@ $summary = apply_filters( 'datamachine_events_map_summary', '', array(), $contex
 		<?php endif; ?>
 	></div>
 	<?php if ( ! empty( $summary ) ) : ?>
-		<p class="datamachine-events-map-summary"><?php echo wp_kses_post( $summary ); ?></p>
+		<p class="data-machine-events-map-summary"><?php echo wp_kses_post( $summary ); ?></p>
 	<?php endif; ?>
 	<?php
 	/**
@@ -122,6 +122,6 @@ $summary = apply_filters( 'datamachine_events_map_summary', '', array(), $contex
 	 *
 	 * @param array $context Map context with taxonomy/term info.
 	 */
-	do_action( 'datamachine_events_map_after_summary', array(), $context );
+	do_action( 'data_machine_events_map_after_summary', array(), $context );
 	?>
 </div>

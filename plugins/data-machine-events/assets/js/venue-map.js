@@ -158,7 +158,7 @@
     }
 
     // Re-initialize for dynamic content
-    document.addEventListener('datamachine-events-loaded', reinitMaps);
+    document.addEventListener('data-machine-events-loaded', reinitMaps);
 
     // Global function for manual initialization
     window.datamachineEventsInitMaps = initVenueMaps;

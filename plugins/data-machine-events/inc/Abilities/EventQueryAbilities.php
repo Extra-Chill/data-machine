@@ -35,10 +35,10 @@ class EventQueryAbilities {
 	private function registerAbility(): void {
 		$register_callback = function () {
 			wp_register_ability(
-				'datamachine-events/get-venue-events',
+				'data-machine-events/get-venue-events',
 				array(
-					'label'               => __( 'Get Venue Events', 'datamachine-events' ),
-					'description'         => __( 'Query events for a specific venue', 'datamachine-events' ),
+					'label'               => __( 'Get Venue Events', 'data-machine-events' ),
+					'description'         => __( 'Query events for a specific venue', 'data-machine-events' ),
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -261,7 +261,7 @@ class EventQueryAbilities {
 		$blocks = parse_blocks( $post->post_content );
 
 		foreach ( $blocks as $block ) {
-			if ( 'datamachine-events/event-details' !== $block['blockName'] ) {
+			if ( 'data-machine-events/event-details' !== $block['blockName'] ) {
 				continue;
 			}
 

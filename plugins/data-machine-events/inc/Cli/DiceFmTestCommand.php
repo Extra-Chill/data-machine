@@ -32,8 +32,8 @@ class DiceFmTestCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine-events test-dice-fm --city="Charleston"
-	 *     wp datamachine-events test-dice-fm --city="New York" --limit=10
+	 *     wp data-machine-events test-dice-fm --city="Charleston"
+	 *     wp data-machine-events test-dice-fm --city="New York" --limit=10
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Associative arguments.

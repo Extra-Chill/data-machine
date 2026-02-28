@@ -26,7 +26,7 @@ A sophisticated address autocomplete component using OpenStreetMap Nominatim API
 // Automatically registered for 'address-autocomplete' field type
 addFilter(
     'datamachine.handlerSettings.fieldComponent',
-    'datamachine-events/address-autocomplete',
+    'data-machine-events/address-autocomplete',
     function( component, fieldType, fieldKey, handlerSlug ) {
         if ( fieldType === 'address-autocomplete' ) {
             return AddressAutocompleteField;
@@ -58,7 +58,7 @@ Automatically populates venue fields when a venue is selected in Universal Web S
 ```javascript
 addFilter(
     'datamachine.handlerSettings.init',
-    'datamachine-events/venue-enrichment',
+    'data-machine-events/venue-enrichment',
     async function( settingsPromise, handlerSlug, fieldsSchema ) {
         // Fetches and populates venue data on modal open
     }
@@ -79,7 +79,7 @@ Handles venue dropdown changes in Universal Web Scraper settings.
 ```javascript
 addFilter(
     'datamachine.handlerSettings.fieldChange',
-    'datamachine-events/venue-change',
+    'data-machine-events/venue-change',
     async function( changesPromise, fieldKey, value, handlerSlug, currentData ) {
         // Handles venue selection changes
     }
