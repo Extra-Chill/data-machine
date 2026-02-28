@@ -227,11 +227,9 @@ function register_routes() {
 		API_NAMESPACE,
 		'/events/geocode/search',
 		array(
-			'methods'             => 'POST',
+			'methods'             => array( 'GET', 'POST' ),
 			'callback'            => array( $geocoding, 'search' ),
-			'permission_callback' => function () {
-				return current_user_can( 'manage_options' );
-			},
+			'permission_callback' => '__return_true',
 			'args'                => array(
 				'query' => array(
 					'required'          => true,

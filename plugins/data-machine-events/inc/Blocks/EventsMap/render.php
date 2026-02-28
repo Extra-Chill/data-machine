@@ -73,6 +73,20 @@ $wrapper = get_block_wrapper_attributes( array(
 $rest_url = rest_url( 'datamachine/v1/events/venues' );
 $nonce    = wp_create_nonce( 'wp_rest' );
 
+// Location search (plugins can enable via filter).
+$show_location_search = (bool) ( $attributes['showLocationSearch'] ?? false );
+
+/**
+ * Filter whether the location search input is shown below the map.
+ *
+ * @param bool  $show    Whether to show the location search input.
+ * @param array $context Map context with taxonomy/term info.
+ */
+$show_location_search = apply_filters( 'datamachine_events_map_show_location_search', $show_location_search, $context );
+
+// Geocode REST URL (only needed when location search is enabled).
+$geocode_rest_url = $show_location_search ? rest_url( 'datamachine/v1/events/geocode/search' ) : '';
+
 // Summary (plugins can filter to show venue/event counts).
 $summary = apply_filters( 'datamachine_events_map_summary', '', array(), $context );
 
@@ -94,6 +108,10 @@ $summary = apply_filters( 'datamachine_events_map_summary', '', array(), $contex
 		data-term-id="<?php echo esc_attr( $context['term_id'] ); ?>"
 		data-rest-url="<?php echo esc_attr( $rest_url ); ?>"
 		data-nonce="<?php echo esc_attr( $nonce ); ?>"
+		<?php if ( $show_location_search ) : ?>
+		data-show-location-search="1"
+		data-geocode-url="<?php echo esc_attr( $geocode_rest_url ); ?>"
+		<?php endif; ?>
 	></div>
 	<?php if ( ! empty( $summary ) ) : ?>
 		<p class="datamachine-events-map-summary"><?php echo wp_kses_post( $summary ); ?></p>

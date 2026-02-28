@@ -68,6 +68,8 @@ export interface MapProps {
 	termId: number;
 	restUrl: string;
 	nonce: string;
+	showLocationSearch: boolean;
+	geocodeUrl: string;
 }
 
 /**

@@ -120,6 +120,123 @@ function debounce<T extends ( ...args: unknown[] ) => void>(
 	};
 }
 
+/* ---------- Location search component ---------- */
+
+interface GeocodeResult {
+	lat: string;
+	lon: string;
+	display_name: string;
+}
+
+function LocationSearch( {
+	geocodeUrl,
+	onLocationFound,
+}: {
+	geocodeUrl: string;
+	onLocationFound: ( lat: number, lng: number, label: string ) => void;
+} ): JSX.Element {
+	const [ query, setQuery ] = useState( '' );
+	const [ loading, setLoading ] = useState( false );
+	const [ error, setError ] = useState( '' );
+	const [ placeholder, setPlaceholder ] = useState(
+		'Enter a city or address...',
+	);
+
+	const handleSubmit = useCallback(
+		async ( e: React.FormEvent ) => {
+			e.preventDefault();
+
+			const trimmed = query.trim();
+			if ( ! trimmed ) return;
+
+			setLoading( true );
+			setError( '' );
+
+			try {
+				const url = `${ geocodeUrl }?query=${ encodeURIComponent(
+					trimmed,
+				) }`;
+				const response = await fetch( url, {
+					headers: { Accept: 'application/json' },
+				} );
+
+				if ( ! response.ok ) {
+					throw new Error( 'Geocoding request failed' );
+				}
+
+				const data = await response.json();
+
+				if (
+					! data.success ||
+					! data.results ||
+					data.results.length === 0
+				) {
+					setError(
+						'Location not found. Try a different city or address.',
+					);
+					return;
+				}
+
+				const result: GeocodeResult = data.results[ 0 ];
+				const lat = parseFloat( result.lat );
+				const lng = parseFloat( result.lon );
+
+				// Show resolved name as placeholder.
+				const label = result.display_name
+					.split( ',' )
+					.slice( 0, 2 )
+					.join( ',' );
+				setPlaceholder( label );
+				setQuery( '' );
+
+				onLocationFound( lat, lng, label );
+			} catch {
+				setError(
+					'Could not look up that location. Please try again.',
+				);
+			} finally {
+				setLoading( false );
+			}
+		},
+		[ query, geocodeUrl, onLocationFound ],
+	);
+
+	return (
+		<div className="datamachine-events-map-location-search">
+			<form
+				className="datamachine-events-map-location-form"
+				onSubmit={ handleSubmit }
+				role="search"
+				aria-label="Change location"
+			>
+				<input
+					type="text"
+					className="datamachine-events-map-location-input"
+					placeholder={ placeholder }
+					aria-label="City or address"
+					autoComplete="off"
+					value={ query }
+					onChange={ ( e ) => setQuery( e.target.value ) }
+					disabled={ loading }
+				/>
+				<button
+					type="submit"
+					className="datamachine-events-map-location-btn"
+					aria-label="Search location"
+					disabled={ loading || ! query.trim() }
+				>
+					{ loading ? '...' : 'Go' }
+				</button>
+			</form>
+			{ error && (
+				<span className="datamachine-events-map-location-error">
+					{ error }
+				</span>
+			) }
+		</div>
+	);
+}
+
 /* ---------- React component ---------- */
 
 function EventsMap( props: MapProps ): JSX.Element | null {
@@ -137,6 +254,8 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		termId,
 		restUrl,
 		nonce,
+		showLocationSearch,
+		geocodeUrl,
 	} = props;
 
 	const mapRef = useRef<L.Map | null>( null );
@@ -234,12 +353,13 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		// Force a resize check after mount.
 		setTimeout( () => map.invalidateSize(), 100 );
 
-		// Fetch venues on mount.
+		// Fetch venues on mount and notify other blocks (e.g. calendar geo-sync).
 		if ( initialVenues.length === 0 ) {
 			// Small delay so map is fully sized first.
 			setTimeout( () => {
 				const bounds = getBoundsFromMap( map );
 				loadVenues( bounds );
+				dispatchBoundsChanged( map );
 			}, 200 );
 		}
 
@@ -350,15 +470,40 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [ userLat, userLon ] );
 
+	/* --- handle location search result --- */
+	const handleLocationFound = useCallback(
+		( lat: number, lng: number, _label: string ) => {
+			const map = mapRef.current;
+			if ( ! map ) return;
+
+			map.setView( [ lat, lng ], 12 );
+
+			// Update URL for shareability.
+			const url = new URL( window.location.href );
+			url.searchParams.set( 'lat', lat.toFixed( 6 ) );
+			url.searchParams.set( 'lng', lng.toFixed( 6 ) );
+			window.history.replaceState( {}, '', url.toString() );
+		},
+		[],
+	);
+
 	return (
-		<div
-			id={ containerId }
-			ref={ containerRef }
-			className="datamachine-events-map"
-			style={ { height: `${ height }px` } }
-			aria-label="Events map"
-			role="application"
-		/>
+		<>
+			<div
+				id={ containerId }
+				ref={ containerRef }
+				className="datamachine-events-map"
+				style={ { height: `${ height }px` } }
+				aria-label="Events map"
+				role="application"
+			/>
+			{ showLocationSearch && geocodeUrl && (
+				<LocationSearch
+					geocodeUrl={ geocodeUrl }
+					onLocationFound={ handleLocationFound }
+				/>
+			) }
+		</>
 	);
 }
 
@@ -387,6 +532,8 @@ function parseMapProps( container: HTMLElement ): MapProps {
 		termId: parseInt( data.termId || '0', 10 ),
 		restUrl: data.restUrl || '',
 		nonce: data.nonce || '',
+		showLocationSearch: data.showLocationSearch === '1',
+		geocodeUrl: data.geocodeUrl || '',
 	};
 }
 

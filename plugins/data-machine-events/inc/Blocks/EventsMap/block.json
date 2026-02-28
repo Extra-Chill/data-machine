@@ -21,6 +21,10 @@
         "mapType": {
             "type": "string",
             "default": "osm-standard"
+        },
+        "showLocationSearch": {
+            "type": "boolean",
+            "default": false
         }
     },
     "supports": {
