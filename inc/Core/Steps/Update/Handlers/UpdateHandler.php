@@ -2,18 +2,21 @@
 /**
  * Base class for Update handlers providing standardized engine data access.
  *
+ * Post tracking is automatic — after executeUpdate() returns a successful
+ * result with a post_id, the base class writes origin metadata (handler,
+ * flow, pipeline) without any action needed from subclasses.
+ *
  * @package DataMachine\Core\Steps\Update\Handlers
  */
 
 namespace DataMachine\Core\Steps\Update\Handlers;
 
 use DataMachine\Core\EngineData;
-use DataMachine\Core\WordPress\PostTrackingTrait;
+use DataMachine\Core\WordPress\PostTracking;
 
 defined( 'ABSPATH' ) || exit;
 
 abstract class UpdateHandler {
-	use PostTrackingTrait;
 
 	/**
 	 * Get all engine data for the current job.
@@ -53,7 +56,11 @@ abstract class UpdateHandler {
 	abstract protected function executeUpdate( array $parameters, array $handler_config ): array;
 
 	/**
-	 * Handle tool call with job_id validation.
+	 * Handle tool call with job_id validation and automatic post tracking.
+	 *
+	 * After executeUpdate() returns, if the result is successful and contains
+	 * a post_id, origin metadata is written automatically. Subclasses never
+	 * need to call any tracking methods.
 	 *
 	 * @param array $parameters Tool parameters
 	 * @param array $tool_def Tool definition
@@ -74,7 +81,17 @@ abstract class UpdateHandler {
 		$parameters['engine'] = $engine;
 
 		$handler_config = $tool_def['handler_config'] ?? array();
-		return $this->executeUpdate( $parameters, $handler_config );
+		$result         = $this->executeUpdate( $parameters, $handler_config );
+
+		// Automatic post tracking — write origin metadata on successful results
+		if ( ! empty( $result['success'] ) ) {
+			$post_id = PostTracking::extractPostId( $result );
+			if ( $post_id > 0 ) {
+				PostTracking::store( $post_id, $tool_def, $job_id );
+			}
+		}
+
+		return $result;
 	}
 
 	/**

@@ -17,12 +17,11 @@ namespace DataMachine\Core\Steps\Publish\Handlers;
 use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\HttpClient;
-use DataMachine\Core\WordPress\PostTrackingTrait;
+use DataMachine\Core\WordPress\PostTracking;
 
 defined( 'ABSPATH' ) || exit;
 
 abstract class PublishHandler {
-	use PostTrackingTrait;
 
 	/** @var string Handler type for logging and responses */
 	protected string $handler_type;
@@ -68,7 +67,17 @@ abstract class PublishHandler {
 		$parameters['engine'] = $engine;
 
 		$handler_config = $tool_def['handler_config'] ?? array();
-		return $this->executePublish( $parameters, $handler_config );
+		$result         = $this->executePublish( $parameters, $handler_config );
+
+		// Automatic post tracking — write origin metadata on successful results
+		if ( ! empty( $result['success'] ) ) {
+			$post_id = PostTracking::extractPostId( $result );
+			if ( $post_id > 0 ) {
+				PostTracking::store( $post_id, $tool_def, $job_id );
+			}
+		}
+
+		return $result;
 	}
 
 	/**
