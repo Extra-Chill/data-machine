@@ -13,6 +13,7 @@ if ( defined( 'DATAMACHINE_EVENTS_PLUGIN_DIR' ) ) {
 		DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Events.php',
 		DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Filters.php',
 		DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Geocoding.php',
+		DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/VenueMap.php',
 	);
 	foreach ( $controllers as $file ) {
 		if ( file_exists( $file ) ) {
@@ -25,6 +26,7 @@ use DataMachineEvents\Api\Controllers\Calendar;
 use DataMachineEvents\Api\Controllers\Venues;
 use DataMachineEvents\Api\Controllers\Filters;
 use DataMachineEvents\Api\Controllers\Geocoding;
+use DataMachineEvents\Api\Controllers\VenueMap;
 
 /**
  * Register REST API routes for Data Machine Events
@@ -124,6 +126,50 @@ function register_routes() {
 				),
 				'address' => array(
 					'sanitize_callback' => 'sanitize_text_field',
+				),
+			),
+		)
+	);
+
+	$venue_map = new VenueMap();
+
+	register_rest_route(
+		API_NAMESPACE,
+		'/events/venues',
+		array(
+			'methods'             => 'GET',
+			'callback'            => array( $venue_map, 'list_venues' ),
+			'permission_callback' => '__return_true',
+			'args'                => array(
+				'lat'         => array(
+					'type'              => 'number',
+					'sanitize_callback' => 'floatval',
+				),
+				'lng'         => array(
+					'type'              => 'number',
+					'sanitize_callback' => 'floatval',
+				),
+				'radius'      => array(
+					'type'              => 'integer',
+					'default'           => 25,
+					'sanitize_callback' => 'absint',
+				),
+				'radius_unit' => array(
+					'type'              => 'string',
+					'default'           => 'mi',
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'bounds'      => array(
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'taxonomy'    => array(
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_key',
+				),
+				'term_id'     => array(
+					'type'              => 'integer',
+					'sanitize_callback' => 'absint',
 				),
 			),
 		)

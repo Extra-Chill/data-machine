@@ -260,6 +260,11 @@ class DATAMACHINE_Events {
 			new \DataMachineEvents\Abilities\VenueAbilities();
 		}
 
+		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/VenueMapAbilities.php' ) ) {
+			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/VenueMapAbilities.php';
+			new \DataMachineEvents\Abilities\VenueMapAbilities();
+		}
+
 		if ( file_exists( DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/CalendarAbilities.php' ) ) {
 			require_once DATAMACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/CalendarAbilities.php';
 			new \DataMachineEvents\Abilities\CalendarAbilities();
