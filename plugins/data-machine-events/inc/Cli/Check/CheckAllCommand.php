@@ -88,9 +88,14 @@ class CheckAllCommand {
 				'limit'      => $limit,
 			);
 
-			// meta-sync doesn't use scope/days-ahead
+			// meta-sync only uses --limit
 			if ( 'meta-sync' === $subcommand ) {
 				$run_args = array( 'limit' => $limit );
+			}
+
+			// duration uses --max-days and --scope, not --days-ahead or --limit
+			if ( 'duration' === $subcommand ) {
+				$run_args = array( 'scope' => $scope );
 			}
 
 			try {

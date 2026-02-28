@@ -65,21 +65,11 @@ class CheckMetaSyncCommand {
 		$fix    = isset( $assoc_args['fix'] );
 		$format = $assoc_args['format'] ?? 'table';
 
-		// Delegate to existing ability if available
-		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine-events/find-missing-meta-sync' ) : null;
-
-		if ( $ability ) {
-			$result = $ability->execute( array( 'limit' => $limit ) );
-
-			if ( is_wp_error( $result ) ) {
-				\WP_CLI::error( 'Meta sync check failed: ' . $result->get_error_message() );
-			}
-
-			$missing = $result['events'] ?? array();
-		} else {
-			// Fallback: manual scan
-			$missing = $this->find_missing_meta_sync( $limit );
-		}
+		// Direct scan — the Abilities API has a permission_callback that
+		// requires manage_options, which isn't loaded in WP-CLI context.
+		// This CLI command already IS the admin interface, so skip the
+		// ability layer and query directly.
+		$missing = $this->find_missing_meta_sync( $limit );
 
 		if ( 'json' === $format ) {
 			\WP_CLI::log( wp_json_encode(
