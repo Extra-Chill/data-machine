@@ -49,7 +49,6 @@ export interface MapAttributes {
 	height: number;
 	zoom: number;
 	mapType: MapType;
-	dynamic: boolean;
 }
 
 /**
@@ -60,7 +59,6 @@ export interface MapProps {
 	height: number;
 	zoom: number;
 	mapType: MapType;
-	dynamic: boolean;
 	centerLat: number | null;
 	centerLon: number | null;
 	userLat: number | null;
