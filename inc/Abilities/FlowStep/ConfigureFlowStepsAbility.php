@@ -241,10 +241,10 @@ class ConfigureFlowStepsAbility {
 					}
 				}
 
-				$existing_handler_slug   = FlowStepNormalizer::getPrimaryHandlerSlug( $step_config );
+				$existing_handler_slug   = FlowStepNormalizer::getEffectiveSlug( $step_config );
 				$existing_handler_config = FlowStepNormalizer::getPrimaryHandlerConfig( $step_config );
 
-				$effective_handler_slug = $target_handler_slug ?? $existing_handler_slug;
+				$effective_handler_slug = FlowStepNormalizer::getEffectiveSlug( $step_config, $target_handler_slug ?? '' );
 
 				if ( empty( $effective_handler_slug ) ) {
 					$errors[] = array(
@@ -547,7 +547,7 @@ class ConfigureFlowStepsAbility {
 				$handler_config = $config['handler_config'] ?? array();
 				$user_message   = $config['user_message'] ?? null;
 
-				$effective_slug = $handler_slug ?? FlowStepNormalizer::getPrimaryHandlerSlug( $flow_config[ $flow_step_id ] );
+				$effective_slug = FlowStepNormalizer::getEffectiveSlug( $flow_config[ $flow_step_id ], $handler_slug ?? '' );
 
 				if ( ! empty( $handler_config ) && ! empty( $effective_slug ) ) {
 					$validation_result = $this->validateHandlerConfig( $effective_slug, $handler_config );
@@ -762,10 +762,10 @@ class ConfigureFlowStepsAbility {
 			$flow_id      = (int) $flow['flow_id'];
 			$flow_name    = $flow['flow_name'] ?? __( 'Unnamed Flow', 'data-machine' );
 
-			$existing_handler_slug   = FlowStepNormalizer::getPrimaryHandlerSlug( $step_config );
+			$existing_handler_slug   = FlowStepNormalizer::getEffectiveSlug( $step_config );
 			$existing_handler_config = FlowStepNormalizer::getPrimaryHandlerConfig( $step_config );
 
-			$effective_handler_slug = $target_handler_slug ?? $existing_handler_slug;
+			$effective_handler_slug = FlowStepNormalizer::getEffectiveSlug( $step_config, $target_handler_slug ?? '' );
 			$is_switching           = ! empty( $target_handler_slug ) && $target_handler_slug !== $existing_handler_slug;
 
 			if ( $is_switching && ! empty( $existing_handler_config ) ) {

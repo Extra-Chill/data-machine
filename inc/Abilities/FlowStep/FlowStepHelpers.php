@@ -272,11 +272,7 @@ trait FlowStepHelpers {
 		// Normalize the existing step config to use plural fields as source of truth.
 		$flow_config[ $flow_step_id ] = FlowStepNormalizer::normalizeHandlerFields( $flow_config[ $flow_step_id ] );
 
-		// Priority: explicit handler_slug > existing handler_slugs[0] > step_type (for non-handler steps like agent_ping).
-		$effective_slug = ! empty( $handler_slug )
-			? $handler_slug
-			: ( FlowStepNormalizer::getPrimaryHandlerSlug( $flow_config[ $flow_step_id ] )
-				?: ( $flow_config[ $flow_step_id ]['step_type'] ?? null ) );
+		$effective_slug = FlowStepNormalizer::getEffectiveSlug( $flow_config[ $flow_step_id ], $handler_slug );
 
 		if ( empty( $effective_slug ) ) {
 			do_action( 'datamachine_log', 'error', 'No handler slug or step_type available for flow step update', array( 'flow_step_id' => $flow_step_id ) );

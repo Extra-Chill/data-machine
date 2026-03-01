@@ -132,12 +132,7 @@ class UpdateFlowStepAbility {
 		$updated_fields = array();
 
 		if ( $has_handler_update ) {
-			// Priority: explicit handler_slug > existing handler_slug > step_type (for non-handler steps like agent_ping).
-			$effective_slug = ! empty( $handler_slug )
-				? $handler_slug
-				: ( ! empty( FlowStepNormalizer::getPrimaryHandlerSlug( $existing_step ) )
-					? FlowStepNormalizer::getPrimaryHandlerSlug( $existing_step )
-					: ( $existing_step['step_type'] ?? '' ) );
+			$effective_slug = FlowStepNormalizer::getEffectiveSlug( $existing_step, $handler_slug ?? '' );
 
 			if ( empty( $effective_slug ) ) {
 				return array(
