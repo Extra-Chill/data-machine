@@ -584,7 +584,7 @@ function datamachine_ensure_default_memory_files() {
 	$directory_manager = new \DataMachine\Core\FilesRepository\DirectoryManager();
 	$agent_dir         = $directory_manager->get_agent_directory();
 
-	if ( ! $directory_manager->ensure_directory_exists( $agent_dir ) ) {
+	if ( ! $directory_manager->ensure_agent_directory_writable() ) {
 		return;
 	}
 
@@ -603,6 +603,7 @@ function datamachine_ensure_default_memory_files() {
 		}
 
 		$fs->put_contents( $filepath, $content . "\n", FS_CHMOD_FILE );
+		\DataMachine\Core\FilesRepository\FilesystemHelper::make_group_writable( $filepath );
 
 		do_action(
 			'datamachine_log',

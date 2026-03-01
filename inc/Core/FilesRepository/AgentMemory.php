@@ -375,8 +375,7 @@ class AgentMemory {
 	 * so a recreated MEMORY.md includes the standard sections.
 	 */
 	private function ensure_file_exists(): void {
-		$agent_dir = $this->directory_manager->get_agent_directory();
-		$this->directory_manager->ensure_directory_exists( $agent_dir );
+		$this->directory_manager->ensure_agent_directory_writable();
 
 		if ( ! file_exists( $this->file_path ) ) {
 			$content = "# Agent Memory\n";
@@ -389,6 +388,7 @@ class AgentMemory {
 			}
 
 			file_put_contents( $this->file_path, $content );
+			FilesystemHelper::make_group_writable( $this->file_path );
 
 			do_action(
 				'datamachine_log',
@@ -409,6 +409,7 @@ class AgentMemory {
 	 */
 	private function write_file( string $content ): int {
 		file_put_contents( $this->file_path, $content );
+		FilesystemHelper::make_group_writable( $this->file_path );
 		$size = strlen( $content );
 
 		if ( $size > self::MAX_FILE_SIZE ) {

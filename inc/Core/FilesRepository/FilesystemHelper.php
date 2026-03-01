@@ -18,6 +18,29 @@ if ( ! defined( 'ABSPATH' ) ) {
 class FilesystemHelper {
 
 	/**
+	 * Group-writable file permissions for agent files.
+	 *
+	 * Agent files live in wp-content/uploads/datamachine-files/agent/ and are
+	 * written by PHP (www-data) but also need to be writable by the coding
+	 * agent user (e.g. opencode) which runs in the www-data group.
+	 *
+	 * Using 0664 (owner rw, group rw, other r) instead of the default 0644
+	 * ensures both users can read and write agent memory files.
+	 *
+	 * @since 0.32.0
+	 * @var int
+	 */
+	const AGENT_FILE_PERMISSIONS = 0664;
+
+	/**
+	 * Group-writable directory permissions for agent directories.
+	 *
+	 * @since 0.32.0
+	 * @var int
+	 */
+	const AGENT_DIR_PERMISSIONS = 0775;
+
+	/**
 	 * Cached initialization result
 	 *
 	 * @var bool|null
@@ -53,6 +76,25 @@ class FilesystemHelper {
 		}
 		global $wp_filesystem;
 		return $wp_filesystem;
+	}
+
+	/**
+	 * Set group-writable permissions on an agent file.
+	 *
+	 * Call this after writing any file in the agent directory to ensure
+	 * both the web server user (www-data) and the coding agent user
+	 * (e.g. opencode) can read and write the file.
+	 *
+	 * @since 0.32.0
+	 * @param string $filepath Absolute path to the file.
+	 * @return bool True if permissions were set, false on failure.
+	 */
+	public static function make_group_writable( string $filepath ): bool {
+		if ( ! file_exists( $filepath ) ) {
+			return false;
+		}
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod
+		return chmod( $filepath, self::AGENT_FILE_PERMISSIONS );
 	}
 
 	/**

@@ -204,4 +204,37 @@ class DirectoryManager {
 		}
 		return true;
 	}
+
+	/**
+	 * Ensure the agent directory and its parents are group-writable.
+	 *
+	 * Agent files need to be writable by both the web server user (www-data)
+	 * and the coding agent user (e.g. opencode). This method creates the
+	 * agent directory if needed and sets 0775 permissions on the agent
+	 * directory and its parent (datamachine-files/).
+	 *
+	 * @since 0.32.0
+	 * @return bool True if directory exists and permissions were set.
+	 */
+	public function ensure_agent_directory_writable(): bool {
+		$agent_dir = $this->get_agent_directory();
+
+		if ( ! $this->ensure_directory_exists( $agent_dir ) ) {
+			return false;
+		}
+
+		$perms = FilesystemHelper::AGENT_DIR_PERMISSIONS;
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod
+		chmod( $agent_dir, $perms );
+
+		// Also set the parent datamachine-files/ directory.
+		$parent = dirname( $agent_dir );
+		if ( is_dir( $parent ) ) {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod
+			chmod( $parent, $perms );
+		}
+
+		return true;
+	}
 }

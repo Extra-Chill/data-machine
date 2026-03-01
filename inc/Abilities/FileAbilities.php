@@ -1090,6 +1090,8 @@ class FileAbilities {
 			);
 		}
 
+		FilesystemHelper::make_group_writable( $filepath );
+
 		do_action(
 			'datamachine_log',
 			'info',

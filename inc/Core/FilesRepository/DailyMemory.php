@@ -125,7 +125,7 @@ class DailyMemory {
 		$file_path = $this->get_file_path( $year, $month, $day );
 		$dir       = dirname( $file_path );
 
-		if ( ! $this->directory_manager->ensure_directory_exists( $dir ) ) {
+		if ( ! $this->ensure_daily_directory( $dir ) ) {
 			return array(
 				'success' => false,
 				'message' => sprintf( 'Failed to create directory for %s-%s-%s.', $year, $month, $day ),
@@ -140,6 +140,8 @@ class DailyMemory {
 				'message' => sprintf( 'Failed to write daily memory for %s-%s-%s.', $year, $month, $day ),
 			);
 		}
+
+		FilesystemHelper::make_group_writable( $file_path );
 
 		return array(
 			'success' => true,
@@ -162,7 +164,7 @@ class DailyMemory {
 		$file_path = $this->get_file_path( $year, $month, $day );
 		$dir       = dirname( $file_path );
 
-		if ( ! $this->directory_manager->ensure_directory_exists( $dir ) ) {
+		if ( ! $this->ensure_daily_directory( $dir ) ) {
 			return array(
 				'success' => false,
 				'message' => sprintf( 'Failed to create directory for %s-%s-%s.', $year, $month, $day ),
@@ -183,6 +185,8 @@ class DailyMemory {
 				'message' => sprintf( 'Failed to append to daily memory for %s-%s-%s.', $year, $month, $day ),
 			);
 		}
+
+		FilesystemHelper::make_group_writable( $file_path );
 
 		return array(
 			'success' => true,
@@ -360,6 +364,37 @@ class DailyMemory {
 	// =========================================================================
 	// Internal Helpers
 	// =========================================================================
+
+	/**
+	 * Ensure a daily memory directory exists with group-writable permissions.
+	 *
+	 * Creates all intermediate directories (daily/YYYY/MM/) and sets 0775
+	 * so the coding agent user can also write daily memory files.
+	 *
+	 * @since 0.32.0
+	 * @param string $dir Directory path.
+	 * @return bool True if directory exists.
+	 */
+	private function ensure_daily_directory( string $dir ): bool {
+		if ( ! $this->directory_manager->ensure_directory_exists( $dir ) ) {
+			return false;
+		}
+
+		$perms = FilesystemHelper::AGENT_DIR_PERMISSIONS;
+
+		// Walk up from the leaf (MM/) through YYYY/ and daily/ — set each.
+		$current = $dir;
+		$stops   = 3; // MM, YYYY, daily.
+		for ( $i = 0; $i < $stops; $i++ ) {
+			if ( is_dir( $current ) ) {
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod
+				chmod( $current, $perms );
+			}
+			$current = dirname( $current );
+		}
+
+		return true;
+	}
 
 	/**
 	 * Parse a YYYY-MM-DD date string into year/month/day components.

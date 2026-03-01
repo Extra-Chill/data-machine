@@ -22,6 +22,7 @@ use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\AgentMemoryAbilities;
 use DataMachine\Core\FilesRepository\DailyMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
+use DataMachine\Core\FilesRepository\FilesystemHelper;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -683,6 +684,8 @@ class MemoryCommand extends BaseCommand {
 			WP_CLI::error( sprintf( 'Failed to write file: %s', $safe_name ) );
 			return;
 		}
+
+		FilesystemHelper::make_group_writable( $filepath );
 
 		WP_CLI::success( sprintf( 'Wrote %s (%s).', $safe_name, size_format( $written ) ) );
 	}
