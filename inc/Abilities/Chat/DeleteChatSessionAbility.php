@@ -62,10 +62,12 @@ class DeleteChatSessionAbility {
 					),
 					'execute_callback'    => array( $this, 'execute' ),
 					'permission_callback' => array( $this, 'checkPermission' ),
-					'annotations'         => array(
-						'destructive' => true,
+					'meta'                => array(
+						'show_in_rest' => true,
+						'annotations'  => array(
+							'destructive' => true,
+						),
 					),
-					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
 		};
