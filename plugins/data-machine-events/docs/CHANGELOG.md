@@ -2,6 +2,10 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.13.3] - 2026-03-01
+
+- feat: re-init lazy render and carousel on external content-updated event for client-side scope switching
+
 ## [0.13.2] - 2026-03-01
 
 ### Fixed
