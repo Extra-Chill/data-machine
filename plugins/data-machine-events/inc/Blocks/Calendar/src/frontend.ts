@@ -76,6 +76,17 @@ function initCalendarInstance( calendar: HTMLElement ): void {
 	}
 
 	filterState.updateFilterCountBadge();
+
+	// Listen for external content updates (e.g., discovery page scope switching).
+	calendar.addEventListener(
+		'data-machine-calendar-content-updated',
+		function () {
+			destroyLazyRender( calendar );
+			destroyCarousel( calendar );
+			initLazyRender( calendar );
+			initCarousel( calendar );
+		}
+	);
 }
 
 function initSearchInput( calendar: HTMLElement ): void {
