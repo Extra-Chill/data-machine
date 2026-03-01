@@ -18,6 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 use DataMachineEvents\Abilities\CalendarAbilities;
 use DataMachineEvents\Abilities\FilterAbilities;
 use DataMachineEvents\Blocks\Calendar\Taxonomy_Helper;
+use DataMachineEvents\Blocks\Calendar\Query\ScopeResolver;
 
 if ( wp_is_json_request() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
 	return '';
@@ -61,6 +62,14 @@ if ( is_array( $tax_filters_raw ) ) {
 	}
 }
 
+// Resolve scope: URL ?scope= param takes priority, then block attribute, then empty (default).
+$scope = '';
+if ( isset( $_GET['scope'] ) ) {
+	$scope = sanitize_key( wp_unslash( $_GET['scope'] ) );
+} elseif ( ! empty( $attributes['defaultDateRange'] ) && 'current' !== $attributes['defaultDateRange'] ) {
+	$scope = $attributes['defaultDateRange'];
+}
+
 $archive_context = array(
 	'taxonomy'  => '',
 	'term_id'   => 0,
@@ -86,6 +95,7 @@ $result    = $abilities->executeGetCalendarPage(
 		'event_search'     => $search_query,
 		'date_start'       => $date_start,
 		'date_end'         => $date_end,
+		'scope'            => $scope,
 		'tax_filter'       => $tax_filters,
 		'archive_taxonomy' => $archive_context['taxonomy'],
 		'archive_term_id'  => $archive_context['term_id'],
@@ -186,9 +196,14 @@ if ( ! empty( $geo_lat ) && ! empty( $geo_lng ) ) {
 		esc_attr( $geo_radius_unit )
 	);
 }
+
+$scope_data_attr = '';
+if ( ! empty( $scope ) ) {
+	$scope_data_attr = sprintf( ' data-scope="%s"', esc_attr( $scope ) );
+}
 ?>
 
-<div data-instance-id="<?php echo esc_attr( $instance_id ); ?>"<?php echo $archive_data_attrs; ?><?php echo $geo_data_attrs; ?> <?php echo $wrapper_attributes; ?>>
+<div data-instance-id="<?php echo esc_attr( $instance_id ); ?>"<?php echo $archive_data_attrs; ?><?php echo $geo_data_attrs; ?><?php echo $scope_data_attr; ?> <?php echo $wrapper_attributes; ?>>
 	<?php
 	\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template(
 		'filter-bar',

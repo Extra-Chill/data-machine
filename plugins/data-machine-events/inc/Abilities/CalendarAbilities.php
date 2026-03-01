@@ -12,6 +12,7 @@ namespace DataMachineEvents\Abilities;
 
 use WP_Query;
 use DataMachineEvents\Blocks\Calendar\Query\EventQueryBuilder;
+use DataMachineEvents\Blocks\Calendar\Query\ScopeResolver;
 use DataMachineEvents\Blocks\Calendar\Data\EventHydrator;
 use DataMachineEvents\Blocks\Calendar\Grouping\DateGrouper;
 use DataMachineEvents\Blocks\Calendar\Display\EventRenderer;
@@ -84,6 +85,10 @@ class CalendarAbilities {
 							'include_gaps'     => array(
 								'type'        => 'boolean',
 								'description' => 'Include time-gap separators (default: true)',
+							),
+							'scope'            => array(
+								'type'        => 'string',
+								'description' => 'Time scope: today, tonight, this-weekend, this-week (overrides date_start/date_end when set)',
 							),
 						),
 					),
@@ -158,6 +163,17 @@ class CalendarAbilities {
 		$user_date_end   = $input['date_end'] ?? '';
 		$tax_filters     = is_array( $input['tax_filter'] ?? null ) ? $input['tax_filter'] : array();
 
+		// Resolve scope to date boundaries when user hasn't set explicit dates.
+		$scope          = $input['scope'] ?? '';
+		$scope_resolved = null;
+		if ( $scope && empty( $user_date_start ) && empty( $user_date_end ) ) {
+			$scope_resolved = ScopeResolver::resolve( $scope );
+			if ( $scope_resolved ) {
+				$user_date_start = $scope_resolved['date_start'];
+				$user_date_end   = $scope_resolved['date_end'];
+			}
+		}
+
 		$archive_taxonomy = sanitize_key( $input['archive_taxonomy'] ?? '' );
 		$archive_term_id  = absint( $input['archive_term_id'] ?? 0 );
 
@@ -177,6 +193,8 @@ class CalendarAbilities {
 			'search_query'       => $search_query,
 			'date_start'         => $user_date_start,
 			'date_end'           => $user_date_end,
+			'time_start'         => $scope_resolved['time_start'] ?? '',
+			'time_end'           => $scope_resolved['time_end'] ?? '',
 			'tax_filters'        => $tax_filters,
 			'tax_query_override' => $tax_query_override,
 			'archive_taxonomy'   => $archive_taxonomy,

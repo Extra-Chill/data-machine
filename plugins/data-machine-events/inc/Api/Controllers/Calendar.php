@@ -33,6 +33,7 @@ class Calendar {
 				'event_search'     => $request->get_param( 'event_search' ) ?? '',
 				'date_start'       => $request->get_param( 'date_start' ) ?? '',
 				'date_end'         => $request->get_param( 'date_end' ) ?? '',
+				'scope'            => $request->get_param( 'scope' ) ?? '',
 				'tax_filter'       => $request->get_param( 'tax_filter' ) ?? array(),
 				'archive_taxonomy' => $request->get_param( 'archive_taxonomy' ) ?? '',
 				'archive_term_id'  => $request->get_param( 'archive_term_id' ) ?? 0,

@@ -36,6 +36,8 @@ class EventQueryBuilder {
 			'search_query'       => '',
 			'date_start'         => '',
 			'date_end'           => '',
+			'time_start'         => '',
+			'time_end'           => '',
 			'tax_filters'        => array(),
 			'tax_query_override' => null,
 			'archive_taxonomy'   => '',
@@ -97,6 +99,10 @@ class EventQueryBuilder {
 		}
 
 		if ( ! empty( $params['date_start'] ) ) {
+			$start_datetime = ! empty( $params['time_start'] )
+				? $params['date_start'] . ' ' . $params['time_start']
+				: $params['date_start'] . ' 00:00:00';
+
 			// Include events that START on/after the boundary OR that END on/after it.
 			// This ensures multi-day events that started before the page boundary
 			// but span into it are still returned.
@@ -104,13 +110,13 @@ class EventQueryBuilder {
 				'relation' => 'OR',
 				array(
 					'key'     => EVENT_DATETIME_META_KEY,
-					'value'   => $params['date_start'] . ' 00:00:00',
+					'value'   => $start_datetime,
 					'compare' => '>=',
 					'type'    => 'DATETIME',
 				),
 				array(
 					'key'     => EVENT_END_DATETIME_META_KEY,
-					'value'   => $params['date_start'] . ' 00:00:00',
+					'value'   => $start_datetime,
 					'compare' => '>=',
 					'type'    => 'DATETIME',
 				),
@@ -118,9 +124,13 @@ class EventQueryBuilder {
 		}
 
 		if ( ! empty( $params['date_end'] ) ) {
+			$end_datetime = ! empty( $params['time_end'] )
+				? $params['date_end'] . ' ' . $params['time_end']
+				: $params['date_end'] . ' 23:59:59';
+
 			$meta_query[] = array(
 				'key'     => EVENT_DATETIME_META_KEY,
-				'value'   => $params['date_end'] . ' 23:59:59',
+				'value'   => $end_datetime,
 				'compare' => '<=',
 				'type'    => 'DATETIME',
 			);

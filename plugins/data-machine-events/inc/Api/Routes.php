@@ -55,6 +55,11 @@ function register_routes() {
 					'type'              => 'string',
 					'sanitize_callback' => 'sanitize_text_field',
 				),
+				'scope'            => array(
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_key',
+					'description'       => 'Time scope: today, tonight, this-weekend, this-week',
+				),
 				'tax_filter'       => array(
 					'type'              => 'object',
 					'sanitize_callback' => function ( $value ) {
