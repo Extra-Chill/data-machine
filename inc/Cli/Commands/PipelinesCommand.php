@@ -85,6 +85,12 @@ class PipelinesCommand extends BaseCommand {
 	 * [--dry-run]
 	 * : Validate without creating (create subcommand).
 	 *
+	 * [--add=<filename>]
+	 * : Attach a memory file to a pipeline (memory-files subcommand).
+	 *
+	 * [--remove=<filename>]
+	 * : Detach a memory file from a pipeline (memory-files subcommand).
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     # List all pipelines
@@ -139,6 +145,15 @@ class PipelinesCommand extends BaseCommand {
 	 *     # Delete a pipeline (skip confirmation)
 	 *     wp datamachine pipelines delete 5 --force
 	 *
+	 *     # List memory files for a pipeline
+	 *     wp datamachine pipelines memory-files 5
+	 *
+	 *     # Attach a memory file
+	 *     wp datamachine pipelines memory-files 5 --add=content-briefing.md
+	 *
+	 *     # Detach a memory file
+	 *     wp datamachine pipelines memory-files 5 --remove=content-briefing.md
+	 *
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		$pipeline_id = null;
@@ -166,6 +181,16 @@ class PipelinesCommand extends BaseCommand {
 				return;
 			}
 			$this->deletePipeline( (int) $args[1], $assoc_args );
+			return;
+		}
+
+		// Handle 'memory-files' subcommand.
+		if ( ! empty( $args ) && 'memory-files' === $args[0] ) {
+			if ( ! isset( $args[1] ) ) {
+				WP_CLI::error( 'Usage: wp datamachine pipelines memory-files <pipeline_id> [--add=<filename>] [--remove=<filename>]' );
+				return;
+			}
+			$this->memoryFiles( (int) $args[1], $assoc_args );
 			return;
 		}
 
@@ -285,6 +310,13 @@ class PipelinesCommand extends BaseCommand {
 		WP_CLI::log( sprintf( 'Name: %s', $pipeline['pipeline_name'] ) );
 		WP_CLI::log( sprintf( 'Created: %s', $pipeline['created_at_display'] ?? $pipeline['created_at'] ?? 'N/A' ) );
 		WP_CLI::log( sprintf( 'Updated: %s', $pipeline['updated_at_display'] ?? $pipeline['updated_at'] ?? 'N/A' ) );
+
+		// Memory files.
+		$memory_files = $pipeline['pipeline_config']['memory_files'] ?? array();
+		if ( ! empty( $memory_files ) ) {
+			WP_CLI::log( sprintf( 'Memory files: %s', implode( ', ', $memory_files ) ) );
+		}
+
 		WP_CLI::log( '' );
 
 		// Output steps.
@@ -636,6 +668,105 @@ class PipelinesCommand extends BaseCommand {
 		}
 
 		return array( 'step_id' => $ai_steps[0]['id'] );
+	}
+
+	/**
+	 * Manage memory files attached to a pipeline.
+	 *
+	 * Without --add or --remove, lists current memory files.
+	 * With --add, attaches a file. With --remove, detaches a file.
+	 *
+	 * @param int   $pipeline_id Pipeline ID.
+	 * @param array $assoc_args  Arguments (add, remove, format).
+	 */
+	private function memoryFiles( int $pipeline_id, array $assoc_args ): void {
+		if ( $pipeline_id <= 0 ) {
+			WP_CLI::error( 'pipeline_id must be a positive integer' );
+			return;
+		}
+
+		$format    = $assoc_args['format'] ?? 'table';
+		$add_file  = $assoc_args['add'] ?? null;
+		$rm_file   = $assoc_args['remove'] ?? null;
+
+		$db = new \DataMachine\Core\Database\Pipelines\Pipelines();
+
+		// Verify pipeline exists.
+		$pipeline = $db->get_pipeline( $pipeline_id );
+		if ( ! $pipeline ) {
+			WP_CLI::error( "Pipeline {$pipeline_id} not found" );
+			return;
+		}
+
+		$current_files = $db->get_pipeline_memory_files( $pipeline_id );
+
+		// Add a file.
+		if ( $add_file ) {
+			$add_file = sanitize_file_name( $add_file );
+
+			if ( in_array( $add_file, $current_files, true ) ) {
+				WP_CLI::warning( sprintf( '"%s" is already attached to pipeline %d.', $add_file, $pipeline_id ) );
+				return;
+			}
+
+			$current_files[] = $add_file;
+			$result          = $db->update_pipeline_memory_files( $pipeline_id, $current_files );
+
+			if ( ! $result ) {
+				WP_CLI::error( 'Failed to update memory files' );
+				return;
+			}
+
+			WP_CLI::success( sprintf( 'Added "%s" to pipeline %d. Files: %s', $add_file, $pipeline_id, implode( ', ', $current_files ) ) );
+			return;
+		}
+
+		// Remove a file.
+		if ( $rm_file ) {
+			$rm_file = sanitize_file_name( $rm_file );
+
+			if ( ! in_array( $rm_file, $current_files, true ) ) {
+				WP_CLI::warning( sprintf( '"%s" is not attached to pipeline %d.', $rm_file, $pipeline_id ) );
+				return;
+			}
+
+			$current_files = array_values( array_diff( $current_files, array( $rm_file ) ) );
+			$result        = $db->update_pipeline_memory_files( $pipeline_id, $current_files );
+
+			if ( ! $result ) {
+				WP_CLI::error( 'Failed to update memory files' );
+				return;
+			}
+
+			WP_CLI::success( sprintf( 'Removed "%s" from pipeline %d.', $rm_file, $pipeline_id ) );
+
+			if ( ! empty( $current_files ) ) {
+				WP_CLI::log( sprintf( 'Remaining: %s', implode( ', ', $current_files ) ) );
+			} else {
+				WP_CLI::log( 'No memory files attached.' );
+			}
+			return;
+		}
+
+		// List files.
+		if ( empty( $current_files ) ) {
+			WP_CLI::log( sprintf( 'Pipeline %d has no memory files attached.', $pipeline_id ) );
+			return;
+		}
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( wp_json_encode( $current_files, JSON_PRETTY_PRINT ) );
+			return;
+		}
+
+		$items = array_map(
+			function ( $filename ) {
+				return array( 'filename' => $filename );
+			},
+			$current_files
+		);
+
+		\WP_CLI\Utils\format_items( $format, $items, array( 'filename' ) );
 	}
 
 	/**
