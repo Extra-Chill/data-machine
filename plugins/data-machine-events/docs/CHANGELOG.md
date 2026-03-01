@@ -2,7 +2,7 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
-## Unreleased
+## [0.13.2] - 2026-03-01
 
 ### Fixed
 - REST API namespace restored to `datamachine/v1` — the rename incorrectly changed it to `data-machine/v1` in the Calendar JS API client and taxonomy filter template
