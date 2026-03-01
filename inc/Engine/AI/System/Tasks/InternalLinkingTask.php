@@ -364,24 +364,37 @@ class InternalLinkingTask extends SystemTask {
 	 * Minimum relevance score a candidate must reach to be considered.
 	 *
 	 * Prevents linking to posts that only share a broad category with no
-	 * other semantic signal. A single shared tag (3) or two title word
-	 * matches (10) clears the threshold.
+	 * other semantic signal. A single shared tag (3) or a high-IDF title
+	 * word match clears the threshold.
 	 *
 	 * @var int
 	 */
 	private const MIN_RELEVANCE_SCORE = 3;
 
 	/**
-	 * Find related posts scored by taxonomy overlap and title similarity.
+	 * Maximum weight a single title word can contribute.
+	 *
+	 * Applied to words with maximum IDF (appearing in only 1 candidate).
+	 * Template words appearing in most candidates score near zero.
+	 *
+	 * @var float
+	 * @since 0.34.0
+	 */
+	private const TITLE_WORD_MAX_WEIGHT = 5.0;
+
+	/**
+	 * Find related posts scored by taxonomy overlap and IDF-weighted title similarity.
 	 *
 	 * Taxonomy provides the candidate pool. Title word overlap between the
-	 * source and candidate posts is the primary relevance signal — it catches
-	 * topical affinity that broad categories miss.
+	 * source and candidate posts is the primary relevance signal — but words
+	 * are weighted by IDF (Inverse Document Frequency) so common template
+	 * words like "spiritual", "meaning", "facts" score near zero while
+	 * differentiating words like "lobsters" score at full weight.
 	 *
 	 * Scoring weights:
 	 * - Shared categories: ×1 (broad, low signal)
 	 * - Shared tags:       ×3 (specific, moderate signal)
-	 * - Title word overlap: ×5 (strongest signal for topical relevance)
+	 * - Title word overlap: ×IDF weight (0 to TITLE_WORD_MAX_WEIGHT per word)
 	 *
 	 * Candidates below MIN_RELEVANCE_SCORE are discarded entirely.
 	 *
@@ -428,7 +441,16 @@ class InternalLinkingTask extends SystemTask {
 		// Extract meaningful words (3+ chars) from source title for matching.
 		$source_words = $this->extractTitleWords( $source_title );
 
-		// Score each candidate by taxonomy overlap + title similarity.
+		// Collect all candidate titles for IDF computation.
+		$candidate_titles = array();
+		foreach ( $query->posts as $candidate_id ) {
+			$candidate_titles[ $candidate_id ] = get_the_title( $candidate_id );
+		}
+
+		// Compute IDF weights: rare words score high, common template words score near zero.
+		$idf_weights = $this->computeWordIDF( $candidate_titles );
+
+		// Score each candidate by taxonomy overlap + IDF-weighted title similarity.
 		$scored = array();
 
 		foreach ( $query->posts as $candidate_id ) {
@@ -443,12 +465,15 @@ class InternalLinkingTask extends SystemTask {
 			$score += count( $shared_cats ) * 1;
 			$score += count( $shared_tags ) * 3;
 
-			// Title word overlap — strongest relevance signal.
-			$candidate_title = get_the_title( $candidate_id );
-			$candidate_words = $this->extractTitleWords( $candidate_title );
+			// IDF-weighted title word overlap — rare shared words score high,
+			// common template words (spiritual, meaning, facts) score near zero.
+			$candidate_words = $this->extractTitleWords( $candidate_titles[ $candidate_id ] );
 			$shared_words    = array_intersect( $source_words, $candidate_words );
 
-			$score += count( $shared_words ) * 5;
+			foreach ( $shared_words as $word ) {
+				$weight = $idf_weights[ $word ] ?? 0;
+				$score += $weight;
+			}
 
 			// Enforce minimum relevance threshold.
 			if ( $score >= self::MIN_RELEVANCE_SCORE ) {
@@ -475,6 +500,62 @@ class InternalLinkingTask extends SystemTask {
 		}
 
 		return $related;
+	}
+
+	/**
+	 * Compute IDF (Inverse Document Frequency) weights for title words.
+	 *
+	 * Words appearing in many candidate titles get low scores (template words
+	 * like "spiritual", "meaning", "facts"). Words appearing in few titles
+	 * get high scores (differentiating words like "lobsters", "sandpipers").
+	 *
+	 * Formula: weight = max_weight × log(N / df) / log(N)
+	 * Where N = total candidates, df = number of candidates containing the word.
+	 *
+	 * A word in every candidate scores 0. A word in only 1 candidate scores max_weight.
+	 *
+	 * @param array $candidate_titles Assoc array of candidate_id => title string.
+	 * @return array Assoc array of word => float weight (0 to max_weight).
+	 * @since 0.34.0
+	 */
+	private function computeWordIDF( array $candidate_titles ): array {
+		$total_docs = count( $candidate_titles );
+
+		if ( $total_docs <= 1 ) {
+			// With 0-1 candidates, all words get max weight (no IDF signal).
+			$all_words = array();
+			foreach ( $candidate_titles as $title ) {
+				foreach ( $this->extractTitleWords( $title ) as $word ) {
+					$all_words[ $word ] = self::TITLE_WORD_MAX_WEIGHT;
+				}
+			}
+			return $all_words;
+		}
+
+		// Count how many candidate titles contain each word (document frequency).
+		$doc_frequency = array();
+		foreach ( $candidate_titles as $title ) {
+			// Use array_unique so each word counts once per document.
+			$words = array_unique( $this->extractTitleWords( $title ) );
+			foreach ( $words as $word ) {
+				$doc_frequency[ $word ] = ( $doc_frequency[ $word ] ?? 0 ) + 1;
+			}
+		}
+
+		// Compute IDF weight for each word.
+		$weights  = array();
+		$log_n    = log( $total_docs );
+
+		foreach ( $doc_frequency as $word => $df ) {
+			if ( $df >= $total_docs ) {
+				// Word appears in every candidate — zero weight.
+				$weights[ $word ] = 0.0;
+			} else {
+				$weights[ $word ] = round( self::TITLE_WORD_MAX_WEIGHT * log( $total_docs / $df ) / $log_n, 2 );
+			}
+		}
+
+		return $weights;
 	}
 
 	/**
