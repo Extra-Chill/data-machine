@@ -199,9 +199,20 @@ class PageSpeedAbilities {
 		);
 
 		if ( ! $result['success'] ) {
+			$error_msg = $result['error'] ?? 'Unknown error';
+
+			// Detect rate limiting and provide actionable guidance.
+			$status_code = $result['status_code'] ?? 0;
+			if ( 429 === $status_code || false !== strpos( $error_msg, '429' ) ) {
+				$has_key = ! empty( $config['api_key'] );
+				$error_msg = $has_key
+					? 'PageSpeed API rate limit exceeded even with an API key. Wait a few minutes and try again, or check your Google Cloud Console quota.'
+					: 'PageSpeed API rate limit exceeded. Configure a Google API key in Data Machine settings (Tools → PageSpeed) for higher limits. Get a free key at https://console.cloud.google.com/apis/credentials (enable PageSpeed Insights API).';
+			}
+
 			return array(
 				'success' => false,
-				'error'   => 'Failed to connect to PageSpeed Insights API: ' . ( $result['error'] ?? 'Unknown error' ),
+				'error'   => $error_msg,
 			);
 		}
 
