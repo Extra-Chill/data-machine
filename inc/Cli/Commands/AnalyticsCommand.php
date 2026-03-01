@@ -104,6 +104,9 @@ class AnalyticsCommand extends BaseCommand {
 	 * [--limit=<number>]
 	 * : Maximum number of results (default: 20).
 	 *
+	 * [--days=<number>]
+	 * : Only show data from the last N days (client-side filter).
+	 *
 	 * [--format=<format>]
 	 * : Output format.
 	 * ---
@@ -125,6 +128,9 @@ class AnalyticsCommand extends BaseCommand {
 	 *     # Crawl stats with limit
 	 *     wp datamachine analytics bing crawl_stats --limit=50
 	 *
+	 *     # Only last 30 days of data
+	 *     wp datamachine analytics bing traffic_stats --days=30
+	 *
 	 * @subcommand bing
 	 */
 	public function bing( array $args, array $assoc_args ): void {
@@ -134,6 +140,7 @@ class AnalyticsCommand extends BaseCommand {
 
 		$this->map_optional( $input, $assoc_args, array(
 			'limit' => 'limit',
+			'days'  => 'days',
 		) );
 
 		$this->execute_ability( 'datamachine/bing-webmaster', $input, $assoc_args );
@@ -345,15 +352,23 @@ class AnalyticsCommand extends BaseCommand {
 			$this->format_items( $flat_results, $fields, $assoc_args );
 		}
 
-		// Show summary.
+		// Show summary with date range if available.
 		$count = $result['results_count'] ?? count( $results );
-		if ( isset( $result['date_range'] ) ) {
-			WP_CLI::log( sprintf(
-				'%d results (%s to %s)',
-				$count,
-				$result['date_range']['start_date'] ?? '?',
-				$result['date_range']['end_date'] ?? '?'
-			) );
+		if ( ! empty( $result['date_range'] ) ) {
+			$range    = $result['date_range'];
+			$start    = $range['start_date'] ?? '?';
+			$end      = $range['end_date'] ?? '?';
+			$days_ago = $range['days_ago'] ?? null;
+
+			WP_CLI::log( sprintf( '%d results (%s to %s)', $count, $start, $end ) );
+
+			if ( null !== $days_ago && $days_ago > 30 ) {
+				WP_CLI::warning( sprintf(
+					'Data is %d days stale (latest: %s). Check API key and site verification.',
+					$days_ago,
+					$end
+				) );
+			}
 		} else {
 			WP_CLI::log( sprintf( '%d results', $count ) );
 		}
