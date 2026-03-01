@@ -12,7 +12,7 @@ const DOT_GAP = 8;
 
 export function initCarousel( calendar: HTMLElement ): void {
 	const groups = calendar.querySelectorAll< HTMLElement >(
-		'.datamachine-date-group'
+		'.data-machine-date-group'
 	);
 
 	groups.forEach( function ( group ) {
@@ -30,7 +30,7 @@ export function initCarousel( calendar: HTMLElement ): void {
 		}
 
 		const events = wrapper.querySelectorAll< HTMLElement >(
-			'.datamachine-event-item'
+			'.data-machine-event-item'
 		);
 
 		let indicators: HTMLElement | null = null;
@@ -44,11 +44,11 @@ export function initCarousel( calendar: HTMLElement ): void {
 			}
 
 			const track = indicators.querySelector< HTMLElement >(
-				'.datamachine-carousel-dots-track'
+				'.data-machine-carousel-dots-track'
 			);
 			const dots = track
 				? track.querySelectorAll< HTMLElement >(
-						'.datamachine-carousel-dot'
+						'.data-machine-carousel-dot'
 				  )
 				: [];
 			if ( ! track || dots.length === 0 ) {
@@ -197,13 +197,13 @@ export function initCarousel( calendar: HTMLElement ): void {
 				wrapper.scrollWidth > wrapper.clientWidth;
 
 			indicators = group.querySelector< HTMLElement >(
-				'.datamachine-carousel-indicators'
+				'.data-machine-carousel-indicators'
 			);
 			chevronLeft = group.querySelector< HTMLElement >(
-				'.datamachine-carousel-chevron-left'
+				'.data-machine-carousel-chevron-left'
 			);
 			chevronRight = group.querySelector< HTMLElement >(
-				'.datamachine-carousel-chevron-right'
+				'.data-machine-carousel-chevron-right'
 			);
 
 			if ( ! hasOverflow ) {
@@ -229,7 +229,7 @@ export function initCarousel( calendar: HTMLElement ): void {
 			if ( ! indicators ) {
 				indicators = document.createElement( 'div' );
 				indicators.className =
-					'datamachine-carousel-indicators';
+					'data-machine-carousel-indicators';
 				group.appendChild( indicators );
 			}
 			indicators.innerHTML = '';
@@ -246,19 +246,19 @@ export function initCarousel( calendar: HTMLElement ): void {
 			if ( useViewport ) {
 				const viewport = document.createElement( 'div' );
 				viewport.className = isMobileScreen
-					? 'datamachine-carousel-viewport'
-					: 'datamachine-carousel-viewport datamachine-carousel-viewport--desktop';
+					? 'data-machine-carousel-viewport'
+					: 'data-machine-carousel-viewport data-machine-carousel-viewport--desktop';
 				indicators.appendChild( viewport );
 				trackParent = viewport;
 			}
 
 			const track = document.createElement( 'div' );
-			track.className = 'datamachine-carousel-dots-track';
+			track.className = 'data-machine-carousel-dots-track';
 			trackParent.appendChild( track );
 
 			for ( let i = 0; i < eventCount; i++ ) {
 				const dot = document.createElement( 'span' );
-				dot.className = 'datamachine-carousel-dot';
+				dot.className = 'data-machine-carousel-dot';
 				dot.dataset.index = String( i );
 				track.appendChild( dot );
 			}
@@ -266,7 +266,7 @@ export function initCarousel( calendar: HTMLElement ): void {
 			if ( ! chevronLeft ) {
 				chevronLeft = document.createElement( 'span' );
 				chevronLeft.className =
-					'datamachine-carousel-chevron datamachine-carousel-chevron-left';
+					'data-machine-carousel-chevron data-machine-carousel-chevron-left';
 				chevronLeft.textContent = '\u2039';
 				group.appendChild( chevronLeft );
 			}
@@ -274,7 +274,7 @@ export function initCarousel( calendar: HTMLElement ): void {
 			if ( ! chevronRight ) {
 				chevronRight = document.createElement( 'span' );
 				chevronRight.className =
-					'datamachine-carousel-chevron datamachine-carousel-chevron-right';
+					'data-machine-carousel-chevron data-machine-carousel-chevron-right';
 				chevronRight.textContent = '\u203A';
 				group.appendChild( chevronRight );
 			}
@@ -400,10 +400,10 @@ export function destroyCarousel( calendar: HTMLElement ): void {
 	}
 
 	const indicatorEls = calendar.querySelectorAll(
-		'.datamachine-carousel-indicators'
+		'.data-machine-carousel-indicators'
 	);
 	const chevronEls = calendar.querySelectorAll(
-		'.datamachine-carousel-chevron'
+		'.data-machine-carousel-chevron'
 	);
 
 	indicatorEls.forEach( ( el ) => el.remove() );

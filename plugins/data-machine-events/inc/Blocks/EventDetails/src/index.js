@@ -70,7 +70,7 @@ registerBlockType('data-machine-events/event-details', {
         } = attributes;
 
         const blockProps = useBlockProps({
-            className: 'datamachine-event-details-block'
+            className: 'data-machine-event-details-block'
         });
 
         const handleAttributeChange = (field, value) => {
@@ -83,7 +83,7 @@ registerBlockType('data-machine-events/event-details', {
 
         return (
             <div {...blockProps}>
-                    <div className="datamachine-event-details-editor">
+                    <div className="data-machine-event-details-editor">
                         <div className="event-description-area">
                             <h4>{__('Event Description', 'data-machine-events')}</h4>
                             <div className="event-description-inner">

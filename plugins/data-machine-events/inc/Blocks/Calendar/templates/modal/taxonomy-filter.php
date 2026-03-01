@@ -13,10 +13,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 ?>
 
-<div class="datamachine-taxonomy-filter-content" data-filters-endpoint="<?php echo esc_url( rest_url( 'datamachine/v1/events/filters' ) ); ?>">
-	<div class="datamachine-filter-loading">
-		<span class="datamachine-filter-spinner"></span>
+<div class="data-machine-taxonomy-filter-content" data-filters-endpoint="<?php echo esc_url( rest_url( 'datamachine/v1/events/filters' ) ); ?>">
+	<div class="data-machine-filter-loading">
+		<span class="data-machine-filter-spinner"></span>
 		<span><?php esc_html_e( 'Loading filters...', 'data-machine-events' ); ?></span>
 	</div>
-	<div class="datamachine-filter-taxonomies"></div>
+	<div class="data-machine-filter-taxonomies"></div>
 </div>

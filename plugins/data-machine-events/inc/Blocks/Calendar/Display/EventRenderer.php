@@ -108,7 +108,7 @@ class EventRenderer {
 				?>
 			</div><!-- .data-machine-events-wrapper -->
 			<?php
-			echo '</div><!-- .datamachine-date-group -->';
+			echo '</div><!-- .data-machine-date-group -->';
 		}
 
 		return ob_get_clean();
@@ -138,24 +138,24 @@ class EventRenderer {
 			'display_vars'    => $display_vars,
 			'display_context' => $display_context,
 			'badges_html'     => Taxonomy_Badges::render_taxonomy_badges( $event_post->ID ),
-			'button_classes'  => implode( ' ', apply_filters( 'data_machine_events_more_info_button_classes', array( 'datamachine-more-info-button' ) ) ),
+			'button_classes'  => implode( ' ', apply_filters( 'data_machine_events_more_info_button_classes', array( 'data-machine-more-info-button' ) ) ),
 		);
 
-		$item_classes = array( 'datamachine-event-item', 'datamachine-event-placeholder' );
+		$item_classes = array( 'data-machine-event-item', 'data-machine-event-placeholder' );
 		if ( ! empty( $display_vars['is_continuation'] ) ) {
-			$item_classes[] = 'datamachine-event-continuation';
+			$item_classes[] = 'data-machine-event-continuation';
 		}
 		if ( ! empty( $display_vars['is_multi_day'] ) ) {
-			$item_classes[] = 'datamachine-event-multi-day';
+			$item_classes[] = 'data-machine-event-multi-day';
 		}
 
 		printf(
 			'<div class="%s" data-event-json="%s">
-				<div class="datamachine-placeholder-skeleton">
-					<div class="datamachine-skeleton-badges"></div>
-					<div class="datamachine-skeleton-title"></div>
-					<div class="datamachine-skeleton-meta"></div>
-					<div class="datamachine-skeleton-button"></div>
+				<div class="data-machine-placeholder-skeleton">
+					<div class="data-machine-skeleton-badges"></div>
+					<div class="data-machine-skeleton-title"></div>
+					<div class="data-machine-skeleton-meta"></div>
+					<div class="data-machine-skeleton-button"></div>
 				</div>
 			</div>',
 			esc_attr( implode( ' ', $item_classes ) ),

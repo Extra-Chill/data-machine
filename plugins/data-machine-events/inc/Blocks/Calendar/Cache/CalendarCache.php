@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class CalendarCache {
 
-	const PREFIX         = 'datamachine_cal_';
+	const PREFIX         = 'data-machine_cal_';
 	const TTL_DATES      = 5 * MINUTE_IN_SECONDS;
 	const TTL_COUNTS     = 10 * MINUTE_IN_SECONDS;
 

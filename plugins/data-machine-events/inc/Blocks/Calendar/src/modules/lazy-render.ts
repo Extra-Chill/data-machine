@@ -45,7 +45,7 @@ export function initLazyRender( calendar: HTMLElement ): void {
 		);
 
 		const placeholders = wrapper.querySelectorAll< HTMLElement >(
-			'.datamachine-event-placeholder'
+			'.data-machine-event-placeholder'
 		);
 		placeholders.forEach( function ( placeholder ) {
 			observer.observe( placeholder );
@@ -69,14 +69,14 @@ export function destroyLazyRender( calendar: HTMLElement ): void {
 
 function hydrateAllPlaceholders( calendar: HTMLElement ): void {
 	const placeholders = calendar.querySelectorAll< HTMLElement >(
-		'.datamachine-event-placeholder'
+		'.data-machine-event-placeholder'
 	);
 	placeholders.forEach( hydratePlaceholder );
 }
 
 function hydratePlaceholder( placeholder: HTMLElement ): void {
 	if (
-		! placeholder.classList.contains( 'datamachine-event-placeholder' )
+		! placeholder.classList.contains( 'data-machine-event-placeholder' )
 	) {
 		return;
 	}
@@ -104,23 +104,23 @@ function hydratePlaceholder( placeholder: HTMLElement ): void {
 	const ticketUrl = displayVars.ticket_url || '';
 	const showTicketLink = displayVars.show_ticket_link !== false;
 
-	const itemClasses = [ 'datamachine-event-item' ];
+	const itemClasses = [ 'data-machine-event-item' ];
 	if ( displayVars.is_continuation ) {
-		itemClasses.push( 'datamachine-event-continuation' );
+		itemClasses.push( 'data-machine-event-continuation' );
 	}
 	if ( displayVars.is_multi_day ) {
-		itemClasses.push( 'datamachine-event-multi-day' );
+		itemClasses.push( 'data-machine-event-multi-day' );
 	}
 
 	let timeHtml = '';
 	if ( formattedTimeDisplay ) {
 		timeHtml =
-			'<div class="datamachine-event-time">' +
+			'<div class="data-machine-event-time">' +
 			'<span class="dashicons dashicons-clock"></span>' +
 			escapeHtml( formattedTimeDisplay );
 		if ( multiDayLabel ) {
 			timeHtml +=
-				'<span class="datamachine-event-multi-day-label">' +
+				'<span class="data-machine-event-multi-day-label">' +
 				escapeHtml( multiDayLabel ) +
 				'</span>';
 		}
@@ -130,30 +130,30 @@ function hydratePlaceholder( placeholder: HTMLElement ): void {
 	let performerHtml = '';
 	if ( showPerformer && performerName ) {
 		performerHtml =
-			'<div class="datamachine-event-performer">' +
+			'<div class="data-machine-event-performer">' +
 			'<span class="dashicons dashicons-admin-users"></span>' +
 			escapeHtml( performerName ) +
 			'</div>';
 	}
 
 	const html =
-		'<div class="datamachine-event-link">' +
+		'<div class="data-machine-event-link">' +
 		( data.badges_html || '' ) +
-		'<h4 class="datamachine-event-title">' +
+		'<h4 class="data-machine-event-title">' +
 		'<a href="' +
 		escapeAttr( data.permalink ) +
 		'">' +
 		escapeHtml( data.title ) +
 		'</a>' +
 		'</h4>' +
-		'<div class="datamachine-event-meta">' +
+		'<div class="data-machine-event-meta">' +
 		timeHtml +
 		performerHtml +
 		'<a href="' +
 		escapeAttr( data.permalink ) +
 		'" class="' +
 		escapeAttr(
-			data.button_classes || 'datamachine-more-info-button'
+			data.button_classes || 'data-machine-more-info-button'
 		) +
 		'">More Info</a>' +
 		'</div>' +

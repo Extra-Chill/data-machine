@@ -80,7 +80,7 @@ class Taxonomy_Badges {
 		$wrapper_classes = apply_filters(
 			'data_machine_events_badge_wrapper_classes',
 			array(
-				'datamachine-taxonomy-badges',
+				'data-machine-taxonomy-badges',
 			),
 			$post_id
 		);
@@ -97,9 +97,9 @@ class Taxonomy_Badges {
 				}
 
 				$badge_classes = array(
-					'datamachine-taxonomy-badge',
-					'datamachine-taxonomy-' . esc_attr( $taxonomy_slug ),
-					'datamachine-term-' . esc_attr( $term->slug ),
+					'data-machine-taxonomy-badge',
+					'data-machine-taxonomy-' . esc_attr( $taxonomy_slug ),
+					'data-machine-term-' . esc_attr( $term->slug ),
 				);
 
 				$badge_classes = apply_filters( 'data_machine_events_badge_classes', $badge_classes, $taxonomy_slug, $term, $post_id );
@@ -183,23 +183,23 @@ class Taxonomy_Badges {
 
 	/**
 	 * @param string $taxonomy_slug
-	 * @return string Hash-based color class (datamachine-badge-{color})
+	 * @return string Hash-based color class (data-machine-badge-{color})
 	 */
 	public static function get_taxonomy_color_class( $taxonomy_slug ) {
 		$hash        = md5( $taxonomy_slug );
 		$color_index = hexdec( substr( $hash, 0, 1 ) ) % 10;
 
 		$color_classes = array(
-			'datamachine-badge-blue',
-			'datamachine-badge-green',
-			'datamachine-badge-purple',
-			'datamachine-badge-orange',
-			'datamachine-badge-red',
-			'datamachine-badge-teal',
-			'datamachine-badge-pink',
-			'datamachine-badge-yellow',
-			'datamachine-badge-indigo',
-			'datamachine-badge-gray',
+			'data-machine-badge-blue',
+			'data-machine-badge-green',
+			'data-machine-badge-purple',
+			'data-machine-badge-orange',
+			'data-machine-badge-red',
+			'data-machine-badge-teal',
+			'data-machine-badge-pink',
+			'data-machine-badge-yellow',
+			'data-machine-badge-indigo',
+			'data-machine-badge-gray',
 		);
 
 		return $color_classes[ $color_index ];

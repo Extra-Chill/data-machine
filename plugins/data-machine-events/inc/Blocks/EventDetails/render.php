@@ -79,7 +79,7 @@ if ( ! empty( $occurrence_dates ) && is_array( $occurrence_dates ) ) {
 }
 $has_more_occurrences = count( $occurrence_dates ) > count( $upcoming_occurrences );
 
-$block_classes = array( 'datamachine-event-details' );
+$block_classes = array( 'data-machine-event-details' );
 if ( ! empty( $attributes['align'] ) ) {
 	$block_classes[] = 'align' . $attributes['align'];
 }
@@ -221,11 +221,11 @@ $event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_
 					$map_display_type = \DataMachineEvents\Admin\Settings_Page::get_map_display_type();
 				}
 				?>
-				<div class="datamachine-venue-map-section">
+				<div class="data-machine-venue-map-section">
 					<h3 class="venue-map-title"><?php echo esc_html__( 'Venue Location', 'data-machine-events' ); ?></h3>
 					<div
 						id="venue-map-<?php echo esc_attr( $post_id ); ?>"
-						class="datamachine-venue-map"
+						class="data-machine-venue-map"
 						data-lat="<?php echo esc_attr( $lat ); ?>"
 						data-lon="<?php echo esc_attr( $lon ); ?>"
 						data-venue-name="<?php echo esc_attr( $venue ); ?>"

@@ -1,7 +1,7 @@
 /**
  * Geo Sync Module
  *
- * Listens for `datamachine-map-bounds-changed` custom events fired by the
+ * Listens for `data-machine-map-bounds-changed` custom events fired by the
  * EventsMap block and re-fetches the calendar via REST API, swapping the
  * DOM in-place without a page reload.
  *
@@ -63,7 +63,7 @@ export function initGeoSync( calendar: HTMLElement ): void {
 	instances.set( calendar, state );
 
 	document.addEventListener(
-		'datamachine-map-bounds-changed',
+		'data-machine-map-bounds-changed',
 		state.handler
 	);
 }
@@ -78,7 +78,7 @@ export function destroyGeoSync( calendar: HTMLElement ): void {
 	}
 
 	document.removeEventListener(
-		'datamachine-map-bounds-changed',
+		'data-machine-map-bounds-changed',
 		state.handler
 	);
 

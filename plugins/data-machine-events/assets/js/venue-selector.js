@@ -73,7 +73,7 @@
     function toggleVenueNameField(show) {
         const venueNameField = document.querySelector('[name="venue_name"]');
         if (venueNameField) {
-            const fieldContainer = venueNameField.closest('.datamachine-field-wrapper, tr, .form-field');
+            const fieldContainer = venueNameField.closest('.data-machine-field-wrapper, tr, .form-field');
             if (fieldContainer) {
                 fieldContainer.style.display = show ? '' : 'none';
             }
@@ -275,7 +275,7 @@
     }
 
     // Re-initialize when modal content is loaded (for Data Machine modals)
-    document.addEventListener('datamachine-core-modal-content-loaded', init);
+    document.addEventListener('data-machine-core-modal-content-loaded', init);
 
     // Expose functions for potential external use
     window.dmEventsVenueSelector = {

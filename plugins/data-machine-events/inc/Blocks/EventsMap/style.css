@@ -1,24 +1,24 @@
 /**
  * Events Map Block Styles (shared: editor + frontend)
  *
- * Uses datamachine-* design tokens from root.css for theme agnosticism.
+ * Uses data-machine-* design tokens from root.css for theme agnosticism.
  *
  * @package DataMachineEvents
  * @since 0.13.0
  */
 
-.datamachine-events-map-block {
+.data-machine-events-map-block {
 	margin-bottom: 1.5rem;
 }
 
-.datamachine-events-map {
+.data-machine-events-map {
 	width: 100%;
-	border-radius: var(--datamachine-border-radius, 8px);
+	border-radius: var(--data-machine-border-radius, 8px);
 	overflow: hidden;
 	z-index: 1;
 }
 
-.datamachine-events-map .emoji-marker {
+.data-machine-events-map .emoji-marker {
 	background: none;
 	border: none;
 }

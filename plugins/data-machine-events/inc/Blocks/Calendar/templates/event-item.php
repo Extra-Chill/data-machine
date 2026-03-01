@@ -27,12 +27,12 @@ $multi_day_label = $display_vars['multi_day_label'] ?? '';
 $is_continuation = $display_vars['is_continuation'] ?? false;
 $is_multi_day    = $display_vars['is_multi_day'] ?? false;
 
-$item_classes = array( 'datamachine-event-item' );
+$item_classes = array( 'data-machine-event-item' );
 if ( $is_continuation ) {
-	$item_classes[] = 'datamachine-event-continuation';
+	$item_classes[] = 'data-machine-event-continuation';
 }
 if ( $is_multi_day ) {
-	$item_classes[] = 'datamachine-event-multi-day';
+	$item_classes[] = 'data-machine-event-multi-day';
 }
 ?>
 
@@ -44,36 +44,36 @@ if ( $is_multi_day ) {
 	data-ticket-url="<?php echo esc_url( $ticket_url ); ?>"
 	data-has-tickets="<?php echo ( $show_ticket_link && ! empty( $ticket_url ) ) ? 'true' : 'false'; ?>">
 
-	<div class="datamachine-event-link">
+	<div class="data-machine-event-link">
 
 		<?php echo \DataMachineEvents\Blocks\Calendar\Taxonomy_Badges::render_taxonomy_badges( $event_post->ID ); ?>
 
-		<h4 class="datamachine-event-title">
+		<h4 class="data-machine-event-title">
 			<a href="<?php echo esc_url( get_the_permalink() ); ?>">
 				<?php the_title(); ?>
 			</a>
 		</h4>
 
-		<div class="datamachine-event-meta">
+		<div class="data-machine-event-meta">
 			<?php if ( ! empty( $formatted_time_display ) ) : ?>
-				<div class="datamachine-event-time">
+				<div class="data-machine-event-time">
 					<span class="dashicons dashicons-clock"></span>
 					<?php echo esc_html( $formatted_time_display ); ?>
 					<?php if ( ! empty( $multi_day_label ) ) : ?>
-						<span class="datamachine-event-multi-day-label"><?php echo esc_html( $multi_day_label ); ?></span>
+						<span class="data-machine-event-multi-day-label"><?php echo esc_html( $multi_day_label ); ?></span>
 					<?php endif; ?>
 				</div>
 			<?php endif; ?>
 
 			<?php if ( $show_performer && ! empty( $performer_name ) ) : ?>
-				<div class="datamachine-event-performer">
+				<div class="data-machine-event-performer">
 					<span class="dashicons dashicons-admin-users"></span>
 					<?php echo esc_html( $performer_name ); ?>
 				</div>
 			<?php endif; ?>
 
 			<a href="<?php echo esc_url( get_the_permalink() ); ?>" 
-				class="<?php echo esc_attr( implode( ' ', apply_filters( 'data_machine_events_more_info_button_classes', array( 'datamachine-more-info-button' ) ) ) ); ?>">
+				class="<?php echo esc_attr( implode( ' ', apply_filters( 'data_machine_events_more_info_button_classes', array( 'data-machine-more-info-button' ) ) ) ); ?>">
 				<?php esc_html_e( 'More Info', 'data-machine-events' ); ?>
 			</a>
 		</div>

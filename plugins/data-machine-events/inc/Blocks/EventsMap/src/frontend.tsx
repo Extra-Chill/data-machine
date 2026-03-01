@@ -103,7 +103,7 @@ function dispatchBoundsChanged( map: L.Map ): void {
 	};
 
 	document.dispatchEvent(
-		new CustomEvent( 'datamachine-map-bounds-changed', { detail } ),
+		new CustomEvent( 'data-machine-map-bounds-changed', { detail } ),
 	);
 }
 
@@ -390,9 +390,9 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 			);
 		};
 
-		document.addEventListener( 'datamachine-map-recenter', handler );
+		document.addEventListener( 'data-machine-map-recenter', handler );
 		return () => {
-			document.removeEventListener( 'datamachine-map-recenter', handler );
+			document.removeEventListener( 'data-machine-map-recenter', handler );
 		};
 	}, [] );
 

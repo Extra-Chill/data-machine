@@ -1,49 +1,49 @@
 /**
  * Events Map Block Frontend Styles
  *
- * Uses datamachine-* design tokens from root.css for theme agnosticism.
+ * Uses data-machine-* design tokens from root.css for theme agnosticism.
  *
  * @package DataMachineEvents
  * @since 0.13.0
  */
 
 /* Leaflet popup overrides — use datamachine design tokens */
-.datamachine-events-map .leaflet-popup-content-wrapper {
-	background: var(--datamachine-background-primary);
-	color: var(--datamachine-text-primary);
-	border-radius: var(--datamachine-border-radius, 8px);
+.data-machine-events-map .leaflet-popup-content-wrapper {
+	background: var(--data-machine-background-primary);
+	color: var(--data-machine-text-primary);
+	border-radius: var(--data-machine-border-radius, 8px);
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 	padding: 0;
 }
 
-.datamachine-events-map .leaflet-popup-content {
+.data-machine-events-map .leaflet-popup-content {
 	margin: 0;
 }
 
-.datamachine-events-map .leaflet-popup-tip {
-	background: var(--datamachine-background-primary);
+.data-machine-events-map .leaflet-popup-tip {
+	background: var(--data-machine-background-primary);
 }
 
-.datamachine-events-map .leaflet-popup-close-button {
-	color: var(--datamachine-text-muted);
+.data-machine-events-map .leaflet-popup-close-button {
+	color: var(--data-machine-text-muted);
 }
 
-.datamachine-events-map .leaflet-popup-close-button:hover {
-	color: var(--datamachine-text-primary);
+.data-machine-events-map .leaflet-popup-close-button:hover {
+	color: var(--data-machine-text-primary);
 }
 
 /* Zoom controls */
-.datamachine-events-map .leaflet-control-zoom {
-	border: 1px solid var(--datamachine-border-default);
-	border-radius: var(--datamachine-border-radius, 8px);
+.data-machine-events-map .leaflet-control-zoom {
+	border: 1px solid var(--data-machine-border-default);
+	border-radius: var(--data-machine-border-radius, 8px);
 	overflow: hidden;
 	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
-.datamachine-events-map .leaflet-control-zoom a {
-	background: var(--datamachine-background-primary);
-	color: var(--datamachine-text-primary);
-	border-color: var(--datamachine-border-default);
+.data-machine-events-map .leaflet-control-zoom a {
+	background: var(--data-machine-background-primary);
+	color: var(--data-machine-text-primary);
+	border-color: var(--data-machine-border-default);
 	width: 32px;
 	height: 32px;
 	line-height: 32px;
@@ -53,40 +53,40 @@
 	transition: background 0.15s ease, color 0.15s ease;
 }
 
-.datamachine-events-map .leaflet-control-zoom a:hover {
-	background: var(--datamachine-background-hover);
-	color: var(--datamachine-text-primary);
+.data-machine-events-map .leaflet-control-zoom a:hover {
+	background: var(--data-machine-background-hover);
+	color: var(--data-machine-text-primary);
 }
 
-.datamachine-events-map .leaflet-control-zoom a.leaflet-disabled {
-	background: var(--datamachine-background-secondary);
-	color: var(--datamachine-text-muted);
+.data-machine-events-map .leaflet-control-zoom a.leaflet-disabled {
+	background: var(--data-machine-background-secondary);
+	color: var(--data-machine-text-muted);
 	cursor: default;
 }
 
-.datamachine-events-map .leaflet-control-zoom-in {
-	border-bottom: 1px solid var(--datamachine-border-default) !important;
-	border-radius: var(--datamachine-border-radius, 8px) var(--datamachine-border-radius, 8px) 0 0;
+.data-machine-events-map .leaflet-control-zoom-in {
+	border-bottom: 1px solid var(--data-machine-border-default) !important;
+	border-radius: var(--data-machine-border-radius, 8px) var(--data-machine-border-radius, 8px) 0 0;
 }
 
-.datamachine-events-map .leaflet-control-zoom-out {
-	border-radius: 0 0 var(--datamachine-border-radius, 8px) var(--datamachine-border-radius, 8px);
+.data-machine-events-map .leaflet-control-zoom-out {
+	border-radius: 0 0 var(--data-machine-border-radius, 8px) var(--data-machine-border-radius, 8px);
 }
 
 /* Leaflet attribution */
-.datamachine-events-map .leaflet-control-attribution {
-	background: var(--datamachine-background-primary);
-	color: var(--datamachine-text-muted);
+.data-machine-events-map .leaflet-control-attribution {
+	background: var(--data-machine-background-primary);
+	color: var(--data-machine-text-muted);
 	font-size: 0.6875rem;
 	opacity: 0.7;
 }
 
-.datamachine-events-map .leaflet-control-attribution a {
-	color: var(--datamachine-text-accent);
+.data-machine-events-map .leaflet-control-attribution a {
+	color: var(--data-machine-text-accent);
 }
 
 /* Venue popup card */
-.datamachine-events-map .venue-popup {
+.data-machine-events-map .venue-popup {
 	display: flex;
 	flex-direction: column;
 	gap: 0.25rem;
@@ -94,10 +94,10 @@
 	min-width: 180px;
 }
 
-.datamachine-events-map .venue-popup-name {
+.data-machine-events-map .venue-popup-name {
 	font-size: 0.875rem;
 	font-weight: 600;
-	color: var(--datamachine-text-primary);
+	color: var(--data-machine-text-primary);
 	text-decoration: none;
 	line-height: 1.3;
 }
@@ -106,25 +106,25 @@ a.venue-popup-name:hover {
 	text-decoration: underline;
 }
 
-.datamachine-events-map .venue-popup-events {
+.data-machine-events-map .venue-popup-events {
 	font-size: 0.8125rem;
-	color: var(--datamachine-text-accent);
+	color: var(--data-machine-text-accent);
 	font-weight: 500;
 }
 
-.datamachine-events-map .venue-popup-address {
+.data-machine-events-map .venue-popup-address {
 	font-size: 0.8125rem;
-	color: var(--datamachine-text-muted);
+	color: var(--data-machine-text-muted);
 	line-height: 1.4;
 }
 
 /* User location marker (blue dot) */
-.datamachine-events-map .user-location-marker {
+.data-machine-events-map .user-location-marker {
 	background: none;
 	border: none;
 }
 
-.datamachine-events-map .user-location-dot {
+.data-machine-events-map .user-location-dot {
 	display: block;
 	width: 16px;
 	height: 16px;
@@ -135,15 +135,15 @@ a.venue-popup-name:hover {
 }
 
 /* Summary below map */
-.datamachine-events-map-summary {
+.data-machine-events-map-summary {
 	margin: 0.5rem 0 0;
 	font-size: 0.8125rem;
-	color: var(--datamachine-text-muted);
+	color: var(--data-machine-text-muted);
 	text-align: center;
 }
 
 /* Location search input */
-.datamachine-events-map-location-search {
+.data-machine-events-map-location-search {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -151,7 +151,7 @@ a.venue-popup-name:hover {
 	margin-top: 0.5rem;
 }
 
-.datamachine-events-map-location-form {
+.data-machine-events-map-location-form {
 	display: flex;
 	align-items: center;
 	gap: 0.5rem;
@@ -159,67 +159,67 @@ a.venue-popup-name:hover {
 	max-width: 360px;
 }
 
-.datamachine-events-map-location-input {
+.data-machine-events-map-location-input {
 	flex: 1;
 	padding: 0.5rem 0.75rem;
 	font-size: 0.875rem;
 	border: none;
-	border-radius: var(--datamachine-border-radius);
-	background: var(--datamachine-background-light);
-	color: var(--datamachine-text-primary);
+	border-radius: var(--data-machine-border-radius);
+	background: var(--data-machine-background-light);
+	color: var(--data-machine-text-primary);
 	transition: all 0.2s ease;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), inset 0 0 0 1px var(--datamachine-border-light);
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), inset 0 0 0 1px var(--data-machine-border-light);
 	margin: 0;
 	line-height: normal;
 	outline: none;
 }
 
-.datamachine-events-map-location-input:focus {
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), inset 0 0 0 2px var(--datamachine-border-focus);
+.data-machine-events-map-location-input:focus {
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), inset 0 0 0 2px var(--data-machine-border-focus);
 }
 
-.datamachine-events-map-location-input::placeholder {
-	color: var(--datamachine-text-muted);
+.data-machine-events-map-location-input::placeholder {
+	color: var(--data-machine-text-muted);
 }
 
-.datamachine-events-map-location-btn {
+.data-machine-events-map-location-btn {
 	padding: 0.5rem 0.75rem;
 	font-size: 0.875rem;
 	font-weight: 600;
 	border: none;
-	border-radius: var(--datamachine-border-radius);
-	background: var(--datamachine-background-light);
-	color: var(--datamachine-text-secondary);
+	border-radius: var(--data-machine-border-radius);
+	background: var(--data-machine-background-light);
+	color: var(--data-machine-text-secondary);
 	cursor: pointer;
 	transition: all 0.2s ease;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), inset 0 0 0 1px var(--datamachine-border-light);
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), inset 0 0 0 1px var(--data-machine-border-light);
 	white-space: nowrap;
 }
 
-.datamachine-events-map-location-btn:hover {
-	background: var(--datamachine-background-hover);
-	color: var(--datamachine-text-accent);
+.data-machine-events-map-location-btn:hover {
+	background: var(--data-machine-background-hover);
+	color: var(--data-machine-text-accent);
 }
 
-.datamachine-events-map-location-btn:disabled {
+.data-machine-events-map-location-btn:disabled {
 	opacity: 0.5;
 	cursor: not-allowed;
 }
 
-.datamachine-events-map-location-error {
+.data-machine-events-map-location-error {
 	font-size: 0.75rem;
 	color: #dc2626;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
-	.datamachine-events-map {
-		border-radius: var(--datamachine-border-radius, 8px);
+	.data-machine-events-map {
+		border-radius: var(--data-machine-border-radius, 8px);
 	}
 }
 
 @media (max-width: 480px) {
-	.datamachine-events-map {
+	.data-machine-events-map {
 		border-radius: 0;
 	}
 }

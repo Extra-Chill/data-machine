@@ -16,7 +16,7 @@
      * Initialize all venue maps on the page
      */
     function initVenueMaps() {
-        const mapContainers = document.querySelectorAll('.datamachine-venue-map');
+        const mapContainers = document.querySelectorAll('.data-machine-venue-map');
 
         if (mapContainers.length === 0) {
             return;
@@ -144,7 +144,7 @@
      * Re-initialize maps after dynamic content loads
      */
     function reinitMaps() {
-        const uninitializedMaps = document.querySelectorAll('.datamachine-venue-map:not(.map-initialized)');
+        const uninitializedMaps = document.querySelectorAll('.data-machine-venue-map:not(.map-initialized)');
         if (uninitializedMaps.length > 0) {
             initVenueMaps();
         }

@@ -169,7 +169,7 @@ if ( ! empty( $archive_context['taxonomy'] ) && ! empty( $archive_context['term_
 \DataMachineEvents\Blocks\Calendar\Template_Loader::init();
 
 $block_id           = isset( $block ) && isset( $block->clientId ) ? (string) $block->clientId : uniqid( 'dm', true );
-$instance_id        = 'datamachine-calendar-' . substr( preg_replace( '/[^a-z0-9]/', '', strtolower( $block_id ) ), 0, 12 );
+$instance_id        = 'data-machine-calendar-' . substr( preg_replace( '/[^a-z0-9]/', '', strtolower( $block_id ) ), 0, 12 );
 $wrapper_attributes = get_block_wrapper_attributes(
 	array(
 		'class' => 'data-machine-events-calendar data-machine-events-date-grouped',

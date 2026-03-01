@@ -546,7 +546,7 @@ data_machine_events();
 add_filter(
 	'get_the_excerpt',
 	function ( $excerpt, $post ) {
-		if ( 'data_machine_events' !== $post->post_type ) {
+		if ( \DataMachineEvents\Core\Event_Post_Type::POST_TYPE !== $post->post_type ) {
 			return $excerpt;
 		}
 

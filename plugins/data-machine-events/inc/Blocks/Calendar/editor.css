@@ -1,6 +1,6 @@
 /* Data Machine Events Calendar Block Editor Styles */
 
-.datamachine-events-calendar-editor {
+.data-machine-events-calendar-editor {
     padding: 2rem;
     border: 2px dashed #cbd5e1;
     border-radius: 8px;
@@ -8,32 +8,32 @@
     text-align: center;
 }
 
-.datamachine-events-calendar-placeholder {
+.data-machine-events-calendar-placeholder {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 1rem;
 }
 
-.datamachine-events-calendar-icon {
+.data-machine-events-calendar-icon {
     color: #64748b;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-.datamachine-events-calendar-icon svg {
+.data-machine-events-calendar-icon svg {
     width: 48px;
     height: 48px;
 }
 
-.datamachine-events-calendar-placeholder h3 {
+.data-machine-events-calendar-placeholder h3 {
     margin: 0;
     color: #1e293b;
     font-size: 1.25rem;
 }
 
-.datamachine-events-calendar-placeholder p {
+.data-machine-events-calendar-placeholder p {
     margin: 0;
     color: #64748b;
     font-size: 0.9rem;

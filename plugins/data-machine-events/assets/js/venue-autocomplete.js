@@ -437,7 +437,7 @@
     function addAttributionNotice() {
         // Wait for modal to be present in DOM
         const checkModal = setInterval(() => {
-            const settingsContainer = document.querySelector('.datamachine-settings-fields');
+            const settingsContainer = document.querySelector('.data-machine-settings-fields');
 
             if (settingsContainer) {
                 clearInterval(checkModal);
@@ -478,6 +478,6 @@
     }
 
     // Re-initialize when modal opens (for dynamic content)
-    document.addEventListener('datamachine-core-modal-content-loaded', init);
+    document.addEventListener('data-machine-core-modal-content-loaded', init);
 
 })();

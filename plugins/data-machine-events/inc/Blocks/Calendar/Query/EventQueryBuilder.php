@@ -206,7 +206,7 @@ class EventQueryBuilder {
 	 * @return array ['past' => int, 'future' => int]
 	 */
 	public static function get_event_counts(): array {
-		$cache_key = 'datamachine_cal_counts';
+		$cache_key = 'data-machine_cal_counts';
 		$cached    = get_transient( $cache_key );
 
 		if ( false !== $cached ) {

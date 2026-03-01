@@ -269,7 +269,7 @@
 		return createElement(
 			'div',
 			{
-				className: 'datamachine-handler-field address-autocomplete-field',
+				className: 'data-machine-handler-field address-autocomplete-field',
 				ref: containerRef,
 			},
 			children

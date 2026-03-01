@@ -20,11 +20,11 @@ if ( 2 == $gap_days ) {
 }
 ?>
 
-<div class="datamachine-time-gap-separator">
-	<div class="datamachine-gap-line"></div>
-	<div class="datamachine-gap-text">
-		<span class="datamachine-gap-indicator">• • •</span>
-		<span class="datamachine-gap-label"><?php echo esc_html( $gap_text ); ?></span>
+<div class="data-machine-time-gap-separator">
+	<div class="data-machine-gap-line"></div>
+	<div class="data-machine-gap-text">
+		<span class="data-machine-gap-indicator">• • •</span>
+		<span class="data-machine-gap-label"><?php echo esc_html( $gap_text ); ?></span>
 	</div>
-	<div class="datamachine-gap-line"></div>
+	<div class="data-machine-gap-line"></div>
 </div>

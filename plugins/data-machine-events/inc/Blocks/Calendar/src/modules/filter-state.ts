@@ -213,10 +213,10 @@ class FilterStateManager {
 		// Taxonomy filters — read from inline collapsible (or modal for backward compat)
 		const filtersContainer =
 			this.calendar.querySelector< HTMLElement >(
-				'.datamachine-taxonomy-filters-inline'
+				'.data-machine-taxonomy-filters-inline'
 			) ||
 			this.calendar.querySelector< HTMLElement >(
-				'.datamachine-taxonomy-modal'
+				'.data-machine-taxonomy-modal'
 			);
 		if ( filtersContainer ) {
 			const checkboxes =
@@ -394,10 +394,10 @@ class FilterStateManager {
 	 */
 	updateFilterCountBadge(): void {
 		const filterBtn = this.calendar.querySelector< HTMLElement >(
-			'.datamachine-taxonomy-toggle, .datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .data-machine-events-filter-btn'
+			'.data-machine-taxonomy-toggle, .data-machine-taxonomy-filter-btn, .data-machine-taxonomy-modal-trigger, .data-machine-events-filter-btn'
 		);
 		const countBadge = filterBtn?.querySelector< HTMLElement >(
-			'.datamachine-filter-count'
+			'.data-machine-filter-count'
 		);
 
 		if ( ! filterBtn || ! countBadge ) {
@@ -410,13 +410,13 @@ class FilterStateManager {
 			filterBtn.hidden = false;
 			countBadge.textContent = String( count );
 			countBadge.classList.add( 'visible' );
-			filterBtn.classList.add( 'datamachine-filters-active' );
+			filterBtn.classList.add( 'data-machine-filters-active' );
 			return;
 		}
 
 		countBadge.textContent = '';
 		countBadge.classList.remove( 'visible' );
-		filterBtn.classList.remove( 'datamachine-filters-active' );
+		filterBtn.classList.remove( 'data-machine-filters-active' );
 
 		if ( filterBtn.dataset.hideWhenInactive === '1' ) {
 			filterBtn.hidden = true;

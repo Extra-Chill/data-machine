@@ -37,7 +37,7 @@ export function initFilterModal(
 	onReset: ( params: URLSearchParams ) => void
 ): void {
 	const modal = calendar.querySelector< ModalElement >(
-		'.datamachine-taxonomy-modal'
+		'.data-machine-taxonomy-modal'
 	);
 	if ( ! modal ) {
 		return;
@@ -51,7 +51,7 @@ export function initFilterModal(
 	const filterState = getFilterState( calendar );
 
 	const modalContainer = modal.querySelector< HTMLElement >(
-		'.datamachine-taxonomy-modal-container'
+		'.data-machine-taxonomy-modal-container'
 	);
 	if ( modalContainer ) {
 		modalContainer.setAttribute( 'role', 'dialog' );
@@ -59,21 +59,21 @@ export function initFilterModal(
 	}
 
 	const filterBtn = calendar.querySelector< HTMLElement >(
-		'.datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .data-machine-events-filter-btn'
+		'.data-machine-taxonomy-filter-btn, .data-machine-taxonomy-modal-trigger, .data-machine-events-filter-btn'
 	);
 	const closeBtns = modal.querySelectorAll< HTMLElement >(
-		'.datamachine-modal-close, .datamachine-taxonomy-modal-close'
+		'.data-machine-modal-close, .data-machine-taxonomy-modal-close'
 	);
 	const applyBtn = modal.querySelector< HTMLElement >(
-		'.datamachine-apply-filters'
+		'.data-machine-apply-filters'
 	);
 	const resetBtn = modal.querySelector< HTMLElement >(
-		'.datamachine-clear-all-filters, .datamachine-reset-filters'
+		'.data-machine-clear-all-filters, .data-machine-reset-filters'
 	);
 
 	const closeModal = function (): void {
-		modal.classList.remove( 'datamachine-modal-active' );
-		document.body.classList.remove( 'datamachine-modal-active' );
+		modal.classList.remove( 'data-machine-modal-active' );
+		document.body.classList.remove( 'data-machine-modal-active' );
 		if ( filterBtn ) {
 			filterBtn.focus();
 			filterBtn.setAttribute( 'aria-expanded', 'false' );
@@ -83,8 +83,8 @@ export function initFilterModal(
 	const archiveContext = getArchiveContextFromModal( modal );
 
 	const openModalHandler = async function (): Promise< void > {
-		modal.classList.add( 'datamachine-modal-active' );
-		document.body.classList.add( 'datamachine-modal-active' );
+		modal.classList.add( 'data-machine-modal-active' );
+		document.body.classList.add( 'data-machine-modal-active' );
 		filterBtn?.setAttribute( 'aria-expanded', 'true' );
 
 		await loadFilters(
@@ -104,7 +104,7 @@ export function initFilterModal(
 		if (
 			target === modal ||
 			target.classList.contains(
-				'datamachine-taxonomy-modal-overlay'
+				'data-machine-taxonomy-modal-overlay'
 			)
 		) {
 			closeModal();
@@ -114,7 +114,7 @@ export function initFilterModal(
 	const escapeHandler = function ( e: KeyboardEvent ): void {
 		if (
 			( e.key === 'Escape' || e.key === 'Esc' ) &&
-			modal.classList.contains( 'datamachine-modal-active' )
+			modal.classList.contains( 'data-machine-modal-active' )
 		) {
 			closeModal();
 		}
@@ -184,7 +184,7 @@ export function initFilterModal(
 
 export function destroyFilterModal( calendar: HTMLElement ): void {
 	const modal = calendar.querySelector< ModalElement >(
-		'.datamachine-taxonomy-modal'
+		'.data-machine-taxonomy-modal'
 	);
 	if ( ! modal ) {
 		return;
@@ -195,7 +195,7 @@ export function destroyFilterModal( calendar: HTMLElement ): void {
 	}
 
 	const filterBtn = calendar.querySelector< HTMLElement >(
-		'.datamachine-taxonomy-filter-btn, .datamachine-taxonomy-modal-trigger, .data-machine-events-filter-btn'
+		'.data-machine-taxonomy-filter-btn, .data-machine-taxonomy-modal-trigger, .data-machine-events-filter-btn'
 	);
 
 	if ( filterBtn && modal._openModalHandler ) {
@@ -273,10 +273,10 @@ async function loadFilters(
 	archiveContext: Partial< ArchiveContext > = {}
 ): Promise< void > {
 	const container = modal.querySelector< HTMLElement >(
-		'.datamachine-filter-taxonomies'
+		'.data-machine-filter-taxonomies'
 	);
 	const loading = modal.querySelector< HTMLElement >(
-		'.datamachine-filter-loading'
+		'.data-machine-filter-loading'
 	);
 
 	if ( ! container ) {
@@ -308,7 +308,7 @@ async function loadFilters(
 		attachFilterChangeListeners( modal, dateContext, archiveContext );
 	} catch {
 		container.innerHTML =
-			'<div class="datamachine-filter-error"><p>Error loading filters. Please try again.</p></div>';
+			'<div class="data-machine-filter-error"><p>Error loading filters. Please try again.</p></div>';
 	} finally {
 		if ( loading ) {
 			loading.style.display = 'none';
@@ -334,42 +334,42 @@ function renderTaxonomies(
 	taxonomyKeys.forEach( ( slug, index ) => {
 		const taxonomy = taxonomies[ slug ];
 		const section = document.createElement( 'div' );
-		section.className = 'datamachine-taxonomy-section';
+		section.className = 'data-machine-taxonomy-section';
 		section.dataset.taxonomy = slug;
 
 		const label = document.createElement( 'h4' );
-		label.className = 'datamachine-taxonomy-label';
+		label.className = 'data-machine-taxonomy-label';
 		label.textContent = taxonomy.label;
 		section.appendChild( label );
 
 		const termsContainer = document.createElement( 'div' );
-		termsContainer.className = 'datamachine-taxonomy-terms';
+		termsContainer.className = 'data-machine-taxonomy-terms';
 
 		const flatTerms = flattenHierarchy( taxonomy.terms );
 		const selectedTerms = activeFilters[ slug ] || [];
 
 		flatTerms.forEach( ( term ) => {
 			const termDiv = document.createElement( 'div' );
-			termDiv.className = 'datamachine-taxonomy-term';
+			termDiv.className = 'data-machine-taxonomy-term';
 
 			const isLocked = isLockedTerm( slug, term.term_id );
 			if ( isLocked ) {
-				termDiv.classList.add( 'datamachine-term-locked' );
+				termDiv.classList.add( 'data-machine-term-locked' );
 			}
 
 			if ( term.level > 0 ) {
 				termDiv.classList.add(
-					`datamachine-term-level-${ term.level }`
+					`data-machine-term-level-${ term.level }`
 				);
 				termDiv.style.marginLeft = `${ term.level * 20 }px`;
 			}
 
 			const labelEl = document.createElement( 'label' );
-			labelEl.className = 'datamachine-term-checkbox-label';
+			labelEl.className = 'data-machine-term-checkbox-label';
 
 			const checkbox = document.createElement( 'input' );
 			checkbox.type = 'checkbox';
-			checkbox.className = 'datamachine-term-checkbox';
+			checkbox.className = 'data-machine-term-checkbox';
 			checkbox.name = `taxonomy_filters[${ slug }][]`;
 			checkbox.value = String( term.term_id );
 			checkbox.dataset.taxonomy = slug;
@@ -383,11 +383,11 @@ function renderTaxonomies(
 			}
 
 			const nameSpan = document.createElement( 'span' );
-			nameSpan.className = 'datamachine-term-name';
+			nameSpan.className = 'data-machine-term-name';
 			nameSpan.textContent = term.name;
 
 			const countSpan = document.createElement( 'span' );
-			countSpan.className = 'datamachine-term-count';
+			countSpan.className = 'data-machine-term-count';
 			countSpan.textContent = `(${ term.event_count } ${
 				term.event_count === 1 ? 'event' : 'events'
 			})`;
@@ -403,7 +403,7 @@ function renderTaxonomies(
 
 		if ( index < taxonomyKeys.length - 1 ) {
 			const separator = document.createElement( 'hr' );
-			separator.className = 'datamachine-taxonomy-separator';
+			separator.className = 'data-machine-taxonomy-separator';
 			section.appendChild( separator );
 		}
 

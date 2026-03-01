@@ -19,11 +19,11 @@ if ( ! $show_search ) {
 	return;
 }
 
-$instance_id   = $instance_id ?? uniqid( 'datamachine-calendar-' );
+$instance_id   = $instance_id ?? uniqid( 'data-machine-calendar-' );
 $search_id     = 'data-machine-events-search-' . $instance_id;
 $search_value  = isset( $search_query ) ? $search_query : '';
 $date_range_id = 'data-machine-events-date-range-' . $instance_id;
-$modal_id      = 'datamachine-taxonomy-filter-modal-' . $instance_id;
+$modal_id      = 'data-machine-taxonomy-filter-modal-' . $instance_id;
 
 $archive_context     = $archive_context ?? array(
 	'taxonomy'  => '',
@@ -65,8 +65,8 @@ $hide_filter_button_attr          = $hide_filter_button_when_inactive ? ' hidden
 		</div>
 		
 		<div class="data-machine-events-taxonomy-filter">
-			<button<?php echo $hide_filter_button_attr; ?> type="button" class="data-machine-events-filter-btn datamachine-taxonomy-modal-trigger<?php echo ( ! empty( $tax_filters ) ? ' datamachine-filters-active' : '' ); ?>" data-modal-id="<?php echo esc_attr( $modal_id ); ?>" aria-controls="<?php echo esc_attr( $modal_id ); ?>" aria-expanded="<?php echo ( ! empty( $tax_filters ) ? 'true' : 'false' ); ?>">
-				<span class="datamachine-filter-count" aria-hidden="true"><?php echo ( ! empty( $tax_filters ) ? array_sum( array_map( 'count', $tax_filters ) ) : '' ); ?></span>
+			<button<?php echo $hide_filter_button_attr; ?> type="button" class="data-machine-events-filter-btn data-machine-taxonomy-modal-trigger<?php echo ( ! empty( $tax_filters ) ? ' data-machine-filters-active' : '' ); ?>" data-modal-id="<?php echo esc_attr( $modal_id ); ?>" aria-controls="<?php echo esc_attr( $modal_id ); ?>" aria-expanded="<?php echo ( ! empty( $tax_filters ) ? 'true' : 'false' ); ?>">
+				<span class="data-machine-filter-count" aria-hidden="true"><?php echo ( ! empty( $tax_filters ) ? array_sum( array_map( 'count', $tax_filters ) ) : '' ); ?></span>
 				<span class="dashicons dashicons-filter"></span>
 				<?php esc_html_e( 'Filter', 'data-machine-events' ); ?>
 			</button>
@@ -74,36 +74,36 @@ $hide_filter_button_attr          = $hide_filter_button_when_inactive ? ' hidden
 	</div>
 	
 	<!-- Taxonomy Filter Modal -->
-	<div id="<?php echo esc_attr( $modal_id ); ?>" class="datamachine-taxonomy-modal" aria-labelledby="<?php echo esc_attr( $modal_id . '-title' ); ?>"
+	<div id="<?php echo esc_attr( $modal_id ); ?>" class="data-machine-taxonomy-modal" aria-labelledby="<?php echo esc_attr( $modal_id . '-title' ); ?>"
 	<?php
 	if ( $has_archive_context ) :
 		?>
 		data-archive-taxonomy="<?php echo esc_attr( $archive_context['taxonomy'] ); ?>" data-archive-term-id="<?php echo esc_attr( $archive_context['term_id'] ); ?>" data-archive-term-name="<?php echo esc_attr( $archive_context['term_name'] ); ?>"<?php endif; ?>>
-		<div class="datamachine-taxonomy-modal-overlay"></div>
-		<div class="datamachine-taxonomy-modal-container">
-			<div class="datamachine-taxonomy-modal-header">
-				<h2 id="<?php echo esc_attr( $modal_id . '-title' ); ?>" class="datamachine-taxonomy-modal-title"><?php esc_html_e( 'Event Display Filters', 'data-machine-events' ); ?></h2>
-				<button type="button" class="datamachine-taxonomy-modal-close" aria-label="<?php esc_attr_e( 'Close', 'data-machine-events' ); ?>">
+		<div class="data-machine-taxonomy-modal-overlay"></div>
+		<div class="data-machine-taxonomy-modal-container">
+			<div class="data-machine-taxonomy-modal-header">
+				<h2 id="<?php echo esc_attr( $modal_id . '-title' ); ?>" class="data-machine-taxonomy-modal-title"><?php esc_html_e( 'Event Display Filters', 'data-machine-events' ); ?></h2>
+				<button type="button" class="data-machine-taxonomy-modal-close" aria-label="<?php esc_attr_e( 'Close', 'data-machine-events' ); ?>">
 					<span aria-hidden="true">&times;</span>
 				</button>
 			</div>
-			<div class="datamachine-taxonomy-modal-body">
+			<div class="data-machine-taxonomy-modal-body">
 				<?php
 				require __DIR__ . '/modal/taxonomy-filter.php';
 				?>
 			</div>
-			<div class="datamachine-taxonomy-modal-footer">
-				<div class="datamachine-modal-actions">
-					<div class="datamachine-modal-actions-left">
-						<button type="button" class="<?php echo esc_attr( implode( ' ', apply_filters( 'data_machine_events_modal_button_classes', array( 'datamachine-button', 'datamachine-clear-all-filters' ), 'secondary' ) ) ); ?>">
+			<div class="data-machine-taxonomy-modal-footer">
+				<div class="data-machine-modal-actions">
+					<div class="data-machine-modal-actions-left">
+						<button type="button" class="<?php echo esc_attr( implode( ' ', apply_filters( 'data_machine_events_modal_button_classes', array( 'data-machine-button', 'data-machine-clear-all-filters' ), 'secondary' ) ) ); ?>">
 							<?php esc_html_e( 'Clear All Filters', 'data-machine-events' ); ?>
 						</button>
 					</div>
-					<div class="datamachine-modal-actions-right">
-						<button type="button" class="<?php echo esc_attr( implode( ' ', apply_filters( 'data_machine_events_modal_button_classes', array( 'datamachine-button', 'datamachine-button-primary', 'datamachine-apply-filters' ), 'primary' ) ) ); ?>">
+					<div class="data-machine-modal-actions-right">
+						<button type="button" class="<?php echo esc_attr( implode( ' ', apply_filters( 'data_machine_events_modal_button_classes', array( 'data-machine-button', 'data-machine-button-primary', 'data-machine-apply-filters' ), 'primary' ) ) ); ?>">
 							<?php esc_html_e( 'Apply Filters', 'data-machine-events' ); ?>
 						</button>
-						<button type="button" class="<?php echo esc_attr( implode( ' ', apply_filters( 'data_machine_events_modal_button_classes', array( 'datamachine-button', 'datamachine-modal-close' ), 'secondary' ) ) ); ?>">
+						<button type="button" class="<?php echo esc_attr( implode( ' ', apply_filters( 'data_machine_events_modal_button_classes', array( 'data-machine-button', 'data-machine-modal-close' ), 'secondary' ) ) ); ?>">
 							<?php esc_html_e( 'Cancel', 'data-machine-events' ); ?>
 						</button>
 					</div>
