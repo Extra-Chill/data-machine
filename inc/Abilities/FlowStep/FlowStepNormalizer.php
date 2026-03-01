@@ -41,9 +41,17 @@ class FlowStepNormalizer {
 			$step_config['handler_configs'] = array( $slug => $config );
 			unset( $step_config['handler_slug'], $step_config['handler_config'] );
 		} else {
-			$step_config['handler_slugs']   = array();
-			$step_config['handler_configs'] = array();
-			unset( $step_config['handler_slug'] );
+			// No handler_slug — use step_type as key for non-handler steps (agent_ping, webhook_gate, etc.)
+			// that store config in handler_config without a handler_slug.
+			$step_type = $step_config['step_type'] ?? '';
+			if ( ! empty( $step_type ) && ! empty( $config ) ) {
+				$step_config['handler_slugs']   = array( $step_type );
+				$step_config['handler_configs'] = array( $step_type => $config );
+			} else {
+				$step_config['handler_slugs']   = array();
+				$step_config['handler_configs'] = array();
+			}
+			unset( $step_config['handler_slug'], $step_config['handler_config'] );
 		}
 
 		return $step_config;
