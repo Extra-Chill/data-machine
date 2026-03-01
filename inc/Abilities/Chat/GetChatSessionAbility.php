@@ -64,11 +64,13 @@ class GetChatSessionAbility {
 					),
 					'execute_callback'    => array( $this, 'execute' ),
 					'permission_callback' => array( $this, 'checkPermission' ),
-					'annotations'         => array(
-						'readonly'   => true,
-						'idempotent' => true,
+					'meta'                => array(
+						'show_in_rest' => true,
+						'annotations'  => array(
+							'readonly'   => true,
+							'idempotent' => true,
+						),
 					),
-					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
 		};
