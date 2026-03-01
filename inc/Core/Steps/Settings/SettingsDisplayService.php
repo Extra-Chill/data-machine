@@ -48,15 +48,8 @@ class SettingsDisplayService {
 			return array();
 		}
 
-		// Data is normalized at the DB layer.
-		$handler_slug     = FlowStepNormalizer::getPrimaryHandlerSlug( $flow_step_config );
+		$handler_slug     = FlowStepNormalizer::getEffectiveSlug( $flow_step_config );
 		$current_settings = FlowStepNormalizer::getPrimaryHandlerConfig( $flow_step_config );
-
-		// For step types with usesHandler: false, fall back to step_type as settings key
-		// This allows steps like agent_ping to display their config without a traditional handler
-		if ( empty( $handler_slug ) && ! empty( $step_type ) ) {
-			$handler_slug = $step_type;
-		}
 
 		return $this->getDisplayForHandler( $handler_slug, $current_settings );
 	}
@@ -89,12 +82,8 @@ class SettingsDisplayService {
 
 		// Fallback: build from primary handler when configs are empty.
 		if ( empty( $handler_configs ) ) {
-			$handler_slug     = FlowStepNormalizer::getPrimaryHandlerSlug( $flow_step_config );
+			$handler_slug     = FlowStepNormalizer::getEffectiveSlug( $flow_step_config );
 			$current_settings = FlowStepNormalizer::getPrimaryHandlerConfig( $flow_step_config );
-
-			if ( empty( $handler_slug ) && ! empty( $step_type ) ) {
-				$handler_slug = $step_type;
-			}
 
 			if ( empty( $handler_slug ) ) {
 				return array();

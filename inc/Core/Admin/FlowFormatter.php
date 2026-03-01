@@ -37,12 +37,8 @@ class FlowFormatter {
 			$step_data['handler_slug']   = FlowStepNormalizer::getPrimaryHandlerSlug( $step_data );
 			$step_data['handler_config'] = FlowStepNormalizer::getPrimaryHandlerConfig( $step_data );
 
-			$step_type    = $step_data['step_type'] ?? '';
-			$handler_slug = $step_data['handler_slug'] ?? '';
-
-			// For step types with usesHandler: false, use step_type as effective handler_slug
-			// This ensures settings_display is generated for steps like agent_ping
-			$effective_slug = ! empty( $handler_slug ) ? $handler_slug : $step_type;
+			$step_type      = $step_data['step_type'] ?? '';
+			$effective_slug = FlowStepNormalizer::getEffectiveSlug( $step_data );
 
 			// Skip steps with no handler or step type
 			if ( empty( $effective_slug ) ) {
