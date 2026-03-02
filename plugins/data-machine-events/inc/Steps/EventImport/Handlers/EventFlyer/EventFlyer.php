@@ -16,7 +16,6 @@ use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\Handlers\VenueFieldsTrait;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
-use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -104,21 +103,19 @@ class EventFlyer extends EventImportHandler {
 
 		$this->stripVenueMetadataFromEvent( $event_data );
 
-		$dataPacket = new DataPacket(
-			array(
-				'title' => $event_data['title'] ? $event_data['title'] : $image_file['original_name'],
-				'body'  => wp_json_encode(
-					array(
-						'event'                => $event_data,
-						'venue_metadata'       => $venue_metadata,
-						'import_source'        => 'event_flyer',
-						'source_file'          => $image_file['original_name'],
-						'ai_extraction_fields' => $ai_fields,
-					),
-					JSON_PRETTY_PRINT
+		return array(
+			'title'    => $event_data['title'] ? $event_data['title'] : $image_file['original_name'],
+			'content'  => wp_json_encode(
+				array(
+					'event'                => $event_data,
+					'venue_metadata'       => $venue_metadata,
+					'import_source'        => 'event_flyer',
+					'source_file'          => $image_file['original_name'],
+					'ai_extraction_fields' => $ai_fields,
 				),
+				JSON_PRETTY_PRINT
 			),
-			array(
+			'metadata' => array(
 				'source_type'      => 'event_flyer',
 				'pipeline_id'      => $context->getPipelineId(),
 				'flow_id'          => $context->getFlowId(),
@@ -127,10 +124,7 @@ class EventFlyer extends EventImportHandler {
 				'import_timestamp' => time(),
 				'image_file_path'  => $image_file['persistent_path'],
 			),
-			'event_import'
 		);
-
-		return array( $dataPacket );
 	}
 
 	private function getNextUnprocessedImage( ExecutionContext $context ): ?array {

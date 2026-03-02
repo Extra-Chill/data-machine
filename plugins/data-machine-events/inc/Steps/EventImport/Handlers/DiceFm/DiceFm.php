@@ -13,7 +13,6 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\DiceFm;
 
 use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
-use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
 // Prevent direct access
@@ -22,10 +21,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Dice.fm API event import handler with single-item processing
+ * Dice.fm API event import handler with batch processing.
  *
- * Implements Data Machine handler interface for importing events from
- * Dice.fm API with standardized processing and venue data extraction.
+ * Returns all eligible events as raw arrays for batch fan-out.
  */
 class DiceFm extends EventImportHandler {
 
@@ -83,20 +81,17 @@ class DiceFm extends EventImportHandler {
 			return array();
 		}
 
-		// Process events one at a time (Data Machine single-item model)
 		$context->log(
 			'info',
-			'DiceFm: Processing events for eligible item',
-			array(
-				'raw_events_available' => count( $raw_events ),
-			)
+			'DiceFm: Processing events',
+			array( 'raw_events_available' => count( $raw_events ) )
 		);
 
+		$eligible_items = array();
+
 		foreach ( $raw_events as $raw_event ) {
-			// Standardize the event
 			$standardized_event = $this->convert_dice_fm_event( $raw_event );
 
-			// Skip if no title
 			if ( empty( $standardized_event['title'] ) ) {
 				continue;
 			}
@@ -105,7 +100,6 @@ class DiceFm extends EventImportHandler {
 				continue;
 			}
 
-			// Apply keyword filtering
 			$search_text = $standardized_event['title'] . ' ' . ( $standardized_event['description'] ?? '' );
 
 			if ( ! $this->applyKeywordSearch( $search_text, $config['search'] ?? '' ) ) {
@@ -116,19 +110,16 @@ class DiceFm extends EventImportHandler {
 				continue;
 			}
 
-			// Create unique identifier for processed items tracking
 			$event_identifier = \DataMachineEvents\Utilities\EventIdentifierGenerator::generate(
 				$standardized_event['title'],
 				$standardized_event['startDate'] ?? '',
 				$standardized_event['venue'] ?? ''
 			);
 
-			// Check if already processed FIRST
 			if ( $this->checkItemProcessed( $context, $event_identifier ) ) {
 				continue;
 			}
 
-			// Found eligible event - mark as processed
 			$this->markItemAsProcessed( $context, $event_identifier );
 
 			$context->log(
@@ -145,20 +136,17 @@ class DiceFm extends EventImportHandler {
 			$this->storeEventContext( $context, $standardized_event );
 			$this->stripVenueMetadataFromEvent( $standardized_event );
 
-			// Create DataPacket
-			$dataPacket = new DataPacket(
-				array(
-					'title' => $standardized_event['title'],
-					'body'  => wp_json_encode(
-						array(
-							'event'          => $standardized_event,
-							'venue_metadata' => $venue_metadata,
-							'import_source'  => 'dice_fm',
-						),
-						JSON_PRETTY_PRINT
+			$eligible_items[] = array(
+				'title'    => $standardized_event['title'],
+				'content'  => wp_json_encode(
+					array(
+						'event'          => $standardized_event,
+						'venue_metadata' => $venue_metadata,
+						'import_source'  => 'dice_fm',
 					),
+					JSON_PRETTY_PRINT
 				),
-				array(
+				'metadata' => array(
 					'source_type'      => 'dice_fm',
 					'pipeline_id'      => $context->getPipelineId(),
 					'flow_id'          => $context->getFlowId(),
@@ -166,22 +154,25 @@ class DiceFm extends EventImportHandler {
 					'event_identifier' => $event_identifier,
 					'import_timestamp' => time(),
 				),
-				'event_import'
 			);
-
-			return array( $dataPacket );
 		}
 
-		// No eligible events found
+		if ( empty( $eligible_items ) ) {
+			$context->log(
+				'info',
+				'DiceFm: No eligible events found',
+				array( 'raw_events_checked' => count( $raw_events ) )
+			);
+			return array();
+		}
+
 		$context->log(
 			'info',
-			'DiceFm: No eligible events found',
-			array(
-				'raw_events_checked' => count( $raw_events ),
-			)
+			sprintf( 'DiceFm: Found %d eligible events', count( $eligible_items ) ),
+			array( 'raw_events_checked' => count( $raw_events ) )
 		);
 
-		return array();
+		return array( 'items' => $eligible_items );
 	}
 
 	/**

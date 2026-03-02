@@ -13,7 +13,6 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper;
 use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
-use DataMachine\Core\DataPacket;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -28,14 +27,14 @@ class StructuredDataProcessor {
 	}
 
 	/**
-	 * Process structured events and return first eligible DataPacket.
+	 * Process structured events and return all eligible items as raw arrays.
 	 *
 	 * @param array            $events            Array of normalized event data from extractor
 	 * @param string           $extraction_method Extraction method identifier
 	 * @param string           $source_url        Source URL
 	 * @param array            $config            Handler configuration
 	 * @param ExecutionContext $context           Execution context
-	 * @return array|null DataPacket array or null if no eligible events
+	 * @return array|null Array with 'items' key, or null if no eligible events
 	 */
 	public function process(
 		array $events,
@@ -44,6 +43,8 @@ class StructuredDataProcessor {
 		array $config,
 		ExecutionContext $context
 	): ?array {
+		$eligible_items = array();
+
 		foreach ( $events as $raw_event ) {
 			$event = $raw_event;
 
@@ -102,21 +103,19 @@ class StructuredDataProcessor {
 			$this->storeEventEngineData( $context, $event );
 			$this->handler->stripVenueMetadataFromEvent( $event );
 
-			$dataPacket = new DataPacket(
-				array(
-					'title' => $event['title'],
-					'body'  => wp_json_encode(
-						array(
-							'event'             => $event,
-							'raw_source'        => $raw_event,
-							'venue_metadata'    => $venue_metadata,
-							'import_source'     => 'universal_web_scraper',
-							'extraction_method' => $extraction_method,
-						),
-						JSON_PRETTY_PRINT
+			$eligible_items[] = array(
+				'title'    => $event['title'],
+				'content'  => wp_json_encode(
+					array(
+						'event'             => $event,
+						'raw_source'        => $raw_event,
+						'venue_metadata'    => $venue_metadata,
+						'import_source'     => 'universal_web_scraper',
+						'extraction_method' => $extraction_method,
 					),
+					JSON_PRETTY_PRINT
 				),
-				array(
+				'metadata' => array(
 					'source_type'       => 'universal_web_scraper',
 					'extraction_method' => $extraction_method,
 					'pipeline_id'       => $context->getPipelineId(),
@@ -125,13 +124,14 @@ class StructuredDataProcessor {
 					'event_identifier'  => $event_identifier,
 					'import_timestamp'  => time(),
 				),
-				'event_import'
 			);
-
-			return array( $dataPacket );
 		}
 
-		return null;
+		if ( empty( $eligible_items ) ) {
+			return null;
+		}
+
+		return array( 'items' => $eligible_items );
 	}
 
 	/**

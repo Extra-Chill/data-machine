@@ -72,7 +72,6 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\VisionExtractionProc
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators\PaginatorInterface;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators\JsonApiPaginator;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators\HtmlLinkPaginator;
-use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -460,20 +459,18 @@ class UniversalWebScraper extends EventImportHandler {
 				)
 			);
 
-			$dataPacket = new DataPacket(
-				array(
-					'title' => 'Raw HTML Event Section',
-					'body'  => wp_json_encode(
-						array(
-							'raw_html'           => $raw_html_data,
-							'source_url'         => $current_url,
-							'import_source'      => 'universal_web_scraper',
-							'section_identifier' => $event_section['identifier'],
-						),
-						JSON_PRETTY_PRINT
+			return array(
+				'title'    => 'Raw HTML Event Section',
+				'content'  => wp_json_encode(
+					array(
+						'raw_html'           => $raw_html_data,
+						'source_url'         => $current_url,
+						'import_source'      => 'universal_web_scraper',
+						'section_identifier' => $event_section['identifier'],
 					),
+					JSON_PRETTY_PRINT
 				),
-				array(
+				'metadata' => array(
 					'source_type'      => 'universal_web_scraper',
 					'pipeline_id'      => $context->getPipelineId(),
 					'flow_id'          => $context->getFlowId(),
@@ -481,10 +478,7 @@ class UniversalWebScraper extends EventImportHandler {
 					'event_identifier' => $event_section['identifier'],
 					'import_timestamp' => time(),
 				),
-				'event_import'
 			);
-
-			return array( $dataPacket );
 		}
 
 		return null;
@@ -557,37 +551,31 @@ class UniversalWebScraper extends EventImportHandler {
 		}
 
 		// VisionExtractionProcessor stores image_file_path in engine data.
-		// Return a DataPacket for the AI step to process.
 		$vision_data = $result[0];
 
-		$dataPacket = new DataPacket(
-			array(
-				'title' => 'Vision Flyer Analysis',
-				'body'  => wp_json_encode(
-					array(
-						'source_type'       => 'vision_flyer',
-						'image_url'         => $vision_data['image_url'] ?? '',
-						'page_url'          => $vision_data['page_url'] ?? $current_url,
-						'extraction_method' => $extraction_method,
-						'venue_config'      => array(
-							'venue'      => $config['venue'] ?? '',
-							'venue_name' => $config['venue_name'] ?? '',
-						),
+		return array(
+			'title'    => 'Vision Flyer Analysis',
+			'content'  => wp_json_encode(
+				array(
+					'source_type'       => 'vision_flyer',
+					'image_url'         => $vision_data['image_url'] ?? '',
+					'page_url'          => $vision_data['page_url'] ?? $current_url,
+					'extraction_method' => $extraction_method,
+					'venue_config'      => array(
+						'venue'      => $config['venue'] ?? '',
+						'venue_name' => $config['venue_name'] ?? '',
 					),
-					JSON_PRETTY_PRINT
 				),
+				JSON_PRETTY_PRINT
 			),
-			array(
+			'metadata' => array(
 				'source_type'       => 'vision_flyer',
 				'extraction_method' => $extraction_method,
 				'pipeline_id'       => $context->getPipelineId(),
 				'flow_id'           => $context->getFlowId(),
 				'import_timestamp'  => time(),
 			),
-			'event_import'
 		);
-
-		return array( $dataPacket );
 	}
 
 	/**

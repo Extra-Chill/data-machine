@@ -14,7 +14,6 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\SingleRecurring;
 use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
-use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -129,19 +128,17 @@ class SingleRecurring extends EventImportHandler {
 		$this->storeEventContext( $context, $standardized_event );
 		$this->stripVenueMetadataFromEvent( $standardized_event );
 
-		$dataPacket = new DataPacket(
-			array(
-				'title' => $standardized_event['title'],
-				'body'  => wp_json_encode(
-					array(
-						'event'          => $standardized_event,
-						'venue_metadata' => $venue_metadata,
-						'import_source'  => 'single_recurring',
-					),
-					JSON_PRETTY_PRINT
+		return array(
+			'title'    => $standardized_event['title'],
+			'content'  => wp_json_encode(
+				array(
+					'event'          => $standardized_event,
+					'venue_metadata' => $venue_metadata,
+					'import_source'  => 'single_recurring',
 				),
+				JSON_PRETTY_PRINT
 			),
-			array(
+			'metadata' => array(
 				'source_type'      => 'single_recurring',
 				'pipeline_id'      => $context->getPipelineId(),
 				'flow_id'          => $context->getFlowId(),
@@ -149,10 +146,7 @@ class SingleRecurring extends EventImportHandler {
 				'event_identifier' => $event_identifier,
 				'import_timestamp' => time(),
 			),
-			'event_import'
 		);
-
-		return array( $dataPacket );
 	}
 
 	/**

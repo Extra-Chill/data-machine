@@ -1,6 +1,6 @@
 <?php
 /**
- * Ticketmaster Discovery API integration with single-item processing
+ * Ticketmaster Discovery API integration with batch processing
  *
  * @package DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster
  */
@@ -9,7 +9,6 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster;
 
 use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
-use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -17,7 +16,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Single-item processing with Discovery API v2 integration
+ * Batch processing with Discovery API v2 integration.
+ *
+ * Returns all eligible events as DataPackets. The pipeline engine
+ * fans each one out into its own child job automatically.
  */
 class Ticketmaster extends EventImportHandler {
 
@@ -76,6 +78,7 @@ class Ticketmaster extends EventImportHandler {
 
 		$current_page   = 0;
 		$has_more_pages = false;
+		$eligible_items = array();
 
 		do {
 			$search_params['page'] = $current_page;
@@ -92,7 +95,7 @@ class Ticketmaster extends EventImportHandler {
 
 			$context->log(
 				'info',
-				'Ticketmaster: Processing events for eligible item',
+				'Ticketmaster: Processing events',
 				array(
 					'page'           => $current_page,
 					'events_on_page' => count( $raw_events ),
@@ -153,19 +156,17 @@ class Ticketmaster extends EventImportHandler {
 				$this->storeEventContext( $context, $standardized_event );
 				$this->stripVenueMetadataFromEvent( $standardized_event );
 
-				$dataPacket = new DataPacket(
-					array(
-						'title' => $standardized_event['title'],
-						'body'  => wp_json_encode(
-							array(
-								'event'          => $standardized_event,
-								'venue_metadata' => $venue_metadata,
-								'import_source'  => 'ticketmaster',
-							),
-							JSON_PRETTY_PRINT
+				$eligible_items[] = array(
+					'title'    => $standardized_event['title'],
+					'content'  => wp_json_encode(
+						array(
+							'event'          => $standardized_event,
+							'venue_metadata' => $venue_metadata,
+							'import_source'  => 'ticketmaster',
 						),
+						JSON_PRETTY_PRINT
 					),
-					array(
+					'metadata' => array(
 						'source_type'      => 'ticketmaster',
 						'pipeline_id'      => $context->getPipelineId(),
 						'flow_id'          => $context->getFlowId(),
@@ -173,38 +174,32 @@ class Ticketmaster extends EventImportHandler {
 						'event_identifier' => $event_identifier,
 						'import_timestamp' => time(),
 					),
-					'event_import'
 				);
-
-				return array( $dataPacket );
 			}
 
 			$has_more_pages = $page_info['number'] < ( $page_info['totalPages'] - 1 )
 								&& $current_page < self::MAX_PAGE;
 
-			if ( $has_more_pages ) {
-				$context->log(
-					'info',
-					'Ticketmaster: No eligible events on page, fetching next',
-					array(
-						'current_page' => $current_page,
-						'total_pages'  => $page_info['totalPages'],
-					)
-				);
-			}
-
 			++$current_page;
 
 		} while ( $has_more_pages );
 
+		if ( empty( $eligible_items ) ) {
+			$context->log(
+				'info',
+				'Ticketmaster: No eligible events found',
+				array( 'pages_searched' => $current_page )
+			);
+			return array();
+		}
+
 		$context->log(
 			'info',
-			'Ticketmaster: No eligible events found',
-			array(
-				'pages_searched' => $current_page,
-			)
+			sprintf( 'Ticketmaster: Found %d eligible events', count( $eligible_items ) ),
+			array( 'pages_searched' => $current_page )
 		);
-		return array();
+
+		return array( 'items' => $eligible_items );
 	}
 
 	/**
