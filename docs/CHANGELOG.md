@@ -2,6 +2,35 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## Unreleased
+
+### Added
+- wp datamachine image CLI command (#407)
+- GitHub integration — fetch handler, abilities, CLI, chat tools (#413)
+- meta description system task for SEO generation (#480, #490)
+- unified posts list command with combinable tracking filters (#465, #491)
+- expose pipeline memory files in pipelines show + memory-files CLI (#470, #475)
+- flows get shows detailed view with step configs (#469, #474)
+
+### Changed
+- extract SelectionMode utility for taxonomy selection logic (#299) (#457)
+- auto-fix PHPCS lint warnings across codebase
+- FlowStepNormalizer::getEffectiveSlug() — single source of truth for config slug resolution (#488)
+- refactor PostTrackingTrait into automatic PostTracking in base handlers (#464)
+
+### Fixed
+- align GitHubAbilities and GitHubTools with codebase conventions (#462)
+- resolveHandlerStep checks handler_slugs only, remove multi-pattern drift (#461)
+- set-prompt no longer wipes handler config, detects agent_ping steps (#458, #459)
+- normalizer wiping handler config for non-handler steps (#485)
+- provide actionable guidance on PageSpeed 429 rate limiting (#486)
+- parse Bing date format, add staleness detection and days filter (#484)
+- move annotations inside meta for WP 6.9 Abilities API compatibility (#483)
+- replace flat title word scoring with IDF-weighted scoring in crosslinker (#481)
+- agent files created with group-writable permissions 0664 (#467)
+- OAuth2 proactive refresh self-heals when token expires (#468)
+- move post tracking meta keys from namespace constants to class constants (#466)
+
 ## [0.33.0] - 2026-02-27
 
 ### Added
