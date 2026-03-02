@@ -160,9 +160,9 @@ class Reddit extends FetchHandler {
 			$data    = $item['data'];
 			$item_id = $item['item_id'] ?? ( $data['metadata']['original_id'] ?? '' );
 
-			// Mark item as processed
+			// Set dedup_key for centralized dedup in FetchHandler::dedup().
 			if ( $item_id ) {
-				$context->markItemProcessed( $item_id );
+				$data['metadata']['dedup_key'] = $item_id;
 			}
 
 			// Download image if present
