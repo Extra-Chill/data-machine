@@ -156,7 +156,7 @@ class PipelineBatchScheduler {
 		$parent_engine = datamachine_get_engine_data( $parent_job_id );
 		if ( ! empty( $parent_engine['cancelled'] ) ) {
 			delete_transient( $transient_key );
-			$this->db_jobs->complete_job( $parent_job_id, 'cancelled' );
+			$this->db_jobs->complete_job( $parent_job_id, JobStatus::failed( 'batch cancelled' )->toString() );
 			return;
 		}
 

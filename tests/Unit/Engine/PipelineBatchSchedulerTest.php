@@ -16,6 +16,15 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 
 	private Jobs $jobs_db;
 
+	public static function set_up_before_class(): void {
+		parent::set_up_before_class();
+
+		// Ensure Data Machine tables exist (activation hook doesn't fire in tests).
+		if ( function_exists( 'datamachine_activate_for_site' ) ) {
+			datamachine_activate_for_site();
+		}
+	}
+
 	public function set_up(): void {
 		parent::set_up();
 		$this->jobs_db = new Jobs();
@@ -188,9 +197,10 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 
 		$this->assertEquals( 0, $count );
 
-		// Parent should be cancelled.
+		// Parent should be failed with cancellation reason.
 		$parent_job = $this->jobs_db->get_job( $parent_id );
-		$this->assertStringContainsString( 'cancelled', $parent_job['status'] );
+		$this->assertStringContainsString( 'failed', $parent_job['status'] );
+		$this->assertStringContainsString( 'batch cancelled', $parent_job['status'] );
 	}
 
 	public function test_child_labels_use_packet_titles(): void {
