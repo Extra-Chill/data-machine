@@ -2,7 +2,7 @@
 
 All notable changes to Data Machine will be documented in this file.
 
-## Unreleased
+## [0.34.0] - 2026-03-02
 
 ### Added
 - wp datamachine image CLI command (#407)
