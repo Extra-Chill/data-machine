@@ -1,293 +1,110 @@
 ---
 name: data-machine
-description: "Self-scheduling execution layer for autonomous task orchestration. Use for queuing tasks, chaining pipeline executions, scheduling recurring work, and 24/7 autonomous operation via Agent Ping webhooks."
-compatibility: "WordPress 6.9+ with Data Machine plugin. WP-CLI required for queue management."
+description: "AI-powered WordPress operations engine. System tasks for site health (SEO, images, links, performance). Pipelines for automated content workflows. Agent memory for persistent context. Discover everything via wp help datamachine."
+compatibility: "WordPress 6.9+ with Data Machine plugin. WP-CLI required."
 ---
 
-# Data Machine Skill
+# Data Machine
 
-Self-scheduling execution layer for AI agents — reminder system + task manager + workflow executor.
+AI-powered WordPress operations engine — system tasks, content pipelines, and agent memory.
 
-**Pipeline** (template) → **Flow** (instance + schedule) → **Job** (single execution)
+## Discovery
 
-## Core Concepts
+Data Machine is fully discoverable via WP-CLI. **Do not memorize commands from this file.** Use the CLI to find what you need in real time:
 
-1. **Flows operate on schedules** — "ping me at X time to do Y"
-2. **Step-level prompt queues** — each run can be a different task
-3. **Purpose-specific flows** — separate flows for separate concerns
+```bash
+# See all command groups
+wp datamachine
 
-## Step Types
+# See subcommands in any group
+wp help datamachine <group>
 
-| Type | Purpose | Queueable | Uses Handlers |
-|------|---------|-----------|---------------|
-| `fetch` | Import from external sources | No | Yes |
-| `ai` | AI processing (multi-turn, tools) | **Yes** | No |
-| `publish` | Output to platforms | No | Yes |
-| `update` | Modify existing content | No | Yes |
-| `agent_ping` | Webhook to external agents | **Yes** | No |
-| `webhook_gate` | Pause until external POST resumes it | No | No |
+# See full usage, flags, and examples for any command
+wp help datamachine <group> <subcommand>
+```
 
-## Handlers
+Singular/plural aliases work interchangeably: `flow`/`flows`, `job`/`jobs`, `link`/`links`, etc.
 
-**Fetch:** `rss`, `files`, `reddit`, `wordpress_posts`, `wordpress_api`, `wordpress_media`
-**Publish:** `wordpress_publish` (social handlers in separate `data-machine-socials` plugin)
-**Update:** `wordpress_update`
+This pattern means you always have accurate, up-to-date documentation — the running plugin IS the docs.
 
-## Scheduling
+## What Data Machine Does
 
-Set via `--scheduling` on flow create/update: `manual`, `one_time`, `every_5_minutes`, `hourly`, `every_2_hours`, `every_4_hours`, `qtrdaily` (6h), `twicedaily`, `daily`, `every_3_days`, `weekly`, `monthly`. Filterable via `datamachine_scheduler_intervals`.
+DM has two layers:
+
+### 1. System Tasks
+
+Built-in operations that work on your WordPress site directly. No pipeline setup required — just run the command.
+
+**Site Health & SEO:**
+- **Alt text** — diagnose missing alt text, AI-generate it in bulk
+- **Internal links** — diagnose coverage, find orphan posts, detect broken links, AI-powered crosslinking
+- **Content blocks** — inspect and edit Gutenberg blocks in any post
+- **Analytics** — PageSpeed Insights audits, Google Search Console, Google Analytics, Bing Webmaster
+- **Images** — AI generation, template rendering
+
+**Agent Operations:**
+- **Memory** — read/write agent files (SOUL.md, MEMORY.md, etc.), daily logs, search
+- **Workspace** — managed git repos with read/write/edit through security boundaries
+- **GitHub** — issues, PRs, repos — managed from within WordPress
+- **Batch** — track long-running operations
+
+To explore any of these, run `wp help datamachine <group>` — e.g. `wp help datamachine links`, `wp help datamachine analytics`, `wp help datamachine alt-text`.
+
+### 2. Pipelines & Flows
+
+Automated content workflows that run on schedules.
+
+**Pipeline** = template (defines steps) → **Flow** = instance (adds schedule + config) → **Job** = single execution
+
+**Step types:** `fetch`, `ai`, `publish`, `update`, `agent_ping`, `webhook_gate`. Discover details with `wp help datamachine pipelines`.
+
+**Scheduling options:** manual, one_time, every_5_minutes, hourly, every_2_hours, every_4_hours, qtrdaily (6h), twicedaily, daily, every_3_days, weekly, monthly.
+
+**Prompt queues:** AI and Agent Ping steps can pop tasks from a queue, so each run processes a different instruction. Explore with `wp help datamachine flows queue`.
+
+**Webhook triggers:** External systems can fire flows via POST. See `wp help datamachine flows webhook`.
 
 ## Memory System
 
-Files in `{uploads}/datamachine-files/agent/` are injected as system context into every AI call:
+Agent files live in `{uploads}/datamachine-files/agent/` and are injected as system context into every AI call:
 
-- **SOUL.md** — agent identity, voice, rules (always injected)
-- **USER.md** — who the human user is, preferences, goals (always injected)
-- **MEMORY.md** — accumulated state, lessons, domain context (always injected)
-- Additional files selectable per-pipeline via admin UI
+- **SOUL.md** — identity, voice, rules (always injected)
+- **USER.md** — human user profile (always injected)
+- **MEMORY.md** — accumulated knowledge (always injected)
+- **daily/YYYY/MM/DD.md** — temporal session logs
 
-All three core files are protected from deletion. Manage via CLI, REST API, or admin UI.
+Manage via `wp datamachine agent` (aliased as `wp datamachine memory`). Run `wp help datamachine agent` to see all subcommands.
 
-```
-GET/PUT/DELETE  /datamachine/v1/files/agent/{filename}
-```
+## AI Tools (During Pipeline Execution)
 
-### Daily Memory
+When running inside a pipeline, the AI step has access to tools. These are NOT CLI commands — they're available to the AI model during flow execution. Key tools include: local_search, image_generation, agent_memory, web_fetch, wordpress_post_reader, google_search, google_search_console, bing_webmaster, skip_item, queue_validator, github_create_issue.
 
-Date-based logs at `YYYY/MM/DD.md` — useful for per-run notes, progress tracking.
-
-```bash
-wp datamachine agent daily list
-wp datamachine agent daily read [<date>]
-wp datamachine agent daily append <date> --content="..."
-```
-
----
-
-## AI Tools (Pipeline Execution)
-
-| Tool | Purpose |
-|------|---------|
-| `local_search` | Search site content (duplicate detection) |
-| `skip_item` | Skip items, sets `agent_skipped` status |
-| `image_generation` | Generate images via Replicate API, auto-sets featured image |
-| `agent_memory` | Read/write memory files during execution |
-| `web_fetch` | Fetch external URLs |
-| `wordpress_post_reader` | Read full post content by ID |
-| `google_search` | Web search via Google Custom Search |
-| `google_search_console` | GSC analytics queries |
-| `bing_webmaster` | Bing Webmaster analytics |
-| `amazon_affiliate_link` | Generate Amazon affiliate links |
-| `queue_validator` | Validate/manage queue state |
-| `github_create_issue` | File GitHub issues from pipelines |
-
-**`local_search` tip:** Search core topic, not exact title. "pelicans dangerous" catches "Are Australian Pelicans Dangerous?"
-
-**`image_generation`** is async — System Agent handles polling and attachment creation in background.
-
----
-
-## CLI Reference
-
-All commands accept `--allow-root`. Singular/plural aliases work interchangeably (`flow`/`flows`, `job`/`jobs`, etc.).
-
-### Pipelines
-
-```bash
-wp datamachine pipelines                              # list
-wp datamachine pipelines get <id>                     # details
-wp datamachine pipelines create --name="..." [--steps='[...]'] [--dry-run]
-wp datamachine pipelines update <id> [--name=<n>] [--config=<json>]
-wp datamachine pipelines update <id> --set-system-prompt="..." [--step=<step_id>]
-wp datamachine pipelines delete <id> [--force]
-```
-
-### Flows
-
-```bash
-wp datamachine flows [<pipeline_id>]                  # list
-wp datamachine flows get <id>                         # details
-wp datamachine flows create --pipeline_id=<id> --name="..." [--scheduling=<interval>]
-wp datamachine flows update <id> [--name=<n>] [--scheduling=<interval>]
-wp datamachine flows update <id> --set-prompt="..." [--step=<step_id>]
-wp datamachine flows run <id> [--count=<1-10>]
-wp datamachine flows delete <id> [--yes]
-```
-
-### Queues
-
-AI and Agent Ping steps pop from queue when prompt is empty and `queue_enabled` is true.
-
-```bash
-wp datamachine flows queue add <flow_id> "Task instruction" [--step=<step_id>]
-wp datamachine flows queue list <flow_id>
-wp datamachine flows queue remove <flow_id> <index>
-wp datamachine flows queue update <flow_id> <index> "New text"
-wp datamachine flows queue move <flow_id> <from> <to>
-wp datamachine flows queue clear <flow_id>
-```
-
-### Jobs
-
-```bash
-wp datamachine jobs list [--status=<s>] [--flow=<id>] [--limit=<n>]
-wp datamachine jobs show <id> [--format=json]
-wp datamachine jobs summary
-wp datamachine jobs fail <id> [--reason="..."]
-wp datamachine jobs retry <id> [--force]
-wp datamachine jobs recover-stuck [--dry-run] [--flow=<id>]
-```
-
-### Agent
-
-```bash
-wp datamachine agent read <filename>
-wp datamachine agent write <filename> --content="..."
-wp datamachine agent search <query>
-wp datamachine agent sections <filename>
-wp datamachine agent files list
-wp datamachine agent files read <filename>
-wp datamachine agent files write <filename>       # from stdin
-wp datamachine agent files check [--days=<n>]
-# Daily: list, read, write, append, delete, search
-wp datamachine agent daily list [--limit=<n>]
-wp datamachine agent daily append <date> --content="..."
-```
-
-Alias: `wp datamachine memory` = `wp datamachine agent`
-
-### Posts
-
-```bash
-wp datamachine posts recent [--limit=<n>] [--post_type=<t>] [--format=json]
-wp datamachine posts by-flow <flow_id> [--per_page=<n>]
-wp datamachine posts by-handler <slug> [--post_type=<t>]
-wp datamachine posts by-pipeline <id>
-```
-
-### Workspace
-
-Managed repo access at `/var/lib/datamachine/workspace/`. Use CLI over direct filesystem access — enforces security boundaries.
-
-```bash
-wp datamachine workspace list                         # list repos
-wp datamachine workspace show <repo>                  # repo details
-wp datamachine workspace ls <repo> [path]             # list files
-wp datamachine workspace read <repo> <path>           # read file
-wp datamachine workspace write <repo> <path> --content="..."       # write
-wp datamachine workspace write <repo> <path> --content=@/tmp/f.rs  # write from file
-wp datamachine workspace edit <repo> <path> --old="..." --new="..." [--replace-all]
-wp datamachine workspace clone <git_url>
-wp datamachine workspace remove <repo>
-```
-
-### Webhook Triggers
-
-External systems can fire flows via `POST /datamachine/v1/trigger/{flow_id}` with Bearer token.
-
-```bash
-wp datamachine flows webhook enable <flow_id>
-wp datamachine flows webhook disable <flow_id>
-wp datamachine flows webhook regenerate <flow_id>
-wp datamachine flows webhook status <flow_id>
-wp datamachine flows webhook list
-```
-
-### Content Tools
-
-```bash
-# Blocks
-wp datamachine blocks list <post_id> [--type=<t>] [--search=<s>]
-wp datamachine blocks edit <post_id> <index> --find="..." --replace="..." [--dry-run]
-
-# Links
-wp datamachine links diagnose
-wp datamachine links crosslink [--category=<slug>] [--all] [--links-per-post=<n>]
-
-# Alt Text
-wp datamachine alt-text diagnose
-wp datamachine alt-text generate [--post_id=<id>] [--force]
-```
-
-### Settings & Logs
-
-```bash
-wp datamachine settings list | get <key> | set <key> <value>
-wp datamachine logs read <pipeline|system|chat>
-wp datamachine logs level <type> [<level>]
-wp datamachine logs clear <type|all> [--yes]
-```
-
----
-
-## Prompt Queue Patterns
-
-### Chaining
-
-Agent executes task, queues the next phase:
-
-```
-"Phase 1: Design architecture" → agent queues "Phase 2: Implement schema"
-"Phase 2: Implement schema"    → agent queues "Phase 3: Build API"
-```
-
-### Purpose-Specific Flows
-
-```
-Content Generation (queue-driven): AI → Publish → Agent Ping
-Content Ideation (daily):          Agent Ping: "Review analytics, queue topics"
-Weekly Review (weekly):            Agent Ping: "Analyze performance"
-Coding Tasks (manual, queue):      Agent Ping: pops specific task
-```
-
-Each flow has its own schedule, queue, and single responsibility.
-
----
-
-## Agent Ping Payload
-
-```json
-{
-  "prompt": "Task instruction",
-  "context": {
-    "flow_id": 7, "pipeline_id": 3, "job_id": 1234,
-    "post_id": 5678, "post_type": "post",
-    "published_url": "https://example.com/my-post/",
-    "data_packets": [], "engine_data": {},
-    "from_queue": false,
-    "site_url": "https://example.com", "wp_path": "/var/www/html/"
-  },
-  "timestamp": "2026-02-25T03:00:00+00:00"
-}
-```
-
-Config: `webhook_url`, `prompt` (static or empty to use queue), `queue_enabled`.
-
----
-
-## Taxonomy Handling
-
-| Mode | Behavior |
-|------|----------|
-| `skip` | Don't assign |
-| `ai_decides` | AI provides values via tool params (hierarchical: string, flat: array) |
-| `<term>` | Pre-selected term (ID, name, or slug) |
-
----
+The tool list is managed by the plugin and may grow. Check pipeline logs to see which tools are available.
 
 ## Debugging
 
 ```bash
-wp datamachine logs read pipeline              # check logs
-wp datamachine jobs list --status=failed        # find failures
-wp datamachine jobs show <id> --format=json     # failure details
-wp datamachine jobs summary                     # status overview
-wp datamachine jobs recover-stuck [--dry-run]   # fix stuck jobs
-wp datamachine jobs retry <id>                  # retry specific job
+wp datamachine logs read pipeline    # pipeline execution logs
+wp datamachine logs read system      # system-level logs
+wp datamachine jobs summary          # job status overview
+wp datamachine jobs list --status=failed
+wp datamachine jobs show <id> --format=json
 ```
 
----
+## Key Patterns
 
-## Chat API
+**Queue-driven work:** Add tasks to a flow's queue → flow runs on schedule → pops and executes one task per run.
 
-REST at `/wp-json/datamachine/v1/chat/` with 30+ tool-based abilities: flow/pipeline/queue/job management, content editing, taxonomy CRUD, memory read/write, analytics queries, image generation, settings, and session management.
+**Chaining:** An AI step can queue the next phase of work for a subsequent run.
+
+**Agent Ping:** A step type that POSTs to an external webhook (Discord bot, automation engine, etc.) to hand off work to another agent.
+
+**System tasks on demand:** Run `wp datamachine links diagnose` or `wp datamachine alt-text diagnose` anytime — no flow needed.
+
+## REST API
+
+Chat API at `/wp-json/datamachine/v1/chat/` with 30+ tool-based abilities. Agent files at `/datamachine/v1/files/agent/{filename}`. Webhook triggers at `/datamachine/v1/trigger/{flow_id}`.
+
+## Remember
+
+When in doubt, `wp help datamachine` will show you everything. Start there.
