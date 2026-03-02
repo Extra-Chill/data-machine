@@ -292,7 +292,7 @@ class BlueskyPublishAbility {
 					'password' => $app_password,
 				) ),
 				'headers' => array( 'Content-Type' => 'application/json' ),
-				timeout => 15,
+				'timeout' => 15,
 			)
 		);
 

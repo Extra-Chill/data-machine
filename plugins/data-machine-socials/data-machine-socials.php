@@ -3,7 +3,7 @@
  * Plugin Name: Data Machine Socials
  * Plugin URI: https://github.com/Extra-Chill/data-machine-socials
  * Description: Social media extension for Data Machine. Adds support for Instagram, Twitter, Facebook, Bluesky, Threads, Pinterest, and Reddit.
- * Version: 0.1.0
+ * Version: 0.2.0
  * Requires at least: 6.9
  * Requires PHP: 8.2
  * Requires Plugins: data-machine
@@ -118,6 +118,9 @@ add_action( 'plugins_loaded', 'datamachine_socials_register_image_templates', 21
 // Register REST API
 require_once DATAMACHINE_SOCIALS_PATH . 'inc/RestApi.php';
 add_action( 'plugins_loaded', array( 'DataMachineSocials\RestApi', 'register' ), 25 );
+
+// Register temp file cleanup
+\DataMachineSocials\Cleanup::register();
 
 /**
  * Enqueue Gutenberg sidebar assets

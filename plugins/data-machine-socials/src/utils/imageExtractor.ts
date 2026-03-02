@@ -63,7 +63,7 @@ export function extractImagesFromBlocks(blocks: WpImageBlock[]): SelectedImage[]
 }
 
 export function extractFeaturedImage(): SelectedImage | null {
-	const featuredImage = (window as any)._dmsFeaturedImage;
+	const featuredImage = (window as any).dmsData?.featuredImage;
 	if (featuredImage?.id) {
 		return {
 			id: featuredImage.id,

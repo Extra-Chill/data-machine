@@ -641,6 +641,7 @@ class RestApi {
 
 		if ( ! file_exists( $temp_dir ) ) {
 			wp_mkdir_p( $temp_dir );
+			Cleanup::secure_temp_dir();
 		}
 
 		// Move file to temp location
