@@ -18,18 +18,6 @@ if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
-// Check if Data Machine core is active
-if ( ! class_exists( 'DataMachine\Core\Steps\Publish\Handlers\PublishHandler' ) ) {
-	add_action( 'admin_notices', function() {
-		?>
-		<div class="notice notice-error">
-			<p><?php esc_html_e( 'Data Machine Socials requires Data Machine core plugin to be installed and activated.', 'data-machine-socials' ); ?></p>
-		</div>
-		<?php
-	} );
-	return;
-}
-
 define( 'DATAMACHINE_SOCIALS_VERSION', '0.2.0' );
 define( 'DATAMACHINE_SOCIALS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_SOCIALS_URL', plugin_dir_url( __FILE__ ) );
@@ -38,9 +26,24 @@ define( 'DATAMACHINE_SOCIALS_URL', plugin_dir_url( __FILE__ ) );
 require_once __DIR__ . '/vendor/autoload.php';
 
 /**
- * Load and instantiate social media handlers and abilities.
+ * Bootstrap the plugin after all plugins are loaded.
+ *
+ * Data Machine core must be active — check at plugins_loaded time
+ * (not at plugin load time, since load order is alphabetical and
+ * data-machine-socials loads before data-machine).
  */
-function datamachine_socials_load_handlers() {
+function datamachine_socials_bootstrap() {
+	if ( ! class_exists( 'DataMachine\Core\Steps\Publish\Handlers\PublishHandler' ) ) {
+		add_action( 'admin_notices', function() {
+			?>
+			<div class="notice notice-error">
+				<p><?php esc_html_e( 'Data Machine Socials requires Data Machine core plugin to be installed and activated.', 'data-machine-socials' ); ?></p>
+			</div>
+			<?php
+		} );
+		return;
+	}
+
 	// Load Abilities (they self-register)
 	// Pinterest
 	new \DataMachineSocials\Abilities\Pinterest\PinterestBoardsAbility();
@@ -94,32 +97,22 @@ function datamachine_socials_load_handlers() {
 
 	// Reddit (Fetch)
 	new \DataMachineSocials\Handlers\Reddit\Reddit();
-}
 
-// Hook into plugins_loaded to ensure Data Machine core is loaded first
-add_action( 'plugins_loaded', 'datamachine_socials_load_handlers', 20 );
-
-/**
- * Register image generation templates with Data Machine core.
- *
- * Templates are registered via filter so core's TemplateRegistry can
- * discover and instantiate them. Runs on plugins_loaded after handlers.
- */
-function datamachine_socials_register_image_templates() {
+	// Register image generation templates
 	add_filter( 'datamachine/image_generation/templates', function ( array $templates ): array {
 		$templates['quote_card'] = \DataMachineSocials\ImageGeneration\Templates\QuoteCard::class;
 		$templates['chart']     = \DataMachineSocials\ImageGeneration\Templates\ChartTemplate::class;
 		$templates['diagram']   = \DataMachineSocials\ImageGeneration\Templates\DiagramTemplate::class;
 		return $templates;
 	} );
+
+	// Register REST API
+	require_once DATAMACHINE_SOCIALS_PATH . 'inc/RestApi.php';
+	\DataMachineSocials\RestApi::register();
 }
-add_action( 'plugins_loaded', 'datamachine_socials_register_image_templates', 21 );
+add_action( 'plugins_loaded', 'datamachine_socials_bootstrap', 20 );
 
-// Register REST API
-require_once DATAMACHINE_SOCIALS_PATH . 'inc/RestApi.php';
-add_action( 'plugins_loaded', array( 'DataMachineSocials\RestApi', 'register' ), 25 );
-
-// Register temp file cleanup
+// Temp file cleanup runs independently (doesn't need DM core)
 \DataMachineSocials\Cleanup::register();
 
 /**
