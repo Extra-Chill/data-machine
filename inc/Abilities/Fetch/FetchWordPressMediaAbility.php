@@ -190,6 +190,8 @@ class FetchWordPressMediaAbility {
 			'data'    => array( 'media_found' => count( $posts ) ),
 		);
 
+		$eligible_items = array();
+
 		foreach ( $posts as $post ) {
 			$post_id = (string) $post->ID;
 
@@ -217,7 +219,6 @@ class FetchWordPressMediaAbility {
 			$site_name   = ! empty( $site_name ) ? $site_name : 'Local WordPress';
 
 			$content_data = array();
-			$parent_post  = null;
 			if ( $include_parent_content && $post->post_parent > 0 ) {
 				$parent_post = get_post( $post->post_parent );
 				if ( $parent_post && $parent_post->post_status === 'publish' ) {
@@ -242,58 +243,53 @@ class FetchWordPressMediaAbility {
 				'file_size_formatted' => $file_size > 0 ? size_format( $file_size ) : null,
 			);
 
-			$metadata = array(
-				'source_type'            => 'wordpress_media',
-				'item_identifier_to_log' => $post->ID,
-				'original_id'            => $post->ID,
-				'parent_post_id'         => $post->post_parent,
-				'original_title'         => $title,
-				'original_date_gmt'      => $post->post_date_gmt,
-				'mime_type'              => $file_type,
-				'file_size'              => $file_size,
-				'site_name'              => $site_name,
-			);
-
-			$data = array(
-				'media_id'  => $post->ID,
-				'title'     => $content_data['title'] ?? '',
-				'content'   => $content_data['content'] ?? '',
-				'metadata'  => $metadata,
-				'file_info' => $file_info,
-			);
-
 			$source_url = '';
 			if ( $include_parent_content && $post->post_parent > 0 ) {
 				$source_url = get_permalink( $post->post_parent ) ?? '';
 			}
 
+			$eligible_items[] = array(
+				'title'    => $content_data['title'] ?? '',
+				'content'  => $content_data['content'] ?? '',
+				'metadata' => array(
+					'source_type'            => 'wordpress_media',
+					'item_identifier_to_log' => $post->ID,
+					'original_id'            => $post->ID,
+					'parent_post_id'         => $post->post_parent,
+					'original_title'         => $title,
+					'original_date_gmt'      => $post->post_date_gmt,
+					'mime_type'              => $file_type,
+					'file_size'              => $file_size,
+					'site_name'              => $site_name,
+					'source_url'             => $source_url,
+					'image_file_path'        => $file_path,
+				),
+				'file_info' => $file_info,
+			);
+		}
+
+		if ( empty( $eligible_items ) ) {
 			$logs[] = array(
 				'level'   => 'debug',
-				'message' => 'Retrieved unprocessed media item',
-				'data'    => array(
-					'media_id'           => $post->ID,
-					'title'              => $title,
-					'has_parent_content' => ! empty( $content_data ),
-				),
+				'message' => 'All media items already processed or filtered out',
 			);
 
 			return array(
-				'success'         => true,
-				'data'            => $data,
-				'source_url'      => $source_url,
-				'image_file_path' => $file_path,
-				'logs'            => $logs,
+				'success' => true,
+				'data'    => array(),
+				'logs'    => $logs,
 			);
 		}
 
 		$logs[] = array(
-			'level'   => 'debug',
-			'message' => 'All media items already processed or filtered out',
+			'level'   => 'info',
+			'message' => sprintf( 'Found %d unprocessed media items.', count( $eligible_items ) ),
+			'data'    => array( 'eligible' => count( $eligible_items ) ),
 		);
 
 		return array(
 			'success' => true,
-			'data'    => array(),
+			'data'    => array( 'items' => $eligible_items ),
 			'logs'    => $logs,
 		);
 	}

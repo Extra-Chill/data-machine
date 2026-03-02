@@ -93,92 +93,57 @@ class WordPressAPI extends FetchHandler {
 			);
 		}
 
-		// Handle failure
-		if ( ! $result['success'] ) {
+		if ( ! $result['success'] || empty( $result['data'] ) ) {
 			return array();
 		}
 
-		// Handle empty result
-		if ( empty( $result['data'] ) ) {
+		$data  = $result['data'];
+		$items = $data['items'] ?? array( $data );
+
+		$processed_items = array();
+
+		foreach ( $items as &$item ) {
+			$item_id = $item['metadata']['item_identifier_to_log'] ?? '';
+
+			// Mark item as processed.
+			if ( ! empty( $item_id ) ) {
+				$context->markItemProcessed( $item_id );
+			}
+
+			// Download image if present in file_info.
+			if ( isset( $item['file_info'] ) && ! empty( $item['file_info']['url'] ) ) {
+				$image_url = $item['file_info']['url'];
+				$url_path  = wp_parse_url( $image_url, PHP_URL_PATH );
+				$extension = $url_path ? pathinfo( $url_path, PATHINFO_EXTENSION ) : 'jpg';
+				if ( empty( $extension ) ) {
+					$extension = 'jpg';
+				}
+				$filename = 'wp_api_image_' . time() . '_' . sanitize_file_name( basename( $url_path ? $url_path : 'image' ) ) . '.' . $extension;
+
+				$download_result = $context->downloadFile( $image_url, $filename );
+
+				if ( $download_result ) {
+					$file_check            = wp_check_filetype( $filename );
+					$mime_type             = $file_check['type'] ? $file_check['type'] : 'image/jpeg';
+					$item['file_info']     = array(
+						'file_path' => $download_result['path'],
+						'mime_type' => $mime_type,
+						'file_size' => $download_result['size'],
+					);
+				} else {
+					unset( $item['file_info'] );
+				}
+			}
+
+			$processed_items[] = $item;
+		}
+		unset( $item );
+
+		if ( empty( $processed_items ) ) {
 			return array();
 		}
 
-		$raw_data   = $result['data'];
-		$item_id    = $result['item_id'] ?? '';
-		$source_url = $result['source_url'] ?? '';
-
-		// Mark item as processed
-		if ( ! empty( $item_id ) ) {
-			$context->markItemProcessed( $item_id );
-		}
-
-		// Download image if present in file_info
-		$file_info       = null;
-		$download_result = null;
-		if ( isset( $raw_data['file_info'] ) && ! empty( $raw_data['file_info']['url'] ) ) {
-			$image_url = $raw_data['file_info']['url'];
-
-			// Generate filename from URL
-			$url_path  = wp_parse_url( $image_url, PHP_URL_PATH );
-			$extension = $url_path ? pathinfo( $url_path, PATHINFO_EXTENSION ) : 'jpg';
-			if ( empty( $extension ) ) {
-				$extension = 'jpg';
-			}
-			$filename = 'wp_api_image_' . time() . '_' . sanitize_file_name( basename( $url_path ? $url_path : 'image' ) ) . '.' . $extension;
-
-			$download_result = $context->downloadFile( $image_url, $filename );
-
-			if ( $download_result ) {
-				$file_check = wp_check_filetype( $filename );
-				$mime_type  = $file_check['type'] ? $file_check['type'] : 'image/jpeg';
-
-				$file_info = array(
-					'file_path' => $download_result['path'],
-					'mime_type' => $mime_type,
-					'file_size' => $download_result['size'],
-				);
-
-				$context->log(
-					'debug',
-					'WordPressAPI: Downloaded remote image for AI processing',
-					array(
-						'item_id'    => $item_id,
-						'source_url' => $image_url,
-						'local_path' => $download_result['path'],
-						'file_size'  => $download_result['size'],
-					)
-				);
-
-				// Update raw_data with downloaded file info
-				$raw_data['file_info'] = $file_info;
-			} else {
-				$context->log(
-					'warning',
-					'WordPressAPI: Failed to download remote image',
-					array(
-						'item_id'   => $item_id,
-						'image_url' => $image_url,
-					)
-				);
-				unset( $raw_data['file_info'] );
-			}
-		}
-
-		// Store URLs and file path in engine_data via centralized filter
-		$image_file_path = '';
-		if ( $download_result ) {
-			$image_file_path = $download_result['path'];
-		}
-
-		$context->storeEngineData(
-			array(
-				'source_url'      => $source_url,
-				'image_file_path' => $image_file_path,
-			)
-		);
-
-		// Return raw data for DataPacket creation
-		return $raw_data;
+		return array( 'items' => $processed_items );
 	}
 
 	/**

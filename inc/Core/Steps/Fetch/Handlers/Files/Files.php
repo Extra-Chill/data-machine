@@ -40,15 +40,14 @@ class Files extends FetchHandler {
 
 	/**
 	 * Process uploaded files with universal image handling.
-	 * For images: stores image_file_path via datamachine_engine_data filter.
-	 *
 	 * Delegates to FetchFilesAbility for core logic.
+	 * Returns all eligible items for batch fan-out.
 	 */
 	protected function executeFetch( array $config, ExecutionContext $context ): array {
 		$uploaded_files = $config['uploaded_files'] ?? array();
 
 		// Build processed items array from context
-		$processed_items = array();
+		$processed_items = $this->getProcessedItems( $context );
 
 		// Delegate to ability
 		$ability_input = array(
@@ -61,38 +60,58 @@ class Files extends FetchHandler {
 		$result  = $ability->execute( $ability_input );
 
 		// Log ability logs
-		if ( ! empty( $result['logs'] ) && is_array( $result['logs'] ) ) {
-			foreach ( $result['logs'] as $log_entry ) {
-				$context->log(
-					$log_entry['level'] ?? 'debug',
-					$log_entry['message'] ?? '',
-					$log_entry['data'] ?? array()
-				);
+		foreach ( $result['logs'] ?? array() as $log_entry ) {
+			$context->log(
+				$log_entry['level'] ?? 'debug',
+				$log_entry['message'] ?? '',
+				$log_entry['data'] ?? array()
+			);
+		}
+
+		if ( ! $result['success'] || empty( $result['data'] ) ) {
+			return array();
+		}
+
+		$data  = $result['data'];
+		$items = $data['items'] ?? array( $data );
+
+		$processed_items = array();
+
+		foreach ( $items as $item ) {
+			$item_id = $item['metadata']['item_identifier_to_log'] ?? '';
+
+			// Mark item as processed.
+			if ( ! empty( $item_id ) ) {
+				$context->markItemProcessed( $item_id );
 			}
+
+			$processed_items[] = $item;
 		}
 
-		if ( ! $result['success'] ) {
+		if ( empty( $processed_items ) ) {
 			return array();
 		}
 
-		// If no data returned, return empty
-		if ( empty( $result['data'] ) ) {
+		return array( 'items' => $processed_items );
+	}
+
+	/**
+	 * Get processed items for deduplication.
+	 *
+	 * @param ExecutionContext $context Execution context.
+	 * @return array Array of processed item IDs.
+	 */
+	private function getProcessedItems( ExecutionContext $context ): array {
+		if ( $context->isDirect() ) {
 			return array();
 		}
 
-		$data            = $result['data'];
-		$item_identifier = $result['item_identifier'] ?? ( $data['metadata']['original_id'] ?? '' );
-
-		// Mark item as processed
-		if ( $item_identifier ) {
-			$context->markItemProcessed( $item_identifier );
+		$flow_step_id = $context->getFlowStepId();
+		if ( empty( $flow_step_id ) ) {
+			return array();
 		}
 
-		// Store engine data if present
-		if ( ! empty( $data['engine_data'] ) ) {
-			$context->storeEngineData( $data['engine_data'] );
-		}
-
-		return $data;
+		$processed_items_table = new \DataMachine\Core\Database\ProcessedItems\ProcessedItems();
+		return $processed_items_table->get_processed_item_ids( $flow_step_id );
 	}
 }

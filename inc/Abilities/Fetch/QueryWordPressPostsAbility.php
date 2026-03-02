@@ -210,17 +210,17 @@ class QueryWordPressPostsAbility {
 			),
 		);
 
-		// Process posts
+		// Collect all unprocessed posts.
 		$unprocessed_posts = array();
 		foreach ( $posts as $post ) {
 			$post_id = (string) $post->ID;
 
-			// Skip already processed items
+			// Skip already processed items.
 			if ( in_array( $post_id, $processed_items, true ) ) {
 				continue;
 			}
 
-			// Client-side search if needed
+			// Client-side search if needed.
 			if ( $use_client_side_search && ! empty( $search ) ) {
 				$search_text = $post->post_title . ' ' . wp_strip_all_tags( $post->post_content . ' ' . $post->post_excerpt );
 				if ( ! $this->applyKeywordSearch( $search_text, $search ) ) {
@@ -237,90 +237,73 @@ class QueryWordPressPostsAbility {
 				'message' => 'All posts already processed or filtered out',
 			);
 			return array(
-				'success'  => true,
-				'data'     => array(),
-				'has_more' => false,
-				'logs'     => $logs,
+				'success' => true,
+				'data'    => array(),
+				'logs'    => $logs,
 			);
 		}
 
-		// Return first unprocessed post
-		$post    = $unprocessed_posts[0];
-		$post_id = $post->ID;
+		$site_name      = get_bloginfo( 'name' ) ?: 'Local WordPress';
+		$eligible_items = array();
 
-		$title     = ! empty( $post->post_title ) ? $post->post_title : 'N/A';
-		$content   = $post->post_content;
-		$site_name = get_bloginfo( 'name' ) ?: 'Local WordPress';
+		foreach ( $unprocessed_posts as $post ) {
+			$post_id = $post->ID;
+			$title   = ! empty( $post->post_title ) ? $post->post_title : 'N/A';
+			$content = $post->post_content;
 
-		// Get featured image
-		$file_info         = null;
-		$featured_image_id = get_post_thumbnail_id( $post_id );
+			// Get featured image.
+			$file_info         = null;
+			$featured_image_id = get_post_thumbnail_id( $post_id );
 
-		if ( $featured_image_id && $include_file_info ) {
-			$file_path = get_attached_file( $featured_image_id );
-			if ( $file_path && file_exists( $file_path ) ) {
-				$file_size = filesize( $file_path );
-				$mime_type = get_post_mime_type( $featured_image_id ) ?: 'image/jpeg';
+			if ( $featured_image_id && $include_file_info ) {
+				$file_path = get_attached_file( $featured_image_id );
+				if ( $file_path && file_exists( $file_path ) ) {
+					$file_size = filesize( $file_path );
+					$mime_type = get_post_mime_type( $featured_image_id ) ?: 'image/jpeg';
 
-				$file_info = array(
-					'file_path' => $file_path,
-					'mime_type' => $mime_type,
-					'file_size' => $file_size,
-				);
-
-				$logs[] = array(
-					'level'   => 'debug',
-					'message' => 'Including featured image file_info for AI processing',
-					'data'    => array(
-						'post_id'           => $post_id,
-						'featured_image_id' => $featured_image_id,
-						'file_path'         => $file_path,
-						'file_size'         => $file_size,
-					),
-				);
+					$file_info = array(
+						'file_path' => $file_path,
+						'mime_type' => $mime_type,
+						'file_size' => $file_size,
+					);
+				}
 			}
+
+			$item_data = array(
+				'title'    => $title,
+				'content'  => $content,
+				'metadata' => array(
+					'source_type'            => 'wordpress_local',
+					'item_identifier_to_log' => $post_id,
+					'original_id'            => $post_id,
+					'original_title'         => $title,
+					'original_date_gmt'      => $post->post_date_gmt,
+					'post_type'              => $post->post_type,
+					'post_status'            => $post->post_status,
+					'site_name'              => $site_name,
+					'permalink'              => get_permalink( $post_id ) ?? '',
+					'excerpt'                => $post->post_excerpt,
+					'author'                 => get_the_author_meta( 'display_name', (int) $post->post_author ),
+				),
+			);
+
+			if ( $file_info ) {
+				$item_data['file_info'] = $file_info;
+			}
+
+			$eligible_items[] = $item_data;
 		}
-
-		// Prepare response data
-		$data = array(
-			'post_id'           => $post_id,
-			'title'             => $title,
-			'content'           => $content,
-			'excerpt'           => $post->post_excerpt,
-			'permalink'         => get_permalink( $post_id ) ?? '',
-			'post_type'         => $post->post_type,
-			'post_status'       => $post->post_status,
-			'publish_date'      => $post->post_date_gmt,
-			'author'            => get_the_author_meta( 'display_name', (int) $post->post_author ),
-			'site_name'         => $site_name,
-			'featured_image_id' => $featured_image_id,
-			'original_id'       => $post_id,
-			'original_title'    => $title,
-			'original_date_gmt' => $post->post_date_gmt,
-		);
-
-		if ( $file_info ) {
-			$data['file_info'] = $file_info;
-		}
-
-		$has_more = count( $unprocessed_posts ) > 1;
 
 		$logs[] = array(
-			'level'   => 'debug',
-			'message' => 'Retrieved unprocessed post',
-			'data'    => array(
-				'post_id'            => $post_id,
-				'title'              => $title,
-				'has_featured_image' => ! empty( $featured_image_id ),
-				'has_more'           => $has_more,
-			),
+			'level'   => 'info',
+			'message' => sprintf( 'Found %d unprocessed posts.', count( $eligible_items ) ),
+			'data'    => array( 'eligible' => count( $eligible_items ) ),
 		);
 
 		return array(
-			'success'  => true,
-			'data'     => $data,
-			'has_more' => $has_more,
-			'logs'     => $logs,
+			'success' => true,
+			'data'    => array( 'items' => $eligible_items ),
+			'logs'    => $logs,
 		);
 	}
 

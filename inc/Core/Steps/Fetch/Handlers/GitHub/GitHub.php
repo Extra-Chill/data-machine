@@ -104,10 +104,11 @@ class GitHub extends FetchHandler {
 
 		$context->log( 'info', sprintf( 'GitHub: Found %d %s.', count( $items ), $data_source ) );
 
-		// Find first unprocessed item (deduplication).
+		// Find all unprocessed items (deduplication + filters).
 		$search           = $config['search'] ?? '';
 		$exclude_keywords = $config['exclude_keywords'] ?? '';
 		$timeframe_limit  = $config['timeframe_limit'] ?? 'all_time';
+		$eligible_items   = array();
 
 		foreach ( $items as $item ) {
 			$guid = sprintf( 'github_%s_%s_%d', $repo, $data_source, $item['number'] );
@@ -140,7 +141,7 @@ class GitHub extends FetchHandler {
 			// Mark as processed.
 			$context->markItemProcessed( $guid );
 
-			// Build the DataPacket-compatible return.
+			// Build the item.
 			$labels_str = ! empty( $item['labels'] ) ? implode( ', ', $item['labels'] ) : '';
 
 			if ( 'pulls' === $data_source ) {
@@ -151,14 +152,7 @@ class GitHub extends FetchHandler {
 				$content = $this->buildIssueContent( $item );
 			}
 
-			$context->storeEngineData( array(
-				'source_url'   => $item['html_url'] ?? '',
-				'github_repo'  => $repo,
-				'github_type'  => $data_source,
-				'issue_number' => $item['number'],
-			) );
-
-			return array(
+			$eligible_items[] = array(
 				'title'    => $title,
 				'content'  => $content,
 				'metadata' => array(
@@ -173,12 +167,18 @@ class GitHub extends FetchHandler {
 					'github_labels'     => $labels_str,
 					'github_user'       => $item['user'] ?? '',
 					'github_url'        => $item['html_url'] ?? '',
+					'source_url'        => $item['html_url'] ?? '',
 				),
 			);
 		}
 
-		$context->log( 'info', 'GitHub: All items already processed or filtered out.' );
-		return array();
+		if ( empty( $eligible_items ) ) {
+			$context->log( 'info', 'GitHub: All items already processed or filtered out.' );
+			return array();
+		}
+
+		$context->log( 'info', sprintf( 'GitHub: Found %d eligible items.', count( $eligible_items ) ) );
+		return array( 'items' => $eligible_items );
 	}
 
 	/**

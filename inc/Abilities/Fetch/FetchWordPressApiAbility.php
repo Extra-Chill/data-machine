@@ -220,8 +220,9 @@ class FetchWordPressApiAbility {
 			);
 		}
 
-		$total_checked = 0;
-		$site_name     = $this->extractSiteNameFromUrl( $endpoint_url );
+		$total_checked  = 0;
+		$site_name      = $this->extractSiteNameFromUrl( $endpoint_url );
+		$eligible_items = array();
 
 		foreach ( $items as $item ) {
 			++$total_checked;
@@ -234,49 +235,31 @@ class FetchWordPressApiAbility {
 			$unique_id = md5( $endpoint_url . '_' . $item_id );
 
 			if ( in_array( $unique_id, $processed_items, true ) ) {
-				$logs[] = array(
-					'level'   => 'debug',
-					'message' => 'WordPressAPI: Skipping item (already processed).',
-					'data'    => array( 'item_id' => $unique_id ),
-				);
 				continue;
 			}
 
-			// Extract item data flexibly
+			// Extract item data flexibly.
 			$title       = $this->extractTitle( $item );
 			$content     = $this->extractContent( $item );
 			$excerpt     = $this->extractExcerpt( $item );
 			$source_link = $this->extractSourceLink( $item );
 			$item_date   = $this->extractDate( $item );
 
-			// Apply timeframe filtering
+			// Apply timeframe filtering.
 			if ( $item_date ) {
 				$item_timestamp = strtotime( $item_date );
 				if ( $item_timestamp && ! $this->applyTimeframeFilter( $item_timestamp, $timeframe_limit ) ) {
-					$logs[] = array(
-						'level'   => 'debug',
-						'message' => 'WordPressAPI: Skipping item outside timeframe.',
-						'data'    => array(
-							'item_id'   => $unique_id,
-							'item_date' => $item_date,
-						),
-					);
 					continue;
 				}
 			}
 
-			// Apply keyword search filter
+			// Apply keyword search filter.
 			$search_text = $title . ' ' . wp_strip_all_tags( $content . ' ' . $excerpt );
 			if ( ! $this->applyKeywordSearch( $search_text, $search ) ) {
-				$logs[] = array(
-					'level'   => 'debug',
-					'message' => 'WordPressAPI: Skipping item (search filter).',
-					'data'    => array( 'item_id' => $unique_id ),
-				);
 				continue;
 			}
 
-			// Extract image URL
+			// Extract image URL.
 			$image_url  = $this->extractImageUrl( $item );
 			$image_info = null;
 
@@ -292,7 +275,7 @@ class FetchWordPressApiAbility {
 				}
 			}
 
-			// Prepare raw data
+			// Prepare raw data.
 			$raw_data = array(
 				'title'    => $title,
 				'content'  => wp_strip_all_tags( $content ),
@@ -303,15 +286,16 @@ class FetchWordPressApiAbility {
 					'original_title'         => $title,
 					'original_date_gmt'      => $item_date,
 					'site_name'              => $site_name,
+					'source_url'             => $source_link,
 				),
 			);
 
-			// Add excerpt if present
+			// Add excerpt if present.
 			if ( ! empty( $excerpt ) ) {
 				$raw_data['content'] .= "\n\nExcerpt: " . wp_strip_all_tags( $excerpt );
 			}
 
-			// Add image info if present
+			// Add image info if present.
 			if ( $image_info ) {
 				$raw_data['file_info'] = array(
 					'url'       => $image_info['url'],
@@ -319,34 +303,35 @@ class FetchWordPressApiAbility {
 				);
 			}
 
+			$eligible_items[] = $raw_data;
+		}
+
+		if ( empty( $eligible_items ) ) {
 			$logs[] = array(
 				'level'   => 'debug',
-				'message' => 'WordPressAPI: Successfully fetched item.',
-				'data'    => array(
-					'item_id'   => $unique_id,
-					'title'     => $title,
-					'has_image' => ! empty( $image_info ),
-				),
+				'message' => 'WordPressAPI: No eligible items found.',
+				'data'    => array( 'total_checked' => $total_checked ),
 			);
 
 			return array(
-				'success'    => true,
-				'data'       => $raw_data,
-				'item_id'    => $unique_id,
-				'source_url' => $source_link,
-				'logs'       => $logs,
+				'success' => true,
+				'data'    => array(),
+				'logs'    => $logs,
 			);
 		}
 
 		$logs[] = array(
-			'level'   => 'debug',
-			'message' => 'WordPressAPI: No eligible items found.',
-			'data'    => array( 'total_checked' => $total_checked ),
+			'level'   => 'info',
+			'message' => sprintf( 'WordPressAPI: Found %d eligible items.', count( $eligible_items ) ),
+			'data'    => array(
+				'total_checked' => $total_checked,
+				'eligible'      => count( $eligible_items ),
+			),
 		);
 
 		return array(
 			'success' => true,
-			'data'    => array(),
+			'data'    => array( 'items' => $eligible_items ),
 			'logs'    => $logs,
 		);
 	}

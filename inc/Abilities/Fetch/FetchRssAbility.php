@@ -204,7 +204,8 @@ class FetchRssAbility {
 			);
 		}
 
-		$total_checked = 0;
+		$total_checked   = 0;
+		$eligible_items  = array();
 
 		foreach ( $items as $item ) {
 			++$total_checked;
@@ -252,11 +253,6 @@ class FetchRssAbility {
 			$categories    = $this->extractItemCategories( $item );
 			$enclosure_url = $this->extractItemEnclosure( $item );
 
-			$content_data = array(
-				'title'   => $title,
-				'content' => $description,
-			);
-
 			$metadata = array(
 				'source_type'            => 'rss',
 				'item_identifier_to_log' => $guid,
@@ -265,6 +261,8 @@ class FetchRssAbility {
 				'original_date_gmt'      => $pub_date ? gmdate( 'Y-m-d\TH:i:s\Z', strtotime( $pub_date ) ) : null,
 				'author'                 => $author,
 				'categories'             => $categories,
+				'guid'                   => $guid,
+				'source_url'             => $link ? $link : '',
 			);
 
 			$file_info = null;
@@ -287,8 +285,8 @@ class FetchRssAbility {
 			}
 
 			$raw_data = array(
-				'title'    => $content_data['title'],
-				'content'  => $content_data['content'],
+				'title'    => $title,
+				'content'  => $description,
 				'metadata' => $metadata,
 			);
 
@@ -306,24 +304,35 @@ class FetchRssAbility {
 				),
 			);
 
+			$eligible_items[] = $raw_data;
+		}
+
+		if ( empty( $eligible_items ) ) {
+			$logs[] = array(
+				'level'   => 'debug',
+				'message' => 'Rss: No eligible items found in RSS feed.',
+				'data'    => array( 'total_checked' => $total_checked ),
+			);
+
 			return array(
-				'success'    => true,
-				'data'       => $raw_data,
-				'guid'       => $guid,
-				'source_url' => $link ? $link : '',
-				'logs'       => $logs,
+				'success' => true,
+				'data'    => array(),
+				'logs'    => $logs,
 			);
 		}
 
 		$logs[] = array(
-			'level'   => 'debug',
-			'message' => 'Rss: No eligible items found in RSS feed.',
-			'data'    => array( 'total_checked' => $total_checked ),
+			'level'   => 'info',
+			'message' => sprintf( 'Rss: Found %d eligible items.', count( $eligible_items ) ),
+			'data'    => array(
+				'total_checked' => $total_checked,
+				'eligible'      => count( $eligible_items ),
+			),
 		);
 
 		return array(
 			'success' => true,
-			'data'    => array(),
+			'data'    => array( 'items' => $eligible_items ),
 			'logs'    => $logs,
 		);
 	}

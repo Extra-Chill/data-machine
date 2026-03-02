@@ -43,12 +43,11 @@ class WordPressMedia extends FetchHandler {
 	/**
 	 * Fetch WordPress media attachments with parent content integration.
 	 * Delegates to FetchWordPressMediaAbility for core functionality.
+	 * Returns all eligible items for batch fan-out.
 	 */
 	protected function executeFetch( array $config, ExecutionContext $context ): array {
 		// Build processed items list from context
-		$processed_items = array();
-		// Get processed items from the context's processed items tracking
-		// The ability expects an array of already processed IDs
+		$processed_items = $this->getProcessedItems( $context );
 
 		// Build ability input
 		$ability_input = array(
@@ -64,49 +63,58 @@ class WordPressMedia extends FetchHandler {
 		$result  = $ability->execute( $ability_input );
 
 		// Log ability logs
-		if ( ! empty( $result['logs'] ) && is_array( $result['logs'] ) ) {
-			foreach ( $result['logs'] as $log_entry ) {
-				$context->log(
+		foreach ( $result['logs'] ?? array() as $log_entry ) {
+			$context->log(
 				$log_entry['level'] ?? 'debug',
 				$log_entry['message'] ?? '',
 				$log_entry['data'] ?? array()
-				);
-			}
+			);
 		}
 
 		if ( ! $result['success'] || empty( $result['data'] ) ) {
 			return array();
 		}
 
-		$data     = $result['data'];
-		$media_id = $data['media_id'] ?? null;
+		$data  = $result['data'];
+		$items = $data['items'] ?? array( $data );
 
-		if ( ! $media_id ) {
+		$processed_items = array();
+
+		foreach ( $items as $item ) {
+			$item_id = $item['metadata']['item_identifier_to_log'] ?? '';
+
+			// Mark item as processed.
+			if ( ! empty( $item_id ) ) {
+				$context->markItemProcessed( (string) $item_id );
+			}
+
+			$processed_items[] = $item;
+		}
+
+		if ( empty( $processed_items ) ) {
 			return array();
 		}
 
-		// Mark as processed
-		$context->markItemProcessed( (string) $media_id );
+		return array( 'items' => $processed_items );
+	}
 
-		// Prepare raw data for DataPacket creation
-		$raw_data = array(
-			'title'     => $data['title'] ?? '',
-			'content'   => $data['content'] ?? '',
-			'metadata'  => $data['metadata'] ?? array(),
-			'file_info' => $data['file_info'] ?? array(),
-		);
+	/**
+	 * Get processed items for deduplication.
+	 *
+	 * @param ExecutionContext $context Execution context.
+	 * @return array Array of processed item IDs.
+	 */
+	private function getProcessedItems( ExecutionContext $context ): array {
+		if ( $context->isDirect() ) {
+			return array();
+		}
 
-		// Store URLs in engine_data via centralized filter
-		$source_url      = $result['source_url'] ?? '';
-		$image_file_path = $result['image_file_path'] ?? '';
+		$flow_step_id = $context->getFlowStepId();
+		if ( empty( $flow_step_id ) ) {
+			return array();
+		}
 
-		$context->storeEngineData(
-		array(
-			'source_url'      => $source_url,
-			'image_file_path' => $image_file_path,
-		)
-		);
-
-		return $raw_data;
+		$processed_items_table = new \DataMachine\Core\Database\ProcessedItems\ProcessedItems();
+		return $processed_items_table->get_processed_item_ids( $flow_step_id );
 	}
 }

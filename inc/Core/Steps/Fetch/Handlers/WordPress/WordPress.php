@@ -131,9 +131,11 @@ class WordPress extends FetchHandler {
 
 	/**
 	 * Fetch posts via query using QueryWordPressPostsAbility.
+	 *
+	 * Returns all eligible posts as { items: [...] }.
 	 */
 	private function fetch_posts_via_query( array $config, ExecutionContext $context ): array {
-		// Build taxonomy query
+		// Build taxonomy query.
 		$tax_query = array();
 		foreach ( $config as $field_key => $field_value ) {
 			if ( strpos( $field_key, 'taxonomy_' ) === 0 && strpos( $field_key, '_filter' ) !== false ) {
@@ -149,7 +151,6 @@ class WordPress extends FetchHandler {
 			}
 		}
 
-		// Build ability input
 		$ability_input = array(
 			'post_type'         => sanitize_text_field( $config['post_type'] ?? 'post' ),
 			'post_status'       => sanitize_text_field( $config['post_status'] ?? 'publish' ),
@@ -164,7 +165,7 @@ class WordPress extends FetchHandler {
 		$ability = new QueryWordPressPostsAbility();
 		$result  = $ability->execute( $ability_input );
 
-		// Log ability logs
+		// Log ability logs.
 		if ( ! empty( $result['logs'] ) && is_array( $result['logs'] ) ) {
 			foreach ( $result['logs'] as $log_entry ) {
 				$context->log(
@@ -179,48 +180,34 @@ class WordPress extends FetchHandler {
 			return array();
 		}
 
-		$data    = $result['data'];
-		$post_id = $data['post_id'];
+		$data  = $result['data'];
+		$items = $data['items'] ?? array( $data );
 
-		// Mark as processed
-		$context->markItemProcessed( (string) $post_id );
+		$processed_items = array();
 
-		// Build response for pipeline
-		$raw_data = array(
-			'title'    => $data['title'],
-			'content'  => $data['content'],
-			'metadata' => array(
-				'source_type'            => 'wordpress_local',
-				'item_identifier_to_log' => $post_id,
-				'original_id'            => $post_id,
-				'original_title'         => $data['original_title'],
-				'original_date_gmt'      => $data['original_date_gmt'],
-				'post_type'              => $data['post_type'],
-				'post_status'            => $data['post_status'],
-				'site_name'              => $data['site_name'],
-			),
-		);
+		foreach ( $items as &$item ) {
+			$post_id = $item['metadata']['original_id'] ?? '';
 
-		// Add excerpt if present
-		if ( ! empty( $data['excerpt'] ) ) {
-			$raw_data['content'] .= "\n\nExcerpt: " . $data['excerpt'];
+			// Mark as processed.
+			if ( $post_id ) {
+				$context->markItemProcessed( (string) $post_id );
+			}
+
+			// Append excerpt to content if present.
+			$excerpt = $item['metadata']['excerpt'] ?? '';
+			if ( ! empty( $excerpt ) ) {
+				$item['content'] .= "\n\nExcerpt: " . $excerpt;
+			}
+
+			$processed_items[] = $item;
+		}
+		unset( $item );
+
+		if ( empty( $processed_items ) ) {
+			return array();
 		}
 
-		// Add file_info if featured image is available
-		if ( ! empty( $data['file_info'] ) ) {
-			$raw_data['file_info'] = $data['file_info'];
-		}
-
-		// Store engine data
-		$image_file_path = $data['file_info']['file_path'] ?? '';
-		$context->storeEngineData(
-			array(
-				'source_url'      => $data['permalink'] ?? '',
-				'image_file_path' => $image_file_path,
-			)
-		);
-
-		return $raw_data;
+		return array( 'items' => $processed_items );
 	}
 
 	public static function get_label(): string {

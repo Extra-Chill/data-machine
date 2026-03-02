@@ -137,15 +137,68 @@ class FetchFilesAbility {
 			$uploaded_files = $repo_files;
 		}
 
-		// Find next unprocessed file
-		$next_file = $this->findNextUnprocessedFile( $uploaded_files, $processed_items );
+		// Collect all unprocessed files
+		$eligible_items = array();
 
-		if ( ! $next_file ) {
+		foreach ( $uploaded_files as $file ) {
+			$file_identifier = $file['persistent_path'] ?? '';
+
+			if ( empty( $file_identifier ) ) {
+				continue;
+			}
+
+			if ( in_array( $file_identifier, $processed_items, true ) ) {
+				continue;
+			}
+
+			// Verify file exists
+			if ( ! file_exists( $file['persistent_path'] ) ) {
+				$logs[] = array(
+					'level'   => 'warning',
+					'message' => 'Files: File not found, skipping.',
+					'data'    => array( 'file_path' => $file['persistent_path'] ),
+				);
+				continue;
+			}
+
+			$mime_type = $file['mime_type'] ?? 'application/octet-stream';
+			$is_image  = strpos( $mime_type, 'image/' ) === 0;
+
+			$file_info = array(
+				'file_path' => $file['persistent_path'],
+				'file_name' => $file['original_name'],
+				'mime_type' => $mime_type,
+				'file_size' => $file['size'] ?? 0,
+			);
+
+			$metadata = array(
+				'source_type'            => 'files',
+				'item_identifier_to_log' => $file_identifier,
+				'original_id'            => $file_identifier,
+				'original_title'         => $file['original_name'],
+				'original_date_gmt'      => $file['uploaded_at'] ?? gmdate( 'Y-m-d H:i:s' ),
+				'source_url'             => '',
+			);
+
+			if ( $is_image ) {
+				$metadata['image_file_path'] = $file['persistent_path'];
+			}
+
+			$eligible_items[] = array(
+				'title'     => $file['original_name'],
+				'content'   => 'File: ' . $file['original_name'] . "\nType: " . $mime_type . "\nSize: " . ( $file['size'] ?? 0 ) . ' bytes',
+				'metadata'  => $metadata,
+				'file_info' => $file_info,
+			);
+		}
+
+		if ( empty( $eligible_items ) ) {
 			$logs[] = array(
 				'level'   => 'debug',
 				'message' => 'Files: No unprocessed files available.',
 				'data'    => array( 'total_files' => count( $uploaded_files ) ),
 			);
+
 			return array(
 				'success' => true,
 				'data'    => array(),
@@ -153,73 +206,16 @@ class FetchFilesAbility {
 			);
 		}
 
-		// Verify file exists
-		if ( ! file_exists( $next_file['persistent_path'] ) ) {
-			$logs[] = array(
-				'level'   => 'error',
-				'message' => 'Files: File not found.',
-				'data'    => array( 'file_path' => $next_file['persistent_path'] ),
-			);
-			return array(
-				'success' => false,
-				'error'   => 'File not found: ' . $next_file['persistent_path'],
-				'logs'    => $logs,
-			);
-		}
-
-		$file_identifier = $next_file['persistent_path'];
-		$mime_type       = $next_file['mime_type'] ?? 'application/octet-stream';
-		$is_image        = strpos( $mime_type, 'image/' ) === 0;
-
-		$content_data = array(
-			'title'   => $next_file['original_name'],
-			'content' => 'File: ' . $next_file['original_name'] . "\nType: " . $mime_type . "\nSize: " . ( $next_file['size'] ?? 0 ) . ' bytes',
-		);
-
-		$file_info = array(
-			'file_path' => $next_file['persistent_path'],
-			'file_name' => $next_file['original_name'],
-			'mime_type' => $mime_type,
-			'file_size' => $next_file['size'] ?? 0,
-		);
-
-		$metadata = array(
-			'source_type'            => 'files',
-			'item_identifier_to_log' => $file_identifier,
-			'original_id'            => $file_identifier,
-			'original_title'         => $next_file['original_name'],
-			'original_date_gmt'      => $next_file['uploaded_at'] ?? gmdate( 'Y-m-d H:i:s' ),
-		);
-
-		$raw_data = array(
-			'title'     => $content_data['title'],
-			'content'   => $content_data['content'],
-			'metadata'  => $metadata,
-			'file_info' => $file_info,
-		);
-
-		// Add image file path to engine data for images
-		$engine_data = array( 'source_url' => '' );
-		if ( $is_image ) {
-			$engine_data['image_file_path'] = $next_file['persistent_path'];
-		}
-		$raw_data['engine_data'] = $engine_data;
-
 		$logs[] = array(
-			'level'   => 'debug',
-			'message' => 'Files: Found unprocessed file for processing.',
-			'data'    => array(
-				'file_path' => $file_identifier,
-				'is_image'  => $is_image,
-			),
+			'level'   => 'info',
+			'message' => sprintf( 'Files: Found %d unprocessed files.', count( $eligible_items ) ),
+			'data'    => array( 'eligible' => count( $eligible_items ) ),
 		);
 
 		return array(
-			'success'         => true,
-			'data'            => $raw_data,
-			'item_identifier' => $file_identifier,
-			'is_image'        => $is_image,
-			'logs'            => $logs,
+			'success' => true,
+			'data'    => array( 'items' => $eligible_items ),
+			'logs'    => $logs,
 		);
 	}
 
@@ -278,32 +274,5 @@ class FetchFilesAbility {
 		return $files;
 	}
 
-	/**
-	 * Find the next unprocessed file.
-	 *
-	 * @param array $uploaded_files List of files.
-	 * @param array $processed_items List of already processed identifiers.
-	 * @return array|null The next unprocessed file or null if none found.
-	 */
-	private function findNextUnprocessedFile( array $uploaded_files, array $processed_items ): ?array {
-		if ( empty( $uploaded_files ) ) {
-			return null;
-		}
 
-		foreach ( $uploaded_files as $file ) {
-			$file_identifier = $file['persistent_path'] ?? '';
-
-			if ( empty( $file_identifier ) ) {
-				continue;
-			}
-
-			if ( in_array( $file_identifier, $processed_items, true ) ) {
-				continue;
-			}
-
-			return $file;
-		}
-
-		return null;
-	}
 }
