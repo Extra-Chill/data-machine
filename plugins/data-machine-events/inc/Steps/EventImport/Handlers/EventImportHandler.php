@@ -174,6 +174,8 @@ abstract class EventImportHandler extends FetchHandler {
 	 * Call this after standardizing event data. Stores venue metadata
 	 * and core fields (dates, ticketUrl, price) so the AI cannot override them.
 	 *
+	 * @deprecated Use buildEventEngineData() and pass as metadata['_engine_data'] for batch fan-out.
+	 *
 	 * @param ExecutionContext $context Execution context
 	 * @param array $event_data Standardized event data
 	 * @since 0.8.32
@@ -187,6 +189,22 @@ abstract class EventImportHandler extends FetchHandler {
 		$venue_metadata = $this->extractVenueMetadata( $event_data );
 		EventEngineData::storeVenueContext( $job_id, $event_data, $venue_metadata );
 		EventEngineData::storeEventCoreFields( $job_id, $event_data );
+	}
+
+	/**
+	 * Build per-item engine data for batch fan-out.
+	 *
+	 * Returns the combined venue context and core event fields as an array.
+	 * Pass this as metadata['_engine_data'] in the handler's return value
+	 * so PipelineBatchScheduler seeds it into each child job's engine data.
+	 *
+	 * @param array $event_data Standardized event data (with venue fields).
+	 * @param array $venue_metadata Extracted venue metadata.
+	 * @return array Engine data payload.
+	 * @since 0.14.0
+	 */
+	protected function buildEventEngineData( array $event_data, array $venue_metadata ): array {
+		return EventEngineData::buildEngineData( $event_data, $venue_metadata );
 	}
 
 	/**

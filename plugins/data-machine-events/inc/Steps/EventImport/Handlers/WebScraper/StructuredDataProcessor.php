@@ -97,10 +97,22 @@ class StructuredDataProcessor {
 			}
 
 			$venue_metadata = $this->handler->extractVenueMetadata( $event );
-			$job_id         = $context->getJobId();
-			EventEngineData::storeVenueContext( $job_id, $event, $venue_metadata );
+			$engine_data    = EventEngineData::buildEngineData( $event, $venue_metadata );
 
-			$this->storeEventEngineData( $context, $event );
+			// Add scraper-specific fields to engine data.
+			$scraper_fields = array_filter(
+				array(
+					'title'     => $event['title'] ?? '',
+					'image_url' => $event['imageUrl'] ?? '',
+				),
+				static function ( $value ) {
+					return '' !== $value && null !== $value;
+				}
+			);
+			if ( ! empty( $scraper_fields ) ) {
+				$engine_data = array_merge( $engine_data, $scraper_fields );
+			}
+
 			$this->handler->stripVenueMetadataFromEvent( $event );
 
 			$eligible_items[] = array(
@@ -123,6 +135,7 @@ class StructuredDataProcessor {
 					'original_title'    => $event['title'],
 					'event_identifier'  => $event_identifier,
 					'import_timestamp'  => time(),
+					'_engine_data'      => $engine_data,
 				),
 			);
 		}
@@ -200,34 +213,5 @@ class StructuredDataProcessor {
 		}
 	}
 
-	/**
-	 * Store additional event fields in engine data.
-	 *
-	 * Uses centralized EventEngineData::storeEventCoreFields() for core fields,
-	 * then stores web scraper-specific fields (title, image_url).
-	 *
-	 * @param ExecutionContext $context Execution context
-	 * @param array            $event   Standardized event data
-	 */
-	private function storeEventEngineData( ExecutionContext $context, array $event ): void {
-		$job_id = $context->getJobId();
 
-		if ( $job_id ) {
-			EventEngineData::storeEventCoreFields( $job_id, $event );
-		}
-
-		$scraper_fields = array_filter(
-			array(
-				'title'     => $event['title'] ?? '',
-				'image_url' => $event['imageUrl'] ?? '',
-			),
-			static function ( $value ) {
-				return '' !== $value && null !== $value;
-			}
-		);
-
-		if ( ! empty( $scraper_fields ) ) {
-			$context->storeEngineData( $scraper_fields );
-		}
-	}
 }

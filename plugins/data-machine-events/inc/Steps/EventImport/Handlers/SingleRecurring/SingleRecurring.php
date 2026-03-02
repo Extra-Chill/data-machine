@@ -125,7 +125,7 @@ class SingleRecurring extends EventImportHandler {
 		);
 
 		$venue_metadata = $this->extractVenueMetadata( $standardized_event );
-		$this->storeEventContext( $context, $standardized_event );
+		$engine_data    = $this->buildEventEngineData( $standardized_event, $venue_metadata );
 		$this->stripVenueMetadataFromEvent( $standardized_event );
 
 		return array(
@@ -145,6 +145,7 @@ class SingleRecurring extends EventImportHandler {
 				'original_title'   => $event_title,
 				'event_identifier' => $event_identifier,
 				'import_timestamp' => time(),
+				'_engine_data'     => $engine_data,
 			),
 		);
 	}

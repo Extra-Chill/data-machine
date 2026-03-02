@@ -14,7 +14,6 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\EventFlyer;
 use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\Handlers\VenueFieldsTrait;
-use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
@@ -78,9 +77,6 @@ class EventFlyer extends EventImportHandler {
 			return array();
 		}
 
-		$job_id = $context->getJobId();
-		$this->storeImageInEngine( $job_id, $image_file['persistent_path'] );
-
 		if ( empty( $event_data['title'] ) || empty( $event_data['startDate'] ) ) {
 			$context->log(
 				'warning',
@@ -98,8 +94,12 @@ class EventFlyer extends EventImportHandler {
 		);
 
 		$venue_metadata = $this->extractVenueMetadata( $event_data );
+		$engine_data    = $this->buildEventEngineData( $event_data, $venue_metadata );
 
-		EventEngineData::storeVenueContext( $job_id, $event_data, $venue_metadata );
+		// Add image context to engine data for vision processing.
+		$engine_data['image_file_path'] = $image_file['persistent_path'];
+		$upload_dir = wp_upload_dir();
+		$engine_data['image_url'] = str_replace( $upload_dir['basedir'], $upload_dir['baseurl'], $image_file['persistent_path'] );
 
 		$this->stripVenueMetadataFromEvent( $event_data );
 
@@ -123,6 +123,7 @@ class EventFlyer extends EventImportHandler {
 				'event_identifier' => $event_identifier,
 				'import_timestamp' => time(),
 				'image_file_path'  => $image_file['persistent_path'],
+				'_engine_data'     => $engine_data,
 			),
 		);
 	}
@@ -222,28 +223,6 @@ class EventFlyer extends EventImportHandler {
 		$event_data       = array_merge( $event_data, $venue_event_data );
 
 		return $event_data;
-	}
-
-	private function storeImageInEngine( ?string $job_id, string $image_path ): void {
-		if ( empty( $job_id ) || empty( $image_path ) ) {
-			return;
-		}
-
-		$job_id = (int) $job_id;
-		if ( $job_id <= 0 || ! function_exists( 'datamachine_merge_engine_data' ) ) {
-			return;
-		}
-
-		$upload_dir = wp_upload_dir();
-		$image_url  = str_replace( $upload_dir['basedir'], $upload_dir['baseurl'], $image_path );
-
-		datamachine_merge_engine_data(
-			$job_id,
-			array(
-				'image_file_path' => $image_path,
-				'image_url'       => $image_url,
-			)
-		);
 	}
 
 	public static function get_vision_prompt(): string {

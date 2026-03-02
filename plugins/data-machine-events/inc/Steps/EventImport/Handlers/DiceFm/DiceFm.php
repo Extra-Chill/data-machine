@@ -133,7 +133,7 @@ class DiceFm extends EventImportHandler {
 			);
 
 			$venue_metadata = $this->extractVenueMetadata( $standardized_event );
-			$this->storeEventContext( $context, $standardized_event );
+			$engine_data    = $this->buildEventEngineData( $standardized_event, $venue_metadata );
 			$this->stripVenueMetadataFromEvent( $standardized_event );
 
 			$eligible_items[] = array(
@@ -150,9 +150,10 @@ class DiceFm extends EventImportHandler {
 					'source_type'      => 'dice_fm',
 					'pipeline_id'      => $context->getPipelineId(),
 					'flow_id'          => $context->getFlowId(),
-					'original_title'   => $standardized_event['title'] ?? '',
+					'original_title'   => $standardized_event['title'],
 					'event_identifier' => $event_identifier,
 					'import_timestamp' => time(),
+					'_engine_data'     => $engine_data,
 				),
 			);
 		}
