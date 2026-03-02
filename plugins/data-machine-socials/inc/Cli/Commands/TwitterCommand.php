@@ -379,7 +379,7 @@ class TwitterCommand {
 			WP_CLI::error( 'Tweet exceeds 280 characters (' . mb_strlen( $content ) . ' chars).' );
 		}
 
-		$publish_ability = $this->get_publish_ability();
+		$this->get_publish_ability();
 
 		$input = array( 'content' => $content );
 
@@ -402,7 +402,7 @@ class TwitterCommand {
 			$input['link_handling'] = $assoc_args['link-handling'];
 		}
 
-		$result = $publish_ability->execute( $input );
+		$result = \DataMachineSocials\Abilities\Twitter\TwitterPublishAbility::execute_publish( $input );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] );

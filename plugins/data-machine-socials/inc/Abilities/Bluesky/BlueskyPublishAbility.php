@@ -173,26 +173,39 @@ class BlueskyPublishAbility {
 			$image_blob = self::upload_image( $access_token, $image_url );
 		}
 
-		// Build post record
+		// Build post text — do NOT append raw URLs, use embeds/facets instead.
 		$post_text = $title ? $title . "\n\n" . $content : $content;
-		if ( ! empty( $source_url ) ) {
-			$post_text .= "\n\n" . $source_url;
-		}
 
 		$record = array(
-			'\$type' => 'app.bsky.feed.post',
+			'$type' => 'app.bsky.feed.post',
 			'text' => $post_text,
 			'createdAt' => gmdate( 'c' ),
 		);
 
+		// Detect URLs in text and create facets for clickable links.
+		$facets = self::extract_url_facets( $post_text );
+		if ( ! empty( $facets ) ) {
+			$record['facets'] = $facets;
+		}
+
+		// Embed: image takes priority, otherwise use external link card for source URL.
 		if ( $image_blob ) {
 			$record['embed'] = array(
-				'\$type' => 'app.bsky.embed.images',
+				'$type' => 'app.bsky.embed.images',
 				'images' => array(
 					array(
 						'alt' => $title ?: 'Image',
 						'image' => $image_blob,
 					),
+				),
+			);
+		} elseif ( ! empty( $source_url ) && filter_var( $source_url, FILTER_VALIDATE_URL ) ) {
+			$record['embed'] = array(
+				'$type' => 'app.bsky.embed.external',
+				'external' => array(
+					'uri'         => $source_url,
+					'title'       => $title ?: $source_url,
+					'description' => mb_substr( $content, 0, 300 ),
 				),
 			);
 		}
@@ -317,5 +330,48 @@ class BlueskyPublishAbility {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Extract URL facets from post text for Bluesky rich text.
+	 *
+	 * Bluesky requires explicit facet annotations for URLs to be clickable.
+	 * Byte offsets are used (not character offsets) per AT Protocol spec.
+	 *
+	 * @param string $text Post text to scan for URLs.
+	 * @return array Array of facet objects, empty if no URLs found.
+	 */
+	private static function extract_url_facets( string $text ): array {
+		$facets = array();
+
+		// Match URLs in the text.
+		$pattern = '/(https?:\/\/[^\s\)\]\}]+)/i';
+		if ( ! preg_match_all( $pattern, $text, $matches, PREG_OFFSET_CAPTURE ) ) {
+			return $facets;
+		}
+
+		foreach ( $matches[0] as $match ) {
+			$url        = $match[0];
+			$char_start = $match[1];
+
+			// Convert character offset to byte offset (AT Protocol uses UTF-8 bytes).
+			$byte_start = strlen( substr( $text, 0, $char_start ) );
+			$byte_end   = $byte_start + strlen( $url );
+
+			$facets[] = array(
+				'index'    => array(
+					'byteStart' => $byte_start,
+					'byteEnd'   => $byte_end,
+				),
+				'features' => array(
+					array(
+						'$type' => 'app.bsky.richtext.facet#link',
+						'uri'    => $url,
+					),
+				),
+			);
+		}
+
+		return $facets;
 	}
 }

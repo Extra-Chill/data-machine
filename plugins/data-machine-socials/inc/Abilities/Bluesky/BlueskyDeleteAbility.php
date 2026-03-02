@@ -101,28 +101,32 @@ class BlueskyDeleteAbility {
 			);
 		}
 
-		$pds_url = $session['pds_url'];
-		$did     = $session['did'];
+		$did = $session['did'];
 
-		$parts = parse_url( $input['post_uri'] );
-		$path  = ltrim( $parts['path'], '/' );
-		$rkey  = basename( $path );
+		// Parse rkey from AT URI: at://did:plc:xxx/app.bsky.feed.post/rkey
+		$post_uri = $input['post_uri'];
+		$uri_parts = explode( '/', $post_uri );
+		$rkey = end( $uri_parts );
 
-		$url = $pds_url . '/xrpc/app.bsky.feed.post';
+		if ( empty( $rkey ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Could not extract rkey from post URI: ' . $post_uri,
+			);
+		}
 
-		$response = wp_remote_request(
-			$url,
+		$response = wp_remote_post(
+			'https://bsky.social/xrpc/com.atproto.repo.deleteRecord',
 			array(
-				'method'  => 'DELETE',
 				'timeout' => 30,
 				'headers' => array(
 					'Authorization' => 'Bearer ' . $session['accessJwt'],
 					'Content-Type'  => 'application/json',
 				),
-				'body'    => json_encode( array(
-					'repo'      => $did,
+				'body'    => wp_json_encode( array(
+					'repo'       => $did,
 					'collection' => 'app.bsky.feed.post',
-					'rkey'      => $rkey,
+					'rkey'       => $rkey,
 				) ),
 			)
 		);

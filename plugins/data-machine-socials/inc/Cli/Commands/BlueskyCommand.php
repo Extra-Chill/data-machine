@@ -271,7 +271,7 @@ class BlueskyCommand {
 			WP_CLI::error( 'Post content is required.' );
 		}
 
-		$publish_ability = $this->get_publish_ability();
+		$this->get_publish_ability();
 
 		$input = array( 'content' => $content );
 
@@ -290,7 +290,7 @@ class BlueskyCommand {
 			$input['source_url'] = $assoc_args['source-url'];
 		}
 
-		$result = $publish_ability->execute( $input );
+		$result = \DataMachineSocials\Abilities\Bluesky\BlueskyPublishAbility::execute_publish( $input );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] );
