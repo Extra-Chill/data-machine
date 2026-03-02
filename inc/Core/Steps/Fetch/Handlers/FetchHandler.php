@@ -18,6 +18,7 @@
 namespace DataMachine\Core\Steps\Fetch\Handlers;
 
 use DataMachine\Abilities\AuthAbilities;
+use DataMachine\Core\DataPacket;
 use DataMachine\Core\ExecutionContext;
 use DataMachine\Core\FilesRepository\FileStorage;
 use DataMachine\Core\HttpClient;
@@ -39,20 +40,96 @@ abstract class FetchHandler {
 	}
 
 	/**
-	 * Template method - final entry point for all fetch handlers
+	 * Template method — final entry point for all fetch handlers.
 	 *
-	 * Creates ExecutionContext and delegates to child class implementation.
+	 * Creates ExecutionContext, delegates to child class, and wraps raw
+	 * handler output into DataPacket objects. Handlers never need to know
+	 * about DataPacket — they return plain arrays.
 	 *
-	 * @param int|string  $pipeline_id     Pipeline ID or 'direct' for direct execution
-	 * @param array       $handler_config  Handler configuration array
-	 * @param string|null $job_id          Optional job ID
-	 * @return array Processed items array
+	 * Accepts any handler output shape and normalizes it into items:
+	 *
+	 * - `{ items: [ {title, content, metadata}, ... ] }` — explicit item list.
+	 * - `{ title, content, metadata, file_info }` — single item (treated as list of one).
+	 * - `[]` or non-array — empty result.
+	 *
+	 * @param int|string  $pipeline_id    Pipeline ID or 'direct' for direct execution.
+	 * @param array       $handler_config Handler configuration array.
+	 * @param string|null $job_id         Optional job ID.
+	 * @return DataPacket[] Array of DataPackets (empty on failure/no data).
 	 */
 	final public function get_fetch_data( int|string $pipeline_id, array $handler_config, ?string $job_id = null ): array {
 		$config  = $this->extractConfig( $handler_config );
 		$context = ExecutionContext::fromConfig( $handler_config, $job_id, $this->handler_type );
 
-		return $this->executeFetch( $config, $context );
+		$result = $this->executeFetch( $config, $context );
+
+		if ( empty( $result ) || ! is_array( $result ) ) {
+			return array();
+		}
+
+		$flow_id = $handler_config['flow_id'] ?? null;
+
+		// Normalize: if handler returned { items: [...] }, use that list.
+		// Otherwise treat the entire result as a single item.
+		$items = ( isset( $result['items'] ) && is_array( $result['items'] ) )
+			? $result['items']
+			: array( $result );
+
+		return $this->toDataPackets( $items, $pipeline_id, $flow_id );
+	}
+
+	/**
+	 * Convert raw item arrays into DataPackets.
+	 *
+	 * One method handles any number of items — zero, one, or many.
+	 * Each item is expected to have title, content, metadata, and/or file_info.
+	 * Items with no content are silently dropped.
+	 *
+	 * @param array      $items       Array of raw item arrays.
+	 * @param int|string $pipeline_id Pipeline ID.
+	 * @param mixed      $flow_id     Flow ID.
+	 * @return DataPacket[] Array of DataPackets.
+	 */
+	private function toDataPackets( array $items, int|string $pipeline_id, mixed $flow_id ): array {
+		$packets = array();
+
+		foreach ( $items as $item ) {
+			if ( ! is_array( $item ) ) {
+				continue;
+			}
+
+			$title     = $item['title'] ?? '';
+			$content   = $item['content'] ?? '';
+			$file_info = $item['file_info'] ?? null;
+			$metadata  = $item['metadata'] ?? array();
+
+			if ( empty( $title ) && empty( $content ) && empty( $file_info ) ) {
+				continue;
+			}
+
+			$content_array = array(
+				'title' => $title,
+				'body'  => $content,
+			);
+
+			if ( $file_info ) {
+				$content_array['file_info'] = $file_info;
+			}
+
+			$packet_metadata = array_merge(
+				array(
+					'source_type' => $this->handler_type,
+					'pipeline_id' => $pipeline_id,
+					'flow_id'     => $flow_id,
+					'handler'     => $this->handler_type,
+				),
+				$metadata
+			);
+
+			$packets[] = new DataPacket( $content_array, $packet_metadata, 'fetch' );
+		}
+
+		return $packets;
 	}
 
 	/**

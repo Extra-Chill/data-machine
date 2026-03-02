@@ -14,6 +14,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Data fetching step for Data Machine pipelines.
  *
+ * Delegates to FetchHandler::get_fetch_data() which returns DataPacket[].
+ * Each DataPacket is added to the step's data packet array. When the
+ * PipelineBatchScheduler is active, multiple packets trigger fan-out
+ * into child jobs.
+ *
  * @package DataMachine
  */
 class FetchStep extends Step {
@@ -40,7 +45,7 @@ class FetchStep extends Step {
 	/**
 	 * Execute fetch step logic.
 	 *
-	 * @return array
+	 * @return array Updated data packet array.
 	 */
 	protected function executeStep(): array {
 		$handler          = $this->getHandlerSlug();
@@ -63,20 +68,42 @@ class FetchStep extends Step {
 		$handler_settings['pipeline_id']  = $this->flow_step_config['pipeline_id'];
 		$handler_settings['flow_id']      = $this->flow_step_config['flow_id'];
 
-		$packet = $this->execute_handler( $handler, $this->flow_step_config, $handler_settings, (string) $this->job_id );
+		$packets = $this->execute_handler( $handler, $handler_settings, (string) $this->job_id );
 
-		if ( ! $packet ) {
+		if ( empty( $packets ) ) {
 			$this->log( 'error', 'Fetch handler returned no content' );
 			return $this->dataPackets;
 		}
 
-		return $packet->addTo( $this->dataPackets );
+		$this->log(
+			'info',
+			'Fetch handler returned data',
+			array(
+				'handler'      => $handler,
+				'packet_count' => count( $packets ),
+			)
+		);
+
+		$result = $this->dataPackets;
+		foreach ( $packets as $packet ) {
+			$result = $packet->addTo( $result );
+		}
+
+		return $result;
 	}
 
 	/**
-	 * Executes handler and builds standardized fetch entry with content extraction.
+	 * Execute handler and return DataPackets.
+	 *
+	 * FetchHandler::get_fetch_data() now returns DataPacket[] directly.
+	 * This method just resolves the handler object and delegates.
+	 *
+	 * @param string $handler_name    Handler slug.
+	 * @param array  $handler_settings Handler settings (includes pipeline_id, flow_id).
+	 * @param string $job_id          Job ID.
+	 * @return DataPacket[] Array of DataPackets, or empty array on failure.
 	 */
-	private function execute_handler( string $handler_name, array $flow_step_config, array $handler_settings, string $job_id ): ?DataPacket {
+	private function execute_handler( string $handler_name, array $handler_settings, string $job_id ): array {
 		$handler = $this->get_handler_object( $handler_name );
 		if ( ! $handler ) {
 			$this->log(
@@ -86,93 +113,18 @@ class FetchStep extends Step {
 					'handler' => $handler_name,
 				)
 			);
-			return null;
+			return array();
 		}
 
 		try {
-			if ( ! isset( $flow_step_config['pipeline_id'] ) || empty( $flow_step_config['pipeline_id'] ) ) {
-				$this->log( 'error', 'Pipeline ID not found in step config' );
-				return null;
-			}
-			if ( ! isset( $flow_step_config['flow_id'] ) || empty( $flow_step_config['flow_id'] ) ) {
-				$this->log( 'error', 'Flow ID not found in step config' );
-				return null;
+			$pipeline_id = $handler_settings['pipeline_id'] ?? null;
+
+			if ( empty( $pipeline_id ) ) {
+				$this->log( 'error', 'Pipeline ID not found in handler settings' );
+				return array();
 			}
 
-			$pipeline_id = $flow_step_config['pipeline_id'];
-			$flow_id     = $flow_step_config['flow_id'];
-
-			$result = $handler->get_fetch_data( $pipeline_id, $handler_settings, $job_id );
-
-			if ( empty( $result ) ) {
-				return null;
-			}
-
-			try {
-				if ( ! is_array( $result ) ) {
-					throw new \InvalidArgumentException( 'Handler output must be an array or null' );
-				}
-
-				$title     = $result['title'] ?? '';
-				$content   = $result['content'] ?? '';
-				$file_info = $result['file_info'] ?? null;
-				$metadata  = $result['metadata'] ?? array();
-
-				$this->log(
-					'debug',
-					'Content extraction',
-					array(
-						'handler'       => $handler_name,
-						'has_title'     => ! empty( $title ),
-						'has_content'   => ! empty( $content ),
-						'has_file_info' => ! empty( $file_info ),
-						'metadata_keys' => array_keys( $metadata ),
-					)
-				);
-
-				if ( empty( $title ) && empty( $content ) && empty( $file_info ) ) {
-					$this->log(
-						'error',
-						'Handler returned no content after extraction',
-						array(
-							'handler' => $handler_name,
-						)
-					);
-					return null;
-				}
-
-				$content_array = array(
-					'title' => $title,
-					'body'  => $content,
-				);
-
-				if ( $file_info ) {
-					$content_array['file_info'] = $file_info;
-				}
-
-				$packet_metadata = array_merge(
-					array(
-						'source_type' => $handler_name,
-						'pipeline_id' => $pipeline_id,
-						'flow_id'     => $flow_id,
-						'handler'     => $handler_name,
-					),
-					$metadata
-				);
-
-				return new DataPacket( $content_array, $packet_metadata, 'fetch' );
-			} catch ( \Exception $e ) {
-				$this->log(
-					'error',
-					'Failed to create data packet from handler output',
-					array(
-						'handler'     => $handler_name,
-						'result_type' => gettype( $result ),
-						'error'       => $e->getMessage(),
-					)
-				);
-				return null;
-			}
+			return $handler->get_fetch_data( $pipeline_id, $handler_settings, $job_id );
 		} catch ( \Exception $e ) {
 			$this->log(
 				'error',
@@ -182,7 +134,7 @@ class FetchStep extends Step {
 					'exception' => $e->getMessage(),
 				)
 			);
-			return null;
+			return array();
 		}
 	}
 
