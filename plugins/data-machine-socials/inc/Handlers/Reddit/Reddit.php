@@ -179,9 +179,17 @@ class Reddit extends FetchHandler {
 				unset( $data['image_info'] );
 			}
 
-			// Add source_url to metadata for engine data
-			$data['metadata']['source_url']      = $item['source_url'] ?? '';
-			$data['metadata']['image_file_path']  = $data['file_info']['file_path'] ?? '';
+			// Per-item engine data for batch fan-out.
+			// PipelineBatchScheduler seeds _engine_data into each child job.
+			$data['metadata']['_engine_data'] = array_filter(
+				array(
+					'source_url'      => $item['source_url'] ?? '',
+					'image_file_path' => $data['file_info']['file_path'] ?? '',
+				),
+				static function ( $value ) {
+					return '' !== $value && null !== $value;
+				}
+			);
 
 			$eligible_items[] = $data;
 		}
