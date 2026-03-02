@@ -14,6 +14,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Data fetching step for Data Machine pipelines.
  *
+ * Supports both single-item and multi-item handler returns. When a handler
+ * returns an `items` key containing an array of raw items, each one is
+ * wrapped into its own DataPacket. The pipeline batch scheduler then fans
+ * each DataPacket out into its own child job.
+ *
  * @package DataMachine
  */
 class FetchStep extends Step {
@@ -40,7 +45,7 @@ class FetchStep extends Step {
 	/**
 	 * Execute fetch step logic.
 	 *
-	 * @return array
+	 * @return array Updated data packet array.
 	 */
 	protected function executeStep(): array {
 		$handler          = $this->getHandlerSlug();
@@ -63,20 +68,36 @@ class FetchStep extends Step {
 		$handler_settings['pipeline_id']  = $this->flow_step_config['pipeline_id'];
 		$handler_settings['flow_id']      = $this->flow_step_config['flow_id'];
 
-		$packet = $this->execute_handler( $handler, $this->flow_step_config, $handler_settings, (string) $this->job_id );
+		$packets = $this->execute_handler( $handler, $this->flow_step_config, $handler_settings, (string) $this->job_id );
 
-		if ( ! $packet ) {
+		if ( empty( $packets ) ) {
 			$this->log( 'error', 'Fetch handler returned no content' );
 			return $this->dataPackets;
 		}
 
-		return $packet->addTo( $this->dataPackets );
+		$result = $this->dataPackets;
+		foreach ( $packets as $packet ) {
+			$result = $packet->addTo( $result );
+		}
+
+		return $result;
 	}
 
 	/**
-	 * Executes handler and builds standardized fetch entry with content extraction.
+	 * Execute handler and build DataPackets from its output.
+	 *
+	 * Supports two return formats from handlers:
+	 *
+	 * 1. Single item (legacy): `{ title, content, metadata, file_info }` — wrapped into 1 DataPacket.
+	 * 2. Multi-item: `{ items: [ {title, content, metadata}, ... ] }` — each item becomes its own DataPacket.
+	 *
+	 * @param string $handler_name    Handler slug.
+	 * @param array  $flow_step_config Flow step configuration.
+	 * @param array  $handler_settings Handler-specific settings.
+	 * @param string $job_id          Job ID.
+	 * @return DataPacket[] Array of DataPackets, or empty array on failure.
 	 */
-	private function execute_handler( string $handler_name, array $flow_step_config, array $handler_settings, string $job_id ): ?DataPacket {
+	private function execute_handler( string $handler_name, array $flow_step_config, array $handler_settings, string $job_id ): array {
 		$handler = $this->get_handler_object( $handler_name );
 		if ( ! $handler ) {
 			$this->log(
@@ -86,17 +107,17 @@ class FetchStep extends Step {
 					'handler' => $handler_name,
 				)
 			);
-			return null;
+			return array();
 		}
 
 		try {
 			if ( ! isset( $flow_step_config['pipeline_id'] ) || empty( $flow_step_config['pipeline_id'] ) ) {
 				$this->log( 'error', 'Pipeline ID not found in step config' );
-				return null;
+				return array();
 			}
 			if ( ! isset( $flow_step_config['flow_id'] ) || empty( $flow_step_config['flow_id'] ) ) {
 				$this->log( 'error', 'Flow ID not found in step config' );
-				return null;
+				return array();
 			}
 
 			$pipeline_id = $flow_step_config['pipeline_id'];
@@ -105,74 +126,27 @@ class FetchStep extends Step {
 			$result = $handler->get_fetch_data( $pipeline_id, $handler_settings, $job_id );
 
 			if ( empty( $result ) ) {
-				return null;
+				return array();
 			}
 
-			try {
-				if ( ! is_array( $result ) ) {
-					throw new \InvalidArgumentException( 'Handler output must be an array or null' );
-				}
-
-				$title     = $result['title'] ?? '';
-				$content   = $result['content'] ?? '';
-				$file_info = $result['file_info'] ?? null;
-				$metadata  = $result['metadata'] ?? array();
-
-				$this->log(
-					'debug',
-					'Content extraction',
-					array(
-						'handler'       => $handler_name,
-						'has_title'     => ! empty( $title ),
-						'has_content'   => ! empty( $content ),
-						'has_file_info' => ! empty( $file_info ),
-						'metadata_keys' => array_keys( $metadata ),
-					)
-				);
-
-				if ( empty( $title ) && empty( $content ) && empty( $file_info ) ) {
-					$this->log(
-						'error',
-						'Handler returned no content after extraction',
-						array(
-							'handler' => $handler_name,
-						)
-					);
-					return null;
-				}
-
-				$content_array = array(
-					'title' => $title,
-					'body'  => $content,
-				);
-
-				if ( $file_info ) {
-					$content_array['file_info'] = $file_info;
-				}
-
-				$packet_metadata = array_merge(
-					array(
-						'source_type' => $handler_name,
-						'pipeline_id' => $pipeline_id,
-						'flow_id'     => $flow_id,
-						'handler'     => $handler_name,
-					),
-					$metadata
-				);
-
-				return new DataPacket( $content_array, $packet_metadata, 'fetch' );
-			} catch ( \Exception $e ) {
+			if ( ! is_array( $result ) ) {
 				$this->log(
 					'error',
-					'Failed to create data packet from handler output',
-					array(
-						'handler'     => $handler_name,
-						'result_type' => gettype( $result ),
-						'error'       => $e->getMessage(),
-					)
+					'Handler output must be an array',
+					array( 'handler' => $handler_name, 'result_type' => gettype( $result ) )
 				);
-				return null;
+				return array();
 			}
+
+			// Detect multi-item format: result has an 'items' key with a numerically-indexed array.
+			if ( isset( $result['items'] ) && is_array( $result['items'] ) && ! empty( $result['items'] ) ) {
+				return $this->wrap_items( $result['items'], $handler_name, $pipeline_id, $flow_id );
+			}
+
+			// Single-item format (legacy): { title, content, metadata, file_info }.
+			$packet = $this->wrap_single_item( $result, $handler_name, $pipeline_id, $flow_id );
+			return $packet ? array( $packet ) : array();
+
 		} catch ( \Exception $e ) {
 			$this->log(
 				'error',
@@ -182,8 +156,82 @@ class FetchStep extends Step {
 					'exception' => $e->getMessage(),
 				)
 			);
+			return array();
+		}
+	}
+
+	/**
+	 * Wrap multiple raw items into DataPackets.
+	 *
+	 * @param array  $items        Array of raw item arrays.
+	 * @param string $handler_name Handler slug.
+	 * @param mixed  $pipeline_id  Pipeline ID.
+	 * @param mixed  $flow_id      Flow ID.
+	 * @return DataPacket[] Array of DataPackets.
+	 */
+	private function wrap_items( array $items, string $handler_name, $pipeline_id, $flow_id ): array {
+		$packets = array();
+
+		foreach ( $items as $item ) {
+			$packet = $this->wrap_single_item( $item, $handler_name, $pipeline_id, $flow_id );
+			if ( $packet ) {
+				$packets[] = $packet;
+			}
+		}
+
+		if ( ! empty( $packets ) ) {
+			$this->log(
+				'info',
+				'Fetch handler returned multiple items',
+				array(
+					'handler'    => $handler_name,
+					'item_count' => count( $packets ),
+				)
+			);
+		}
+
+		return $packets;
+	}
+
+	/**
+	 * Wrap a single raw item array into a DataPacket.
+	 *
+	 * @param array  $item         Raw item array with title, content, metadata, file_info.
+	 * @param string $handler_name Handler slug.
+	 * @param mixed  $pipeline_id  Pipeline ID.
+	 * @param mixed  $flow_id      Flow ID.
+	 * @return DataPacket|null DataPacket or null if item has no content.
+	 */
+	private function wrap_single_item( array $item, string $handler_name, $pipeline_id, $flow_id ): ?DataPacket {
+		$title     = $item['title'] ?? '';
+		$content   = $item['content'] ?? '';
+		$file_info = $item['file_info'] ?? null;
+		$metadata  = $item['metadata'] ?? array();
+
+		if ( empty( $title ) && empty( $content ) && empty( $file_info ) ) {
 			return null;
 		}
+
+		$content_array = array(
+			'title' => $title,
+			'body'  => $content,
+		);
+
+		if ( $file_info ) {
+			$content_array['file_info'] = $file_info;
+		}
+
+		$packet_metadata = array_merge(
+			array(
+				'source_type' => $handler_name,
+				'pipeline_id' => $pipeline_id,
+				'flow_id'     => $flow_id,
+				'handler'     => $handler_name,
+			),
+			$metadata
+		);
+
+		return new DataPacket( $content_array, $packet_metadata, 'fetch' );
 	}
 
 	/**
