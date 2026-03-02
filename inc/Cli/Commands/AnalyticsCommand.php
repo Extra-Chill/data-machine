@@ -43,8 +43,8 @@ class AnalyticsCommand extends BaseCommand {
 	 * [--query-filter=<string>]
 	 * : Filter results to queries containing this string.
 	 *
-	 * [--url=<url>]
-	 * : URL for inspect_url action.
+	 * [--inspect-url=<url>]
+	 * : URL for inspect_url action (named --inspect-url to avoid WP-CLI's global --url).
 	 *
 	 * [--sitemap-url=<url>]
 	 * : Sitemap URL for get_sitemap/submit_sitemap actions.
@@ -71,7 +71,7 @@ class AnalyticsCommand extends BaseCommand {
 	 *     wp datamachine analytics gsc date_stats --format=json
 	 *
 	 *     # Inspect a URL
-	 *     wp datamachine analytics gsc inspect_url --url=https://chubes.net/about/
+	 *     wp datamachine analytics gsc inspect_url --inspect-url=https://chubes.net/about/
 	 *
 	 * @subcommand gsc
 	 */
@@ -86,7 +86,7 @@ class AnalyticsCommand extends BaseCommand {
 			'limit'        => 'limit',
 			'url-filter'   => 'url_filter',
 			'query-filter' => 'query_filter',
-			'url'          => 'url',
+			'inspect-url'  => 'url',
 			'sitemap-url'  => 'sitemap_url',
 		) );
 
@@ -218,8 +218,8 @@ class AnalyticsCommand extends BaseCommand {
 	 * <action>
 	 * : Action to perform: analyze (full audit), performance (Core Web Vitals), opportunities (optimization suggestions).
 	 *
-	 * [--url=<url>]
-	 * : URL to analyze. Defaults to the site home URL.
+	 * [--page-url=<url>]
+	 * : URL to analyze. Defaults to the site home URL (named --page-url to avoid WP-CLI's global --url).
 	 *
 	 * [--strategy=<strategy>]
 	 * : Device strategy: mobile or desktop (default: mobile).
@@ -243,7 +243,7 @@ class AnalyticsCommand extends BaseCommand {
 	 *     wp datamachine analytics pagespeed performance --strategy=desktop
 	 *
 	 *     # Optimization opportunities for a specific page
-	 *     wp datamachine analytics pagespeed opportunities --url=https://chubes.net/blog/
+	 *     wp datamachine analytics pagespeed opportunities --page-url=https://chubes.net/blog/
 	 *
 	 *     # Full audit as JSON
 	 *     wp datamachine analytics pagespeed analyze --format=json
@@ -256,7 +256,7 @@ class AnalyticsCommand extends BaseCommand {
 		);
 
 		$this->map_optional( $input, $assoc_args, array(
-			'url'      => 'url',
+			'page-url' => 'url',
 			'strategy' => 'strategy',
 		) );
 
