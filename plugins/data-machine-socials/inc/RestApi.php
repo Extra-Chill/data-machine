@@ -80,17 +80,6 @@ class RestApi {
 			)
 		);
 
-		// Schedule cross-platform post
-		register_rest_route(
-			self::NAMESPACE,
-			'/schedule',
-			array(
-				'methods'             => 'POST',
-				'callback'            => array( __CLASS__, 'schedule_post' ),
-				'permission_callback' => array( __CLASS__, 'check_publish_permission' ),
-			)
-		);
-
 		// Upload cropped image
 		register_rest_route(
 			self::NAMESPACE,
@@ -601,15 +590,6 @@ class RestApi {
 			'success'  => false,
 			'error'    => $result['error'] ?? 'Unknown error',
 		);
-	}
-
-	/**
-	 * Schedule cross-platform post
-	 */
-	public static function schedule_post( \WP_REST_Request $request ) {
-		// For now, just delegate to cross_post
-		// Future: Use Action Scheduler for deferred execution
-		return self::cross_post( $request );
 	}
 
 	/**

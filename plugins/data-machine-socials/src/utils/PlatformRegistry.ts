@@ -17,7 +17,6 @@ export const PLATFORMS: Record<string, PlatformConfig> = {
 		charLimit: 2200,
 		supportsCarousel: true,
 		supportsVideo: false,
-		supportsScheduling: true,
 		requiresAuth: true,
 		bestPractices: {
 			optimalLength: 138,
@@ -42,7 +41,6 @@ export const PLATFORMS: Record<string, PlatformConfig> = {
 		charLimit: 280,
 		supportsCarousel: false,
 		supportsVideo: false,
-		supportsScheduling: true,
 		requiresAuth: true,
 		bestPractices: {
 			optimalLength: 71,
@@ -67,7 +65,6 @@ export const PLATFORMS: Record<string, PlatformConfig> = {
 		charLimit: 63206,
 		supportsCarousel: true,
 		supportsVideo: false,
-		supportsScheduling: true,
 		requiresAuth: true,
 		bestPractices: {
 			optimalLength: 80,
@@ -92,7 +89,6 @@ export const PLATFORMS: Record<string, PlatformConfig> = {
 		charLimit: 300,
 		supportsCarousel: false,
 		supportsVideo: false,
-		supportsScheduling: true,
 		requiresAuth: true,
 		bestPractices: {
 			optimalLength: 300,
@@ -117,7 +113,6 @@ export const PLATFORMS: Record<string, PlatformConfig> = {
 		charLimit: 500,
 		supportsCarousel: true,
 		supportsVideo: false,
-		supportsScheduling: true,
 		requiresAuth: true,
 		bestPractices: {
 			optimalLength: 500,
@@ -142,7 +137,6 @@ export const PLATFORMS: Record<string, PlatformConfig> = {
 		charLimit: 500,
 		supportsCarousel: false,
 		supportsVideo: false,
-		supportsScheduling: true,
 		requiresAuth: true,
 		requiresBoard: true,
 		bestPractices: {

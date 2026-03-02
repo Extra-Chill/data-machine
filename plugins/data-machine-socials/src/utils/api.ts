@@ -23,14 +23,6 @@ export async function crossPost(payload: CrossPostPayload): Promise<CrossPostRes
 	});
 }
 
-export async function schedulePost(payload: CrossPostPayload & { schedule: Date }): Promise<CrossPostResponse> {
-	return apiFetch({
-		path: `${REST_BASE}/schedule`,
-		method: 'POST',
-		data: payload,
-	});
-}
-
 export async function uploadCroppedImage(
 	blob: Blob,
 	filename: string

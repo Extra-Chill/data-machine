@@ -407,6 +407,113 @@ class InstagramCommand {
 	}
 
 	/**
+	 * Publish to Instagram.
+	 *
+	 * Posts content to Instagram with optional images. Wraps the
+	 * datamachine/instagram-publish ability.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <caption>
+	 * : The caption text for the post.
+	 *
+	 * [--image=<url>]
+	 * : Image URL to include. Can be specified multiple times for carousel (up to 10).
+	 *
+	 * [--aspect-ratio=<ratio>]
+	 * : Aspect ratio for images.
+	 * ---
+	 * default: 4:5
+	 * options:
+	 *   - 1:1
+	 *   - 4:5
+	 *   - 3:4
+	 *   - 1.91:1
+	 * ---
+	 *
+	 * [--source-url=<url>]
+	 * : Source URL to attribute.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Post with caption only
+	 *     wp datamachine-socials instagram publish "Check out our new show!"
+	 *
+	 *     # Post with image
+	 *     wp datamachine-socials instagram publish "Tonight's lineup 🎶" --image=https://example.com/flyer.jpg
+	 *
+	 *     # Carousel post with multiple images
+	 *     wp datamachine-socials instagram publish "Best moments" --image=https://example.com/1.jpg --image=https://example.com/2.jpg
+	 *
+	 *     # Post with custom aspect ratio
+	 *     wp datamachine-socials instagram publish "Wide shot" --image=https://example.com/wide.jpg --aspect-ratio=1.91:1
+	 */
+	public function publish( $args, $assoc_args ) {
+		$caption = $args[0] ?? '';
+
+		if ( empty( $caption ) ) {
+			WP_CLI::error( 'Caption is required.' );
+		}
+
+		$publish_ability = $this->get_publish_ability();
+
+		$input = array(
+			'content' => $caption,
+		);
+
+		// Collect image URLs (--image can be repeated)
+		if ( ! empty( $assoc_args['image'] ) ) {
+			$images = is_array( $assoc_args['image'] ) ? $assoc_args['image'] : array( $assoc_args['image'] );
+			$input['image_urls'] = $images;
+
+			if ( count( $images ) > 10 ) {
+				WP_CLI::error( 'Instagram supports a maximum of 10 images per carousel.' );
+			}
+
+			$count_label = count( $images ) > 1 ? count( $images ) . ' images (carousel)' : '1 image';
+			WP_CLI::log( "Publishing to Instagram with {$count_label}..." );
+		} else {
+			WP_CLI::log( 'Publishing to Instagram (text only)...' );
+		}
+
+		if ( ! empty( $assoc_args['aspect-ratio'] ) ) {
+			$input['aspect_ratio'] = $assoc_args['aspect-ratio'];
+		}
+
+		if ( ! empty( $assoc_args['source-url'] ) ) {
+			$input['source_url'] = $assoc_args['source-url'];
+		}
+
+		$result = $publish_ability->execute( $input );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Published to Instagram!' );
+		WP_CLI::log( 'Media ID:  ' . ( $result['media_id'] ?? '' ) );
+		WP_CLI::log( 'Permalink: ' . ( $result['permalink'] ?? '' ) );
+	}
+
+	/**
+	 * Get the Instagram publish ability.
+	 *
+	 * @return \DataMachineSocials\Abilities\Instagram\InstagramPublishAbility
+	 */
+	private function get_publish_ability() {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/instagram-publish' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/instagram-publish ability not registered.' );
+		}
+
+		return new \DataMachineSocials\Abilities\Instagram\InstagramPublishAbility();
+	}
+
+	/**
 	 * Get the Instagram read ability.
 	 *
 	 * @return \DataMachineSocials\Abilities\Instagram\InstagramReadAbility

@@ -12,7 +12,6 @@ export interface PlatformConfig {
 	charLimit: number;
 	supportsCarousel: boolean;
 	supportsVideo: boolean;
-	supportsScheduling: boolean;
 	requiresAuth: boolean;
 	requiresBoard?: boolean;
 	bestPractices: {
@@ -67,7 +66,6 @@ export interface CrossPostPayload {
 	images: SelectedImage[];
 	caption: string;
 	aspectRatio: string;
-	schedule?: Date;
 }
 
 export interface CrossPostResponse {
