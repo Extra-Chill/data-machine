@@ -75,6 +75,12 @@ abstract class FetchHandler {
 			? $result['items']
 			: array( $result );
 
+		// Apply max_items cap when configured.
+		$max_items = (int) ( $config['max_items'] ?? 0 );
+		if ( $max_items > 0 && count( $items ) > $max_items ) {
+			$items = array_slice( $items, 0, $max_items );
+		}
+
 		return $this->toDataPackets( $items, $pipeline_id, $flow_id );
 	}
 
