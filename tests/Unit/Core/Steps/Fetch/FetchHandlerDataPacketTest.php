@@ -187,6 +187,26 @@ class FetchHandlerDataPacketTest extends TestCase {
 	}
 
 	// ---------------------------------------------------------------
+	// Dedup consolidation — structural tests
+	// ---------------------------------------------------------------
+
+	public function test_dedup_method_exists_and_is_private(): void {
+		$method = new ReflectionMethod( FetchHandler::class, 'dedup' );
+		$this->assertTrue( $method->isPrivate() );
+	}
+
+	public function test_on_item_processed_hook_exists_and_is_protected(): void {
+		$method = new ReflectionMethod( FetchHandler::class, 'onItemProcessed' );
+		$this->assertTrue( $method->isProtected() );
+	}
+
+	public function test_on_item_processed_is_overridable(): void {
+		// Verify it's not final so subclasses can override.
+		$method = new ReflectionMethod( FetchHandler::class, 'onItemProcessed' );
+		$this->assertFalse( $method->isFinal() );
+	}
+
+	// ---------------------------------------------------------------
 	// Contract / structural tests
 	// ---------------------------------------------------------------
 

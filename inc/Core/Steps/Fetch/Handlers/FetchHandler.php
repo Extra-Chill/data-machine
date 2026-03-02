@@ -75,6 +75,11 @@ abstract class FetchHandler {
 			? $result['items']
 			: array( $result );
 
+		// Dedup: filter out already-processed items and mark new ones.
+		// Items with metadata['dedup_key'] participate in dedup.
+		// Items without dedup_key pass through unchanged.
+		$items = $this->dedup( $items, $context );
+
 		// Apply max_items cap when configured.
 		$max_items = (int) ( $config['max_items'] ?? 0 );
 		if ( $max_items > 0 && count( $items ) > $max_items ) {
@@ -82,6 +87,67 @@ abstract class FetchHandler {
 		}
 
 		return $this->toDataPackets( $items, $pipeline_id, $flow_id );
+	}
+
+	/**
+	 * Filter out already-processed items and mark new ones as processed.
+	 *
+	 * Items with metadata['dedup_key'] are checked against the processed items
+	 * database. Already-processed items are removed. New items are marked as
+	 * processed and passed to onItemProcessed() for any handler-specific side
+	 * effects.
+	 *
+	 * Items without dedup_key are not deduped and pass through unchanged.
+	 *
+	 * @param array            $items   Normalized items array.
+	 * @param ExecutionContext $context Execution context.
+	 * @return array Filtered items array.
+	 */
+	private function dedup( array $items, ExecutionContext $context ): array {
+		$result = array();
+
+		foreach ( $items as $item ) {
+			if ( ! is_array( $item ) ) {
+				continue;
+			}
+
+			$dedup_key = $item['metadata']['dedup_key'] ?? null;
+
+			// No dedup_key — pass through.
+			if ( null === $dedup_key || '' === $dedup_key ) {
+				$result[] = $item;
+				continue;
+			}
+
+			// Already processed — skip.
+			if ( $context->isItemProcessed( (string) $dedup_key ) ) {
+				continue;
+			}
+
+			// Mark as processed.
+			$context->markItemProcessed( (string) $dedup_key );
+
+			// Hook for handler-specific side effects (e.g., storeItemContext).
+			$this->onItemProcessed( $context, $item );
+
+			$result[] = $item;
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Called after an item is marked as processed during dedup.
+	 *
+	 * Override in subclasses to add handler-specific side effects.
+	 * For example, EventImportHandler stores item context in engine data
+	 * for the skip_item AI tool.
+	 *
+	 * @param ExecutionContext $context Execution context.
+	 * @param array            $item    The item that was just marked as processed.
+	 */
+	protected function onItemProcessed( ExecutionContext $context, array $item ): void {
+		// No-op in base class. Subclasses override as needed.
 	}
 
 	/**
