@@ -47,6 +47,7 @@ require_once __DIR__ . '/ImportExport.php';
 require_once __DIR__ . '/Engine.php';
 
 use DataMachine\Abilities\EngineAbilities;
+use DataMachine\Abilities\Engine\PipelineBatchScheduler;
 use DataMachine\Engine\Actions\Handlers\MarkItemProcessedHandler;
 use DataMachine\Engine\Actions\Handlers\FailJobHandler;
 use DataMachine\Engine\Actions\Handlers\JobCompleteHandler;
@@ -85,6 +86,18 @@ function datamachine_register_core_actions() {
 	);
 
 	\DataMachine\Engine\Actions\ImportExport::register();
+
+	// Pipeline batch fan-out: process chunks and track child completion.
+	add_action(
+		PipelineBatchScheduler::BATCH_HOOK,
+		function ( $parent_job_id ) {
+			$scheduler = new PipelineBatchScheduler();
+			$scheduler->processChunk( (int) $parent_job_id );
+		},
+		10,
+		1
+	);
+	add_action( 'datamachine_job_complete', array( PipelineBatchScheduler::class, 'onChildComplete' ), 20, 2 );
 
 	// Register engine abilities (business logic) before hook bridges.
 	new EngineAbilities();

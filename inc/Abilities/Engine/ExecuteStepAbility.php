@@ -429,11 +429,22 @@ class ExecuteStepAbility {
 			$next_flow_step_id = $navigator->get_next_flow_step_id( $flow_step_id, $payload );
 
 			if ( $next_flow_step_id ) {
-				do_action( 'datamachine_schedule_next_step', $job_id, $next_flow_step_id, $dataPackets );
+				// Fan out: each DataPacket becomes its own child job
+				// continuing through the remaining pipeline steps.
+				$engine_snapshot = datamachine_get_engine_data( $job_id );
+				$batch_scheduler = new PipelineBatchScheduler();
+				$batch_result    = $batch_scheduler->fanOut(
+					$job_id,
+					$next_flow_step_id,
+					$dataPackets,
+					$engine_snapshot
+				);
+
 				return array(
 					'success'      => true,
 					'step_success' => true,
-					'outcome'      => 'next_step_scheduled',
+					'outcome'      => 'batch_scheduled',
+					'batch'        => $batch_result,
 				);
 			}
 
@@ -464,7 +475,7 @@ class ExecuteStepAbility {
 		}
 
 		// Failure: check for "no new items" vs actual failure.
-		$is_fetch_step = ( 'fetch' === $step_type );
+		$is_fetch_step = in_array( $step_type, array( 'fetch', 'event_import' ), true );
 		$has_history   = $this->db_processed_items->has_processed_items( $flow_step_id );
 
 		if ( $is_fetch_step && $has_history ) {
