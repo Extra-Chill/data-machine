@@ -314,7 +314,7 @@ class CalendarAbilities {
 				);
 			}
 
-			$serialized[ $date_key ] = array(
+			$serialized[] = array(
 				'date'   => $date_key,
 				'events' => $events,
 			);

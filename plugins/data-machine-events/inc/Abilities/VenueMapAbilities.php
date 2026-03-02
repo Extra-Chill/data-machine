@@ -104,13 +104,13 @@ class VenueMapAbilities {
 							),
 						),
 						'total'  => array( 'type' => 'integer' ),
-						'center' => array(
-							'type'       => 'object',
-							'properties' => array(
-								'lat' => array( 'type' => 'number' ),
-								'lng' => array( 'type' => 'number' ),
-							),
+					'center' => array(
+						'type'       => array( 'object', 'null' ),
+						'properties' => array(
+							'lat' => array( 'type' => 'number' ),
+							'lng' => array( 'type' => 'number' ),
 						),
+					),
 						'radius' => array( 'type' => 'integer' ),
 					),
 				),
