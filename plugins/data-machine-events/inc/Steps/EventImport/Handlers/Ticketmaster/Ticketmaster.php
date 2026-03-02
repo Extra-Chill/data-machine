@@ -135,12 +135,6 @@ class Ticketmaster extends EventImportHandler {
 					$standardized_event['venue'] ?? ''
 				);
 
-				if ( $this->checkItemProcessed( $context, $event_identifier ) ) {
-					continue;
-				}
-
-				$this->markItemAsProcessed( $context, $event_identifier );
-
 				$context->log(
 					'info',
 					'Ticketmaster: Found eligible event',
@@ -172,6 +166,7 @@ class Ticketmaster extends EventImportHandler {
 						'flow_id'          => $context->getFlowId(),
 						'original_title'   => $standardized_event['title'],
 						'event_identifier' => $event_identifier,
+						'dedup_key'        => $event_identifier,
 						'import_timestamp' => time(),
 						'_engine_data'     => $engine_data,
 					),

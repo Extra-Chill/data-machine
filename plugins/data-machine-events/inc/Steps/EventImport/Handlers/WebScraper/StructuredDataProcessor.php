@@ -74,12 +74,6 @@ class StructuredDataProcessor {
 				$event['venue'] ?? ''
 			);
 
-			if ( $this->handler->checkItemProcessed( $context, $event_identifier ) ) {
-				continue;
-			}
-
-			$this->handler->markItemAsProcessed( $context, $event_identifier );
-
 			$this->applyVenueConfigOverride( $event, $config );
 
 			$venue_from_config = ! empty( $config['venue'] ) || ! empty( $config['venue_name'] );
@@ -134,6 +128,7 @@ class StructuredDataProcessor {
 					'flow_id'           => $context->getFlowId(),
 					'original_title'    => $event['title'],
 					'event_identifier'  => $event_identifier,
+					'dedup_key'         => $event_identifier,
 					'import_timestamp'  => time(),
 					'_engine_data'      => $engine_data,
 				),

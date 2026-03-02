@@ -96,22 +96,7 @@ class SingleRecurring extends EventImportHandler {
 		$venue_name       = $config['venue_name'] ?? '';
 		$event_identifier = EventIdentifierGenerator::generate( $event_title, $next_date, $venue_name );
 
-		if ( $this->checkItemProcessed( $context, $event_identifier ) ) {
-			$context->log(
-				'info',
-				'SingleRecurring: Event occurrence already processed',
-				array(
-					'event_title' => $event_title,
-					'date'        => $next_date,
-					'venue'       => $venue_name,
-				)
-			);
-			return array();
-		}
-
 		$standardized_event = $this->buildEventData( $config, $next_date );
-
-		$this->markItemAsProcessed( $context, $event_identifier );
 
 		$context->log(
 			'info',
@@ -144,6 +129,7 @@ class SingleRecurring extends EventImportHandler {
 				'flow_id'          => $context->getFlowId(),
 				'original_title'   => $event_title,
 				'event_identifier' => $event_identifier,
+				'dedup_key'        => $event_identifier,
 				'import_timestamp' => time(),
 				'_engine_data'     => $engine_data,
 			),

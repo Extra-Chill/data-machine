@@ -67,7 +67,6 @@ class EventFlyer extends EventImportHandler {
 		);
 
 		$file_identifier = $image_file['persistent_path'];
-		$this->markItemAsProcessed( $context, $file_identifier );
 
 		$ai_fields = $this->buildAIExtractionFields( $config );
 
@@ -121,6 +120,7 @@ class EventFlyer extends EventImportHandler {
 				'flow_id'          => $context->getFlowId(),
 				'original_title'   => $event_data['title'] ? $event_data['title'] : $image_file['original_name'],
 				'event_identifier' => $event_identifier,
+				'dedup_key'        => $file_identifier,
 				'import_timestamp' => time(),
 				'image_file_path'  => $image_file['persistent_path'],
 				'_engine_data'     => $engine_data,
@@ -149,7 +149,9 @@ class EventFlyer extends EventImportHandler {
 
 			$file_identifier = $file['path'];
 
-			if ( $this->checkItemProcessed( $context, $file_identifier ) ) {
+			// Pre-filter: skip already-processed images to find the next one.
+			// This is a selection mechanism, not dedup — dedup happens in FetchHandler::dedup().
+			if ( $context->isItemProcessed( $file_identifier ) ) {
 				continue;
 			}
 

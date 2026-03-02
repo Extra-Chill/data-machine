@@ -447,8 +447,6 @@ class UniversalWebScraper extends EventImportHandler {
 				continue;
 			}
 
-			$this->markItemAsProcessed( $context, $event_section['identifier'] );
-
 			$context->log(
 				'info',
 				'Universal Web Scraper: Found eligible HTML section',
@@ -476,6 +474,7 @@ class UniversalWebScraper extends EventImportHandler {
 					'flow_id'          => $context->getFlowId(),
 					'original_title'   => 'HTML Section from ' . parse_url( $current_url, PHP_URL_HOST ),
 					'event_identifier' => $event_section['identifier'],
+					'dedup_key'        => $event_section['identifier'],
 					'import_timestamp' => time(),
 				),
 			);
@@ -550,8 +549,26 @@ class UniversalWebScraper extends EventImportHandler {
 			return null;
 		}
 
-		// VisionExtractionProcessor stores image_file_path in engine data.
+		// VisionExtractionProcessor returns per-item engine data via _engine_data.
 		$vision_data = $result[0];
+
+		$metadata = array(
+			'source_type'       => 'vision_flyer',
+			'extraction_method' => $extraction_method,
+			'pipeline_id'       => $context->getPipelineId(),
+			'flow_id'           => $context->getFlowId(),
+			'import_timestamp'  => time(),
+		);
+
+		// Pass through dedup_key from VisionExtractionProcessor.
+		if ( ! empty( $vision_data['image_identifier'] ) ) {
+			$metadata['dedup_key'] = $vision_data['image_identifier'];
+		}
+
+		// Pass through per-item engine data for batch fan-out.
+		if ( ! empty( $vision_data['_engine_data'] ) ) {
+			$metadata['_engine_data'] = $vision_data['_engine_data'];
+		}
 
 		return array(
 			'title'    => 'Vision Flyer Analysis',
@@ -568,13 +585,7 @@ class UniversalWebScraper extends EventImportHandler {
 				),
 				JSON_PRETTY_PRINT
 			),
-			'metadata' => array(
-				'source_type'       => 'vision_flyer',
-				'extraction_method' => $extraction_method,
-				'pipeline_id'       => $context->getPipelineId(),
-				'flow_id'           => $context->getFlowId(),
-				'import_timestamp'  => time(),
-			),
+			'metadata' => $metadata,
 		);
 	}
 
