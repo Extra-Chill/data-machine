@@ -93,7 +93,9 @@ class Reddit extends FetchHandler {
 	/**
 	 * Fetch Reddit posts with timeframe and keyword filtering.
 	 *
-	 * Delegates to FetchRedditAbility for core logic.
+	 * Delegates to FetchRedditAbility for core logic. Returns all eligible
+	 * posts as raw arrays for batch fan-out.
+	 *
 	 * Uses get_valid_access_token() for automatic token lifecycle management.
 	 */
 	protected function executeFetch( array $config, ExecutionContext $context ): array {
@@ -112,7 +114,6 @@ class Reddit extends FetchHandler {
 
 		// Build processed items array from context
 		$processed_items = array();
-		// Note: The ability will check processed items internally
 
 		// Delegate to ability
 		$ability_input = array(
@@ -148,42 +149,53 @@ class Reddit extends FetchHandler {
 			return array();
 		}
 
-		// If no data returned, return empty
-		if ( empty( $result['data'] ) ) {
+		// No eligible items
+		if ( empty( $result['items'] ) ) {
 			return array();
 		}
 
-		$data    = $result['data'];
-		$item_id = $result['item_id'] ?? ( $data['metadata']['original_id'] ?? '' );
+		$eligible_items = array();
 
-		// Mark item as processed
-		if ( $item_id ) {
-			$context->markItemProcessed( $item_id );
-		}
+		foreach ( $result['items'] as $item ) {
+			$data    = $item['data'];
+			$item_id = $item['item_id'] ?? ( $data['metadata']['original_id'] ?? '' );
 
-		// Download image if present
-		if ( ! empty( $data['image_info'] ) && ! empty( $data['image_info']['url'] ) ) {
-			$stored_image = $this->store_reddit_image( $data['image_info']['url'], $context, $item_id );
-			if ( $stored_image ) {
-				$data['file_info'] = array(
-					'file_path' => $stored_image['path'],
-					'file_name' => $stored_image['filename'],
-					'mime_type' => $data['image_info']['mime_type'] ?? 'application/octet-stream',
-					'file_size' => $stored_image['size'],
-				);
+			// Mark item as processed
+			if ( $item_id ) {
+				$context->markItemProcessed( $item_id );
 			}
-			unset( $data['image_info'] );
+
+			// Download image if present
+			if ( ! empty( $data['image_info'] ) && ! empty( $data['image_info']['url'] ) ) {
+				$stored_image = $this->store_reddit_image( $data['image_info']['url'], $context, $item_id );
+				if ( $stored_image ) {
+					$data['file_info'] = array(
+						'file_path' => $stored_image['path'],
+						'file_name' => $stored_image['filename'],
+						'mime_type' => $data['image_info']['mime_type'] ?? 'application/octet-stream',
+						'file_size' => $stored_image['size'],
+					);
+				}
+				unset( $data['image_info'] );
+			}
+
+			// Add source_url to metadata for engine data
+			$data['metadata']['source_url']      = $item['source_url'] ?? '';
+			$data['metadata']['image_file_path']  = $data['file_info']['file_path'] ?? '';
+
+			$eligible_items[] = $data;
 		}
 
-		// Store engine data
-		$context->storeEngineData(
-			array(
-				'source_url'      => $result['source_url'] ?? '',
-				'image_file_path' => $data['file_info']['file_path'] ?? '',
-			)
+		if ( empty( $eligible_items ) ) {
+			return array();
+		}
+
+		$context->log(
+			'info',
+			sprintf( 'Reddit: Returning %d eligible posts for batch fan-out', count( $eligible_items ) )
 		);
 
-		return $data;
+		return array( 'items' => $eligible_items );
 	}
 
 	public static function get_label(): string {

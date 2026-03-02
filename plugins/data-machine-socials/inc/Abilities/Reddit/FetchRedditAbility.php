@@ -143,6 +143,9 @@ class FetchRedditAbility {
 	/**
 	 * Execute Reddit fetch ability.
 	 *
+	 * Returns all eligible posts across all pages. The pipeline engine
+	 * fans each one out into its own child job automatically.
+	 *
 	 * @param array $input Input parameters.
 	 * @return array Result with fetched data or error.
 	 */
@@ -193,9 +196,10 @@ class FetchRedditAbility {
 			);
 		}
 
-		$after_param   = null;
-		$total_checked = 0;
-		$pages_fetched = 0;
+		$after_param    = null;
+		$total_checked  = 0;
+		$pages_fetched  = 0;
+		$eligible_items = array();
 
 		while ( $pages_fetched < $max_pages ) {
 			++$pages_fetched;
@@ -454,7 +458,7 @@ class FetchRedditAbility {
 
 				$logs[] = array(
 					'level'   => 'debug',
-					'message' => 'Reddit: Fetched data successfully',
+					'message' => 'Reddit: Found eligible post',
 					'data'    => array(
 						'source_type'      => 'reddit',
 						'item_id'          => $current_item_id,
@@ -464,12 +468,10 @@ class FetchRedditAbility {
 					),
 				);
 
-				return array(
-					'success'    => true,
+				$eligible_items[] = array(
 					'data'       => $raw_data,
 					'source_url' => $source_url,
 					'item_id'    => $current_item_id,
-					'logs'       => $logs,
 				);
 			}
 
@@ -483,9 +485,26 @@ class FetchRedditAbility {
 			}
 		}
 
+		if ( empty( $eligible_items ) ) {
+			$logs[] = array(
+				'level'   => 'debug',
+				'message' => 'Reddit: No eligible items found.',
+				'data'    => array(
+					'total_checked' => $total_checked,
+					'pages_fetched' => $pages_fetched,
+				),
+			);
+
+			return array(
+				'success' => true,
+				'data'    => array(),
+				'logs'    => $logs,
+			);
+		}
+
 		$logs[] = array(
-			'level'   => 'debug',
-			'message' => 'Reddit: No eligible items found.',
+			'level'   => 'info',
+			'message' => sprintf( 'Reddit: Found %d eligible posts', count( $eligible_items ) ),
 			'data'    => array(
 				'total_checked' => $total_checked,
 				'pages_fetched' => $pages_fetched,
@@ -494,7 +513,7 @@ class FetchRedditAbility {
 
 		return array(
 			'success' => true,
-			'data'    => array(),
+			'items'   => $eligible_items,
 			'logs'    => $logs,
 		);
 	}
