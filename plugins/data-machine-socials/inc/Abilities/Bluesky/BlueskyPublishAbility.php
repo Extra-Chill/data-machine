@@ -188,7 +188,7 @@ class BlueskyPublishAbility {
 			$record['facets'] = $facets;
 		}
 
-		// Embed: image takes priority, otherwise use external link card for source URL.
+		// Embed: explicit image OR link card with OG metadata for source URL.
 		if ( $image_blob ) {
 			$record['embed'] = array(
 				'$type' => 'app.bsky.embed.images',
@@ -200,13 +200,26 @@ class BlueskyPublishAbility {
 				),
 			);
 		} elseif ( ! empty( $source_url ) && filter_var( $source_url, FILTER_VALIDATE_URL ) ) {
+			// Fetch OG tags from the source URL for a rich link card.
+			$og = self::fetch_og_tags( $source_url );
+
+			$card = array(
+				'uri'         => $source_url,
+				'title'       => $og['title'] ?: ( $title ?: $source_url ),
+				'description' => $og['description'] ?: mb_substr( $content, 0, 300 ),
+			);
+
+			// Upload OG image as thumbnail blob if available.
+			if ( ! empty( $og['image'] ) ) {
+				$thumb_blob = self::upload_image( $access_token, $og['image'] );
+				if ( $thumb_blob ) {
+					$card['thumb'] = $thumb_blob;
+				}
+			}
+
 			$record['embed'] = array(
-				'$type' => 'app.bsky.embed.external',
-				'external' => array(
-					'uri'         => $source_url,
-					'title'       => $title ?: $source_url,
-					'description' => mb_substr( $content, 0, 300 ),
-				),
+				'$type'    => 'app.bsky.embed.external',
+				'external' => $card,
 			);
 		}
 
@@ -373,5 +386,66 @@ class BlueskyPublishAbility {
 		}
 
 		return $facets;
+	}
+
+	/**
+	 * Fetch Open Graph tags from a URL.
+	 *
+	 * Retrieves og:title, og:description, and og:image from the target page
+	 * so link card embeds render with proper metadata and thumbnails.
+	 *
+	 * @param string $url URL to fetch OG tags from.
+	 * @return array Associative array with 'title', 'description', 'image' keys (empty strings if not found).
+	 */
+	private static function fetch_og_tags( string $url ): array {
+		$defaults = array(
+			'title'       => '',
+			'description' => '',
+			'image'       => '',
+		);
+
+		$response = wp_remote_get( $url, array(
+			'timeout'    => 10,
+			'user-agent' => 'DataMachineSocials/1.0 (link card preview)',
+		) );
+
+		if ( is_wp_error( $response ) ) {
+			return $defaults;
+		}
+
+		$html = wp_remote_retrieve_body( $response );
+		if ( empty( $html ) ) {
+			return $defaults;
+		}
+
+		// Parse OG meta tags.
+		$og = $defaults;
+
+		if ( preg_match( '/<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)["\']/i', $html, $m ) ) {
+			$og['title'] = html_entity_decode( $m[1], ENT_QUOTES, 'UTF-8' );
+		}
+
+		if ( preg_match( '/<meta[^>]+property=["\']og:description["\'][^>]+content=["\']([^"\']+)["\']/i', $html, $m ) ) {
+			$og['description'] = html_entity_decode( $m[1], ENT_QUOTES, 'UTF-8' );
+		}
+
+		if ( preg_match( '/<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']/i', $html, $m ) ) {
+			$og['image'] = $m[1];
+		}
+
+		// Fallback: try content before property (some sites reverse the attribute order).
+		if ( empty( $og['title'] ) && preg_match( '/<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:title["\']/i', $html, $m ) ) {
+			$og['title'] = html_entity_decode( $m[1], ENT_QUOTES, 'UTF-8' );
+		}
+
+		if ( empty( $og['description'] ) && preg_match( '/<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:description["\']/i', $html, $m ) ) {
+			$og['description'] = html_entity_decode( $m[1], ENT_QUOTES, 'UTF-8' );
+		}
+
+		if ( empty( $og['image'] ) && preg_match( '/<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']/i', $html, $m ) ) {
+			$og['image'] = $m[1];
+		}
+
+		return $og;
 	}
 }
