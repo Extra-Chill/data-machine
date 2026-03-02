@@ -45,8 +45,9 @@ abstract class FetchHandlerSettings extends SettingsHandler {
 				'type'        => 'number',
 				'label'       => __( 'Max Items Per Run', 'data-machine' ),
 				'description' => __( 'Maximum number of items to process per execution. 0 = unlimited.', 'data-machine' ),
-				'default'     => 0,
+				'default'     => 1,
 				'min'         => 0,
+				'max'         => 100,
 			),
 		);
 	}
