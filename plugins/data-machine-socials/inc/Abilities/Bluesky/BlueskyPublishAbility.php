@@ -154,20 +154,18 @@ class BlueskyPublishAbility {
 			);
 		}
 
-		$handle = $provider->get_handle();
-		$app_password = $provider->get_app_password();
-
-		// Get auth token
-		$token = self::get_auth_token( $handle, $app_password );
-		if ( is_wp_error( $token ) ) {
+		// Use the provider's session method which handles auth internally.
+		$session = $provider->get_session();
+		if ( is_wp_error( $session ) ) {
 			return array(
 				'success' => false,
-				'error' => $token->get_error_message(),
+				'error' => $session->get_error_message(),
 			);
 		}
 
-		$did = $token['did'];
-		$access_token = $token['access_token'];
+		$handle       = $session['handle'];
+		$did          = $session['did'];
+		$access_token = $session['accessJwt'];
 
 		// Upload image if provided
 		$image_blob = null;
@@ -267,54 +265,12 @@ class BlueskyPublishAbility {
 			);
 		}
 
-		$handle = $provider->get_handle();
+		$details = $provider->get_account_details();
 
 		return array(
 			'success' => true,
-			'handle' => $handle,
-			'did' => $provider->get_did() ?? '',
-		);
-	}
-
-	/**
-	 * Get authentication token from Bluesky.
-	 *
-	 * @param string $handle Bluesky handle.
-	 * @param string $app_password App password.
-	 * @return array|\WP_Error Token data or error.
-	 */
-	private static function get_auth_token( string $handle, string $app_password ) {
-		$response = wp_remote_post(
-			'https://bsky.social/xrpc/com.atproto.server.createSession',
-			array(
-				'body' => wp_json_encode( array(
-					'identifier' => $handle,
-					'password' => $app_password,
-				) ),
-				'headers' => array( 'Content-Type' => 'application/json' ),
-				'timeout' => 15,
-			)
-		);
-
-		if ( is_wp_error( $response ) ) {
-			return $response;
-		}
-
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body = wp_remote_retrieve_body( $response );
-		$data = json_decode( $body, true );
-
-		if ( $status_code >= 200 && $status_code < 300 ) {
-			return array(
-				'did' => $data['did'],
-				'access_token' => $data['accessJwt'],
-				'refresh_token' => $data['refreshJwt'] ?? '',
-			);
-		}
-
-		return new \WP_Error(
-			'bluesky_auth_failed',
-			$data['message'] ?? 'Authentication failed'
+			'handle'  => $details['handle'] ?? '',
+			'did'     => '',
 		);
 	}
 

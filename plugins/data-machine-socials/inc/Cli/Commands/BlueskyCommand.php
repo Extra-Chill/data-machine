@@ -233,6 +233,74 @@ class BlueskyCommand {
 		WP_CLI::log( 'Auth type:     App Password (session-based, no stored tokens)' );
 	}
 
+	/**
+	 * Publish a post to Bluesky.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <content>
+	 * : Post text content.
+	 *
+	 * [--title=<title>]
+	 * : Optional title (prepended to content).
+	 *
+	 * [--image=<url>]
+	 * : Image URL to attach to the post.
+	 *
+	 * [--source-url=<url>]
+	 * : Source URL to append to the post.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Simple text post
+	 *     wp datamachine-socials bluesky publish "Hello from the CLI!"
+	 *
+	 *     # Post with title
+	 *     wp datamachine-socials bluesky publish "Great show last night" --title="Live Review"
+	 *
+	 *     # Post with image
+	 *     wp datamachine-socials bluesky publish "Check this out" --image=https://extrachill.com/photo.jpg
+	 *
+	 *     # Post with source URL
+	 *     wp datamachine-socials bluesky publish "New article on the site" --source-url=https://extrachill.com/article
+	 */
+	public function publish( $args, $assoc_args ) {
+		$content = $args[0] ?? '';
+
+		if ( empty( $content ) ) {
+			WP_CLI::error( 'Post content is required.' );
+		}
+
+		$publish_ability = $this->get_publish_ability();
+
+		$input = array( 'content' => $content );
+
+		if ( ! empty( $assoc_args['title'] ) ) {
+			$input['title'] = $assoc_args['title'];
+		}
+
+		if ( ! empty( $assoc_args['image'] ) ) {
+			$input['image_url'] = $assoc_args['image'];
+			WP_CLI::log( 'Publishing to Bluesky with image...' );
+		} else {
+			WP_CLI::log( 'Publishing to Bluesky...' );
+		}
+
+		if ( ! empty( $assoc_args['source-url'] ) ) {
+			$input['source_url'] = $assoc_args['source-url'];
+		}
+
+		$result = $publish_ability->execute( $input );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Published to Bluesky!' );
+		WP_CLI::log( 'Post ID: ' . ( $result['post_id'] ?? '' ) );
+		WP_CLI::log( 'URL:     ' . ( $result['post_url'] ?? '' ) );
+	}
+
 	private function get_ability() {
 		if ( ! function_exists( 'wp_get_ability' ) ) {
 			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
@@ -326,5 +394,18 @@ class BlueskyCommand {
 		}
 
 		WP_CLI::success( 'Post liked successfully!' );
+	}
+
+	private function get_publish_ability() {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/bluesky-publish' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/bluesky-publish ability not registered.' );
+		}
+
+		return new \DataMachineSocials\Abilities\Bluesky\BlueskyPublishAbility();
 	}
 }

@@ -330,6 +330,94 @@ class TwitterCommand {
 		WP_CLI::success( 'Tweet liked successfully!' );
 	}
 
+	/**
+	 * Publish a tweet.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <content>
+	 * : Tweet text (max 280 characters).
+	 *
+	 * [--image=<path>]
+	 * : Path to a local image file to attach.
+	 *
+	 * [--source-url=<url>]
+	 * : Source URL to include with the tweet.
+	 *
+	 * [--link-handling=<mode>]
+	 * : How to handle the source URL.
+	 * ---
+	 * default: append
+	 * options:
+	 *   - none
+	 *   - append
+	 *   - reply
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Simple tweet
+	 *     wp datamachine-socials twitter publish "Hello from the CLI!"
+	 *
+	 *     # Tweet with image
+	 *     wp datamachine-socials twitter publish "Check this out" --image=/tmp/photo.jpg
+	 *
+	 *     # Tweet with source URL appended
+	 *     wp datamachine-socials twitter publish "New article" --source-url=https://extrachill.com/article
+	 *
+	 *     # Tweet with source URL as reply
+	 *     wp datamachine-socials twitter publish "Read more below" --source-url=https://extrachill.com/article --link-handling=reply
+	 */
+	public function publish( $args, $assoc_args ) {
+		$content = $args[0] ?? '';
+
+		if ( empty( $content ) ) {
+			WP_CLI::error( 'Tweet content is required.' );
+		}
+
+		if ( mb_strlen( $content ) > 280 && empty( $assoc_args['source-url'] ) ) {
+			WP_CLI::error( 'Tweet exceeds 280 characters (' . mb_strlen( $content ) . ' chars).' );
+		}
+
+		$publish_ability = $this->get_publish_ability();
+
+		$input = array( 'content' => $content );
+
+		if ( ! empty( $assoc_args['image'] ) ) {
+			$image_path = $assoc_args['image'];
+			if ( ! file_exists( $image_path ) ) {
+				WP_CLI::error( "Image file not found: {$image_path}" );
+			}
+			$input['image_path'] = $image_path;
+			WP_CLI::log( 'Publishing tweet with image...' );
+		} else {
+			WP_CLI::log( 'Publishing tweet...' );
+		}
+
+		if ( ! empty( $assoc_args['source-url'] ) ) {
+			$input['source_url'] = $assoc_args['source-url'];
+		}
+
+		if ( ! empty( $assoc_args['link-handling'] ) ) {
+			$input['link_handling'] = $assoc_args['link-handling'];
+		}
+
+		$result = $publish_ability->execute( $input );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Published to Twitter!' );
+		WP_CLI::log( 'Tweet ID:  ' . ( $result['tweet_id'] ?? '' ) );
+		WP_CLI::log( 'URL:       ' . ( $result['tweet_url'] ?? '' ) );
+
+		if ( ! empty( $result['reply_tweet_id'] ) ) {
+			WP_CLI::log( 'Reply ID:  ' . $result['reply_tweet_id'] );
+			WP_CLI::log( 'Reply URL: ' . $result['reply_tweet_url'] );
+		}
+	}
+
 	private function get_ability() {
 		if ( ! function_exists( 'wp_get_ability' ) ) {
 			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
@@ -367,5 +455,18 @@ class TwitterCommand {
 		}
 
 		return new \DataMachineSocials\Abilities\Twitter\TwitterDeleteAbility();
+	}
+
+	private function get_publish_ability() {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/twitter-publish' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/twitter-publish ability not registered.' );
+		}
+
+		return new \DataMachineSocials\Abilities\Twitter\TwitterPublishAbility();
 	}
 }
