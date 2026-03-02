@@ -88,10 +88,9 @@ class WordPress extends FetchHandler {
 		$data    = $result['data'];
 		$post_id = $data['post_id'];
 
-		// Mark as processed
-		$context->markItemProcessed( (string) $post_id );
-
 		// Build response for pipeline
+		$image_file_path = $data['file_info']['file_path'] ?? '';
+
 		$raw_data = array(
 			'title'    => $data['title'],
 			'content'  => $data['content'],
@@ -99,11 +98,16 @@ class WordPress extends FetchHandler {
 				'source_type'            => 'wordpress_local',
 				'item_identifier_to_log' => $post_id,
 				'original_id'            => $post_id,
+				'dedup_key'              => (string) $post_id,
 				'original_title'         => $data['title'],
 				'original_date_gmt'      => $data['publish_date'],
 				'post_type'              => $data['post_type'],
 				'post_status'            => $data['post_status'],
 				'site_name'              => $data['site_name'],
+				'_engine_data'           => array(
+					'source_url'      => $data['permalink'] ?? '',
+					'image_file_path' => $image_file_path,
+				),
 			),
 		);
 
@@ -116,15 +120,6 @@ class WordPress extends FetchHandler {
 		if ( ! empty( $data['file_info'] ) ) {
 			$raw_data['file_info'] = $data['file_info'];
 		}
-
-		// Store engine data
-		$image_file_path = $data['file_info']['file_path'] ?? '';
-		$context->storeEngineData(
-			array(
-				'source_url'      => $data['permalink'] ?? '',
-				'image_file_path' => $image_file_path,
-			)
-		);
 
 		return $raw_data;
 	}
@@ -188,9 +183,9 @@ class WordPress extends FetchHandler {
 		foreach ( $items as &$item ) {
 			$post_id = $item['metadata']['original_id'] ?? '';
 
-			// Mark as processed.
+			// Set dedup_key for centralized dedup in FetchHandler::dedup().
 			if ( $post_id ) {
-				$context->markItemProcessed( (string) $post_id );
+				$item['metadata']['dedup_key'] = (string) $post_id;
 			}
 
 			// Append excerpt to content if present.

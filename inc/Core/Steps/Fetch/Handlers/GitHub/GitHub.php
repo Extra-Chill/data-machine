@@ -104,7 +104,7 @@ class GitHub extends FetchHandler {
 
 		$context->log( 'info', sprintf( 'GitHub: Found %d %s.', count( $items ), $data_source ) );
 
-		// Find all unprocessed items (deduplication + filters).
+		// Filter items by keyword, exclusion, and timeframe. Dedup handled by FetchHandler::dedup().
 		$search           = $config['search'] ?? '';
 		$exclude_keywords = $config['exclude_keywords'] ?? '';
 		$timeframe_limit  = $config['timeframe_limit'] ?? 'all_time';
@@ -112,11 +112,6 @@ class GitHub extends FetchHandler {
 
 		foreach ( $items as $item ) {
 			$guid = sprintf( 'github_%s_%s_%d', $repo, $data_source, $item['number'] );
-
-			// Check if already processed.
-			if ( $context->isItemProcessed( $guid ) ) {
-				continue;
-			}
 
 			$searchable_text = ( $item['title'] ?? '' ) . ' ' . ( $item['body'] ?? '' );
 
@@ -138,9 +133,6 @@ class GitHub extends FetchHandler {
 				}
 			}
 
-			// Mark as processed.
-			$context->markItemProcessed( $guid );
-
 			// Build the item.
 			$labels_str = ! empty( $item['labels'] ) ? implode( ', ', $item['labels'] ) : '';
 
@@ -158,6 +150,7 @@ class GitHub extends FetchHandler {
 				'metadata' => array(
 					'source_type'       => 'github',
 					'original_id'       => $guid,
+					'dedup_key'         => $guid,
 					'original_title'    => $item['title'] ?? '',
 					'original_date_gmt' => $item['created_at'] ?? '',
 					'github_repo'       => $repo,
@@ -173,7 +166,7 @@ class GitHub extends FetchHandler {
 		}
 
 		if ( empty( $eligible_items ) ) {
-			$context->log( 'info', 'GitHub: All items already processed or filtered out.' );
+			$context->log( 'info', 'GitHub: All items filtered out.' );
 			return array();
 		}
 

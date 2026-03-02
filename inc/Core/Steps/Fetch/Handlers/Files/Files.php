@@ -80,9 +80,9 @@ class Files extends FetchHandler {
 		foreach ( $items as $item ) {
 			$item_id = $item['metadata']['item_identifier_to_log'] ?? '';
 
-			// Mark item as processed.
+			// Set dedup_key for centralized dedup in FetchHandler::dedup().
 			if ( ! empty( $item_id ) ) {
-				$context->markItemProcessed( $item_id );
+				$item['metadata']['dedup_key'] = $item_id;
 			}
 
 			$processed_items[] = $item;
