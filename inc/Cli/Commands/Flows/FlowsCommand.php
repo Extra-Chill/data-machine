@@ -109,6 +109,12 @@ class FlowsCommand extends BaseCommand {
 	 * [--remove=<filename>]
 	 * : Detach a memory file from a flow (memory-files subcommand).
 	 *
+	 * [--post_type=<post_type>]
+	 * : Post type to check against (validate subcommand). Default: 'post'.
+	 *
+	 * [--threshold=<threshold>]
+	 * : Jaccard similarity threshold 0.0-1.0 (validate subcommand). Default: 0.65.
+	 *
 	 * [--dry-run]
 	 * : Validate without creating (create subcommand).
 	 *
