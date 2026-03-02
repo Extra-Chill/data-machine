@@ -13,7 +13,6 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper;
 use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
-use DataMachine\Core\DataPacket;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -28,14 +27,14 @@ class StructuredDataProcessor {
 	}
 
 	/**
-	 * Process structured events and return first eligible DataPacket.
+	 * Process structured events and return all eligible items as raw arrays.
 	 *
 	 * @param array            $events            Array of normalized event data from extractor
 	 * @param string           $extraction_method Extraction method identifier
 	 * @param string           $source_url        Source URL
 	 * @param array            $config            Handler configuration
 	 * @param ExecutionContext $context           Execution context
-	 * @return array|null DataPacket array or null if no eligible events
+	 * @return array|null Array with 'items' key, or null if no eligible events
 	 */
 	public function process(
 		array $events,
@@ -44,6 +43,8 @@ class StructuredDataProcessor {
 		array $config,
 		ExecutionContext $context
 	): ?array {
+		$eligible_items = array();
+
 		foreach ( $events as $raw_event ) {
 			$event = $raw_event;
 
@@ -73,12 +74,6 @@ class StructuredDataProcessor {
 				$event['venue'] ?? ''
 			);
 
-			if ( $this->handler->checkItemProcessed( $context, $event_identifier ) ) {
-				continue;
-			}
-
-			$this->handler->markItemAsProcessed( $context, $event_identifier );
-
 			$this->applyVenueConfigOverride( $event, $config );
 
 			$venue_from_config = ! empty( $config['venue'] ) || ! empty( $config['venue_name'] );
@@ -96,42 +91,55 @@ class StructuredDataProcessor {
 			}
 
 			$venue_metadata = $this->handler->extractVenueMetadata( $event );
-			$job_id         = $context->getJobId();
-			EventEngineData::storeVenueContext( $job_id, $event, $venue_metadata );
+			$engine_data    = EventEngineData::buildEngineData( $event, $venue_metadata );
 
-			$this->storeEventEngineData( $context, $event );
+			// Add scraper-specific fields to engine data.
+			$scraper_fields = array_filter(
+				array(
+					'title'     => $event['title'] ?? '',
+					'image_url' => $event['imageUrl'] ?? '',
+				),
+				static function ( $value ) {
+					return '' !== $value && null !== $value;
+				}
+			);
+			if ( ! empty( $scraper_fields ) ) {
+				$engine_data = array_merge( $engine_data, $scraper_fields );
+			}
+
 			$this->handler->stripVenueMetadataFromEvent( $event );
 
-			$dataPacket = new DataPacket(
-				array(
-					'title' => $event['title'],
-					'body'  => wp_json_encode(
-						array(
-							'event'             => $event,
-							'raw_source'        => $raw_event,
-							'venue_metadata'    => $venue_metadata,
-							'import_source'     => 'universal_web_scraper',
-							'extraction_method' => $extraction_method,
-						),
-						JSON_PRETTY_PRINT
+			$eligible_items[] = array(
+				'title'    => $event['title'],
+				'content'  => wp_json_encode(
+					array(
+						'event'             => $event,
+						'raw_source'        => $raw_event,
+						'venue_metadata'    => $venue_metadata,
+						'import_source'     => 'universal_web_scraper',
+						'extraction_method' => $extraction_method,
 					),
+					JSON_PRETTY_PRINT
 				),
-				array(
+				'metadata' => array(
 					'source_type'       => 'universal_web_scraper',
 					'extraction_method' => $extraction_method,
 					'pipeline_id'       => $context->getPipelineId(),
 					'flow_id'           => $context->getFlowId(),
 					'original_title'    => $event['title'],
 					'event_identifier'  => $event_identifier,
+					'dedup_key'         => $event_identifier,
 					'import_timestamp'  => time(),
+					'_engine_data'      => $engine_data,
 				),
-				'event_import'
 			);
-
-			return array( $dataPacket );
 		}
 
-		return null;
+		if ( empty( $eligible_items ) ) {
+			return null;
+		}
+
+		return array( 'items' => $eligible_items );
 	}
 
 	/**
@@ -200,34 +208,5 @@ class StructuredDataProcessor {
 		}
 	}
 
-	/**
-	 * Store additional event fields in engine data.
-	 *
-	 * Uses centralized EventEngineData::storeEventCoreFields() for core fields,
-	 * then stores web scraper-specific fields (title, image_url).
-	 *
-	 * @param ExecutionContext $context Execution context
-	 * @param array            $event   Standardized event data
-	 */
-	private function storeEventEngineData( ExecutionContext $context, array $event ): void {
-		$job_id = $context->getJobId();
 
-		if ( $job_id ) {
-			EventEngineData::storeEventCoreFields( $job_id, $event );
-		}
-
-		$scraper_fields = array_filter(
-			array(
-				'title'     => $event['title'] ?? '',
-				'image_url' => $event['imageUrl'] ?? '',
-			),
-			static function ( $value ) {
-				return '' !== $value && null !== $value;
-			}
-		);
-
-		if ( ! empty( $scraper_fields ) ) {
-			$context->storeEngineData( $scraper_fields );
-		}
-	}
 }

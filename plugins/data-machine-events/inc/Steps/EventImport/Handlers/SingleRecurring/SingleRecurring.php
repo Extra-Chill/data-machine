@@ -14,7 +14,6 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\SingleRecurring;
 use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
-use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -97,22 +96,7 @@ class SingleRecurring extends EventImportHandler {
 		$venue_name       = $config['venue_name'] ?? '';
 		$event_identifier = EventIdentifierGenerator::generate( $event_title, $next_date, $venue_name );
 
-		if ( $this->checkItemProcessed( $context, $event_identifier ) ) {
-			$context->log(
-				'info',
-				'SingleRecurring: Event occurrence already processed',
-				array(
-					'event_title' => $event_title,
-					'date'        => $next_date,
-					'venue'       => $venue_name,
-				)
-			);
-			return array();
-		}
-
 		$standardized_event = $this->buildEventData( $config, $next_date );
-
-		$this->markItemAsProcessed( $context, $event_identifier );
 
 		$context->log(
 			'info',
@@ -126,33 +110,30 @@ class SingleRecurring extends EventImportHandler {
 		);
 
 		$venue_metadata = $this->extractVenueMetadata( $standardized_event );
-		$this->storeEventContext( $context, $standardized_event );
+		$engine_data    = $this->buildEventEngineData( $standardized_event, $venue_metadata );
 		$this->stripVenueMetadataFromEvent( $standardized_event );
 
-		$dataPacket = new DataPacket(
-			array(
-				'title' => $standardized_event['title'],
-				'body'  => wp_json_encode(
-					array(
-						'event'          => $standardized_event,
-						'venue_metadata' => $venue_metadata,
-						'import_source'  => 'single_recurring',
-					),
-					JSON_PRETTY_PRINT
+		return array(
+			'title'    => $standardized_event['title'],
+			'content'  => wp_json_encode(
+				array(
+					'event'          => $standardized_event,
+					'venue_metadata' => $venue_metadata,
+					'import_source'  => 'single_recurring',
 				),
+				JSON_PRETTY_PRINT
 			),
-			array(
+			'metadata' => array(
 				'source_type'      => 'single_recurring',
 				'pipeline_id'      => $context->getPipelineId(),
 				'flow_id'          => $context->getFlowId(),
 				'original_title'   => $event_title,
 				'event_identifier' => $event_identifier,
+				'dedup_key'        => $event_identifier,
 				'import_timestamp' => time(),
+				'_engine_data'     => $engine_data,
 			),
-			'event_import'
 		);
-
-		return array( $dataPacket );
 	}
 
 	/**

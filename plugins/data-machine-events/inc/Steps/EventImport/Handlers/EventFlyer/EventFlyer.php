@@ -14,9 +14,7 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\EventFlyer;
 use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\Handlers\VenueFieldsTrait;
-use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
-use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -69,7 +67,6 @@ class EventFlyer extends EventImportHandler {
 		);
 
 		$file_identifier = $image_file['persistent_path'];
-		$this->markItemAsProcessed( $context, $file_identifier );
 
 		$ai_fields = $this->buildAIExtractionFields( $config );
 
@@ -78,9 +75,6 @@ class EventFlyer extends EventImportHandler {
 		if ( ! empty( $event_data['title'] ) && $this->shouldSkipEventTitle( $event_data['title'] ) ) {
 			return array();
 		}
-
-		$job_id = $context->getJobId();
-		$this->storeImageInEngine( $job_id, $image_file['persistent_path'] );
 
 		if ( empty( $event_data['title'] ) || empty( $event_data['startDate'] ) ) {
 			$context->log(
@@ -99,38 +93,39 @@ class EventFlyer extends EventImportHandler {
 		);
 
 		$venue_metadata = $this->extractVenueMetadata( $event_data );
+		$engine_data    = $this->buildEventEngineData( $event_data, $venue_metadata );
 
-		EventEngineData::storeVenueContext( $job_id, $event_data, $venue_metadata );
+		// Add image context to engine data for vision processing.
+		$engine_data['image_file_path'] = $image_file['persistent_path'];
+		$upload_dir = wp_upload_dir();
+		$engine_data['image_url'] = str_replace( $upload_dir['basedir'], $upload_dir['baseurl'], $image_file['persistent_path'] );
 
 		$this->stripVenueMetadataFromEvent( $event_data );
 
-		$dataPacket = new DataPacket(
-			array(
-				'title' => $event_data['title'] ? $event_data['title'] : $image_file['original_name'],
-				'body'  => wp_json_encode(
-					array(
-						'event'                => $event_data,
-						'venue_metadata'       => $venue_metadata,
-						'import_source'        => 'event_flyer',
-						'source_file'          => $image_file['original_name'],
-						'ai_extraction_fields' => $ai_fields,
-					),
-					JSON_PRETTY_PRINT
+		return array(
+			'title'    => $event_data['title'] ? $event_data['title'] : $image_file['original_name'],
+			'content'  => wp_json_encode(
+				array(
+					'event'                => $event_data,
+					'venue_metadata'       => $venue_metadata,
+					'import_source'        => 'event_flyer',
+					'source_file'          => $image_file['original_name'],
+					'ai_extraction_fields' => $ai_fields,
 				),
+				JSON_PRETTY_PRINT
 			),
-			array(
+			'metadata' => array(
 				'source_type'      => 'event_flyer',
 				'pipeline_id'      => $context->getPipelineId(),
 				'flow_id'          => $context->getFlowId(),
 				'original_title'   => $event_data['title'] ? $event_data['title'] : $image_file['original_name'],
 				'event_identifier' => $event_identifier,
+				'dedup_key'        => $file_identifier,
 				'import_timestamp' => time(),
 				'image_file_path'  => $image_file['persistent_path'],
+				'_engine_data'     => $engine_data,
 			),
-			'event_import'
 		);
-
-		return array( $dataPacket );
 	}
 
 	private function getNextUnprocessedImage( ExecutionContext $context ): ?array {
@@ -154,7 +149,9 @@ class EventFlyer extends EventImportHandler {
 
 			$file_identifier = $file['path'];
 
-			if ( $this->checkItemProcessed( $context, $file_identifier ) ) {
+			// Pre-filter: skip already-processed images to find the next one.
+			// This is a selection mechanism, not dedup — dedup happens in FetchHandler::dedup().
+			if ( $context->isItemProcessed( $file_identifier ) ) {
 				continue;
 			}
 
@@ -228,28 +225,6 @@ class EventFlyer extends EventImportHandler {
 		$event_data       = array_merge( $event_data, $venue_event_data );
 
 		return $event_data;
-	}
-
-	private function storeImageInEngine( ?string $job_id, string $image_path ): void {
-		if ( empty( $job_id ) || empty( $image_path ) ) {
-			return;
-		}
-
-		$job_id = (int) $job_id;
-		if ( $job_id <= 0 || ! function_exists( 'datamachine_merge_engine_data' ) ) {
-			return;
-		}
-
-		$upload_dir = wp_upload_dir();
-		$image_url  = str_replace( $upload_dir['basedir'], $upload_dir['baseurl'], $image_path );
-
-		datamachine_merge_engine_data(
-			$job_id,
-			array(
-				'image_file_path' => $image_path,
-				'image_url'       => $image_url,
-			)
-		);
 	}
 
 	public static function get_vision_prompt(): string {

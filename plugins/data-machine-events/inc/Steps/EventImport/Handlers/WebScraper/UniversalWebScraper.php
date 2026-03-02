@@ -72,7 +72,6 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\VisionExtractionProc
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators\PaginatorInterface;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators\JsonApiPaginator;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators\HtmlLinkPaginator;
-use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -448,8 +447,6 @@ class UniversalWebScraper extends EventImportHandler {
 				continue;
 			}
 
-			$this->markItemAsProcessed( $context, $event_section['identifier'] );
-
 			$context->log(
 				'info',
 				'Universal Web Scraper: Found eligible HTML section',
@@ -460,31 +457,27 @@ class UniversalWebScraper extends EventImportHandler {
 				)
 			);
 
-			$dataPacket = new DataPacket(
-				array(
-					'title' => 'Raw HTML Event Section',
-					'body'  => wp_json_encode(
-						array(
-							'raw_html'           => $raw_html_data,
-							'source_url'         => $current_url,
-							'import_source'      => 'universal_web_scraper',
-							'section_identifier' => $event_section['identifier'],
-						),
-						JSON_PRETTY_PRINT
+			return array(
+				'title'    => 'Raw HTML Event Section',
+				'content'  => wp_json_encode(
+					array(
+						'raw_html'           => $raw_html_data,
+						'source_url'         => $current_url,
+						'import_source'      => 'universal_web_scraper',
+						'section_identifier' => $event_section['identifier'],
 					),
+					JSON_PRETTY_PRINT
 				),
-				array(
+				'metadata' => array(
 					'source_type'      => 'universal_web_scraper',
 					'pipeline_id'      => $context->getPipelineId(),
 					'flow_id'          => $context->getFlowId(),
 					'original_title'   => 'HTML Section from ' . parse_url( $current_url, PHP_URL_HOST ),
 					'event_identifier' => $event_section['identifier'],
+					'dedup_key'        => $event_section['identifier'],
 					'import_timestamp' => time(),
 				),
-				'event_import'
 			);
-
-			return array( $dataPacket );
 		}
 
 		return null;
@@ -556,38 +549,44 @@ class UniversalWebScraper extends EventImportHandler {
 			return null;
 		}
 
-		// VisionExtractionProcessor stores image_file_path in engine data.
-		// Return a DataPacket for the AI step to process.
+		// VisionExtractionProcessor returns per-item engine data via _engine_data.
 		$vision_data = $result[0];
 
-		$dataPacket = new DataPacket(
-			array(
-				'title' => 'Vision Flyer Analysis',
-				'body'  => wp_json_encode(
-					array(
-						'source_type'       => 'vision_flyer',
-						'image_url'         => $vision_data['image_url'] ?? '',
-						'page_url'          => $vision_data['page_url'] ?? $current_url,
-						'extraction_method' => $extraction_method,
-						'venue_config'      => array(
-							'venue'      => $config['venue'] ?? '',
-							'venue_name' => $config['venue_name'] ?? '',
-						),
-					),
-					JSON_PRETTY_PRINT
-				),
-			),
-			array(
-				'source_type'       => 'vision_flyer',
-				'extraction_method' => $extraction_method,
-				'pipeline_id'       => $context->getPipelineId(),
-				'flow_id'           => $context->getFlowId(),
-				'import_timestamp'  => time(),
-			),
-			'event_import'
+		$metadata = array(
+			'source_type'       => 'vision_flyer',
+			'extraction_method' => $extraction_method,
+			'pipeline_id'       => $context->getPipelineId(),
+			'flow_id'           => $context->getFlowId(),
+			'import_timestamp'  => time(),
 		);
 
-		return array( $dataPacket );
+		// Pass through dedup_key from VisionExtractionProcessor.
+		if ( ! empty( $vision_data['image_identifier'] ) ) {
+			$metadata['dedup_key'] = $vision_data['image_identifier'];
+		}
+
+		// Pass through per-item engine data for batch fan-out.
+		if ( ! empty( $vision_data['_engine_data'] ) ) {
+			$metadata['_engine_data'] = $vision_data['_engine_data'];
+		}
+
+		return array(
+			'title'    => 'Vision Flyer Analysis',
+			'content'  => wp_json_encode(
+				array(
+					'source_type'       => 'vision_flyer',
+					'image_url'         => $vision_data['image_url'] ?? '',
+					'page_url'          => $vision_data['page_url'] ?? $current_url,
+					'extraction_method' => $extraction_method,
+					'venue_config'      => array(
+						'venue'      => $config['venue'] ?? '',
+						'venue_name' => $config['venue_name'] ?? '',
+					),
+				),
+				JSON_PRETTY_PRINT
+			),
+			'metadata' => $metadata,
+		);
 	}
 
 	/**

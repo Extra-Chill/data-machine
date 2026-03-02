@@ -126,6 +126,97 @@ class EventEngineData {
 	}
 
 	/**
+	 * Build per-item engine data array for batch fan-out.
+	 *
+	 * Returns the combined venue context and core event fields as an array
+	 * suitable for DataPacket metadata['_engine_data']. The
+	 * PipelineBatchScheduler seeds this into each child job's engine data.
+	 *
+	 * @param array $event_data Standardized event data (with venue fields).
+	 * @param array $venue_metadata Extracted venue metadata.
+	 * @return array Engine data payload (may be empty if no data).
+	 * @since 0.14.0
+	 */
+	public static function buildEngineData( array $event_data, array $venue_metadata ): array {
+		$payload = array();
+
+		// Venue fields (flattened).
+		$venue_fields = array(
+			'venue'            => $event_data['venue'] ?? '',
+			'venueAddress'     => $venue_metadata['venueAddress'] ?? '',
+			'venueCity'        => $venue_metadata['venueCity'] ?? '',
+			'venueState'       => $venue_metadata['venueState'] ?? '',
+			'venueZip'         => $venue_metadata['venueZip'] ?? '',
+			'venueCountry'     => $venue_metadata['venueCountry'] ?? '',
+			'venuePhone'       => $venue_metadata['venuePhone'] ?? '',
+			'venueWebsite'     => $venue_metadata['venueWebsite'] ?? '',
+			'venueCoordinates' => $venue_metadata['venueCoordinates'] ?? '',
+			'venueCapacity'    => $venue_metadata['venueCapacity'] ?? '',
+			'venueTimezone'    => $venue_metadata['venueTimezone'] ?? '',
+		);
+
+		$venue_fields_clean = array_filter(
+			$venue_fields,
+			static function ( $value ) {
+				return '' !== $value && null !== $value;
+			}
+		);
+
+		if ( ! empty( $venue_fields_clean ) ) {
+			$payload = array_merge( $payload, $venue_fields_clean );
+
+			// Build venue_context sub-array.
+			$context_map = array(
+				'name'        => $venue_fields['venue'],
+				'address'     => $venue_fields['venueAddress'],
+				'city'        => $venue_fields['venueCity'],
+				'state'       => $venue_fields['venueState'],
+				'zip'         => $venue_fields['venueZip'],
+				'country'     => $venue_fields['venueCountry'],
+				'phone'       => $venue_fields['venuePhone'],
+				'website'     => $venue_fields['venueWebsite'],
+				'coordinates' => $venue_fields['venueCoordinates'],
+				'capacity'    => $venue_fields['venueCapacity'],
+				'timezone'    => $venue_fields['venueTimezone'],
+			);
+
+			$context_clean = array_filter(
+				$context_map,
+				static function ( $value ) {
+					return '' !== $value && null !== $value;
+				}
+			);
+
+			if ( ! empty( $context_clean ) ) {
+				$payload['venue_context'] = $context_clean;
+			}
+		}
+
+		// Core event fields.
+		$core_fields = array(
+			'startDate' => $event_data['startDate'] ?? '',
+			'startTime' => $event_data['startTime'] ?? '',
+			'endDate'   => $event_data['endDate'] ?? '',
+			'endTime'   => $event_data['endTime'] ?? '',
+			'ticketUrl' => $event_data['ticketUrl'] ?? '',
+			'price'     => $event_data['price'] ?? '',
+		);
+
+		$core_clean = array_filter(
+			$core_fields,
+			static function ( $value ) {
+				return '' !== $value && null !== $value;
+			}
+		);
+
+		if ( ! empty( $core_clean ) ) {
+			$payload = array_merge( $payload, $core_clean );
+		}
+
+		return $payload;
+	}
+
+	/**
 	 * Store item context in engine data for skip_item tool.
 	 *
 	 * This enables the skip_item tool to mark items as processed even when

@@ -81,7 +81,8 @@ class VisionExtractionProcessor {
 			// Generate content-based identifier for cross-run tracking.
 			$image_identifier = md5( $url . $image_url );
 
-			// Check if already processed (replaces in-memory tracking).
+			// Pre-filter: skip already-processed images to find the next candidate.
+			// This is a selection mechanism, not dedup — dedup happens in FetchHandler::dedup().
 			if ( $context->isItemProcessed( $image_identifier ) ) {
 				$context->log(
 					'debug',
@@ -104,7 +105,9 @@ class VisionExtractionProcessor {
 			$file_path = $this->downloadImageToPersistentStorage( $image_url, $context );
 
 			// Mark as processed AFTER download attempt (success or fail).
-			$this->handler->markItemAsProcessed( $context, $image_identifier );
+			// Direct call — this is a pre-filter, not dedup. Centralized dedup
+			// in FetchHandler::dedup() runs after executeFetch() returns.
+			$context->markItemProcessed( $image_identifier );
 
 			if ( ! $file_path ) {
 				$context->log(
@@ -114,14 +117,6 @@ class VisionExtractionProcessor {
 				);
 				return null;
 			}
-
-			// Store in engine data for AI step.
-			$context->storeEngineData(
-				array(
-					'image_file_path' => $file_path,
-					'source_url'      => $url,
-				)
-			);
 
 			$context->log(
 				'info',
@@ -134,11 +129,17 @@ class VisionExtractionProcessor {
 			);
 
 			// Return minimal packet - AI step will process the image.
+			// Engine data passed via _engine_data for batch fan-out.
 			return array(
 				array(
-					'source_type' => 'vision_flyer',
-					'image_url'   => $image_url,
-					'page_url'    => $url,
+					'source_type'      => 'vision_flyer',
+					'image_url'        => $image_url,
+					'page_url'         => $url,
+					'image_identifier' => $image_identifier,
+					'_engine_data'     => array(
+						'image_file_path' => $file_path,
+						'source_url'      => $url,
+					),
 				),
 			);
 		}
