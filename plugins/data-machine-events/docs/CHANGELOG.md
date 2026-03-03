@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.14.0] - 2026-03-03
+
+### Changed
+- Bump to 0.14.0 — batch fan-out handler migration is a breaking change, not a patch
+
 ## [0.13.4] - 2026-03-03
 
 ### Added
