@@ -42,7 +42,25 @@ class FailJobHandler {
 
 		$specific_reason = $context_data['reason'] ?? $reason;
 		$status          = \DataMachine\Core\JobStatus::failed( $specific_reason );
-		$success         = $db_jobs->complete_job( $job_id, $status->toString() );
+
+		// Persist structured error context into engine_data so it is
+		// available from `wp datamachine jobs show` without grepping PHP logs.
+		$error_data = array(
+			'error_reason'  => $specific_reason,
+			'error_step_id' => $context_data['flow_step_id'] ?? null,
+			'error_message' => $context_data['exception_message']
+				?? $context_data['error_message']
+				?? $context_data['ai_error']
+				?? $reason,
+			'error_trace'   => isset( $context_data['exception_trace'] )
+				? mb_substr( $context_data['exception_trace'], 0, 2000 )
+				: null,
+		);
+		// Strip null values so we only store keys that carry information.
+		$error_data = array_filter( $error_data, fn( $v ) => null !== $v );
+		\datamachine_merge_engine_data( $job_id, $error_data );
+
+		$success = $db_jobs->complete_job( $job_id, $status->toString() );
 
 		// Re-queue logic: If a queued prompt was popped but the job failed, add it back.
 		$engine_data = \datamachine_get_engine_data( $job_id );
