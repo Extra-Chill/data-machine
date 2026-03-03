@@ -2,6 +2,27 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.13.4] - 2026-03-03
+
+### Added
+- batch multi-return + dedup_key migration for all event handlers
+- migrate event handlers from storeEventContext to _engine_data metadata
+
+### Changed
+- migrate event handlers to dedup_key metadata convention
+- convert all event handlers to raw array returns for batch fan-out
+
+### Fixed
+- remove stale nonce from public venue/geocode API requests
+- mobile map scroll trap and border-radius
+- ability output validation errors for calendar and venues
+- Convert all event handlers to raw array returns for batch fan-out
+- Migrate event handlers to dedup_key metadata and _engine_data for batch fan-out
+- Listen for external content-updated event to re-init lazy render and carousel
+- Fix ability output validation errors for calendar and venues
+- Fix mobile map scroll trap and border-radius
+- Fix stale nonce from public venue/geocode API requests
+
 ## [0.13.3] - 2026-03-01
 
 - feat: re-init lazy render and carousel on external content-updated event for client-side scope switching
