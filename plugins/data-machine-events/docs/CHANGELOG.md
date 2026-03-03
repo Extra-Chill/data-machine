@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.14.1] - 2026-03-03
+
+### Fixed
+- Fix user location blue dot not appearing on Near Me page initial geolocation (race condition)
+
 ## [0.14.0] - 2026-03-03
 
 ### Changed
