@@ -134,6 +134,34 @@ a.venue-popup-name:hover {
 	box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4), 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
+/* Map container — relative anchor for gesture overlay */
+.data-machine-events-map-container {
+	position: relative;
+}
+
+/* Gesture overlay — shown on touch devices on single-finger drag */
+.data-machine-events-map-gesture-overlay {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(0, 0, 0, 0.5);
+	color: #fff;
+	font-size: 0.875rem;
+	font-weight: 600;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 0.3s ease;
+	z-index: 1000;
+	border-radius: inherit;
+}
+
+/* Touch devices: let browser own single-finger scroll */
+.data-machine-events-map.leaflet-touch-drag {
+	touch-action: pan-y !important;
+}
+
 /* Summary below map */
 .data-machine-events-map-summary {
 	margin: 0.5rem 0 0;
@@ -211,15 +239,11 @@ a.venue-popup-name:hover {
 	color: #dc2626;
 }
 
-/* Responsive */
+/* Responsive — map keeps rounded corners at all breakpoints.
+   The parent theme handles edge-to-edge padding; the map itself
+   should always retain its border-radius for visual consistency. */
 @media (max-width: 768px) {
 	.data-machine-events-map {
 		border-radius: var(--data-machine-border-radius, 8px);
-	}
-}
-
-@media (max-width: 480px) {
-	.data-machine-events-map {
-		border-radius: 0;
 	}
 }
