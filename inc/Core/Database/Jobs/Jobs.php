@@ -68,6 +68,32 @@ class Jobs {
 		return $this->operations->delete_jobs( $criteria );
 	}
 
+	/**
+	 * Delete old jobs by status and age.
+	 *
+	 * @since 0.28.0
+	 *
+	 * @param string $status_pattern Base status to match (e.g., 'failed').
+	 * @param int    $older_than_days Delete jobs older than this many days.
+	 * @return int|false Number of deleted rows, or false on error.
+	 */
+	public function delete_old_jobs( string $status_pattern, int $older_than_days ): int|false {
+		return $this->operations->delete_old_jobs( $status_pattern, $older_than_days );
+	}
+
+	/**
+	 * Count jobs matching a status pattern older than a given age.
+	 *
+	 * @since 0.28.0
+	 *
+	 * @param string $status_pattern Base status to match (e.g., 'failed').
+	 * @param int    $older_than_days Count jobs older than this many days.
+	 * @return int Number of matching jobs.
+	 */
+	public function count_old_jobs( string $status_pattern, int $older_than_days ): int {
+		return $this->operations->count_old_jobs( $status_pattern, $older_than_days );
+	}
+
 	public function store_engine_data( int $job_id, array $data ): bool {
 		return $this->operations->store_engine_data( $job_id, $data );
 	}
