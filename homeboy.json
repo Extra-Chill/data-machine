@@ -8,6 +8,10 @@
       "pattern": "(?m)^\\s*\\*?\\s*Version:\\s*([0-9.]+)"
     },
     {
+      "file": "data-machine.php",
+      "pattern": "DATAMACHINE_VERSION',\\s*'([0-9.]+)'"
+    },
+    {
       "file": "readme.txt",
       "pattern": "(?m)^Stable tag:\\s*([0-9.]+)"
     },
