@@ -196,7 +196,12 @@ trait FlowHelpers {
 	 * @param int $offset Pagination offset.
 	 * @return array Paginated flows.
 	 */
-	protected function getAllFlowsPaginated( int $per_page, int $offset ): array {
+	protected function getAllFlowsPaginated( int $per_page, int $offset, ?int $user_id = null ): array {
+		if ( null !== $user_id ) {
+			$all_flows = $this->db_flows->get_all_flows( $user_id );
+			return array_slice( $all_flows, $offset, $per_page );
+		}
+
 		$all_pipelines = $this->db_pipelines->get_pipelines_list();
 		$all_flows     = array();
 
@@ -213,7 +218,12 @@ trait FlowHelpers {
 	 *
 	 * @return int Total flow count.
 	 */
-	protected function countAllFlows(): int {
+	protected function countAllFlows( ?int $user_id = null ): int {
+		if ( null !== $user_id ) {
+			$all_flows = $this->db_flows->get_all_flows( $user_id );
+			return count( $all_flows );
+		}
+
 		$all_pipelines = $this->db_pipelines->get_pipelines_list();
 		$total         = 0;
 

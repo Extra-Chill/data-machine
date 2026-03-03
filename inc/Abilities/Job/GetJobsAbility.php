@@ -43,6 +43,10 @@ class GetJobsAbility {
 								'type'        => array( 'integer', 'null' ),
 								'description' => __( 'Get a specific job by ID (ignores pagination/filters when provided)', 'data-machine' ),
 							),
+							'user_id'     => array(
+								'type'        => 'integer',
+								'description' => __( 'Filter jobs by WordPress user ID.', 'data-machine' ),
+							),
 							'flow_id'     => array(
 								'type'        => array( 'integer', 'string', 'null' ),
 								'description' => __( 'Filter jobs by flow ID (integer or "direct")', 'data-machine' ),
@@ -125,6 +129,7 @@ class GetJobsAbility {
 		$job_id      = $input['job_id'] ?? null;
 		$flow_id     = $input['flow_id'] ?? null;
 		$pipeline_id = $input['pipeline_id'] ?? null;
+		$user_id     = $input['user_id'] ?? null;
 		$status      = $input['status'] ?? null;
 		$source      = $input['source'] ?? null;
 		$since       = $input['since'] ?? null;
@@ -195,6 +200,11 @@ class GetJobsAbility {
 		if ( null !== $source && '' !== $source ) {
 			$args['source']            = sanitize_text_field( $source );
 			$filters_applied['source'] = $args['source'];
+		}
+
+		if ( null !== $user_id ) {
+			$args['user_id']            = (int) $user_id;
+			$filters_applied['user_id'] = $args['user_id'];
 		}
 
 		if ( null !== $since && '' !== $since ) {

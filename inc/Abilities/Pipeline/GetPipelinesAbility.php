@@ -43,6 +43,11 @@ class GetPipelinesAbility {
 								'type'        => array( 'integer', 'null' ),
 								'description' => __( 'Get a specific pipeline by ID (ignores pagination when provided)', 'data-machine' ),
 							),
+							'user_id'     => array(
+								'type'        => 'integer',
+								'description' => __( 'Filter pipelines by WordPress user ID. Defaults to 0 (shared/legacy).', 'data-machine' ),
+								'default'     => 0,
+							),
 							'per_page'    => array(
 								'type'        => 'integer',
 								'default'     => self::DEFAULT_PER_PAGE,
@@ -99,6 +104,7 @@ class GetPipelinesAbility {
 	public function execute( array $input ): array {
 		try {
 			$pipeline_id = $input['pipeline_id'] ?? null;
+			$user_id     = isset( $input['user_id'] ) ? (int) $input['user_id'] : null;
 			$per_page    = (int) ( $input['per_page'] ?? self::DEFAULT_PER_PAGE );
 			$offset      = (int) ( $input['offset'] ?? 0 );
 			$output_mode = $input['output_mode'] ?? 'full';
@@ -141,7 +147,7 @@ class GetPipelinesAbility {
 				);
 			}
 
-			$all_pipelines = $this->db_pipelines->get_all_pipelines();
+			$all_pipelines = $this->db_pipelines->get_all_pipelines( $user_id );
 			$total         = count( $all_pipelines );
 			$pipelines     = array_slice( $all_pipelines, $offset, $per_page );
 

@@ -408,7 +408,14 @@ class Files {
 	 * List agent files.
 	 */
 	public static function list_agent_files( WP_REST_Request $request ) {
-		$result = self::getAbilities()->executeListFiles( array( 'scope' => 'agent' ) );
+		$user_id = $request->get_param( 'user_id' );
+		$input   = array( 'scope' => 'agent' );
+
+		if ( null !== $user_id ) {
+			$input['user_id'] = (int) $user_id;
+		}
+
+		$result = self::getAbilities()->executeListFiles( $input );
 
 		if ( ! $result['success'] ) {
 			return new WP_Error( 'list_agent_files_error', $result['error'], array( 'status' => 500 ) );
@@ -427,13 +434,18 @@ class Files {
 	 */
 	public static function get_agent_file( WP_REST_Request $request ) {
 		$filename = sanitize_file_name( wp_unslash( $request['filename'] ) );
+		$user_id  = $request->get_param( 'user_id' );
 
-		$result = self::getAbilities()->executeGetFile(
-			array(
-				'filename' => $filename,
-				'scope'    => 'agent',
-			)
+		$input = array(
+			'filename' => $filename,
+			'scope'    => 'agent',
 		);
+
+		if ( null !== $user_id ) {
+			$input['user_id'] = (int) $user_id;
+		}
+
+		$result = self::getAbilities()->executeGetFile( $input );
 
 		if ( ! $result['success'] ) {
 			$status = false !== strpos( $result['error'] ?? '', 'not found' ) ? 404 : 400;
@@ -455,13 +467,18 @@ class Files {
 	public static function put_agent_file( WP_REST_Request $request ) {
 		$filename = sanitize_file_name( wp_unslash( $request['filename'] ) );
 		$content  = $request->get_body();
+		$user_id  = $request->get_param( 'user_id' );
 
-		$result = self::getAbilities()->executeWriteAgentFile(
-			array(
-				'filename' => $filename,
-				'content'  => $content,
-			)
+		$input = array(
+			'filename' => $filename,
+			'content'  => $content,
 		);
+
+		if ( null !== $user_id ) {
+			$input['user_id'] = (int) $user_id;
+		}
+
+		$result = self::getAbilities()->executeWriteAgentFile( $input );
 
 		if ( ! $result['success'] ) {
 			$status = 400;
@@ -496,12 +513,17 @@ class Files {
 			);
 		}
 
-		$result = self::getAbilities()->executeDeleteFile(
-			array(
-				'filename' => $filename,
-				'scope'    => 'agent',
-			)
+		$input = array(
+			'filename' => $filename,
+			'scope'    => 'agent',
 		);
+
+		$user_id = $request->get_param( 'user_id' );
+		if ( null !== $user_id ) {
+			$input['user_id'] = (int) $user_id;
+		}
+
+		$result = self::getAbilities()->executeDeleteFile( $input );
 
 		if ( ! $result['success'] ) {
 			$status = false !== strpos( $result['error'] ?? '', 'not found' ) ? 404 : 400;

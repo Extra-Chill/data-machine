@@ -25,6 +25,7 @@ WP_CLI::add_command( 'datamachine pipelines', Commands\PipelinesCommand::class )
 WP_CLI::add_command( 'datamachine posts', Commands\PostsCommand::class );
 WP_CLI::add_command( 'datamachine logs', Commands\LogsCommand::class );
 WP_CLI::add_command( 'datamachine agent', Commands\MemoryCommand::class );
+WP_CLI::add_command( 'datamachine agents', Commands\AgentsCommand::class );
 
 // Backwards-compatible alias: `wp datamachine memory` → agent.
 WP_CLI::add_command( 'datamachine memory', Commands\MemoryCommand::class );
