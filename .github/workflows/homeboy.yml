@@ -1,0 +1,23 @@
+name: Homeboy
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  homeboy:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: Extra-Chill/homeboy-action@v1
+        with:
+          extension: wordpress
+          commands: lint,test
+          component: data-machine
+          settings: '{"database_type": "sqlite"}'
+          php-version: '8.2'
+          node-version: '20'
