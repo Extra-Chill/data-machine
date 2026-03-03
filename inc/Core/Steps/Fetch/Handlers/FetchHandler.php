@@ -80,8 +80,10 @@ abstract class FetchHandler {
 		// Items without dedup_key pass through unchanged.
 		$items = $this->dedup( $items, $context );
 
-		// Apply max_items cap when configured.
-		$max_items = (int) ( $config['max_items'] ?? 0 );
+		// Apply max_items cap.
+		// Default to 1 to prevent unbounded fan-out when flows lack an
+		// explicit max_items value. Set to 0 for unlimited.
+		$max_items = (int) ( $config['max_items'] ?? 1 );
 		if ( $max_items > 0 && count( $items ) > $max_items ) {
 			$items = array_slice( $items, 0, $max_items );
 		}
