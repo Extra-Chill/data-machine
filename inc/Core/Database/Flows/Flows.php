@@ -455,6 +455,41 @@ class Flows extends BaseRepository {
 	}
 
 	/**
+	 * Get flow memory files from scheduling config.
+	 *
+	 * @param int $flow_id Flow ID.
+	 * @return array Array of memory filenames.
+	 */
+	public function get_flow_memory_files( int $flow_id ): array {
+		$scheduling_config = $this->get_flow_scheduling( $flow_id );
+		if ( null === $scheduling_config ) {
+			return array();
+		}
+		return $scheduling_config['memory_files'] ?? array();
+	}
+
+	/**
+	 * Update flow memory files in scheduling config.
+	 *
+	 * @param int   $flow_id      Flow ID.
+	 * @param array $memory_files Array of memory filenames.
+	 * @return bool True on success, false on failure.
+	 */
+	public function update_flow_memory_files( int $flow_id, array $memory_files ): bool {
+		if ( empty( $flow_id ) ) {
+			return false;
+		}
+
+		$scheduling_config = $this->get_flow_scheduling( $flow_id );
+		if ( null === $scheduling_config ) {
+			return false;
+		}
+		$scheduling_config['memory_files'] = $memory_files;
+
+		return $this->update_flow_scheduling( $flow_id, $scheduling_config );
+	}
+
+	/**
 	 * Update flow scheduling configuration
 	 */
 	public function update_flow_scheduling( int $flow_id, array $scheduling_config ): bool {
