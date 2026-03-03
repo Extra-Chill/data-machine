@@ -643,7 +643,7 @@ function datamachine_ensure_default_memory_files() {
 
 		do_action(
 			'datamachine_log',
-			'notice',
+			'info',
 			sprintf( 'Self-healing: created missing agent file %s with scaffold defaults.', $filename ),
 			array( 'filename' => $filename )
 		);

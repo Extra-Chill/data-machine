@@ -33,7 +33,10 @@ class LogHandler {
 		if ( ! in_array( $level, $valid_levels, true ) ) {
 			if ( class_exists( 'WP_Ability' ) ) {
 				$ability = wp_get_ability( 'datamachine/write-to-log' );
-				$result  = $ability->execute(
+				if ( ! $ability ) {
+					return false;
+				}
+				$result = $ability->execute(
 					array(
 						'level'   => $level,
 						'message' => $message,
