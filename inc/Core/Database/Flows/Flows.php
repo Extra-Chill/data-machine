@@ -26,11 +26,13 @@ class Flows extends BaseRepository {
 		$sql = "CREATE TABLE $table_name (
             flow_id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
             pipeline_id bigint(20) unsigned NOT NULL,
+            user_id bigint(20) unsigned NOT NULL DEFAULT 0,
             flow_name varchar(255) NOT NULL,
             flow_config longtext NOT NULL,
             scheduling_config longtext NOT NULL,
             PRIMARY KEY (flow_id),
-            KEY pipeline_id (pipeline_id)
+            KEY pipeline_id (pipeline_id),
+            KEY user_id (user_id)
         ) $charset_collate;";
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -46,6 +48,57 @@ class Flows extends BaseRepository {
 				'result'     => $result,
 			)
 		);
+	}
+
+	/**
+	 * Migrate existing table columns to current schema.
+	 *
+	 * Handles:
+	 * - user_id column: added for multi-agent support
+	 *
+	 * Safe to run multiple times - only executes if columns need updating.
+	 */
+	public function migrate_columns(): void {
+		// Check if user_id column already exists.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$column = $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				"SELECT COLUMN_NAME
+				 FROM information_schema.COLUMNS
+				 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'user_id'",
+				DB_NAME,
+				$this->table_name
+			)
+		);
+
+		if ( null === $column ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$result = $this->wpdb->query(
+				"ALTER TABLE {$this->table_name}
+				 ADD COLUMN user_id bigint(20) unsigned NOT NULL DEFAULT 0 AFTER pipeline_id,
+				 ADD KEY user_id (user_id)"
+			);
+
+			if ( false === $result ) {
+				do_action(
+					'datamachine_log',
+					'error',
+					'Failed to add user_id column to flows table',
+					array(
+						'table_name' => $this->table_name,
+						'db_error'   => $this->wpdb->last_error,
+					)
+				);
+				return;
+			}
+
+			do_action(
+				'datamachine_log',
+				'info',
+				'Added user_id column to flows table for multi-agent support',
+				array( 'table_name' => $this->table_name )
+			);
+		}
 	}
 
 	public function create_flow( array $flow_data ) {
@@ -70,8 +123,11 @@ class Flows extends BaseRepository {
 		$flow_config       = wp_json_encode( $flow_data['flow_config'] );
 		$scheduling_config = wp_json_encode( $flow_data['scheduling_config'] );
 
+		$user_id = isset( $flow_data['user_id'] ) ? absint( $flow_data['user_id'] ) : 0;
+
 		$insert_data = array(
 			'pipeline_id'       => intval( $flow_data['pipeline_id'] ),
+			'user_id'           => $user_id,
 			'flow_name'         => sanitize_text_field( $flow_data['flow_name'] ),
 			'flow_config'       => $flow_config,
 			'scheduling_config' => $scheduling_config,
@@ -79,6 +135,7 @@ class Flows extends BaseRepository {
 
 		$insert_format = array(
 			'%d', // pipeline_id
+			'%d', // user_id
 			'%s', // flow_name
 			'%s', // flow_config
 			'%s',  // scheduling_config
@@ -197,14 +254,23 @@ class Flows extends BaseRepository {
 	 *
 	 * Used for global operations like handler-based filtering across the entire system.
 	 *
+	 * @param int|null $user_id Optional user ID to filter by.
 	 * @return array All flows with decoded configs.
 	 */
-	public function get_all_flows(): array {
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$flows = $this->wpdb->get_results(
-			$this->wpdb->prepare( 'SELECT * FROM %i ORDER BY pipeline_id ASC, flow_id ASC', $this->table_name ),
-			ARRAY_A
-		);
+	public function get_all_flows( ?int $user_id = null ): array {
+		if ( null !== $user_id ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$flows = $this->wpdb->get_results(
+				$this->wpdb->prepare( 'SELECT * FROM %i WHERE user_id = %d ORDER BY pipeline_id ASC, flow_id ASC', $this->table_name, $user_id ),
+				ARRAY_A
+			);
+		} else {
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$flows = $this->wpdb->get_results(
+				$this->wpdb->prepare( 'SELECT * FROM %i ORDER BY pipeline_id ASC, flow_id ASC', $this->table_name ),
+				ARRAY_A
+			);
+		}
 
 		if ( null === $flows ) {
 			return array();
@@ -522,6 +588,9 @@ class Flows extends BaseRepository {
 	 * Get flows ready for execution based on scheduling.
 	 *
 	 * Uses jobs table to determine last run time (single source of truth).
+	 *
+	 * Note: No user_id filter here — the scheduler must run ALL users' flows.
+	 * User-scoping happens at the pipeline/flow management level, not execution.
 	 */
 	public function get_flows_ready_for_execution(): array {
 

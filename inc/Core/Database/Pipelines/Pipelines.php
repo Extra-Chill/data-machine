@@ -39,15 +39,17 @@ class Pipelines extends BaseRepository {
 		$pipeline_name        = sanitize_text_field( $pipeline_data['pipeline_name'] );
 		$pipeline_config      = $pipeline_data['pipeline_config'] ?? array();
 		$pipeline_config_json = wp_json_encode( $pipeline_config );
+		$user_id              = isset( $pipeline_data['user_id'] ) ? absint( $pipeline_data['user_id'] ) : 0;
 
 		$data = array(
+			'user_id'         => $user_id,
 			'pipeline_name'   => $pipeline_name,
 			'pipeline_config' => $pipeline_config_json,
 			'created_at'      => current_time( 'mysql', true ),
 			'updated_at'      => current_time( 'mysql', true ),
 		);
 
-		$format = array( '%s', '%s', '%s', '%s' );
+		$format = array( '%d', '%s', '%s', '%s', '%s' );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$inserted = $this->wpdb->insert( $this->table_name, $data, $format );
@@ -104,11 +106,17 @@ class Pipelines extends BaseRepository {
 	/**
 	 * Get all pipelines from the database.
 	 *
+	 * @param int|null $user_id Optional user ID to filter by.
 	 * @return array Array of all pipeline records
 	 */
-	public function get_all_pipelines(): array {
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$results = $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT * FROM %i ORDER BY updated_at DESC', $this->table_name ), ARRAY_A );
+	public function get_all_pipelines( ?int $user_id = null ): array {
+		if ( null !== $user_id ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$results = $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT * FROM %i WHERE user_id = %d ORDER BY updated_at DESC', $this->table_name, $user_id ), ARRAY_A );
+		} else {
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$results = $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT * FROM %i ORDER BY updated_at DESC', $this->table_name ), ARRAY_A );
+		}
 
 		foreach ( $results as &$pipeline ) {
 			if ( ! empty( $pipeline['pipeline_config'] ) ) {
@@ -121,10 +129,17 @@ class Pipelines extends BaseRepository {
 
 	/**
 	 * Get lightweight pipelines list for UI dropdowns.
+	 *
+	 * @param int|null $user_id Optional user ID to filter by.
 	 */
-	public function get_pipelines_list(): array {
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$results = $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT pipeline_id, pipeline_name FROM %i ORDER BY pipeline_name ASC', $this->table_name ), ARRAY_A );
+	public function get_pipelines_list( ?int $user_id = null ): array {
+		if ( null !== $user_id ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$results = $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT pipeline_id, pipeline_name FROM %i WHERE user_id = %d ORDER BY pipeline_name ASC', $this->table_name, $user_id ), ARRAY_A );
+		} else {
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$results = $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT pipeline_id, pipeline_name FROM %i ORDER BY pipeline_name ASC', $this->table_name ), ARRAY_A );
+		}
 
 		return $results ? $results : array();
 	}
@@ -324,10 +339,17 @@ class Pipelines extends BaseRepository {
 
 	/**
 	 * Get pipeline count.
+	 *
+	 * @param int|null $user_id Optional user ID to filter by.
 	 */
-	public function get_pipelines_count(): int {
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$count = $this->wpdb->get_var( $this->wpdb->prepare( 'SELECT COUNT(pipeline_id) FROM %i', $this->table_name ) );
+	public function get_pipelines_count( ?int $user_id = null ): int {
+		if ( null !== $user_id ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$count = $this->wpdb->get_var( $this->wpdb->prepare( 'SELECT COUNT(pipeline_id) FROM %i WHERE user_id = %d', $this->table_name, $user_id ) );
+		} else {
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$count = $this->wpdb->get_var( $this->wpdb->prepare( 'SELECT COUNT(pipeline_id) FROM %i', $this->table_name ) );
+		}
 
 		return (int) $count;
 	}
@@ -341,22 +363,28 @@ class Pipelines extends BaseRepository {
 		$order    = strtoupper( $args['order'] ?? 'DESC' );
 		$per_page = (int) ( $args['per_page'] ?? 20 );
 		$offset   = (int) ( $args['offset'] ?? 0 );
+		$user_id  = isset( $args['user_id'] ) ? absint( $args['user_id'] ) : null;
 		$is_asc   = ( 'ASC' === $order );
+
+		$where = '';
+		if ( null !== $user_id ) {
+			$where = $this->wpdb->prepare( ' WHERE user_id = %d', $user_id );
+		}
 
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL
 		$results = match ( $orderby ) {
 			'pipeline_name' => $is_asc
-				? $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT * FROM %i ORDER BY pipeline_name ASC LIMIT %d OFFSET %d', $this->table_name, $per_page, $offset ), ARRAY_A )
-				: $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT * FROM %i ORDER BY pipeline_name DESC LIMIT %d OFFSET %d', $this->table_name, $per_page, $offset ), ARRAY_A ),
+				? $this->wpdb->get_results( $this->wpdb->prepare( "SELECT * FROM %i{$where} ORDER BY pipeline_name ASC LIMIT %d OFFSET %d", $this->table_name, $per_page, $offset ), ARRAY_A )
+				: $this->wpdb->get_results( $this->wpdb->prepare( "SELECT * FROM %i{$where} ORDER BY pipeline_name DESC LIMIT %d OFFSET %d", $this->table_name, $per_page, $offset ), ARRAY_A ),
 			'created_at' => $is_asc
-				? $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT * FROM %i ORDER BY created_at ASC LIMIT %d OFFSET %d', $this->table_name, $per_page, $offset ), ARRAY_A )
-				: $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT * FROM %i ORDER BY created_at DESC LIMIT %d OFFSET %d', $this->table_name, $per_page, $offset ), ARRAY_A ),
+				? $this->wpdb->get_results( $this->wpdb->prepare( "SELECT * FROM %i{$where} ORDER BY created_at ASC LIMIT %d OFFSET %d", $this->table_name, $per_page, $offset ), ARRAY_A )
+				: $this->wpdb->get_results( $this->wpdb->prepare( "SELECT * FROM %i{$where} ORDER BY created_at DESC LIMIT %d OFFSET %d", $this->table_name, $per_page, $offset ), ARRAY_A ),
 			'updated_at' => $is_asc
-				? $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT * FROM %i ORDER BY updated_at ASC LIMIT %d OFFSET %d', $this->table_name, $per_page, $offset ), ARRAY_A )
-				: $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT * FROM %i ORDER BY updated_at DESC LIMIT %d OFFSET %d', $this->table_name, $per_page, $offset ), ARRAY_A ),
+				? $this->wpdb->get_results( $this->wpdb->prepare( "SELECT * FROM %i{$where} ORDER BY updated_at ASC LIMIT %d OFFSET %d", $this->table_name, $per_page, $offset ), ARRAY_A )
+				: $this->wpdb->get_results( $this->wpdb->prepare( "SELECT * FROM %i{$where} ORDER BY updated_at DESC LIMIT %d OFFSET %d", $this->table_name, $per_page, $offset ), ARRAY_A ),
 			default => $is_asc
-				? $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT * FROM %i ORDER BY pipeline_id ASC LIMIT %d OFFSET %d', $this->table_name, $per_page, $offset ), ARRAY_A )
-				: $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT * FROM %i ORDER BY pipeline_id DESC LIMIT %d OFFSET %d', $this->table_name, $per_page, $offset ), ARRAY_A ),
+				? $this->wpdb->get_results( $this->wpdb->prepare( "SELECT * FROM %i{$where} ORDER BY pipeline_id ASC LIMIT %d OFFSET %d", $this->table_name, $per_page, $offset ), ARRAY_A )
+				: $this->wpdb->get_results( $this->wpdb->prepare( "SELECT * FROM %i{$where} ORDER BY pipeline_id DESC LIMIT %d OFFSET %d", $this->table_name, $per_page, $offset ), ARRAY_A ),
 		};
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL
 
@@ -470,6 +498,57 @@ class Pipelines extends BaseRepository {
 		return $step_config;
 	}
 
+	/**
+	 * Migrate existing table columns to current schema.
+	 *
+	 * Handles:
+	 * - user_id column: added for multi-agent support
+	 *
+	 * Safe to run multiple times - only executes if columns need updating.
+	 */
+	public function migrate_columns(): void {
+		// Check if user_id column already exists.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$column = $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				"SELECT COLUMN_NAME
+				 FROM information_schema.COLUMNS
+				 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'user_id'",
+				DB_NAME,
+				$this->table_name
+			)
+		);
+
+		if ( null === $column ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$result = $this->wpdb->query(
+				"ALTER TABLE {$this->table_name}
+				 ADD COLUMN user_id bigint(20) unsigned NOT NULL DEFAULT 0 AFTER pipeline_id,
+				 ADD KEY user_id (user_id)"
+			);
+
+			if ( false === $result ) {
+				do_action(
+					'datamachine_log',
+					'error',
+					'Failed to add user_id column to pipelines table',
+					array(
+						'table_name' => $this->table_name,
+						'db_error'   => $this->wpdb->last_error,
+					)
+				);
+				return;
+			}
+
+			do_action(
+				'datamachine_log',
+				'info',
+				'Added user_id column to pipelines table for multi-agent support',
+				array( 'table_name' => $this->table_name )
+			);
+		}
+	}
+
 	public static function create_table() {
 		global $wpdb;
 		$table_name      = $wpdb->prefix . 'datamachine_pipelines';
@@ -480,11 +559,13 @@ class Pipelines extends BaseRepository {
 
 		$sql = "CREATE TABLE $table_name (
 			pipeline_id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			user_id bigint(20) unsigned NOT NULL DEFAULT 0,
 			pipeline_name varchar(255) NOT NULL,
 			pipeline_config longtext NULL,
 			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY  (pipeline_id),
+			KEY user_id (user_id),
 			KEY pipeline_name (pipeline_name),
 			KEY created_at (created_at),
 			KEY updated_at (updated_at)

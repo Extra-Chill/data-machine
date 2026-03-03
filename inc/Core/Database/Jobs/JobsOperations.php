@@ -62,16 +62,18 @@ class JobsOperations extends BaseRepository {
 		$label = isset( $job_data['label'] ) ? sanitize_text_field( $job_data['label'] ) : null;
 
 		$parent_job_id = isset( $job_data['parent_job_id'] ) ? absint( $job_data['parent_job_id'] ) : 0;
+		$user_id       = isset( $job_data['user_id'] ) ? absint( $job_data['user_id'] ) : 0;
 
 		$data = array(
 			'pipeline_id' => $pipeline_id,
 			'flow_id'     => $flow_id,
+			'user_id'     => $user_id,
 			'source'      => $source,
 			'label'       => $label,
 			'status'      => 'pending',
 		);
 
-		$format = array( '%s', '%s', '%s', '%s', '%s' );
+		$format = array( '%s', '%s', '%d', '%s', '%s', '%s' );
 
 		if ( $parent_job_id > 0 ) {
 			$data['parent_job_id'] = $parent_job_id;
@@ -151,6 +153,11 @@ class JobsOperations extends BaseRepository {
 		if ( ! empty( $args['source'] ) ) {
 			$where_clauses[] = 'source = %s';
 			$where_values[]  = sanitize_text_field( $args['source'] );
+		}
+
+		if ( isset( $args['user_id'] ) ) {
+			$where_clauses[] = 'user_id = %d';
+			$where_values[]  = absint( $args['user_id'] );
 		}
 
 		if ( ! empty( $args['since'] ) ) {
@@ -242,6 +249,11 @@ class JobsOperations extends BaseRepository {
 		if ( ! empty( $args['source'] ) ) {
 			$where_clauses[] = 'j.source = %s';
 			$where_values[]  = sanitize_text_field( $args['source'] );
+		}
+
+		if ( isset( $args['user_id'] ) ) {
+			$where_clauses[] = 'j.user_id = %d';
+			$where_values[]  = absint( $args['user_id'] );
 		}
 
 		if ( ! empty( $args['since'] ) ) {

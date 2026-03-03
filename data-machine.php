@@ -345,9 +345,11 @@ function datamachine_activate_plugin( $network_wide = false ) {
 function datamachine_activate_for_site() {
 	$db_pipelines = new \DataMachine\Core\Database\Pipelines\Pipelines();
 	$db_pipelines->create_table();
+	$db_pipelines->migrate_columns();
 
 	$db_flows = new \DataMachine\Core\Database\Flows\Flows();
 	$db_flows->create_table();
+	$db_flows->migrate_columns();
 
 	$db_jobs = new \DataMachine\Core\Database\Jobs\Jobs();
 	$db_jobs->create_table();

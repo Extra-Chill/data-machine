@@ -128,14 +128,58 @@ class DirectoryManager {
 	}
 
 	/**
-	 * Get agent directory path
+	 * Get agent directory path.
 	 *
-	 * @return string Full path to agent directory
+	 * When a user_id is provided, returns the per-agent subdirectory
+	 * ({base}/agent/{user_id}). When user_id is 0, returns the legacy
+	 * shared directory ({base}/agent) for backward compatibility.
+	 *
+	 * @since 0.37.0 Added $user_id parameter for multi-agent partitioning.
+	 *
+	 * @param int $user_id WordPress user ID. 0 = legacy shared directory.
+	 * @return string Full path to agent directory.
 	 */
-	public function get_agent_directory(): string {
+	public function get_agent_directory( int $user_id = 0 ): string {
 		$upload_dir = wp_upload_dir();
 		$base       = trailingslashit( $upload_dir['basedir'] ) . self::REPOSITORY_DIR;
+
+		if ( 0 < $user_id ) {
+			return "{$base}/agent/{$user_id}";
+		}
+
 		return "{$base}/agent";
+	}
+
+	/**
+	 * Get the default agent user ID.
+	 *
+	 * For single-agent installs, returns the configured default or the first admin user.
+	 *
+	 * @since 0.37.0
+	 * @return int Default agent user ID.
+	 */
+	public static function get_default_agent_user_id(): int {
+		if ( defined( 'DATAMACHINE_DEFAULT_AGENT_USER' ) ) {
+			return absint( DATAMACHINE_DEFAULT_AGENT_USER );
+		}
+
+		// Cache in a static to avoid repeated DB queries.
+		static $default_id = null;
+		if ( null !== $default_id ) {
+			return $default_id;
+		}
+
+		// First admin user.
+		$admins = get_users( array(
+			'role'    => 'administrator',
+			'number'  => 1,
+			'orderby' => 'ID',
+			'order'   => 'ASC',
+			'fields'  => 'ID',
+		) );
+
+		$default_id = ! empty( $admins ) ? absint( $admins[0] ) : 1;
+		return $default_id;
 	}
 
 	/**
@@ -214,10 +258,13 @@ class DirectoryManager {
 	 * directory and its parent (datamachine-files/).
 	 *
 	 * @since 0.32.0
+	 * @since 0.37.0 Added $user_id parameter for multi-agent partitioning.
+	 *
+	 * @param int $user_id WordPress user ID. 0 = legacy shared directory.
 	 * @return bool True if directory exists and permissions were set.
 	 */
-	public function ensure_agent_directory_writable(): bool {
-		$agent_dir = $this->get_agent_directory();
+	public function ensure_agent_directory_writable( int $user_id = 0 ): bool {
+		$agent_dir = $this->get_agent_directory( $user_id );
 
 		if ( ! $this->ensure_directory_exists( $agent_dir ) ) {
 			return false;

@@ -49,6 +49,7 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 		DirectoryManager::ensure_agent_files();
 
 		$directory_manager = new DirectoryManager();
+		// TODO: Multi-agent Phase 2 — resolve user_id from execution context (#565).
 		$agent_dir         = $directory_manager->get_agent_directory();
 		$outputs           = array();
 

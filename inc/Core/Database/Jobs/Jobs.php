@@ -127,6 +127,7 @@ class Jobs {
 		// status is VARCHAR(255) to support compound statuses with reasons
 		$sql = "CREATE TABLE $table_name (
             job_id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            user_id bigint(20) unsigned NOT NULL DEFAULT 0,
             pipeline_id varchar(20) NOT NULL,
             flow_id varchar(20) NOT NULL,
             source varchar(50) NOT NULL DEFAULT 'pipeline',
@@ -141,7 +142,8 @@ class Jobs {
             KEY pipeline_id (pipeline_id),
             KEY flow_id (flow_id),
             KEY source (source),
-            KEY parent_job_id (parent_job_id)
+            KEY parent_job_id (parent_job_id),
+            KEY user_id (user_id)
         ) $charset_collate;";
 
 		dbDelta( $sql );
@@ -179,7 +181,7 @@ class Jobs {
 				"SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH 
                  FROM information_schema.COLUMNS 
                  WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s 
-                 AND COLUMN_NAME IN ('status', 'pipeline_id', 'flow_id', 'source', 'parent_job_id')",
+                 AND COLUMN_NAME IN ('status', 'pipeline_id', 'flow_id', 'source', 'parent_job_id', 'user_id')",
 				DB_NAME,
 				$table_name
 			),
@@ -282,6 +284,25 @@ class Jobs {
 					'datamachine_log',
 					'info',
 					'Added parent_job_id column to jobs table for job hierarchy',
+					array( 'table_name' => $table_name )
+				);
+			}
+		}
+
+		// Add user_id column for multi-agent support.
+		if ( ! isset( $columns['user_id'] ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$result = $wpdb->query(
+				"ALTER TABLE {$table_name}
+				 ADD COLUMN user_id bigint(20) unsigned NOT NULL DEFAULT 0 AFTER job_id,
+				 ADD KEY user_id (user_id)"
+			);
+
+			if ( false !== $result ) {
+				do_action(
+					'datamachine_log',
+					'info',
+					'Added user_id column to jobs table for multi-agent support',
 					array( 'table_name' => $table_name )
 				);
 			}
