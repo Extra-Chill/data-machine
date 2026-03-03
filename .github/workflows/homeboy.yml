@@ -1,0 +1,25 @@
+name: Homeboy
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  homeboy:
+    name: Lint, Test & Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: Extra-Chill/homeboy-action@v1
+        with:
+          extension: wordpress
+          commands: lint,test,audit
+          component: data-machine
+          settings: '{"database_type": "sqlite"}'
+          php-version: '8.2'
+          node-version: '20'
