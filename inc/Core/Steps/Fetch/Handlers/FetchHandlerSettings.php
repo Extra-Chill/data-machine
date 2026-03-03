@@ -23,7 +23,7 @@ abstract class FetchHandlerSettings extends SettingsHandler {
 	 *
 	 * @return array Common field definitions.
 	 */
-	protected static function get_common_fields(): array {
+	public static function get_common_fields(): array {
 		return array(
 			'timeframe_limit'  => array(
 				'type'        => 'select',

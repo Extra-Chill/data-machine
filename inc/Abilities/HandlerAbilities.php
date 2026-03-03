@@ -553,7 +553,18 @@ class HandlerAbilities {
 			return array();
 		}
 
-		$fields                                     = $settings_class::get_fields();
+		$fields = $settings_class::get_fields();
+
+		// Ensure base handler settings fields are always included, even if
+		// an external handler's get_fields() forgot to merge them.
+		if ( $settings_class instanceof \DataMachine\Core\Steps\Fetch\Handlers\FetchHandlerSettings ) {
+			$common_fields = \DataMachine\Core\Steps\Fetch\Handlers\FetchHandlerSettings::get_common_fields();
+			$fields        = array_merge( $common_fields, $fields );
+		} elseif ( $settings_class instanceof \DataMachine\Core\Steps\Publish\Handlers\PublishHandlerSettings ) {
+			$common_fields = \DataMachine\Core\Steps\Publish\Handlers\PublishHandlerSettings::get_common_fields();
+			$fields        = array_merge( $common_fields, $fields );
+		}
+
 		self::$config_fields_cache[ $handler_slug ] = $fields;
 
 		return $fields;
