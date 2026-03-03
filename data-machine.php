@@ -21,7 +21,7 @@ if ( ! datamachine_check_requirements() ) {
 	return;
 }
 
-define( 'DATAMACHINE_VERSION', '0.34.0' );
+define( 'DATAMACHINE_VERSION', '0.35.0' );
 
 define( 'DATAMACHINE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_URL', plugin_dir_url( __FILE__ ) );
@@ -367,6 +367,9 @@ function datamachine_activate_for_site() {
 
 	// Re-schedule any flows with non-manual scheduling
 	datamachine_activate_scheduled_flows();
+
+	// Track DB schema version so deploy-time migrations auto-run.
+	update_option( 'datamachine_db_version', DATAMACHINE_VERSION, true );
 }
 
 /**
@@ -404,6 +407,30 @@ function datamachine_on_new_site( \WP_Site $new_site ) {
 	restore_current_blog();
 }
 add_action( 'wp_initialize_site', 'datamachine_on_new_site', 200 );
+
+/**
+ * Auto-run DB migrations when code version is ahead of stored DB version.
+ *
+ * Deploys via rsync/homeboy don't trigger activation hooks, so new columns
+ * are silently missing until someone manually reactivates. This check runs
+ * on every request and calls the idempotent activation function when the
+ * deployed code version exceeds the stored DB schema version.
+ *
+ * Pattern used by WooCommerce, bbPress, and most plugins with custom tables.
+ *
+ * @since 0.35.0
+ */
+function datamachine_maybe_run_migrations() {
+	$db_version = get_option( 'datamachine_db_version', '0.0.0' );
+
+	if ( version_compare( $db_version, DATAMACHINE_VERSION, '>=' ) ) {
+		return;
+	}
+
+	datamachine_activate_for_site();
+	update_option( 'datamachine_db_version', DATAMACHINE_VERSION, true );
+}
+add_action( 'init', 'datamachine_maybe_run_migrations', 5 );
 
 /**
  * Build scaffold defaults for agent memory files using WordPress site data.
