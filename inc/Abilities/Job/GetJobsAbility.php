@@ -77,12 +77,16 @@ class GetJobsAbility {
 								'default'     => 'j.job_id',
 								'description' => __( 'Column to order by', 'data-machine' ),
 							),
-							'order'       => array(
-								'type'        => 'string',
-								'enum'        => array( 'ASC', 'DESC' ),
-								'default'     => 'DESC',
-								'description' => __( 'Sort order', 'data-machine' ),
-							),
+						'order'       => array(
+							'type'        => 'string',
+							'enum'        => array( 'ASC', 'DESC' ),
+							'default'     => 'DESC',
+							'description' => __( 'Sort order', 'data-machine' ),
+						),
+						'since'       => array(
+							'type'        => array( 'string', 'null' ),
+							'description' => __( 'Filter jobs created at or after this datetime (Y-m-d H:i:s)', 'data-machine' ),
+						),
 						),
 					),
 					'output_schema'       => array(
@@ -123,6 +127,7 @@ class GetJobsAbility {
 		$pipeline_id = $input['pipeline_id'] ?? null;
 		$status      = $input['status'] ?? null;
 		$source      = $input['source'] ?? null;
+		$since       = $input['since'] ?? null;
 		$per_page    = (int) ( $input['per_page'] ?? self::DEFAULT_PER_PAGE );
 		$offset      = (int) ( $input['offset'] ?? 0 );
 		$orderby     = $input['orderby'] ?? 'j.job_id';
@@ -190,6 +195,11 @@ class GetJobsAbility {
 		if ( null !== $source && '' !== $source ) {
 			$args['source']            = sanitize_text_field( $source );
 			$filters_applied['source'] = $args['source'];
+		}
+
+		if ( null !== $since && '' !== $since ) {
+			$args['since']            = sanitize_text_field( $since );
+			$filters_applied['since'] = $args['since'];
 		}
 
 		$jobs  = $this->db_jobs->get_jobs_for_list_table( $args );

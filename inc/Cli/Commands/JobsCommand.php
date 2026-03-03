@@ -151,6 +151,9 @@ class JobsCommand extends BaseCommand {
 	 * [--source=<source>]
 	 * : Filter by source (pipeline, system).
 	 *
+	 * [--since=<datetime>]
+	 * : Show jobs created after this time. Accepts ISO datetime or relative strings (e.g., "1 hour ago", "today", "yesterday").
+	 *
 	 * [--limit=<limit>]
 	 * : Number of jobs to show.
 	 * ---
@@ -196,6 +199,12 @@ class JobsCommand extends BaseCommand {
 	 *     # JSON output
 	 *     wp datamachine jobs list --format=json
 	 *
+	 *     # Show failed jobs from the last 2 hours
+	 *     wp datamachine jobs list --status=failed --since="2 hours ago"
+	 *
+	 *     # Show all jobs since midnight
+	 *     wp datamachine jobs list --since=today
+	 *
 	 * @subcommand list
 	 */
 	public function list_jobs( array $args, array $assoc_args ): void {
@@ -224,6 +233,16 @@ class JobsCommand extends BaseCommand {
 
 		if ( $flow_id ) {
 			$input['flow_id'] = $flow_id;
+		}
+
+		$since = $assoc_args['since'] ?? null;
+		if ( $since ) {
+			$timestamp = strtotime( $since );
+			if ( false === $timestamp ) {
+				WP_CLI::error( sprintf( 'Invalid --since value: "%s". Use ISO datetime or relative string (e.g., "1 hour ago", "today").', $since ) );
+				return;
+			}
+			$input['since'] = gmdate( 'Y-m-d H:i:s', $timestamp );
 		}
 
 		$result = $this->abilities->executeGetJobs( $input );

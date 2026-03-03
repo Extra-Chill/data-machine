@@ -143,13 +143,19 @@ class JobsOperations extends BaseRepository {
 		}
 
 		if ( ! empty( $args['status'] ) ) {
-			$where_clauses[] = 'status = %s';
-			$where_values[]  = sanitize_text_field( $args['status'] );
+			$status_value    = sanitize_text_field( $args['status'] );
+			$where_clauses[] = 'status LIKE %s';
+			$where_values[]  = $this->wpdb->esc_like( $status_value ) . '%';
 		}
 
 		if ( ! empty( $args['source'] ) ) {
 			$where_clauses[] = 'source = %s';
 			$where_values[]  = sanitize_text_field( $args['source'] );
+		}
+
+		if ( ! empty( $args['since'] ) ) {
+			$where_clauses[] = 'created_at >= %s';
+			$where_values[]  = sanitize_text_field( $args['since'] );
 		}
 
 		$where_sql = '';
@@ -227,13 +233,20 @@ class JobsOperations extends BaseRepository {
 		}
 
 		if ( ! empty( $args['status'] ) ) {
-			$where_clauses[] = 'j.status = %s';
-			$where_values[]  = sanitize_text_field( $args['status'] );
+			$status_value = sanitize_text_field( $args['status'] );
+			// Prefix match: --status=failed matches "failed", "failed:reason", etc.
+			$where_clauses[] = 'j.status LIKE %s';
+			$where_values[]  = $this->wpdb->esc_like( $status_value ) . '%';
 		}
 
 		if ( ! empty( $args['source'] ) ) {
 			$where_clauses[] = 'j.source = %s';
 			$where_values[]  = sanitize_text_field( $args['source'] );
+		}
+
+		if ( ! empty( $args['since'] ) ) {
+			$where_clauses[] = 'j.created_at >= %s';
+			$where_values[]  = sanitize_text_field( $args['since'] );
 		}
 
 		$where_sql = '';
