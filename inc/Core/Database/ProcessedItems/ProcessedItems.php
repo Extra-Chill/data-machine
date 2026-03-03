@@ -253,6 +253,9 @@ class ProcessedItems extends BaseRepository {
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
 
+		// dbDelta may not add UNIQUE indexes to existing tables — ensure it exists.
+		self::ensure_unique_index( $this->table_name );
+
 		// Log table creation
 		do_action(
 			'datamachine_log',
@@ -262,6 +265,65 @@ class ProcessedItems extends BaseRepository {
 				'table_name' => $this->table_name,
 				'action'     => 'create_table',
 			)
+		);
+	}
+
+	/**
+	 * Ensure the UNIQUE index on (flow_step_id, source_type, item_identifier) exists.
+	 *
+	 * dbDelta is unreliable at adding indexes to existing tables. This method
+	 * deduplicates any existing rows and adds the UNIQUE index if missing.
+	 *
+	 * @since 0.35.0
+	 *
+	 * @param string $table_name Full table name.
+	 */
+	private static function ensure_unique_index( string $table_name ): void {
+		global $wpdb;
+
+		// Check if the index already exists.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$index = $wpdb->get_row( "SHOW INDEX FROM {$table_name} WHERE Key_name = 'flow_source_item'" );
+
+		if ( $index ) {
+			return;
+		}
+
+		// Remove duplicate rows, keeping the earliest (lowest id) for each combo.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$deleted = $wpdb->query(
+			"DELETE t1 FROM {$table_name} t1
+			 INNER JOIN {$table_name} t2
+			 WHERE t1.id > t2.id
+			   AND t1.flow_step_id = t2.flow_step_id
+			   AND t1.source_type = t2.source_type
+			   AND t1.item_identifier = t2.item_identifier"
+		);
+
+		if ( $deleted > 0 ) {
+			do_action(
+				'datamachine_log',
+				'info',
+				'Deduplicated processed_items before adding UNIQUE index',
+				array(
+					'table_name'   => $table_name,
+					'rows_removed' => $deleted,
+				)
+			);
+		}
+
+		// Add the UNIQUE index.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$wpdb->query(
+			"ALTER TABLE {$table_name}
+			 ADD UNIQUE KEY `flow_source_item` (flow_step_id, source_type, item_identifier(191))"
+		);
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Added UNIQUE index flow_source_item to processed_items table',
+			array( 'table_name' => $table_name )
 		);
 	}
 }
