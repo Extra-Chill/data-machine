@@ -34,6 +34,11 @@ import './frontend.css';
 
 /* ---------- helpers ---------- */
 
+/** Detect touch-primary devices (phones/tablets). */
+function isTouchDevice(): boolean {
+	return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+}
+
 function escapeHtml( text: string ): string {
 	const div = document.createElement( 'div' );
 	div.textContent = text;
@@ -262,6 +267,10 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 	const markersRef = useRef<L.Marker[]>( [] );
 	const userMarkerRef = useRef<L.Marker | null>( null );
 	const containerRef = useRef<HTMLDivElement | null>( null );
+	const gestureOverlayRef = useRef<HTMLDivElement | null>( null );
+	const gestureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+		null,
+	);
 
 	const [ venues, setVenues ] = useState<Venue[]>( initialVenues );
 	const [ loading, setLoading ] = useState( false );
@@ -319,23 +328,60 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 			? venues[ 0 ].lon
 			: -97.7431;
 
+		const isTouch = isTouchDevice();
+
 		const map = L.map( el, {
 			scrollWheelZoom: false,
 			boxZoom: true,
+			// On touch devices: disable dragging so single-finger
+			// scrolls the page. Users pinch-zoom or use two fingers.
+			dragging: ! isTouch,
+			tap: ! isTouch,
 		} ).setView( [ initialLat, initialLon ], zoom );
 
-		// Ctrl/Cmd + scroll to zoom.
-		el.addEventListener(
-			'wheel',
-			( e: WheelEvent ) => {
-				if ( e.ctrlKey || e.metaKey ) {
-					e.preventDefault();
-					map.scrollWheelZoom.enable();
+		if ( isTouch ) {
+			// Show gesture hint when user tries single-finger drag.
+			const showGestureHint = () => {
+				const overlay = gestureOverlayRef.current;
+				if ( ! overlay ) return;
+
+				overlay.style.opacity = '1';
+
+				if ( gestureTimeoutRef.current ) {
+					clearTimeout( gestureTimeoutRef.current );
 				}
-			},
-			{ passive: false },
-		);
-		map.on( 'mouseout', () => map.scrollWheelZoom.disable() );
+				gestureTimeoutRef.current = setTimeout( () => {
+					overlay.style.opacity = '0';
+				}, 1500 );
+			};
+
+			el.addEventListener( 'touchstart', ( e: TouchEvent ) => {
+				if ( e.touches.length === 1 ) {
+					showGestureHint();
+				} else if ( e.touches.length >= 2 ) {
+					// Two-finger gesture — enable dragging temporarily.
+					map.dragging.enable();
+				}
+			}, { passive: true } );
+
+			el.addEventListener( 'touchend', () => {
+				// Re-disable dragging after gesture ends.
+				map.dragging.disable();
+			}, { passive: true } );
+		} else {
+			// Desktop: Ctrl/Cmd + scroll to zoom.
+			el.addEventListener(
+				'wheel',
+				( e: WheelEvent ) => {
+					if ( e.ctrlKey || e.metaKey ) {
+						e.preventDefault();
+						map.scrollWheelZoom.enable();
+					}
+				},
+				{ passive: false },
+			);
+			map.on( 'mouseout', () => map.scrollWheelZoom.disable() );
+		}
 
 		// Tile layer.
 		const tileUrl = TILE_URLS[ mapType ] || TILE_URLS[ 'osm-standard' ];
@@ -489,14 +535,23 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 
 	return (
 		<>
-			<div
-				id={ containerId }
-				ref={ containerRef }
-				className="data-machine-events-map"
-				style={ { height: `${ height }px` } }
-				aria-label="Events map"
-				role="application"
-			/>
+			<div className="data-machine-events-map-container">
+				<div
+					id={ containerId }
+					ref={ containerRef }
+					className="data-machine-events-map"
+					style={ { height: `${ height }px` } }
+					aria-label="Events map"
+					role="application"
+				/>
+				<div
+					ref={ gestureOverlayRef }
+					className="data-machine-events-map-gesture-overlay"
+					aria-hidden="true"
+				>
+					Use two fingers to move the map
+				</div>
+			</div>
 			{ showLocationSearch && geocodeUrl && (
 				<LocationSearch
 					geocodeUrl={ geocodeUrl }
