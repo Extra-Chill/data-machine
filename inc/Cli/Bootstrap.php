@@ -32,6 +32,7 @@ WP_CLI::add_command( 'datamachine workspace', Commands\WorkspaceCommand::class )
 WP_CLI::add_command( 'datamachine batch', Commands\BatchCommand::class );
 WP_CLI::add_command( 'datamachine image', Commands\ImageCommand::class );
 WP_CLI::add_command( 'datamachine github', Commands\GitHubCommand::class );
+WP_CLI::add_command( 'datamachine auth', Commands\AuthCommand::class );
 
 // Aliases for AI agent compatibility (singular/plural variants).
 WP_CLI::add_command( 'datamachine setting', Commands\SettingsCommand::class );
