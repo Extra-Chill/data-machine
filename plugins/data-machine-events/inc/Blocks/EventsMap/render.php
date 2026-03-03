@@ -69,9 +69,8 @@ $wrapper = get_block_wrapper_attributes( array(
 	'class' => 'data-machine-events-map-block',
 ) );
 
-// REST URL for venue fetching.
+// REST URL for venue fetching (public endpoint — no nonce needed).
 $rest_url = rest_url( 'datamachine/v1/events/venues' );
-$nonce    = wp_create_nonce( 'wp_rest' );
 
 // Location search (plugins can enable via filter).
 $show_location_search = (bool) ( $attributes['showLocationSearch'] ?? false );
@@ -107,7 +106,6 @@ $summary = apply_filters( 'data_machine_events_map_summary', '', array(), $conte
 		data-taxonomy="<?php echo esc_attr( $context['taxonomy'] ); ?>"
 		data-term-id="<?php echo esc_attr( $context['term_id'] ); ?>"
 		data-rest-url="<?php echo esc_attr( $rest_url ); ?>"
-		data-nonce="<?php echo esc_attr( $nonce ); ?>"
 		<?php if ( $show_location_search ) : ?>
 		data-show-location-search="1"
 		data-geocode-url="<?php echo esc_attr( $geocode_rest_url ); ?>"

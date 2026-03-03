@@ -22,14 +22,20 @@ interface FetchVenuesParams {
 /**
  * Fetch venues from the REST API.
  *
+ * This is a public endpoint (permission_callback: __return_true) so we
+ * intentionally do NOT send X-WP-Nonce. Sending a stale nonce causes
+ * WordPress to return 403 (rest_cookie_invalid_nonce) even on public
+ * routes — this happens on client-side navigation where the nonce
+ * from the original page render goes stale.
+ *
  * @param restUrl  Base REST URL (e.g. /wp-json/datamachine/v1/events/venues).
- * @param nonce    WP REST nonce for authentication (optional for public endpoint).
+ * @param _nonce   Deprecated — kept for API compatibility but no longer sent.
  * @param params   Optional filter parameters.
  * @returns Promise resolving to the venue list response.
  */
 export async function fetchVenues(
 	restUrl: string,
-	nonce: string,
+	_nonce: string,
 	params: FetchVenuesParams = {},
 ): Promise<VenueListResponse> {
 	const url = new URL( restUrl, window.location.origin );
@@ -60,15 +66,9 @@ export async function fetchVenues(
 		url.searchParams.set( 'term_id', String( params.termId ) );
 	}
 
-	const headers: Record<string, string> = {
-		'Content-Type': 'application/json',
-	};
-
-	if ( nonce ) {
-		headers['X-WP-Nonce'] = nonce;
-	}
-
-	const response = await fetch( url.toString(), { headers } );
+	const response = await fetch( url.toString(), {
+		headers: { Accept: 'application/json' },
+	} );
 
 	if ( ! response.ok ) {
 		throw new Error( `Venue fetch failed: ${ response.status } ${ response.statusText }` );
