@@ -277,6 +277,65 @@ class InternalLinkingAbilities {
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
+
+			wp_register_ability(
+				'datamachine/inject-category-links',
+				array(
+					'label'               => 'Inject Category Links',
+					'description'         => 'Deterministic keyword-matching internal link injection within a single category. No AI calls. Appends a "Related Reading" section to each post.',
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'category' ),
+						'properties' => array(
+							'category'       => array(
+								'type'        => 'string',
+								'description' => 'Category slug to process.',
+							),
+							'links_per_post' => array(
+								'type'        => 'integer',
+								'description' => 'Maximum related links per post.',
+								'default'     => 3,
+							),
+							'min_score'      => array(
+								'type'        => 'integer',
+								'description' => 'Minimum keyword overlap score. Use 0 to allow category-sibling fallback.',
+								'default'     => 0,
+							),
+							'dry_run'        => array(
+								'type'        => 'boolean',
+								'description' => 'Preview without writing.',
+								'default'     => false,
+							),
+							'orphans_only'   => array(
+								'type'        => 'boolean',
+								'description' => 'Only process posts with zero existing internal links.',
+								'default'     => false,
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'  => array( 'type' => 'boolean' ),
+							'category' => array( 'type' => 'string' ),
+							'total'    => array( 'type' => 'integer' ),
+							'injected' => array( 'type' => 'integer' ),
+							'skipped'  => array( 'type' => 'integer' ),
+							'dry_run'  => array( 'type' => 'boolean' ),
+							'results'  => array(
+								'type'  => 'array',
+								'items' => array( 'type' => 'object' ),
+							),
+							'message'  => array( 'type' => 'string' ),
+							'error'    => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'injectCategoryLinks' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => false ),
+				)
+			);
 		};
 
 		if ( doing_action( 'wp_abilities_api_init' ) ) {
@@ -969,5 +1028,414 @@ class InternalLinkingAbilities {
 		}
 
 		return array_unique( $links );
+	}
+
+	/**
+	 * Inject "Related Reading" internal links for posts within a category.
+	 *
+	 * Deterministic keyword-matching approach — no AI calls.
+	 * For each post, extracts significant keywords from the title, scores
+	 * all other posts in the same category by keyword overlap, and appends
+	 * a "Related Reading" section with the top matches.
+	 *
+	 * Skips posts that already have a "Related Reading" section.
+	 *
+	 * @since 0.34.0
+	 *
+	 * @param array $input {
+	 *     @type string $category       Category slug (required).
+	 *     @type int    $links_per_post Max related links per post (default 3).
+	 *     @type int    $min_score      Minimum keyword overlap score (default 1).
+	 *     @type bool   $dry_run        Preview without writing (default false).
+	 *     @type bool   $orphans_only   Only process orphan posts — those with zero
+	 *                                  existing internal links in content (default false).
+	 * }
+	 * @return array Ability response.
+	 */
+	public static function injectCategoryLinks( array $input ): array {
+		$category       = sanitize_text_field( $input['category'] ?? '' );
+		$links_per_post = absint( $input['links_per_post'] ?? 3 );
+		$min_score      = absint( $input['min_score'] ?? 0 );
+		$dry_run        = ! empty( $input['dry_run'] );
+		$orphans_only   = ! empty( $input['orphans_only'] );
+
+		if ( empty( $category ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Required parameter: category (slug).',
+			);
+		}
+
+		$term = get_term_by( 'slug', $category, 'category' );
+		if ( ! $term ) {
+			return array(
+				'success' => false,
+				'error'   => "Category '{$category}' not found.",
+			);
+		}
+
+		// Get all published posts in this category.
+		$posts = get_posts(
+			array(
+				'post_type'      => 'post',
+				'post_status'    => 'publish',
+				'category'       => $term->term_id,
+				'numberposts'    => -1,
+				'orderby'        => 'title',
+				'order'          => 'ASC',
+			)
+		);
+
+		if ( empty( $posts ) ) {
+			return array(
+				'success'    => true,
+				'category'   => $term->name,
+				'total'      => 0,
+				'injected'   => 0,
+				'skipped'    => 0,
+				'results'    => array(),
+				'message'    => "No published posts in category '{$term->name}'.",
+			);
+		}
+
+		$home_host = wp_parse_url( home_url(), PHP_URL_HOST );
+
+		// Build keyword index for all posts.
+		$post_keywords = array();
+		$post_map      = array(); // id => post object.
+		foreach ( $posts as $post ) {
+			$post_map[ $post->ID ] = $post;
+			$post_keywords[ $post->ID ] = self::extractTitleKeywords( $post->post_title );
+		}
+
+		$results  = array();
+		$injected = 0;
+		$skipped  = 0;
+
+		foreach ( $posts as $post ) {
+			$post_id = $post->ID;
+
+			// Skip if already has a Related Reading section.
+			if ( false !== strpos( $post->post_content, 'Related Reading' ) ) {
+				$results[] = array(
+					'post_id' => $post_id,
+					'title'   => $post->post_title,
+					'status'  => 'skipped_has_section',
+					'matches' => array(),
+				);
+				++$skipped;
+				continue;
+			}
+
+			// If orphans_only, skip posts that already have internal links.
+			if ( $orphans_only ) {
+				$existing_links = self::extractInternalLinks( $post->post_content, $home_host );
+				if ( ! empty( $existing_links ) ) {
+					$results[] = array(
+						'post_id' => $post_id,
+						'title'   => $post->post_title,
+						'status'  => 'skipped_has_links',
+						'matches' => array(),
+					);
+					++$skipped;
+					continue;
+				}
+			}
+
+			// Score all other posts in category by keyword overlap.
+			$scores = self::scoreRelatedPosts( $post_id, $post_keywords );
+
+			// Filter by min score and take top N.
+			$matches = array();
+			foreach ( $scores as $match_id => $score ) {
+				if ( $score < $min_score ) {
+					continue;
+				}
+				$match_post = $post_map[ $match_id ] ?? null;
+				if ( ! $match_post ) {
+					continue;
+				}
+				$matches[] = array(
+					'post_id'   => $match_id,
+					'title'     => $match_post->post_title,
+					'permalink' => get_permalink( $match_id ),
+					'score'     => $score,
+				);
+				if ( count( $matches ) >= $links_per_post ) {
+					break;
+				}
+			}
+
+			// Fallback: if fewer matches than needed, fill with random
+			// category siblings. All posts in the same category are related
+			// by topic — e.g. all "Why Am I Craving X?" posts.
+			if ( count( $matches ) < $links_per_post && 0 === $min_score ) {
+				$used_ids    = array_column( $matches, 'post_id' );
+				$used_ids[]  = $post_id;
+				$sibling_ids = array_diff( array_keys( $post_map ), $used_ids );
+
+				// Deterministic shuffle based on source post ID for consistency.
+				$sibling_list = array_values( $sibling_ids );
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.rand_mt_rand
+				mt_srand( $post_id );
+				shuffle( $sibling_list );
+				mt_srand();
+
+				foreach ( $sibling_list as $sib_id ) {
+					if ( count( $matches ) >= $links_per_post ) {
+						break;
+					}
+					$sib_post = $post_map[ $sib_id ] ?? null;
+					if ( ! $sib_post ) {
+						continue;
+					}
+					$matches[] = array(
+						'post_id'   => $sib_id,
+						'title'     => $sib_post->post_title,
+						'permalink' => get_permalink( $sib_id ),
+						'score'     => 0,
+					);
+				}
+			}
+
+			if ( empty( $matches ) ) {
+				$results[] = array(
+					'post_id' => $post_id,
+					'title'   => $post->post_title,
+					'status'  => 'skipped_no_matches',
+					'matches' => array(),
+				);
+				++$skipped;
+				continue;
+			}
+
+			// Build the Related Reading block HTML.
+			$section = self::buildRelatedReadingBlock( $matches );
+
+			if ( ! $dry_run ) {
+				$updated_content = rtrim( $post->post_content ) . "\n\n" . $section;
+				wp_update_post(
+					array(
+						'ID'           => $post_id,
+						'post_content' => $updated_content,
+					)
+				);
+			}
+
+			$results[] = array(
+				'post_id' => $post_id,
+				'title'   => $post->post_title,
+				'status'  => $dry_run ? 'would_inject' : 'injected',
+				'matches' => array_map(
+					fn( $m ) => $m['title'] . ' (score: ' . $m['score'] . ')',
+					$matches
+				),
+			);
+			++$injected;
+		}
+
+		$verb = $dry_run ? 'would be updated' : 'updated';
+
+		return array(
+			'success'  => true,
+			'category' => $term->name,
+			'total'    => count( $posts ),
+			'injected' => $injected,
+			'skipped'  => $skipped,
+			'dry_run'  => $dry_run,
+			'results'  => $results,
+			'message'  => sprintf(
+				'%s: %d/%d posts %s, %d skipped.',
+				$term->name,
+				$injected,
+				count( $posts ),
+				$verb,
+				$skipped
+			),
+		);
+	}
+
+	/**
+	 * Extract significant keywords from a post title.
+	 *
+	 * Strips common stop words, question patterns, and site-specific
+	 * prefixes to isolate the meaningful topic words.
+	 *
+	 * @since 0.34.0
+	 *
+	 * @param string $title Post title.
+	 * @return array Array of lowercase keyword strings.
+	 */
+	private static function extractTitleKeywords( string $title ): array {
+		$title = strtolower( $title );
+
+		// Remove common patterns from saraichinwag.com titles.
+		// Order matters — longer/more specific patterns first.
+		$patterns = array(
+			// Listicle templates.
+			'/^\d+\s+(amazing|incredible|mind[\s\-]melting|surprising|unique|unusual|weird|fun|cool|interesting|common)\s+facts?\s+about\s*/i',
+			'/^\d+\s+(unique\s+)?uses?\s+for\s*/i',
+			'/^\d+\s+things\s+\w+\s+know\s+about\s*/i',
+			'/^\d+\s+(most\s+common|ways\s+to|things\s+that|reasons?\s+why)\s*/i',
+			// Craving patterns.
+			'/^why am i craving\s*/i',
+			// Spiritual/meaning patterns.
+			'/^the spiritual meaning of\s*/i',
+			'/^spiritual meaning of\s*/i',
+			'/^the meaning of\s+.*\s+in\s+dreams?\s*/i',
+			'/^the meaning of\s*/i',
+			'/^meaning of\s*/i',
+			'/^the symbolism of\s*/i',
+			'/^symbolism of\s*/i',
+			// Question patterns.
+			'/^what does it mean (when|to|if)\s*/i',
+			'/^what (does|do|is|are|happens?\s+if|happens?\s+when)\s*/i',
+			'/^how (do|does|to|can|are)\s*/i',
+			'/^why (do|does|don\'t|are|is|can\'t)\s*/i',
+			'/^can\s+\w+\s*/i',
+			'/^do\s+\w+\s*/i',
+			'/^is\s+\w+\s*/i',
+			'/^are\s+/i',
+			// Cleanup.
+			'/\s*\([^)]*\)\s*/i', // Remove parenthetical text.
+			'/\?$/',               // Remove trailing question mark.
+		);
+
+		foreach ( $patterns as $pattern ) {
+			$title = preg_replace( $pattern, '', $title );
+		}
+
+		// Split into words.
+		$words = preg_split( '/[\s\-–—:,;!?.]+/', $title, -1, PREG_SPLIT_NO_EMPTY );
+
+		// Remove stop words.
+		$stop_words = array(
+			'a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to',
+			'for', 'of', 'with', 'by', 'from', 'up', 'out', 'if', 'about',
+			'into', 'through', 'during', 'before', 'after', 'above', 'below',
+			'between', 'same', 'all', 'each', 'every', 'both', 'few', 'more',
+			'most', 'other', 'some', 'such', 'no', 'not', 'only', 'own',
+			'so', 'than', 'too', 'very', 'just', 'because', 'as', 'until',
+			'while', 'when', 'where', 'how', 'what', 'which', 'who', 'whom',
+			'this', 'that', 'these', 'those', 'am', 'is', 'are', 'was',
+			'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having',
+			'do', 'does', 'did', 'doing', 'would', 'should', 'could', 'may',
+			'might', 'must', 'shall', 'can', 'will', 'it', 'its', 'you',
+			'your', 'yours', 'i', 'me', 'my', 'we', 'our', 'they', 'their',
+			'he', 'she', 'him', 'her', 'his', 'hers', 'them',
+		);
+
+		$keywords = array_diff( $words, $stop_words );
+
+		// Remove very short words (1-2 chars) unless they're meaningful.
+		$keywords = array_filter(
+			$keywords,
+			fn( $w ) => strlen( $w ) > 2
+		);
+
+		return array_values( $keywords );
+	}
+
+	/**
+	 * Score all other posts against a source post by keyword overlap.
+	 *
+	 * Returns an associative array of post_id => score, sorted descending.
+	 * Uses three matching strategies:
+	 * 1. Exact keyword match (strongest signal).
+	 * 2. Stem match — keywords sharing a common stem of 5+ chars.
+	 * 3. Substring match — one keyword contains the other (for compounds).
+	 *
+	 * @since 0.34.0
+	 *
+	 * @param int   $source_id     Source post ID.
+	 * @param array $post_keywords Map of post_id => array of keywords.
+	 * @return array Sorted array of post_id => score (descending).
+	 */
+	private static function scoreRelatedPosts( int $source_id, array $post_keywords ): array {
+		$source_words = $post_keywords[ $source_id ] ?? array();
+		if ( empty( $source_words ) ) {
+			return array();
+		}
+
+		$scores = array();
+
+		foreach ( $post_keywords as $candidate_id => $candidate_words ) {
+			if ( $candidate_id === $source_id ) {
+				continue;
+			}
+			if ( empty( $candidate_words ) ) {
+				continue;
+			}
+
+			$score = 0;
+
+			// 1. Exact keyword match (2 points each).
+			$exact_overlap = array_intersect( $source_words, $candidate_words );
+			$score += count( $exact_overlap ) * 2;
+
+			// 2. Stem/substring matching for non-exact matches (1 point each).
+			$source_remaining    = array_diff( $source_words, $exact_overlap );
+			$candidate_remaining = array_diff( $candidate_words, $exact_overlap );
+
+			foreach ( $source_remaining as $s_word ) {
+				foreach ( $candidate_remaining as $c_word ) {
+					// Stem match: compare first 5+ characters.
+					$min_stem = min( strlen( $s_word ), strlen( $c_word ), 5 );
+					if ( $min_stem >= 4 && substr( $s_word, 0, $min_stem ) === substr( $c_word, 0, $min_stem ) ) {
+						++$score;
+						break; // One match per source word.
+					}
+
+					// Substring match: one contains the other (for compound words).
+					if ( strlen( $s_word ) >= 4 && strlen( $c_word ) >= 4 ) {
+						if ( false !== strpos( $s_word, $c_word ) || false !== strpos( $c_word, $s_word ) ) {
+							++$score;
+							break;
+						}
+					}
+				}
+			}
+
+			if ( $score > 0 ) {
+				$scores[ $candidate_id ] = $score;
+			}
+		}
+
+		arsort( $scores );
+		return $scores;
+	}
+
+	/**
+	 * Build a WordPress block-format "Related Reading" section.
+	 *
+	 * Creates a heading + unordered list of internal links using
+	 * Gutenberg block markup.
+	 *
+	 * @since 0.34.0
+	 *
+	 * @param array $matches Array of match arrays with 'title' and 'permalink'.
+	 * @return string Block-formatted HTML.
+	 */
+	private static function buildRelatedReadingBlock( array $matches ): string {
+		$lines   = array();
+		$lines[] = '<!-- wp:heading -->';
+		$lines[] = '<h2 class="wp-block-heading">Related Reading</h2>';
+		$lines[] = '<!-- /wp:heading -->';
+		$lines[] = '';
+		$lines[] = '<!-- wp:list -->';
+		$lines[] = '<ul>';
+
+		foreach ( $matches as $match ) {
+			$title = esc_html( $match['title'] );
+			$url   = esc_url( $match['permalink'] );
+			$lines[] = '<!-- wp:list-item -->';
+			$lines[] = '<li><a href="' . $url . '">' . $title . '</a></li>';
+			$lines[] = '<!-- /wp:list-item -->';
+		}
+
+		$lines[] = '</ul>';
+		$lines[] = '<!-- /wp:list -->';
+
+		return implode( "\n", $lines );
 	}
 }

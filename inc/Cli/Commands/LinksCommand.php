@@ -531,6 +531,144 @@ class LinksCommand extends BaseCommand {
 	}
 
 	/**
+	 * Inject "Related Reading" internal links within a category.
+	 *
+	 * Deterministic keyword-matching — no AI calls, no cost.
+	 * For each post, extracts significant keywords from the title,
+	 * scores all other posts in the same category by overlap, and
+	 * appends a "Related Reading" section with the top matches.
+	 *
+	 * Bypasses the crosslinker System Agent entirely — safe to run
+	 * while issue #479 (template title bias) is open.
+	 *
+	 * ## OPTIONS
+	 *
+	 * --category=<slug>
+	 * : Category slug to process (required).
+	 *
+	 * [--links-per-post=<number>]
+	 * : Maximum related links per post.
+	 * ---
+	 * default: 3
+	 * ---
+	 *
+	 * [--min-score=<number>]
+	 * : Minimum keyword overlap score to qualify as a match.
+	 *   Use 0 to allow category-sibling fallback when no keyword
+	 *   overlap exists (useful for single-keyword title categories
+	 *   like Cravings where all posts are topically related).
+	 * ---
+	 * default: 0
+	 * ---
+	 *
+	 * [--orphans-only]
+	 * : Only process posts with zero existing internal links in content.
+	 *
+	 * [--dry-run]
+	 * : Preview what would be injected without writing.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - csv
+	 * ---
+	 *
+	 * [--fields=<fields>]
+	 * : Limit output to specific fields (comma-separated).
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Preview links for the Cravings category
+	 *     wp datamachine links inject-category --category=cravings --dry-run
+	 *
+	 *     # Inject links for Cravings (orphans only, 3 links each)
+	 *     wp datamachine links inject-category --category=cravings --orphans-only
+	 *
+	 *     # Process Science category with higher match threshold
+	 *     wp datamachine links inject-category --category=science --min-score=2
+	 *
+	 *     # JSON output for scripting
+	 *     wp datamachine links inject-category --category=colors --dry-run --format=json
+	 *
+	 * @subcommand inject-category
+	 */
+	public function inject_category( array $args, array $assoc_args ): void {
+		$category       = sanitize_text_field( $assoc_args['category'] ?? '' );
+		$links_per_post = absint( $assoc_args['links-per-post'] ?? 3 );
+		$min_score      = absint( $assoc_args['min-score'] ?? 0 );
+		$orphans_only   = isset( $assoc_args['orphans-only'] );
+		$dry_run        = isset( $assoc_args['dry-run'] );
+		$format         = $assoc_args['format'] ?? 'table';
+
+		if ( empty( $category ) ) {
+			WP_CLI::error( 'Required: --category=<slug>' );
+			return;
+		}
+
+		if ( $dry_run ) {
+			WP_CLI::log( 'Dry run mode — no posts will be modified.' );
+		}
+
+		WP_CLI::log( sprintf( 'Processing category: %s (links-per-post=%d, min-score=%d%s)',
+			$category,
+			$links_per_post,
+			$min_score,
+			$orphans_only ? ', orphans-only' : ''
+		) );
+
+		$result = InternalLinkingAbilities::injectCategoryLinks(
+			array(
+				'category'       => $category,
+				'links_per_post' => $links_per_post,
+				'min_score'      => $min_score,
+				'dry_run'        => $dry_run,
+				'orphans_only'   => $orphans_only,
+			)
+		);
+
+		if ( empty( $result['success'] ) ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to inject category links.' );
+			return;
+		}
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( \wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			return;
+		}
+
+		// Display results table.
+		$items = array();
+		foreach ( $result['results'] as $row ) {
+			$items[] = array(
+				'post_id' => $row['post_id'],
+				'title'   => mb_substr( $row['title'], 0, 60 ),
+				'status'  => $row['status'],
+				'matches' => implode( ' | ', $row['matches'] ),
+			);
+		}
+
+		if ( ! empty( $items ) ) {
+			$this->format_items(
+				$items,
+				array( 'post_id', 'title', 'status', 'matches' ),
+				$assoc_args
+			);
+		}
+
+		$verb = $dry_run ? 'would be updated' : 'updated';
+		WP_CLI::success( $result['message'] ?? sprintf(
+			'%d/%d posts %s.',
+			$result['injected'],
+			$result['total'],
+			$verb
+		) );
+	}
+
+	/**
 	 * Check for broken internal links via HTTP HEAD requests.
 	 *
 	 * Reads link URLs from the cached graph and performs HTTP HEAD
