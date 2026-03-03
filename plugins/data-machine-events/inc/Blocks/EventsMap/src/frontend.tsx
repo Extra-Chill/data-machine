@@ -442,6 +442,46 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		};
 	}, [] );
 
+	/* --- listen for external user-location updates (e.g. geolocation) --- */
+	useEffect( () => {
+		const handler = ( e: Event ) => {
+			const map = mapRef.current;
+			if ( ! map ) return;
+
+			const detail = ( e as CustomEvent< {
+				lat: number;
+				lng: number;
+			} > ).detail;
+
+			if ( ! detail?.lat || ! detail?.lng ) return;
+
+			// Remove old user marker if present.
+			if ( userMarkerRef.current ) {
+				map.removeLayer( userMarkerRef.current );
+			}
+
+			const icon = createUserLocationIcon();
+			const marker = L.marker( [ detail.lat, detail.lng ], { icon } )
+				.addTo( map )
+				.bindPopup(
+					'<div class="venue-popup"><span class="venue-popup-name">You are here</span></div>',
+				);
+
+			userMarkerRef.current = marker;
+		};
+
+		document.addEventListener(
+			'data-machine-map-set-user-location',
+			handler,
+		);
+		return () => {
+			document.removeEventListener(
+				'data-machine-map-set-user-location',
+				handler,
+			);
+		};
+	}, [] );
+
 	/* --- update markers when venues change --- */
 	useEffect( () => {
 		const map = mapRef.current;
