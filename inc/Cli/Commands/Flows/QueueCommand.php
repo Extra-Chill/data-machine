@@ -29,7 +29,7 @@ class QueueCommand extends BaseCommand {
 	 */
 	public function dispatch( array $args, array $assoc_args ): void {
 		if ( empty( $args ) ) {
-			WP_CLI::error( 'Usage: wp datamachine flows queue <add|list|clear|remove|update|move> <flow_id> [args...]' );
+			WP_CLI::error( 'Usage: wp datamachine flows queue <add|list|clear|remove|update|move|validate> <flow_id> [args...]' );
 			return;
 		}
 
@@ -55,8 +55,11 @@ class QueueCommand extends BaseCommand {
 			case 'move':
 				$this->move( $remaining, $assoc_args );
 				break;
+			case 'validate':
+				$this->validate( $remaining, $assoc_args );
+				break;
 			default:
-				WP_CLI::error( "Unknown queue action: {$action}. Use: add, list, clear, remove, update, move" );
+				WP_CLI::error( "Unknown queue action: {$action}. Use: add, list, clear, remove, update, move, validate" );
 		}
 	}
 
@@ -505,6 +508,116 @@ class QueueCommand extends BaseCommand {
 		}
 
 		WP_CLI::success( $result['message'] ?? 'Item moved in queue.' );
+	}
+
+	/**
+	 * Validate a topic against published posts and queue items for duplicates.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <flow_id>
+	 * : The flow ID (used for queue duplicate checking).
+	 *
+	 * <topic>
+	 * : The topic or title to validate.
+	 *
+	 * [--post_type=<post_type>]
+	 * : Post type to check against. Default: 'post'.
+	 *
+	 * [--threshold=<threshold>]
+	 * : Jaccard similarity threshold (0.0 to 1.0). Default: 0.65.
+	 *
+	 * [--step=<flow_step_id>]
+	 * : Target a specific flow step for queue checking. Auto-resolved if the flow has exactly one queueable step.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Validate a quiz topic
+	 *     wp datamachine flows queue validate 48 "Spider ID Quiz" --post_type=quiz
+	 *
+	 *     # Validate with stricter threshold
+	 *     wp datamachine flows queue validate 25 "Craving Bagels" --threshold=0.5
+	 *
+	 * @subcommand validate
+	 */
+	public function validate( array $args, array $assoc_args ): void {
+		if ( count( $args ) < 2 ) {
+			WP_CLI::error( 'Usage: wp datamachine flows queue validate <flow_id> "topic"' );
+			return;
+		}
+
+		$flow_id      = (int) $args[0];
+		$topic        = $args[1];
+		$post_type    = $assoc_args['post_type'] ?? 'post';
+		$threshold    = $assoc_args['threshold'] ?? null;
+		$flow_step_id = $assoc_args['step'] ?? null;
+		$format       = $assoc_args['format'] ?? 'table';
+
+		if ( $flow_id <= 0 ) {
+			WP_CLI::error( 'flow_id must be a positive integer' );
+			return;
+		}
+
+		if ( empty( trim( $topic ) ) ) {
+			WP_CLI::error( 'topic cannot be empty' );
+			return;
+		}
+
+		// Resolve flow step for queue checking.
+		if ( empty( $flow_step_id ) ) {
+			$resolved = $this->resolveQueueableStep( $flow_id );
+			if ( $resolved['error'] ) {
+				WP_CLI::warning( 'Queue check skipped: ' . $resolved['error'] );
+				// Continue — still check published posts.
+			} else {
+				$flow_step_id = $resolved['step_id'];
+			}
+		}
+
+		$validator = new \DataMachine\Engine\AI\Tools\Global\QueueValidator();
+		$params    = array(
+			'topic'     => $topic,
+			'post_type' => $post_type,
+		);
+
+		if ( null !== $threshold ) {
+			$params['similarity_threshold'] = (float) $threshold;
+		}
+
+		if ( $flow_id > 0 && ! empty( $flow_step_id ) ) {
+			$params['flow_id']      = $flow_id;
+			$params['flow_step_id'] = $flow_step_id;
+		}
+
+		$result = $validator->validate( $params );
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			return;
+		}
+
+		// Human-readable output.
+		if ( 'clear' === $result['verdict'] ) {
+			WP_CLI::success( $result['reason'] );
+		} elseif ( 'duplicate' === $result['verdict'] ) {
+			WP_CLI::warning( $result['reason'] );
+			if ( ! empty( $result['match'] ) ) {
+				foreach ( $result['match'] as $key => $value ) {
+					WP_CLI::log( sprintf( '  %s: %s', $key, $value ) );
+				}
+			}
+		} else {
+			WP_CLI::error( $result['reason'] ?? 'Unknown validation error.' );
+		}
 	}
 
 	/**
