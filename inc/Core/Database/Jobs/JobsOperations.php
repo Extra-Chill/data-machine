@@ -380,6 +380,83 @@ class JobsOperations extends BaseRepository {
 	}
 
 	/**
+	 * Delete old jobs by status and age.
+	 *
+	 * Removes jobs matching the given status pattern that are older than
+	 * the specified number of days. Uses LIKE matching to handle compound
+	 * statuses (e.g., "failed - timeout").
+	 *
+	 * @since 0.28.0
+	 *
+	 * @param string $status_pattern Base status to match (e.g., 'failed'). Uses LIKE prefix matching.
+	 * @param int    $older_than_days Delete jobs older than this many days.
+	 * @return int|false Number of deleted rows, or false on error.
+	 */
+	public function delete_old_jobs( string $status_pattern, int $older_than_days ): int|false {
+		if ( empty( $status_pattern ) || $older_than_days < 1 ) {
+			return false;
+		}
+
+		$cutoff_datetime = gmdate( 'Y-m-d H:i:s', time() - ( $older_than_days * DAY_IN_SECONDS ) );
+		$like_pattern    = $this->wpdb->esc_like( $status_pattern ) . '%';
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$result = $this->wpdb->query(
+			$this->wpdb->prepare(
+				'DELETE FROM %i WHERE status LIKE %s AND created_at < %s',
+				$this->table_name,
+				$like_pattern,
+				$cutoff_datetime
+			)
+		);
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Deleted old jobs',
+			array(
+				'status_pattern'  => $status_pattern,
+				'older_than_days' => $older_than_days,
+				'cutoff_datetime' => $cutoff_datetime,
+				'jobs_deleted'    => false !== $result ? $result : 0,
+				'success'         => false !== $result,
+			)
+		);
+
+		return $result;
+	}
+
+	/**
+	 * Count jobs matching a status pattern older than a given age.
+	 *
+	 * @since 0.28.0
+	 *
+	 * @param string $status_pattern Base status to match (e.g., 'failed').
+	 * @param int    $older_than_days Count jobs older than this many days.
+	 * @return int Number of matching jobs.
+	 */
+	public function count_old_jobs( string $status_pattern, int $older_than_days ): int {
+		if ( empty( $status_pattern ) || $older_than_days < 1 ) {
+			return 0;
+		}
+
+		$cutoff_datetime = gmdate( 'Y-m-d H:i:s', time() - ( $older_than_days * DAY_IN_SECONDS ) );
+		$like_pattern    = $this->wpdb->esc_like( $status_pattern ) . '%';
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$count = $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				'SELECT COUNT(*) FROM %i WHERE status LIKE %s AND created_at < %s',
+				$this->table_name,
+				$like_pattern,
+				$cutoff_datetime
+			)
+		);
+
+		return (int) $count;
+	}
+
+	/**
 	 * Delete jobs by status criteria or all jobs.
 	 */
 	public function delete_jobs( array $criteria = array() ): int|false {

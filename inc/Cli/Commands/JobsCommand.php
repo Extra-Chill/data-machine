@@ -774,6 +774,123 @@ class JobsCommand extends BaseCommand {
 	}
 
 	/**
+	 * Cleanup old jobs by status and age.
+	 *
+	 * Removes jobs matching a status that are older than a specified age.
+	 * Useful for keeping the jobs table clean by purging stale failures,
+	 * completed jobs, or other terminal statuses.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--older-than=<duration>]
+	 * : Delete jobs older than this duration. Accepts days (e.g., 30d),
+	 *   weeks (e.g., 4w), or hours (e.g., 72h).
+	 * ---
+	 * default: 30d
+	 * ---
+	 *
+	 * [--status=<status>]
+	 * : Which job status to clean up. Uses prefix matching to catch
+	 *   compound statuses (e.g., "failed" matches "failed - timeout").
+	 * ---
+	 * default: failed
+	 * ---
+	 *
+	 * [--dry-run]
+	 * : Show what would be deleted without making changes.
+	 *
+	 * [--yes]
+	 * : Skip confirmation prompt.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Preview cleanup of failed jobs older than 30 days
+	 *     wp datamachine jobs cleanup --dry-run
+	 *
+	 *     # Delete failed jobs older than 30 days
+	 *     wp datamachine jobs cleanup --yes
+	 *
+	 *     # Delete failed jobs older than 2 weeks
+	 *     wp datamachine jobs cleanup --older-than=2w --yes
+	 *
+	 *     # Delete completed jobs older than 90 days
+	 *     wp datamachine jobs cleanup --status=completed --older-than=90d --yes
+	 *
+	 *     # Delete agent_skipped jobs older than 1 week
+	 *     wp datamachine jobs cleanup --status=agent_skipped --older-than=1w
+	 *
+	 * @subcommand cleanup
+	 */
+	public function cleanup( array $args, array $assoc_args ): void {
+		$duration_str = $assoc_args['older-than'] ?? '30d';
+		$status       = $assoc_args['status'] ?? 'failed';
+		$dry_run      = isset( $assoc_args['dry-run'] );
+		$skip_confirm = isset( $assoc_args['yes'] );
+
+		$days = $this->parseDurationToDays( $duration_str );
+		if ( null === $days ) {
+			WP_CLI::error( sprintf( 'Invalid duration format: "%s". Use format like 30d, 4w, or 72h.', $duration_str ) );
+			return;
+		}
+
+		$db_jobs = new Jobs();
+		$count   = $db_jobs->count_old_jobs( $status, $days );
+
+		if ( 0 === $count ) {
+			WP_CLI::success( sprintf( 'No "%s" jobs older than %s found. Nothing to clean up.', $status, $duration_str ) );
+			return;
+		}
+
+		WP_CLI::log( sprintf( 'Found %d "%s" job(s) older than %s (%d days).', $count, $status, $duration_str, $days ) );
+
+		if ( $dry_run ) {
+			WP_CLI::success( sprintf( 'Dry run: %d job(s) would be deleted.', $count ) );
+			return;
+		}
+
+		if ( ! $skip_confirm ) {
+			WP_CLI::confirm( sprintf( 'Delete %d "%s" job(s) older than %s?', $count, $status, $duration_str ) );
+		}
+
+		$deleted = $db_jobs->delete_old_jobs( $status, $days );
+
+		if ( false === $deleted ) {
+			WP_CLI::error( 'Failed to delete jobs.' );
+			return;
+		}
+
+		WP_CLI::success( sprintf( 'Deleted %d "%s" job(s) older than %s.', $deleted, $status, $duration_str ) );
+	}
+
+	/**
+	 * Parse a human-readable duration string to days.
+	 *
+	 * Supports formats: 30d (days), 4w (weeks), 72h (hours).
+	 *
+	 * @param string $duration Duration string.
+	 * @return int|null Number of days, or null if invalid.
+	 */
+	private function parseDurationToDays( string $duration ): ?int {
+		if ( ! preg_match( '/^(\d+)(d|w|h)$/i', trim( $duration ), $matches ) ) {
+			return null;
+		}
+
+		$value = (int) $matches[1];
+		$unit  = strtolower( $matches[2] );
+
+		if ( $value <= 0 ) {
+			return null;
+		}
+
+		return match ( $unit ) {
+			'd' => $value,
+			'w' => $value * 7,
+			'h' => max( 1, (int) ceil( $value / 24 ) ),
+			default => null,
+		};
+	}
+
+	/**
 	 * Undo a completed job by reversing its recorded effects.
 	 *
 	 * Reads the standardized effects array from the job's engine_data and

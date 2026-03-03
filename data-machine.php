@@ -310,6 +310,11 @@ register_activation_hook( __FILE__, 'datamachine_activate_plugin' );
 register_deactivation_hook( __FILE__, 'datamachine_deactivate_plugin' );
 
 function datamachine_deactivate_plugin() {
+	// Unschedule recurring maintenance actions.
+	if ( function_exists( 'as_unschedule_all_actions' ) ) {
+		as_unschedule_all_actions( 'datamachine_cleanup_stale_claims', array(), 'datamachine-maintenance' );
+		as_unschedule_all_actions( 'datamachine_cleanup_failed_jobs', array(), 'datamachine-maintenance' );
+	}
 }
 
 /**
