@@ -120,6 +120,7 @@ class RunFlowAbility {
 					'flow_id'     => $flow_id,
 					'source'      => 'pipeline',
 					'label'       => $flow['flow_name'] ?? null,
+					'user_id'     => (int) ( $flow['user_id'] ?? 0 ),
 				)
 			);
 			if ( ! $job_id ) {
@@ -167,6 +168,7 @@ class RunFlowAbility {
 				'job_id'      => $job_id,
 				'flow_id'     => $flow_id,
 				'pipeline_id' => $pipeline_id,
+				'user_id'     => (int) ( $flow['user_id'] ?? 0 ),
 				'created_at'  => current_time( 'mysql', true ),
 			),
 			'flow'            => array(

@@ -54,7 +54,9 @@ class FlowMemoryFilesDirective implements \DataMachine\Engine\AI\Directives\Dire
 		$db_flows     = new Flows();
 		$memory_files = $db_flows->get_flow_memory_files( $flow_id );
 
-		return MemoryFilesReader::read( $memory_files, 'Flow', $flow_id );
+		$user_id = (int) ( $payload['user_id'] ?? 0 );
+
+		return MemoryFilesReader::read( $memory_files, 'Flow', $flow_id, $user_id );
 	}
 }
 

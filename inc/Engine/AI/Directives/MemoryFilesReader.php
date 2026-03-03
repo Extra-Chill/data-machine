@@ -23,16 +23,19 @@ class MemoryFilesReader {
 	 * @param array  $memory_files Array of memory filenames.
 	 * @param string $scope_label  Label for logging (e.g. 'Pipeline', 'Flow').
 	 * @param int    $scope_id     Entity ID for logging (e.g. pipeline_id, flow_id).
+	 * @param int    $user_id      WordPress user ID. 0 = legacy shared directory.
 	 * @return array Array of directive outputs (type => system_text, content => ...).
 	 */
-	public static function read( array $memory_files, string $scope_label, int $scope_id ): array {
+	/**
+	 * @since 0.37.0 Added $user_id parameter for multi-agent partitioning.
+	 */
+	public static function read( array $memory_files, string $scope_label, int $scope_id, int $user_id = 0 ): array {
 		if ( empty( $memory_files ) ) {
 			return array();
 		}
 
 		$directory_manager = new DirectoryManager();
-		// TODO: Multi-agent Phase 2 — resolve user_id from execution context (#565).
-		$agent_dir         = $directory_manager->get_agent_directory();
+		$agent_dir         = $directory_manager->get_agent_directory( $user_id );
 		$outputs           = array();
 
 		foreach ( $memory_files as $filename ) {
