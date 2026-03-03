@@ -2,6 +2,31 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.36.0] - 2026-03-03
+
+### Added
+- cron expressions for flow scheduling (#482)
+- wp datamachine auth CLI commands (#508)
+- GA4 CLI batch — new actions, sorting, hostname filter, period comparison (#538, #548)
+- IndexNow integration for instant search engine notification (#443)
+- datamachine_github_issue_repos filter for extension plugin repo registration (#315)
+- HandlerAbilities unit tests for getConfigFields (#532, #558)
+- Homeboy CI workflow for automated PR lint and test
+
+### Changed
+- extract tool config save into BaseTool, remove wp_send_json exits (#535)
+
+### Fixed
+- prevent LogHandler crash during bootstrap when abilities not yet registered (#557)
+- jobs list status prefix matching and --since date filter
+- display structured error details in jobs show for failed jobs
+- persist structured error context in engine_data on job failure
+- auto-run DB migrations on deploy without activation hook
+- single-handler steps show blank settings display (#528)
+- merge base handler settings fields into getConfigFields for validation (#541)
+- ensure UNIQUE index on processed_items and deduplicate existing rows (#542)
+- update composer.lock to match composer.json (#559)
+
 ## [0.35.0] - 2026-03-03
 
 ### Added
