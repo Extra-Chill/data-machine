@@ -11,6 +11,7 @@
 namespace DataMachine\Abilities\Publish;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\WordPress\WordPressSettingsResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -205,7 +206,9 @@ class PublishWordPressAbility {
 			'post_content' => $content,
 			'post_status'  => $post_status,
 			'post_type'    => $post_type,
-			'post_author'  => $post_author > 0 ? $post_author : get_current_user_id(),
+			'post_author'  => WordPressSettingsResolver::getPostAuthor(
+				array( 'post_author' => $post_author )
+			),
 		);
 
 		$logs[] = array(
