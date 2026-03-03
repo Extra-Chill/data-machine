@@ -53,18 +53,6 @@ export default function FlowStepHandler( {
 	const perHandlerDisplays = handlerSettingsDisplays || {};
 	const hasPerHandler = Object.keys( perHandlerDisplays ).length > 0;
 
-	// Legacy flat display — used when per-handler data isn't available.
-	const flatDisplaySettings = ! hasPerHandler && Array.isArray( settingsDisplay )
-		? settingsDisplay.reduce( ( acc, setting ) => {
-				acc[ setting.key ] = {
-					label: setting.label,
-					value: setting.display_value ?? setting.value,
-				};
-				return acc;
-		  }, {} )
-		: {};
-	const hasFlatSettings = Object.keys( flatDisplaySettings ).length > 0;
-
 	/**
 	 * Resolve a handler label from handlers registry, step types, or slug.
 	 *
@@ -90,6 +78,26 @@ export default function FlowStepHandler( {
 					return acc;
 			  }, {} )
 			: {};
+
+	// Unified display: for single-handler, extract from per-handler data; else use legacy flat.
+	const flatDisplaySettings = ( () => {
+		// Single handler with per-handler data — extract the one handler's display.
+		if ( hasPerHandler && slugs.length === 1 ) {
+			return toDisplayMap( perHandlerDisplays[ slugs[ 0 ] ] || [] );
+		}
+		// Legacy flat display — used when per-handler data isn't available.
+		if ( ! hasPerHandler && Array.isArray( settingsDisplay ) ) {
+			return settingsDisplay.reduce( ( acc, setting ) => {
+				acc[ setting.key ] = {
+					label: setting.label,
+					value: setting.display_value ?? setting.value,
+				};
+				return acc;
+			}, {} );
+		}
+		return {};
+	} )();
+	const hasFlatSettings = Object.keys( flatDisplaySettings ).length > 0;
 
 	const isMultiHandler = slugs.length > 1;
 
