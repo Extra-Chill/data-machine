@@ -13,6 +13,7 @@ namespace DataMachine\Cli\Commands;
 
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
+use DataMachine\Cli\UserResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -217,12 +218,14 @@ class PipelinesCommand extends BaseCommand {
 			$offset = 0;
 		}
 
+		$user_id = UserResolver::resolve( $assoc_args );
 		$ability = new \DataMachine\Abilities\PipelineAbilities();
 
 		if ( $pipeline_id ) {
 			$result = $ability->executeGetPipelines(
 				array(
 					'pipeline_id' => $pipeline_id,
+					'user_id'     => $user_id > 0 ? $user_id : null,
 					'output_mode' => 'full',
 				)
 			);
@@ -246,6 +249,7 @@ class PipelinesCommand extends BaseCommand {
 				array(
 					'per_page'    => $per_page,
 					'offset'      => $offset,
+					'user_id'     => $user_id > 0 ? $user_id : null,
 					'output_mode' => 'full',
 				)
 			);

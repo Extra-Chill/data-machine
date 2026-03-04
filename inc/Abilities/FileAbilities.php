@@ -90,6 +90,11 @@ class FileAbilities {
 							'type'        => array( 'string', 'null' ),
 							'description' => __( 'Flow step ID for flow-level files (e.g., "1-2" for pipeline 1, flow 2)', 'data-machine' ),
 						),
+						'user_id'      => array(
+							'type'        => 'integer',
+							'description' => __( 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).', 'data-machine' ),
+							'default'     => 0,
+						),
 						'scope'        => array(
 							'type'        => array( 'string', 'null' ),
 							'description' => __( 'Scope for file operations. Use "agent" for agent directory files.', 'data-machine' ),
@@ -133,6 +138,11 @@ class FileAbilities {
 						'flow_step_id' => array(
 							'type'        => array( 'string', 'null' ),
 							'description' => __( 'Flow step ID for flow-level files', 'data-machine' ),
+						),
+						'user_id'      => array(
+							'type'        => 'integer',
+							'description' => __( 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).', 'data-machine' ),
+							'default'     => 0,
 						),
 						'scope'        => array(
 							'type'        => array( 'string', 'null' ),
@@ -178,6 +188,11 @@ class FileAbilities {
 							'type'        => 'string',
 							'description' => __( 'Content to write to the file', 'data-machine' ),
 						),
+						'user_id'  => array(
+							'type'        => 'integer',
+							'description' => __( 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).', 'data-machine' ),
+							'default'     => 0,
+						),
 					),
 				),
 				'output_schema'       => array(
@@ -216,6 +231,11 @@ class FileAbilities {
 						'flow_step_id' => array(
 							'type'        => array( 'string', 'null' ),
 							'description' => __( 'Flow step ID for flow-level files', 'data-machine' ),
+						),
+						'user_id'      => array(
+							'type'        => 'integer',
+							'description' => __( 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).', 'data-machine' ),
+							'default'     => 0,
 						),
 						'scope'        => array(
 							'type'        => array( 'string', 'null' ),
@@ -307,6 +327,11 @@ class FileAbilities {
 							'type'        => array( 'string', 'null' ),
 							'description' => __( 'Flow step ID for flow-level files', 'data-machine' ),
 						),
+						'user_id'      => array(
+							'type'        => 'integer',
+							'description' => __( 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).', 'data-machine' ),
+							'default'     => 0,
+						),
 						'scope'        => array(
 							'type'        => array( 'string', 'null' ),
 							'description' => __( 'Scope for file operations. Use "agent" for agent directory files.', 'data-machine' ),
@@ -347,9 +372,10 @@ class FileAbilities {
 	public function executeListFiles( array $input ): array {
 		$flow_step_id = $input['flow_step_id'] ?? null;
 		$scope        = $input['scope'] ?? null;
+		$user_id      = (int) ( $input['user_id'] ?? 0 );
 
 		if ( 'agent' === $scope ) {
-			return $this->listAgentFiles();
+			return $this->listAgentFiles( $user_id );
 		}
 
 		if ( ! $flow_step_id ) {
@@ -372,6 +398,7 @@ class FileAbilities {
 		$filename     = $input['filename'] ?? null;
 		$flow_step_id = $input['flow_step_id'] ?? null;
 		$scope        = $input['scope'] ?? null;
+		$user_id      = (int) ( $input['user_id'] ?? 0 );
 
 		if ( empty( $filename ) ) {
 			return array(
@@ -383,7 +410,7 @@ class FileAbilities {
 		$filename = sanitize_file_name( $filename );
 
 		if ( 'agent' === $scope ) {
-			return $this->getAgentFile( $filename );
+			return $this->getAgentFile( $filename, $user_id );
 		}
 
 		if ( ! $flow_step_id ) {
@@ -405,6 +432,7 @@ class FileAbilities {
 	public function executeWriteAgentFile( array $input ): array {
 		$filename = $input['filename'] ?? null;
 		$content  = $input['content'] ?? null;
+		$user_id  = (int) ( $input['user_id'] ?? 0 );
 
 		if ( empty( $filename ) ) {
 			return array(
@@ -422,7 +450,7 @@ class FileAbilities {
 
 		$filename = sanitize_file_name( $filename );
 
-		return $this->writeAgentFile( $filename, $content );
+		return $this->writeAgentFile( $filename, $content, $user_id );
 	}
 
 	/**
@@ -435,6 +463,7 @@ class FileAbilities {
 		$filename     = $input['filename'] ?? null;
 		$flow_step_id = $input['flow_step_id'] ?? null;
 		$scope        = $input['scope'] ?? null;
+		$user_id      = (int) ( $input['user_id'] ?? 0 );
 
 		if ( empty( $filename ) ) {
 			return array(
@@ -446,7 +475,7 @@ class FileAbilities {
 		$filename = sanitize_file_name( $filename );
 
 		if ( 'agent' === $scope ) {
-			return $this->deleteAgentFile( $filename );
+			return $this->deleteAgentFile( $filename, $user_id );
 		}
 
 		if ( ! $flow_step_id ) {
@@ -557,6 +586,7 @@ class FileAbilities {
 		$file_data    = $input['file_data'] ?? array();
 		$flow_step_id = $input['flow_step_id'] ?? null;
 		$scope        = $input['scope'] ?? null;
+		$user_id      = (int) ( $input['user_id'] ?? 0 );
 
 		if ( 'agent' !== $scope && ! $flow_step_id ) {
 			return array(
@@ -615,7 +645,7 @@ class FileAbilities {
 		}
 
 		if ( 'agent' === $scope ) {
-			return $this->uploadToAgent( $file );
+			return $this->uploadToAgent( $file, $user_id );
 		}
 
 		return $this->uploadToFlow( $file, $flow_step_id );
@@ -905,12 +935,12 @@ class FileAbilities {
 	 *
 	 * @return array Result with files.
 	 */
-	private function listAgentFiles(): array {
+	private function listAgentFiles( int $user_id = 0 ): array {
 		// Self-heal: ensure agent files exist before listing.
 		DirectoryManager::ensure_agent_files();
 
 		$directory_manager = new DirectoryManager();
-		$agent_dir         = $directory_manager->get_agent_directory();
+		$agent_dir         = $directory_manager->get_agent_directory( $user_id );
 
 		if ( ! file_exists( $agent_dir ) ) {
 			return array(
@@ -943,7 +973,7 @@ class FileAbilities {
 		}
 
 		// Include daily memory summary if the directory exists.
-		$daily        = new DailyMemory();
+		$daily        = new DailyMemory( $user_id );
 		$daily_result = $daily->list_all();
 
 		if ( ! empty( $daily_result['months'] ) ) {
@@ -974,12 +1004,12 @@ class FileAbilities {
 	 * @param string $filename Filename to retrieve.
 	 * @return array Result with file data.
 	 */
-	private function getAgentFile( string $filename ): array {
+	private function getAgentFile( string $filename, int $user_id = 0 ): array {
 		// Self-heal: ensure agent files exist before retrieval.
 		DirectoryManager::ensure_agent_files();
 
 		$directory_manager = new DirectoryManager();
-		$agent_dir         = $directory_manager->get_agent_directory();
+		$agent_dir         = $directory_manager->get_agent_directory( $user_id );
 		$filepath          = "{$agent_dir}/{$filename}";
 
 		if ( ! file_exists( $filepath ) ) {
@@ -1009,7 +1039,7 @@ class FileAbilities {
 	 * @param string $filename Filename to delete.
 	 * @return array Result with deletion status.
 	 */
-	private function deleteAgentFile( string $filename ): array {
+	private function deleteAgentFile( string $filename, int $user_id = 0 ): array {
 		if ( in_array( $filename, self::PROTECTED_FILES, true ) ) {
 			return array(
 				'success' => false,
@@ -1018,7 +1048,7 @@ class FileAbilities {
 		}
 
 		$directory_manager = new DirectoryManager();
-		$agent_dir         = $directory_manager->get_agent_directory();
+		$agent_dir         = $directory_manager->get_agent_directory( $user_id );
 		$filepath          = "{$agent_dir}/{$filename}";
 
 		if ( ! file_exists( $filepath ) ) {
@@ -1034,7 +1064,10 @@ class FileAbilities {
 			'datamachine_log',
 			'info',
 			'Agent file deleted via ability',
-			array( 'filename' => $filename )
+			array(
+				'filename' => $filename,
+				'user_id'  => $user_id,
+			)
 		);
 
 		return array(
@@ -1053,7 +1086,7 @@ class FileAbilities {
 	 * @param string $content  Content to write.
 	 * @return array Result with write status.
 	 */
-	private function writeAgentFile( string $filename, string $content ): array {
+	private function writeAgentFile( string $filename, string $content, int $user_id = 0 ): array {
 		if ( in_array( $filename, self::PROTECTED_FILES, true ) && '' === trim( $content ) ) {
 			return array(
 				'success' => false,
@@ -1062,7 +1095,7 @@ class FileAbilities {
 		}
 
 		$directory_manager = new DirectoryManager();
-		$agent_dir         = $directory_manager->get_agent_directory();
+		$agent_dir         = $directory_manager->get_agent_directory( $user_id );
 
 		if ( ! $directory_manager->ensure_directory_exists( $agent_dir ) ) {
 			return array(
@@ -1111,9 +1144,9 @@ class FileAbilities {
 	 * @param array $file File data.
 	 * @return array Result with files list.
 	 */
-	private function uploadToAgent( array $file ): array {
+	private function uploadToAgent( array $file, int $user_id = 0 ): array {
 		$directory_manager = new DirectoryManager();
-		$agent_dir         = $directory_manager->get_agent_directory();
+		$agent_dir         = $directory_manager->get_agent_directory( $user_id );
 
 		if ( ! $directory_manager->ensure_directory_exists( $agent_dir ) ) {
 			return array(

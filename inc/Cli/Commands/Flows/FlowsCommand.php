@@ -18,6 +18,7 @@ namespace DataMachine\Cli\Commands\Flows;
 
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
+use DataMachine\Cli\UserResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -290,11 +291,13 @@ class FlowsCommand extends BaseCommand {
 			$offset = 0;
 		}
 
+		$user_id = UserResolver::resolve( $assoc_args );
 		$ability = new \DataMachine\Abilities\FlowAbilities();
 		$result  = $ability->executeAbility(
 			array(
 				'flow_id'      => $flow_id,
 				'pipeline_id'  => $pipeline_id,
+				'user_id'      => $user_id > 0 ? $user_id : null,
 				'handler_slug' => $handler_slug,
 				'per_page'     => $per_page,
 				'offset'       => $offset,

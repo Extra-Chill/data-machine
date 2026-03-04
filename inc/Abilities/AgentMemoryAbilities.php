@@ -44,6 +44,11 @@ class AgentMemoryAbilities {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
+							'user_id'  => array(
+								'type'        => 'integer',
+								'description' => 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).',
+								'default'     => 0,
+							),
 							'section' => array(
 								'type'        => 'string',
 								'description' => 'Section name to read (without ##). If omitted, returns the full file.',
@@ -78,6 +83,11 @@ class AgentMemoryAbilities {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
+							'user_id'  => array(
+								'type'        => 'integer',
+								'description' => 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).',
+								'default'     => 0,
+							),
 							'section' => array(
 								'type'        => 'string',
 								'description' => 'Section name (without ##). Created if it does not exist.',
@@ -117,6 +127,11 @@ class AgentMemoryAbilities {
 						'type'       => 'object',
 						'required'   => array( 'query' ),
 						'properties' => array(
+							'user_id'  => array(
+								'type'        => 'integer',
+								'description' => 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).',
+								'default'     => 0,
+							),
 							'query'   => array(
 								'type'        => 'string',
 								'description' => 'Search term (case-insensitive substring match).',
@@ -162,6 +177,11 @@ class AgentMemoryAbilities {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(),
+							'user_id'  => array(
+								'type'        => 'integer',
+								'description' => 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).',
+								'default'     => 0,
+							),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
@@ -195,7 +215,8 @@ class AgentMemoryAbilities {
 	 * @return array Result.
 	 */
 	public static function getMemory( array $input ): array {
-		$memory  = new AgentMemory();
+		$user_id = (int) ( $input['user_id'] ?? 0 );
+		$memory  = new AgentMemory( $user_id );
 		$section = $input['section'] ?? null;
 
 		if ( null === $section || '' === $section ) {
@@ -212,7 +233,8 @@ class AgentMemoryAbilities {
 	 * @return array Result.
 	 */
 	public static function updateMemory( array $input ): array {
-		$memory  = new AgentMemory();
+		$user_id = (int) ( $input['user_id'] ?? 0 );
+		$memory  = new AgentMemory( $user_id );
 		$section = $input['section'];
 		$content = $input['content'];
 		$mode    = $input['mode'];
@@ -231,7 +253,8 @@ class AgentMemoryAbilities {
 	 * @return array Search results.
 	 */
 	public static function searchMemory( array $input ): array {
-		$memory  = new AgentMemory();
+		$user_id = (int) ( $input['user_id'] ?? 0 );
+		$memory  = new AgentMemory( $user_id );
 		$query   = $input['query'];
 		$section = $input['section'] ?? null;
 
@@ -245,7 +268,8 @@ class AgentMemoryAbilities {
 	 * @return array Result.
 	 */
 	public static function listSections( array $input ): array {
-		$memory = new AgentMemory();
+		$user_id = (int) ( $input['user_id'] ?? 0 );
+		$memory  = new AgentMemory( $user_id );
 		return $memory->get_sections();
 	}
 }
