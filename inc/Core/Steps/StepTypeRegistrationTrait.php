@@ -42,6 +42,8 @@ trait StepTypeRegistrationTrait {
 	 * @param bool       $hasPipelineConfig Whether step has pipeline-level configuration
 	 * @param bool       $consumeAllPackets Whether step consumes all packets at once
 	 * @param array|null $stepSettings Optional UI settings for pipeline step configuration
+	 * @param bool       $showSettingsDisplay Whether to show settings display in UI
+	 * @param bool       $producesBatchItems Whether step outputs multiple items that should fan out into child jobs
 	 */
 	protected static function registerStepType(
 		string $slug,
@@ -53,7 +55,8 @@ trait StepTypeRegistrationTrait {
 		bool $hasPipelineConfig = false,
 		bool $consumeAllPackets = false,
 		?array $stepSettings = null,
-		bool $showSettingsDisplay = true
+		bool $showSettingsDisplay = true,
+		bool $producesBatchItems = false
 	): void {
 		// Prevent duplicate registration when step class is instantiated multiple times
 		if ( isset( self::$registered_step_types[ $slug ] ) ) {
@@ -72,7 +75,8 @@ trait StepTypeRegistrationTrait {
 				$usesHandler,
 				$hasPipelineConfig,
 				$consumeAllPackets,
-				$showSettingsDisplay
+				$showSettingsDisplay,
+				$producesBatchItems
 			) {
 				$steps[ $slug ] = array(
 					'label'                 => $label,
@@ -83,6 +87,7 @@ trait StepTypeRegistrationTrait {
 					'has_pipeline_config'   => $hasPipelineConfig,
 					'consume_all_packets'   => $consumeAllPackets,
 					'show_settings_display' => $showSettingsDisplay,
+					'produces_batch_items'  => $producesBatchItems,
 				);
 				return $steps;
 			}

@@ -220,7 +220,8 @@ class ExecuteStepAbility {
 				$dataPackets,
 				$payload,
 				$step_success,
-				$status_override
+				$status_override,
+				$step_definition
 			);
 		} catch ( \Throwable $e ) {
 			do_action(
@@ -348,6 +349,7 @@ class ExecuteStepAbility {
 	 * @param array  $payload          Full step payload.
 	 * @param bool   $step_success     Whether step succeeded.
 	 * @param mixed  $status_override  Status override from engine data.
+	 * @param array  $step_definition  Step type definition from registry.
 	 * @return array Result with outcome details.
 	 */
 	private function routeAfterExecution(
@@ -360,7 +362,8 @@ class ExecuteStepAbility {
 		array $dataPackets,
 		array $payload,
 		bool $step_success,
-		$status_override
+		$status_override,
+		array $step_definition = array()
 	): array {
 		$pipeline_id = $flow_step_config['pipeline_id'] ?? null;
 
@@ -429,22 +432,43 @@ class ExecuteStepAbility {
 			$next_flow_step_id = $navigator->get_next_flow_step_id( $flow_step_id, $payload );
 
 			if ( $next_flow_step_id ) {
-				// Fan out: each DataPacket becomes its own child job
-				// continuing through the remaining pipeline steps.
-				$engine_snapshot = datamachine_get_engine_data( $job_id );
-				$batch_scheduler = new PipelineBatchScheduler();
-				$batch_result    = $batch_scheduler->fanOut(
-					$job_id,
-					$next_flow_step_id,
-					$dataPackets,
-					$engine_snapshot
+				$produces_batch_items = ! empty( $step_definition['produces_batch_items'] );
+
+				if ( $produces_batch_items ) {
+					// Fan out: each DataPacket becomes its own child job
+					// continuing through the remaining pipeline steps.
+					$engine_snapshot = datamachine_get_engine_data( $job_id );
+					$batch_scheduler = new PipelineBatchScheduler();
+					$batch_result    = $batch_scheduler->fanOut(
+						$job_id,
+						$next_flow_step_id,
+						$dataPackets,
+						$engine_snapshot
+					);
+
+					return array(
+						'success'      => true,
+						'step_success' => true,
+						'outcome'      => 'batch_scheduled',
+						'batch'        => $batch_result,
+					);
+				}
+
+				// Non-batch step: advance the same job to the next step.
+				$schedule_ability = new ScheduleNextStepAbility();
+				$schedule_result  = $schedule_ability->execute(
+					array(
+						'job_id'       => $job_id,
+						'flow_step_id' => $next_flow_step_id,
+						'data_packets' => $dataPackets,
+					)
 				);
 
 				return array(
 					'success'      => true,
 					'step_success' => true,
-					'outcome'      => 'batch_scheduled',
-					'batch'        => $batch_result,
+					'outcome'      => 'next_step_scheduled',
+					'action_id'    => $schedule_result['action_id'] ?? null,
 				);
 			}
 

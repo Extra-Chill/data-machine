@@ -38,7 +38,8 @@ class FetchStep extends Step {
 			class: self::class,
 			position: 10,
 			usesHandler: true,
-			hasPipelineConfig: false
+			hasPipelineConfig: false,
+			producesBatchItems: true
 		);
 	}
 
