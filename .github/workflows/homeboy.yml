@@ -12,6 +12,20 @@ jobs:
   homeboy:
     name: Lint, Test & Audit
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ''
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: homeboy_wptests
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
     steps:
       - uses: actions/checkout@v4
 
@@ -32,6 +46,6 @@ jobs:
           extension: wordpress
           commands: lint,test,audit
           component: data-machine
-          settings: '{"database_type": "sqlite"}'
+          settings: '{"database_type": "mysql"}'
           php-version: '8.2'
           node-version: '20'
