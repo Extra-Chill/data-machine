@@ -17,15 +17,31 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 		parent::set_up();
 		
 		// Mock the RequestBuilder for testing AI requests
-		add_filter( 'datamachine_ai_request_response', [ $this, 'mock_ai_response' ], 10, 2 );
+		add_filter( 'chubes_ai_request', [ $this, 'mock_ai_response' ], 10, 6 );
 	}
 
 	public function tear_down(): void {
 		delete_site_option( 'datamachine_image_generation_config' );
-		PluginSettings::delete( 'default_provider' );
-		PluginSettings::delete( 'default_model' );
-		remove_filter( 'datamachine_ai_request_response', [ $this, 'mock_ai_response' ] );
+		delete_option( 'datamachine_settings' );
+		PluginSettings::clearCache();
+		remove_filter( 'chubes_ai_request', [ $this, 'mock_ai_response' ] );
 		parent::tear_down();
+	}
+
+	/**
+	 * Helper: set plugin settings via the WordPress option.
+	 */
+	private function set_plugin_settings( array $settings ): void {
+		update_option( 'datamachine_settings', $settings );
+		PluginSettings::clearCache();
+	}
+
+	/**
+	 * Helper: clear all plugin settings.
+	 */
+	private function clear_plugin_settings(): void {
+		delete_option( 'datamachine_settings' );
+		PluginSettings::clearCache();
 	}
 
 	/**
@@ -35,14 +51,14 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 	 * @param array $request Request parameters.
 	 * @return array Mocked response.
 	 */
-	public function mock_ai_response( $response, $request ) {
+	public function mock_ai_response( $request, $provider = '', $streaming = null, $tools = array(), $step_id = null, $context = array() ) {
 		// Return a refined prompt for testing
-		return [
+		return array(
 			'success' => true,
-			'data' => [
-				'content' => 'A majestic crane standing gracefully in misty wetlands at golden hour, soft natural lighting, high detail photography style, serene atmosphere, shallow depth of field, professional nature photography'
-			]
-		];
+			'data'    => array(
+				'content' => 'A majestic crane standing gracefully in misty wetlands at golden hour, soft natural lighting, high detail photography style, serene atmosphere, shallow depth of field, professional nature photography',
+			),
+		);
 	}
 
 	public function test_is_refinement_enabled_returns_false_when_disabled(): void {
@@ -59,8 +75,7 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 		];
 		
 		// No AI provider configured
-		PluginSettings::delete( 'default_provider' );
-		PluginSettings::delete( 'default_model' );
+		$this->clear_plugin_settings();
 		
 		$this->assertFalse( ImageGenerationAbilities::is_refinement_enabled( $config ) );
 	}
@@ -70,8 +85,10 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 			'prompt_refinement_enabled' => true,
 		];
 		
-		PluginSettings::set( 'default_provider', 'openai' );
-		PluginSettings::set( 'default_model', 'gpt-4' );
+		$this->set_plugin_settings( array(
+			'default_provider' => 'openai',
+			'default_model'    => 'gpt-4',
+		) );
 		
 		$this->assertTrue( ImageGenerationAbilities::is_refinement_enabled( $config ) );
 	}
@@ -79,15 +96,16 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 	public function test_is_refinement_enabled_defaults_to_true(): void {
 		$config = []; // No explicit setting
 		
-		PluginSettings::set( 'default_provider', 'openai' );
-		PluginSettings::set( 'default_model', 'gpt-4' );
+		$this->set_plugin_settings( array(
+			'default_provider' => 'openai',
+			'default_model'    => 'gpt-4',
+		) );
 		
 		$this->assertTrue( ImageGenerationAbilities::is_refinement_enabled( $config ) );
 	}
 
 	public function test_refine_prompt_returns_null_when_no_provider(): void {
-		PluginSettings::delete( 'default_provider' );
-		PluginSettings::delete( 'default_model' );
+		$this->clear_plugin_settings();
 		
 		$refined = ImageGenerationAbilities::refine_prompt( 'Test prompt' );
 		
@@ -95,8 +113,10 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 	}
 
 	public function test_refine_prompt_returns_refined_text_when_successful(): void {
-		PluginSettings::set( 'default_provider', 'openai' );
-		PluginSettings::set( 'default_model', 'gpt-4' );
+		$this->set_plugin_settings( array(
+			'default_provider' => 'openai',
+			'default_model'    => 'gpt-4',
+		) );
 		
 		$refined = ImageGenerationAbilities::refine_prompt( 'The Spiritual Meaning of Cranes' );
 		
@@ -107,37 +127,42 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 	}
 
 	public function test_refine_prompt_includes_post_context_when_provided(): void {
-		PluginSettings::set( 'default_provider', 'openai' );
-		PluginSettings::set( 'default_model', 'gpt-4' );
-		
-		// Track the AI request to verify context is included
+		$this->set_plugin_settings( array(
+			'default_provider' => 'openai',
+			'default_model'    => 'gpt-4',
+		) );
+
+		// Capture the AI request to verify context is included.
 		$captured_request = null;
-		add_filter( 'datamachine_ai_request_capture', function( $request ) use ( &$captured_request ) {
+		remove_filter( 'chubes_ai_request', array( $this, 'mock_ai_response' ) );
+		add_filter( 'chubes_ai_request', function ( $request ) use ( &$captured_request ) {
 			$captured_request = $request;
-			return $request;
-		} );
-		
-		// Mock the AI request filter to capture requests
-		remove_filter( 'datamachine_ai_request_response', [ $this, 'mock_ai_response' ] );
-		add_filter( 'chubes_ai_request', function( $request ) use ( &$captured_request ) {
-			$captured_request = $request;
-			return [
+			return array(
 				'success' => true,
-				'data' => [ 'content' => 'refined prompt with context' ]
-			];
+				'data'    => array( 'content' => 'refined prompt with context' ),
+			);
 		}, 10, 6 );
-		
+
 		ImageGenerationAbilities::refine_prompt( 'Crane meaning', 'This article explores the spiritual symbolism of cranes in various cultures.' );
-		
+
 		$this->assertNotNull( $captured_request );
-		$user_message = $captured_request['messages'][1]['content'] ?? '';
+		// Directives prepend messages, so find the last user message (our refinement request).
+		$user_message = '';
+		foreach ( array_reverse( $captured_request['messages'] ) as $msg ) {
+			if ( ( $msg['role'] ?? '' ) === 'user' ) {
+				$user_message = $msg['content'] ?? '';
+				break;
+			}
+		}
 		$this->assertStringContainsString( 'Article context:', $user_message );
 		$this->assertStringContainsString( 'spiritual symbolism', $user_message );
 	}
 
 	public function test_refine_prompt_uses_custom_style_guide(): void {
-		PluginSettings::set( 'default_provider', 'openai' );
-		PluginSettings::set( 'default_model', 'gpt-4' );
+		$this->set_plugin_settings( array(
+			'default_provider' => 'openai',
+			'default_model'    => 'gpt-4',
+		) );
 		
 		$custom_style_guide = 'Create minimalist, modern image prompts with clean lines and bright colors.';
 		$config = [
@@ -146,7 +171,7 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 		
 		// Track the AI request to verify custom style guide is used
 		$captured_request = null;
-		remove_filter( 'datamachine_ai_request_response', [ $this, 'mock_ai_response' ] );
+		remove_filter( 'chubes_ai_request', [ $this, 'mock_ai_response' ] );
 		add_filter( 'chubes_ai_request', function( $request ) use ( &$captured_request ) {
 			$captured_request = $request;
 			return [
@@ -158,8 +183,16 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 		ImageGenerationAbilities::refine_prompt( 'Test prompt', '', $config );
 		
 		$this->assertNotNull( $captured_request );
-		$system_message = $captured_request['messages'][0]['content'] ?? '';
-		$this->assertStringContainsString( 'minimalist, modern', $system_message );
+		// Directives prepend messages (SOUL.md, USER.md), so search all system messages
+		// for our custom style guide content.
+		$found_style_guide = false;
+		foreach ( $captured_request['messages'] as $msg ) {
+			if ( ( $msg['role'] ?? '' ) === 'system' && str_contains( $msg['content'] ?? '', 'minimalist, modern' ) ) {
+				$found_style_guide = true;
+				break;
+			}
+		}
+		$this->assertTrue( $found_style_guide, 'Custom style guide should appear in one of the system messages.' );
 	}
 
 	public function test_get_default_style_guide_contains_key_instructions(): void {
@@ -174,11 +207,13 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 	}
 
 	public function test_refine_prompt_returns_null_on_ai_failure(): void {
-		PluginSettings::set( 'default_provider', 'openai' );
-		PluginSettings::set( 'default_model', 'gpt-4' );
+		$this->set_plugin_settings( array(
+			'default_provider' => 'openai',
+			'default_model'    => 'gpt-4',
+		) );
 		
 		// Mock AI failure
-		remove_filter( 'datamachine_ai_request_response', [ $this, 'mock_ai_response' ] );
+		remove_filter( 'chubes_ai_request', [ $this, 'mock_ai_response' ] );
 		add_filter( 'chubes_ai_request', function() {
 			return [
 				'success' => false,
@@ -192,11 +227,13 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 	}
 
 	public function test_refine_prompt_returns_null_on_empty_ai_response(): void {
-		PluginSettings::set( 'default_provider', 'openai' );
-		PluginSettings::set( 'default_model', 'gpt-4' );
+		$this->set_plugin_settings( array(
+			'default_provider' => 'openai',
+			'default_model'    => 'gpt-4',
+		) );
 		
 		// Mock empty AI response
-		remove_filter( 'datamachine_ai_request_response', [ $this, 'mock_ai_response' ] );
+		remove_filter( 'chubes_ai_request', [ $this, 'mock_ai_response' ] );
 		add_filter( 'chubes_ai_request', function() {
 			return [
 				'success' => true,
@@ -211,57 +248,85 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 
 	public function test_generate_image_applies_refinement_when_enabled(): void {
 		// Configure image generation and AI provider
-		update_site_option( 'datamachine_image_generation_config', [
-			'api_key' => 'test-replicate-key',
+		update_site_option( 'datamachine_image_generation_config', array(
+			'api_key'                   => 'test-replicate-key',
 			'prompt_refinement_enabled' => true,
-		] );
-		PluginSettings::set( 'default_provider', 'openai' );
-		PluginSettings::set( 'default_model', 'gpt-4' );
-		
-		// Mock Replicate API
-		add_filter( 'pre_http_request', function( $preempt, $args, $url ) {
-			if ( strpos( $url, 'replicate.com/v1/predictions' ) !== false ) {
-				return [
-					'response' => [ 'code' => 200 ],
-					'body' => wp_json_encode( [ 'id' => 'test-prediction-id' ] ),
-				];
+		) );
+		$this->set_plugin_settings( array(
+			'default_provider' => 'openai',
+			'default_model'    => 'gpt-4',
+		) );
+
+		// Mock Replicate API — HttpClient::post() expects 201 for POST requests.
+		$http_filter = function ( $preempt, $args, $url ) {
+			if ( str_contains( $url, 'replicate.com' ) ) {
+				return array(
+					'response' => array( 'code' => 201, 'message' => 'Created' ),
+					'body'     => wp_json_encode( array( 'id' => 'test-prediction-id' ) ),
+					'headers'  => array(),
+					'cookies'  => array(),
+				);
 			}
 			return $preempt;
-		}, 10, 3 );
-		
-		// Mock SystemAgent
-		add_filter( 'datamachine_system_agent_schedule_task', function() { return 123; }, 10, 4 );
-		
-		$result = ImageGenerationAbilities::generateImage( [ 'prompt' => 'The Spiritual Meaning of Cranes' ] );
-		
-		$this->assertTrue( $result['success'] );
+		};
+		add_filter( 'pre_http_request', $http_filter, 10, 3 );
+
+		// Mock SystemAgent singleton via reflection.
+		$reflection = new \ReflectionClass( \DataMachine\Engine\AI\System\SystemAgent::class );
+		$prop       = $reflection->getProperty( 'instance' );
+		$prop->setAccessible( true );
+		$original = $prop->getValue();
+
+		$mock = $this->createMock( \DataMachine\Engine\AI\System\SystemAgent::class );
+		$mock->method( 'scheduleTask' )->willReturn( 789 );
+		$prop->setValue( $mock );
+
+		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => 'The Spiritual Meaning of Cranes' ) );
+
+		$this->assertTrue( $result['success'], 'generateImage should succeed. Error: ' . ( $result['error'] ?? 'none' ) );
 		$this->assertStringContainsString( 'Prompt was refined', $result['message'] );
+
+		// Cleanup
+		$prop->setValue( $original );
+		remove_filter( 'pre_http_request', $http_filter, 10 );
 	}
 
 	public function test_generate_image_skips_refinement_when_disabled(): void {
-		// Configure image generation with refinement disabled
-		update_site_option( 'datamachine_image_generation_config', [
-			'api_key' => 'test-replicate-key',
+		update_site_option( 'datamachine_image_generation_config', array(
+			'api_key'                   => 'test-replicate-key',
 			'prompt_refinement_enabled' => false,
-		] );
-		
-		// Mock Replicate API
-		add_filter( 'pre_http_request', function( $preempt, $args, $url ) {
-			if ( strpos( $url, 'replicate.com/v1/predictions' ) !== false ) {
-				return [
-					'response' => [ 'code' => 200 ],
-					'body' => wp_json_encode( [ 'id' => 'test-prediction-id' ] ),
-				];
+		) );
+
+		// Mock Replicate API.
+		$http_filter = function ( $preempt, $args, $url ) {
+			if ( str_contains( $url, 'replicate.com' ) ) {
+				return array(
+					'response' => array( 'code' => 201, 'message' => 'Created' ),
+					'body'     => wp_json_encode( array( 'id' => 'test-prediction-id' ) ),
+					'headers'  => array(),
+					'cookies'  => array(),
+				);
 			}
 			return $preempt;
-		}, 10, 3 );
-		
-		// Mock SystemAgent
-		add_filter( 'datamachine_system_agent_schedule_task', function() { return 123; }, 10, 4 );
-		
-		$result = ImageGenerationAbilities::generateImage( [ 'prompt' => 'The Spiritual Meaning of Cranes' ] );
-		
+		};
+		add_filter( 'pre_http_request', $http_filter, 10, 3 );
+
+		// Mock SystemAgent singleton.
+		$reflection = new \ReflectionClass( \DataMachine\Engine\AI\System\SystemAgent::class );
+		$prop       = $reflection->getProperty( 'instance' );
+		$prop->setAccessible( true );
+		$original = $prop->getValue();
+
+		$mock = $this->createMock( \DataMachine\Engine\AI\System\SystemAgent::class );
+		$mock->method( 'scheduleTask' )->willReturn( 456 );
+		$prop->setValue( $mock );
+
+		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => 'The Spiritual Meaning of Cranes' ) );
+
 		$this->assertTrue( $result['success'] );
 		$this->assertStringNotContainsString( 'Prompt was refined', $result['message'] );
+
+		$prop->setValue( $original );
+		remove_filter( 'pre_http_request', $http_filter, 10 );
 	}
 }
