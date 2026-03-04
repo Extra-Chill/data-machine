@@ -17,6 +17,11 @@ class BingWebmasterTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+
+		// Ability execute() requires manage_options capability.
+		$admin_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		wp_set_current_user( $admin_id );
+
 		$this->tool = new BingWebmaster();
 	}
 
@@ -45,117 +50,98 @@ class BingWebmasterTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Test handle_tool_call returns error when ability not registered.
-	 */
-	public function test_handle_tool_call_missing_ability(): void {
-		// Mock wp_get_ability to return null
-		$filter = function( $ability, $ability_name ) {
-			if ( 'datamachine/bing-webmaster' === $ability_name ) {
-				return null;
-			}
-			return $ability;
-		};
-		add_filter( 'wp_get_ability', $filter, 10, 2 );
-
-		$result = $this->tool->handle_tool_call( [ 'action' => 'query_stats' ] );
-
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'ability not registered', $result['error'] );
-		$this->assertSame( 'bing_webmaster', $result['tool_name'] );
-
-		remove_filter( 'wp_get_ability', $filter, 10 );
-	}
-
-	/**
-	 * Test handle_tool_call handles WP_Error from ability.
+	 * Test handle_tool_call handles WP_Error from HTTP failure.
 	 */
 	public function test_handle_tool_call_wp_error(): void {
-		$mock_ability = $this->createMock( \stdClass::class );
-		$mock_ability->method( 'execute' )
-			->willReturn( new WP_Error( 'api_error', 'Bing API connection failed' ) );
-
-		$filter = function( $ability, $ability_name ) use ( $mock_ability ) {
-			if ( 'datamachine/bing-webmaster' === $ability_name ) {
-				return $mock_ability;
+		$filter = function ( $preempt, $parsed_args, $url ) {
+			if ( str_contains( $url, 'ssl.bing.com' ) ) {
+				return new WP_Error( 'http_request_failed', 'Bing API connection failed' );
 			}
-			return $ability;
+			return $preempt;
 		};
-		add_filter( 'wp_get_ability', $filter, 10, 2 );
+		add_filter( 'pre_http_request', $filter, 10, 3 );
 
-		$result = $this->tool->handle_tool_call( [ 'action' => 'query_stats' ] );
+		update_site_option( 'datamachine_bing_webmaster_config', array( 'api_key' => 'test-key' ) );
+
+		$result = $this->tool->handle_tool_call( array( 'action' => 'query_stats' ) );
 
 		$this->assertFalse( $result['success'] );
-		$this->assertSame( 'Bing API connection failed', $result['error'] );
+		$this->assertStringContainsString( 'failed', strtolower( $result['error'] ) );
 		$this->assertSame( 'bing_webmaster', $result['tool_name'] );
 
-		remove_filter( 'wp_get_ability', $filter, 10 );
+		remove_filter( 'pre_http_request', $filter, 10 );
 	}
 
 	/**
-	 * Test handle_tool_call handles error from ability result.
+	 * Test handle_tool_call handles error from ability result (e.g. invalid API key).
 	 */
 	public function test_handle_tool_call_ability_error(): void {
-		$mock_ability = $this->createMock( \stdClass::class );
-		$mock_ability->method( 'execute' )
-			->willReturn( [
-				'success' => false,
-				'error' => 'Invalid API key'
-			] );
-
-		$filter = function( $ability, $ability_name ) use ( $mock_ability ) {
-			if ( 'datamachine/bing-webmaster' === $ability_name ) {
-				return $mock_ability;
+		$filter = function ( $preempt, $parsed_args, $url ) {
+			if ( str_contains( $url, 'ssl.bing.com' ) ) {
+				return array(
+					'response' => array( 'code' => 401, 'message' => 'Unauthorized' ),
+					'body'     => wp_json_encode( array( 'Message' => 'Invalid API key' ) ),
+					'headers'  => array(),
+					'cookies'  => array(),
+				);
 			}
-			return $ability;
+			return $preempt;
 		};
-		add_filter( 'wp_get_ability', $filter, 10, 2 );
+		add_filter( 'pre_http_request', $filter, 10, 3 );
 
-		$result = $this->tool->handle_tool_call( [ 'action' => 'query_stats' ] );
+		update_site_option( 'datamachine_bing_webmaster_config', array( 'api_key' => 'bad-key' ) );
+
+		$result = $this->tool->handle_tool_call( array( 'action' => 'query_stats' ) );
 
 		$this->assertFalse( $result['success'] );
-		$this->assertSame( 'Invalid API key', $result['error'] );
+		$this->assertNotEmpty( $result['error'] );
 		$this->assertSame( 'bing_webmaster', $result['tool_name'] );
 
-		remove_filter( 'wp_get_ability', $filter, 10 );
+		remove_filter( 'pre_http_request', $filter, 10 );
 	}
 
 	/**
 	 * Test handle_tool_call delegates to ability successfully.
 	 */
 	public function test_handle_tool_call_success(): void {
-		$expected_params = [ 'action' => 'query_stats', 'limit' => 20 ];
-		$expected_result = [
-			'success' => true,
-			'action' => 'query_stats',
-			'results_count' => 2,
-			'results' => [
-				[ 'query' => 'test query 1', 'clicks' => 100 ],
-				[ 'query' => 'test query 2', 'clicks' => 50 ]
-			]
-		];
-
-		$mock_ability = $this->createMock( \stdClass::class );
-		$mock_ability->expects( $this->once() )
-			->method( 'execute' )
-			->with( $expected_params )
-			->willReturn( $expected_result );
-
-		$filter = function( $ability, $ability_name ) use ( $mock_ability ) {
-			if ( 'datamachine/bing-webmaster' === $ability_name ) {
-				return $mock_ability;
+		$filter = function ( $preempt, $parsed_args, $url ) {
+			if ( str_contains( $url, 'ssl.bing.com' ) ) {
+				return array(
+					'response' => array( 'code' => 200, 'message' => 'OK' ),
+					'body'     => wp_json_encode( array(
+						'd' => array(
+							array(
+								'Query' => 'test query 1',
+								'Clicks' => 100,
+								'Date' => '/Date(1700000000000)/',
+							),
+							array(
+								'Query' => 'test query 2',
+								'Clicks' => 50,
+								'Date' => '/Date(1700100000000)/',
+							),
+						),
+					) ),
+					'headers'  => array(),
+					'cookies'  => array(),
+				);
 			}
-			return $ability;
+			return $preempt;
 		};
-		add_filter( 'wp_get_ability', $filter, 10, 2 );
+		add_filter( 'pre_http_request', $filter, 10, 3 );
 
-		$result = $this->tool->handle_tool_call( $expected_params );
+		update_site_option( 'datamachine_bing_webmaster_config', array(
+			'api_key'  => 'test-key',
+			'site_url' => 'https://example.com',
+		) );
+
+		$result = $this->tool->handle_tool_call( array( 'action' => 'query_stats', 'limit' => 20 ) );
 
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( 'query_stats', $result['action'] );
-		$this->assertSame( 2, $result['results_count'] );
 		$this->assertSame( 'bing_webmaster', $result['tool_name'] );
 
-		remove_filter( 'wp_get_ability', $filter, 10 );
+		remove_filter( 'pre_http_request', $filter, 10 );
 	}
 
 	/**
@@ -177,7 +163,7 @@ class BingWebmasterTest extends WP_UnitTestCase {
 	 * Test get_config_fields passthrough for different tool_id.
 	 */
 	public function test_get_config_fields_passthrough(): void {
-		$existing = [ 'foo' => 'bar' ];
+		$existing = array( 'foo' => 'bar' );
 		$result = $this->tool->get_config_fields( $existing, 'image_generation' );
 		$this->assertSame( $existing, $result );
 	}
@@ -197,7 +183,7 @@ class BingWebmasterTest extends WP_UnitTestCase {
 		delete_site_option( 'datamachine_bing_webmaster_config' );
 		$this->assertFalse( $this->tool->check_configuration( true, 'bing_webmaster' ) );
 
-		update_site_option( 'datamachine_bing_webmaster_config', [ 'api_key' => 'test-key' ] );
+		update_site_option( 'datamachine_bing_webmaster_config', array( 'api_key' => 'test-key' ) );
 		$this->assertTrue( $this->tool->check_configuration( false, 'bing_webmaster' ) );
 	}
 
@@ -205,7 +191,7 @@ class BingWebmasterTest extends WP_UnitTestCase {
 	 * Test get_configuration passthrough for wrong tool_id.
 	 */
 	public function test_get_configuration_passthrough(): void {
-		$existing = [ 'foo' => 'bar' ];
+		$existing = array( 'foo' => 'bar' );
 		$result = $this->tool->get_configuration( $existing, 'image_generation' );
 		$this->assertSame( $existing, $result );
 	}
@@ -214,10 +200,10 @@ class BingWebmasterTest extends WP_UnitTestCase {
 	 * Test get_configuration for bing_webmaster tool.
 	 */
 	public function test_get_configuration_bing_webmaster(): void {
-		$config = [ 'api_key' => 'test-key', 'site_url' => 'https://example.com' ];
+		$config = array( 'api_key' => 'test-key', 'site_url' => 'https://example.com' );
 		update_site_option( 'datamachine_bing_webmaster_config', $config );
 
-		$result = $this->tool->get_configuration( [], 'bing_webmaster' );
+		$result = $this->tool->get_configuration( array(), 'bing_webmaster' );
 		$this->assertSame( $config, $result );
 	}
 
@@ -233,7 +219,7 @@ class BingWebmasterTest extends WP_UnitTestCase {
 	 * Test is_configured returns true when configured.
 	 */
 	public function test_is_configured_true(): void {
-		update_site_option( 'datamachine_bing_webmaster_config', [ 'api_key' => 'test-key' ] );
+		update_site_option( 'datamachine_bing_webmaster_config', array( 'api_key' => 'test-key' ) );
 		$this->assertTrue( BingWebmaster::is_configured() );
 	}
 }

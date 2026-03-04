@@ -8,6 +8,7 @@
 namespace DataMachine\Tests\Unit\AI\Tools;
 
 use DataMachine\Engine\AI\Tools\Global\ImageGeneration;
+use DataMachine\Abilities\Media\ImageGenerationAbilities;
 use WP_UnitTestCase;
 
 class ImageGenerationTest extends WP_UnitTestCase {
@@ -16,6 +17,11 @@ class ImageGenerationTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+
+		// Ability execute() requires manage_options capability.
+		$admin_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		wp_set_current_user( $admin_id );
+
 		$this->tool = new ImageGeneration();
 	}
 
@@ -117,6 +123,6 @@ class ImageGenerationTest extends WP_UnitTestCase {
 	}
 
 	public function test_config_option_key(): void {
-		$this->assertSame( 'datamachine_image_generation_config', ImageGeneration::CONFIG_OPTION );
+		$this->assertSame( 'datamachine_image_generation_config', ImageGenerationAbilities::CONFIG_OPTION );
 	}
 }

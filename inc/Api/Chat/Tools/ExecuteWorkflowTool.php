@@ -35,7 +35,7 @@ class ExecuteWorkflowTool extends BaseTool {
 
 		if ( $step_types_ability ) {
 			$result = $step_types_ability->execute( array() );
-			if ( ! empty( $result['success'] ) && ! empty( $result['step_types'] ) ) {
+			if ( ! is_wp_error( $result ) && ! empty( $result['success'] ) && ! empty( $result['step_types'] ) ) {
 				$type_slugs = array_keys( $result['step_types'] );
 			}
 		}
