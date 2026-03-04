@@ -13,7 +13,8 @@
 		"php-stubs/wordpress-stubs": "^6.9",
 		"wp-coding-standards/wpcs": "^3.1",
 		"phpcsstandards/phpcsutils": "^1.0",
-		"phpcompatibility/phpcompatibility-wp": "^2.1"
+		"phpcompatibility/phpcompatibility-wp": "^2.1",
+		"wp-cli/wp-cli": "^2.12"
 	},
 	"autoload": {
 		"psr-4": {
