@@ -401,15 +401,26 @@ abstract class SystemTask {
 	protected function failJob( int $jobId, string $reason ): void {
 		$jobs_db = new Jobs();
 
-		// Store error in engine_data
-		$error_data = array(
-			'error'     => $reason,
-			'failed_at' => current_time( 'mysql' ),
-			'task_type' => $this->getTaskType(),
+		// Retrieve current engine_data to preserve original params.
+		$current_data = $jobs_db->retrieve_engine_data( $jobId );
+		$current_data = is_array( $current_data ) ? $current_data : array();
+
+		// Build error data, preserving original scheduling params for debugging.
+		$error_data = array_merge(
+			$current_data,
+			array(
+				'error'     => $reason,
+				'failed_at' => current_time( 'mysql' ),
+				'task_type' => $this->getTaskType(),
+			)
 		);
+
+		// Remove transient execution keys that shouldn't persist.
+		unset( $error_data['scheduled_at'] );
+
 		$jobs_db->store_engine_data( $jobId, $error_data );
 
-		// Mark job as failed
+		// Mark job as failed.
 		$jobs_db->complete_job( $jobId, JobStatus::failed( $reason )->toString() );
 
 		do_action(

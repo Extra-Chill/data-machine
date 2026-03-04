@@ -211,6 +211,8 @@ class JobsCommand extends BaseCommand {
 			$limit = 500;
 		}
 
+		$source = $assoc_args['source'] ?? null;
+
 		$input = array(
 			'per_page' => $limit,
 			'offset'   => 0,
@@ -226,6 +228,10 @@ class JobsCommand extends BaseCommand {
 			$input['flow_id'] = $flow_id;
 		}
 
+		if ( $source ) {
+			$input['source'] = $source;
+		}
+
 		$result = $this->abilities->executeGetJobs( $input );
 
 		if ( ! $result['success'] ) {
@@ -238,23 +244,6 @@ class JobsCommand extends BaseCommand {
 		if ( empty( $jobs ) ) {
 			WP_CLI::warning( 'No jobs found.' );
 			return;
-		}
-
-		// Filter by source if specified.
-		$source_filter = $assoc_args['source'] ?? null;
-		if ( $source_filter ) {
-			$jobs = array_filter(
-				$jobs,
-				function ( $j ) use ( $source_filter ) {
-					return ( $j['source'] ?? 'pipeline' ) === $source_filter;
-				}
-			);
-			$jobs = array_values( $jobs );
-
-			if ( empty( $jobs ) ) {
-				WP_CLI::warning( sprintf( 'No %s jobs found.', $source_filter ) );
-				return;
-			}
 		}
 
 		// Transform jobs to flat row format.
@@ -385,35 +374,6 @@ class JobsCommand extends BaseCommand {
 			WP_CLI::log( sprintf( 'Reason: %s', $parsed_status['reason'] ) );
 		}
 
-		// Display structured error details for failed jobs (persisted by #536).
-		if ( 'failed' === $parsed_status['type'] ) {
-			$engine_data   = $job['engine_data'] ?? array();
-			$error_message = $engine_data['error_message'] ?? null;
-			$error_step_id = $engine_data['error_step_id'] ?? null;
-			$error_trace   = $engine_data['error_trace'] ?? null;
-
-			if ( $error_message ) {
-				WP_CLI::log( '' );
-				WP_CLI::log( WP_CLI::colorize( '%RError:%n ' . $error_message ) );
-
-				if ( $error_step_id ) {
-					WP_CLI::log( sprintf( '  Step: %s', $error_step_id ) );
-				}
-
-				if ( $error_trace ) {
-					WP_CLI::log( '' );
-					WP_CLI::log( '  Stack Trace (truncated):' );
-					$trace_lines = explode( "\n", $error_trace );
-					foreach ( array_slice( $trace_lines, 0, 10 ) as $line ) {
-						WP_CLI::log( '    ' . $line );
-					}
-					if ( count( $trace_lines ) > 10 ) {
-						WP_CLI::log( sprintf( '    ... (%d more lines, use --format=json for full trace)', count( $trace_lines ) - 10 ) );
-					}
-				}
-			}
-		}
-
 		WP_CLI::log( '' );
 		WP_CLI::log( sprintf( 'Created: %s', $job['created_at_display'] ?? $job['created_at'] ?? 'N/A' ) );
 		WP_CLI::log( sprintf( 'Completed: %s', $job['completed_at_display'] ?? $job['completed_at'] ?? '-' ) );
@@ -424,9 +384,6 @@ class JobsCommand extends BaseCommand {
 		}
 
 		$engine_data = $job['engine_data'] ?? array();
-
-		// Strip error keys already displayed in the error section above.
-		unset( $engine_data['error_reason'], $engine_data['error_message'], $engine_data['error_step_id'], $engine_data['error_trace'] );
 
 		if ( ! empty( $engine_data ) ) {
 			WP_CLI::log( '' );

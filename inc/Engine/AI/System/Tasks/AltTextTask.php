@@ -26,6 +26,24 @@ class AltTextTask extends SystemTask {
 	 * @param array $params Task parameters from engine_data.
 	 */
 	public function execute( int $jobId, array $params ): void {
+		try {
+			$this->doExecute( $jobId, $params );
+		} catch ( \Throwable $e ) {
+			// Ensure failures are never silent — store error details alongside original params.
+			$this->failJob( $jobId, sprintf( 'Uncaught exception: %s (%s:%d)', $e->getMessage(), basename( $e->getFile() ), $e->getLine() ) );
+		}
+	}
+
+	/**
+	 * Internal execution logic for alt text generation.
+	 *
+	 * Separated from execute() so the outer try/catch captures any uncaught
+	 * exceptions and stores meaningful error details in engine_data.
+	 *
+	 * @param int   $jobId  Job ID from DM Jobs table.
+	 * @param array $params Task parameters from engine_data.
+	 */
+	private function doExecute( int $jobId, array $params ): void {
 		$attachment_id = absint( $params['attachment_id'] ?? 0 );
 		$force         = ! empty( $params['force'] );
 
@@ -85,6 +103,8 @@ class AltTextTask extends SystemTask {
 			),
 		);
 
+		$retry_count = $params['retry_count'] ?? 0;
+
 		$response = RequestBuilder::build(
 			$messages,
 			$provider,
@@ -95,7 +115,15 @@ class AltTextTask extends SystemTask {
 		);
 
 		if ( empty( $response['success'] ) ) {
-			$this->failJob( $jobId, 'AI request failed: ' . ( $response['error'] ?? 'Unknown error' ) );
+			$error_msg = $response['error'] ?? 'Unknown error';
+
+			// Auto-retry once on AI request failures.
+			if ( $retry_count < 1 ) {
+				$this->retryAltText( $jobId, $params, "AI request failed: {$error_msg}" );
+				return;
+			}
+
+			$this->failJob( $jobId, "AI request failed after retry: {$error_msg}" );
 			return;
 		}
 
@@ -103,7 +131,13 @@ class AltTextTask extends SystemTask {
 		$alt_text = $this->normalizeAltText( $content );
 
 		if ( empty( $alt_text ) ) {
-			$this->failJob( $jobId, 'AI returned empty alt text' );
+			// Auto-retry once on empty AI responses.
+			if ( $retry_count < 1 ) {
+				$this->retryAltText( $jobId, $params, 'AI returned empty alt text' );
+				return;
+			}
+
+			$this->failJob( $jobId, 'AI returned empty alt text after retry' );
 			return;
 		}
 
@@ -165,6 +199,42 @@ class AltTextTask extends SystemTask {
 	 */
 	public function supportsUndo(): bool {
 		return true;
+	}
+
+	/**
+	 * Schedule a retry for a failed alt text generation attempt.
+	 *
+	 * Increments the retry_count in engine_data and reschedules the task
+	 * for execution after a short delay. Only called when retry_count < max retries.
+	 *
+	 * @param int    $jobId  Job ID.
+	 * @param array  $params Original task parameters.
+	 * @param string $reason Reason for the retry.
+	 */
+	private function retryAltText( int $jobId, array $params, string $reason ): void {
+		$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
+
+		// Update engine_data with retry info, preserving original params.
+		$params['retry_count']  = ( $params['retry_count'] ?? 0 ) + 1;
+		$params['last_retry']   = current_time( 'mysql' );
+		$params['retry_reason'] = $reason;
+		$jobs_db->store_engine_data( $jobId, $params );
+
+		do_action(
+			'datamachine_log',
+			'warning',
+			sprintf( 'Alt text generation retrying job %d (attempt %d): %s', $jobId, $params['retry_count'], $reason ),
+			array(
+				'job_id'      => $jobId,
+				'task_type'   => $this->getTaskType(),
+				'agent_type'  => 'system',
+				'retry_count' => $params['retry_count'],
+				'reason'      => $reason,
+			)
+		);
+
+		// Reschedule with a 30-second delay.
+		$this->reschedule( $jobId, 30 );
 	}
 
 	/**

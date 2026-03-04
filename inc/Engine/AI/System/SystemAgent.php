@@ -692,23 +692,44 @@ class SystemAgent {
 			$handler = new $handler_class();
 			$handler->execute( $jobId, $engine_data );
 		} catch ( \Throwable $e ) {
+			$error_message = $e->getMessage();
+			$error_context = sprintf( '%s:%d', basename( $e->getFile() ), $e->getLine() );
+
 			do_action(
 				'datamachine_log',
 				'error',
-				"System Agent task execution failed for job {$jobId}: " . $e->getMessage(),
+				"System Agent task execution failed for job {$jobId}: {$error_message}",
 				array(
 					'job_id'         => $jobId,
 					'task_type'      => $task_type,
 					'agent_type'     => 'system',
 					'handler_class'  => $handler_class,
-					'exception'      => $e->getMessage(),
+					'exception'      => $error_message,
 					'exception_file' => $e->getFile(),
 					'exception_line' => $e->getLine(),
 				)
 			);
 
-			// Mark job as failed due to exception
-			$jobs_db->complete_job( $jobId, JobStatus::failed( 'Task execution exception: ' . $e->getMessage() )->toString() );
+			// Store error details in engine_data so failures are never silent.
+			$error_data = array(
+				'error'         => "Exception: {$error_message}",
+				'error_context' => $error_context,
+				'task_type'     => $task_type,
+				'failed_at'     => current_time( 'mysql' ),
+			);
+
+			// Preserve original scheduling params for debugging.
+			$preserve_keys = array( 'attachment_id', 'source', 'context' );
+			foreach ( $preserve_keys as $key ) {
+				if ( isset( $engine_data[ $key ] ) ) {
+					$error_data[ $key ] = $engine_data[ $key ];
+				}
+			}
+
+			$jobs_db->store_engine_data( $jobId, $error_data );
+
+			// Mark job as failed due to exception.
+			$jobs_db->complete_job( $jobId, JobStatus::failed( 'Task execution exception: ' . $error_message )->toString() );
 		}
 	}
 

@@ -143,8 +143,10 @@ class JobsOperations extends BaseRepository {
 		}
 
 		if ( ! empty( $args['status'] ) ) {
-			$where_clauses[] = 'status = %s';
-			$where_values[]  = sanitize_text_field( $args['status'] );
+			$status = sanitize_text_field( $args['status'] );
+			// Use prefix matching to support compound statuses (e.g., "failed" matches "failed - reason").
+			$where_clauses[] = 'status LIKE %s';
+			$where_values[]  = $this->wpdb->esc_like( $status ) . '%';
 		}
 
 		if ( ! empty( $args['source'] ) ) {
@@ -227,8 +229,10 @@ class JobsOperations extends BaseRepository {
 		}
 
 		if ( ! empty( $args['status'] ) ) {
-			$where_clauses[] = 'j.status = %s';
-			$where_values[]  = sanitize_text_field( $args['status'] );
+			$status = sanitize_text_field( $args['status'] );
+			// Use prefix matching to support compound statuses (e.g., "failed" matches "failed - reason").
+			$where_clauses[] = 'j.status LIKE %s';
+			$where_values[]  = $this->wpdb->esc_like( $status ) . '%';
 		}
 
 		if ( ! empty( $args['source'] ) ) {
