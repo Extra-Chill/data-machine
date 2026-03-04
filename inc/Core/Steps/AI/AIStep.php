@@ -250,19 +250,15 @@ class AIStep extends Step {
 	}
 
 	/**
-	 * Process AI conversation loop results into pipeline data packets.
-	 *
-	 * @param array $loop_result Result from AIConversationLoop
-	 * @param array $dataPackets Current data packet array
-	 * @param array $payload Step payload
-	 * @param array $available_tools Available tool definitions
-	 * @return array Updated data packet array
-	 */
-	/**
 	 * Process AI conversation loop results into data packets.
 	 *
+	 * Only emits actionable packets (handler completions, tool results) that
+	 * downstream steps depend on. Conversation turns are tracked as metadata
+	 * but not emitted as individual DataPackets — doing so causes the batch
+	 * scheduler to fan them out as ghost child jobs.
+	 *
 	 * @param array $loop_result Results from AIConversationLoop
-	 * @param array $data Current data packet array
+	 * @param array $dataPackets Current data packet array
 	 * @param array $payload Step payload
 	 * @param array $available_tools Tools available during conversation
 	 * @return array Updated data packet array
@@ -275,54 +271,25 @@ class AIStep extends Step {
 		$flow_step_id           = $payload['flow_step_id'];
 		$messages               = $loop_result['messages'] ?? array();
 		$tool_execution_results = $loop_result['tool_execution_results'] ?? array();
-		$turn_count             = 0;
-		$handler_completed      = false;
 
-		// Process conversation messages to build data packets
+		// Count conversation turns for metadata (not emitted as packets).
+		$turn_count        = 0;
+		$handler_completed = false;
+		$final_ai_content  = '';
+
 		foreach ( $messages as $message ) {
-			$role = $message['role'] ?? '';
-
-			// Track turns by counting assistant messages
-			if ( 'assistant' === $role ) {
+			if ( 'assistant' === ( $message['role'] ?? '' ) ) {
 				++$turn_count;
-			}
-
-			// Process assistant responses (AI content or tool calls)
-			if ( 'assistant' === $role ) {
-				$content    = $message['content'] ?? '';
-				$tool_calls = $message['tool_calls'] ?? array();
-
-				if ( ! empty( $content ) || ! empty( $tool_calls ) ) {
-					if ( ! empty( $content ) ) {
-						$content_lines = explode( "\n", trim( $content ), 2 );
-						$ai_title      = ( strlen( $content_lines[0] ) <= 100 ) ? $content_lines[0] : "AI Response - Turn {$turn_count}";
-						$response_body = $content;
-					} else {
-						$ai_title      = "AI Tool Execution - Turn {$turn_count}";
-						$tool_names    = array_column( $tool_calls, 'name' );
-						$response_body = 'AI executed ' . count( $tool_calls ) . ' tool(s): ' . implode( ', ', $tool_names );
-					}
-
-					$packet      = new DataPacket(
-						array(
-							'title' => $ai_title,
-							'body'  => $response_body,
-						),
-						array(
-							'source_type'       => 'ai_response',
-							'flow_step_id'      => $flow_step_id,
-							'conversation_turn' => $turn_count,
-							'has_tool_calls'    => ! empty( $tool_calls ),
-							'tool_count'        => count( $tool_calls ),
-						),
-						'ai_response'
-					);
-					$dataPackets = $packet->addTo( $dataPackets );
+				$content = $message['content'] ?? '';
+				if ( ! empty( $content ) ) {
+					$final_ai_content = $content;
 				}
 			}
 		}
 
-		// Process tool execution results into data packets
+		// Process tool execution results into data packets.
+		// Only handler completions and tool results are emitted — these are
+		// consumed by downstream steps (PublishStep, UpdateStep) via ToolResultFinder.
 		foreach ( $tool_execution_results as $tool_result_data ) {
 			$tool_name         = $tool_result_data['tool_name'] ?? '';
 			$tool_result       = $tool_result_data['result'] ?? array();
@@ -387,6 +354,27 @@ class AIStep extends Step {
 				);
 				$dataPackets = $packet->addTo( $dataPackets );
 			}
+		}
+
+		// If no handler completed and no tool results were added, emit a single
+		// summary packet so the step doesn't appear to have produced nothing.
+		if ( ! $handler_completed && count( $dataPackets ) === 0 && ! empty( $final_ai_content ) ) {
+			$content_lines = explode( "\n", trim( $final_ai_content ), 2 );
+			$ai_title      = ( strlen( $content_lines[0] ) <= 100 ) ? $content_lines[0] : 'AI Response';
+
+			$packet      = new DataPacket(
+				array(
+					'title' => $ai_title,
+					'body'  => $final_ai_content,
+				),
+				array(
+					'source_type'       => 'ai_response',
+					'flow_step_id'      => $flow_step_id,
+					'conversation_turn' => $turn_count,
+				),
+				'ai_response'
+			);
+			$dataPackets = $packet->addTo( $dataPackets );
 		}
 
 		return $dataPackets;
