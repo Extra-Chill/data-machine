@@ -3,18 +3,17 @@
 	"description": "WordPress plugin for automated data collection, AI processing, and multi-platform publishing",
 	"version": "0.10.2",
 	"license": "GPL-2.0-or-later",
-  "require": {
-    "php": ">=8.2",
-    "monolog/monolog": "^3.9",
-    "woocommerce/action-scheduler": "^3.9",
-    "chubes4/ai-http-client": "^2.0.13"
-  },
+	"require": {
+		"php": ">=8.2",
+		"monolog/monolog": "^3.9",
+		"woocommerce/action-scheduler": "^3.9",
+		"chubes4/ai-http-client": "^2.0.13"
+	},
 	"require-dev": {
 		"php-stubs/wordpress-stubs": "^6.9",
 		"wp-coding-standards/wpcs": "^3.1",
 		"phpcsstandards/phpcsutils": "^1.0",
-		"phpcompatibility/phpcompatibility-wp": "^2.1",
-		"wp-cli/wp-cli": "^2.12"
+		"phpcompatibility/phpcompatibility-wp": "^2.1"
 	},
 	"autoload": {
 		"psr-4": {
