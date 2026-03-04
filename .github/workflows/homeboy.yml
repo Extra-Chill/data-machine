@@ -42,7 +42,7 @@ jobs:
 
       - uses: Extra-Chill/homeboy-action@v1
         with:
-          version: '0.53.0'
+          version: 'latest'
           extension: wordpress
           commands: lint,test,audit
           component: data-machine
