@@ -158,6 +158,7 @@ class ChatOrchestrator {
 				'max_turns'            => $max_turns,
 				'selected_pipeline_id' => $selected_pipeline_id ? $selected_pipeline_id : null,
 				'agent_type'           => AgentType::CHAT,
+				'user_id'              => $user_id,
 			)
 		);
 
@@ -289,6 +290,7 @@ class ChatOrchestrator {
 				'max_turns'            => $max_turns,
 				'selected_pipeline_id' => $selected_pipeline_id,
 				'agent_type'           => AgentType::CHAT,
+				'user_id'              => (int) ( $session['user_id'] ?? 0 ),
 			)
 		);
 
@@ -389,7 +391,10 @@ class ChatOrchestrator {
 			$messages,
 			$provider,
 			$model,
-			array( 'agent_type' => AgentType::CHAT )
+			array(
+				'agent_type' => AgentType::CHAT,
+				'user_id'    => $user_id,
+			)
 		);
 
 		if ( is_wp_error( $result ) ) {
@@ -544,7 +549,11 @@ class ChatOrchestrator {
 			$tool_manager = new ToolManager();
 			$all_tools    = $tool_manager->getAvailableToolsForChat();
 
-			$loop_context = array( 'session_id' => $session_id );
+			$user_id      = $options['user_id'] ?? 0;
+			$loop_context = array(
+				'session_id' => $session_id,
+				'user_id'    => $user_id,
+			);
 			if ( $selected_pipeline_id ) {
 				$loop_context['selected_pipeline_id'] = $selected_pipeline_id;
 			}

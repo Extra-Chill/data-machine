@@ -176,12 +176,17 @@ class AIStep extends Step {
 
 		$max_turns = PluginSettings::get( 'max_turns', 12 );
 
+		// Resolve user_id from engine snapshot (set by RunFlowAbility).
+		$job_snapshot = $this->engine->get( 'job' );
+		$user_id      = (int) ( $job_snapshot['user_id'] ?? 0 );
+
 		$payload = array(
 			'job_id'       => $this->job_id,
 			'flow_step_id' => $this->flow_step_id,
 			'step_id'      => $pipeline_step_id,
 			'data'         => $this->dataPackets,
 			'engine'       => $this->engine,
+			'user_id'      => $user_id,
 		);
 
 		$navigator             = new \DataMachine\Engine\StepNavigator();
