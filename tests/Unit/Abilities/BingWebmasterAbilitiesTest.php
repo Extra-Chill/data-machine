@@ -81,16 +81,13 @@ class BingWebmasterAbilitiesTest extends WP_UnitTestCase {
 		] );
 
 		// Mock HttpClient to return error
-		$filter = function( $result, $url, $args, $context ) {
-			if ( 'Bing Webmaster Tools Ability' === $context ) {
-				return [
-					'success' => false,
-					'error' => 'Connection timeout'
-				];
+		$filter = function( $result, $parsed_args, $url ) {
+			if ( str_contains( $url, 'ssl.bing.com' ) ) {
+				return new \WP_Error( 'http_request_failed', 'Connection timeout' );
 			}
 			return $result;
 		};
-		add_filter( 'pre_http_request', $filter, 10, 4 );
+		add_filter( 'pre_http_request', $filter, 10, 3 );
 
 		$result = BingWebmasterAbilities::fetchStats( [
 			'action' => 'query_stats',
@@ -113,16 +110,18 @@ class BingWebmasterAbilitiesTest extends WP_UnitTestCase {
 		] );
 
 		// Mock HttpClient to return invalid JSON
-		$filter = function( $result, $url, $args, $context ) {
-			if ( 'Bing Webmaster Tools Ability' === $context ) {
-				return [
-					'success' => true,
-					'data' => 'invalid json response'
-				];
+		$filter = function( $result, $parsed_args, $url ) {
+			if ( str_contains( $url, 'ssl.bing.com' ) ) {
+				return array(
+					'response' => array( 'code' => 200, 'message' => 'OK' ),
+					'body'     => 'invalid json response',
+					'headers'  => array(),
+					'cookies'  => array(),
+				);
 			}
 			return $result;
 		};
-		add_filter( 'pre_http_request', $filter, 10, 4 );
+		add_filter( 'pre_http_request', $filter, 10, 3 );
 
 		$result = BingWebmasterAbilities::fetchStats( [ 'action' => 'query_stats' ] );
 
@@ -149,21 +148,23 @@ class BingWebmasterAbilitiesTest extends WP_UnitTestCase {
 		];
 
 		// Mock HttpClient to return success
-		$filter = function( $result, $url, $args, $context ) use ( $mock_data ) {
-			if ( 'Bing Webmaster Tools Ability' === $context ) {
+		$filter = function( $result, $parsed_args, $url ) use ( $mock_data ) {
+			if ( str_contains( $url, 'ssl.bing.com' ) ) {
 				// Verify API key and site_url are in the URL
 				$this->assertStringContainsString( 'apikey=test-key', $url );
-				$this->assertStringContainsString( 'siteUrl=https%3A%2F%2Fexample.com', $url );
+				$this->assertStringContainsString( 'siteUrl=https://example.com', $url );
 				$this->assertStringContainsString( 'GetQueryStats', $url );
-				
-				return [
-					'success' => true,
-					'data' => wp_json_encode( $mock_data )
-				];
+
+				return array(
+					'response' => array( 'code' => 200, 'message' => 'OK' ),
+					'body'     => wp_json_encode( $mock_data ),
+					'headers'  => array(),
+					'cookies'  => array(),
+				);
 			}
 			return $result;
 		};
-		add_filter( 'pre_http_request', $filter, 10, 4 );
+		add_filter( 'pre_http_request', $filter, 10, 3 );
 
 		$result = BingWebmasterAbilities::fetchStats( [ 'action' => 'query_stats' ] );
 
@@ -188,20 +189,22 @@ class BingWebmasterAbilitiesTest extends WP_UnitTestCase {
 		];
 
 		// Mock HttpClient to return success
-		$filter = function( $result, $url, $args, $context ) use ( $mock_data ) {
-			if ( 'Bing Webmaster Tools Ability' === $context ) {
+		$filter = function( $result, $parsed_args, $url ) use ( $mock_data ) {
+			if ( str_contains( $url, 'ssl.bing.com' ) ) {
 				// Verify custom site_url is used instead of config
-				$this->assertStringContainsString( 'siteUrl=https%3A%2F%2Fcustom.com', $url );
-				$this->assertStringContainsString( 'GetTrafficStats', $url );
-				
-				return [
-					'success' => true,
-					'data' => wp_json_encode( $mock_data )
-				];
+				$this->assertStringContainsString( 'siteUrl=https://custom.com', $url );
+				$this->assertStringContainsString( 'GetRankAndTrafficStats', $url );
+
+				return array(
+					'response' => array( 'code' => 200, 'message' => 'OK' ),
+					'body'     => wp_json_encode( $mock_data ),
+					'headers'  => array(),
+					'cookies'  => array(),
+				);
 			}
 			return $result;
 		};
-		add_filter( 'pre_http_request', $filter, 10, 4 );
+		add_filter( 'pre_http_request', $filter, 10, 3 );
 
 		$result = BingWebmasterAbilities::fetchStats( [
 			'action' => 'traffic_stats',
@@ -234,17 +237,19 @@ class BingWebmasterAbilitiesTest extends WP_UnitTestCase {
 		];
 
 		foreach ( $actions as $action => $endpoint ) {
-			$filter = function( $result, $url, $args, $context ) use ( $endpoint ) {
-				if ( 'Bing Webmaster Tools Ability' === $context ) {
+			$filter = function( $result, $parsed_args, $url ) use ( $endpoint ) {
+				if ( str_contains( $url, 'ssl.bing.com' ) ) {
 					$this->assertStringContainsString( $endpoint, $url );
-					return [
-						'success' => true,
-						'data' => wp_json_encode( [ 'd' => [] ] )
-					];
+					return array(
+						'response' => array( 'code' => 200, 'message' => 'OK' ),
+						'body'     => wp_json_encode( array( 'd' => array() ) ),
+						'headers'  => array(),
+						'cookies'  => array(),
+					);
 				}
 				return $result;
 			};
-			add_filter( 'pre_http_request', $filter, 10, 4 );
+			add_filter( 'pre_http_request', $filter, 10, 3 );
 
 			$result = BingWebmasterAbilities::fetchStats( [ 'action' => $action ] );
 			$this->assertTrue( $result['success'], "Action {$action} should succeed" );

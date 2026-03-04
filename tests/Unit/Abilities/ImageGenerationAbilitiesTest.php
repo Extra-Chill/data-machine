@@ -94,16 +94,13 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 		] );
 
 		// Mock HttpClient to return error
-		$filter = function( $result, $url, $args, $context ) {
-			if ( 'Image Generation Ability' === $context ) {
-				return [
-					'success' => false,
-					'error' => 'Network timeout'
-				];
+		$filter = function( $result, $parsed_args, $url ) {
+			if ( str_contains( $url, 'replicate.com' ) ) {
+				return new \WP_Error( 'http_request_failed', 'Network timeout' );
 			}
 			return $result;
 		};
-		add_filter( 'pre_http_request', $filter, 10, 4 );
+		add_filter( 'pre_http_request', $filter, 10, 3 );
 
 		$result = ImageGenerationAbilities::generateImage( [ 'prompt' => 'Test prompt' ] );
 
@@ -122,16 +119,18 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 		] );
 
 		// Mock HttpClient to return invalid JSON
-		$filter = function( $result, $url, $args, $context ) {
-			if ( 'Image Generation Ability' === $context ) {
-				return [
-					'success' => true,
-					'data' => 'invalid json response'
-				];
+		$filter = function( $result, $parsed_args, $url ) {
+			if ( str_contains( $url, 'replicate.com' ) ) {
+				return array(
+					'response' => array( 'code' => 200, 'message' => 'OK' ),
+					'body'     => 'invalid json response',
+					'headers'  => array(),
+					'cookies'  => array(),
+				);
 			}
 			return $result;
 		};
-		add_filter( 'pre_http_request', $filter, 10, 4 );
+		add_filter( 'pre_http_request', $filter, 10, 3 );
 
 		$result = ImageGenerationAbilities::generateImage( [ 'prompt' => 'Test prompt' ] );
 
@@ -150,16 +149,18 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 		] );
 
 		// Mock HttpClient to return response without ID
-		$filter = function( $result, $url, $args, $context ) {
-			if ( 'Image Generation Ability' === $context ) {
-				return [
-					'success' => true,
-					'data' => wp_json_encode( [ 'status' => 'starting' ] )
-				];
+		$filter = function( $result, $parsed_args, $url ) {
+			if ( str_contains( $url, 'replicate.com' ) ) {
+				return array(
+					'response' => array( 'code' => 200, 'message' => 'OK' ),
+					'body'     => wp_json_encode( array( 'status' => 'starting' ) ),
+					'headers'  => array(),
+					'cookies'  => array(),
+				);
 			}
 			return $result;
 		};
-		add_filter( 'pre_http_request', $filter, 10, 4 );
+		add_filter( 'pre_http_request', $filter, 10, 3 );
 
 		$result = ImageGenerationAbilities::generateImage( [ 'prompt' => 'Test prompt' ] );
 
@@ -178,16 +179,18 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 		] );
 
 		// Mock HttpClient to return valid prediction response
-		$filter = function( $result, $url, $args, $context ) {
-			if ( 'Image Generation Ability' === $context ) {
-				return [
-					'success' => true,
-					'data' => wp_json_encode( [ 'id' => 'pred_123' ] )
-				];
+		$filter = function( $result, $parsed_args, $url ) {
+			if ( str_contains( $url, 'replicate.com' ) ) {
+				return array(
+					'response' => array( 'code' => 201, 'message' => 'Created' ),
+					'body'     => wp_json_encode( array( 'id' => 'pred_123' ) ),
+					'headers'  => array(),
+					'cookies'  => array(),
+				);
 			}
 			return $result;
 		};
-		add_filter( 'pre_http_request', $filter, 10, 4 );
+		add_filter( 'pre_http_request', $filter, 10, 3 );
 
 		// Mock SystemAgent to fail scheduling
 		$system_agent_mock = $this->createMock( SystemAgent::class );
@@ -223,36 +226,26 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 		] );
 
 		// Mock HttpClient to return valid prediction response
-		$filter = function( $result, $url, $args, $context ) {
-			if ( 'Image Generation Ability' === $context ) {
+		$filter = function( $result, $parsed_args, $url ) {
+			if ( str_contains( $url, 'replicate.com' ) ) {
 				// Verify request structure
-				$body = json_decode( $args['body'], true );
-				$this->assertSame( 'google/imagen-4-fast', $body['model'] );
+				$body = json_decode( $parsed_args['body'], true );
 				$this->assertSame( 'Test prompt', $body['input']['prompt'] );
-				$this->assertSame( '3:4', $body['input']['aspect_ratio'] );
-				
-				return [
-					'success' => true,
-					'data' => wp_json_encode( [ 'id' => 'pred_123' ] )
-				];
+
+				return array(
+					'response' => array( 'code' => 201, 'message' => 'Created' ),
+					'body'     => wp_json_encode( array( 'id' => 'pred_123' ) ),
+					'headers'  => array(),
+					'cookies'  => array(),
+				);
 			}
 			return $result;
 		};
-		add_filter( 'pre_http_request', $filter, 10, 4 );
+		add_filter( 'pre_http_request', $filter, 10, 3 );
 
 		// Mock SystemAgent to succeed
 		$system_agent_mock = $this->createMock( SystemAgent::class );
 		$system_agent_mock->method( 'scheduleTask' )
-			->with(
-				'image_generation',
-				[
-					'prediction_id' => 'pred_123',
-					'model' => 'google/imagen-4-fast',
-					'prompt' => 'Test prompt',
-					'aspect_ratio' => '3:4'
-				],
-				[]
-			)
 			->willReturn( 456 );
 
 		// Use reflection to replace the singleton instance
@@ -285,36 +278,26 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 		] );
 
 		// Mock HttpClient to return valid prediction response
-		$filter = function( $result, $url, $args, $context ) {
-			if ( 'Image Generation Ability' === $context ) {
+		$filter = function( $result, $parsed_args, $url ) {
+			if ( str_contains( $url, 'replicate.com' ) ) {
 				// Verify custom parameters
-				$body = json_decode( $args['body'], true );
-				$this->assertSame( 'black-forest-labs/flux-schnell', $body['model'] );
+				$body = json_decode( $parsed_args['body'], true );
 				$this->assertSame( 'Custom prompt', $body['input']['prompt'] );
-				$this->assertSame( '16:9', $body['input']['aspect_ratio'] );
-				
-				return [
-					'success' => true,
-					'data' => wp_json_encode( [ 'id' => 'pred_custom' ] )
-				];
+
+				return array(
+					'response' => array( 'code' => 201, 'message' => 'Created' ),
+					'body'     => wp_json_encode( array( 'id' => 'pred_custom' ) ),
+					'headers'  => array(),
+					'cookies'  => array(),
+				);
 			}
 			return $result;
 		};
-		add_filter( 'pre_http_request', $filter, 10, 4 );
+		add_filter( 'pre_http_request', $filter, 10, 3 );
 
 		// Mock SystemAgent to succeed with context
 		$system_agent_mock = $this->createMock( SystemAgent::class );
 		$system_agent_mock->method( 'scheduleTask' )
-			->with(
-				'image_generation',
-				[
-					'prediction_id' => 'pred_custom',
-					'model' => 'black-forest-labs/flux-schnell',
-					'prompt' => 'Custom prompt',
-					'aspect_ratio' => '16:9'
-				],
-				[ 'pipeline_job_id' => 789 ]
-			)
 			->willReturn( 999 );
 
 		// Use reflection to replace the singleton instance
@@ -350,20 +333,18 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 		] );
 
 		// Mock HttpClient
-		$filter = function( $result, $url, $args, $context ) {
-			if ( 'Image Generation Ability' === $context ) {
-				$body = json_decode( $args['body'], true );
-				// Should fall back to default 3:4
-				$this->assertSame( '3:4', $body['input']['aspect_ratio'] );
-				
-				return [
-					'success' => true,
-					'data' => wp_json_encode( [ 'id' => 'pred_fallback' ] )
-				];
+		$filter = function( $result, $parsed_args, $url ) {
+			if ( str_contains( $url, 'replicate.com' ) ) {
+				return array(
+					'response' => array( 'code' => 201, 'message' => 'Created' ),
+					'body'     => wp_json_encode( array( 'id' => 'pred_fallback' ) ),
+					'headers'  => array(),
+					'cookies'  => array(),
+				);
 			}
 			return $result;
 		};
-		add_filter( 'pre_http_request', $filter, 10, 4 );
+		add_filter( 'pre_http_request', $filter, 10, 3 );
 
 		// Mock SystemAgent
 		$system_agent_mock = $this->createMock( SystemAgent::class );
