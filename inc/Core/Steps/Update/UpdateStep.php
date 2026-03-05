@@ -45,7 +45,7 @@ class UpdateStep extends Step {
 	protected function executeStep(): array {
 		$handler = $this->getHandlerSlug();
 
-		$tool_result_entry = ToolResultFinder::findHandlerResult( $this->dataPackets, $handler, $this->flow_step_id );
+		$tool_result_entry = ToolResultFinder::findHandlerResult( $this->dataPackets, $handler, $this->flow_step_id, false );
 		if ( $tool_result_entry ) {
 			$this->log(
 				'info',
@@ -59,7 +59,32 @@ class UpdateStep extends Step {
 			return $this->create_update_entry_from_tool_result( $tool_result_entry, $this->dataPackets, $handler, $this->flow_step_id );
 		}
 
-		return array();
+		$this->log(
+			'warning',
+			'Update step handler tool was not executed by AI',
+			array(
+				'handler' => $handler,
+			)
+		);
+
+		$packet = new DataPacket(
+			array(
+				'update_result' => array(),
+				'updated_at'    => current_time( 'mysql', true ),
+			),
+			array(
+				'step_type'           => 'update',
+				'handler'             => $handler,
+				'flow_step_id'        => $this->flow_step_id,
+				'success'             => false,
+				'agent_skipped'       => true,
+				'agent_skip_reason'   => 'handler_tool_not_called',
+				'missing_handler_tool' => true,
+			),
+			'update'
+		);
+
+		return $packet->addTo( $this->dataPackets );
 	}
 
 	/**

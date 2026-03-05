@@ -27,9 +27,10 @@ class ToolResultFinder {
 	 * @param  array  $dataPackets  Data packet array from pipeline execution
 	 * @param  string $handler      Handler slug to match
 	 * @param  string $flow_step_id Flow step ID for error logging context
+	 * @param  bool   $log_error_on_missing Whether to log an error when no match is found.
 	 * @return array|null Tool result entry or null if no match found
 	 */
-	public static function findHandlerResult( array $dataPackets, string $handler, string $flow_step_id ): ?array {
+	public static function findHandlerResult( array $dataPackets, string $handler, string $flow_step_id, bool $log_error_on_missing = true ): ?array {
 		foreach ( $dataPackets as $entry ) {
 			$entry_type = $entry['type'] ?? '';
 
@@ -53,16 +54,17 @@ class ToolResultFinder {
 			}
 		}
 
-		// Log error when not found
-		do_action(
-			'datamachine_log',
-			'error',
-			'AI did not execute handler tool',
-			array(
-				'handler'      => $handler,
-				'flow_step_id' => $flow_step_id,
-			)
-		);
+		if ( $log_error_on_missing ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'AI did not execute handler tool',
+				array(
+					'handler'      => $handler,
+					'flow_step_id' => $flow_step_id,
+				)
+			);
+		}
 
 		return null;
 	}

@@ -309,6 +309,23 @@ class ExecuteStepAbility {
 	 * @return bool True if step succeeded.
 	 */
 	private function evaluateStepSuccess( array $dataPackets, int $job_id, string $flow_step_id ): bool {
+		foreach ( $dataPackets as $packet ) {
+			$metadata = $packet['metadata'] ?? array();
+			if ( ! empty( $metadata['agent_skipped'] ) ) {
+				do_action(
+					'datamachine_log',
+					'info',
+					'Step requested agent skip',
+					array(
+						'job_id'       => $job_id,
+						'flow_step_id' => $flow_step_id,
+						'reason'       => $metadata['agent_skip_reason'] ?? 'unspecified',
+					)
+				);
+				return true;
+			}
+		}
+
 		$step_success = ! empty( $dataPackets );
 
 		if ( $step_success ) {
@@ -423,6 +440,35 @@ class ExecuteStepAbility {
 			);
 		}
 
+		$agent_skip_reason = $this->getAgentSkipReason( $dataPackets );
+		if ( null !== $agent_skip_reason ) {
+			$agent_skipped_status = JobStatus::agentSkipped( $agent_skip_reason )->toString();
+			$this->db_jobs->complete_job( $job_id, $agent_skipped_status );
+
+			$cleanup = new FileCleanup();
+			$context = datamachine_get_file_context( $flow_id );
+			$cleanup->cleanup_job_data_packets( $job_id, $context );
+
+			do_action(
+				'datamachine_log',
+				'info',
+				'Pipeline execution agent-skipped by step metadata',
+				array(
+					'job_id'       => $job_id,
+					'pipeline_id'  => $pipeline_id,
+					'flow_id'      => $flow_id,
+					'flow_step_id' => $flow_step_id,
+					'reason'       => $agent_skip_reason,
+				)
+			);
+
+			return array(
+				'success'      => true,
+				'step_success' => true,
+				'outcome'      => 'agent_skipped',
+			);
+		}
+
 		// Success: advance to next step or complete.
 		if ( $step_success ) {
 			$navigator         = new StepNavigator();
@@ -530,5 +576,27 @@ class ExecuteStepAbility {
 			'step_success' => false,
 			'outcome'      => 'failed',
 		);
+	}
+
+	/**
+	 * Extract agent skip reason from step packets.
+	 *
+	 * @param array $dataPackets Data packets from step execution.
+	 * @return string|null
+	 */
+	private function getAgentSkipReason( array $dataPackets ): ?string {
+		foreach ( $dataPackets as $packet ) {
+			$metadata = $packet['metadata'] ?? array();
+			if ( empty( $metadata['agent_skipped'] ) ) {
+				continue;
+			}
+
+			$reason = $metadata['agent_skip_reason'] ?? 'step requested skip';
+			if ( is_string( $reason ) && '' !== trim( $reason ) ) {
+				return trim( $reason );
+			}
+		}
+
+		return null;
 	}
 }
