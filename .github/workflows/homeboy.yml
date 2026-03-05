@@ -5,6 +5,12 @@ on:
     branches: [main]
   push:
     branches: [main]
+    paths:
+      - data-machine.php
+      - readme.txt
+      - package.json
+      - docs/CHANGELOG.md
+      - VERSION
 
 permissions:
   contents: read
