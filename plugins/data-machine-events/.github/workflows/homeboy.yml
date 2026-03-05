@@ -1,0 +1,105 @@
+name: Homeboy
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  pull-request:
+    if: github.event_name == 'pull_request'
+    name: Homeboy PR (Scoped)
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ''
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: homeboy_wptests
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, intl, pdo_sqlite, mysqli
+          tools: composer:v2
+          coverage: none
+
+      - name: Install project dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - uses: Extra-Chill/homeboy-action@v1
+        with:
+          version: 'latest'
+          extension: wordpress
+          commands: lint,test,audit
+          lint-changed-only: 'true'
+          test-scope: 'changed'
+          component: data-machine-events
+          settings: '{"database_type": "mysql"}'
+          php-version: '8.3'
+          node-version: '20'
+
+  main:
+    if: github.event_name != 'pull_request'
+    name: Homeboy Main (Full)
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ''
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: homeboy_wptests
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, intl, pdo_sqlite, mysqli
+          tools: composer:v2
+          coverage: none
+
+      - name: Install project dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - uses: Extra-Chill/homeboy-action@v1
+        with:
+          version: 'latest'
+          extension: wordpress
+          commands: lint,test,audit
+          test-scope: 'full'
+          auto-issue: 'true'
+          component: data-machine-events
+          settings: '{"database_type": "mysql"}'
+          php-version: '8.3'
+          node-version: '20'
