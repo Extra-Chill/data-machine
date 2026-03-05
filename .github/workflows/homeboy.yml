@@ -3,6 +3,8 @@ name: Homeboy
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
 
 permissions:
   contents: read
@@ -49,6 +51,7 @@ jobs:
           commands: lint,test,audit
           lint-changed-only: true
           test-scope: 'changed'
+          auto-issue: ${{ github.event_name != 'pull_request' }}
           component: data-machine
           settings: '{"database_type": "mysql"}'
           php-version: '8.2'
