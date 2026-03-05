@@ -29,7 +29,7 @@ class FlowsCommand extends BaseCommand {
 	 *
 	 * @var array
 	 */
-	private array $default_fields = array( 'id', 'name', 'pipeline_id', 'handlers', 'prompt', 'status', 'next_run' );
+	private array $default_fields = array( 'id', 'name', 'pipeline_id', 'handlers', 'schedule', 'max_items', 'prompt', 'status', 'next_run' );
 
 	/**
 	 * Get flows with optional filtering.
@@ -332,6 +332,8 @@ class FlowsCommand extends BaseCommand {
 					'name'        => $flow['flow_name'],
 					'pipeline_id' => $flow['pipeline_id'],
 					'handlers'    => $this->extractHandlers( $flow ),
+					'schedule'    => $this->extractSchedule( $flow ),
+					'max_items'   => $this->extractMaxItems( $flow ),
 					'prompt'      => $this->extractPrompt( $flow ),
 					'status'      => $flow['last_run_status'] ?? 'Never',
 					'next_run'    => $flow['next_run_display'] ?? 'Not scheduled',
@@ -844,6 +846,57 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		return '';
+	}
+
+	/**
+	 * Extract scheduling summary from flow scheduling config.
+	 *
+	 * @param array $flow Flow data.
+	 * @return string Scheduling summary for list view.
+	 */
+	private function extractSchedule( array $flow ): string {
+		$scheduling_config = $flow['scheduling_config'] ?? array();
+		$interval          = $scheduling_config['interval'] ?? 'manual';
+
+		if ( 'cron' === $interval && ! empty( $scheduling_config['cron_expression'] ) ) {
+			return 'cron:' . $scheduling_config['cron_expression'];
+		}
+
+		return (string) $interval;
+	}
+
+	/**
+	 * Extract max_items values from handler configs in a flow.
+	 *
+	 * @param array $flow Flow data.
+	 * @return string Comma-separated handler=max_items pairs, or empty string.
+	 */
+	private function extractMaxItems( array $flow ): string {
+		$flow_config = $flow['flow_config'] ?? array();
+		$pairs       = array();
+
+		foreach ( $flow_config as $step_data ) {
+			if ( ! is_array( $step_data ) ) {
+				continue;
+			}
+
+			$handler_configs = $step_data['handler_configs'] ?? array();
+			if ( ! is_array( $handler_configs ) ) {
+				continue;
+			}
+
+			foreach ( $handler_configs as $handler_slug => $handler_config ) {
+				if ( ! is_array( $handler_config ) || ! array_key_exists( 'max_items', $handler_config ) ) {
+					continue;
+				}
+
+				$pairs[] = $handler_slug . '=' . (string) $handler_config['max_items'];
+			}
+		}
+
+		$pairs = array_values( array_unique( $pairs ) );
+
+		return implode( ', ', $pairs );
 	}
 
 	/**
