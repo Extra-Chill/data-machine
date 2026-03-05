@@ -77,8 +77,7 @@ class UpdateStep extends Step {
 				'handler'             => $handler,
 				'flow_step_id'        => $this->flow_step_id,
 				'success'             => false,
-				'agent_skipped'       => true,
-				'agent_skip_reason'   => 'handler_tool_not_called',
+				'failure_reason'      => 'required_handler_tool_not_called',
 				'missing_handler_tool' => true,
 			),
 			'update'
