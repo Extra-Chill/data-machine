@@ -46,7 +46,7 @@ jobs:
 
       - uses: Extra-Chill/homeboy-action@v1
         with:
-          version: 'latest'
+          version: '0.56.1'
           extension: wordpress
           commands: lint,test
           lint-changed-only: true
@@ -78,9 +78,10 @@ jobs:
 
       - uses: Extra-Chill/homeboy-action@v1
         with:
-          version: 'latest'
+          version: '0.56.1'
           extension: wordpress
           commands: audit
+          args: ${{ github.event_name == 'pull_request' && format('--changed-since {0}', github.event.pull_request.base.sha) || '' }}
           auto-issue: ${{ github.event_name != 'pull_request' }}
           component: data-machine
           php-version: '8.2'
