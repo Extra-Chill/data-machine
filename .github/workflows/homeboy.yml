@@ -11,8 +11,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  homeboy:
-    name: Lint, Test & Audit
+  build:
+    name: Homeboy Build (Lint & Test)
     runs-on: ubuntu-latest
     services:
       mysql:
@@ -48,11 +48,40 @@ jobs:
         with:
           version: 'latest'
           extension: wordpress
-          commands: lint,test,audit
+          commands: lint,test
           lint-changed-only: true
           test-scope: 'changed'
           auto-issue: ${{ github.event_name != 'pull_request' }}
           component: data-machine
           settings: '{"database_type": "mysql"}'
+          php-version: '8.2'
+          node-version: '20'
+
+  audit:
+    name: Homeboy Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, intl, pdo_sqlite, mysqli
+          tools: composer:v2
+          coverage: none
+
+      - name: Install project dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - uses: Extra-Chill/homeboy-action@v1
+        with:
+          version: 'latest'
+          extension: wordpress
+          commands: audit
+          auto-issue: ${{ github.event_name != 'pull_request' }}
+          component: data-machine
           php-version: '8.2'
           node-version: '20'
