@@ -272,9 +272,13 @@ function datamachine_load_handlers() {
 	new \DataMachine\Core\Steps\Fetch\Handlers\Rss\Rss();
 	new \DataMachine\Core\Steps\Fetch\Handlers\Files\Files();
 	new \DataMachine\Core\Steps\Fetch\Handlers\GitHub\GitHub();
+	new \DataMachine\Core\Steps\Fetch\Handlers\Workspace\Workspace();
 
 	// Update Handlers
 	new \DataMachine\Core\Steps\Update\Handlers\WordPress\WordPress();
+
+	// Workspace publish handler
+	new \DataMachine\Core\Steps\Publish\Handlers\Workspace\Workspace();
 }
 
 /**
