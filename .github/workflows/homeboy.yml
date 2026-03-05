@@ -4,13 +4,8 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
-    paths:
-      - data-machine.php
-      - readme.txt
-      - package.json
-      - docs/CHANGELOG.md
-      - VERSION
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
