@@ -49,7 +49,7 @@ jobs:
         with:
           version: 'latest'
           extension: wordpress
-          commands: ${{ github.event_name == 'pull_request' && 'lint' || 'lint,test' }}
+          commands: lint,test
           lint-changed-only: true
           test-scope: 'changed'
           auto-issue: ${{ github.event_name != 'pull_request' }}
@@ -60,7 +60,6 @@ jobs:
 
   audit:
     name: Homeboy Audit
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -83,6 +82,7 @@ jobs:
           version: 'latest'
           extension: wordpress
           commands: audit
+          lint-changed-only: true
           auto-issue: ${{ github.event_name != 'pull_request' }}
           component: data-machine
           php-version: '8.2'
