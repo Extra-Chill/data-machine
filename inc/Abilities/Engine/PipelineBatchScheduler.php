@@ -143,9 +143,10 @@ class PipelineBatchScheduler {
 		$batch_data    = get_transient( $transient_key );
 
 		if ( ! $batch_data ) {
+			$this->failParentIfStillProcessing( $parent_job_id, 'batch_state_missing' );
 			do_action(
 				'datamachine_log',
-				'warning',
+				'error',
 				'Pipeline batch: transient expired or missing',
 				array( 'parent_job_id' => $parent_job_id )
 			);
@@ -216,6 +217,26 @@ class PipelineBatchScheduler {
 		} else {
 			// All items scheduled — clean up transient.
 			delete_transient( $transient_key );
+
+			$child_count = $this->countChildren( $parent_job_id );
+			if ( $child_count < 1 ) {
+				$this->db_jobs->complete_job(
+					$parent_job_id,
+					JobStatus::failed( 'batch_no_children_scheduled' )->toString()
+				);
+
+				do_action(
+					'datamachine_log',
+					'error',
+					'Pipeline batch: no child jobs were scheduled; parent marked failed',
+					array(
+						'parent_job_id' => $parent_job_id,
+						'total'         => $total,
+					)
+				);
+
+				return;
+			}
 
 			do_action(
 				'datamachine_log',
@@ -413,5 +434,47 @@ class PipelineBatchScheduler {
 				'total'         => $total_children,
 			)
 		);
+	}
+
+	/**
+	 * Mark parent as failed when batch state is missing.
+	 *
+	 * @param int    $parent_job_id Parent job ID.
+	 * @param string $reason        Failure reason suffix.
+	 */
+	private function failParentIfStillProcessing( int $parent_job_id, string $reason ): void {
+		$job = $this->db_jobs->get_job( $parent_job_id );
+
+		if ( ! $job ) {
+			return;
+		}
+
+		$current_status = $job['status'] ?? '';
+		if ( JobStatus::PROCESSING !== $current_status ) {
+			return;
+		}
+
+		$this->db_jobs->complete_job( $parent_job_id, JobStatus::failed( $reason )->toString() );
+	}
+
+	/**
+	 * Count child jobs for a parent job.
+	 *
+	 * @param int $parent_job_id Parent job ID.
+	 * @return int
+	 */
+	private function countChildren( int $parent_job_id ): int {
+		global $wpdb;
+		$table = $wpdb->prefix . 'datamachine_jobs';
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$count = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$table} WHERE parent_job_id = %d",
+				$parent_job_id
+			)
+		);
+
+		return $count;
 	}
 }

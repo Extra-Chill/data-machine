@@ -203,6 +203,51 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'batch cancelled', $parent_job['status'] );
 	}
 
+	public function test_process_chunk_marks_parent_failed_when_batch_state_is_missing(): void {
+		$parent_id = $this->create_parent_job();
+
+		$scheduler = new PipelineBatchScheduler();
+		$scheduler->processChunk( $parent_id );
+
+		$parent_job = $this->jobs_db->get_job( $parent_id );
+		$this->assertStringContainsString( 'failed', $parent_job['status'] );
+		$this->assertStringContainsString( 'batch_state_missing', $parent_job['status'] );
+	}
+
+	public function test_process_chunk_marks_parent_failed_when_zero_children_scheduled(): void {
+		$parent_id = $this->create_parent_job();
+		$engine    = $this->make_engine_snapshot( $parent_id );
+
+		datamachine_merge_engine_data( $parent_id, array(
+			'batch'             => true,
+			'batch_total'       => 0,
+			'batch_scheduled'   => 0,
+			'batch_chunk_size'  => PipelineBatchScheduler::CHUNK_SIZE,
+			'next_flow_step_id' => 'step_empty',
+			'started_at'        => current_time( 'mysql' ),
+		) );
+
+		set_transient(
+			'dm_pipeline_batch_' . $parent_id,
+			array(
+				'parent_job_id'     => $parent_id,
+				'next_flow_step_id' => 'step_empty',
+				'engine_snapshot'   => $engine,
+				'data_packets'      => array(),
+				'total'             => 0,
+				'offset'            => 0,
+			),
+			4 * HOUR_IN_SECONDS
+		);
+
+		$scheduler = new PipelineBatchScheduler();
+		$scheduler->processChunk( $parent_id );
+
+		$parent_job = $this->jobs_db->get_job( $parent_id );
+		$this->assertStringContainsString( 'failed', $parent_job['status'] );
+		$this->assertStringContainsString( 'batch_no_children_scheduled', $parent_job['status'] );
+	}
+
 	public function test_child_labels_use_packet_titles(): void {
 		$parent_id = $this->create_parent_job();
 		$engine    = $this->make_engine_snapshot( $parent_id );
