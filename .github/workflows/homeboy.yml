@@ -46,9 +46,9 @@ jobs:
 
       - uses: Extra-Chill/homeboy-action@v1
         with:
-          version: '0.56.1'
+          version: 'latest'
           extension: wordpress
-          commands: lint,test
+          commands: ${{ github.event_name == 'pull_request' && 'lint' || 'lint,test' }}
           lint-changed-only: true
           test-scope: 'changed'
           auto-issue: ${{ github.event_name != 'pull_request' }}
@@ -78,7 +78,7 @@ jobs:
 
       - uses: Extra-Chill/homeboy-action@v1
         with:
-          version: '0.56.1'
+          version: 'latest'
           extension: wordpress
           commands: audit
           args: ${{ github.event_name == 'pull_request' && format('--changed-since {0}', github.event.pull_request.base.sha) || '' }}
