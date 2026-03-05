@@ -43,23 +43,105 @@ class UpdateStep extends Step {
 	 * @return array
 	 */
 	protected function executeStep(): array {
-		$handler = $this->getHandlerSlug();
+		$configured_handler_slugs = $this->getHandlerSlugs();
+		$required_handler_slugs   = $this->getRequiredHandlerSlugs( $configured_handler_slugs );
+		$tool_results_by_slug     = $this->findSuccessfulHandlerResultsBySlug( $required_handler_slugs );
 
-		$tool_result_entry = ToolResultFinder::findHandlerResult( $this->dataPackets, $handler, $this->flow_step_id );
-		if ( $tool_result_entry ) {
+		$missing_required_handlers = array_values( array_diff( $required_handler_slugs, array_keys( $tool_results_by_slug ) ) );
+
+		if ( empty( $missing_required_handlers ) && ! empty( $required_handler_slugs ) ) {
+			$primary_handler_slug = $required_handler_slugs[0];
+			$tool_result_entry    = $tool_results_by_slug[ $primary_handler_slug ] ?? null;
+
+			if ( ! is_array( $tool_result_entry ) ) {
+				$this->log(
+					'error',
+					'Update step missing primary tool result despite required handlers being satisfied',
+					array(
+						'primary_handler_slug' => $primary_handler_slug,
+					)
+				);
+
+				return $this->buildMissingHandlerPacket(
+					$configured_handler_slugs,
+					$required_handler_slugs,
+					array( $primary_handler_slug )
+				);
+			}
+
 			$this->log(
 				'info',
-				'AI successfully used handler tool',
+				'AI successfully executed required update handler tools',
 				array(
-					'handler'     => $handler,
-					'tool_result' => $tool_result_entry['metadata']['tool_name'] ?? 'unknown',
+					'primary_handler'  => $primary_handler_slug,
+					'required_handlers' => $required_handler_slugs,
 				)
 			);
 
-			return $this->create_update_entry_from_tool_result( $tool_result_entry, $this->dataPackets, $handler, $this->flow_step_id );
+			return $this->create_update_entry_from_tool_result( $tool_result_entry, $this->dataPackets, $primary_handler_slug, $this->flow_step_id );
 		}
 
-		return array();
+		$this->log(
+			'warning',
+			'Update step required handler tool was not executed by AI',
+			array(
+				'configured_handlers'     => $configured_handler_slugs,
+				'required_handler_slugs'  => $required_handler_slugs,
+				'missing_required_handlers' => $missing_required_handlers,
+			)
+		);
+
+		return $this->buildMissingHandlerPacket( $configured_handler_slugs, $required_handler_slugs, $missing_required_handlers );
+	}
+
+	/**
+	 * Validate update step configuration.
+	 *
+	 * @return bool
+	 */
+	protected function validateStepConfiguration(): bool {
+		$configured_handler_slugs = $this->getHandlerSlugs();
+
+		if ( empty( $configured_handler_slugs ) ) {
+			$this->logConfigurationError(
+				'Step requires handler configuration',
+				array(
+					'available_flow_step_config' => array_keys( $this->flow_step_config ),
+				)
+			);
+			return false;
+		}
+
+		$raw_required_handlers = $this->getRawRequiredHandlerSlugs();
+
+		if ( empty( $raw_required_handlers ) && count( $configured_handler_slugs ) > 1 ) {
+			$this->log(
+				'warning',
+				'Multi-handler update step has no required_handler_slugs set; defaulting to first handler',
+				array(
+					'configured_handlers' => $configured_handler_slugs,
+					'default_required'    => array( $configured_handler_slugs[0] ),
+				)
+			);
+		}
+
+		if ( ! empty( $raw_required_handlers ) ) {
+			$invalid_handlers = array_values( array_diff( $raw_required_handlers, $configured_handler_slugs ) );
+
+			if ( ! empty( $invalid_handlers ) ) {
+				$this->logConfigurationError(
+					'required_handler_slugs must be a subset of handler_slugs',
+					array(
+						'configured_handlers' => $configured_handler_slugs,
+						'required_handlers'   => $raw_required_handlers,
+						'invalid_handlers'    => $invalid_handlers,
+					)
+				);
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	/**
@@ -113,5 +195,108 @@ class UpdateStep extends Step {
 		);
 
 		return $packet->addTo( $dataPackets );
+	}
+
+	/**
+	 * Build failure packet when required handlers were not called.
+	 *
+	 * @param array $configured_handler_slugs Configured handler slugs.
+	 * @param array $required_handler_slugs   Required handler slugs.
+	 * @param array $missing_required_handlers Missing required handlers.
+	 * @return array
+	 */
+	private function buildMissingHandlerPacket( array $configured_handler_slugs, array $required_handler_slugs, array $missing_required_handlers ): array {
+		$packet = new DataPacket(
+			array(
+				'update_result' => array(),
+				'updated_at'    => current_time( 'mysql', true ),
+			),
+			array(
+				'step_type'                 => 'update',
+				'handler'                   => $required_handler_slugs[0] ?? ( $configured_handler_slugs[0] ?? '' ),
+				'flow_step_id'              => $this->flow_step_id,
+				'success'                   => false,
+				'failure_reason'            => 'required_handler_tool_not_called',
+				'missing_handler_tool'      => true,
+				'configured_handler_slugs'  => $configured_handler_slugs,
+				'required_handler_slugs'    => $required_handler_slugs,
+				'missing_required_handlers' => $missing_required_handlers,
+			),
+			'update'
+		);
+
+		return $packet->addTo( $this->dataPackets );
+	}
+
+	/**
+	 * Resolve required handler slugs for this update step.
+	 *
+	 * @param array $configured_handler_slugs Configured handler slugs.
+	 * @return array
+	 */
+	private function getRequiredHandlerSlugs( array $configured_handler_slugs ): array {
+		$required = $this->getRawRequiredHandlerSlugs();
+
+		if ( ! empty( $required ) ) {
+			return $required;
+		}
+
+		if ( empty( $configured_handler_slugs ) ) {
+			return array();
+		}
+
+		return array( $configured_handler_slugs[0] );
+	}
+
+	/**
+	 * Get required handler slugs from flow step config.
+	 *
+	 * @return array
+	 */
+	private function getRawRequiredHandlerSlugs(): array {
+		$required = $this->flow_step_config['required_handler_slugs'] ?? array();
+
+		if ( ! is_array( $required ) ) {
+			return array();
+		}
+
+		$required = array_values(
+			array_unique(
+				array_filter(
+					array_map(
+						static function ( $slug ) {
+							if ( ! is_string( $slug ) ) {
+								return '';
+							}
+
+							return sanitize_key( $slug );
+						},
+						$required
+					)
+				)
+			)
+		);
+
+		return $required;
+	}
+
+	/**
+	 * Find successful tool results keyed by handler slug.
+	 *
+	 * @param array $handler_slugs Handler slugs to search for.
+	 * @return array<string, array>
+	 */
+	private function findSuccessfulHandlerResultsBySlug( array $handler_slugs ): array {
+		$results = array();
+
+		foreach ( $handler_slugs as $handler_slug ) {
+			$entry = ToolResultFinder::findHandlerResult( $this->dataPackets, $handler_slug, $this->flow_step_id, false );
+
+			if ( is_array( $entry ) ) {
+				$results[ $handler_slug ] = $entry;
+			}
+		}
+
+		return $results;
 	}
 }

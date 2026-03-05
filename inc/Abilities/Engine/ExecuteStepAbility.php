@@ -521,7 +521,7 @@ class ExecuteStepAbility {
 			array(
 				'flow_step_id' => $flow_step_id,
 				'class'        => $step_class,
-				'reason'       => 'empty_data_packet_returned',
+				'reason'       => $this->getFailureReasonFromPackets( $dataPackets, 'empty_data_packet_returned' ),
 			)
 		);
 
@@ -530,5 +530,28 @@ class ExecuteStepAbility {
 			'step_success' => false,
 			'outcome'      => 'failed',
 		);
+	}
+
+	/**
+	 * Extract failure reason from step packets.
+	 *
+	 * @param array  $dataPackets Data packets from step execution.
+	 * @param string $default Default reason when none found.
+	 * @return string
+	 */
+	private function getFailureReasonFromPackets( array $dataPackets, string $default ): string {
+		foreach ( $dataPackets as $packet ) {
+			$metadata = $packet['metadata'] ?? array();
+			if ( empty( $metadata['failure_reason'] ) ) {
+				continue;
+			}
+
+			$reason = $metadata['failure_reason'];
+			if ( is_string( $reason ) && '' !== trim( $reason ) ) {
+				return sanitize_key( str_replace( ' ', '_', trim( $reason ) ) );
+			}
+		}
+
+		return $default;
 	}
 }
