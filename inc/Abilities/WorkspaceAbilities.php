@@ -396,6 +396,283 @@ class WorkspaceAbilities {
 					'meta'                => array( 'show_in_rest' => false ),
 				)
 			);
+
+			wp_register_ability(
+				'datamachine/workspace-git-status',
+				array(
+					'label'               => 'Workspace Git Status',
+					'description'         => 'Get git status information for a workspace repository.',
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'name' => array(
+								'type'        => 'string',
+								'description' => 'Repository directory name.',
+							),
+						),
+						'required'   => array( 'name' ),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'name'    => array( 'type' => 'string' ),
+							'path'    => array( 'type' => 'string' ),
+							'branch'  => array( 'type' => 'string' ),
+							'remote'  => array( 'type' => 'string' ),
+							'commit'  => array( 'type' => 'string' ),
+							'dirty'   => array( 'type' => 'integer' ),
+							'files'   => array(
+								'type'  => 'array',
+								'items' => array( 'type' => 'string' ),
+							),
+						),
+					),
+					'execute_callback'    => array( self::class, 'gitStatus' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/workspace-git-log',
+				array(
+					'label'               => 'Workspace Git Log',
+					'description'         => 'Read git log entries for a workspace repository.',
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'name'  => array(
+								'type'        => 'string',
+								'description' => 'Repository directory name.',
+							),
+							'limit' => array(
+								'type'        => 'integer',
+								'description' => 'Maximum log entries to return (1-100).',
+							),
+						),
+						'required'   => array( 'name' ),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'name'    => array( 'type' => 'string' ),
+							'entries' => array(
+								'type'  => 'array',
+								'items' => array(
+									'type'       => 'object',
+									'properties' => array(
+										'hash'    => array( 'type' => 'string' ),
+										'author'  => array( 'type' => 'string' ),
+										'date'    => array( 'type' => 'string' ),
+										'subject' => array( 'type' => 'string' ),
+									),
+								),
+							),
+						),
+					),
+					'execute_callback'    => array( self::class, 'gitLog' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/workspace-git-diff',
+				array(
+					'label'               => 'Workspace Git Diff',
+					'description'         => 'Read git diff output for a workspace repository.',
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'name'   => array(
+								'type'        => 'string',
+								'description' => 'Repository directory name.',
+							),
+							'from'   => array(
+								'type'        => 'string',
+								'description' => 'Optional from git ref.',
+							),
+							'to'     => array(
+								'type'        => 'string',
+								'description' => 'Optional to git ref.',
+							),
+							'staged' => array(
+								'type'        => 'boolean',
+								'description' => 'Read staged diff instead of working tree diff.',
+							),
+							'path'   => array(
+								'type'        => 'string',
+								'description' => 'Optional relative path filter.',
+							),
+						),
+						'required'   => array( 'name' ),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'name'    => array( 'type' => 'string' ),
+							'diff'    => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'gitDiff' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/workspace-git-pull',
+				array(
+					'label'               => 'Workspace Git Pull',
+					'description'         => 'Run git pull --ff-only for a workspace repository.',
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'name'        => array(
+								'type'        => 'string',
+								'description' => 'Repository directory name.',
+							),
+							'allow_dirty' => array(
+								'type'        => 'boolean',
+								'description' => 'Allow pull when working tree is dirty.',
+							),
+						),
+						'required'   => array( 'name' ),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'name'    => array( 'type' => 'string' ),
+							'message' => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'gitPull' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => false ),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/workspace-git-add',
+				array(
+					'label'               => 'Workspace Git Add',
+					'description'         => 'Stage repository paths with git add.',
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'name'  => array(
+								'type'        => 'string',
+								'description' => 'Repository directory name.',
+							),
+							'paths' => array(
+								'type'        => 'array',
+								'description' => 'Relative paths to stage.',
+								'items'       => array( 'type' => 'string' ),
+							),
+						),
+						'required'   => array( 'name', 'paths' ),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'name'    => array( 'type' => 'string' ),
+							'paths'   => array(
+								'type'  => 'array',
+								'items' => array( 'type' => 'string' ),
+							),
+							'message' => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'gitAdd' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => false ),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/workspace-git-commit',
+				array(
+					'label'               => 'Workspace Git Commit',
+					'description'         => 'Commit staged changes in a workspace repository.',
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'name'    => array(
+								'type'        => 'string',
+								'description' => 'Repository directory name.',
+							),
+							'message' => array(
+								'type'        => 'string',
+								'description' => 'Commit message.',
+							),
+						),
+						'required'   => array( 'name', 'message' ),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'name'    => array( 'type' => 'string' ),
+							'commit'  => array( 'type' => 'string' ),
+							'message' => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'gitCommit' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => false ),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/workspace-git-push',
+				array(
+					'label'               => 'Workspace Git Push',
+					'description'         => 'Push commits for a workspace repository.',
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'name'   => array(
+								'type'        => 'string',
+								'description' => 'Repository directory name.',
+							),
+							'remote' => array(
+								'type'        => 'string',
+								'description' => 'Remote name (default origin).',
+							),
+							'branch' => array(
+								'type'        => 'string',
+								'description' => 'Branch override.',
+							),
+						),
+						'required'   => array( 'name' ),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'name'    => array( 'type' => 'string' ),
+							'remote'  => array( 'type' => 'string' ),
+							'branch'  => array( 'type' => 'string' ),
+							'message' => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'gitPush' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => false ),
+				)
+			);
 		};
 
 		if ( doing_action( 'wp_abilities_api_init' ) ) {
@@ -551,6 +828,108 @@ class WorkspaceAbilities {
 			$input['old_string'] ?? '',
 			$input['new_string'] ?? '',
 			! empty( $input['replace_all'] )
+		);
+	}
+
+	/**
+	 * Get git status details for a workspace repository.
+	 *
+	 * @param array $input Input parameters with 'name'.
+	 * @return array
+	 */
+	public static function gitStatus( array $input ): array {
+		$workspace = new Workspace();
+		return $workspace->git_status( $input['name'] ?? '' );
+	}
+
+	/**
+	 * Pull latest changes for a workspace repository.
+	 *
+	 * @param array $input Input parameters with 'name', optional 'allow_dirty'.
+	 * @return array
+	 */
+	public static function gitPull( array $input ): array {
+		$workspace = new Workspace();
+		return $workspace->git_pull(
+			$input['name'] ?? '',
+			! empty( $input['allow_dirty'] )
+		);
+	}
+
+	/**
+	 * Stage paths in a workspace repository.
+	 *
+	 * @param array $input Input parameters with 'name', 'paths'.
+	 * @return array
+	 */
+	public static function gitAdd( array $input ): array {
+		$workspace = new Workspace();
+		$paths     = $input['paths'] ?? array();
+
+		if ( ! is_array( $paths ) ) {
+			$paths = array();
+		}
+
+		return $workspace->git_add( $input['name'] ?? '', $paths );
+	}
+
+	/**
+	 * Commit staged changes in a workspace repository.
+	 *
+	 * @param array $input Input parameters with 'name', 'message'.
+	 * @return array
+	 */
+	public static function gitCommit( array $input ): array {
+		$workspace = new Workspace();
+		return $workspace->git_commit(
+			$input['name'] ?? '',
+			$input['message'] ?? ''
+		);
+	}
+
+	/**
+	 * Push commits for a workspace repository.
+	 *
+	 * @param array $input Input parameters with 'name', optional 'remote', 'branch'.
+	 * @return array
+	 */
+	public static function gitPush( array $input ): array {
+		$workspace = new Workspace();
+		return $workspace->git_push(
+			$input['name'] ?? '',
+			$input['remote'] ?? 'origin',
+			$input['branch'] ?? null
+		);
+	}
+
+	/**
+	 * Read git log entries for a workspace repository.
+	 *
+	 * @param array $input Input parameters with 'name', optional 'limit'.
+	 * @return array
+	 */
+	public static function gitLog( array $input ): array {
+		$workspace = new Workspace();
+		return $workspace->git_log(
+			$input['name'] ?? '',
+			isset( $input['limit'] ) ? (int) $input['limit'] : 20
+		);
+	}
+
+	/**
+	 * Read git diff output for a workspace repository.
+	 *
+	 * @param array $input Input parameters.
+	 * @return array
+	 */
+	public static function gitDiff( array $input ): array {
+		$workspace = new Workspace();
+		return $workspace->git_diff(
+			$input['name'] ?? '',
+			$input['from'] ?? null,
+			$input['to'] ?? null,
+			! empty( $input['staged'] ),
+			$input['path'] ?? null
 		);
 	}
 }

@@ -683,4 +683,224 @@ class WorkspaceCommand extends BaseCommand {
 
 		return $content;
 	}
+
+	/**
+	 * Git operations for workspace repositories.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <operation>
+	 * : Git operation: status, pull, add, commit, push, log, diff
+	 *
+	 * <repo>
+	 * : Repository directory name.
+	 *
+	 * [<value>]
+	 * : Optional operation value (e.g., commit message for commit).
+	 *
+	 * [--path=<path>]
+	 * : Relative path (repeatable) for add/diff operations.
+	 *
+	 * [--allow-dirty]
+	 * : Allow pull with dirty working tree.
+	 *
+	 * [--remote=<remote>]
+	 * : Remote name for push (default: origin).
+	 *
+	 * [--branch=<branch>]
+	 * : Branch override for push.
+	 *
+	 * [--from=<ref>]
+	 * : From ref for diff.
+	 *
+	 * [--to=<ref>]
+	 * : To ref for diff.
+	 *
+	 * [--staged]
+	 * : Show staged diff.
+	 *
+	 * [--limit=<n>]
+	 * : Number of log entries to return (default 20).
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Show git status for a workspace repo
+	 *     wp datamachine workspace git status data-machine
+	 *
+	 *     # Pull latest changes
+	 *     wp datamachine workspace git pull data-machine
+	 *
+	 *     # Stage docs paths
+	 *     wp datamachine workspace git add extrachill-docs --path=ec_docs/community/getting-started.md
+	 *
+	 *     # Commit staged changes
+	 *     wp datamachine workspace git commit extrachill-docs "docs: update community guide"
+	 *
+	 *     # Push current branch to origin
+	 *     wp datamachine workspace git push extrachill-docs --remote=origin
+	 *
+	 *     # Show recent log
+	 *     wp datamachine workspace git log data-machine --limit=10
+	 *
+	 *     # Show diff for a path
+	 *     wp datamachine workspace git diff data-machine --path=inc/Core/FilesRepository/Workspace.php
+	 *
+	 * @subcommand git
+	 */
+	public function git( array $args, array $assoc_args ): void {
+		$operation = $args[0] ?? '';
+		$repo      = $args[1] ?? '';
+
+		if ( '' === $operation || '' === $repo ) {
+			WP_CLI::error( 'Usage: wp datamachine workspace git <operation> <repo> [<value>] [--flags]' );
+			return;
+		}
+
+		$ability_name = match ( $operation ) {
+			'status' => 'datamachine/workspace-git-status',
+			'pull'   => 'datamachine/workspace-git-pull',
+			'add'    => 'datamachine/workspace-git-add',
+			'commit' => 'datamachine/workspace-git-commit',
+			'push'   => 'datamachine/workspace-git-push',
+			'log'    => 'datamachine/workspace-git-log',
+			'diff'   => 'datamachine/workspace-git-diff',
+			default  => '',
+		};
+
+		if ( '' === $ability_name ) {
+			WP_CLI::error( sprintf( 'Unknown git operation: %s', $operation ) );
+			return;
+		}
+
+		$ability = wp_get_ability( $ability_name );
+		if ( ! $ability ) {
+			WP_CLI::error( sprintf( 'Workspace git ability not available: %s', $ability_name ) );
+			return;
+		}
+
+		$input = array( 'name' => $repo );
+
+		if ( 'pull' === $operation ) {
+			$input['allow_dirty'] = ! empty( $assoc_args['allow-dirty'] );
+		}
+
+		if ( 'add' === $operation ) {
+			$paths = $assoc_args['path'] ?? array();
+			if ( ! is_array( $paths ) ) {
+				$paths = array( $paths );
+			}
+			$input['paths'] = array_values( array_filter( array_map( 'strval', $paths ) ) );
+
+			if ( empty( $input['paths'] ) ) {
+				WP_CLI::error( 'git add requires at least one --path=<relative/path>.' );
+				return;
+			}
+		}
+
+		if ( 'commit' === $operation ) {
+			$message = $args[2] ?? '';
+			if ( '' === trim( $message ) ) {
+				WP_CLI::error( 'git commit requires a commit message as the third argument.' );
+				return;
+			}
+			$input['message'] = $message;
+		}
+
+		if ( 'push' === $operation ) {
+			$input['remote'] = $assoc_args['remote'] ?? 'origin';
+			if ( ! empty( $assoc_args['branch'] ) ) {
+				$input['branch'] = (string) $assoc_args['branch'];
+			}
+		}
+
+		if ( 'log' === $operation ) {
+			if ( isset( $assoc_args['limit'] ) ) {
+				$input['limit'] = (int) $assoc_args['limit'];
+			}
+		}
+
+		if ( 'diff' === $operation ) {
+			if ( isset( $assoc_args['from'] ) ) {
+				$input['from'] = (string) $assoc_args['from'];
+			}
+			if ( isset( $assoc_args['to'] ) ) {
+				$input['to'] = (string) $assoc_args['to'];
+			}
+			if ( ! empty( $assoc_args['staged'] ) ) {
+				$input['staged'] = true;
+			}
+			if ( isset( $assoc_args['path'] ) ) {
+				$path          = $assoc_args['path'];
+				$input['path'] = is_array( $path ) ? (string) reset( $path ) : (string) $path;
+			}
+		}
+
+		$result = $ability->execute( $input );
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
+
+		if ( empty( $result['success'] ) ) {
+			WP_CLI::error( $result['message'] ?? 'Workspace git operation failed.' );
+			return;
+		}
+
+		$this->renderGitOperationResult( $operation, $result, $assoc_args );
+	}
+
+	/**
+	 * Render CLI output for workspace git operations.
+	 *
+	 * @param string $operation Git operation.
+	 * @param array  $result    Ability result.
+	 * @param array  $assoc_args CLI assoc args.
+	 */
+	private function renderGitOperationResult( string $operation, array $result, array $assoc_args ): void {
+		switch ( $operation ) {
+			case 'status':
+				WP_CLI::log( sprintf( 'Repo:   %s', $result['name'] ?? '-' ) );
+				WP_CLI::log( sprintf( 'Path:   %s', $result['path'] ?? '-' ) );
+				WP_CLI::log( sprintf( 'Branch: %s', $result['branch'] ?? '-' ) );
+				WP_CLI::log( sprintf( 'Remote: %s', $result['remote'] ?? '-' ) );
+				WP_CLI::log( sprintf( 'Latest: %s', $result['commit'] ?? '-' ) );
+				$dirty = (int) ( $result['dirty'] ?? 0 );
+				WP_CLI::log( sprintf( 'Dirty:  %s', 0 === $dirty ? 'no' : "yes ({$dirty} files)" ) );
+				if ( ! empty( $result['files'] ) ) {
+					WP_CLI::log( '' );
+					foreach ( $result['files'] as $file ) {
+						WP_CLI::log( (string) $file );
+					}
+				}
+				return;
+
+			case 'log':
+				if ( empty( $result['entries'] ) ) {
+					WP_CLI::log( 'No commits found.' );
+					return;
+				}
+
+				$items = array_map(
+					fn( $entry ) => array(
+						'hash'    => $entry['hash'] ?? '',
+						'author'  => $entry['author'] ?? '',
+						'date'    => $entry['date'] ?? '',
+						'subject' => $entry['subject'] ?? '',
+					),
+					$result['entries']
+				);
+
+				$this->format_items( $items, array( 'hash', 'author', 'date', 'subject' ), $assoc_args, 'hash' );
+				return;
+
+			case 'diff':
+				WP_CLI::log( (string) ( $result['diff'] ?? '' ) );
+				return;
+
+			default:
+				WP_CLI::success( $result['message'] ?? 'Workspace git operation completed.' );
+				return;
+		}
+	}
 }
