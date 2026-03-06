@@ -12,6 +12,7 @@
 
 namespace DataMachine\Cli;
 
+use DataMachine\Core\FilesRepository\DirectoryManager;
 use WP_CLI;
 
 defined( 'ABSPATH' ) || exit;
@@ -28,7 +29,8 @@ class UserResolver {
 		$user_value = $assoc_args['user'] ?? null;
 
 		if ( null === $user_value || '' === $user_value ) {
-			return 0;
+			$directory_manager = new DirectoryManager();
+			return $directory_manager->get_default_agent_user_id();
 		}
 
 		// Numeric: treat as user ID.

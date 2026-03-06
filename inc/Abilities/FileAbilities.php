@@ -940,7 +940,8 @@ class FileAbilities {
 		DirectoryManager::ensure_agent_files();
 
 		$directory_manager = new DirectoryManager();
-		$agent_dir         = $directory_manager->get_agent_directory( $user_id );
+		$user_id           = $directory_manager->get_effective_user_id( $user_id );
+		$agent_dir         = $directory_manager->get_agent_identity_directory_for_user( $user_id );
 
 		if ( ! file_exists( $agent_dir ) ) {
 			return array(
@@ -1009,7 +1010,8 @@ class FileAbilities {
 		DirectoryManager::ensure_agent_files();
 
 		$directory_manager = new DirectoryManager();
-		$agent_dir         = $directory_manager->get_agent_directory( $user_id );
+		$user_id           = $directory_manager->get_effective_user_id( $user_id );
+		$agent_dir         = $directory_manager->get_agent_identity_directory_for_user( $user_id );
 		$filepath          = "{$agent_dir}/{$filename}";
 
 		if ( ! file_exists( $filepath ) ) {
@@ -1048,7 +1050,8 @@ class FileAbilities {
 		}
 
 		$directory_manager = new DirectoryManager();
-		$agent_dir         = $directory_manager->get_agent_directory( $user_id );
+		$user_id           = $directory_manager->get_effective_user_id( $user_id );
+		$agent_dir         = $directory_manager->get_agent_identity_directory_for_user( $user_id );
 		$filepath          = "{$agent_dir}/{$filename}";
 
 		if ( ! file_exists( $filepath ) ) {
@@ -1095,7 +1098,8 @@ class FileAbilities {
 		}
 
 		$directory_manager = new DirectoryManager();
-		$agent_dir         = $directory_manager->get_agent_directory( $user_id );
+		$user_id           = $directory_manager->get_effective_user_id( $user_id );
+		$agent_dir         = $directory_manager->get_agent_identity_directory_for_user( $user_id );
 
 		if ( ! $directory_manager->ensure_directory_exists( $agent_dir ) ) {
 			return array(
@@ -1146,7 +1150,8 @@ class FileAbilities {
 	 */
 	private function uploadToAgent( array $file, int $user_id = 0 ): array {
 		$directory_manager = new DirectoryManager();
-		$agent_dir         = $directory_manager->get_agent_directory( $user_id );
+		$user_id           = $directory_manager->get_effective_user_id( $user_id );
+		$agent_dir         = $directory_manager->get_agent_identity_directory_for_user( $user_id );
 
 		if ( ! $directory_manager->ensure_directory_exists( $agent_dir ) ) {
 			return array(
@@ -1166,7 +1171,7 @@ class FileAbilities {
 		}
 
 		// Return updated file list.
-		return $this->listAgentFiles();
+		return $this->listAgentFiles( $user_id );
 	}
 
 	/**

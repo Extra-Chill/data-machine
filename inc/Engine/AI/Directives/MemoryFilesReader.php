@@ -35,7 +35,8 @@ class MemoryFilesReader {
 		}
 
 		$directory_manager = new DirectoryManager();
-		$agent_dir         = $directory_manager->get_agent_directory( $user_id );
+		$user_id           = $directory_manager->get_effective_user_id( $user_id );
+		$agent_dir         = $directory_manager->get_agent_identity_directory_for_user( $user_id );
 		$outputs           = array();
 
 		foreach ( $memory_files as $filename ) {

@@ -49,9 +49,9 @@ class AgentMemory {
 	 * @param int $user_id WordPress user ID. 0 = legacy shared directory.
 	 */
 	public function __construct( int $user_id = 0 ) {
-		$this->user_id           = $user_id;
 		$this->directory_manager = new DirectoryManager();
-		$agent_dir               = $this->directory_manager->get_agent_directory( $user_id );
+		$this->user_id           = $this->directory_manager->get_effective_user_id( $user_id );
+		$agent_dir               = $this->directory_manager->get_agent_identity_directory_for_user( $this->user_id );
 		$this->file_path         = "{$agent_dir}/MEMORY.md";
 
 		// Self-heal: ensure agent files exist on first use.
@@ -389,7 +389,20 @@ class AgentMemory {
 	 * so a recreated MEMORY.md includes the standard sections.
 	 */
 	private function ensure_file_exists(): void {
-		$this->directory_manager->ensure_agent_directory_writable( $this->user_id );
+		$agent_dir = $this->directory_manager->get_agent_identity_directory_for_user( $this->user_id );
+
+		if ( ! $this->directory_manager->ensure_directory_exists( $agent_dir ) ) {
+			return;
+		}
+
+		$index_file = trailingslashit( $agent_dir ) . 'index.php';
+		if ( ! file_exists( $index_file ) ) {
+			$fs = FilesystemHelper::get();
+			if ( $fs ) {
+				$fs->put_contents( $index_file, "<?php\n// Silence is golden.\n", FS_CHMOD_FILE );
+				FilesystemHelper::make_group_writable( $index_file );
+			}
+		}
 
 		if ( ! file_exists( $this->file_path ) ) {
 			$content = "# Agent Memory\n";

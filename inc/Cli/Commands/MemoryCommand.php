@@ -763,7 +763,7 @@ class MemoryCommand extends BaseCommand {
 	 */
 	private function get_agent_dir( int $user_id = 0 ): string {
 		$directory_manager = new DirectoryManager();
-		return $directory_manager->get_agent_directory( $user_id );
+		return $directory_manager->get_agent_identity_directory_for_user( $user_id );
 	}
 
 	/**

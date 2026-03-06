@@ -176,12 +176,13 @@ class AgentMemoryAbilities {
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
-						'properties' => array(),
-							'user_id'  => array(
+						'properties' => array(
+							'user_id' => array(
 								'type'        => 'integer',
 								'description' => 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).',
 								'default'     => 0,
 							),
+						),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',

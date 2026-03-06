@@ -10,6 +10,7 @@
 
 namespace DataMachine\Api;
 
+use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\DailyMemoryAbilities;
 use DataMachine\Abilities\FileAbilities;
 use WP_Error;
@@ -119,6 +120,13 @@ class Files {
 				'methods'             => WP_REST_Server::READABLE,
 				'callback'            => array( self::class, 'list_agent_files' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => array(
+					'user_id' => array(
+						'required'          => false,
+						'type'              => 'integer',
+						'sanitize_callback' => 'absint',
+					),
+				),
 			)
 		);
 
@@ -137,6 +145,11 @@ class Files {
 						'sanitize_callback' => function ( $param ) {
 							return sanitize_file_name( $param );
 						},
+					),
+					'user_id'  => array(
+						'required'          => false,
+						'type'              => 'integer',
+						'sanitize_callback' => 'absint',
 					),
 				),
 			)
@@ -158,6 +171,11 @@ class Files {
 							return sanitize_file_name( $param );
 						},
 					),
+					'user_id'  => array(
+						'required'          => false,
+						'type'              => 'integer',
+						'sanitize_callback' => 'absint',
+					),
 				),
 			)
 		);
@@ -178,12 +196,22 @@ class Files {
 							return sanitize_file_name( $param );
 						},
 					),
+					'user_id'  => array(
+						'required'          => false,
+						'type'              => 'integer',
+						'sanitize_callback' => 'absint',
+					),
 				),
 			)
 		);
 
 		// Daily memory file routes (YYYY/MM/DD convention).
 		$daily_date_args = array(
+			'user_id' => array(
+				'required'          => false,
+				'type'              => 'integer',
+				'sanitize_callback' => 'absint',
+			),
 			'year'  => array(
 				'required'          => true,
 				'type'              => 'string',
@@ -215,6 +243,13 @@ class Files {
 				'methods'             => WP_REST_Server::READABLE,
 				'callback'            => array( self::class, 'list_daily_files' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => array(
+					'user_id' => array(
+						'required'          => false,
+						'type'              => 'integer',
+						'sanitize_callback' => 'absint',
+					),
+				),
 			)
 		);
 
@@ -259,15 +294,49 @@ class Files {
 	 * Check user permission
 	 */
 	public static function check_permission( $request ) {
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! is_user_logged_in() ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'You do not have permission to manage files.', 'data-machine' ),
-				array( 'status' => 403 )
+				__( 'You must be logged in to manage files.', 'data-machine' ),
+				array( 'status' => 401 )
 			);
 		}
 
-		return true;
+		$requested_user_id = self::resolve_scoped_user_id( $request );
+		$current_user_id   = get_current_user_id();
+
+		if ( $requested_user_id === $current_user_id ) {
+			return true;
+		}
+
+		if ( PermissionHelper::can( 'manage_agents' ) ) {
+			return true;
+		}
+
+		return new WP_Error(
+			'rest_forbidden',
+			__( 'You do not have permission to access another user\'s files.', 'data-machine' ),
+			array( 'status' => 403 )
+		);
+	}
+
+	/**
+	 * Resolve the effective REST-scoped user ID.
+	 *
+	 * If user_id is omitted, REST requests default to the current user instead
+	 * of the shared/default agent context.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 * @return int
+	 */
+	private static function resolve_scoped_user_id( WP_REST_Request $request ): int {
+		$user_id = $request->get_param( 'user_id' );
+
+		if ( null !== $user_id && '' !== $user_id ) {
+			return (int) $user_id;
+		}
+
+		return get_current_user_id();
 	}
 
 	/**
@@ -408,12 +477,10 @@ class Files {
 	 * List agent files.
 	 */
 	public static function list_agent_files( WP_REST_Request $request ) {
-		$user_id = $request->get_param( 'user_id' );
-		$input   = array( 'scope' => 'agent' );
-
-		if ( null !== $user_id ) {
-			$input['user_id'] = (int) $user_id;
-		}
+		$input = array(
+			'scope'   => 'agent',
+			'user_id' => self::resolve_scoped_user_id( $request ),
+		);
 
 		$result = self::getAbilities()->executeListFiles( $input );
 
@@ -434,16 +501,12 @@ class Files {
 	 */
 	public static function get_agent_file( WP_REST_Request $request ) {
 		$filename = sanitize_file_name( wp_unslash( $request['filename'] ) );
-		$user_id  = $request->get_param( 'user_id' );
 
 		$input = array(
 			'filename' => $filename,
 			'scope'    => 'agent',
+			'user_id'  => self::resolve_scoped_user_id( $request ),
 		);
-
-		if ( null !== $user_id ) {
-			$input['user_id'] = (int) $user_id;
-		}
 
 		$result = self::getAbilities()->executeGetFile( $input );
 
@@ -467,16 +530,12 @@ class Files {
 	public static function put_agent_file( WP_REST_Request $request ) {
 		$filename = sanitize_file_name( wp_unslash( $request['filename'] ) );
 		$content  = $request->get_body();
-		$user_id  = $request->get_param( 'user_id' );
 
 		$input = array(
 			'filename' => $filename,
 			'content'  => $content,
+			'user_id'  => self::resolve_scoped_user_id( $request ),
 		);
-
-		if ( null !== $user_id ) {
-			$input['user_id'] = (int) $user_id;
-		}
 
 		$result = self::getAbilities()->executeWriteAgentFile( $input );
 
@@ -516,12 +575,8 @@ class Files {
 		$input = array(
 			'filename' => $filename,
 			'scope'    => 'agent',
+			'user_id'  => self::resolve_scoped_user_id( $request ),
 		);
-
-		$user_id = $request->get_param( 'user_id' );
-		if ( null !== $user_id ) {
-			$input['user_id'] = (int) $user_id;
-		}
 
 		$result = self::getAbilities()->executeDeleteFile( $input );
 
@@ -549,7 +604,11 @@ class Files {
 	 * @since 0.32.0
 	 */
 	public static function list_daily_files( WP_REST_Request $request ) {
-		$result = DailyMemoryAbilities::listDaily( array() );
+		$input = array(
+			'user_id' => self::resolve_scoped_user_id( $request ),
+		);
+
+		$result = DailyMemoryAbilities::listDaily( $input );
 
 		return rest_ensure_response(
 			array(
@@ -567,7 +626,13 @@ class Files {
 	 */
 	public static function get_daily_file( WP_REST_Request $request ) {
 		$date   = sprintf( '%s-%s-%s', $request['year'], $request['month'], $request['day'] );
-		$result = DailyMemoryAbilities::readDaily( array( 'date' => $date ) );
+
+		$input = array(
+			'date'    => $date,
+			'user_id' => self::resolve_scoped_user_id( $request ),
+		);
+
+		$result = DailyMemoryAbilities::readDaily( $input );
 
 		if ( ! $result['success'] ) {
 			return new WP_Error( 'daily_file_not_found', $result['message'], array( 'status' => 404 ) );
@@ -596,13 +661,14 @@ class Files {
 		$date    = sprintf( '%s-%s-%s', $request['year'], $request['month'], $request['day'] );
 		$content = $request->get_body();
 
-		$result = DailyMemoryAbilities::writeDaily(
-			array(
-				'date'    => $date,
-				'content' => $content,
-				'mode'    => 'write',
-			)
+		$input = array(
+			'date'    => $date,
+			'content' => $content,
+			'mode'    => 'write',
+			'user_id' => self::resolve_scoped_user_id( $request ),
 		);
+
+		$result = DailyMemoryAbilities::writeDaily( $input );
 
 		if ( ! $result['success'] ) {
 			$status = false !== strpos( $result['message'] ?? '', 'disabled' ) ? 403 : 500;
@@ -628,7 +694,13 @@ class Files {
 	 */
 	public static function delete_daily_file( WP_REST_Request $request ) {
 		$date   = sprintf( '%s-%s-%s', $request['year'], $request['month'], $request['day'] );
-		$result = DailyMemoryAbilities::deleteDaily( array( 'date' => $date ) );
+
+		$input = array(
+			'date'    => $date,
+			'user_id' => self::resolve_scoped_user_id( $request ),
+		);
+
+		$result = DailyMemoryAbilities::deleteDaily( $input );
 
 		if ( ! $result['success'] ) {
 			$status = false !== strpos( $result['message'] ?? '', 'disabled' ) ? 403 : 404;
