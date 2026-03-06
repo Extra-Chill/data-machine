@@ -32,6 +32,7 @@ class SkipItemTool {
 	 * @return array Tool result with success status
 	 */
 	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
+		$tool_def;
 		$reason = trim( $parameters['reason'] ?? '' );
 
 		if ( empty( $reason ) ) {

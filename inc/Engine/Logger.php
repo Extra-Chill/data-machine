@@ -122,6 +122,7 @@ function datamachine_log_message( Level $level, string|\Stringable $message, arr
 		datamachine_get_monolog_instance( $agent_type )->log( $level, $message, $context );
 	} catch ( \Exception $e ) {
 		// Prevent logging failures from crashing the application
+		unset( $e );
 	}
 }
 

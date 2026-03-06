@@ -97,6 +97,7 @@ class Auth {
 	 * Check if user has permission to manage authentication
 	 */
 	public static function check_permission( $request ) {
+		$request;
 		if ( ! PermissionHelper::can( 'manage_settings' ) ) {
 			return new \WP_Error(
 				'rest_forbidden',

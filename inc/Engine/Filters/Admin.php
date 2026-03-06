@@ -26,6 +26,7 @@ function datamachine_register_admin_filters() {
 	add_filter(
 		'datamachine_render_template',
 		function ( $content, $template_name, $data = array() ) {
+			$data;
 			// Template discovery and rendering
 			// Dynamic discovery of all registered admin pages and their template directories
 			$all_pages = apply_filters( 'datamachine_admin_pages', array() );
@@ -293,11 +294,11 @@ function datamachine_enqueue_admin_assets( $hook_suffix ) {
 	$page_assets = $page_config['assets'] ?? array();
 
 	if ( ! empty( $page_assets['css'] ) || ! empty( $page_assets['js'] ) ) {
-		datamachine_enqueue_page_assets( $page_assets, $page_slug );
+		datamachine_enqueue_page_assets( $page_assets);
 	}
 }
 
-function datamachine_enqueue_page_assets( $assets, $page_slug ) {
+function datamachine_enqueue_page_assets( $assets) {
 	$plugin_base_path = DATAMACHINE_PATH;
 	$plugin_base_url  = DATAMACHINE_URL;
 	$version          = DATAMACHINE_VERSION;

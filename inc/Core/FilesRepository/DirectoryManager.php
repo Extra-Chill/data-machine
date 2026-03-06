@@ -122,7 +122,7 @@ class DirectoryManager {
 	 * @param string     $pipeline_name Pipeline name (unused, for signature compatibility)
 	 * @return string Full path to pipeline context directory
 	 */
-	public function get_pipeline_context_directory( int|string $pipeline_id, string $pipeline_name ): string {
+	public function get_pipeline_context_directory( int|string $pipeline_id): string {
 		$pipeline_dir = $this->get_pipeline_directory( $pipeline_id );
 		return "{$pipeline_dir}/context";
 	}

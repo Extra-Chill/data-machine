@@ -112,6 +112,7 @@ class ConversationManager {
 	 * @return string Human-readable success/failure message
 	 */
 	public static function generateSuccessMessage( string $tool_name, array $tool_result, array $tool_parameters ): string {
+		$tool_parameters;
 		$success = $tool_result['success'] ?? false;
 		$data    = $tool_result['data'] ?? array();
 

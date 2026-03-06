@@ -97,7 +97,7 @@ class FlowFormatter {
 			'scheduling_config' => $scheduling_config,
 			'last_run'          => $last_run_at,
 			'last_run_status'   => $last_run_status,
-			'last_run_display'  => DateFormatter::format_for_display( $last_run_at, $last_run_status ),
+			'last_run_display'  => DateFormatter::format_for_display( $last_run_at),
 			'is_running'        => $is_running,
 			'next_run'          => $next_run,
 			'next_run_display'  => DateFormatter::format_for_display( $next_run ),

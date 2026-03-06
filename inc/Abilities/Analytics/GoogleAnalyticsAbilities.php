@@ -426,8 +426,8 @@ class GoogleAnalyticsAbilities {
 		}
 
 		$rows = $compare
-			? self::formatComparisonRows( $data, $report_config )
-			: self::formatReportRows( $data, $report_config );
+			? self::formatComparisonRows( $data)
+			: self::formatReportRows( $data);
 
 		$response = array(
 			'success'       => true,
@@ -549,7 +549,7 @@ class GoogleAnalyticsAbilities {
 	 * @param array $report_config Report configuration with dimension/metric names.
 	 * @return array Formatted rows.
 	 */
-	private static function formatReportRows( array $data, array $report_config ): array {
+	private static function formatReportRows( array $data): array {
 		$dimension_headers = wp_list_pluck( $data['dimensionHeaders'] ?? array(), 'name' );
 		$metric_headers    = wp_list_pluck( $data['metricHeaders'] ?? array(), 'name' );
 
@@ -590,7 +590,7 @@ class GoogleAnalyticsAbilities {
 	 * @param array $report_config Report configuration.
 	 * @return array Formatted rows with delta columns.
 	 */
-	private static function formatComparisonRows( array $data, array $report_config ): array {
+	private static function formatComparisonRows( array $data): array {
 		$dimension_headers = wp_list_pluck( $data['dimensionHeaders'] ?? array(), 'name' );
 		$metric_headers    = wp_list_pluck( $data['metricHeaders'] ?? array(), 'name' );
 		$metric_count      = count( $metric_headers );

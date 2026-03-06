@@ -102,8 +102,10 @@ class WorkspaceWriter {
 		// the file exists on disk.
 		$containment = $this->workspace->validate_containment( $file_path, $repo_path );
 		if ( ! $containment['valid'] ) {
-			// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-			@unlink( $file_path );
+			if ( file_exists( $file_path ) ) {
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+				unlink( $file_path );
+			}
 			return array(
 				'success' => false,
 				'message' => 'Path traversal detected. Written file removed.',

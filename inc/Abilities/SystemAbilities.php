@@ -211,6 +211,7 @@ class SystemAbilities {
 	 * @return array System diagnostic results
 	 */
 	private function runSystemDiagnostics( array $options = array() ): array {
+		$options;
 		return array(
 			'version'     => defined( 'DATAMACHINE_VERSION' ) ? DATAMACHINE_VERSION : 'unknown',
 			'php_version' => PHP_VERSION,

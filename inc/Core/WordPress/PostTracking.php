@@ -97,7 +97,7 @@ class PostTracking {
 	 * @return int Post ID or 0 if not found
 	 */
 	public static function extractPostId( array $result ): int {
-		// Update handlers: result['data']['post_id']
+		// Update handlers: result.data.post_id
 		if ( ! empty( $result['data']['post_id'] ) ) {
 			return (int) $result['data']['post_id'];
 		}

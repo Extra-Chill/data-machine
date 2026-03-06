@@ -338,6 +338,7 @@ class PipelineBatchScheduler {
 	 * @param string $status The completion status.
 	 */
 	public static function onChildComplete( int $job_id, string $status ): void {
+		$status;
 		$jobs_db = new Jobs();
 		$job     = $jobs_db->get_job( $job_id );
 

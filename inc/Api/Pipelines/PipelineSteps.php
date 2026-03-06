@@ -213,6 +213,7 @@ class PipelineSteps {
 	 * Check if user has permission to manage pipeline steps
 	 */
 	public static function check_permission( $request ) {
+		$request;
 		if ( ! PermissionHelper::can( 'manage_flows' ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
@@ -314,6 +315,8 @@ class PipelineSteps {
 	 * Validate step_order parameter structure
 	 */
 	public static function validate_step_order( $param, $request, $key ) {
+		$request;
+		$key;
 		if ( ! is_array( $param ) || empty( $param ) ) {
 			return new \WP_Error(
 				'invalid_step_order',
@@ -492,23 +495,22 @@ class PipelineSteps {
 		$step_config_data = array();
 		$api_key_saved    = false;
 
-		{
-			// Handle AI step configuration
-			$has_provider       = $request->has_param( 'provider' );
-			$has_model          = $request->has_param( 'model' );
-			$has_system_prompt  = $request->has_param( 'system_prompt' );
-			$has_disabled_tools = $request->has_param( 'disabled_tools' );
-			$has_api_key        = $request->has_param( 'ai_api_key' );
+		// Handle AI step configuration.
+		$has_provider       = $request->has_param( 'provider' );
+		$has_model          = $request->has_param( 'model' );
+		$has_system_prompt  = $request->has_param( 'system_prompt' );
+		$has_disabled_tools = $request->has_param( 'disabled_tools' );
+		$has_api_key        = $request->has_param( 'ai_api_key' );
 
-			$effective_provider = $has_provider
-				? sanitize_text_field( $request->get_param( 'provider' ) )
-				: ( $existing_config['provider'] ?? '' );
-			$effective_model    = $has_model
-				? sanitize_text_field( $request->get_param( 'model' ) )
-				: ( $existing_config['model'] ?? '' );
-			$system_prompt      = $has_system_prompt
-				? sanitize_textarea_field( $request->get_param( 'system_prompt' ) )
-				: null;
+		$effective_provider = $has_provider
+			? sanitize_text_field( $request->get_param( 'provider' ) )
+			: ( $existing_config['provider'] ?? '' );
+		$effective_model    = $has_model
+			? sanitize_text_field( $request->get_param( 'model' ) )
+			: ( $existing_config['model'] ?? '' );
+		$system_prompt      = $has_system_prompt
+			? sanitize_textarea_field( $request->get_param( 'system_prompt' ) )
+			: null;
 
 		if ( $has_provider ) {
 			$step_config_data['provider'] = $effective_provider;
@@ -545,18 +547,6 @@ class PipelineSteps {
 			$step_config_data['disabled_tools'] = $tools_manager->save_step_tool_selections( $pipeline_step_id, $sanitized_tool_ids );
 		}
 
-		if ( empty( $step_config_data ) && ! $has_api_key ) {
-			return new \WP_Error(
-				'no_config_values',
-				__( 'No configuration values were provided.', 'data-machine' ),
-				array( 'status' => 400 )
-			);
-		}
-		}
-
-		// Check for API key (AI steps only)
-		$has_api_key = $request->has_param( 'ai_api_key' );
-
 		if ( 'ai' === $step_type && empty( $step_config_data ) && ! $has_api_key ) {
 			return new \WP_Error(
 				'no_config_values',
@@ -575,6 +565,7 @@ class PipelineSteps {
 				apply_filters( 'chubes_ai_provider_api_keys', $all_keys );
 				$api_key_saved = true;
 			} catch ( \Exception $e ) {
+				unset( $e );
 			}
 		}
 

@@ -77,7 +77,7 @@ class FlowScheduling {
 	 * @return bool True if it looks like a cron expression.
 	 */
 	public static function looks_like_cron_expression( string $value ): bool {
-		// @ shortcuts: @yearly, @monthly, @weekly, @daily, @hourly.
+		// @ shortcuts: yearly, monthly, weekly, daily, hourly.
 		if ( str_starts_with( $value, '@' ) ) {
 			return true;
 		}
@@ -321,6 +321,7 @@ class FlowScheduling {
 			$next_run = $cron->getNextRunDate()->format( 'c' );
 		} catch ( \Exception $e ) {
 			// Non-fatal — next run display is informational.
+			unset( $e );
 		}
 
 		$db_flows->update_flow_scheduling(

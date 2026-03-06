@@ -274,6 +274,7 @@ class AltTextAbilities {
 	 * @return array Ability response.
 	 */
 	public static function diagnoseAltText( array $input = array() ): array {
+		$input;
 		global $wpdb;
 
 		$image_like = 'image/%';

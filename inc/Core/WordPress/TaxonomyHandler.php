@@ -109,7 +109,7 @@ class TaxonomyHandler {
 					$taxonomy_results[ $taxonomy->name ] = $result;
 				}
 			} elseif ( SelectionMode::PRE_SELECTED === $mode ) {
-				$result = $this->processPreSelectedTaxonomy( $post_id, $taxonomy->name, $selection, $engine_data );
+				$result = $this->processPreSelectedTaxonomy( $post_id, $taxonomy->name, $selection);
 				if ( $result ) {
 					$taxonomy_results[ $taxonomy->name ] = $result;
 				}
@@ -291,7 +291,7 @@ class TaxonomyHandler {
 	 * @param string $selection Term ID, name, or slug
 	 * @return array|null Taxonomy assignment result or null if invalid
 	 */
-	private function processPreSelectedTaxonomy( int $post_id, string $taxonomy_name, string $selection, array $engine_data = array() ): ?array {
+	private function processPreSelectedTaxonomy( int $post_id, string $taxonomy_name, string $selection): ?array {
 		$term_id   = null;
 		$term_name = null;
 

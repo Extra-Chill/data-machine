@@ -313,6 +313,7 @@ class SettingsAbilities {
 	}
 
 	public function executeGetSettings( array $input ): array {
+		$input;
 		$settings = PluginSettings::all();
 
 		$tool_manager = new \DataMachine\Engine\AI\Tools\ToolManager();
@@ -543,6 +544,7 @@ class SettingsAbilities {
 	}
 
 	public function executeGetSchedulingIntervals( array $input ): array {
+		$input;
 		$intervals = apply_filters( 'datamachine_scheduler_intervals', array() );
 
 		$frontend_intervals = array();
@@ -711,6 +713,7 @@ class SettingsAbilities {
 	}
 
 	public function executeGetHandlerDefaults( array $input ): array {
+		$input;
 		$defaults = get_option( self::HANDLER_DEFAULTS_OPTION, null );
 
 		if ( null === $defaults ) {

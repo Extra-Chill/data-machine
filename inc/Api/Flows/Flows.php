@@ -246,6 +246,7 @@ class Flows {
 	 * Check if user has permission to manage flows
 	 */
 	public static function check_permission( $request ) {
+		$request;
 		if ( ! PermissionHelper::can( 'manage_flows' ) ) {
 			return new \WP_Error(
 				'rest_forbidden',

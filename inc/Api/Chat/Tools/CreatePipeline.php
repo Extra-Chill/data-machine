@@ -287,7 +287,7 @@ class CreatePipeline extends BaseTool {
 
 	private function validateSteps( array $steps ): bool|string {
 		foreach ( $steps as $index => $step ) {
-			// Accept shorthand: "event_import" → {"step_type": "event_import"}
+			// Accept shorthand: "event_import" becomes step_type=event_import
 			if ( is_string( $step ) ) {
 				$step = array( 'step_type' => $step );
 			}
@@ -313,7 +313,7 @@ class CreatePipeline extends BaseTool {
 	private function normalizeSteps( array $steps ): array {
 		$normalized = array();
 		foreach ( $steps as $index => $step ) {
-			// Accept shorthand: "event_import" → {"step_type": "event_import"}
+			// Accept shorthand: "event_import" becomes step_type=event_import
 			if ( is_string( $step ) ) {
 				$step = array( 'step_type' => $step );
 			}

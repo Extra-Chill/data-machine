@@ -436,22 +436,12 @@ class DailyMemory {
 	 */
 	private function scan_sorted_dirs( string $path ): array {
 		$entries = array();
-		$handle  = opendir( $path );
 
-		if ( ! $handle ) {
-			return $entries;
-		}
-
-		while ( false !== ( $entry = readdir( $handle ) ) ) {
-			if ( '.' === $entry || '..' === $entry ) {
-				continue;
-			}
+		foreach ( array_diff( scandir( $path ), array( '.', '..' ) ) as $entry ) {
 			if ( is_dir( "{$path}/{$entry}" ) ) {
 				$entries[] = $entry;
 			}
 		}
-
-		closedir( $handle );
 		sort( $entries );
 
 		return $entries;
@@ -466,24 +456,14 @@ class DailyMemory {
 	 */
 	private function scan_sorted_files( string $path, string $extension ): array {
 		$entries = array();
-		$handle  = opendir( $path );
-
-		if ( ! $handle ) {
-			return $entries;
-		}
 
 		$ext_len = strlen( $extension );
 
-		while ( false !== ( $entry = readdir( $handle ) ) ) {
-			if ( '.' === $entry || '..' === $entry ) {
-				continue;
-			}
+		foreach ( array_diff( scandir( $path ), array( '.', '..' ) ) as $entry ) {
 			if ( is_file( "{$path}/{$entry}" ) && substr( $entry, -$ext_len ) === $extension ) {
 				$entries[] = substr( $entry, 0, -$ext_len );
 			}
 		}
-
-		closedir( $handle );
 		sort( $entries );
 
 		return $entries;

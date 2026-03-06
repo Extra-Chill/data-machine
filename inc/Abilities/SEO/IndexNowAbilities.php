@@ -585,6 +585,7 @@ class IndexNowAbilities {
 	 * @return array Status information.
 	 */
 	public function executeStatus( array $input ): array {
+		$input;
 		$status            = self::get_status();
 		$status['success'] = true;
 		return $status;
@@ -597,6 +598,7 @@ class IndexNowAbilities {
 	 * @return array Result with key preview.
 	 */
 	public function executeGenerateKey( array $input ): array {
+		$input;
 		$key = self::generate_key();
 
 		return array(
@@ -614,6 +616,7 @@ class IndexNowAbilities {
 	 * @return array Verification result.
 	 */
 	public function executeVerifyKey( array $input ): array {
+		$input;
 		return self::verify_key_file();
 	}
 }

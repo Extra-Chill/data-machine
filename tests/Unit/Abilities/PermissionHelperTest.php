@@ -99,6 +99,7 @@ class PermissionHelperTest extends WP_UnitTestCase {
 			);
 		} catch ( \RuntimeException $e ) {
 			// Expected.
+			unset( $e );
 		}
 
 		// Context must be reset even after exception.

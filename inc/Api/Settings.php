@@ -177,6 +177,7 @@ class Settings {
 	 * @return \WP_REST_Response|\WP_Error Response with new secret.
 	 */
 	public static function handle_generate_ping_secret( $request ) {
+		$request;
 		$secret   = wp_generate_password( 32, false );
 		$settings = get_option( 'datamachine_settings', array() );
 
@@ -197,6 +198,7 @@ class Settings {
 	 * Check if user has permission to manage settings
 	 */
 	public static function check_permission( $request ) {
+		$request;
 		if ( ! PermissionHelper::can( 'manage_settings' ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
@@ -301,6 +303,7 @@ class Settings {
 	 * @return WP_REST_Response|\WP_Error Settings data or error
 	 */
 	public static function handle_get_settings( $request ) {
+		$request;
 		$result = self::getAbilities()->executeGetSettings( array() );
 
 		if ( ! $result['success'] ) {
@@ -355,6 +358,7 @@ class Settings {
 	 * Handle get scheduling intervals request
 	 */
 	public static function handle_get_scheduling_intervals( $request ) {
+		$request;
 		$result = self::getAbilities()->executeGetSchedulingIntervals( array() );
 
 		if ( ! $result['success'] ) {

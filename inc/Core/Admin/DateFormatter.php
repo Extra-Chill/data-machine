@@ -43,7 +43,7 @@ class DateFormatter {
 	 * @param string|null $status Unused, kept for backward compatibility
 	 * @return string Formatted datetime string
 	 */
-	public static function format_for_display( ?string $mysql_datetime, ?string $status = null ): string {
+	public static function format_for_display( ?string $mysql_datetime): string {
 		if ( empty( $mysql_datetime ) || '0000-00-00 00:00:00' === $mysql_datetime ) {
 			return __( 'Never', 'data-machine' );
 		}

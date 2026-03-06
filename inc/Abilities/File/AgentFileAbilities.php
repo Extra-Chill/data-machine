@@ -286,13 +286,8 @@ class AgentFileAbilities {
 				continue;
 			}
 
-			$handle = opendir( $dir );
-			if ( ! $handle ) {
-				continue;
-			}
-
-			while ( false !== ( $entry = readdir( $handle ) ) ) {
-				if ( '.' === $entry || '..' === $entry || 'index.php' === $entry ) {
+			foreach ( array_diff( scandir( $dir ), array( '.', '..' ) ) as $entry ) {
+				if ( 'index.php' === $entry ) {
 					continue;
 				}
 
@@ -311,7 +306,6 @@ class AgentFileAbilities {
 					$seen[ $entry ] = true;
 				}
 			}
-			closedir( $handle );
 		}
 
 		// Include daily memory summary.

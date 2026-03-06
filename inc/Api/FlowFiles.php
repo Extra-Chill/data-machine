@@ -107,6 +107,7 @@ class FlowFiles {
 	// =========================================================================
 
 	public static function check_permission( $request ) {
+		$request;
 		if ( ! is_user_logged_in() ) {
 			return new WP_Error(
 				'rest_forbidden',

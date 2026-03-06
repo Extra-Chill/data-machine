@@ -27,6 +27,7 @@ class ToolParameters {
 		array $payload,
 		array $tool_definition
 	): array {
+		$tool_definition;
 		// Start with payload (contains job_id, flow_step_id, data, flow_step_config)
 		$parameters = $payload;
 

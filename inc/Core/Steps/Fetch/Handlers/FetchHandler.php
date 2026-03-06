@@ -391,6 +391,7 @@ abstract class FetchHandler {
 	 * @since 0.9.7
 	 */
 	public static function registerSkipItemTool( array $tools, ?string $handler_slug = null, array $handler_config = array(), array $engine_data = array() ): array {
+		$engine_data;
 		if ( empty( $handler_slug ) ) {
 			return $tools;
 		}

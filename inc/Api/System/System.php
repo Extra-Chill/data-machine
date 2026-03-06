@@ -72,6 +72,7 @@ class System {
 	 * @return array|WP_Error Response data or error
 	 */
 	public static function get_status( WP_REST_Request $request ) {
+		$request;
 		return rest_ensure_response(
 			array(
 				'success' => true,
@@ -92,6 +93,7 @@ class System {
 	 * @since 0.32.0
 	 */
 	public static function get_tasks( WP_REST_Request $request ) {
+		$request;
 		$system_agent = SystemAgent::getInstance();
 		$registry     = $system_agent->getTaskRegistry();
 		$last_runs    = self::get_last_runs( array_keys( $registry ) );

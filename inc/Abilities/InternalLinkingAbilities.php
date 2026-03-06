@@ -481,6 +481,7 @@ class InternalLinkingAbilities {
 	 * @return array Ability response.
 	 */
 	public static function diagnoseInternalLinks( array $input = array() ): array {
+		$input;
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching

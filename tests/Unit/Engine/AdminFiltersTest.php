@@ -52,7 +52,7 @@ class AdminFiltersTest extends WP_UnitTestCase {
 			),
 		);
 
-		datamachine_enqueue_page_assets( $assets, 'test-page' );
+		datamachine_enqueue_page_assets( $assets);
 
 		$wp_scripts = wp_scripts();
 		$registered = $wp_scripts->registered;
@@ -102,7 +102,7 @@ class AdminFiltersTest extends WP_UnitTestCase {
 			),
 		);
 
-		datamachine_enqueue_page_assets( $assets, 'test-page' );
+		datamachine_enqueue_page_assets( $assets);
 
 		$wp_scripts = wp_scripts();
 		$script = $wp_scripts->registered['test-handle-2'];
@@ -127,7 +127,7 @@ class AdminFiltersTest extends WP_UnitTestCase {
 			),
 		);
 
-		datamachine_enqueue_page_assets( $assets, 'test-page' );
+		datamachine_enqueue_page_assets( $assets);
 
 		$wp_scripts = wp_scripts();
 		$script = $wp_scripts->registered['test-handle-3'];

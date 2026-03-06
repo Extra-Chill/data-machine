@@ -135,6 +135,7 @@ class ReplacePostBlocksAbility {
 	 * @return array
 	 */
 	public static function handleChatToolCall( array $parameters, array $tool_def = array() ): array {
+		$tool_def;
 		$result = self::execute( $parameters );
 
 		return array(

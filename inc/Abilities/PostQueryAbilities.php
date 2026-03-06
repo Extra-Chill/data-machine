@@ -451,6 +451,7 @@ class PostQueryAbilities {
 	}
 
 	public function handleQueryPosts( array $parameters, array $tool_def = array() ): array {
+		$tool_def;
 		$result = $this->executeQueryPosts(
 			array(
 				'filter_by'    => $parameters['filter_by'] ?? '',

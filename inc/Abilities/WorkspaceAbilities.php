@@ -720,6 +720,7 @@ class WorkspaceAbilities {
 	 * @return array Result.
 	 */
 	public static function listRepos( array $input ): array {
+		$input;
 		$workspace = new Workspace();
 		return $workspace->list_repos();
 	}

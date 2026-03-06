@@ -368,7 +368,11 @@ class LogAbilities {
 			);
 		}
 
-		$file_content = @file( $log_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES );
+		if ( is_readable( $log_file ) ) {
+			$file_content = file( $log_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES );
+		} else {
+			$file_content = false;
+		}
 
 		if ( false === $file_content ) {
 			return array(

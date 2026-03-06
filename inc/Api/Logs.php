@@ -189,6 +189,7 @@ class Logs {
 	 * Check if user has permission to manage logs
 	 */
 	public static function check_permission( $request ) {
+		$request;
 		if ( ! PermissionHelper::can( 'view_logs' ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
@@ -206,6 +207,7 @@ class Logs {
 	 * GET /datamachine/v1/logs/agent-types
 	 */
 	public static function handle_get_agent_types( $request ) {
+		$request;
 		$agent_types = AgentType::getAll();
 
 		return rest_ensure_response(

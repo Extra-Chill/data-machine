@@ -796,10 +796,12 @@ class GDRenderer {
 			default => imagepng( $this->image, $path, $quality >= 0 ? $quality : 9 ),
 		};
 
-		@unlink( $temp_file );
+		if ( file_exists( $temp_file ) ) {
+			unlink( $temp_file );
+		}
 
 		if ( ! $success ) {
-			@unlink( $path );
+			unlink( $path );
 			return null;
 		}
 
@@ -824,7 +826,9 @@ class GDRenderer {
 		$storage     = new FileStorage();
 		$stored_path = $storage->store_file( $temp_path, $filename, $context );
 
-		@unlink( $temp_path );
+		if ( file_exists( $temp_path ) ) {
+			unlink( $temp_path );
+		}
 
 		return $stored_path ? $stored_path : null;
 	}

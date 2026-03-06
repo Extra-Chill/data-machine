@@ -217,6 +217,7 @@ class ImageTemplateAbilities {
 	 * @return array Result with template definitions.
 	 */
 	public static function listTemplates( array $input ): array {
+		$input;
 		return array(
 			'success'   => true,
 			'templates' => TemplateRegistry::get_template_definitions(),

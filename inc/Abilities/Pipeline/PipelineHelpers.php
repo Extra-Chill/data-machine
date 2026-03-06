@@ -123,7 +123,7 @@ trait PipelineHelpers {
 		$valid_types         = array_keys( $step_type_abilities->getAllStepTypes() );
 
 		foreach ( $steps as $index => $step ) {
-			// Accept shorthand: "event_import" → {"step_type": "event_import"}
+			// Accept shorthand: "event_import" becomes step_type=event_import
 			if ( is_string( $step ) ) {
 				$step = array( 'step_type' => $step );
 			}

@@ -224,6 +224,7 @@ class Users {
 	 * Permission callback for /users/me routes.
 	 */
 	public static function check_current_user_permission( $request = null ) {
+		$request;
 		if ( ! is_user_logged_in() ) {
 			return new WP_Error(
 				'rest_not_logged_in',
