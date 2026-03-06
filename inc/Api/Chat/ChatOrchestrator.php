@@ -453,11 +453,16 @@ class ChatOrchestrator {
 	 * @return string|WP_Error Session ID on success, WP_Error on failure.
 	 */
 	private static function createSession( int $user_id, string $source = '' ): string|WP_Error {
+		$agent_id = function_exists( 'datamachine_resolve_or_create_agent_id' )
+			? datamachine_resolve_or_create_agent_id( $user_id )
+			: 0;
+
 		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/create-chat-session' ) : null;
 
 		if ( $ability ) {
 			$input = array(
 				'user_id'    => $user_id,
+				'agent_id'   => $agent_id,
 				'agent_type' => AgentType::CHAT,
 			);
 
@@ -493,7 +498,7 @@ class ChatOrchestrator {
 			$metadata['source'] = $source;
 		}
 
-		$session_id = $chat_db->create_session( $user_id, $metadata, AgentType::CHAT );
+		$session_id = $chat_db->create_session( $user_id, $agent_id, $metadata, AgentType::CHAT );
 
 		if ( empty( $session_id ) ) {
 			return new WP_Error(

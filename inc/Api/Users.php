@@ -9,6 +9,7 @@
 
 namespace DataMachine\Api;
 
+use DataMachine\Abilities\PermissionHelper;
 use WP_REST_Request;
 use WP_REST_Server;
 use WP_Error;
@@ -204,7 +205,11 @@ class Users {
 			);
 		}
 
-		if ( current_user_can( 'manage_options' ) || get_current_user_id() === $target_user_id ) {
+		if ( PermissionHelper::can( 'manage_flows' ) || get_current_user_id() === $target_user_id ) {
+			return true;
+		}
+
+		if ( PermissionHelper::can( 'manage_agents' ) ) {
 			return true;
 		}
 

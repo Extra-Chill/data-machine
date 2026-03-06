@@ -146,6 +146,7 @@ class Chat extends BaseRepository {
 	 */
 	public function create_session(
 		int $user_id,
+		int $agent_id = 0,
 		array $metadata = array(),
 		string $agent_type = \DataMachine\Engine\AI\AgentType::CHAT
 	): string {
@@ -160,6 +161,7 @@ class Chat extends BaseRepository {
 			array(
 				'session_id' => $session_id,
 				'user_id'    => $user_id,
+				'agent_id'   => $agent_id > 0 ? $agent_id : null,
 				'messages'   => wp_json_encode( array() ),
 				'metadata'   => wp_json_encode( $metadata ),
 				'provider'   => null,
@@ -167,7 +169,7 @@ class Chat extends BaseRepository {
 				'agent_type' => $agent_type,
 				'expires_at' => null,
 			),
-			array( '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s' )
+			array( '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s' )
 		);
 
 		if ( false === $result ) {
@@ -191,6 +193,7 @@ class Chat extends BaseRepository {
 			array(
 				'session_id' => $session_id,
 				'user_id'    => $user_id,
+				'agent_id'   => $agent_id,
 				'agent_type' => $agent_type,
 			)
 		);
