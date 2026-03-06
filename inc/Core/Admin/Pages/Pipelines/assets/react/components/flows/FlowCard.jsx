@@ -318,6 +318,8 @@ function FlowCardContent( props ) {
 					flowId={ currentFlowData.flow_id }
 					scheduling={ {
 						interval: currentFlowData.scheduling_config?.interval,
+						scheduled_time:
+							currentFlowData.scheduling_config?.scheduled_time,
 						last_run_display:
 							optimisticLastRunDisplay ||
 							currentFlowData.last_run_display,

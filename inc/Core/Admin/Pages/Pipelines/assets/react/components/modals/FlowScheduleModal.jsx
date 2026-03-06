@@ -7,7 +7,12 @@
 /**
  * WordPress dependencies
  */
-import { Modal, Button, SelectControl } from '@wordpress/components';
+import {
+	Modal,
+	Button,
+	SelectControl,
+	DateTimePicker,
+} from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 /**
  * Internal dependencies
@@ -43,14 +48,34 @@ export default function FlowScheduleModal( {
 
 	// Form state for interval selection
 	const formState = useFormState( {
-		initialData: { selectedInterval: currentInterval || 'manual' },
+		initialData: {
+			selectedInterval: currentInterval || 'manual',
+			scheduledDate: null,
+		},
 		onSubmit: async ( data ) => {
 			try {
+				const schedulingConfig = {
+					interval: data.selectedInterval,
+				};
+
+				// Add timestamp for one-time scheduling.
+				if ( data.selectedInterval === 'one_time' ) {
+					if ( ! data.scheduledDate ) {
+						throw new Error(
+							__(
+								'Please select a date and time.',
+								'data-machine'
+							)
+						);
+					}
+					schedulingConfig.timestamp = Math.floor(
+						new Date( data.scheduledDate ).getTime() / 1000
+					);
+				}
+
 				await updateScheduleMutation.mutateAsync( {
 					flowId,
-					schedulingConfig: {
-						interval: data.selectedInterval,
-					},
+					schedulingConfig,
 				} );
 
 				if ( onSuccess ) {
@@ -108,7 +133,19 @@ export default function FlowScheduleModal( {
 					) }
 				/>
 
-				{ formState.data.selectedInterval === 'manual' && (
+				{ formState.data.selectedInterval === 'one_time' && (
+				<div className="datamachine-modal-spacing--mb-20">
+					<DateTimePicker
+						currentDate={ formState.data.scheduledDate }
+						onChange={ ( date ) =>
+							formState.updateField( 'scheduledDate', date )
+						}
+						is12Hour={ true }
+					/>
+				</div>
+			) }
+
+			{ formState.data.selectedInterval === 'manual' && (
 					<div className="datamachine-modal-info-box datamachine-modal-info-box--highlight">
 						<p>
 							<strong>
@@ -122,22 +159,40 @@ export default function FlowScheduleModal( {
 					</div>
 				) }
 
-				{ formState.data.selectedInterval !== 'manual' && (
-					<div className="datamachine-modal-info-box datamachine-modal-info-box--note">
-						<p>
-							<strong>
-								{ __(
-									'Automatic Scheduling:',
-									'data-machine'
-								) }
-							</strong>{ ' ' }
+			{ formState.data.selectedInterval === 'one_time' && (
+				<div className="datamachine-modal-info-box datamachine-modal-info-box--note">
+					<p>
+						<strong>
 							{ __(
-								'Flow will run automatically based on the selected interval. You can still trigger it manually anytime.',
+								'One-Time Execution:',
 								'data-machine'
 							) }
-						</p>
-					</div>
-				) }
+						</strong>{ ' ' }
+						{ __(
+							'Flow will run once at the selected date and time, then revert to manual mode.',
+							'data-machine'
+						) }
+					</p>
+				</div>
+			) }
+
+			{ formState.data.selectedInterval !== 'manual' &&
+				formState.data.selectedInterval !== 'one_time' && (
+				<div className="datamachine-modal-info-box datamachine-modal-info-box--note">
+					<p>
+						<strong>
+							{ __(
+								'Automatic Scheduling:',
+								'data-machine'
+							) }
+						</strong>{ ' ' }
+						{ __(
+							'Flow will run automatically based on the selected interval. You can still trigger it manually anytime.',
+							'data-machine'
+						) }
+					</p>
+				</div>
+			) }
 
 				<div className="datamachine-modal-actions">
 					<Button

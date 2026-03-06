@@ -92,7 +92,10 @@ class FlowsCommand extends BaseCommand {
 	 * : JSON object with step configurations keyed by step_type (create subcommand).
 	 *
 	 * [--scheduling=<interval>]
-	 * : Scheduling interval (manual, hourly, daily, etc.) or cron expression (e.g. "0 9 * * 1-5").
+	 * : Scheduling interval (manual, hourly, daily, one_time, etc.) or cron expression (e.g. "0 9 * * 1-5").
+	 *
+	 * [--scheduled-at=<datetime>]
+	 * : ISO-8601 datetime for one-time scheduling (e.g. "2026-03-20T15:00:00Z"). Implies --scheduling=one_time.
 	 *
 	 * [--set-prompt=<text>]
 	 * : Update the prompt for a handler step (requires handler step to exist).
@@ -498,9 +501,10 @@ class FlowsCommand extends BaseCommand {
 	private function createFlow( array $assoc_args ): void {
 		$pipeline_id = isset( $assoc_args['pipeline_id'] ) ? (int) $assoc_args['pipeline_id'] : null;
 		$flow_name   = $assoc_args['name'] ?? null;
-		$scheduling  = $assoc_args['scheduling'] ?? 'manual';
-		$dry_run     = isset( $assoc_args['dry-run'] );
-		$format      = $assoc_args['format'] ?? 'table';
+		$scheduling   = $assoc_args['scheduling'] ?? 'manual';
+		$scheduled_at = $assoc_args['scheduled-at'] ?? null;
+		$dry_run      = isset( $assoc_args['dry-run'] );
+		$format       = $assoc_args['format'] ?? 'table';
 
 		if ( ! $pipeline_id ) {
 			WP_CLI::error( 'Required: --pipeline_id=<id>' );
@@ -526,7 +530,7 @@ class FlowsCommand extends BaseCommand {
 			$step_configs = $decoded ?? array();
 		}
 
-		$scheduling_config = self::build_scheduling_config( $scheduling );
+		$scheduling_config = self::build_scheduling_config( $scheduling, $scheduled_at );
 
 		$input = array(
 			'pipeline_id'       => $pipeline_id,
@@ -681,6 +685,7 @@ class FlowsCommand extends BaseCommand {
 
 		$name           = $assoc_args['name'] ?? null;
 		$scheduling     = $assoc_args['scheduling'] ?? null;
+		$scheduled_at   = $assoc_args['scheduled-at'] ?? null;
 		$prompt         = isset( $assoc_args['set-prompt'] )
 			? wp_kses_post( wp_unslash( $assoc_args['set-prompt'] ) )
 			: null;
@@ -689,13 +694,18 @@ class FlowsCommand extends BaseCommand {
 			: null;
 		$step           = $assoc_args['step'] ?? null;
 
+		// --scheduled-at implies --scheduling=one_time.
+		if ( $scheduled_at && null === $scheduling ) {
+			$scheduling = 'one_time';
+		}
+
 		if ( null !== $handler_config && ! is_array( $handler_config ) ) {
 			WP_CLI::error( 'Invalid JSON in --handler-config. Must be a JSON object.' );
 			return;
 		}
 
 		if ( null === $name && null === $scheduling && null === $prompt && null === $handler_config ) {
-			WP_CLI::error( 'Must provide --name, --scheduling, --set-prompt, or --handler-config to update' );
+			WP_CLI::error( 'Must provide --name, --scheduling, --set-prompt, --scheduled-at, or --handler-config to update' );
 			return;
 		}
 
@@ -719,7 +729,7 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		if ( null !== $scheduling ) {
-			$input['scheduling_config'] = self::build_scheduling_config( $scheduling );
+			$input['scheduling_config'] = self::build_scheduling_config( $scheduling, $scheduled_at );
 		}
 
 		if ( null !== $name || null !== $scheduling ) {
@@ -1229,11 +1239,29 @@ class FlowsCommand extends BaseCommand {
 	 * Detects cron expressions and routes them correctly:
 	 * - Cron expression (e.g. "0 * /3 * * *") → interval=cron + cron_expression
 	 * - Interval key (e.g. "daily") → interval=<key>
+	 * - One-time (scheduling=one_time) → interval=one_time + timestamp (requires $scheduled_at)
 	 *
-	 * @param string $scheduling Value from --scheduling CLI flag.
+	 * @param string      $scheduling   Value from --scheduling CLI flag.
+	 * @param string|null $scheduled_at ISO-8601 datetime for one-time scheduling.
 	 * @return array Scheduling config array.
 	 */
-	private static function build_scheduling_config( string $scheduling ): array {
+	private static function build_scheduling_config( string $scheduling, ?string $scheduled_at = null ): array {
+		// If --scheduled-at is provided, treat as one_time regardless of --scheduling value.
+		if ( $scheduled_at ) {
+			$timestamp = strtotime( $scheduled_at );
+			if ( ! $timestamp ) {
+				\WP_CLI::error( "Invalid --scheduled-at value: {$scheduled_at}. Use ISO-8601 format (e.g. 2026-03-20T15:00:00Z)." );
+			}
+			return array(
+				'interval'  => 'one_time',
+				'timestamp' => $timestamp,
+			);
+		}
+
+		if ( 'one_time' === $scheduling ) {
+			\WP_CLI::error( 'one_time scheduling requires --scheduled-at=<datetime> (ISO-8601 format).' );
+		}
+
 		if ( \DataMachine\Api\Flows\FlowScheduling::looks_like_cron_expression( $scheduling ) ) {
 			return array(
 				'interval'        => 'cron',

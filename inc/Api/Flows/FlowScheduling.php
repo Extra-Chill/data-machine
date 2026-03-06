@@ -197,6 +197,11 @@ class FlowScheduling {
 				);
 			}
 
+			// Clear any existing schedule first (prevents duplicate actions on re-schedule).
+			if ( function_exists( 'as_unschedule_all_actions' ) ) {
+				as_unschedule_all_actions( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
+			}
+
 			as_schedule_single_action(
 				$timestamp,
 				'datamachine_run_flow_now',

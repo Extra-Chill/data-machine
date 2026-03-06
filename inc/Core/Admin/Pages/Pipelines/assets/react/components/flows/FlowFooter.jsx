@@ -67,16 +67,23 @@ const formatStatus = ( status ) => {
 export default function FlowFooter( { flowId, scheduling } ) {
 	const {
 		interval,
+		scheduled_time,
 		last_run_display,
 		last_run_status,
 		is_running,
 		next_run_display,
 	} = scheduling || {};
 
-	const scheduleDisplay =
-		interval && interval !== 'manual'
-			? interval
-			: __( 'Manual', 'data-machine' );
+	let scheduleDisplay;
+	if ( interval === 'one_time' && scheduled_time ) {
+		scheduleDisplay =
+			__( 'One Time: ', 'data-machine' ) +
+			new Date( scheduled_time ).toLocaleString();
+	} else if ( interval && interval !== 'manual' ) {
+		scheduleDisplay = interval;
+	} else {
+		scheduleDisplay = __( 'Manual', 'data-machine' );
+	}
 
 	// When running, show "Running" status; otherwise format the job status
 	const displayStatus = is_running

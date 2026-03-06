@@ -554,6 +554,11 @@ class SettingsAbilities {
 			'label' => __( 'Manual only', 'data-machine' ),
 		);
 
+		$frontend_intervals[] = array(
+			'value' => 'one_time',
+			'label' => __( 'One Time (scheduled)', 'data-machine' ),
+		);
+
 		foreach ( $intervals as $key => $interval_data ) {
 			$frontend_intervals[] = array(
 				'value' => $key,
