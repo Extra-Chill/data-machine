@@ -50,6 +50,35 @@ datamachine_register_importexport_filters();
 function datamachine_register_utility_filters() {
 
 	add_filter(
+		'chubes_ai_provider_api_keys',
+		function ( $keys ) {
+			if ( is_array( $keys ) ) {
+				return $keys;
+			}
+
+			if ( ! is_string( $keys ) || '' === $keys ) {
+				return $keys;
+			}
+
+			$normalized = maybe_unserialize( $keys );
+
+			if ( ! is_array( $normalized ) ) {
+				return $keys;
+			}
+
+			$option_name = 'chubes_ai_http_shared_api_keys';
+			$current_raw = get_site_option( $option_name, null );
+
+			if ( $current_raw === $keys ) {
+				update_site_option( $option_name, $normalized );
+			}
+
+			return $normalized;
+		},
+		20
+	);
+
+	add_filter(
 		'datamachine_generate_flow_step_id',
 		function ( $existing_id, $pipeline_step_id, $flow_id ) {
 			if ( empty( $pipeline_step_id ) || empty( $flow_id ) ) {
