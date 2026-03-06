@@ -30,7 +30,7 @@ export const logsKeys = {
 };
 
 /**
- * Fetch available agent types
+ * Fetch available contexts
  */
 export const useAgentTypes = () =>
 	useQuery( {
@@ -39,16 +39,16 @@ export const useAgentTypes = () =>
 			const response = await logsApi.fetchAgentTypes();
 			if ( ! response.success ) {
 				throw new Error(
-					response.message || 'Failed to fetch agent types'
+					response.message || 'Failed to fetch contexts'
 				);
 			}
 			return response.data;
 		},
-		staleTime: 10 * 60 * 1000, // Agent types rarely change
+		staleTime: 10 * 60 * 1000, // Context types rarely change
 	} );
 
 /**
- * Fetch log metadata for a specific agent type
+ * Fetch log metadata for a specific context
  * @param agentType
  */
 export const useLogMetadata = ( agentType ) =>
@@ -67,7 +67,7 @@ export const useLogMetadata = ( agentType ) =>
 	} );
 
 /**
- * Fetch log content for a specific agent type
+ * Fetch log content for a specific context
  * @param agentType
  * @param mode
  * @param limit
@@ -92,7 +92,7 @@ export const useLogContent = ( agentType, mode = 'recent', limit = 200 ) =>
 	} );
 
 /**
- * Clear logs for a specific agent type
+ * Clear logs for a specific context
  */
 export const useClearLogs = () => {
 	const queryClient = useQueryClient();
@@ -206,7 +206,7 @@ export const useClearAllLogs = () => {
 };
 
 /**
- * Update log level for a specific agent type
+ * Update log level for a specific context
  */
 export const useUpdateLogLevel = () => {
 	const queryClient = useQueryClient();

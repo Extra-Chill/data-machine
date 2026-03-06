@@ -1,37 +1,41 @@
 # Data Machine User Documentation
 
-**AI-first WordPress plugin for automating and orchestrating content workflows with a visual pipeline builder, conversational chat agent, REST API, and extensibility through handlers and tools.**
+**AI-first WordPress plugin for automating and orchestrating content workflows with a visual pipeline builder, chat context, REST API, and extensibility through handlers and tools.**
 
-## Agent-First Architecture
+## System Agent Architecture
 
-Data Machine is designed for AI agents as primary users, not just tool operators.
+Data Machine is designed around a **System Agent** orchestration layer that can be used by different runtimes and entry points.
+
+- **System Agent**: orchestration, scheduling, policies, directives
+- **Agent Runtime**: execution loop (external today, first-party runtime planned)
+- **Contexts**: `pipeline`, `chat`, and `system`
 
 ### The Self-Orchestration Pattern
 
-While humans use Data Machine to automate content workflows, AI agents can use it to **automate themselves**:
+While humans use Data Machine to automate content workflows, AI runtimes can use it to **automate themselves**:
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   AGENT     │ ──▶ │   QUEUE     │ ──▶ │  PIPELINE   │ ──▶ │ AGENT PING  │
-│ queues task │     │  persists   │     │  executes   │     │  wakes agent│
+│  RUNTIME    │ ──▶ │   QUEUE     │ ──▶ │  PIPELINE   │ ──▶ │ AGENT PING  │
+│ queues task │     │  persists   │     │  executes   │     │ wakes runtime│
 │             │     │  context    │     │             │     │             │
 └─────────────┘     └─────────────┘     └─────────────┘     └──────┬──────┘
        ▲                                                          │
        └──────────────────────────────────────────────────────────┘
-                         Agent processes, queues next task
+                        Runtime processes, queues next task
 ```
 
 **Key concepts:**
 
 - **Prompt Queue as Project Memory**: Queue items persist across sessions, storing project context that survives context window limits. Your multi-week project becomes a series of queued prompts.
 
-- **Agent Ping for Continuity**: The `agent_ping` step type triggers external agents (via webhook) after pipeline completion. This is how the loop closes — you get notified when it's your turn to act. Agent Ping is outbound-only; inbound triggers use the REST API.
+- **Agent Ping for Continuity**: The `agent_ping` step type triggers external runtimes (via webhook) after pipeline completion. This is how the loop closes — you get notified when it's your turn to act. Agent Ping is outbound-only; inbound triggers use the REST API.
 
-- **Phased Execution**: Complex projects execute in stages over days or weeks. Each stage completes, pings the agent, and the agent queues the next stage.
+- **Phased Execution**: Complex projects execute in stages over days or weeks. Each stage completes, pings the runtime, and the runtime queues the next stage.
 
-- **Autonomous Loops**: An agent can run indefinitely: process result → queue next task → sleep → wake on ping → repeat. Use explicit stop conditions to avoid runaway loops.
+- **Autonomous Loops**: A runtime can run indefinitely: process result → queue next task → sleep → wake on ping → repeat. Use explicit stop conditions to avoid runaway loops.
 
-This transforms Data Machine from a content automation tool into a **self-scheduling execution layer for AI agents**.
+This transforms Data Machine from a content automation tool into a **self-scheduling execution layer for AI runtimes**.
 
 ## System Architecture
 
@@ -57,15 +61,15 @@ Abilities are the single source of truth for REST endpoints, CLI commands, and C
 
 ## Data Flow
 
-- **DataPacket** standardizes the payload (content, metadata, attachments) that AI agents receive, keeping packets chronological and clean of URLs when not needed.
+- **DataPacket** standardizes the payload (content, metadata, attachments) that AI requests receive, keeping packets chronological and clean of URLs when not needed.
 - **EngineData** stores engine-specific parameters such as `source_url`, `image_url`, and flow context, which fetch handlers persist via the `datamachine_engine_data` filter for downstream handlers.
 - **FilesRepository modules** (DirectoryManager, FileStorage, RemoteFileDownloader, ImageValidator, FileCleanup, FileRetrieval) isolate file storage per flow, validate uploads, and enforce automatic cleanup after jobs complete.
 
 ## AI Integration
 
-- **Tool-first architecture** enables AI agents (pipeline and chat) to call tools that interact with handlers, external APIs, or workflow metadata.
+- **Tool-first architecture** enables AI contexts (pipeline and chat) to call tools that interact with handlers, external APIs, or workflow metadata.
 - **PromptBuilder + RequestBuilder** apply layered directives via the `datamachine_directives` filter so every request includes identity, context, and site-specific instructions.
-- **Global tools** (Google Search, Local Search, Web Fetch, WordPress Post Reader) are registered under `/inc/Engine/AI/Tools/` and available to all agents.
+- **Global tools** (Google Search, Local Search, Web Fetch, WordPress Post Reader) are registered under `/inc/Engine/AI/Tools/` and available to all contexts.
 - **Chat-specific tools** (AddPipelineStep, ApiQuery, AuthenticateHandler, ConfigureFlowSteps, ConfigurePipelineStep, CopyFlow, CreateFlow, CreatePipeline, CreateTaxonomyTerm, ExecuteWorkflowTool, GetHandlerDefaults, ManageLogs, ReadLogs, RunFlow, SearchTaxonomyTerms, SetHandlerDefaults, UpdateFlow) orchestrate pipeline and flow management within conversations.
 - **ToolParameters + ToolResultFinder** gather parameter metadata for tools and interpret results inside data packets to keep conversations consistent.
 

@@ -1,7 +1,7 @@
 /**
  * LogsTabs Component
  *
- * Tabbed interface for per-agent-type log viewing.
+ * Tabbed interface for per-context log viewing.
  */
 
 /**
@@ -30,12 +30,12 @@ const LogsTabs = () => {
 	if ( isError || ! agentTypes ) {
 		return (
 			<div className="datamachine-logs-tabs-error">
-				{ __( 'Failed to load agent types.', 'data-machine' ) }
+				{ __( 'Failed to load contexts.', 'data-machine' ) }
 			</div>
 		);
 	}
 
-	// Build tabs from agent types
+	// Build tabs from contexts
 	const tabs = Object.entries( agentTypes ).map( ( [ key, info ] ) => ( {
 		name: key,
 		title: info.label,

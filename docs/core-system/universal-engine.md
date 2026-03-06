@@ -2,13 +2,16 @@
 
 **Since**: 0.2.0
 
-The Universal Engine is a shared AI infrastructure layer that provides consistent request building, tool execution, and conversation management for both Pipeline AI and Chat API agents in Data Machine.
+> **Terminology note:** `agent_type` in Data Machine primarily identifies execution
+> contexts (`pipeline`, `chat`, `system`) for the same System Agent orchestration layer.
+
+The Universal Engine is a shared AI infrastructure layer that provides consistent request building, tool execution, and conversation management for both Pipeline and Chat contexts in Data Machine.
 
 ## Overview
 
-Prior to v0.2.0, Pipeline AI and Chat agents maintained separate implementations of conversation loops, tool execution, and request building. This architectural duplication created maintenance overhead and potential behavioral drift between agent types.
+Prior to v0.2.0, Pipeline and Chat contexts maintained separate implementations of conversation loops, tool execution, and request building. This architectural duplication created maintenance overhead and potential behavioral drift between contexts.
 
-The Universal Engine consolidates this shared functionality into a centralized layer at `/inc/Engine/AI/`, enabling both agent types to leverage identical AI infrastructure while maintaining their specialized behaviors through filter-based integration. Since v0.2.2, it includes ToolManager for centralized tool management and BaseTool for unified tool inheritance.
+The Universal Engine consolidates this shared functionality into a centralized layer at `/inc/Engine/AI/`, enabling both contexts to leverage identical AI infrastructure while maintaining their specialized behaviors through filter-based integration. Since v0.2.2, it includes ToolManager for centralized tool management and BaseTool for unified tool inheritance.
 
 ## Architecture
 
@@ -45,7 +48,7 @@ The Universal Engine consolidates this shared functionality into a centralized l
         │                               │
         ▼                               ▼
 ┌──────────────────┐          ┌──────────────────┐
-│  Pipeline Agent  │          │    Chat Agent    │
+│ Pipeline Context │          │  Chat Context    │
 │  (/inc/Core/     │          │   (/inc/Api/     │
 │   Steps/AI/)     │          │    Chat/)        │
 │                  │          │                  │
@@ -82,7 +85,7 @@ Centralized tool management system that replaces distributed tool discovery and 
 
 #### Key Responsibilities
 
-- **Tool Discovery**: Discovers all tools available for a given agent type and execution context
+- **Tool Discovery**: Discovers all tools available for a given context and execution scope
 - **Enablement Validation**: Three-layer validation (global settings → step configuration → runtime validation)
 - **Configuration Management**: Checks if tools have required configuration (API keys, OAuth credentials)
 - **Opt-Out Pattern**: WordPress-native tools without configuration requirements
@@ -151,7 +154,7 @@ Unified abstract base class for all AI tools (global and chat) that provides sta
 #### Key Features
 
 - **Unified Inheritance**: Single base class for all tools (global and chat)
-- **Agent-Agnostic Registration**: `registerTool()` method handles all agent types
+- **Context-Agnostic Registration**: `registerTool()` method handles all contexts
 - **Dynamic Filter Creation**: Automatically creates `datamachine_{agentType}_tools` filters
 - **Error Handling**: Standardized error response building with classification
 - **Configuration Integration**: Automatic configuration handler registration
@@ -194,9 +197,9 @@ class GoogleSearch extends BaseTool {
 #### Benefits
 
 - **Unified Architecture**: One base class for all tools eliminates trait usage
-- **Agent Agnostic**: Dynamic filter creation per agent type
+- **Context Agnostic**: Dynamic filter creation per context
 - **Error Handling**: Standardized error classification (not_found, validation, permission, system)
-- **Extensibility**: Easy to add new agent types without updating tools
+- **Extensibility**: Easy to add new contexts without updating tools
 - **Maintainability**: Centralized registration and error handling logic
 
 See [BaseTool documentation](base-tool.md) for complete details.

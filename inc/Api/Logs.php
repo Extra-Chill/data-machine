@@ -3,15 +3,15 @@
  * Logs REST API Endpoints
  *
  * Provides REST API access to log file operations and configuration.
- * Supports per-agent-type log files and levels.
+ * Supports per-context log files and levels.
  * Requires WordPress manage_options capability for all operations.
  *
  * Endpoints:
- * - GET /datamachine/v1/logs/agent-types - Get available agent types
- * - GET /datamachine/v1/logs - Get log metadata (requires agent_type param)
- * - GET /datamachine/v1/logs/content - Get log file content (requires agent_type param)
- * - DELETE /datamachine/v1/logs - Clear log file (requires agent_type param, or agent_type=all)
- * - PUT /datamachine/v1/logs/level - Update log level (requires agent_type param)
+ * - GET /datamachine/v1/logs/agent-types - Get available contexts
+ * - GET /datamachine/v1/logs - Get log metadata (requires agent_type context param)
+ * - GET /datamachine/v1/logs/content - Get log file content (requires agent_type context param)
+ * - DELETE /datamachine/v1/logs - Clear log file (requires agent_type context param, or agent_type=all)
+ * - PUT /datamachine/v1/logs/level - Update log level (requires agent_type context param)
  *
  * @package DataMachine\Api
  */
@@ -39,7 +39,7 @@ class Logs {
 	 */
 	public static function register_routes() {
 
-		// GET /datamachine/v1/logs/agent-types - Get available agent types
+		// GET /datamachine/v1/logs/agent-types - Get available contexts
 		register_rest_route(
 			'datamachine/v1',
 			'/logs/agent-types',
@@ -62,7 +62,7 @@ class Logs {
 					'agent_type' => array(
 						'required'          => true,
 						'type'              => 'string',
-						'description'       => __( 'Agent type to clear logs for, or "all" to clear all logs', 'data-machine' ),
+						'description'       => __( 'Context to clear logs for, or "all" to clear all logs', 'data-machine' ),
 						'validate_callback' => function ( $param ) {
 							return 'all' === $param || AgentType::isValid( $param );
 						},
@@ -83,7 +83,7 @@ class Logs {
 					'agent_type'  => array(
 						'required'          => true,
 						'type'              => 'string',
-						'description'       => __( 'Agent type to get logs for', 'data-machine' ),
+						'description'       => __( 'Context to get logs for', 'data-machine' ),
 						'validate_callback' => function ( $param ) {
 							return AgentType::isValid( $param );
 						},
@@ -144,7 +144,7 @@ class Logs {
 					'agent_type' => array(
 						'required'          => false,
 						'type'              => 'string',
-						'description'       => __( 'Agent type to get metadata for. If omitted, returns metadata for all agent types.', 'data-machine' ),
+						'description'       => __( 'Context to get metadata for. If omitted, returns metadata for all contexts.', 'data-machine' ),
 						'validate_callback' => function ( $param ) {
 							return empty( $param ) || AgentType::isValid( $param );
 						},
@@ -165,7 +165,7 @@ class Logs {
 					'agent_type' => array(
 						'required'          => true,
 						'type'              => 'string',
-						'description'       => __( 'Agent type to set log level for', 'data-machine' ),
+						'description'       => __( 'Context to set log level for', 'data-machine' ),
 						'validate_callback' => function ( $param ) {
 							return AgentType::isValid( $param );
 						},
@@ -200,7 +200,7 @@ class Logs {
 	}
 
 	/**
-	 * Handle get agent types request
+	 * Handle get contexts request
 	 *
 	 * GET /datamachine/v1/logs/agent-types
 	 */
@@ -245,7 +245,7 @@ class Logs {
 					'success' => true,
 					'data'    => null,
 					'message' => sprintf(
-						/* translators: %s: agent type label (e.g., Pipeline, Chat, System) */
+						/* translators: %s: context label (e.g., Pipeline Context, Chat Context, System Context) */
 						__( '%s logs cleared successfully.', 'data-machine' ),
 						$agent_label
 					),

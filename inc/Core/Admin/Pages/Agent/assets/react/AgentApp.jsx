@@ -41,7 +41,7 @@ const AgentApp = () => {
 	return (
 		<div className="datamachine-agent-app">
 			<div className="datamachine-agent-header">
-				<h1 className="datamachine-agent-title">Agent</h1>
+				<h1 className="datamachine-agent-title">System Agent</h1>
 			</div>
 			<TabPanel
 				className="datamachine-tabs"

@@ -1,9 +1,9 @@
 <?php
 /**
- * Agent Type Registry
+ * Agent Context Registry
  *
- * Defines agent type constants and provides a filterable registry
- * for discovering available agent types throughout the system.
+ * Defines context constants and provides a filterable registry
+ * for discovering available execution contexts throughout the system.
  *
  * @package DataMachine\Engine\AI
  * @since 0.7.2
@@ -23,7 +23,7 @@ final class AgentType {
 	public const ALL      = 'all';
 
 	/**
-	 * Get all registered agent types.
+	 * Get all registered execution contexts.
 	 *
 	 * @return array<string, array{label: string, description: string}>
 	 */
@@ -32,25 +32,25 @@ final class AgentType {
 			'datamachine_agent_types',
 			array(
 				self::PIPELINE => array(
-					'label'       => __( 'Pipeline', 'data-machine' ),
-					'description' => __( 'Automated workflow execution', 'data-machine' ),
+					'label'       => __( 'Pipeline Context', 'data-machine' ),
+					'description' => __( 'Automated workflow execution context', 'data-machine' ),
 				),
 				self::CHAT     => array(
-					'label'       => __( 'Chat', 'data-machine' ),
-					'description' => __( 'Conversational interface', 'data-machine' ),
+					'label'       => __( 'Chat Context', 'data-machine' ),
+					'description' => __( 'Conversational execution context', 'data-machine' ),
 				),
 				self::SYSTEM   => array(
-					'label'       => __( 'System', 'data-machine' ),
-					'description' => __( 'Infrastructure and system operations', 'data-machine' ),
+					'label'       => __( 'System Context', 'data-machine' ),
+					'description' => __( 'Infrastructure and background operations context', 'data-machine' ),
 				),
 			)
 		);
 	}
 
 	/**
-	 * Check if a given agent type is valid.
+	 * Check if a given context is valid.
 	 *
-	 * @param string $type Agent type to validate
+	 * @param string $type Context to validate
 	 * @return bool
 	 */
 	public static function isValid( string $type ): bool {
@@ -58,9 +58,9 @@ final class AgentType {
 	}
 
 	/**
-	 * Get the log filename for a given agent type.
+	 * Get the log filename for a given context.
 	 *
-	 * @param string $type Agent type
+	 * @param string $type Context identifier
 	 * @return string Filename without path (e.g., 'datamachine-pipeline.log')
 	 */
 	public static function getLogFilename( string $type ): string {

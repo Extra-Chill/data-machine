@@ -129,26 +129,26 @@ class PluginSettings {
 	}
 
 	/**
-	 * Get the list of known agent types.
+	 * Get the list of known execution contexts.
 	 *
-	 * @return array Array of agent type definitions with id, label, and description.
+	 * @return array Array of context definitions with id, label, and description.
 	 */
 	public static function getAgentTypes(): array {
 		return array(
 			array(
 				'id'          => 'chat',
-				'label'       => __( 'Chat Agent', 'data-machine' ),
-				'description' => __( 'Interactive chat conversations. Benefits from capable models for complex reasoning.', 'data-machine' ),
+				'label'       => __( 'Chat Context', 'data-machine' ),
+				'description' => __( 'Interactive chat execution context. Benefits from capable models for complex reasoning.', 'data-machine' ),
 			),
 			array(
 				'id'          => 'pipeline',
-				'label'       => __( 'Pipeline Agent', 'data-machine' ),
-				'description' => __( 'Structured workflow execution. Operates within defined steps — efficient models work well.', 'data-machine' ),
+				'label'       => __( 'Pipeline Context', 'data-machine' ),
+				'description' => __( 'Structured workflow execution context. Operates within defined steps — efficient models work well.', 'data-machine' ),
 			),
 			array(
 				'id'          => 'system',
-				'label'       => __( 'System Agent', 'data-machine' ),
-				'description' => __( 'Background tasks like alt text generation and issue creation.', 'data-machine' ),
+				'label'       => __( 'System Context', 'data-machine' ),
+				'description' => __( 'Background task execution context (for example, alt text generation and issue creation).', 'data-machine' ),
 			),
 		);
 	}

@@ -212,13 +212,13 @@ const AgentSettings = () => {
 															</Button>
 														) }
 
-														{ isConfigured ? (
-															<label className="datamachine-tool-enabled-toggle">
-																<input
-																	type="checkbox"
-																	checked={
-																		isEnabled
-																	}
+								{ isConfigured ? (
+									<label className="datamachine-tool-enabled-toggle">
+										<input
+													type="checkbox"
+													checked={
+														isEnabled
+													}
 																	onChange={ (
 																		e
 																	) =>
@@ -229,11 +229,10 @@ const AgentSettings = () => {
 																				.checked
 																		)
 																	}
-																/>
-																Enable for
-																agents
-															</label>
-														) : (
+													/>
+										Enable in contexts
+									</label>
+								) : (
 															<label className="datamachine-tool-enabled-toggle datamachine-tool-disabled">
 																<input
 																	type="checkbox"
@@ -275,7 +274,7 @@ const AgentSettings = () => {
 							</div>
 							<p className="description">
 								Fallback provider and model used when no
-								agent-specific override is set below.
+								context-specific override is set below.
 							</p>
 						</td>
 					</tr>
@@ -283,20 +282,20 @@ const AgentSettings = () => {
 					{ ( providersData?.agent_types || [] ).length > 0 && (
 						<tr>
 							<th scope="row">
-								Per-Agent Model Overrides
+								Per-Context Model Overrides
 							</th>
 							<td>
-								<p
-									className="description"
-									style={ {
-										marginTop: 0,
-										marginBottom: '16px',
-									} }
-								>
-									Assign different providers and models to
-									each agent type. Leave empty to use the
-									global default above.
-								</p>
+							<p
+								className="description"
+								style={ {
+									marginTop: 0,
+									marginBottom: '16px',
+								} }
+							>
+								Assign different providers and models to
+								each context. Leave empty to use the
+								global default above.
+							</p>
 								{ ( providersData?.agent_types || [] ).map(
 									( agentType ) => {
 										const agentConfig =
@@ -387,7 +386,7 @@ const AgentSettings = () => {
 					) }
 
 					<tr>
-						<th scope="row">Provide site context to agents</th>
+						<th scope="row">Provide site context to AI requests</th>
 						<td>
 							<fieldset>
 								<label htmlFor="site_context_enabled">
@@ -407,13 +406,13 @@ const AgentSettings = () => {
 									Include WordPress site context in AI
 									requests
 								</label>
-								<p className="description">
-									Automatically provides site information
-									(post types, taxonomies, user stats) to AI
-									agents for better context awareness.
-								</p>
-							</fieldset>
-						</td>
+							<p className="description">
+								Automatically provides site information
+								(post types, taxonomies, user stats) to AI
+								requests for better context awareness.
+							</p>
+						</fieldset>
+					</td>
 					</tr>
 
 					<tr>
@@ -447,23 +446,23 @@ const AgentSettings = () => {
 								className="small-text"
 							/>
 							<p className="description">
-								Maximum number of conversation turns allowed for
-								AI agents (1-50). Applies to both pipeline and
-								chat conversations.
+								Maximum number of conversation turns allowed per
+								AI request (1-50). Applies to both pipeline and
+								chat contexts.
 							</p>
 						</td>
 					</tr>
 
 					<tr>
-						<th scope="row">Chat Agent Webhook</th>
+						<th scope="row">Chat Context Webhook</th>
 						<td>
 							<div className="datamachine-ping-secret-section">
-								<p className="description" style={ { marginTop: 0 } }>
-									Allow external services to send messages to
-									your chat agent via webhook. Use this
-									endpoint URL and secret token in Agent Ping
-									step configurations.
-								</p>
+							<p className="description" style={ { marginTop: 0 } }>
+								Allow external services to send messages to
+								your chat context via webhook. Use this
+								endpoint URL and secret token in Agent Ping
+								step configurations.
+							</p>
 
 								<div style={ { marginBottom: '12px' } }>
 									<strong>Endpoint URL:</strong>{ ' ' }

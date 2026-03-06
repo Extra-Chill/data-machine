@@ -1,7 +1,7 @@
 /**
  * SystemTasksTab Component
  *
- * Displays registered system agent tasks in a table with
+ * Displays registered system tasks in a table with
  * enable/disable toggles, last run info, and result status.
  *
  * @since 0.32.0
