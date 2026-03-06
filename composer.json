@@ -30,7 +30,7 @@
 		}
 	},
 	"scripts": {
-		"test": "homeboy module run wordpress --component data-machine",
+		"test": "homeboy test data-machine",
 		"lint": "phpcs",
 		"lint-fix": "phpcbf"
 	},
