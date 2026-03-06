@@ -29,7 +29,7 @@ jobs:
       - name: Install project dependencies
         run: composer install --no-interaction --prefer-dist
 
-      - uses: Extra-Chill/homeboy-action@feat/shared-pr-comment-aggregation
+      - uses: Extra-Chill/homeboy-action@v1
         with:
           version: 'latest'
           extension: wordpress
@@ -74,7 +74,7 @@ jobs:
       - name: Install project dependencies
         run: composer install --no-interaction --prefer-dist
 
-      - uses: Extra-Chill/homeboy-action@feat/shared-pr-comment-aggregation
+      - uses: Extra-Chill/homeboy-action@v1
         with:
           version: 'latest'
           extension: wordpress
@@ -105,7 +105,7 @@ jobs:
       - name: Install project dependencies
         run: composer install --no-interaction --prefer-dist
 
-      - uses: Extra-Chill/homeboy-action@feat/shared-pr-comment-aggregation
+      - uses: Extra-Chill/homeboy-action@v1
         with:
           version: 'latest'
           extension: wordpress
