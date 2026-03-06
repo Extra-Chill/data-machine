@@ -11,6 +11,7 @@
 
 namespace DataMachine\Api;
 
+use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\SettingsAbilities;
 use WP_REST_Response;
 use WP_REST_Server;
@@ -196,7 +197,7 @@ class Settings {
 	 * Check if user has permission to manage settings
 	 */
 	public static function check_permission( $request ) {
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! PermissionHelper::can( 'manage_settings' ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
 				__( 'You do not have permission to manage settings.', 'data-machine' ),

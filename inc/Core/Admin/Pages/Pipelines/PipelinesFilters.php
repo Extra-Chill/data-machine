@@ -31,7 +31,7 @@ function datamachine_register_pipelines_admin_page_filters() {
 			$pages['pipelines'] = array(
 				'page_title' => __( 'Pipelines', 'data-machine' ),
 				'menu_title' => __( 'Pipelines', 'data-machine' ),
-				'capability' => 'manage_options',
+				'capability' => 'datamachine_manage_flows',
 				'position'   => 10,
 				'templates'  => __DIR__ . '/templates/',
 				'assets'     => array(

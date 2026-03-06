@@ -37,7 +37,7 @@ function datamachine_register_jobs_admin_page_filters() {
 			$pages['jobs'] = array(
 				'page_title' => __( 'Jobs', 'data-machine' ),
 				'menu_title' => __( 'Jobs', 'data-machine' ),
-				'capability' => 'manage_options',
+				'capability' => 'datamachine_manage_flows',
 				'position'   => 20,
 				'templates'  => __DIR__ . '/templates/',
 				'assets'     => array(

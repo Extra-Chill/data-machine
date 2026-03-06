@@ -11,6 +11,7 @@
 
 namespace DataMachine\Api\Pipelines;
 
+use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\PipelineStepAbilities;
 use DataMachine\Abilities\StepTypeAbilities;
 use WP_REST_Server;
@@ -212,7 +213,7 @@ class PipelineSteps {
 	 * Check if user has permission to manage pipeline steps
 	 */
 	public static function check_permission( $request ) {
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! PermissionHelper::can( 'manage_flows' ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
 				__( 'You do not have permission to manage pipeline steps.', 'data-machine' ),
@@ -423,7 +424,7 @@ class PipelineSteps {
 	 */
 	public static function handle_update_step_config( $request ) {
 		// Validate permissions
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! PermissionHelper::can( 'manage_flows' ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
 				__( 'Insufficient permissions.', 'data-machine' ),

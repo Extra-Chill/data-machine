@@ -10,6 +10,7 @@
 
 namespace DataMachine\Api\Flows;
 
+use DataMachine\Abilities\PermissionHelper;
 use WP_REST_Server;
 
 if ( ! defined( 'WPINC' ) ) {
@@ -245,7 +246,7 @@ class Flows {
 	 * Check if user has permission to manage flows
 	 */
 	public static function check_permission( $request ) {
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! PermissionHelper::can( 'manage_flows' ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
 				__( 'You do not have permission to create flows.', 'data-machine' ),

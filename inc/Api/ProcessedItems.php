@@ -14,6 +14,7 @@
 
 namespace DataMachine\Api;
 
+use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\ProcessedItemsAbilities;
 
 if ( ! defined( 'WPINC' ) ) {
@@ -72,7 +73,7 @@ class ProcessedItems {
 	 * Check if user has permission to manage processed items
 	 */
 	public static function check_permission( $request ) {
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! PermissionHelper::can( 'manage_flows' ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
 				__( 'You do not have permission to manage processed items.', 'data-machine' ),

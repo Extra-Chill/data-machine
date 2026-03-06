@@ -16,6 +16,7 @@
 
 namespace DataMachine\Api;
 
+use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\JobAbilities;
 
 if ( ! defined( 'WPINC' ) ) {
@@ -149,7 +150,7 @@ class Jobs {
 	 * Check if user has permission to manage jobs
 	 */
 	public static function check_permission( $request ) {
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! PermissionHelper::can( 'manage_flows' ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
 				__( 'You do not have permission to manage jobs.', 'data-machine' ),
