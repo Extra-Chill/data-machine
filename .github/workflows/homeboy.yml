@@ -12,8 +12,40 @@ permissions:
   pull-requests: write
 
 jobs:
-  build:
-    name: Homeboy Build (Lint & Test)
+  lint:
+    if: github.event_name == 'pull_request'
+    name: Homeboy Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, intl, pdo_sqlite, mysqli
+          tools: composer:v2
+          coverage: none
+
+      - name: Install project dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - uses: Extra-Chill/homeboy-action@feat/shared-pr-comment-aggregation
+        with:
+          version: 'latest'
+          extension: wordpress
+          commands: lint
+          lint-changed-only: true
+          component: data-machine
+          settings: '{"database_type": "mysql"}'
+          php-version: '8.2'
+          node-version: '20'
+
+  test:
+    if: github.event_name == 'pull_request'
+    name: Homeboy Test
     runs-on: ubuntu-latest
     services:
       mysql:
@@ -45,20 +77,19 @@ jobs:
       - name: Install project dependencies
         run: composer install --no-interaction --prefer-dist
 
-      - uses: Extra-Chill/homeboy-action@v1
+      - uses: Extra-Chill/homeboy-action@feat/shared-pr-comment-aggregation
         with:
           version: 'latest'
           extension: wordpress
-          commands: lint,test
-          lint-changed-only: true
+          commands: test
           test-scope: 'changed'
-          auto-issue: ${{ github.event_name != 'pull_request' }}
           component: data-machine
           settings: '{"database_type": "mysql"}'
           php-version: '8.2'
           node-version: '20'
 
   audit:
+    if: github.event_name == 'pull_request'
     name: Homeboy Audit
     runs-on: ubuntu-latest
     steps:
@@ -77,13 +108,57 @@ jobs:
       - name: Install project dependencies
         run: composer install --no-interaction --prefer-dist
 
-      - uses: Extra-Chill/homeboy-action@v1
+      - uses: Extra-Chill/homeboy-action@feat/shared-pr-comment-aggregation
         with:
           version: 'latest'
           extension: wordpress
           commands: audit
           lint-changed-only: true
-          auto-issue: ${{ github.event_name != 'pull_request' }}
           component: data-machine
           php-version: '8.2'
           node-version: '20'
+
+  release-check:
+    if: github.event_name != 'pull_request'
+    name: Homeboy Release Check
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ''
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: homeboy_wptests
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, intl, pdo_sqlite, mysqli
+          tools: composer:v2
+          coverage: none
+
+      - name: Install project dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - uses: Extra-Chill/homeboy-action@feat/shared-pr-comment-aggregation
+        with:
+          version: 'latest'
+          extension: wordpress
+          commands: lint,test,audit
+          component: data-machine
+          settings: '{"database_type": "mysql"}'
+          php-version: '8.2'
+          node-version: '20'
+          auto-issue: true
