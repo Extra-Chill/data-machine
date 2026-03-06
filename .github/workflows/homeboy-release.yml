@@ -8,11 +8,40 @@ on:
 permissions:
   contents: read
   issues: write
-  pull-requests: write
 
 jobs:
-  release-check:
-    name: Homeboy Release Check
+  lint:
+    name: Homeboy Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, intl, pdo_sqlite, mysqli
+          tools: composer:v2
+          coverage: none
+
+      - name: Install project dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - uses: Extra-Chill/homeboy-action@v1
+        with:
+          version: 'latest'
+          extension: wordpress
+          commands: lint
+          component: data-machine
+          settings: '{"database_type": "mysql"}'
+          php-version: '8.2'
+          node-version: '20'
+          auto-issue: true
+
+  test:
+    name: Homeboy Test
     runs-on: ubuntu-latest
     services:
       mysql:
@@ -48,9 +77,38 @@ jobs:
         with:
           version: 'latest'
           extension: wordpress
-          commands: lint,test,audit
+          commands: test
           component: data-machine
           settings: '{"database_type": "mysql"}'
+          php-version: '8.2'
+          node-version: '20'
+          auto-issue: true
+
+  audit:
+    name: Homeboy Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, intl, pdo_sqlite, mysqli
+          tools: composer:v2
+          coverage: none
+
+      - name: Install project dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - uses: Extra-Chill/homeboy-action@v1
+        with:
+          version: 'latest'
+          extension: wordpress
+          commands: audit
+          component: data-machine
           php-version: '8.2'
           node-version: '20'
           auto-issue: true
