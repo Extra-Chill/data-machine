@@ -22,6 +22,21 @@ namespace DataMachine\Abilities;
 class PermissionHelper {
 
 	/**
+	 * Data Machine capability map.
+	 *
+	 * @since 0.37.0
+	 * @var array<string, string>
+	 */
+	private const CAPABILITY_MAP = array(
+		'manage_agents'   => 'datamachine_manage_agents',
+		'manage_flows'    => 'datamachine_manage_flows',
+		'manage_settings' => 'datamachine_manage_settings',
+		'chat'            => 'datamachine_chat',
+		'use_tools'       => 'datamachine_use_tools',
+		'view_logs'       => 'datamachine_view_logs',
+	);
+
+	/**
 	 * Whether the current execution context has been pre-authenticated.
 	 *
 	 * When true, can_manage() returns true without checking WordPress
@@ -37,6 +52,14 @@ class PermissionHelper {
 	private static bool $authenticated_context = false;
 
 	/**
+	 * Acting user ID for pre-authenticated contexts.
+	 *
+	 * @since 0.37.0
+	 * @var int
+	 */
+	private static int $authenticated_user_id = 0;
+
+	/**
 	 * Check if current context has admin-level permissions.
 	 *
 	 * Allows execution in:
@@ -50,36 +73,59 @@ class PermissionHelper {
 	 * @return bool True if permission granted.
 	 */
 	public static function can_manage(): bool {
+		return self::can( 'manage_flows' ) || self::can( 'manage_settings' ) || self::can( 'manage_agents' );
+	}
+
+	/**
+	 * Check whether current context can perform an action.
+	 *
+	 * @since 0.37.0
+	 *
+	 * @param string $action Action key (manage_agents, manage_flows, manage_settings, chat, use_tools, view_logs).
+	 * @return bool
+	 */
+	public static function can( string $action ): bool {
 		// WP-CLI always allowed (filterable for testing).
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
-			/**
-			 * Filters whether WP-CLI context bypasses permission checks.
-			 *
-			 * In production, WP-CLI always has full access. During testing,
-			 * this filter allows permission denial tests to run by returning false.
-			 *
-			 * @since 0.31.0
-			 *
-			 * @param bool $bypass True to bypass permission check (default: true).
-			 */
 			if ( apply_filters( 'datamachine_cli_bypass_permissions', true ) ) {
 				return true;
 			}
 		}
 
 		// Action Scheduler background processing context.
-		// This is needed because async requests may not have user cookies.
 		if ( doing_action( 'action_scheduler_run_queue' ) ) {
 			return true;
 		}
 
-		// Pre-authenticated context (e.g., webhook trigger with valid Bearer token).
+		// Pre-authenticated context: evaluate acting user if provided.
 		if ( self::$authenticated_context ) {
+			if ( self::$authenticated_user_id > 0 ) {
+				return self::user_can( self::$authenticated_user_id, $action );
+			}
+
 			return true;
 		}
 
-		// Standard capability check for logged-in users.
-		return current_user_can( 'manage_options' );
+		if ( ! is_user_logged_in() ) {
+			return false;
+		}
+
+		return self::user_can( get_current_user_id(), $action );
+	}
+
+	/**
+	 * Get current acting user ID for permission-bounded execution.
+	 *
+	 * @since 0.37.0
+	 *
+	 * @return int
+	 */
+	public static function acting_user_id(): int {
+		if ( self::$authenticated_context && self::$authenticated_user_id > 0 ) {
+			return self::$authenticated_user_id;
+		}
+
+		return get_current_user_id();
 	}
 
 	/**
@@ -103,13 +149,15 @@ class PermissionHelper {
 	 *
 	 * @throws \Throwable Re-throws any exception from the callback after resetting context.
 	 */
-	public static function run_as_authenticated( callable $callback ) {
+	public static function run_as_authenticated( callable $callback, int $acting_user_id = 0 ) {
 		self::$authenticated_context = true;
+		self::$authenticated_user_id = absint( $acting_user_id );
 
 		try {
 			$result = $callback();
 		} finally {
 			self::$authenticated_context = false;
+			self::$authenticated_user_id = 0;
 		}
 
 		return $result;
@@ -127,5 +175,33 @@ class PermissionHelper {
 	 */
 	public static function is_authenticated_context(): bool {
 		return self::$authenticated_context;
+	}
+
+	/**
+	 * Check capability for a specific user against Data Machine action.
+	 *
+	 * @since 0.37.0
+	 *
+	 * @param int    $user_id User ID.
+	 * @param string $action  Action key.
+	 * @return bool
+	 */
+	private static function user_can( int $user_id, string $action ): bool {
+		$mapped_capability = self::CAPABILITY_MAP[ $action ] ?? null;
+
+		if ( empty( $mapped_capability ) ) {
+			return false;
+		}
+
+		if ( user_can( $user_id, $mapped_capability ) ) {
+			return true;
+		}
+
+		// Backward compatibility for legacy installs/roles.
+		if ( user_can( $user_id, 'manage_options' ) ) {
+			return true;
+		}
+
+		return false;
 	}
 }

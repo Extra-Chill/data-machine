@@ -20,7 +20,7 @@ function datamachine_register_settings_admin_page_filters() {
 			$pages['settings'] = array(
 				'page_title' => __( 'Data Machine Settings', 'data-machine' ),
 				'menu_title' => __( 'Settings', 'data-machine' ),
-				'capability' => 'manage_options',
+				'capability' => 'datamachine_manage_settings',
 				'position'   => 100,
 				'templates'  => DATAMACHINE_PATH . 'inc/Core/Admin/Settings/templates/',
 				'assets'     => array(

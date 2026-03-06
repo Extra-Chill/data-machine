@@ -11,6 +11,7 @@
 
 namespace DataMachine\Api\Flows;
 
+use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\FlowStepAbilities;
 use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Abilities\StepTypeAbilities;
@@ -216,7 +217,7 @@ class FlowSteps {
 	 * Check if user has permission to manage flow steps
 	 */
 	public static function check_permission( $request ) {
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! PermissionHelper::can( 'manage_flows' ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
 				__( 'You do not have permission to manage flow steps.', 'data-machine' ),

@@ -36,7 +36,7 @@ function datamachine_register_logs_admin_page_filters() {
 			$pages['logs'] = array(
 				'page_title' => __( 'Logs', 'data-machine' ),
 				'menu_title' => __( 'Logs', 'data-machine' ),
-				'capability' => 'manage_options',
+				'capability' => 'datamachine_view_logs',
 				'position'   => 30,
 				'templates'  => __DIR__ . '/templates/',
 				'assets'     => array(

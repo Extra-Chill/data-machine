@@ -10,6 +10,7 @@
 
 namespace DataMachine\Api\System;
 
+use DataMachine\Abilities\PermissionHelper;
 use WP_REST_Server;
 use WP_REST_Request;
 use WP_Error;
@@ -45,7 +46,7 @@ class System {
 				'methods'             => WP_REST_Server::READABLE,
 				'callback'            => array( self::class, 'get_status' ),
 				'permission_callback' => function () {
-					return current_user_can('manage_options');
+					return PermissionHelper::can( 'manage_settings' );
 				},
 			)
 		);
@@ -58,7 +59,7 @@ class System {
 				'methods'             => WP_REST_Server::READABLE,
 				'callback'            => array( self::class, 'get_tasks' ),
 				'permission_callback' => function () {
-					return current_user_can( 'manage_options' );
+					return PermissionHelper::can( 'manage_settings' );
 				},
 			)
 		);

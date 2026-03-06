@@ -17,6 +17,7 @@
 
 namespace DataMachine\Api;
 
+use DataMachine\Abilities\PermissionHelper;
 use WP_REST_Server;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -80,7 +81,7 @@ class InternalLinks {
 	 * @return bool|\WP_Error
 	 */
 	public static function check_permission( $request ) {
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! PermissionHelper::can( 'manage_flows' ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
 				__( 'You do not have permission to access internal link tools.', 'data-machine' ),

@@ -9,6 +9,8 @@
 
 namespace DataMachine\Api;
 
+use DataMachine\Abilities\PermissionHelper;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -33,7 +35,7 @@ class Execute {
 				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_execute' ),
 				'permission_callback' => function () {
-					return current_user_can( 'manage_options' );
+					return PermissionHelper::can( 'manage_flows' );
 				},
 				'args'                => array(
 					'flow_id'      => array(

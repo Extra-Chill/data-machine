@@ -11,6 +11,7 @@
 
 namespace DataMachine\Api;
 
+use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\AuthAbilities;
 use WP_REST_Server;
 
@@ -96,7 +97,7 @@ class Auth {
 	 * Check if user has permission to manage authentication
 	 */
 	public static function check_permission( $request ) {
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! PermissionHelper::can( 'manage_settings' ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
 				__( 'You do not have permission to manage authentication.', 'data-machine' ),

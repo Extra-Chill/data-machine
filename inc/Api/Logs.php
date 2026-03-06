@@ -18,6 +18,7 @@
 
 namespace DataMachine\Api;
 
+use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\LogAbilities;
 use DataMachine\Engine\AI\AgentType;
 
@@ -188,7 +189,7 @@ class Logs {
 	 * Check if user has permission to manage logs
 	 */
 	public static function check_permission( $request ) {
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! PermissionHelper::can( 'view_logs' ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
 				__( 'You do not have permission to manage logs.', 'data-machine' ),

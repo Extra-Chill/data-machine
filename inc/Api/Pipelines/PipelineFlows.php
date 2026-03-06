@@ -10,6 +10,8 @@
 
 namespace DataMachine\Api\Pipelines;
 
+use DataMachine\Abilities\PermissionHelper;
+
 if ( ! defined( 'WPINC' ) ) {
 	die;
 }
@@ -50,7 +52,7 @@ class PipelineFlows {
 	 * Check if user has permission to access pipeline flows
 	 */
 	public static function check_permission( $request ) {
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! PermissionHelper::can( 'manage_flows' ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
 				__( 'You do not have permission to access pipeline flows.', 'data-machine' ),

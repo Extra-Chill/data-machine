@@ -10,6 +10,7 @@
 
 namespace DataMachine\Api\Flows;
 
+use DataMachine\Abilities\PermissionHelper;
 use WP_REST_Server;
 
 if ( ! defined( 'WPINC' ) ) {
@@ -212,7 +213,7 @@ class FlowQueue {
 	 * @return bool|\WP_Error
 	 */
 	public static function check_permission( $request ) {
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! PermissionHelper::can( 'manage_flows' ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
 				__( 'You do not have permission to manage flow queues.', 'data-machine' ),
