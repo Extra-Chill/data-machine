@@ -555,8 +555,9 @@ class GoogleSearchConsoleAbilities {
 				'method'  => 'PUT',
 				'timeout' => 30,
 				'headers' => array(
-					'Authorization' => 'Bearer ' . $access_token,
-					'Content-Type'  => 'application/json',
+					'Authorization'  => 'Bearer ' . $access_token,
+					'Content-Type'   => 'application/json',
+					'Content-Length' => '0',
 				),
 				'body'    => '',
 			)
@@ -606,7 +607,7 @@ class GoogleSearchConsoleAbilities {
 		$now    = time();
 		$claims = self::base64url_encode( wp_json_encode( array(
 			'iss'   => $service_account['client_email'],
-			'scope' => 'https://www.googleapis.com/auth/webmasters.readonly',
+			'scope' => 'https://www.googleapis.com/auth/webmasters',
 			'aud'   => 'https://oauth2.googleapis.com/token',
 			'iat'   => $now,
 			'exp'   => $now + 3600,
