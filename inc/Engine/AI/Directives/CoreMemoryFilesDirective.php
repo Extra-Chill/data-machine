@@ -39,66 +39,111 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 	 * @return array Directive outputs.
 	 */
 	public static function get_outputs( string $provider_name, array $tools, ?string $step_id = null, array $payload = array() ): array {
-		$filenames = MemoryFileRegistry::get_filenames();
-
-		if ( empty( $filenames ) ) {
-			return array();
-		}
-
 		// Self-heal: ensure agent files exist before reading.
 		DirectoryManager::ensure_agent_files();
 
 		$directory_manager = new DirectoryManager();
-		$user_id           = (int) ( $payload['user_id'] ?? 0 );
-		$agent_dir         = $directory_manager->get_agent_directory( $user_id );
+		$user_id           = $directory_manager->get_effective_user_id( (int) ( $payload['user_id'] ?? 0 ) );
+		$shared_dir        = $directory_manager->get_shared_directory();
+		$agent_dir         = $directory_manager->get_agent_identity_directory_for_user( $user_id );
+		$user_dir          = $directory_manager->get_user_directory( $user_id );
 		$outputs           = array();
 
-		foreach ( $filenames as $filename ) {
-			$filepath = "{$agent_dir}/{$filename}";
+		$core_layer_files = array(
+			// Site layer.
+			array( 'directory' => $shared_dir, 'filename' => 'SITE.md' ),
+			array( 'directory' => $shared_dir, 'filename' => 'RULES.md' ),
+
+			// Agent layer.
+			array( 'directory' => $agent_dir, 'filename' => 'SOUL.md' ),
+			array( 'directory' => $agent_dir, 'filename' => 'MEMORY.md' ),
+
+			// User layer.
+			array( 'directory' => $user_dir, 'filename' => 'USER.md' ),
+			array( 'directory' => $user_dir, 'filename' => 'MEMORY.md' ),
+		);
+
+		foreach ( $core_layer_files as $entry ) {
+			$filepath = trailingslashit( $entry['directory'] ) . $entry['filename'];
 
 			if ( ! file_exists( $filepath ) ) {
-				do_action(
-					'datamachine_log',
-					'warning',
-					sprintf( 'Core memory file %s missing from agent directory after scaffolding check.', $filename ),
-					array( 'filename' => $filename )
-				);
 				continue;
 			}
 
-			$file_size = filesize( $filepath );
-
-			if ( $file_size > AgentMemory::MAX_FILE_SIZE ) {
-				do_action(
-					'datamachine_log',
-					'warning',
-					sprintf(
-						'Memory file %s exceeds recommended size for context injection: %s (threshold %s)',
-						$filename,
-						size_format( $file_size ),
-						size_format( AgentMemory::MAX_FILE_SIZE )
-					),
-					array(
-						'filename' => $filename,
-						'size'     => $file_size,
-						'max'      => AgentMemory::MAX_FILE_SIZE,
-					)
-				);
-			}
-
-			$content = file_get_contents( $filepath );
-
-			if ( empty( trim( $content ) ) ) {
+			$content = self::get_file_content_for_output( $filepath, $entry['filename'] );
+			if ( null === $content ) {
 				continue;
 			}
 
 			$outputs[] = array(
 				'type'    => 'system_text',
-				'content' => trim( $content ),
+				'content' => $content,
+			);
+		}
+
+		// Backward-compatible extension point: custom registered memory files
+		// are loaded from the agent identity layer.
+		$custom_files = array_diff(
+			MemoryFileRegistry::get_filenames(),
+			array( 'SOUL.md', 'USER.md', 'MEMORY.md' )
+		);
+
+		foreach ( $custom_files as $filename ) {
+			$filepath = trailingslashit( $agent_dir ) . $filename;
+
+			if ( ! file_exists( $filepath ) ) {
+				continue;
+			}
+
+			$content = self::get_file_content_for_output( $filepath, $filename );
+			if ( null === $content ) {
+				continue;
+			}
+
+			$outputs[] = array(
+				'type'    => 'system_text',
+				'content' => $content,
 			);
 		}
 
 		return $outputs;
+	}
+
+	/**
+	 * Read a memory file and return normalized directive content.
+	 *
+	 * @param string $filepath Full file path.
+	 * @param string $filename Filename for logs.
+	 * @return string|null
+	 */
+	private static function get_file_content_for_output( string $filepath, string $filename ): ?string {
+		$file_size = filesize( $filepath );
+
+		if ( $file_size > AgentMemory::MAX_FILE_SIZE ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				sprintf(
+					'Memory file %s exceeds recommended size for context injection: %s (threshold %s)',
+					$filename,
+					size_format( $file_size ),
+					size_format( AgentMemory::MAX_FILE_SIZE )
+				),
+				array(
+					'filename' => $filename,
+					'size'     => $file_size,
+					'max'      => AgentMemory::MAX_FILE_SIZE,
+				)
+			);
+		}
+
+		$content = file_get_contents( $filepath );
+
+		if ( empty( trim( $content ) ) ) {
+			return null;
+		}
+
+		return trim( $content );
 	}
 }
 

@@ -16,6 +16,7 @@ namespace DataMachine\Engine\AI\Tools\Global;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Engine\AI\Tools\BaseTool;
+use DataMachine\Core\FilesRepository\DirectoryManager;
 
 class AgentDailyMemory extends BaseTool {
 
@@ -36,7 +37,7 @@ class AgentDailyMemory extends BaseTool {
 		return match ( $action ) {
 			'read'   => $this->handleRead( $parameters ),
 			'write'  => $this->handleWrite( $parameters ),
-			'list'   => $this->handleList(),
+			'list'   => $this->handleList( $parameters ),
 			'search' => $this->handleSearch( $parameters ),
 			default  => $this->buildErrorResponse(
 				'Invalid action "' . $action . '". Use "read", "write", "list", or "search".',
@@ -53,6 +54,7 @@ class AgentDailyMemory extends BaseTool {
 	 */
 	private function handleRead( array $parameters ): array {
 		$ability = wp_get_ability( 'datamachine/daily-memory-read' );
+		$user_id = $this->resolve_user_id( $parameters );
 
 		if ( ! $ability ) {
 			return $this->buildErrorResponse(
@@ -63,6 +65,7 @@ class AgentDailyMemory extends BaseTool {
 
 		$result = $ability->execute(
 			array(
+				'user_id' => $user_id,
 				'date' => $parameters['date'] ?? gmdate( 'Y-m-d' ),
 			)
 		);
@@ -93,6 +96,7 @@ class AgentDailyMemory extends BaseTool {
 	 */
 	private function handleWrite( array $parameters ): array {
 		$content = $parameters['content'] ?? '';
+		$user_id = $this->resolve_user_id( $parameters );
 
 		if ( '' === $content ) {
 			return $this->buildErrorResponse(
@@ -112,6 +116,7 @@ class AgentDailyMemory extends BaseTool {
 
 		$result = $ability->execute(
 			array(
+				'user_id' => $user_id,
 				'content' => $content,
 				'date'    => $parameters['date'] ?? gmdate( 'Y-m-d' ),
 				'mode'    => $parameters['mode'] ?? 'append',
@@ -141,8 +146,9 @@ class AgentDailyMemory extends BaseTool {
 	 *
 	 * @return array Response.
 	 */
-	private function handleList(): array {
+	private function handleList( array $parameters = array() ): array {
 		$ability = wp_get_ability( 'datamachine/daily-memory-list' );
+		$user_id = $this->resolve_user_id( $parameters );
 
 		if ( ! $ability ) {
 			return $this->buildErrorResponse(
@@ -151,7 +157,7 @@ class AgentDailyMemory extends BaseTool {
 			);
 		}
 
-		$result = $ability->execute( array() );
+		$result = $ability->execute( array( 'user_id' => $user_id ) );
 
 		if ( is_wp_error( $result ) ) {
 			return $this->buildErrorResponse( $result->get_error_message(), 'agent_daily_memory' );
@@ -179,6 +185,7 @@ class AgentDailyMemory extends BaseTool {
 	 */
 	private function handleSearch( array $parameters ): array {
 		$query = $parameters['query'] ?? '';
+		$user_id = $this->resolve_user_id( $parameters );
 
 		if ( '' === $query ) {
 			return $this->buildErrorResponse(
@@ -198,6 +205,7 @@ class AgentDailyMemory extends BaseTool {
 
 		$result = $ability->execute(
 			array(
+				'user_id' => $user_id,
 				'query' => $query,
 				'from'  => $parameters['from'] ?? null,
 				'to'    => $parameters['to'] ?? null,
@@ -234,6 +242,11 @@ class AgentDailyMemory extends BaseTool {
 			'description'     => 'Manage daily memory journal entries (daily/YYYY/MM/DD.md). Use for session activity, temporal events, and work logs. Use "write" to record today\'s session notes (defaults to append mode). Use "read" to review a specific day. Use "search" to find past entries by keyword. Use "list" to see which days have entries. Daily memory captures WHAT HAPPENED — persistent knowledge belongs in agent_memory (MEMORY.md) instead.',
 			'requires_config' => false,
 			'parameters'      => array(
+				'user_id' => array(
+					'type'        => 'integer',
+					'required'    => false,
+					'description' => 'Optional WordPress user ID for layered memory context. Defaults to current user context.',
+				),
 				'action'  => array(
 					'type'        => 'string',
 					'required'    => true,
@@ -271,6 +284,28 @@ class AgentDailyMemory extends BaseTool {
 				),
 			),
 		);
+	}
+
+	/**
+	 * Resolve scoped user ID from tool parameters.
+	 *
+	 * @param array $parameters Tool parameters.
+	 * @return int
+	 */
+	private function resolve_user_id( array $parameters ): int {
+		$directory_manager = new DirectoryManager();
+		$raw_user_id       = (int) ( $parameters['user_id'] ?? 0 );
+
+		if ( $raw_user_id > 0 ) {
+			return $directory_manager->get_effective_user_id( $raw_user_id );
+		}
+
+		$current_user_id = get_current_user_id();
+		if ( $current_user_id > 0 ) {
+			return $directory_manager->get_effective_user_id( $current_user_id );
+		}
+
+		return $directory_manager->get_effective_user_id( 0 );
 	}
 
 	/**
