@@ -32,13 +32,22 @@ class DailyMemory {
 	private string $base_path;
 
 	/**
+	 * Effective scoped user ID.
+	 *
+	 * @since 0.37.0
+	 * @var int
+	 */
+	private int $user_id;
+
+	/**
 	 * @since 0.37.0 Added $user_id parameter for multi-agent partitioning.
 	 *
 	 * @param int $user_id WordPress user ID. 0 = legacy shared directory.
 	 */
 	public function __construct( int $user_id = 0 ) {
 		$this->directory_manager = new DirectoryManager();
-		$agent_dir               = $this->directory_manager->get_agent_directory( $user_id );
+		$this->user_id           = $this->directory_manager->get_effective_user_id( $user_id );
+		$agent_dir               = $this->directory_manager->get_agent_identity_directory_for_user( $this->user_id );
 		$this->base_path         = "{$agent_dir}/daily";
 	}
 

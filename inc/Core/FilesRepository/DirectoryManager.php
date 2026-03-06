@@ -193,6 +193,67 @@ class DirectoryManager {
 	}
 
 	/**
+	 * Resolve effective user ID for layered memory context.
+	 *
+	 * @since 0.37.0
+	 * @param int $user_id Optional user ID from request/payload.
+	 * @return int Effective user ID.
+	 */
+	public function get_effective_user_id( int $user_id = 0 ): int {
+		$user_id = absint( $user_id );
+
+		if ( $user_id > 0 ) {
+			return $user_id;
+		}
+
+		return self::get_default_agent_user_id();
+	}
+
+	/**
+	 * Resolve the first-class agent slug for a user.
+	 *
+	 * Resolution order:
+	 * 1) datamachine_agents.owner_id mapping
+	 * 2) WordPress user_login
+	 * 3) deterministic user-{id} fallback
+	 *
+	 * @since 0.37.0
+	 * @param int $user_id WordPress user ID.
+	 * @return string Agent slug.
+	 */
+	public function get_agent_slug_for_user( int $user_id ): string {
+		$user_id = $this->get_effective_user_id( $user_id );
+
+		if ( class_exists( '\\DataMachine\\Core\\Database\\Agents\\Agents' ) ) {
+			$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+			$agent       = $agents_repo->get_by_owner_id( $user_id );
+
+			if ( ! empty( $agent['agent_slug'] ) ) {
+				return sanitize_title( (string) $agent['agent_slug'] );
+			}
+		}
+
+		$user = get_user_by( 'id', $user_id );
+		if ( $user && ! empty( $user->user_login ) ) {
+			return sanitize_title( (string) $user->user_login );
+		}
+
+		return 'user-' . $user_id;
+	}
+
+	/**
+	 * Get first-class agent identity directory for a user context.
+	 *
+	 * @since 0.37.0
+	 * @param int $user_id WordPress user ID (0 resolves to default user).
+	 * @return string Full path to agent identity directory.
+	 */
+	public function get_agent_identity_directory_for_user( int $user_id = 0 ): string {
+		$agent_slug = $this->get_agent_slug_for_user( $user_id );
+		return $this->get_agent_identity_directory( $agent_slug );
+	}
+
+	/**
 	 * Get the default agent user ID.
 	 *
 	 * For single-agent installs, returns the configured default or the first admin user.

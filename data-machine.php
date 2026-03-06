@@ -315,7 +315,81 @@ add_action( 'update_option_datamachine_settings', array( \DataMachine\Core\Plugi
 register_activation_hook( __FILE__, 'datamachine_activate_plugin' );
 register_deactivation_hook( __FILE__, 'datamachine_deactivate_plugin' );
 
+/**
+ * Register Data Machine custom capabilities on roles.
+ *
+ * @since 0.37.0
+ * @return void
+ */
+function datamachine_register_capabilities(): void {
+	$capabilities = array(
+		'datamachine_manage_agents',
+		'datamachine_manage_flows',
+		'datamachine_manage_settings',
+		'datamachine_chat',
+		'datamachine_use_tools',
+		'datamachine_view_logs',
+	);
+
+	$administrator = get_role( 'administrator' );
+	if ( $administrator ) {
+		foreach ( $capabilities as $capability ) {
+			$administrator->add_cap( $capability );
+		}
+	}
+
+	$editor = get_role( 'editor' );
+	if ( $editor ) {
+		$editor->add_cap( 'datamachine_chat' );
+		$editor->add_cap( 'datamachine_use_tools' );
+		$editor->add_cap( 'datamachine_view_logs' );
+	}
+
+	$author = get_role( 'author' );
+	if ( $author ) {
+		$author->add_cap( 'datamachine_chat' );
+		$author->add_cap( 'datamachine_use_tools' );
+	}
+
+	$subscriber = get_role( 'subscriber' );
+	if ( $subscriber ) {
+		$subscriber->add_cap( 'datamachine_chat' );
+	}
+}
+
+/**
+ * Remove Data Machine custom capabilities from roles.
+ *
+ * @since 0.37.0
+ * @return void
+ */
+function datamachine_remove_capabilities(): void {
+	$capabilities = array(
+		'datamachine_manage_agents',
+		'datamachine_manage_flows',
+		'datamachine_manage_settings',
+		'datamachine_chat',
+		'datamachine_use_tools',
+		'datamachine_view_logs',
+	);
+
+	$roles = array( 'administrator', 'editor', 'author', 'subscriber' );
+
+	foreach ( $roles as $role_name ) {
+		$role = get_role( $role_name );
+		if ( ! $role ) {
+			continue;
+		}
+
+		foreach ( $capabilities as $capability ) {
+			$role->remove_cap( $capability );
+		}
+	}
+}
+
 function datamachine_deactivate_plugin() {
+	datamachine_remove_capabilities();
+
 	// Unschedule recurring maintenance actions.
 	if ( function_exists( 'as_unschedule_all_actions' ) ) {
 		as_unschedule_all_actions( 'datamachine_cleanup_stale_claims', array(), 'datamachine-maintenance' );
@@ -347,6 +421,8 @@ function datamachine_activate_plugin( $network_wide = false ) {
  * new site creation.
  */
 function datamachine_activate_for_site() {
+	datamachine_register_capabilities();
+
 	// Ensure first-class agents table exists.
 	\DataMachine\Core\Database\Agents\Agents::create_table();
 
@@ -385,6 +461,49 @@ function datamachine_activate_for_site() {
 
 	// Track DB schema version so deploy-time migrations auto-run.
 	update_option( 'datamachine_db_version', DATAMACHINE_VERSION, true );
+}
+
+/**
+ * Resolve or create first-class agent ID for a WordPress user.
+ *
+ * @since 0.37.0
+ *
+ * @param int $user_id WordPress user ID.
+ * @return int Agent ID, or 0 when resolution fails.
+ */
+function datamachine_resolve_or_create_agent_id( int $user_id ): int {
+	$user_id = absint( $user_id );
+
+	if ( $user_id <= 0 ) {
+		return 0;
+	}
+
+	$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+	$existing    = $agents_repo->get_by_owner_id( $user_id );
+
+	if ( ! empty( $existing['agent_id'] ) ) {
+		return (int) $existing['agent_id'];
+	}
+
+	$user = get_user_by( 'id', $user_id );
+	if ( ! $user ) {
+		return 0;
+	}
+
+	$agent_slug  = sanitize_title( (string) $user->user_login );
+	$agent_name  = (string) $user->display_name;
+	$agent_model = \DataMachine\Core\PluginSettings::getAgentModel( 'chat' );
+
+	return $agents_repo->create_if_missing(
+		$agent_slug,
+		$agent_name,
+		$user_id,
+		array(
+			'model' => array(
+				'default' => $agent_model,
+			),
+		)
+	);
 }
 
 /**

@@ -73,7 +73,7 @@ class MultiAgentScopingTest extends WP_UnitTestCase {
 
 		// Clean up agent-specific directories if created.
 		foreach ( array( $this->agent_a_id, $this->agent_b_id ) as $uid ) {
-			$dir = $dm->get_agent_directory( $uid );
+			$dir = $dm->get_agent_identity_directory_for_user( $uid );
 			if ( is_dir( $dir ) ) {
 				array_map( 'unlink', glob( "{$dir}/*" ) );
 				rmdir( $dir );
@@ -239,7 +239,7 @@ class MultiAgentScopingTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['success'] );
 
 		$dm       = new DirectoryManager();
-		$user_dir = $dm->get_agent_directory( $this->agent_a_id );
+		$user_dir = $dm->get_agent_identity_directory_for_user( $this->agent_a_id );
 		$this->assertDirectoryExists( $user_dir );
 		$this->assertFileExists( $user_dir . '/test-scoped.md' );
 	}
@@ -448,8 +448,8 @@ class MultiAgentScopingTest extends WP_UnitTestCase {
 		$dm = new DirectoryManager();
 
 		$shared_dir  = $dm->get_agent_directory( 0 );
-		$agent_a_dir = $dm->get_agent_directory( $this->agent_a_id );
-		$agent_b_dir = $dm->get_agent_directory( $this->agent_b_id );
+		$agent_a_dir = $dm->get_agent_identity_directory_for_user( $this->agent_a_id );
+		$agent_b_dir = $dm->get_agent_identity_directory_for_user( $this->agent_b_id );
 
 		// All three directories should be different paths.
 		$this->assertNotEquals( $shared_dir, $agent_a_dir );
@@ -469,13 +469,13 @@ class MultiAgentScopingTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Test user-scoped agent directory uses agent-{user_id} path.
+	 * Test user-scoped agent directory uses agent slug path.
 	 */
 	public function test_user_scoped_agent_path(): void {
 		$dm       = new DirectoryManager();
-		$user_dir = $dm->get_agent_directory( $this->agent_a_id );
+		$user_dir = $dm->get_agent_identity_directory_for_user( $this->agent_a_id );
 
-		// Should end with /agent-{user_id}.
-		$this->assertStringEndsWith( '/agent-' . $this->agent_a_id, $user_dir );
+		// Should end with the agent slug derived from user_login.
+		$this->assertStringEndsWith( '/agents/agent-alpha', $user_dir );
 	}
 }

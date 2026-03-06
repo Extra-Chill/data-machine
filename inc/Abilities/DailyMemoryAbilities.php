@@ -46,6 +46,11 @@ class DailyMemoryAbilities {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
+							'user_id' => array(
+								'type'        => 'integer',
+								'description' => 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).',
+								'default'     => 0,
+							),
 							'date' => array(
 								'type'        => 'string',
 								'description' => 'Date in YYYY-MM-DD format. Defaults to today.',
@@ -76,6 +81,11 @@ class DailyMemoryAbilities {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
+							'user_id' => array(
+								'type'        => 'integer',
+								'description' => 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).',
+								'default'     => 0,
+							),
 							'content' => array(
 								'type'        => 'string',
 								'description' => 'Content to write.',
@@ -113,7 +123,13 @@ class DailyMemoryAbilities {
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
-						'properties' => array(),
+						'properties' => array(
+							'user_id' => array(
+								'type'        => 'integer',
+								'description' => 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).',
+								'default'     => 0,
+							),
+						),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
@@ -141,6 +157,11 @@ class DailyMemoryAbilities {
 						'type'       => 'object',
 						'required'   => array( 'query' ),
 						'properties' => array(
+							'user_id' => array(
+								'type'        => 'integer',
+								'description' => 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).',
+								'default'     => 0,
+							),
 							'query' => array(
 								'type'        => 'string',
 								'description' => 'Search term (case-insensitive substring match).',
@@ -190,6 +211,11 @@ class DailyMemoryAbilities {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
+							'user_id' => array(
+								'type'        => 'integer',
+								'description' => 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).',
+								'default'     => 0,
+							),
 							'date' => array(
 								'type'        => 'string',
 								'description' => 'Date in YYYY-MM-DD format. Defaults to today.',
@@ -224,7 +250,8 @@ class DailyMemoryAbilities {
 	 * @return array Result.
 	 */
 	public static function readDaily( array $input ): array {
-		$daily = new DailyMemory();
+		$user_id = (int) ( $input['user_id'] ?? 0 );
+		$daily   = new DailyMemory( $user_id );
 		$date  = $input['date'] ?? gmdate( 'Y-m-d' );
 
 		$parts = DailyMemory::parse_date( $date );
@@ -252,7 +279,8 @@ class DailyMemoryAbilities {
 			);
 		}
 
-		$daily   = new DailyMemory();
+		$user_id = (int) ( $input['user_id'] ?? 0 );
+		$daily   = new DailyMemory( $user_id );
 		$content = $input['content'];
 		$date    = $input['date'] ?? gmdate( 'Y-m-d' );
 		$mode    = $input['mode'] ?? 'append';
@@ -279,7 +307,8 @@ class DailyMemoryAbilities {
 	 * @return array Result.
 	 */
 	public static function listDaily( array $input ): array {
-		$daily = new DailyMemory();
+		$user_id = (int) ( $input['user_id'] ?? 0 );
+		$daily   = new DailyMemory( $user_id );
 		return $daily->list_all();
 	}
 
@@ -290,7 +319,8 @@ class DailyMemoryAbilities {
 	 * @return array Search results.
 	 */
 	public static function searchDaily( array $input ): array {
-		$daily = new DailyMemory();
+		$user_id = (int) ( $input['user_id'] ?? 0 );
+		$daily   = new DailyMemory( $user_id );
 		$query = $input['query'];
 		$from  = $input['from'] ?? null;
 		$to    = $input['to'] ?? null;
@@ -314,7 +344,8 @@ class DailyMemoryAbilities {
 			);
 		}
 
-		$daily = new DailyMemory();
+		$user_id = (int) ( $input['user_id'] ?? 0 );
+		$daily   = new DailyMemory( $user_id );
 		$date  = $input['date'] ?? gmdate( 'Y-m-d' );
 
 		$parts = DailyMemory::parse_date( $date );

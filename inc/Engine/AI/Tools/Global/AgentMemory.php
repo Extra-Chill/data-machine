@@ -10,11 +10,12 @@
  * @since   0.30.0
  */
 
-namespace DataMachine\Engine\AI\Tools\Global;
+	namespace DataMachine\Engine\AI\Tools\Global;
 
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Engine\AI\Tools\BaseTool;
+use DataMachine\Core\FilesRepository\DirectoryManager;
 
 class AgentMemory extends BaseTool {
 
@@ -35,7 +36,7 @@ class AgentMemory extends BaseTool {
 		return match ( $action ) {
 			'get'           => $this->handleGet( $parameters ),
 			'update'        => $this->handleUpdate( $parameters ),
-			'list_sections' => $this->handleListSections(),
+			'list_sections' => $this->handleListSections( $parameters ),
 			default         => $this->buildErrorResponse(
 				'Invalid action "' . $action . '". Use "get", "update", or "list_sections".',
 				'agent_memory'
@@ -51,6 +52,7 @@ class AgentMemory extends BaseTool {
 	 */
 	private function handleGet( array $parameters ): array {
 		$ability = wp_get_ability( 'datamachine/get-agent-memory' );
+		$user_id = $this->resolve_user_id( $parameters );
 
 		if ( ! $ability ) {
 			return $this->buildErrorResponse(
@@ -61,6 +63,7 @@ class AgentMemory extends BaseTool {
 
 		$result = $ability->execute(
 			array(
+				'user_id' => $user_id,
 				'section' => $parameters['section'] ?? '',
 			)
 		);
@@ -93,6 +96,7 @@ class AgentMemory extends BaseTool {
 		$section = $parameters['section'] ?? '';
 		$content = $parameters['content'] ?? '';
 		$mode    = $parameters['mode'] ?? 'set';
+		$user_id = $this->resolve_user_id( $parameters );
 
 		if ( '' === $section ) {
 			return $this->buildErrorResponse(
@@ -119,6 +123,7 @@ class AgentMemory extends BaseTool {
 
 		$result = $ability->execute(
 			array(
+				'user_id' => $user_id,
 				'section' => $section,
 				'content' => $content,
 				'mode'    => $mode,
@@ -148,8 +153,9 @@ class AgentMemory extends BaseTool {
 	 *
 	 * @return array Response.
 	 */
-	private function handleListSections(): array {
+	private function handleListSections( array $parameters = array() ): array {
 		$ability = wp_get_ability( 'datamachine/list-agent-memory-sections' );
+		$user_id = $this->resolve_user_id( $parameters );
 
 		if ( ! $ability ) {
 			return $this->buildErrorResponse(
@@ -158,7 +164,7 @@ class AgentMemory extends BaseTool {
 			);
 		}
 
-		$result = $ability->execute( array() );
+		$result = $ability->execute( array( 'user_id' => $user_id ) );
 
 		if ( is_wp_error( $result ) ) {
 			return $this->buildErrorResponse( $result->get_error_message(), 'agent_memory' );
@@ -190,6 +196,11 @@ class AgentMemory extends BaseTool {
 			'description'     => 'Manage persistent agent memory (MEMORY.md) — long-lived knowledge that survives across sessions. Stored as markdown sections (## headers). Use "list_sections" to see what exists, "get" to read content, and "update" to write. Use "append" mode to add new information without losing existing content. Use "set" mode to replace a section entirely. For session activity and temporal events, use agent_daily_memory instead.',
 			'requires_config' => false,
 			'parameters'      => array(
+				'user_id' => array(
+					'type'        => 'integer',
+					'required'    => false,
+					'description' => 'Optional WordPress user ID for layered memory context. Defaults to current user context.',
+				),
 				'action'  => array(
 					'type'        => 'string',
 					'required'    => true,
@@ -212,6 +223,28 @@ class AgentMemory extends BaseTool {
 				),
 			),
 		);
+	}
+
+	/**
+	 * Resolve scoped user ID from tool parameters.
+	 *
+	 * @param array $parameters Tool parameters.
+	 * @return int
+	 */
+	private function resolve_user_id( array $parameters ): int {
+		$directory_manager = new DirectoryManager();
+		$raw_user_id       = (int) ( $parameters['user_id'] ?? 0 );
+
+		if ( $raw_user_id > 0 ) {
+			return $directory_manager->get_effective_user_id( $raw_user_id );
+		}
+
+		$current_user_id = get_current_user_id();
+		if ( $current_user_id > 0 ) {
+			return $directory_manager->get_effective_user_id( $current_user_id );
+		}
+
+		return $directory_manager->get_effective_user_id( 0 );
 	}
 
 	/**
