@@ -47,6 +47,10 @@ class CreateChatSessionAbility {
 								'type'        => 'integer',
 								'description' => __( 'User ID who owns the session.', 'data-machine' ),
 							),
+							'agent_id'   => array(
+								'type'        => 'integer',
+								'description' => __( 'First-class agent ID for this session.', 'data-machine' ),
+							),
 							'agent_type' => array(
 								'type'        => 'string',
 								'default'     => 'chat',
@@ -100,8 +104,16 @@ class CreateChatSessionAbility {
 		}
 
 		$user_id    = (int) $input['user_id'];
+		$agent_id   = (int) ( $input['agent_id'] ?? 0 );
 		$agent_type = ! empty( $input['agent_type'] ) ? sanitize_text_field( $input['agent_type'] ) : AgentType::CHAT;
 		$source     = ! empty( $input['source'] ) ? sanitize_text_field( $input['source'] ) : null;
+
+		if ( ! $this->can_access_user_sessions( $user_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'session_access_denied',
+			);
+		}
 
 		$session_metadata = array(
 			'started_at'    => current_time( 'mysql', true ),
@@ -117,7 +129,7 @@ class CreateChatSessionAbility {
 			$session_metadata = array_merge( $session_metadata, $input['metadata'] );
 		}
 
-		$session_id = $this->chat_db->create_session( $user_id, $session_metadata, $agent_type );
+		$session_id = $this->chat_db->create_session( $user_id, $agent_id, $session_metadata, $agent_type );
 
 		if ( empty( $session_id ) ) {
 			return array(

@@ -30,7 +30,23 @@ trait ChatSessionHelpers {
 	 * @return bool True if user has permission.
 	 */
 	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
+		return PermissionHelper::can( 'chat' );
+	}
+
+	/**
+	 * Check whether a requester can access a target user's chat sessions.
+	 *
+	 * @param int $target_user_id Target user ID.
+	 * @return bool
+	 */
+	protected function can_access_user_sessions( int $target_user_id ): bool {
+		$acting_user_id = PermissionHelper::acting_user_id();
+
+		if ( $acting_user_id > 0 && $acting_user_id === $target_user_id ) {
+			return true;
+		}
+
+		return PermissionHelper::can( 'manage_agents' );
 	}
 
 	/**
