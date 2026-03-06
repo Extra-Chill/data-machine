@@ -36,7 +36,7 @@ trait HandlerRegistrationTrait {
 	protected static function registerHandler(
 		string $slug,
 		string $type,
-		string $class,
+		string $class_name,
 		string $label,
 		string $description,
 		bool $requiresAuth = false,
@@ -50,11 +50,11 @@ trait HandlerRegistrationTrait {
 
 		// Handler registration
 		add_filter('datamachine_handlers', function($handlers, $step_type = null)
-			use ($slug, $type, $class, $label, $description, $requiresAuth, $provider_key) {
+			use ($slug, $type, $class_name, $label, $description, $requiresAuth, $provider_key) {
 			if ( null === $step_type || $step_type === $type ) {
 				$handlers[ $slug ] = array(
 					'type'              => $type,
-					'class'             => $class,
+					'class'             => $class_name,
 					'label'             => $label,
 					'description'       => $description,
 					'requires_auth'     => $requiresAuth,

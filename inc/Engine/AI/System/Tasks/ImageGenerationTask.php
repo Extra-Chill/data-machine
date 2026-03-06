@@ -716,7 +716,8 @@ class ImageGenerationTask extends SystemTask {
 				);
 
 				// Gaps between consecutive images.
-				for ( $j = 0; $j < count( $image_positions ) - 1; $j++ ) {
+				$image_positions_count = count( $image_positions );
+				for ( $j = 0; $j < $image_positions_count - 1; $j++ ) {
 					$gaps[] = array(
 						'start' => $image_positions[ $j ],
 						'end'   => $image_positions[ $j + 1 ],

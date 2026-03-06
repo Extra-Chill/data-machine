@@ -129,7 +129,7 @@ class SelectionMode {
 	 * @param string   $default           Default value if validation fails (default: 'skip').
 	 * @return mixed Sanitized value.
 	 */
-	public static function sanitize( $value, callable $validate_callback, string $default = 'skip' ) {
+	public static function sanitize( $value, callable $validate_callback, string $default_value = 'skip' ) {
 		// Reserved modes pass through directly.
 		if ( in_array( $value, self::RESERVED_MODES, true ) ) {
 			return $value;
@@ -137,13 +137,13 @@ class SelectionMode {
 
 		// Empty values fall back to default.
 		if ( empty( $value ) ) {
-			return $default;
+			return $default_value;
 		}
 
 		// Validate the pre-selected value via callback.
 		$validated = $validate_callback( $value );
 
-		return null !== $validated ? $validated : $default;
+		return null !== $validated ? $validated : $default_value;
 	}
 
 	/**

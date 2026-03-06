@@ -329,15 +329,13 @@ class FlowQueue {
 			if ( $result['success'] ) {
 				++$added_count;
 				$queue_length = $result['queue_length'];
-			} else {
 				// If first one fails with flow not found, return error
-				if ( 0 === $added_count && false !== strpos( $result['error'] ?? '', 'not found' ) ) {
-					return new \WP_Error(
-						'flow_not_found',
-						$result['error'],
-						array( 'status' => 404 )
-					);
-				}
+			} elseif ( 0 === $added_count && false !== strpos( $result['error'] ?? '', 'not found' ) ) {
+				return new \WP_Error(
+					'flow_not_found',
+					$result['error'],
+					array( 'status' => 404 )
+				);
 			}
 		}
 

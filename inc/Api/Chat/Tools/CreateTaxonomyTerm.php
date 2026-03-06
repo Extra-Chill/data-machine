@@ -190,9 +190,9 @@ class CreateTaxonomyTerm extends BaseTool {
 	 * @param string     $taxonomy Taxonomy slug
 	 * @return int|false Term ID or false if not found
 	 */
-	private function resolveParentTerm( $parent, string $taxonomy ) {
+	private function resolveParentTerm( $parent_item, string $taxonomy ) {
 		// Use centralized resolution for parent term lookup.
-		$result = ResolveTermAbility::resolve( (string) $parent, $taxonomy, false );
+		$result = ResolveTermAbility::resolve( (string) $parent_item, $taxonomy, false );
 
 		return $result['success'] ? $result['term_id'] : false;
 	}

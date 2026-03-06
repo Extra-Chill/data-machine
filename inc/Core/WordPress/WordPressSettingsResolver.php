@@ -28,14 +28,14 @@ class WordPressSettingsResolver {
 	 * @param string $default Default status if not configured (default: 'draft')
 	 * @return string Post status (publish, draft, pending, etc.)
 	 */
-	public static function getPostStatus( array $handler_config, string $default = 'draft' ): string {
+	public static function getPostStatus( array $handler_config, string $default_value = 'draft' ): string {
 		$wp_settings         = PluginSettings::get( 'wordpress_settings', array() );
 		$default_post_status = $wp_settings['default_post_status'] ?? '';
 
 		if ( ! empty( $default_post_status ) ) {
 			return $default_post_status;
 		}
-		return $handler_config['post_status'] ?? $default;
+		return $handler_config['post_status'] ?? $default_value;
 	}
 
 	/**

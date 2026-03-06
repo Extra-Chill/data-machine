@@ -107,8 +107,8 @@ abstract class SettingsHandler {
 	 * @param mixed  $default      Default value.
 	 * @return string Sanitized text value.
 	 */
-	protected static function sanitizeText( array $raw_settings, string $key, $default ): string {
-		$value = $raw_settings[ $key ] ?? $default;
+	protected static function sanitizeText( array $raw_settings, string $key, $default_value ): string {
+		$value = $raw_settings[ $key ] ?? $default_value;
 		return sanitize_text_field( wp_unslash( $value ) );
 	}
 
@@ -120,8 +120,8 @@ abstract class SettingsHandler {
 	 * @param mixed  $default      Default value.
 	 * @return string Sanitized URL value.
 	 */
-	protected static function sanitizeUrl( array $raw_settings, string $key, $default ): string {
-		$value = $raw_settings[ $key ] ?? $default;
+	protected static function sanitizeUrl( array $raw_settings, string $key, $default_value ): string {
+		$value = $raw_settings[ $key ] ?? $default_value;
 		return esc_url_raw( wp_unslash( $value ) );
 	}
 
@@ -163,8 +163,8 @@ abstract class SettingsHandler {
 	 * @param mixed  $default      Default value.
 	 * @return string Sanitized textarea value.
 	 */
-	protected static function sanitizeTextarea( array $raw_settings, string $key, $default ): string {
-		$value = $raw_settings[ $key ] ?? $default;
+	protected static function sanitizeTextarea( array $raw_settings, string $key, $default_value ): string {
+		$value = $raw_settings[ $key ] ?? $default_value;
 		return sanitize_textarea_field( wp_unslash( $value ) );
 	}
 
@@ -176,7 +176,7 @@ abstract class SettingsHandler {
 	 * @return bool Checkbox value as boolean.
 	 */
 	protected static function sanitizeCheckbox( array $raw_settings, string $key ): bool {
-		return isset( $raw_settings[ $key ] ) && '1' == $raw_settings[ $key ];
+		return isset( $raw_settings[ $key ] ) && '1' === $raw_settings[ $key ];
 	}
 
 	/**

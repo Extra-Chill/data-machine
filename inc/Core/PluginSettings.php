@@ -39,9 +39,9 @@ class PluginSettings {
 	 * @param mixed  $default Default value if key not found
 	 * @return mixed
 	 */
-	public static function get( string $key, mixed $default = null ): mixed {
+	public static function get( string $key, mixed $default_value = null ): mixed {
 		$settings = self::all();
-		return $settings[ $key ] ?? $default;
+		return $settings[ $key ] ?? $default_value;
 	}
 
 	/**
@@ -60,7 +60,7 @@ class PluginSettings {
 	 * @param mixed  $default Default value if neither site nor network has it.
 	 * @return mixed
 	 */
-	public static function resolve( string $key, mixed $default = null ): mixed {
+	public static function resolve( string $key, mixed $default_value = null ): mixed {
 		// Check per-site first.
 		$site_value = self::get( $key );
 
@@ -77,7 +77,7 @@ class PluginSettings {
 			}
 		}
 
-		return $default;
+		return $default_value;
 	}
 
 	/**

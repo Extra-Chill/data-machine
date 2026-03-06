@@ -102,7 +102,7 @@ function datamachine_register_utility_filters() {
 
 	add_filter(
 		'datamachine_split_pipeline_step_id',
-		function ( $default, $pipeline_step_id ) {
+		function ( $default_value, $pipeline_step_id ) {
 			if ( empty( $pipeline_step_id ) || strpos( $pipeline_step_id, '_' ) === false ) {
 				return null; // Old UUID4 format or invalid
 			}
@@ -124,7 +124,7 @@ function datamachine_register_utility_filters() {
 	// Split composite flow_step_id: {pipeline_step_id}_{flow_id}
 	add_filter(
 		'datamachine_split_flow_step_id',
-		function ( $null, $flow_step_id ) {
+		function ( $null_value, $flow_step_id ) {
 			if ( empty( $flow_step_id ) || ! is_string( $flow_step_id ) ) {
 				return null;
 			}

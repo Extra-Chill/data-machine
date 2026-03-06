@@ -110,7 +110,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 		update_post_meta( $this->attachment_id, '_wp_attachment_image_alt', 'Existing alt text' );
 
 		// Mock PluginSettings
-		$settings_filter = function( $value, $key, $default ) {
+		$settings_filter = function( $value, $key, $default_value ) {
 			if ( 'default_provider' === $key ) {
 				return 'openai';
 			}

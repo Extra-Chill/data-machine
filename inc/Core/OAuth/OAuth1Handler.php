@@ -47,7 +47,7 @@ class OAuth1Handler {
 			$request_token = $connection->oauth( $request_token_url, array( 'oauth_callback' => $callback_url ) );
 
 			// Check for API errors
-			if ( $connection->getLastHttpCode() != 200 ||
+			if ( $connection->getLastHttpCode() !== 200 ||
 				! isset( $request_token['oauth_token'] ) ||
 				! isset( $request_token['oauth_token_secret'] ) ) {
 				do_action(
@@ -241,7 +241,7 @@ class OAuth1Handler {
 			$access_token_data = $connection->oauth( $access_token_url, array( 'oauth_verifier' => $oauth_verifier ) );
 
 			// Validate token exchange
-			if ( $connection->getLastHttpCode() != 200 ||
+			if ( $connection->getLastHttpCode() !== 200 ||
 				! isset( $access_token_data['oauth_token'] ) ||
 				! isset( $access_token_data['oauth_token_secret'] ) ) {
 				do_action(

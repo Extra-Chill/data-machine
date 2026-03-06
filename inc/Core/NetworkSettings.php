@@ -55,13 +55,13 @@ class NetworkSettings {
 	 * @param mixed  $default Default value if key not found.
 	 * @return mixed
 	 */
-	public static function get( string $key, mixed $default = null ): mixed {
+	public static function get( string $key, mixed $default_value = null ): mixed {
 		if ( ! in_array( $key, self::NETWORK_KEYS, true ) ) {
-			return $default;
+			return $default_value;
 		}
 
 		$settings = self::all();
-		return $settings[ $key ] ?? $default;
+		return $settings[ $key ] ?? $default_value;
 	}
 
 	/**

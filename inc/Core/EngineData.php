@@ -142,7 +142,7 @@ class EngineData {
 	 * @param mixed  $default Default value if key not found.
 	 * @return mixed
 	 */
-	public function get( string $key, $default = null ) {
+	public function get( string $key, $default_value = null ) {
 		if ( array_key_exists( $key, $this->data ) ) {
 			return $this->data[ $key ];
 		}
@@ -152,7 +152,7 @@ class EngineData {
 			return $metadata[ $key ];
 		}
 
-		return $default;
+		return $default_value;
 	}
 
 	/**

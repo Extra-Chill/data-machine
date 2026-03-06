@@ -363,7 +363,8 @@ class FlowStepAbilitiesTest extends WP_UnitTestCase {
 		$this->assertGreaterThanOrEqual( 3, $result['step_count'] );
 
 		$steps = $result['steps'];
-		for ( $i = 1; $i < count( $steps ); $i++ ) {
+		$steps_count = count( $steps );
+		for ( $i = 1; $i < $steps_count; $i++ ) {
 			$prev_order = $steps[ $i - 1 ]['execution_order'] ?? 0;
 			$curr_order = $steps[ $i ]['execution_order'] ?? 0;
 			$this->assertLessThanOrEqual( $curr_order, $prev_order );

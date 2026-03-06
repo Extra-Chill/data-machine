@@ -242,7 +242,7 @@ class UpdateTaxonomyTerm extends BaseTool {
 	 * @param string|null $parent New parent identifier
 	 * @return array Result with success status and updated fields
 	 */
-	private function updateCoreFields( \WP_Term $term, string $taxonomy, ?string $name, ?string $slug, ?string $description, ?string $parent ): array {
+	private function updateCoreFields( \WP_Term $term, string $taxonomy, ?string $name, ?string $slug, ?string $description, ?string $parent_item ): array {
 		$args           = array();
 		$updated_fields = array();
 
@@ -261,7 +261,7 @@ class UpdateTaxonomyTerm extends BaseTool {
 			$updated_fields[]    = 'description';
 		}
 
-		if ( ! empty( $parent ) ) {
+		if ( ! empty( $parent_item ) ) {
 			$taxonomy_obj = get_taxonomy( $taxonomy );
 			if ( ! $taxonomy_obj->hierarchical ) {
 				return array(
@@ -271,11 +271,11 @@ class UpdateTaxonomyTerm extends BaseTool {
 				);
 			}
 
-			$parent_term = $this->resolveTerm( $parent, $taxonomy );
+			$parent_term = $this->resolveTerm( $parent_item, $taxonomy );
 			if ( ! $parent_term ) {
 				return array(
 					'success'   => false,
-					'error'     => "Parent term '{$parent}' not found in taxonomy '{$taxonomy}'",
+					'error'     => "Parent term '{$parent_item}' not found in taxonomy '{$taxonomy}'",
 					'tool_name' => 'update_taxonomy_term',
 				);
 			}

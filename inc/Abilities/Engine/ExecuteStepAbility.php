@@ -539,7 +539,7 @@ class ExecuteStepAbility {
 	 * @param string $default Default reason when none found.
 	 * @return string
 	 */
-	private function getFailureReasonFromPackets( array $dataPackets, string $default ): string {
+	private function getFailureReasonFromPackets( array $dataPackets, string $default_value ): string {
 		foreach ( $dataPackets as $packet ) {
 			$metadata = $packet['metadata'] ?? array();
 			if ( empty( $metadata['failure_reason'] ) ) {
@@ -552,6 +552,6 @@ class ExecuteStepAbility {
 			}
 		}
 
-		return $default;
+		return $default_value;
 	}
 }

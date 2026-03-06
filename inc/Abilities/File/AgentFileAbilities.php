@@ -392,8 +392,8 @@ class AgentFileAbilities {
 			);
 		}
 
-		$dm        = new DirectoryManager();
-		$user_id   = $dm->get_effective_user_id( (int) ( $input['user_id'] ?? 0 ) );
+		$dm         = new DirectoryManager();
+		$user_id    = $dm->get_effective_user_id( (int) ( $input['user_id'] ?? 0 ) );
 		$target_dir = in_array( $filename, FileConstants::USER_LAYER_FILES, true )
 			? $dm->get_user_directory( $user_id )
 			: $dm->get_agent_identity_directory_for_user( $user_id );
@@ -500,8 +500,8 @@ class AgentFileAbilities {
 			);
 		}
 
-		$dm       = new DirectoryManager();
-		$user_id  = $dm->get_effective_user_id( (int) ( $input['user_id'] ?? 0 ) );
+		$dm        = new DirectoryManager();
+		$user_id   = $dm->get_effective_user_id( (int) ( $input['user_id'] ?? 0 ) );
 		$agent_dir = $dm->get_agent_identity_directory_for_user( $user_id );
 
 		if ( ! $dm->ensure_directory_exists( $agent_dir ) ) {

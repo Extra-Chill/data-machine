@@ -15,7 +15,7 @@ function datamachine_register_handler_filters() {
 	 */
 	add_filter(
 		'datamachine_timeframe_limit',
-		function ( $default, $timeframe_limit ) {
+		function ( $default_value, $timeframe_limit ) {
 			if ( null === $timeframe_limit ) {
 				return array(
 					'all_time' => 'All Time',
@@ -52,7 +52,7 @@ function datamachine_register_handler_filters() {
 	 */
 	add_filter(
 		'datamachine_keyword_search_match',
-		function ( $default, $content, $search_term ) {
+		function ( $default_value, $content, $search_term ) {
 			if ( empty( $search_term ) ) {
 				return true;
 			}
@@ -83,7 +83,7 @@ function datamachine_register_handler_filters() {
 	 */
 	add_filter(
 		'datamachine_get_handler_settings_display',
-		function ( $default, $flow_step_id, $step_type ) {
+		function ( $default_value, $flow_step_id, $step_type ) {
 			$service = new \DataMachine\Core\Steps\Settings\SettingsDisplayService();
 			return $service->getDisplaySettings( $flow_step_id, $step_type );
 		},
