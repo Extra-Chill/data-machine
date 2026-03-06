@@ -97,6 +97,30 @@ class QueueValidator extends BaseTool {
 	}
 
 	/**
+	 * Check if queue validator is configured.
+	 *
+	 * @return bool
+	 */
+	public static function is_configured(): bool {
+		return class_exists( DB_Flows::class );
+	}
+
+	/**
+	 * Check if queue validator should be considered configured.
+	 *
+	 * @param bool   $configured Current configuration status.
+	 * @param string $tool_id    Tool identifier.
+	 * @return bool
+	 */
+	public function check_configuration( $configured, $tool_id ) {
+		if ( 'queue_validator' !== $tool_id ) {
+			return $configured;
+		}
+
+		return self::is_configured();
+	}
+
+	/**
 	 * Validate a topic against published posts and queue items.
 	 *
 	 * @param array $parameters Tool call parameters.

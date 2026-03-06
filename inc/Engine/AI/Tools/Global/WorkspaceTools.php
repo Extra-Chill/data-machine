@@ -18,6 +18,38 @@ defined( 'ABSPATH' ) || exit;
 class WorkspaceTools extends BaseTool {
 
 	/**
+	 * Check if workspace tools are configured.
+	 *
+	 * @return bool
+	 */
+	public static function is_configured(): bool {
+		return function_exists( 'wp_get_ability' );
+	}
+
+	/**
+	 * Check if a workspace tool should be considered configured.
+	 *
+	 * @param bool   $configured Current configuration status.
+	 * @param string $tool_id    Tool identifier.
+	 * @return bool
+	 */
+	public function check_configuration( $configured, $tool_id ) {
+		$workspace_tools = array(
+			'workspace_path',
+			'workspace_list',
+			'workspace_show',
+			'workspace_ls',
+			'workspace_read',
+		);
+
+		if ( ! in_array( $tool_id, $workspace_tools, true ) ) {
+			return $configured;
+		}
+
+		return self::is_configured();
+	}
+
+	/**
 	 * Constructor — register all workspace read tools as global tools.
 	 */
 	public function __construct() {
@@ -237,6 +269,15 @@ class WorkspaceTools extends BaseTool {
 			'data'      => $result,
 			'tool_name' => 'workspace_read',
 		);
+	}
+
+	/**
+	 * Primary tool definition for convention compatibility.
+	 *
+	 * @return array
+	 */
+	public function getToolDefinition(): array {
+		return $this->getPathDefinition();
 	}
 
 	/**

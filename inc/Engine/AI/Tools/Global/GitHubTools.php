@@ -67,6 +67,15 @@ class GitHubTools extends BaseTool {
 	}
 
 	/**
+	 * Check if GitHub tools are configured.
+	 *
+	 * @return bool
+	 */
+	public static function is_configured(): bool {
+		return GitHubAbilities::isConfigured();
+	}
+
+	/**
 	 * Get tool definition — returns the primary tool definition (list issues).
 	 *
 	 * Individual tools use their own definition methods via registerGlobalTool.
