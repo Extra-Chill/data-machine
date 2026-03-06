@@ -31,6 +31,13 @@ class FileAbilities {
 	 */
 	const PROTECTED_FILES = array( 'SOUL.md', 'MEMORY.md' );
 
+	/**
+	 * Files that belong in the user layer rather than the agent identity layer.
+	 *
+	 * @var string[]
+	 */
+	const USER_LAYER_FILES = array( 'USER.md' );
+
 	private static bool $registered = false;
 
 	private FileStorage $file_storage;
@@ -942,32 +949,43 @@ class FileAbilities {
 		$directory_manager = new DirectoryManager();
 		$user_id           = $directory_manager->get_effective_user_id( $user_id );
 		$agent_dir         = $directory_manager->get_agent_identity_directory_for_user( $user_id );
+		$user_dir          = $directory_manager->get_user_directory( $user_id );
 
-		if ( ! file_exists( $agent_dir ) ) {
-			return array(
-				'success' => true,
-				'files'   => array(),
-				'scope'   => 'agent',
-			);
-		}
+		$files    = array();
+		$seen     = array();
 
-		$files  = array();
-		$handle = opendir( $agent_dir );
+		// Collect files from both layers: agent identity + user.
+		$dirs = array( $agent_dir, $user_dir );
 
-		if ( $handle ) {
+		foreach ( $dirs as $dir ) {
+			if ( ! file_exists( $dir ) ) {
+				continue;
+			}
+
+			$handle = opendir( $dir );
+			if ( ! $handle ) {
+				continue;
+			}
+
 			while ( false !== ( $entry = readdir( $handle ) ) ) {
 				if ( '.' === $entry || '..' === $entry || 'index.php' === $entry ) {
 					continue;
 				}
 
-				$filepath = "{$agent_dir}/{$entry}";
+				// Agent identity layer wins on conflicts.
+				if ( isset( $seen[ $entry ] ) ) {
+					continue;
+				}
+
+				$filepath = "{$dir}/{$entry}";
 				if ( is_file( $filepath ) ) {
-					$files[] = array(
+					$files[]        = array(
 						'filename' => $entry,
 						'size'     => filesize( $filepath ),
 						'modified' => gmdate( 'c', filemtime( $filepath ) ),
 						'type'     => 'core',
 					);
+					$seen[ $entry ] = true;
 				}
 			}
 			closedir( $handle );
@@ -1011,10 +1029,9 @@ class FileAbilities {
 
 		$directory_manager = new DirectoryManager();
 		$user_id           = $directory_manager->get_effective_user_id( $user_id );
-		$agent_dir         = $directory_manager->get_agent_identity_directory_for_user( $user_id );
-		$filepath          = "{$agent_dir}/{$filename}";
+		$filepath          = $this->resolveAgentFilePath( $directory_manager, $user_id, $filename );
 
-		if ( ! file_exists( $filepath ) ) {
+		if ( ! $filepath ) {
 			return array(
 				'success' => false,
 				'error'   => sprintf( 'File %s not found in agent directory', $filename ),
@@ -1051,10 +1068,9 @@ class FileAbilities {
 
 		$directory_manager = new DirectoryManager();
 		$user_id           = $directory_manager->get_effective_user_id( $user_id );
-		$agent_dir         = $directory_manager->get_agent_identity_directory_for_user( $user_id );
-		$filepath          = "{$agent_dir}/{$filename}";
+		$filepath          = $this->resolveAgentFilePath( $directory_manager, $user_id, $filename );
 
-		if ( ! file_exists( $filepath ) ) {
+		if ( ! $filepath ) {
 			return array(
 				'success' => false,
 				'error'   => sprintf( 'File %s not found in agent directory', $filename ),
@@ -1099,16 +1115,18 @@ class FileAbilities {
 
 		$directory_manager = new DirectoryManager();
 		$user_id           = $directory_manager->get_effective_user_id( $user_id );
-		$agent_dir         = $directory_manager->get_agent_identity_directory_for_user( $user_id );
+		$target_dir        = in_array( $filename, self::USER_LAYER_FILES, true )
+			? $directory_manager->get_user_directory( $user_id )
+			: $directory_manager->get_agent_identity_directory_for_user( $user_id );
 
-		if ( ! $directory_manager->ensure_directory_exists( $agent_dir ) ) {
+		if ( ! $directory_manager->ensure_directory_exists( $target_dir ) ) {
 			return array(
 				'success' => false,
 				'error'   => 'Failed to create agent directory',
 			);
 		}
 
-		$filepath = "{$agent_dir}/{$filename}";
+		$filepath = "{$target_dir}/{$filename}";
 
 		$fs = FilesystemHelper::get();
 		if ( ! $fs ) {
@@ -1172,6 +1190,30 @@ class FileAbilities {
 
 		// Return updated file list.
 		return $this->listAgentFiles( $user_id );
+	}
+
+	/**
+	 * Resolve a filename to its absolute path across agent layers.
+	 *
+	 * Checks the agent identity directory first, then the user directory.
+	 *
+	 * @param DirectoryManager $dm      Directory manager instance.
+	 * @param int              $user_id Effective user ID.
+	 * @param string           $filename Filename to resolve.
+	 * @return string|null Absolute file path, or null if not found.
+	 */
+	private function resolveAgentFilePath( DirectoryManager $dm, int $user_id, string $filename ): ?string {
+		$agent_path = $dm->get_agent_identity_directory_for_user( $user_id ) . '/' . $filename;
+		if ( file_exists( $agent_path ) ) {
+			return $agent_path;
+		}
+
+		$user_path = $dm->get_user_directory( $user_id ) . '/' . $filename;
+		if ( file_exists( $user_path ) ) {
+			return $user_path;
+		}
+
+		return null;
 	}
 
 	/**

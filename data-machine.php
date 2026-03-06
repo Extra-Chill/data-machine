@@ -972,6 +972,75 @@ function datamachine_migrate_to_layered_architecture(): void {
 		}
 	}
 
+	// Single-agent case: .md files live directly in agent/ with no numeric subdirs.
+	// This is the most common layout for sites that never had multi-user partitioning.
+	$legacy_md_files = glob( trailingslashit( $legacy_agent_base ) . '*.md' );
+
+	if ( ! empty( $legacy_md_files ) ) {
+		$default_user_id = \DataMachine\Core\FilesRepository\DirectoryManager::get_default_agent_user_id();
+		$default_user    = get_user_by( 'id', $default_user_id );
+		$default_slug    = $default_user ? sanitize_title( $default_user->user_login ) : 'user-' . $default_user_id;
+		$default_name    = $default_user ? $default_user->display_name : 'User ' . $default_user_id;
+		$default_model   = \DataMachine\Core\PluginSettings::getAgentModel( 'chat' );
+
+		$agents_repo->create_if_missing(
+			$default_slug,
+			$default_name,
+			$default_user_id,
+			array(
+				'model' => array(
+					'default' => $default_model,
+				),
+			)
+		);
+
+		$default_identity_dir = $directory_manager->get_agent_identity_directory( $default_slug );
+		$default_user_dir     = $directory_manager->get_user_directory( $default_user_id );
+
+		if ( ! is_dir( $default_identity_dir ) ) {
+			wp_mkdir_p( $default_identity_dir );
+		}
+		if ( ! is_dir( $default_user_dir ) ) {
+			wp_mkdir_p( $default_user_dir );
+		}
+
+		$default_agent_index = trailingslashit( $default_identity_dir ) . 'index.php';
+		if ( ! file_exists( $default_agent_index ) ) {
+			$fs->put_contents( $default_agent_index, "<?php\n// Silence is golden.\n", FS_CHMOD_FILE );
+			\DataMachine\Core\FilesRepository\FilesystemHelper::make_group_writable( $default_agent_index );
+		}
+
+		$default_user_index = trailingslashit( $default_user_dir ) . 'index.php';
+		if ( ! file_exists( $default_user_index ) ) {
+			$fs->put_contents( $default_user_index, "<?php\n// Silence is golden.\n", FS_CHMOD_FILE );
+			\DataMachine\Core\FilesRepository\FilesystemHelper::make_group_writable( $default_user_index );
+		}
+
+		foreach ( $legacy_md_files as $legacy_file ) {
+			$filename = basename( $legacy_file );
+
+			// USER.md goes to user layer; everything else to agent identity.
+			if ( 'USER.md' === $filename ) {
+				$dest = trailingslashit( $default_user_dir ) . $filename;
+			} else {
+				$dest = trailingslashit( $default_identity_dir ) . $filename;
+			}
+
+			if ( ! file_exists( $dest ) ) {
+				$fs->copy( $legacy_file, $dest, true, FS_CHMOD_FILE );
+				\DataMachine\Core\FilesRepository\FilesystemHelper::make_group_writable( $dest );
+			}
+		}
+
+		// Migrate daily memory directory.
+		$legacy_daily = trailingslashit( $legacy_agent_base ) . 'daily';
+		$new_daily    = trailingslashit( $default_identity_dir ) . 'daily';
+
+		if ( is_dir( $legacy_daily ) && ! is_dir( $new_daily ) ) {
+			datamachine_copy_directory_recursive( $legacy_daily, $new_daily );
+		}
+	}
+
 	update_option( 'datamachine_layered_arch_migrated', 1, false );
 }
 
@@ -1041,9 +1110,17 @@ function datamachine_copy_directory_recursive( string $source_dir, string $targe
  */
 function datamachine_ensure_default_memory_files() {
 	$directory_manager = new \DataMachine\Core\FilesRepository\DirectoryManager();
-	$agent_dir         = $directory_manager->get_agent_directory();
+	$default_user_id   = \DataMachine\Core\FilesRepository\DirectoryManager::get_default_agent_user_id();
+	$agent_dir         = $directory_manager->get_agent_identity_directory_for_user( $default_user_id );
+	$user_dir          = $directory_manager->get_user_directory( $default_user_id );
 
-	if ( ! $directory_manager->ensure_agent_directory_writable() ) {
+	// USER.md belongs in the user layer; everything else in the agent identity layer.
+	$user_layer_files = array( 'USER.md' );
+
+	if ( ! $directory_manager->ensure_directory_exists( $agent_dir ) ) {
+		return;
+	}
+	if ( ! $directory_manager->ensure_directory_exists( $user_dir ) ) {
 		return;
 	}
 
@@ -1055,7 +1132,8 @@ function datamachine_ensure_default_memory_files() {
 	$defaults = datamachine_get_scaffold_defaults();
 
 	foreach ( $defaults as $filename => $content ) {
-		$filepath = "{$agent_dir}/{$filename}";
+		$target_dir = in_array( $filename, $user_layer_files, true ) ? $user_dir : $agent_dir;
+		$filepath   = "{$target_dir}/{$filename}";
 
 		if ( file_exists( $filepath ) ) {
 			continue;
