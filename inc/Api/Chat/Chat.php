@@ -14,6 +14,7 @@
 
 namespace DataMachine\Api\Chat;
 
+use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\AgentType;
 use WP_REST_Response;
@@ -44,15 +45,17 @@ class Chat {
 	 * Register chat endpoints.
 	 */
 	public static function register_routes() {
+		$chat_permission_callback = function () {
+			return PermissionHelper::can( 'chat' );
+		};
+
 		register_rest_route(
 			'datamachine/v1',
 			'/chat',
 			array(
 				'methods'             => WP_REST_Server::CREATABLE,
 				'callback'            => array( self::class, 'handle_chat' ),
-				'permission_callback' => function () {
-					return current_user_can( 'manage_options' );
-				},
+				'permission_callback' => $chat_permission_callback,
 				'args'                => array(
 					'message'              => array(
 						'type'              => 'string',
@@ -101,9 +104,7 @@ class Chat {
 			array(
 				'methods'             => WP_REST_Server::CREATABLE,
 				'callback'            => array( self::class, 'handle_continue' ),
-				'permission_callback' => function () {
-					return current_user_can( 'manage_options' );
-				},
+				'permission_callback' => $chat_permission_callback,
 				'args'                => array(
 					'session_id' => array(
 						'type'              => 'string',
@@ -121,9 +122,7 @@ class Chat {
 			array(
 				'methods'             => WP_REST_Server::READABLE,
 				'callback'            => array( self::class, 'get_session' ),
-				'permission_callback' => function () {
-					return current_user_can( 'manage_options' );
-				},
+				'permission_callback' => $chat_permission_callback,
 				'args'                => array(
 					'session_id' => array(
 						'type'              => 'string',
@@ -141,9 +140,7 @@ class Chat {
 			array(
 				'methods'             => WP_REST_Server::DELETABLE,
 				'callback'            => array( self::class, 'delete_session' ),
-				'permission_callback' => function () {
-					return current_user_can( 'manage_options' );
-				},
+				'permission_callback' => $chat_permission_callback,
 				'args'                => array(
 					'session_id' => array(
 						'type'              => 'string',
@@ -190,9 +187,7 @@ class Chat {
 			array(
 				'methods'             => WP_REST_Server::READABLE,
 				'callback'            => array( self::class, 'list_sessions' ),
-				'permission_callback' => function () {
-					return current_user_can( 'manage_options' );
-				},
+				'permission_callback' => $chat_permission_callback,
 				'args'                => array(
 					'limit'      => array(
 						'type'              => 'integer',

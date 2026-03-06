@@ -103,6 +103,13 @@ class DeleteChatSessionAbility {
 		$session_id = sanitize_text_field( $input['session_id'] );
 		$user_id    = (int) $input['user_id'];
 
+		if ( ! $this->can_access_user_sessions( $user_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'session_access_denied',
+			);
+		}
+
 		$session = $this->verifySessionOwnership( $session_id, $user_id );
 
 		if ( isset( $session['error'] ) ) {

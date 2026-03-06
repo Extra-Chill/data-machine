@@ -111,6 +111,14 @@ class ListChatSessionsAbility {
 		}
 
 		$user_id    = (int) $input['user_id'];
+
+		if ( ! $this->can_access_user_sessions( $user_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'session_access_denied',
+			);
+		}
+
 		$limit      = min( 100, max( 1, (int) ( $input['limit'] ?? 20 ) ) );
 		$offset     = max( 0, (int) ( $input['offset'] ?? 0 ) );
 		$agent_type = ! empty( $input['agent_type'] ) ? sanitize_text_field( $input['agent_type'] ) : null;
