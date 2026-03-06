@@ -140,7 +140,7 @@ class GetWordPressPostAbility {
 
 		$post = get_post( $post_id );
 
-		if ( ! $post || $post->post_status === 'trash' ) {
+		if ( ! $post || 'trash' === $post->post_status ) {
 			$logs[] = array(
 				'level'   => 'warning',
 				'message' => 'Post not found or trashed',
@@ -160,7 +160,7 @@ class GetWordPressPostAbility {
 		$post_status  = $post->post_status;
 		$publish_date = get_the_date( 'Y-m-d H:i:s', $post_id );
 		$author_name  = get_the_author_meta( 'display_name', (int) $post->post_author );
-		$site_name    = get_bloginfo( 'name' ) ?: 'Local WordPress';
+		$site_name    = get_bloginfo( 'name' ) ? get_bloginfo( 'name' ) : 'Local WordPress';
 
 		$content_length     = strlen( $content );
 		$content_word_count = str_word_count( wp_strip_all_tags( $content ) );
@@ -177,7 +177,7 @@ class GetWordPressPostAbility {
 				$file_path = get_attached_file( $featured_image_id );
 				if ( $file_path && file_exists( $file_path ) ) {
 					$file_size = filesize( $file_path );
-					$mime_type = get_post_mime_type( $featured_image_id ) ?: 'image/jpeg';
+					$mime_type = get_post_mime_type( $featured_image_id ) ? get_post_mime_type( $featured_image_id ) : 'image/jpeg';
 
 					$file_info = array(
 						'file_path' => $file_path,

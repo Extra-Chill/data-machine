@@ -221,7 +221,7 @@ class FetchWordPressMediaAbility {
 			$content_data = array();
 			if ( $include_parent_content && $post->post_parent > 0 ) {
 				$parent_post = get_post( $post->post_parent );
-				if ( $parent_post && $parent_post->post_status === 'publish' ) {
+				if ( $parent_post && 'publish' === $parent_post->post_status ) {
 					$parent_title = ! empty( $parent_post->post_title ) ? $parent_post->post_title : 'Untitled';
 					$content_data = array(
 						'title'   => $parent_title,

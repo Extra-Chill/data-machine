@@ -447,7 +447,7 @@ class FlowsCommand extends BaseCommand {
 					'order'     => $order,
 					'step_type' => $step_type,
 					'handler'   => $slug,
-					'config'    => implode( ', ', $config_parts ) ?: '(default)',
+					'config'    => implode( ', ', $config_parts ) ? implode( ', ', $config_parts ) : '(default)',
 				);
 			}
 		}
@@ -1049,7 +1049,7 @@ class FlowsCommand extends BaseCommand {
 					'flow_step_id' => $sid,
 					'step_type'    => $step_type,
 					'handler'      => $slug,
-					'config'       => implode( ', ', $config_summary ) ?: '(default)',
+					'config'       => implode( ', ', $config_summary ) ? implode( ', ', $config_summary ) : '(default)',
 				);
 			}
 		}

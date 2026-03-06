@@ -75,7 +75,7 @@ class Agents extends BaseRepository {
 		}
 
 		if ( ! empty( $row['agent_config'] ) ) {
-			$row['agent_config'] = json_decode( $row['agent_config'], true ) ?: array();
+			$row['agent_config'] = json_decode( $row['agent_config'], true ) ? json_decode( $row['agent_config'], true ) : array();
 		}
 
 		return $row;
@@ -103,7 +103,7 @@ class Agents extends BaseRepository {
 		}
 
 		if ( ! empty( $row['agent_config'] ) ) {
-			$row['agent_config'] = json_decode( $row['agent_config'], true ) ?: array();
+			$row['agent_config'] = json_decode( $row['agent_config'], true ) ? json_decode( $row['agent_config'], true ) : array();
 		}
 
 		return $row;

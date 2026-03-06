@@ -243,7 +243,7 @@ class QueryWordPressPostsAbility {
 			);
 		}
 
-		$site_name      = get_bloginfo( 'name' ) ?: 'Local WordPress';
+		$site_name      = get_bloginfo( 'name' ) ? get_bloginfo( 'name' ) : 'Local WordPress';
 		$eligible_items = array();
 
 		foreach ( $unprocessed_posts as $post ) {
@@ -259,7 +259,7 @@ class QueryWordPressPostsAbility {
 				$file_path = get_attached_file( $featured_image_id );
 				if ( $file_path && file_exists( $file_path ) ) {
 					$file_size = filesize( $file_path );
-					$mime_type = get_post_mime_type( $featured_image_id ) ?: 'image/jpeg';
+					$mime_type = get_post_mime_type( $featured_image_id ) ? get_post_mime_type( $featured_image_id ) : 'image/jpeg';
 
 					$file_info = array(
 						'file_path' => $file_path,

@@ -208,7 +208,7 @@ class Jobs {
 		}
 
 		// Migrate pipeline_id column: bigint -> varchar(20) for 'direct' execution
-		if ( isset( $columns['pipeline_id'] ) && $columns['pipeline_id']->DATA_TYPE === 'bigint' ) {
+		if ( isset( $columns['pipeline_id'] ) && 'bigint' === $columns['pipeline_id']->DATA_TYPE ) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			$wpdb->query( "ALTER TABLE {$table_name} MODIFY pipeline_id varchar(20) NOT NULL" );
 			do_action(
@@ -222,7 +222,7 @@ class Jobs {
 		}
 
 		// Migrate flow_id column: bigint -> varchar(20) for 'direct' execution
-		if ( isset( $columns['flow_id'] ) && $columns['flow_id']->DATA_TYPE === 'bigint' ) {
+		if ( isset( $columns['flow_id'] ) && 'bigint' === $columns['flow_id']->DATA_TYPE ) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			$wpdb->query( "ALTER TABLE {$table_name} MODIFY flow_id varchar(20) NOT NULL" );
 			do_action(

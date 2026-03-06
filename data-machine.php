@@ -579,14 +579,14 @@ add_action( 'init', 'datamachine_maybe_run_migrations', 5 );
  */
 function datamachine_get_scaffold_defaults(): array {
 	// --- Site metadata ---
-	$site_name    = get_bloginfo( 'name' ) ?: 'WordPress Site';
+	$site_name    = get_bloginfo( 'name' ) ? get_bloginfo( 'name' ) : 'WordPress Site';
 	$site_tagline = get_bloginfo( 'description' );
 	$site_url     = home_url();
 	$timezone     = wp_timezone_string();
 
 	// --- Active theme ---
 	$theme      = wp_get_theme();
-	$theme_name = $theme->get( 'Name' ) ?: 'Unknown';
+	$theme_name = $theme->get( 'Name' ) ? $theme->get( 'Name' ) : 'Unknown';
 
 	// --- Active plugins (exclude Data Machine itself) ---
 	$active_plugins = get_option( 'active_plugins', array() );
@@ -746,13 +746,13 @@ MD;
  * @return string
  */
 function datamachine_get_site_scaffold_content(): string {
-	$site_name        = get_bloginfo( 'name' ) ?: 'WordPress Site';
-	$site_description = get_bloginfo( 'description' ) ?: '';
+	$site_name        = get_bloginfo( 'name' ) ? get_bloginfo( 'name' ) : 'WordPress Site';
+	$site_description = get_bloginfo( 'description' ) ? get_bloginfo( 'description' ) : '';
 	$site_url         = home_url();
 	$post_types       = get_post_types( array( 'public' => true ), 'names' );
 	$taxonomies       = get_taxonomies( array( 'public' => true ), 'names' );
 	$active_plugins   = get_option( 'active_plugins', array() );
-	$theme_name       = wp_get_theme()->get( 'Name' ) ?: 'Unknown';
+	$theme_name       = wp_get_theme()->get( 'Name' ) ? wp_get_theme()->get( 'Name' ) : 'Unknown';
 
 	if ( is_multisite() ) {
 		$network_plugins = array_keys( get_site_option( 'active_sitewide_plugins', array() ) );

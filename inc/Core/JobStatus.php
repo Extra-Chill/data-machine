@@ -148,7 +148,7 @@ class JobStatus {
 	 * Check if this is a failure status.
 	 */
 	public function isFailure(): bool {
-		return $this->baseStatus === self::FAILED;
+		return self::FAILED === $this->baseStatus;
 	}
 
 	/**
@@ -156,7 +156,7 @@ class JobStatus {
 	 */
 	public static function isStatusFailure( string $status ): bool {
 		$base = self::parseBaseStatus( $status );
-		return $base === self::FAILED;
+		return self::FAILED === $base;
 	}
 
 	/**
@@ -170,7 +170,7 @@ class JobStatus {
 	 * Check if this status should increment the no-items counter.
 	 */
 	public function shouldIncrementNoItemsCount(): bool {
-		return $this->baseStatus === self::COMPLETED_NO_ITEMS;
+		return self::COMPLETED_NO_ITEMS === $this->baseStatus;
 	}
 
 	/**
@@ -184,7 +184,7 @@ class JobStatus {
 	 * Check if this is a waiting status (pipeline parked at webhook gate).
 	 */
 	public function isWaiting(): bool {
-		return $this->baseStatus === self::WAITING;
+		return self::WAITING === $this->baseStatus;
 	}
 
 	/**
@@ -192,7 +192,7 @@ class JobStatus {
 	 */
 	public static function isStatusWaiting( string $status ): bool {
 		$base = self::parseBaseStatus( $status );
-		return $base === self::WAITING;
+		return self::WAITING === $base;
 	}
 
 	/**
@@ -206,21 +206,21 @@ class JobStatus {
 	 * Check if this is an agent_skipped status.
 	 */
 	public function isAgentSkipped(): bool {
-		return $this->baseStatus === self::AGENT_SKIPPED;
+		return self::AGENT_SKIPPED === $this->baseStatus;
 	}
 
 	/**
 	 * Check if this is a completed status (not completed_no_items).
 	 */
 	public function isCompleted(): bool {
-		return $this->baseStatus === self::COMPLETED;
+		return self::COMPLETED === $this->baseStatus;
 	}
 
 	/**
 	 * Check if this is a completed_no_items status.
 	 */
 	public function isCompletedNoItems(): bool {
-		return $this->baseStatus === self::COMPLETED_NO_ITEMS;
+		return self::COMPLETED_NO_ITEMS === $this->baseStatus;
 	}
 
 	/**
@@ -241,7 +241,7 @@ class JobStatus {
 	 * Check if this status has a reason.
 	 */
 	public function hasReason(): bool {
-		return $this->reason !== null && $this->reason !== '';
+		return null !== $this->reason && '' !== $this->reason;
 	}
 
 	/**

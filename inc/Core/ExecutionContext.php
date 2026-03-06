@@ -146,7 +146,7 @@ class ExecutionContext {
 	 * @return bool
 	 */
 	public function isDirect(): bool {
-		return $this->mode === self::MODE_DIRECT;
+		return self::MODE_DIRECT === $this->mode;
 	}
 
 	/**
@@ -155,7 +155,7 @@ class ExecutionContext {
 	 * @return bool
 	 */
 	public function isFlow(): bool {
-		return $this->mode === self::MODE_FLOW;
+		return self::MODE_FLOW === $this->mode;
 	}
 
 	/**
@@ -211,7 +211,7 @@ class ExecutionContext {
 	 * @return EngineData
 	 */
 	public function getEngine(): EngineData {
-		if ( $this->engine === null ) {
+		if ( null === $this->engine ) {
 			$data         = $this->job_id ? datamachine_get_engine_data( (int) $this->job_id ) : array();
 			$this->engine = new EngineData( $data, $this->job_id );
 		}
