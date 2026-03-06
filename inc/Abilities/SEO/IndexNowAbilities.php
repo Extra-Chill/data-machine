@@ -300,7 +300,7 @@ class IndexNowAbilities {
 		$key = wp_generate_uuid4();
 		$key = str_replace( '-', '', $key );
 
-		$settings = get_option( 'datamachine_settings', array() );
+		$settings                     = get_option( 'datamachine_settings', array() );
 		$settings['indexnow_api_key'] = $key;
 		update_option( 'datamachine_settings', $settings );
 

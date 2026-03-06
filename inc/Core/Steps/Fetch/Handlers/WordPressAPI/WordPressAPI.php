@@ -123,9 +123,9 @@ class WordPressAPI extends FetchHandler {
 				$download_result = $context->downloadFile( $image_url, $filename );
 
 				if ( $download_result ) {
-					$file_check            = wp_check_filetype( $filename );
-					$mime_type             = $file_check['type'] ? $file_check['type'] : 'image/jpeg';
-					$item['file_info']     = array(
+					$file_check        = wp_check_filetype( $filename );
+					$mime_type         = $file_check['type'] ? $file_check['type'] : 'image/jpeg';
+					$item['file_info'] = array(
 						'file_path' => $download_result['path'],
 						'mime_type' => $mime_type,
 						'file_size' => $download_result['size'],

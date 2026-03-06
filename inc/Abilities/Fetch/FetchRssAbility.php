@@ -204,8 +204,8 @@ class FetchRssAbility {
 			);
 		}
 
-		$total_checked   = 0;
-		$eligible_items  = array();
+		$total_checked  = 0;
+		$eligible_items = array();
 
 		foreach ( $items as $item ) {
 			++$total_checked;

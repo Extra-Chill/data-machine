@@ -66,7 +66,7 @@ class AgentDailyMemory extends BaseTool {
 		$result = $ability->execute(
 			array(
 				'user_id' => $user_id,
-				'date' => $parameters['date'] ?? gmdate( 'Y-m-d' ),
+				'date'    => $parameters['date'] ?? gmdate( 'Y-m-d' ),
 			)
 		);
 
@@ -184,7 +184,7 @@ class AgentDailyMemory extends BaseTool {
 	 * @return array Response.
 	 */
 	private function handleSearch( array $parameters ): array {
-		$query = $parameters['query'] ?? '';
+		$query   = $parameters['query'] ?? '';
 		$user_id = $this->resolve_user_id( $parameters );
 
 		if ( '' === $query ) {
@@ -206,9 +206,9 @@ class AgentDailyMemory extends BaseTool {
 		$result = $ability->execute(
 			array(
 				'user_id' => $user_id,
-				'query' => $query,
-				'from'  => $parameters['from'] ?? null,
-				'to'    => $parameters['to'] ?? null,
+				'query'   => $query,
+				'from'    => $parameters['from'] ?? null,
+				'to'      => $parameters['to'] ?? null,
 			)
 		);
 

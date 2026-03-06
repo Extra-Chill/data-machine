@@ -543,8 +543,8 @@ class InternalLinkingTask extends SystemTask {
 		}
 
 		// Compute IDF weight for each word.
-		$weights  = array();
-		$log_n    = log( $total_docs );
+		$weights = array();
+		$log_n   = log( $total_docs );
 
 		foreach ( $doc_frequency as $word => $df ) {
 			if ( $df >= $total_docs ) {

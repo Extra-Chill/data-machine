@@ -110,7 +110,7 @@ class ListChatSessionsAbility {
 			);
 		}
 
-		$user_id    = (int) $input['user_id'];
+		$user_id = (int) $input['user_id'];
 
 		if ( ! $this->can_access_user_sessions( $user_id ) ) {
 			return array(

@@ -73,7 +73,7 @@ class UpdateStep extends Step {
 				'info',
 				'AI successfully executed required update handler tools',
 				array(
-					'primary_handler'  => $primary_handler_slug,
+					'primary_handler'   => $primary_handler_slug,
 					'required_handlers' => $required_handler_slugs,
 				)
 			);
@@ -85,8 +85,8 @@ class UpdateStep extends Step {
 			'warning',
 			'Update step required handler tool was not executed by AI',
 			array(
-				'configured_handlers'     => $configured_handler_slugs,
-				'required_handler_slugs'  => $required_handler_slugs,
+				'configured_handlers'       => $configured_handler_slugs,
+				'required_handler_slugs'    => $required_handler_slugs,
 				'missing_required_handlers' => $missing_required_handlers,
 			)
 		);

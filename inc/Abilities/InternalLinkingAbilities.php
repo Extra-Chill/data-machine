@@ -1077,24 +1077,24 @@ class InternalLinkingAbilities {
 		// Get all published posts in this category.
 		$posts = get_posts(
 			array(
-				'post_type'      => 'post',
-				'post_status'    => 'publish',
-				'category'       => $term->term_id,
-				'numberposts'    => -1,
-				'orderby'        => 'title',
-				'order'          => 'ASC',
+				'post_type'   => 'post',
+				'post_status' => 'publish',
+				'category'    => $term->term_id,
+				'numberposts' => -1,
+				'orderby'     => 'title',
+				'order'       => 'ASC',
 			)
 		);
 
 		if ( empty( $posts ) ) {
 			return array(
-				'success'    => true,
-				'category'   => $term->name,
-				'total'      => 0,
-				'injected'   => 0,
-				'skipped'    => 0,
-				'results'    => array(),
-				'message'    => "No published posts in category '{$term->name}'.",
+				'success'  => true,
+				'category' => $term->name,
+				'total'    => 0,
+				'injected' => 0,
+				'skipped'  => 0,
+				'results'  => array(),
+				'message'  => "No published posts in category '{$term->name}'.",
 			);
 		}
 
@@ -1104,7 +1104,7 @@ class InternalLinkingAbilities {
 		$post_keywords = array();
 		$post_map      = array(); // id => post object.
 		foreach ( $posts as $post ) {
-			$post_map[ $post->ID ] = $post;
+			$post_map[ $post->ID ]      = $post;
 			$post_keywords[ $post->ID ] = self::extractTitleKeywords( $post->post_title );
 		}
 
@@ -1317,19 +1317,112 @@ class InternalLinkingAbilities {
 
 		// Remove stop words.
 		$stop_words = array(
-			'a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to',
-			'for', 'of', 'with', 'by', 'from', 'up', 'out', 'if', 'about',
-			'into', 'through', 'during', 'before', 'after', 'above', 'below',
-			'between', 'same', 'all', 'each', 'every', 'both', 'few', 'more',
-			'most', 'other', 'some', 'such', 'no', 'not', 'only', 'own',
-			'so', 'than', 'too', 'very', 'just', 'because', 'as', 'until',
-			'while', 'when', 'where', 'how', 'what', 'which', 'who', 'whom',
-			'this', 'that', 'these', 'those', 'am', 'is', 'are', 'was',
-			'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having',
-			'do', 'does', 'did', 'doing', 'would', 'should', 'could', 'may',
-			'might', 'must', 'shall', 'can', 'will', 'it', 'its', 'you',
-			'your', 'yours', 'i', 'me', 'my', 'we', 'our', 'they', 'their',
-			'he', 'she', 'him', 'her', 'his', 'hers', 'them',
+			'a',
+			'an',
+			'the',
+			'and',
+			'or',
+			'but',
+			'in',
+			'on',
+			'at',
+			'to',
+			'for',
+			'of',
+			'with',
+			'by',
+			'from',
+			'up',
+			'out',
+			'if',
+			'about',
+			'into',
+			'through',
+			'during',
+			'before',
+			'after',
+			'above',
+			'below',
+			'between',
+			'same',
+			'all',
+			'each',
+			'every',
+			'both',
+			'few',
+			'more',
+			'most',
+			'other',
+			'some',
+			'such',
+			'no',
+			'not',
+			'only',
+			'own',
+			'so',
+			'than',
+			'too',
+			'very',
+			'just',
+			'because',
+			'as',
+			'until',
+			'while',
+			'when',
+			'where',
+			'how',
+			'what',
+			'which',
+			'who',
+			'whom',
+			'this',
+			'that',
+			'these',
+			'those',
+			'am',
+			'is',
+			'are',
+			'was',
+			'were',
+			'be',
+			'been',
+			'being',
+			'have',
+			'has',
+			'had',
+			'having',
+			'do',
+			'does',
+			'did',
+			'doing',
+			'would',
+			'should',
+			'could',
+			'may',
+			'might',
+			'must',
+			'shall',
+			'can',
+			'will',
+			'it',
+			'its',
+			'you',
+			'your',
+			'yours',
+			'i',
+			'me',
+			'my',
+			'we',
+			'our',
+			'they',
+			'their',
+			'he',
+			'she',
+			'him',
+			'her',
+			'his',
+			'hers',
+			'them',
 		);
 
 		$keywords = array_diff( $words, $stop_words );
@@ -1378,7 +1471,7 @@ class InternalLinkingAbilities {
 
 			// 1. Exact keyword match (2 points each).
 			$exact_overlap = array_intersect( $source_words, $candidate_words );
-			$score += count( $exact_overlap ) * 2;
+			$score        += count( $exact_overlap ) * 2;
 
 			// 2. Stem/substring matching for non-exact matches (1 point each).
 			$source_remaining    = array_diff( $source_words, $exact_overlap );
@@ -1433,8 +1526,8 @@ class InternalLinkingAbilities {
 		$lines[] = '<ul>';
 
 		foreach ( $matches as $match ) {
-			$title = esc_html( $match['title'] );
-			$url   = esc_url( $match['permalink'] );
+			$title   = esc_html( $match['title'] );
+			$url     = esc_url( $match['permalink'] );
 			$lines[] = '<!-- wp:list-item -->';
 			$lines[] = '<li><a href="' . $url . '">' . $title . '</a></li>';
 			$lines[] = '<!-- /wp:list-item -->';

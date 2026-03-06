@@ -65,7 +65,7 @@ class AgentsCommand extends BaseCommand {
 	public function list_agents( array $args, array $assoc_args ): void {
 		global $wpdb;
 
-		$items = array();
+		$items            = array();
 		$agent_repository = new Agents();
 		$agents_table     = $wpdb->prefix . Agents::TABLE_NAME;
 

@@ -51,7 +51,7 @@ class DailyMemoryAbilities {
 								'description' => 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).',
 								'default'     => 0,
 							),
-							'date' => array(
+							'date'    => array(
 								'type'        => 'string',
 								'description' => 'Date in YYYY-MM-DD format. Defaults to today.',
 							),
@@ -162,15 +162,15 @@ class DailyMemoryAbilities {
 								'description' => 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).',
 								'default'     => 0,
 							),
-							'query' => array(
+							'query'   => array(
 								'type'        => 'string',
 								'description' => 'Search term (case-insensitive substring match).',
 							),
-							'from'  => array(
+							'from'    => array(
 								'type'        => 'string',
 								'description' => 'Start date (YYYY-MM-DD, inclusive). Omit for no lower bound.',
 							),
-							'to'    => array(
+							'to'      => array(
 								'type'        => 'string',
 								'description' => 'End date (YYYY-MM-DD, inclusive). Omit for no upper bound.',
 							),
@@ -216,7 +216,7 @@ class DailyMemoryAbilities {
 								'description' => 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).',
 								'default'     => 0,
 							),
-							'date' => array(
+							'date'    => array(
 								'type'        => 'string',
 								'description' => 'Date in YYYY-MM-DD format. Defaults to today.',
 							),
@@ -252,7 +252,7 @@ class DailyMemoryAbilities {
 	public static function readDaily( array $input ): array {
 		$user_id = (int) ( $input['user_id'] ?? 0 );
 		$daily   = new DailyMemory( $user_id );
-		$date  = $input['date'] ?? gmdate( 'Y-m-d' );
+		$date    = $input['date'] ?? gmdate( 'Y-m-d' );
 
 		$parts = DailyMemory::parse_date( $date );
 		if ( ! $parts ) {
@@ -321,9 +321,9 @@ class DailyMemoryAbilities {
 	public static function searchDaily( array $input ): array {
 		$user_id = (int) ( $input['user_id'] ?? 0 );
 		$daily   = new DailyMemory( $user_id );
-		$query = $input['query'];
-		$from  = $input['from'] ?? null;
-		$to    = $input['to'] ?? null;
+		$query   = $input['query'];
+		$from    = $input['from'] ?? null;
+		$to      = $input['to'] ?? null;
 
 		return $daily->search( $query, $from, $to );
 	}
@@ -346,7 +346,7 @@ class DailyMemoryAbilities {
 
 		$user_id = (int) ( $input['user_id'] ?? 0 );
 		$daily   = new DailyMemory( $user_id );
-		$date  = $input['date'] ?? gmdate( 'Y-m-d' );
+		$date    = $input['date'] ?? gmdate( 'Y-m-d' );
 
 		$parts = DailyMemory::parse_date( $date );
 		if ( ! $parts ) {

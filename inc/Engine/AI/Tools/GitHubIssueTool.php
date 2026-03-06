@@ -102,7 +102,7 @@ class GitHubIssueTool extends BaseTool {
 
 		$repos = \DataMachine\Abilities\Fetch\GitHubAbilities::getRegisteredRepos();
 		if ( ! empty( $repos ) ) {
-			$repo_list = array_map(
+			$repo_list    = array_map(
 				function ( $r ) {
 					return $r['owner'] . '/' . $r['repo'] . ' (' . $r['label'] . ')';
 				},

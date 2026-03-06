@@ -81,16 +81,16 @@ class GetJobsAbility {
 								'default'     => 'j.job_id',
 								'description' => __( 'Column to order by', 'data-machine' ),
 							),
-						'order'       => array(
-							'type'        => 'string',
-							'enum'        => array( 'ASC', 'DESC' ),
-							'default'     => 'DESC',
-							'description' => __( 'Sort order', 'data-machine' ),
-						),
-						'since'       => array(
-							'type'        => array( 'string', 'null' ),
-							'description' => __( 'Filter jobs created at or after this datetime (Y-m-d H:i:s)', 'data-machine' ),
-						),
+							'order'       => array(
+								'type'        => 'string',
+								'enum'        => array( 'ASC', 'DESC' ),
+								'default'     => 'DESC',
+								'description' => __( 'Sort order', 'data-machine' ),
+							),
+							'since'       => array(
+								'type'        => array( 'string', 'null' ),
+								'description' => __( 'Filter jobs created at or after this datetime (Y-m-d H:i:s)', 'data-machine' ),
+							),
 						),
 					),
 					'output_schema'       => array(

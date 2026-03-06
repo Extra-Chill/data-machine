@@ -306,7 +306,7 @@ class MetaDescriptionAbilities {
 			);
 		}
 
-		return array_map( 'absint', $results ?: array() );
+		return array_map( 'absint', $results ? $results : array() );
 	}
 
 	/**

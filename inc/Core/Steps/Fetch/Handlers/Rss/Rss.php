@@ -100,7 +100,10 @@ class Rss extends FetchHandler {
 					$context->log(
 						'warning',
 						'Rss: Failed to download remote image',
-						array( 'guid' => $guid, 'enclosure_url' => $image_url )
+						array(
+							'guid'          => $guid,
+							'enclosure_url' => $image_url,
+						)
 					);
 				}
 			}

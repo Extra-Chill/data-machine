@@ -925,7 +925,7 @@ class GitHubAbilities {
 		// Always include the default repo from settings if configured.
 		$default_repo = self::getDefaultRepo();
 		if ( ! empty( $default_repo ) && str_contains( $default_repo, '/' ) ) {
-			$parts  = explode( '/', $default_repo, 2 );
+			$parts   = explode( '/', $default_repo, 2 );
 			$repos[] = array(
 				'owner' => $parts[0],
 				'repo'  => $parts[1],

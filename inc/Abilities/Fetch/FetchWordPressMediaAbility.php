@@ -249,9 +249,9 @@ class FetchWordPressMediaAbility {
 			}
 
 			$eligible_items[] = array(
-				'title'    => $content_data['title'] ?? '',
-				'content'  => $content_data['content'] ?? '',
-				'metadata' => array(
+				'title'     => $content_data['title'] ?? '',
+				'content'   => $content_data['content'] ?? '',
+				'metadata'  => array(
 					'source_type'            => 'wordpress_media',
 					'item_identifier_to_log' => $post->ID,
 					'original_id'            => $post->ID,

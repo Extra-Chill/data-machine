@@ -689,9 +689,9 @@ class PipelinesCommand extends BaseCommand {
 			return;
 		}
 
-		$format    = $assoc_args['format'] ?? 'table';
-		$add_file  = $assoc_args['add'] ?? null;
-		$rm_file   = $assoc_args['remove'] ?? null;
+		$format   = $assoc_args['format'] ?? 'table';
+		$add_file = $assoc_args['add'] ?? null;
+		$rm_file  = $assoc_args['remove'] ?? null;
 
 		$db = new \DataMachine\Core\Database\Pipelines\Pipelines();
 

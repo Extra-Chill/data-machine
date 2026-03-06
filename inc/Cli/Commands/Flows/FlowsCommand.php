@@ -425,11 +425,11 @@ class FlowsCommand extends BaseCommand {
 				}
 
 				$rows[] = array(
-					'step_id'    => $step_id,
-					'order'      => $order,
-					'step_type'  => $step_type,
-					'handler'    => '—',
-					'config'     => $config_display ?: '(default)',
+					'step_id'   => $step_id,
+					'order'     => $order,
+					'step_type' => $step_type,
+					'handler'   => '—',
+					'config'    => $config_display ? $config_display : '(default)',
 				);
 				continue;
 			}
@@ -443,11 +443,11 @@ class FlowsCommand extends BaseCommand {
 				}
 
 				$rows[] = array(
-					'step_id'    => $step_id,
-					'order'      => $order,
-					'step_type'  => $step_type,
-					'handler'    => $slug,
-					'config'     => implode( ', ', $config_parts ) ?: '(default)',
+					'step_id'   => $step_id,
+					'order'     => $order,
+					'step_type' => $step_type,
+					'handler'   => $slug,
+					'config'    => implode( ', ', $config_parts ) ?: '(default)',
 				);
 			}
 		}

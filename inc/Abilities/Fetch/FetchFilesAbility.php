@@ -273,6 +273,4 @@ class FetchFilesAbility {
 
 		return $files;
 	}
-
-
 }

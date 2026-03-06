@@ -44,7 +44,7 @@ class AgentMemoryAbilities {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'user_id'  => array(
+							'user_id' => array(
 								'type'        => 'integer',
 								'description' => 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).',
 								'default'     => 0,
@@ -83,7 +83,7 @@ class AgentMemoryAbilities {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'user_id'  => array(
+							'user_id' => array(
 								'type'        => 'integer',
 								'description' => 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).',
 								'default'     => 0,
@@ -127,7 +127,7 @@ class AgentMemoryAbilities {
 						'type'       => 'object',
 						'required'   => array( 'query' ),
 						'properties' => array(
-							'user_id'  => array(
+							'user_id' => array(
 								'type'        => 'integer',
 								'description' => 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).',
 								'default'     => 0,

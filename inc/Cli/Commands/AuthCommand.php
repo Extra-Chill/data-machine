@@ -498,9 +498,9 @@ class AuthCommand extends BaseCommand {
 		WP_CLI::log( '' );
 
 		foreach ( $config_fields as $field_name => $field_def ) {
-			$label    = $field_def['label'] ?? $field_name;
-			$required = ! empty( $field_def['required'] ) ? ' (required)' : '';
-			$value    = $current_config[ $field_name ] ?? '';
+			$label     = $field_def['label'] ?? $field_name;
+			$required  = ! empty( $field_def['required'] ) ? ' (required)' : '';
+			$value     = $current_config[ $field_name ] ?? '';
 			$is_secret = $this->isSecretField( $field_name, $field_def );
 
 			if ( ! empty( $value ) ) {

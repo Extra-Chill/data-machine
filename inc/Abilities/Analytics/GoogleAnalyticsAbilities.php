@@ -628,8 +628,8 @@ class GoogleAnalyticsAbilities {
 
 				// Compute delta percentage.
 				if ( 0.0 !== $previous_num ) {
-					$delta = ( ( $current_num - $previous_num ) / $previous_num ) * 100;
-					$sign  = $delta >= 0 ? '+' : '';
+					$delta                            = ( ( $current_num - $previous_num ) / $previous_num ) * 100;
+					$sign                             = $delta >= 0 ? '+' : '';
 					$formatted[ "\xCE\x94 " . $name ] = $sign . round( $delta, 1 ) . '%';
 				} else {
 					$formatted[ "\xCE\x94 " . $name ] = $current_num > 0 ? 'new' : '-';

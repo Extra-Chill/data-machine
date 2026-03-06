@@ -51,16 +51,34 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 
 		$core_layer_files = array(
 			// Site layer.
-			array( 'directory' => $shared_dir, 'filename' => 'SITE.md' ),
-			array( 'directory' => $shared_dir, 'filename' => 'RULES.md' ),
+			array(
+				'directory' => $shared_dir,
+				'filename'  => 'SITE.md',
+			),
+			array(
+				'directory' => $shared_dir,
+				'filename'  => 'RULES.md',
+			),
 
 			// Agent layer.
-			array( 'directory' => $agent_dir, 'filename' => 'SOUL.md' ),
-			array( 'directory' => $agent_dir, 'filename' => 'MEMORY.md' ),
+			array(
+				'directory' => $agent_dir,
+				'filename'  => 'SOUL.md',
+			),
+			array(
+				'directory' => $agent_dir,
+				'filename'  => 'MEMORY.md',
+			),
 
 			// User layer.
-			array( 'directory' => $user_dir, 'filename' => 'USER.md' ),
-			array( 'directory' => $user_dir, 'filename' => 'MEMORY.md' ),
+			array(
+				'directory' => $user_dir,
+				'filename'  => 'USER.md',
+			),
+			array(
+				'directory' => $user_dir,
+				'filename'  => 'MEMORY.md',
+			),
 		);
 
 		foreach ( $core_layer_files as $entry ) {

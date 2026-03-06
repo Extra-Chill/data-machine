@@ -210,7 +210,7 @@ class IndexNowCommand extends BaseCommand {
 	 * @subcommand enable
 	 */
 	public function enable( array $args, array $assoc_args ): void {
-		$settings = get_option( 'datamachine_settings', array() );
+		$settings                     = get_option( 'datamachine_settings', array() );
 		$settings['indexnow_enabled'] = true;
 		update_option( 'datamachine_settings', $settings );
 		PluginSettings::clearCache();
@@ -232,7 +232,7 @@ class IndexNowCommand extends BaseCommand {
 	 * @subcommand disable
 	 */
 	public function disable( array $args, array $assoc_args ): void {
-		$settings = get_option( 'datamachine_settings', array() );
+		$settings                     = get_option( 'datamachine_settings', array() );
 		$settings['indexnow_enabled'] = false;
 		update_option( 'datamachine_settings', $settings );
 		PluginSettings::clearCache();

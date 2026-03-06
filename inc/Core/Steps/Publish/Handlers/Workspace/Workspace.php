@@ -65,17 +65,17 @@ class Workspace extends PublishHandler {
 					'operation'      => 'publish_edit',
 					'description'    => 'Edit a file in the configured workspace repository via scoped find/replace.',
 					'parameters'     => array(
-						'path'       => array(
+						'path'        => array(
 							'type'        => 'string',
 							'required'    => true,
 							'description' => 'Relative file path within writable allowlist.',
 						),
-						'old_string' => array(
+						'old_string'  => array(
 							'type'        => 'string',
 							'required'    => true,
 							'description' => 'Exact string to replace.',
 						),
-						'new_string' => array(
+						'new_string'  => array(
 							'type'        => 'string',
 							'required'    => false,
 							'description' => 'Replacement string.',

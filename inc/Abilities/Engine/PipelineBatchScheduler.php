@@ -79,12 +79,12 @@ class PipelineBatchScheduler {
 
 		// Store batch metadata on the parent job.
 		datamachine_merge_engine_data( $parent_job_id, array(
-			'batch'              => true,
-			'batch_total'        => $total,
-			'batch_scheduled'    => 0,
-			'batch_chunk_size'   => self::CHUNK_SIZE,
-			'next_flow_step_id'  => $next_flow_step_id,
-			'started_at'         => current_time( 'mysql' ),
+			'batch'             => true,
+			'batch_total'       => $total,
+			'batch_scheduled'   => 0,
+			'batch_chunk_size'  => self::CHUNK_SIZE,
+			'next_flow_step_id' => $next_flow_step_id,
+			'started_at'        => current_time( 'mysql' ),
 		) );
 
 		do_action(
@@ -294,8 +294,8 @@ class PipelineBatchScheduler {
 		}
 
 		// Clone engine_data to child, updating the job context.
-		$child_engine            = $engine_snapshot;
-		$child_engine['job']     = array(
+		$child_engine        = $engine_snapshot;
+		$child_engine['job'] = array(
 			'job_id'        => $child_job_id,
 			'flow_id'       => $flow_id,
 			'pipeline_id'   => $pipeline_id,

@@ -21,19 +21,19 @@ class WorkspaceSettings extends PublishHandlerSettings {
 	 */
 	public static function get_fields(): array {
 		$fields = array(
-			'repo'             => array(
+			'repo'           => array(
 				'type'        => 'text',
 				'label'       => __( 'Workspace Repo', 'data-machine' ),
 				'description' => __( 'Workspace repository directory name for writes/mutations.', 'data-machine' ),
 				'required'    => true,
 			),
-			'writable_paths'   => array(
+			'writable_paths' => array(
 				'type'        => 'textarea',
 				'label'       => __( 'Writable Paths', 'data-machine' ),
 				'description' => __( 'Newline-separated relative path allowlist for writes (e.g. ec_docs/, docs/).', 'data-machine' ),
 				'required'    => true,
 			),
-			'branch_mode'      => array(
+			'branch_mode'    => array(
 				'type'        => 'select',
 				'label'       => __( 'Branch Mode', 'data-machine' ),
 				'description' => __( 'Use current branch or enforce a fixed branch for publish git operations.', 'data-machine' ),
@@ -43,25 +43,25 @@ class WorkspaceSettings extends PublishHandlerSettings {
 					'fixed'   => __( 'Fixed branch', 'data-machine' ),
 				),
 			),
-			'fixed_branch'     => array(
+			'fixed_branch'   => array(
 				'type'        => 'text',
 				'label'       => __( 'Fixed Branch (optional)', 'data-machine' ),
 				'description' => __( 'Required when branch mode is fixed. Example: docs/auto-updates', 'data-machine' ),
 				'required'    => false,
 			),
-			'commit_enabled'   => array(
+			'commit_enabled' => array(
 				'type'        => 'checkbox',
 				'label'       => __( 'Enable Commits', 'data-machine' ),
 				'description' => __( 'Allow git add/commit operations in this handler.', 'data-machine' ),
 				'default'     => true,
 			),
-			'push_enabled'     => array(
+			'push_enabled'   => array(
 				'type'        => 'checkbox',
 				'label'       => __( 'Enable Push', 'data-machine' ),
 				'description' => __( 'Allow git push operations in this handler.', 'data-machine' ),
 				'default'     => false,
 			),
-			'commit_message'   => array(
+			'commit_message' => array(
 				'type'        => 'text',
 				'label'       => __( 'Commit Message Template', 'data-machine' ),
 				'description' => __( 'Template used when AI does not provide a commit message.', 'data-machine' ),

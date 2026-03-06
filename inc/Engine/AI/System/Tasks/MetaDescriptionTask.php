@@ -218,7 +218,7 @@ class MetaDescriptionTask extends SystemTask {
 
 		$prompt = "Write a meta description for the following web page.\n\n"
 			. "Guidelines:\n"
-			. "- Maximum " . self::MAX_LENGTH . " characters (this is strict — do not exceed)\n"
+			. '- Maximum ' . self::MAX_LENGTH . " characters (this is strict — do not exceed)\n"
 			. "- Lead with the direct answer or hook — what will the reader learn or get?\n"
 			. "- Include the primary topic/keyword naturally\n"
 			. "- Create curiosity or value to encourage clicks\n"
@@ -226,7 +226,7 @@ class MetaDescriptionTask extends SystemTask {
 			. "- Write in a warm, conversational tone\n"
 			. "- No quotes around the description\n"
 			. "- One or two sentences\n\n"
-			. "Return ONLY the meta description text, nothing else.";
+			. 'Return ONLY the meta description text, nothing else.';
 
 		if ( ! empty( $context_lines ) ) {
 			$prompt .= "\n\nPage context:\n" . implode( "\n", $context_lines );

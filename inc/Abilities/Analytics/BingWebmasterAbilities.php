@@ -229,7 +229,7 @@ class BingWebmasterAbilities {
 					return true;
 				}
 				$ts = strtotime( $row['Date'] );
-				return $ts !== false && $ts >= $cutoff;
+				return false !== $ts && $ts >= $cutoff;
 			} ) );
 		}
 
@@ -242,8 +242,8 @@ class BingWebmasterAbilities {
 		// the key names expected by AnalyticsCommand::execute_ability().
 		$date_range = array();
 		if ( ! empty( $parsed_dates ) ) {
-			$min_ts = min( $parsed_dates );
-			$max_ts = max( $parsed_dates );
+			$min_ts     = min( $parsed_dates );
+			$max_ts     = max( $parsed_dates );
 			$date_range = array(
 				'start_date' => gmdate( 'Y-m-d', $min_ts ),
 				'end_date'   => gmdate( 'Y-m-d', $max_ts ),

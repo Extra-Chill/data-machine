@@ -212,21 +212,21 @@ class Files {
 				'type'              => 'integer',
 				'sanitize_callback' => 'absint',
 			),
-			'year'  => array(
+			'year'    => array(
 				'required'          => true,
 				'type'              => 'string',
 				'validate_callback' => function ( $value ) {
 					return (bool) preg_match( '/^\d{4}$/', $value );
 				},
 			),
-			'month' => array(
+			'month'   => array(
 				'required'          => true,
 				'type'              => 'string',
 				'validate_callback' => function ( $value ) {
 					return (bool) preg_match( '/^\d{2}$/', $value ) && (int) $value >= 1 && (int) $value <= 12;
 				},
 			),
-			'day'   => array(
+			'day'     => array(
 				'required'          => true,
 				'type'              => 'string',
 				'validate_callback' => function ( $value ) {
@@ -625,7 +625,7 @@ class Files {
 	 * @since 0.32.0
 	 */
 	public static function get_daily_file( WP_REST_Request $request ) {
-		$date   = sprintf( '%s-%s-%s', $request['year'], $request['month'], $request['day'] );
+		$date = sprintf( '%s-%s-%s', $request['year'], $request['month'], $request['day'] );
 
 		$input = array(
 			'date'    => $date,
@@ -693,7 +693,7 @@ class Files {
 	 * @since 0.32.0
 	 */
 	public static function delete_daily_file( WP_REST_Request $request ) {
-		$date   = sprintf( '%s-%s-%s', $request['year'], $request['month'], $request['day'] );
+		$date = sprintf( '%s-%s-%s', $request['year'], $request['month'], $request['day'] );
 
 		$input = array(
 			'date'    => $date,
