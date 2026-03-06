@@ -15,7 +15,7 @@
 namespace DataMachine\Tests\Unit\Abilities;
 
 use DataMachine\Abilities\AgentMemoryAbilities;
-use DataMachine\Abilities\FileAbilities;
+use DataMachine\Abilities\File\AgentFileAbilities;
 use DataMachine\Abilities\PipelineAbilities;
 use DataMachine\Abilities\FlowAbilities;
 use DataMachine\Abilities\JobAbilities;
@@ -157,14 +157,14 @@ class MultiAgentScopingTest extends WP_UnitTestCase {
 	}
 
 	// =========================================================================
-	// FileAbilities — agent-scoped ops use user_id
+	// AgentFileAbilities — agent-scoped ops use user_id
 	// =========================================================================
 
 	/**
-	 * Test list-files input_schema includes user_id.
+	 * Test list-agent-files input_schema includes user_id.
 	 */
-	public function test_list_files_schema_has_user_id(): void {
-		$ability = wp_get_ability( 'datamachine/list-files' );
+	public function test_list_agent_files_schema_has_user_id(): void {
+		$ability = wp_get_ability( 'datamachine/list-agent-files' );
 		$this->assertNotNull( $ability );
 
 		$schema = $ability->get_input_schema();
@@ -186,7 +186,7 @@ class MultiAgentScopingTest extends WP_UnitTestCase {
 	 * Test agent file listing with user_id returns scoped results.
 	 */
 	public function test_list_agent_files_scoped_by_user_id(): void {
-		$fa = new FileAbilities();
+		$fa = new AgentFileAbilities();
 
 		// Write a file to agent A's directory.
 		$fa->executeWriteAgentFile(
@@ -198,9 +198,8 @@ class MultiAgentScopingTest extends WP_UnitTestCase {
 		);
 
 		// List agent A's files — should include test-alpha.md.
-		$result_a = $fa->executeListFiles(
+		$result_a = $fa->executeListAgentFiles(
 			array(
-				'scope'   => 'agent',
 				'user_id' => $this->agent_a_id,
 			)
 		);
@@ -210,9 +209,8 @@ class MultiAgentScopingTest extends WP_UnitTestCase {
 		$this->assertContains( 'test-alpha.md', $filenames_a );
 
 		// List agent B's files — should NOT include test-alpha.md.
-		$result_b = $fa->executeListFiles(
+		$result_b = $fa->executeListAgentFiles(
 			array(
-				'scope'   => 'agent',
 				'user_id' => $this->agent_b_id,
 			)
 		);
@@ -226,7 +224,7 @@ class MultiAgentScopingTest extends WP_UnitTestCase {
 	 * Test agent file write creates user-scoped directory.
 	 */
 	public function test_write_agent_file_creates_user_directory(): void {
-		$fa = new FileAbilities();
+		$fa = new AgentFileAbilities();
 
 		$result = $fa->executeWriteAgentFile(
 			array(
@@ -248,7 +246,7 @@ class MultiAgentScopingTest extends WP_UnitTestCase {
 	 * Test agent file delete is scoped by user_id.
 	 */
 	public function test_delete_agent_file_scoped(): void {
-		$fa = new FileAbilities();
+		$fa = new AgentFileAbilities();
 
 		// Write to agent A.
 		$fa->executeWriteAgentFile(
@@ -260,20 +258,18 @@ class MultiAgentScopingTest extends WP_UnitTestCase {
 		);
 
 		// Delete from agent B — should fail (file doesn't exist there).
-		$result_b = $fa->executeDeleteFile(
+		$result_b = $fa->executeDeleteAgentFile(
 			array(
 				'filename' => 'deleteme.md',
-				'scope'    => 'agent',
 				'user_id'  => $this->agent_b_id,
 			)
 		);
 		$this->assertFalse( $result_b['success'] );
 
 		// Delete from agent A — should succeed.
-		$result_a = $fa->executeDeleteFile(
+		$result_a = $fa->executeDeleteAgentFile(
 			array(
 				'filename' => 'deleteme.md',
-				'scope'    => 'agent',
 				'user_id'  => $this->agent_a_id,
 			)
 		);

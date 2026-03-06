@@ -98,7 +98,8 @@ function datamachine_run_datamachine_plugin() {
 	\DataMachine\Api\Flows\FlowSteps::register();
 	\DataMachine\Api\Flows\FlowQueue::register();
 	\DataMachine\Api\AgentPing::register();
-	\DataMachine\Api\Files::register();
+	\DataMachine\Api\AgentFiles::register();
+	\DataMachine\Api\FlowFiles::register();
 	\DataMachine\Api\Users::register();
 	\DataMachine\Api\Logs::register();
 	\DataMachine\Api\ProcessedItems::register();
@@ -116,7 +117,9 @@ function datamachine_run_datamachine_plugin() {
 
 	// Load abilities
 	require_once __DIR__ . '/inc/Abilities/AuthAbilities.php';
-	require_once __DIR__ . '/inc/Abilities/FileAbilities.php';
+	require_once __DIR__ . '/inc/Abilities/File/FileConstants.php';
+	require_once __DIR__ . '/inc/Abilities/File/AgentFileAbilities.php';
+	require_once __DIR__ . '/inc/Abilities/File/FlowFileAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/FlowAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/FlowStepAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/JobAbilities.php';
@@ -162,7 +165,8 @@ function datamachine_run_datamachine_plugin() {
 	// Defer ability instantiation to init so translations are loaded.
 	add_action( 'init', function () {
 		new \DataMachine\Abilities\AuthAbilities();
-		new \DataMachine\Abilities\FileAbilities();
+		new \DataMachine\Abilities\File\AgentFileAbilities();
+		new \DataMachine\Abilities\File\FlowFileAbilities();
 		new \DataMachine\Abilities\FlowAbilities();
 		new \DataMachine\Abilities\FlowStepAbilities();
 		new \DataMachine\Abilities\JobAbilities();

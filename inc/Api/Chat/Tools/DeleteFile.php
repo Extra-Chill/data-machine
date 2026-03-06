@@ -3,7 +3,7 @@
  * Delete File Tool
  *
  * Focused tool for deleting uploaded files.
- * Delegates to FileAbilities for core logic.
+ * Delegates to FlowFileAbilities for core logic.
  *
  * @package DataMachine\Api\Chat\Tools
  */
@@ -66,7 +66,7 @@ class DeleteFile extends BaseTool {
 			);
 		}
 
-		$ability = wp_get_ability( 'datamachine/delete-file' );
+		$ability = wp_get_ability( 'datamachine/delete-flow-file' );
 		if ( ! $ability ) {
 			return array(
 				'success'   => false,

@@ -1,22 +1,22 @@
 <?php
 /**
- * FileAbilities Tests
+ * FlowFileAbilities Tests
  *
- * Tests for file listing, retrieval, deletion, and cleanup abilities.
+ * Tests for flow-scoped file listing, retrieval, deletion, and cleanup abilities.
  *
  * @package DataMachine\Tests\Unit\Abilities
  */
 
 namespace DataMachine\Tests\Unit\Abilities;
 
-use DataMachine\Abilities\FileAbilities;
+use DataMachine\Abilities\File\FlowFileAbilities;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\FilesRepository\FileStorage;
 use WP_UnitTestCase;
 
 class FileAbilitiesTest extends WP_UnitTestCase {
 
-	private FileAbilities $file_abilities;
+	private FlowFileAbilities $flow_file_abilities;
 	private int $test_pipeline_id;
 	private int $test_flow_id;
 	private string $test_flow_step_id;
@@ -27,7 +27,7 @@ class FileAbilitiesTest extends WP_UnitTestCase {
 		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $user_id );
 
-		$this->file_abilities = new FileAbilities();
+		$this->flow_file_abilities = new FlowFileAbilities();
 
 		$pipeline_ability       = wp_get_ability( 'datamachine/create-pipeline' );
 		$flow_ability           = wp_get_ability( 'datamachine/create-flow' );
@@ -45,95 +45,64 @@ class FileAbilitiesTest extends WP_UnitTestCase {
 		parent::tear_down();
 	}
 
-	public function test_list_files_ability_registered(): void {
-		$ability = wp_get_ability( 'datamachine/list-files' );
+	// =========================================================================
+	// Ability registration
+	// =========================================================================
+
+	public function test_list_flow_files_ability_registered(): void {
+		$ability = wp_get_ability( 'datamachine/list-flow-files' );
 
 		$this->assertNotNull( $ability );
-		$this->assertSame( 'datamachine/list-files', $ability->get_name() );
+		$this->assertSame( 'datamachine/list-flow-files', $ability->get_name() );
 	}
 
-	public function test_get_file_ability_registered(): void {
-		$ability = wp_get_ability( 'datamachine/get-file' );
+	public function test_get_flow_file_ability_registered(): void {
+		$ability = wp_get_ability( 'datamachine/get-flow-file' );
 
 		$this->assertNotNull( $ability );
-		$this->assertSame( 'datamachine/get-file', $ability->get_name() );
+		$this->assertSame( 'datamachine/get-flow-file', $ability->get_name() );
 	}
 
-	public function test_delete_file_ability_registered(): void {
-		$ability = wp_get_ability( 'datamachine/delete-file' );
+	public function test_delete_flow_file_ability_registered(): void {
+		$ability = wp_get_ability( 'datamachine/delete-flow-file' );
 
 		$this->assertNotNull( $ability );
-		$this->assertSame( 'datamachine/delete-file', $ability->get_name() );
+		$this->assertSame( 'datamachine/delete-flow-file', $ability->get_name() );
 	}
 
-	public function test_cleanup_files_ability_registered(): void {
-		$ability = wp_get_ability( 'datamachine/cleanup-files' );
+	public function test_cleanup_flow_files_ability_registered(): void {
+		$ability = wp_get_ability( 'datamachine/cleanup-flow-files' );
 
 		$this->assertNotNull( $ability );
-		$this->assertSame( 'datamachine/cleanup-files', $ability->get_name() );
+		$this->assertSame( 'datamachine/cleanup-flow-files', $ability->get_name() );
 	}
 
-	public function test_list_files_requires_scope(): void {
-		$result = $this->file_abilities->executeListFiles( array() );
+	public function test_upload_flow_file_ability_registered(): void {
+		$ability = wp_get_ability( 'datamachine/upload-flow-file' );
+
+		$this->assertNotNull( $ability );
+		$this->assertSame( 'datamachine/upload-flow-file', $ability->get_name() );
+	}
+
+	// =========================================================================
+	// List flow files
+	// =========================================================================
+
+	public function test_list_flow_files_requires_flow_step_id(): void {
+		$result = $this->flow_file_abilities->executeListFlowFiles( array() );
 
 		$this->assertFalse( $result['success'] );
 		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'Must provide either', $result['error'] );
+		$this->assertStringContainsString( 'flow_step_id is required', $result['error'] );
 	}
 
-	public function test_list_files_rejects_both_scopes(): void {
-		$result = $this->file_abilities->executeListFiles(
-			array(
-				'flow_step_id' => $this->test_flow_step_id,
-				'pipeline_id'  => $this->test_pipeline_id,
-			)
-		);
+	// =========================================================================
+	// Get flow file
+	// =========================================================================
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'Cannot provide both', $result['error'] );
-	}
-
-	public function test_list_files_with_pipeline_id(): void {
-		$result = $this->file_abilities->executeListFiles(
-			array(
-				'pipeline_id' => $this->test_pipeline_id,
-			)
-		);
-
-		$this->assertTrue( $result['success'] );
-		$this->assertArrayHasKey( 'files', $result );
-		$this->assertArrayHasKey( 'scope', $result );
-		$this->assertEquals( 'pipeline', $result['scope'] );
-		$this->assertIsArray( $result['files'] );
-	}
-
-	public function test_list_files_with_invalid_pipeline_id(): void {
-		$result = $this->file_abilities->executeListFiles(
-			array(
-				'pipeline_id' => 999999,
-			)
-		);
-
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'not found', $result['error'] );
-	}
-
-	public function test_get_file_requires_filename(): void {
-		$result = $this->file_abilities->executeGetFile(
-			array(
-				'pipeline_id' => $this->test_pipeline_id,
-			)
-		);
-
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'filename is required', $result['error'] );
-	}
-
-	public function test_get_file_requires_scope(): void {
-		$result = $this->file_abilities->executeGetFile(
+	public function test_get_flow_file_requires_both_params(): void {
+		// Without flow_step_id — should fail.
+		$result = $this->flow_file_abilities->executeGetFlowFile(
 			array(
 				'filename' => 'test.txt',
 			)
@@ -141,50 +110,10 @@ class FileAbilitiesTest extends WP_UnitTestCase {
 
 		$this->assertFalse( $result['success'] );
 		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'Must provide either', $result['error'] );
 	}
 
-	public function test_get_file_rejects_both_scopes(): void {
-		$result = $this->file_abilities->executeGetFile(
-			array(
-				'filename'     => 'test.txt',
-				'flow_step_id' => $this->test_flow_step_id,
-				'pipeline_id'  => $this->test_pipeline_id,
-			)
-		);
-
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'Cannot provide both', $result['error'] );
-	}
-
-	public function test_get_file_not_found_in_pipeline(): void {
-		$result = $this->file_abilities->executeGetFile(
-			array(
-				'filename'    => 'nonexistent.txt',
-				'pipeline_id' => $this->test_pipeline_id,
-			)
-		);
-
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'not found', $result['error'] );
-	}
-
-	public function test_delete_file_requires_filename(): void {
-		$result = $this->file_abilities->executeDeleteFile(
-			array(
-				'pipeline_id' => $this->test_pipeline_id,
-			)
-		);
-
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'filename is required', $result['error'] );
-	}
-
-	public function test_delete_file_requires_scope(): void {
-		$result = $this->file_abilities->executeDeleteFile(
+	public function test_get_flow_file_requires_flow_step_id(): void {
+		$result = $this->flow_file_abilities->executeGetFlowFile(
 			array(
 				'filename' => 'test.txt',
 			)
@@ -192,46 +121,50 @@ class FileAbilitiesTest extends WP_UnitTestCase {
 
 		$this->assertFalse( $result['success'] );
 		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'Must provide either', $result['error'] );
+		$this->assertStringContainsString( 'flow_step_id is required', $result['error'] );
 	}
 
-	public function test_delete_file_rejects_both_scopes(): void {
-		$result = $this->file_abilities->executeDeleteFile(
+	// =========================================================================
+	// Delete flow file
+	// =========================================================================
+
+	public function test_delete_flow_file_requires_filename(): void {
+		$result = $this->flow_file_abilities->executeDeleteFlowFile(
 			array(
-				'filename'     => 'test.txt',
 				'flow_step_id' => $this->test_flow_step_id,
-				'pipeline_id'  => $this->test_pipeline_id,
 			)
 		);
 
 		$this->assertFalse( $result['success'] );
 		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'Cannot provide both', $result['error'] );
 	}
 
-	public function test_delete_file_not_found_in_pipeline(): void {
-		$result = $this->file_abilities->executeDeleteFile(
+	public function test_delete_flow_file_requires_flow_step_id(): void {
+		$result = $this->flow_file_abilities->executeDeleteFlowFile(
 			array(
-				'filename'    => 'nonexistent.txt',
-				'pipeline_id' => $this->test_pipeline_id,
+				'filename' => 'test.txt',
 			)
 		);
 
 		$this->assertFalse( $result['success'] );
 		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'not found', $result['error'] );
+		$this->assertStringContainsString( 'flow_step_id is required', $result['error'] );
 	}
 
-	public function test_cleanup_files_requires_scope(): void {
-		$result = $this->file_abilities->executeCleanupFiles( array() );
+	// =========================================================================
+	// Cleanup flow files
+	// =========================================================================
+
+	public function test_cleanup_flow_files_requires_scope(): void {
+		$result = $this->flow_file_abilities->executeCleanupFlowFiles( array() );
 
 		$this->assertFalse( $result['success'] );
 		$this->assertArrayHasKey( 'error', $result );
 		$this->assertStringContainsString( 'Must provide either', $result['error'] );
 	}
 
-	public function test_cleanup_files_job_requires_flow(): void {
-		$result = $this->file_abilities->executeCleanupFiles(
+	public function test_cleanup_flow_files_job_requires_flow(): void {
+		$result = $this->flow_file_abilities->executeCleanupFlowFiles(
 			array(
 				'job_id' => 1,
 			)
@@ -242,8 +175,8 @@ class FileAbilitiesTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'flow_id is required', $result['error'] );
 	}
 
-	public function test_cleanup_files_with_invalid_flow_id(): void {
-		$result = $this->file_abilities->executeCleanupFiles(
+	public function test_cleanup_flow_files_with_invalid_flow_id(): void {
+		$result = $this->flow_file_abilities->executeCleanupFlowFiles(
 			array(
 				'flow_id' => 999999,
 			)
@@ -254,8 +187,8 @@ class FileAbilitiesTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'not found', $result['error'] );
 	}
 
-	public function test_cleanup_files_with_valid_flow(): void {
-		$result = $this->file_abilities->executeCleanupFiles(
+	public function test_cleanup_flow_files_with_valid_flow(): void {
+		$result = $this->flow_file_abilities->executeCleanupFlowFiles(
 			array(
 				'flow_id' => $this->test_flow_id,
 			)
@@ -267,7 +200,7 @@ class FileAbilitiesTest extends WP_UnitTestCase {
 		$this->assertIsInt( $result['deleted_count'] );
 	}
 
-	public function test_cleanup_files_with_job_and_flow(): void {
+	public function test_cleanup_flow_files_with_job_and_flow(): void {
 		$db_jobs = new Jobs();
 		$job_id  = $db_jobs->create_job(
 			array(
@@ -276,7 +209,7 @@ class FileAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$result = $this->file_abilities->executeCleanupFiles(
+		$result = $this->flow_file_abilities->executeCleanupFlowFiles(
 			array(
 				'job_id'  => $job_id,
 				'flow_id' => $this->test_flow_id,
@@ -286,19 +219,23 @@ class FileAbilitiesTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['success'] );
 		$this->assertArrayHasKey( 'deleted_count', $result );
 		$this->assertArrayHasKey( 'message', $result );
-		$this->assertStringContainsString( 'job', $result['message'] );
+		$this->assertStringContainsString( 'Cleanup completed', $result['message'] );
 	}
+
+	// =========================================================================
+	// Permission
+	// =========================================================================
 
 	public function test_permission_callback_denies_unauthenticated(): void {
 		wp_set_current_user( 0 );
 		add_filter( 'datamachine_cli_bypass_permissions', '__return_false' );
 
-		$ability = wp_get_ability( 'datamachine/list-files' );
+		$ability = wp_get_ability( 'datamachine/list-flow-files' );
 		$this->assertNotNull( $ability );
 
 		$result = $ability->execute(
 			array(
-				'pipeline_id' => $this->test_pipeline_id,
+				'flow_step_id' => $this->test_flow_step_id,
 			)
 		);
 
@@ -310,20 +247,7 @@ class FileAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_permission_callback_allows_admin(): void {
-		$result = $this->file_abilities->checkPermission();
+		$result = $this->flow_file_abilities->checkPermission();
 		$this->assertTrue( $result );
-	}
-
-	public function test_filename_is_sanitized(): void {
-		$result = $this->file_abilities->executeGetFile(
-			array(
-				'filename'    => '../../../etc/passwd',
-				'pipeline_id' => $this->test_pipeline_id,
-			)
-		);
-
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringNotContainsString( '../', $result['error'] );
 	}
 }

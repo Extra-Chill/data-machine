@@ -34,12 +34,18 @@ class AllAbilitiesRegisteredTest extends WP_UnitTestCase {
 			'datamachine/get-auth-status',
 			'datamachine/disconnect-auth',
 			'datamachine/save-auth-config',
-			// FileAbilities (5)
-			'datamachine/list-files',
-			'datamachine/get-file',
-			'datamachine/delete-file',
-			'datamachine/cleanup-files',
-			'datamachine/upload-file',
+			// AgentFileAbilities (5)
+			'datamachine/list-agent-files',
+			'datamachine/get-agent-file',
+			'datamachine/write-agent-file',
+			'datamachine/delete-agent-file',
+			'datamachine/upload-agent-file',
+			// FlowFileAbilities (5)
+			'datamachine/list-flow-files',
+			'datamachine/get-flow-file',
+			'datamachine/delete-flow-file',
+			'datamachine/cleanup-flow-files',
+			'datamachine/upload-flow-file',
 			// FlowStepAbilities (3)
 			'datamachine/get-flow-steps',
 			'datamachine/update-flow-step',

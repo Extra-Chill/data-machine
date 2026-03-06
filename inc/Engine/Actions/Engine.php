@@ -37,7 +37,7 @@ function datamachine_normalize_engine_config( $config ): array {
  * @return array Context array with pipeline/flow metadata.
  */
 function datamachine_get_file_context( int|string $flow_id ): array {
-	return \DataMachine\Api\Files::get_file_context( $flow_id );
+	return \DataMachine\Api\FlowFiles::get_file_context( $flow_id );
 }
 
 /**
