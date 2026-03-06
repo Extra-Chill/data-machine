@@ -44,6 +44,7 @@ class Chat extends BaseRepository {
 		$sql = "CREATE TABLE {$table_name} (
             session_id VARCHAR(50) NOT NULL,
             user_id BIGINT(20) UNSIGNED NOT NULL,
+            agent_id BIGINT(20) UNSIGNED NULL COMMENT 'First-class agent identity (nullable for backward compatibility)',
             title VARCHAR(100) NULL COMMENT 'AI-generated or truncated first message title',
             messages LONGTEXT NOT NULL COMMENT 'JSON array of conversation messages',
             metadata LONGTEXT NULL COMMENT 'JSON object for session metadata',
@@ -55,6 +56,7 @@ class Chat extends BaseRepository {
             expires_at DATETIME NULL COMMENT 'Auto-cleanup timestamp',
             PRIMARY KEY  (session_id),
             KEY user_id (user_id),
+            KEY agent_id (agent_id),
             KEY agent_type (agent_type),
             KEY user_agent (user_id, agent_type),
             KEY created_at (created_at),
@@ -64,6 +66,34 @@ class Chat extends BaseRepository {
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
+	}
+
+	/**
+	 * Ensure agent_id column exists for layered architecture migration.
+	 *
+	 * dbDelta can miss edge cases on existing installs, so we perform an explicit
+	 * column check and ALTER as a safety net.
+	 *
+	 * @since 0.36.1
+	 * @return void
+	 */
+	public static function ensure_agent_id_column(): void {
+		global $wpdb;
+
+		$table_name = self::get_prefixed_table_name();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$column = $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM %i LIKE %s', $table_name, 'agent_id' ) );
+
+		if ( $column ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN agent_id BIGINT(20) UNSIGNED NULL AFTER user_id', $table_name ) );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD KEY agent_id (agent_id)', $table_name ) );
 	}
 
 	/**

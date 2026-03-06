@@ -151,6 +151,48 @@ class DirectoryManager {
 	}
 
 	/**
+	 * Get shared site directory path.
+	 *
+	 * @since 0.36.1
+	 * @return string Full path to shared directory.
+	 */
+	public function get_shared_directory(): string {
+		$upload_dir = wp_upload_dir();
+		$base       = trailingslashit( $upload_dir['basedir'] ) . self::REPOSITORY_DIR;
+		return "{$base}/shared";
+	}
+
+	/**
+	 * Get first-class agent directory path by slug.
+	 *
+	 * @since 0.36.1
+	 * @param string $agent_slug Agent slug.
+	 * @return string Full path to agent identity directory.
+	 */
+	public function get_agent_identity_directory( string $agent_slug ): string {
+		$upload_dir = wp_upload_dir();
+		$base       = trailingslashit( $upload_dir['basedir'] ) . self::REPOSITORY_DIR;
+		$safe_slug  = sanitize_title( $agent_slug );
+
+		return "{$base}/agents/{$safe_slug}";
+	}
+
+	/**
+	 * Get user layer directory path.
+	 *
+	 * @since 0.36.1
+	 * @param int $user_id WordPress user ID.
+	 * @return string Full path to user layer directory.
+	 */
+	public function get_user_directory( int $user_id ): string {
+		$upload_dir = wp_upload_dir();
+		$base       = trailingslashit( $upload_dir['basedir'] ) . self::REPOSITORY_DIR;
+		$user_id    = absint( $user_id );
+
+		return "{$base}/users/{$user_id}";
+	}
+
+	/**
 	 * Get the default agent user ID.
 	 *
 	 * For single-agent installs, returns the configured default or the first admin user.
