@@ -340,6 +340,7 @@ class AgentFileAbilities {
 	 * @return array Result with file data.
 	 */
 	public function executeGetAgentFile( array $input ): array {
+		$fs = FilesystemHelper::get();
 		DirectoryManager::ensure_agent_files();
 
 		$filename = sanitize_file_name( $input['filename'] ?? '' );
@@ -361,7 +362,7 @@ class AgentFileAbilities {
 					'filename' => $filename,
 					'size'     => filesize( $filepath ),
 					'modified' => gmdate( 'c', filemtime( $filepath ) ),
-					'content'  => file_get_contents( $filepath ),
+					'content'  => $fs->get_contents( $filepath ),
 				)
 			),
 		);

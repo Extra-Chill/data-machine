@@ -73,6 +73,7 @@ class AgentMemory {
 	 * @return array{success: bool, content?: string, message?: string}
 	 */
 	public function get_all(): array {
+		$fs = FilesystemHelper::get();
 		if ( ! file_exists( $this->file_path ) ) {
 			return array(
 				'success' => false,
@@ -80,7 +81,7 @@ class AgentMemory {
 			);
 		}
 
-		$content = file_get_contents( $this->file_path );
+		$content = $fs->get_contents( $this->file_path );
 
 		return array(
 			'success' => true,
@@ -96,6 +97,7 @@ class AgentMemory {
 	 * @return array{success: bool, sections?: string[], message?: string}
 	 */
 	public function get_sections(): array {
+		$fs = FilesystemHelper::get();
 		if ( ! file_exists( $this->file_path ) ) {
 			return array(
 				'success' => false,
@@ -103,7 +105,7 @@ class AgentMemory {
 			);
 		}
 
-		$content  = file_get_contents( $this->file_path );
+		$content  = $fs->get_contents( $this->file_path );
 		$sections = $this->parse_section_headers( $content );
 
 		return array(
@@ -119,6 +121,7 @@ class AgentMemory {
 	 * @return array{success: bool, section?: string, content?: string, message?: string}
 	 */
 	public function get_section( string $section_name ): array {
+		$fs = FilesystemHelper::get();
 		if ( ! file_exists( $this->file_path ) ) {
 			return array(
 				'success' => false,
@@ -126,7 +129,7 @@ class AgentMemory {
 			);
 		}
 
-		$content = file_get_contents( $this->file_path );
+		$content = $fs->get_contents( $this->file_path );
 		$parsed  = $this->parse_section( $content, $section_name );
 
 		if ( null === $parsed ) {
@@ -155,9 +158,10 @@ class AgentMemory {
 	 * @return array{success: bool, message: string}
 	 */
 	public function set_section( string $section_name, string $content ): array {
+		$fs = FilesystemHelper::get();
 		$this->ensure_file_exists();
 
-		$file_content = file_get_contents( $this->file_path );
+		$file_content = $fs->get_contents( $this->file_path );
 		$section_pos  = $this->find_section_position( $file_content, $section_name );
 
 		if ( null === $section_pos ) {
@@ -194,9 +198,10 @@ class AgentMemory {
 	 * @return array{success: bool, message: string}
 	 */
 	public function append_to_section( string $section_name, string $content ): array {
+		$fs = FilesystemHelper::get();
 		$this->ensure_file_exists();
 
-		$file_content = file_get_contents( $this->file_path );
+		$file_content = $fs->get_contents( $this->file_path );
 		$section_pos  = $this->find_section_position( $file_content, $section_name );
 
 		if ( null === $section_pos ) {
@@ -255,6 +260,7 @@ class AgentMemory {
 	 * @return array{success: bool, query: string, matches: array, match_count: int}
 	 */
 	public function search( string $query, ?string $section = null, int $context_lines = 2 ): array {
+		$fs = FilesystemHelper::get();
 		if ( ! file_exists( $this->file_path ) ) {
 			return array(
 				'success'     => false,
@@ -264,7 +270,7 @@ class AgentMemory {
 			);
 		}
 
-		$content         = file_get_contents( $this->file_path );
+		$content         = $fs->get_contents( $this->file_path );
 		$lines           = explode( "\n", $content );
 		$matches         = array();
 		$current_section = null;
@@ -389,6 +395,7 @@ class AgentMemory {
 	 * so a recreated MEMORY.md includes the standard sections.
 	 */
 	private function ensure_file_exists(): void {
+		$fs        = FilesystemHelper::get();
 		$agent_dir = $this->directory_manager->get_agent_identity_directory_for_user( $this->user_id );
 
 		if ( ! $this->directory_manager->ensure_directory_exists( $agent_dir ) ) {
@@ -414,7 +421,7 @@ class AgentMemory {
 				}
 			}
 
-			file_put_contents( $this->file_path, $content );
+			$fs->put_contents( $this->file_path, $content );
 			FilesystemHelper::make_group_writable( $this->file_path );
 
 			do_action(
@@ -435,7 +442,8 @@ class AgentMemory {
 	 * @return int Written file size in bytes.
 	 */
 	private function write_file( string $content ): int {
-		file_put_contents( $this->file_path, $content );
+		$fs = FilesystemHelper::get();
+		$fs->put_contents( $this->file_path, $content );
 		FilesystemHelper::make_group_writable( $this->file_path );
 		$size = strlen( $content );
 

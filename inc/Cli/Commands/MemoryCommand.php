@@ -669,6 +669,7 @@ class MemoryCommand extends BaseCommand {
 	 * @param string $filename File name (e.g., SOUL.md).
 	 */
 	private function files_write( string $filename, int $user_id = 0 ): void {
+		$fs        = FilesystemHelper::get();
 		$safe_name = $this->sanitize_agent_filename( $filename );
 
 		// Only allow .md files.
@@ -681,7 +682,7 @@ class MemoryCommand extends BaseCommand {
 		$filepath  = $agent_dir . '/' . $safe_name;
 
 		// Read from stdin.
-		$content = file_get_contents( 'php://stdin' );
+		$content = $fs->get_contents( 'php://stdin' );
 
 		if ( false === $content || '' === trim( $content ) ) {
 			WP_CLI::error( 'No content received from stdin. Pipe content in: echo "content" | wp datamachine agent files write SOUL.md' );

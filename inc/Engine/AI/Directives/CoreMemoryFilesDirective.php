@@ -135,6 +135,7 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 	 * @return string|null
 	 */
 	private static function get_file_content_for_output( string $filepath, string $filename ): ?string {
+		global $wp_filesystem;
 		$file_size = filesize( $filepath );
 
 		if ( $file_size > AgentMemory::MAX_FILE_SIZE ) {
@@ -155,7 +156,7 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 			);
 		}
 
-		$content = file_get_contents( $filepath );
+		$content = $wp_filesystem->get_contents( $filepath );
 
 		if ( empty( trim( $content ) ) ) {
 			return null;

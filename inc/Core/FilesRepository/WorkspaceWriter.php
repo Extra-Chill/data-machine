@@ -135,6 +135,7 @@ class WorkspaceWriter {
 	 * @return array{success: bool, path?: string, replacements?: int, message?: string}
 	 */
 	public function edit_file( string $name, string $path, string $old_string, string $new_string, bool $replace_all = false ): array {
+		$fs        = FilesystemHelper::get();
 		$repo_path = $this->workspace->get_repo_path( $name );
 		$path      = ltrim( $path, '/' );
 
@@ -164,7 +165,7 @@ class WorkspaceWriter {
 			);
 		}
 
-		if ( ! is_readable( $real_path ) || ! is_writable( $real_path ) ) {
+		if ( ! is_readable( $real_path ) || ! $fs->$fs->is_writable( $real_path ) ) {
 			return array(
 				'success' => false,
 				'message' => sprintf( 'File not readable/writable: %s', $path ),
