@@ -454,11 +454,13 @@ function datamachine_activate_for_site() {
 		wp_mkdir_p( $log_dir );
 	}
 
+	// Run layered architecture migration (idempotent).
+	// Must run BEFORE scaffold so custom legacy files are copied first,
+	// then scaffold fills in any remaining gaps with defaults.
+	datamachine_migrate_to_layered_architecture();
+
 	// Ensure default agent memory files exist.
 	datamachine_ensure_default_memory_files();
-
-	// Run layered architecture migration (idempotent).
-	datamachine_migrate_to_layered_architecture();
 
 	// Re-schedule any flows with non-manual scheduling
 	datamachine_activate_scheduled_flows();
@@ -808,10 +810,34 @@ function datamachine_get_site_scaffold_content(): string {
 }
 
 /**
+ * Build shared RULES.md scaffold content.
+ *
+ * Creates a template for site-wide behavioral rules that apply to all agents.
+ * Loaded by CoreMemoryFilesDirective at Priority 20 from the shared/ directory.
+ *
+ * @since 0.37.1
+ * @return string
+ */
+function datamachine_get_rules_scaffold_content(): string {
+	return <<<'MD'
+# Rules
+
+<!-- Site-wide behavioral rules that apply to all agents on this site. -->
+<!-- These rules are loaded before agent-specific files (SOUL.md, MEMORY.md). -->
+
+## Content Rules
+<!-- Guidelines for content creation, quality standards, taxonomy usage -->
+
+## Operational Rules
+<!-- Constraints on agent behavior, safety guardrails, workflow requirements -->
+MD;
+}
+
+/**
  * Migrate existing user_id-scoped agent files to layered architecture.
  *
  * Idempotent migration that:
- * - Creates shared/ SITE.md
+ * - Creates shared/ SITE.md and RULES.md
  * - Creates agents/{slug}/ and users/{user_id}/
  * - Copies SOUL.md + MEMORY.md to agent layer
  * - Copies USER.md to user layer
@@ -853,6 +879,12 @@ function datamachine_migrate_to_layered_architecture(): void {
 	if ( ! file_exists( $site_md ) ) {
 		$fs->put_contents( $site_md, datamachine_get_site_scaffold_content(), FS_CHMOD_FILE );
 		\DataMachine\Core\FilesRepository\FilesystemHelper::make_group_writable( $site_md );
+	}
+
+	$rules_md = trailingslashit( $shared_dir ) . 'RULES.md';
+	if ( ! file_exists( $rules_md ) ) {
+		$fs->put_contents( $rules_md, datamachine_get_rules_scaffold_content(), FS_CHMOD_FILE );
+		\DataMachine\Core\FilesRepository\FilesystemHelper::make_group_writable( $rules_md );
 	}
 
 	$index_file = trailingslashit( $shared_dir ) . 'index.php';
@@ -1152,6 +1184,23 @@ function datamachine_ensure_default_memory_files() {
 			sprintf( 'Self-healing: created missing agent file %s with scaffold defaults.', $filename ),
 			array( 'filename' => $filename )
 		);
+	}
+
+	// Ensure shared/ layer files exist (SITE.md, RULES.md).
+	$shared_dir = $directory_manager->get_shared_directory();
+	if ( $directory_manager->ensure_directory_exists( $shared_dir ) ) {
+		$shared_files = array(
+			'SITE.md'  => 'datamachine_get_site_scaffold_content',
+			'RULES.md' => 'datamachine_get_rules_scaffold_content',
+		);
+
+		foreach ( $shared_files as $filename => $scaffold_fn ) {
+			$filepath = "{$shared_dir}/{$filename}";
+			if ( ! file_exists( $filepath ) ) {
+				$fs->put_contents( $filepath, call_user_func( $scaffold_fn ), FS_CHMOD_FILE );
+				\DataMachine\Core\FilesRepository\FilesystemHelper::make_group_writable( $filepath );
+			}
+		}
 	}
 }
 
