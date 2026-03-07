@@ -328,7 +328,9 @@ class FlowSteps {
 			);
 		}
 
-		$handler_settings = self::process_handler_settings( $handler_slug, $request->get_params() );
+		// Raw settings are passed to the ability, which handles sanitization.
+		$raw_settings     = $request->get_param( 'settings' );
+		$handler_settings = is_array( $raw_settings ) ? $raw_settings : array();
 
 		$parts = apply_filters( 'datamachine_split_flow_step_id', null, $flow_step_id );
 		if ( ! isset( $parts['flow_id'] ) || ! isset( $parts['pipeline_step_id'] ) ) {
@@ -454,31 +456,4 @@ class FlowSteps {
 		);
 	}
 
-	/**
-	 * Process handler settings from request parameters
-	 *
-	 * @param string $handler_slug Handler identifier
-	 * @param array  $params Request parameters
-	 * @return array Sanitized handler settings
-	 */
-	private static function process_handler_settings( $handler_slug, $params ) {
-		$handler_abilities = new HandlerAbilities();
-		$handler_settings  = $handler_abilities->getSettingsClass( $handler_slug );
-
-		if ( ! $handler_settings || ! method_exists( $handler_settings, 'sanitize' ) ) {
-			return array();
-		}
-
-		$raw_settings = $params['settings'] ?? array();
-
-		if ( ! is_array( $raw_settings ) ) {
-			$raw_settings = array();
-		}
-
-		try {
-			return $handler_settings->sanitize( $raw_settings );
-		} catch ( \Exception $e ) {
-			return array();
-		}
-	}
 }
