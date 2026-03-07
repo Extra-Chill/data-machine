@@ -12,6 +12,7 @@ use DataMachine\Core\EngineData;
 use DataMachine\Core\Steps\Publish\Handlers\PublishHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 use DataMachine\Core\Selection\SelectionMode;
+use DataMachine\Core\WordPress\DuplicateDetection;
 use DataMachine\Core\WordPress\TaxonomyHandler;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
 use DataMachine\Core\WordPress\WordPressPublishHelper;
@@ -105,6 +106,40 @@ class WordPress extends PublishHandler {
 
 				if ( SelectionMode::isAiDecides( $selection ) && ! empty( $parameters[ $taxonomy ] ) ) {
 					$taxonomies[ $taxonomy ] = $parameters[ $taxonomy ];
+				}
+			}
+		}
+
+		// Duplicate detection — check before publishing
+		$dedup_enabled = ! empty( $handler_config['dedup_enabled'] );
+		if ( $dedup_enabled ) {
+			$title     = $parameters['title'] ?? '';
+			$post_type = $handler_config['post_type'] ?? '';
+
+			if ( ! empty( $title ) && ! empty( $post_type ) ) {
+				$lookback_days  = (int) ( $handler_config['dedup_lookback_days'] ?? DuplicateDetection::DEFAULT_LOOKBACK_DAYS );
+				$existing_id    = DuplicateDetection::findExistingPostByTitle( $title, $post_type, $lookback_days );
+
+				if ( $existing_id ) {
+					$this->log(
+						'info',
+						'WordPress: Duplicate detected, skipping publish',
+						array(
+							'incoming_title' => $title,
+							'existing_id'    => $existing_id,
+							'existing_title' => get_the_title( $existing_id ),
+							'existing_url'   => get_permalink( $existing_id ),
+						)
+					);
+
+					return $this->successResponse(
+						array(
+							'post_id'    => $existing_id,
+							'post_title' => get_the_title( $existing_id ),
+							'post_url'   => get_permalink( $existing_id ),
+							'action'     => 'duplicate_skipped',
+						)
+					);
 				}
 			}
 		}
