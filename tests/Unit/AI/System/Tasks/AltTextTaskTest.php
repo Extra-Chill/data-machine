@@ -19,6 +19,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 	private string $test_image_path;
 
 	public function set_up(): void {
+		global $wp_filesystem;
 		parent::set_up();
 		$this->task = new AltTextTask();
 
@@ -28,7 +29,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 		
 		// Create a minimal JPEG file
 		$jpeg_data = base64_decode( '/9j/4AAQSkZJRgABAQEAAAAAAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwA/3/AD' );
-		file_put_contents( $this->test_image_path, $jpeg_data );
+		$wp_filesystem->put_contents( $this->test_image_path, $jpeg_data );
 
 		// Create attachment
 		$this->attachment_id = self::factory()->attachment->create_object( [
@@ -43,7 +44,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 
 	public function tear_down(): void {
 		if ( file_exists( $this->test_image_path ) ) {
-			unlink( $this->test_image_path );
+			wp_delete_file( $this->test_image_path );
 		}
 		parent::tear_down();
 	}
@@ -155,7 +156,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 	 */
 	public function test_execute_missing_file(): void {
 		// Delete the file but keep the attachment
-		unlink( $this->test_image_path );
+		wp_delete_file( $this->test_image_path );
 
 		$this->expectOutputString( '' );
 		$this->task->execute( 1, [ 'attachment_id' => $this->attachment_id ] );

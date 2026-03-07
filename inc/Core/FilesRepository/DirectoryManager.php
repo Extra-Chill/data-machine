@@ -305,6 +305,7 @@ class DirectoryManager {
 	 * @return string Full path to workspace directory, or empty string if unavailable.
 	 */
 	public function get_workspace_directory(): string {
+		$fs = FilesystemHelper::get();
 		// 1. Explicit constant override.
 		if ( defined( 'DATAMACHINE_WORKSPACE_PATH' ) ) {
 			return rtrim( DATAMACHINE_WORKSPACE_PATH, '/' );
@@ -313,7 +314,7 @@ class DirectoryManager {
 		// 2. System-level default (outside web root).
 		$system_path = '/var/lib/datamachine/workspace';
 		$system_base = dirname( $system_path );
-		if ( is_writable( $system_base ) || ( ! file_exists( $system_base ) && is_writable( dirname( $system_base ) ) ) ) {
+		if ( $fs->$fs->is_writable( $system_base ) || ( ! file_exists( $system_base ) && $fs->$fs->is_writable( dirname( $system_base ) ) ) ) {
 			return $system_path;
 		}
 

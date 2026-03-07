@@ -797,11 +797,11 @@ class GDRenderer {
 		};
 
 		if ( file_exists( $temp_file ) ) {
-			unlink( $temp_file );
+			wp_delete_file( $temp_file );
 		}
 
 		if ( ! $success ) {
-			unlink( $path );
+			wp_delete_file( $path );
 			return null;
 		}
 
@@ -827,7 +827,7 @@ class GDRenderer {
 		$stored_path = $storage->store_file( $temp_path, $filename, $context );
 
 		if ( file_exists( $temp_path ) ) {
-			unlink( $temp_path );
+			wp_delete_file( $temp_path );
 		}
 
 		return $stored_path ? $stored_path : null;

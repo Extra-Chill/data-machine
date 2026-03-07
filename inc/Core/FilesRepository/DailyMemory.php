@@ -106,6 +106,7 @@ class DailyMemory {
 	 * @return array{success: bool, content?: string, date?: string, message?: string}
 	 */
 	public function read( string $year, string $month, string $day ): array {
+		$fs        = FilesystemHelper::get();
 		$file_path = $this->get_file_path( $year, $month, $day );
 
 		if ( ! file_exists( $file_path ) ) {
@@ -115,7 +116,7 @@ class DailyMemory {
 			);
 		}
 
-		$content = file_get_contents( $file_path );
+		$content = $fs->get_contents( $file_path );
 
 		return array(
 			'success' => true,
@@ -136,6 +137,7 @@ class DailyMemory {
 	 * @return array{success: bool, message: string}
 	 */
 	public function write( string $year, string $month, string $day, string $content ): array {
+		$fs        = FilesystemHelper::get();
 		$file_path = $this->get_file_path( $year, $month, $day );
 		$dir       = dirname( $file_path );
 
@@ -146,7 +148,7 @@ class DailyMemory {
 			);
 		}
 
-		$written = file_put_contents( $file_path, $content );
+		$written = $fs->put_contents( $file_path, $content );
 
 		if ( false === $written ) {
 			return array(
@@ -175,6 +177,7 @@ class DailyMemory {
 	 * @return array{success: bool, message: string}
 	 */
 	public function append( string $year, string $month, string $day, string $content ): array {
+		$fs        = FilesystemHelper::get();
 		$file_path = $this->get_file_path( $year, $month, $day );
 		$dir       = dirname( $file_path );
 
@@ -188,9 +191,11 @@ class DailyMemory {
 		// If file doesn't exist, create with date header.
 		if ( ! file_exists( $file_path ) ) {
 			$header  = "# {$year}-{$month}-{$day}\n\n";
-			$written = file_put_contents( $file_path, $header . $content . "\n" );
+			$written = $fs->put_contents( $file_path, $header . $content . "\n" );
 		} else {
-			$written = file_put_contents( $file_path, $content . "\n", FILE_APPEND );
+			$_existing_content = $fs->get_contents( $file_path );
+			$_existing_content = ( false !== $_existing_content ) ? $_existing_content : '';
+			$written           = $fs->put_contents( $file_path, $_existing_content . $content . "\n" );
 		}
 
 		if ( false === $written ) {

@@ -1055,6 +1055,7 @@ class Workspace {
 	 * @param string $path Directory path.
 	 */
 	private function protect_directory( string $path ): void {
+		$fs = FilesystemHelper::get();
 		// Only needed if path is under ABSPATH (web root).
 		$abspath = rtrim( ABSPATH, '/' );
 		if ( 0 !== strpos( $path, $abspath ) ) {
@@ -1063,12 +1064,12 @@ class Workspace {
 
 		$htaccess = $path . '/.htaccess';
 		if ( ! file_exists( $htaccess ) ) {
-			file_put_contents( $htaccess, "Deny from all\n" );
+			$fs->put_contents( $htaccess, "Deny from all\n" );
 		}
 
 		$index = $path . '/index.php';
 		if ( ! file_exists( $index ) ) {
-			file_put_contents( $index, "<?php\n// Silence is golden.\n" );
+			$fs->put_contents( $index, "<?php\n// Silence is golden.\n" );
 		}
 	}
 }

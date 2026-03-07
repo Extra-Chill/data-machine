@@ -30,6 +30,7 @@ class MemoryFilesReader {
 	 * @since 0.37.0 Added $user_id parameter for multi-agent partitioning.
 	 */
 	public static function read( array $memory_files, string $scope_label, int $scope_id, int $user_id = 0 ): array {
+		global $wp_filesystem;
 		if ( empty( $memory_files ) ) {
 			return array();
 		}
@@ -56,7 +57,7 @@ class MemoryFilesReader {
 				continue;
 			}
 
-			$content = file_get_contents( $filepath );
+			$content = $wp_filesystem->get_contents( $filepath );
 			if ( empty( trim( $content ) ) ) {
 				continue;
 			}

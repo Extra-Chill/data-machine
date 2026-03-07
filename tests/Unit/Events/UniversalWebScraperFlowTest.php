@@ -36,6 +36,7 @@ class UniversalWebScraperFlowTest extends WP_UnitTestCase {
 	}
 
 	public function stub_http_request( $preempt, $args, $url ) {
+		global $wp_filesystem;
 		$fixtures = [
 			'https://example.test/events' => 'jsonld-with-venue.html',
 			'https://example.test/events-no-venue' => 'jsonld-without-venue.html',
@@ -46,7 +47,7 @@ class UniversalWebScraperFlowTest extends WP_UnitTestCase {
 		}
 
 		$path = dirname( __DIR__, 2 ) . '/fixtures/universal-web-scraper/' . $fixtures[ $url ];
-		$html = file_get_contents( $path );
+		$html = $wp_filesystem->get_contents( $path );
 		if ( false === $html ) {
 			return $preempt;
 		}
