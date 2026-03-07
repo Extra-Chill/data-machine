@@ -440,11 +440,17 @@ class QueueAbility {
 		// Duplicate validation (unless explicitly skipped).
 		$skip_validation = ! empty( $input['skip_validation'] );
 		if ( ! $skip_validation ) {
+			// Resolve post_type from the flow's publish step handler config.
+			// Without this, the validator defaults to 'post' and misses duplicates
+			// for custom post types (quizzes, recipes, events, etc.).
+			$post_type = $input['post_type'] ?? $this->resolvePublishPostType( $flow_config );
+
 			$validator = new QueueValidator();
 			$result    = $validator->validate( array(
 				'topic'        => $prompt,
 				'flow_id'      => $flow_id,
 				'flow_step_id' => $flow_step_id,
+				'post_type'    => $post_type,
 			) );
 
 			if ( 'duplicate' === $result['verdict'] ) {
@@ -1107,6 +1113,35 @@ class QueueAbility {
 		);
 
 		return $popped_item;
+	}
+
+	/**
+	/**
+	 * Resolve the post_type from the flow's publish step handler config.
+	 *
+	 * Scans all steps in the flow config for a publish step and extracts
+	 * the post_type from its handler config. Falls back to 'post' if no
+	 * publish step is found or no post_type is configured.
+	 *
+	 * @param array $flow_config The flow configuration array keyed by flow_step_id.
+	 * @return string The resolved post type.
+	 */
+	private function resolvePublishPostType( array $flow_config ): string {
+		foreach ( $flow_config as $step_config ) {
+			if ( ! is_array( $step_config ) ) {
+				continue;
+			}
+			if ( ( $step_config['step_type'] ?? '' ) !== 'publish' ) {
+				continue;
+			}
+			$handler_configs = $step_config['handler_configs'] ?? array();
+			foreach ( $handler_configs as $handler_config ) {
+				if ( ! empty( $handler_config['post_type'] ) ) {
+					return sanitize_text_field( $handler_config['post_type'] );
+				}
+			}
+		}
+		return 'post';
 	}
 
 	/**
