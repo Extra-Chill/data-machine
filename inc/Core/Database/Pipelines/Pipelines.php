@@ -509,6 +509,7 @@ class Pipelines extends BaseRepository {
 	public function migrate_columns(): void {
 		// Check if user_id column already exists.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$column = $this->wpdb->get_var(
 			$this->wpdb->prepare(
 				"SELECT COLUMN_NAME
@@ -518,14 +519,17 @@ class Pipelines extends BaseRepository {
 				$this->table_name
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( null === $column ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$result = $this->wpdb->query(
 				"ALTER TABLE {$this->table_name}
 				 ADD COLUMN user_id bigint(20) unsigned NOT NULL DEFAULT 0 AFTER pipeline_id,
 				 ADD KEY user_id (user_id)"
 			);
+			// phpcs:enable WordPress.DB.PreparedSQL
 
 			if ( false === $result ) {
 				do_action(

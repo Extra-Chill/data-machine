@@ -61,6 +61,7 @@ class Agents extends BaseRepository {
 	 */
 	public function get_by_owner_id( int $owner_id ): ?array {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$row = $this->wpdb->get_row(
 			$this->wpdb->prepare(
 				'SELECT * FROM %i WHERE owner_id = %d ORDER BY agent_id ASC LIMIT 1',
@@ -69,6 +70,7 @@ class Agents extends BaseRepository {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( ! $row ) {
 			return null;
@@ -89,6 +91,7 @@ class Agents extends BaseRepository {
 	 */
 	public function get_by_slug( string $agent_slug ): ?array {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$row = $this->wpdb->get_row(
 			$this->wpdb->prepare(
 				'SELECT * FROM %i WHERE agent_slug = %s LIMIT 1',
@@ -97,6 +100,7 @@ class Agents extends BaseRepository {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( ! $row ) {
 			return null;

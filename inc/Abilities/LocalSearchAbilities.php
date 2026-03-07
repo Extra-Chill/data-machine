@@ -181,6 +181,7 @@ class LocalSearchAbilities {
 		$prepare_args           = array_merge( $post_types, array( $like_query, $limit ) );
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Placeholders are dynamically generated for IN clause.
+		// phpcs:disable WordPress.DB.PreparedSQLPlaceholders, WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$sql = $wpdb->prepare(
 			"SELECT ID FROM {$wpdb->posts}
              WHERE post_type IN ({$post_type_placeholders})
@@ -190,6 +191,7 @@ class LocalSearchAbilities {
              LIMIT %d",
 			$prepare_args
 		);
+		// phpcs:enable WordPress.DB.PreparedSQLPlaceholders, WordPress.DB.PreparedSQL
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared above; caching handled at ability level.
 		$post_ids = $wpdb->get_col( $sql );

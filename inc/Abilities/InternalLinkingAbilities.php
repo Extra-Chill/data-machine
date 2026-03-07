@@ -805,11 +805,13 @@ class InternalLinkingAbilities {
 			// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$posts = $wpdb->get_results(
 				$wpdb->prepare(
+					// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 					"SELECT ID, post_title, post_content FROM {$wpdb->posts}
 					WHERE ID IN ($id_placeholders) AND post_status = %s",
 					array_merge( $specific_ids, array( 'publish' ) )
 				)
 			);
+					// phpcs:enable WordPress.DB.PreparedSQL
 		} elseif ( ! empty( $category ) ) {
 			$term = get_term_by( 'slug', $category, 'category' );
 			if ( ! $term ) {
@@ -1175,11 +1177,13 @@ class InternalLinkingAbilities {
 				$sibling_ids = array_diff( array_keys( $post_map ), $used_ids );
 
 				// Deterministic shuffle based on source post ID for consistency.
+				// phpcs:disable WordPress.WP.AlternativeFunctions -- Intentional deterministic seeding for reproducible output.
 				$sibling_list = array_values( $sibling_ids );
 				// phpcs:ignore WordPress.WP.AlternativeFunctions.rand_mt_rand
 				mt_srand( $post_id );
 				shuffle( $sibling_list );
 				mt_srand();
+				// phpcs:enable WordPress.WP.AlternativeFunctions
 
 				foreach ( $sibling_list as $sib_id ) {
 					if ( count( $matches ) >= $links_per_post ) {

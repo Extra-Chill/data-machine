@@ -82,6 +82,7 @@ class PlatformPresets {
 		 *
 		 * @param array $presets Default presets.
 		 */
+		// phpcs:ignore WordPress.NamingConventions.ValidHookName -- Intentional slash-separated hook namespace.
 		return apply_filters( 'datamachine/image_generation/platform_presets', self::PRESETS );
 	}
 

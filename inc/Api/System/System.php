@@ -136,6 +136,7 @@ class System {
 
 		foreach ( $task_types as $task_type ) {
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$row = $wpdb->get_row(
 				$wpdb->prepare(
 					"SELECT job_id, status, created_at, completed_at
@@ -148,6 +149,7 @@ class System {
 				),
 				ARRAY_A
 			);
+			// phpcs:enable WordPress.DB.PreparedSQL
 
 			if ( $row ) {
 				$results[ $task_type ] = $row;

@@ -712,6 +712,7 @@ class GoogleAnalyticsAbilities {
 	 * @return string Base64url encoded string.
 	 */
 	private static function base64url_encode( string $data ): string {
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions -- Required for API authentication, not obfuscation.
 		return rtrim( strtr( base64_encode( $data ), '+/', '-_' ), '=' );
 	}
 

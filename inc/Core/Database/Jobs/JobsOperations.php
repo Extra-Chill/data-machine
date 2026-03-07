@@ -426,6 +426,7 @@ class JobsOperations extends BaseRepository {
 		$like_pattern    = $this->wpdb->esc_like( $status_pattern ) . '%';
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$result = $this->wpdb->query(
 			$this->wpdb->prepare(
 				'DELETE FROM %i WHERE status LIKE %s AND created_at < %s',
@@ -434,6 +435,7 @@ class JobsOperations extends BaseRepository {
 				$cutoff_datetime
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		do_action(
 			'datamachine_log',
@@ -469,6 +471,7 @@ class JobsOperations extends BaseRepository {
 		$like_pattern    = $this->wpdb->esc_like( $status_pattern ) . '%';
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$count = $this->wpdb->get_var(
 			$this->wpdb->prepare(
 				'SELECT COUNT(*) FROM %i WHERE status LIKE %s AND created_at < %s',
@@ -477,6 +480,7 @@ class JobsOperations extends BaseRepository {
 				$cutoff_datetime
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		return (int) $count;
 	}
@@ -625,6 +629,7 @@ class JobsOperations extends BaseRepository {
 		}
 
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$results = $this->wpdb->get_results(
 			$this->wpdb->prepare(
 				'SELECT * FROM %i WHERE flow_id = %s ORDER BY created_at DESC LIMIT %d',
@@ -634,6 +639,7 @@ class JobsOperations extends BaseRepository {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		return $results ? $results : array();
 	}

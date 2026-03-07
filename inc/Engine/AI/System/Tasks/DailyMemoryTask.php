@@ -163,6 +163,7 @@ class DailyMemoryTask extends SystemTask {
 		$table = $wpdb->prefix . 'datamachine_jobs';
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$jobs = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT job_id, pipeline_id, flow_id, source, label, status,
@@ -174,6 +175,7 @@ class DailyMemoryTask extends SystemTask {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( empty( $jobs ) ) {
 			return '';
@@ -211,6 +213,7 @@ class DailyMemoryTask extends SystemTask {
 		}
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$sessions = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT session_id, title, agent_type, created_at
@@ -221,6 +224,7 @@ class DailyMemoryTask extends SystemTask {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( empty( $sessions ) ) {
 			return '';

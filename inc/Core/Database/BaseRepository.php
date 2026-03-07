@@ -65,6 +65,7 @@ abstract class BaseRepository {
 		$format = is_int( $id ) ? '%d' : '%s';
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders -- Table name from $wpdb->prefix, not user input.
 		$row = $this->wpdb->get_row(
 			$this->wpdb->prepare(
 				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -73,6 +74,7 @@ abstract class BaseRepository {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders
 
 		return $row ? $row : null;
 	}

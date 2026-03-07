@@ -363,6 +363,7 @@ class PipelineBatchScheduler {
 		$table = $wpdb->prefix . 'datamachine_jobs';
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQLPlaceholders, WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$counts = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT
@@ -377,6 +378,7 @@ class PipelineBatchScheduler {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQLPlaceholders, WordPress.DB.PreparedSQL
 
 		if ( ! $counts ) {
 			return;
@@ -469,12 +471,14 @@ class PipelineBatchScheduler {
 		$table = $wpdb->prefix . 'datamachine_jobs';
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$count = (int) $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT COUNT(*) FROM {$table} WHERE parent_job_id = %d",
 				$parent_job_id
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		return $count;
 	}

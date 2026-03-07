@@ -1119,6 +1119,7 @@ class JobsCommand extends BaseCommand {
 		$table = $wpdb->prefix . 'datamachine_jobs';
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT job_id FROM {$table}
@@ -1129,6 +1130,7 @@ class JobsCommand extends BaseCommand {
 				'%"task_type":"' . $wpdb->esc_like( $task_type ) . '"%'
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( empty( $rows ) ) {
 			return array();

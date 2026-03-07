@@ -165,7 +165,7 @@ class WorkspaceWriter {
 			);
 		}
 
-		if ( ! is_readable( $real_path ) || ! $fs->$fs->is_writable( $real_path ) ) {
+		if ( ! is_readable( $real_path ) || ! $fs->is_writable( $real_path ) ) {
 			return array(
 				'success' => false,
 				'message' => sprintf( 'File not readable/writable: %s', $path ),

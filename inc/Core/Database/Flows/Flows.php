@@ -61,6 +61,7 @@ class Flows extends BaseRepository {
 	public function migrate_columns(): void {
 		// Check if user_id column already exists.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$column = $this->wpdb->get_var(
 			$this->wpdb->prepare(
 				"SELECT COLUMN_NAME
@@ -70,14 +71,17 @@ class Flows extends BaseRepository {
 				$this->table_name
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( null === $column ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$result = $this->wpdb->query(
 				"ALTER TABLE {$this->table_name}
 				 ADD COLUMN user_id bigint(20) unsigned NOT NULL DEFAULT 0 AFTER pipeline_id,
 				 ADD KEY user_id (user_id)"
 			);
+			// phpcs:enable WordPress.DB.PreparedSQL
 
 			if ( false === $result ) {
 				do_action(
@@ -260,16 +264,20 @@ class Flows extends BaseRepository {
 	public function get_all_flows( ?int $user_id = null ): array {
 		if ( null !== $user_id ) {
 			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$flows = $this->wpdb->get_results(
 				$this->wpdb->prepare( 'SELECT * FROM %i WHERE user_id = %d ORDER BY pipeline_id ASC, flow_id ASC', $this->table_name, $user_id ),
 				ARRAY_A
 			);
+			// phpcs:enable WordPress.DB.PreparedSQL
 		} else {
 			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$flows = $this->wpdb->get_results(
 				$this->wpdb->prepare( 'SELECT * FROM %i ORDER BY pipeline_id ASC, flow_id ASC', $this->table_name ),
 				ARRAY_A
 			);
+			// phpcs:enable WordPress.DB.PreparedSQL
 		}
 
 		if ( null === $flows ) {
@@ -294,6 +302,7 @@ class Flows extends BaseRepository {
 	 */
 	public function get_flows_for_pipeline_paginated( int $pipeline_id, int $per_page = 20, int $offset = 0 ): array {
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$flows = $this->wpdb->get_results(
 			$this->wpdb->prepare(
 				'SELECT * FROM %i WHERE pipeline_id = %d ORDER BY flow_id ASC LIMIT %d OFFSET %d',
@@ -304,6 +313,7 @@ class Flows extends BaseRepository {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( null === $flows ) {
 			return array();
@@ -325,6 +335,7 @@ class Flows extends BaseRepository {
 	 */
 	public function count_flows_for_pipeline( int $pipeline_id ): int {
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$count = $this->wpdb->get_var(
 			$this->wpdb->prepare(
 				'SELECT COUNT(*) FROM %i WHERE pipeline_id = %d',
@@ -332,6 +343,7 @@ class Flows extends BaseRepository {
 				$pipeline_id
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		return (int) ( $count ?? 0 );
 	}
@@ -598,6 +610,7 @@ class Flows extends BaseRepository {
 
 		// Get all non-manual flows
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$flows = $this->wpdb->get_results(
 			$this->wpdb->prepare(
 				"SELECT * FROM %i WHERE JSON_EXTRACT(scheduling_config, '$.interval') != 'manual' ORDER BY flow_id ASC",
@@ -605,6 +618,7 @@ class Flows extends BaseRepository {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( null === $flows || empty( $flows ) ) {
 			return array();
@@ -717,9 +731,11 @@ class Flows extends BaseRepository {
 
 		// Read raw flow_config JSON to avoid normalization side effects.
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$raw_config_json = $this->wpdb->get_var(
 			$this->wpdb->prepare( 'SELECT flow_config FROM %i WHERE flow_id = %d', $this->table_name, $flow_id )
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( null === $raw_config_json ) {
 			return false;

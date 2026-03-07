@@ -291,6 +291,7 @@ class ProcessedItems extends BaseRepository {
 
 		// Remove duplicate rows, keeping the earliest (lowest id) for each combo.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$deleted = $wpdb->query(
 			"DELETE t1 FROM {$table_name} t1
 			 INNER JOIN {$table_name} t2
@@ -299,6 +300,7 @@ class ProcessedItems extends BaseRepository {
 			   AND t1.source_type = t2.source_type
 			   AND t1.item_identifier = t2.item_identifier"
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( $deleted > 0 ) {
 			do_action(
@@ -314,10 +316,12 @@ class ProcessedItems extends BaseRepository {
 
 		// Add the UNIQUE index.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$wpdb->query(
 			"ALTER TABLE {$table_name}
 			 ADD UNIQUE KEY `flow_source_item` (flow_step_id, source_type, item_identifier(191))"
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		do_action(
 			'datamachine_log',

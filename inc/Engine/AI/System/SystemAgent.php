@@ -505,7 +505,8 @@ class SystemAgent {
 
 		// Count child jobs by status via parent_job_id column.
 		global $wpdb;
-		$table       = $wpdb->prefix . 'datamachine_jobs';
+		$table = $wpdb->prefix . 'datamachine_jobs';
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$child_stats = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT
@@ -521,6 +522,7 @@ class SystemAgent {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		return array(
 			'batch_job_id'    => $batchJobId,
@@ -603,6 +605,7 @@ class SystemAgent {
 		global $wpdb;
 		$table = $wpdb->prefix . 'datamachine_jobs';
 
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$results = $wpdb->get_results(
 			"SELECT * FROM {$table}
 			WHERE source = 'batch'
@@ -610,6 +613,7 @@ class SystemAgent {
 			LIMIT 50",
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( ! $results ) {
 			return array();

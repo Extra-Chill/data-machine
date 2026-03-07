@@ -314,7 +314,7 @@ class DirectoryManager {
 		// 2. System-level default (outside web root).
 		$system_path = '/var/lib/datamachine/workspace';
 		$system_base = dirname( $system_path );
-		if ( $fs->$fs->is_writable( $system_base ) || ( ! file_exists( $system_base ) && $fs->$fs->is_writable( dirname( $system_base ) ) ) ) {
+		if ( $fs->is_writable( $system_base ) || ( ! file_exists( $system_base ) && $fs->is_writable( dirname( $system_base ) ) ) ) {
 			return $system_path;
 		}
 

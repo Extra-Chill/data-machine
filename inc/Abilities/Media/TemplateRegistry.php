@@ -104,6 +104,7 @@ class TemplateRegistry {
 		 *
 		 * @param array<string, string> $template_classes Map of template_id => fully-qualified class name.
 		 */
+		// phpcs:ignore WordPress.NamingConventions.ValidHookName -- Intentional slash-separated hook namespace.
 		$template_classes = apply_filters( 'datamachine/image_generation/templates', array() );
 
 		$resolved = array();

@@ -195,7 +195,9 @@ class Jobs {
 		// Migrate status column: varchar(20/100) -> varchar(255)
 		if ( isset( $columns['status'] ) && (int) $columns['status']->CHARACTER_MAXIMUM_LENGTH < 255 ) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$wpdb->query( "ALTER TABLE {$table_name} MODIFY status varchar(255) NOT NULL" );
+			// phpcs:enable WordPress.DB.PreparedSQL
 			do_action(
 				'datamachine_log',
 				'info',
@@ -210,7 +212,9 @@ class Jobs {
 		// Migrate pipeline_id column: bigint -> varchar(20) for 'direct' execution
 		if ( isset( $columns['pipeline_id'] ) && 'bigint' === $columns['pipeline_id']->DATA_TYPE ) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$wpdb->query( "ALTER TABLE {$table_name} MODIFY pipeline_id varchar(20) NOT NULL" );
+			// phpcs:enable WordPress.DB.PreparedSQL
 			do_action(
 				'datamachine_log',
 				'info',
@@ -224,7 +228,9 @@ class Jobs {
 		// Migrate flow_id column: bigint -> varchar(20) for 'direct' execution
 		if ( isset( $columns['flow_id'] ) && 'bigint' === $columns['flow_id']->DATA_TYPE ) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$wpdb->query( "ALTER TABLE {$table_name} MODIFY flow_id varchar(20) NOT NULL" );
+			// phpcs:enable WordPress.DB.PreparedSQL
 			do_action(
 				'datamachine_log',
 				'info',
@@ -238,12 +244,14 @@ class Jobs {
 		// Add source and label columns for pipeline decoupling.
 		if ( ! isset( $columns['source'] ) ) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$result = $wpdb->query(
 				"ALTER TABLE {$table_name}
 				 ADD COLUMN source varchar(50) NOT NULL DEFAULT 'pipeline' AFTER flow_id,
 				 ADD COLUMN label varchar(255) NULL DEFAULT NULL AFTER source,
 				 ADD KEY source (source)"
 			);
+			// phpcs:enable WordPress.DB.PreparedSQL
 
 			if ( false === $result ) {
 				do_action(
@@ -260,7 +268,9 @@ class Jobs {
 
 			// Backfill existing rows.
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$wpdb->query( "UPDATE {$table_name} SET source = 'direct' WHERE pipeline_id = 'direct'" );
+			// phpcs:enable WordPress.DB.PreparedSQL
 
 			do_action(
 				'datamachine_log',
@@ -273,11 +283,13 @@ class Jobs {
 		// Add parent_job_id column for job hierarchy (batch parents, pipeline sub-jobs).
 		if ( ! isset( $columns['parent_job_id'] ) ) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$result = $wpdb->query(
 				"ALTER TABLE {$table_name}
 				 ADD COLUMN parent_job_id bigint(20) unsigned NULL DEFAULT NULL AFTER label,
 				 ADD KEY parent_job_id (parent_job_id)"
 			);
+			// phpcs:enable WordPress.DB.PreparedSQL
 
 			if ( false !== $result ) {
 				do_action(
@@ -292,11 +304,13 @@ class Jobs {
 		// Add user_id column for multi-agent support.
 		if ( ! isset( $columns['user_id'] ) ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$result = $wpdb->query(
 				"ALTER TABLE {$table_name}
 				 ADD COLUMN user_id bigint(20) unsigned NOT NULL DEFAULT 0 AFTER job_id,
 				 ADD KEY user_id (user_id)"
 			);
+			// phpcs:enable WordPress.DB.PreparedSQL
 
 			if ( false !== $result ) {
 				do_action(
