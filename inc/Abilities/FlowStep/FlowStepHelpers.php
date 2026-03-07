@@ -129,6 +129,41 @@ trait FlowStepHelpers {
 	}
 
 	/**
+	 * Sanitize handler configuration values via the handler's settings class.
+	 *
+	 * Delegates to the handler's SettingsClass::sanitize() method, which performs
+	 * type coercion, term ID resolution, and value validation. This ensures all
+	 * write paths (REST, CLI, chat tools, abilities API) produce consistent data.
+	 *
+	 * @since 0.38.0
+	 * @param string $handler_slug Handler slug.
+	 * @param array  $handler_config Raw configuration values to sanitize.
+	 * @return array Sanitized configuration values.
+	 */
+	protected function sanitizeHandlerConfig( string $handler_slug, array $handler_config ): array {
+		$settings_class = $this->handler_abilities->getSettingsClass( $handler_slug );
+
+		if ( ! $settings_class || ! method_exists( $settings_class, 'sanitize' ) ) {
+			return $handler_config;
+		}
+
+		try {
+			return $settings_class->sanitize( $handler_config );
+		} catch ( \Exception $e ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Handler config sanitization failed, using raw values',
+				array(
+					'handler_slug' => $handler_slug,
+					'error'        => $e->getMessage(),
+				)
+			);
+			return $handler_config;
+		}
+	}
+
+	/**
 	 * Validate handler_config fields against handler schema.
 	 *
 	 * Returns structured error data with field specs when validation fails,
@@ -304,6 +339,9 @@ trait FlowStepHelpers {
 			}
 		}
 
+		// Sanitize incoming values via handler's settings class before merge.
+		$handler_settings = $this->sanitizeHandlerConfig( $effective_slug, $handler_settings );
+
 		// Merge and store in handler_configs.
 		$merged_config = array_merge( $existing_handler_config, $handler_settings );
 		$flow_config[ $flow_step_id ]['handler_configs'][ $effective_slug ] = $this->handler_abilities->applyDefaults( $effective_slug, $merged_config );
@@ -384,11 +422,12 @@ trait FlowStepHelpers {
 		$existing_slugs[]      = $handler_slug;
 		$step['handler_slugs'] = $existing_slugs;
 
-		// Store per-handler config.
+		// Sanitize and store per-handler config.
 		$handler_configs = $step['handler_configs'] ?? array();
 
 		if ( ! empty( $handler_config ) ) {
-			$validated_config                 = $this->handler_abilities->applyDefaults( $handler_slug, $handler_config );
+			$sanitized_config                 = $this->sanitizeHandlerConfig( $handler_slug, $handler_config );
+			$validated_config                 = $this->handler_abilities->applyDefaults( $handler_slug, $sanitized_config );
 			$handler_configs[ $handler_slug ] = $validated_config;
 		} else {
 			$handler_configs[ $handler_slug ] = $this->handler_abilities->applyDefaults( $handler_slug, array() );
