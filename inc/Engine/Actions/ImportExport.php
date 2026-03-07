@@ -134,7 +134,9 @@ class ImportExport {
 				continue;
 			}
 
-			$pipeline_config = json_decode( $pipeline['pipeline_config'], true ) ?? array();
+			$pipeline_config = is_string( $pipeline['pipeline_config'] )
+			? ( json_decode( $pipeline['pipeline_config'], true ) ?? array() )
+			: ( $pipeline['pipeline_config'] ?? array() );
 			$flows           = $db_flows->get_flows_for_pipeline( $pipeline_id );
 
 			$position = 0;

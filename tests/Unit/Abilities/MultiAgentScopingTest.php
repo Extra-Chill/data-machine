@@ -472,6 +472,6 @@ class MultiAgentScopingTest extends WP_UnitTestCase {
 		$user_dir = $dm->get_agent_identity_directory_for_user( $this->agent_a_id );
 
 		// Should end with the agent slug derived from user_login.
-		$this->assertStringEndsWith( '/agents/agent-alpha', $user_dir );
+		$this->assertStringEndsWith( '/agents/agent_alpha', $user_dir );
 	}
 }

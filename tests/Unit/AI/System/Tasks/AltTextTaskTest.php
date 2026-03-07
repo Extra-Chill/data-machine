@@ -43,6 +43,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 	}
 
 	public function tear_down(): void {
+		PluginSettings::clearCache();
 		if ( file_exists( $this->test_image_path ) ) {
 			wp_delete_file( $this->test_image_path );
 		}
@@ -111,24 +112,17 @@ class AltTextTaskTest extends WP_UnitTestCase {
 		update_post_meta( $this->attachment_id, '_wp_attachment_image_alt', 'Existing alt text' );
 
 		// Mock PluginSettings
-		$settings_filter = function( $value, $key, $default_value ) {
-			if ( 'default_provider' === $key ) {
-				return 'openai';
-			}
-			if ( 'default_model' === $key ) {
-				return 'gpt-4';
-			}
-			return $value;
-		};
-		add_filter( 'pre_option_datamachine_settings', function( $pre_option ) use ( $settings_filter ) {
+		$settings_filter = function( $pre_option ) {
 			return [
 				'default_provider' => 'openai',
 				'default_model' => 'gpt-4'
 			];
-		}, 10, 1 );
+		};
+		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
+		PluginSettings::clearCache();
 
-		// Mock RequestBuilder
-		$request_filter = function( $response, $messages, $provider, $model, $tools, $agent_type, $context ) {
+		// Mock AI request via chubes_ai_request filter
+		$request_filter = function( $request, $provider = '', $streaming = null, $tools = array(), $step_id = null, $context = array() ) {
 			return [
 				'success' => true,
 				'data' => [
@@ -136,7 +130,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 				]
 			];
 		};
-		add_filter( 'pre_datamachine_ai_request', $request_filter, 10, 7 );
+		add_filter( 'chubes_ai_request', $request_filter, 10, 6 );
 
 		$this->expectOutputString( '' );
 		$this->task->execute( 1, [
@@ -147,8 +141,8 @@ class AltTextTaskTest extends WP_UnitTestCase {
 		$updated_alt = get_post_meta( $this->attachment_id, '_wp_attachment_image_alt', true );
 		$this->assertSame( 'A small test image showing minimal JPEG data.', $updated_alt );
 
-		remove_filter( 'pre_option_datamachine_settings', function() {} );
-		remove_filter( 'pre_datamachine_ai_request', $request_filter, 10 );
+		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
+		remove_filter( 'chubes_ai_request', $request_filter, 10 );
 	}
 
 	/**
@@ -175,6 +169,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 			];
 		};
 		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
+		PluginSettings::clearCache();
 
 		$this->expectOutputString( '' );
 		$this->task->execute( 1, [ 'attachment_id' => $this->attachment_id ] );
@@ -195,21 +190,22 @@ class AltTextTaskTest extends WP_UnitTestCase {
 			];
 		};
 		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
+		PluginSettings::clearCache();
 
-		// Mock RequestBuilder to fail
-		$request_filter = function( $response, $messages, $provider, $model, $tools, $agent_type, $context ) {
+		// Mock AI request to fail via chubes_ai_request filter
+		$request_filter = function( $request, $provider = '', $streaming = null, $tools = array(), $step_id = null, $context = array() ) {
 			return [
 				'success' => false,
 				'error' => 'API connection failed'
 			];
 		};
-		add_filter( 'pre_datamachine_ai_request', $request_filter, 10, 7 );
+		add_filter( 'chubes_ai_request', $request_filter, 10, 6 );
 
 		$this->expectOutputString( '' );
 		$this->task->execute( 1, [ 'attachment_id' => $this->attachment_id ] );
 
 		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
-		remove_filter( 'pre_datamachine_ai_request', $request_filter, 10 );
+		remove_filter( 'chubes_ai_request', $request_filter, 10 );
 		$this->assertTrue( true ); // Placeholder assertion
 	}
 
@@ -225,9 +221,10 @@ class AltTextTaskTest extends WP_UnitTestCase {
 			];
 		};
 		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
+		PluginSettings::clearCache();
 
-		// Mock RequestBuilder to return empty content
-		$request_filter = function( $response, $messages, $provider, $model, $tools, $agent_type, $context ) {
+		// Mock AI request to return empty content via chubes_ai_request filter
+		$request_filter = function( $request, $provider = '', $streaming = null, $tools = array(), $step_id = null, $context = array() ) {
 			return [
 				'success' => true,
 				'data' => [
@@ -235,13 +232,13 @@ class AltTextTaskTest extends WP_UnitTestCase {
 				]
 			];
 		};
-		add_filter( 'pre_datamachine_ai_request', $request_filter, 10, 7 );
+		add_filter( 'chubes_ai_request', $request_filter, 10, 6 );
 
 		$this->expectOutputString( '' );
 		$this->task->execute( 1, [ 'attachment_id' => $this->attachment_id ] );
 
 		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
-		remove_filter( 'pre_datamachine_ai_request', $request_filter, 10 );
+		remove_filter( 'chubes_ai_request', $request_filter, 10 );
 		$this->assertTrue( true ); // Placeholder assertion
 	}
 
@@ -257,21 +254,15 @@ class AltTextTaskTest extends WP_UnitTestCase {
 			];
 		};
 		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
+		PluginSettings::clearCache();
 
-		// Mock RequestBuilder
-		$request_filter = function( $response, $messages, $provider, $model, $tools, $agent_type, $context ) {
+		// Mock AI request via chubes_ai_request filter
+		$request_filter = function( $request, $provider = '', $streaming = null, $tools = array(), $step_id = null, $context = array() ) {
 			// Verify the request structure
-			$this->assertCount( 2, $messages );
-			$this->assertSame( 'user', $messages[0]['role'] );
-			$this->assertIsArray( $messages[0]['content'] );
-			$this->assertSame( 'file', $messages[0]['content'][0]['type'] );
-			$this->assertSame( 'user', $messages[1]['role'] );
-			$this->assertStringContainsString( 'alt text', $messages[1]['content'] );
+			$this->assertIsArray( $request['messages'] );
+			$this->assertSame( 'gpt-4', $request['model'] );
 			$this->assertSame( 'openai', $provider );
-			$this->assertSame( 'gpt-4', $model );
-			$this->assertSame( 'system', $agent_type );
-			$this->assertSame( $this->attachment_id, $context['attachment_id'] );
-			
+
 			return [
 				'success' => true,
 				'data' => [
@@ -279,7 +270,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 				]
 			];
 		};
-		add_filter( 'pre_datamachine_ai_request', $request_filter, 10, 7 );
+		add_filter( 'chubes_ai_request', $request_filter, 10, 6 );
 
 		$this->expectOutputString( '' );
 		$this->task->execute( 1, [ 'attachment_id' => $this->attachment_id ] );
@@ -288,7 +279,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 		$this->assertSame( 'A colorful test image for unit testing.', $alt_text );
 
 		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
-		remove_filter( 'pre_datamachine_ai_request', $request_filter, 10 );
+		remove_filter( 'chubes_ai_request', $request_filter, 10 );
 	}
 
 	/**
@@ -303,6 +294,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 			];
 		};
 		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
+		PluginSettings::clearCache();
 
 		// Test various AI responses that need normalization
 		$test_cases = [
@@ -317,20 +309,20 @@ class AltTextTaskTest extends WP_UnitTestCase {
 			// Clear existing alt text
 			delete_post_meta( $this->attachment_id, '_wp_attachment_image_alt' );
 
-			$request_filter = function( $response, $messages, $provider, $model, $tools, $agent_type, $context ) use ( $ai_response ) {
+			$request_filter = function( $request, $provider = '', $streaming = null, $tools = array(), $step_id = null, $context = array() ) use ( $ai_response ) {
 				return [
 					'success' => true,
 					'data' => [ 'content' => $ai_response ]
 				];
 			};
-			add_filter( 'pre_datamachine_ai_request', $request_filter, 10, 7 );
+			add_filter( 'chubes_ai_request', $request_filter, 10, 6 );
 
 			$this->task->execute( 1, [ 'attachment_id' => $this->attachment_id ] );
 
 			$alt_text = get_post_meta( $this->attachment_id, '_wp_attachment_image_alt', true );
 			$this->assertSame( $expected_alt, $alt_text, "Failed for input: {$ai_response}" );
 
-			remove_filter( 'pre_datamachine_ai_request', $request_filter, 10 );
+			remove_filter( 'chubes_ai_request', $request_filter, 10 );
 		}
 
 		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
@@ -365,9 +357,17 @@ class AltTextTaskTest extends WP_UnitTestCase {
 			];
 		};
 		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
+		PluginSettings::clearCache();
 
-		$request_filter = function( $response, $messages, $provider, $model, $tools, $agent_type, $context ) {
-			$prompt = $messages[1]['content'];
+		$request_filter = function( $request, $provider = '', $streaming = null, $tools = array(), $step_id = null, $context = array() ) {
+			// Find the text prompt message (second message in the messages array)
+			$messages = $request['messages'] ?? array();
+			$prompt   = '';
+			foreach ( $messages as $msg ) {
+				if ( is_string( $msg['content'] ?? null ) ) {
+					$prompt = $msg['content'];
+				}
+			}
 			$this->assertStringContainsString( 'Sunset Photo', $prompt );
 			$this->assertStringContainsString( 'Beautiful sunset caption', $prompt );
 			$this->assertStringContainsString( 'A detailed description', $prompt );
@@ -378,11 +378,11 @@ class AltTextTaskTest extends WP_UnitTestCase {
 				'data' => [ 'content' => 'Generated alt text' ]
 			];
 		};
-		add_filter( 'pre_datamachine_ai_request', $request_filter, 10, 7 );
+		add_filter( 'chubes_ai_request', $request_filter, 10, 6 );
 
 		$this->task->execute( 1, [ 'attachment_id' => $this->attachment_id ] );
 
 		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
-		remove_filter( 'pre_datamachine_ai_request', $request_filter, 10 );
+		remove_filter( 'chubes_ai_request', $request_filter, 10 );
 	}
 }

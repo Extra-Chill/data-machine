@@ -133,7 +133,11 @@ trait FlowHelpers {
 	 * @param string $output_mode Output mode (full, summary).
 	 * @return array Formatted flow.
 	 */
-	protected function formatFlowByMode( array $flow, string $output_mode ): array {
+	protected function formatFlowByMode( array $flow, string $output_mode ) {
+		if ( 'ids' === $output_mode ) {
+			return (int) $flow['flow_id'];
+		}
+
 		if ( 'summary' === $output_mode ) {
 			return $this->formatSummary( $flow );
 		}

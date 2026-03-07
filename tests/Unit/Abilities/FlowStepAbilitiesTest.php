@@ -247,7 +247,7 @@ class FlowStepAbilitiesTest extends WP_UnitTestCase {
 		);
 
 		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'No flows found', $result['error'] );
+		$this->assertStringContainsString( 'Pipeline has no flows yet', $result['error'] );
 	}
 
 	public function test_configure_flow_steps_invalid_pipeline_id(): void {

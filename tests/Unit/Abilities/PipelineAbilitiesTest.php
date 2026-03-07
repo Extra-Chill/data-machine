@@ -448,6 +448,7 @@ class PipelineAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_ability_not_found(): void {
+		$this->setExpectedIncorrectUsage( 'WP_Abilities_Registry::get_registered' );
 		$ability = wp_get_ability( 'datamachine/non-existent-ability' );
 		$this->assertNull( $ability );
 	}

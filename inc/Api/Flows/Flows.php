@@ -395,8 +395,11 @@ class Flows {
 
 		return rest_ensure_response(
 			array(
-				'success' => true,
-				'data'    => $result['flows'],
+				'success'  => true,
+				'data'     => $result['flows'],
+				'total'    => $result['total'] ?? count( $result['flows'] ),
+				'per_page' => $result['per_page'] ?? 20,
+				'offset'   => $result['offset'] ?? 0,
 			)
 		);
 	}

@@ -82,7 +82,7 @@ class SystemAbilities {
 						'title'   => array( 'type' => 'string' ),
 						'method'  => array(
 							'type' => 'string',
-							'enum' => array( 'ai', 'fallback' ),
+							'enum' => array( 'ai', 'fallback', 'existing' ),
 						),
 						'message' => array( 'type' => 'string' ),
 						'error'   => array( 'type' => 'string' ),

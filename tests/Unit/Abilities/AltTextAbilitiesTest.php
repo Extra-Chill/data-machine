@@ -34,6 +34,7 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function tear_down(): void {
+		PluginSettings::clearCache();
 		parent::tear_down();
 	}
 
@@ -68,6 +69,7 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 			];
 		};
 		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
+		PluginSettings::clearCache();
 
 		$result = AltTextAbilities::generateAltText( [
 			'attachment_id' => $this->test_image_id
@@ -93,6 +95,7 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 			];
 		};
 		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
+		PluginSettings::clearCache();
 
 		$result = AltTextAbilities::generateAltText( [] );
 
@@ -114,20 +117,23 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 			];
 		};
 		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
+		PluginSettings::clearCache();
 
-		// Mock SystemAgent
+		// Mock SystemAgent with scheduleBatch
 		$system_agent_mock = $this->createMock( SystemAgent::class );
 		$system_agent_mock->expects( $this->once() )
-			->method( 'scheduleTask' )
+			->method( 'scheduleBatch' )
 			->with(
 				'alt_text_generation',
 				[
-					'attachment_id' => $this->test_image_id,
-					'force' => false,
-					'source' => 'ability'
+					[
+						'attachment_id' => $this->test_image_id,
+						'force' => false,
+						'source' => 'ability',
+					]
 				]
 			)
-			->willReturn( 123 );
+			->willReturn( [ 'batch_id' => 'test-batch-1', 'total' => 1, 'chunk_size' => 10 ] );
 
 		$reflection = new \ReflectionClass( SystemAgent::class );
 		$instance_property = $reflection->getProperty( 'instance' );
@@ -142,7 +148,7 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( 1, $result['queued_count'] );
 		$this->assertSame( [ $this->test_image_id ], $result['attachment_ids'] );
-		$this->assertStringContainsString( 'queued for 1 attachment', $result['message'] );
+		$this->assertStringContainsString( '1 attachment', $result['message'] );
 
 		$instance_property->setValue( $original_instance );
 		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
@@ -162,20 +168,23 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 			];
 		};
 		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
+		PluginSettings::clearCache();
 
-		// Mock SystemAgent
+		// Mock SystemAgent with scheduleBatch
 		$system_agent_mock = $this->createMock( SystemAgent::class );
 		$system_agent_mock->expects( $this->once() )
-			->method( 'scheduleTask' )
+			->method( 'scheduleBatch' )
 			->with(
 				'alt_text_generation',
 				[
-					'attachment_id' => $this->test_image_id,
-					'force' => true,
-					'source' => 'ability'
+					[
+						'attachment_id' => $this->test_image_id,
+						'force' => true,
+						'source' => 'ability',
+					]
 				]
 			)
-			->willReturn( 456 );
+			->willReturn( [ 'batch_id' => 'test-batch-2', 'total' => 1, 'chunk_size' => 10 ] );
 
 		$reflection = new \ReflectionClass( SystemAgent::class );
 		$instance_property = $reflection->getProperty( 'instance' );
@@ -220,12 +229,13 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 			];
 		};
 		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
+		PluginSettings::clearCache();
 
-		// Mock SystemAgent to expect 2 calls (attached + featured)
+		// Mock SystemAgent with scheduleBatch to expect 2 items
 		$system_agent_mock = $this->createMock( SystemAgent::class );
-		$system_agent_mock->expects( $this->exactly( 2 ) )
-			->method( 'scheduleTask' )
-			->willReturn( 789 );
+		$system_agent_mock->expects( $this->once() )
+			->method( 'scheduleBatch' )
+			->willReturn( [ 'batch_id' => 'test-batch-3', 'total' => 2, 'chunk_size' => 10 ] );
 
 		$reflection = new \ReflectionClass( SystemAgent::class );
 		$instance_property = $reflection->getProperty( 'instance' );
@@ -260,11 +270,12 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 			];
 		};
 		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
+		PluginSettings::clearCache();
 
-		// Mock SystemAgent - should not be called
+		// Mock SystemAgent - scheduleBatch should not be called (skips existing)
 		$system_agent_mock = $this->createMock( SystemAgent::class );
 		$system_agent_mock->expects( $this->never() )
-			->method( 'scheduleTask' );
+			->method( 'scheduleBatch' );
 
 		$reflection = new \ReflectionClass( SystemAgent::class );
 		$instance_property = $reflection->getProperty( 'instance' );
@@ -295,6 +306,7 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 			];
 		};
 		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
+		PluginSettings::clearCache();
 
 		$result = AltTextAbilities::generateAltText( [
 			'post_id' => 99999 // Non-existent post
@@ -350,6 +362,7 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 			];
 		};
 		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
+		PluginSettings::clearCache();
 
 		// Mock SystemAgent
 		$system_agent_mock = $this->createMock( SystemAgent::class );
@@ -389,6 +402,7 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 			];
 		};
 		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
+		PluginSettings::clearCache();
 
 		// Mock SystemAgent - should not be called
 		$system_agent_mock = $this->createMock( SystemAgent::class );

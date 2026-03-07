@@ -569,12 +569,12 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 
 		// Add some processed items for this step
 		$processed_items_db = new \DataMachine\Core\Database\ProcessedItems\ProcessedItems();
-		$processed_items_db->mark_item_processed($flow_step_id, 'rss', 'test-item-1', 1);
-		$processed_items_db->mark_item_processed($flow_step_id, 'rss', 'test-item-2', 1);
+		$processed_items_db->add_processed_item($flow_step_id, 'rss', 'test-item-1', 1);
+		$processed_items_db->add_processed_item($flow_step_id, 'rss', 'test-item-2', 1);
 
 		// Verify processed items exist
-		$items = $processed_items_db->get_processed_items(['flow_step_id' => $flow_step_id]);
-		$this->assertCount(2, $items);
+		$this->assertTrue($processed_items_db->has_item_been_processed($flow_step_id, 'rss', 'test-item-1'));
+		$this->assertTrue($processed_items_db->has_item_been_processed($flow_step_id, 'rss', 'test-item-2'));
 
 		// Delete the pipeline step
 		$delete_result = $this->step_abilities->executeDeletePipelineStep([
@@ -598,7 +598,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey($flow_step_id, $updated_flow['flow_config']);
 
 		// Verify processed items are cleaned up
-		$remaining_items = $processed_items_db->get_processed_items(['flow_step_id' => $flow_step_id]);
-		$this->assertEmpty($remaining_items);
+		$this->assertFalse($processed_items_db->has_item_been_processed($flow_step_id, 'rss', 'test-item-1'));
+		$this->assertFalse($processed_items_db->has_item_been_processed($flow_step_id, 'rss', 'test-item-2'));
 	}
 }

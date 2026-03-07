@@ -47,7 +47,8 @@ class ListFlowsTest extends WP_UnitTestCase {
 		$tools = apply_filters('datamachine_chat_tools', []);
 
 		$this->assertArrayHasKey('list_flows', $tools);
-		$this->assertSame(ListFlows::class, $tools['list_flows']['class']);
+		$definition = is_callable( $tools['list_flows'] ) ? call_user_func( $tools['list_flows'] ) : $tools['list_flows'];
+		$this->assertSame(ListFlows::class, $definition['class']);
 	}
 
 	public function test_tool_calls_ability(): void {

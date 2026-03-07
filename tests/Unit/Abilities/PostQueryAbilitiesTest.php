@@ -45,9 +45,9 @@ class PostQueryAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		update_post_meta( $post_id, 'datamachine_handler_slug', 'universal_web_scraper' );
-		update_post_meta( $post_id, 'datamachine_flow_id', 123 );
-		update_post_meta( $post_id, 'datamachine_pipeline_id', 456 );
+		update_post_meta( $post_id, '_datamachine_post_handler', 'universal_web_scraper' );
+		update_post_meta( $post_id, '_datamachine_post_flow_id', 123 );
+		update_post_meta( $post_id, '_datamachine_post_pipeline_id', 456 );
 
 		$result = $this->post_query_abilities->executeQueryPosts(
 			array(
@@ -81,8 +81,8 @@ class PostQueryAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		update_post_meta( $post_id, 'datamachine_flow_id', 789 );
-		update_post_meta( $post_id, 'datamachine_handler_slug', 'rss' );
+		update_post_meta( $post_id, '_datamachine_post_flow_id', 789 );
+		update_post_meta( $post_id, '_datamachine_post_handler', 'rss' );
 
 		$result = $this->post_query_abilities->executeQueryPosts(
 			array(
@@ -113,9 +113,9 @@ class PostQueryAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		update_post_meta( $post_id, 'datamachine_pipeline_id', 999 );
-		update_post_meta( $post_id, 'datamachine_flow_id', 100 );
-		update_post_meta( $post_id, 'datamachine_handler_slug', 'ics_feed' );
+		update_post_meta( $post_id, '_datamachine_post_pipeline_id', 999 );
+		update_post_meta( $post_id, '_datamachine_post_flow_id', 100 );
+		update_post_meta( $post_id, '_datamachine_post_handler', 'ics_feed' );
 
 		$result = $this->post_query_abilities->executeQueryPosts(
 			array(
@@ -232,7 +232,7 @@ class PostQueryAbilitiesTest extends WP_UnitTestCase {
 					'post_title'  => "Test Post $i",
 				)
 			);
-			update_post_meta( $post_id, 'datamachine_handler_slug', 'rss' );
+			update_post_meta( $post_id, '_datamachine_post_handler', 'rss' );
 		}
 
 		$result1 = $this->post_query_abilities->executeQueryPosts(
@@ -271,9 +271,9 @@ class PostQueryAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		update_post_meta( $post_id, 'datamachine_handler_slug', 'universal_web_scraper' );
-		update_post_meta( $post_id, 'datamachine_flow_id', 123 );
-		update_post_meta( $post_id, 'datamachine_pipeline_id', 456 );
+		update_post_meta( $post_id, '_datamachine_post_handler', 'universal_web_scraper' );
+		update_post_meta( $post_id, '_datamachine_post_flow_id', 123 );
+		update_post_meta( $post_id, '_datamachine_post_pipeline_id', 456 );
 
 		$result = $this->post_query_abilities->executeQueryPosts(
 			array(
@@ -339,7 +339,7 @@ class PostQueryAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		update_post_meta( $post_id, 'datamachine_handler_slug', 'rss' );
+		update_post_meta( $post_id, '_datamachine_post_handler', 'rss' );
 
 		$result = $this->post_query_abilities->handleQueryPosts(
 			array(

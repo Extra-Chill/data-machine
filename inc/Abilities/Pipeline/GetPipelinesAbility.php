@@ -114,7 +114,7 @@ class GetPipelinesAbility {
 			}
 
 			// Direct pipeline lookup by ID - bypasses pagination.
-			if ( $pipeline_id ) {
+			if ( null !== $pipeline_id ) {
 				if ( ! is_numeric( $pipeline_id ) || (int) $pipeline_id <= 0 ) {
 					return array(
 						'success' => false,
