@@ -474,11 +474,12 @@ class ExecuteStepAbility {
 			);
 		}
 
-		// Failure: check for "no new items" vs actual failure.
+		// Fetch/event_import steps: empty data means "nothing to process", not failure.
+		// This applies regardless of whether the flow has historical processed items —
+		// a new flow checking a source with no events is not broken, it just has nothing yet.
 		$is_fetch_step = in_array( $step_type, array( 'fetch', 'event_import' ), true );
-		$has_history   = $this->db_processed_items->has_processed_items( $flow_step_id );
 
-		if ( $is_fetch_step && $has_history ) {
+		if ( $is_fetch_step ) {
 			$this->db_jobs->complete_job( $job_id, JobStatus::COMPLETED_NO_ITEMS );
 			do_action(
 				'datamachine_log',
@@ -499,7 +500,7 @@ class ExecuteStepAbility {
 			);
 		}
 
-		// Actual failure.
+		// Non-fetch steps: empty data packet is an actual failure.
 		do_action(
 			'datamachine_log',
 			'error',
@@ -511,7 +512,6 @@ class ExecuteStepAbility {
 				'flow_step_id' => $flow_step_id,
 				'step_class'   => $step_class,
 				'step_type'    => $step_type,
-				'has_history'  => $has_history,
 			)
 		);
 		do_action(
