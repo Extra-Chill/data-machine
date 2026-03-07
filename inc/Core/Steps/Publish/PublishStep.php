@@ -31,7 +31,7 @@ class PublishStep extends Step {
 			slug: 'publish',
 			label: 'Publish',
 			description: 'Publish content to external platforms',
-			class: self::class,
+			class_name: self::class,
 			position: 30,
 			usesHandler: true,
 			hasPipelineConfig: false

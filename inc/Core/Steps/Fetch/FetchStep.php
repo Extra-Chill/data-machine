@@ -35,7 +35,7 @@ class FetchStep extends Step {
 			slug: 'fetch',
 			label: 'Fetch',
 			description: 'Collect data from external sources',
-			class: self::class,
+			class_name: self::class,
 			position: 10,
 			usesHandler: true,
 			hasPipelineConfig: false

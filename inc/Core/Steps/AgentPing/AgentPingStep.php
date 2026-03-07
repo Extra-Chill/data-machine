@@ -38,7 +38,7 @@ class AgentPingStep extends Step {
 			slug: 'agent_ping',
 			label: 'Agent Ping',
 			description: 'Send pipeline context to Discord, Slack, or custom webhook endpoints',
-			class: self::class,
+			class_name: self::class,
 			position: 80,
 			usesHandler: false,
 			hasPipelineConfig: false,

@@ -36,7 +36,7 @@ class AIStep extends Step {
 			slug: 'ai',
 			label: 'AI Agent',
 			description: 'Configure an intelligent agent with custom prompts and tools to process data through any LLM provider (OpenAI, Anthropic, Google, Grok, OpenRouter)',
-			class: self::class,
+			class_name: self::class,
 			position: 20,
 			usesHandler: false,
 			hasPipelineConfig: true,

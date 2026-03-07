@@ -44,7 +44,7 @@ class SystemTaskStep extends Step {
 			slug: 'system_task',
 			label: 'System Task',
 			description: 'Run a registered system task (internal linking, alt text, etc.) inline in the pipeline',
-			class: self::class,
+			class_name: self::class,
 			position: 70,
 			usesHandler: false,
 			hasPipelineConfig: false,

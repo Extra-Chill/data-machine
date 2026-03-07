@@ -37,7 +37,7 @@ class WebhookGateStep extends Step {
 			slug: 'webhook_gate',
 			label: 'Webhook Gate',
 			description: 'Pause pipeline and wait for an external webhook before continuing',
-			class: self::class,
+			class_name: self::class,
 			position: 70,
 			usesHandler: false,
 			hasPipelineConfig: false,

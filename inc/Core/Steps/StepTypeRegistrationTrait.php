@@ -36,7 +36,7 @@ trait StepTypeRegistrationTrait {
 	 * @param string     $slug Step type slug identifier
 	 * @param string     $label Display label
 	 * @param string     $description Step type description
-	 * @param string     $class Step class name
+	 * @param string     $class_name Step class name
 	 * @param int        $position Position in step type list (lower = earlier)
 	 * @param bool       $usesHandler Whether step type uses handlers
 	 * @param bool       $hasPipelineConfig Whether step has pipeline-level configuration

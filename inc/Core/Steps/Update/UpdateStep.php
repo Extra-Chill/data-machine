@@ -30,7 +30,7 @@ class UpdateStep extends Step {
 			slug: 'update',
 			label: 'Update',
 			description: 'Update existing content on external platforms',
-			class: self::class,
+			class_name: self::class,
 			position: 40,
 			usesHandler: true,
 			hasPipelineConfig: false
