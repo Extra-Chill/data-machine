@@ -67,17 +67,6 @@ class TaxonomyHandler {
 		}
 		$taxonomies = self::getPublicTaxonomies( $post_type );
 
-		do_action(
-			'datamachine_log',
-			'debug',
-			'Processing taxonomies for post',
-			array(
-				'post_id'          => $post_id,
-				'post_type'        => $post_type,
-				'found_taxonomies' => array_keys( $taxonomies ),
-			)
-		);
-
 		foreach ( $taxonomies as $taxonomy ) {
 			if ( self::shouldSkipTaxonomy( $taxonomy->name ) ) {
 				continue;
@@ -85,19 +74,6 @@ class TaxonomyHandler {
 
 			$field_key = "taxonomy_{$taxonomy->name}_selection";
 			$selection = $handler_config[ $field_key ] ?? 'skip';
-
-			do_action(
-				'datamachine_log',
-				'debug',
-				"Taxonomy check: {$taxonomy->name}",
-				array(
-					'selection'        => $selection,
-					'field_key'        => $field_key,
-					'param_name'       => $this->getParameterName( $taxonomy->name ),
-					'has_tool_param'   => isset( $parameters[ $this->getParameterName( $taxonomy->name ) ] ),
-					'has_engine_param' => isset( $engine_data[ $this->getParameterName( $taxonomy->name ) ] ),
-				)
-			);
 
 			$mode = SelectionMode::detect( $selection );
 
@@ -315,17 +291,6 @@ class TaxonomyHandler {
 			if ( is_wp_error( $result ) ) {
 				return $this->createErrorResult( $result->get_error_message() );
 			} else {
-				do_action(
-					'datamachine_log',
-					'debug',
-					'WordPress Tool: Applied pre-selected taxonomy',
-					array(
-						'taxonomy_name' => $taxonomy_name,
-						'term_id'       => $term_id,
-						'term_name'     => $term_name,
-					)
-				);
-
 				return $this->createSuccessResult( $taxonomy_name, array( $term_name ), array( $term_id ) );
 			}
 		}

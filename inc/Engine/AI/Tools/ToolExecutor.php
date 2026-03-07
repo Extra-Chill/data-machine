@@ -40,10 +40,17 @@ class ToolExecutor {
 			$handler_slugs       = $step_config['handler_slugs'] ?? array();
 			$handler_configs_map = $step_config['handler_configs'] ?? array();
 
+			// Scope handler-specific tool cache by flow_step_id so that
+			// different flows (with different handler_configs) are cached
+			// independently within the same PHP process. Without this,
+			// the first flow to resolve "upsert_event" would poison the
+			// cache for all subsequent flows in the same AS batch.
+			$cache_scope = $step_config['flow_step_id'] ?? '';
+
 			foreach ( $handler_slugs as $slug ) {
 				$handler_config  = $handler_configs_map[ $slug ] ?? array();
 				$tools           = apply_filters('chubes_ai_tools', array(), $slug, $handler_config, $engine_data);
-				$tools           = $tool_manager->resolveAllTools($tools);
+				$tools           = $tool_manager->resolveAllTools( $tools, $cache_scope );
 				$allowed         = self::getAllowedTools($tools, $slug, $current_pipeline_step_id, $tool_manager);
 				$available_tools = array_merge($available_tools, $allowed);
 			}
