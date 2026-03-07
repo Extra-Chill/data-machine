@@ -117,8 +117,8 @@ class WordPress extends PublishHandler {
 			$post_type = $handler_config['post_type'] ?? '';
 
 			if ( ! empty( $title ) && ! empty( $post_type ) ) {
-				$lookback_days  = (int) ( $handler_config['dedup_lookback_days'] ?? DuplicateDetection::DEFAULT_LOOKBACK_DAYS );
-				$existing_id    = DuplicateDetection::findExistingPostByTitle( $title, $post_type, $lookback_days );
+				$lookback_days = (int) ( $handler_config['dedup_lookback_days'] ?? DuplicateDetection::DEFAULT_LOOKBACK_DAYS );
+				$existing_id   = DuplicateDetection::findExistingPostByTitle( $title, $post_type, $lookback_days );
 
 				if ( $existing_id ) {
 					$this->log(

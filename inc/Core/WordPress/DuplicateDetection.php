@@ -49,6 +49,7 @@ class DuplicateDetection {
 			array(
 				'post_type'      => $post_type,
 				'post_status'    => array( 'publish', 'draft', 'pending' ),
+				// phpcs:ignore WordPress.WP.PostsPerPage.posts_per_page_posts_per_page -- intentional batch query
 				'posts_per_page' => 200,
 				'date_query'     => array(
 					array(
@@ -75,11 +76,11 @@ class DuplicateDetection {
 					'info',
 					'DuplicateDetection: Found existing post with matching title',
 					array(
-						'incoming_title'  => $title,
-						'incoming_core'   => $incoming_core,
-						'existing_id'     => $candidate_id,
-						'existing_title'  => $candidate_title,
-						'existing_core'   => self::extractCoreTitle( $candidate_title ),
+						'incoming_title' => $title,
+						'incoming_core'  => $incoming_core,
+						'existing_id'    => $candidate_id,
+						'existing_title' => $candidate_title,
+						'existing_core'  => self::extractCoreTitle( $candidate_title ),
 					)
 				);
 				return $candidate_id;
