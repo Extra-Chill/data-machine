@@ -31,8 +31,7 @@ export const putAgentFile = async ( filename, content ) => {
 	return apiFetch( {
 		path: `/${ config.restNamespace }/files/agent/${ filename }`,
 		method: 'PUT',
-		body: content,
-		headers: { 'Content-Type': 'text/plain' },
+		data: { content },
 	} );
 };
 
@@ -65,8 +64,7 @@ export const putDailyFile = async ( year, month, day, content ) => {
 	return apiFetch( {
 		path: `/${ config.restNamespace }/files/agent/daily/${ year }/${ month }/${ day }`,
 		method: 'PUT',
-		body: content,
-		headers: { 'Content-Type': 'text/plain' },
+		data: { content },
 	} );
 };
 
