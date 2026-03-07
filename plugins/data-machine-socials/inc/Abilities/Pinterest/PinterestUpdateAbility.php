@@ -96,13 +96,12 @@ class PinterestUpdateAbility {
 			);
 		}
 
-		$config = $auth->get_config();
-		$access_token = $config['access_token'] ?? '';
+		$access_token = $auth->get_valid_access_token();
 
 		if ( empty( $access_token ) ) {
 			return array(
 				'success' => false,
-				'error'   => 'Pinterest access token not configured',
+				'error'   => 'Pinterest access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings',
 			);
 		}
 

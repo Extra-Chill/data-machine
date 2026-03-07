@@ -110,13 +110,11 @@ class PinterestReadAbility {
 			);
 		}
 
-		// Pinterest uses a static bearer token stored in config.
-		$config = $auth->get_config();
-		$token  = $config['access_token'] ?? '';
+		$token = $auth->get_valid_access_token();
 		if ( empty( $token ) ) {
 			return array(
 				'success' => false,
-				'error'   => 'Pinterest access token not configured',
+				'error'   => 'Pinterest access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings',
 			);
 		}
 
