@@ -39,7 +39,6 @@ jobs:
           settings: '{"database_type": "mysql"}'
           php-version: '8.2'
           node-version: '20'
-          inline-review: 'false'
 
   test:
     if: github.event_name == 'pull_request'
@@ -85,7 +84,6 @@ jobs:
           settings: '{"database_type": "mysql"}'
           php-version: '8.2'
           node-version: '20'
-          inline-review: 'false'
 
   audit:
     if: github.event_name == 'pull_request'
@@ -116,4 +114,4 @@ jobs:
           component: data-machine
           php-version: '8.2'
           node-version: '20'
-          inline-review: 'false'
+
