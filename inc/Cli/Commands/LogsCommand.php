@@ -31,7 +31,7 @@ class LogsCommand extends BaseCommand {
 	 *
 	 * @var array
 	 */
-	private array $valid_levels = array( 'debug', 'error', 'none' );
+	private array $valid_levels = array( 'debug', 'info', 'warning', 'error', 'none' );
 
 	/**
 	 * Read log entries for a specific agent type.
@@ -217,7 +217,7 @@ class LogsCommand extends BaseCommand {
 	 * : The agent type (pipeline, system, chat).
 	 *
 	 * [<level>]
-	 * : Log level to set (debug, error, none). If omitted, shows current level.
+	 * : Log level to set (debug, info, warning, error, none). If omitted, shows current level.
 	 *
 	 * ## EXAMPLES
 	 *

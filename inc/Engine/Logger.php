@@ -68,20 +68,19 @@ function datamachine_get_monolog_instance( string $agent_type = AgentType::PIPEL
 /**
  * Convert string log level to Monolog Level.
  *
- * @param string $level_string Log level string (debug, error, none)
+ * @param string $level_string Log level string (debug, info, warning, error, none)
  * @return Level|null Monolog level constant, null for 'none'
  */
 function datamachine_get_monolog_level( string $level_string ): ?Level {
-	switch ( strtolower( $level_string ) ) {
-		case 'debug':
-			return Level::Debug;
-		case 'error':
-			return Level::Error;
-		case 'none':
-			return null;
-		default:
-			return Level::Debug;
-	}
+	return match ( strtolower( $level_string ) ) {
+		'debug'    => Level::Debug,
+		'info'     => Level::Info,
+		'warning'  => Level::Warning,
+		'error'    => Level::Error,
+		'critical' => Level::Critical,
+		'none'     => null,
+		default    => Level::Debug,
+	};
 }
 
 /**
@@ -229,11 +228,15 @@ function datamachine_get_recent_logs( string $agent_type = AgentType::PIPELINE, 
 /**
  * Clean up log files based on size or age criteria.
  *
- * @param int $max_size_mb Maximum log file size in MB
- * @param int $max_age_days Maximum log file age in days
+ * Triggers cleanup when EITHER condition is met:
+ * - File exceeds max size (prevents unbounded growth on active logs)
+ * - File exceeds max age (cleans up stale logs from inactive agents)
+ *
+ * @param int $max_size_mb  Maximum log file size in MB before cleanup. Default 50.
+ * @param int $max_age_days Maximum log file age in days before cleanup. Default 30.
  * @return bool True if cleanup was performed on any file
  */
-function datamachine_cleanup_log_files( int $max_size_mb = 10, int $max_age_days = 30 ): bool {
+function datamachine_cleanup_log_files( int $max_size_mb = 50, int $max_age_days = 30 ): bool {
 	$upload_dir = wp_upload_dir();
 	$log_dir    = $upload_dir['basedir'] . DATAMACHINE_LOG_DIR;
 
@@ -251,11 +254,14 @@ function datamachine_cleanup_log_files( int $max_size_mb = 10, int $max_age_days
 			continue;
 		}
 
-		$size_exceeds = filesize( $log_file ) > $max_size_bytes;
+		$file_size    = filesize( $log_file );
+		$size_exceeds = $file_size > $max_size_bytes;
 		$age_exceeds  = ( time() - filemtime( $log_file ) ) / DAY_IN_SECONDS > $max_age_days;
 
-		if ( $size_exceeds && $age_exceeds ) {
-			datamachine_log_debug( "Log file cleanup triggered for {$agent_type}: Size and age limits exceeded" );
+		if ( $size_exceeds || $age_exceeds ) {
+			$reason = $size_exceeds ? 'size' : 'age';
+			$size_mb = round( $file_size / 1024 / 1024, 2 );
+			datamachine_log_info( "Log cleanup triggered for {$agent_type}: {$reason} limit exceeded ({$size_mb} MB)" );
 			if ( datamachine_clear_log_file( $agent_type ) ) {
 				$cleaned = true;
 			}
@@ -362,14 +368,16 @@ function datamachine_get_valid_log_levels(): array {
 }
 
 /**
- * Get user-configurable log levels for admin interface.
+ * Get user-configurable log levels for admin interface and CLI.
  *
  * @return array Array of log levels with descriptions for user selection
  */
 function datamachine_get_available_log_levels(): array {
 	return array(
-		'debug' => 'Debug (full logging)',
-		'error' => 'Error (problems only)',
-		'none'  => 'None (disable logging)',
+		'debug'   => 'Debug (full logging)',
+		'info'    => 'Info (operational events)',
+		'warning' => 'Warning (potential issues)',
+		'error'   => 'Error (problems only)',
+		'none'    => 'None (disable logging)',
 	);
 }

@@ -72,4 +72,5 @@ require_once __DIR__ . '/Core/Steps/AI/Directives/FlowMemoryFilesDirective.php';
 require_once __DIR__ . '/Core/FilesRepository/FileCleanup.php';
 require_once __DIR__ . '/Core/ActionScheduler/ClaimsCleanup.php';
 require_once __DIR__ . '/Core/ActionScheduler/JobsCleanup.php';
+require_once __DIR__ . '/Core/ActionScheduler/LogCleanup.php';
 require_once __DIR__ . '/Core/ActionScheduler/QueueTuning.php';
