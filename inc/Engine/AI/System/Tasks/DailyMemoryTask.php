@@ -225,23 +225,35 @@ class DailyMemoryTask extends SystemTask {
 		$new_content = $parsed['persistent'];
 		$new_size    = strlen( $new_content );
 
-		// Safety check: don't write if the new content is suspiciously small
-		// compared to the original (less than 10% — AI may have been too aggressive).
-		$min_ratio = 0.10;
-		if ( $new_size < ( $original_size * $min_ratio ) ) {
+		// Safety check: don't write if the new content is suspiciously small.
+		// When the file is massively oversized, the TARGET size is a small
+		// percentage of the original, so the minimum ratio must scale accordingly.
+		// For a file that's 12x over budget, the target IS ~8% of original.
+		$target_size = AgentMemory::MAX_FILE_SIZE;
+		$oversize_factor = $original_size / max( $target_size, 1 );
+
+		if ( $oversize_factor > 2 ) {
+			// File is more than 2x over budget — allow reduction down to half the target.
+			$min_size = intval( $target_size * 0.5 );
+		} else {
+			// File is near budget — don't allow reduction below 10% of original.
+			$min_size = intval( $original_size * 0.10 );
+		}
+
+		if ( $new_size < $min_size ) {
 			do_action(
 				'datamachine_log',
 				'warning',
 				sprintf(
-					'Memory cleanup aborted — new content (%s) is less than %d%% of original (%s). AI may have been too aggressive.',
+					'Memory cleanup aborted — new content (%s) is below minimum (%s). AI may have been too aggressive.',
 					size_format( $new_size ),
-					intval( $min_ratio * 100 ),
-					size_format( $original_size )
+					size_format( $min_size )
 				),
 				array(
 					'date'          => $date,
 					'original_size' => $original_size,
 					'new_size'      => $new_size,
+					'min_size'      => $min_size,
 				)
 			);
 			return array(
