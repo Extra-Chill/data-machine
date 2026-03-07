@@ -787,4 +787,135 @@ class MemoryCommand extends BaseCommand {
 		$files     = glob( $agent_dir . '/*.md' );
 		return array_map( 'basename', $files ? $files : array() );
 	}
+
+	// =========================================================================
+	// Agent Paths — discovery for external consumers
+	// =========================================================================
+
+	/**
+	 * Show resolved file paths for all agent memory layers.
+	 *
+	 * External consumers (wp-opencode setup scripts, Kimaki, OpenCode configs)
+	 * use this to discover the correct file paths instead of hardcoding them.
+	 * Outputs absolute paths, relative paths (from site root), and layer directories.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: json
+	 * options:
+	 *   - json
+	 *   - table
+	 * ---
+	 *
+	 * [--relative]
+	 * : Output paths relative to the WordPress root (for config file injection).
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Get all resolved paths as JSON (for setup scripts)
+	 *     wp datamachine agent paths --format=json
+	 *
+	 *     # Get relative paths for opencode.json prompt injection
+	 *     wp datamachine agent paths --relative
+	 *
+	 *     # Table view for debugging
+	 *     wp datamachine agent paths --format=table
+	 *
+	 * @subcommand paths
+	 */
+	public function paths( array $args, array $assoc_args ): void {
+		$user_id           = UserResolver::resolve( $assoc_args );
+		$directory_manager = new DirectoryManager();
+		$effective_user_id = $directory_manager->get_effective_user_id( $user_id );
+		$agent_slug        = $directory_manager->get_agent_slug_for_user( $effective_user_id );
+
+		$shared_dir = $directory_manager->get_shared_directory();
+		$agent_dir  = $directory_manager->get_agent_identity_directory_for_user( $effective_user_id );
+		$user_dir   = $directory_manager->get_user_directory( $effective_user_id );
+
+		$site_root = untrailingslashit( ABSPATH );
+		$relative  = \WP_CLI\Utils\get_flag_value( $assoc_args, 'relative', false );
+
+		// Core files in injection order (matches CoreMemoryFilesDirective).
+		$core_files = array(
+			array(
+				'file'      => 'SITE.md',
+				'layer'     => 'shared',
+				'directory' => $shared_dir,
+			),
+			array(
+				'file'      => 'SOUL.md',
+				'layer'     => 'agent',
+				'directory' => $agent_dir,
+			),
+			array(
+				'file'      => 'MEMORY.md',
+				'layer'     => 'agent',
+				'directory' => $agent_dir,
+			),
+			array(
+				'file'      => 'USER.md',
+				'layer'     => 'user',
+				'directory' => $user_dir,
+			),
+		);
+
+		$format = \WP_CLI\Utils\get_flag_value( $assoc_args, 'format', 'json' );
+
+		if ( 'json' === $format ) {
+			$layers = array(
+				'shared' => $shared_dir,
+				'agent'  => $agent_dir,
+				'user'   => $user_dir,
+			);
+
+			$files          = array();
+			$relative_files = array();
+
+			foreach ( $core_files as $entry ) {
+				$abs_path = trailingslashit( $entry['directory'] ) . $entry['file'];
+				$rel_path = str_replace( $site_root . '/', '', $abs_path );
+				$exists   = file_exists( $abs_path );
+
+				$files[ $entry['file'] ] = array(
+					'layer'    => $entry['layer'],
+					'path'     => $abs_path,
+					'relative' => $rel_path,
+					'exists'   => $exists,
+				);
+
+				if ( $exists ) {
+					$relative_files[] = $rel_path;
+				}
+			}
+
+			$output = array(
+				'agent_slug'     => $agent_slug,
+				'user_id'        => $effective_user_id,
+				'layers'         => $layers,
+				'files'          => $files,
+				'relative_files' => $relative_files,
+			);
+
+			WP_CLI::line( wp_json_encode( $output, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+		} else {
+			$items = array();
+			foreach ( $core_files as $entry ) {
+				$abs_path = trailingslashit( $entry['directory'] ) . $entry['file'];
+				$rel_path = str_replace( $site_root . '/', '', $abs_path );
+
+				$items[] = array(
+					'file'     => $entry['file'],
+					'layer'    => $entry['layer'],
+					'path'     => $relative ? $rel_path : $abs_path,
+					'exists'   => file_exists( $abs_path ) ? 'yes' : 'no',
+				);
+			}
+
+			$this->format_items( $items, array( 'file', 'layer', 'path', 'exists' ), $assoc_args );
+		}
+	}
 }
