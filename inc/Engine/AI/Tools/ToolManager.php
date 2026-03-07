@@ -89,14 +89,22 @@ class ToolManager {
 	 * Handles lazy evaluation of tool definitions. Callables are invoked
 	 * and their results cached. Arrays are returned as-is.
 	 *
-	 * @param string $tool_id Tool identifier for caching
-	 * @param mixed  $definition Tool definition (array or callable)
-	 * @return array Resolved tool definition
+	 * Cache keys are scoped: when a $cache_scope is provided, the key
+	 * becomes "$cache_scope|$tool_id" so that the same tool_id can hold
+	 * different definitions for different contexts (e.g. different flows
+	 * configure upsert_event with different taxonomy selections).
+	 *
+	 * @param string $tool_id     Tool identifier.
+	 * @param mixed  $definition  Tool definition (array or callable).
+	 * @param string $cache_scope Optional scope prefix for the cache key.
+	 * @return array Resolved tool definition.
 	 */
-	private function resolveToolDefinition( string $tool_id, mixed $definition ): array {
+	private function resolveToolDefinition( string $tool_id, mixed $definition, string $cache_scope = '' ): array {
+		$cache_key = $cache_scope ? $cache_scope . '|' . $tool_id : $tool_id;
+
 		// Return cached if available
-		if ( isset( self::$resolved_cache[ $tool_id ] ) ) {
-			return self::$resolved_cache[ $tool_id ];
+		if ( isset( self::$resolved_cache[ $cache_key ] ) ) {
+			return self::$resolved_cache[ $cache_key ];
 		}
 
 		// Log warning if resolving before translations ready
@@ -124,7 +132,7 @@ class ToolManager {
 		$resolved = is_array( $resolved ) ? $resolved : array();
 
 		// Cache the resolved definition
-		self::$resolved_cache[ $tool_id ] = $resolved;
+		self::$resolved_cache[ $cache_key ] = $resolved;
 
 		return $resolved;
 	}
@@ -132,13 +140,17 @@ class ToolManager {
 	/**
 	 * Resolve all tool definitions in an array.
 	 *
-	 * @param array $tools Raw tools array (may contain callables)
-	 * @return array Resolved tools array
+	 * @param array  $tools       Raw tools array (may contain callables).
+	 * @param string $cache_scope Optional scope prefix for cache isolation.
+	 *                            Use a flow_step_id or similar context key so
+	 *                            that handler-specific tools from different
+	 *                            flows are cached independently.
+	 * @return array Resolved tools array.
 	 */
-	public function resolveAllTools( array $tools ): array {
+	public function resolveAllTools( array $tools, string $cache_scope = '' ): array {
 		$resolved = array();
 		foreach ( $tools as $tool_id => $definition ) {
-			$resolved[ $tool_id ] = $this->resolveToolDefinition( $tool_id, $definition );
+			$resolved[ $tool_id ] = $this->resolveToolDefinition( $tool_id, $definition, $cache_scope );
 		}
 		return $resolved;
 	}
