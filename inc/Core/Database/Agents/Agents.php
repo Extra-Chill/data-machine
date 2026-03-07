@@ -54,53 +54,6 @@ class Agents extends BaseRepository {
 	}
 
 	/**
-	 * Get all agents.
-	 *
-	 * @param string $status Filter by status. Empty string for all.
-	 * @return array List of agent rows.
-	 */
-	public function get_all( string $status = '' ): array {
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		if ( '' !== $status ) {
-			$rows = $this->wpdb->get_results(
-				$this->wpdb->prepare(
-					'SELECT * FROM %i WHERE status = %s ORDER BY agent_id ASC',
-					$this->table_name,
-					$status
-				),
-				ARRAY_A
-			);
-		} else {
-			$rows = $this->wpdb->get_results(
-				$this->wpdb->prepare( 'SELECT * FROM %i ORDER BY agent_id ASC', $this->table_name ),
-				ARRAY_A
-			);
-		}
-
-		return array_map( array( $this, 'decode_config' ), $rows ?: array() );
-	}
-
-	/**
-	 * Get agent by ID.
-	 *
-	 * @param int $agent_id Agent ID.
-	 * @return array|null
-	 */
-	public function get_by_id( int $agent_id ): ?array {
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$row = $this->wpdb->get_row(
-			$this->wpdb->prepare(
-				'SELECT * FROM %i WHERE agent_id = %d LIMIT 1',
-				$this->table_name,
-				$agent_id
-			),
-			ARRAY_A
-		);
-
-		return $row ? $this->decode_config( $row ) : null;
-	}
-
-	/**
 	 * Get agent by owner ID.
 	 *
 	 * @param int $owner_id Owner user ID.
@@ -117,7 +70,15 @@ class Agents extends BaseRepository {
 			ARRAY_A
 		);
 
-		return $row ? $this->decode_config( $row ) : null;
+		if ( ! $row ) {
+			return null;
+		}
+
+		if ( ! empty( $row['agent_config'] ) ) {
+			$row['agent_config'] = json_decode( $row['agent_config'], true ) ? json_decode( $row['agent_config'], true ) : array();
+		}
+
+		return $row;
 	}
 
 	/**
@@ -137,7 +98,65 @@ class Agents extends BaseRepository {
 			ARRAY_A
 		);
 
-		return $row ? $this->decode_config( $row ) : null;
+		if ( ! $row ) {
+			return null;
+		}
+
+		if ( ! empty( $row['agent_config'] ) ) {
+			$row['agent_config'] = json_decode( $row['agent_config'], true ) ? json_decode( $row['agent_config'], true ) : array();
+		}
+
+		return $row;
+	}
+
+	/**
+	 * Update an agent's slug.
+	 *
+	 * Pure data operation — no validation, no filesystem side effects.
+	 *
+	 * @since 0.38.0
+	 * @param int    $agent_id Agent ID.
+	 * @param string $new_slug New slug value.
+	 * @return bool True on success, false on DB failure.
+	 */
+	public function update_slug( int $agent_id, string $new_slug ): bool {
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$result = $this->wpdb->update(
+			$this->table_name,
+			array( 'agent_slug' => $new_slug ),
+			array( 'agent_id' => $agent_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
+
+		return false !== $result;
+	}
+
+	/**
+	 * Get all agents.
+	 *
+	 * @since 0.38.0
+	 * @return array List of agent rows.
+	 */
+	public function get_all(): array {
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $this->wpdb->get_results(
+			$this->wpdb->prepare( 'SELECT * FROM %i ORDER BY agent_id ASC', $this->table_name ),
+			ARRAY_A
+		);
+
+		if ( ! $rows ) {
+			return array();
+		}
+
+		foreach ( $rows as &$row ) {
+			if ( ! empty( $row['agent_config'] ) ) {
+				$decoded              = json_decode( $row['agent_config'], true );
+				$row['agent_config'] = is_array( $decoded ) ? $decoded : array();
+			}
+		}
+
+		return $rows;
 	}
 
 	/**
@@ -170,61 +189,5 @@ class Agents extends BaseRepository {
 		);
 
 		return (int) $this->wpdb->insert_id;
-	}
-
-	/**
-	 * Update an agent row.
-	 *
-	 * @param int   $agent_id Agent ID.
-	 * @param array $data     Columns to update. agent_config should be a PHP array (encoded here).
-	 * @return bool True on success.
-	 */
-	public function update( int $agent_id, array $data ): bool {
-		if ( isset( $data['agent_config'] ) && is_array( $data['agent_config'] ) ) {
-			$data['agent_config'] = wp_json_encode( $data['agent_config'] );
-		}
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$result = $this->wpdb->update(
-			$this->table_name,
-			$data,
-			array( 'agent_id' => $agent_id )
-		);
-
-		return false !== $result;
-	}
-
-	/**
-	 * Delete an agent by ID.
-	 *
-	 * @param int $agent_id Agent ID.
-	 * @return bool True on success.
-	 */
-	public function delete( int $agent_id ): bool {
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$result = $this->wpdb->delete(
-			$this->table_name,
-			array( 'agent_id' => $agent_id ),
-			array( '%d' )
-		);
-
-		return false !== $result;
-	}
-
-	/**
-	 * Decode agent_config JSON for a row.
-	 *
-	 * @param array $row Database row.
-	 * @return array Row with decoded agent_config.
-	 */
-	private function decode_config( array $row ): array {
-		if ( ! empty( $row['agent_config'] ) ) {
-			$decoded             = json_decode( $row['agent_config'], true );
-			$row['agent_config'] = is_array( $decoded ) ? $decoded : array();
-		} else {
-			$row['agent_config'] = array();
-		}
-
-		return $row;
 	}
 }
