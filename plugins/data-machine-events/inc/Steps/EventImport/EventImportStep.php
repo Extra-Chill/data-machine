@@ -29,7 +29,7 @@ class EventImportStep extends Step {
 			slug: 'event_import',
 			label: 'Event Import',
 			description: 'Import events from venues and ticketing platforms',
-			class: self::class,
+			class_name: self::class,
 			position: 25,
 			usesHandler: true,
 			hasPipelineConfig: false
