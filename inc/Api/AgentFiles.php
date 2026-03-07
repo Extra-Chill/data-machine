@@ -273,9 +273,15 @@ class AgentFiles {
 	}
 
 	public static function put_agent_file( WP_REST_Request $request ) {
+		// Content may arrive as JSON body param (admin UI) or raw body (API clients).
+		$content = $request->get_param( 'content' );
+		if ( null === $content ) {
+			$content = $request->get_body();
+		}
+
 		$result = self::getAbilities()->executeWriteAgentFile( array(
 			'filename' => sanitize_file_name( wp_unslash( $request['filename'] ) ),
-			'content'  => $request->get_body(),
+			'content'  => $content,
 			'user_id'  => self::resolve_scoped_user_id( $request ),
 		) );
 
@@ -357,10 +363,17 @@ class AgentFiles {
 	}
 
 	public static function put_daily_file( WP_REST_Request $request ) {
-		$date   = sprintf( '%s-%s-%s', $request['year'], $request['month'], $request['day'] );
+		$date = sprintf( '%s-%s-%s', $request['year'], $request['month'], $request['day'] );
+
+		// Content may arrive as JSON body param (admin UI) or raw body (API clients).
+		$content = $request->get_param( 'content' );
+		if ( null === $content ) {
+			$content = $request->get_body();
+		}
+
 		$result = DailyMemoryAbilities::writeDaily( array(
 			'date'    => $date,
-			'content' => $request->get_body(),
+			'content' => $content,
 			'mode'    => 'write',
 			'user_id' => self::resolve_scoped_user_id( $request ),
 		) );
