@@ -82,8 +82,8 @@ class GetFlowStepsAbility {
 		$flow_step_id = $input['flow_step_id'] ?? null;
 
 		// Direct step lookup by ID - bypasses flow_id requirement.
-		if ( $flow_step_id ) {
-			if ( ! is_string( $flow_step_id ) ) {
+		if ( null !== $flow_step_id ) {
+			if ( ! is_string( $flow_step_id ) || empty( $flow_step_id ) ) {
 				return array(
 					'success' => false,
 					'error'   => 'flow_step_id must be a non-empty string',

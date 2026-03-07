@@ -60,7 +60,7 @@ class AllAbilitiesRegisteredTest extends WP_UnitTestCase {
 			'datamachine/write-to-log',
 			'datamachine/clear-logs',
 			'datamachine/read-logs',
-			'datamachine/log-metadata',
+			'datamachine/get-log-metadata',
 			'datamachine/get-log-level',
 			'datamachine/set-log-level',
 			// PipelineAbilities (7)
@@ -91,13 +91,13 @@ class AllAbilitiesRegisteredTest extends WP_UnitTestCase {
 			'datamachine/update-handler-defaults',
 			// HandlerAbilities (5)
 			'datamachine/get-handlers',
-			'datamachine/get-handler',
-			'datamachine/get-handler-settings-fields',
-			'datamachine/get-handler-auth-config',
-			'datamachine/get-handlers-by-step-type',
+			'datamachine/validate-handler',
+			'datamachine/get-handler-config-fields',
+			'datamachine/apply-handler-defaults',
+			'datamachine/get-handler-site-defaults',
 			// StepTypeAbilities (2)
 			'datamachine/get-step-types',
-			'datamachine/get-step-type',
+			'datamachine/validate-step-type',
 			// PostQueryAbilities (1)
 			'datamachine/query-posts',
 			// LocalSearchAbilities (1)

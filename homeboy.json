@@ -13,7 +13,13 @@
   },
   "changelog_target": "docs/CHANGELOG.md",
   "extensions": {
-    "wordpress": {}
+    "wordpress": {
+      "database_type": "mysql",
+      "mysql_host": "localhost",
+      "mysql_database": "wptests",
+      "mysql_user": "root",
+      "mysql_password": ""
+    }
   },
   "id": "data-machine",
   "version_targets": [

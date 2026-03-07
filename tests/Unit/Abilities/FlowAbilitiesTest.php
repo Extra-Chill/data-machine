@@ -113,6 +113,14 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 			'pipeline_id'       => $this->test_pipeline_id,
 			'flow_name'         => 'RSS Test Flow',
 			'scheduling_config' => [ 'interval' => 'manual' ],
+			'flow_config'       => [
+				'step1' => [
+					'step_type'        => 'fetch',
+					'handler_slugs'    => [ 'rss' ],
+					'handler_configs'  => [ 'rss' => [] ],
+					'pipeline_step_id' => 'step1',
+				],
+			],
 		] );
 
 		$result = $this->flow_abilities->executeAbility([
@@ -199,6 +207,13 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_get_flows_with_pagination(): void {
+		// Create a second flow so pagination has data at offset=1
+		$flow_ability = wp_get_ability( 'datamachine/create-flow' );
+		$flow_ability->execute( [
+			'pipeline_id' => $this->test_pipeline_id,
+			'flow_name'   => 'Second Flow for Pagination',
+		] );
+
 		$result1 = $this->flow_abilities->executeAbility([
 			'per_page' => 1,
 			'offset' => 0
@@ -381,6 +396,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_ability_not_found(): void {
+		$this->setExpectedIncorrectUsage( 'WP_Abilities_Registry::get_registered' );
 		$ability = wp_get_ability('datamachine/non-existent-ability');
 		$this->assertNull($ability);
 	}

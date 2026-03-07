@@ -27,11 +27,15 @@ class SystemAbilitiesTest extends WP_UnitTestCase {
 		$this->test_user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $this->test_user_id );
 
+		// Ensure the chat_sessions table exists
+		ChatDatabase::create_table();
+
 		$this->system_abilities = new SystemAbilities();
 		$this->chat_db          = new ChatDatabase();
 	}
 
 	public function tear_down(): void {
+		PluginSettings::clearCache();
 		parent::tear_down();
 	}
 
@@ -168,7 +172,10 @@ class SystemAbilitiesTest extends WP_UnitTestCase {
 	 */
 	public function test_generate_truncated_title_when_ai_disabled(): void {
 		// Disable AI titles.
-		update_option( 'datamachine_chat_ai_titles_enabled', false );
+		$settings = get_option( 'datamachine_settings', array() );
+		$settings['chat_ai_titles_enabled'] = false;
+		update_option( 'datamachine_settings', $settings );
+		PluginSettings::clearCache();
 
 		$messages = array(
 			array(
@@ -191,7 +198,10 @@ class SystemAbilitiesTest extends WP_UnitTestCase {
 		$this->assertEquals( 'fallback', $result['method'] );
 
 		// Clean up.
-		delete_option( 'datamachine_chat_ai_titles_enabled' );
+		$settings = get_option( 'datamachine_settings', array() );
+		unset( $settings['chat_ai_titles_enabled'] );
+		update_option( 'datamachine_settings', $settings );
+		PluginSettings::clearCache();
 	}
 
 	/**
@@ -199,7 +209,10 @@ class SystemAbilitiesTest extends WP_UnitTestCase {
 	 */
 	public function test_truncated_title_respects_max_length(): void {
 		// Disable AI titles.
-		update_option( 'datamachine_chat_ai_titles_enabled', false );
+		$settings = get_option( 'datamachine_settings', array() );
+		$settings['chat_ai_titles_enabled'] = false;
+		update_option( 'datamachine_settings', $settings );
+		PluginSettings::clearCache();
 
 		$long_message = str_repeat( 'a', 150 ); // 150 character message.
 		$messages     = array(
@@ -219,7 +232,10 @@ class SystemAbilitiesTest extends WP_UnitTestCase {
 		$this->assertStringEndsWith( '...', $result['title'] );
 
 		// Clean up.
-		delete_option( 'datamachine_chat_ai_titles_enabled' );
+		$settings = get_option( 'datamachine_settings', array() );
+		unset( $settings['chat_ai_titles_enabled'] );
+		update_option( 'datamachine_settings', $settings );
+		PluginSettings::clearCache();
 	}
 
 	/**
@@ -227,7 +243,10 @@ class SystemAbilitiesTest extends WP_UnitTestCase {
 	 */
 	public function test_truncated_title_normalizes_whitespace(): void {
 		// Disable AI titles.
-		update_option( 'datamachine_chat_ai_titles_enabled', false );
+		$settings = get_option( 'datamachine_settings', array() );
+		$settings['chat_ai_titles_enabled'] = false;
+		update_option( 'datamachine_settings', $settings );
+		PluginSettings::clearCache();
 
 		$messages = array(
 			array(
@@ -245,7 +264,10 @@ class SystemAbilitiesTest extends WP_UnitTestCase {
 		$this->assertEquals( 'Help me with multiple spaces', $result['title'] );
 
 		// Clean up.
-		delete_option( 'datamachine_chat_ai_titles_enabled' );
+		$settings = get_option( 'datamachine_settings', array() );
+		unset( $settings['chat_ai_titles_enabled'] );
+		update_option( 'datamachine_settings', $settings );
+		PluginSettings::clearCache();
 	}
 
 	/**
@@ -253,7 +275,10 @@ class SystemAbilitiesTest extends WP_UnitTestCase {
 	 */
 	public function test_title_persisted_to_database(): void {
 		// Disable AI titles for deterministic test.
-		update_option( 'datamachine_chat_ai_titles_enabled', false );
+		$settings = get_option( 'datamachine_settings', array() );
+		$settings['chat_ai_titles_enabled'] = false;
+		update_option( 'datamachine_settings', $settings );
+		PluginSettings::clearCache();
 
 		$messages = array(
 			array(
@@ -276,7 +301,10 @@ class SystemAbilitiesTest extends WP_UnitTestCase {
 		$this->assertEquals( 'Test message for title persistence', $session['title'] );
 
 		// Clean up.
-		delete_option( 'datamachine_chat_ai_titles_enabled' );
+		$settings = get_option( 'datamachine_settings', array() );
+		unset( $settings['chat_ai_titles_enabled'] );
+		update_option( 'datamachine_settings', $settings );
+		PluginSettings::clearCache();
 	}
 
 	/**
@@ -284,7 +312,10 @@ class SystemAbilitiesTest extends WP_UnitTestCase {
 	 */
 	public function test_force_flag_regenerates_existing_title(): void {
 		// Disable AI titles for deterministic test.
-		update_option( 'datamachine_chat_ai_titles_enabled', false );
+		$settings = get_option( 'datamachine_settings', array() );
+		$settings['chat_ai_titles_enabled'] = false;
+		update_option( 'datamachine_settings', $settings );
+		PluginSettings::clearCache();
 
 		$messages = array(
 			array(
@@ -317,6 +348,9 @@ class SystemAbilitiesTest extends WP_UnitTestCase {
 		$this->assertEquals( 'New message content', $session['title'] );
 
 		// Clean up.
-		delete_option( 'datamachine_chat_ai_titles_enabled' );
+		$settings = get_option( 'datamachine_settings', array() );
+		unset( $settings['chat_ai_titles_enabled'] );
+		update_option( 'datamachine_settings', $settings );
+		PluginSettings::clearCache();
 	}
 }

@@ -294,7 +294,7 @@ class PipelineStepAbilities {
 		$pipeline_step_id = $input['pipeline_step_id'] ?? null;
 
 		// Direct step lookup by ID - bypasses pipeline_id requirement.
-		if ( $pipeline_step_id ) {
+		if ( null !== $pipeline_step_id ) {
 			if ( ! is_string( $pipeline_step_id ) || empty( $pipeline_step_id ) ) {
 				return array(
 					'success' => false,
@@ -338,7 +338,7 @@ class PipelineStepAbilities {
 			);
 		}
 
-		$steps = $this->db_pipelines->get_pipeline_config( $pipeline_id );
+		$steps = array_values( $this->db_pipelines->get_pipeline_config( $pipeline_id ) );
 
 		return array(
 			'success'     => true,
