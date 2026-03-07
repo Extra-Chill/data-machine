@@ -157,11 +157,10 @@ class Pinterest extends PublishHandler {
 			return $this->errorResponse( 'Pinterest authentication not configured', array(), 'critical' );
 		}
 
-		$config = $auth->get_config();
-		$token = $config['access_token'] ?? '';
+		$token = $auth->get_valid_access_token();
 
 		if ( empty( $token ) ) {
-			return $this->errorResponse( 'Pinterest access token is empty', array(), 'critical' );
+			return $this->errorResponse( 'Pinterest access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings', array(), 'critical' );
 		}
 
 		$board_id = $this->resolve_board_id( $parameters, $handler_config, $engine );
