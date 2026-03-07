@@ -12,7 +12,6 @@
 
 namespace DataMachine\Cli;
 
-use DataMachine\Core\FilesRepository\DirectoryManager;
 use WP_CLI;
 
 defined( 'ABSPATH' ) || exit;
@@ -22,15 +21,21 @@ class UserResolver {
 	/**
 	 * Resolve a --user flag to a WordPress user ID.
 	 *
+	 * Returns 0 when no --user flag is provided, which means "no user filter"
+	 * (show all data regardless of owner). This is the correct default for CLI
+	 * commands where admins expect to see all pipelines, flows, and jobs —
+	 * including pre-multi-agent data with user_id=0.
+	 *
 	 * @param array $assoc_args Command arguments (checks for 'user' key).
 	 * @return int WordPress user ID, or 0 if not specified.
 	 */
 	public static function resolve( array $assoc_args ): int {
 		$user_value = $assoc_args['user'] ?? null;
 
+		// No --user flag: return 0 (unscoped). CLI callers pass this as null
+		// to ability queries, which then return all data regardless of owner.
 		if ( null === $user_value || '' === $user_value ) {
-			$directory_manager = new DirectoryManager();
-			return $directory_manager->get_default_agent_user_id();
+			return 0;
 		}
 
 		// Numeric: treat as user ID.
