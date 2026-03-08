@@ -420,6 +420,8 @@ class ToolManager {
 	 * Filters out unconfigured and disabled tools.
 	 * Resolves any callable definitions before returning.
 	 *
+	 * @deprecated 0.39.0 Use ToolPolicyResolver::resolve() with SURFACE_CHAT instead.
+	 *
 	 * @return array Available tools for chat agents
 	 */
 	public function getAvailableToolsForChat(): array {

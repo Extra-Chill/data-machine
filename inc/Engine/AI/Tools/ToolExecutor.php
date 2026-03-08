@@ -20,6 +20,8 @@ class ToolExecutor {
 	 * Get available tools for AI agent execution.
 	 * Used by both chat and pipeline agents.
 	 *
+	 * @deprecated 0.39.0 Use ToolPolicyResolver::resolve() with SURFACE_PIPELINE instead.
+	 *
 	 * @param  array|null  $previous_step_config     Previous step configuration (pipeline only)
 	 * @param  array|null  $next_step_config         Next step configuration (pipeline only)
 	 * @param  string|null $current_pipeline_step_id Current pipeline step ID (pipeline only)

@@ -10,6 +10,7 @@ use DataMachine\Core\Steps\QueueableTrait;
 use DataMachine\Engine\AI\AIConversationLoop;
 use DataMachine\Engine\AI\ConversationManager;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
+use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use DataMachine\Engine\AI\AgentType;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -213,7 +214,14 @@ class AIStep extends Step {
 		}
 
 		$engine_data     = $this->engine->all();
-		$available_tools = ToolExecutor::getAvailableTools( $previous_step_config, $next_step_config, $pipeline_step_id, $engine_data );
+		$resolver        = new ToolPolicyResolver();
+		$available_tools = $resolver->resolve( array(
+			'surface'             => ToolPolicyResolver::SURFACE_PIPELINE,
+			'previous_step_config' => $previous_step_config,
+			'next_step_config'     => $next_step_config,
+			'pipeline_step_id'     => $pipeline_step_id,
+			'engine_data'          => $engine_data,
+		) );
 
 		$pipeline_agent_defaults = PluginSettings::getAgentModel( 'pipeline' );
 		$provider_name           = $pipeline_step_config['provider'] ?? $pipeline_agent_defaults['provider'];
