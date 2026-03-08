@@ -335,7 +335,7 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 							key={ file.filename }
 							className={ `datamachine-agent-file-item${
 								selected ? ' is-selected' : ''
-							}${ isSoul ? ' is-soul' : '' }` }
+							}` }
 							onClick={ () =>
 								onSelectFile( {
 									type: 'core',
@@ -358,14 +358,6 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 						>
 							<div className="datamachine-agent-file-item-info">
 								<span className="datamachine-agent-file-item-name">
-									{ isSoul && (
-										<span
-											className="datamachine-agent-file-soul-badge"
-											title="Agent identity"
-										>
-											&#x1f9e0;
-										</span>
-									) }
 									{ file.filename }
 								</span>
 								<span className="datamachine-agent-file-item-meta">
