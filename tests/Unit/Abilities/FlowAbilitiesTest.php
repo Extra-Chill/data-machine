@@ -165,21 +165,19 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 			],
 		] );
 
+		// Use step_configs to set handlers through the proper API contract.
+		// Passing flow_config directly gets overwritten by syncStepsToFlow.
 		$flow = $flow_ability->execute( [
-			'pipeline_id' => $pipeline['pipeline_id'],
-			'flow_name'   => 'Multi-Handler Flow',
-			'flow_config' => [
-				'step1' => [
-					'step_type'        => 'fetch',
-					'handler_slugs'    => [ 'rss' ],
-					'handler_configs'  => [ 'rss' => [] ],
-					'pipeline_step_id' => 'step1',
+			'pipeline_id'  => $pipeline['pipeline_id'],
+			'flow_name'    => 'Multi-Handler Flow',
+			'step_configs' => [
+				'fetch'   => [
+					'handler_slug'   => 'rss',
+					'handler_config' => [],
 				],
-				'step2' => [
-					'step_type'        => 'publish',
-					'handler_slugs'    => [ 'wordpress_publish' ],
-					'handler_configs'  => [ 'wordpress_publish' => [] ],
-					'pipeline_step_id' => 'step2',
+				'publish' => [
+					'handler_slug'   => 'wordpress_publish',
+					'handler_config' => [],
 				],
 			],
 		] );

@@ -36,15 +36,13 @@ class FlowAbilities {
 	private WebhookTriggerAbility $webhook_trigger;
 
 	public function __construct() {
-		// Always initialize queue - CLI commands need it regardless of WP_Ability
-		$this->queue = new QueueAbility();
-
 		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
 			return;
 		}
 
 		$this->registerCategory();
 
+		$this->queue           = new QueueAbility();
 		$this->get_flows       = new GetFlowsAbility();
 		$this->create_flow     = new CreateFlowAbility();
 		$this->update_flow     = new UpdateFlowAbility();
@@ -157,6 +155,9 @@ class FlowAbilities {
 	 * @return array Result with queue status.
 	 */
 	public function executeQueueAdd( array $input ): array {
+		if ( ! isset( $this->queue ) ) {
+			$this->queue = new QueueAbility();
+		}
 		return $this->queue->executeQueueAdd( $input );
 	}
 
@@ -167,6 +168,9 @@ class FlowAbilities {
 	 * @return array Result with queue items.
 	 */
 	public function executeQueueList( array $input ): array {
+		if ( ! isset( $this->queue ) ) {
+			$this->queue = new QueueAbility();
+		}
 		return $this->queue->executeQueueList( $input );
 	}
 
@@ -177,6 +181,9 @@ class FlowAbilities {
 	 * @return array Result with cleared count.
 	 */
 	public function executeQueueClear( array $input ): array {
+		if ( ! isset( $this->queue ) ) {
+			$this->queue = new QueueAbility();
+		}
 		return $this->queue->executeQueueClear( $input );
 	}
 
@@ -187,6 +194,9 @@ class FlowAbilities {
 	 * @return array Result with removed prompt info.
 	 */
 	public function executeQueueRemove( array $input ): array {
+		if ( ! isset( $this->queue ) ) {
+			$this->queue = new QueueAbility();
+		}
 		return $this->queue->executeQueueRemove( $input );
 	}
 
@@ -197,6 +207,9 @@ class FlowAbilities {
 	 * @return array Result with update status.
 	 */
 	public function executeQueueUpdate( array $input ): array {
+		if ( ! isset( $this->queue ) ) {
+			$this->queue = new QueueAbility();
+		}
 		return $this->queue->executeQueueUpdate( $input );
 	}
 
@@ -207,6 +220,9 @@ class FlowAbilities {
 	 * @return array Result with move status.
 	 */
 	public function executeQueueMove( array $input ): array {
+		if ( ! isset( $this->queue ) ) {
+			$this->queue = new QueueAbility();
+		}
 		return $this->queue->executeQueueMove( $input );
 	}
 }
