@@ -102,6 +102,9 @@ class AllAbilitiesRegisteredTest extends WP_UnitTestCase {
 			'datamachine/query-posts',
 			// LocalSearchAbilities (1)
 			'datamachine/local-search',
+			// DuplicateCheckAbility (2)
+			'datamachine/check-duplicate',
+			'datamachine/titles-match',
 		);
 
 		$missing = array();

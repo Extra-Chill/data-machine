@@ -2,10 +2,12 @@
 /**
  * Queue Validator tool for duplicate detection.
  *
- * Checks whether a topic already exists as a published post or in a
- * Data Machine queue before content generation begins. Returns a clear
- * verdict with match details so agents (and humans in the dashboard)
- * can see exactly what was caught and why.
+ * AI-facing tool that checks whether a topic already exists as a published
+ * post or in a Data Machine queue before content generation begins.
+ *
+ * Delegates all similarity math to the unified SimilarityEngine.
+ * The published-post check can also be routed through the
+ * DuplicateCheckAbility for strategy-aware checking.
  *
  * @package DataMachine\Engine\AI\Tools\Global
  */
@@ -15,82 +17,10 @@ namespace DataMachine\Engine\AI\Tools\Global;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\Database\Flows\Flows as DB_Flows;
+use DataMachine\Core\Similarity\SimilarityEngine;
 use DataMachine\Engine\AI\Tools\BaseTool;
 
 class QueueValidator extends BaseTool {
-
-	/**
-	 * Default Jaccard similarity threshold.
-	 *
-	 * @var float
-	 */
-	const DEFAULT_THRESHOLD = 0.65;
-
-	/**
-	 * Stop words excluded from similarity comparison.
-	 *
-	 * @var array
-	 */
-	const STOP_WORDS = array(
-		'the',
-		'a',
-		'an',
-		'and',
-		'or',
-		'but',
-		'in',
-		'on',
-		'at',
-		'to',
-		'for',
-		'of',
-		'with',
-		'by',
-		'from',
-		'is',
-		'it',
-		'are',
-		'was',
-		'were',
-		'be',
-		'been',
-		'being',
-		'have',
-		'has',
-		'had',
-		'do',
-		'does',
-		'did',
-		'will',
-		'would',
-		'could',
-		'should',
-		'may',
-		'might',
-		'shall',
-		'can',
-		'not',
-		'no',
-		'if',
-		'when',
-		'what',
-		'why',
-		'how',
-		'who',
-		'where',
-		'which',
-		'that',
-		'this',
-		'you',
-		'your',
-		'my',
-		'am',
-		'me',
-		'we',
-		'they',
-		'them',
-		'its',
-	);
 
 	public function __construct() {
 		$this->registerGlobalTool( 'queue_validator', array( $this, 'getToolDefinition' ) );
@@ -120,13 +50,6 @@ class QueueValidator extends BaseTool {
 		return self::is_configured();
 	}
 
-	/**
-	 * Validate a topic against published posts and queue items.
-	 *
-	 * @param array $parameters Tool call parameters.
-	 * @param array $tool_def   Tool definition (unused).
-	 * @return array Validation result with verdict and match details.
-	 */
 	/**
 	 * Core duplicate-check logic. Returns a structured result usable by
 	 * both the AI tool interface and the queue-add ability.
@@ -170,7 +93,7 @@ class QueueValidator extends BaseTool {
 			)
 		);
 
-		// Check 1: Existing published posts.
+		// Check 1: Existing published posts — use SimilarityEngine title match.
 		$post_match = $this->checkPublishedPosts( $topic, $threshold, $post_type );
 
 		if ( null !== $post_match ) {
@@ -283,7 +206,7 @@ class QueueValidator extends BaseTool {
 	 * Check published posts for similar titles.
 	 *
 	 * Uses WP_Query with a keyword search for candidate fetch, then
-	 * Jaccard similarity on tokenized words for accurate matching.
+	 * Jaccard similarity via SimilarityEngine for accurate matching.
 	 *
 	 * @param string $topic     Topic to check.
 	 * @param float  $threshold Similarity threshold.
@@ -291,7 +214,7 @@ class QueueValidator extends BaseTool {
 	 * @return array|null Best match above threshold, or null.
 	 */
 	private function checkPublishedPosts( string $topic, float $threshold, string $post_type = 'post' ): ?array {
-		$search_word = $this->getBestSearchWord( $topic );
+		$search_word = SimilarityEngine::getBestSearchWord( $topic );
 
 		if ( empty( $search_word ) ) {
 			return null;
@@ -312,14 +235,14 @@ class QueueValidator extends BaseTool {
 			return null;
 		}
 
-		$topic_words = $this->tokenize( $topic );
+		$topic_words = SimilarityEngine::tokenize( $topic );
 		$best_match  = null;
 		$best_score  = 0.0;
 
 		foreach ( $query->posts as $post_id ) {
 			$title       = get_the_title( $post_id );
-			$title_words = $this->tokenize( $title );
-			$score       = $this->jaccard( $topic_words, $title_words );
+			$title_words = SimilarityEngine::tokenize( $title );
+			$score       = SimilarityEngine::jaccard( $topic_words, $title_words );
 
 			if ( $score > $best_score ) {
 				$best_score = $score;
@@ -368,14 +291,14 @@ class QueueValidator extends BaseTool {
 			return null;
 		}
 
-		$topic_words = $this->tokenize( $topic );
+		$topic_words = SimilarityEngine::tokenize( $topic );
 		$best_match  = null;
 		$best_score  = 0.0;
 
 		foreach ( $prompt_queue as $index => $item ) {
 			$prompt     = $item['prompt'] ?? '';
-			$item_words = $this->tokenize( $prompt );
-			$score      = $this->jaccard( $topic_words, $item_words );
+			$item_words = SimilarityEngine::tokenize( $prompt );
+			$score      = SimilarityEngine::jaccard( $topic_words, $item_words );
 
 			if ( $score > $best_score ) {
 				$best_score = $score;
@@ -395,74 +318,6 @@ class QueueValidator extends BaseTool {
 	}
 
 	/**
-	 * Tokenize text into a set of significant lowercase words.
-	 *
-	 * Strips stop words and short words (< 2 chars) to focus on
-	 * content-bearing terms for similarity comparison.
-	 *
-	 * @param string $text Input text.
-	 * @return array Set of significant words (unique).
-	 */
-	public function tokenize( string $text ): array {
-		preg_match_all( '/[a-z0-9]+/', strtolower( $text ), $matches );
-
-		$words = array();
-		foreach ( $matches[0] as $word ) {
-			if ( strlen( $word ) >= 2 && ! in_array( $word, self::STOP_WORDS, true ) ) {
-				$words[ $word ] = true;
-			}
-		}
-
-		return array_keys( $words );
-	}
-
-	/**
-	 * Compute Jaccard similarity between two word sets.
-	 *
-	 * @param array $set_a First word set.
-	 * @param array $set_b Second word set.
-	 * @return float Similarity score between 0.0 and 1.0.
-	 */
-	public function jaccard( array $set_a, array $set_b ): float {
-		if ( empty( $set_a ) || empty( $set_b ) ) {
-			return 0.0;
-		}
-
-		$intersection = array_intersect( $set_a, $set_b );
-		$union        = array_unique( array_merge( $set_a, $set_b ) );
-
-		return count( $intersection ) / count( $union );
-	}
-
-	/**
-	 * Get the best search word for WP_Query candidate fetch.
-	 *
-	 * Returns the longest significant word (3+ chars, not a stop word)
-	 * to cast a wide net for potential matches.
-	 *
-	 * @param string $text Input text.
-	 * @return string|null Best search word, or null if none found.
-	 */
-	private function getBestSearchWord( string $text ): ?string {
-		preg_match_all( '/[a-z0-9]+/', strtolower( $text ), $matches );
-
-		$candidates = array();
-		foreach ( $matches[0] as $word ) {
-			if ( strlen( $word ) >= 3 && ! in_array( $word, self::STOP_WORDS, true ) ) {
-				$candidates[] = $word;
-			}
-		}
-
-		if ( empty( $candidates ) ) {
-			return null;
-		}
-
-		usort( $candidates, fn( $a, $b ) => strlen( $b ) - strlen( $a ) );
-
-		return $candidates[0];
-	}
-
-	/**
 	 * Resolve the similarity threshold from parameters.
 	 *
 	 * @param array $parameters Tool call parameters.
@@ -476,7 +331,7 @@ class QueueValidator extends BaseTool {
 			}
 		}
 
-		return self::DEFAULT_THRESHOLD;
+		return SimilarityEngine::DEFAULT_JACCARD_THRESHOLD;
 	}
 
 	/**

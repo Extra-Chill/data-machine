@@ -127,6 +127,9 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/PostQueryAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/PipelineAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/PipelineStepAbilities.php';
+	require_once __DIR__ . '/inc/Core/Similarity/SimilarityResult.php';
+	require_once __DIR__ . '/inc/Core/Similarity/SimilarityEngine.php';
+	require_once __DIR__ . '/inc/Abilities/DuplicateCheck/DuplicateCheckAbility.php';
 	require_once __DIR__ . '/inc/Abilities/ProcessedItemsAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/SettingsAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/HandlerAbilities.php';
@@ -175,6 +178,7 @@ function datamachine_run_datamachine_plugin() {
 		new \DataMachine\Abilities\PostQueryAbilities();
 		new \DataMachine\Abilities\PipelineAbilities();
 		new \DataMachine\Abilities\PipelineStepAbilities();
+		new \DataMachine\Abilities\DuplicateCheck\DuplicateCheckAbility();
 		new \DataMachine\Abilities\ProcessedItemsAbilities();
 		new \DataMachine\Abilities\SettingsAbilities();
 		new \DataMachine\Abilities\HandlerAbilities();
