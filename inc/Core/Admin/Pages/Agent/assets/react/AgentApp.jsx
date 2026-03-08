@@ -12,6 +12,10 @@ import { useState } from '@wordpress/element';
 import { TabPanel } from '@wordpress/components';
 
 /**
+ * External dependencies
+ */
+import AgentSwitcher from '@shared/components/AgentSwitcher';
+/**
  * Internal dependencies
  */
 import AgentFileList from './components/AgentFileList';
@@ -44,6 +48,7 @@ const AgentApp = () => {
 		<div className="datamachine-agent-app">
 			<div className="datamachine-agent-header">
 				<h1 className="datamachine-agent-title">Agent</h1>
+				<AgentSwitcher />
 			</div>
 			<TabPanel
 				className="datamachine-tabs"

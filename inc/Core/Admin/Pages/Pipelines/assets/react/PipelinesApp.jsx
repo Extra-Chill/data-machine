@@ -26,6 +26,7 @@ import PipelineSelector from './components/pipelines/PipelineSelector';
 import ModalManager from './components/shared/ModalManager';
 import ChatToggle from './components/chat/ChatToggle';
 import ChatSidebar from './components/chat/ChatSidebar';
+import AgentSwitcher from '@shared/components/AgentSwitcher';
 import { MODAL_TYPES } from './utils/constants';
 import { isSameId } from './utils/ids';
 
@@ -238,6 +239,7 @@ export default function PipelinesApp() {
 						{ __( 'Add New Pipeline', 'data-machine' ) }
 					</Button>
 					<div className="datamachine-header__right">
+						<AgentSwitcher />
 						<Button
 							variant="secondary"
 							onClick={ () =>

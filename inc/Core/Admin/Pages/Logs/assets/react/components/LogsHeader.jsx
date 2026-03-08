@@ -10,6 +10,10 @@
 import { Button } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 /**
+ * External dependencies
+ */
+import AgentSwitcher from '@shared/components/AgentSwitcher';
+/**
  * Internal dependencies
  */
 import { useClearAllLogs } from '../queries/logs';
@@ -36,6 +40,7 @@ const LogsHeader = () => {
 				{ __( 'Logs', 'data-machine' ) }
 			</h1>
 			<div className="datamachine-logs-header-actions">
+				<AgentSwitcher />
 				<Button
 					variant="secondary"
 					isDestructive

@@ -101,6 +101,7 @@ function datamachine_run_datamachine_plugin() {
 	\DataMachine\Api\AgentFiles::register();
 	\DataMachine\Api\FlowFiles::register();
 	\DataMachine\Api\Users::register();
+	\DataMachine\Api\Agents::register();
 	\DataMachine\Api\Logs::register();
 	\DataMachine\Api\ProcessedItems::register();
 	\DataMachine\Api\Jobs::register();

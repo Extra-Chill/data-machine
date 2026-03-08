@@ -3,6 +3,11 @@
  *
  * Centralized REST API wrapper with error handling and standardized responses.
  * Uses wp.apiFetch from @wordpress/api-fetch.
+ *
+ * Supports param interceptors — functions that inject query params into every
+ * GET request. Register interceptors at app boot via client.addParamInterceptor().
+ * The client itself has no knowledge of what's being injected (agents, user
+ * preferences, etc.) — it just calls the registered functions and merges results.
  */
 
 /**
@@ -25,6 +30,27 @@ const getConfig = () => {
 		restNamespace: config.restNamespace || 'datamachine/v1',
 		restNonce: config.restNonce || '',
 	};
+};
+
+/**
+ * Registered param interceptors.
+ * Each is a function () => Object that returns params to merge into GET requests.
+ *
+ * @type {Array<Function>}
+ */
+const paramInterceptors = [];
+
+/**
+ * Collect params from all registered interceptors.
+ *
+ * @return {Object} Merged params from all interceptors.
+ */
+const getInterceptedParams = () => {
+	let merged = {};
+	for ( const interceptor of paramInterceptors ) {
+		merged = { ...merged, ...interceptor() };
+	}
+	return merged;
 };
 
 /**
@@ -82,7 +108,15 @@ const request = async (
  * API Client Methods
  */
 export const client = {
-	get: ( path, params = {} ) => request( path, 'GET', undefined, params ),
+	/**
+	 * GET request with automatic param interceptor injection.
+	 * Interceptor params are applied first, then caller params override.
+	 */
+	get: ( path, params = {} ) =>
+		request( path, 'GET', undefined, {
+			...getInterceptedParams(),
+			...params,
+		} ),
 	post: ( path, data ) => request( path, 'POST', data ),
 	put: ( path, data ) => request( path, 'PUT', data ),
 	patch: ( path, data ) => request( path, 'PATCH', data ),
@@ -104,6 +138,19 @@ export const client = {
 				body: formData,
 			}
 		);
+	},
+
+	/**
+	 * Register a param interceptor.
+	 * The function is called on every GET request and should return an Object
+	 * of query params to inject (or {} to inject nothing).
+	 *
+	 * @param {Function} interceptor - () => Object
+	 */
+	addParamInterceptor: ( interceptor ) => {
+		if ( typeof interceptor === 'function' ) {
+			paramInterceptors.push( interceptor );
+		}
 	},
 };
 
