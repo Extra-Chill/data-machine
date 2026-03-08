@@ -19,7 +19,7 @@ class BingWebmaster extends BaseTool {
 
 	public function __construct() {
 		$this->registerConfigurationHandlers( 'bing_webmaster' );
-		$this->registerGlobalTool( 'bing_webmaster', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'bing_webmaster', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline', 'standalone' ) );
 	}
 
 	/**

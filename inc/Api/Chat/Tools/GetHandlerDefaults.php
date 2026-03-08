@@ -19,7 +19,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class GetHandlerDefaults extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'get_handler_defaults', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'get_handler_defaults', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	public function getToolDefinition(): array {

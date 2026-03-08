@@ -89,13 +89,17 @@ class ToolManager {
 	 * Handles lazy evaluation of tool definitions. Callables are invoked
 	 * and their results cached. Arrays are returned as-is.
 	 *
+	 * Supports the unified registry wrapper format where a callable is stored
+	 * as `['_callable' => callable, 'contexts' => [...]]`. The callable is
+	 * resolved and contexts are merged into the result.
+	 *
 	 * Cache keys are scoped: when a $cache_scope is provided, the key
 	 * becomes "$cache_scope|$tool_id" so that the same tool_id can hold
 	 * different definitions for different contexts (e.g. different flows
 	 * configure upsert_event with different taxonomy selections).
 	 *
 	 * @param string $tool_id     Tool identifier.
-	 * @param mixed  $definition  Tool definition (array or callable).
+	 * @param mixed  $definition  Tool definition (array, callable, or wrapper with _callable key).
 	 * @param string $cache_scope Optional scope prefix for the cache key.
 	 * @return array Resolved tool definition.
 	 */
@@ -121,6 +125,13 @@ class ToolManager {
 			);
 		}
 
+		// Handle unified registry wrapper: ['_callable' => callable, 'contexts' => [...]]
+		$contexts = array();
+		if ( is_array( $definition ) && isset( $definition['_callable'] ) ) {
+			$contexts   = $definition['contexts'] ?? array();
+			$definition = $definition['_callable'];
+		}
+
 		// Resolve callable or use array directly
 		if ( is_callable( $definition ) ) {
 			$resolved = $definition();
@@ -130,6 +141,11 @@ class ToolManager {
 
 		// Ensure result is an array
 		$resolved = is_array( $resolved ) ? $resolved : array();
+
+		// Merge contexts into resolved definition (registry contexts take precedence)
+		if ( ! empty( $contexts ) ) {
+			$resolved['contexts'] = $contexts;
+		}
 
 		// Cache the resolved definition
 		self::$resolved_cache[ $cache_key ] = $resolved;
@@ -160,14 +176,51 @@ class ToolManager {
 	// ============================================
 
 	/**
-	 * Get all global tools (handler-agnostic).
+	 * Get all registered tools from the unified registry.
 	 * Resolves any callable definitions before returning.
 	 *
-	 * @return array All global tools with resolved definitions
+	 * @return array All tools with resolved definitions.
+	 */
+	public function get_all_tools(): array {
+		$raw_tools = apply_filters( 'datamachine_tools', array() );
+		return $this->resolveAllTools( $raw_tools );
+	}
+
+	/**
+	 * Get all registered tools (raw, unresolved).
+	 *
+	 * Returns the raw registry including callables and wrapper arrays.
+	 * Useful when you need to check contexts without resolving all definitions.
+	 *
+	 * @return array Raw tools array.
+	 */
+	public function get_raw_tools(): array {
+		return apply_filters( 'datamachine_tools', array() );
+	}
+
+	/**
+	 * Get contexts for a tool from its raw (unresolved) definition.
+	 *
+	 * Extracts contexts without resolving callable definitions.
+	 *
+	 * @param mixed $definition Raw tool definition (array, callable, or wrapper).
+	 * @return array Contexts array.
+	 */
+	public static function get_tool_contexts( mixed $definition ): array {
+		if ( is_array( $definition ) ) {
+			return $definition['contexts'] ?? array();
+		}
+		return array();
+	}
+
+	/**
+	 * Alias for get_all_tools() — backward compatibility.
+	 *
+	 * @deprecated Use get_all_tools() instead.
+	 * @return array All tools with resolved definitions.
 	 */
 	public function get_global_tools(): array {
-		$raw_tools = apply_filters( 'datamachine_global_tools', array() );
-		return $this->resolveAllTools( $raw_tools );
+		return $this->get_all_tools();
 	}
 
 	/**

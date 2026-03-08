@@ -26,7 +26,7 @@ class GitHubIssueTool extends BaseTool {
 	 * Constructor.
 	 */
 	public function __construct() {
-		$this->registerGlobalTool( 'create_github_issue', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'create_github_issue', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline', 'standalone' ) );
 	}
 
 	/**

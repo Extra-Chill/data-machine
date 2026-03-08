@@ -21,7 +21,7 @@ use DataMachine\Abilities\Taxonomy\ResolveTermAbility;
 class AssignTaxonomyTerm extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'assign_taxonomy_term', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'assign_taxonomy_term', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	public function getToolDefinition(): array {

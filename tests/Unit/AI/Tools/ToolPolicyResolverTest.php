@@ -137,27 +137,32 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	// SYSTEM SURFACE
 	// ============================================
 
-	public function test_system_returns_global_tools(): void {
+	public function test_system_returns_only_system_context_tools(): void {
 		$tools = $this->resolver->resolve( array(
 			'surface' => ToolPolicyResolver::SURFACE_SYSTEM,
 		) );
 
 		$this->assertIsArray( $tools );
-		$this->assertArrayHasKey( 'web_fetch', $tools );
+		// No tools currently register with 'system' context,
+		// so the system surface should be empty by default.
+		$this->assertArrayNotHasKey( 'web_fetch', $tools );
 	}
 
-	public function test_system_includes_system_filter_tools(): void {
-		// Register a system-only tool via filter.
-		add_filter( 'datamachine_system_tools', function ( $tools ) {
+	public function test_system_includes_system_context_tools(): void {
+		// Register a system-only tool via unified filter.
+		add_filter( 'datamachine_tools', function ( $tools ) {
 			$tools['test_system_tool'] = array(
 				'label'       => 'Test System Tool',
 				'description' => 'Only available to system tasks.',
 				'class'       => 'NonExistentClass',
 				'method'      => 'handle_tool_call',
 				'parameters'  => array(),
+				'contexts'    => array( 'system' ),
 			);
 			return $tools;
 		} );
+
+		ToolManager::clearCache();
 
 		$tools = $this->resolver->resolve( array(
 			'surface' => ToolPolicyResolver::SURFACE_SYSTEM,
@@ -166,7 +171,8 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'test_system_tool', $tools );
 
 		// Clean up.
-		remove_all_filters( 'datamachine_system_tools' );
+		remove_all_filters( 'datamachine_tools' );
+		ToolManager::clearCache();
 	}
 
 	// ============================================

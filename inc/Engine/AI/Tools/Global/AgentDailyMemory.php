@@ -21,7 +21,7 @@ use DataMachine\Core\FilesRepository\DirectoryManager;
 class AgentDailyMemory extends BaseTool {
 
 	public function __construct() {
-		$this->registerGlobalTool( 'agent_daily_memory', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'agent_daily_memory', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline', 'standalone' ) );
 	}
 
 	/**

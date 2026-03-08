@@ -23,11 +23,12 @@ class GitHubTools extends BaseTool {
 	 * Constructor — register all GitHub tools as global tools.
 	 */
 	public function __construct() {
-		$this->registerGlobalTool( 'list_github_issues', array( $this, 'getListIssuesDefinition' ) );
-		$this->registerGlobalTool( 'get_github_issue', array( $this, 'getGetIssueDefinition' ) );
-		$this->registerGlobalTool( 'manage_github_issue', array( $this, 'getManageIssueDefinition' ) );
-		$this->registerGlobalTool( 'list_github_pulls', array( $this, 'getListPullsDefinition' ) );
-		$this->registerGlobalTool( 'list_github_repos', array( $this, 'getListReposDefinition' ) );
+		$contexts = array( 'chat', 'pipeline', 'standalone' );
+		$this->registerTool( 'list_github_issues', array( $this, 'getListIssuesDefinition' ), $contexts );
+		$this->registerTool( 'get_github_issue', array( $this, 'getGetIssueDefinition' ), $contexts );
+		$this->registerTool( 'manage_github_issue', array( $this, 'getManageIssueDefinition' ), $contexts );
+		$this->registerTool( 'list_github_pulls', array( $this, 'getListPullsDefinition' ), $contexts );
+		$this->registerTool( 'list_github_repos', array( $this, 'getListReposDefinition' ), $contexts );
 	}
 
 	/**
@@ -78,7 +79,7 @@ class GitHubTools extends BaseTool {
 	/**
 	 * Get tool definition — returns the primary tool definition (list issues).
 	 *
-	 * Individual tools use their own definition methods via registerGlobalTool.
+	 * Individual tools use their own definition methods via registerTool.
 	 *
 	 * @return array Tool definition array.
 	 */

@@ -93,9 +93,12 @@ class GetPostBlocksAbility {
 
 	private function registerChatTool(): void {
 		add_filter(
-			'datamachine_chat_tools',
+			'datamachine_tools',
 			function ( $tools ) {
-				$tools['get_post_blocks'] = array( self::class, 'getChatTool' );
+				$tools['get_post_blocks'] = array(
+					'_callable' => array( self::class, 'getChatTool' ),
+					'contexts'  => array( 'chat' ),
+				);
 				return $tools;
 			}
 		);

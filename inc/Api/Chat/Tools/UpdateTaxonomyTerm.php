@@ -20,7 +20,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class UpdateTaxonomyTerm extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'update_taxonomy_term', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'update_taxonomy_term', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	public function getToolDefinition(): array {

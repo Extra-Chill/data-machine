@@ -24,7 +24,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class ApiQuery extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'api_query', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'api_query', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	/**

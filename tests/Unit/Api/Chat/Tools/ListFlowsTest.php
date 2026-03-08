@@ -44,10 +44,13 @@ class ListFlowsTest extends WP_UnitTestCase {
 	}
 
 	public function test_tool_registered(): void {
-		$tools = apply_filters('datamachine_chat_tools', []);
+		$tools = apply_filters('datamachine_tools', []);
 
 		$this->assertArrayHasKey('list_flows', $tools);
-		$definition = is_callable( $tools['list_flows'] ) ? call_user_func( $tools['list_flows'] ) : $tools['list_flows'];
+		$raw = $tools['list_flows'];
+		// Unified registry wraps callables with _callable key.
+		$callable   = $raw['_callable'] ?? $raw;
+		$definition = is_callable( $callable ) ? call_user_func( $callable ) : $callable;
 		$this->assertSame(ListFlows::class, $definition['class']);
 	}
 

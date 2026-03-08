@@ -21,7 +21,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class CreateFlow extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'create_flow', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'create_flow', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	/**

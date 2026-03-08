@@ -20,7 +20,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class ReadLogs extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'read_logs', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'read_logs', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	/**

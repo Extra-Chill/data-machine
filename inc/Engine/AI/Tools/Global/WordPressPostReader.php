@@ -17,7 +17,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class WordPressPostReader extends BaseTool {
 
 	public function __construct() {
-		$this->registerGlobalTool( 'wordpress_post_reader', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'wordpress_post_reader', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline', 'standalone' ) );
 	}
 
 	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {

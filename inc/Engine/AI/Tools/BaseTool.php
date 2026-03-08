@@ -23,49 +23,42 @@ abstract class BaseTool {
 	protected bool $async = false;
 
 	/**
-	 * Register a tool for any agent type.
+	 * Register a tool with the unified tool registry.
 	 *
-	 * Agent-agnostic tool registration that dynamically creates the appropriate filter
-	 * based on the agent type. Enables unlimited agent specialization while maintaining
-	 * consistent registration patterns.
+	 * All tools register via the single `datamachine_tools` filter. Each tool
+	 * must declare its contexts — the surfaces where it's available (e.g.
+	 * 'chat', 'pipeline', 'standalone').
+	 *
+	 * When the definition is a callable (for lazy evaluation), the contexts
+	 * are stored alongside so they're available before the callable is resolved.
+	 * The ToolManager merges contexts into the resolved definition.
 	 *
 	 * IMPORTANT: Pass a callable (e.g., [$this, 'getToolDefinition']) instead of
 	 * calling the method directly. This enables lazy evaluation after translations
 	 * are loaded, preventing WordPress 6.7+ translation timing errors.
 	 *
-	 * @param string         $agentType Agent type (global, chat, frontend, supportbot, etc.)
-	 * @param string         $toolName Tool identifier
-	 * @param array|callable $toolDefinition Tool definition array OR callable that returns it
+	 * @param string         $toolName       Tool identifier.
+	 * @param array|callable $toolDefinition Tool definition array OR callable that returns it.
+	 * @param array          $contexts       Contexts where this tool is available (e.g. ['chat', 'pipeline']).
 	 */
-	protected function registerTool( string $agentType, string $toolName, array|callable $toolDefinition ): void {
-		$filterName = "datamachine_{$agentType}_tools";
+	protected function registerTool( string $toolName, array|callable $toolDefinition, array $contexts = array() ): void {
 		add_filter(
-			$filterName,
-			function ( $tools ) use ( $toolName, $toolDefinition ) {
-				$tools[ $toolName ] = $toolDefinition;
+			'datamachine_tools',
+			function ( $tools ) use ( $toolName, $toolDefinition, $contexts ) {
+				if ( is_callable( $toolDefinition ) ) {
+					// Wrap callable with contexts for pre-resolution filtering.
+					$tools[ $toolName ] = array(
+						'_callable' => $toolDefinition,
+						'contexts'  => $contexts,
+					);
+				} else {
+					// Array definition — merge contexts directly.
+					$toolDefinition['contexts'] = $contexts;
+					$tools[ $toolName ]          = $toolDefinition;
+				}
 				return $tools;
 			}
 		);
-	}
-
-	/**
-	 * Register a global tool available to all AI agents.
-	 *
-	 * @param string         $tool_name Tool identifier
-	 * @param array|callable $tool_definition Tool definition array OR callable
-	 */
-	protected function registerGlobalTool( string $tool_name, array|callable $tool_definition ): void {
-		$this->registerTool( 'global', $tool_name, $tool_definition );
-	}
-
-	/**
-	 * Register a chat-specific tool.
-	 *
-	 * @param string         $tool_name Tool identifier
-	 * @param array|callable $tool_definition Tool definition array OR callable
-	 */
-	protected function registerChatTool( string $tool_name, array|callable $tool_definition ): void {
-		$this->registerTool( 'chat', $tool_name, $tool_definition );
 	}
 
 	/**
