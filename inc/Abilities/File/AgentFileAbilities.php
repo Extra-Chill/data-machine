@@ -274,7 +274,10 @@ class AgentFileAbilities {
 		$dm      = new DirectoryManager();
 		$user_id = $dm->get_effective_user_id( (int) ( $input['user_id'] ?? 0 ) );
 
-		$agent_dir = $dm->get_agent_identity_directory_for_user( $user_id );
+		$agent_dir = $dm->resolve_agent_directory( array(
+			'agent_id' => (int) ( $input['agent_id'] ?? 0 ),
+			'user_id'  => $user_id,
+		) );
 		$user_dir  = $dm->get_user_directory( $user_id );
 
 		$files = array();
@@ -309,7 +312,7 @@ class AgentFileAbilities {
 		}
 
 		// Include daily memory summary.
-		$daily        = new DailyMemory( $user_id );
+		$daily        = new DailyMemory( $user_id, (int) ( $input['agent_id'] ?? 0 ) );
 		$daily_result = $daily->list_all();
 
 		if ( ! empty( $daily_result['months'] ) ) {
@@ -346,7 +349,8 @@ class AgentFileAbilities {
 		$filename = sanitize_file_name( $input['filename'] ?? '' );
 		$dm       = new DirectoryManager();
 		$user_id  = $dm->get_effective_user_id( (int) ( $input['user_id'] ?? 0 ) );
-		$filepath = $this->resolveFilePath( $dm, $user_id, $filename );
+		$agent_id = (int) ( $input['agent_id'] ?? 0 );
+		$filepath = $this->resolveFilePath( $dm, $user_id, $filename, $agent_id );
 
 		if ( ! $filepath ) {
 			return array(
@@ -391,7 +395,10 @@ class AgentFileAbilities {
 		$user_id    = $dm->get_effective_user_id( (int) ( $input['user_id'] ?? 0 ) );
 		$target_dir = in_array( $filename, FileConstants::USER_LAYER_FILES, true )
 			? $dm->get_user_directory( $user_id )
-			: $dm->get_agent_identity_directory_for_user( $user_id );
+			: $dm->resolve_agent_directory( array(
+				'agent_id' => (int) ( $input['agent_id'] ?? 0 ),
+				'user_id'  => $user_id,
+			) );
 
 		if ( ! $dm->ensure_directory_exists( $target_dir ) ) {
 			return array(
@@ -452,7 +459,8 @@ class AgentFileAbilities {
 
 		$dm       = new DirectoryManager();
 		$user_id  = $dm->get_effective_user_id( (int) ( $input['user_id'] ?? 0 ) );
-		$filepath = $this->resolveFilePath( $dm, $user_id, $filename );
+		$agent_id = (int) ( $input['agent_id'] ?? 0 );
+		$filepath = $this->resolveFilePath( $dm, $user_id, $filename, $agent_id );
 
 		if ( ! $filepath ) {
 			return array(
@@ -470,6 +478,7 @@ class AgentFileAbilities {
 			array(
 				'filename' => $filename,
 				'user_id'  => $user_id,
+				'agent_id' => $agent_id,
 			)
 		);
 
@@ -497,7 +506,11 @@ class AgentFileAbilities {
 
 		$dm        = new DirectoryManager();
 		$user_id   = $dm->get_effective_user_id( (int) ( $input['user_id'] ?? 0 ) );
-		$agent_dir = $dm->get_agent_identity_directory_for_user( $user_id );
+		$agent_id  = (int) ( $input['agent_id'] ?? 0 );
+		$agent_dir = $dm->resolve_agent_directory( array(
+			'agent_id' => $agent_id,
+			'user_id'  => $user_id,
+		) );
 
 		if ( ! $dm->ensure_directory_exists( $agent_dir ) ) {
 			return array(
@@ -517,7 +530,10 @@ class AgentFileAbilities {
 		}
 
 		// Return updated file list.
-		return $this->executeListAgentFiles( array( 'user_id' => $user_id ) );
+		return $this->executeListAgentFiles( array(
+			'user_id'  => $user_id,
+			'agent_id' => $agent_id,
+		) );
 	}
 
 	// =========================================================================
@@ -529,13 +545,20 @@ class AgentFileAbilities {
 	 *
 	 * Checks the agent identity directory first, then the user directory.
 	 *
+	 * @since 0.41.0 Added $agent_id parameter for agent-first resolution.
+	 *
 	 * @param DirectoryManager $dm       Directory manager instance.
 	 * @param int              $user_id  Effective user ID.
 	 * @param string           $filename Filename to resolve.
+	 * @param int              $agent_id Agent ID for direct resolution. 0 = resolve from user_id.
 	 * @return string|null Absolute file path, or null if not found.
 	 */
-	private function resolveFilePath( DirectoryManager $dm, int $user_id, string $filename ): ?string {
-		$agent_path = $dm->get_agent_identity_directory_for_user( $user_id ) . '/' . $filename;
+	private function resolveFilePath( DirectoryManager $dm, int $user_id, string $filename, int $agent_id = 0 ): ?string {
+		$agent_dir  = $dm->resolve_agent_directory( array(
+			'agent_id' => $agent_id,
+			'user_id'  => $user_id,
+		) );
+		$agent_path = $agent_dir . '/' . $filename;
 		if ( file_exists( $agent_path ) ) {
 			return $agent_path;
 		}

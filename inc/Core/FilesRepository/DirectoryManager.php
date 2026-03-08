@@ -217,6 +217,10 @@ class DirectoryManager {
 	 * 2) WordPress user_login
 	 * 3) deterministic user-{id} fallback
 	 *
+	 * For multi-agent resolution, use resolve_agent_slug() instead — it
+	 * accepts agent_id or agent_slug directly and only falls back to
+	 * user-based lookup when neither is provided.
+	 *
 	 * @since 0.37.0
 	 * @param int $user_id WordPress user ID.
 	 * @return string Agent slug.
@@ -242,7 +246,60 @@ class DirectoryManager {
 	}
 
 	/**
+	 * Resolve agent slug from the best available identifier.
+	 *
+	 * Multi-agent safe. Resolution order:
+	 * 1) Explicit agent_slug (already resolved — just sanitize)
+	 * 2) agent_id → lookup slug from agents table
+	 * 3) user_id → fallback to get_agent_slug_for_user() (single-agent compat)
+	 *
+	 * @since 0.41.0
+	 * @param array $context {
+	 *     @type string $agent_slug Explicit agent slug.
+	 *     @type int    $agent_id   Agent ID for DB lookup.
+	 *     @type int    $user_id    WordPress user ID (fallback).
+	 * }
+	 * @return string Agent slug.
+	 */
+	public function resolve_agent_slug( array $context ): string {
+		// 1) Explicit slug — fastest path.
+		if ( ! empty( $context['agent_slug'] ) ) {
+			return sanitize_title( (string) $context['agent_slug'] );
+		}
+
+		// 2) Agent ID → lookup.
+		$agent_id = (int) ( $context['agent_id'] ?? 0 );
+		if ( $agent_id > 0 && class_exists( '\\DataMachine\\Core\\Database\\Agents\\Agents' ) ) {
+			$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+			$agent       = $agents_repo->get_agent( $agent_id );
+
+			if ( ! empty( $agent['agent_slug'] ) ) {
+				return sanitize_title( (string) $agent['agent_slug'] );
+			}
+		}
+
+		// 3) User ID fallback (single-agent compat).
+		$user_id = (int) ( $context['user_id'] ?? 0 );
+		return $this->get_agent_slug_for_user( $user_id );
+	}
+
+	/**
+	 * Get first-class agent identity directory from the best available identifier.
+	 *
+	 * Multi-agent safe. Accepts the same context array as resolve_agent_slug().
+	 *
+	 * @since 0.41.0
+	 * @param array $context See resolve_agent_slug() for keys.
+	 * @return string Full path to agent identity directory.
+	 */
+	public function resolve_agent_directory( array $context ): string {
+		return $this->get_agent_identity_directory( $this->resolve_agent_slug( $context ) );
+	}
+
+	/**
 	 * Get first-class agent identity directory for a user context.
+	 *
+	 * For multi-agent resolution, use resolve_agent_directory() instead.
 	 *
 	 * @since 0.37.0
 	 * @param int $user_id WordPress user ID (0 resolves to default user).

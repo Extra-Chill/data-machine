@@ -51,8 +51,9 @@ class PipelineMemoryFilesDirective implements \DataMachine\Engine\AI\Directives\
 
 		$memory_files = $db_pipelines->get_pipeline_memory_files( (int) $pipeline_id );
 		$user_id      = (int) ( $payload['user_id'] ?? 0 );
+		$agent_id     = (int) ( $payload['agent_id'] ?? 0 );
 
-		return MemoryFilesReader::read( $memory_files, 'Pipeline', (int) $pipeline_id, $user_id );
+		return MemoryFilesReader::read( $memory_files, 'Pipeline', (int) $pipeline_id, $user_id, $agent_id );
 	}
 }
 

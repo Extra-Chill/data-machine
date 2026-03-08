@@ -795,11 +795,16 @@ class MemoryCommand extends BaseCommand {
 	/**
 	 * Show resolved file paths for all agent memory layers.
 	 *
-	 * External consumers (wp-opencode setup scripts, Kimaki, OpenCode configs)
-	 * use this to discover the correct file paths instead of hardcoding them.
+	 * External consumers (Kimaki, Claude Code, setup scripts) use this to
+	 * discover the correct file paths instead of hardcoding them.
 	 * Outputs absolute paths, relative paths (from site root), and layer directories.
 	 *
 	 * ## OPTIONS
+	 *
+	 * [--agent=<slug>]
+	 * : Agent slug to resolve paths for. When provided, bypasses
+	 *   user-to-agent lookup and resolves directly by slug.
+	 *   Required for multi-agent setups where a user owns multiple agents.
 	 *
 	 * [--format=<format>]
 	 * : Output format.
@@ -818,7 +823,10 @@ class MemoryCommand extends BaseCommand {
 	 *     # Get all resolved paths as JSON (for setup scripts)
 	 *     wp datamachine agent paths --format=json
 	 *
-	 *     # Get relative paths for opencode.json prompt injection
+	 *     # Get paths for a specific agent (multi-agent)
+	 *     wp datamachine agent paths --agent=chubes-bot
+	 *
+	 *     # Get relative paths for config file injection
 	 *     wp datamachine agent paths --relative
 	 *
 	 *     # Table view for debugging
@@ -827,13 +835,36 @@ class MemoryCommand extends BaseCommand {
 	 * @subcommand paths
 	 */
 	public function paths( array $args, array $assoc_args ): void {
-		$user_id           = UserResolver::resolve( $assoc_args );
 		$directory_manager = new DirectoryManager();
-		$effective_user_id = $directory_manager->get_effective_user_id( $user_id );
-		$agent_slug        = $directory_manager->get_agent_slug_for_user( $effective_user_id );
+		$explicit_slug     = \WP_CLI\Utils\get_flag_value( $assoc_args, 'agent', null );
+
+		if ( null !== $explicit_slug ) {
+			// Direct slug resolution — multi-agent safe.
+			$agent_slug = $directory_manager->resolve_agent_slug( array( 'agent_slug' => $explicit_slug ) );
+			$agent_dir  = $directory_manager->get_agent_identity_directory( $agent_slug );
+
+			// Look up the agent's owner for the user layer.
+			$effective_user_id = 0;
+			if ( class_exists( '\\DataMachine\\Core\\Database\\Agents\\Agents' ) ) {
+				$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+				$agent_row   = $agents_repo->get_by_slug( $agent_slug );
+				if ( $agent_row ) {
+					$effective_user_id = (int) $agent_row['owner_id'];
+				}
+			}
+
+			if ( 0 === $effective_user_id ) {
+				$effective_user_id = DirectoryManager::get_default_agent_user_id();
+			}
+		} else {
+			// Legacy user-based resolution (single-agent compat).
+			$user_id           = UserResolver::resolve( $assoc_args );
+			$effective_user_id = $directory_manager->get_effective_user_id( $user_id );
+			$agent_slug        = $directory_manager->get_agent_slug_for_user( $effective_user_id );
+			$agent_dir         = $directory_manager->get_agent_identity_directory_for_user( $effective_user_id );
+		}
 
 		$shared_dir = $directory_manager->get_shared_directory();
-		$agent_dir  = $directory_manager->get_agent_identity_directory_for_user( $effective_user_id );
 		$user_dir   = $directory_manager->get_user_directory( $effective_user_id );
 
 		$site_root = untrailingslashit( ABSPATH );

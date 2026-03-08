@@ -250,8 +250,9 @@ class DailyMemoryAbilities {
 	 * @return array Result.
 	 */
 	public static function readDaily( array $input ): array {
-		$user_id = (int) ( $input['user_id'] ?? 0 );
-		$daily   = new DailyMemory( $user_id );
+		$user_id  = (int) ( $input['user_id'] ?? 0 );
+		$agent_id = (int) ( $input['agent_id'] ?? 0 );
+		$daily    = new DailyMemory( $user_id, $agent_id );
 		$date    = $input['date'] ?? gmdate( 'Y-m-d' );
 
 		$parts = DailyMemory::parse_date( $date );
@@ -279,9 +280,10 @@ class DailyMemoryAbilities {
 			);
 		}
 
-		$user_id = (int) ( $input['user_id'] ?? 0 );
-		$daily   = new DailyMemory( $user_id );
-		$content = $input['content'];
+		$user_id  = (int) ( $input['user_id'] ?? 0 );
+		$agent_id = (int) ( $input['agent_id'] ?? 0 );
+		$daily    = new DailyMemory( $user_id, $agent_id );
+		$content  = $input['content'];
 		$date    = $input['date'] ?? gmdate( 'Y-m-d' );
 		$mode    = $input['mode'] ?? 'append';
 
@@ -307,8 +309,9 @@ class DailyMemoryAbilities {
 	 * @return array Result.
 	 */
 	public static function listDaily( array $input ): array {
-		$user_id = (int) ( $input['user_id'] ?? 0 );
-		$daily   = new DailyMemory( $user_id );
+		$user_id  = (int) ( $input['user_id'] ?? 0 );
+		$agent_id = (int) ( $input['agent_id'] ?? 0 );
+		$daily    = new DailyMemory( $user_id, $agent_id );
 		return $daily->list_all();
 	}
 
@@ -319,8 +322,9 @@ class DailyMemoryAbilities {
 	 * @return array Search results.
 	 */
 	public static function searchDaily( array $input ): array {
-		$user_id = (int) ( $input['user_id'] ?? 0 );
-		$daily   = new DailyMemory( $user_id );
+		$user_id  = (int) ( $input['user_id'] ?? 0 );
+		$agent_id = (int) ( $input['agent_id'] ?? 0 );
+		$daily    = new DailyMemory( $user_id, $agent_id );
 		$query   = $input['query'];
 		$from    = $input['from'] ?? null;
 		$to      = $input['to'] ?? null;
@@ -344,9 +348,10 @@ class DailyMemoryAbilities {
 			);
 		}
 
-		$user_id = (int) ( $input['user_id'] ?? 0 );
-		$daily   = new DailyMemory( $user_id );
-		$date    = $input['date'] ?? gmdate( 'Y-m-d' );
+		$user_id  = (int) ( $input['user_id'] ?? 0 );
+		$agent_id = (int) ( $input['agent_id'] ?? 0 );
+		$daily    = new DailyMemory( $user_id, $agent_id );
+		$date     = $input['date'] ?? gmdate( 'Y-m-d' );
 
 		$parts = DailyMemory::parse_date( $date );
 		if ( ! $parts ) {

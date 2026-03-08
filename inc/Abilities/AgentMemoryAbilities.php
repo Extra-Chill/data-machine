@@ -216,8 +216,9 @@ class AgentMemoryAbilities {
 	 * @return array Result.
 	 */
 	public static function getMemory( array $input ): array {
-		$user_id = (int) ( $input['user_id'] ?? 0 );
-		$memory  = new AgentMemory( $user_id );
+		$user_id  = (int) ( $input['user_id'] ?? 0 );
+		$agent_id = (int) ( $input['agent_id'] ?? 0 );
+		$memory   = new AgentMemory( $user_id, $agent_id );
 		$section = $input['section'] ?? null;
 
 		if ( null === $section || '' === $section ) {
@@ -234,8 +235,9 @@ class AgentMemoryAbilities {
 	 * @return array Result.
 	 */
 	public static function updateMemory( array $input ): array {
-		$user_id = (int) ( $input['user_id'] ?? 0 );
-		$memory  = new AgentMemory( $user_id );
+		$user_id  = (int) ( $input['user_id'] ?? 0 );
+		$agent_id = (int) ( $input['agent_id'] ?? 0 );
+		$memory   = new AgentMemory( $user_id, $agent_id );
 		$section = $input['section'];
 		$content = $input['content'];
 		$mode    = $input['mode'];
@@ -254,8 +256,9 @@ class AgentMemoryAbilities {
 	 * @return array Search results.
 	 */
 	public static function searchMemory( array $input ): array {
-		$user_id = (int) ( $input['user_id'] ?? 0 );
-		$memory  = new AgentMemory( $user_id );
+		$user_id  = (int) ( $input['user_id'] ?? 0 );
+		$agent_id = (int) ( $input['agent_id'] ?? 0 );
+		$memory   = new AgentMemory( $user_id, $agent_id );
 		$query   = $input['query'];
 		$section = $input['section'] ?? null;
 
@@ -269,8 +272,9 @@ class AgentMemoryAbilities {
 	 * @return array Result.
 	 */
 	public static function listSections( array $input ): array {
-		$user_id = (int) ( $input['user_id'] ?? 0 );
-		$memory  = new AgentMemory( $user_id );
+		$user_id  = (int) ( $input['user_id'] ?? 0 );
+		$agent_id = (int) ( $input['agent_id'] ?? 0 );
+		$memory   = new AgentMemory( $user_id, $agent_id );
 		return $memory->get_sections();
 	}
 }

@@ -45,13 +45,18 @@ class AgentMemory {
 
 	/**
 	 * @since 0.37.0 Added $user_id parameter for multi-agent partitioning.
+	 * @since 0.41.0 Added $agent_id parameter for agent-first resolution.
 	 *
-	 * @param int $user_id WordPress user ID. 0 = legacy shared directory.
+	 * @param int $user_id  WordPress user ID. 0 = legacy shared directory.
+	 * @param int $agent_id Agent ID for direct resolution. 0 = resolve from user_id.
 	 */
-	public function __construct( int $user_id = 0 ) {
+	public function __construct( int $user_id = 0, int $agent_id = 0 ) {
 		$this->directory_manager = new DirectoryManager();
 		$this->user_id           = $this->directory_manager->get_effective_user_id( $user_id );
-		$agent_dir               = $this->directory_manager->get_agent_identity_directory_for_user( $this->user_id );
+		$agent_dir               = $this->directory_manager->resolve_agent_directory( array(
+			'agent_id' => $agent_id,
+			'user_id'  => $this->user_id,
+		) );
 		$this->file_path         = "{$agent_dir}/MEMORY.md";
 
 		// Self-heal: ensure agent files exist on first use.

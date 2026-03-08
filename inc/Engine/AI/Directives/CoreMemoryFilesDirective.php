@@ -45,7 +45,10 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 		$directory_manager = new DirectoryManager();
 		$user_id           = $directory_manager->get_effective_user_id( (int) ( $payload['user_id'] ?? 0 ) );
 		$shared_dir        = $directory_manager->get_shared_directory();
-		$agent_dir         = $directory_manager->get_agent_identity_directory_for_user( $user_id );
+		$agent_dir         = $directory_manager->resolve_agent_directory( array(
+			'agent_id' => (int) ( $payload['agent_id'] ?? 0 ),
+			'user_id'  => $user_id,
+		) );
 		$user_dir          = $directory_manager->get_user_directory( $user_id );
 		$outputs           = array();
 
