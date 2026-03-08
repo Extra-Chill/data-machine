@@ -15,6 +15,8 @@ use WP_UnitTestCase;
 class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 
 	private Jobs $jobs_db;
+	private int $test_pipeline_id;
+	private int $test_flow_id;
 
 	public static function set_up_before_class(): void {
 		parent::set_up_before_class();
@@ -27,13 +29,31 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+
+		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		wp_set_current_user( $user_id );
+
 		$this->jobs_db = new Jobs();
+
+		// Create real pipeline + flow so engine lookups don't fail.
+		$pipeline_ability = wp_get_ability( 'datamachine/create-pipeline' );
+		$pipeline         = $pipeline_ability->execute( array( 'pipeline_name' => 'Batch Test Pipeline' ) );
+		$this->test_pipeline_id = $pipeline['pipeline_id'];
+
+		$flow_ability = wp_get_ability( 'datamachine/create-flow' );
+		$flow         = $flow_ability->execute( array(
+			'pipeline_id' => $this->test_pipeline_id,
+			'flow_name'   => 'Batch Test Flow',
+		) );
+		$this->test_flow_id = $flow['flow_id'];
 	}
 
 	/**
 	 * Build a minimal engine snapshot for testing.
 	 */
-	private function make_engine_snapshot( int $job_id, int $flow_id = 1, int $pipeline_id = 1 ): array {
+	private function make_engine_snapshot( int $job_id, ?int $flow_id = null, ?int $pipeline_id = null ): array {
+		$flow_id     = $flow_id ?? $this->test_flow_id;
+		$pipeline_id = $pipeline_id ?? $this->test_pipeline_id;
 		return array(
 			'job'             => array(
 				'job_id'      => $job_id,
@@ -79,8 +99,8 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 	 */
 	private function create_parent_job(): int {
 		$job_id = $this->jobs_db->create_job( array(
-			'pipeline_id' => 1,
-			'flow_id'     => 1,
+			'pipeline_id' => $this->test_pipeline_id,
+			'flow_id'     => $this->test_flow_id,
 			'source'      => 'pipeline',
 			'label'       => 'Test Flow',
 		) );
@@ -169,8 +189,8 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		foreach ( $children as $child ) {
 			$this->assertEquals( $parent_id, $child['parent_job_id'] );
 			$this->assertEquals( 'pipeline', $child['source'] );
-			$this->assertEquals( '1', $child['pipeline_id'] );
-			$this->assertEquals( '1', $child['flow_id'] );
+			$this->assertEquals( (string) $this->test_pipeline_id, $child['pipeline_id'] );
+			$this->assertEquals( (string) $this->test_flow_id, $child['flow_id'] );
 		}
 
 		// Check parent progress was updated.
