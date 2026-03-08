@@ -15,6 +15,8 @@ use WP_UnitTestCase;
 class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 
 	private Jobs $jobs_db;
+	private int $test_pipeline_id;
+	private int $test_flow_id;
 
 	public static function set_up_before_class(): void {
 		parent::set_up_before_class();
@@ -27,13 +29,31 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+
+		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		wp_set_current_user( $user_id );
+
 		$this->jobs_db = new Jobs();
+
+		// Create real pipeline + flow so engine lookups don't fail.
+		$pipeline_ability = wp_get_ability( 'datamachine/create-pipeline' );
+		$pipeline         = $pipeline_ability->execute( array( 'pipeline_name' => 'Batch Test Pipeline' ) );
+		$this->test_pipeline_id = $pipeline['pipeline_id'];
+
+		$flow_ability = wp_get_ability( 'datamachine/create-flow' );
+		$flow         = $flow_ability->execute( array(
+			'pipeline_id' => $this->test_pipeline_id,
+			'flow_name'   => 'Batch Test Flow',
+		) );
+		$this->test_flow_id = $flow['flow_id'];
 	}
 
 	/**
 	 * Build a minimal engine snapshot for testing.
 	 */
-	private function make_engine_snapshot( int $job_id, int $flow_id = 1, int $pipeline_id = 1 ): array {
+	private function make_engine_snapshot( int $job_id, ?int $flow_id = null, ?int $pipeline_id = null ): array {
+		$flow_id     = $flow_id ?? $this->test_flow_id;
+		$pipeline_id = $pipeline_id ?? $this->test_pipeline_id;
 		return array(
 			'job'             => array(
 				'job_id'      => $job_id,
@@ -79,8 +99,8 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 	 */
 	private function create_parent_job(): int {
 		$job_id = $this->jobs_db->create_job( array(
-			'pipeline_id' => 1,
-			'flow_id'     => 1,
+			'pipeline_id' => $this->test_pipeline_id,
+			'flow_id'     => $this->test_flow_id,
 			'source'      => 'pipeline',
 			'label'       => 'Test Flow',
 		) );
@@ -118,7 +138,7 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$this->assertEquals( 'step_abc_123', $parent_engine['next_flow_step_id'] );
 	}
 
-	public function test_fanout_stores_transient(): void {
+	public function test_fanout_stores_batch_state_in_engine_data(): void {
 		$parent_id = $this->create_parent_job();
 		$engine    = $this->make_engine_snapshot( $parent_id );
 		$packets   = array(
@@ -128,11 +148,18 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$scheduler = new PipelineBatchScheduler();
 		$scheduler->fanOut( $parent_id, 'step_abc_123', $packets, $engine );
 
-		$transient = get_transient( 'dm_pipeline_batch_' . $parent_id );
-		$this->assertNotFalse( $transient );
-		$this->assertEquals( $parent_id, $transient['parent_job_id'] );
-		$this->assertEquals( 1, $transient['total'] );
-		$this->assertCount( 1, $transient['data_packets'] );
+		$parent_engine = datamachine_get_engine_data( $parent_id );
+		$this->assertArrayHasKey( 'batch_state', $parent_engine );
+
+		$batch_state = $parent_engine['batch_state'];
+		$this->assertEquals( 'step_abc_123', $batch_state['next_flow_step_id'] );
+		$this->assertEquals( 1, $batch_state['total'] );
+		$this->assertEquals( 0, $batch_state['offset'] );
+		$this->assertCount( 1, $batch_state['data_packets'] );
+		$this->assertArrayHasKey( 'engine_snapshot', $batch_state );
+
+		// No transient should exist.
+		$this->assertFalse( get_transient( 'dm_pipeline_batch_' . $parent_id ) );
 	}
 
 	public function test_process_chunk_creates_child_jobs(): void {
@@ -162,8 +189,8 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		foreach ( $children as $child ) {
 			$this->assertEquals( $parent_id, $child['parent_job_id'] );
 			$this->assertEquals( 'pipeline', $child['source'] );
-			$this->assertEquals( '1', $child['pipeline_id'] );
-			$this->assertEquals( '1', $child['flow_id'] );
+			$this->assertEquals( (string) $this->test_pipeline_id, $child['pipeline_id'] );
+			$this->assertEquals( (string) $this->test_flow_id, $child['flow_id'] );
 		}
 
 		// Check parent progress was updated.
@@ -225,20 +252,14 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 			'batch_chunk_size'  => PipelineBatchScheduler::CHUNK_SIZE,
 			'next_flow_step_id' => 'step_empty',
 			'started_at'        => current_time( 'mysql' ),
-		) );
-
-		set_transient(
-			'dm_pipeline_batch_' . $parent_id,
-			array(
-				'parent_job_id'     => $parent_id,
+			'batch_state'       => array(
 				'next_flow_step_id' => 'step_empty',
 				'engine_snapshot'   => $engine,
 				'data_packets'      => array(),
 				'total'             => 0,
 				'offset'            => 0,
 			),
-			4 * HOUR_IN_SECONDS
-		);
+		) );
 
 		$scheduler = new PipelineBatchScheduler();
 		$scheduler->processChunk( $parent_id );
@@ -431,6 +452,31 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'job', $child_engine );
 		$this->assertArrayHasKey( 'flow', $child_engine );
 		$this->assertArrayNotHasKey( 'venue', $child_engine );
+	}
+
+	public function test_batch_state_cleaned_up_after_all_chunks_processed(): void {
+		$parent_id = $this->create_parent_job();
+		$engine    = $this->make_engine_snapshot( $parent_id );
+		$packets   = array(
+			$this->make_data_packet( 'Event A' ),
+		);
+
+		$scheduler = new PipelineBatchScheduler();
+		$scheduler->fanOut( $parent_id, 'step_abc_123', $packets, $engine );
+
+		// Verify batch_state exists before processing.
+		$parent_engine = datamachine_get_engine_data( $parent_id );
+		$this->assertArrayHasKey( 'batch_state', $parent_engine );
+
+		$scheduler->processChunk( $parent_id );
+
+		// After all chunks processed, batch_state should be removed.
+		$parent_engine = datamachine_get_engine_data( $parent_id );
+		$this->assertArrayNotHasKey( 'batch_state', $parent_engine );
+
+		// But batch metadata should still exist for onChildComplete.
+		$this->assertTrue( $parent_engine['batch'] );
+		$this->assertEquals( 1, $parent_engine['batch_total'] );
 	}
 
 	public function test_on_child_complete_ignores_non_batch_parents(): void {

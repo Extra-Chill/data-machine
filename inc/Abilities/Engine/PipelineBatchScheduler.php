@@ -77,7 +77,9 @@ class PipelineBatchScheduler {
 		$flow_id     = $engine_snapshot['job']['flow_id'] ?? 0;
 		$flow_name   = $engine_snapshot['flow']['name'] ?? '';
 
-		// Store batch metadata on the parent job.
+		// Store batch metadata and state on the parent job's engine_data.
+		// This survives deploys, cache flushes, and Redis restarts — unlike
+		// the old transient approach which could be evicted mid-batch.
 		datamachine_merge_engine_data( $parent_job_id, array(
 			'batch'             => true,
 			'batch_total'       => $total,
@@ -85,6 +87,13 @@ class PipelineBatchScheduler {
 			'batch_chunk_size'  => self::CHUNK_SIZE,
 			'next_flow_step_id' => $next_flow_step_id,
 			'started_at'        => current_time( 'mysql' ),
+			'batch_state'       => array(
+				'next_flow_step_id' => $next_flow_step_id,
+				'engine_snapshot'   => $engine_snapshot,
+				'data_packets'      => $dataPackets,
+				'total'             => $total,
+				'offset'            => 0,
+			),
 		) );
 
 		do_action(
@@ -99,19 +108,6 @@ class PipelineBatchScheduler {
 				'next_flow_step_id' => $next_flow_step_id,
 			)
 		);
-
-		// Store all DataPackets in a transient for chunked scheduling.
-		$transient_key = 'dm_pipeline_batch_' . $parent_job_id;
-		$batch_data    = array(
-			'parent_job_id'     => $parent_job_id,
-			'next_flow_step_id' => $next_flow_step_id,
-			'engine_snapshot'   => $engine_snapshot,
-			'data_packets'      => $dataPackets,
-			'total'             => $total,
-			'offset'            => 0,
-		);
-
-		set_transient( $transient_key, $batch_data, 4 * HOUR_IN_SECONDS );
 
 		// Schedule first chunk immediately.
 		if ( function_exists( 'as_schedule_single_action' ) ) {
@@ -139,24 +135,24 @@ class PipelineBatchScheduler {
 	 * @param int $parent_job_id The parent job ID.
 	 */
 	public function processChunk( int $parent_job_id ): void {
-		$transient_key = 'dm_pipeline_batch_' . $parent_job_id;
-		$batch_data    = get_transient( $transient_key );
+		$parent_engine = datamachine_get_engine_data( $parent_job_id );
+		$batch_data    = $parent_engine['batch_state'] ?? null;
 
 		if ( ! $batch_data ) {
 			$this->failParentIfStillProcessing( $parent_job_id, 'batch_state_missing' );
 			do_action(
 				'datamachine_log',
 				'error',
-				'Pipeline batch: transient expired or missing',
+				'Pipeline batch: batch state missing from engine_data',
 				array( 'parent_job_id' => $parent_job_id )
 			);
 			return;
 		}
 
 		// Check for cancellation.
-		$parent_engine = datamachine_get_engine_data( $parent_job_id );
 		if ( ! empty( $parent_engine['cancelled'] ) ) {
-			delete_transient( $transient_key );
+			unset( $parent_engine['batch_state'] );
+			datamachine_set_engine_data( $parent_job_id, $parent_engine );
 			$this->db_jobs->complete_job( $parent_job_id, JobStatus::failed( 'batch cancelled' )->toString() );
 			return;
 		}
@@ -189,7 +185,6 @@ class PipelineBatchScheduler {
 		$parent_engine                    = datamachine_get_engine_data( $parent_job_id );
 		$parent_engine['batch_scheduled'] = ( $parent_engine['batch_scheduled'] ?? 0 ) + $scheduled;
 		$parent_engine['batch_offset']    = min( $new_offset, $total );
-		datamachine_set_engine_data( $parent_job_id, $parent_engine );
 
 		do_action(
 			'datamachine_log',
@@ -204,9 +199,9 @@ class PipelineBatchScheduler {
 		);
 
 		if ( $new_offset < $total ) {
-			// More items — schedule next chunk with delay.
-			$batch_data['offset'] = $new_offset;
-			set_transient( $transient_key, $batch_data, 4 * HOUR_IN_SECONDS );
+			// More items — update offset in batch_state and persist.
+			$parent_engine['batch_state']['offset'] = $new_offset;
+			datamachine_set_engine_data( $parent_job_id, $parent_engine );
 
 			as_schedule_single_action(
 				time() + self::CHUNK_DELAY,
@@ -215,8 +210,9 @@ class PipelineBatchScheduler {
 				'data-machine'
 			);
 		} else {
-			// All items scheduled — clean up transient.
-			delete_transient( $transient_key );
+			// All items scheduled — remove batch_state to free space.
+			unset( $parent_engine['batch_state'] );
+			datamachine_set_engine_data( $parent_job_id, $parent_engine );
 
 			$child_count = $this->countChildren( $parent_job_id );
 			if ( $child_count < 1 ) {
