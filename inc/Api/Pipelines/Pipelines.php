@@ -244,11 +244,12 @@ class Pipelines {
 	 * Handle pipeline retrieval request
 	 */
 	public static function handle_get_pipelines( $request ) {
-		$pipeline_id    = $request->get_param( 'pipeline_id' );
-		$fields         = $request->get_param( 'fields' );
-		$format         = $request->get_param( 'format' ) ?? 'json';
-		$ids            = $request->get_param( 'ids' );
-		$scoped_user_id = PermissionHelper::resolve_scoped_user_id( $request );
+		$pipeline_id     = $request->get_param( 'pipeline_id' );
+		$fields          = $request->get_param( 'fields' );
+		$format          = $request->get_param( 'format' ) ?? 'json';
+		$ids             = $request->get_param( 'ids' );
+		$scoped_user_id  = PermissionHelper::resolve_scoped_user_id( $request );
+		$scoped_agent_id = PermissionHelper::resolve_scoped_agent_id( $request );
 
 		$abilities = new PipelineAbilities();
 
@@ -294,7 +295,9 @@ class Pipelines {
 				'pipeline_id' => (int) $pipeline_id,
 				'output_mode' => 'full',
 			);
-			if ( null !== $scoped_user_id ) {
+			if ( null !== $scoped_agent_id ) {
+				$input['agent_id'] = $scoped_agent_id;
+			} elseif ( null !== $scoped_user_id ) {
 				$input['user_id'] = $scoped_user_id;
 			}
 			$result = $abilities->executeGetPipelines( $input );
@@ -331,7 +334,9 @@ class Pipelines {
 				'offset'      => 0,
 				'output_mode' => 'full',
 			);
-			if ( null !== $scoped_user_id ) {
+			if ( null !== $scoped_agent_id ) {
+				$input['agent_id'] = $scoped_agent_id;
+			} elseif ( null !== $scoped_user_id ) {
 				$input['user_id'] = $scoped_user_id;
 			}
 			$result = $abilities->executeGetPipelines( $input );
@@ -416,7 +421,8 @@ class Pipelines {
 		$db_pipelines = new \DataMachine\Core\Database\Pipelines\Pipelines();
 		$pipeline     = $db_pipelines->get_pipeline( $pipeline_id );
 
-		if ( $pipeline && ! PermissionHelper::owns_resource( (int) ( $pipeline['user_id'] ?? 0 ) ) ) {
+		$resource_agent_id = isset( $pipeline['agent_id'] ) ? (int) $pipeline['agent_id'] : null;
+		if ( $pipeline && ! PermissionHelper::owns_agent_resource( $resource_agent_id, (int) ( $pipeline['user_id'] ?? 0 ) ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
 				__( 'You do not have permission to delete this pipeline.', 'data-machine' ),
@@ -463,7 +469,8 @@ class Pipelines {
 		$db_pipelines = new \DataMachine\Core\Database\Pipelines\Pipelines();
 		$pipeline     = $db_pipelines->get_pipeline( $pipeline_id );
 
-		if ( $pipeline && ! PermissionHelper::owns_resource( (int) ( $pipeline['user_id'] ?? 0 ) ) ) {
+		$resource_agent_id = isset( $pipeline['agent_id'] ) ? (int) $pipeline['agent_id'] : null;
+		if ( $pipeline && ! PermissionHelper::owns_agent_resource( $resource_agent_id, (int) ( $pipeline['user_id'] ?? 0 ) ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
 				__( 'You do not have permission to update this pipeline.', 'data-machine' ),
@@ -523,7 +530,8 @@ class Pipelines {
 			);
 		}
 
-		if ( ! PermissionHelper::owns_resource( (int) ( $pipeline['user_id'] ?? 0 ) ) ) {
+		$resource_agent_id = isset( $pipeline['agent_id'] ) ? (int) $pipeline['agent_id'] : null;
+		if ( ! PermissionHelper::owns_agent_resource( $resource_agent_id, (int) ( $pipeline['user_id'] ?? 0 ) ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
 				__( 'You do not have permission to access this pipeline.', 'data-machine' ),
@@ -563,7 +571,8 @@ class Pipelines {
 			);
 		}
 
-		if ( ! PermissionHelper::owns_resource( (int) ( $pipeline['user_id'] ?? 0 ) ) ) {
+		$resource_agent_id = isset( $pipeline['agent_id'] ) ? (int) $pipeline['agent_id'] : null;
+		if ( ! PermissionHelper::owns_agent_resource( $resource_agent_id, (int) ( $pipeline['user_id'] ?? 0 ) ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
 				__( 'You do not have permission to update this pipeline.', 'data-machine' ),

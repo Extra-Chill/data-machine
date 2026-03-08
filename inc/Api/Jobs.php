@@ -174,7 +174,8 @@ class Jobs {
 	 * GET /datamachine/v1/jobs
 	 */
 	public static function handle_get_jobs( $request ) {
-		$scoped_user_id = PermissionHelper::resolve_scoped_user_id( $request );
+		$scoped_user_id  = PermissionHelper::resolve_scoped_user_id( $request );
+		$scoped_agent_id = PermissionHelper::resolve_scoped_agent_id( $request );
 
 		$input = array(
 			'orderby'  => $request->get_param( 'orderby' ),
@@ -183,7 +184,9 @@ class Jobs {
 			'offset'   => $request->get_param( 'offset' ),
 		);
 
-		if ( null !== $scoped_user_id ) {
+		if ( null !== $scoped_agent_id ) {
+			$input['agent_id'] = $scoped_agent_id;
+		} elseif ( null !== $scoped_user_id ) {
 			$input['user_id'] = $scoped_user_id;
 		}
 		if ( $request->get_param( 'pipeline_id' ) ) {

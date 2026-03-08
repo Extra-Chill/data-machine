@@ -47,6 +47,10 @@ class GetJobsAbility {
 								'type'        => 'integer',
 								'description' => __( 'Filter jobs by WordPress user ID.', 'data-machine' ),
 							),
+							'agent_id'    => array(
+								'type'        => array( 'integer', 'null' ),
+								'description' => __( 'Filter jobs by agent ID. Takes priority over user_id when provided.', 'data-machine' ),
+							),
 							'flow_id'     => array(
 								'type'        => array( 'integer', 'string', 'null' ),
 								'description' => __( 'Filter jobs by flow ID (integer or "direct")', 'data-machine' ),
@@ -130,6 +134,7 @@ class GetJobsAbility {
 		$flow_id     = $input['flow_id'] ?? null;
 		$pipeline_id = $input['pipeline_id'] ?? null;
 		$user_id     = $input['user_id'] ?? null;
+		$agent_id    = $input['agent_id'] ?? null;
 		$status      = $input['status'] ?? null;
 		$source      = $input['source'] ?? null;
 		$since       = $input['since'] ?? null;
@@ -202,7 +207,10 @@ class GetJobsAbility {
 			$filters_applied['source'] = $args['source'];
 		}
 
-		if ( null !== $user_id ) {
+		if ( null !== $agent_id ) {
+			$args['agent_id']            = (int) $agent_id;
+			$filters_applied['agent_id'] = $args['agent_id'];
+		} elseif ( null !== $user_id ) {
 			$args['user_id']            = (int) $user_id;
 			$filters_applied['user_id'] = $args['user_id'];
 		}

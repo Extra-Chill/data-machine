@@ -48,6 +48,10 @@ class GetPipelinesAbility {
 								'description' => __( 'Filter pipelines by WordPress user ID. Defaults to 0 (shared/legacy).', 'data-machine' ),
 								'default'     => 0,
 							),
+							'agent_id'    => array(
+								'type'        => array( 'integer', 'null' ),
+								'description' => __( 'Filter pipelines by agent ID. Takes priority over user_id when provided.', 'data-machine' ),
+							),
 							'per_page'    => array(
 								'type'        => 'integer',
 								'default'     => self::DEFAULT_PER_PAGE,
@@ -105,6 +109,7 @@ class GetPipelinesAbility {
 		try {
 			$pipeline_id = $input['pipeline_id'] ?? null;
 			$user_id     = isset( $input['user_id'] ) ? (int) $input['user_id'] : null;
+			$agent_id    = isset( $input['agent_id'] ) ? (int) $input['agent_id'] : null;
 			$per_page    = (int) ( $input['per_page'] ?? self::DEFAULT_PER_PAGE );
 			$offset      = (int) ( $input['offset'] ?? 0 );
 			$output_mode = $input['output_mode'] ?? 'full';
@@ -147,7 +152,7 @@ class GetPipelinesAbility {
 				);
 			}
 
-			$all_pipelines = $this->db_pipelines->get_all_pipelines( $user_id );
+			$all_pipelines = $this->db_pipelines->get_all_pipelines( $user_id, $agent_id );
 			$total         = count( $all_pipelines );
 			$pipelines     = array_slice( $all_pipelines, $offset, $per_page );
 

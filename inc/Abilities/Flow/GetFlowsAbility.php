@@ -47,6 +47,10 @@ class GetFlowsAbility {
 								'type'        => 'integer',
 								'description' => __( 'Filter flows by WordPress user ID. Defaults to showing all.', 'data-machine' ),
 							),
+							'agent_id'     => array(
+								'type'        => array( 'integer', 'null' ),
+								'description' => __( 'Filter flows by agent ID. Takes priority over user_id when provided.', 'data-machine' ),
+							),
 							'pipeline_id'  => array(
 								'type'        => array( 'integer', 'null' ),
 								'description' => __( 'Filter flows by pipeline ID', 'data-machine' ),
@@ -112,6 +116,7 @@ class GetFlowsAbility {
 			$flow_id      = $input['flow_id'] ?? null;
 			$pipeline_id  = $input['pipeline_id'] ?? null;
 			$user_id      = isset( $input['user_id'] ) ? (int) $input['user_id'] : null;
+			$agent_id     = isset( $input['agent_id'] ) ? (int) $input['agent_id'] : null;
 			$handler_slug = $input['handler_slug'] ?? null;
 			$per_page     = (int) ( $input['per_page'] ?? self::DEFAULT_PER_PAGE );
 			$offset       = (int) ( $input['offset'] ?? 0 );
@@ -151,6 +156,7 @@ class GetFlowsAbility {
 			$filters_applied = array(
 				'pipeline_id'  => $pipeline_id,
 				'user_id'      => $user_id,
+				'agent_id'     => $agent_id,
 				'handler_slug' => $handler_slug,
 			);
 
@@ -161,8 +167,8 @@ class GetFlowsAbility {
 				$flows = $this->db_flows->get_flows_for_pipeline_paginated( $pipeline_id, $per_page, $offset );
 				$total = $this->db_flows->count_flows_for_pipeline( $pipeline_id );
 			} else {
-				$flows = $this->getAllFlowsPaginated( $per_page, $offset, $user_id );
-				$total = $this->countAllFlows( $user_id );
+				$flows = $this->getAllFlowsPaginated( $per_page, $offset, $user_id, $agent_id );
+				$total = $this->countAllFlows( $user_id, $agent_id );
 			}
 
 			if ( $handler_slug ) {

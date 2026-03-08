@@ -114,15 +114,20 @@ class RunFlowAbility {
 
 		// Use provided job_id or create new one (for scheduled/recurring flows).
 		if ( ! $job_id ) {
-			$job_id = $this->db_jobs->create_job(
-				array(
-					'pipeline_id' => $pipeline_id,
-					'flow_id'     => $flow_id,
-					'source'      => 'pipeline',
-					'label'       => $flow['flow_name'] ?? null,
-					'user_id'     => (int) ( $flow['user_id'] ?? 0 ),
-				)
+			$job_data = array(
+				'pipeline_id' => $pipeline_id,
+				'flow_id'     => $flow_id,
+				'source'      => 'pipeline',
+				'label'       => $flow['flow_name'] ?? null,
+				'user_id'     => (int) ( $flow['user_id'] ?? 0 ),
 			);
+
+			// Propagate agent_id from flow to job.
+			if ( ! empty( $flow['agent_id'] ) ) {
+				$job_data['agent_id'] = (int) $flow['agent_id'];
+			}
+
+			$job_id = $this->db_jobs->create_job( $job_data );
 			if ( ! $job_id ) {
 				do_action(
 					'datamachine_log',
@@ -163,14 +168,20 @@ class RunFlowAbility {
 		$flow_config     = datamachine_normalize_engine_config( $flow_config );
 		$pipeline_config = datamachine_normalize_engine_config( $pipeline_config );
 
+		$job_snapshot = array(
+			'job_id'      => $job_id,
+			'flow_id'     => $flow_id,
+			'pipeline_id' => $pipeline_id,
+			'user_id'     => (int) ( $flow['user_id'] ?? 0 ),
+			'created_at'  => current_time( 'mysql', true ),
+		);
+
+		if ( ! empty( $flow['agent_id'] ) ) {
+			$job_snapshot['agent_id'] = (int) $flow['agent_id'];
+		}
+
 		$engine_snapshot = array(
-			'job'             => array(
-				'job_id'      => $job_id,
-				'flow_id'     => $flow_id,
-				'pipeline_id' => $pipeline_id,
-				'user_id'     => (int) ( $flow['user_id'] ?? 0 ),
-				'created_at'  => current_time( 'mysql', true ),
-			),
+			'job'             => $job_snapshot,
 			'flow'            => array(
 				'name'        => $flow['flow_name'] ?? '',
 				'description' => $flow['flow_description'] ?? '',

@@ -196,11 +196,18 @@ trait FlowHelpers {
 	/**
 	 * Get all flows with pagination.
 	 *
-	 * @param int $per_page Items per page.
-	 * @param int $offset Pagination offset.
+	 * @param int      $per_page Items per page.
+	 * @param int      $offset   Pagination offset.
+	 * @param int|null $user_id  Optional user ID filter.
+	 * @param int|null $agent_id Optional agent ID filter (takes priority over user_id).
 	 * @return array Paginated flows.
 	 */
-	protected function getAllFlowsPaginated( int $per_page, int $offset, ?int $user_id = null ): array {
+	protected function getAllFlowsPaginated( int $per_page, int $offset, ?int $user_id = null, ?int $agent_id = null ): array {
+		if ( null !== $agent_id ) {
+			$all_flows = $this->db_flows->get_all_flows( null, $agent_id );
+			return array_slice( $all_flows, $offset, $per_page );
+		}
+
 		if ( null !== $user_id ) {
 			$all_flows = $this->db_flows->get_all_flows( $user_id );
 			return array_slice( $all_flows, $offset, $per_page );
@@ -220,9 +227,16 @@ trait FlowHelpers {
 	/**
 	 * Count all flows across all pipelines.
 	 *
+	 * @param int|null $user_id  Optional user ID filter.
+	 * @param int|null $agent_id Optional agent ID filter (takes priority over user_id).
 	 * @return int Total flow count.
 	 */
-	protected function countAllFlows( ?int $user_id = null ): int {
+	protected function countAllFlows( ?int $user_id = null, ?int $agent_id = null ): int {
+		if ( null !== $agent_id ) {
+			$all_flows = $this->db_flows->get_all_flows( null, $agent_id );
+			return count( $all_flows );
+		}
+
 		if ( null !== $user_id ) {
 			$all_flows = $this->db_flows->get_all_flows( $user_id );
 			return count( $all_flows );
