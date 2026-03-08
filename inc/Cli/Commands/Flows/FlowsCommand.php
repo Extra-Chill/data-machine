@@ -171,7 +171,6 @@ class FlowsCommand extends BaseCommand {
 	 *
 	 *     # Detach a memory file from a flow
 	 *     wp datamachine flows memory-files 42 --remove=content-briefing.md
-	 *
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		$flow_id     = null;
@@ -499,8 +498,8 @@ class FlowsCommand extends BaseCommand {
 	 * @param array $assoc_args Associative arguments (pipeline_id, name, step_configs, scheduling, dry-run).
 	 */
 	private function createFlow( array $assoc_args ): void {
-		$pipeline_id = isset( $assoc_args['pipeline_id'] ) ? (int) $assoc_args['pipeline_id'] : null;
-		$flow_name   = $assoc_args['name'] ?? null;
+		$pipeline_id  = isset( $assoc_args['pipeline_id'] ) ? (int) $assoc_args['pipeline_id'] : null;
+		$flow_name    = $assoc_args['name'] ?? null;
 		$scheduling   = $assoc_args['scheduling'] ?? 'manual';
 		$scheduled_at = $assoc_args['scheduled-at'] ?? null;
 		$dry_run      = isset( $assoc_args['dry-run'] );
@@ -565,12 +564,14 @@ class FlowsCommand extends BaseCommand {
 				WP_CLI::line( wp_json_encode( $result['would_create'], JSON_PRETTY_PRINT ) );
 			} elseif ( isset( $result['would_create'] ) ) {
 				foreach ( $result['would_create'] as $preview ) {
-					WP_CLI::log( sprintf(
-						'Would create: "%s" on pipeline %d (scheduling: %s)',
-						$preview['flow_name'],
-						$preview['pipeline_id'],
-						$preview['scheduling']
-					) );
+					WP_CLI::log(
+						sprintf(
+							'Would create: "%s" on pipeline %d (scheduling: %s)',
+							$preview['flow_name'],
+							$preview['pipeline_id'],
+							$preview['scheduling']
+						)
+					);
 				}
 			}
 			return;
@@ -985,10 +986,12 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		$ability = new \DataMachine\Abilities\FlowStepAbilities();
-		$result  = $ability->executeUpdateFlowStep( array(
-			'flow_step_id'   => $step_id,
-			'remove_handler' => $handler_slug,
-		) );
+		$result  = $ability->executeUpdateFlowStep(
+			array(
+				'flow_step_id'   => $step_id,
+				'remove_handler' => $handler_slug,
+			)
+		);
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to remove handler' );

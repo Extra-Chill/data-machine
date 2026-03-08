@@ -35,10 +35,13 @@ class DailyMemoryTask extends SystemTask {
 	 */
 	public function execute( int $jobId, array $params ): void {
 		if ( ! PluginSettings::get( 'daily_memory_enabled', false ) ) {
-			$this->completeJob( $jobId, array(
-				'skipped' => true,
-				'reason'  => 'Daily memory is disabled.',
-			) );
+			$this->completeJob(
+				$jobId,
+				array(
+					'skipped' => true,
+					'reason'  => 'Daily memory is disabled.',
+				)
+			);
 			return;
 		}
 
@@ -96,11 +99,14 @@ class DailyMemoryTask extends SystemTask {
 		// agent work happens via Kimaki sessions which don't create DM jobs.
 		$cleanup_result = $this->cleanupMemory( $date, $provider, $model, $daily );
 
-		$this->completeJob( $jobId, array(
-			'date'           => $date,
-			'summary_length' => $summary_length,
-			'cleanup'        => $cleanup_result,
-		) );
+		$this->completeJob(
+			$jobId,
+			array(
+				'date'           => $date,
+				'summary_length' => $summary_length,
+				'cleanup'        => $cleanup_result,
+			)
+		);
 	}
 
 	/**
@@ -213,7 +219,10 @@ class DailyMemoryTask extends SystemTask {
 				'datamachine_log',
 				'warning',
 				'Memory cleanup parse failed — no persistent section found. MEMORY.md unchanged.',
-				array( 'date' => $date, 'ai_output_length' => strlen( $ai_output ) )
+				array(
+					'date'             => $date,
+					'ai_output_length' => strlen( $ai_output ),
+				)
 			);
 			return array(
 				'skipped' => true,
@@ -229,7 +238,7 @@ class DailyMemoryTask extends SystemTask {
 		// When the file is massively oversized, the TARGET size is a small
 		// percentage of the original, so the minimum ratio must scale accordingly.
 		// For a file that's 12x over budget, the target IS ~8% of original.
-		$target_size = AgentMemory::MAX_FILE_SIZE;
+		$target_size     = AgentMemory::MAX_FILE_SIZE;
 		$oversize_factor = $original_size / max( $target_size, 1 );
 
 		if ( $oversize_factor > 2 ) {

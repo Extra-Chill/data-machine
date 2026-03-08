@@ -2,6 +2,36 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.38.0] - 2026-03-08
+
+### Added
+- feat(#704): publish-level duplicate detection for wordpress_publish handler (#706)
+- add 'wp datamachine agent paths' discovery subcommand (#708)
+- add MEMORY.md cleanup phase to daily memory task (#705)
+- agent CRUD CLI — create, show, update, delete, config commands (#702)
+
+### Changed
+- agent identity cleanup — rename ability, migrations extraction, legacy removal (#709)
+- Add one-time scheduled flow execution (#659)
+
+### Fixed
+- add null guard to get_workspace_directory() filesystem access (#713) (#714)
+- resolve release blockers —  param rename + PHPCS suppressions (#715)
+- scale memory cleanup safety threshold for oversized files (#707)
+- fix(#698): add log auto-rotation, fix cleanup logic, expose all log levels (#701)
+- treat empty fetch/event_import as completed_no_items regardless of history (#700)
+- swap migration/scaffold order and add RULES.md scaffolding (#703)
+- fix(#695): move handler config sanitization into ability layer (#697)
+- resolve 20 test failures across 5 test classes (#671)
+- fix(#689): resolve post_type from flow publish step for queue dedup validation (#693)
+- fix(#687): UserResolver returns 0 (unscoped) when no --user flag provided (#694)
+- fix(#688): scope tool definition cache by flow_step_id (#690)
+- agent file save returns 400 — apiFetch sends JSON, not text/plain (#692)
+- prevent duplicate inline reviews from parallel jobs (#691)
+- suppress known-safe DB queries + fix corrupted is_writable calls (#669)
+- GSC submit_sitemap — upgrade OAuth scope to read-write and add Content-Length header (#656)
+- sync version targets to 0.37.1
+
 ## [0.37.1] - 2026-03-07
 
 ### Changed

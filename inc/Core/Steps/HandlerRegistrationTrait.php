@@ -24,7 +24,7 @@ trait HandlerRegistrationTrait {
 	 *
 	 * @param string $slug Handler slug identifier
 	 * @param string $type Handler type (publish, fetch, update)
-	 * @param string $class Handler class name
+	 * @param string $class_name Handler class name
 	 * @param string $label Display label
 	 * @param string $description Handler description
 	 * @param bool $requiresAuth Whether handler requires authentication

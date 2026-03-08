@@ -908,10 +908,10 @@ class MemoryCommand extends BaseCommand {
 				$rel_path = str_replace( $site_root . '/', '', $abs_path );
 
 				$items[] = array(
-					'file'     => $entry['file'],
-					'layer'    => $entry['layer'],
-					'path'     => $relative ? $rel_path : $abs_path,
-					'exists'   => file_exists( $abs_path ) ? 'yes' : 'no',
+					'file'   => $entry['file'],
+					'layer'  => $entry['layer'],
+					'path'   => $relative ? $rel_path : $abs_path,
+					'exists' => file_exists( $abs_path ) ? 'yes' : 'no',
 				);
 			}
 
