@@ -5,9 +5,10 @@
  * Encapsulates execution mode and provides a unified interface for all handler types.
  * Centralizes deduplication, engine data access, file storage context, and logging.
  *
- * Supports two execution modes:
+ * Supports three execution modes:
  * - 'direct': Direct execution without database persistence (CLI tools, ephemeral workflows)
  * - 'flow': Standard flow-based execution with full pipeline/flow context
+ * - 'standalone': Job execution without pipeline/flow context (system tasks, ad-hoc jobs)
  *
  * In direct mode, pipeline_id and flow_id are set to the string 'direct' for consistent
  * end-to-end traceability throughout the system.
@@ -25,8 +26,9 @@ defined( 'ABSPATH' ) || exit;
 
 class ExecutionContext {
 
-	public const MODE_DIRECT = 'direct';
-	public const MODE_FLOW   = 'flow';
+	public const MODE_DIRECT     = 'direct';
+	public const MODE_FLOW       = 'flow';
+	public const MODE_STANDALONE = 'standalone';
 
 	private string $mode;
 	private int|string|null $pipeline_id;
@@ -106,6 +108,27 @@ class ExecutionContext {
 	}
 
 	/**
+	 * Factory: Standalone execution (no pipeline/flow).
+	 *
+	 * Use for system tasks, ad-hoc jobs, and standalone operations that
+	 * don't belong to a pipeline or flow.
+	 *
+	 * @param string|null $job_id Job ID
+	 * @param string      $handler_type Handler type identifier
+	 * @return self
+	 */
+	public static function standalone( ?string $job_id = null, string $handler_type = '' ): self {
+		return new self(
+			self::MODE_STANDALONE,
+			null,
+			null,
+			null,
+			$job_id,
+			$handler_type
+		);
+	}
+
+	/**
 	 * Factory: Create from handler config array.
 	 *
 	 * Provides backward compatibility with existing config structures.
@@ -129,6 +152,11 @@ class ExecutionContext {
 				$job_id,
 				$handler_type
 			);
+		}
+
+		// Standalone: both null — no pipeline/flow context.
+		if ( null === $pipeline_id && null === $flow_id ) {
+			return self::standalone( $job_id, $handler_type );
 		}
 
 		return self::fromFlow(
@@ -159,9 +187,18 @@ class ExecutionContext {
 	}
 
 	/**
+	 * Check if this is standalone execution mode (no pipeline/flow).
+	 *
+	 * @return bool
+	 */
+	public function isStandalone(): bool {
+		return self::MODE_STANDALONE === $this->mode;
+	}
+
+	/**
 	 * Get execution mode.
 	 *
-	 * @return string 'direct' or 'flow'
+	 * @return string 'direct', 'flow', or 'standalone'
 	 */
 	public function getMode(): string {
 		return $this->mode;
@@ -176,7 +213,7 @@ class ExecutionContext {
 	 * @return bool True if already processed
 	 */
 	public function isItemProcessed( string $item_id ): bool {
-		if ( $this->isDirect() || ! $this->flow_step_id ) {
+		if ( $this->isDirect() || $this->isStandalone() || ! $this->flow_step_id ) {
 			return false;
 		}
 		$db_processed_items = new ProcessedItems();
@@ -191,7 +228,7 @@ class ExecutionContext {
 	 * @param string $item_id Item identifier
 	 */
 	public function markItemProcessed( string $item_id ): void {
-		if ( $this->isDirect() || ! $this->flow_step_id ) {
+		if ( $this->isDirect() || $this->isStandalone() || ! $this->flow_step_id ) {
 			return;
 		}
 		do_action(
@@ -258,6 +295,9 @@ class ExecutionContext {
 		if ( $this->isDirect() ) {
 			return 'direct';
 		}
+		if ( $this->isStandalone() ) {
+			return 'standalone' . ( $this->job_id ? "/job-{$this->job_id}" : '' );
+		}
 		return "pipeline-{$this->pipeline_id}/flow-{$this->flow_id}";
 	}
 
@@ -275,6 +315,14 @@ class ExecutionContext {
 				'pipeline_name' => 'direct',
 				'flow_id'       => 'direct',
 				'flow_name'     => 'direct',
+			);
+		}
+		if ( $this->isStandalone() ) {
+			return array(
+				'pipeline_id'   => null,
+				'pipeline_name' => 'standalone',
+				'flow_id'       => null,
+				'flow_name'     => 'standalone',
 			);
 		}
 		return array(

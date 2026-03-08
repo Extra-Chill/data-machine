@@ -262,16 +262,20 @@ class PipelineBatchScheduler {
 		array $single_packet,
 		array $engine_snapshot
 	): int|false {
-		$pipeline_id = $engine_snapshot['job']['pipeline_id'] ?? 0;
-		$flow_id     = $engine_snapshot['job']['flow_id'] ?? 0;
+		$pipeline_id = $engine_snapshot['job']['pipeline_id'] ?? null;
+		$flow_id     = $engine_snapshot['job']['flow_id'] ?? null;
 		$flow_name   = $engine_snapshot['flow']['name'] ?? '';
 		$item_title  = $single_packet['data']['title'] ?? 'Untitled';
+
+		// Normalize: 0 → null for standalone compatibility.
+		$pipeline_id = ( empty( $pipeline_id ) && ! is_string( $pipeline_id ) ) ? null : $pipeline_id;
+		$flow_id     = ( empty( $flow_id ) && ! is_string( $flow_id ) ) ? null : $flow_id;
 
 		// Create child job linked to parent.
 		$child_job_id = $this->db_jobs->create_job( array(
 			'pipeline_id'   => $pipeline_id,
 			'flow_id'       => $flow_id,
-			'source'        => 'pipeline',
+			'source'        => $pipeline_id ? 'pipeline' : 'standalone',
 			'label'         => $item_title,
 			'parent_job_id' => $parent_job_id,
 		) );
