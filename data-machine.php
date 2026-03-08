@@ -102,6 +102,7 @@ function datamachine_run_datamachine_plugin() {
 	\DataMachine\Api\FlowFiles::register();
 	\DataMachine\Api\Users::register();
 	\DataMachine\Api\Agents::register();
+	\DataMachine\Api\AgentLog::register();
 	\DataMachine\Api\Logs::register();
 	\DataMachine\Api\ProcessedItems::register();
 	\DataMachine\Api\Jobs::register();
@@ -405,6 +406,7 @@ function datamachine_deactivate_plugin() {
 	if ( function_exists( 'as_unschedule_all_actions' ) ) {
 		as_unschedule_all_actions( 'datamachine_cleanup_stale_claims', array(), 'datamachine-maintenance' );
 		as_unschedule_all_actions( 'datamachine_cleanup_failed_jobs', array(), 'datamachine-maintenance' );
+		as_unschedule_all_actions( 'datamachine_cleanup_audit_log', array(), 'datamachine-maintenance' );
 	}
 }
 
@@ -434,9 +436,10 @@ function datamachine_activate_plugin( $network_wide = false ) {
 function datamachine_activate_for_site() {
 	datamachine_register_capabilities();
 
-	// Ensure first-class agents table exists.
+	// Ensure first-class agents tables exist.
 	\DataMachine\Core\Database\Agents\Agents::create_table();
 	\DataMachine\Core\Database\Agents\AgentAccess::create_table();
+	\DataMachine\Core\Database\Agents\AgentLog::create_table();
 
 	$db_pipelines = new \DataMachine\Core\Database\Pipelines\Pipelines();
 	$db_pipelines->create_table();

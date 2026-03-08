@@ -148,6 +148,19 @@ class DeletePipelineAbility {
 			)
 		);
 
+		\DataMachine\Engine\AuditLogger::record(
+			'pipeline.delete',
+			'allowed',
+			array(
+				'resource_type' => 'pipeline',
+				'resource_id'   => $pipeline_id,
+				'metadata'      => array(
+					'pipeline_name' => $pipeline_name,
+					'deleted_flows' => $flow_count,
+				),
+			)
+		);
+
 		return array(
 			'success'       => true,
 			'pipeline_id'   => $pipeline_id,

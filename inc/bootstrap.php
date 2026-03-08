@@ -70,6 +70,7 @@ require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineSystemPromptDirective.
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineMemoryFilesDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/FlowMemoryFilesDirective.php';
 require_once __DIR__ . '/Core/FilesRepository/FileCleanup.php';
+require_once __DIR__ . '/Core/ActionScheduler/AuditCleanup.php';
 require_once __DIR__ . '/Core/ActionScheduler/ClaimsCleanup.php';
 require_once __DIR__ . '/Core/ActionScheduler/JobsCleanup.php';
 require_once __DIR__ . '/Core/ActionScheduler/LogCleanup.php';

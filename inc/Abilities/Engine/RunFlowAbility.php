@@ -235,6 +235,20 @@ class RunFlowAbility {
 			)
 		);
 
+		\DataMachine\Engine\AuditLogger::record(
+			'flow.run',
+			'allowed',
+			array(
+				'agent_id'      => (int) ( $flow['agent_id'] ?? 0 ),
+				'resource_type' => 'flow',
+				'resource_id'   => $flow_id,
+				'metadata'      => array(
+					'job_id'      => $job_id,
+					'pipeline_id' => $pipeline_id,
+				),
+			)
+		);
+
 		return array(
 			'success'    => true,
 			'flow_id'    => $flow_id,

@@ -13,6 +13,8 @@ namespace DataMachine\Cli\Commands;
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\AgentAbilities;
+use DataMachine\Core\Database\Agents\AgentLog;
+use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 
 defined( 'ABSPATH' ) || exit;
@@ -134,5 +136,147 @@ class AgentsCommand extends BaseCommand {
 		} else {
 			WP_CLI::error( $result['message'] );
 		}
+	}
+
+	/**
+	 * View audit trail for an agent.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <agent-slug>
+	 * : Agent slug to view logs for.
+	 *
+	 * [--period=<period>]
+	 * : Time period to show.
+	 * ---
+	 * default: 7d
+	 * options:
+	 *   - 1h
+	 *   - 24h
+	 *   - 7d
+	 *   - 30d
+	 *   - all
+	 * ---
+	 *
+	 * [--action=<action>]
+	 * : Filter by action (e.g. flow.run, pipeline.create, job.fail).
+	 *
+	 * [--result=<result>]
+	 * : Filter by result.
+	 * ---
+	 * options:
+	 *   - allowed
+	 *   - denied
+	 *   - error
+	 * ---
+	 *
+	 * [--limit=<limit>]
+	 * : Maximum entries to show.
+	 * ---
+	 * default: 50
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - csv
+	 *   - yaml
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine agents log chubes-bot
+	 *     wp datamachine agents log chubes-bot --period=24h
+	 *     wp datamachine agents log chubes-bot --action=flow.run --result=error
+	 *     wp datamachine agents log chubes-bot --format=json
+	 *
+	 * @subcommand log
+	 */
+	public function log( array $args, array $assoc_args ): void {
+		$agent_slug = sanitize_title( $args[0] );
+		$agents_repo = new Agents();
+		$agent       = $agents_repo->get_by_slug( $agent_slug );
+
+		if ( ! $agent ) {
+			WP_CLI::error( sprintf( 'Agent "%s" not found.', $agent_slug ) );
+		}
+
+		$agent_id = (int) $agent['agent_id'];
+		$period   = $assoc_args['period'] ?? '7d';
+		$limit    = (int) ( $assoc_args['limit'] ?? 50 );
+
+		$filters = array( 'per_page' => $limit );
+
+		// Map period to since datetime.
+		if ( 'all' !== $period ) {
+			$intervals = array(
+				'1h'  => '-1 hour',
+				'24h' => '-24 hours',
+				'7d'  => '-7 days',
+				'30d' => '-30 days',
+			);
+
+			if ( isset( $intervals[ $period ] ) ) {
+				$dt = new \DateTime( 'now', new \DateTimeZone( 'UTC' ) );
+				$dt->modify( $intervals[ $period ] );
+				$filters['since'] = $dt->format( 'Y-m-d H:i:s' );
+			}
+		}
+
+		if ( ! empty( $assoc_args['action'] ) ) {
+			$filters['action'] = sanitize_text_field( $assoc_args['action'] );
+		}
+
+		if ( ! empty( $assoc_args['result'] ) ) {
+			$filters['result'] = sanitize_text_field( $assoc_args['result'] );
+		}
+
+		$log_repo = new AgentLog();
+		$data     = $log_repo->get_for_agent( $agent_id, $filters );
+
+		if ( empty( $data['items'] ) ) {
+			WP_CLI::warning( sprintf( 'No audit log entries found for "%s" in the %s period.', $agent_slug, $period ) );
+			return;
+		}
+
+		// Format items for display.
+		$items = array();
+		foreach ( $data['items'] as $entry ) {
+			$metadata_str = '';
+			if ( ! empty( $entry['metadata'] ) && is_array( $entry['metadata'] ) ) {
+				$parts = array();
+				foreach ( $entry['metadata'] as $key => $value ) {
+					$parts[] = "{$key}=" . ( is_scalar( $value ) ? $value : wp_json_encode( $value ) );
+				}
+				$metadata_str = implode( ', ', $parts );
+			}
+
+			$items[] = array(
+				'id'            => (int) $entry['id'],
+				'action'        => $entry['action'],
+				'result'        => $entry['result'],
+				'resource_type' => $entry['resource_type'] ?? '-',
+				'resource_id'   => $entry['resource_id'] ?? '-',
+				'user_id'       => $entry['user_id'] ?? '-',
+				'metadata'      => $metadata_str ?: '-',
+				'created_at'    => $entry['created_at'],
+			);
+		}
+
+		$fields = array( 'id', 'action', 'result', 'resource_type', 'resource_id', 'created_at' );
+
+		// Show metadata in JSON format.
+		$format = $assoc_args['format'] ?? 'table';
+		if ( 'json' === $format || 'yaml' === $format ) {
+			$fields[] = 'user_id';
+			$fields[] = 'metadata';
+		}
+
+		$this->format_items( $items, $fields, $assoc_args, 'id' );
+		WP_CLI::log( sprintf( 'Showing %d of %d entries.', count( $items ), $data['total'] ) );
 	}
 }

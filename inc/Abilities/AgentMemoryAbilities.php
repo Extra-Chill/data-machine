@@ -243,10 +243,26 @@ class AgentMemoryAbilities {
 		$mode    = $input['mode'];
 
 		if ( 'append' === $mode ) {
-			return $memory->append_to_section( $section, $content );
+			$result = $memory->append_to_section( $section, $content );
+		} else {
+			$result = $memory->set_section( $section, $content );
 		}
 
-		return $memory->set_section( $section, $content );
+		if ( ! empty( $result['success'] ) ) {
+			\DataMachine\Engine\AuditLogger::record(
+				'memory.write',
+				'allowed',
+				array(
+					'agent_id' => $agent_id,
+					'metadata' => array(
+						'section' => $section,
+						'mode'    => $mode,
+					),
+				)
+			);
+		}
+
+		return $result;
 	}
 
 	/**

@@ -92,22 +92,41 @@ class AgentAccess extends BaseRepository {
 				array( '%d', '%d' )
 			);
 
-			return false !== $result;
+			$success = false !== $result;
+		} else {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$result = $this->wpdb->insert(
+				$this->table_name,
+				array(
+					'agent_id'   => $agent_id,
+					'user_id'    => $user_id,
+					'role'       => $role,
+					'granted_at' => current_time( 'mysql', true ),
+				),
+				array( '%d', '%d', '%s', '%s' )
+			);
+
+			$success = false !== $result;
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-		$result = $this->wpdb->insert(
-			$this->table_name,
-			array(
-				'agent_id'   => $agent_id,
-				'user_id'    => $user_id,
-				'role'       => $role,
-				'granted_at' => current_time( 'mysql', true ),
-			),
-			array( '%d', '%d', '%s', '%s' )
-		);
+		if ( $success && class_exists( '\\DataMachine\\Engine\\AuditLogger' ) ) {
+			\DataMachine\Engine\AuditLogger::record(
+				'agent.access.grant',
+				'allowed',
+				array(
+					'agent_id'      => $agent_id,
+					'resource_type' => 'agent',
+					'resource_id'   => $agent_id,
+					'metadata'      => array(
+						'granted_user_id' => $user_id,
+						'role'            => $role,
+						'was_update'      => null !== $existing,
+					),
+				)
+			);
+		}
 
-		return false !== $result;
+		return $success;
 	}
 
 	/**
@@ -128,7 +147,24 @@ class AgentAccess extends BaseRepository {
 			array( '%d', '%d' )
 		);
 
-		return false !== $result && $result > 0;
+		$success = false !== $result && $result > 0;
+
+		if ( $success && class_exists( '\\DataMachine\\Engine\\AuditLogger' ) ) {
+			\DataMachine\Engine\AuditLogger::record(
+				'agent.access.revoke',
+				'allowed',
+				array(
+					'agent_id'      => $agent_id,
+					'resource_type' => 'agent',
+					'resource_id'   => $agent_id,
+					'metadata'      => array(
+						'revoked_user_id' => $user_id,
+					),
+				)
+			);
+		}
+
+		return $success;
 	}
 
 	/**

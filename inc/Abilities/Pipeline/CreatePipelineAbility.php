@@ -250,6 +250,20 @@ class CreatePipelineAbility {
 			)
 		);
 
+		\DataMachine\Engine\AuditLogger::record(
+			'pipeline.create',
+			'allowed',
+			array(
+				'resource_type' => 'pipeline',
+				'resource_id'   => $pipeline_id,
+				'metadata'      => array(
+					'pipeline_name' => $pipeline_name,
+					'steps_created' => $steps_created,
+					'flow_id'       => $flow_result['flow_id'] ?? null,
+				),
+			)
+		);
+
 		return array(
 			'success'       => true,
 			'pipeline_id'   => $pipeline_id,

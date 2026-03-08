@@ -150,6 +150,25 @@ class FailJobHandler {
 			)
 		);
 
+		// Audit trail: record job failure.
+		$job = $db_jobs->get_job( $job_id );
+		if ( $job ) {
+			$agent_id = (int) ( is_array( $job ) ? ( $job['agent_id'] ?? 0 ) : ( $job->agent_id ?? 0 ) );
+			\DataMachine\Engine\AuditLogger::record(
+				'job.fail',
+				'error',
+				array(
+					'agent_id'      => $agent_id,
+					'resource_type' => 'job',
+					'resource_id'   => $job_id,
+					'metadata'      => array(
+						'reason'  => $specific_reason,
+						'flow_id' => (int) ( is_array( $job ) ? ( $job['flow_id'] ?? 0 ) : ( $job->flow_id ?? 0 ) ),
+					),
+				)
+			);
+		}
+
 		return true;
 	}
 }
