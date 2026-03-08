@@ -81,7 +81,7 @@ class FlowFormatter {
 		unset( $step_data );
 
 		$scheduling_config = $flow['scheduling_config'] ?? array();
-		$flow_id           = $flow['flow_id'] ?? null;
+		$flow_id           = isset( $flow['flow_id'] ) ? (int) $flow['flow_id'] : null;
 
 		$last_run_at     = $latest_job['created_at'] ?? null;
 		$last_run_status = $latest_job['status'] ?? null;
@@ -92,7 +92,7 @@ class FlowFormatter {
 		return array(
 			'flow_id'           => $flow_id,
 			'flow_name'         => $flow['flow_name'] ?? '',
-			'pipeline_id'       => $flow['pipeline_id'] ?? null,
+			'pipeline_id'       => isset( $flow['pipeline_id'] ) ? (int) $flow['pipeline_id'] : null,
 			'flow_config'       => $flow_config,
 			'scheduling_config' => $scheduling_config,
 			'last_run'          => $last_run_at,
