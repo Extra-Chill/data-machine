@@ -12,7 +12,7 @@
 namespace DataMachine\Abilities\Flow;
 
 use DataMachine\Core\Database\Flows\Flows as DB_Flows;
-use DataMachine\Engine\AI\Tools\Global\QueueValidator;
+use DataMachine\Abilities\DuplicateCheck\DuplicateCheckAbility;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -81,6 +81,10 @@ class QueueAbility {
 							'type'        => 'boolean',
 							'description' => __( 'Skip duplicate validation (default: false). Use only when intentionally re-adding a known prompt.', 'data-machine' ),
 						),
+						'context'         => array(
+							'type'        => 'object',
+							'description' => __( 'Domain-specific context for duplicate detection strategies (e.g., venue, startDate for events).', 'data-machine' ),
+						),
 					),
 				),
 				'output_schema'       => array(
@@ -95,6 +99,7 @@ class QueueAbility {
 						'reason'       => array( 'type' => 'string' ),
 						'match'        => array( 'type' => 'object' ),
 						'source'       => array( 'type' => 'string' ),
+						'strategy'     => array( 'type' => 'string' ),
 					),
 				),
 				'execute_callback'    => array( $this, 'executeQueueAdd' ),
@@ -445,23 +450,26 @@ class QueueAbility {
 			// for custom post types (quizzes, recipes, events, etc.).
 			$post_type = $input['post_type'] ?? $this->resolvePublishPostType( $flow_config );
 
-			$validator = new QueueValidator();
-			$result    = $validator->validate( array(
-				'topic'        => $prompt,
+			$dedup  = new DuplicateCheckAbility();
+			$result = $dedup->executeCheckDuplicate( array(
+				'title'        => $prompt,
+				'post_type'    => $post_type,
+				'scope'        => 'both',
 				'flow_id'      => $flow_id,
 				'flow_step_id' => $flow_step_id,
-				'post_type'    => $post_type,
+				'context'      => $input['context'] ?? array(),
 			) );
 
 			if ( 'duplicate' === $result['verdict'] ) {
 				return array(
-					'success' => false,
-					'error'   => 'duplicate_rejected',
-					'reason'  => $result['reason'],
-					'match'   => $result['match'] ?? array(),
-					'source'  => $result['source'] ?? 'unknown',
-					'flow_id' => $flow_id,
-					'message' => sprintf( 'Rejected: "%s" is a duplicate. %s', $prompt, $result['reason'] ),
+					'success'  => false,
+					'error'    => 'duplicate_rejected',
+					'reason'   => $result['reason'] ?? '',
+					'match'    => $result['match'] ?? array(),
+					'source'   => $result['source'] ?? 'unknown',
+					'strategy' => $result['strategy'] ?? '',
+					'flow_id'  => $flow_id,
+					'message'  => sprintf( 'Rejected: "%s" is a duplicate. %s', $prompt, $result['reason'] ?? '' ),
 				);
 			}
 		}
@@ -1115,7 +1123,6 @@ class QueueAbility {
 		return $popped_item;
 	}
 
-	/**
 	/**
 	 * Resolve the post_type from the flow's publish step handler config.
 	 *
