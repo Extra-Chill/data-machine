@@ -24,8 +24,8 @@ function datamachine_register_agent_admin_page_filters() {
 		'datamachine_admin_pages',
 		function ( $pages ) {
 			$pages['agent'] = array(
-				'page_title' => __( 'Agent', 'data-machine' ),
-				'menu_title' => __( 'Agent', 'data-machine' ),
+				'page_title' => __( 'Agents', 'data-machine' ),
+				'menu_title' => __( 'Agents', 'data-machine' ),
 				'capability' => 'manage_options',
 				'position'   => 20,
 				'templates'  => __DIR__ . '/templates/',
