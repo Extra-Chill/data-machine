@@ -98,6 +98,12 @@ class Jobs {
 						'type'        => 'string',
 						'description' => __( 'Filter by job status', 'data-machine' ),
 					),
+					'user_id'     => array(
+						'required'          => false,
+						'type'              => 'integer',
+						'description'       => __( 'Filter by user ID (admin only, non-admins always see own data)', 'data-machine' ),
+						'sanitize_callback' => 'absint',
+					),
 				),
 			)
 		);
@@ -168,6 +174,8 @@ class Jobs {
 	 * GET /datamachine/v1/jobs
 	 */
 	public static function handle_get_jobs( $request ) {
+		$scoped_user_id = PermissionHelper::resolve_scoped_user_id( $request );
+
 		$input = array(
 			'orderby'  => $request->get_param( 'orderby' ),
 			'order'    => $request->get_param( 'order' ),
@@ -175,6 +183,9 @@ class Jobs {
 			'offset'   => $request->get_param( 'offset' ),
 		);
 
+		if ( null !== $scoped_user_id ) {
+			$input['user_id'] = $scoped_user_id;
+		}
 		if ( $request->get_param( 'pipeline_id' ) ) {
 			$input['pipeline_id'] = (int) $request->get_param( 'pipeline_id' );
 		}

@@ -103,6 +103,12 @@ class Flows {
 						'sanitize_callback' => 'absint',
 						'description'       => __( 'Offset for pagination', 'data-machine' ),
 					),
+					'user_id'     => array(
+						'required'          => false,
+						'type'              => 'integer',
+						'description'       => __( 'Filter by user ID (admin only, non-admins always see own data)', 'data-machine' ),
+						'sanitize_callback' => 'absint',
+					),
 				),
 			)
 		);
@@ -270,6 +276,7 @@ class Flows {
 		$input = array(
 			'pipeline_id' => (int) $request->get_param( 'pipeline_id' ),
 			'flow_name'   => $request->get_param( 'flow_name' ) ?? 'Flow',
+			'user_id'     => PermissionHelper::acting_user_id(),
 		);
 
 		if ( $request->get_param( 'flow_config' ) ) {
@@ -301,6 +308,20 @@ class Flows {
 	 * Handle flow deletion request
 	 */
 	public static function handle_delete_flow( $request ) {
+		$flow_id = (int) $request->get_param( 'flow_id' );
+
+		// Verify ownership before deleting.
+		$db_flows = new \DataMachine\Core\Database\Flows\Flows();
+		$flow     = $db_flows->get_flow( $flow_id );
+
+		if ( $flow && ! PermissionHelper::owns_resource( (int) ( $flow['user_id'] ?? 0 ) ) ) {
+			return new \WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to delete this flow.', 'data-machine' ),
+				array( 'status' => 403 )
+			);
+		}
+
 		$ability = wp_get_ability( 'datamachine/delete-flow' );
 		if ( ! $ability ) {
 			return new \WP_Error( 'ability_not_found', 'Ability not found', array( 'status' => 500 ) );
@@ -308,7 +329,7 @@ class Flows {
 
 		$result = $ability->execute(
 			array(
-				'flow_id' => (int) $request->get_param( 'flow_id' ),
+				'flow_id' => $flow_id,
 			)
 		);
 
@@ -327,6 +348,20 @@ class Flows {
 	 * Handle flow duplication request
 	 */
 	public static function handle_duplicate_flow( $request ) {
+		$flow_id = (int) $request->get_param( 'flow_id' );
+
+		// Verify ownership before duplicating.
+		$db_flows = new \DataMachine\Core\Database\Flows\Flows();
+		$flow     = $db_flows->get_flow( $flow_id );
+
+		if ( $flow && ! PermissionHelper::owns_resource( (int) ( $flow['user_id'] ?? 0 ) ) ) {
+			return new \WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to duplicate this flow.', 'data-machine' ),
+				array( 'status' => 403 )
+			);
+		}
+
 		$ability = wp_get_ability( 'datamachine/duplicate-flow' );
 		if ( ! $ability ) {
 			return new \WP_Error( 'ability_not_found', 'Ability not found', array( 'status' => 500 ) );
@@ -334,7 +369,8 @@ class Flows {
 
 		$result = $ability->execute(
 			array(
-				'source_flow_id' => (int) $request->get_param( 'flow_id' ),
+				'source_flow_id' => $flow_id,
+				'user_id'        => PermissionHelper::acting_user_id(),
 			)
 		);
 
@@ -353,22 +389,25 @@ class Flows {
 	 * Handle flows retrieval request with pagination support
 	 */
 	public static function handle_get_flows( $request ) {
-		$pipeline_id = $request->get_param( 'pipeline_id' );
-		$per_page    = $request->get_param( 'per_page' ) ?? 20;
-		$offset      = $request->get_param( 'offset' ) ?? 0;
+		$pipeline_id    = $request->get_param( 'pipeline_id' );
+		$per_page       = $request->get_param( 'per_page' ) ?? 20;
+		$offset         = $request->get_param( 'offset' ) ?? 0;
+		$scoped_user_id = PermissionHelper::resolve_scoped_user_id( $request );
 
 		$ability = wp_get_ability( 'datamachine/get-flows' );
 		if ( ! $ability ) {
 			return new \WP_Error( 'ability_not_found', 'Ability not found', array( 'status' => 500 ) );
 		}
 
-		$result = $ability->execute(
-			array(
-				'pipeline_id' => $pipeline_id,
-				'per_page'    => $per_page,
-				'offset'      => $offset,
-			)
+		$input = array(
+			'pipeline_id' => $pipeline_id,
+			'per_page'    => $per_page,
+			'offset'      => $offset,
 		);
+		if ( null !== $scoped_user_id ) {
+			$input['user_id'] = $scoped_user_id;
+		}
+		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
 			return $result;
@@ -444,13 +483,27 @@ class Flows {
 	 * PATCH /datamachine/v1/flows/{id}
 	 */
 	public static function handle_update_flow( $request ) {
+		$flow_id = (int) $request->get_param( 'flow_id' );
+
+		// Verify ownership before updating.
+		$db_flows = new \DataMachine\Core\Database\Flows\Flows();
+		$flow     = $db_flows->get_flow( $flow_id );
+
+		if ( $flow && ! PermissionHelper::owns_resource( (int) ( $flow['user_id'] ?? 0 ) ) ) {
+			return new \WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to update this flow.', 'data-machine' ),
+				array( 'status' => 403 )
+			);
+		}
+
 		$ability = wp_get_ability( 'datamachine/update-flow' );
 		if ( ! $ability ) {
 			return new \WP_Error( 'ability_not_found', 'Ability not found', array( 'status' => 500 ) );
 		}
 
 		$input = array(
-			'flow_id' => (int) $request->get_param( 'flow_id' ),
+			'flow_id' => $flow_id,
 		);
 
 		$flow_name         = $request->get_param( 'flow_name' );
@@ -566,6 +619,14 @@ class Flows {
 			);
 		}
 
+		if ( ! PermissionHelper::owns_resource( (int) ( $flow['user_id'] ?? 0 ) ) ) {
+			return new \WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to access this flow.', 'data-machine' ),
+				array( 'status' => 403 )
+			);
+		}
+
 		$memory_files = $db_flows->get_flow_memory_files( $flow_id );
 
 		return rest_ensure_response(
@@ -597,6 +658,14 @@ class Flows {
 				'flow_not_found',
 				__( 'Flow not found.', 'data-machine' ),
 				array( 'status' => 404 )
+			);
+		}
+
+		if ( ! PermissionHelper::owns_resource( (int) ( $flow['user_id'] ?? 0 ) ) ) {
+			return new \WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to update this flow.', 'data-machine' ),
+				array( 'status' => 403 )
 			);
 		}
 

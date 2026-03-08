@@ -70,6 +70,12 @@ class Pipelines {
 							'description'       => __( 'Comma-separated pipeline IDs for export', 'data-machine' ),
 							'sanitize_callback' => 'sanitize_text_field',
 						),
+						'user_id'     => array(
+							'required'          => false,
+							'type'              => 'integer',
+							'description'       => __( 'Filter by user ID (admin only, non-admins always see own data)', 'data-machine' ),
+							'sanitize_callback' => 'absint',
+						),
 					),
 				),
 				array(
@@ -238,10 +244,11 @@ class Pipelines {
 	 * Handle pipeline retrieval request
 	 */
 	public static function handle_get_pipelines( $request ) {
-		$pipeline_id = $request->get_param( 'pipeline_id' );
-		$fields      = $request->get_param( 'fields' );
-		$format      = $request->get_param( 'format' ) ?? 'json';
-		$ids         = $request->get_param( 'ids' );
+		$pipeline_id    = $request->get_param( 'pipeline_id' );
+		$fields         = $request->get_param( 'fields' );
+		$format         = $request->get_param( 'format' ) ?? 'json';
+		$ids            = $request->get_param( 'ids' );
+		$scoped_user_id = PermissionHelper::resolve_scoped_user_id( $request );
 
 		$abilities = new PipelineAbilities();
 
@@ -283,12 +290,14 @@ class Pipelines {
 		}
 
 		if ( $pipeline_id ) {
-			$result = $abilities->executeGetPipelines(
-				array(
-					'pipeline_id' => (int) $pipeline_id,
-					'output_mode' => 'full',
-				)
+			$input = array(
+				'pipeline_id' => (int) $pipeline_id,
+				'output_mode' => 'full',
 			);
+			if ( null !== $scoped_user_id ) {
+				$input['user_id'] = $scoped_user_id;
+			}
+			$result = $abilities->executeGetPipelines( $input );
 
 			if ( ! $result['success'] || empty( $result['pipelines'] ) ) {
 				return new \WP_Error(
@@ -317,13 +326,15 @@ class Pipelines {
 				)
 			);
 		} else {
-			$result = $abilities->executeGetPipelines(
-				array(
-					'per_page'    => 100,
-					'offset'      => 0,
-					'output_mode' => 'full',
-				)
+			$input = array(
+				'per_page'    => 100,
+				'offset'      => 0,
+				'output_mode' => 'full',
 			);
+			if ( null !== $scoped_user_id ) {
+				$input['user_id'] = $scoped_user_id;
+			}
+			$result = $abilities->executeGetPipelines( $input );
 
 			if ( ! $result['success'] ) {
 				return new \WP_Error(
@@ -375,6 +386,7 @@ class Pipelines {
 				'pipeline_name' => $params['pipeline_name'],
 				'steps'         => $params['steps'] ?? array(),
 				'flow_config'   => $params['flow_config'] ?? array(),
+				'user_id'       => PermissionHelper::acting_user_id(),
 			)
 		);
 
@@ -399,6 +411,18 @@ class Pipelines {
 	 */
 	public static function handle_delete_pipeline( $request ) {
 		$pipeline_id = (int) $request->get_param( 'pipeline_id' );
+
+		// Verify ownership before deleting.
+		$db_pipelines = new \DataMachine\Core\Database\Pipelines\Pipelines();
+		$pipeline     = $db_pipelines->get_pipeline( $pipeline_id );
+
+		if ( $pipeline && ! PermissionHelper::owns_resource( (int) ( $pipeline['user_id'] ?? 0 ) ) ) {
+			return new \WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to delete this pipeline.', 'data-machine' ),
+				array( 'status' => 403 )
+			);
+		}
 
 		$abilities = new PipelineAbilities();
 		$result    = $abilities->executeDeletePipeline( array( 'pipeline_id' => $pipeline_id ) );
@@ -432,6 +456,18 @@ class Pipelines {
 				'rest_invalid_param',
 				__( 'Pipeline ID and name are required.', 'data-machine' ),
 				array( 'status' => 400 )
+			);
+		}
+
+		// Verify ownership before updating.
+		$db_pipelines = new \DataMachine\Core\Database\Pipelines\Pipelines();
+		$pipeline     = $db_pipelines->get_pipeline( $pipeline_id );
+
+		if ( $pipeline && ! PermissionHelper::owns_resource( (int) ( $pipeline['user_id'] ?? 0 ) ) ) {
+			return new \WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to update this pipeline.', 'data-machine' ),
+				array( 'status' => 403 )
 			);
 		}
 
@@ -487,6 +523,14 @@ class Pipelines {
 			);
 		}
 
+		if ( ! PermissionHelper::owns_resource( (int) ( $pipeline['user_id'] ?? 0 ) ) ) {
+			return new \WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to access this pipeline.', 'data-machine' ),
+				array( 'status' => 403 )
+			);
+		}
+
 		$memory_files = $db_pipelines->get_pipeline_memory_files( $pipeline_id );
 
 		return rest_ensure_response(
@@ -516,6 +560,14 @@ class Pipelines {
 				'pipeline_not_found',
 				__( 'Pipeline not found.', 'data-machine' ),
 				array( 'status' => 404 )
+			);
+		}
+
+		if ( ! PermissionHelper::owns_resource( (int) ( $pipeline['user_id'] ?? 0 ) ) ) {
+			return new \WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to update this pipeline.', 'data-machine' ),
+				array( 'status' => 403 )
 			);
 		}
 

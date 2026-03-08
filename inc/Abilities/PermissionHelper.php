@@ -178,6 +178,67 @@ class PermissionHelper {
 	}
 
 	/**
+	 * Resolve user_id for scoped REST API queries.
+	 *
+	 * Determines whose data should be returned based on the request:
+	 * - If `user_id` param is present and caller is admin → use that user_id
+	 * - If caller is admin and no `user_id` param → return null (all users)
+	 * - If caller is non-admin → always return their own user_id
+	 *
+	 * @since 0.40.0
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @param string           $action  Action key for admin check (default: 'manage_flows').
+	 * @return int|null User ID to filter by, or null for all users (admin default).
+	 */
+	public static function resolve_scoped_user_id( \WP_REST_Request $request, string $action = 'manage_flows' ): ?int {
+		$requested_user_id = $request->get_param( 'user_id' );
+		$is_admin          = self::can( $action );
+
+		// Admin with explicit user filter → scope to that user.
+		if ( $is_admin && null !== $requested_user_id && '' !== $requested_user_id ) {
+			return (int) $requested_user_id;
+		}
+
+		// Admin with no filter → all users.
+		if ( $is_admin ) {
+			return null;
+		}
+
+		// Non-admin → always their own data.
+		return self::acting_user_id();
+	}
+
+	/**
+	 * Check if the acting user owns a resource.
+	 *
+	 * Returns true if:
+	 * - Resource has user_id 0 (single-agent mode, anyone can access)
+	 * - Resource belongs to the acting user
+	 * - Acting user is an admin (can manage any resource)
+	 *
+	 * @since 0.40.0
+	 *
+	 * @param int    $resource_user_id User ID on the resource record.
+	 * @param string $action           Action key for admin check (default: 'manage_flows').
+	 * @return bool True if the acting user can access this resource.
+	 */
+	public static function owns_resource( int $resource_user_id, string $action = 'manage_flows' ): bool {
+		// Single-agent mode resources (user_id 0) are accessible to anyone with the capability.
+		if ( 0 === $resource_user_id ) {
+			return true;
+		}
+
+		// Admins can access any resource.
+		if ( self::can( $action ) && ( self::is_authenticated_context() || current_user_can( 'manage_options' ) ) ) {
+			return true;
+		}
+
+		// Owner check.
+		return self::acting_user_id() === $resource_user_id;
+	}
+
+	/**
 	 * Check capability for a specific user against Data Machine action.
 	 *
 	 * @since 0.37.0
