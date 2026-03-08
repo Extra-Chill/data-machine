@@ -102,10 +102,9 @@ export default function ModalManager() {
 					throw new Error( message );
 				}
 
-				// Derive current settings from plural fields, fall back to singular.
 				const stepConfig = result?.data?.step_config || {};
 				const handlerConfigs = stepConfig.handler_configs || {};
-				const currentSettings = handlerConfigs[selectedHandlerSlug] || stepConfig.handler_config || {};
+				const currentSettings = handlerConfigs[selectedHandlerSlug] || {};
 
 				openModal( MODAL_TYPES.HANDLER_SETTINGS, {
 					...modalData,

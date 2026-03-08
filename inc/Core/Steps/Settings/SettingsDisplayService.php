@@ -12,7 +12,7 @@
 namespace DataMachine\Core\Steps\Settings;
 
 use DataMachine\Abilities\HandlerAbilities;
-use DataMachine\Abilities\FlowStep\FlowStepNormalizer;
+use DataMachine\Core\Steps\FlowStepConfig;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -48,8 +48,8 @@ class SettingsDisplayService {
 			return array();
 		}
 
-		$handler_slug     = FlowStepNormalizer::getEffectiveSlug( $flow_step_config );
-		$current_settings = FlowStepNormalizer::getPrimaryHandlerConfig( $flow_step_config );
+		$handler_slug     = FlowStepConfig::getEffectiveSlug( $flow_step_config );
+		$current_settings = FlowStepConfig::getPrimaryHandlerConfig( $flow_step_config );
 
 		return $this->getDisplayForHandler( $handler_slug, $current_settings );
 	}
@@ -58,8 +58,7 @@ class SettingsDisplayService {
 	 * Get formatted settings display for all handlers on a flow step.
 	 *
 	 * Returns an associative array keyed by handler slug, each containing the
-	 * display settings array for that handler. Falls back to the singular
-	 * handler_slug/handler_config when handler_configs is not populated.
+	 * display settings array for that handler.
 	 *
 	 * @param string $flow_step_id Flow step ID.
 	 * @param string $step_type    Step type slug.
@@ -82,8 +81,8 @@ class SettingsDisplayService {
 
 		// Fallback: build from primary handler when configs are empty.
 		if ( empty( $handler_configs ) ) {
-			$handler_slug     = FlowStepNormalizer::getEffectiveSlug( $flow_step_config );
-			$current_settings = FlowStepNormalizer::getPrimaryHandlerConfig( $flow_step_config );
+			$handler_slug     = FlowStepConfig::getEffectiveSlug( $flow_step_config );
+			$current_settings = FlowStepConfig::getPrimaryHandlerConfig( $flow_step_config );
 
 			if ( empty( $handler_slug ) ) {
 				return array();

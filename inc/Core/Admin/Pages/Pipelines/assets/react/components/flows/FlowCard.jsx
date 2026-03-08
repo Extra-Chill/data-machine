@@ -234,24 +234,24 @@ function FlowCardContent( props ) {
 				isSameId( s.pipeline_step_id, pipelineStepId )
 			);
 
-			const handlerSlugs = flowStepConfig.handler_slugs ||
-				( flowStepConfig.handler_slug ? [ flowStepConfig.handler_slug ] : [] );
+			const handlerSlugs = flowStepConfig.handler_slugs || [];
+			const primarySlug = handlerSlugs[0] || '';
 
 			// Build data for handler modals
 			const data = {
 				flowStepId,
-				handlerSlug: specificHandler || flowStepConfig.handler_slug || '',
+				handlerSlug: specificHandler || primarySlug,
 				handlerSlugs,
 				stepType: pipelineStep?.step_type || flowStepConfig.step_type,
 				pipelineId: currentFlowData.pipeline_id,
 				flowId: currentFlowData.flow_id,
 				currentSettings: specificHandler
-					? ( flowStepConfig.handler_configs?.[ specificHandler ] || flowStepConfig.handler_config || {} )
-					: ( flowStepConfig.handler_config || {} ),
+					? ( flowStepConfig.handler_configs?.[ specificHandler ] || {} )
+					: ( flowStepConfig.handler_configs?.[ primarySlug ] || {} ),
 				addMode,
 			};
 
-			if ( addMode || ! flowStepConfig.handler_slug ) {
+			if ( addMode || ! primarySlug ) {
 				// Adding a new handler or no handler yet — open selection modal.
 				openModal( MODAL_TYPES.HANDLER_SELECTION, {
 					...data,
@@ -262,8 +262,7 @@ function FlowCardContent( props ) {
 				openModal( MODAL_TYPES.HANDLER_SETTINGS, {
 					...data,
 					handlerSlug: specificHandler,
-					currentSettings: flowStepConfig.handler_configs?.[ specificHandler ]
-						|| flowStepConfig.handler_config || {},
+					currentSettings: flowStepConfig.handler_configs?.[ specificHandler ] || {},
 				} );
 			} else {
 				// Default: open settings for primary handler.

@@ -65,12 +65,11 @@ export default function FlowStepCard( {
 		if ( isAiStep ) {
 			return flowStepConfig.user_message || '';
 		}
-		// Use primary handler config from plural fields, fall back to singular.
 		const handlerSlugs = flowStepConfig?.handler_slugs || [];
 		const primarySlug = handlerSlugs[0];
 		const primaryConfig = primarySlug && flowStepConfig?.handler_configs?.[primarySlug];
-		return primaryConfig?.prompt || flowStepConfig?.handler_config?.prompt || '';
-	}, [ isAiStep, flowStepConfig.user_message, flowStepConfig?.handler_slugs, flowStepConfig?.handler_configs, flowStepConfig?.handler_config?.prompt ] );
+		return primaryConfig?.prompt || '';
+	}, [ isAiStep, flowStepConfig.user_message, flowStepConfig?.handler_slugs, flowStepConfig?.handler_configs ] );
 
 	// Determine if this step type shows a prompt field.
 	// AI steps always get it. Other steps get it if they have a prompt in handler_config
@@ -78,7 +77,7 @@ export default function FlowStepCard( {
 	const handlerSlugs = flowStepConfig?.handler_slugs || [];
 	const primarySlug = handlerSlugs[0];
 	const primaryConfig = primarySlug && flowStepConfig?.handler_configs?.[primarySlug];
-	const hasPromptConfig = (primaryConfig && primaryConfig.prompt !== undefined) || flowStepConfig?.handler_config?.prompt !== undefined;
+	const hasPromptConfig = primaryConfig && primaryConfig.prompt !== undefined;
 	const showPromptField = isAiStep || shouldShowQueue || hasPromptConfig;
 
 	// Fields to exclude from inline config (handled by QueueablePromptField).
@@ -97,7 +96,7 @@ export default function FlowStepCard( {
 					? { user_message: value }
 					: {
 						handler_config: {
-							...(primaryConfig || flowStepConfig?.handler_config || {}),
+							...( primaryConfig || {} ),
 							prompt: value
 						}
 					};
@@ -112,14 +111,14 @@ export default function FlowStepCard( {
 				setError( err.message || __( 'An error occurred', 'data-machine' ) );
 			}
 		},
-		[ flowStepId, isAiStep, primaryConfig, flowStepConfig?.handler_config ]
+		[ flowStepId, isAiStep, primaryConfig ]
 	);
 
 	// Resolve handler info for settings display.
 	// Strict positive check — defaults to false while step types are loading
 	// so non-handler step types (AI, Agent Ping, Webhook Gate) never flash handler UI.
 	const usesHandler = stepTypeInfo.uses_handler === true;
-	const effectiveHandlerSlug = usesHandler ? flowStepConfig.handler_slug : pipelineStep.step_type;
+	const effectiveHandlerSlug = usesHandler ? ( flowStepConfig.handler_slugs?.[0] || '' ) : pipelineStep.step_type;
 
 	return (
 		<Card
@@ -166,10 +165,10 @@ export default function FlowStepCard( {
 					   not inline on the card. Non-handler step types (Agent Ping, Webhook Gate)
 					   render their fields here via the handler details API fallback. */ }
 					{ ! usesHandler && effectiveHandlerSlug && (
-						<InlineStepConfig
-							flowStepId={ flowStepId }
-							handlerConfig={ flowStepConfig?.handler_config || {} }
-							handlerSlug={ effectiveHandlerSlug }
+					<InlineStepConfig
+						flowStepId={ flowStepId }
+						handlerConfig={ flowStepConfig?.handler_configs?.[ effectiveHandlerSlug ] || {} }
+						handlerSlug={ effectiveHandlerSlug }
 							excludeFields={ excludeFields }
 							onError={ setError }
 							pipelineId={ pipelineId }
@@ -200,8 +199,8 @@ export default function FlowStepCard( {
 
 					{ /* Handler Configuration (handler-based steps only) */ }
 					{ usesHandler && (
-						<FlowStepHandler
-							handlerSlug={ flowStepConfig.handler_slug || null }
+					<FlowStepHandler
+						handlerSlug={ flowStepConfig.handler_slugs?.[0] || null }
 							handlerSlugs={ flowStepConfig.handler_slugs || null }
 							settingsDisplay={ flowStepConfig.settings_display || [] }
 							handlerSettingsDisplays={ flowStepConfig.handler_settings_displays || null }
