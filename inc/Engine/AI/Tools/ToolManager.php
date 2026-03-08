@@ -471,7 +471,7 @@ class ToolManager {
 	/**
 	 * Get all available tools for chat context.
 	 *
-	 * @deprecated 0.39.0 Use ToolPolicyResolver::resolve() with SURFACE_CHAT instead.
+	 * @deprecated 0.39.0 Use ToolPolicyResolver::resolve() with CONTEXT_CHAT instead.
 	 *             Delegates to ToolPolicyResolver internally.
 	 *
 	 * @return array Available tools for chat agents
@@ -480,7 +480,7 @@ class ToolManager {
 		$resolver = new ToolPolicyResolver( $this );
 
 		return $resolver->resolve( array(
-			'surface' => ToolPolicyResolver::SURFACE_CHAT,
+			'context' => ToolPolicyResolver::CONTEXT_CHAT,
 		) );
 	}
 }

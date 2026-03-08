@@ -34,7 +34,7 @@ class WorkspaceScopedToolsTest extends WP_UnitTestCase {
 		);
 
 		$tools = $this->resolver->resolve( [
-			'surface'              => ToolPolicyResolver::SURFACE_PIPELINE,
+			'context'              => ToolPolicyResolver::CONTEXT_PIPELINE,
 			'previous_step_config' => $previous_step,
 		] );
 
@@ -59,7 +59,7 @@ class WorkspaceScopedToolsTest extends WP_UnitTestCase {
 		);
 
 		$tools = $this->resolver->resolve( [
-			'surface'          => ToolPolicyResolver::SURFACE_PIPELINE,
+			'context'          => ToolPolicyResolver::CONTEXT_PIPELINE,
 			'next_step_config' => $next_step,
 		] );
 

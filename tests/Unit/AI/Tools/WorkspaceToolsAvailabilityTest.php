@@ -25,7 +25,7 @@ class WorkspaceToolsAvailabilityTest extends WP_UnitTestCase {
 	 */
 	public function test_chat_tools_include_workspace_global_read_tools(): void {
 		$tools = $this->resolver->resolve( [
-			'surface' => ToolPolicyResolver::SURFACE_CHAT,
+			'context' => ToolPolicyResolver::CONTEXT_CHAT,
 		] );
 
 		$this->assertIsArray( $tools );
@@ -69,7 +69,7 @@ class WorkspaceToolsAvailabilityTest extends WP_UnitTestCase {
 		$this->assertTrue( $updated );
 
 		$tools = $this->resolver->resolve( [
-			'surface'          => ToolPolicyResolver::SURFACE_PIPELINE,
+			'context'          => ToolPolicyResolver::CONTEXT_PIPELINE,
 			'pipeline_step_id' => $pipeline_step_id,
 		] );
 
