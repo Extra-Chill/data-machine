@@ -2,10 +2,13 @@
 /**
  * Duplicate Detection Abilities
  *
- * Universal primitives for event identity matching. Exposes fuzzy title
- * comparison, venue comparison, and combined duplicate-event search as
- * abilities that any part of the system can consume (CLI, REST, Chat,
- * import pipeline, MCP).
+ * Event-domain duplicate detection abilities. Venue comparison and the
+ * combined find-duplicate-event search remain event-specific. Title
+ * comparison delegates to the core SimilarityEngine.
+ *
+ * Also registers an event strategy on the `datamachine_duplicate_strategies`
+ * filter so the unified `datamachine/check-duplicate` ability can find
+ * event duplicates using venue + date + title matching.
  *
  * @package DataMachineEvents\Abilities
  * @since   0.15.0
@@ -13,6 +16,7 @@
 
 namespace DataMachineEvents\Abilities;
 
+use DataMachine\Core\Similarity\SimilarityEngine;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
 use DataMachineEvents\Core\Event_Post_Type;
 use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
@@ -28,13 +32,13 @@ class DuplicateDetectionAbilities {
 	public function __construct() {
 		if ( ! self::$registered ) {
 			$this->registerAbilities();
+			$this->registerStrategy();
 			self::$registered = true;
 		}
 	}
 
 	private function registerAbilities(): void {
 		$register_callback = function () {
-			$this->registerTitlesMatchAbility();
 			$this->registerVenuesMatchAbility();
 			$this->registerFindDuplicateEventAbility();
 		};
@@ -46,61 +50,81 @@ class DuplicateDetectionAbilities {
 		}
 	}
 
-	// -----------------------------------------------------------------------
-	// Ability: titles-match
-	// -----------------------------------------------------------------------
-
-	private function registerTitlesMatchAbility(): void {
-		wp_register_ability(
-			'data-machine-events/titles-match',
-			array(
-				'label'               => __( 'Titles Match', 'data-machine-events' ),
-				'description'         => __( 'Compare two event titles for semantic equivalence. Strips tour names, supporting acts, and normalizes for fuzzy comparison.', 'data-machine-events' ),
-				'category'            => 'datamachine',
-				'input_schema'        => array(
-					'type'       => 'object',
-					'required'   => array( 'title1', 'title2' ),
-					'properties' => array(
-						'title1' => array(
-							'type'        => 'string',
-							'description' => 'First event title',
-						),
-						'title2' => array(
-							'type'        => 'string',
-							'description' => 'Second event title',
-						),
-					),
-				),
-				'output_schema'       => array(
-					'type'       => 'object',
-					'properties' => array(
-						'match'      => array( 'type' => 'boolean' ),
-						'core1'      => array( 'type' => 'string' ),
-						'core2'      => array( 'type' => 'string' ),
-					),
-				),
-				'execute_callback'    => array( $this, 'executeTitlesMatch' ),
-				'permission_callback' => '__return_true',
-				'meta'                => array( 'show_in_rest' => true ),
-			)
-		);
+	/**
+	 * Register event duplicate strategy on the unified filter.
+	 *
+	 * When core's `datamachine/check-duplicate` ability runs for the
+	 * `event` post type, this strategy fires first (priority 10) and
+	 * uses venue + date + fuzzy title matching.
+	 */
+	private function registerStrategy(): void {
+		add_filter( 'datamachine_duplicate_strategies', array( $this, 'addEventStrategy' ) );
 	}
 
 	/**
-	 * Compare two event titles for semantic match.
+	 * Add event duplicate strategy to the strategy registry.
 	 *
-	 * @param array $input { title1: string, title2: string }
-	 * @return array { match: bool, core1: string, core2: string }
+	 * @param array $strategies Existing strategies.
+	 * @return array Strategies with event strategy appended.
 	 */
-	public function executeTitlesMatch( array $input ): array {
-		$title1 = $input['title1'] ?? '';
-		$title2 = $input['title2'] ?? '';
-
-		return array(
-			'match' => EventIdentifierGenerator::titlesMatch( $title1, $title2 ),
-			'core1' => EventIdentifierGenerator::extractCoreTitle( $title1 ),
-			'core2' => EventIdentifierGenerator::extractCoreTitle( $title2 ),
+	public function addEventStrategy( array $strategies ): array {
+		$strategies[] = array(
+			'id'        => 'event_venue_date_title',
+			'post_type' => Event_Post_Type::POST_TYPE,
+			'callback'  => array( $this, 'executeEventStrategy' ),
+			'priority'  => 10,
 		);
+		return $strategies;
+	}
+
+	/**
+	 * Event duplicate strategy callback.
+	 *
+	 * Called by core's `datamachine/check-duplicate` ability. Checks for
+	 * duplicate events using venue + date + fuzzy title matching.
+	 *
+	 * @param array $input { title: string, context: { venue?: string, startDate?: string } }
+	 * @return array Result with verdict key.
+	 */
+	public function executeEventStrategy( array $input ): array {
+		$title     = $input['title'] ?? '';
+		$context   = $input['context'] ?? array();
+		$venue     = $context['venue'] ?? '';
+		$startDate = $context['startDate'] ?? '';
+
+		if ( empty( $title ) || empty( $startDate ) ) {
+			return array( 'verdict' => 'clear' );
+		}
+
+		$result = $this->executeFindDuplicateEvent(
+			array(
+				'title'     => $title,
+				'venue'     => $venue,
+				'startDate' => $startDate,
+			)
+		);
+
+		if ( ! empty( $result['found'] ) ) {
+			return array(
+				'verdict'  => 'duplicate',
+				'source'   => 'event_' . ( $result['match_strategy'] ?? 'fuzzy' ),
+				'match'    => array(
+					'post_id' => $result['post_id'] ?? 0,
+					'title'   => $result['matched_title'] ?? '',
+					'venue'   => $result['matched_venue'] ?? '',
+				),
+				'reason'   => sprintf(
+					'Rejected: "%s" matches existing event "%s" (ID %d) via %s.',
+					$title,
+					$result['matched_title'] ?? '',
+					$result['post_id'] ?? 0,
+					$result['match_strategy'] ?? 'fuzzy'
+				),
+				'strategy' => 'event_venue_date_title',
+			);
+		}
+
+		return array( 'verdict' => 'clear' );
 	}
 
 	// -----------------------------------------------------------------------

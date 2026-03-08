@@ -6,11 +6,17 @@
  * Normalizes event data (title, venue, date) to create stable identifiers that
  * remain consistent across minor variations in source data.
  *
+ * Title normalization and fuzzy matching are delegated to the core
+ * SimilarityEngine (DataMachine\Core\Similarity\SimilarityEngine).
+ * Venue matching remains here — it's event-domain-specific.
+ *
  * @package DataMachineEvents\Utilities
  * @since   0.2.0
  */
 
 namespace DataMachineEvents\Utilities;
+
+use DataMachine\Core\Similarity\SimilarityEngine;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -36,147 +42,37 @@ class EventIdentifierGenerator {
 	 * @return string MD5 hash identifier
 	 */
 	public static function generate( string $title, string $startDate, string $venue ): string {
-		$normalized_title = self::normalize_text( $title );
-		$normalized_venue = self::normalize_text( $venue );
+		$normalized_title = SimilarityEngine::normalizeBasic( $title );
+		$normalized_venue = SimilarityEngine::normalizeBasic( $venue );
 
 		return md5( $normalized_title . $startDate . $normalized_venue );
 	}
 
 	/**
-	 * Normalize text for consistent identifier generation
-	 *
-	 * Applies transformations:
-	 * - Lowercase
-	 * - Trim whitespace
-	 * - Collapse multiple spaces to single space
-	 * - Remove common article prefixes ("the ", "a ", "an ")
-	 *
-	 * @param string $text Text to normalize
-	 * @return string Normalized text
-	 */
-	private static function normalize_text( string $text ): string {
-		// Normalize unicode dashes to ASCII hyphen
-		$text = self::normalize_dashes( $text );
-
-		// Lowercase
-		$text = strtolower( $text );
-
-		// Trim and collapse whitespace
-		$text = trim( preg_replace( '/\s+/', ' ', $text ) );
-
-		// Remove common article prefixes
-		$text = preg_replace( '/^(the|a|an)\s+/i', '', $text );
-
-		return $text;
-	}
-
-	/**
-	 * Normalize unicode dash characters to ASCII hyphen
-	 *
-	 * Scraped titles commonly use en dashes (–), em dashes (—), or other
-	 * unicode dash variants interchangeably with ASCII hyphens (-).
-	 * Normalizing prevents false dedup mismatches like:
-	 * "bbno$ - The Internet Explorer Tour" vs "bbno$ – The Internet Explorer Tour"
-	 *
-	 * @param string $text Input text
-	 * @return string Text with all dashes normalized to ASCII hyphen
-	 */
-	private static function normalize_dashes( string $text ): string {
-		$unicode_dashes = array(
-			"\u{2010}", // hyphen
-			"\u{2011}", // non-breaking hyphen
-			"\u{2012}", // figure dash
-			"\u{2013}", // en dash
-			"\u{2014}", // em dash
-			"\u{2015}", // horizontal bar
-			"\u{FE58}", // small em dash
-			"\u{FE63}", // small hyphen-minus
-			"\u{FF0D}", // fullwidth hyphen-minus
-		);
-
-		return str_replace( $unicode_dashes, '-', $text );
-	}
-
-	/**
 	 * Extract core identifying portion of event title
 	 *
-	 * Strips tour names, supporting acts, and normalizes for comparison.
-	 * Used for fuzzy matching across sources with different title formats.
-	 *
-	 * Examples:
-	 * - "Andy Frasco & the U.N. — Growing Pains Tour with Candi Jenkins" → "andy frasco u.n."
-	 * - "Andy Frasco & The U.N." → "andy frasco u.n."
-	 * - "Jazz Night: Holiday Special" → "jazz night"
+	 * Delegates to the unified SimilarityEngine which consolidates the
+	 * normalization logic from this class and core's DuplicateDetection.
 	 *
 	 * @param string $title Event title
 	 * @return string Core title for comparison
 	 */
 	public static function extractCoreTitle( string $title ): string {
-		$text = strtolower( self::normalize_dashes( $title ) );
+		return SimilarityEngine::normalizeTitle( $title );
+	}
 
-		// Split on common delimiters that typically separate main event from tour/opener info.
-		// Dashes are already normalized to ASCII hyphen by normalize_dashes(), so we match
-		// the ASCII equivalents here (not unicode originals).
-		// Note: standalone hyphen omitted to preserve band names like "Run-DMC".
-		$delimiters = array(
-			' - ',           // ASCII hyphen with spaces (normalized from em/en dash)
-			' : ',           // colon with spaces
-			': ',            // colon
-			' | ',           // pipe
-			'|',             // pipe
-			' featuring ',
-			' feat. ',
-			' feat ',
-			' ft. ',
-			' ft ',
-			' with ',
-			' w/ ',
-			' + ',
-		);
-
-		// Find the first delimiter occurrence to extract the headliner/core.
-		$best_pos       = PHP_INT_MAX;
-		$best_delimiter = null;
-
-		foreach ( $delimiters as $delimiter ) {
-			$pos = strpos( $text, $delimiter );
-			if ( false !== $pos && $pos > 0 && $pos < $best_pos ) {
-				$best_pos       = $pos;
-				$best_delimiter = $delimiter;
-			}
-		}
-
-		if ( null !== $best_delimiter ) {
-			$parts = explode( $best_delimiter, $text, 2 );
-			$text  = $parts[0];
-		}
-
-		// Comma-separated artist lists: treat first segment as the headliner.
-		// "Comfort Club, Valories, Barb" → "Comfort Club"
-		// Only split if the part before the first comma is substantial (>2 chars).
-		if ( strpos( $text, ',' ) !== false ) {
-			$comma_parts = explode( ',', $text, 2 );
-			$first       = trim( $comma_parts[0] );
-			if ( strlen( $first ) > 2 ) {
-				$text = $first;
-			}
-		}
-
-		// Remove articles at word boundaries
-		$text = preg_replace( '/\b(the|a|an)\b/i', '', $text );
-
-		// Remove non-alphanumeric characters (keep spaces)
-		$text = preg_replace( '/[^a-z0-9\s]/i', '', $text );
-
-		// Collapse whitespace and trim
-		$text = trim( preg_replace( '/\s+/', ' ', $text ) );
-
-		// If result is too short, return normalized original instead
-		if ( strlen( $text ) < 3 ) {
-			return self::normalize_text( $title );
-		}
-
-		return $text;
+	/**
+	 * Compare two event titles for semantic match
+	 *
+	 * Delegates to the unified SimilarityEngine which runs exact,
+	 * prefix, and Levenshtein strategies.
+	 *
+	 * @param string $title1 First event title
+	 * @param string $title2 Second event title
+	 * @return bool True if titles represent the same event
+	 */
+	public static function titlesMatch( string $title1, string $title2 ): bool {
+		return SimilarityEngine::titlesMatch( $title1, $title2 )->match;
 	}
 
 	/**
@@ -233,7 +129,7 @@ class EventIdentifierGenerator {
 		$text = html_entity_decode( $venue, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 
 		// Normalize unicode dashes to ASCII hyphen.
-		$text = self::normalize_dashes( $text );
+		$text = SimilarityEngine::normalizeDashes( $text );
 
 		// Lowercase.
 		$text = strtolower( $text );
@@ -272,7 +168,7 @@ class EventIdentifierGenerator {
 		$text = html_entity_decode( $venue, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 
 		// Normalize dashes so we can match consistently.
-		$text = self::normalize_dashes( $text );
+		$text = SimilarityEngine::normalizeDashes( $text );
 
 		// Strip parenthetical suffixes: "(Indoor)", "(NÜTRL Beach Stage)"
 		$text = preg_replace( '/\s*\(.*\)\s*$/', '', $text );
@@ -285,36 +181,5 @@ class EventIdentifierGenerator {
 		}
 
 		return trim( $text );
-	}
-
-	/**
-	 * Compare two event titles for semantic match
-	 *
-	 * Returns true if core titles match after extraction and normalization.
-	 * Used for cross-source duplicate detection where titles may vary.
-	 *
-	 * @param string $title1 First event title
-	 * @param string $title2 Second event title
-	 * @return bool True if titles represent the same event
-	 */
-	public static function titlesMatch( string $title1, string $title2 ): bool {
-		$core1 = self::extractCoreTitle( $title1 );
-		$core2 = self::extractCoreTitle( $title2 );
-
-		// Exact match.
-		if ( $core1 === $core2 ) {
-			return true;
-		}
-
-		// One core is a prefix of the other (covers venue name appended to title).
-		// "colombian jazz experience" vs "colombian jazz experience sahara"
-		$shorter = strlen( $core1 ) <= strlen( $core2 ) ? $core1 : $core2;
-		$longer  = strlen( $core1 ) <= strlen( $core2 ) ? $core2 : $core1;
-
-		if ( strlen( $shorter ) >= 5 && str_starts_with( $longer, $shorter ) ) {
-			return true;
-		}
-
-		return false;
 	}
 }

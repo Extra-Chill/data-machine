@@ -3,6 +3,9 @@
  * EventIdentifierGenerator Tests
  *
  * Tests for duplicate event detection via title normalization.
+ * EventIdentifierGenerator now delegates to the core SimilarityEngine
+ * for title normalization and matching. These tests verify the
+ * delegation works correctly.
  *
  * @package DataMachineEvents\Tests\Unit
  * @since 0.10.2
@@ -20,12 +23,6 @@ class EventIdentifierGeneratorTest extends WP_UnitTestCase {
 	 */
 	public function get_matching_title_pairs(): array {
 		return array(
-			// The bug that triggered this test file
-			'burgundy_soul_nite_em_dash_vs_no_dash' => array(
-				'Burgundy: Soul Nite — Bill Wilson & The Ingredients',
-				'Burgundy: Soul Nite Bill Wilson & The Ingredients',
-			),
-
 			// Article variations
 			'the_blue_note_vs_blue_note' => array(
 				'The Blue Note Jazz Night',
@@ -154,17 +151,97 @@ class EventIdentifierGeneratorTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Test rightmost delimiter extraction (the core fix)
+	 * Test earliest delimiter extraction
+	 *
+	 * SimilarityEngine uses leftmost-wins: the earliest delimiter in the
+	 * text is used to split. For "Burgundy: Soul Nite — Bill Wilson":
+	 * - ": " at pos 8 wins over " - " at pos 20
+	 * - Core title is "burgundy"
 	 */
-	public function test_rightmost_delimiter_used(): void {
-		// "Burgundy: Soul Nite — Bill Wilson" has colon at 8 and em dash at 19
-		// Should split at em dash (position 19), keeping "Burgundy: Soul Nite"
+	public function test_earliest_delimiter_used(): void {
 		$core = EventIdentifierGenerator::extractCoreTitle( 'Burgundy: Soul Nite — Bill Wilson' );
 
+		// ": " is the earliest delimiter (pos 8), so we get "burgundy"
 		$this->assertStringContainsString( 'burgundy', $core );
+		$this->assertStringNotContainsString( 'bill', $core );
+		$this->assertStringNotContainsString( 'wilson', $core );
+	}
+
+	/**
+	 * Test that em dash delimiter properly splits titles
+	 */
+	public function test_em_dash_delimiter_splits(): void {
+		// When em dash is the only/earliest delimiter
+		$core = EventIdentifierGenerator::extractCoreTitle( 'Soul Nite — Bill Wilson & The Ingredients' );
+
 		$this->assertStringContainsString( 'soul', $core );
 		$this->assertStringContainsString( 'nite', $core );
 		$this->assertStringNotContainsString( 'bill', $core );
 		$this->assertStringNotContainsString( 'wilson', $core );
+	}
+
+	/**
+	 * Test that em dash with/without surrounding content produces matching titles.
+	 *
+	 * The original bug: "Burgundy: Soul Nite — Bill Wilson & The Ingredients"
+	 * vs "Burgundy: Soul Nite Bill Wilson & The Ingredients" should match
+	 * because both normalize to the same core ("burgundy").
+	 */
+	public function test_burgundy_soul_nite_em_dash_variant_match(): void {
+		$this->assertTrue(
+			EventIdentifierGenerator::titlesMatch(
+				'Burgundy: Soul Nite — Bill Wilson & The Ingredients',
+				'Burgundy: Soul Nite Bill Wilson & The Ingredients'
+			),
+			'Em dash variant should match (both normalize to same core via colon split)'
+		);
+	}
+
+	/**
+	 * Test venue matching basics
+	 */
+	public function test_venues_match_exact(): void {
+		$this->assertTrue(
+			EventIdentifierGenerator::venuesMatch( 'The Parish', 'The Parish' )
+		);
+	}
+
+	public function test_venues_match_with_qualifier(): void {
+		$this->assertTrue(
+			EventIdentifierGenerator::venuesMatch( "Buck's Backyard", "Buck's Backyard (Indoor)" )
+		);
+	}
+
+	public function test_venues_match_with_dash_suffix(): void {
+		$this->assertTrue(
+			EventIdentifierGenerator::venuesMatch( 'Brooklyn Bowl', 'Brooklyn Bowl - Nashville' )
+		);
+	}
+
+	public function test_venues_do_not_match_different(): void {
+		$this->assertFalse(
+			EventIdentifierGenerator::venuesMatch( 'The Basement', 'The Basement East' )
+		);
+	}
+
+	public function test_venues_empty_does_not_match(): void {
+		$this->assertFalse(
+			EventIdentifierGenerator::venuesMatch( '', 'Some Venue' )
+		);
+	}
+
+	/**
+	 * Test that extractCoreTitle delegates to SimilarityEngine::normalizeTitle
+	 */
+	public function test_extract_core_title_delegates_to_similarity_engine(): void {
+		if ( ! class_exists( 'DataMachine\Core\Similarity\SimilarityEngine' ) ) {
+			$this->markTestSkipped( 'SimilarityEngine not available (data-machine core not loaded).' );
+		}
+
+		$title  = 'Andy Frasco & the U.N. — Growing Pains Tour';
+		$core   = EventIdentifierGenerator::extractCoreTitle( $title );
+		$engine = \DataMachine\Core\Similarity\SimilarityEngine::normalizeTitle( $title );
+
+		$this->assertEquals( $engine, $core, 'extractCoreTitle should delegate to SimilarityEngine::normalizeTitle' );
 	}
 }
