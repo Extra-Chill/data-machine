@@ -3,8 +3,8 @@
  * Tool Policy Resolver
  *
  * Single entry point for determining which tools are available for any
- * execution context. Replaces fragmented tool assembly across ToolExecutor,
- * ToolManager, and ChatOrchestrator with one deterministic resolution path.
+ * execution context. Reads from the unified `datamachine_tools` registry
+ * and filters by context (pipeline/chat/standalone/system).
  *
  * Resolution precedence (highest to lowest):
  * 1. Explicit deny list (always wins)
@@ -92,19 +92,36 @@ class ToolPolicyResolver {
 			self::SURFACE_CHAT       => $this->gatherChatTools( $context ),
 			self::SURFACE_STANDALONE => $this->gatherStandaloneTools( $context ),
 			self::SURFACE_SYSTEM     => $this->gatherSystemTools( $context ),
-			default                  => $this->gatherGlobalTools( $context ),
+			default                  => $this->gatherFallbackTools( $context ),
 		};
 	}
 
 	/**
-	 * Pipeline surface: global tools + handler tools from adjacent steps.
+	 * Filter resolved tools by context.
+	 *
+	 * @param array  $tools   Resolved tools array.
+	 * @param string $context Context string to filter by (e.g. 'chat', 'pipeline').
+	 * @return array Filtered tools.
+	 */
+	private function filterByContext( array $tools, string $context ): array {
+		return array_filter(
+			$tools,
+			function ( $tool ) use ( $context ) {
+				$contexts = $tool['contexts'] ?? array();
+				return in_array( $context, $contexts, true );
+			}
+		);
+	}
+
+	/**
+	 * Pipeline surface: context-filtered tools + handler tools from adjacent steps.
 	 */
 	private function gatherPipelineTools( array $context ): array {
-		$available_tools     = array();
-		$pipeline_step_id    = $context['pipeline_step_id'] ?? null;
-		$engine_data         = $context['engine_data'] ?? array();
+		$available_tools  = array();
+		$pipeline_step_id = $context['pipeline_step_id'] ?? null;
+		$engine_data      = $context['engine_data'] ?? array();
 
-		// Handler tools from adjacent steps.
+		// Handler tools from adjacent steps (dynamic, not part of the static registry).
 		foreach ( array( $context['previous_step_config'] ?? null, $context['next_step_config'] ?? null ) as $step_config ) {
 			if ( ! $step_config ) {
 				continue;
@@ -131,9 +148,11 @@ class ToolPolicyResolver {
 			}
 		}
 
-		// Global tools filtered for pipeline availability.
-		$global_tools = $this->tool_manager->get_global_tools();
-		foreach ( $global_tools as $tool_name => $tool_config ) {
+		// Static registry tools filtered for 'pipeline' context.
+		$all_tools      = $this->tool_manager->get_all_tools();
+		$pipeline_tools = $this->filterByContext( $all_tools, 'pipeline' );
+
+		foreach ( $pipeline_tools as $tool_name => $tool_config ) {
 			if ( is_array( $tool_config ) && $this->tool_manager->is_tool_available( $tool_name, $pipeline_step_id ) ) {
 				$available_tools[ $tool_name ] = $tool_config;
 			}
@@ -143,49 +162,53 @@ class ToolPolicyResolver {
 	}
 
 	/**
-	 * Chat surface: global tools + chat-specific tools.
+	 * Chat surface: all tools with 'chat' context.
 	 *
-	 * Global tools go through is_tool_available() for enablement/config checks.
-	 * Chat-specific tools are included if they have a valid definition — they
-	 * register via datamachine_chat_tools and are outside the global enablement
-	 * system (is_tool_available() only knows about global tools).
+	 * Tools with configuration requirements go through is_tool_available().
+	 * Chat-only tools (those without requires_config) are included if they
+	 * resolve to a valid definition.
 	 */
 	private function gatherChatTools( array $context ): array {
 		$available_tools = array();
 
-		// Global tools filtered for chat availability.
-		$global_tools = $this->tool_manager->get_global_tools();
-		foreach ( $global_tools as $tool_name => $tool_config ) {
-			if ( $this->tool_manager->is_tool_available( $tool_name, null ) ) {
-				$available_tools[ $tool_name ] = $tool_config;
-			}
-		}
-
-		// Chat-specific tools — included if they resolve to a valid definition.
-		// These are outside the global enablement system (they have their own
-		// registration path via datamachine_chat_tools filter).
-		$raw_chat_tools = apply_filters( 'datamachine_chat_tools', array() );
-		$chat_tools     = $this->tool_manager->resolveAllTools( $raw_chat_tools );
+		$all_tools  = $this->tool_manager->get_all_tools();
+		$chat_tools = $this->filterByContext( $all_tools, 'chat' );
 
 		foreach ( $chat_tools as $tool_name => $tool_config ) {
-			if ( is_array( $tool_config ) && ! empty( $tool_config ) ) {
-				$available_tools[ $tool_name ] = $tool_config;
+			if ( ! is_array( $tool_config ) || empty( $tool_config ) ) {
+				continue;
 			}
+
+			// Tools with requires_config go through availability checks.
+			// Tools without it (chat-only management tools) are always available.
+			if ( ! empty( $tool_config['requires_config'] ) ) {
+				if ( ! $this->tool_manager->is_tool_available( $tool_name, null ) ) {
+					continue;
+				}
+			} elseif ( ! $this->tool_manager->is_globally_enabled( $tool_name ) ) {
+				// Check global enablement for tools that can be disabled.
+				// For tools not in the disabled list, is_globally_enabled returns true.
+				continue;
+			}
+
+			$available_tools[ $tool_name ] = $tool_config;
 		}
 
 		return $available_tools;
 	}
 
 	/**
-	 * Standalone surface: global tools only (no handler or chat tools).
+	 * Standalone surface: tools with 'standalone' context.
 	 *
 	 * For standalone jobs that need AI tool access without pipeline context.
 	 */
 	private function gatherStandaloneTools( array $context ): array {
 		$available_tools = array();
 
-		$global_tools = $this->tool_manager->get_global_tools();
-		foreach ( $global_tools as $tool_name => $tool_config ) {
+		$all_tools        = $this->tool_manager->get_all_tools();
+		$standalone_tools = $this->filterByContext( $all_tools, 'standalone' );
+
+		foreach ( $standalone_tools as $tool_name => $tool_config ) {
 			if ( is_array( $tool_config ) && $this->tool_manager->is_tool_available( $tool_name, null ) ) {
 				$available_tools[ $tool_name ] = $tool_config;
 			}
@@ -195,7 +218,7 @@ class ToolPolicyResolver {
 	}
 
 	/**
-	 * System surface: minimal toolset for system tasks.
+	 * System surface: tools with 'system' context.
 	 *
 	 * Only includes tools that system tasks explicitly need.
 	 * Today most system tasks call abilities directly, but this provides
@@ -204,21 +227,11 @@ class ToolPolicyResolver {
 	private function gatherSystemTools( array $context ): array {
 		$available_tools = array();
 
-		// System tasks get global tools that are explicitly marked as system-compatible,
-		// or all global tools if no system-specific filtering exists.
-		$global_tools = $this->tool_manager->get_global_tools();
-		foreach ( $global_tools as $tool_name => $tool_config ) {
-			if ( is_array( $tool_config ) && $this->tool_manager->is_tool_available( $tool_name, null ) ) {
-				$available_tools[ $tool_name ] = $tool_config;
-			}
-		}
-
-		// System-specific tools (if any register via this filter).
-		$raw_system_tools = apply_filters( 'datamachine_system_tools', array() );
-		$system_tools     = $this->tool_manager->resolveAllTools( $raw_system_tools );
+		$all_tools    = $this->tool_manager->get_all_tools();
+		$system_tools = $this->filterByContext( $all_tools, 'system' );
 
 		foreach ( $system_tools as $tool_name => $tool_config ) {
-			if ( is_array( $tool_config ) && ! empty( $tool_config ) ) {
+			if ( is_array( $tool_config ) && $this->tool_manager->is_tool_available( $tool_name, null ) ) {
 				$available_tools[ $tool_name ] = $tool_config;
 			}
 		}
@@ -227,9 +240,9 @@ class ToolPolicyResolver {
 	}
 
 	/**
-	 * Fallback: global tools only.
+	 * Fallback: standalone tools for unknown surfaces.
 	 */
-	private function gatherGlobalTools( array $context ): array {
+	private function gatherFallbackTools( array $context ): array {
 		return $this->gatherStandaloneTools( $context );
 	}
 

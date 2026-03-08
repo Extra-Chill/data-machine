@@ -23,7 +23,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class AuthenticateHandler extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'authenticate_handler', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'authenticate_handler', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	/**

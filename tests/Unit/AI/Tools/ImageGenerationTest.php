@@ -117,8 +117,8 @@ class ImageGenerationTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'not configured', $result['error'] );
 	}
 
-	public function test_tool_registers_as_global_tool(): void {
-		$tools = apply_filters( 'datamachine_global_tools', [] );
+	public function test_tool_registers_in_unified_registry(): void {
+		$tools = apply_filters( 'datamachine_tools', [] );
 		$this->assertArrayHasKey( 'image_generation', $tools );
 	}
 

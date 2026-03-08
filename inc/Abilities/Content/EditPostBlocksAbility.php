@@ -99,9 +99,12 @@ class EditPostBlocksAbility {
 
 	private function registerChatTool(): void {
 		add_filter(
-			'datamachine_chat_tools',
+			'datamachine_tools',
 			function ( $tools ) {
-				$tools['edit_post_blocks'] = array( self::class, 'getChatTool' );
+				$tools['edit_post_blocks'] = array(
+					'_callable' => array( self::class, 'getChatTool' ),
+					'contexts'  => array( 'chat' ),
+				);
 				return $tools;
 			}
 		);

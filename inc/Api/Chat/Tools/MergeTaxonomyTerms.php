@@ -20,7 +20,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class MergeTaxonomyTerms extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'merge_taxonomy_terms', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'merge_taxonomy_terms', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	public function getToolDefinition(): array {

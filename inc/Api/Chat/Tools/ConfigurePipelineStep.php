@@ -20,7 +20,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class ConfigurePipelineStep extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'configure_pipeline_step', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'configure_pipeline_step', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	/**

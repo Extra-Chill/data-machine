@@ -21,7 +21,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class CopyFlow extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'copy_flow', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'copy_flow', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	/**

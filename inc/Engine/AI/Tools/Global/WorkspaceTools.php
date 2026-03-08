@@ -53,11 +53,12 @@ class WorkspaceTools extends BaseTool {
 	 * Constructor — register all workspace read tools as global tools.
 	 */
 	public function __construct() {
-		$this->registerGlobalTool( 'workspace_path', array( $this, 'getPathDefinition' ) );
-		$this->registerGlobalTool( 'workspace_list', array( $this, 'getListDefinition' ) );
-		$this->registerGlobalTool( 'workspace_show', array( $this, 'getShowDefinition' ) );
-		$this->registerGlobalTool( 'workspace_ls', array( $this, 'getLsDefinition' ) );
-		$this->registerGlobalTool( 'workspace_read', array( $this, 'getReadDefinition' ) );
+		$contexts = array( 'chat', 'pipeline', 'standalone' );
+		$this->registerTool( 'workspace_path', array( $this, 'getPathDefinition' ), $contexts );
+		$this->registerTool( 'workspace_list', array( $this, 'getListDefinition' ), $contexts );
+		$this->registerTool( 'workspace_show', array( $this, 'getShowDefinition' ), $contexts );
+		$this->registerTool( 'workspace_ls', array( $this, 'getLsDefinition' ), $contexts );
+		$this->registerTool( 'workspace_read', array( $this, 'getReadDefinition' ), $contexts );
 	}
 
 	/**

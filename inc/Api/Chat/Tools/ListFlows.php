@@ -17,7 +17,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class ListFlows extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'list_flows', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'list_flows', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	public function getToolDefinition(): array {

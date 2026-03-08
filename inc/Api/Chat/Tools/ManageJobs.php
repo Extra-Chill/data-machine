@@ -19,7 +19,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class ManageJobs extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'manage_jobs', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'manage_jobs', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	/**

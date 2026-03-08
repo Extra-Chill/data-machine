@@ -19,7 +19,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class DeletePipelineStep extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'delete_pipeline_step', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'delete_pipeline_step', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	/**

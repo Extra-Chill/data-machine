@@ -188,9 +188,12 @@ class PostQueryAbilities {
 
 	private function registerChatTool(): void {
 		add_filter(
-			'datamachine_chat_tools',
+			'datamachine_tools',
 			function ( $tools ) {
-				$tools['query_posts'] = array( $this, 'getQueryPostsTool' );
+				$tools['query_posts'] = array(
+					'_callable' => array( $this, 'getQueryPostsTool' ),
+					'contexts'  => array( 'chat' ),
+				);
 				return $tools;
 			}
 		);

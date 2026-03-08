@@ -20,7 +20,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class ManageLogs extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'manage_logs', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'manage_logs', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	/**

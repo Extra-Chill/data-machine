@@ -2,9 +2,9 @@
 /**
  * Tool Service Provider.
  *
- * Centralizes registration of all global and chat tools.
- * Global tools are registered first, then chat tools (which depend
- * on step types and handlers already being registered).
+ * Centralizes registration of all tools via the unified `datamachine_tools` filter.
+ * Each tool declares a `contexts` array specifying where it's available
+ * (e.g. 'chat', 'pipeline', 'standalone').
  *
  * @package DataMachine\Engine\AI\Tools
  * @since   0.27.0
@@ -14,7 +14,7 @@ namespace DataMachine\Engine\AI\Tools;
 
 defined( 'ABSPATH' ) || exit;
 
-// Global tools.
+// Tools available in chat, pipeline, and standalone contexts.
 use DataMachine\Engine\AI\Tools\Global\AgentDailyMemory;
 use DataMachine\Engine\AI\Tools\Global\AgentMemory;
 use DataMachine\Engine\AI\Tools\Global\AmazonAffiliateLink;
@@ -31,7 +31,7 @@ use DataMachine\Engine\AI\Tools\Global\WebFetch;
 use DataMachine\Engine\AI\Tools\Global\WorkspaceTools;
 use DataMachine\Engine\AI\Tools\Global\WordPressPostReader;
 
-// Chat tools.
+// Chat-only tools.
 use DataMachine\Api\Chat\Tools\AddPipelineStep;
 use DataMachine\Api\Chat\Tools\ApiQuery;
 use DataMachine\Api\Chat\Tools\AssignTaxonomyTerm;
@@ -64,27 +64,26 @@ use DataMachine\Api\Chat\Tools\UpdateFlow;
 use DataMachine\Api\Chat\Tools\UpdateTaxonomyTerm;
 
 /**
- * Registers all global and chat tools.
+ * Registers all tools via the unified datamachine_tools filter.
  */
 class ToolServiceProvider {
 
 	/**
 	 * Register all tools.
 	 *
-	 * Global tools are registered first because chat tools may depend
-	 * on handlers and step types that global tools provide.
+	 * Tools with contexts ['chat', 'pipeline', 'standalone'] are registered
+	 * first because chat-only tools may depend on handlers and step types
+	 * that they provide.
 	 */
 	public static function register(): void {
-		self::registerGlobalTools();
-		self::registerChatTools();
+		self::registerTools();
 	}
 
 	/**
-	 * Register global tools.
-	 *
-	 * These tools are available to all agent types (pipeline, system, chat).
+	 * Register all tools with their context declarations.
 	 */
-	private static function registerGlobalTools(): void {
+	private static function registerTools(): void {
+		// Tools available in chat, pipeline, and standalone contexts.
 		new AgentDailyMemory();
 		new AgentMemory();
 		new AmazonAffiliateLink();
@@ -100,15 +99,8 @@ class ToolServiceProvider {
 		new WebFetch();
 		new WorkspaceTools();
 		new WordPressPostReader();
-	}
 
-	/**
-	 * Register chat tools.
-	 *
-	 * These tools are only available to the chat agent and depend on
-	 * step types and handlers being already registered.
-	 */
-	private static function registerChatTools(): void {
+		// Chat-only tools.
 		new ApiQuery();
 		new CreatePipeline();
 		new AddPipelineStep();
