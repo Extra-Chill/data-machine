@@ -7,6 +7,7 @@
 
 namespace DataMachine\Tests\Unit\AI\Tools;
 
+use DataMachine\Core\Similarity\SimilarityEngine;
 use DataMachine\Engine\AI\Tools\Global\QueueValidator;
 use WP_UnitTestCase;
 
@@ -111,7 +112,7 @@ class QueueValidatorTest extends WP_UnitTestCase {
 	 * Test tokenize strips stop words and short words.
 	 */
 	public function test_tokenize_strips_stop_words(): void {
-		$tokens = $this->validator->tokenize( 'The Spiritual Meaning of a Blue Jay' );
+		$tokens = SimilarityEngine::tokenize( 'The Spiritual Meaning of a Blue Jay' );
 
 		$this->assertContains( 'spiritual', $tokens );
 		$this->assertContains( 'meaning', $tokens );
@@ -126,7 +127,7 @@ class QueueValidatorTest extends WP_UnitTestCase {
 	 * Test tokenize returns unique words.
 	 */
 	public function test_tokenize_returns_unique_words(): void {
-		$tokens = $this->validator->tokenize( 'blue blue blue jay jay' );
+		$tokens = SimilarityEngine::tokenize( 'blue blue blue jay jay' );
 
 		$this->assertCount( 2, $tokens );
 		$this->assertContains( 'blue', $tokens );
@@ -137,7 +138,7 @@ class QueueValidatorTest extends WP_UnitTestCase {
 	 * Test jaccard similarity with identical sets.
 	 */
 	public function test_jaccard_identical_sets(): void {
-		$score = $this->validator->jaccard( array( 'blue', 'jay' ), array( 'blue', 'jay' ) );
+		$score = SimilarityEngine::jaccard( array( 'blue', 'jay' ), array( 'blue', 'jay' ) );
 		$this->assertSame( 1.0, $score );
 	}
 
@@ -145,7 +146,7 @@ class QueueValidatorTest extends WP_UnitTestCase {
 	 * Test jaccard similarity with no overlap.
 	 */
 	public function test_jaccard_no_overlap(): void {
-		$score = $this->validator->jaccard( array( 'blue', 'jay' ), array( 'red', 'cardinal' ) );
+		$score = SimilarityEngine::jaccard( array( 'blue', 'jay' ), array( 'red', 'cardinal' ) );
 		$this->assertSame( 0.0, $score );
 	}
 
@@ -153,7 +154,7 @@ class QueueValidatorTest extends WP_UnitTestCase {
 	 * Test jaccard similarity with partial overlap.
 	 */
 	public function test_jaccard_partial_overlap(): void {
-		$score = $this->validator->jaccard( array( 'blue', 'jay', 'meaning' ), array( 'blue', 'jay', 'symbolism' ) );
+		$score = SimilarityEngine::jaccard( array( 'blue', 'jay', 'meaning' ), array( 'blue', 'jay', 'symbolism' ) );
 		$this->assertSame( 0.5, $score ); // 2 intersect / 4 union.
 	}
 
@@ -161,9 +162,9 @@ class QueueValidatorTest extends WP_UnitTestCase {
 	 * Test jaccard with empty sets returns 0.
 	 */
 	public function test_jaccard_empty_sets(): void {
-		$this->assertSame( 0.0, $this->validator->jaccard( array(), array( 'word' ) ) );
-		$this->assertSame( 0.0, $this->validator->jaccard( array( 'word' ), array() ) );
-		$this->assertSame( 0.0, $this->validator->jaccard( array(), array() ) );
+		$this->assertSame( 0.0, SimilarityEngine::jaccard( array(), array( 'word' ) ) );
+		$this->assertSame( 0.0, SimilarityEngine::jaccard( array( 'word' ), array() ) );
+		$this->assertSame( 0.0, SimilarityEngine::jaccard( array(), array() ) );
 	}
 
 	/**
