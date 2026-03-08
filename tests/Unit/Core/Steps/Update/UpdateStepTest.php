@@ -94,11 +94,19 @@ class UpdateStepTest extends WP_UnitTestCase {
 		);
 
 		$this->assertNotEmpty( $result );
-		$last = $result[ array_key_last( $result ) ];
 
-		$this->assertSame( 'update', $last['type'] ?? '' );
-		$this->assertSame( 'publish_post', $last['metadata']['handler'] ?? '' );
-		$this->assertTrue( (bool) ( $last['metadata']['success'] ?? false ) );
-		$this->assertArrayNotHasKey( 'failure_reason', $last['metadata'] ?? array() );
+		// Find the update packet — it's added alongside the original tool_result.
+		$update_packet = null;
+		foreach ( $result as $packet ) {
+			if ( ( $packet['type'] ?? '' ) === 'update' ) {
+				$update_packet = $packet;
+				break;
+			}
+		}
+
+		$this->assertNotNull( $update_packet, 'Expected an update packet in results' );
+		$this->assertSame( 'publish_post', $update_packet['metadata']['handler'] ?? '' );
+		$this->assertTrue( (bool) ( $update_packet['metadata']['success'] ?? false ) );
+		$this->assertArrayNotHasKey( 'failure_reason', $update_packet['metadata'] ?? array() );
 	}
 }
