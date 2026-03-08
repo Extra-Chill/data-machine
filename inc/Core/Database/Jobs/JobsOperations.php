@@ -18,14 +18,12 @@ class JobsOperations extends BaseRepository {
 	/**
 	 * Create a new job record.
 	 *
-	 * Supports two execution modes:
+	 * Supports three execution modes:
 	 * - Direct execution: pipeline_id='direct', flow_id='direct' (chat/API workflows without saved pipeline/flow)
 	 * - Database flow: pipeline_id and flow_id are numeric strings (saved pipelines and flows)
+	 * - Standalone: pipeline_id=null, flow_id=null (jobs without pipeline/flow context)
 	 *
-	 * Validation is strict: null values are rejected. Callers must explicitly pass 'direct'
-	 * for ephemeral workflows or valid numeric IDs for database flows.
-	 *
-	 * @param array $job_data Job data with pipeline_id and flow_id
+	 * @param array $job_data Job data with optional pipeline_id and flow_id
 	 * @return int|false Job ID on success, false on failure
 	 */
 	public function create_job( array $job_data ): int|false {
@@ -39,11 +37,14 @@ class JobsOperations extends BaseRepository {
 		// Database flow: both must be valid numeric IDs > 0
 		$is_database_flow = ( is_numeric( $pipeline_id ) && (int) $pipeline_id > 0 && is_numeric( $flow_id ) && (int) $flow_id > 0 );
 
-		if ( ! $is_direct_execution && ! $is_database_flow ) {
+		// Standalone: both are null (no pipeline/flow context)
+		$is_standalone = ( null === $pipeline_id && null === $flow_id );
+
+		if ( ! $is_direct_execution && ! $is_database_flow && ! $is_standalone ) {
 			do_action(
 				'datamachine_log',
 				'error',
-				'Invalid job data: must provide both IDs as "direct" or both as valid numeric IDs',
+				'Invalid job data: must provide both IDs as "direct", both as valid numeric IDs, or both as null',
 				array(
 					'pipeline_id' => $pipeline_id,
 					'flow_id'     => $flow_id,
@@ -52,12 +53,16 @@ class JobsOperations extends BaseRepository {
 			return false;
 		}
 
-		// Normalize to string for database storage
-		$pipeline_id = $is_direct_execution ? 'direct' : (string) absint( $pipeline_id );
-		$flow_id     = $is_direct_execution ? 'direct' : (string) absint( $flow_id );
+		// Normalize to string for database storage (null stays null for standalone)
+		if ( $is_database_flow ) {
+			$pipeline_id = (string) absint( $pipeline_id );
+			$flow_id     = (string) absint( $flow_id );
+		}
+		// Direct and standalone keep their values ('direct' or null)
 
 		// Sanitize source — accept any string, don't gatekeep values.
-		$source = sanitize_key( $job_data['source'] ?? ( $is_direct_execution ? 'direct' : 'pipeline' ) );
+		$default_source = $is_standalone ? 'standalone' : ( $is_direct_execution ? 'direct' : 'pipeline' );
+		$source         = sanitize_key( $job_data['source'] ?? $default_source );
 
 		$label = isset( $job_data['label'] ) ? sanitize_text_field( $job_data['label'] ) : null;
 
@@ -65,15 +70,21 @@ class JobsOperations extends BaseRepository {
 		$user_id       = isset( $job_data['user_id'] ) ? absint( $job_data['user_id'] ) : 0;
 
 		$data = array(
-			'pipeline_id' => $pipeline_id,
-			'flow_id'     => $flow_id,
 			'user_id'     => $user_id,
 			'source'      => $source,
 			'label'       => $label,
 			'status'      => 'pending',
 		);
 
-		$format = array( '%s', '%s', '%d', '%s', '%s', '%s' );
+		$format = array( '%d', '%s', '%s', '%s' );
+
+		// Only include pipeline_id/flow_id when they have values (NULL omission lets DB default apply).
+		if ( ! $is_standalone ) {
+			$data['pipeline_id'] = $pipeline_id;
+			$data['flow_id']     = $flow_id;
+			$format[]            = '%s';
+			$format[]            = '%s';
+		}
 
 		if ( $parent_job_id > 0 ) {
 			$data['parent_job_id'] = $parent_job_id;

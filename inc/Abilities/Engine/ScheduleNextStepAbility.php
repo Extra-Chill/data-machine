@@ -115,28 +115,33 @@ class ScheduleNextStepAbility {
 			$engine           = new EngineData( $engine_snapshot, $job_id );
 			$flow_step_config = $engine->getFlowStepConfig( $flow_step_id );
 
-			$flow_id = (int) ( $flow_step_config['flow_id'] ?? ( $engine->getJobContext()['flow_id'] ?? 0 ) );
+			$raw_flow_id = $flow_step_config['flow_id'] ?? ( $engine->getJobContext()['flow_id'] ?? null );
 
-			if ( $flow_id <= 0 ) {
-				do_action(
-					'datamachine_log',
-					'error',
-					'Flow ID missing during data storage',
-					array(
-						'job_id'       => $job_id,
-						'flow_step_id' => $flow_step_id,
-					)
-				);
-				return array(
-					'success' => false,
-					'error'   => 'Flow ID missing during data storage.',
-				);
+			// Standalone jobs (null flow_id) skip file-based data storage.
+			if ( null !== $raw_flow_id && 'direct' !== $raw_flow_id ) {
+				$flow_id = (int) $raw_flow_id;
+
+				if ( $flow_id <= 0 ) {
+					do_action(
+						'datamachine_log',
+						'error',
+						'Flow ID missing during data storage',
+						array(
+							'job_id'       => $job_id,
+							'flow_step_id' => $flow_step_id,
+						)
+					);
+					return array(
+						'success' => false,
+						'error'   => 'Flow ID missing during data storage.',
+					);
+				}
+
+				$context = datamachine_get_file_context( $flow_id );
+
+				$storage = new FileStorage();
+				$storage->store_data_packet( $dataPackets, $job_id, $context );
 			}
-
-			$context = datamachine_get_file_context( $flow_id );
-
-			$storage = new FileStorage();
-			$storage->store_data_packet( $dataPackets, $job_id, $context );
 		}
 
 		// Action Scheduler only receives IDs.

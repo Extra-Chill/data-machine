@@ -122,14 +122,16 @@ class Jobs {
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
-		// pipeline_id and flow_id are VARCHAR to support 'direct' execution mode
-		// where these values store the string 'direct' instead of numeric IDs
+		// pipeline_id and flow_id are VARCHAR to support multiple execution modes:
+		// - Numeric string: database flow execution (e.g. '123')
+		// - 'direct': ephemeral workflow execution
+		// - NULL: standalone job execution (no pipeline/flow)
 		// status is VARCHAR(255) to support compound statuses with reasons
 		$sql = "CREATE TABLE $table_name (
             job_id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
             user_id bigint(20) unsigned NOT NULL DEFAULT 0,
-            pipeline_id varchar(20) NOT NULL,
-            flow_id varchar(20) NOT NULL,
+            pipeline_id varchar(20) NULL DEFAULT NULL,
+            flow_id varchar(20) NULL DEFAULT NULL,
             source varchar(50) NOT NULL DEFAULT 'pipeline',
             label varchar(255) NULL DEFAULT NULL,
             parent_job_id bigint(20) unsigned NULL DEFAULT NULL,
@@ -178,7 +180,7 @@ class Jobs {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$columns = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH 
+				"SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE
                  FROM information_schema.COLUMNS 
                  WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s 
                  AND COLUMN_NAME IN ('status', 'pipeline_id', 'flow_id', 'source', 'parent_job_id', 'user_id')",
@@ -209,36 +211,51 @@ class Jobs {
 			);
 		}
 
-		// Migrate pipeline_id column: bigint -> varchar(20) for 'direct' execution
+		// Migrate pipeline_id column: bigint -> varchar(20) NULL for standalone job support
 		if ( isset( $columns['pipeline_id'] ) && 'bigint' === $columns['pipeline_id']->DATA_TYPE ) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-			$wpdb->query( "ALTER TABLE {$table_name} MODIFY pipeline_id varchar(20) NOT NULL" );
+			$wpdb->query( "ALTER TABLE {$table_name} MODIFY pipeline_id varchar(20) NULL DEFAULT NULL" );
 			// phpcs:enable WordPress.DB.PreparedSQL
 			do_action(
 				'datamachine_log',
 				'info',
-				'Migrated jobs.pipeline_id column to varchar(20) for direct execution support',
+				'Migrated jobs.pipeline_id column to varchar(20) NULL',
 				array(
 					'table_name' => $table_name,
 				)
 			);
 		}
 
-		// Migrate flow_id column: bigint -> varchar(20) for 'direct' execution
+		// Migrate flow_id column: bigint -> varchar(20) NULL for standalone job support
 		if ( isset( $columns['flow_id'] ) && 'bigint' === $columns['flow_id']->DATA_TYPE ) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-			$wpdb->query( "ALTER TABLE {$table_name} MODIFY flow_id varchar(20) NOT NULL" );
+			$wpdb->query( "ALTER TABLE {$table_name} MODIFY flow_id varchar(20) NULL DEFAULT NULL" );
 			// phpcs:enable WordPress.DB.PreparedSQL
 			do_action(
 				'datamachine_log',
 				'info',
-				'Migrated jobs.flow_id column to varchar(20) for direct execution support',
+				'Migrated jobs.flow_id column to varchar(20) NULL',
 				array(
 					'table_name' => $table_name,
 				)
 			);
+		}
+
+		// Migrate pipeline_id/flow_id from NOT NULL to NULL for standalone job support.
+		// Runs on existing varchar(20) installs that haven't been updated yet.
+		if ( isset( $columns['pipeline_id'] ) && 'varchar' === $columns['pipeline_id']->DATA_TYPE && 'NO' === $columns['pipeline_id']->IS_NULLABLE ) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+			$wpdb->query( "ALTER TABLE {$table_name} MODIFY pipeline_id varchar(20) NULL DEFAULT NULL" );
+			// phpcs:enable WordPress.DB.PreparedSQL
+		}
+		if ( isset( $columns['flow_id'] ) && 'varchar' === $columns['flow_id']->DATA_TYPE && 'NO' === $columns['flow_id']->IS_NULLABLE ) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+			$wpdb->query( "ALTER TABLE {$table_name} MODIFY flow_id varchar(20) NULL DEFAULT NULL" );
+			// phpcs:enable WordPress.DB.PreparedSQL
 		}
 
 		// Add source and label columns for pipeline decoupling.
