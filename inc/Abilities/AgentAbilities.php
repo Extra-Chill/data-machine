@@ -238,7 +238,7 @@ class AgentAbilities {
 	 * @param array $input Input parameters (unused).
 	 * @return array Result.
 	 */
-	public static function listAgents( array $input ): array {
+	public static function listAgents( array $input ): array { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- Required by WP_Ability interface.
 		$agents_repo = new Agents();
 		$rows        = $agents_repo->get_all();
 

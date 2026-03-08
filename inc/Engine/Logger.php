@@ -259,7 +259,7 @@ function datamachine_cleanup_log_files( int $max_size_mb = 50, int $max_age_days
 		$age_exceeds  = ( time() - filemtime( $log_file ) ) / DAY_IN_SECONDS > $max_age_days;
 
 		if ( $size_exceeds || $age_exceeds ) {
-			$reason = $size_exceeds ? 'size' : 'age';
+			$reason  = $size_exceeds ? 'size' : 'age';
 			$size_mb = round( $file_size / 1024 / 1024, 2 );
 			datamachine_log_info( "Log cleanup triggered for {$agent_type}: {$reason} limit exceeded ({$size_mb} MB)" );
 			if ( datamachine_clear_log_file( $agent_type ) ) {
