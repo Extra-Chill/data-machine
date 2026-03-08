@@ -51,7 +51,6 @@ class LogAbilitiesTest extends \WP_UnitTestCase {
 			'level' => 'debug',
 			'message' => 'Test log entry',
 			'context' => [
-				'agent_type' => 'system',
 				'test' => true
 			]
 		]);
@@ -95,7 +94,7 @@ class LogAbilitiesTest extends \WP_UnitTestCase {
 		$this->assertInstanceOf( \WP_Error::class, $result );
 	}
 
-	public function testWrite_toLog_withContext_includesAgentType(): void {
+	public function testWrite_toLog_withContext_storesContext(): void {
 		if (!class_exists('WP_Ability')) {
 			$this->markTestSkipped('WP_Ability class not available');
 			return;
@@ -106,7 +105,6 @@ class LogAbilitiesTest extends \WP_UnitTestCase {
 			'level' => 'info',
 			'message' => 'Test log entry',
 			'context' => [
-				'agent_type' => 'pipeline',
 				'flow_id' => 123
 			]
 		]);
@@ -114,7 +112,7 @@ class LogAbilitiesTest extends \WP_UnitTestCase {
 		$this->assertTrue($result['success']);
 	}
 
-	public function testWrite_toLog_withoutContext_usesDefaultAgentType(): void {
+	public function testWrite_toLog_withoutContext_succeeds(): void {
 		if (!class_exists('WP_Ability')) {
 			$this->markTestSkipped('WP_Ability class not available');
 			return;
@@ -136,11 +134,10 @@ class LogAbilitiesTest extends \WP_UnitTestCase {
 		}
 
 		$ability = wp_get_ability('datamachine/clear-logs');
-		$result = $ability->execute(['agent_type' => 'pipeline']);
+		$result = $ability->execute([]);
 
 		$this->assertTrue($result['success']);
-		$this->assertArrayHasKey('files_cleared', $result);
-		$this->assertEquals(['pipeline'], $result['files_cleared']);
+		$this->assertArrayHasKey('deleted', $result);
 	}
 
 	public function testClearLogs_withAll_clearsAllAgentTypes(): void {
@@ -150,10 +147,10 @@ class LogAbilitiesTest extends \WP_UnitTestCase {
 		}
 
 		$ability = wp_get_ability('datamachine/clear-logs');
-		$result = $ability->execute(['agent_type' => 'all']);
+		$result = $ability->execute([]);
 
 		$this->assertTrue($result['success']);
-		$this->assertEquals(['all'], $result['files_cleared']);
+		$this->assertEquals('Logs cleared successfully', $result['message']);
 	}
 
 	public function testClearLogs_withoutPermissions_returnsPermissionDenied(): void {
@@ -166,7 +163,7 @@ class LogAbilitiesTest extends \WP_UnitTestCase {
 		add_filter( 'datamachine_cli_bypass_permissions', '__return_false' );
 
 		$ability = wp_get_ability('datamachine/clear-logs');
-		$result = $ability->execute(['agent_type' => 'pipeline']);
+		$result = $ability->execute([]);
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertEquals( 'ability_invalid_permissions', $result->get_error_code() );

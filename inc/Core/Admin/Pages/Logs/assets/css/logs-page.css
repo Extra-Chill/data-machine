@@ -1,12 +1,12 @@
 /**
  * Logs Admin Page Styles
  *
- * Styling for the React-based logs interface with tabbed agent type views.
+ * Styling for the database-backed log viewer with filters and data table.
  */
 
 /* App Container */
 .datamachine-logs-app {
-	max-width: 1200px;
+	max-width: 1400px;
 	margin: 0 auto;
 	padding: 20px 0;
 }
@@ -21,6 +21,12 @@
 	border-bottom: 1px solid #ddd;
 }
 
+.datamachine-logs-header-left {
+	display: flex;
+	align-items: baseline;
+	gap: 12px;
+}
+
 .datamachine-logs-title {
 	margin: 0;
 	font-size: 23px;
@@ -28,18 +34,18 @@
 	line-height: 1.3;
 }
 
+.datamachine-logs-count {
+	font-size: 13px;
+	color: #757575;
+}
+
 .datamachine-logs-header-actions {
 	display: flex;
 	gap: 10px;
 }
 
-/* Tab Content */
-.datamachine-logs-tab-content {
-	padding: 20px;
-}
-
-/* Controls */
-.datamachine-logs-controls {
+/* Filters */
+.datamachine-logs-filters {
 	display: flex;
 	justify-content: space-between;
 	align-items: flex-end;
@@ -48,61 +54,95 @@
 	gap: 15px;
 }
 
-.datamachine-logs-controls-left {
+.datamachine-logs-filters-left {
 	display: flex;
 	align-items: flex-end;
-	gap: 20px;
+	gap: 15px;
 }
 
-.datamachine-logs-controls-left .components-base-control {
+.datamachine-logs-filters-left .components-base-control {
 	margin-bottom: 0;
 }
 
-.datamachine-logs-controls-left .components-select-control__input {
-	min-width: 180px;
+.datamachine-logs-filters-left .components-select-control__input {
+	min-width: 160px;
 }
 
-.datamachine-logs-file-size {
-	font-size: 13px;
-	color: #757575;
-	padding-bottom: 8px;
+.datamachine-logs-filters-left .components-search-control {
+	min-width: 250px;
 }
 
-.datamachine-logs-controls-right {
+.datamachine-logs-filters-right {
 	display: flex;
 	gap: 8px;
 }
 
-/* Log Viewer */
-.datamachine-logs-viewer-container {
+/* Table */
+.datamachine-logs-table-container {
 	margin-top: 10px;
 }
 
-.datamachine-logs-viewer-info {
-	font-size: 13px;
-	color: #757575;
-	margin-bottom: 10px;
+.datamachine-logs-table {
+	border-collapse: collapse;
+	width: 100%;
 }
 
-.datamachine-log-viewer {
-	background: #1e1e1e;
-	color: #d4d4d4;
-	font-family: 'SF Mono', Monaco, Menlo, 'Ubuntu Mono', Consolas, monospace;
-	font-size: 12px;
-	line-height: 1.5;
-	padding: 15px;
-	border-radius: 4px;
-	overflow-x: auto;
-	overflow-y: auto;
-	max-height: 600px;
-	white-space: pre-wrap;
-	word-wrap: break-word;
-	margin: 0;
+.datamachine-logs-col-level {
+	width: 80px;
+}
+
+.datamachine-logs-col-message {
+	width: auto;
+}
+
+.datamachine-logs-col-context {
+	width: 200px;
+	max-width: 200px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.datamachine-logs-col-time {
+	width: 160px;
+	white-space: nowrap;
+}
+
+.datamachine-logs-level-badge {
+	font-weight: 600;
+	font-size: 11px;
+	letter-spacing: 0.5px;
+}
+
+.datamachine-logs-context-code {
+	font-size: 11px;
+	background: #f0f0f0;
+	padding: 2px 6px;
+	border-radius: 3px;
+	color: #555;
+	display: inline-block;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Pagination */
+.datamachine-logs-pagination {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 15px;
+	padding: 15px 0;
+}
+
+.datamachine-logs-page-info {
+	font-size: 13px;
+	color: #757575;
 }
 
 /* Loading States */
-.datamachine-logs-viewer-loading,
-.datamachine-logs-tabs-loading {
+.datamachine-logs-table-loading {
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -112,7 +152,7 @@
 }
 
 /* Empty State */
-.datamachine-logs-viewer-empty {
+.datamachine-logs-table-empty {
 	background: #f6f7f7;
 	border: 1px dashed #c3c4c7;
 	border-radius: 4px;
@@ -123,8 +163,7 @@
 }
 
 /* Error State */
-.datamachine-logs-viewer-error,
-.datamachine-logs-tabs-error {
+.datamachine-logs-table-error {
 	background: #fcf0f1;
 	border: 1px solid #d63638;
 	border-radius: 4px;
@@ -141,24 +180,17 @@
 		gap: 15px;
 	}
 
-	.datamachine-logs-controls {
+	.datamachine-logs-filters {
 		flex-direction: column;
 		align-items: stretch;
 	}
 
-	.datamachine-logs-controls-left,
-	.datamachine-logs-controls-right {
+	.datamachine-logs-filters-left {
 		flex-direction: column;
 		width: 100%;
 	}
 
-	.datamachine-logs-controls-right {
-		flex-direction: row;
-		flex-wrap: wrap;
-	}
-
-	.datamachine-log-viewer {
-		max-height: 400px;
-		font-size: 11px;
+	.datamachine-logs-col-context {
+		display: none;
 	}
 }

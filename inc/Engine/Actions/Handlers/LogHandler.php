@@ -9,12 +9,10 @@
 namespace DataMachine\Engine\Actions\Handlers;
 
 /**
- * Central log-write handler — delegates to abilities-based logging.
+ * Central log-write handler — delegates to database-backed logging.
  *
  * Write operations only (info, error, warning, debug, etc.).
- * For management operations (clear_all, cleanup, set_level), use
- * LogManageHandler via the datamachine_log_manage action or call
- * LogManageHandler methods directly.
+ * Management operations (clear, metadata) use LogAbilities directly.
  */
 class LogHandler {
 

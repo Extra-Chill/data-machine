@@ -52,7 +52,6 @@ use DataMachine\Engine\Actions\Handlers\MarkItemProcessedHandler;
 use DataMachine\Engine\Actions\Handlers\FailJobHandler;
 use DataMachine\Engine\Actions\Handlers\JobCompleteHandler;
 use DataMachine\Engine\Actions\Handlers\LogHandler;
-use DataMachine\Engine\Actions\Handlers\LogManageHandler;
 
 /**
  * Register core Data Machine action hooks.
@@ -65,7 +64,6 @@ function datamachine_register_core_actions() {
 	add_action( 'datamachine_fail_job', array( FailJobHandler::class, 'handle' ), 10, 3 );
 	add_action( 'datamachine_job_complete', array( JobCompleteHandler::class, 'handle' ), 10, 2 );
 	add_action( 'datamachine_log', array( LogHandler::class, 'handle' ), 10, 3 );
-	add_action( 'datamachine_log_manage', array( LogManageHandler::class, 'handle' ), 10, 4 );
 
 	// AI library error logging — universal handler for all AI interactions (pipeline agents, chat agents).
 	add_action(

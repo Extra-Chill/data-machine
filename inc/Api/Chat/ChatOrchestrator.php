@@ -7,7 +7,7 @@
  * session lifecycle, conversation turn execution, and error persistence.
  *
  * This is intentionally NOT an ability — it coordinates multiple operations
- * (AgentContext, ToolManager, AIConversationLoop, session updates) and has
+ * (ToolManager, AIConversationLoop, session updates) and has
  * side effects. Composition happens here; flat primitives live in abilities.
  *
  * @package DataMachine\Api\Chat
@@ -23,7 +23,6 @@ use DataMachine\Engine\AI\AIConversationLoop;
 use DataMachine\Engine\AI\Tools\ToolManager;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use DataMachine\Engine\AI\AgentType;
-use DataMachine\Engine\AI\AgentContext;
 use WP_Error;
 
 defined( 'ABSPATH' ) || exit;
@@ -515,7 +514,7 @@ class ChatOrchestrator {
 	/**
 	 * Execute a single conversation turn with the AI loop.
 	 *
-	 * Encapsulates AgentContext management, tool loading, AIConversationLoop
+	 * Encapsulates tool loading, AIConversationLoop
 	 * execution, error handling, and session error updates.
 	 *
 	 * @since 0.26.0
@@ -548,8 +547,6 @@ class ChatOrchestrator {
 		$agent_type           = $options['agent_type'] ?? AgentType::CHAT;
 
 		$chat_db = new ChatDatabase();
-
-		AgentContext::set( $agent_type );
 
 		try {
 			$resolver  = new ToolPolicyResolver();
@@ -649,8 +646,6 @@ class ChatOrchestrator {
 				$e->getMessage(),
 				array( 'status' => 500 )
 			);
-		} finally {
-			AgentContext::clear();
 		}
 	}
 }

@@ -14,9 +14,6 @@
 
 namespace DataMachine\Abilities\Engine;
 
-use DataMachine\Engine\AI\AgentType;
-use DataMachine\Engine\AI\AgentContext;
-
 defined( 'ABSPATH' ) || exit;
 
 class RunFlowAbility {
@@ -96,8 +93,6 @@ class RunFlowAbility {
 	 * @return array Result with success status and execution details.
 	 */
 	public function execute( array $input ): array {
-		AgentContext::set( AgentType::PIPELINE );
-
 		$flow_id = (int) ( $input['flow_id'] ?? 0 );
 		$job_id  = $input['job_id'] ?? null;
 

@@ -5,7 +5,6 @@
 	"license": "GPL-2.0-or-later",
 	"require": {
 		"php": ">=8.2",
-		"monolog/monolog": "^3.9",
 		"woocommerce/action-scheduler": "^3.9",
 		"chubes4/ai-http-client": "^2.0.13"
 	},

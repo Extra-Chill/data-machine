@@ -26,9 +26,6 @@ define( 'DATAMACHINE_VERSION', '0.38.0' );
 define( 'DATAMACHINE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_URL', plugin_dir_url( __FILE__ ) );
 
-// Log directory constant (individual log files are per-agent-type)
-define( 'DATAMACHINE_LOG_DIR', '/datamachine-logs' );
-
 require_once __DIR__ . '/vendor/autoload.php';
 
 // WP-CLI integration
@@ -405,6 +402,7 @@ function datamachine_deactivate_plugin() {
 	if ( function_exists( 'as_unschedule_all_actions' ) ) {
 		as_unschedule_all_actions( 'datamachine_cleanup_stale_claims', array(), 'datamachine-maintenance' );
 		as_unschedule_all_actions( 'datamachine_cleanup_failed_jobs', array(), 'datamachine-maintenance' );
+		as_unschedule_all_actions( 'datamachine_cleanup_logs', array(), 'datamachine-maintenance' );
 	}
 }
 
@@ -434,6 +432,9 @@ function datamachine_activate_plugin( $network_wide = false ) {
 function datamachine_activate_for_site() {
 	datamachine_register_capabilities();
 
+	// Create logs table first — other table migrations log messages during creation.
+	\DataMachine\Core\Database\Logs\LogRepository::create_table();
+
 	// Ensure first-class agents table exists.
 	\DataMachine\Core\Database\Agents\Agents::create_table();
 	\DataMachine\Core\Database\Agents\AgentAccess::create_table();
@@ -455,13 +456,6 @@ function datamachine_activate_for_site() {
 	\DataMachine\Core\Database\Chat\Chat::create_table();
 	\DataMachine\Core\Database\Chat\Chat::ensure_agent_id_column();
 
-	// Create log directory during activation
-	$upload_dir = wp_upload_dir();
-	$log_dir    = $upload_dir['basedir'] . DATAMACHINE_LOG_DIR;
-	if ( ! file_exists( $log_dir ) ) {
-		wp_mkdir_p( $log_dir );
-	}
-
 	// Ensure default agent memory files exist.
 	datamachine_ensure_default_memory_files();
 
@@ -473,6 +467,11 @@ function datamachine_activate_for_site() {
 
 	// Backfill agent_id on pipelines, flows, and jobs from user_id→owner_id mapping (idempotent).
 	datamachine_backfill_agent_ids();
+
+	// Clean up legacy per-agent-type log level options (idempotent).
+	foreach ( array( 'pipeline', 'chat', 'system' ) as $legacy_agent_type ) {
+		delete_option( "datamachine_log_level_{$legacy_agent_type}" );
+	}
 
 	// Re-schedule any flows with non-manual scheduling
 	datamachine_activate_scheduled_flows();

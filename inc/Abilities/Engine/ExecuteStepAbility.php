@@ -19,8 +19,6 @@ use DataMachine\Core\EngineData;
 use DataMachine\Core\FilesRepository\FileCleanup;
 use DataMachine\Core\FilesRepository\FileRetrieval;
 use DataMachine\Core\JobStatus;
-use DataMachine\Engine\AI\AgentType;
-use DataMachine\Engine\AI\AgentContext;
 use DataMachine\Engine\StepNavigator;
 
 defined( 'ABSPATH' ) || exit;
@@ -101,8 +99,6 @@ class ExecuteStepAbility {
 	 * @return array Result with step execution outcome.
 	 */
 	public function execute( array $input ): array {
-		AgentContext::set( AgentType::PIPELINE );
-
 		$job_id       = (int) ( $input['job_id'] ?? 0 );
 		$flow_step_id = (string) ( $input['flow_step_id'] ?? '' );
 

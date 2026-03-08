@@ -2,19 +2,22 @@
  * LogsApp Component
  *
  * Root container for the Logs admin page.
+ * Single filterable log viewer replacing the old tabbed agent-type interface.
  */
 
 /**
  * Internal dependencies
  */
 import LogsHeader from './components/LogsHeader';
-import LogsTabs from './components/LogsTabs';
+import LogsFilters from './components/LogsFilters';
+import LogsTable from './components/LogsTable';
 
 const LogsApp = () => {
 	return (
 		<div className="datamachine-logs-app">
 			<LogsHeader />
-			<LogsTabs />
+			<LogsFilters />
+			<LogsTable />
 		</div>
 	);
 };

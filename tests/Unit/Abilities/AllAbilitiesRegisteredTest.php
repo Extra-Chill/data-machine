@@ -56,13 +56,11 @@ class AllAbilitiesRegisteredTest extends WP_UnitTestCase {
 			'datamachine/run-flow',
 			'datamachine/get-flow-health',
 			'datamachine/get-problem-flows',
-			// LogAbilities (6)
+			// LogAbilities (4)
 			'datamachine/write-to-log',
 			'datamachine/clear-logs',
 			'datamachine/read-logs',
 			'datamachine/get-log-metadata',
-			'datamachine/get-log-level',
-			'datamachine/set-log-level',
 			// PipelineAbilities (7)
 			'datamachine/get-pipelines',
 			'datamachine/create-pipeline',

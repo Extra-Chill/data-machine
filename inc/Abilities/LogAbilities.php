@@ -3,7 +3,7 @@
  * Log Abilities
  *
  * WordPress 6.9 Abilities API primitives for logging operations.
- * Centralizes all logging (write and clear) through abilities.
+ * Backed by LogRepository (database) — no file I/O.
  *
  * @package DataMachine\Abilities
  */
@@ -11,8 +11,7 @@
 namespace DataMachine\Abilities;
 
 use DataMachine\Abilities\PermissionHelper;
-
-use DataMachine\Engine\AI\AgentType;
+use DataMachine\Core\Database\Logs\LogRepository;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -39,7 +38,7 @@ class LogAbilities {
 				'datamachine/write-to-log',
 				array(
 					'label'               => 'Write to Data Machine Logs',
-					'description'         => 'Write log entries with level routing to system, pipeline, or chat logs',
+					'description'         => 'Write log entries to the database',
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -55,7 +54,7 @@ class LogAbilities {
 							),
 							'context' => array(
 								'type'        => 'object',
-								'description' => 'Additional context (agent_type, job_id, flow_id, etc.)',
+								'description' => 'Additional context (agent_id, job_id, flow_id, etc.)',
 							),
 						),
 						'required'   => array( 'level', 'message' ),
@@ -77,28 +76,23 @@ class LogAbilities {
 				'datamachine/clear-logs',
 				array(
 					'label'               => 'Clear Data Machine Logs',
-					'description'         => 'Clear log files for specified agent type or all logs',
+					'description'         => 'Clear log entries for a specific agent or all logs',
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'agent_type' => array(
-								'type'        => 'string',
-								'enum'        => array( 'pipeline', 'chat', 'system', 'all' ),
-								'description' => 'Agent type log to clear (or "all")',
+							'agent_id' => array(
+								'type'        => array( 'integer', 'null' ),
+								'description' => 'Agent ID to clear logs for. Null or omitted clears all.',
 							),
 						),
-						'required'   => array( 'agent_type' ),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'       => array( 'type' => 'boolean' ),
-							'message'       => array( 'type' => 'string' ),
-							'files_cleared' => array(
-								'type'  => 'array',
-								'items' => array( 'type' => 'string' ),
-							),
+							'success' => array( 'type' => 'boolean' ),
+							'message' => array( 'type' => 'string' ),
+							'deleted' => array( 'type' => array( 'integer', 'null' ) ),
 						),
 					),
 					'execute_callback'    => array( self::class, 'clear' ),
@@ -111,51 +105,62 @@ class LogAbilities {
 				'datamachine/read-logs',
 				array(
 					'label'               => 'Read Data Machine Logs',
-					'description'         => 'Read log content with optional filtering by job, pipeline, or flow',
+					'description'         => 'Read log entries with filtering and pagination',
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'agent_type'  => array(
-								'type'        => 'string',
-								'enum'        => array( 'pipeline', 'chat', 'system' ),
-								'description' => 'Agent type to read logs for',
+							'agent_id'    => array(
+								'type'        => array( 'integer', 'null' ),
+								'description' => 'Filter by agent ID. Null = all agents.',
 							),
-							'mode'        => array(
+							'level'       => array(
 								'type'        => 'string',
-								'enum'        => array( 'full', 'recent' ),
-								'description' => 'Content mode: full or recent',
+								'enum'        => array( 'debug', 'info', 'warning', 'error', 'critical' ),
+								'description' => 'Filter by log level',
 							),
-							'limit'       => array(
-								'type'        => 'integer',
-								'description' => 'Number of entries when mode is recent',
+							'since'       => array(
+								'type'        => 'string',
+								'description' => 'ISO datetime — entries after this time',
+							),
+							'before'      => array(
+								'type'        => 'string',
+								'description' => 'ISO datetime — entries before this time',
 							),
 							'job_id'      => array(
 								'type'        => 'integer',
-								'description' => 'Filter by job ID',
+								'description' => 'Filter by job ID (in context)',
 							),
 							'pipeline_id' => array(
 								'type'        => 'integer',
-								'description' => 'Filter by pipeline ID',
+								'description' => 'Filter by pipeline ID (in context)',
 							),
 							'flow_id'     => array(
 								'type'        => 'integer',
-								'description' => 'Filter by flow ID',
+								'description' => 'Filter by flow ID (in context)',
+							),
+							'search'      => array(
+								'type'        => 'string',
+								'description' => 'Free-text search in message',
+							),
+							'per_page'    => array(
+								'type'        => 'integer',
+								'description' => 'Items per page (default 50, max 500)',
+							),
+							'page'        => array(
+								'type'        => 'integer',
+								'description' => 'Page number (1-indexed)',
 							),
 						),
-						'required'   => array( 'agent_type' ),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'        => array( 'type' => 'boolean' ),
-							'content'        => array( 'type' => 'string' ),
-							'total_lines'    => array( 'type' => 'integer' ),
-							'filtered_lines' => array( 'type' => 'integer' ),
-							'mode'           => array( 'type' => 'string' ),
-							'agent_type'     => array( 'type' => 'string' ),
-							'message'        => array( 'type' => 'string' ),
-							'error'          => array( 'type' => 'string' ),
+							'success' => array( 'type' => 'boolean' ),
+							'items'   => array( 'type' => 'array' ),
+							'total'   => array( 'type' => 'integer' ),
+							'page'    => array( 'type' => 'integer' ),
+							'pages'   => array( 'type' => 'integer' ),
 						),
 					),
 					'execute_callback'    => array( self::class, 'readLogs' ),
@@ -168,99 +173,28 @@ class LogAbilities {
 				'datamachine/get-log-metadata',
 				array(
 					'label'               => 'Get Log Metadata',
-					'description'         => 'Get log file metadata and configuration for agent type(s)',
+					'description'         => 'Get log entry counts and time range',
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'agent_type' => array(
-								'type'        => 'string',
-								'enum'        => array( 'pipeline', 'chat', 'system' ),
-								'description' => 'Agent type to get metadata for. If omitted, returns all.',
+							'agent_id' => array(
+								'type'        => array( 'integer', 'null' ),
+								'description' => 'Agent ID to get metadata for. Null = all.',
 							),
 						),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'     => array( 'type' => 'boolean' ),
-							'agent_type'  => array( 'type' => 'string' ),
-							'agent_types' => array( 'type' => 'object' ),
-							'log_file'    => array( 'type' => 'object' ),
-							'error'       => array( 'type' => 'string' ),
+							'success'       => array( 'type' => 'boolean' ),
+							'total_entries' => array( 'type' => 'integer' ),
+							'oldest'        => array( 'type' => array( 'string', 'null' ) ),
+							'newest'        => array( 'type' => array( 'string', 'null' ) ),
+							'level_counts'  => array( 'type' => 'object' ),
 						),
 					),
 					'execute_callback'    => array( self::class, 'getMetadata' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
-					'meta'                => array( 'show_in_rest' => true ),
-				)
-			);
-
-			wp_register_ability(
-				'datamachine/set-log-level',
-				array(
-					'label'               => 'Set Log Level',
-					'description'         => 'Set the log level for a specific agent type',
-					'category'            => 'datamachine',
-					'input_schema'        => array(
-						'type'       => 'object',
-						'properties' => array(
-							'agent_type' => array(
-								'type'        => 'string',
-								'enum'        => array( 'pipeline', 'chat', 'system' ),
-								'description' => 'Agent type to set level for',
-							),
-							'level'      => array(
-								'type'        => 'string',
-								'enum'        => array( 'debug', 'error', 'none' ),
-								'description' => 'Log level to set',
-							),
-						),
-						'required'   => array( 'agent_type', 'level' ),
-					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success'    => array( 'type' => 'boolean' ),
-							'agent_type' => array( 'type' => 'string' ),
-							'level'      => array( 'type' => 'string' ),
-							'message'    => array( 'type' => 'string' ),
-							'error'      => array( 'type' => 'string' ),
-						),
-					),
-					'execute_callback'    => array( self::class, 'setLevel' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
-					'meta'                => array( 'show_in_rest' => true ),
-				)
-			);
-
-			wp_register_ability(
-				'datamachine/get-log-level',
-				array(
-					'label'               => 'Get Log Level',
-					'description'         => 'Get the current log level for a specific agent type',
-					'category'            => 'datamachine',
-					'input_schema'        => array(
-						'type'       => 'object',
-						'properties' => array(
-							'agent_type' => array(
-								'type'        => 'string',
-								'enum'        => array( 'pipeline', 'chat', 'system' ),
-								'description' => 'Agent type to get level for',
-							),
-						),
-						'required'   => array( 'agent_type' ),
-					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success'    => array( 'type' => 'boolean' ),
-							'agent_type' => array( 'type' => 'string' ),
-							'level'      => array( 'type' => 'string' ),
-							'error'      => array( 'type' => 'string' ),
-						),
-					),
-					'execute_callback'    => array( self::class, 'getLevel' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
@@ -274,6 +208,12 @@ class LogAbilities {
 		}
 	}
 
+	/**
+	 * Write a log entry via the Abilities API.
+	 *
+	 * @param array $input { level, message, context }.
+	 * @return array Result.
+	 */
 	public static function write( array $input ): array {
 		$level   = $input['level'];
 		$message = $input['message'];
@@ -303,308 +243,95 @@ class LogAbilities {
 		);
 	}
 
+	/**
+	 * Clear log entries.
+	 *
+	 * @param array $input { agent_id (optional) }.
+	 * @return array Result.
+	 */
 	public static function clear( array $input ): array {
-		$agent_type = $input['agent_type'];
+		$repo     = new LogRepository();
+		$agent_id = $input['agent_id'] ?? null;
 
-		if ( 'all' === $agent_type ) {
-			$cleared       = datamachine_clear_all_log_files();
-			$files_cleared = array( 'all' );
+		if ( null !== $agent_id && $agent_id > 0 ) {
+			$deleted = $repo->clear_for_agent( (int) $agent_id );
 		} else {
-			$cleared       = datamachine_clear_log_file( $agent_type );
-			$files_cleared = array( $agent_type );
+			$deleted = $repo->clear_all();
 		}
 
-		if ( $cleared ) {
-			do_action(
-				'datamachine_log',
-				'info',
-				'Logs cleared',
-				array(
-					'agent_type'         => 'system',
-					'agent_type_cleared' => $agent_type,
-					'files_cleared'      => $files_cleared,
-				)
-			);
-
+		if ( false === $deleted ) {
 			return array(
-				'success'       => true,
-				'message'       => 'Logs cleared successfully',
-				'files_cleared' => $files_cleared,
+				'success' => false,
+				'error'   => 'Failed to clear logs',
 			);
 		}
+
+		// Log the clear operation.
+		do_action(
+			'datamachine_log',
+			'info',
+			'Logs cleared',
+			array(
+				'agent_id_cleared' => $agent_id,
+				'rows_deleted'     => $deleted,
+			)
+		);
 
 		return array(
-			'success' => false,
-			'error'   => 'Failed to clear logs',
+			'success' => true,
+			'message' => 'Logs cleared successfully',
+			'deleted' => (int) $deleted,
 		);
 	}
 
+	/**
+	 * Read log entries with filtering and pagination.
+	 *
+	 * @param array $input Filters (agent_id, level, since, before, job_id, flow_id, pipeline_id, search, per_page, page).
+	 * @return array Paginated result.
+	 */
 	public static function readLogs( array $input ): array {
-		$agent_type  = $input['agent_type'];
-		$mode        = $input['mode'] ?? 'full';
-		$limit       = $input['limit'] ?? 200;
-		$job_id      = $input['job_id'] ?? null;
-		$pipeline_id = $input['pipeline_id'] ?? null;
-		$flow_id     = $input['flow_id'] ?? null;
+		$repo    = new LogRepository();
+		$filters = array();
 
-		if ( ! AgentType::isValid( $agent_type ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'invalid_agent_type',
-				'message' => __( 'Invalid agent type specified.', 'data-machine' ),
-			);
+		// Map input to repository filters.
+		$filter_keys = array( 'agent_id', 'level', 'since', 'before', 'job_id', 'flow_id', 'pipeline_id', 'search', 'per_page', 'page' );
+		foreach ( $filter_keys as $key ) {
+			if ( isset( $input[ $key ] ) ) {
+				$filters[ $key ] = $input[ $key ];
+			}
 		}
 
-		$log_file = datamachine_get_log_file_path( $agent_type );
+		$result = $repo->get_logs( $filters );
 
-		if ( ! file_exists( $log_file ) ) {
-			return array(
-				'success'     => true,
-				'content'     => '',
-				'total_lines' => 0,
-				'mode'        => $mode,
-				'agent_type'  => $agent_type,
-				'message'     => __( 'No log entries found.', 'data-machine' ),
-			);
-		}
-
-		if ( is_readable( $log_file ) ) {
-			$file_content = file( $log_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES );
-		} else {
-			$file_content = false;
-		}
-
-		if ( false === $file_content ) {
-			return array(
-				'success' => false,
-				'error'   => 'log_file_read_error',
-				'message' => __( 'Unable to read log file.', 'data-machine' ),
-			);
-		}
-
-		$file_content = array_reverse( $file_content );
-		$total_lines  = count( $file_content );
-
-		$has_filters = null !== $job_id || null !== $pipeline_id || null !== $flow_id;
-		if ( null !== $job_id ) {
-			$file_content = self::filterByJobId( $file_content, $job_id );
-		}
-		if ( null !== $pipeline_id ) {
-			$file_content = self::filterByPipelineId( $file_content, $pipeline_id );
-		}
-		if ( null !== $flow_id ) {
-			$file_content = self::filterByFlowId( $file_content, $flow_id );
-		}
-		$filtered_lines = $has_filters ? count( $file_content ) : null;
-
-		if ( 'recent' === $mode ) {
-			$file_content = array_slice( $file_content, 0, $limit );
-		}
-
-		$content = implode( "\n", $file_content );
-
-		$response = array(
-			'success'     => true,
-			'content'     => $content,
-			'total_lines' => $total_lines,
-			'mode'        => $mode,
-			'agent_type'  => $agent_type,
+		return array(
+			'success' => true,
+			'items'   => $result['items'],
+			'total'   => $result['total'],
+			'page'    => $result['page'],
+			'pages'   => $result['pages'],
 		);
-
-		if ( null !== $filtered_lines ) {
-			$response['filtered_lines'] = $filtered_lines;
-			if ( null !== $job_id ) {
-				$response['job_id'] = $job_id;
-			}
-			if ( null !== $pipeline_id ) {
-				$response['pipeline_id'] = $pipeline_id;
-			}
-			if ( null !== $flow_id ) {
-				$response['flow_id'] = $flow_id;
-			}
-		}
-
-		if ( null !== $job_id || null !== $pipeline_id || null !== $flow_id ) {
-			$filter_parts = array();
-			if ( null !== $job_id ) {
-				$filter_parts[] = sprintf( 'job %d', $job_id );
-			}
-			if ( null !== $pipeline_id ) {
-				$filter_parts[] = sprintf( 'pipeline %d', $pipeline_id );
-			}
-			if ( null !== $flow_id ) {
-				$filter_parts[] = sprintf( 'flow %d', $flow_id );
-			}
-			$response['message'] = sprintf(
-				/* translators: %1$d is the number of log entries, %2$s is the filter criteria */
-				__( 'Retrieved %1$d log entries for %2$s.', 'data-machine' ),
-				count( $file_content ),
-				implode( ', ', $filter_parts )
-			);
-		} else {
-			$response['message'] = sprintf(
-				/* translators: %1$d is the number of log entries, %2$s is either "recent" or "total" */
-				__( 'Loaded %1$d %2$s log entries.', 'data-machine' ),
-				count( $file_content ),
-				'recent' === $mode ? 'recent' : 'total'
-			);
-		}
-
-		return $response;
 	}
 
+	/**
+	 * Get log metadata (counts, time range, level distribution).
+	 *
+	 * @param array $input { agent_id (optional) }.
+	 * @return array Metadata.
+	 */
 	public static function getMetadata( array $input ): array {
-		$agent_type = $input['agent_type'] ?? null;
+		$repo     = new LogRepository();
+		$agent_id = isset( $input['agent_id'] ) ? (int) $input['agent_id'] : null;
 
-		if ( null === $agent_type ) {
-			$all_metadata = array();
-			foreach ( AgentType::getAll() as $type => $info ) {
-				$all_metadata[ $type ] = self::getSingleMetadata( $type );
-			}
-
-			return array(
-				'success'     => true,
-				'agent_types' => $all_metadata,
-			);
-		}
-
-		if ( ! AgentType::isValid( $agent_type ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'invalid_agent_type',
-				'message' => __( 'Invalid agent type specified.', 'data-machine' ),
-			);
-		}
-
-		return self::getSingleMetadata( $agent_type );
-	}
-
-	public static function setLevel( array $input ): array {
-		$agent_type = $input['agent_type'];
-		$level      = $input['level'];
-
-		if ( ! AgentType::isValid( $agent_type ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'invalid_agent_type',
-				'message' => __( 'Invalid agent type specified.', 'data-machine' ),
-			);
-		}
-
-		$available_levels = datamachine_get_available_log_levels();
-		if ( ! array_key_exists( $level, $available_levels ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'invalid_level',
-				'message' => __( 'Invalid log level specified.', 'data-machine' ),
-			);
-		}
-
-		$result = datamachine_set_log_level( $agent_type, $level );
-
-		if ( $result ) {
-			$level_display = $available_levels[ $level ] ?? ucfirst( $level );
-			$agent_types   = AgentType::getAll();
-			$agent_label   = $agent_types[ $agent_type ]['label'] ?? ucfirst( $agent_type );
-
-			return array(
-				'success'    => true,
-				'agent_type' => $agent_type,
-				'level'      => $level,
-				'message'    => sprintf(
-					/* translators: %1$s: agent label, %2$s: level display */
-					__( '%1$s log level updated to %2$s.', 'data-machine' ),
-					$agent_label,
-					$level_display
-				),
-			);
-		}
-
-		return array(
-			'success' => false,
-			'error'   => 'Failed to set log level',
-		);
-	}
-
-	public static function getLevel( array $input ): array {
-		$agent_type = $input['agent_type'];
-
-		if ( ! AgentType::isValid( $agent_type ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'invalid_agent_type',
-				'message' => __( 'Invalid agent type specified.', 'data-machine' ),
-			);
-		}
-
-		$level = datamachine_get_log_level( $agent_type );
-
-		return array(
-			'success'    => true,
-			'agent_type' => $agent_type,
-			'level'      => $level,
-		);
-	}
-
-	private static function getSingleMetadata( string $agent_type ): array {
-		$log_file_path   = datamachine_get_log_file_path( $agent_type );
-		$log_file_exists = file_exists( $log_file_path );
-		$log_file_size   = $log_file_exists ? filesize( $log_file_path ) : 0;
-
-		$size_formatted = $log_file_size > 0
-			? size_format( $log_file_size, 2 )
-			: '0 bytes';
-
-		$current_level    = datamachine_get_log_level( $agent_type );
-		$available_levels = datamachine_get_available_log_levels();
-
-		$agent_types = AgentType::getAll();
-		$agent_info  = $agent_types[ $agent_type ] ?? array();
+		$metadata     = $repo->get_metadata( $agent_id );
+		$level_counts = $repo->get_level_counts( $agent_id );
 
 		return array(
 			'success'       => true,
-			'agent_type'    => $agent_type,
-			'agent_label'   => $agent_info['label'] ?? ucfirst( $agent_type ),
-			'log_file'      => array(
-				'path'           => $log_file_path,
-				'exists'         => $log_file_exists,
-				'size'           => $log_file_size,
-				'size_formatted' => $size_formatted,
-			),
-			'configuration' => array(
-				'current_level'    => $current_level,
-				'available_levels' => $available_levels,
-			),
+			'total_entries' => $metadata['total_entries'],
+			'oldest'        => $metadata['oldest'],
+			'newest'        => $metadata['newest'],
+			'level_counts'  => $level_counts,
 		);
-	}
-
-	private static function filterByJobId( array $lines, int $job_id ): array {
-		$filtered = array();
-		foreach ( $lines as $line ) {
-			if ( preg_match( '/"job_id"\s*:\s*' . preg_quote( (string) $job_id, '/' ) . '(?:[,\}])/', $line ) ) {
-				$filtered[] = $line;
-			}
-		}
-		return $filtered;
-	}
-
-	private static function filterByPipelineId( array $lines, int $pipeline_id ): array {
-		$filtered = array();
-		foreach ( $lines as $line ) {
-			if ( preg_match( '/"pipeline_id"\s*:\s*' . preg_quote( (string) $pipeline_id, '/' ) . '(?:[,\}])/', $line ) ) {
-				$filtered[] = $line;
-			}
-		}
-		return $filtered;
-	}
-
-	private static function filterByFlowId( array $lines, int $flow_id ): array {
-		$filtered = array();
-		foreach ( $lines as $line ) {
-			if ( preg_match( '/"flow_id"\s*:\s*' . preg_quote( (string) $flow_id, '/' ) . '(?:[,\}])/', $line ) ) {
-				$filtered[] = $line;
-			}
-		}
-		return $filtered;
 	}
 }

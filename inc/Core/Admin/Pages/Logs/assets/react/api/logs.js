@@ -1,7 +1,7 @@
 /**
  * Logs API Operations
  *
- * REST API calls for log management operations.
+ * REST API calls for database-backed log operations.
  */
 
 /* eslint-disable jsdoc/check-line-alignment */
@@ -12,49 +12,23 @@
 import { client } from '@shared/utils/api';
 
 /**
- * Fetch available agent types
- * @return {Promise<Object>} Agent types with labels and descriptions
+ * Fetch log entries with filters and pagination.
+ * @param {Object} params Filter parameters (agent_id, level, since, before, job_id, flow_id, pipeline_id, search, per_page, page).
+ * @return {Promise<Object>} Paginated log entries.
  */
-export const fetchAgentTypes = () => client.get( '/logs/agent-types' );
+export const fetchLogs = ( params = {} ) => client.get( '/logs', params );
 
 /**
- * Fetch log metadata for a specific agent type
- * @param {string} agentType - Agent type (pipeline, chat)
- * @return {Promise<Object>} Log metadata including file info and configuration
+ * Fetch log metadata (counts, time range, level distribution).
+ * @param {Object} params Optional { agent_id }.
+ * @return {Promise<Object>} Log metadata.
  */
-export const fetchLogMetadata = ( agentType ) =>
-	client.get( '/logs', { agent_type: agentType } );
+export const fetchLogMetadata = ( params = {} ) =>
+	client.get( '/logs/metadata', params );
 
 /**
- * Fetch log content for a specific agent type
- * @param {string} agentType  Agent type (pipeline, chat)
- * @param {string} mode  Content mode: 'full' or 'recent'
- * @param {number} limit  Number of entries when mode is 'recent'
- * @return {Promise<Object>}  Log content and metadata
+ * Clear log entries.
+ * @param {Object} params Optional { agent_id }.
+ * @return {Promise<Object>} Clear operation result.
  */
-export const fetchLogContent = ( agentType, mode = 'recent', limit = 200 ) =>
-	client.get( '/logs/content', { agent_type: agentType, mode, limit } );
-
-/**
- * Clear logs for a specific agent type
- * @param {string} agentType - Agent type (pipeline, chat)
- * @return {Promise<Object>} Clear operation result
- */
-export const clearLogs = ( agentType ) =>
-	client.delete( '/logs', { agent_type: agentType } );
-
-/**
- * Clear all logs for all agent types
- * @return {Promise<Object>} Clear operation result
- */
-export const clearAllLogs = () =>
-	client.delete( '/logs', { agent_type: 'all' } );
-
-/**
- * Update log level for a specific agent type
- * @param {string} agentType - Agent type (pipeline, chat)
- * @param {string} level     - Log level (debug, error, none)
- * @return {Promise<Object>} Update operation result
- */
-export const updateLogLevel = ( agentType, level ) =>
-	client.put( '/logs/level', { agent_type: agentType, level } );
+export const clearLogs = ( params = {} ) => client.delete( '/logs', params );
