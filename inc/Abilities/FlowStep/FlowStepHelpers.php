@@ -16,6 +16,7 @@ use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
+use DataMachine\Core\Steps\FlowStepConfig;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -304,10 +305,7 @@ trait FlowStepHelpers {
 			);
 		}
 
-		// Normalize the existing step config to use plural fields as source of truth.
-		$flow_config[ $flow_step_id ] = FlowStepNormalizer::normalizeHandlerFields( $flow_config[ $flow_step_id ] );
-
-		$effective_slug = FlowStepNormalizer::getEffectiveSlug( $flow_config[ $flow_step_id ], $handler_slug );
+		$effective_slug = FlowStepConfig::getEffectiveSlug( $flow_config[ $flow_step_id ], $handler_slug );
 
 		if ( empty( $effective_slug ) ) {
 			do_action( 'datamachine_log', 'error', 'No handler slug or step_type available for flow step update', array( 'flow_step_id' => $flow_step_id ) );
@@ -329,7 +327,7 @@ trait FlowStepHelpers {
 		$existing_handler_config = $flow_config[ $flow_step_id ]['handler_configs'][ $effective_slug ] ?? array();
 
 		// If switching handlers, strip legacy config fields that don't belong to the new handler.
-		$current_primary = FlowStepNormalizer::getPrimaryHandlerSlug( $flow_config[ $flow_step_id ] );
+		$current_primary = $flow_config[ $flow_step_id ]['handler_slugs'][0] ?? '';
 		if ( $current_primary !== $effective_slug ) {
 			$valid_fields = array_keys( $this->handler_abilities->getConfigFields( $effective_slug ) );
 			if ( ! empty( $valid_fields ) ) {
@@ -404,9 +402,7 @@ trait FlowStepHelpers {
 			return false;
 		}
 
-		// Normalize first to handle legacy data.
-		$flow_config[ $flow_step_id ] = FlowStepNormalizer::normalizeHandlerFields( $flow_config[ $flow_step_id ] );
-		$step                         = &$flow_config[ $flow_step_id ];
+		$step = &$flow_config[ $flow_step_id ];
 
 		$existing_slugs = $step['handler_slugs'] ?? array();
 
@@ -486,9 +482,7 @@ trait FlowStepHelpers {
 			return false;
 		}
 
-		// Normalize first to handle legacy data.
-		$flow_config[ $flow_step_id ] = FlowStepNormalizer::normalizeHandlerFields( $flow_config[ $flow_step_id ] );
-		$step                         = &$flow_config[ $flow_step_id ];
+		$step = &$flow_config[ $flow_step_id ];
 
 		$existing_slugs = $step['handler_slugs'] ?? array();
 		$existing_slugs = array_values( array_filter( $existing_slugs, fn( $s ) => $s !== $handler_slug ) );

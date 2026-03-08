@@ -1033,14 +1033,6 @@ class FlowsCommand extends BaseCommand {
 			$slugs   = $step['handler_slugs'] ?? array();
 			$configs = $step['handler_configs'] ?? array();
 
-			// Check for legacy single handler_slug.
-			if ( empty( $slugs ) ) {
-				$legacy = $step['handler_slug'] ?? '';
-				if ( $legacy ) {
-					$slugs = array( $legacy );
-				}
-			}
-
 			if ( empty( $slugs ) && ! $step_id ) {
 				continue; // Skip steps with no handlers unless specifically requested.
 			}

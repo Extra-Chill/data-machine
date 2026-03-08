@@ -206,8 +206,8 @@ class ValidateFlowStepsConfigAbility {
 
 				++$total_matching_steps;
 
-				$existing_handler_slug  = FlowStepNormalizer::getEffectiveSlug( $step_config );
-				$effective_handler_slug = FlowStepNormalizer::getEffectiveSlug( $step_config, $target_handler_slug ?? '' );
+				$existing_handler_slug  = \DataMachine\Core\Steps\FlowStepConfig::getEffectiveSlug( $step_config );
+				$effective_handler_slug = \DataMachine\Core\Steps\FlowStepConfig::getEffectiveSlug( $step_config, $target_handler_slug ?? '' );
 
 				if ( empty( $effective_handler_slug ) ) {
 					$validation_errors[] = array(

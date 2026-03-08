@@ -462,6 +462,9 @@ function datamachine_activate_for_site() {
 	// Run layered architecture migration (idempotent).
 	datamachine_migrate_to_layered_architecture();
 
+	// Migrate flow_config handler keys from singular to plural (idempotent).
+	datamachine_migrate_handler_keys_to_plural();
+
 	// Re-schedule any flows with non-manual scheduling
 	datamachine_activate_scheduled_flows();
 

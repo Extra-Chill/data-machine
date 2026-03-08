@@ -11,7 +11,7 @@
 namespace DataMachine\Core\Admin;
 
 use DataMachine\Abilities\HandlerAbilities;
-use DataMachine\Abilities\FlowStep\FlowStepNormalizer;
+use DataMachine\Core\Steps\FlowStepConfig;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -32,13 +32,8 @@ class FlowFormatter {
 		$settings_display_service = new \DataMachine\Core\Steps\Settings\SettingsDisplayService();
 
 		foreach ( $flow_config as $flow_step_id => &$step_data ) {
-			// Derive singular fields for backward compatibility in API response.
-			// Data is normalized at the DB layer — handler_slugs/handler_configs are canonical.
-			$step_data['handler_slug']   = FlowStepNormalizer::getPrimaryHandlerSlug( $step_data );
-			$step_data['handler_config'] = FlowStepNormalizer::getPrimaryHandlerConfig( $step_data );
-
 			$step_type      = $step_data['step_type'] ?? '';
-			$effective_slug = FlowStepNormalizer::getEffectiveSlug( $step_data );
+			$effective_slug = FlowStepConfig::getEffectiveSlug( $step_data );
 
 			// Skip steps with no handler or step type
 			if ( empty( $effective_slug ) ) {
@@ -58,11 +53,12 @@ class FlowFormatter {
 				$step_type
 			);
 
-			// Apply defaults if we have an effective slug
+			// Apply defaults to the primary handler config.
 			if ( ! empty( $effective_slug ) ) {
-				$step_data['handler_config'] = $handler_abilities->applyDefaults(
+				$primary_config = $step_data['handler_configs'][ $effective_slug ] ?? array();
+				$step_data['handler_configs'][ $effective_slug ] = $handler_abilities->applyDefaults(
 					$effective_slug,
-					$step_data['handler_config'] ?? array()
+					$primary_config
 				);
 			}
 
