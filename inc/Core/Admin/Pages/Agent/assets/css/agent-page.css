@@ -101,10 +101,6 @@
 	padding-left: 12px;
 }
 
-.datamachine-agent-file-item.is-soul .datamachine-agent-file-item-name {
-	font-weight: 600;
-}
-
 .datamachine-agent-file-item-info {
 	display: flex;
 	flex-direction: column;
@@ -119,10 +115,6 @@
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-}
-
-.datamachine-agent-file-soul-badge {
-	margin-right: 4px;
 }
 
 .datamachine-agent-file-item-meta {
