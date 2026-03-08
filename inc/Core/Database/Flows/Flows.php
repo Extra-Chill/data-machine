@@ -102,6 +102,50 @@ class Flows extends BaseRepository {
 				array( 'table_name' => $this->table_name )
 			);
 		}
+
+		// Add agent_id column for agent-first scoping (#735).
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		$agent_col = $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				"SELECT COLUMN_NAME
+				 FROM information_schema.COLUMNS
+				 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'agent_id'",
+				DB_NAME,
+				$this->table_name
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL
+
+		if ( null === $agent_col ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+			$result = $this->wpdb->query(
+				"ALTER TABLE {$this->table_name}
+				 ADD COLUMN agent_id bigint(20) unsigned DEFAULT NULL AFTER user_id,
+				 ADD KEY agent_id (agent_id)"
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL
+
+			if ( false === $result ) {
+				do_action(
+					'datamachine_log',
+					'error',
+					'Failed to add agent_id column to flows table',
+					array(
+						'table_name' => $this->table_name,
+						'db_error'   => $this->wpdb->last_error,
+					)
+				);
+				return;
+			}
+
+			do_action(
+				'datamachine_log',
+				'info',
+				'Added agent_id column to flows table for agent-first scoping',
+				array( 'table_name' => $this->table_name )
+			);
+		}
 	}
 
 	public function create_flow( array $flow_data ) {
@@ -126,7 +170,8 @@ class Flows extends BaseRepository {
 		$flow_config       = wp_json_encode( $flow_data['flow_config'] );
 		$scheduling_config = wp_json_encode( $flow_data['scheduling_config'] );
 
-		$user_id = isset( $flow_data['user_id'] ) ? absint( $flow_data['user_id'] ) : 0;
+		$user_id  = isset( $flow_data['user_id'] ) ? absint( $flow_data['user_id'] ) : 0;
+		$agent_id = isset( $flow_data['agent_id'] ) ? absint( $flow_data['agent_id'] ) : null;
 
 		$insert_data = array(
 			'pipeline_id'       => intval( $flow_data['pipeline_id'] ),
@@ -143,6 +188,11 @@ class Flows extends BaseRepository {
 			'%s', // flow_config
 			'%s',  // scheduling_config
 		);
+
+		if ( null !== $agent_id && $agent_id > 0 ) {
+			$insert_data['agent_id'] = $agent_id;
+			$insert_format[]         = '%d';
+		}
 
 		$result = $this->wpdb->insert(
 			$this->table_name,
@@ -230,27 +280,31 @@ class Flows extends BaseRepository {
 	 *
 	 * Used for global operations like handler-based filtering across the entire system.
 	 *
-	 * @param int|null $user_id Optional user ID to filter by.
+	 * @param int|null $user_id  Optional user ID to filter by.
+	 * @param int|null $agent_id Optional agent ID to filter by.
 	 * @return array All flows with decoded configs.
 	 */
-	public function get_all_flows( ?int $user_id = null ): array {
-		if ( null !== $user_id ) {
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-			$flows = $this->wpdb->get_results(
-				$this->wpdb->prepare( 'SELECT * FROM %i WHERE user_id = %d ORDER BY pipeline_id ASC, flow_id ASC', $this->table_name, $user_id ),
-				ARRAY_A
-			);
-			// phpcs:enable WordPress.DB.PreparedSQL
-		} else {
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-			$flows = $this->wpdb->get_results(
-				$this->wpdb->prepare( 'SELECT * FROM %i ORDER BY pipeline_id ASC, flow_id ASC', $this->table_name ),
-				ARRAY_A
-			);
-			// phpcs:enable WordPress.DB.PreparedSQL
+	public function get_all_flows( ?int $user_id = null, ?int $agent_id = null ): array {
+		$where        = '';
+		$where_values = array();
+
+		if ( null !== $agent_id ) {
+			$where          = ' WHERE agent_id = %d';
+			$where_values[] = $agent_id;
+		} elseif ( null !== $user_id ) {
+			$where          = ' WHERE user_id = %d';
+			$where_values[] = $user_id;
 		}
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
+		$flows = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				"SELECT * FROM %i{$where} ORDER BY pipeline_id ASC, flow_id ASC",
+				array_merge( array( $this->table_name ), $where_values )
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
 
 		if ( null === $flows ) {
 			return array();

@@ -239,6 +239,124 @@ class PermissionHelper {
 	}
 
 	/**
+	 * Resolve agent_id for scoped REST API queries.
+	 *
+	 * Determines which agent's data should be returned based on the request:
+	 * - If `agent_id` param is present and caller has access → use that agent_id
+	 * - If caller is admin and no `agent_id` param → return null (all agents)
+	 * - If caller is non-admin → resolve their accessible agent IDs
+	 *
+	 * @since 0.41.0
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @param string           $action  Action key for admin check (default: 'manage_flows').
+	 * @return int|null Agent ID to filter by, or null for all agents (admin default).
+	 */
+	public static function resolve_scoped_agent_id( \WP_REST_Request $request, string $action = 'manage_flows' ): ?int {
+		$requested_agent_id = $request->get_param( 'agent_id' );
+		$is_admin           = self::can( $action );
+
+		// Explicit agent_id parameter — use it if caller has access.
+		if ( null !== $requested_agent_id && '' !== $requested_agent_id ) {
+			$agent_id = (int) $requested_agent_id;
+
+			// Admins can access any agent.
+			if ( $is_admin ) {
+				return $agent_id;
+			}
+
+			// Non-admin: verify they have access to this agent.
+			if ( self::can_access_agent( $agent_id ) ) {
+				return $agent_id;
+			}
+
+			// Fallback: try user_id-based scoping via resolve_scoped_user_id.
+			return null;
+		}
+
+		// Admin with no filter → all agents.
+		if ( $is_admin ) {
+			return null;
+		}
+
+		// Non-admin with no explicit agent_id: resolve via owner_id lookup.
+		$user_id     = self::acting_user_id();
+		$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+		$agent       = $agents_repo->get_by_owner_id( $user_id );
+
+		if ( $agent ) {
+			return (int) $agent['agent_id'];
+		}
+
+		// No agent found — return 0 which will match nothing (safe fallback).
+		return 0;
+	}
+
+	/**
+	 * Check if the acting user can access an agent.
+	 *
+	 * Returns true if:
+	 * - User is an admin (manage_options or authenticated context)
+	 * - User is the agent's owner
+	 * - User has an explicit access grant via agent_access table
+	 *
+	 * @since 0.41.0
+	 *
+	 * @param int    $agent_id     Agent ID to check.
+	 * @param string $minimum_role Minimum role required (default: 'viewer').
+	 * @return bool True if the acting user can access this agent.
+	 */
+	public static function can_access_agent( int $agent_id, string $minimum_role = 'viewer' ): bool {
+		// Admins can access any agent.
+		if ( self::can( 'manage_agents' ) && ( self::is_authenticated_context() || current_user_can( 'manage_options' ) ) ) {
+			return true;
+		}
+
+		$user_id = self::acting_user_id();
+
+		if ( $user_id <= 0 ) {
+			return false;
+		}
+
+		// Check if user is the agent owner.
+		$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+		$agent       = $agents_repo->get_agent( $agent_id );
+
+		if ( $agent && (int) $agent['owner_id'] === $user_id ) {
+			return true;
+		}
+
+		// Check explicit access grants.
+		$access_repo = new \DataMachine\Core\Database\Agents\AgentAccess();
+		return $access_repo->user_can_access( $agent_id, $user_id, $minimum_role );
+	}
+
+	/**
+	 * Check if the acting user owns a resource scoped by agent_id.
+	 *
+	 * Returns true if:
+	 * - Resource has agent_id NULL (single-agent mode, anyone can access)
+	 * - User can access the resource's agent
+	 * - Fallback to user_id-based ownership check
+	 *
+	 * @since 0.41.0
+	 *
+	 * @param int|null $resource_agent_id Agent ID on the resource record (null = unscoped).
+	 * @param int      $resource_user_id  User ID on the resource record.
+	 * @param string   $action            Action key for admin check (default: 'manage_flows').
+	 * @return bool True if the acting user can access this resource.
+	 */
+	public static function owns_agent_resource( ?int $resource_agent_id, int $resource_user_id, string $action = 'manage_flows' ): bool {
+		// Unscoped resources (agent_id NULL) — fall back to user_id check.
+		if ( null === $resource_agent_id ) {
+			return self::owns_resource( $resource_user_id, $action );
+		}
+
+		// Agent-scoped — check agent access.
+		return self::can_access_agent( $resource_agent_id );
+	}
+
+	/**
 	 * Check capability for a specific user against Data Machine action.
 	 *
 	 * @since 0.37.0

@@ -338,5 +338,38 @@ class Jobs {
 				);
 			}
 		}
+
+		// Add agent_id column for agent-first scoping (#735).
+		// Re-check columns since initial batch query may not include agent_id.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$agent_col = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COLUMN_NAME
+				 FROM information_schema.COLUMNS
+				 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'agent_id'",
+				DB_NAME,
+				$table_name
+			)
+		);
+
+		if ( null === $agent_col ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+			$result = $wpdb->query(
+				"ALTER TABLE {$table_name}
+				 ADD COLUMN agent_id bigint(20) unsigned DEFAULT NULL AFTER user_id,
+				 ADD KEY agent_id (agent_id)"
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL
+
+			if ( false !== $result ) {
+				do_action(
+					'datamachine_log',
+					'info',
+					'Added agent_id column to jobs table for agent-first scoping',
+					array( 'table_name' => $table_name )
+				);
+			}
+		}
 	}
 }

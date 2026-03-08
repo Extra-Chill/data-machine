@@ -40,6 +40,7 @@ class Pipelines extends BaseRepository {
 		$pipeline_config      = $pipeline_data['pipeline_config'] ?? array();
 		$pipeline_config_json = wp_json_encode( $pipeline_config );
 		$user_id              = isset( $pipeline_data['user_id'] ) ? absint( $pipeline_data['user_id'] ) : 0;
+		$agent_id             = isset( $pipeline_data['agent_id'] ) ? absint( $pipeline_data['agent_id'] ) : null;
 
 		$data = array(
 			'user_id'         => $user_id,
@@ -50,6 +51,11 @@ class Pipelines extends BaseRepository {
 		);
 
 		$format = array( '%d', '%s', '%s', '%s', '%s' );
+
+		if ( null !== $agent_id && $agent_id > 0 ) {
+			$data['agent_id'] = $agent_id;
+			$format[]         = '%d';
+		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$inserted = $this->wpdb->insert( $this->table_name, $data, $format );
@@ -106,17 +112,31 @@ class Pipelines extends BaseRepository {
 	/**
 	 * Get all pipelines from the database.
 	 *
-	 * @param int|null $user_id Optional user ID to filter by.
+	 * @param int|null $user_id  Optional user ID to filter by.
+	 * @param int|null $agent_id Optional agent ID to filter by.
 	 * @return array Array of all pipeline records
 	 */
-	public function get_all_pipelines( ?int $user_id = null ): array {
-		if ( null !== $user_id ) {
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			$results = $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT * FROM %i WHERE user_id = %d ORDER BY updated_at DESC', $this->table_name, $user_id ), ARRAY_A );
-		} else {
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			$results = $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT * FROM %i ORDER BY updated_at DESC', $this->table_name ), ARRAY_A );
+	public function get_all_pipelines( ?int $user_id = null, ?int $agent_id = null ): array {
+		$where        = '';
+		$where_values = array();
+
+		if ( null !== $agent_id ) {
+			$where          = ' WHERE agent_id = %d';
+			$where_values[] = $agent_id;
+		} elseif ( null !== $user_id ) {
+			$where          = ' WHERE user_id = %d';
+			$where_values[] = $user_id;
 		}
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
+		$results = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				"SELECT * FROM %i{$where} ORDER BY updated_at DESC",
+				array_merge( array( $this->table_name ), $where_values )
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
 
 		foreach ( $results as &$pipeline ) {
 			if ( ! empty( $pipeline['pipeline_config'] ) ) {
@@ -130,16 +150,30 @@ class Pipelines extends BaseRepository {
 	/**
 	 * Get lightweight pipelines list for UI dropdowns.
 	 *
-	 * @param int|null $user_id Optional user ID to filter by.
+	 * @param int|null $user_id  Optional user ID to filter by.
+	 * @param int|null $agent_id Optional agent ID to filter by.
 	 */
-	public function get_pipelines_list( ?int $user_id = null ): array {
-		if ( null !== $user_id ) {
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			$results = $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT pipeline_id, pipeline_name FROM %i WHERE user_id = %d ORDER BY pipeline_name ASC', $this->table_name, $user_id ), ARRAY_A );
-		} else {
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			$results = $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT pipeline_id, pipeline_name FROM %i ORDER BY pipeline_name ASC', $this->table_name ), ARRAY_A );
+	public function get_pipelines_list( ?int $user_id = null, ?int $agent_id = null ): array {
+		$where        = '';
+		$where_values = array();
+
+		if ( null !== $agent_id ) {
+			$where          = ' WHERE agent_id = %d';
+			$where_values[] = $agent_id;
+		} elseif ( null !== $user_id ) {
+			$where          = ' WHERE user_id = %d';
+			$where_values[] = $user_id;
 		}
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
+		$results = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				"SELECT pipeline_id, pipeline_name FROM %i{$where} ORDER BY pipeline_name ASC",
+				array_merge( array( $this->table_name ), $where_values )
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
 
 		return $results ? $results : array();
 	}
@@ -340,16 +374,29 @@ class Pipelines extends BaseRepository {
 	/**
 	 * Get pipeline count.
 	 *
-	 * @param int|null $user_id Optional user ID to filter by.
+	 * @param int|null $user_id  Optional user ID to filter by.
+	 * @param int|null $agent_id Optional agent ID to filter by.
 	 */
-	public function get_pipelines_count( ?int $user_id = null ): int {
-		if ( null !== $user_id ) {
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			$count = $this->wpdb->get_var( $this->wpdb->prepare( 'SELECT COUNT(pipeline_id) FROM %i WHERE user_id = %d', $this->table_name, $user_id ) );
-		} else {
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			$count = $this->wpdb->get_var( $this->wpdb->prepare( 'SELECT COUNT(pipeline_id) FROM %i', $this->table_name ) );
+	public function get_pipelines_count( ?int $user_id = null, ?int $agent_id = null ): int {
+		$where        = '';
+		$where_values = array();
+
+		if ( null !== $agent_id ) {
+			$where          = ' WHERE agent_id = %d';
+			$where_values[] = $agent_id;
+		} elseif ( null !== $user_id ) {
+			$where          = ' WHERE user_id = %d';
+			$where_values[] = $user_id;
 		}
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
+		$count = $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				"SELECT COUNT(pipeline_id) FROM %i{$where}",
+				array_merge( array( $this->table_name ), $where_values )
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
 
 		return (int) $count;
 	}
@@ -364,10 +411,13 @@ class Pipelines extends BaseRepository {
 		$per_page = (int) ( $args['per_page'] ?? 20 );
 		$offset   = (int) ( $args['offset'] ?? 0 );
 		$user_id  = isset( $args['user_id'] ) ? absint( $args['user_id'] ) : null;
+		$agent_id = isset( $args['agent_id'] ) ? absint( $args['agent_id'] ) : null;
 		$is_asc   = ( 'ASC' === $order );
 
 		$where = '';
-		if ( null !== $user_id ) {
+		if ( null !== $agent_id ) {
+			$where = $this->wpdb->prepare( ' WHERE agent_id = %d', $agent_id );
+		} elseif ( null !== $user_id ) {
 			$where = $this->wpdb->prepare( ' WHERE user_id = %d', $user_id );
 		}
 
@@ -548,6 +598,50 @@ class Pipelines extends BaseRepository {
 				'datamachine_log',
 				'info',
 				'Added user_id column to pipelines table for multi-agent support',
+				array( 'table_name' => $this->table_name )
+			);
+		}
+
+		// Add agent_id column for agent-first scoping (#735).
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		$agent_col = $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				"SELECT COLUMN_NAME
+				 FROM information_schema.COLUMNS
+				 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'agent_id'",
+				DB_NAME,
+				$this->table_name
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL
+
+		if ( null === $agent_col ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+			$result = $this->wpdb->query(
+				"ALTER TABLE {$this->table_name}
+				 ADD COLUMN agent_id bigint(20) unsigned DEFAULT NULL AFTER user_id,
+				 ADD KEY agent_id (agent_id)"
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL
+
+			if ( false === $result ) {
+				do_action(
+					'datamachine_log',
+					'error',
+					'Failed to add agent_id column to pipelines table',
+					array(
+						'table_name' => $this->table_name,
+						'db_error'   => $this->wpdb->last_error,
+					)
+				);
+				return;
+			}
+
+			do_action(
+				'datamachine_log',
+				'info',
+				'Added agent_id column to pipelines table for agent-first scoping',
 				array( 'table_name' => $this->table_name )
 			);
 		}

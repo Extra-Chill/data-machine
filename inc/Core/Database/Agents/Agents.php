@@ -54,6 +54,40 @@ class Agents extends BaseRepository {
 	}
 
 	/**
+	 * Get agent by agent ID.
+	 *
+	 * @since 0.41.0
+	 * @param int $agent_id Agent ID.
+	 * @return array|null Agent row or null if not found.
+	 */
+	public function get_agent( int $agent_id ): ?array {
+		if ( $agent_id <= 0 ) {
+			return null;
+		}
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$row = $this->wpdb->get_row(
+			$this->wpdb->prepare(
+				'SELECT * FROM %i WHERE agent_id = %d',
+				$this->table_name,
+				$agent_id
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+
+		if ( ! $row ) {
+			return null;
+		}
+
+		if ( ! empty( $row['agent_config'] ) ) {
+			$row['agent_config'] = json_decode( $row['agent_config'], true ) ? json_decode( $row['agent_config'], true ) : array();
+		}
+
+		return $row;
+	}
+
+	/**
 	 * Get agent by owner ID.
 	 *
 	 * @param int $owner_id Owner user ID.

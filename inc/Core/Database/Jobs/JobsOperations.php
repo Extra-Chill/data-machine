@@ -68,6 +68,7 @@ class JobsOperations extends BaseRepository {
 
 		$parent_job_id = isset( $job_data['parent_job_id'] ) ? absint( $job_data['parent_job_id'] ) : 0;
 		$user_id       = isset( $job_data['user_id'] ) ? absint( $job_data['user_id'] ) : 0;
+		$agent_id      = isset( $job_data['agent_id'] ) ? absint( $job_data['agent_id'] ) : null;
 
 		$data = array(
 			'user_id'     => $user_id,
@@ -77,6 +78,11 @@ class JobsOperations extends BaseRepository {
 		);
 
 		$format = array( '%d', '%s', '%s', '%s' );
+
+		if ( null !== $agent_id && $agent_id > 0 ) {
+			$data['agent_id'] = $agent_id;
+			$format[]         = '%d';
+		}
 
 		// Only include pipeline_id/flow_id when they have values (NULL omission lets DB default apply).
 		if ( ! $is_standalone ) {
@@ -169,6 +175,11 @@ class JobsOperations extends BaseRepository {
 		if ( isset( $args['user_id'] ) ) {
 			$where_clauses[] = 'user_id = %d';
 			$where_values[]  = absint( $args['user_id'] );
+		}
+
+		if ( isset( $args['agent_id'] ) ) {
+			$where_clauses[] = 'agent_id = %d';
+			$where_values[]  = absint( $args['agent_id'] );
 		}
 
 		if ( ! empty( $args['since'] ) ) {
@@ -265,6 +276,11 @@ class JobsOperations extends BaseRepository {
 		if ( isset( $args['user_id'] ) ) {
 			$where_clauses[] = 'j.user_id = %d';
 			$where_values[]  = absint( $args['user_id'] );
+		}
+
+		if ( isset( $args['agent_id'] ) ) {
+			$where_clauses[] = 'j.agent_id = %d';
+			$where_values[]  = absint( $args['agent_id'] );
 		}
 
 		if ( ! empty( $args['since'] ) ) {
