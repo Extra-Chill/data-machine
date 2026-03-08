@@ -8,16 +8,18 @@
 namespace DataMachine\Tests\Unit\AI\Tools;
 
 use DataMachine\Core\Database\Pipelines\Pipelines;
-use DataMachine\Engine\AI\Tools\ToolExecutor;
+use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use WP_UnitTestCase;
 
 class PipelineToolsAvailabilityTest extends WP_UnitTestCase {
 
 	private Pipelines $pipelines;
+	private ToolPolicyResolver $resolver;
 
 	public function set_up(): void {
 		parent::set_up();
 		$this->pipelines = new Pipelines();
+		$this->resolver  = new ToolPolicyResolver();
 	}
 
 	public function test_pipeline_step_tools_respect_disabled_tools(): void {
@@ -43,7 +45,10 @@ class PipelineToolsAvailabilityTest extends WP_UnitTestCase {
 		] );
 		$this->assertTrue( $updated );
 
-		$tools_without_disabled = ToolExecutor::getAvailableTools( null, null, $pipeline_step_id, [] );
+		$tools_without_disabled = $this->resolver->resolve( [
+			'surface'          => ToolPolicyResolver::SURFACE_PIPELINE,
+			'pipeline_step_id' => $pipeline_step_id,
+		] );
 		$this->assertIsArray( $tools_without_disabled );
 		$this->assertArrayHasKey( 'web_fetch', $tools_without_disabled );
 
@@ -53,7 +58,10 @@ class PipelineToolsAvailabilityTest extends WP_UnitTestCase {
 		] );
 		$this->assertTrue( $updated_again );
 
-		$tools_with_disabled = ToolExecutor::getAvailableTools( null, null, $pipeline_step_id, [] );
+		$tools_with_disabled = $this->resolver->resolve( [
+			'surface'          => ToolPolicyResolver::SURFACE_PIPELINE,
+			'pipeline_step_id' => $pipeline_step_id,
+		] );
 		$this->assertIsArray( $tools_with_disabled );
 		$this->assertArrayNotHasKey( 'web_fetch', $tools_with_disabled );
 	}
@@ -81,7 +89,10 @@ class PipelineToolsAvailabilityTest extends WP_UnitTestCase {
 		] );
 		$this->assertTrue( $updated );
 
-		$tools = ToolExecutor::getAvailableTools( null, null, $pipeline_step_id, [] );
+		$tools = $this->resolver->resolve( [
+			'surface'          => ToolPolicyResolver::SURFACE_PIPELINE,
+			'pipeline_step_id' => $pipeline_step_id,
+		] );
 		$this->assertIsArray( $tools );
 		$this->assertArrayNotHasKey( 'update_flow', $tools );
 	}

@@ -18,7 +18,9 @@ class ToolExecutor {
 
 	/**
 	 * Get available tools for AI agent execution.
-	 * Used by both chat and pipeline agents.
+	 *
+	 * @deprecated 0.39.0 Use ToolPolicyResolver::resolve() with SURFACE_PIPELINE instead.
+	 *             Delegates to ToolPolicyResolver internally.
 	 *
 	 * @param  array|null  $previous_step_config     Previous step configuration (pipeline only)
 	 * @param  array|null  $next_step_config         Next step configuration (pipeline only)
@@ -27,75 +29,15 @@ class ToolExecutor {
 	 * @return array Available tools array
 	 */
 	public static function getAvailableTools( ?array $previous_step_config = null, ?array $next_step_config = null, ?string $current_pipeline_step_id = null, array $engine_data = array() ): array {
-		$available_tools = array();
-		$tool_manager    = new ToolManager();
+		$resolver = new ToolPolicyResolver();
 
-		// Load tools from adjacent steps (supports both singular and plural handler config)
-		foreach ( array( $previous_step_config, $next_step_config ) as $step_config ) {
-			if ( ! $step_config ) {
-				continue;
-			}
-
-			// Data is normalized at the DB layer — handler_slugs/handler_configs are canonical.
-			$handler_slugs       = $step_config['handler_slugs'] ?? array();
-			$handler_configs_map = $step_config['handler_configs'] ?? array();
-
-			// Scope handler-specific tool cache by flow_step_id so that
-			// different flows (with different handler_configs) are cached
-			// independently within the same PHP process. Without this,
-			// the first flow to resolve "upsert_event" would poison the
-			// cache for all subsequent flows in the same AS batch.
-			$cache_scope = $step_config['flow_step_id'] ?? '';
-
-			foreach ( $handler_slugs as $slug ) {
-				$handler_config  = $handler_configs_map[ $slug ] ?? array();
-				$tools           = apply_filters('chubes_ai_tools', array(), $slug, $handler_config, $engine_data);
-				$tools           = $tool_manager->resolveAllTools( $tools, $cache_scope );
-				$allowed         = self::getAllowedTools($tools, $slug, $current_pipeline_step_id, $tool_manager);
-				$available_tools = array_merge($available_tools, $allowed);
-			}
-		}
-
-		// Load global tools (available to all AI agents) - use ToolManager which resolves callables
-		$global_tools         = $tool_manager->get_global_tools();
-		$allowed_global_tools = self::getAllowedTools($global_tools, null, $current_pipeline_step_id, $tool_manager);
-		$available_tools      = array_merge($available_tools, $allowed_global_tools);
-
-		return array_unique($available_tools, SORT_REGULAR);
-	}
-
-	/**
-	 * Get allowed tools based on enablement and configuration.
-	 *
-	 * @param  array       $all_tools        All available tools (must be resolved, not callables)
-	 * @param  string|null $handler_slug     Handler slug for filtering
-	 * @param  string|null $pipeline_step_id Pipeline step ID (pipeline only, null for chat)
-	 * @param  ToolManager $tool_manager     Tool manager instance for availability checks
-	 * @return array Filtered allowed tools
-	 */
-	private static function getAllowedTools( array $all_tools, ?string $handler_slug, ?string $pipeline_step_id, ToolManager $tool_manager ): array {
-		$allowed_tools = array();
-
-		foreach ( $all_tools as $tool_name => $tool_config ) {
-			// Skip if not a valid array definition
-			if ( ! is_array($tool_config) ) {
-				continue;
-			}
-
-			if ( isset($tool_config['handler']) ) {
-				if ( $tool_config['handler'] === $handler_slug ) {
-					$allowed_tools[ $tool_name ] = $tool_config;
-				}
-				continue;
-			}
-
-			// Direct ToolManager call replaces filter
-			if ( $tool_manager->is_tool_available($tool_name, $pipeline_step_id) ) {
-				$allowed_tools[ $tool_name ] = $tool_config;
-			}
-		}
-
-		return $allowed_tools;
+		return $resolver->resolve( array(
+			'surface'              => ToolPolicyResolver::SURFACE_PIPELINE,
+			'previous_step_config' => $previous_step_config,
+			'next_step_config'     => $next_step_config,
+			'pipeline_step_id'     => $current_pipeline_step_id,
+			'engine_data'          => $engine_data,
+		) );
 	}
 
 	/**

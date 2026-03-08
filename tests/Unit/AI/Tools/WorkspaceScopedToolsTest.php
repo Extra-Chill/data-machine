@@ -7,10 +7,17 @@
 
 namespace DataMachine\Tests\Unit\AI\Tools;
 
-use DataMachine\Engine\AI\Tools\ToolExecutor;
+use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use WP_UnitTestCase;
 
 class WorkspaceScopedToolsTest extends WP_UnitTestCase {
+
+	private ToolPolicyResolver $resolver;
+
+	public function set_up(): void {
+		parent::set_up();
+		$this->resolver = new ToolPolicyResolver();
+	}
 
 	/**
 	 * Ensure workspace fetch tools are only exposed when workspace fetch handler is adjacent.
@@ -26,7 +33,10 @@ class WorkspaceScopedToolsTest extends WP_UnitTestCase {
 			),
 		);
 
-		$tools = ToolExecutor::getAvailableTools( $previous_step, null, null, array() );
+		$tools = $this->resolver->resolve( [
+			'surface'              => ToolPolicyResolver::SURFACE_PIPELINE,
+			'previous_step_config' => $previous_step,
+		] );
 
 		$this->assertArrayHasKey( 'workspace_fetch_ls', $tools );
 		$this->assertArrayHasKey( 'workspace_fetch_read', $tools );
@@ -48,7 +58,10 @@ class WorkspaceScopedToolsTest extends WP_UnitTestCase {
 			),
 		);
 
-		$tools = ToolExecutor::getAvailableTools( null, $next_step, null, array() );
+		$tools = $this->resolver->resolve( [
+			'surface'          => ToolPolicyResolver::SURFACE_PIPELINE,
+			'next_step_config' => $next_step,
+		] );
 
 		$this->assertArrayHasKey( 'workspace_write', $tools );
 		$this->assertArrayHasKey( 'workspace_edit', $tools );

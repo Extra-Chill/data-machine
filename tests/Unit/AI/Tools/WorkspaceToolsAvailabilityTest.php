@@ -8,17 +8,25 @@
 namespace DataMachine\Tests\Unit\AI\Tools;
 
 use DataMachine\Core\Database\Pipelines\Pipelines;
-use DataMachine\Engine\AI\Tools\ToolExecutor;
-use DataMachine\Engine\AI\Tools\ToolManager;
+use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use WP_UnitTestCase;
 
 class WorkspaceToolsAvailabilityTest extends WP_UnitTestCase {
+
+	private ToolPolicyResolver $resolver;
+
+	public function set_up(): void {
+		parent::set_up();
+		$this->resolver = new ToolPolicyResolver();
+	}
 
 	/**
 	 * Verify chat tool list includes workspace global read tools.
 	 */
 	public function test_chat_tools_include_workspace_global_read_tools(): void {
-		$tools = ( new ToolManager() )->getAvailableToolsForChat();
+		$tools = $this->resolver->resolve( [
+			'surface' => ToolPolicyResolver::SURFACE_CHAT,
+		] );
 
 		$this->assertIsArray( $tools );
 		$this->assertArrayHasKey( 'workspace_path', $tools );
@@ -60,7 +68,10 @@ class WorkspaceToolsAvailabilityTest extends WP_UnitTestCase {
 
 		$this->assertTrue( $updated );
 
-		$tools = ToolExecutor::getAvailableTools( null, null, $pipeline_step_id, array() );
+		$tools = $this->resolver->resolve( [
+			'surface'          => ToolPolicyResolver::SURFACE_PIPELINE,
+			'pipeline_step_id' => $pipeline_step_id,
+		] );
 
 		$this->assertIsArray( $tools );
 		$this->assertArrayHasKey( 'workspace_path', $tools );

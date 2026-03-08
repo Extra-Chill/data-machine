@@ -21,6 +21,7 @@ use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\ConversationManager;
 use DataMachine\Engine\AI\AIConversationLoop;
 use DataMachine\Engine\AI\Tools\ToolManager;
+use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use DataMachine\Engine\AI\AgentType;
 use DataMachine\Engine\AI\AgentContext;
 use WP_Error;
@@ -551,8 +552,10 @@ class ChatOrchestrator {
 		AgentContext::set( $agent_type );
 
 		try {
-			$tool_manager = new ToolManager();
-			$all_tools    = $tool_manager->getAvailableToolsForChat();
+			$resolver  = new ToolPolicyResolver();
+			$all_tools = $resolver->resolve( array(
+				'surface' => ToolPolicyResolver::SURFACE_CHAT,
+			) );
 
 			$user_id      = $options['user_id'] ?? 0;
 			$loop_context = array(

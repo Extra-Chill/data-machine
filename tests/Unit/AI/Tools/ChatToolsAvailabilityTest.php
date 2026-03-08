@@ -7,13 +7,22 @@
 
 namespace DataMachine\Tests\Unit\AI\Tools;
 
-use DataMachine\Engine\AI\Tools\ToolManager;
+use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use WP_UnitTestCase;
 
 class ChatToolsAvailabilityTest extends WP_UnitTestCase {
 
+	private ToolPolicyResolver $resolver;
+
+	public function set_up(): void {
+		parent::set_up();
+		$this->resolver = new ToolPolicyResolver();
+	}
+
 	public function test_chat_tools_include_update_flow(): void {
-		$tools = ( new ToolManager() )->getAvailableToolsForChat();
+		$tools = $this->resolver->resolve( [
+			'surface' => ToolPolicyResolver::SURFACE_CHAT,
+		] );
 
 		$this->assertIsArray( $tools );
 		$this->assertArrayHasKey( 'update_flow', $tools );
@@ -23,7 +32,9 @@ class ChatToolsAvailabilityTest extends WP_UnitTestCase {
 	}
 
 	public function test_chat_tools_include_web_fetch(): void {
-		$tools = ( new ToolManager() )->getAvailableToolsForChat();
+		$tools = $this->resolver->resolve( [
+			'surface' => ToolPolicyResolver::SURFACE_CHAT,
+		] );
 
 		$this->assertIsArray( $tools );
 		$this->assertArrayHasKey( 'web_fetch', $tools );
