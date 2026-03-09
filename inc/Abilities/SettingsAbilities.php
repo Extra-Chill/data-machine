@@ -122,6 +122,14 @@ class SettingsAbilities {
 								'time_limit'         => array( 'type' => 'integer' ),
 							),
 						),
+						'github_pat'                     => array(
+							'type'        => 'string',
+							'description' => 'GitHub Personal Access Token for GitHub integration.',
+						),
+						'github_default_repo'            => array(
+							'type'        => 'string',
+							'description' => 'Default GitHub repository in owner/repo format.',
+						),
 						'network_settings'               => array(
 							'type'        => 'object',
 							'description' => 'Network-wide defaults (multisite). Keys: default_provider, default_model, agent_models.',
@@ -381,58 +389,71 @@ class SettingsAbilities {
 
 	public function executeUpdateSettings( array $input ): array {
 		$all_settings = get_option( 'datamachine_settings', array() );
+		$handled_keys = array();
 
 		if ( isset( $input['cleanup_job_data_on_failure'] ) ) {
 			$all_settings['cleanup_job_data_on_failure'] = (bool) $input['cleanup_job_data_on_failure'];
+			$handled_keys[]                              = 'cleanup_job_data_on_failure';
 		}
 
 		if ( isset( $input['file_retention_days'] ) ) {
 			$days                                = absint( $input['file_retention_days'] );
 			$all_settings['file_retention_days'] = max( 1, min( 90, $days ) );
+			$handled_keys[]                      = 'file_retention_days';
 		}
 
 		if ( isset( $input['chat_retention_days'] ) ) {
 			$days                                = absint( $input['chat_retention_days'] );
 			$all_settings['chat_retention_days'] = max( 1, min( 365, $days ) );
+			$handled_keys[]                      = 'chat_retention_days';
 		}
 
 		if ( isset( $input['chat_ai_titles_enabled'] ) ) {
 			$all_settings['chat_ai_titles_enabled'] = (bool) $input['chat_ai_titles_enabled'];
+			$handled_keys[]                         = 'chat_ai_titles_enabled';
 		}
 
 		if ( isset( $input['alt_text_auto_generate_enabled'] ) ) {
 			$all_settings['alt_text_auto_generate_enabled'] = (bool) $input['alt_text_auto_generate_enabled'];
+			$handled_keys[]                                 = 'alt_text_auto_generate_enabled';
 		}
 
 		if ( isset( $input['problem_flow_threshold'] ) ) {
 			$threshold                              = absint( $input['problem_flow_threshold'] );
 			$all_settings['problem_flow_threshold'] = max( 1, min( 10, $threshold ) );
+			$handled_keys[]                         = 'problem_flow_threshold';
 		}
 
 		if ( isset( $input['flows_per_page'] ) ) {
 			$flows_per_page                 = absint( $input['flows_per_page'] );
 			$all_settings['flows_per_page'] = max( 5, min( 100, $flows_per_page ) );
+			$handled_keys[]                 = 'flows_per_page';
 		}
 
 		if ( isset( $input['jobs_per_page'] ) ) {
 			$jobs_per_page                 = absint( $input['jobs_per_page'] );
 			$all_settings['jobs_per_page'] = max( 5, min( 100, $jobs_per_page ) );
+			$handled_keys[]                = 'jobs_per_page';
 		}
 
 		if ( isset( $input['site_context_enabled'] ) ) {
 			$all_settings['site_context_enabled'] = (bool) $input['site_context_enabled'];
+			$handled_keys[]                       = 'site_context_enabled';
 		}
 
 		if ( isset( $input['daily_memory_enabled'] ) ) {
 			$all_settings['daily_memory_enabled'] = (bool) $input['daily_memory_enabled'];
+			$handled_keys[]                       = 'daily_memory_enabled';
 		}
 
 		if ( isset( $input['default_provider'] ) ) {
 			$all_settings['default_provider'] = sanitize_text_field( $input['default_provider'] );
+			$handled_keys[]                   = 'default_provider';
 		}
 
 		if ( isset( $input['default_model'] ) ) {
 			$all_settings['default_model'] = sanitize_text_field( $input['default_model'] );
+			$handled_keys[]                = 'default_model';
 		}
 
 		if ( isset( $input['agent_models'] ) && is_array( $input['agent_models'] ) ) {
@@ -447,11 +468,13 @@ class SettingsAbilities {
 				}
 			}
 			$all_settings['agent_models'] = $agent_models;
+			$handled_keys[]               = 'agent_models';
 		}
 
 		if ( isset( $input['max_turns'] ) ) {
 			$turns                     = absint( $input['max_turns'] );
 			$all_settings['max_turns'] = max( 1, min( 50, $turns ) );
+			$handled_keys[]            = 'max_turns';
 		}
 
 		if ( isset( $input['disabled_tools'] ) ) {
@@ -461,6 +484,7 @@ class SettingsAbilities {
 					$all_settings['disabled_tools'][ sanitize_key( $tool_id ) ] = true;
 				}
 			}
+			$handled_keys[] = 'disabled_tools';
 		}
 
 		if ( isset( $input['ai_provider_keys'] ) && is_array( $input['ai_provider_keys'] ) ) {
@@ -477,6 +501,7 @@ class SettingsAbilities {
 				}
 			}
 			apply_filters( 'chubes_ai_provider_api_keys', $current_keys );
+			$handled_keys[] = 'ai_provider_keys';
 		}
 
 		// Queue tuning settings for Action Scheduler
@@ -499,6 +524,18 @@ class SettingsAbilities {
 			}
 
 			$all_settings['queue_tuning'] = $tuning;
+			$handled_keys[]               = 'queue_tuning';
+		}
+
+		// GitHub integration settings.
+		if ( isset( $input['github_pat'] ) ) {
+			$all_settings['github_pat'] = sanitize_text_field( $input['github_pat'] );
+			$handled_keys[]             = 'github_pat';
+		}
+
+		if ( isset( $input['github_default_repo'] ) ) {
+			$all_settings['github_default_repo'] = sanitize_text_field( $input['github_default_repo'] );
+			$handled_keys[]                      = 'github_default_repo';
 		}
 
 		// Network-wide defaults (requires super admin on multisite).
@@ -532,15 +569,51 @@ class SettingsAbilities {
 					NetworkSettings::update( $network_values );
 				}
 			}
+			$handled_keys[] = 'network_settings';
 		}
+
+		/**
+		 * Filter to allow extensions to handle their own settings keys.
+		 *
+		 * Extensions can modify $all_settings for keys they own and add
+		 * those keys to $handled_keys so the CLI knows they were processed.
+		 *
+		 * @since 0.40.0
+		 *
+		 * @param array $all_settings  Current settings array (will be saved to DB).
+		 * @param array $input         Raw input from the settings update request.
+		 * @param array $handled_keys  Keys already handled by core.
+		 * @return array Associative array with 'settings' and 'handled_keys'.
+		 */
+		$filtered = apply_filters(
+			'datamachine_update_settings',
+			array(
+				'settings'     => $all_settings,
+				'handled_keys' => $handled_keys,
+			),
+			$input
+		);
+
+		$all_settings = $filtered['settings'] ?? $all_settings;
+		$handled_keys = $filtered['handled_keys'] ?? $handled_keys;
 
 		update_option( 'datamachine_settings', $all_settings );
 		PluginSettings::clearCache();
 
-		return array(
+		// Identify unhandled keys so callers know if something was ignored.
+		$input_keys    = array_keys( $input );
+		$unhandled     = array_diff( $input_keys, $handled_keys );
+
+		$result = array(
 			'success' => true,
 			'message' => __( 'Settings saved successfully.', 'data-machine' ),
 		);
+
+		if ( ! empty( $unhandled ) ) {
+			$result['unhandled_keys'] = array_values( $unhandled );
+		}
+
+		return $result;
 	}
 
 	public function executeGetSchedulingIntervals( array $input ): array {

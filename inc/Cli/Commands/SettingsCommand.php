@@ -154,6 +154,10 @@ class SettingsCommand extends BaseCommand {
 		}
 
 		if ( $result['success'] ?? false ) {
+			$unhandled = $result['unhandled_keys'] ?? array();
+			if ( in_array( $key, $unhandled, true ) ) {
+				WP_CLI::error( "Setting '{$key}' is not a recognized setting key. It was not saved." );
+			}
 			WP_CLI::success( "Updated '{$key}': " . $this->format_value( $old_value ) . ' → ' . $this->format_value( $value ) );
 		} elseif ( $old_value === $value ) {
 			WP_CLI::warning( "Setting '{$key}' already has value: " . $this->format_value( $value ) );
