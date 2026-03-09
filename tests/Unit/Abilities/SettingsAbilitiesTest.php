@@ -228,6 +228,79 @@ class SettingsAbilitiesTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'not found', $result['error'] );
 	}
 
+	public function test_update_settings_handles_github_pat(): void {
+		$result = $this->settings_abilities->executeUpdateSettings(
+			array( 'github_pat' => 'ghp_test123' )
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertArrayNotHasKey( 'unhandled_keys', $result );
+
+		$updated_settings = get_option( 'datamachine_settings', array() );
+		$this->assertSame( 'ghp_test123', $updated_settings['github_pat'] );
+	}
+
+	public function test_update_settings_handles_github_default_repo(): void {
+		$result = $this->settings_abilities->executeUpdateSettings(
+			array( 'github_default_repo' => 'Extra-Chill/data-machine' )
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertArrayNotHasKey( 'unhandled_keys', $result );
+
+		$updated_settings = get_option( 'datamachine_settings', array() );
+		$this->assertSame( 'Extra-Chill/data-machine', $updated_settings['github_default_repo'] );
+	}
+
+	public function test_update_settings_reports_unhandled_keys(): void {
+		$result = $this->settings_abilities->executeUpdateSettings(
+			array( 'totally_fake_key' => 'some_value' )
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertArrayHasKey( 'unhandled_keys', $result );
+		$this->assertContains( 'totally_fake_key', $result['unhandled_keys'] );
+	}
+
+	public function test_update_settings_no_unhandled_keys_for_known_settings(): void {
+		$result = $this->settings_abilities->executeUpdateSettings(
+			array(
+				'default_model'    => 'gpt-4o',
+				'default_provider' => 'openai',
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertArrayNotHasKey( 'unhandled_keys', $result );
+	}
+
+	public function test_update_settings_extensible_via_filter(): void {
+		add_filter(
+			'datamachine_update_settings',
+			function ( $data, $input ) {
+				if ( isset( $input['custom_extension_key'] ) ) {
+					$data['settings']['custom_extension_key'] = sanitize_text_field( $input['custom_extension_key'] );
+					$data['handled_keys'][]                   = 'custom_extension_key';
+				}
+				return $data;
+			},
+			10,
+			2
+		);
+
+		$result = $this->settings_abilities->executeUpdateSettings(
+			array( 'custom_extension_key' => 'extension_value' )
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertArrayNotHasKey( 'unhandled_keys', $result );
+
+		$updated_settings = get_option( 'datamachine_settings', array() );
+		$this->assertSame( 'extension_value', $updated_settings['custom_extension_key'] );
+
+		remove_all_filters( 'datamachine_update_settings' );
+	}
+
 	public function test_permission_callback(): void {
 		wp_set_current_user( 0 );
 		add_filter( 'datamachine_cli_bypass_permissions', '__return_false' );

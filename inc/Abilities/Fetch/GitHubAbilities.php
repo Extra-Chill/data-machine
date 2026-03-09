@@ -552,6 +552,69 @@ class GitHubAbilities {
 	}
 
 	/**
+	 * Create a GitHub issue.
+	 *
+	 * @param array $input Ability input with repo, title, body, labels.
+	 * @return array Result with success, issue data, or error.
+	 */
+	public static function createIssue( array $input ): array {
+		$repo = self::resolveRepo( sanitize_text_field( $input['repo'] ?? '' ) );
+		if ( empty( $repo ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Repository (owner/repo) is required or configure a default repo.',
+			);
+		}
+
+		$title = sanitize_text_field( $input['title'] ?? '' );
+		if ( empty( $title ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Issue title is required.',
+			);
+		}
+
+		$pat = self::getPat();
+		if ( empty( $pat ) ) {
+			return self::patError();
+		}
+
+		$body = array(
+			'title' => $title,
+		);
+
+		if ( ! empty( $input['body'] ) ) {
+			$body['body'] = $input['body'];
+		}
+
+		if ( ! empty( $input['labels'] ) && is_array( $input['labels'] ) ) {
+			$body['labels'] = array_map( 'sanitize_text_field', $input['labels'] );
+		}
+
+		if ( ! empty( $input['assignees'] ) && is_array( $input['assignees'] ) ) {
+			$body['assignees'] = array_map( 'sanitize_text_field', $input['assignees'] );
+		}
+
+		$url      = sprintf( '%s/repos/%s/issues', self::API_BASE, $repo );
+		$response = self::apiRequest( 'POST', $url, $body, $pat );
+
+		if ( ! $response['success'] ) {
+			return $response;
+		}
+
+		$issue = self::normalizeIssue( $response['data'] );
+
+		return array(
+			'success'      => true,
+			'issue'        => $issue,
+			'issue_url'    => $issue['url'] ?? '',
+			'issue_number' => $issue['number'] ?? 0,
+			'html_url'     => $issue['html_url'] ?? '',
+			'message'      => sprintf( 'Issue #%d created in %s.', $issue['number'] ?? 0, $repo ),
+		);
+	}
+
+	/**
 	 * Add a comment to a GitHub issue.
 	 *
 	 * @param array $input Ability input.
