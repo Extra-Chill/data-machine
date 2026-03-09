@@ -14,7 +14,6 @@ namespace DataMachine\Abilities;
 use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Engine\AI\RequestBuilder;
-use DataMachine\Engine\AI\AgentType;
 use DataMachine\Core\Database\Chat\Chat as ChatDatabase;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\System\SystemAgent;

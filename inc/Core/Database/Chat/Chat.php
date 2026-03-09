@@ -148,7 +148,7 @@ class Chat extends BaseRepository {
 		int $user_id,
 		int $agent_id = 0,
 		array $metadata = array(),
-		string $agent_type = \DataMachine\Engine\AI\AgentType::CHAT
+		string $agent_type = 'chat'
 	): string {
 		global $wpdb;
 
@@ -287,7 +287,7 @@ class Chat extends BaseRepository {
 				array(
 					'session_id' => $session_id,
 					'error'      => $wpdb->last_error,
-					'agent_type' => \DataMachine\Engine\AI\AgentType::CHAT,
+					'agent_type' => 'chat',
 				)
 			);
 			return false;
@@ -322,7 +322,7 @@ class Chat extends BaseRepository {
 				array(
 					'session_id' => $session_id,
 					'error'      => $wpdb->last_error,
-					'agent_type' => \DataMachine\Engine\AI\AgentType::CHAT,
+					'agent_type' => 'chat',
 				)
 			);
 			return false;
@@ -334,7 +334,7 @@ class Chat extends BaseRepository {
 			'Chat session deleted',
 			array(
 				'session_id' => $session_id,
-				'agent_type' => \DataMachine\Engine\AI\AgentType::CHAT,
+				'agent_type' => 'chat',
 			)
 		);
 
@@ -367,7 +367,7 @@ class Chat extends BaseRepository {
 				'Cleaned up expired chat sessions',
 				array(
 					'deleted_count' => $deleted,
-					'agent_type'    => \DataMachine\Engine\AI\AgentType::CHAT,
+					'agent_type'    => 'chat',
 				)
 			);
 		}
@@ -388,7 +388,7 @@ class Chat extends BaseRepository {
 		int $user_id,
 		int $limit = 20,
 		int $offset = 0,
-		string $agent_type = \DataMachine\Engine\AI\AgentType::CHAT
+		string $agent_type = 'chat'
 	): array {
 		global $wpdb;
 
@@ -444,7 +444,7 @@ class Chat extends BaseRepository {
 	 */
 	public function get_user_session_count(
 		int $user_id,
-		string $agent_type = \DataMachine\Engine\AI\AgentType::CHAT
+		string $agent_type = 'chat'
 	): int {
 		global $wpdb;
 
@@ -485,7 +485,7 @@ class Chat extends BaseRepository {
 	public function get_recent_pending_session(
 		int $user_id,
 		int $seconds = 600,
-		string $agent_type = \DataMachine\Engine\AI\AgentType::CHAT
+		string $agent_type = 'chat'
 	): ?array {
 		global $wpdb;
 
@@ -553,7 +553,7 @@ class Chat extends BaseRepository {
 				array(
 					'session_id' => $session_id,
 					'error'      => $wpdb->last_error,
-					'agent_type' => \DataMachine\Engine\AI\AgentType::CHAT,
+					'agent_type' => 'chat',
 				)
 			);
 			return false;
@@ -592,7 +592,7 @@ class Chat extends BaseRepository {
 					'deleted_count'  => $deleted,
 					'retention_days' => $retention_days,
 					'cutoff_date'    => $cutoff_date,
-					'agent_type'     => \DataMachine\Engine\AI\AgentType::CHAT,
+					'agent_type'     => 'chat',
 				)
 			);
 		}
@@ -640,7 +640,7 @@ class Chat extends BaseRepository {
 					'deleted_count'   => $deleted,
 					'hours_threshold' => $hours,
 					'cutoff_time'     => $cutoff_time,
-					'agent_type'      => \DataMachine\Engine\AI\AgentType::CHAT,
+					'agent_type'      => 'chat',
 				)
 			);
 		}

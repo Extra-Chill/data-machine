@@ -11,8 +11,6 @@
 
 namespace DataMachine\Abilities\Chat;
 
-use DataMachine\Engine\AI\AgentType;
-
 defined( 'ABSPATH' ) || exit;
 
 class CreateChatSessionAbility {
@@ -105,7 +103,7 @@ class CreateChatSessionAbility {
 
 		$user_id    = (int) $input['user_id'];
 		$agent_id   = (int) ( $input['agent_id'] ?? 0 );
-		$agent_type = ! empty( $input['agent_type'] ) ? sanitize_text_field( $input['agent_type'] ) : AgentType::CHAT;
+		$agent_type = ! empty( $input['agent_type'] ) ? sanitize_text_field( $input['agent_type'] ) : 'chat';
 		$source     = ! empty( $input['source'] ) ? sanitize_text_field( $input['source'] ) : null;
 
 		if ( ! $this->can_access_user_sessions( $user_id ) ) {

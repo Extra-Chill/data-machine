@@ -22,7 +22,6 @@ use DataMachine\Engine\AI\ConversationManager;
 use DataMachine\Engine\AI\AIConversationLoop;
 use DataMachine\Engine\AI\Tools\ToolManager;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
-use DataMachine\Engine\AI\AgentType;
 use WP_Error;
 
 defined( 'ABSPATH' ) || exit;
@@ -89,7 +88,7 @@ class ChatOrchestrator {
 			$messages = $session['messages'];
 		} else {
 			// Check for recent pending session to prevent duplicates from timeout retries.
-			$pending_session = $chat_db->get_recent_pending_session( $user_id, 600, AgentType::CHAT );
+			$pending_session = $chat_db->get_recent_pending_session( $user_id, 600, 'chat' );
 
 			if ( $pending_session ) {
 				$session_id = $pending_session['session_id'];
@@ -103,7 +102,7 @@ class ChatOrchestrator {
 						'session_id'          => $session_id,
 						'user_id'             => $user_id,
 						'original_created_at' => $pending_session['created_at'],
-						'agent_type'          => AgentType::CHAT,
+						'agent_type'          => 'chat',
 					)
 				);
 			} else {
@@ -157,7 +156,7 @@ class ChatOrchestrator {
 				'single_turn'          => true,
 				'max_turns'            => $max_turns,
 				'selected_pipeline_id' => $selected_pipeline_id ? $selected_pipeline_id : null,
-				'agent_type'           => AgentType::CHAT,
+				'agent_type'           => 'chat',
 				'user_id'              => $user_id,
 			)
 		);
@@ -289,7 +288,7 @@ class ChatOrchestrator {
 				'single_turn'          => true,
 				'max_turns'            => $max_turns,
 				'selected_pipeline_id' => $selected_pipeline_id,
-				'agent_type'           => AgentType::CHAT,
+				'agent_type'           => 'chat',
 				'user_id'              => (int) ( $session['user_id'] ?? 0 ),
 			)
 		);
@@ -392,7 +391,7 @@ class ChatOrchestrator {
 			$provider,
 			$model,
 			array(
-				'agent_type' => AgentType::CHAT,
+				'agent_type' => 'chat',
 				'user_id'    => $user_id,
 			)
 		);
@@ -428,7 +427,7 @@ class ChatOrchestrator {
 			array(
 				'session_id' => $session_id,
 				'turns'      => $result['turn_count'],
-				'agent_type' => AgentType::CHAT,
+				'agent_type' => 'chat',
 			)
 		);
 
@@ -463,7 +462,7 @@ class ChatOrchestrator {
 			$input = array(
 				'user_id'    => $user_id,
 				'agent_id'   => $agent_id,
-				'agent_type' => AgentType::CHAT,
+				'agent_type' => 'chat',
 			);
 
 			if ( $source ) {
@@ -498,7 +497,7 @@ class ChatOrchestrator {
 			$metadata['source'] = $source;
 		}
 
-		$session_id = $chat_db->create_session( $user_id, $agent_id, $metadata, AgentType::CHAT );
+		$session_id = $chat_db->create_session( $user_id, $agent_id, $metadata, 'chat' );
 
 		if ( empty( $session_id ) ) {
 			return new WP_Error(
@@ -528,7 +527,7 @@ class ChatOrchestrator {
 	 *     @type bool   $single_turn          Whether to run single turn (default false).
 	 *     @type int    $max_turns             Maximum turns allowed (default 12).
 	 *     @type int    $selected_pipeline_id  Currently selected pipeline ID.
-	 *     @type string $agent_type            Agent type for context (default AgentType::CHAT).
+	 *     @type string $agent_type            Agent type for context (default 'chat').
 	 * }
 	 * @return array|WP_Error Result array with messages, final_content, completed, turn_count,
 	 *                        last_tool_calls, and optional warning/max_turns_reached keys.
@@ -544,7 +543,7 @@ class ChatOrchestrator {
 		$single_turn          = $options['single_turn'] ?? false;
 		$max_turns            = $options['max_turns'] ?? PluginSettings::get( 'max_turns', 12 );
 		$selected_pipeline_id = $options['selected_pipeline_id'] ?? null;
-		$agent_type           = $options['agent_type'] ?? AgentType::CHAT;
+		$agent_type           = $options['agent_type'] ?? 'chat';
 
 		$chat_db = new ChatDatabase();
 

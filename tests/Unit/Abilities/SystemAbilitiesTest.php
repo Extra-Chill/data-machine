@@ -12,7 +12,6 @@ namespace DataMachine\Tests\Unit\Abilities;
 use DataMachine\Abilities\SystemAbilities;
 use DataMachine\Core\Database\Chat\Chat as ChatDatabase;
 use DataMachine\Core\PluginSettings;
-use DataMachine\Engine\AI\AgentType;
 use WP_UnitTestCase;
 
 class SystemAbilitiesTest extends WP_UnitTestCase {
@@ -51,7 +50,7 @@ class SystemAbilitiesTest extends WP_UnitTestCase {
 			$this->test_user_id,
 			0,
 			array( 'status' => 'completed' ),
-			AgentType::CHAT
+			'chat'
 		);
 
 		$this->chat_db->update_session( $session_id, $messages, array() );

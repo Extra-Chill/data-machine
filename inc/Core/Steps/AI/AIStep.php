@@ -11,7 +11,6 @@ use DataMachine\Engine\AI\AIConversationLoop;
 use DataMachine\Engine\AI\ConversationManager;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
-use DataMachine\Engine\AI\AgentType;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -235,7 +234,7 @@ class AIStep extends Step {
 			$available_tools,
 			$provider_name,
 			$pipeline_step_config['model'] ?? $pipeline_agent_defaults['model'],
-			AgentType::PIPELINE,
+			'pipeline',
 			$payload,
 			$max_turns
 		);

@@ -16,7 +16,6 @@ namespace DataMachine\Api\Chat;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\PluginSettings;
-use DataMachine\Engine\AI\AgentType;
 use WP_REST_Response;
 use WP_REST_Server;
 use WP_REST_Request;
@@ -206,11 +205,11 @@ class Chat {
 					'agent_type' => array(
 						'type'              => 'string',
 						'required'          => false,
-						'default'           => AgentType::CHAT,
+						'default'           => 'chat',
 						'description'       => __( 'Agent type filter (chat, pipeline, system)', 'data-machine' ),
 						'sanitize_callback' => 'sanitize_text_field',
 						'validate_callback' => function ( $param ) {
-							return AgentType::isValid( $param );
+							return in_array( $param, array( 'chat', 'pipeline', 'system' ), true );
 						},
 					),
 				),
