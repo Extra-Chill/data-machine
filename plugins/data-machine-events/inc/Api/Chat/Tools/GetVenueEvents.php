@@ -20,7 +20,7 @@ use DataMachineEvents\Abilities\EventQueryAbilities;
 class GetVenueEvents extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'get_venue_events', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'get_venue_events', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	public function getToolDefinition(): array {
