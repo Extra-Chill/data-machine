@@ -225,4 +225,17 @@ abstract class BaseExtractor implements ExtractorInterface {
 	protected function formatPriceRange( ?float $min, ?float $max = null ): string {
 		return PriceFormatter::formatRange( $min, $max );
 	}
+
+	/**
+	 * Format structured price data into a display string.
+	 *
+	 * @param float|null $min Minimum price.
+	 * @param float|null $max Maximum price.
+	 * @param string     $currency ISO currency code.
+	 * @param bool|null  $is_free Explicit free flag.
+	 * @return string
+	 */
+	protected function formatStructuredPrice( ?float $min = null, ?float $max = null, string $currency = 'USD', ?bool $is_free = null ): string {
+		return PriceFormatter::formatStructured( $min, $max, $currency, $is_free );
+	}
 }
