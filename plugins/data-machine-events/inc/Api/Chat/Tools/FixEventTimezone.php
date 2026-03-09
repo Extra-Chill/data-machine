@@ -20,7 +20,7 @@ use DataMachineEvents\Abilities\TimezoneAbilities;
 class FixEventTimezone extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'fix_event_timezone', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'fix_event_timezone', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	public function getToolDefinition(): array {

@@ -20,7 +20,7 @@ use DataMachineEvents\Abilities\TimezoneAbilities;
 class FindBrokenTimezoneEvents extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'find_broken_timezone_events', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'find_broken_timezone_events', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	public function getToolDefinition(): array {

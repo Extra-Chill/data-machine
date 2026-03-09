@@ -21,7 +21,7 @@ use DataMachineEvents\Abilities\VenueAbilities;
 class VenueHealthCheck extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'venue_health_check', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'venue_health_check', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	public function getToolDefinition(): array {

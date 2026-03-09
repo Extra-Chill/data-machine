@@ -20,7 +20,7 @@ use DataMachineEvents\Abilities\EventScraperTest;
 class TestEventScraper extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'test_event_scraper', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'test_event_scraper', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	public function getToolDefinition(): array {
