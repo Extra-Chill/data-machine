@@ -83,6 +83,7 @@ function datamachine_socials_bootstrap() {
 	new \DataMachineSocials\Abilities\Pinterest\PinterestReadAbility();
 	new \DataMachineSocials\Abilities\Pinterest\PinterestUpdateAbility();
 	new \DataMachineSocials\Abilities\Pinterest\PinterestDeleteAbility();
+	new \DataMachineSocials\Abilities\Pinterest\PinterestAnalyticsAbility();
 
 	// Reddit (Fetch)
 	new \DataMachineSocials\Abilities\Reddit\FetchRedditAbility();

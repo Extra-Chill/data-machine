@@ -31,7 +31,7 @@ class PinterestAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
 	const AUTH_URL  = 'https://www.pinterest.com/oauth/';
 	const TOKEN_URL = 'https://api.pinterest.com/v5/oauth/token';
-	const SCOPES    = 'boards:read,pins:write';
+	const SCOPES    = 'boards:read,pins:read,pins:write,user_accounts:read';
 
 	/**
 	 * Constructor.
