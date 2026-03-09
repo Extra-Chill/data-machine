@@ -13,6 +13,7 @@ namespace DataMachine\Cli\Commands;
 
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
+use DataMachine\Cli\AgentResolver;
 use DataMachine\Cli\UserResolver;
 use DataMachine\Abilities\JobAbilities;
 use DataMachine\Core\Database\Jobs\Jobs;
@@ -221,13 +222,16 @@ class JobsCommand extends BaseCommand {
 			$limit = 500;
 		}
 
-		$user_id = UserResolver::resolve( $assoc_args );
+		$scoping = AgentResolver::buildScopingInput( $assoc_args );
 
-		$input = array(
-			'per_page' => $limit,
-			'offset'   => 0,
-			'orderby'  => 'j.job_id',
-			'order'    => 'DESC',
+		$input = array_merge(
+			$scoping,
+			array(
+				'per_page' => $limit,
+				'offset'   => 0,
+				'orderby'  => 'j.job_id',
+				'order'    => 'DESC',
+			)
 		);
 
 		if ( $status ) {
@@ -236,10 +240,6 @@ class JobsCommand extends BaseCommand {
 
 		if ( $flow_id ) {
 			$input['flow_id'] = $flow_id;
-		}
-
-		if ( $user_id > 0 ) {
-			$input['user_id'] = $user_id;
 		}
 
 		$since = $assoc_args['since'] ?? null;

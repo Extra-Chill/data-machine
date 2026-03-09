@@ -19,6 +19,7 @@ namespace DataMachine\Cli\Commands;
 
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
+use DataMachine\Cli\AgentResolver;
 use DataMachine\Abilities\AgentMemoryAbilities;
 use DataMachine\Core\FilesRepository\DailyMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
@@ -62,9 +63,8 @@ class MemoryCommand extends BaseCommand {
 	 */
 	public function read( array $args, array $assoc_args ): void {
 		$section = $args[0] ?? null;
-		$user_id = UserResolver::resolve( $assoc_args );
+		$input   = $this->resolveMemoryScoping( $assoc_args );
 
-		$input = array( 'user_id' => $user_id );
 		if ( null !== $section ) {
 			$input['section'] = $section;
 		}
@@ -110,8 +110,8 @@ class MemoryCommand extends BaseCommand {
 	 * @subcommand sections
 	 */
 	public function sections( array $args, array $assoc_args ): void {
-		$user_id = UserResolver::resolve( $assoc_args );
-		$result  = AgentMemoryAbilities::listSections( array( 'user_id' => $user_id ) );
+		$scoping = $this->resolveMemoryScoping( $assoc_args );
+		$result  = AgentMemoryAbilities::listSections( $scoping );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['message'] ?? 'Failed to list sections.' );
@@ -183,14 +183,16 @@ class MemoryCommand extends BaseCommand {
 			return;
 		}
 
-		$user_id = UserResolver::resolve( $assoc_args );
+		$scoping = $this->resolveMemoryScoping( $assoc_args );
 
 		$result = AgentMemoryAbilities::updateMemory(
-			array(
-				'user_id' => $user_id,
-				'section' => $section,
-				'content' => $content,
-				'mode'    => $mode,
+			array_merge(
+				$scoping,
+				array(
+					'section' => $section,
+					'content' => $content,
+					'mode'    => $mode,
+				)
 			)
 		);
 
@@ -231,14 +233,15 @@ class MemoryCommand extends BaseCommand {
 
 		$query   = $args[0];
 		$section = $assoc_args['section'] ?? null;
-
-		$user_id = UserResolver::resolve( $assoc_args );
+		$scoping = $this->resolveMemoryScoping( $assoc_args );
 
 		$result = AgentMemoryAbilities::searchMemory(
-			array(
-				'user_id' => $user_id,
-				'query'   => $query,
-				'section' => $section,
+			array_merge(
+				$scoping,
+				array(
+					'query'   => $query,
+					'section' => $section,
+				)
 			)
 		);
 
@@ -309,9 +312,10 @@ class MemoryCommand extends BaseCommand {
 			return;
 		}
 
-		$action  = $args[0];
-		$user_id = UserResolver::resolve( $assoc_args );
-		$daily   = new DailyMemory( $user_id );
+		$action   = $args[0];
+		$agent_id = AgentResolver::resolve( $assoc_args );
+		$user_id  = ( null === $agent_id ) ? UserResolver::resolve( $assoc_args ) : 0;
+		$daily    = new DailyMemory( $user_id, $agent_id ?? 0 );
 
 		switch ( $action ) {
 			case 'list':
@@ -575,12 +579,13 @@ class MemoryCommand extends BaseCommand {
 			return;
 		}
 
-		$action  = $args[0];
-		$user_id = UserResolver::resolve( $assoc_args );
+		$action   = $args[0];
+		$agent_id = AgentResolver::resolve( $assoc_args );
+		$user_id  = ( null === $agent_id ) ? UserResolver::resolve( $assoc_args ) : 0;
 
 		switch ( $action ) {
 			case 'list':
-				$this->files_list( $assoc_args, $user_id );
+				$this->files_list( $assoc_args, $user_id, $agent_id );
 				break;
 			case 'read':
 				$filename = $args[1] ?? null;
@@ -588,7 +593,7 @@ class MemoryCommand extends BaseCommand {
 					WP_CLI::error( 'Filename is required. Usage: wp datamachine agent files read <filename>' );
 					return;
 				}
-				$this->files_read( $filename, $user_id );
+				$this->files_read( $filename, $user_id, $agent_id );
 				break;
 			case 'write':
 				$filename = $args[1] ?? null;
@@ -596,10 +601,10 @@ class MemoryCommand extends BaseCommand {
 					WP_CLI::error( 'Filename is required. Usage: wp datamachine agent files write <filename>' );
 					return;
 				}
-				$this->files_write( $filename, $user_id );
+				$this->files_write( $filename, $user_id, $agent_id );
 				break;
 			case 'check':
-				$this->files_check( $assoc_args, $user_id );
+				$this->files_check( $assoc_args, $user_id, $agent_id );
 				break;
 			default:
 				WP_CLI::error( "Unknown files action: {$action}. Use: list, read, write, check" );
@@ -611,8 +616,8 @@ class MemoryCommand extends BaseCommand {
 	 *
 	 * @param array $assoc_args Command arguments.
 	 */
-	private function files_list( array $assoc_args, int $user_id = 0 ): void {
-		$agent_dir = $this->get_agent_dir( $user_id );
+	private function files_list( array $assoc_args, int $user_id = 0, ?int $agent_id = null ): void {
+		$agent_dir = $this->get_agent_dir( $user_id, $agent_id );
 
 		if ( ! is_dir( $agent_dir ) ) {
 			WP_CLI::error( 'Agent directory does not exist.' );
@@ -649,12 +654,12 @@ class MemoryCommand extends BaseCommand {
 	 *
 	 * @param string $filename File name (e.g., SOUL.md).
 	 */
-	private function files_read( string $filename, int $user_id = 0 ): void {
-		$agent_dir = $this->get_agent_dir( $user_id );
+	private function files_read( string $filename, int $user_id = 0, ?int $agent_id = null ): void {
+		$agent_dir = $this->get_agent_dir( $user_id, $agent_id );
 		$filepath  = $agent_dir . '/' . $this->sanitize_agent_filename( $filename );
 
 		if ( ! file_exists( $filepath ) ) {
-			$available = $this->list_agent_filenames( $user_id );
+			$available = $this->list_agent_filenames( $user_id, $agent_id );
 			WP_CLI::error( sprintf( 'File "%s" not found. Available files: %s', $filename, implode( ', ', $available ) ) );
 			return;
 		}
@@ -668,7 +673,7 @@ class MemoryCommand extends BaseCommand {
 	 *
 	 * @param string $filename File name (e.g., SOUL.md).
 	 */
-	private function files_write( string $filename, int $user_id = 0 ): void {
+	private function files_write( string $filename, int $user_id = 0, ?int $agent_id = null ): void {
 		$fs        = FilesystemHelper::get();
 		$safe_name = $this->sanitize_agent_filename( $filename );
 
@@ -678,7 +683,7 @@ class MemoryCommand extends BaseCommand {
 			return;
 		}
 
-		$agent_dir = $this->get_agent_dir( $user_id );
+		$agent_dir = $this->get_agent_dir( $user_id, $agent_id );
 		$filepath  = $agent_dir . '/' . $safe_name;
 
 		// Read from stdin.
@@ -710,8 +715,8 @@ class MemoryCommand extends BaseCommand {
 	 *
 	 * @param array $assoc_args Command arguments.
 	 */
-	private function files_check( array $assoc_args, int $user_id = 0 ): void {
-		$agent_dir      = $this->get_agent_dir( $user_id );
+	private function files_check( array $assoc_args, int $user_id = 0, ?int $agent_id = null ): void {
+		$agent_dir      = $this->get_agent_dir( $user_id, $agent_id );
 		$threshold_days = (int) ( $assoc_args['days'] ?? 7 );
 
 		if ( ! is_dir( $agent_dir ) ) {
@@ -762,8 +767,33 @@ class MemoryCommand extends BaseCommand {
 	 *
 	 * @return string
 	 */
-	private function get_agent_dir( int $user_id = 0 ): string {
+	/**
+	 * Resolve memory scoping from CLI flags.
+	 *
+	 * Returns an input array with agent_id (preferred) or user_id for
+	 * memory ability calls. Agent scoping takes precedence over user scoping.
+	 *
+	 * @param array $assoc_args Command arguments.
+	 * @return array Input parameters with user_id and/or agent_id.
+	 */
+	private function resolveMemoryScoping( array $assoc_args ): array {
+		$agent_id = AgentResolver::resolve( $assoc_args );
+
+		if ( null !== $agent_id ) {
+			return array( 'agent_id' => $agent_id );
+		}
+
+		return array( 'user_id' => UserResolver::resolve( $assoc_args ) );
+	}
+
+	private function get_agent_dir( int $user_id = 0, ?int $agent_id = null ): string {
 		$directory_manager = new DirectoryManager();
+
+		if ( null !== $agent_id && $agent_id > 0 ) {
+			$slug = $directory_manager->resolve_agent_slug( array( 'agent_id' => $agent_id ) );
+			return $directory_manager->get_agent_identity_directory( $slug );
+		}
+
 		return $directory_manager->get_agent_identity_directory_for_user( $user_id );
 	}
 
@@ -782,8 +812,8 @@ class MemoryCommand extends BaseCommand {
 	 *
 	 * @return string[]
 	 */
-	private function list_agent_filenames( int $user_id = 0 ): array {
-		$agent_dir = $this->get_agent_dir( $user_id );
+	private function list_agent_filenames( int $user_id = 0, ?int $agent_id = null ): array {
+		$agent_dir = $this->get_agent_dir( $user_id, $agent_id );
 		$files     = glob( $agent_dir . '/*.md' );
 		return array_map( 'basename', $files ? $files : array() );
 	}
