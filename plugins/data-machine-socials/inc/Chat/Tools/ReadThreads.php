@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
 class ReadThreads extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'read_threads', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'read_threads', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	public function getToolDefinition(): array {

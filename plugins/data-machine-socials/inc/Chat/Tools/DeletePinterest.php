@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
 class DeletePinterest extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'delete_pinterest', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'delete_pinterest', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	public function getToolDefinition(): array {

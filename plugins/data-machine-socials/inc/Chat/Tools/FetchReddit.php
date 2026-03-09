@@ -20,7 +20,7 @@ defined( 'ABSPATH' ) || exit;
 class FetchReddit extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'fetch_reddit', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'fetch_reddit', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	/**

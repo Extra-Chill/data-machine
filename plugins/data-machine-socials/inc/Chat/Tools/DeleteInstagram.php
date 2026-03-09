@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
 class DeleteInstagram extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'delete_instagram', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'delete_instagram', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	public function getToolDefinition(): array {

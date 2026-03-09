@@ -20,7 +20,7 @@ defined( 'ABSPATH' ) || exit;
 class UpdateInstagram extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'update_instagram', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'update_instagram', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	/**

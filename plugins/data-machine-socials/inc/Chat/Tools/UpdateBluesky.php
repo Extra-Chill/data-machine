@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
 class UpdateBluesky extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'update_bluesky', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'update_bluesky', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	public function getToolDefinition(): array {

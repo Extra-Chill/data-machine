@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
 class DeleteTwitter extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'delete_twitter', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'delete_twitter', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	public function getToolDefinition(): array {
