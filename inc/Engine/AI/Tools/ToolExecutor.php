@@ -19,7 +19,7 @@ class ToolExecutor {
 	/**
 	 * Get available tools for AI agent execution.
 	 *
-	 * @deprecated 0.39.0 Use ToolPolicyResolver::resolve() with SURFACE_PIPELINE instead.
+	 * @deprecated 0.39.0 Use ToolPolicyResolver::resolve() with CONTEXT_PIPELINE instead.
 	 *             Delegates to ToolPolicyResolver internally.
 	 *
 	 * @param  array|null  $previous_step_config     Previous step configuration (pipeline only)
@@ -32,7 +32,7 @@ class ToolExecutor {
 		$resolver = new ToolPolicyResolver();
 
 		return $resolver->resolve( array(
-			'surface'              => ToolPolicyResolver::SURFACE_PIPELINE,
+			'context'              => ToolPolicyResolver::CONTEXT_PIPELINE,
 			'previous_step_config' => $previous_step_config,
 			'next_step_config'     => $next_step_config,
 			'pipeline_step_id'     => $current_pipeline_step_id,

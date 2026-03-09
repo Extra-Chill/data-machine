@@ -177,9 +177,10 @@ class AIStep extends Step {
 
 		$max_turns = PluginSettings::get( 'max_turns', 12 );
 
-		// Resolve user_id from engine snapshot (set by RunFlowAbility).
+		// Resolve user_id and agent_id from engine snapshot (set by RunFlowAbility).
 		$job_snapshot = $this->engine->get( 'job' );
 		$user_id      = (int) ( $job_snapshot['user_id'] ?? 0 );
+		$agent_id     = (int) ( $job_snapshot['agent_id'] ?? 0 );
 
 		$payload = array(
 			'job_id'       => $this->job_id,
@@ -216,7 +217,8 @@ class AIStep extends Step {
 		$engine_data     = $this->engine->all();
 		$resolver        = new ToolPolicyResolver();
 		$available_tools = $resolver->resolve( array(
-			'surface'             => ToolPolicyResolver::SURFACE_PIPELINE,
+			'context'              => ToolPolicyResolver::CONTEXT_PIPELINE,
+			'agent_id'             => $agent_id,
 			'previous_step_config' => $previous_step_config,
 			'next_step_config'     => $next_step_config,
 			'pipeline_step_id'     => $pipeline_step_id,

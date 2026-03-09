@@ -549,12 +549,18 @@ class ChatOrchestrator {
 		$chat_db = new ChatDatabase();
 
 		try {
+			$user_id  = $options['user_id'] ?? 0;
+			$agent_id = 0;
+
+			if ( $user_id > 0 && function_exists( 'datamachine_resolve_or_create_agent_id' ) ) {
+				$agent_id = datamachine_resolve_or_create_agent_id( $user_id );
+			}
+
 			$resolver  = new ToolPolicyResolver();
 			$all_tools = $resolver->resolve( array(
-				'surface' => ToolPolicyResolver::SURFACE_CHAT,
+				'context'  => ToolPolicyResolver::CONTEXT_CHAT,
+				'agent_id' => $agent_id,
 			) );
-
-			$user_id      = $options['user_id'] ?? 0;
 			$loop_context = array(
 				'session_id' => $session_id,
 				'user_id'    => $user_id,
