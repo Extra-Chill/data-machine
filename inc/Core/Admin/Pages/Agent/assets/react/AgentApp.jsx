@@ -24,6 +24,7 @@ import AgentEmptyState from './components/AgentEmptyState';
 import AgentSettings from './components/AgentSettings';
 import AgentToolsTab from './components/AgentToolsTab';
 import AgentListTab from './components/AgentListTab';
+import AgentEditView from './components/AgentEditView';
 import SystemTasksTab from './components/SystemTasksTab';
 import { useAgentFiles } from './queries/agentFiles';
 
@@ -43,6 +44,7 @@ const TABS = [
  */
 const AgentApp = () => {
 	const [ selectedFile, setSelectedFile ] = useState( null );
+	const [ editingAgentId, setEditingAgentId ] = useState( null );
 	const { data: files } = useAgentFiles();
 	const hasFiles = files && files.length > 0;
 
@@ -55,13 +57,34 @@ const AgentApp = () => {
 			<TabPanel
 				className="datamachine-tabs"
 				tabs={ TABS }
+				onSelect={ () => {
+					// Reset edit view when switching tabs.
+					setEditingAgentId( null );
+				} }
 			>
-			{ ( tab ) => {
-				if ( tab.name === 'manage' ) {
-					return <AgentListTab />;
-				}
+				{ ( tab ) => {
+					if ( tab.name === 'manage' ) {
+						if ( editingAgentId ) {
+							return (
+								<AgentEditView
+									agentId={ editingAgentId }
+									onBack={ () =>
+										setEditingAgentId( null )
+									}
+								/>
+							);
+						}
 
-				if ( tab.name === 'memory' ) {
+						return (
+							<AgentListTab
+								onSelectAgent={ ( agent ) =>
+									setEditingAgentId( agent.agent_id )
+								}
+							/>
+						);
+					}
+
+					if ( tab.name === 'memory' ) {
 						return (
 							<div className="datamachine-agent-layout">
 								<AgentFileList
