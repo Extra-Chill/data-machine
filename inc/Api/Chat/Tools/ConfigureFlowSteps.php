@@ -31,8 +31,6 @@ class ConfigureFlowSteps extends BaseTool {
 	 * @return array Tool definition array
 	 */
 	public function getToolDefinition(): array {
-		$handler_docs = HandlerDocumentation::buildAllHandlersSections();
-
 		$description = 'Configure flow steps with handlers or AI user messages. REQUIRES EXPLICIT TARGETING to prevent accidental bulk updates.' . "\n\n"
 			. 'SELECTION MODES (all explicit):' . "\n"
 			. '1. By flow_step_id: flow_step_id="18_abc_138" (single) or flow_step_ids=["18_abc_138","18_abc_137"] (multiple)' . "\n"
@@ -49,9 +47,9 @@ class ConfigureFlowSteps extends BaseTool {
 			. '- flow_configs: [{flow_id: 9, handler_config: {source_url: "..."}}]' . "\n"
 			. '- Per-flow config merges with shared handler_config (per-flow takes precedence)' . "\n\n"
 			. 'BEFORE CONFIGURING:' . "\n"
+			. '- Use get_handler_defaults or api_query (/datamachine/v1/handlers/{slug}) to discover available handlers and their config fields' . "\n"
 			. '- Query existing flows to learn established patterns' . "\n"
-			. '- Only use handler_config fields documented below - unknown fields are rejected' . "\n\n"
-			. $handler_docs;
+			. '- Only use handler_config fields returned by discovery - unknown fields are rejected';
 
 		return array(
 			'class'       => self::class,
