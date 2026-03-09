@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
 class DeleteThreads extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'delete_threads', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'delete_threads', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	public function getToolDefinition(): array {

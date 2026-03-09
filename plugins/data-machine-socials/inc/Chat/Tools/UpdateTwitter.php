@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
 class UpdateTwitter extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'update_twitter', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'update_twitter', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	public function getToolDefinition(): array {

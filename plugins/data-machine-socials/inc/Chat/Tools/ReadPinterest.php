@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
 class ReadPinterest extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'chat', 'read_pinterest', array( $this, 'getToolDefinition' ) );
+		$this->registerTool( 'read_pinterest', array( $this, 'getToolDefinition' ), array( 'chat' ) );
 	}
 
 	public function getToolDefinition(): array {
