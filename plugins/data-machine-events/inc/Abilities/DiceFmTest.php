@@ -201,6 +201,9 @@ class DiceFmTest {
 				'date_end' => $dice_event['date_end'] ?? '',
 				'venue'    => $dice_event['venue'] ?? '',
 				'url'      => $dice_event['url'] ?? '',
+				'price'    => $dice_event['price'] ?? null,
+				'currency' => $dice_event['currency'] ?? '',
+				'ticket_types' => $dice_event['ticket_types'] ?? array(),
 				'timezone' => $dice_event['timezone'] ?? '',
 				'location' => $dice_event['location'] ?? null,
 			);
@@ -293,8 +296,80 @@ class DiceFmTest {
 			'venueCity'        => $venue_city,
 			'venueState'       => $venue_state,
 			'venueCoordinates' => $venue_coordinates,
+			'price'            => $this->mapPrice( $dice_event ),
 			'ticketUrl'        => $dice_event['url'] ?? '',
 		);
+	}
+
+	/**
+	 * Map Dice price fields to display format.
+	 *
+	 * @param array $dice_event Raw Dice event.
+	 * @return string
+	 */
+	private function mapPrice( array $dice_event ): string {
+		$currency = strtoupper( trim( (string) ( $dice_event['currency'] ?? 'USD' ) ) );
+
+		if ( isset( $dice_event['price'] ) && is_numeric( $dice_event['price'] ) && (float) $dice_event['price'] > 0 ) {
+			$amount = (float) $dice_event['price'] / 100;
+			return $this->formatCurrencyPrice( $amount, $amount, $currency );
+		}
+
+		$ticket_types = $dice_event['ticket_types'] ?? array();
+		if ( ! is_array( $ticket_types ) || empty( $ticket_types ) ) {
+			return '';
+		}
+
+		$face_values  = array();
+		$total_values = array();
+
+		foreach ( $ticket_types as $ticket_type ) {
+			if ( ! is_array( $ticket_type ) || empty( $ticket_type['price'] ) || ! is_array( $ticket_type['price'] ) ) {
+				continue;
+			}
+
+			$price_data = $ticket_type['price'];
+
+			if ( isset( $price_data['face_value'] ) && is_numeric( $price_data['face_value'] ) ) {
+				$face_values[] = (float) $price_data['face_value'] / 100;
+			}
+
+			if ( isset( $price_data['total'] ) && is_numeric( $price_data['total'] ) ) {
+				$total_values[] = (float) $price_data['total'] / 100;
+			}
+		}
+
+		if ( ! empty( $face_values ) ) {
+			return $this->formatCurrencyPrice( min( $face_values ), max( $face_values ), $currency );
+		}
+
+		if ( ! empty( $total_values ) ) {
+			return $this->formatCurrencyPrice( min( $total_values ), max( $total_values ), $currency );
+		}
+
+		return '';
+	}
+
+	/**
+	 * Format mapped prices with currency indicator.
+	 *
+	 * @param float  $min Minimum.
+	 * @param float  $max Maximum.
+	 * @param string $currency Currency code.
+	 * @return string
+	 */
+	private function formatCurrencyPrice( float $min, float $max, string $currency ): string {
+		$formatted = \DataMachineEvents\Core\PriceFormatter::formatRange( $min, $max );
+
+		if ( '' === $formatted ) {
+			return '';
+		}
+
+		if ( 'USD' === $currency || '' === $currency ) {
+			return $formatted;
+		}
+
+		return $currency . ' ' . $formatted;
 	}
 
 	private function parseDateTimeUtc( string $datetime_utc, string $timezone ): array {

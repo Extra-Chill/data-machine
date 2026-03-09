@@ -12,6 +12,7 @@
 namespace DataMachineEvents\Steps\EventImport\Handlers\DiceFm;
 
 use DataMachine\Core\ExecutionContext;
+use DataMachineEvents\Core\PriceFormatter;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
@@ -242,6 +243,7 @@ class DiceFm extends EventImportHandler {
 	private function convert_dice_fm_event( $event ) {
 		$venue_data = $this->extract_venue_data( $event );
 		$timezone   = $event['timezone'] ?? '';
+		$price      = $this->extractPrice( $event );
 
 		$start_parsed = $this->parseDateTimeUtc( $event['date'] ?? '', $timezone );
 		$end_parsed   = $this->parseDateTimeUtc( $event['date_end'] ?? '', $timezone );
@@ -254,7 +256,7 @@ class DiceFm extends EventImportHandler {
 			'endTime'          => $end_parsed['time'],
 			'venue'            => sanitize_text_field( $venue_data['venue_name'] ),
 			'artist'           => '',
-			'price'            => '',
+			'price'            => $price,
 			'ticketUrl'        => esc_url_raw( $event['url'] ?? '' ),
 			'description'      => wp_kses_post( $event['description'] ?? '' ),
 			'venueAddress'     => sanitize_text_field( $venue_data['venue_address'] ),
@@ -265,6 +267,80 @@ class DiceFm extends EventImportHandler {
 			'venueCoordinates' => sanitize_text_field( $venue_data['venue_coordinates'] ),
 			'venueTimezone'    => sanitize_text_field( $timezone ),
 		);
+	}
+
+	/**
+	 * Extract and format Dice.fm event pricing.
+	 *
+	 * Supports both top-level cent amount (`price`) and per-ticket pricing
+	 * (`ticket_types[].price`).
+	 *
+	 * @param array $event Raw Dice.fm event data.
+	 * @return string Formatted price string for event-details block.
+	 */
+	private function extractPrice( array $event ): string {
+		$currency = strtoupper( trim( (string) ( $event['currency'] ?? 'USD' ) ) );
+
+		if ( ! empty( $event['price'] ) && is_numeric( $event['price'] ) ) {
+			$top_level_price = (float) $event['price'] / 100;
+			return $this->formatCurrencyPrice( $top_level_price, $top_level_price, $currency );
+		}
+
+		$ticket_types = $event['ticket_types'] ?? array();
+		if ( ! is_array( $ticket_types ) || empty( $ticket_types ) ) {
+			return '';
+		}
+
+		$face_values  = array();
+		$total_values = array();
+
+		foreach ( $ticket_types as $ticket_type ) {
+			if ( ! is_array( $ticket_type ) || empty( $ticket_type['price'] ) || ! is_array( $ticket_type['price'] ) ) {
+				continue;
+			}
+
+			$price_data = $ticket_type['price'];
+
+			if ( isset( $price_data['face_value'] ) && is_numeric( $price_data['face_value'] ) ) {
+				$face_values[] = (float) $price_data['face_value'] / 100;
+			}
+
+			if ( isset( $price_data['total'] ) && is_numeric( $price_data['total'] ) ) {
+				$total_values[] = (float) $price_data['total'] / 100;
+			}
+		}
+
+		if ( ! empty( $face_values ) ) {
+			return $this->formatCurrencyPrice( min( $face_values ), max( $face_values ), $currency );
+		}
+
+		if ( ! empty( $total_values ) ) {
+			return $this->formatCurrencyPrice( min( $total_values ), max( $total_values ), $currency );
+		}
+
+		return '';
+	}
+
+	/**
+	 * Format numeric prices with currency-aware prefix.
+	 *
+	 * @param float  $min Minimum price.
+	 * @param float  $max Maximum price.
+	 * @param string $currency ISO currency code.
+	 * @return string
+	 */
+	private function formatCurrencyPrice( float $min, float $max, string $currency ): string {
+		$formatted = PriceFormatter::formatRange( $min, $max );
+
+		if ( '' === $formatted ) {
+			return '';
+		}
+
+		if ( 'USD' === $currency || '' === $currency ) {
+			return $formatted;
+		}
+
+		return $currency . ' ' . $formatted;
 	}
 
 	/**

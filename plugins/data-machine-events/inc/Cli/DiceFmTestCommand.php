@@ -100,6 +100,9 @@ class DiceFmTestCommand {
 			\WP_CLI::log( '[RAW] Date: ' . ( $raw['date'] ?? '' ) );
 			\WP_CLI::log( '[RAW] Date End: ' . ( $raw['date_end'] ?? '' ) );
 			\WP_CLI::log( '[RAW] Venue: ' . ( $raw['venue'] ?? '' ) );
+			\WP_CLI::log( '[RAW] Price: ' . wp_json_encode( $raw['price'] ?? null ) );
+			\WP_CLI::log( '[RAW] Currency: ' . ( $raw['currency'] ?? '' ) );
+			\WP_CLI::log( '[RAW] Ticket Types: ' . ( isset( $raw['ticket_types'] ) ? wp_json_encode( $raw['ticket_types'] ) : '[]' ) );
 			\WP_CLI::log( '[RAW] Timezone: ' . ( $raw['timezone'] ?? '' ) );
 
 			if ( isset( $raw['location'] ) && is_array( $raw['location'] ) ) {
@@ -121,6 +124,7 @@ class DiceFmTestCommand {
 			\WP_CLI::log( '[MAPPED] Venue City: ' . ( $mapped['venueCity'] ?? '(none)' ) );
 			\WP_CLI::log( '[MAPPED] Venue State: ' . ( $mapped['venueState'] ?? '(none)' ) );
 			\WP_CLI::log( '[MAPPED] Venue Timezone: ' . ( $mapped['venueTimezone'] ?? '(none)' ) );
+			\WP_CLI::log( '[MAPPED] Price: ' . ( $mapped['price'] ?? '' ) );
 			\WP_CLI::log( '[MAPPED] Ticket URL: ' . ( $mapped['ticketUrl'] ?? '' ) );
 
 			$issues = $event['issues'] ?? array();
