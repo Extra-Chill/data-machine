@@ -107,6 +107,174 @@ class AgentAbilities {
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
+
+			wp_register_ability(
+				'datamachine/create-agent',
+				array(
+					'label'               => 'Create Agent',
+					'description'         => 'Create a new agent identity with filesystem directory and owner access',
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'agent_slug', 'owner_id' ),
+						'properties' => array(
+							'agent_slug' => array(
+								'type'        => 'string',
+								'description' => 'Unique agent slug (sanitized automatically).',
+							),
+							'agent_name' => array(
+								'type'        => 'string',
+								'description' => 'Display name (defaults to slug if omitted).',
+							),
+							'owner_id'   => array(
+								'type'        => 'integer',
+								'description' => 'WordPress user ID of the agent owner.',
+							),
+							'config'     => array(
+								'type'        => 'object',
+								'description' => 'Agent configuration object.',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'    => array( 'type' => 'boolean' ),
+							'agent_id'   => array( 'type' => 'integer' ),
+							'agent_slug' => array( 'type' => 'string' ),
+							'agent_name' => array( 'type' => 'string' ),
+							'owner_id'   => array( 'type' => 'integer' ),
+							'agent_dir'  => array( 'type' => 'string' ),
+							'message'    => array( 'type' => 'string' ),
+							'error'      => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'createAgent' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/get-agent',
+				array(
+					'label'               => 'Get Agent',
+					'description'         => 'Retrieve a single agent by slug or ID with access grants and directory info',
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'agent_slug' => array(
+								'type'        => 'string',
+								'description' => 'Agent slug (provide this or agent_id).',
+							),
+							'agent_id'   => array(
+								'type'        => 'integer',
+								'description' => 'Agent ID (provide this or agent_slug).',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'agent'   => array( 'type' => 'object' ),
+							'error'   => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'getAgent' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array(
+						'show_in_rest' => true,
+						'annotations'  => array(
+							'readonly'   => true,
+							'idempotent' => true,
+						),
+					),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/update-agent',
+				array(
+					'label'               => 'Update Agent',
+					'description'         => 'Update an agent\'s mutable fields (name, config, status)',
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'agent_id' ),
+						'properties' => array(
+							'agent_id'     => array(
+								'type'        => 'integer',
+								'description' => 'Agent ID to update.',
+							),
+							'agent_name'   => array(
+								'type'        => 'string',
+								'description' => 'New display name.',
+							),
+							'agent_config' => array(
+								'type'        => 'object',
+								'description' => 'New agent configuration (replaces existing config).',
+							),
+							'status'       => array(
+								'type'        => 'string',
+								'description' => 'New status (active, inactive, archived).',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'agent'   => array( 'type' => 'object' ),
+							'error'   => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'updateAgent' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/delete-agent',
+				array(
+					'label'               => 'Delete Agent',
+					'description'         => 'Delete an agent record and access grants, optionally removing filesystem directory',
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'agent_slug'   => array(
+								'type'        => 'string',
+								'description' => 'Agent slug (provide this or agent_id).',
+							),
+							'agent_id'     => array(
+								'type'        => 'integer',
+								'description' => 'Agent ID (provide this or agent_slug).',
+							),
+							'delete_files' => array(
+								'type'        => 'boolean',
+								'description' => 'Also delete filesystem directory and contents.',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'       => array( 'type' => 'boolean' ),
+							'agent_id'      => array( 'type' => 'integer' ),
+							'agent_slug'    => array( 'type' => 'string' ),
+							'files_deleted' => array( 'type' => 'boolean' ),
+							'message'       => array( 'type' => 'string' ),
+							'error'         => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'deleteAgent' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
 		};
 
 		if ( doing_action( 'wp_abilities_api_init' ) ) {
@@ -387,6 +555,82 @@ class AgentAbilities {
 				'access'       => $access,
 			),
 		);
+	}
+
+	/**
+	 * Update an agent's mutable fields.
+	 *
+	 * @param array $input { agent_id, agent_name?, agent_config?, status? }.
+	 * @return array Result with updated agent data.
+	 */
+	public static function updateAgent( array $input ): array {
+		$agent_id = (int) ( $input['agent_id'] ?? 0 );
+
+		if ( $agent_id <= 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'agent_id is required.',
+			);
+		}
+
+		$agents_repo = new Agents();
+		$agent       = $agents_repo->get_agent( $agent_id );
+
+		if ( ! $agent ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Agent ID %d not found.', $agent_id ),
+			);
+		}
+
+		// Build update payload from allowed mutable fields.
+		$update = array();
+
+		if ( isset( $input['agent_name'] ) ) {
+			$name = sanitize_text_field( $input['agent_name'] );
+			if ( empty( $name ) ) {
+				return array(
+					'success' => false,
+					'error'   => 'Agent name cannot be empty.',
+				);
+			}
+			$update['agent_name'] = $name;
+		}
+
+		if ( array_key_exists( 'agent_config', $input ) ) {
+			$update['agent_config'] = is_array( $input['agent_config'] ) ? $input['agent_config'] : array();
+		}
+
+		if ( isset( $input['status'] ) ) {
+			$valid_statuses = array( 'active', 'inactive', 'archived' );
+			$status         = sanitize_text_field( $input['status'] );
+			if ( ! in_array( $status, $valid_statuses, true ) ) {
+				return array(
+					'success' => false,
+					'error'   => sprintf( 'Invalid status "%s". Must be one of: %s', $status, implode( ', ', $valid_statuses ) ),
+				);
+			}
+			$update['status'] = $status;
+		}
+
+		if ( empty( $update ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'No fields to update. Provide agent_name, agent_config, or status.',
+			);
+		}
+
+		$ok = $agents_repo->update_agent( $agent_id, $update );
+
+		if ( ! $ok ) {
+			return array(
+				'success' => false,
+				'error'   => 'Database update failed.',
+			);
+		}
+
+		// Return the updated agent.
+		return self::getAgent( array( 'agent_id' => $agent_id ) );
 	}
 
 	/**

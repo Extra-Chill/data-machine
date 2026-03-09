@@ -209,4 +209,161 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( 'no-name-bot', $result['agent_name'] );
 	}
+
+	// --- updateAgent tests ---
+
+	public function test_updateAgent_name(): void {
+		$created = AgentAbilities::createAgent(
+			array(
+				'agent_slug' => 'rename-me',
+				'agent_name' => 'Old Name',
+				'owner_id'   => $this->admin_id,
+			)
+		);
+
+		$result = AgentAbilities::updateAgent(
+			array(
+				'agent_id'   => $created['agent_id'],
+				'agent_name' => 'New Name',
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'New Name', $result['agent']['agent_name'] );
+	}
+
+	public function test_updateAgent_status(): void {
+		$created = AgentAbilities::createAgent(
+			array(
+				'agent_slug' => 'status-bot',
+				'owner_id'   => $this->admin_id,
+			)
+		);
+
+		$result = AgentAbilities::updateAgent(
+			array(
+				'agent_id' => $created['agent_id'],
+				'status'   => 'inactive',
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'inactive', $result['agent']['status'] );
+	}
+
+	public function test_updateAgent_config(): void {
+		$created = AgentAbilities::createAgent(
+			array(
+				'agent_slug' => 'config-bot',
+				'owner_id'   => $this->admin_id,
+				'config'     => array( 'provider' => 'anthropic' ),
+			)
+		);
+
+		$result = AgentAbilities::updateAgent(
+			array(
+				'agent_id'     => $created['agent_id'],
+				'agent_config' => array( 'provider' => 'openai', 'model' => 'gpt-4o' ),
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'openai', $result['agent']['agent_config']['provider'] );
+		$this->assertSame( 'gpt-4o', $result['agent']['agent_config']['model'] );
+	}
+
+	public function test_updateAgent_multiple_fields(): void {
+		$created = AgentAbilities::createAgent(
+			array(
+				'agent_slug' => 'multi-update-bot',
+				'agent_name' => 'Before',
+				'owner_id'   => $this->admin_id,
+			)
+		);
+
+		$result = AgentAbilities::updateAgent(
+			array(
+				'agent_id'   => $created['agent_id'],
+				'agent_name' => 'After',
+				'status'     => 'archived',
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'After', $result['agent']['agent_name'] );
+		$this->assertSame( 'archived', $result['agent']['status'] );
+	}
+
+	public function test_updateAgent_requires_agent_id(): void {
+		$result = AgentAbilities::updateAgent( array( 'agent_name' => 'Orphan' ) );
+
+		$this->assertFalse( $result['success'] );
+		$this->assertStringContainsString( 'agent_id', $result['error'] );
+	}
+
+	public function test_updateAgent_rejects_not_found(): void {
+		$result = AgentAbilities::updateAgent(
+			array(
+				'agent_id'   => 999999,
+				'agent_name' => 'Ghost',
+			)
+		);
+
+		$this->assertFalse( $result['success'] );
+		$this->assertStringContainsString( 'not found', $result['error'] );
+	}
+
+	public function test_updateAgent_rejects_empty_name(): void {
+		$created = AgentAbilities::createAgent(
+			array(
+				'agent_slug' => 'empty-name-bot',
+				'owner_id'   => $this->admin_id,
+			)
+		);
+
+		$result = AgentAbilities::updateAgent(
+			array(
+				'agent_id'   => $created['agent_id'],
+				'agent_name' => '',
+			)
+		);
+
+		$this->assertFalse( $result['success'] );
+		$this->assertStringContainsString( 'empty', $result['error'] );
+	}
+
+	public function test_updateAgent_rejects_invalid_status(): void {
+		$created = AgentAbilities::createAgent(
+			array(
+				'agent_slug' => 'bad-status-bot',
+				'owner_id'   => $this->admin_id,
+			)
+		);
+
+		$result = AgentAbilities::updateAgent(
+			array(
+				'agent_id' => $created['agent_id'],
+				'status'   => 'deleted',
+			)
+		);
+
+		$this->assertFalse( $result['success'] );
+		$this->assertStringContainsString( 'Invalid status', $result['error'] );
+	}
+
+	public function test_updateAgent_rejects_no_fields(): void {
+		$created = AgentAbilities::createAgent(
+			array(
+				'agent_slug' => 'no-fields-bot',
+				'owner_id'   => $this->admin_id,
+			)
+		);
+
+		$result = AgentAbilities::updateAgent(
+			array( 'agent_id' => $created['agent_id'] )
+		);
+
+		$this->assertFalse( $result['success'] );
+		$this->assertStringContainsString( 'No fields', $result['error'] );
+	}
 }

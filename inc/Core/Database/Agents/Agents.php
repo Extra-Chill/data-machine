@@ -169,6 +169,52 @@ class Agents extends BaseRepository {
 	}
 
 	/**
+	 * Update an agent's mutable fields.
+	 *
+	 * Only updates fields that are present in the $data array.
+	 * Allowed fields: agent_name, agent_config, status.
+	 *
+	 * @since 0.43.0
+	 * @param int   $agent_id Agent ID.
+	 * @param array $data     Associative array of fields to update.
+	 * @return bool True on success, false on DB failure or no valid fields.
+	 */
+	public function update_agent( int $agent_id, array $data ): bool {
+		$allowed = array( 'agent_name', 'agent_config', 'status' );
+		$update  = array();
+		$formats = array();
+
+		foreach ( $allowed as $field ) {
+			if ( ! array_key_exists( $field, $data ) ) {
+				continue;
+			}
+
+			if ( 'agent_config' === $field ) {
+				$update[ $field ] = is_array( $data[ $field ] ) ? wp_json_encode( $data[ $field ] ) : (string) $data[ $field ];
+				$formats[]        = '%s';
+			} else {
+				$update[ $field ] = (string) $data[ $field ];
+				$formats[]        = '%s';
+			}
+		}
+
+		if ( empty( $update ) ) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$result = $this->wpdb->update(
+			$this->table_name,
+			$update,
+			array( 'agent_id' => $agent_id ),
+			$formats,
+			array( '%d' )
+		);
+
+		return false !== $result;
+	}
+
+	/**
 	 * Get all agents.
 	 *
 	 * @since 0.38.0
