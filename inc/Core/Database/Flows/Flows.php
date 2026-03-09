@@ -744,13 +744,30 @@ class Flows extends BaseRepository {
 	}
 
 	/**
+	 * Get flow daily memory config from flow config.
+	 *
+	 * @since 0.40.0
+	 *
+	 * @param int $flow_id Flow ID.
+	 * @return array Daily memory config with 'mode' and mode-specific fields.
+	 */
+	public function get_flow_daily_memory( int $flow_id ): array {
+		$flow = $this->get_flow( $flow_id );
+		if ( ! $flow ) {
+			return array( 'mode' => 'none' );
+		}
+		return $flow['flow_config']['daily_memory'] ?? array( 'mode' => 'none' );
+	}
+
+	/**
 	 * Update flow memory files in flow config.
 	 *
-	 * @param int   $flow_id      Flow ID.
-	 * @param array $memory_files Array of memory filenames.
+	 * @param int   $flow_id       Flow ID.
+	 * @param array $memory_files  Array of memory filenames.
+	 * @param array $daily_memory  Optional. Daily memory config array.
 	 * @return bool True on success, false on failure.
 	 */
-	public function update_flow_memory_files( int $flow_id, array $memory_files ): bool {
+	public function update_flow_memory_files( int $flow_id, array $memory_files, array $daily_memory = null ): bool {
 		if ( empty( $flow_id ) ) {
 			return false;
 		}
@@ -769,6 +786,11 @@ class Flows extends BaseRepository {
 
 		$flow_config                 = json_decode( $raw_config_json, true ) ?? array();
 		$flow_config['memory_files'] = $memory_files;
+
+		// Update daily_memory if provided.
+		if ( null !== $daily_memory ) {
+			$flow_config['daily_memory'] = $daily_memory;
+		}
 
 		$result = $this->wpdb->update(
 			$this->table_name,

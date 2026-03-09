@@ -289,8 +289,11 @@ export const usePipelineMemoryFiles = ( pipelineId ) =>
 export const useUpdatePipelineMemoryFiles = ( pipelineId ) => {
 	const queryClient = useQueryClient();
 	return useMutation( {
-		mutationFn: ( filenames ) =>
-			updatePipelineMemoryFiles( pipelineId, filenames ),
+		mutationFn: ( data ) => {
+			// Support both old format (array) and new format ({ memoryFiles, dailyMemory }).
+			const filenames = Array.isArray( data ) ? data : data.memoryFiles;
+			return updatePipelineMemoryFiles( pipelineId, filenames );
+		},
 		onSuccess: () => {
 			queryClient.invalidateQueries( {
 				queryKey: [ 'pipeline-memory-files', pipelineId ],

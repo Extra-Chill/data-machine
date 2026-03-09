@@ -3,6 +3,9 @@
  *
  * Allows selecting agent memory files to include in pipeline AI context.
  * Delegates to the shared MemoryFilesSelector component.
+ *
+ * Note: Daily memory selection is flow-scoped, not pipeline-scoped.
+ * Pipelines only select custom memory files.
  */
 
 /**
@@ -32,6 +35,7 @@ export default function PipelineMemoryFiles( { pipelineId } ) {
 			selectedFiles={ selectedFiles }
 			isLoading={ isLoading }
 			updateMutation={ updateMutation }
+			showDailyMemory={ false }
 		/>
 	);
 }

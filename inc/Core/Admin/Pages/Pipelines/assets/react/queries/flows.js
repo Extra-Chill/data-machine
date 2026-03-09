@@ -488,7 +488,21 @@ export const useFlowMemoryFiles = ( flowId ) =>
 		queryKey: [ 'flow-memory-files', flowId ],
 		queryFn: async () => {
 			const response = await fetchFlowMemoryFiles( flowId );
-			return response.success ? response.data : [];
+			if ( response.success && response.data ) {
+				// Handle new format with memory_files and daily_memory
+				if ( typeof response.data === 'object' && ! Array.isArray( response.data ) ) {
+					return {
+						memoryFiles: response.data.memory_files || [],
+						dailyMemory: response.data.daily_memory || { mode: 'none' },
+					};
+				}
+				// Backward compat: old format was just an array
+				return {
+					memoryFiles: response.data,
+					dailyMemory: { mode: 'none' },
+				};
+			}
+			return { memoryFiles: [], dailyMemory: { mode: 'none' } };
 		},
 		enabled: !! flowId,
 	} );
@@ -496,8 +510,8 @@ export const useFlowMemoryFiles = ( flowId ) =>
 export const useUpdateFlowMemoryFiles = ( flowId ) => {
 	const queryClient = useQueryClient();
 	return useMutation( {
-		mutationFn: ( filenames ) =>
-			updateFlowMemoryFiles( flowId, filenames ),
+		mutationFn: ( { memoryFiles, dailyMemory } ) =>
+			updateFlowMemoryFiles( flowId, memoryFiles, dailyMemory ),
 		onSuccess: () => {
 			queryClient.invalidateQueries( {
 				queryKey: [ 'flow-memory-files', flowId ],

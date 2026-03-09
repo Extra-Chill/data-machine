@@ -3,18 +3,21 @@
  *
  * Reusable component for selecting agent memory files.
  * Used by both pipeline-scoped and flow-scoped memory file UIs.
+ *
+ * @since 0.40.0 Added daily memory selector support.
  */
 
 /**
  * WordPress dependencies
  */
-import { useState, useEffect } from '@wordpress/element';
+import { useState, useEffect, useCallback } from '@wordpress/element';
 import { CheckboxControl, Button, Notice, Spinner } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
 import { useAgentFiles } from '../../queries/pipelines';
+import DailyMemorySelector from './DailyMemorySelector';
 
 /**
  * Files to exclude from the memory files picker (always injected separately).
@@ -22,25 +25,35 @@ import { useAgentFiles } from '../../queries/pipelines';
 const EXCLUDED_FILES = [ 'SOUL.md', 'USER.md', 'MEMORY.md' ];
 
 /**
+ * Default daily memory config.
+ */
+const DEFAULT_DAILY_MEMORY = { mode: 'none' };
+
+/**
  * Memory Files Selector Component
  *
- * @param {Object}   props               - Component props
- * @param {string}   props.scopeLabel    - Label for the scope (e.g. 'pipeline', 'flow')
- * @param {Array}    props.selectedFiles - Currently selected filenames
- * @param {boolean}  props.isLoading     - Whether selected files are loading
- * @param {Object}   props.updateMutation - TanStack mutation for saving
+ * @param {Object}   props                  - Component props
+ * @param {string}   props.scopeLabel       - Label for the scope (e.g. 'pipeline', 'flow')
+ * @param {Array}    props.selectedFiles    - Currently selected filenames
+ * @param {Object}   props.dailyMemory      - Current daily memory config
+ * @param {boolean}  props.isLoading        - Whether selected files are loading
+ * @param {Object}   props.updateMutation   - TanStack mutation for saving
+ * @param {boolean}  props.showDailyMemory  - Whether to show daily memory selector (default: true)
  * @return {React.ReactElement} Memory files selector
  */
 export default function MemoryFilesSelector( {
 	scopeLabel,
 	selectedFiles = [],
+	dailyMemory = DEFAULT_DAILY_MEMORY,
 	isLoading: loadingSelected = false,
 	updateMutation,
+	showDailyMemory = true,
 } ) {
 	const { data: agentFiles = [], isLoading: loadingAgent } =
 		useAgentFiles();
 
 	const [ localSelected, setLocalSelected ] = useState( [] );
+	const [ localDailyMemory, setLocalDailyMemory ] = useState( DEFAULT_DAILY_MEMORY );
 	const [ success, setSuccess ] = useState( null );
 
 	// Sync local state when server data loads.
@@ -48,10 +61,15 @@ export default function MemoryFilesSelector( {
 		setLocalSelected( selectedFiles );
 	}, [ selectedFiles ] );
 
+	useEffect( () => {
+		setLocalDailyMemory( dailyMemory || DEFAULT_DAILY_MEMORY );
+	}, [ dailyMemory ] );
+
 	const loading = loadingAgent || loadingSelected;
 
-	// Filter out core files and non-text files.
+	// Filter out core files, non-text files, and daily_summary type.
 	const availableFiles = agentFiles
+		.filter( ( f ) => f.type !== 'daily_summary' )
 		.map( ( f ) => ( typeof f === 'string' ? f : f.name || f.filename ) )
 		.filter( ( name ) => name && ! EXCLUDED_FILES.includes( name ) );
 
@@ -63,10 +81,19 @@ export default function MemoryFilesSelector( {
 		);
 	};
 
+	const handleDailyMemoryChange = useCallback( ( newConfig ) => {
+		setLocalDailyMemory( newConfig );
+	}, [] );
+
 	const handleSave = async () => {
 		setSuccess( null );
 		try {
-			await updateMutation.mutateAsync( localSelected );
+			// Check if the mutation expects the new format.
+			// The mutation function receives { memoryFiles, dailyMemory }.
+			await updateMutation.mutateAsync( {
+				memoryFiles: localSelected,
+				dailyMemory: localDailyMemory,
+			} );
 			setSuccess(
 				__( 'Memory files updated successfully!', 'data-machine' )
 			);
@@ -76,9 +103,12 @@ export default function MemoryFilesSelector( {
 		}
 	};
 
+	// Check if either memory files or daily memory have changed.
 	const isDirty =
 		JSON.stringify( [ ...localSelected ].sort() ) !==
-		JSON.stringify( [ ...selectedFiles ].sort() );
+			JSON.stringify( [ ...selectedFiles ].sort() ) ||
+		JSON.stringify( localDailyMemory ) !==
+			JSON.stringify( dailyMemory || DEFAULT_DAILY_MEMORY );
 
 	return (
 		<div className="datamachine-memory-files-selector">
@@ -135,46 +165,69 @@ export default function MemoryFilesSelector( {
 				>
 					<Spinner />
 				</div>
-			) : availableFiles.length === 0 ? (
-				<p
-					style={ {
-						color: '#757575',
-						fontStyle: 'italic',
-						padding: '12px 0',
-					} }
-				>
-					{ __(
-						'No agent memory files available. Upload files to the agent directory first.',
-						'data-machine'
-					) }
-				</p>
 			) : (
 				<>
-					<div
-						style={ {
-							display: 'flex',
-							flexDirection: 'column',
-							gap: '8px',
-							marginBottom: '16px',
-						} }
-					>
-						{ availableFiles.map( ( filename ) => (
-							<CheckboxControl
-								key={ filename }
-								label={ filename }
-								checked={ localSelected.includes( filename ) }
-								onChange={ ( checked ) =>
-									handleToggle( filename, checked )
-								}
+					{/* Custom Memory Files Section */}
+					{ availableFiles.length > 0 && (
+						<div
+							style={ {
+								display: 'flex',
+								flexDirection: 'column',
+								gap: '8px',
+								marginBottom: '16px',
+							} }
+						>
+							{ availableFiles.map( ( filename ) => (
+								<CheckboxControl
+									key={ filename }
+									label={ filename }
+									checked={ localSelected.includes( filename ) }
+									onChange={ ( checked ) =>
+										handleToggle( filename, checked )
+									}
+								/>
+							) ) }
+						</div>
+					) }
+
+					{ availableFiles.length === 0 && (
+						<p
+							style={ {
+								color: '#757575',
+								fontStyle: 'italic',
+								padding: '12px 0',
+							} }
+						>
+							{ __(
+								'No custom memory files available. Add .md files to the agent directory.',
+								'data-machine'
+							) }
+						</p>
+					) }
+
+					{/* Daily Memory Selector Section */}
+					{ showDailyMemory && (
+						<div
+							style={ {
+								marginTop: '20px',
+								paddingTop: '20px',
+								borderTop: '1px solid #ddd',
+							} }
+						>
+							<DailyMemorySelector
+								config={ localDailyMemory }
+								onChange={ handleDailyMemoryChange }
+								disabled={ updateMutation.isPending }
 							/>
-						) ) }
-					</div>
+						</div>
+					) }
 
 					<Button
 						variant="primary"
 						onClick={ handleSave }
 						disabled={ ! isDirty || updateMutation.isPending }
 						isBusy={ updateMutation.isPending }
+						style={ { marginTop: '16px' } }
 					>
 						{ updateMutation.isPending
 							? __( 'Saving…', 'data-machine' )
