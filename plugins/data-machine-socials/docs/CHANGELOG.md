@@ -4,7 +4,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [0.2.1] - 2026-03-09
+
+### Fixed
+- Update all 19 chat tool `registerTool()` calls for Data Machine 0.39.0 compatibility
 
 ## [0.1.0] - 2025-02-21
 
