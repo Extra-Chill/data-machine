@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.14.2] - 2026-03-09
+
+### Fixed
+- Update all 8 chat tool `registerTool()` calls for Data Machine 0.39.0 compatibility
+
 ## [0.14.1] - 2026-03-03
 
 ### Fixed
