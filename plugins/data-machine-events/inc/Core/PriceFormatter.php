@@ -18,6 +18,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 class PriceFormatter {
 
 	/**
+	 * Canonical display string for free events.
+	 */
+	private const FREE_LABEL = 'Free';
+
+	/**
 	 * Format a price range as a display string.
 	 *
 	 * @param float|null $min Minimum price
@@ -48,6 +53,56 @@ class PriceFormatter {
 		}
 
 		return '$' . number_format( $min, 2 ) . ' - $' . number_format( $max, 2 );
+	}
+
+	/**
+	 * Format a structured price payload into a display string.
+	 *
+	 * Treats explicit free flags and all-zero values as free.
+	 * Non-USD currencies are prefixed with the ISO currency code while preserving
+	 * the existing dollar-based numeric formatting behavior.
+	 *
+	 * @param float|null  $min Minimum price.
+	 * @param float|null  $max Maximum price.
+	 * @param string      $currency ISO currency code.
+	 * @param bool|null   $is_free Explicit free signal from source data.
+	 * @return string Formatted price string.
+	 */
+	public static function formatStructured( ?float $min = null, ?float $max = null, string $currency = 'USD', ?bool $is_free = null ): string {
+		if ( true === $is_free ) {
+			return self::formatFree();
+		}
+
+		$normalized_min = null !== $min ? (float) $min : null;
+		$normalized_max = null !== $max ? (float) $max : null;
+
+		if ( self::isZeroOrLess( $normalized_min ) && self::isZeroOrLess( $normalized_max ) ) {
+			if ( null !== $normalized_min || null !== $normalized_max ) {
+				return self::formatFree();
+			}
+			return '';
+		}
+
+		$formatted = self::formatRange( $normalized_min, $normalized_max );
+		if ( '' === $formatted ) {
+			return '';
+		}
+
+		$currency = strtoupper( trim( $currency ) );
+		if ( '' === $currency || 'USD' === $currency ) {
+			return $formatted;
+		}
+
+		return $currency . ' ' . $formatted;
+	}
+
+	/**
+	 * Format a free event label.
+	 *
+	 * @return string
+	 */
+	public static function formatFree(): string {
+		return self::FREE_LABEL;
 	}
 
 	/**
@@ -90,5 +145,15 @@ class PriceFormatter {
 	 */
 	public static function isFree( string $raw ): bool {
 		return preg_match( '/^free$/i', trim( $raw ) ) === 1;
+	}
+
+	/**
+	 * Whether the provided numeric value is null or non-positive.
+	 *
+	 * @param float|null $value Numeric value.
+	 * @return bool
+	 */
+	private static function isZeroOrLess( ?float $value ): bool {
+		return null === $value || $value <= 0;
 	}
 }

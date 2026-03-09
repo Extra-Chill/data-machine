@@ -12,7 +12,6 @@
 namespace DataMachineEvents\Steps\EventImport\Handlers\DiceFm;
 
 use DataMachine\Core\ExecutionContext;
-use DataMachineEvents\Core\PriceFormatter;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
@@ -281,9 +280,9 @@ class DiceFm extends EventImportHandler {
 	private function extractPrice( array $event ): string {
 		$currency = strtoupper( trim( (string) ( $event['currency'] ?? 'USD' ) ) );
 
-		if ( ! empty( $event['price'] ) && is_numeric( $event['price'] ) ) {
+		if ( isset( $event['price'] ) && is_numeric( $event['price'] ) ) {
 			$top_level_price = (float) $event['price'] / 100;
-			return $this->formatCurrencyPrice( $top_level_price, $top_level_price, $currency );
+			return $this->formatStructuredPrice( $top_level_price, $top_level_price, $currency );
 		}
 
 		$ticket_types = $event['ticket_types'] ?? array();
@@ -311,36 +310,14 @@ class DiceFm extends EventImportHandler {
 		}
 
 		if ( ! empty( $face_values ) ) {
-			return $this->formatCurrencyPrice( min( $face_values ), max( $face_values ), $currency );
+			return $this->formatStructuredPrice( min( $face_values ), max( $face_values ), $currency );
 		}
 
 		if ( ! empty( $total_values ) ) {
-			return $this->formatCurrencyPrice( min( $total_values ), max( $total_values ), $currency );
+			return $this->formatStructuredPrice( min( $total_values ), max( $total_values ), $currency );
 		}
 
 		return '';
-	}
-
-	/**
-	 * Format numeric prices with currency-aware prefix.
-	 *
-	 * @param float  $min Minimum price.
-	 * @param float  $max Maximum price.
-	 * @param string $currency ISO currency code.
-	 * @return string
-	 */
-	private function formatCurrencyPrice( float $min, float $max, string $currency ): string {
-		$formatted = PriceFormatter::formatRange( $min, $max );
-
-		if ( '' === $formatted ) {
-			return '';
-		}
-
-		if ( 'USD' === $currency || '' === $currency ) {
-			return $formatted;
-		}
-
-		return $currency . ' ' . $formatted;
 	}
 
 	/**

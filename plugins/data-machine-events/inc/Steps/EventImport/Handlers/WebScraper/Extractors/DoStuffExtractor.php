@@ -133,7 +133,7 @@ class DoStuffExtractor extends BaseExtractor {
 
 	private function parsePrice( array &$event, array $raw_event ): void {
 		if ( ! empty( $raw_event['is_free'] ) ) {
-			$event['price'] = 'Free';
+			$event['price'] = $this->formatStructuredPrice( null, null, 'USD', true );
 		}
 	}
 

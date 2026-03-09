@@ -249,7 +249,7 @@ class DuskFmExtractor extends BaseExtractor {
 		}
 
 		if ( empty( $price ) && ! empty( $event['isAccessibleForFree'] ) ) {
-			$price = 'Free';
+			$price = $this->formatStructuredPrice( null, null, 'USD', true );
 		}
 
 		return array_merge(

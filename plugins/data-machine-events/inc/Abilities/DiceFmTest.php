@@ -312,7 +312,7 @@ class DiceFmTest {
 
 		if ( isset( $dice_event['price'] ) && is_numeric( $dice_event['price'] ) && (float) $dice_event['price'] > 0 ) {
 			$amount = (float) $dice_event['price'] / 100;
-			return $this->formatCurrencyPrice( $amount, $amount, $currency );
+			return \DataMachineEvents\Core\PriceFormatter::formatStructured( $amount, $amount, $currency );
 		}
 
 		$ticket_types = $dice_event['ticket_types'] ?? array();
@@ -340,36 +340,18 @@ class DiceFmTest {
 		}
 
 		if ( ! empty( $face_values ) ) {
-			return $this->formatCurrencyPrice( min( $face_values ), max( $face_values ), $currency );
+			return \DataMachineEvents\Core\PriceFormatter::formatStructured( min( $face_values ), max( $face_values ), $currency );
 		}
 
 		if ( ! empty( $total_values ) ) {
-			return $this->formatCurrencyPrice( min( $total_values ), max( $total_values ), $currency );
+			return \DataMachineEvents\Core\PriceFormatter::formatStructured( min( $total_values ), max( $total_values ), $currency );
+		}
+
+		if ( isset( $dice_event['price'] ) && is_numeric( $dice_event['price'] ) ) {
+			return \DataMachineEvents\Core\PriceFormatter::formatStructured( (float) $dice_event['price'] / 100, null, $currency );
 		}
 
 		return '';
-	}
-
-	/**
-	 * Format mapped prices with currency indicator.
-	 *
-	 * @param float  $min Minimum.
-	 * @param float  $max Maximum.
-	 * @param string $currency Currency code.
-	 * @return string
-	 */
-	private function formatCurrencyPrice( float $min, float $max, string $currency ): string {
-		$formatted = \DataMachineEvents\Core\PriceFormatter::formatRange( $min, $max );
-
-		if ( '' === $formatted ) {
-			return '';
-		}
-
-		if ( 'USD' === $currency || '' === $currency ) {
-			return $formatted;
-		}
-
-		return $currency . ' ' . $formatted;
 	}
 
 	private function parseDateTimeUtc( string $datetime_utc, string $timezone ): array {
