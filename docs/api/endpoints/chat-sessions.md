@@ -19,7 +19,7 @@ List chat sessions for the current user.
 **Query Parameters**:
 - `limit` (integer, optional, default: `20`): Maximum sessions to return (capped at 100)
 - `offset` (integer, optional, default: `0`): Pagination offset
-- `agent_type` (string, optional, default: `chat`): Agent type filter. Values must be valid per `DataMachine\\Engine\\AI\\AgentType`.
+- `agent_type` (string, optional, default: `chat`): Deprecated. Use `agent_id` to filter by specific agent.
 
 **Success Response**:
 

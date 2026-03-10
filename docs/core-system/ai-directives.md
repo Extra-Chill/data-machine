@@ -38,17 +38,28 @@ Provides a lightweight inventory of all pipelines, including their configured st
 **Context Awareness**:
 When `selected_pipeline_id` is provided (e.g., from the Integrated Chat Sidebar), the agent prioritizes and expands context for that specific pipeline, enabling it to learn from established configuration patterns and provide targeted assistance.
 
-### AgentSoulDirective (Priority 20)
+### CoreMemoryFilesDirective (Priority 20)
 
-**Location**: `inc/Engine/AI/Directives/AgentSoulDirective.php`  
-**Agent Types**: All agents  
-**Purpose**: Injects the agent's persistent identity from SOUL.md
+**Location**: `inc/Engine/AI/Directives/CoreMemoryFilesDirective.php`  
+**Contexts**: All  
+**Purpose**: Injects core memory files from the agent registry
 
-Reads `SOUL.md` from the agent memory directory (`{wp-content}/uploads/datamachine-files/agent/SOUL.md`) and injects it as a system message. This defines the overall tone, personality, and behavioral guidelines for ALL AI interactions.
+Reads core memory files and injects them as system messages. Files are loaded from multiple layers:
 
-**Configuration**: Edit SOUL.md via the Agent admin page file browser or REST API (`PUT /datamachine/v1/files/agent/SOUL.md`).
+**Site Layer** (shared):
+- `SITE.md` - Site identity and configuration
+- `RULES.md` - Global rules and constraints
 
-**Migration**: Previously stored as `global_system_prompt` in plugin settings. Migrated to file-based storage via `AgentMemoryMigration` (v0.13.0+). SOUL.md is protected from deletion in the admin UI.
+**Agent Layer** (per-agent):
+- `SOUL.md` - Agent personality and behavioral guidelines
+- `MEMORY.md` - Agent long-term memory
+
+**User Layer** (per-user):
+- `USER.md` - User-specific preferences and context
+
+**Configuration**: Edit files via the Agent admin page file browser or REST API (`PUT /datamachine/v1/files/agent/{filename}`).
+
+**Migration**: SOUL.md previously stored as `global_system_prompt` in plugin settings. Migrated to file-based storage in v0.13.0+.
 
 ### PipelineMemoryFilesDirective (Priority 25)
 
@@ -61,7 +72,7 @@ Reads the pipeline's `memory_files` configuration (an array of filenames) and in
 **Configuration**: Select memory files per-pipeline via the "Agent Memory Files" section in the pipeline settings UI. SOUL.md is excluded from the picker (it's always injected separately at Priority 20).
 
 **Features**:
-- Files sourced from the shared agent directory (`wp-content/uploads/datamachine-files/agent/`)
+- Files sourced from the agent's memory directory (`wp-content/uploads/datamachine-files/agents/{agent_slug}/`)
 - Missing files logged as warnings but don't fail the request
 - Empty files are silently skipped
 

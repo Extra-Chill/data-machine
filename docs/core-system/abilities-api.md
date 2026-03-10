@@ -323,7 +323,7 @@ CLI commands execute abilities directly. See individual command files in `inc/Cl
 
 ## Post Tracking
 
-The `PostTrackingTrait` in `inc/Core/WordPress/PostTrackingTrait.php` provides post tracking functionality for handlers creating WordPress posts.
+The `PostTracking` class in `inc/Core/WordPress/PostTracking.php` provides post tracking functionality for handlers creating WordPress posts.
 
 **Meta Keys**:
 - `_datamachine_post_handler`: Handler slug that created the post
@@ -332,7 +332,7 @@ The `PostTrackingTrait` in `inc/Core/WordPress/PostTrackingTrait.php` provides p
 
 **Usage**:
 ```php
-use PostTrackingTrait;
+use DataMachine\Core\WordPress\PostTracking;
 
 // After creating a post
 $this->storePostTrackingMeta($post_id, $handler_config);

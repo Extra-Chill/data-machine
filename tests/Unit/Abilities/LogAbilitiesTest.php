@@ -9,9 +9,11 @@
 
 namespace DataMachine\Tests\Unit\Engine\Abilities;
 
+use WP_UnitTestCase;
+
 defined('ABSPATH') || exit;
 
-class LogAbilitiesTest extends \WP_UnitTestCase {
+class LogAbilitiesTest extends WP_UnitTestCase {
 
 	private $original_user_id;
 

@@ -23,7 +23,7 @@ Three layers, each serving a different purpose:
 
 ### 1. Agent Files — Identity and Knowledge
 
-**Location:** `wp-content/uploads/datamachine-files/agent/`
+**Location:** `wp-content/uploads/datamachine-files/agents/{agent_slug}/` (per-agent) or `wp-content/uploads/datamachine-files/agent/` (legacy shared)
 
 Markdown files stored on the WordPress filesystem. The agent reads these to know who it is, who it works with, and what it knows.
 
@@ -277,16 +277,16 @@ This makes WordPress the single source of truth for agent memory, regardless of 
 Agents with shell access can read files directly:
 
 ```bash
-# Read directly from disk
-cat wp-content/uploads/datamachine-files/agent/MEMORY.md
+# Read directly from disk (replace {agent_slug} with actual agent slug)
+cat wp-content/uploads/datamachine-files/agents/{agent_slug}/MEMORY.md
 
 # List all agent files
-ls wp-content/uploads/datamachine-files/agent/
+ls wp-content/uploads/datamachine-files/agents/{agent_slug}/
 ```
 
 ### The Key Principle
 
-However the agent consumes memory — directives, AGENTS.md injection, REST API, direct file read — the **files on disk are the source of truth.** All paths lead to the same markdown documents in `wp-content/uploads/datamachine-files/agent/`.
+However the agent consumes memory — directives, AGENTS.md injection, REST API, direct file read — the **files on disk are the source of truth.** All paths lead to the same markdown documents in the agent's directory (`wp-content/uploads/datamachine-files/agents/{agent_slug}/`).
 
 ## Memory Maintenance
 
@@ -354,7 +354,7 @@ Each pipeline explicitly selects which additional memory files it needs. No embe
 
 ### WordPress uploads over custom storage
 
-Files live in `wp-content/uploads/datamachine-files/agent/`. WordPress backup tools include them automatically, standard permissions apply, and no custom mount configuration is needed.
+Files live in `wp-content/uploads/datamachine-files/agents/{agent_slug}/` (per-agent) or `wp-content/uploads/datamachine-files/agent/` (legacy shared). WordPress backup tools include them automatically, standard permissions apply, and no custom mount configuration is needed.
 
 ## REST API Reference
 
@@ -398,7 +398,7 @@ use DataMachine\Engine\AI\MemoryFileRegistry;
 MemoryFileRegistry::register( 'brand-guidelines.md', 40 );
 ```
 
-The file must exist in `wp-content/uploads/datamachine-files/agent/`. Missing files are silently skipped.
+The file must exist in the agent's directory (`wp-content/uploads/datamachine-files/agents/{agent_slug}/`). Missing files are silently skipped.
 
 ### Custom Directives
 

@@ -10,6 +10,7 @@
 namespace DataMachine\Tests\Unit\Cli;
 
 use PHPUnit\Framework\TestCase;
+use WP_UnitTestCase;
 use DataMachine\Cli\UserResolver;
 use ReflectionMethod;
 
