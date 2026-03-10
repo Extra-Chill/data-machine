@@ -1,7 +1,7 @@
 /**
  * LogsHeader Component
  *
- * Page title, agent switcher, and global clear button.
+ * Page title and clear button for current agent scope.
  */
 
 /**
@@ -12,28 +12,29 @@ import { __ } from '@wordpress/i18n';
 /**
  * External dependencies
  */
-import AgentSwitcher from '@shared/components/AgentSwitcher';
-/**
- * Internal dependencies
- */
 import { useClearLogs, useLogMetadata } from '../queries/logs';
+import { useAgentStore } from '@shared/stores/agentStore';
 
 const LogsHeader = () => {
 	const clearMutation = useClearLogs();
-	const { data: metadata } = useLogMetadata();
+	const selectedAgentId = useAgentStore( ( state ) => state.selectedAgentId );
+	const { data: metadata } = useLogMetadata( selectedAgentId ?? undefined );
 
 	const totalEntries = metadata?.total_entries || 0;
 
 	const handleClearAll = () => {
+		const scopeLabel = selectedAgentId
+			? __( 'the selected agent', 'data-machine' )
+			: __( 'ALL agents', 'data-machine' );
+
 		if (
 			window.confirm( // eslint-disable-line no-alert
-				__(
-					'Are you sure you want to clear ALL logs? This action cannot be undone.',
-					'data-machine'
-				)
+				`${ __( 'Are you sure you want to clear logs for', 'data-machine' ) } ${ scopeLabel }? ${ __( 'This action cannot be undone.', 'data-machine' ) }`
 			)
 		) {
-			clearMutation.mutate( {} );
+			clearMutation.mutate(
+				selectedAgentId ? { agent_id: selectedAgentId } : {}
+			);
 		}
 	};
 
@@ -51,7 +52,6 @@ const LogsHeader = () => {
 				) }
 			</div>
 			<div className="datamachine-logs-header-actions">
-				<AgentSwitcher />
 				<Button
 					variant="secondary"
 					isDestructive

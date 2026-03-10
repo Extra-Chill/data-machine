@@ -433,7 +433,7 @@ class SystemAbilities {
 					'session_id' => $session_id,
 					'title'      => $title,
 					'method'     => $method,
-					'agent_type' => 'system',
+					'context'    => 'system',
 				)
 			);
 		}
@@ -447,7 +447,7 @@ class SystemAbilities {
 	}
 
 	private static function generateAITitle( string $first_user_message, ?string $first_assistant_response ): ?string {
-		$chat_defaults = PluginSettings::getAgentModel( 'chat' );
+		$chat_defaults = PluginSettings::resolveModelForAgentContext( null, 'chat' );
 		$provider      = $chat_defaults['provider'];
 		$model         = $chat_defaults['model'];
 
@@ -456,7 +456,7 @@ class SystemAbilities {
 				'datamachine_log',
 				'warning',
 				'Session title AI generation skipped - no default provider/model configured',
-				array( 'agent_type' => 'system' )
+				array( 'context' => 'system' )
 			);
 			return null;
 		}
@@ -524,10 +524,10 @@ class SystemAbilities {
 					'error',
 					'Session title AI generation failed',
 					array(
-						'error'      => $response['error'] ?? 'Unknown error',
-						'agent_type' => 'system',
-					)
-				);
+					'error'   => $response['error'] ?? 'Unknown error',
+					'context' => 'system',
+				)
+			);
 					return null;
 			}
 
@@ -548,8 +548,8 @@ class SystemAbilities {
 				'error',
 				'Session title AI generation exception',
 				array(
-					'exception'  => $e->getMessage(),
-					'agent_type' => 'system',
+					'exception' => $e->getMessage(),
+					'context'   => 'system',
 				)
 			);
 			return null;

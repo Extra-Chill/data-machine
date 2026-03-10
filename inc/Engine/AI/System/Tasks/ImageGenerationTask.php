@@ -91,7 +91,7 @@ class ImageGenerationTask extends SystemTask {
 				array(
 					'job_id'        => $jobId,
 					'task_type'     => $this->getTaskType(),
-					'agent_type'    => 'system',
+					'context'       => 'system',
 					'prediction_id' => $prediction_id,
 					'error'         => $result['error'] ?? 'Unknown HTTP error',
 				)
@@ -166,11 +166,11 @@ class ImageGenerationTask extends SystemTask {
 				'warning',
 				"System Agent: Image sideload failed for job {$jobId}: " . $sideload_result->get_error_message(),
 				array(
-					'job_id'     => $jobId,
-					'task_type'  => $this->getTaskType(),
-					'agent_type' => 'system',
-					'image_url'  => $image_url,
-					'error'      => $sideload_result->get_error_message(),
+					'job_id'    => $jobId,
+					'task_type' => $this->getTaskType(),
+					'context'   => 'system',
+					'image_url' => $image_url,
+					'error'     => $sideload_result->get_error_message(),
 				)
 			);
 			// Don't fail the job — we still have the remote URL
@@ -281,7 +281,7 @@ class ImageGenerationTask extends SystemTask {
 					'job_id'        => $jobId,
 					'post_id'       => $post_id,
 					'attachment_id' => $attachmentId,
-					'agent_type'    => 'system',
+					'context'       => 'system',
 				)
 			);
 			return array();
@@ -299,7 +299,7 @@ class ImageGenerationTask extends SystemTask {
 					'job_id'        => $jobId,
 					'post_id'       => $post_id,
 					'attachment_id' => $attachmentId,
-					'agent_type'    => 'system',
+					'context'       => 'system',
 				)
 			);
 
@@ -320,7 +320,7 @@ class ImageGenerationTask extends SystemTask {
 				'job_id'        => $jobId,
 				'post_id'       => $post_id,
 				'attachment_id' => $attachmentId,
-				'agent_type'    => 'system',
+				'context'       => 'system',
 			)
 		);
 
@@ -359,7 +359,7 @@ class ImageGenerationTask extends SystemTask {
 			array(
 				'attachment_id'   => $attachmentId,
 				'pipeline_job_id' => $pipelineJobId,
-				'agent_type'      => 'system',
+				'context'         => 'system',
 			)
 		);
 	}
@@ -443,7 +443,7 @@ class ImageGenerationTask extends SystemTask {
 				'attachment_id'  => $attachment_id,
 				'attachment_url' => $attachment_url,
 				'model'          => $model,
-				'agent_type'     => 'system',
+				'context'        => 'system',
 			)
 		);
 
@@ -495,7 +495,7 @@ class ImageGenerationTask extends SystemTask {
 				'datamachine_log',
 				'warning',
 				'System Agent: JPEG conversion failed, using original file: ' . $converted->get_error_message(),
-				array( 'agent_type' => 'system' )
+				array( 'context' => 'system' )
 			);
 			// Fall back to original file — non-critical failure.
 			return $tmp_file;
@@ -510,7 +510,7 @@ class ImageGenerationTask extends SystemTask {
 			"System Agent: Converted {$current_mime} to JPEG for sideload",
 			array(
 				'original_mime' => $current_mime,
-				'agent_type'    => 'system',
+				'context'       => 'system',
 			)
 		);
 
@@ -543,7 +543,7 @@ class ImageGenerationTask extends SystemTask {
 			do_action( 'datamachine_log', 'warning', "System Agent: Cannot insert image — no post_id available for job {$jobId}", array(
 				'job_id'        => $jobId,
 				'attachment_id' => $attachmentId,
-				'agent_type'    => 'system',
+				'context'       => 'system',
 			) );
 			return array();
 		}
@@ -551,8 +551,8 @@ class ImageGenerationTask extends SystemTask {
 		$post = get_post( $post_id );
 		if ( ! $post ) {
 			do_action( 'datamachine_log', 'warning', "System Agent: Post #{$post_id} not found for image insert", array(
-				'job_id'     => $jobId,
-				'agent_type' => 'system',
+				'job_id'  => $jobId,
+				'context' => 'system',
 			) );
 			return array();
 		}
@@ -590,14 +590,14 @@ class ImageGenerationTask extends SystemTask {
 			'post_content' => $new_content,
 		) );
 
-		do_action( 'datamachine_log', 'info', "System Agent: Image inserted into post #{$post_id} content at position '{$position}' (attachment #{$attachmentId})", array(
-			'job_id'        => $jobId,
-			'post_id'       => $post_id,
-			'attachment_id' => $attachmentId,
-			'position'      => $position,
-			'insert_index'  => $insert_index,
-			'agent_type'    => 'system',
-		) );
+			do_action( 'datamachine_log', 'info', "System Agent: Image inserted into post #{$post_id} content at position '{$position}' (attachment #{$attachmentId})", array(
+				'job_id'        => $jobId,
+				'post_id'       => $post_id,
+				'attachment_id' => $attachmentId,
+				'position'      => $position,
+				'insert_index'  => $insert_index,
+				'context'       => 'system',
+			) );
 
 		// Build effects for undo.
 		$effects = array();

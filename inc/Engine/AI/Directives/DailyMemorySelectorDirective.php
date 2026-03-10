@@ -312,9 +312,9 @@ add_filter(
 	'datamachine_directives',
 	function ( $directives ) {
 		$directives[] = array(
-			'class'       => DailyMemorySelectorDirective::class,
-			'priority'    => 46,
-			'agent_types' => array( 'pipeline' ),
+			'class'    => DailyMemorySelectorDirective::class,
+			'priority' => 46,
+			'contexts' => array( 'pipeline' ),
 		);
 		return $directives;
 	}

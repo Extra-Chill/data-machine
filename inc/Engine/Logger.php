@@ -84,9 +84,6 @@ function datamachine_log_message( string $level, string|\Stringable $message, ar
 			}
 		}
 
-		// Clean context: remove routing fields that are now handled structurally.
-		unset( $context['agent_type'] );
-
 		$repo->log( $level, (string) $message, $context, $agent_id, $user_id );
 	} catch ( \Exception $e ) {
 		// Prevent logging failures from crashing the application.

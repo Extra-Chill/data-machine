@@ -126,9 +126,9 @@ add_filter(
 	'datamachine_directives',
 	function ( $directives ) {
 		$directives[] = array(
-			'class'       => ChatPipelinesDirective::class,
-			'priority'    => 45,
-			'agent_types' => array( 'chat' ),
+			'class'    => ChatPipelinesDirective::class,
+			'priority' => 45,
+			'contexts' => array( 'chat' ),
 		);
 
 		return $directives;

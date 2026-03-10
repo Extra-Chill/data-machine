@@ -144,7 +144,9 @@ class AltTextAbilities {
 		$post_id       = absint( $input['post_id'] ?? 0 );
 		$force         = ! empty( $input['force'] );
 
-		$system_defaults = PluginSettings::getAgentModel( 'system' );
+		$user_id         = get_current_user_id();
+		$agent_id        = function_exists( 'datamachine_resolve_or_create_agent_id' ) && $user_id > 0 ? datamachine_resolve_or_create_agent_id( $user_id ) : 0;
+		$system_defaults = PluginSettings::resolveModelForAgentContext( $agent_id, 'system' );
 		$provider        = $system_defaults['provider'];
 		$model           = $system_defaults['model'];
 
@@ -242,7 +244,14 @@ class AltTextAbilities {
 		}
 
 		$systemAgent = SystemAgent::getInstance();
-		$batch       = $systemAgent->scheduleBatch( 'alt_text_generation', $item_params );
+		$batch       = $systemAgent->scheduleBatch(
+			'alt_text_generation',
+			$item_params,
+			array(
+				'user_id'  => $user_id,
+				'agent_id' => $agent_id,
+			)
+		);
 
 		if ( false === $batch ) {
 			return array(
@@ -352,7 +361,9 @@ class AltTextAbilities {
 			return;
 		}
 
-		$system_defaults = PluginSettings::getAgentModel( 'system' );
+		$user_id         = get_current_user_id();
+		$agent_id        = function_exists( 'datamachine_resolve_or_create_agent_id' ) && $user_id > 0 ? datamachine_resolve_or_create_agent_id( $user_id ) : 0;
+		$system_defaults = PluginSettings::resolveModelForAgentContext( $agent_id, 'system' );
 		$provider        = $system_defaults['provider'];
 		$model           = $system_defaults['model'];
 
@@ -375,6 +386,10 @@ class AltTextAbilities {
 				'attachment_id' => $attachment_id,
 				'force'         => false,
 				'source'        => 'add_attachment',
+			),
+			array(
+				'user_id'  => $user_id,
+				'agent_id' => $agent_id,
 			)
 		);
 	}

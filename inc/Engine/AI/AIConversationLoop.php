@@ -33,7 +33,7 @@ class AIConversationLoop {
 	 * @param array  $tools          Available tools for AI
 	 * @param string $provider       AI provider (openai, anthropic, etc.)
 	 * @param string $model          AI model identifier
-	 * @param string $agent_type     Agent type: 'pipeline' or 'chat'
+	 * @param string $context        Execution context: 'pipeline' or 'chat'
 	 * @param array  $payload        Step payload (job_id, flow_step_id, data, flow_step_config)
 	 * @param int    $max_turns      Maximum conversation turns (default 25)
 	 * @param bool   $single_turn    Execute exactly one turn and return (default false)
@@ -50,7 +50,7 @@ class AIConversationLoop {
 		array $tools,
 		string $provider,
 		string $model,
-		string $agent_type,
+		string $context,
 		array $payload = array(),
 		int $max_turns = PluginSettings::DEFAULT_MAX_TURNS,
 		bool $single_turn = false
@@ -73,7 +73,7 @@ class AIConversationLoop {
 		// Build base log context from payload for consistent logging
 		$base_log_context = array_filter(
 			array(
-				'agent_type'   => $agent_type,
+				'context'      => $context,
 				'job_id'       => $payload['job_id'] ?? null,
 				'flow_step_id' => $payload['flow_step_id'] ?? null,
 			),
@@ -89,7 +89,7 @@ class AIConversationLoop {
 				$provider,
 				$model,
 				$tools,
-				$agent_type,
+				$context,
 				$payload
 			);
 
@@ -133,7 +133,7 @@ class AIConversationLoop {
 				$messages[] = $ai_message;
 
 				// Fire hook for AI response events (used for system operations like title generation)
-				do_action( 'datamachine_ai_response_received', $agent_type, $messages, $payload );
+				do_action( 'datamachine_ai_response_received', $context, $messages, $payload );
 			}
 
 			// Process tool calls
@@ -237,7 +237,7 @@ class AIConversationLoop {
 
 					// Track handler tool execution in pipeline mode.
 					// Only complete when ALL configured handlers have fired (multi-handler support).
-					if ( 'pipeline' === $agent_type && $is_handler_tool && ( $tool_result['success'] ?? false ) ) {
+					if ( 'pipeline' === $context && $is_handler_tool && ( $tool_result['success'] ?? false ) ) {
 						$handler_slug = $tool_def['handler'] ?? null;
 						if ( $handler_slug ) {
 							$executed_handler_slugs[] = $handler_slug;

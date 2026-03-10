@@ -62,9 +62,9 @@ add_filter(
 	'datamachine_directives',
 	function ( $directives ) {
 		$directives[] = array(
-			'class'       => PipelineMemoryFilesDirective::class,
-			'priority'    => 40,
-			'agent_types' => array( 'pipeline' ),
+			'class'    => PipelineMemoryFilesDirective::class,
+			'priority' => 40,
+			'contexts' => array( 'pipeline' ),
 		);
 		return $directives;
 	}

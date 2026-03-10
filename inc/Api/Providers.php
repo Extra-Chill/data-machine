@@ -86,8 +86,8 @@ class Providers {
 				'model'    => PluginSettings::get( 'default_model', '' ),
 			);
 
-			$agent_types  = PluginSettings::getAgentTypes();
-			$agent_models = PluginSettings::get( 'agent_models', array() );
+			$contexts       = PluginSettings::getContexts();
+			$context_models = PluginSettings::get( 'context_models', PluginSettings::get( 'agent_models', array() ) );
 
 			return rest_ensure_response(
 				array(
@@ -95,8 +95,8 @@ class Providers {
 					'data'    => array(
 						'providers'    => $providers,
 						'defaults'     => $defaults,
-						'agent_types'  => $agent_types,
-						'agent_models' => $agent_models,
+						'contexts'     => $contexts,
+						'context_models' => $context_models,
 					),
 				)
 			);

@@ -94,16 +94,16 @@ export function useChatMutation() {
  * injects agent_id when an agent is selected in the AgentSwitcher.
  *
  * @param {number} limit     - Maximum sessions to return
- * @param {string} agentType - Agent type filter (chat, cli)
- * @return {Object} TanStack Query object with sessions data
- */
-export function useChatSessions( limit = 20, agentType = 'chat' ) {
+	 * @param {string|null} context - Optional session context filter
+	 * @return {Object} TanStack Query object with sessions data
+	 */
+export function useChatSessions( limit = 20, context = null ) {
 	return useQuery( {
-		queryKey: [ 'chat-sessions', limit, agentType ],
+		queryKey: [ 'chat-sessions', limit, context ],
 		queryFn: async () => {
 			const response = await client.get( '/chat/sessions', {
 				limit,
-				agent_type: agentType,
+				context: context || undefined,
 			} );
 
 			if ( ! response.success ) {

@@ -108,9 +108,13 @@ class SettingsAbilities {
 						'daily_memory_enabled'           => array( 'type' => 'boolean' ),
 						'default_provider'               => array( 'type' => 'string' ),
 						'default_model'                  => array( 'type' => 'string' ),
+						'context_models'                 => array(
+							'type'        => 'object',
+							'description' => 'Per-context provider/model overrides keyed by context id',
+						),
 						'agent_models'                   => array(
 							'type'        => 'object',
-							'description' => 'Per-agent-type provider/model overrides keyed by agent type id',
+							'description' => 'Legacy alias for context_models',
 						),
 						'max_turns'                      => array( 'type' => 'integer' ),
 						'disabled_tools'                 => array( 'type' => 'object' ),
@@ -134,7 +138,7 @@ class SettingsAbilities {
 						),
 						'network_settings'               => array(
 							'type'        => 'object',
-							'description' => 'Network-wide defaults (multisite). Keys: default_provider, default_model, agent_models.',
+							'description' => 'Network-wide defaults (multisite). Keys: default_provider, default_model, context_models.',
 						),
 					),
 				),
@@ -371,7 +375,8 @@ class SettingsAbilities {
 				'daily_memory_enabled'           => $settings['daily_memory_enabled'] ?? false,
 				'default_provider'               => $settings['default_provider'] ?? '',
 				'default_model'                  => $settings['default_model'] ?? '',
-				'agent_models'                   => $settings['agent_models'] ?? array(),
+				'context_models'                 => $settings['context_models'] ?? $settings['agent_models'] ?? array(),
+				'agent_models'                   => $settings['context_models'] ?? $settings['agent_models'] ?? array(),
 				'max_turns'                      => $settings['max_turns'] ?? $defaults['max_turns'],
 				'disabled_tools'                 => $settings['disabled_tools'] ?? array(),
 				'ai_provider_keys'               => $masked_keys,
@@ -381,7 +386,8 @@ class SettingsAbilities {
 			'network_settings' => array(
 				'default_provider' => $network_defaults['default_provider'] ?? '',
 				'default_model'    => $network_defaults['default_model'] ?? '',
-				'agent_models'     => $network_defaults['agent_models'] ?? array(),
+				'context_models'   => $network_defaults['context_models'] ?? $network_defaults['agent_models'] ?? array(),
+				'agent_models'     => $network_defaults['context_models'] ?? $network_defaults['agent_models'] ?? array(),
 			),
 			'global_tools'     => $tools_keyed,
 		);
@@ -456,19 +462,28 @@ class SettingsAbilities {
 			$handled_keys[]                = 'default_model';
 		}
 
-		if ( isset( $input['agent_models'] ) && is_array( $input['agent_models'] ) ) {
-			$valid_agent_ids = array_column( PluginSettings::getAgentTypes(), 'id' );
-			$agent_models    = array();
-			foreach ( $input['agent_models'] as $agent_type => $config ) {
-				if ( in_array( $agent_type, $valid_agent_ids, true ) && is_array( $config ) ) {
-					$agent_models[ $agent_type ] = array(
+		$raw_context_models = null;
+		if ( isset( $input['context_models'] ) && is_array( $input['context_models'] ) ) {
+			$raw_context_models = $input['context_models'];
+		} elseif ( isset( $input['agent_models'] ) && is_array( $input['agent_models'] ) ) {
+			$raw_context_models = $input['agent_models'];
+		}
+
+		if ( is_array( $raw_context_models ) ) {
+			$valid_context_ids = array_column( PluginSettings::getContexts(), 'id' );
+			$context_models    = array();
+			foreach ( $raw_context_models as $context => $config ) {
+				if ( in_array( $context, $valid_context_ids, true ) && is_array( $config ) ) {
+					$context_models[ $context ] = array(
 						'provider' => sanitize_text_field( $config['provider'] ?? '' ),
 						'model'    => sanitize_text_field( $config['model'] ?? '' ),
 					);
 				}
 			}
-			$all_settings['agent_models'] = $agent_models;
-			$handled_keys[]               = 'agent_models';
+			$all_settings['context_models'] = $context_models;
+			$all_settings['agent_models']   = $context_models;
+			$handled_keys[]                 = 'context_models';
+			$handled_keys[]                 = 'agent_models';
 		}
 
 		if ( isset( $input['max_turns'] ) ) {
@@ -551,18 +566,26 @@ class SettingsAbilities {
 					$network_values['default_model'] = sanitize_text_field( $input['network_settings']['default_model'] );
 				}
 
-				if ( isset( $input['network_settings']['agent_models'] ) && is_array( $input['network_settings']['agent_models'] ) ) {
-					$valid_agent_ids      = array_column( PluginSettings::getAgentTypes(), 'id' );
-					$network_agent_models = array();
-					foreach ( $input['network_settings']['agent_models'] as $agent_type => $config ) {
-						if ( in_array( $agent_type, $valid_agent_ids, true ) && is_array( $config ) ) {
-							$network_agent_models[ $agent_type ] = array(
+				$raw_network_context_models = null;
+				if ( isset( $input['network_settings']['context_models'] ) && is_array( $input['network_settings']['context_models'] ) ) {
+					$raw_network_context_models = $input['network_settings']['context_models'];
+				} elseif ( isset( $input['network_settings']['agent_models'] ) && is_array( $input['network_settings']['agent_models'] ) ) {
+					$raw_network_context_models = $input['network_settings']['agent_models'];
+				}
+
+				if ( is_array( $raw_network_context_models ) ) {
+					$valid_context_ids     = array_column( PluginSettings::getContexts(), 'id' );
+					$network_context_models = array();
+					foreach ( $raw_network_context_models as $context => $config ) {
+						if ( in_array( $context, $valid_context_ids, true ) && is_array( $config ) ) {
+							$network_context_models[ $context ] = array(
 								'provider' => sanitize_text_field( $config['provider'] ?? '' ),
 								'model'    => sanitize_text_field( $config['model'] ?? '' ),
 							);
 						}
 					}
-					$network_values['agent_models'] = $network_agent_models;
+					$network_values['context_models'] = $network_context_models;
+					$network_values['agent_models']   = $network_context_models;
 				}
 
 				if ( ! empty( $network_values ) ) {

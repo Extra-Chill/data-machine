@@ -26,8 +26,8 @@ class ChatCommand extends BaseCommand {
 	 * [--user=<id>]
 	 * : User ID to list sessions for. Defaults to current user.
 	 *
-	 * [--agent-type=<type>]
-	 * : Filter by agent type (chat, pipeline, system).
+	 * [--context=<type>]
+	 * : Filter by execution context (chat, pipeline, system, standalone).
 	 *
 	 * [--limit=<n>]
 	 * : Maximum number of sessions to return.
@@ -61,8 +61,8 @@ class ChatCommand extends BaseCommand {
 	 *     # List sessions for user 1
 	 *     wp datamachine chat list --user=1
 	 *
-	 *     # List chat-type sessions
-	 *     wp datamachine chat list --user=1 --agent-type=chat
+	 *     # List chat-context sessions
+	 *     wp datamachine chat list --user=1 --context=chat
 	 *
 	 *     # Get session IDs only
 	 *     wp datamachine chat list --user=1 --format=ids
@@ -73,11 +73,11 @@ class ChatCommand extends BaseCommand {
 		$user_id = $this->get_user_id( $assoc_args );
 		$limit   = min( 100, max( 1, (int) ( $assoc_args['limit'] ?? 20 ) ) );
 		$offset  = max( 0, (int) ( $assoc_args['offset'] ?? 0 ) );
-		$agent_type = ! empty( $assoc_args['agent-type'] ) ? sanitize_text_field( $assoc_args['agent-type'] ) : 'chat';
+		$context = ! empty( $assoc_args['context'] ) ? sanitize_text_field( $assoc_args['context'] ) : null;
 
 		$chat_db = new ChatDatabase();
-		$sessions = $chat_db->get_user_sessions( $user_id, $limit, $offset, $agent_type );
-		$total    = $chat_db->get_user_session_count( $user_id, $agent_type );
+		$sessions = $chat_db->get_user_sessions( $user_id, $limit, $offset, $context );
+		$total    = $chat_db->get_user_session_count( $user_id, $context );
 
 		if ( empty( $sessions ) ) {
 			WP_CLI::log( 'No chat sessions found.' );
@@ -91,13 +91,13 @@ class ChatCommand extends BaseCommand {
 			$display_items[] = array(
 				'session_id'   => $session['session_id'],
 				'title'        => $session['title'] ?? '(untitled)',
-				'agent_type'   => $session['agent_type'] ?? 'chat',
+				'context'      => $session['context'] ?? 'chat',
 				'message_count' => $metadata['message_count'] ?? 0,
 				'created_at'   => $metadata['started_at'] ?? $session['created_at'] ?? '-',
 			);
 		}
 
-		$fields = array( 'session_id', 'title', 'agent_type', 'message_count', 'created_at' );
+		$fields = array( 'session_id', 'title', 'context', 'message_count', 'created_at' );
 		$this->format_items( $display_items, $fields, $assoc_args, 'session_id' );
 
 		$format = $assoc_args['format'] ?? 'table';
@@ -171,7 +171,7 @@ class ChatCommand extends BaseCommand {
 		WP_CLI::log( WP_CLI::colorize( '%BSession Metadata:%n' ) );
 		WP_CLI::log( "  Session ID:   {$session['session_id']}" );
 		WP_CLI::log( "  Title:        " . ( $session['title'] ?? '(untitled)' ) );
-		WP_CLI::log( "  Agent Type:   " . ( $session['agent_type'] ?? 'chat' ) );
+		WP_CLI::log( "  Context:      " . ( $session['context'] ?? 'chat' ) );
 		WP_CLI::log( "  User ID:      {$session['user_id']}" );
 		WP_CLI::log( "  Started:      " . ( $metadata['started_at'] ?? '-' ) );
 		WP_CLI::log( "  Messages:     " . count( $messages ) );
@@ -209,8 +209,8 @@ class ChatCommand extends BaseCommand {
 	 * [--agent-id=<id>]
 	 * : First-class agent ID for this session.
 	 *
-	 * [--agent-type=<type>]
-	 * : Agent type (chat, pipeline, system).
+	 * [--context=<type>]
+	 * : Execution context (chat, pipeline, system, standalone).
 	 * ---
 	 * default: chat
 	 * ---
@@ -230,10 +230,10 @@ class ChatCommand extends BaseCommand {
 	 *     wp datamachine chat create --user=1 --agent-id=5
 	 */
 	public function create( array $args, array $assoc_args ): void {
-		$user_id    = $this->get_user_id( $assoc_args );
-		$agent_id   = (int) ( $assoc_args['agent-id'] ?? 0 );
-		$agent_type = sanitize_text_field( $assoc_args['agent-type'] ?? 'chat' );
-		$source     = sanitize_text_field( $assoc_args['source'] ?? 'cli' );
+		$user_id  = $this->get_user_id( $assoc_args );
+		$agent_id = (int) ( $assoc_args['agent-id'] ?? 0 );
+		$context  = sanitize_text_field( $assoc_args['context'] ?? 'chat' );
+		$source   = sanitize_text_field( $assoc_args['source'] ?? 'cli' );
 
 		$metadata = array(
 			'started_at'    => current_time( 'mysql', true ),
@@ -242,7 +242,7 @@ class ChatCommand extends BaseCommand {
 		);
 
 		$chat_db = new ChatDatabase();
-		$session_id = $chat_db->create_session( $user_id, $agent_id, $metadata, $agent_type );
+		$session_id = $chat_db->create_session( $user_id, $agent_id, $metadata, $context );
 
 		if ( empty( $session_id ) ) {
 			WP_CLI::error( 'Failed to create chat session.' );

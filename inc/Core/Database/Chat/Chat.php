@@ -50,15 +50,15 @@ class Chat extends BaseRepository {
             metadata LONGTEXT NULL COMMENT 'JSON object for session metadata',
             provider VARCHAR(50) NULL COMMENT 'AI provider (anthropic, openai, etc)',
             model VARCHAR(100) NULL COMMENT 'AI model identifier',
-            agent_type VARCHAR(20) NOT NULL DEFAULT 'chat' COMMENT 'Agent type: chat, pipeline, system',
+	            context VARCHAR(20) NOT NULL DEFAULT 'chat' COMMENT 'Execution context: chat, pipeline, system, standalone',
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             expires_at DATETIME NULL COMMENT 'Auto-cleanup timestamp',
             PRIMARY KEY  (session_id),
             KEY user_id (user_id),
             KEY agent_id (agent_id),
-            KEY agent_type (agent_type),
-            KEY user_agent (user_id, agent_type),
+	            KEY context (context),
+	            KEY user_context (user_id, context),
             KEY created_at (created_at),
             KEY updated_at (updated_at),
             KEY expires_at (expires_at)
@@ -94,6 +94,43 @@ class Chat extends BaseRepository {
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
 		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD KEY agent_id (agent_id)', $table_name ) );
+	}
+
+	/**
+	 * Ensure context column exists and migrate legacy agent_type data.
+	 *
+	 * @return void
+	 */
+	public static function ensure_context_column(): void {
+		global $wpdb;
+
+		$table_name = self::get_prefixed_table_name();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$context_column = $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM %i LIKE %s', $table_name, 'context' ) );
+
+		if ( ! $context_column ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$legacy_agent_type = $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM %i LIKE %s', $table_name, 'agent_type' ) );
+
+			if ( $legacy_agent_type ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i CHANGE COLUMN agent_type context VARCHAR(20) NOT NULL DEFAULT %s', $table_name, 'chat' ) );
+			} else {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN context VARCHAR(20) NOT NULL DEFAULT %s AFTER model', $table_name, 'chat' ) );
+			}
+		}
+
+		// Best-effort index creation / normalization.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP KEY agent_type', $table_name ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP KEY user_agent', $table_name ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD KEY context (context)', $table_name ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD KEY user_context (user_id, context)', $table_name ) );
 	}
 
 	/**
@@ -139,16 +176,16 @@ class Chat extends BaseRepository {
 	/**
 	 * Create new chat session
 	 *
-	 * @param int    $user_id    WordPress user ID
-	 * @param array  $metadata   Optional session metadata
-	 * @param string $agent_type Agent type (chat, pipeline, system)
+	 * @param int    $user_id  WordPress user ID
+	 * @param array  $metadata Optional session metadata
+	 * @param string $context  Execution context (chat, pipeline, system, standalone)
 	 * @return string Session ID (UUID)
 	 */
 	public function create_session(
 		int $user_id,
 		int $agent_id = 0,
 		array $metadata = array(),
-		string $agent_type = 'chat'
+		string $context = 'chat'
 	): string {
 		global $wpdb;
 
@@ -166,7 +203,7 @@ class Chat extends BaseRepository {
 				'metadata'   => wp_json_encode( $metadata ),
 				'provider'   => null,
 				'model'      => null,
-				'agent_type' => $agent_type,
+				'context'    => $context,
 				'expires_at' => null,
 			),
 			array( '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s' )
@@ -180,7 +217,7 @@ class Chat extends BaseRepository {
 				array(
 					'user_id'    => $user_id,
 					'error'      => $wpdb->last_error,
-					'agent_type' => $agent_type,
+					'context'    => $context,
 				)
 			);
 			return '';
@@ -194,7 +231,7 @@ class Chat extends BaseRepository {
 				'session_id' => $session_id,
 				'user_id'    => $user_id,
 				'agent_id'   => $agent_id,
-				'agent_type' => $agent_type,
+				'context'    => $context,
 			)
 		);
 
@@ -287,7 +324,7 @@ class Chat extends BaseRepository {
 				array(
 					'session_id' => $session_id,
 					'error'      => $wpdb->last_error,
-					'agent_type' => 'chat',
+					'context'    => 'chat',
 				)
 			);
 			return false;
@@ -322,7 +359,7 @@ class Chat extends BaseRepository {
 				array(
 					'session_id' => $session_id,
 					'error'      => $wpdb->last_error,
-					'agent_type' => 'chat',
+					'context'    => 'chat',
 				)
 			);
 			return false;
@@ -334,7 +371,7 @@ class Chat extends BaseRepository {
 			'Chat session deleted',
 			array(
 				'session_id' => $session_id,
-				'agent_type' => 'chat',
+				'context'    => 'chat',
 			)
 		);
 
@@ -367,7 +404,7 @@ class Chat extends BaseRepository {
 				'Cleaned up expired chat sessions',
 				array(
 					'deleted_count' => $deleted,
-					'agent_type'    => 'chat',
+					'context'       => 'chat',
 				)
 			);
 		}
@@ -378,33 +415,59 @@ class Chat extends BaseRepository {
 	/**
 	 * Get all sessions for a user
 	 *
-	 * @param int      $user_id    WordPress user ID
-	 * @param int      $limit      Maximum sessions to return
-	 * @param int      $offset     Pagination offset
-	 * @param string   $agent_type Agent type filter (chat, pipeline, system)
-	 * @param int|null $agent_id   Optional agent ID filter (null = no filter)
+	 * @param int         $user_id  WordPress user ID
+	 * @param int         $limit    Maximum sessions to return
+	 * @param int         $offset   Pagination offset
+	 * @param string|null $context  Optional context filter
+	 * @param int|null    $agent_id Optional agent ID filter (null = no filter)
 	 * @return array Array of session data
 	 */
 	public function get_user_sessions(
 		int $user_id,
 		int $limit = 20,
 		int $offset = 0,
-		string $agent_type = 'chat',
+		?string $context = null,
 		?int $agent_id = null
 	): array {
 		global $wpdb;
 
 		$table_name = self::get_prefixed_table_name();
 
-		if ( null !== $agent_id ) {
+		if ( null !== $agent_id && null !== $context && '' !== $context ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$sessions = $wpdb->get_results(
 				$wpdb->prepare(
-					'SELECT * FROM %i WHERE user_id = %d AND agent_type = %s AND agent_id = %d ORDER BY updated_at DESC LIMIT %d OFFSET %d',
+					'SELECT * FROM %i WHERE user_id = %d AND context = %s AND agent_id = %d ORDER BY updated_at DESC LIMIT %d OFFSET %d',
 					$table_name,
 					$user_id,
-					$agent_type,
+					$context,
 					$agent_id,
+					$limit,
+					$offset
+				),
+				ARRAY_A
+			);
+		} elseif ( null !== $agent_id ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$sessions = $wpdb->get_results(
+				$wpdb->prepare(
+					'SELECT * FROM %i WHERE user_id = %d AND agent_id = %d ORDER BY updated_at DESC LIMIT %d OFFSET %d',
+					$table_name,
+					$user_id,
+					$agent_id,
+					$limit,
+					$offset
+				),
+				ARRAY_A
+			);
+		} elseif ( null !== $context && '' !== $context ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$sessions = $wpdb->get_results(
+				$wpdb->prepare(
+					'SELECT * FROM %i WHERE user_id = %d AND context = %s ORDER BY updated_at DESC LIMIT %d OFFSET %d',
+					$table_name,
+					$user_id,
+					$context,
 					$limit,
 					$offset
 				),
@@ -414,10 +477,9 @@ class Chat extends BaseRepository {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$sessions = $wpdb->get_results(
 				$wpdb->prepare(
-					'SELECT * FROM %i WHERE user_id = %d AND agent_type = %s ORDER BY updated_at DESC LIMIT %d OFFSET %d',
+					'SELECT * FROM %i WHERE user_id = %d ORDER BY updated_at DESC LIMIT %d OFFSET %d',
 					$table_name,
 					$user_id,
-					$agent_type,
 					$limit,
 					$offset
 				),
@@ -443,6 +505,7 @@ class Chat extends BaseRepository {
 			$result[] = array(
 				'session_id'    => $session['session_id'],
 				'title'         => $session['title'] ?? null,
+				'context'       => $session['context'] ?? 'chat',
 				'first_message' => mb_substr( $first_message, 0, 100 ),
 				'message_count' => count( $messages ),
 				'created_at'    => DateFormatter::format_for_api( $session['created_at'] ?? null ),
@@ -456,39 +519,58 @@ class Chat extends BaseRepository {
 	/**
 	 * Get total session count for a user
 	 *
-	 * @param int      $user_id    WordPress user ID
-	 * @param string   $agent_type Agent type filter (chat, pipeline, system)
-	 * @param int|null $agent_id   Optional agent ID filter (null = no filter)
+	 * @param int         $user_id  WordPress user ID
+	 * @param string|null $context  Optional context filter
+	 * @param int|null    $agent_id Optional agent ID filter (null = no filter)
 	 * @return int Total session count
 	 */
 	public function get_user_session_count(
 		int $user_id,
-		string $agent_type = 'chat',
+		?string $context = null,
 		?int $agent_id = null
 	): int {
 		global $wpdb;
 
 		$table_name = self::get_prefixed_table_name();
 
-		if ( null !== $agent_id ) {
+		if ( null !== $agent_id && null !== $context && '' !== $context ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$count = $wpdb->get_var(
 				$wpdb->prepare(
-					'SELECT COUNT(*) FROM %i WHERE user_id = %d AND agent_type = %s AND agent_id = %d',
+					'SELECT COUNT(*) FROM %i WHERE user_id = %d AND context = %s AND agent_id = %d',
 					$table_name,
 					$user_id,
-					$agent_type,
+					$context,
 					$agent_id
+				)
+			);
+		} elseif ( null !== $agent_id ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$count = $wpdb->get_var(
+				$wpdb->prepare(
+					'SELECT COUNT(*) FROM %i WHERE user_id = %d AND agent_id = %d',
+					$table_name,
+					$user_id,
+					$agent_id
+				)
+			);
+		} elseif ( null !== $context && '' !== $context ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$count = $wpdb->get_var(
+				$wpdb->prepare(
+					'SELECT COUNT(*) FROM %i WHERE user_id = %d AND context = %s',
+					$table_name,
+					$user_id,
+					$context
 				)
 			);
 		} else {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$count = $wpdb->get_var(
 				$wpdb->prepare(
-					'SELECT COUNT(*) FROM %i WHERE user_id = %d AND agent_type = %s',
+					'SELECT COUNT(*) FROM %i WHERE user_id = %d',
 					$table_name,
-					$user_id,
-					$agent_type
+					$user_id
 				)
 			);
 		}
@@ -510,15 +592,15 @@ class Chat extends BaseRepository {
 	 * instead of creating a new one.
 	 *
 	 * @since 0.9.8
-	 * @param int    $user_id    WordPress user ID
-	 * @param int    $seconds    Lookback window in seconds (default 600 = 10 minutes)
-	 * @param string $agent_type Agent type filter (chat, pipeline, system)
+	 * @param int    $user_id WordPress user ID
+	 * @param int    $seconds Lookback window in seconds (default 600 = 10 minutes)
+	 * @param string $context Context filter
 	 * @return array|null Session data or null if none found
 	 */
 	public function get_recent_pending_session(
 		int $user_id,
 		int $seconds = 600,
-		string $agent_type = 'chat'
+		string $context = 'chat'
 	): ?array {
 		global $wpdb;
 
@@ -530,7 +612,7 @@ class Chat extends BaseRepository {
 			$wpdb->prepare(
 				"SELECT * FROM %i
 				WHERE user_id = %d
-				AND agent_type = %s
+				AND context = %s
 				AND created_at >= %s
 				AND (
 					(messages = '[]' OR messages = '' OR messages IS NULL)
@@ -540,7 +622,7 @@ class Chat extends BaseRepository {
 				LIMIT 1",
 				$table_name,
 				$user_id,
-				$agent_type,
+				$context,
 				$cutoff_time,
 				'%"status":"processing"%'
 			),
@@ -586,7 +668,7 @@ class Chat extends BaseRepository {
 				array(
 					'session_id' => $session_id,
 					'error'      => $wpdb->last_error,
-					'agent_type' => 'chat',
+					'context'    => 'chat',
 				)
 			);
 			return false;
@@ -625,7 +707,7 @@ class Chat extends BaseRepository {
 					'deleted_count'  => $deleted,
 					'retention_days' => $retention_days,
 					'cutoff_date'    => $cutoff_date,
-					'agent_type'     => 'chat',
+					'context'        => 'chat',
 				)
 			);
 		}
@@ -673,7 +755,7 @@ class Chat extends BaseRepository {
 					'deleted_count'   => $deleted,
 					'hours_threshold' => $hours,
 					'cutoff_time'     => $cutoff_time,
-					'agent_type'      => 'chat',
+					'context'         => 'chat',
 				)
 			);
 		}

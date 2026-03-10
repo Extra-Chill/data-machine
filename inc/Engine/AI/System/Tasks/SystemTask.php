@@ -26,6 +26,7 @@ defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\JobStatus;
+use DataMachine\Core\PluginSettings;
 
 abstract class SystemTask {
 
@@ -60,6 +61,20 @@ abstract class SystemTask {
 			'setting_key'     => null,
 			'default_enabled' => true,
 		);
+	}
+
+	/**
+	 * Resolve the effective system-context model for this job.
+	 *
+	 * Prefers the explicit agent_id stored in task params or nested context.
+	 * Falls back to global system context defaults when no agent is available.
+	 *
+	 * @param array $params Task params / engine_data.
+	 * @return array{ provider: string, model: string }
+	 */
+	protected function resolveSystemModel( array $params ): array {
+		$agent_id = (int) ( $params['agent_id'] ?? ( $params['context']['agent_id'] ?? 0 ) );
+		return PluginSettings::resolveModelForAgentContext( $agent_id, 'system' );
 	}
 
 	/**
@@ -382,10 +397,10 @@ abstract class SystemTask {
 			'info',
 			"System Agent task completed successfully for job {$jobId}",
 			array(
-				'job_id'     => $jobId,
-				'task_type'  => $this->getTaskType(),
-				'agent_type' => 'system',
-				'result'     => $result,
+				'job_id'    => $jobId,
+				'task_type' => $this->getTaskType(),
+				'context'   => 'system',
+				'result'    => $result,
 			)
 		);
 	}
@@ -417,10 +432,10 @@ abstract class SystemTask {
 			'error',
 			"System Agent task failed for job {$jobId}: {$reason}",
 			array(
-				'job_id'     => $jobId,
-				'task_type'  => $this->getTaskType(),
-				'agent_type' => 'system',
-				'error'      => $reason,
+				'job_id'    => $jobId,
+				'task_type' => $this->getTaskType(),
+				'context'   => 'system',
+				'error'     => $reason,
 			)
 		);
 	}
@@ -477,10 +492,10 @@ abstract class SystemTask {
 				'debug',
 				"System Agent task rescheduled for job {$jobId} (attempt {$attempts}/{$max_attempts})",
 				array(
-					'job_id'        => $jobId,
-					'task_type'     => $this->getTaskType(),
-					'agent_type'    => 'system',
-					'attempts'      => $attempts,
+				'job_id'        => $jobId,
+				'task_type'     => $this->getTaskType(),
+				'context'       => 'system',
+				'attempts'      => $attempts,
 					'max_attempts'  => $max_attempts,
 					'delay_seconds' => $delaySeconds,
 				)

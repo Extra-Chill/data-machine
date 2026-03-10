@@ -73,14 +73,14 @@ class PromptBuilder {
 	 *
 	 * @param string|object $directive Directive class name or instance
 	 * @param int           $priority Priority for ordering (lower = applied first)
-	 * @param array         $agentTypes Agent types this directive applies to ('all' for global)
+	 * @param array         $contexts Contexts this directive applies to ('all' for global)
 	 * @return self
 	 */
-	public function addDirective( $directive, int $priority, array $agentTypes = array( 'all' ) ): self {
+	public function addDirective( $directive, int $priority, array $contexts = array( 'all' ) ): self {
 		$this->directives[] = array(
-			'directive'  => $directive,
-			'priority'   => $priority,
-			'agentTypes' => $agentTypes,
+			'directive' => $directive,
+			'priority'  => $priority,
+			'contexts'  => $contexts,
 		);
 		return $this;
 	}
@@ -88,12 +88,12 @@ class PromptBuilder {
 	/**
 	 * Build the final AI request with directives applied
 	 *
-	 * @param string $agentType Agent type ('pipeline', 'chat', etc.)
+	 * @param string $context Execution context ('pipeline', 'chat', etc.)
 	 * @param string $provider AI provider name
 	 * @param array  $payload Request payload
 	 * @return array Request array with 'messages', 'tools', and 'applied_directives' metadata
 	 */
-	public function build( string $agentType, string $provider, array $payload = array() ): array {
+	public function build( string $context, string $provider, array $payload = array() ): array {
 		usort(
 			$this->directives,
 			function ( $a, $b ) {
@@ -106,10 +106,10 @@ class PromptBuilder {
 		$applied_directives    = array();
 
 		foreach ( $this->directives as $directiveConfig ) {
-			$directive  = $directiveConfig['directive'];
-			$agentTypes = $directiveConfig['agentTypes'];
+			$directive = $directiveConfig['directive'];
+			$contexts  = $directiveConfig['contexts'];
 
-			if ( ! in_array( 'all', $agentTypes, true ) && ! in_array( $agentType, $agentTypes, true ) ) {
+			if ( ! in_array( 'all', $contexts, true ) && ! in_array( $context, $contexts, true ) ) {
 				continue;
 			}
 

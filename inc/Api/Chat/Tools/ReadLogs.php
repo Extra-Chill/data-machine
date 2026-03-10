@@ -34,10 +34,15 @@ class ReadLogs extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => $this->buildDescription(),
 			'parameters'  => array(
-				'agent_type'  => array(
+				'agent_id'    => array(
+					'type'        => 'integer',
+					'required'    => false,
+					'description' => 'Agent ID to read logs for. Omit for all agents.',
+				),
+				'context'     => array(
 					'type'        => 'string',
 					'required'    => false,
-					'description' => 'Log source: "pipeline" (default) for job execution logs, "chat" for chat agent logs, "system" for system infrastructure operations',
+					'description' => 'Deprecated label only. Use agent_id instead.',
 				),
 				'mode'        => array(
 					'type'        => 'string',
@@ -76,10 +81,9 @@ class ReadLogs extends BaseTool {
 	private function buildDescription(): string {
 		return 'Read Data Machine logs for troubleshooting jobs, flows, pipelines, and system operations.
 
-AGENT TYPES:
-- pipeline (default): Logs from job/flow execution - use this for troubleshooting failed jobs
-- chat: Logs from chat agent operations - use this to check your own activity
-- system: System infrastructure operations - database, OAuth, cleanup, and service initialization
+SCOPE:
+- Filter by explicit agent_id when you want a single agent
+- Omit agent_id to read across all agents
 
 FILTERS (all optional, combined with AND logic):
 - job_id: Filter to specific job execution
@@ -115,10 +119,13 @@ TIPS:
 		}
 
 		$input = array(
-			'agent_type' => $parameters['agent_type'] ?? 'pipeline',
-			'mode'       => $parameters['mode'] ?? 'recent',
-			'limit'      => $parameters['limit'] ?? 200,
+			'mode'  => $parameters['mode'] ?? 'recent',
+			'limit' => $parameters['limit'] ?? 200,
 		);
+
+		if ( isset( $parameters['agent_id'] ) && (int) $parameters['agent_id'] > 0 ) {
+			$input['agent_id'] = (int) $parameters['agent_id'];
+		}
 
 		if ( ! empty( $parameters['job_id'] ) ) {
 			$input['job_id'] = (int) $parameters['job_id'];

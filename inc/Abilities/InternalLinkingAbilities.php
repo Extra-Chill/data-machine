@@ -358,7 +358,9 @@ class InternalLinkingAbilities {
 		$dry_run        = ! empty( $input['dry_run'] );
 		$force          = ! empty( $input['force'] );
 
-		$system_defaults = PluginSettings::getAgentModel( 'system' );
+		$user_id         = get_current_user_id();
+		$agent_id        = function_exists( 'datamachine_resolve_or_create_agent_id' ) && $user_id > 0 ? datamachine_resolve_or_create_agent_id( $user_id ) : 0;
+		$system_defaults = PluginSettings::resolveModelForAgentContext( $agent_id, 'system' );
 		$provider        = $system_defaults['provider'];
 		$model           = $system_defaults['model'];
 
@@ -449,7 +451,14 @@ class InternalLinkingAbilities {
 		}
 
 		$systemAgent = SystemAgent::getInstance();
-		$batch       = $systemAgent->scheduleBatch( 'internal_linking', $item_params );
+		$batch       = $systemAgent->scheduleBatch(
+			'internal_linking',
+			$item_params,
+			array(
+				'user_id'  => $user_id,
+				'agent_id' => $agent_id,
+			)
+		);
 
 		if ( false === $batch ) {
 			return array(

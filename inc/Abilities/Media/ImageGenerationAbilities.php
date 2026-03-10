@@ -281,7 +281,9 @@ class ImageGenerationAbilities {
 	 * @return string|null Refined prompt on success, null on failure.
 	 */
 	public static function refine_prompt( string $raw_prompt, string $post_context = '', array $config = array() ): ?string {
-		$system_defaults = PluginSettings::getAgentModel( 'system' );
+		$user_id         = get_current_user_id();
+		$agent_id        = function_exists( 'datamachine_resolve_or_create_agent_id' ) && $user_id > 0 ? datamachine_resolve_or_create_agent_id( $user_id ) : 0;
+		$system_defaults = PluginSettings::resolveModelForAgentContext( $agent_id, 'system' );
 		$provider        = $system_defaults['provider'];
 		$model           = $system_defaults['model'];
 
@@ -383,7 +385,9 @@ class ImageGenerationAbilities {
 		}
 
 		// Must have a DM AI provider configured.
-		$system_defaults = PluginSettings::getAgentModel( 'system' );
+		$user_id         = get_current_user_id();
+		$agent_id        = function_exists( 'datamachine_resolve_or_create_agent_id' ) && $user_id > 0 ? datamachine_resolve_or_create_agent_id( $user_id ) : 0;
+		$system_defaults = PluginSettings::resolveModelForAgentContext( $agent_id, 'system' );
 
 		return ! empty( $system_defaults['provider'] ) && ! empty( $system_defaults['model'] );
 	}

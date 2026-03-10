@@ -12,6 +12,8 @@
 
 namespace DataMachine\Core;
 
+use DataMachine\Core\Database\Agents\Agents;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -21,6 +23,7 @@ class PluginSettings {
 	public const DEFAULT_MAX_TURNS = 25;
 
 	private static ?array $cache = null;
+	private static array $agent_model_cache = array();
 
 	/**
 	 * Get default queue tuning values.
@@ -108,36 +111,36 @@ class PluginSettings {
 	}
 
 	/**
-	 * Get provider and model for a specific agent type.
+	 * Get provider and model for a specific execution context.
 	 *
 	 * Resolution order:
-	 * 1. Per-site agent-specific override from agent_models setting
-	 * 2. Network agent-specific override from network agent_models
+	 * 1. Per-site context-specific override from context_models setting (or legacy agent_models)
+	 * 2. Network context-specific override from network context_models (or legacy agent_models)
 	 * 3. Per-site global default_provider / default_model
 	 * 4. Network global default_provider / default_model
 	 * 5. Empty strings
 	 *
-	 * @param string $agent_type Agent type: 'chat', 'pipeline', 'system'.
+	 * @param string $context Execution context: 'chat', 'pipeline', 'system', 'standalone'.
 	 * @return array{ provider: string, model: string }
 	 */
-	public static function getAgentModel( string $agent_type ): array {
-		// Step 1: Check per-site agent-specific override.
-		$site_agent_models = self::get( 'agent_models', array() );
-		$site_agent_config = $site_agent_models[ $agent_type ] ?? array();
+	public static function getContextModel( string $context ): array {
+		// Step 1: Check per-site context-specific override.
+		$site_context_models = self::get( 'context_models', self::get( 'agent_models', array() ) );
+		$site_context_config = $site_context_models[ $context ] ?? array();
 
-		$provider = ! empty( $site_agent_config['provider'] ) ? $site_agent_config['provider'] : '';
-		$model    = ! empty( $site_agent_config['model'] ) ? $site_agent_config['model'] : '';
+		$provider = ! empty( $site_context_config['provider'] ) ? $site_context_config['provider'] : '';
+		$model    = ! empty( $site_context_config['model'] ) ? $site_context_config['model'] : '';
 
-		// Step 2: Fall back to network agent-specific override.
+		// Step 2: Fall back to network context-specific override.
 		if ( empty( $provider ) || empty( $model ) ) {
-			$network_agent_models = NetworkSettings::get( 'agent_models', array() );
-			$network_agent_config = $network_agent_models[ $agent_type ] ?? array();
+			$network_context_models = NetworkSettings::get( 'context_models', NetworkSettings::get( 'agent_models', array() ) );
+			$network_context_config = $network_context_models[ $context ] ?? array();
 
-			if ( empty( $provider ) && ! empty( $network_agent_config['provider'] ) ) {
-				$provider = $network_agent_config['provider'];
+			if ( empty( $provider ) && ! empty( $network_context_config['provider'] ) ) {
+				$provider = $network_context_config['provider'];
 			}
-			if ( empty( $model ) && ! empty( $network_agent_config['model'] ) ) {
-				$model = $network_agent_config['model'];
+			if ( empty( $model ) && ! empty( $network_context_config['model'] ) ) {
+				$model = $network_context_config['model'];
 			}
 		}
 
@@ -156,11 +159,68 @@ class PluginSettings {
 	}
 
 	/**
-	 * Get the list of known agent types.
+	 * Resolve provider/model for an agent within an execution context.
 	 *
-	 * @return array Array of agent type definitions with id, label, and description.
+	 * Resolution order:
+	 * 1. agent_config.context_models[context]
+	 * 2. agent_config.default_provider/default_model
+	 * 3. site/network context-specific overrides
+	 * 4. site/network global defaults
+	 *
+	 * @param int|null $agent_id Agent ID or null/0 for no agent-specific override.
+	 * @param string   $context  Execution context.
+	 * @return array{ provider: string, model: string }
 	 */
-	public static function getAgentTypes(): array {
+	public static function resolveModelForAgentContext( ?int $agent_id, string $context ): array {
+		$agent_id = (int) $agent_id;
+		$cache_key = $agent_id . ':' . $context;
+
+		if ( isset( self::$agent_model_cache[ $cache_key ] ) ) {
+			return self::$agent_model_cache[ $cache_key ];
+		}
+
+		if ( $agent_id > 0 ) {
+			$agents_repo = new Agents();
+			$agent       = $agents_repo->get_agent( $agent_id );
+			$config      = is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array();
+
+			$context_models = is_array( $config['context_models'] ?? null )
+				? $config['context_models']
+				: ( is_array( $config['agent_models'] ?? null ) ? $config['agent_models'] : array() );
+			$context_model  = is_array( $context_models[ $context ] ?? null ) ? $context_models[ $context ] : array();
+
+			$provider = sanitize_text_field( $context_model['provider'] ?? '' );
+			$model    = sanitize_text_field( $context_model['model'] ?? '' );
+
+			if ( empty( $provider ) ) {
+				$provider = sanitize_text_field( $config['default_provider'] ?? '' );
+			}
+
+			if ( empty( $model ) ) {
+				$model = sanitize_text_field( $config['default_model'] ?? '' );
+			}
+
+			if ( ! empty( $provider ) && ! empty( $model ) ) {
+				self::$agent_model_cache[ $cache_key ] = array(
+					'provider' => $provider,
+					'model'    => $model,
+				);
+
+				return self::$agent_model_cache[ $cache_key ];
+			}
+		}
+
+		self::$agent_model_cache[ $cache_key ] = self::getContextModel( $context );
+
+		return self::$agent_model_cache[ $cache_key ];
+	}
+
+	/**
+	 * Get the list of known execution contexts.
+	 *
+	 * @return array Array of context definitions with id, label, and description.
+	 */
+	public static function getContexts(): array {
 		return array(
 			array(
 				'id'          => 'chat',
@@ -177,6 +237,11 @@ class PluginSettings {
 				'label'       => __( 'System Agent', 'data-machine' ),
 				'description' => __( 'Background tasks like alt text generation and issue creation.', 'data-machine' ),
 			),
+			array(
+				'id'          => 'standalone',
+				'label'       => __( 'Standalone Context', 'data-machine' ),
+				'description' => __( 'Direct or ad-hoc execution outside pipeline and chat flows.', 'data-machine' ),
+			),
 		);
 	}
 
@@ -187,6 +252,7 @@ class PluginSettings {
 	 */
 	public static function clearCache(): void {
 		self::$cache = null;
+		self::$agent_model_cache = array();
 	}
 
 	/**

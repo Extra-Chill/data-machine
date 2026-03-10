@@ -45,7 +45,7 @@ class DailyMemoryTask extends SystemTask {
 			return;
 		}
 
-		$system_defaults = PluginSettings::getAgentModel( 'system' );
+		$system_defaults = $this->resolveSystemModel( $params );
 		$provider        = $system_defaults['provider'];
 		$model           = $system_defaults['model'];
 
@@ -183,9 +183,9 @@ class DailyMemoryTask extends SystemTask {
 			$provider,
 			$model,
 			array(),
-			'system',
-			array()
-		);
+				'system',
+				array()
+			);
 
 		if ( empty( $response['success'] ) ) {
 			do_action(
@@ -519,7 +519,7 @@ PROMPT;
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$sessions = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT session_id, title, agent_type, created_at
+				"SELECT session_id, title, context, created_at
 				 FROM {$table}
 				 WHERE DATE(created_at) = %s
 				 ORDER BY created_at ASC",
@@ -536,8 +536,8 @@ PROMPT;
 		$lines = array();
 		foreach ( $sessions as $session ) {
 			$title   = $session['title'] ? $session['title'] : 'Untitled session';
-			$type    = $session['agent_type'] ?? 'chat';
-			$lines[] = "- [{$type}] {$title}";
+			$context = $session['context'] ?? 'chat';
+			$lines[] = "- [{$context}] {$title}";
 		}
 
 		return implode( "\n", $lines );

@@ -174,9 +174,9 @@ add_filter(
 	'datamachine_directives',
 	function ( $directives ) {
 		$directives[] = array(
-			'class'       => CoreMemoryFilesDirective::class,
-			'priority'    => 20,
-			'agent_types' => array( 'all' ),
+			'class'    => CoreMemoryFilesDirective::class,
+			'priority' => 20,
+			'contexts' => array( 'all' ),
 		);
 		return $directives;
 	}

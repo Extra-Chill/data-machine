@@ -71,9 +71,9 @@ if ( $datamachine_site_context_directive ) {
 		'datamachine_directives',
 		function ( $directives ) use ( $datamachine_site_context_directive ) {
 			$directives[] = array(
-				'class'       => $datamachine_site_context_directive,
-				'priority'    => 80,
-				'agent_types' => array( 'all' ),
+				'class'    => $datamachine_site_context_directive,
+				'priority' => 80,
+				'contexts' => array( 'all' ),
 			);
 			return $directives;
 		}

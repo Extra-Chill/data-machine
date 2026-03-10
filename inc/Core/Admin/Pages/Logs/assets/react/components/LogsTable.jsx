@@ -14,6 +14,7 @@ import { __ } from '@wordpress/i18n';
  * Internal dependencies
  */
 import { useLogs } from '../queries/logs';
+import { useAgentStore } from '@shared/stores/agentStore';
 
 /**
  * Level badge color mapping.
@@ -29,6 +30,7 @@ const LEVEL_COLORS = {
 const LogsTable = () => {
 	const [ page, setPage ] = useState( 1 );
 	const perPage = 50;
+	const selectedAgentId = useAgentStore( ( state ) => state.selectedAgentId );
 
 	// Read filters from window (set by LogsFilters).
 	const filters = window.__dmLogsFilters || {};
@@ -37,6 +39,10 @@ const LogsTable = () => {
 		per_page: perPage,
 		page,
 	};
+
+	if ( selectedAgentId ) {
+		queryFilters.agent_id = selectedAgentId;
+	}
 
 	if ( filters.level ) {
 		queryFilters.level = filters.level;

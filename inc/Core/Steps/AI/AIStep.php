@@ -70,7 +70,9 @@ class AIStep extends Step {
 		$pipeline_step_id = $this->flow_step_config['pipeline_step_id'];
 
 		$pipeline_step_config = $this->engine->getPipelineStepConfig( $pipeline_step_id );
-		$pipeline_defaults    = PluginSettings::getAgentModel( 'pipeline' );
+		$job_snapshot         = $this->engine->get( 'job' );
+		$agent_id             = (int) ( $job_snapshot['agent_id'] ?? 0 );
+		$pipeline_defaults    = PluginSettings::resolveModelForAgentContext( $agent_id, 'pipeline' );
 		$provider_name        = $pipeline_step_config['provider'] ?? $pipeline_defaults['provider'];
 		if ( empty( $provider_name ) ) {
 			do_action(
@@ -177,9 +179,7 @@ class AIStep extends Step {
 		$max_turns = PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
 
 		// Resolve user_id and agent_id from engine snapshot (set by RunFlowAbility).
-		$job_snapshot = $this->engine->get( 'job' );
 		$user_id      = (int) ( $job_snapshot['user_id'] ?? 0 );
-		$agent_id     = (int) ( $job_snapshot['agent_id'] ?? 0 );
 
 		$payload = array(
 			'job_id'       => $this->job_id,
@@ -224,7 +224,7 @@ class AIStep extends Step {
 			'engine_data'          => $engine_data,
 		) );
 
-		$pipeline_agent_defaults = PluginSettings::getAgentModel( 'pipeline' );
+		$pipeline_agent_defaults = PluginSettings::resolveModelForAgentContext( $agent_id, 'pipeline' );
 		$provider_name           = $pipeline_step_config['provider'] ?? $pipeline_agent_defaults['provider'];
 
 		// Execute conversation loop
@@ -234,7 +234,7 @@ class AIStep extends Step {
 			$available_tools,
 			$provider_name,
 			$pipeline_step_config['model'] ?? $pipeline_agent_defaults['model'],
-			'pipeline',
+			ToolPolicyResolver::CONTEXT_PIPELINE,
 			$payload,
 			$max_turns
 		);

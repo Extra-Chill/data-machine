@@ -104,7 +104,7 @@ class InternalLinkingTask extends SystemTask {
 		}
 
 		// Build AI request config.
-		$system_defaults = PluginSettings::getAgentModel( 'system' );
+		$system_defaults = $this->resolveSystemModel( $params );
 		$provider        = $system_defaults['provider'];
 		$model           = $system_defaults['model'];
 

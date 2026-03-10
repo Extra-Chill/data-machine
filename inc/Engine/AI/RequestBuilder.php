@@ -2,7 +2,7 @@
 /**
  * AI Request Builder - Centralized AI request construction for all agents
  *
- * Single source of truth for building standardized AI requests across Chat and Pipeline agents.
+	 * Single source of truth for building standardized AI requests across chat and pipeline contexts.
  * Ensures consistent request structure, tool formatting, and directive application to prevent
  * architectural drift between different AI agent types.
  *
@@ -17,9 +17,9 @@ defined( 'ABSPATH' ) || exit;
 class RequestBuilder {
 
 	/**
-	 * Build standardized AI request for any agent type
+	 * Build standardized AI request for any context.
 	 *
-	 * Centralizes request construction logic to ensure Chat and Pipeline agents
+	 * Centralizes request construction logic to ensure chat and pipeline flows
 	 * build identical request structures. Handles tool restructuring, directive
 	 * application via PromptBuilder, and consistent chubes_ai_request filter invocation.
 	 *
@@ -27,7 +27,7 @@ class RequestBuilder {
 	 * @param string $provider    AI provider name (openai, anthropic, google, grok, openrouter)
 	 * @param string $model       Model identifier
 	 * @param array  $tools       Raw tools array from filters
-	 * @param string $agent_type  Agent type: 'chat' or 'pipeline'
+	 * @param string $context     Execution context: 'chat' or 'pipeline'
 	 * @param array  $payload     Step payload (session_id, job_id, flow_step_id, data, etc)
 	 * @return array AI response from provider
 	 */
@@ -36,7 +36,7 @@ class RequestBuilder {
 		string $provider,
 		string $model,
 		array $tools,
-		string $agent_type,
+		string $context,
 		array $payload = array()
 	): array {
 
@@ -61,12 +61,12 @@ class RequestBuilder {
 			$promptBuilder->addDirective(
 				$directive['class'],
 				$directive['priority'],
-				$directive['agent_types'] ?? array( 'all' )
+				$directive['contexts'] ?? array( 'all' )
 			);
 		}
 
 		// Build the request with directives applied
-		$request            = $promptBuilder->build( $agent_type, $provider, $payload );
+		$request            = $promptBuilder->build( $context, $provider, $payload );
 		$applied_directives = $request['applied_directives'] ?? array();
 		unset( $request['applied_directives'] );
 		$request['model'] = $model;
@@ -77,7 +77,7 @@ class RequestBuilder {
 			'AI request built',
 			array_filter(
 				array(
-					'agent_type'    => $agent_type,
+					'context'       => $context,
 					'job_id'        => $payload['job_id'] ?? null,
 					'flow_step_id'  => $payload['flow_step_id'] ?? null,
 					'provider'      => $provider,
@@ -99,8 +99,8 @@ class RequestBuilder {
 			$structured_tools,
 			$payload['step_id'] ?? $payload['session_id'] ?? null,
 			array(
-				'agent_type' => $agent_type,
-				'payload'    => $payload,
+				'context' => $context,
+				'payload' => $payload,
 			)
 		);
 	}

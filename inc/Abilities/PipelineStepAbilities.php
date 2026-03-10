@@ -405,7 +405,7 @@ class PipelineStepAbilities {
 		);
 
 		if ( 'ai' === $step_type ) {
-			$pipeline_defaults    = PluginSettings::getAgentModel( 'pipeline' );
+			$pipeline_defaults    = PluginSettings::getContextModel( 'pipeline' );
 			$new_step['provider'] = $pipeline_defaults['provider'];
 			$new_step['model']    = $pipeline_defaults['model'];
 		}

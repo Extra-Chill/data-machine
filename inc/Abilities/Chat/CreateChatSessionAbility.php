@@ -49,10 +49,10 @@ class CreateChatSessionAbility {
 								'type'        => 'integer',
 								'description' => __( 'First-class agent ID for this session.', 'data-machine' ),
 							),
-							'agent_type' => array(
+							'context'    => array(
 								'type'        => 'string',
 								'default'     => 'chat',
-								'description' => __( 'Agent type (chat, pipeline, system).', 'data-machine' ),
+								'description' => __( 'Execution context (chat, pipeline, system, standalone).', 'data-machine' ),
 							),
 							'source'     => array(
 								'type'        => 'string',
@@ -90,7 +90,7 @@ class CreateChatSessionAbility {
 	/**
 	 * Execute create-chat-session ability.
 	 *
-	 * @param array $input Input parameters with user_id, optional agent_type, source, metadata.
+	 * @param array $input Input parameters with user_id, optional context, source, metadata.
 	 * @return array Result with session_id on success.
 	 */
 	public function execute( array $input ): array {
@@ -101,10 +101,10 @@ class CreateChatSessionAbility {
 			);
 		}
 
-		$user_id    = (int) $input['user_id'];
-		$agent_id   = (int) ( $input['agent_id'] ?? 0 );
-		$agent_type = ! empty( $input['agent_type'] ) ? sanitize_text_field( $input['agent_type'] ) : 'chat';
-		$source     = ! empty( $input['source'] ) ? sanitize_text_field( $input['source'] ) : null;
+		$user_id  = (int) $input['user_id'];
+		$agent_id = (int) ( $input['agent_id'] ?? 0 );
+		$context  = ! empty( $input['context'] ) ? sanitize_text_field( $input['context'] ) : 'chat';
+		$source   = ! empty( $input['source'] ) ? sanitize_text_field( $input['source'] ) : null;
 
 		if ( ! $this->can_access_user_sessions( $user_id ) ) {
 			return array(
@@ -127,7 +127,7 @@ class CreateChatSessionAbility {
 			$session_metadata = array_merge( $session_metadata, $input['metadata'] );
 		}
 
-		$session_id = $this->chat_db->create_session( $user_id, $agent_id, $session_metadata, $agent_type );
+		$session_id = $this->chat_db->create_session( $user_id, $agent_id, $session_metadata, $context );
 
 		if ( empty( $session_id ) ) {
 			return array(

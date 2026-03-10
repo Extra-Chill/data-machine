@@ -72,10 +72,10 @@ class SystemAgent {
 				'error',
 				"System Agent: Unknown task type '{$taskType}'",
 				array(
-					'task_type'  => $taskType,
-					'agent_type' => 'system',
-					'params'     => $params,
-					'context'    => $context,
+					'task_type' => $taskType,
+					'context'   => 'system',
+					'params'    => $params,
+					'route'     => $context,
 				)
 			);
 			return false;
@@ -88,6 +88,7 @@ class SystemAgent {
 			'flow_id'     => 'direct',
 			'source'      => 'system',
 			'label'       => ucfirst( str_replace( '_', ' ', $taskType ) ),
+			'user_id'     => (int) ( $context['user_id'] ?? 0 ),
 		);
 
 		if ( $parentJobId > 0 ) {
@@ -102,8 +103,8 @@ class SystemAgent {
 				'error',
 				'System Agent: Failed to create job for task',
 				array(
-					'task_type'  => $taskType,
-					'agent_type' => 'system',
+					'task_type' => $taskType,
+					'context'   => 'system',
 				)
 			);
 			return false;
@@ -140,10 +141,10 @@ class SystemAgent {
 					array(
 						'job_id'     => $job_id,
 						'action_id'  => $action_id,
-						'task_type'  => $taskType,
-						'agent_type' => 'system',
-						'params'     => $params,
-						'context'    => $context,
+						'task_type' => $taskType,
+						'context'   => 'system',
+						'params'    => $params,
+						'route'     => $context,
 					)
 				);
 
@@ -198,9 +199,9 @@ class SystemAgent {
 				'error',
 				"System Agent: Cannot schedule batch for unknown task type '{$taskType}'",
 				array(
-					'task_type'  => $taskType,
-					'agent_type' => 'system',
-					'count'      => count( $itemParams ),
+					'task_type' => $taskType,
+					'context'   => 'system',
+					'count'     => count( $itemParams ),
 				)
 			);
 			return false;
@@ -311,10 +312,10 @@ class SystemAgent {
 			array(
 				'batch_id'     => $batch_id,
 				'batch_job_id' => $batch_job_id,
-				'task_type'    => $taskType,
-				'agent_type'   => 'system',
-				'total'        => count( $itemParams ),
-				'chunk_size'   => $chunkSize,
+				'task_type'  => $taskType,
+				'context'    => 'system',
+				'total'      => count( $itemParams ),
+				'chunk_size' => $chunkSize,
 			)
 		);
 
@@ -348,8 +349,8 @@ class SystemAgent {
 				'warning',
 				"System Agent: Batch {$batchId} not found or expired",
 				array(
-					'batch_id'   => $batchId,
-					'agent_type' => 'system',
+					'batch_id' => $batchId,
+					'context'  => 'system',
 				)
 			);
 			return;
@@ -382,10 +383,10 @@ class SystemAgent {
 						array(
 							'batch_id'     => $batchId,
 							'batch_job_id' => $batch_job_id,
-							'task_type'    => $task_type,
-							'agent_type'   => 'system',
-							'offset'       => $offset,
-							'total'        => $total,
+						'task_type' => $task_type,
+						'context'   => 'system',
+						'offset'    => $offset,
+						'total'     => $total,
 						)
 					);
 					return;
@@ -430,12 +431,12 @@ class SystemAgent {
 			array(
 				'batch_id'     => $batchId,
 				'batch_job_id' => $batch_job_id,
-				'task_type'    => $task_type,
-				'agent_type'   => 'system',
-				'offset'       => $offset,
-				'chunk_size'   => $chunk_size,
-				'scheduled'    => $scheduled,
-				'remaining'    => max( 0, $total - $new_offset ),
+				'task_type'  => $task_type,
+				'context'    => 'system',
+				'offset'     => $offset,
+				'chunk_size' => $chunk_size,
+				'scheduled'  => $scheduled,
+				'remaining'  => max( 0, $total - $new_offset ),
 			)
 		);
 
@@ -471,9 +472,9 @@ class SystemAgent {
 				array(
 					'batch_id'     => $batchId,
 					'batch_job_id' => $batch_job_id,
-					'task_type'    => $task_type,
-					'agent_type'   => 'system',
-					'total'        => $total,
+					'task_type' => $task_type,
+					'context'   => 'system',
+					'total'     => $total,
 				)
 			);
 		}
@@ -580,16 +581,16 @@ class SystemAgent {
 			delete_transient( $transient_key );
 		}
 
-		do_action(
-			'datamachine_log',
-			'info',
-			sprintf( 'System Agent batch cancelled: job #%d (%s)', $batchJobId, $engine_data['task_type'] ?? '' ),
-			array(
-				'batch_job_id' => $batchJobId,
-				'task_type'    => $engine_data['task_type'] ?? '',
-				'agent_type'   => 'system',
-			)
-		);
+			do_action(
+				'datamachine_log',
+				'info',
+				sprintf( 'System Agent batch cancelled: job #%d (%s)', $batchJobId, $engine_data['task_type'] ?? '' ),
+				array(
+					'batch_job_id' => $batchJobId,
+					'task_type'    => $engine_data['task_type'] ?? '',
+					'context'      => 'system',
+				)
+			);
 
 		return true;
 	}
@@ -647,8 +648,8 @@ class SystemAgent {
 				'error',
 				"System Agent: Job {$jobId} not found",
 				array(
-					'job_id'     => $jobId,
-					'agent_type' => 'system',
+					'job_id'  => $jobId,
+					'context' => 'system',
 				)
 			);
 			return;
@@ -664,7 +665,7 @@ class SystemAgent {
 				"System Agent: No task type found in job {$jobId}",
 				array(
 					'job_id'      => $jobId,
-					'agent_type'  => 'system',
+					'context'     => 'system',
 					'engine_data' => $engine_data,
 				)
 			);
@@ -679,9 +680,9 @@ class SystemAgent {
 				'error',
 				"System Agent: Unknown task type '{$task_type}' for job {$jobId}",
 				array(
-					'job_id'     => $jobId,
-					'task_type'  => $task_type,
-					'agent_type' => 'system',
+					'job_id'    => $jobId,
+					'task_type' => $task_type,
+					'context'   => 'system',
 				)
 			);
 
@@ -703,7 +704,7 @@ class SystemAgent {
 				array(
 					'job_id'         => $jobId,
 					'task_type'      => $task_type,
-					'agent_type'     => 'system',
+					'context'        => 'system',
 					'handler_class'  => $handler_class,
 					'exception'      => $e->getMessage(),
 					'exception_file' => $e->getFile(),

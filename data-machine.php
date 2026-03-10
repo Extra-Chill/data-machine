@@ -320,6 +320,15 @@ add_filter( 'upload_mimes', 'datamachine_allow_json_upload' );
 
 add_action( 'update_option_datamachine_settings', array( \DataMachine\Core\PluginSettings::class, 'clearCache' ) );
 
+add_action(
+	'plugins_loaded',
+	function () {
+		\DataMachine\Core\Database\Chat\Chat::ensure_context_column();
+		\DataMachine\Core\Database\Chat\Chat::ensure_agent_id_column();
+	},
+	6
+);
+
 register_activation_hook( __FILE__, 'datamachine_activate_plugin' );
 register_deactivation_hook( __FILE__, 'datamachine_deactivate_plugin' );
 
@@ -454,6 +463,7 @@ function datamachine_activate_for_site() {
 	$db_processed_items->create_table();
 
 	\DataMachine\Core\Database\Chat\Chat::create_table();
+	\DataMachine\Core\Database\Chat\Chat::ensure_context_column();
 	\DataMachine\Core\Database\Chat\Chat::ensure_agent_id_column();
 
 	// Ensure default agent memory files exist.
@@ -509,7 +519,7 @@ function datamachine_resolve_or_create_agent_id( int $user_id ): int {
 
 	$agent_slug  = sanitize_title( (string) $user->user_login );
 	$agent_name  = (string) $user->display_name;
-	$agent_model = \DataMachine\Core\PluginSettings::getAgentModel( 'chat' );
+	$agent_model = \DataMachine\Core\PluginSettings::getContextModel( 'chat' );
 
 	return $agents_repo->create_if_missing(
 		$agent_slug,

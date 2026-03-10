@@ -159,9 +159,9 @@ add_filter(
 	'datamachine_directives',
 	function ( $directives ) {
 		$directives[] = array(
-			'class'       => PipelineSystemPromptDirective::class,
-			'priority'    => 50,
-			'agent_types' => array( 'pipeline' ),
+			'class'    => PipelineSystemPromptDirective::class,
+			'priority' => 50,
+			'contexts' => array( 'pipeline' ),
 		);
 		return $directives;
 	}

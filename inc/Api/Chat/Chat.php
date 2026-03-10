@@ -202,14 +202,13 @@ class Chat {
 						'description'       => __( 'Pagination offset', 'data-machine' ),
 						'sanitize_callback' => 'absint',
 					),
-					'agent_type' => array(
+					'context'    => array(
 						'type'              => 'string',
 						'required'          => false,
-						'default'           => 'chat',
-						'description'       => __( 'Agent type filter (chat, pipeline, system)', 'data-machine' ),
+						'description'       => __( 'Context filter (chat, pipeline, system, standalone)', 'data-machine' ),
 						'sanitize_callback' => 'sanitize_text_field',
 						'validate_callback' => function ( $param ) {
-							return in_array( $param, array( 'chat', 'pipeline', 'system' ), true );
+							return in_array( $param, array( 'chat', 'pipeline', 'system', 'standalone' ), true );
 						},
 					),
 					'agent_id'   => array(
@@ -282,7 +281,7 @@ class Chat {
 		$prompt  = sanitize_textarea_field( wp_unslash( $request->get_param( 'prompt' ) ?? '' ) );
 		$context = $request->get_param( 'context' ) ?? array();
 
-		$agent_config = PluginSettings::getAgentModel( 'chat' );
+		$agent_config = PluginSettings::resolveModelForAgentContext( $agent_id, 'chat' );
 		$provider     = $agent_config['provider'];
 		$model        = $agent_config['model'];
 
@@ -335,7 +334,7 @@ class Chat {
 					'agent_id'   => $agent_id,
 					'limit'      => (int) $request->get_param( 'limit' ),
 					'offset'     => (int) $request->get_param( 'offset' ),
-					'agent_type' => $request->get_param( 'agent_type' ),
+					'context'    => $request->get_param( 'context' ),
 				)
 			);
 
@@ -348,14 +347,14 @@ class Chat {
 		}
 
 		// Fallback: direct DB access (should not happen when abilities are loaded).
-		$user_id    = get_current_user_id();
-		$limit      = min( 100, max( 1, (int) $request->get_param( 'limit' ) ) );
-		$offset     = max( 0, (int) $request->get_param( 'offset' ) );
-		$agent_type = $request->get_param( 'agent_type' );
+		$user_id = get_current_user_id();
+		$limit   = min( 100, max( 1, (int) $request->get_param( 'limit' ) ) );
+		$offset  = max( 0, (int) $request->get_param( 'offset' ) );
+		$context = $request->get_param( 'context' );
 
 		$chat_db  = new \DataMachine\Core\Database\Chat\Chat();
-		$sessions = $chat_db->get_user_sessions( $user_id, $limit, $offset, $agent_type, $agent_id );
-		$total    = $chat_db->get_user_session_count( $user_id, $agent_type, $agent_id );
+		$sessions = $chat_db->get_user_sessions( $user_id, $limit, $offset, $context, $agent_id );
+		$total    = $chat_db->get_user_session_count( $user_id, $context, $agent_id );
 
 		return rest_ensure_response(
 			array(
@@ -365,7 +364,7 @@ class Chat {
 					'total'      => $total,
 					'limit'      => $limit,
 					'offset'     => $offset,
-					'agent_type' => $agent_type,
+					'context'    => $context,
 				),
 			)
 		);
@@ -519,7 +518,7 @@ class Chat {
 		$model    = $request->get_param( 'model' );
 
 		if ( empty( $provider ) || empty( $model ) ) {
-			$agent_config = PluginSettings::getAgentModel( 'chat' );
+			$agent_config = PluginSettings::resolveModelForAgentContext( $agent_id, 'chat' );
 			if ( empty( $provider ) ) {
 				$provider = $agent_config['provider'];
 			}

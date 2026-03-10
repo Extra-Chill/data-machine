@@ -73,9 +73,9 @@ add_filter(
 	'datamachine_directives',
 	function ( $directives ) {
 		$directives[] = array(
-			'class'       => SystemAgentDirective::class,
-			'priority'    => 20,
-			'agent_types' => array( 'system' ),
+			'class'    => SystemAgentDirective::class,
+			'priority' => 20,
+			'contexts' => array( 'system' ),
 		);
 		return $directives;
 	}

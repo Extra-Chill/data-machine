@@ -19,7 +19,7 @@ import { useProviders } from '@shared/queries/providers';
 const EMPTY_FORM = {
 	default_provider: '',
 	default_model: '',
-	agent_models: {},
+	context_models: {},
 	site_context_enabled: false,
 	max_turns: 0,
 };
@@ -88,7 +88,10 @@ const AgentSettings = () => {
 			form.reset( {
 				default_provider: data.settings.default_provider || '',
 				default_model: data.settings.default_model || '',
-				agent_models: data.settings.agent_models || {},
+				context_models:
+					data.settings.context_models ||
+					data.settings.agent_models ||
+					{},
 				site_context_enabled:
 					data.settings.site_context_enabled ?? false,
 				max_turns: data.settings.max_turns ?? maxTurnsDefault,
@@ -155,10 +158,10 @@ const AgentSettings = () => {
 						</td>
 					</tr>
 
-					{ ( providersData?.agent_types || [] ).length > 0 && (
+					{ ( providersData?.contexts || [] ).length > 0 && (
 						<tr>
 							<th scope="row">
-								Per-Agent Model Overrides
+								Per-Context Model Overrides
 							</th>
 							<td>
 								<p
@@ -169,18 +172,18 @@ const AgentSettings = () => {
 									} }
 								>
 									Assign different providers and models to
-									each agent type. Leave empty to use the
+									each execution context. Leave empty to use the
 									global default above.
 								</p>
-								{ ( providersData?.agent_types || [] ).map(
-									( agentType ) => {
-										const agentConfig =
-											form.data.agent_models?.[
-												agentType.id
+								{ ( providersData?.contexts || [] ).map(
+									( contextItem ) => {
+										const contextConfig =
+											form.data.context_models?.[
+												contextItem.id
 											] || {};
 										return (
 											<div
-												key={ agentType.id }
+												key={ contextItem.id }
 												className="datamachine-agent-model-override"
 												style={ {
 													marginBottom: '20px',
@@ -194,7 +197,7 @@ const AgentSettings = () => {
 														margin: '0 0 4px',
 													} }
 												>
-													{ agentType.label }
+													{ contextItem.label }
 												</h4>
 												<p
 													className="description"
@@ -203,31 +206,29 @@ const AgentSettings = () => {
 														marginBottom: '8px',
 													} }
 												>
-													{
-														agentType.description
-													}
-												</p>
-												<ProviderModelSelector
-													provider={
-														agentConfig.provider ||
-														''
-													}
-													model={
-														agentConfig.model ||
-														''
-													}
+														{ contextItem.description }
+													</p>
+													<ProviderModelSelector
+														provider={
+															contextConfig.provider ||
+															''
+														}
+														model={
+															contextConfig.model ||
+															''
+														}
 													onProviderChange={ (
 														provider
 													) => {
-														form.updateData( {
-															agent_models: {
-																...form.data
-																	.agent_models,
-																[ agentType.id ]:
-																	{
-																		...agentConfig,
-																		provider,
-																		model: '',
+															form.updateData( {
+																context_models: {
+																	...form.data
+																		.context_models,
+																	[ contextItem.id ]:
+																		{
+																			...contextConfig,
+																			provider,
+																			model: '',
 																	},
 															},
 														} );
@@ -236,14 +237,14 @@ const AgentSettings = () => {
 													onModelChange={ (
 														model
 													) => {
-														form.updateData( {
-															agent_models: {
-																...form.data
-																	.agent_models,
-																[ agentType.id ]:
-																	{
-																		...agentConfig,
-																		model,
+															form.updateData( {
+																context_models: {
+																	...form.data
+																		.context_models,
+																	[ contextItem.id ]:
+																		{
+																			...contextConfig,
+																			model,
 																	},
 															},
 														} );

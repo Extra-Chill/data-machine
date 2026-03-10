@@ -209,7 +209,7 @@ class SystemAgentServiceProvider {
 					array(
 						'attachment_id'   => $attachmentId,
 						'pipeline_job_id' => $pipelineJobId,
-						'agent_type'      => 'system',
+						'context'         => 'system',
 					)
 				);
 				return;
@@ -249,7 +249,7 @@ class SystemAgentServiceProvider {
 				'attachment_id'   => $attachmentId,
 				'pipeline_job_id' => $pipelineJobId,
 				'attempt'         => $attempt,
-				'agent_type'      => 'system',
+				'context'         => 'system',
 			)
 		);
 	}

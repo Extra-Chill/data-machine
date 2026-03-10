@@ -44,6 +44,15 @@
 	gap: 10px;
 }
 
+.datamachine-logs-agent-tabs {
+	margin-bottom: 16px;
+}
+
+.datamachine-logs-agent-tabs .components-tab-panel__tab-content {
+	display: none;
+	padding: 0;
+}
+
 /* Filters */
 .datamachine-logs-filters {
 	display: flex;

@@ -102,7 +102,7 @@ class ChatOrchestrator {
 						'session_id'          => $session_id,
 						'user_id'             => $user_id,
 						'original_created_at' => $pending_session['created_at'],
-						'agent_type'          => 'chat',
+						'context'             => 'chat',
 					)
 				);
 			} else {
@@ -156,7 +156,7 @@ class ChatOrchestrator {
 				'single_turn'          => true,
 				'max_turns'            => $max_turns,
 				'selected_pipeline_id' => $selected_pipeline_id ? $selected_pipeline_id : null,
-				'agent_type'           => 'chat',
+				'context'              => 'chat',
 				'user_id'              => $user_id,
 			)
 		);
@@ -273,7 +273,7 @@ class ChatOrchestrator {
 		}
 
 		$messages             = $session['messages'] ?? array();
-		$chat_defaults        = PluginSettings::getAgentModel( 'chat' );
+		$chat_defaults        = PluginSettings::resolveModelForAgentContext( (int) ( $session['agent_id'] ?? 0 ), 'chat' );
 		$provider             = $session['provider'] ?? $chat_defaults['provider'];
 		$model                = $session['model'] ?? $chat_defaults['model'];
 		$message_count_before = count( $messages );
@@ -288,7 +288,7 @@ class ChatOrchestrator {
 				'single_turn'          => true,
 				'max_turns'            => $max_turns,
 				'selected_pipeline_id' => $selected_pipeline_id,
-				'agent_type'           => 'chat',
+				'context'              => 'chat',
 				'user_id'              => (int) ( $session['user_id'] ?? 0 ),
 			)
 		);
@@ -391,7 +391,7 @@ class ChatOrchestrator {
 			$provider,
 			$model,
 			array(
-				'agent_type' => 'chat',
+				'context' => 'chat',
 				'user_id'    => $user_id,
 			)
 		);
@@ -427,7 +427,7 @@ class ChatOrchestrator {
 			array(
 				'session_id' => $session_id,
 				'turns'      => $result['turn_count'],
-				'agent_type' => 'chat',
+				'context'    => 'chat',
 			)
 		);
 
@@ -462,7 +462,7 @@ class ChatOrchestrator {
 			$input = array(
 				'user_id'    => $user_id,
 				'agent_id'   => $agent_id,
-				'agent_type' => 'chat',
+				'context'    => 'chat',
 			);
 
 			if ( $source ) {
@@ -527,7 +527,7 @@ class ChatOrchestrator {
 	 *     @type bool   $single_turn          Whether to run single turn (default false).
 	 *     @type int    $max_turns             Maximum turns allowed (default 25).
 	 *     @type int    $selected_pipeline_id  Currently selected pipeline ID.
-	 *     @type string $agent_type            Agent type for context (default 'chat').
+	 *     @type string $context               Execution context (default 'chat').
 	 * }
 	 * @return array|WP_Error Result array with messages, final_content, completed, turn_count,
 	 *                        last_tool_calls, and optional warning/max_turns_reached keys.
@@ -543,15 +543,15 @@ class ChatOrchestrator {
 		$single_turn          = $options['single_turn'] ?? false;
 		$max_turns            = $options['max_turns'] ?? PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
 		$selected_pipeline_id = $options['selected_pipeline_id'] ?? null;
-		$agent_type           = $options['agent_type'] ?? 'chat';
+		$context              = $options['context'] ?? ToolPolicyResolver::CONTEXT_CHAT;
+		$agent_id             = (int) ( $options['agent_id'] ?? 0 );
 
 		$chat_db = new ChatDatabase();
 
 		try {
 			$user_id  = $options['user_id'] ?? 0;
-			$agent_id = 0;
 
-			if ( $user_id > 0 && function_exists( 'datamachine_resolve_or_create_agent_id' ) ) {
+			if ( $agent_id <= 0 && $user_id > 0 && function_exists( 'datamachine_resolve_or_create_agent_id' ) ) {
 				$agent_id = datamachine_resolve_or_create_agent_id( $user_id );
 			}
 
@@ -563,6 +563,7 @@ class ChatOrchestrator {
 			$loop_context = array(
 				'session_id' => $session_id,
 				'user_id'    => $user_id,
+				'agent_id'   => $agent_id,
 			);
 			if ( $selected_pipeline_id ) {
 				$loop_context['selected_pipeline_id'] = $selected_pipeline_id;
@@ -574,7 +575,7 @@ class ChatOrchestrator {
 				$all_tools,
 				$provider,
 				$model,
-				$agent_type,
+				$context,
 				$loop_context,
 				$max_turns,
 				$single_turn
@@ -601,7 +602,7 @@ class ChatOrchestrator {
 					array(
 						'session_id' => $session_id,
 						'error'      => $loop_result['error'],
-						'agent_type' => $agent_type,
+						'context'    => $context,
 					)
 				);
 
@@ -629,7 +630,7 @@ class ChatOrchestrator {
 				array(
 					'session_id' => $session_id,
 					'error'      => $e->getMessage(),
-					'agent_type' => $agent_type,
+					'context'    => $context,
 				)
 			);
 

@@ -31,6 +31,7 @@ class NetworkSettings {
 	const NETWORK_KEYS = array(
 		'default_provider',
 		'default_model',
+		'context_models',
 		'agent_models',
 	);
 

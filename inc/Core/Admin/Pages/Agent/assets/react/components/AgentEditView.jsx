@@ -31,6 +31,8 @@ import {
 	useGrantAccess,
 	useRevokeAccess,
 } from '../queries/agents';
+import { useProviders } from '@shared/queries/providers';
+import ProviderModelSelector from '@shared/components/ai/ProviderModelSelector';
 
 /**
  * Status options for the dropdown.
@@ -243,16 +245,24 @@ const AccessPanel = ( { agentId, ownerId } ) => {
 const AgentEditView = ( { agentId, onBack } ) => {
 	const { data: agent, isLoading, error } = useAgent( agentId );
 	const updateMutation = useUpdateAgent();
+	const { data: providersData } = useProviders();
 
 	const [ name, setName ] = useState( '' );
 	const [ status, setStatus ] = useState( 'active' );
+	const [ defaultProvider, setDefaultProvider ] = useState( '' );
+	const [ defaultModel, setDefaultModel ] = useState( '' );
+	const [ contextModels, setContextModels ] = useState( {} );
 	const [ saveMessage, setSaveMessage ] = useState( null );
 
 	// Sync form state when agent data loads.
 	useEffect( () => {
 		if ( agent ) {
+			const config = agent.agent_config || {};
 			setName( agent.agent_name || '' );
 			setStatus( agent.status || 'active' );
+			setDefaultProvider( config.default_provider || '' );
+			setDefaultModel( config.default_model || '' );
+			setContextModels( config.context_models || config.agent_models || {} );
 		}
 	}, [ agent ] );
 
@@ -263,6 +273,12 @@ const AgentEditView = ( { agentId, onBack } ) => {
 			agentId,
 			agent_name: name,
 			status,
+			agent_config: {
+				...( agent.agent_config || {} ),
+				default_provider: defaultProvider,
+				default_model: defaultModel,
+				context_models: contextModels,
+			},
 		} );
 
 		if ( result.success ) {
@@ -304,7 +320,11 @@ const AgentEditView = ( { agentId, onBack } ) => {
 
 	const isDirty =
 		name !== ( agent.agent_name || '' ) ||
-		status !== ( agent.status || 'active' );
+		status !== ( agent.status || 'active' ) ||
+		defaultProvider !== ( agent.agent_config?.default_provider || '' ) ||
+		defaultModel !== ( agent.agent_config?.default_model || '' ) ||
+		JSON.stringify( contextModels ) !==
+			JSON.stringify( agent.agent_config?.context_models || {} );
 
 	return (
 		<div className="datamachine-agent-edit-view">
@@ -394,6 +414,84 @@ const AgentEditView = ( { agentId, onBack } ) => {
 					>
 						{ __( 'Save Changes', 'data-machine' ) }
 					</Button>
+				</CardBody>
+			</Card>
+
+			<Card className="datamachine-agent-models-card">
+				<CardHeader>
+					<h3>{ __( 'AI Model Policy', 'data-machine' ) }</h3>
+				</CardHeader>
+				<CardBody>
+					<p className="description">
+						{ __(
+							'Agent defaults override global settings. Context-specific overrides override the agent default for that context.',
+							'data-machine'
+						) }
+					</p>
+
+					<div className="datamachine-ai-provider-model-settings">
+						<ProviderModelSelector
+							provider={ defaultProvider }
+							model={ defaultModel }
+							onProviderChange={ ( provider ) => {
+								setDefaultProvider( provider );
+								setDefaultModel( '' );
+							} }
+							onModelChange={ setDefaultModel }
+							applyDefaults={ false }
+							providerLabel={ __( 'Agent Default Provider', 'data-machine' ) }
+							modelLabel={ __( 'Agent Default Model', 'data-machine' ) }
+						/>
+					</div>
+
+					{ ( providersData?.contexts || [] ).map( ( contextItem ) => {
+						const value = contextModels?.[ contextItem.id ] || {};
+
+						return (
+							<div
+								key={ contextItem.id }
+								className="datamachine-agent-model-override"
+								style={ {
+									marginTop: '20px',
+									paddingTop: '16px',
+									borderTop: '1px solid #e0e0e0',
+								} }
+							>
+								<h4 style={ { margin: '0 0 4px' } }>
+									{ contextItem.label }
+								</h4>
+								<p className="description" style={ { marginTop: 0 } }>
+									{ contextItem.description }
+								</p>
+								<ProviderModelSelector
+									provider={ value.provider || '' }
+									model={ value.model || '' }
+									onProviderChange={ ( provider ) => {
+										setContextModels( {
+											...contextModels,
+											[ contextItem.id ]: {
+												...value,
+												provider,
+												model: '',
+											},
+										} );
+									} }
+									onModelChange={ ( modelValue ) => {
+										setContextModels( {
+											...contextModels,
+											[ contextItem.id ]: {
+												...value,
+												model: modelValue,
+											},
+										} );
+									} }
+									applyDefaults={ false }
+									providerLabel={ __( 'Provider', 'data-machine' ) }
+									modelLabel={ __( 'Model', 'data-machine' ) }
+								/>
+							</div>
+						);
+					} ) }
 				</CardBody>
 			</Card>
 
