@@ -517,10 +517,12 @@ export const getProviders = async () => {
 /**
  * Get available tools
  *
+ * @param {string|null} context - Optional context filter ('pipeline', 'chat', 'standalone', 'system')
  * @return {Promise<Object>} Tools configuration
  */
-export const getTools = async () => {
-	return await client.get( '/tools' );
+export const getTools = async ( context = null ) => {
+	const params = context ? { context } : {};
+	return await client.get( '/tools', params );
 };
 
 /**

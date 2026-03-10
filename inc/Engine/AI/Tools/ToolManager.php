@@ -447,10 +447,19 @@ class ToolManager {
 	/**
 	 * Get tools for REST API response.
 	 *
+	 * @param string|null $context Optional context to filter tools ('pipeline', 'chat', 'standalone', 'system').
+	 *                            When null, returns all tools.
 	 * @return array Tools formatted for API
 	 */
-	public function get_tools_for_api(): array {
-		$tools     = $this->get_global_tools();
+	public function get_tools_for_api( ?string $context = null ): array {
+		// If context specified, use ToolPolicyResolver to filter appropriately
+		if ( null !== $context ) {
+			$resolver = new ToolPolicyResolver( $this );
+			$tools    = $resolver->resolve( array( 'context' => $context ) );
+		} else {
+			$tools = $this->get_global_tools();
+		}
+
 		$formatted = array();
 
 		foreach ( $tools as $tool_id => $tool_config ) {
@@ -462,6 +471,7 @@ class ToolManager {
 				'requires_config'  => $this->requires_configuration( $tool_id ),
 				'configured'       => $this->is_tool_configured( $tool_id ),
 				'globally_enabled' => $is_globally_enabled,
+				'contexts'         => $tool_config['contexts'] ?? array(),
 			);
 		}
 

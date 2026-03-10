@@ -44,7 +44,14 @@ class Tools {
 				'methods'             => WP_REST_Server::READABLE,
 				'callback'            => array( self::class, 'handle_get_tools' ),
 				'permission_callback' => '__return_true', // Public endpoint
-				'args'                => array(),
+				'args'                => array(
+					'context' => array(
+						'type'        => 'string',
+						'enum'        => array( 'pipeline', 'chat', 'standalone', 'system' ),
+						'required'    => false,
+						'description' => 'Filter tools by execution context. Returns only tools available in the specified context.',
+					),
+				),
 			)
 		);
 	}
@@ -56,11 +63,13 @@ class Tools {
 	 * Filters to only global tools (excludes handler-specific tools).
 	 *
 	 * @since 0.1.2
+	 * @param \WP_REST_Request $request REST request object.
 	 * @return \WP_REST_Response Tools response
 	 */
-	public static function handle_get_tools() {
+	public static function handle_get_tools( $request ) {
+		$context      = $request->get_param( 'context' );
 		$tool_manager = new \DataMachine\Engine\AI\Tools\ToolManager();
-		$tools        = $tool_manager->get_tools_for_api();
+		$tools        = $tool_manager->get_tools_for_api( $context );
 
 		return rest_ensure_response(
 			array(

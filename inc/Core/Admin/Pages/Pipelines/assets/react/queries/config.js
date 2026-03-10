@@ -43,11 +43,11 @@ export const useSchedulingIntervals = () =>
 		staleTime: Infinity, // Scheduling intervals don't change
 	} );
 
-export const useTools = () =>
+export const useTools = ( context = 'pipeline' ) =>
 	useQuery( {
-		queryKey: [ 'config', 'tools' ],
+		queryKey: [ 'config', 'tools', context ],
 		queryFn: async () => {
-			const result = await getTools();
+			const result = await getTools( context );
 			return result.success ? result.data : {};
 		},
 		staleTime: 30 * 60 * 1000, // 30 minutes - tools don't change often
