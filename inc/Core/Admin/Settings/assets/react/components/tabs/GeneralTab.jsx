@@ -19,7 +19,7 @@ import SettingsSaveBar, {
 	useSaveStatus,
 } from '@shared/components/SettingsSaveBar';
 
-const DEFAULTS = {
+const EMPTY_FORM = {
 	cleanup_job_data_on_failure: true,
 	file_retention_days: 7,
 	chat_retention_days: 90,
@@ -27,9 +27,9 @@ const DEFAULTS = {
 	flows_per_page: 20,
 	jobs_per_page: 50,
 	queue_tuning: {
-		concurrent_batches: 3,
-		batch_size: 25,
-		time_limit: 60,
+		concurrent_batches: 0,
+		batch_size: 0,
+		time_limit: 0,
 	},
 };
 
@@ -54,9 +54,14 @@ const QUEUE_LIMITS = {
 const GeneralTab = () => {
 	const { data, isLoading, error } = useSettings();
 	const updateMutation = useUpdateSettings();
+	const queueDefaults = data?.defaults?.queue_tuning ?? {
+		concurrent_batches: 3,
+		batch_size: 25,
+		time_limit: 60,
+	};
 
 	const form = useFormState( {
-		initialData: DEFAULTS,
+		initialData: EMPTY_FORM,
 		onSubmit: ( formData ) => updateMutation.mutateAsync( formData ),
 	} );
 
@@ -69,23 +74,23 @@ const GeneralTab = () => {
 		if ( data?.settings ) {
 			form.reset( {
 				cleanup_job_data_on_failure:
-					data.settings.cleanup_job_data_on_failure ?? DEFAULTS.cleanup_job_data_on_failure,
+					data.settings.cleanup_job_data_on_failure ?? EMPTY_FORM.cleanup_job_data_on_failure,
 				file_retention_days:
-					data.settings.file_retention_days ?? DEFAULTS.file_retention_days,
+					data.settings.file_retention_days ?? EMPTY_FORM.file_retention_days,
 				chat_retention_days:
-					data.settings.chat_retention_days ?? DEFAULTS.chat_retention_days,
+					data.settings.chat_retention_days ?? EMPTY_FORM.chat_retention_days,
 				chat_ai_titles_enabled:
-					data.settings.chat_ai_titles_enabled ?? DEFAULTS.chat_ai_titles_enabled,
+					data.settings.chat_ai_titles_enabled ?? EMPTY_FORM.chat_ai_titles_enabled,
 				flows_per_page:
-					data.settings.flows_per_page ?? DEFAULTS.flows_per_page,
+					data.settings.flows_per_page ?? EMPTY_FORM.flows_per_page,
 				jobs_per_page:
-					data.settings.jobs_per_page ?? DEFAULTS.jobs_per_page,
+					data.settings.jobs_per_page ?? EMPTY_FORM.jobs_per_page,
 				queue_tuning:
-					data.settings.queue_tuning ?? DEFAULTS.queue_tuning,
+					data.settings.queue_tuning ?? queueDefaults,
 			} );
 			save.setHasChanges( false );
 		}
-	}, [ data ] ); // eslint-disable-line react-hooks/exhaustive-deps
+	}, [ data, queueDefaults ] ); // eslint-disable-line react-hooks/exhaustive-deps
 
 	/**
 	 * Update a field and mark the form as changed.
@@ -100,7 +105,7 @@ const GeneralTab = () => {
 
 	const updateQueueTuning = ( key, rawValue ) => {
 		const { min, max, default: defaultVal } = QUEUE_LIMITS[ key ];
-		const value = clamp( rawValue, min, max, defaultVal );
+		const value = clamp( rawValue, min, max, queueDefaults[ key ] ?? defaultVal );
 		form.updateData( {
 			queue_tuning: {
 				...form.data.queue_tuning,
@@ -330,7 +335,7 @@ const GeneralTab = () => {
 									id="concurrent_batches"
 									value={
 										form.data.queue_tuning
-											?.concurrent_batches ?? 3
+											?.concurrent_batches ?? queueDefaults.concurrent_batches
 									}
 									onChange={ ( e ) =>
 										updateQueueTuning(
@@ -345,7 +350,7 @@ const GeneralTab = () => {
 								<p className="description">
 									Number of action batches that can run
 									simultaneously. Higher = faster processing,
-									but more server load. (1-10, default: 3)
+									but more server load. (1-10, default: { queueDefaults.concurrent_batches })
 								</p>
 							</fieldset>
 						</td>
@@ -359,7 +364,7 @@ const GeneralTab = () => {
 									type="number"
 									id="batch_size"
 									value={
-										form.data.queue_tuning?.batch_size ?? 25
+										form.data.queue_tuning?.batch_size ?? queueDefaults.batch_size
 									}
 									onChange={ ( e ) =>
 										updateQueueTuning(
@@ -375,7 +380,7 @@ const GeneralTab = () => {
 									Number of actions claimed per batch. For
 									AI-heavy workloads, smaller batches with
 									more concurrency often works better. (10-200,
-									default: 25)
+									default: { queueDefaults.batch_size })
 								</p>
 							</fieldset>
 						</td>
@@ -389,7 +394,7 @@ const GeneralTab = () => {
 									type="number"
 									id="time_limit"
 									value={
-										form.data.queue_tuning?.time_limit ?? 60
+										form.data.queue_tuning?.time_limit ?? queueDefaults.time_limit
 									}
 									onChange={ ( e ) =>
 										updateQueueTuning(
@@ -404,7 +409,7 @@ const GeneralTab = () => {
 								<p className="description">
 									Maximum seconds per batch execution. AI
 									steps with external API calls may need
-									longer limits. (15-300, default: 60)
+									longer limits. (15-300, default: { queueDefaults.time_limit })
 								</p>
 							</fieldset>
 						</td>

@@ -16,25 +16,26 @@ import SettingsSaveBar, {
 import ProviderModelSelector from '@shared/components/ai/ProviderModelSelector';
 import { useProviders } from '@shared/queries/providers';
 
-const DEFAULTS = {
+const EMPTY_FORM = {
 	default_provider: '',
 	default_model: '',
 	agent_models: {},
 	site_context_enabled: false,
-	max_turns: 12,
+	max_turns: 0,
 };
 
 const AgentSettings = () => {
 	const { data, isLoading, error } = useSettings();
 	const { data: providersData } = useProviders();
 	const updateMutation = useUpdateSettings();
+	const maxTurnsDefault = data?.defaults?.max_turns ?? 1;
 	const [ pingSecret, setPingSecret ] = useState( '' );
 	const [ pingSecretVisible, setPingSecretVisible ] = useState( false );
 	const [ pingCopied, setPingCopied ] = useState( false );
 	const [ pingGenerating, setPingGenerating ] = useState( false );
 
 	const form = useFormState( {
-		initialData: DEFAULTS,
+		initialData: EMPTY_FORM,
 		onSubmit: ( formData ) => updateMutation.mutateAsync( formData ),
 	} );
 
@@ -90,11 +91,11 @@ const AgentSettings = () => {
 				agent_models: data.settings.agent_models || {},
 				site_context_enabled:
 					data.settings.site_context_enabled ?? false,
-				max_turns: data.settings.max_turns ?? 12,
+				max_turns: data.settings.max_turns ?? maxTurnsDefault,
 			} );
 			save.setHasChanges( false );
 		}
-	}, [ data ] ); // eslint-disable-line react-hooks/exhaustive-deps
+	}, [ data, maxTurnsDefault ] ); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const updateField = ( field, value ) => {
 		form.updateField( field, value );
@@ -311,7 +312,7 @@ const AgentSettings = () => {
 												parseInt(
 													e.target.value,
 													10
-												) || 1
+												) || maxTurnsDefault
 											)
 										)
 									)

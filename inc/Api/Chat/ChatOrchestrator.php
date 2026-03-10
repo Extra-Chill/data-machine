@@ -60,7 +60,7 @@ class ChatOrchestrator {
 	): array|WP_Error {
 		$session_id           = $options['session_id'] ?? null;
 		$selected_pipeline_id = (int) ( $options['selected_pipeline_id'] ?? 0 );
-		$max_turns            = $options['max_turns'] ?? PluginSettings::get( 'max_turns', 12 );
+		$max_turns            = $options['max_turns'] ?? PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
 		$request_id           = $options['request_id'] ?? null;
 
 		$chat_db = new ChatDatabase();
@@ -235,7 +235,7 @@ class ChatOrchestrator {
 	 * @return array|WP_Error Response data array or WP_Error on failure.
 	 */
 	public static function processContinue( string $session_id, int $user_id ): array|WP_Error {
-		$max_turns = PluginSettings::get( 'max_turns', 12 );
+		$max_turns = PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
 
 		$chat_db = new ChatDatabase();
 		$session = $chat_db->get_session( $session_id );
@@ -525,7 +525,7 @@ class ChatOrchestrator {
 	 * @param string $model      AI model identifier.
 	 * @param array  $options    Optional settings {
 	 *     @type bool   $single_turn          Whether to run single turn (default false).
-	 *     @type int    $max_turns             Maximum turns allowed (default 12).
+	 *     @type int    $max_turns             Maximum turns allowed (default 25).
 	 *     @type int    $selected_pipeline_id  Currently selected pipeline ID.
 	 *     @type string $agent_type            Agent type for context (default 'chat').
 	 * }
@@ -541,7 +541,7 @@ class ChatOrchestrator {
 		array $options = array()
 	): array|WP_Error {
 		$single_turn          = $options['single_turn'] ?? false;
-		$max_turns            = $options['max_turns'] ?? PluginSettings::get( 'max_turns', 12 );
+		$max_turns            = $options['max_turns'] ?? PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
 		$selected_pipeline_id = $options['selected_pipeline_id'] ?? null;
 		$agent_type           = $options['agent_type'] ?? 'chat';
 

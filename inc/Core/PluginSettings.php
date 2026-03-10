@@ -18,7 +18,34 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class PluginSettings {
 
+	public const DEFAULT_MAX_TURNS = 25;
+
 	private static ?array $cache = null;
+
+	/**
+	 * Get default queue tuning values.
+	 *
+	 * @return array{concurrent_batches:int,batch_size:int,time_limit:int}
+	 */
+	public static function getDefaultQueueTuning(): array {
+		return array(
+			'concurrent_batches' => 3,
+			'batch_size'         => 25,
+			'time_limit'         => 60,
+		);
+	}
+
+	/**
+	 * Get centralized plugin defaults used by backend and admin UI.
+	 *
+	 * @return array{max_turns:int,queue_tuning:array{concurrent_batches:int,batch_size:int,time_limit:int}}
+	 */
+	public static function getDefaults(): array {
+		return array(
+			'max_turns'    => self::DEFAULT_MAX_TURNS,
+			'queue_tuning' => self::getDefaultQueueTuning(),
+		);
+	}
 
 	/**
 	 * Get all plugin settings (per-site only, no cascade).

@@ -29,11 +29,7 @@ defined( 'ABSPATH' ) || exit;
  * @return array
  */
 function datamachine_get_queue_tuning_defaults(): array {
-	return array(
-		'concurrent_batches' => 3,  // AS defaults to 1
-		'batch_size'         => 25, // AS defaults to 25 (keep same)
-		'time_limit'         => 60, // AS defaults to 30
-	);
+	return PluginSettings::getDefaultQueueTuning();
 }
 
 /**

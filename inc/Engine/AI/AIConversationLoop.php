@@ -11,6 +11,7 @@
 
 namespace DataMachine\Engine\AI;
 
+use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -34,7 +35,7 @@ class AIConversationLoop {
 	 * @param string $model          AI model identifier
 	 * @param string $agent_type     Agent type: 'pipeline' or 'chat'
 	 * @param array  $payload        Step payload (job_id, flow_step_id, data, flow_step_config)
-	 * @param int    $max_turns      Maximum conversation turns (default 12)
+	 * @param int    $max_turns      Maximum conversation turns (default 25)
 	 * @param bool   $single_turn    Execute exactly one turn and return (default false)
 	 * @return array {
 	 *     @type array  $messages        Final conversation state
@@ -51,7 +52,7 @@ class AIConversationLoop {
 		string $model,
 		string $agent_type,
 		array $payload = array(),
-		int $max_turns = 12,
+		int $max_turns = PluginSettings::DEFAULT_MAX_TURNS,
 		bool $single_turn = false
 	): array {
 		// Ensure max_turns is within reasonable bounds

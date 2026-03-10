@@ -73,6 +73,8 @@ class SettingsAbilities {
 					'properties' => array(
 						'success'      => array( 'type' => 'boolean' ),
 						'settings'     => array( 'type' => 'object' ),
+						'defaults'     => array( 'type' => 'object' ),
+						'network_settings' => array( 'type' => 'object' ),
 						'global_tools' => array( 'type' => 'object' ),
 						'error'        => array( 'type' => 'string' ),
 					),
@@ -323,6 +325,7 @@ class SettingsAbilities {
 	public function executeGetSettings( array $input ): array {
 		$input;
 		$settings = PluginSettings::all();
+		$defaults = PluginSettings::getDefaults();
 
 		$tool_manager = new \DataMachine\Engine\AI\Tools\ToolManager();
 		$global_tools = $tool_manager->get_global_tools();
@@ -369,15 +372,12 @@ class SettingsAbilities {
 				'default_provider'               => $settings['default_provider'] ?? '',
 				'default_model'                  => $settings['default_model'] ?? '',
 				'agent_models'                   => $settings['agent_models'] ?? array(),
-				'max_turns'                      => $settings['max_turns'] ?? 12,
+				'max_turns'                      => $settings['max_turns'] ?? $defaults['max_turns'],
 				'disabled_tools'                 => $settings['disabled_tools'] ?? array(),
 				'ai_provider_keys'               => $masked_keys,
-				'queue_tuning'                   => $settings['queue_tuning'] ?? array(
-					'concurrent_batches' => 3,
-					'batch_size'         => 25,
-					'time_limit'         => 60,
-				),
+				'queue_tuning'                   => wp_parse_args( $settings['queue_tuning'] ?? array(), $defaults['queue_tuning'] ),
 			),
+			'defaults'         => $defaults,
 			'network_settings' => array(
 				'default_provider' => $network_defaults['default_provider'] ?? '',
 				'default_model'    => $network_defaults['default_model'] ?? '',
@@ -506,7 +506,7 @@ class SettingsAbilities {
 
 		// Queue tuning settings for Action Scheduler
 		if ( isset( $input['queue_tuning'] ) && is_array( $input['queue_tuning'] ) ) {
-			$tuning = $all_settings['queue_tuning'] ?? array();
+			$tuning = wp_parse_args( $all_settings['queue_tuning'] ?? array(), PluginSettings::getDefaultQueueTuning() );
 
 			if ( isset( $input['queue_tuning']['concurrent_batches'] ) ) {
 				$batches                      = absint( $input['queue_tuning']['concurrent_batches'] );

@@ -174,7 +174,7 @@ class AIStep extends Step {
 
 		$pipeline_step_config = $this->engine->getPipelineStepConfig( $pipeline_step_id );
 
-		$max_turns = PluginSettings::get( 'max_turns', 12 );
+		$max_turns = PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
 
 		// Resolve user_id and agent_id from engine snapshot (set by RunFlowAbility).
 		$job_snapshot = $this->engine->get( 'job' );
