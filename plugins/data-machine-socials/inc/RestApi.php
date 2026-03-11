@@ -229,6 +229,16 @@ class RestApi {
 				'caption'  => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
 			),
 		) );
+
+		register_rest_route( self::NAMESPACE, '/instagram/comments/reply', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'instagram_comment_reply' ),
+			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			'args'                => array(
+				'comment_id' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
+				'message'    => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_textarea_field' ),
+			),
+		) );
 	}
 
 	/**
@@ -345,6 +355,31 @@ class RestApi {
 		}
 
 		$result = $ability->execute( $input );
+
+		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
+	}
+
+	/**
+	 * Reply to an Instagram comment.
+	 */
+	public static function instagram_comment_reply( \WP_REST_Request $request ) {
+		$params = $request->get_json_params() ?: $request->get_body_params();
+
+		if ( empty( $params['comment_id'] ) ) {
+			return new \WP_REST_Response( array( 'success' => false, 'error' => 'comment_id is required' ), 400 );
+		}
+
+		if ( empty( $params['message'] ) ) {
+			return new \WP_REST_Response( array( 'success' => false, 'error' => 'message is required' ), 400 );
+		}
+
+		$ability = new \DataMachineSocials\Abilities\Instagram\InstagramCommentReplyAbility();
+		$result  = $ability->execute(
+			array(
+				'comment_id' => sanitize_text_field( $params['comment_id'] ),
+				'message'    => sanitize_textarea_field( $params['message'] ),
+			)
+		);
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
 	}

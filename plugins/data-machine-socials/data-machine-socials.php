@@ -78,6 +78,7 @@ function datamachine_socials_bootstrap() {
 	new \DataMachineSocials\Abilities\Instagram\InstagramReadAbility();
 	new \DataMachineSocials\Abilities\Instagram\InstagramUpdateAbility();
 	new \DataMachineSocials\Abilities\Instagram\InstagramDeleteAbility();
+	new \DataMachineSocials\Abilities\Instagram\InstagramCommentReplyAbility();
 
 	// Pinterest
 	new \DataMachineSocials\Abilities\Pinterest\PinterestReadAbility();
@@ -203,6 +204,7 @@ function datamachine_socials_load_chat_tools() {
 	new \DataMachineSocials\Chat\Tools\FetchReddit();
 	new \DataMachineSocials\Chat\Tools\ReadInstagram();
 	new \DataMachineSocials\Chat\Tools\UpdateInstagram();
+	new \DataMachineSocials\Chat\Tools\ReplyInstagramComment();
 	new \DataMachineSocials\Chat\Tools\ReadThreads();
 	new \DataMachineSocials\Chat\Tools\ReadFacebook();
 	new \DataMachineSocials\Chat\Tools\UpdateFacebook();

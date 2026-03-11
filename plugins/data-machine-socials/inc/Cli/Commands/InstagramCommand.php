@@ -253,6 +253,50 @@ class InstagramCommand {
 	}
 
 	/**
+	 * Reply to an Instagram comment.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <comment_id>
+	 * : The Instagram comment ID to reply to.
+	 *
+	 * <message>
+	 * : The reply text.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials instagram reply-comment 1789000000000 "Thanks for listening!"
+	 */
+	public function reply_comment( $args, $assoc_args ) {
+		$comment_id = $args[0] ?? '';
+		$message    = $args[1] ?? '';
+		$ability    = $this->get_comment_reply_ability();
+
+		if ( empty( $comment_id ) ) {
+			WP_CLI::error( 'Comment ID is required.' );
+		}
+
+		if ( empty( $message ) ) {
+			WP_CLI::error( 'Reply message is required.' );
+		}
+
+		$result = $ability->execute(
+			array(
+				'comment_id' => $comment_id,
+				'message'    => $message,
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Instagram comment reply posted successfully!' );
+		WP_CLI::log( 'Comment ID: ' . ( $result['data']['comment_id'] ?? $comment_id ) );
+		WP_CLI::log( 'Reply ID:   ' . ( $result['data']['reply_id'] ?? '' ) );
+	}
+
+	/**
 	 * Show Instagram authentication status.
 	 *
 	 * ## EXAMPLES
@@ -565,5 +609,23 @@ class InstagramCommand {
 		}
 
 		return new \DataMachineSocials\Abilities\Instagram\InstagramDeleteAbility();
+	}
+
+	/**
+	 * Get the Instagram comment reply ability.
+	 *
+	 * @return \DataMachineSocials\Abilities\Instagram\InstagramCommentReplyAbility
+	 */
+	private function get_comment_reply_ability() {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/instagram-comment-reply' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/instagram-comment-reply ability not registered.' );
+		}
+
+		return new \DataMachineSocials\Abilities\Instagram\InstagramCommentReplyAbility();
 	}
 }
