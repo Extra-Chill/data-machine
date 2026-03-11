@@ -1,0 +1,13 @@
+{
+  "id": "data-machine-socials",
+  "changelog_target": "docs/CHANGELOG.md",
+  "extensions": {
+    "wordpress": {}
+  },
+  "version_targets": [
+    {
+      "file": "data-machine-socials.php",
+      "pattern": "Version:\\s*([\\d.]+)"
+    }
+  ]
+}
