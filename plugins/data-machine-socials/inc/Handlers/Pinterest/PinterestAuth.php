@@ -108,7 +108,10 @@ class PinterestAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				'datamachine_log',
 				'error',
 				'Pinterest OAuth: App ID not configured',
-				array( 'handler' => 'pinterest', 'operation' => 'get_authorization_url' )
+				array(
+					'handler'   => 'pinterest',
+					'operation' => 'get_authorization_url',
+				)
 			);
 			return '';
 		}
@@ -160,6 +163,7 @@ class PinterestAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			'code'         => $code,
 			'redirect_uri' => $this->get_callback_url(),
 			'headers'      => array(
+				// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions -- Required for API authentication, not obfuscation.
 				'Authorization' => 'Basic ' . base64_encode( $client_id . ':' . $client_secret ),
 			),
 		);
@@ -209,6 +213,7 @@ class PinterestAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			self::TOKEN_URL,
 			array(
 				'headers' => array(
+					// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions -- Required for API authentication, not obfuscation.
 					'Authorization' => 'Basic ' . base64_encode( $client_id . ':' . $client_secret ),
 					'Content-Type'  => 'application/x-www-form-urlencoded',
 				),

@@ -132,9 +132,21 @@ class RestApi {
 			'callback'            => array( __CLASS__, 'platform_update' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
 			'args'                => array(
-				'action'  => array( 'type' => 'string', 'required' => true, 'enum' => array( 'edit', 'hide', 'unhide', 'delete' ), 'sanitize_callback' => 'sanitize_text_field' ),
-				'post_id' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
-				'message' => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
+				'action'  => array(
+					'type'              => 'string',
+					'required'          => true,
+					'enum'              => array( 'edit', 'hide', 'unhide', 'delete' ),
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'post_id' => array(
+					'type'              => 'string',
+					'required'          => true,
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'message' => array(
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_text_field',
+				),
 			),
 		) );
 
@@ -143,10 +155,25 @@ class RestApi {
 			'callback'            => array( __CLASS__, 'platform_read' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
 			'args'                => array(
-				'action'           => array( 'type' => 'string', 'default' => 'list', 'enum' => array( 'list', 'get', 'mentions' ), 'sanitize_callback' => 'sanitize_text_field' ),
-				'tweet_id'         => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
-				'limit'            => array( 'type' => 'integer', 'default' => 25, 'sanitize_callback' => 'absint' ),
-				'pagination_token' => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
+				'action'           => array(
+					'type'              => 'string',
+					'default'           => 'list',
+					'enum'              => array( 'list', 'get', 'mentions' ),
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'tweet_id'         => array(
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'limit'            => array(
+					'type'              => 'integer',
+					'default'           => 25,
+					'sanitize_callback' => 'absint',
+				),
+				'pagination_token' => array(
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_text_field',
+				),
 			),
 		) );
 
@@ -155,8 +182,17 @@ class RestApi {
 			'callback'            => array( __CLASS__, 'platform_update' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
 			'args'                => array(
-				'action'   => array( 'type' => 'string', 'required' => true, 'enum' => array( 'delete', 'retweet', 'unretweet', 'like', 'unlike' ), 'sanitize_callback' => 'sanitize_text_field' ),
-				'tweet_id' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
+				'action'   => array(
+					'type'              => 'string',
+					'required'          => true,
+					'enum'              => array( 'delete', 'retweet', 'unretweet', 'like', 'unlike' ),
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'tweet_id' => array(
+					'type'              => 'string',
+					'required'          => true,
+					'sanitize_callback' => 'sanitize_text_field',
+				),
 			),
 		) );
 
@@ -165,10 +201,25 @@ class RestApi {
 			'callback'            => array( __CLASS__, 'platform_read' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
 			'args'                => array(
-				'action'   => array( 'type' => 'string', 'default' => 'list', 'enum' => array( 'list', 'get', 'profile' ), 'sanitize_callback' => 'sanitize_text_field' ),
-				'post_uri' => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
-				'limit'    => array( 'type' => 'integer', 'default' => 25, 'sanitize_callback' => 'absint' ),
-				'cursor'   => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
+				'action'   => array(
+					'type'              => 'string',
+					'default'           => 'list',
+					'enum'              => array( 'list', 'get', 'profile' ),
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'post_uri' => array(
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'limit'    => array(
+					'type'              => 'integer',
+					'default'           => 25,
+					'sanitize_callback' => 'absint',
+				),
+				'cursor'   => array(
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_text_field',
+				),
 			),
 		) );
 
@@ -177,11 +228,29 @@ class RestApi {
 			'callback'            => array( __CLASS__, 'platform_read' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
 			'args'                => array(
-				'action'   => array( 'type' => 'string', 'default' => 'pins', 'enum' => array( 'pins', 'pin', 'boards', 'board_pins' ), 'sanitize_callback' => 'sanitize_text_field' ),
-				'pin_id'   => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
-				'board_id' => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
-				'limit'    => array( 'type' => 'integer', 'default' => 25, 'sanitize_callback' => 'absint' ),
-				'bookmark' => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
+				'action'   => array(
+					'type'              => 'string',
+					'default'           => 'pins',
+					'enum'              => array( 'pins', 'pin', 'boards', 'board_pins' ),
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'pin_id'   => array(
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'board_id' => array(
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'limit'    => array(
+					'type'              => 'integer',
+					'default'           => 25,
+					'sanitize_callback' => 'absint',
+				),
+				'bookmark' => array(
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_text_field',
+				),
 			),
 		) );
 
@@ -190,8 +259,17 @@ class RestApi {
 			'callback'            => array( __CLASS__, 'platform_update' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
 			'args'                => array(
-				'action'    => array( 'type' => 'string', 'required' => true, 'enum' => array( 'delete' ), 'sanitize_callback' => 'sanitize_text_field' ),
-				'thread_id' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
+				'action'    => array(
+					'type'              => 'string',
+					'required'          => true,
+					'enum'              => array( 'delete' ),
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'thread_id' => array(
+					'type'              => 'string',
+					'required'          => true,
+					'sanitize_callback' => 'sanitize_text_field',
+				),
 			),
 		) );
 
@@ -200,8 +278,17 @@ class RestApi {
 			'callback'            => array( __CLASS__, 'platform_update' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
 			'args'                => array(
-				'action'   => array( 'type' => 'string', 'required' => true, 'enum' => array( 'delete', 'like', 'unlike' ), 'sanitize_callback' => 'sanitize_text_field' ),
-				'post_uri' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
+				'action'   => array(
+					'type'              => 'string',
+					'required'          => true,
+					'enum'              => array( 'delete', 'like', 'unlike' ),
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'post_uri' => array(
+					'type'              => 'string',
+					'required'          => true,
+					'sanitize_callback' => 'sanitize_text_field',
+				),
 			),
 		) );
 
@@ -210,8 +297,17 @@ class RestApi {
 			'callback'            => array( __CLASS__, 'platform_update' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
 			'args'                => array(
-				'action' => array( 'type' => 'string', 'required' => true, 'enum' => array( 'delete' ), 'sanitize_callback' => 'sanitize_text_field' ),
-				'pin_id' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
+				'action' => array(
+					'type'              => 'string',
+					'required'          => true,
+					'enum'              => array( 'delete' ),
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'pin_id' => array(
+					'type'              => 'string',
+					'required'          => true,
+					'sanitize_callback' => 'sanitize_text_field',
+				),
 			),
 		) );
 
@@ -224,9 +320,21 @@ class RestApi {
 			'callback'            => array( __CLASS__, 'platform_update' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
 			'args'                => array(
-				'action'   => array( 'type' => 'string', 'required' => true, 'enum' => array( 'edit', 'delete', 'archive' ), 'sanitize_callback' => 'sanitize_text_field' ),
-				'media_id' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
-				'caption'  => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
+				'action'   => array(
+					'type'              => 'string',
+					'required'          => true,
+					'enum'              => array( 'edit', 'delete', 'archive' ),
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'media_id' => array(
+					'type'              => 'string',
+					'required'          => true,
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'caption'  => array(
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_text_field',
+				),
 			),
 		) );
 
@@ -235,8 +343,16 @@ class RestApi {
 			'callback'            => array( __CLASS__, 'instagram_comment_reply' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
 			'args'                => array(
-				'comment_id' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
-				'message'    => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_textarea_field' ),
+				'comment_id' => array(
+					'type'              => 'string',
+					'required'          => true,
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'message'    => array(
+					'type'              => 'string',
+					'required'          => true,
+					'sanitize_callback' => 'sanitize_textarea_field',
+				),
 			),
 		) );
 	}
@@ -246,10 +362,25 @@ class RestApi {
 	 */
 	private static function read_endpoint_args( array $actions, string $id_param ): array {
 		return array(
-			'action'  => array( 'type' => 'string', 'default' => $actions[0], 'enum' => $actions, 'sanitize_callback' => 'sanitize_text_field' ),
-			$id_param => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
-			'limit'   => array( 'type' => 'integer', 'default' => 25, 'sanitize_callback' => 'absint' ),
-			'after'   => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
+			'action'  => array(
+				'type'              => 'string',
+				'default'           => $actions[0],
+				'enum'              => $actions,
+				'sanitize_callback' => 'sanitize_text_field',
+			),
+			$id_param => array(
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+			),
+			'limit'   => array(
+				'type'              => 'integer',
+				'default'           => 25,
+				'sanitize_callback' => 'absint',
+			),
+			'after'   => array(
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+			),
 		);
 	}
 
@@ -257,7 +388,7 @@ class RestApi {
 	 * Generic platform read handler — routes to the correct ability by URL.
 	 */
 	public static function platform_read( \WP_REST_Request $request ) {
-		$route = $request->get_route();
+		$route  = $request->get_route();
 		$params = $request->get_params();
 
 		$ability_map = array(
@@ -278,11 +409,15 @@ class RestApi {
 		}
 
 		if ( ! $platform || ! isset( $ability_map[ $platform ] ) ) {
-			return new \WP_REST_Response( array( 'success' => false, 'error' => 'Unknown platform' ), 400 );
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => 'Unknown platform',
+			), 400 );
 		}
 
 		$ability = new $ability_map[ $platform ]();
-		$input   = array_filter( $params, function ( $v ) { return '' !== $v && null !== $v; } );
+		$input   = array_filter( $params, function ( $v ) { return '' !== $v && null !== $v;
+		} );
 		$result  = $ability->execute( $input );
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
@@ -292,8 +427,8 @@ class RestApi {
 	 * Generic platform update handler — routes to the correct ability by URL.
 	 */
 	public static function platform_update( \WP_REST_Request $request ) {
-		$route = $request->get_route();
-		$params = $request->get_json_params() ?: $request->get_body_params();
+		$route  = $request->get_route();
+		$params = $request->get_json_params() ? $request->get_json_params() : $request->get_body_params();
 
 		$ability_map = array(
 			'instagram' => \DataMachineSocials\Abilities\Instagram\InstagramUpdateAbility::class,
@@ -313,12 +448,18 @@ class RestApi {
 		}
 
 		if ( ! $platform || ! isset( $ability_map[ $platform ] ) ) {
-			return new \WP_REST_Response( array( 'success' => false, 'error' => 'Unknown platform or update not supported' ), 400 );
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => 'Unknown platform or update not supported',
+			), 400 );
 		}
 
 		// Validate required params.
 		if ( empty( $params['action'] ) ) {
-			return new \WP_REST_Response( array( 'success' => false, 'error' => 'action is required' ), 400 );
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => 'action is required',
+			), 400 );
 		}
 
 		// Build input based on platform - different platforms use different ID fields.
@@ -336,12 +477,15 @@ class RestApi {
 		}
 
 		if ( empty( $params[ $id_field ] ) ) {
-			return new \WP_REST_Response( array( 'success' => false, 'error' => "{$id_field} is required" ), 400 );
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => "{$id_field} is required",
+			), 400 );
 		}
 
 		$ability = new $ability_map[ $platform ]();
 		$input   = array(
-			'action'   => sanitize_text_field( $params['action'] ),
+			'action'  => sanitize_text_field( $params['action'] ),
 			$id_field => sanitize_text_field( $params[ $id_field ] ),
 		);
 
@@ -363,14 +507,20 @@ class RestApi {
 	 * Reply to an Instagram comment.
 	 */
 	public static function instagram_comment_reply( \WP_REST_Request $request ) {
-		$params = $request->get_json_params() ?: $request->get_body_params();
+		$params = $request->get_json_params() ? $request->get_json_params() : $request->get_body_params();
 
 		if ( empty( $params['comment_id'] ) ) {
-			return new \WP_REST_Response( array( 'success' => false, 'error' => 'comment_id is required' ), 400 );
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => 'comment_id is required',
+			), 400 );
 		}
 
 		if ( empty( $params['message'] ) ) {
-			return new \WP_REST_Response( array( 'success' => false, 'error' => 'message is required' ), 400 );
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => 'message is required',
+			), 400 );
 		}
 
 		$ability = new \DataMachineSocials\Abilities\Instagram\InstagramCommentReplyAbility();
@@ -436,58 +586,58 @@ class RestApi {
 		// Return platform configurations from registry
 		$platforms = array(
 			'instagram' => array(
-				'label'            => 'Instagram',
-				'maxImages'        => 10,
-				'aspectRatios'     => array( '1:1', '4:5', '3:4', '1.91:1' ),
+				'label'              => 'Instagram',
+				'maxImages'          => 10,
+				'aspectRatios'       => array( '1:1', '4:5', '3:4', '1.91:1' ),
 				'defaultAspectRatio' => '4:5',
-				'charLimit'        => 2200,
-				'supportsCarousel' => true,
+				'charLimit'          => 2200,
+				'supportsCarousel'   => true,
 			),
 			'twitter'   => array(
-				'label'            => 'Twitter / X',
-				'maxImages'        => 4,
-				'aspectRatios'     => array( 'any' ),
+				'label'              => 'Twitter / X',
+				'maxImages'          => 4,
+				'aspectRatios'       => array( 'any' ),
 				'defaultAspectRatio' => 'any',
-				'charLimit'        => 280,
-				'supportsCarousel' => false,
+				'charLimit'          => 280,
+				'supportsCarousel'   => false,
 			),
 			'facebook'  => array(
-				'label'            => 'Facebook',
-				'maxImages'        => 10,
-				'aspectRatios'     => array( 'any' ),
+				'label'              => 'Facebook',
+				'maxImages'          => 10,
+				'aspectRatios'       => array( 'any' ),
 				'defaultAspectRatio' => 'any',
-				'charLimit'        => 63206,
-				'supportsCarousel' => true,
+				'charLimit'          => 63206,
+				'supportsCarousel'   => true,
 			),
 			'bluesky'   => array(
-				'label'            => 'Bluesky',
-				'maxImages'        => 4,
-				'aspectRatios'     => array( 'any' ),
+				'label'              => 'Bluesky',
+				'maxImages'          => 4,
+				'aspectRatios'       => array( 'any' ),
 				'defaultAspectRatio' => 'any',
-				'charLimit'        => 300,
-				'supportsCarousel' => false,
+				'charLimit'          => 300,
+				'supportsCarousel'   => false,
 			),
 			'threads'   => array(
-				'label'            => 'Threads',
-				'maxImages'        => 10,
-				'aspectRatios'     => array( 'any' ),
+				'label'              => 'Threads',
+				'maxImages'          => 10,
+				'aspectRatios'       => array( 'any' ),
 				'defaultAspectRatio' => 'any',
-				'charLimit'        => 500,
-				'supportsCarousel' => true,
+				'charLimit'          => 500,
+				'supportsCarousel'   => true,
 			),
 			'pinterest' => array(
-				'label'            => 'Pinterest',
-				'maxImages'        => 1,
-				'aspectRatios'     => array( '2:3' ),
+				'label'              => 'Pinterest',
+				'maxImages'          => 1,
+				'aspectRatios'       => array( '2:3' ),
 				'defaultAspectRatio' => '2:3',
-				'charLimit'        => 500,
-				'supportsCarousel' => false,
+				'charLimit'          => 500,
+				'supportsCarousel'   => false,
 			),
 			'reddit'    => array(
-				'label'      => 'Reddit',
-				'type'       => 'fetch',
-				'charLimit'  => 40000,
-				'scopes'     => 'identity read',
+				'label'     => 'Reddit',
+				'type'      => 'fetch',
+				'charLimit' => 40000,
+				'scopes'    => 'identity read',
 			),
 		);
 
@@ -498,11 +648,11 @@ class RestApi {
 	 * Cross-platform post
 	 */
 	public static function cross_post( \WP_REST_Request $request ) {
-		$params     = $request->get_json_params();
-		$platforms  = $params['platforms'] ?? array();
-		$images     = $params['images'] ?? array();
-		$caption    = sanitize_textarea_field( $params['caption'] ?? '' );
-		$post_id    = intval( $params['post_id'] ?? 0 );
+		$params       = $request->get_json_params();
+		$platforms    = $params['platforms'] ?? array();
+		$images       = $params['images'] ?? array();
+		$caption      = sanitize_textarea_field( $params['caption'] ?? '' );
+		$post_id      = intval( $params['post_id'] ?? 0 );
 		$aspect_ratio = sanitize_text_field( $params['aspect_ratio'] ?? '4:5' );
 
 		if ( empty( $platforms ) ) {
@@ -533,7 +683,7 @@ class RestApi {
 
 		// Post to each platform
 		foreach ( $platforms as $platform ) {
-			$result = self::post_to_platform( $platform, $images, $caption, $source_url );
+			$result    = self::post_to_platform( $platform, $images, $caption, $source_url );
 			$results[] = $result;
 
 			if ( ! $result['success'] ) {
@@ -561,7 +711,7 @@ class RestApi {
 			array(
 				'success' => empty( $errors ),
 				'results' => $results,
-				'errors'  => $errors ?: null,
+				'errors'  => $errors ? $errors : null,
 			)
 		);
 	}
@@ -660,7 +810,7 @@ class RestApi {
 		}
 
 		// Move file to temp location
-		$filename = sanitize_file_name( $file['name'] );
+		$filename  = sanitize_file_name( $file['name'] );
 		$temp_path = $temp_dir . '/' . $filename;
 
 		if ( ! move_uploaded_file( $file['tmp_name'], $temp_path ) ) {

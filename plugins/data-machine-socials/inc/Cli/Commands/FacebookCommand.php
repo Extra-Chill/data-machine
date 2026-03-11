@@ -228,6 +228,8 @@ class FacebookCommand {
 	 *     wp datamachine-socials facebook status
 	 */
 	public function status( $args, $assoc_args ) {
+		$args;
+		$assoc_args;
 		$auth_abilities = new AuthAbilities();
 		$provider       = $auth_abilities->getProvider( 'facebook' );
 
@@ -320,9 +322,10 @@ class FacebookCommand {
 	 *     wp datamachine-socials facebook edit 123456789 "New message"
 	 */
 	public function edit( $args, $assoc_args ) {
-		$post_id  = $args[0];
-		$message  = $args[1] ?? '';
-		$ability  = $this->get_update_ability();
+		$assoc_args;
+		$post_id = $args[0];
+		$message = $args[1] ?? '';
+		$ability = $this->get_update_ability();
 
 		if ( empty( $message ) ) {
 			WP_CLI::error( 'Message is required.' );
@@ -355,6 +358,7 @@ class FacebookCommand {
 	 *     wp datamachine-socials facebook hide 123456789
 	 */
 	public function hide( $args, $assoc_args ) {
+		$assoc_args;
 		$post_id = $args[0];
 		$ability = $this->get_update_ability();
 
@@ -383,6 +387,7 @@ class FacebookCommand {
 	 *     wp datamachine-socials facebook delete 123456789
 	 */
 	public function delete( $args, $assoc_args ) {
+		$assoc_args;
 		$post_id = $args[0];
 		$ability = $this->get_delete_ability();
 

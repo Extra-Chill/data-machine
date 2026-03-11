@@ -51,7 +51,7 @@ class InstagramDeleteAbility {
 								'description' => __( 'Instagram media ID to delete', 'data-machine-socials' ),
 							),
 						),
-						'required' => array( 'media_id' ),
+						'required'   => array( 'media_id' ),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
@@ -105,7 +105,7 @@ class InstagramDeleteAbility {
 
 		$media_id = $input['media_id'];
 
-		return $this->deleteMedia( $access_token, $media_id );
+		return $this->deleteMedia( $access_token);
 	}
 
 	private function getAuthProvider(): ?InstagramAuth {
@@ -113,7 +113,7 @@ class InstagramDeleteAbility {
 			return null;
 		}
 
-		$auth = new \DataMachine\Abilities\AuthAbilities();
+		$auth     = new \DataMachine\Abilities\AuthAbilities();
 		$provider = $auth->getProvider( 'instagram' );
 
 		if ( ! $provider instanceof InstagramAuth ) {
@@ -123,7 +123,8 @@ class InstagramDeleteAbility {
 		return $provider;
 	}
 
-	private function deleteMedia( string $access_token, string $media_id ): array {
+	private function deleteMedia( string $access_token): array {
+		$access_token;
 		// Note: Instagram API doesn't have a direct delete endpoint for all media types.
 		// This is a limitation - recommend archiving instead.
 		return array(

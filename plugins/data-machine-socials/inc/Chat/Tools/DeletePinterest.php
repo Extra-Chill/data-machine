@@ -59,7 +59,10 @@ class DeletePinterest extends BaseTool {
 		$result  = $ability->execute( array( 'pin_id' => $parameters['pin_id'] ) );
 
 		if ( $result['success'] ) {
-			return array( 'result' => 'Pin deleted!', 'pin_id' => $parameters['pin_id'] );
+			return array(
+				'result' => 'Pin deleted!',
+				'pin_id' => $parameters['pin_id'],
+			);
 		}
 
 		return $this->buildErrorResponse( $result['error'] ?? 'Delete failed', $tool_name );

@@ -59,7 +59,10 @@ class DeleteFacebook extends BaseTool {
 		$result  = $ability->execute( array( 'post_id' => $parameters['post_id'] ) );
 
 		if ( $result['success'] ) {
-			return array( 'result' => 'Post deleted!', 'post_id' => $parameters['post_id'] );
+			return array(
+				'result'  => 'Post deleted!',
+				'post_id' => $parameters['post_id'],
+			);
 		}
 
 		return $this->buildErrorResponse( $result['error'] ?? 'Delete failed', $tool_name );

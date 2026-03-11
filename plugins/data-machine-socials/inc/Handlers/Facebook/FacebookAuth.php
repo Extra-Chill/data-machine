@@ -21,10 +21,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
 	public const GRAPH_API_VERSION = 'v23.0';
-	public const AUTH_URL = 'https://www.facebook.com/' . self::GRAPH_API_VERSION . '/dialog/oauth';
-	public const TOKEN_URL = 'https://graph.facebook.com/' . self::GRAPH_API_VERSION . '/oauth/access_token';
-	public const SCOPES = 'email,public_profile,pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_engagement,business_management';
-	public const GRAPH_API_URL = 'https://graph.facebook.com/' . self::GRAPH_API_VERSION;
+	public const AUTH_URL          = 'https://www.facebook.com/' . self::GRAPH_API_VERSION . '/dialog/oauth';
+	public const TOKEN_URL         = 'https://graph.facebook.com/' . self::GRAPH_API_VERSION . '/oauth/access_token';
+	public const SCOPES            = 'email,public_profile,pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_engagement,business_management';
+	public const GRAPH_API_URL     = 'https://graph.facebook.com/' . self::GRAPH_API_VERSION;
 
 	public function __construct() {
 		parent::__construct( 'facebook' );
@@ -37,16 +37,16 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	*/
 	public function get_config_fields(): array {
 		return array(
-			'app_id' => array(
-				'label' => __( 'App ID', 'data-machine-socials' ),
-				'type' => 'text',
-				'required' => true,
+			'app_id'     => array(
+				'label'       => __( 'App ID', 'data-machine-socials' ),
+				'type'        => 'text',
+				'required'    => true,
 				'description' => __( 'Your Facebook application App ID from developers.facebook.com', 'data-machine-socials' ),
 			),
 			'app_secret' => array(
-				'label' => __( 'App Secret', 'data-machine-socials' ),
-				'type' => 'text',
-				'required' => true,
+				'label'       => __( 'App Secret', 'data-machine-socials' ),
+				'type'        => 'text',
+				'required'    => true,
 				'description' => __( 'Your Facebook application App Secret from developers.facebook.com', 'data-machine-socials' ),
 			),
 		);
@@ -114,7 +114,7 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			'client_secret'     => $config['app_secret'],
 			'fb_exchange_token' => $current_token,
 		);
-		$url = self::TOKEN_URL . '?' . http_build_query( $params );
+		$url    = self::TOKEN_URL . '?' . http_build_query( $params );
 
 		$result = HttpClient::get( $url, array( 'context' => 'Facebook OAuth' ) );
 
@@ -150,7 +150,7 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		// Build return data — the base class will store access_token + expires_at.
 		// We also need to update the Facebook-specific fields, so we do a full
 		// account update here rather than relying solely on the base class.
-		$account = $this->get_account();
+		$account                      = $this->get_account();
 		$account['user_access_token'] = $new_user_token;
 		$account['token_expires_at']  = $expires_at;
 		$account['last_refreshed_at'] = time();
@@ -278,11 +278,11 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
 		$config = $this->get_config();
 		$params = array(
-			'client_id' => $config['app_id'] ?? '',
-			'redirect_uri' => $this->get_callback_url(),
-			'scope' => self::SCOPES,
+			'client_id'     => $config['app_id'] ?? '',
+			'redirect_uri'  => $this->get_callback_url(),
+			'scope'         => self::SCOPES,
 			'response_type' => 'code',
-			'state' => $state,
+			'state'         => $state,
 		);
 
 		return $this->oauth2->get_authorization_url( self::AUTH_URL, $params );
@@ -301,14 +301,14 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			'facebook',
 			self::TOKEN_URL,
 			array(
-				'client_id' => $config['app_id'] ?? '',
+				'client_id'     => $config['app_id'] ?? '',
 				'client_secret' => $config['app_secret'] ?? '',
-				'redirect_uri' => $this->get_callback_url(),
-				'code' => $facebook_code,
+				'redirect_uri'  => $this->get_callback_url(),
+				'code'          => $facebook_code,
 			),
 			function ( $long_lived_token_data ) {
 				// Build account data from long-lived token
-				$access_token = $long_lived_token_data['access_token'];
+				$access_token     = $long_lived_token_data['access_token'];
 				$token_expires_at = $long_lived_token_data['expires_at'];
 
 				// Fetch Page credentials
@@ -318,25 +318,25 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				}
 
 				// Fetch user profile
-				$profile_info = $this->get_user_profile( $access_token );
-				$user_profile_id = 'Unknown';
+				$profile_info      = $this->get_user_profile( $access_token );
+				$user_profile_id   = 'Unknown';
 				$user_profile_name = 'Unknown';
 
 				if ( ! is_wp_error( $profile_info ) ) {
-					$user_profile_id = $profile_info['id'] ?? 'ErrorFetchingId';
+					$user_profile_id   = $profile_info['id'] ?? 'ErrorFetchingId';
 					$user_profile_name = $profile_info['name'] ?? 'ErrorFetchingName';
 				}
 
 				return array(
 					'user_access_token' => $access_token,
 					'page_access_token' => $page_credentials['access_token'],
-					'token_type' => 'bearer',
-					'user_id' => $user_profile_id,
-					'user_name' => $user_profile_name,
-					'page_id' => $page_credentials['id'],
-					'page_name' => $page_credentials['name'],
-					'authenticated_at' => time(),
-					'token_expires_at' => $token_expires_at,
+					'token_type'        => 'bearer',
+					'user_id'           => $user_profile_id,
+					'user_name'         => $user_profile_name,
+					'page_id'           => $page_credentials['id'],
+					'page_name'         => $page_credentials['name'],
+					'authenticated_at'  => time(),
+					'token_expires_at'  => $token_expires_at,
 				);
 			},
 			function ( $short_lived_token_data ) use ( $config ) {
@@ -364,12 +364,12 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		do_action( 'datamachine_log', 'debug', 'Exchanging Facebook short-lived token for long-lived token' );
 
 		$params = array(
-			'grant_type' => 'fb_exchange_token',
-			'client_id' => $config['app_id'] ?? '',
-			'client_secret' => $config['app_secret'] ?? '',
+			'grant_type'        => 'fb_exchange_token',
+			'client_id'         => $config['app_id'] ?? '',
+			'client_secret'     => $config['app_secret'] ?? '',
 			'fb_exchange_token' => $short_lived_token,
 		);
-		$url = self::TOKEN_URL . '?' . http_build_query( $params );
+		$url    = self::TOKEN_URL . '?' . http_build_query( $params );
 
 		$result = HttpClient::get( $url, array( 'context' => 'Facebook OAuth' ) );
 
@@ -378,8 +378,8 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			return new \WP_Error( 'facebook_oauth_long_token_request_failed', __( 'HTTP error during long-lived token exchange with Facebook.', 'data-machine-socials' ), $result['error'] );
 		}
 
-		$body = $result['data'];
-		$data = json_decode( $body, true );
+		$body      = $result['data'];
+		$data      = json_decode( $body, true );
 		$http_code = $result['status_code'];
 
 		if ( 200 !== $http_code || empty( $data['access_token'] ) ) {
@@ -390,7 +390,7 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				'Facebook OAuth Error: Long-lived token exchange failed',
 				array(
 					'http_code' => $http_code,
-					'response' => $body,
+					'response'  => $body,
 				)
 			);
 			return new \WP_Error( 'facebook_oauth_long_token_exchange_failed', $error_message, $data );
@@ -403,7 +403,7 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
 		return array(
 			'access_token' => $data['access_token'],
-			'expires_at' => $expires_at,
+			'expires_at'   => $expires_at,
 		);
 	}
 
@@ -431,8 +431,8 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			return new \WP_Error( 'facebook_page_request_failed', __( 'HTTP error while fetching Facebook pages.', 'data-machine-socials' ), $result['error'] );
 		}
 
-		$body = $result['data'];
-		$data = json_decode( $body, true );
+		$body      = $result['data'];
+		$data      = json_decode( $body, true );
 		$http_code = $result['status_code'];
 
 		if ( 200 !== $http_code || ! isset( $data['data'] ) ) {
@@ -443,7 +443,7 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				'Facebook Page Fetch Error: API error',
 				array(
 					'http_code' => $http_code,
-					'response' => $body,
+					'response'  => $body,
 				)
 			);
 			return new \WP_Error( 'facebook_page_api_error', $error_message, $data );
@@ -464,8 +464,8 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		do_action( 'datamachine_log', 'debug', 'Successfully fetched credentials for Facebook page', array( 'page_id' => $first_page['id'] ) );
 
 		return array(
-			'id' => $first_page['id'],
-			'name' => $first_page['name'],
+			'id'           => $first_page['id'],
+			'name'         => $first_page['name'],
 			'access_token' => $first_page['access_token'],
 		);
 	}
@@ -491,8 +491,8 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			return new \WP_Error( 'facebook_profile_fetch_failed', $result['error'] );
 		}
 
-		$body = $result['data'];
-		$data = json_decode( $body, true );
+		$body      = $result['data'];
+		$data      = json_decode( $body, true );
 		$http_code = $result['status_code'];
 
 		if ( 200 !== $http_code || isset( $data['error'] ) ) {
@@ -563,18 +563,18 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	*/
 	public function remove_account(): bool {
 		$account = $this->get_account();
-		$token = null;
+		$token   = null;
 
 		if ( ! empty( $account ) && is_array( $account ) && ! empty( $account['user_access_token'] ) ) {
 			$token = $account['user_access_token'];
 		}
 
 		if ( $token ) {
-			$url = self::GRAPH_API_URL . '/me/permissions';
+			$url    = self::GRAPH_API_URL . '/me/permissions';
 			$result = HttpClient::delete(
 				$url,
 				array(
-					'body' => array( 'access_token' => $token ),
+					'body'    => array( 'access_token' => $token ),
 					'context' => 'Facebook Authentication',
 				)
 			);

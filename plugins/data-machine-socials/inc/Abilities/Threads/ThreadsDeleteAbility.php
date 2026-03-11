@@ -51,7 +51,7 @@ class ThreadsDeleteAbility {
 								'description' => __( 'Threads thread ID to delete', 'data-machine-socials' ),
 							),
 						),
-						'required' => array( 'thread_id' ),
+						'required'   => array( 'thread_id' ),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
@@ -125,7 +125,7 @@ class ThreadsDeleteAbility {
 		$status_code = wp_remote_retrieve_response_code( $response );
 		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
 
-		if ( $status_code === 200 || $status_code === 204 ) {
+		if ( 200 === $status_code || 204 === $status_code ) {
 			return array(
 				'success' => true,
 				'data'    => array(
@@ -146,7 +146,7 @@ class ThreadsDeleteAbility {
 			return null;
 		}
 
-		$auth = new \DataMachine\Abilities\AuthAbilities();
+		$auth     = new \DataMachine\Abilities\AuthAbilities();
 		$provider = $auth->getProvider( 'threads' );
 
 		if ( ! $provider instanceof ThreadsAuth ) {

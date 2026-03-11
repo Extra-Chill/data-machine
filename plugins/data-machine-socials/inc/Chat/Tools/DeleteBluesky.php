@@ -59,7 +59,10 @@ class DeleteBluesky extends BaseTool {
 		$result  = $ability->execute( array( 'post_uri' => $parameters['post_uri'] ) );
 
 		if ( $result['success'] ) {
-			return array( 'result' => 'Post deleted!', 'post_uri' => $parameters['post_uri'] );
+			return array(
+				'result'   => 'Post deleted!',
+				'post_uri' => $parameters['post_uri'],
+			);
 		}
 
 		return $this->buildErrorResponse( $result['error'] ?? 'Delete failed', $tool_name );

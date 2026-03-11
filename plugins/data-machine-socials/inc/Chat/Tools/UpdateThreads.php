@@ -56,8 +56,14 @@ class UpdateThreads extends BaseTool {
 				'Threads auth provider not available',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'threads', 'status' => 'not_registered' ),
-				array( 'action' => 'configure_threads_auth', 'message' => 'Threads OAuth needs to be configured.' )
+				array(
+					'provider' => 'threads',
+					'status'   => 'not_registered',
+				),
+				array(
+					'action'  => 'configure_threads_auth',
+					'message' => 'Threads OAuth needs to be configured.',
+				)
 			);
 		}
 
@@ -66,8 +72,14 @@ class UpdateThreads extends BaseTool {
 				'Threads is not authenticated',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'threads', 'status' => 'not_authenticated' ),
-				array( 'action' => 'authenticate_threads', 'message' => 'Threads OAuth needs to be connected.' )
+				array(
+					'provider' => 'threads',
+					'status'   => 'not_authenticated',
+				),
+				array(
+					'action'  => 'authenticate_threads',
+					'message' => 'Threads OAuth needs to be connected.',
+				)
 			);
 		}
 

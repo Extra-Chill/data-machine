@@ -39,16 +39,16 @@ class TwitterAuth extends \DataMachine\Core\OAuth\BaseOAuth1Provider {
 	 */
 	public function get_config_fields(): array {
 		return array(
-			'api_key' => array(
-				'label' => __( 'API Key', 'data-machine-socials' ),
-				'type' => 'text',
-				'required' => true,
+			'api_key'    => array(
+				'label'       => __( 'API Key', 'data-machine-socials' ),
+				'type'        => 'text',
+				'required'    => true,
 				'description' => __( 'Your Twitter application API key from developer.twitter.com', 'data-machine-socials' ),
 			),
 			'api_secret' => array(
-				'label' => __( 'API Secret', 'data-machine-socials' ),
-				'type' => 'text',
-				'required' => true,
+				'label'       => __( 'API Secret', 'data-machine-socials' ),
+				'type'        => 'text',
+				'required'    => true,
 				'description' => __( 'Your Twitter application API secret from developer.twitter.com', 'data-machine-socials' ),
 			),
 		);
@@ -75,11 +75,11 @@ class TwitterAuth extends \DataMachine\Core\OAuth\BaseOAuth1Provider {
 			return new \WP_Error( 'twitter_missing_credentials', __( 'Twitter credentials not found. Please authenticate.', 'data-machine-socials' ) );
 		}
 
-		$access_token = $credentials['access_token'];
+		$access_token        = $credentials['access_token'];
 		$access_token_secret = $credentials['access_token_secret'];
 
-		$config = $this->get_config();
-		$consumer_key = $config['api_key'] ?? '';
+		$config          = $this->get_config();
+		$consumer_key    = $config['api_key'] ?? '';
 		$consumer_secret = $config['api_secret'] ?? '';
 
 		if ( empty( $consumer_key ) || empty( $consumer_secret ) ) {
@@ -102,8 +102,8 @@ class TwitterAuth extends \DataMachine\Core\OAuth\BaseOAuth1Provider {
 	 * @return string Authorization URL
 	 */
 	public function get_authorization_url(): string {
-		$config = $this->get_config();
-		$api_key = $config['api_key'] ?? '';
+		$config     = $this->get_config();
+		$api_key    = $config['api_key'] ?? '';
 		$api_secret = $config['api_secret'] ?? '';
 
 		if ( empty( $api_key ) || empty( $api_secret ) ) {
@@ -112,7 +112,7 @@ class TwitterAuth extends \DataMachine\Core\OAuth\BaseOAuth1Provider {
 				'error',
 				'Twitter OAuth Error: API Key/Secret not configured.',
 				array(
-					'handler' => 'twitter',
+					'handler'   => 'twitter',
 					'operation' => 'get_authorization_url',
 				)
 			);
@@ -136,7 +136,7 @@ class TwitterAuth extends \DataMachine\Core\OAuth\BaseOAuth1Provider {
 				'error',
 				'Twitter OAuth Error: ' . $request_token->get_error_message(),
 				array(
-					'handler' => 'twitter',
+					'handler'   => 'twitter',
 					'operation' => 'get_authorization_url',
 				)
 			);
@@ -160,8 +160,8 @@ class TwitterAuth extends \DataMachine\Core\OAuth\BaseOAuth1Provider {
 			exit;
 		}
 
-		$config = $this->get_config();
-		$api_key = $config['api_key'] ?? '';
+		$config     = $this->get_config();
+		$api_key    = $config['api_key'] ?? '';
 		$api_secret = $config['api_secret'] ?? '';
 
 		if ( empty( $api_key ) || empty( $api_secret ) ) {
@@ -179,11 +179,11 @@ class TwitterAuth extends \DataMachine\Core\OAuth\BaseOAuth1Provider {
 			function ( $access_token_data ) {
 				// Build account data from Twitter response
 				return array(
-					'access_token' => $access_token_data['oauth_token'],
+					'access_token'        => $access_token_data['oauth_token'],
 					'access_token_secret' => $access_token_data['oauth_token_secret'],
-					'user_id' => $access_token_data['user_id'] ?? null,
-					'screen_name' => $access_token_data['screen_name'] ?? null,
-					'last_verified_at' => time(),
+					'user_id'             => $access_token_data['user_id'] ?? null,
+					'screen_name'         => $access_token_data['screen_name'] ?? null,
+					'last_verified_at'    => time(),
 				);
 			},
 			array( $this, 'save_account' )

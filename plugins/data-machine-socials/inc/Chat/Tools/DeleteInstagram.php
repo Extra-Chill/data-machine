@@ -59,7 +59,10 @@ class DeleteInstagram extends BaseTool {
 		$result  = $ability->execute( array( 'media_id' => $parameters['media_id'] ) );
 
 		if ( $result['success'] ) {
-			return array( 'result' => 'Post deleted!', 'media_id' => $parameters['media_id'] );
+			return array(
+				'result'   => 'Post deleted!',
+				'media_id' => $parameters['media_id'],
+			);
 		}
 
 		return $this->buildErrorResponse( $result['error'] ?? 'Delete failed', $tool_name );

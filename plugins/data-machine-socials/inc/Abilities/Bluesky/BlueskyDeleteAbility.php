@@ -49,7 +49,7 @@ class BlueskyDeleteAbility {
 								'description' => __( 'Bluesky post URI (at://...)', 'data-machine-socials' ),
 							),
 						),
-						'required' => array( 'post_uri' ),
+						'required'   => array( 'post_uri' ),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
@@ -104,9 +104,9 @@ class BlueskyDeleteAbility {
 		$did = $session['did'];
 
 		// Parse rkey from AT URI: at://did:plc:xxx/app.bsky.feed.post/rkey
-		$post_uri = $input['post_uri'];
+		$post_uri  = $input['post_uri'];
 		$uri_parts = explode( '/', $post_uri );
-		$rkey = end( $uri_parts );
+		$rkey      = end( $uri_parts );
 
 		if ( empty( $rkey ) ) {
 			return array(
@@ -140,7 +140,7 @@ class BlueskyDeleteAbility {
 
 		$status_code = wp_remote_retrieve_response_code( $response );
 
-		if ( $status_code === 200 || $status_code === 204 ) {
+		if ( 200 === $status_code || 204 === $status_code ) {
 			return array(
 				'success' => true,
 				'data'    => array(
@@ -162,7 +162,7 @@ class BlueskyDeleteAbility {
 			return null;
 		}
 
-		$auth = new \DataMachine\Abilities\AuthAbilities();
+		$auth     = new \DataMachine\Abilities\AuthAbilities();
 		$provider = $auth->getProvider( 'bluesky' );
 
 		if ( ! $provider instanceof BlueskyAuth ) {

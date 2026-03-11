@@ -94,8 +94,10 @@ class PinterestCommand {
 	 *     wp datamachine-socials pinterest status
 	 */
 	public function status( $args, $assoc_args ) {
+		$args;
+		$assoc_args;
 		$authenticated = PinterestBoardsAbility::is_configured();
-		$sync_status = PinterestBoardsAbility::get_sync_status();
+		$sync_status   = PinterestBoardsAbility::get_sync_status();
 
 		WP_CLI::log( 'Pinterest Integration Status' );
 		WP_CLI::log( '---' );
@@ -194,6 +196,7 @@ class PinterestCommand {
 	 * ---
 	 */
 	public function pin( $args, $assoc_args ) {
+		$assoc_args;
 		$pin_id  = $args[0];
 		$ability = $this->get_read_ability();
 
@@ -333,7 +336,8 @@ class PinterestCommand {
 	 *     wp datamachine-socials pinterest delete 1234567890
 	 */
 	public function delete( $args, $assoc_args ) {
-		$pin_id = $args[0];
+		$assoc_args;
+		$pin_id  = $args[0];
 		$ability = $this->get_delete_ability();
 
 		$result = $ability->execute( array(
@@ -365,6 +369,7 @@ class PinterestCommand {
 
 		if ( 'csv' === $format ) {
 			// Output CSV header
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- CLI CSV output is intentionally raw text.
 			echo implode( ',', $fields ) . "\n";
 			foreach ( $items as $item ) {
 				$row = array();
@@ -376,6 +381,7 @@ class PinterestCommand {
 					}
 					$row[] = $value;
 				}
+				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- CLI CSV output is intentionally raw text.
 				echo implode( ',', $row ) . "\n";
 			}
 			return;

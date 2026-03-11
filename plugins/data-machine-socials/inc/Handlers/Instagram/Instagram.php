@@ -47,35 +47,36 @@ class Instagram extends PublishHandler {
 			InstagramAuth::class,
 			InstagramSettings::class,
 			function ( $tools, $handler_slug, $handler_config ) {
+				$handler_config;
 				if ( 'instagram_publish' === $handler_slug ) {
 					$tools['instagram_publish'] = array(
-						'class' => self::class,
-						'method' => 'handle_tool_call',
-						'handler' => 'instagram_publish',
+						'class'       => self::class,
+						'method'      => 'handle_tool_call',
+						'handler'     => 'instagram_publish',
 						'description' => 'Post content to Instagram. Supports single images and carousels (up to 10 images). Images are processed async.',
-						'parameters' => array(
-							'type' => 'object',
+						'parameters'  => array(
+							'type'       => 'object',
 							'properties' => array(
-								'content' => array(
-									'type' => 'string',
+								'content'      => array(
+									'type'        => 'string',
 									'description' => 'The caption text to post to Instagram (max 2200 characters)',
 								),
-								'image_urls' => array(
-									'type' => 'array',
+								'image_urls'   => array(
+									'type'        => 'array',
 									'description' => 'Array of image URLs (1-10 for carousel)',
-									'items' => array(
-										'type' => 'string',
+									'items'       => array(
+										'type'   => 'string',
 										'format' => 'uri',
 									),
 								),
 								'aspect_ratio' => array(
-									'type' => 'string',
+									'type'        => 'string',
 									'description' => 'Aspect ratio for images: 1:1, 4:5, 3:4, or 1.91:1',
-									'enum' => array( '1:1', '4:5', '3:4', '1.91:1' ),
-									'default' => '4:5',
+									'enum'        => array( '1:1', '4:5', '3:4', '1.91:1' ),
+									'default'     => '4:5',
 								),
 							),
-							'required' => array( 'content' ),
+							'required'   => array( 'content' ),
 						),
 					);
 				}
@@ -91,17 +92,17 @@ class Instagram extends PublishHandler {
 	 * @return InstagramAuth|null Auth provider instance or null if unavailable
 	 */
 	private function get_auth() {
-		if ( $this->auth === null ) {
+		if ( null === $this->auth ) {
 			$auth_abilities = new \DataMachine\Abilities\AuthAbilities();
-			$this->auth = $auth_abilities->getProvider( 'instagram' );
+			$this->auth     = $auth_abilities->getProvider( 'instagram' );
 
-			if ( $this->auth === null ) {
+			if ( null === $this->auth ) {
 				$this->log(
 					'error',
 					'Instagram Handler: Authentication service not available',
 					array(
-						'handler' => 'instagram',
-						'missing_service' => 'instagram',
+						'handler'             => 'instagram',
+						'missing_service'     => 'instagram',
 						'available_providers' => array_keys( $auth_abilities->getAllProviders() ),
 					)
 				);
@@ -117,8 +118,8 @@ class Instagram extends PublishHandler {
 		}
 
 		// Get image URL from engine data
-		$file_storage = new \DataMachine\Core\FilesRepository\FileStorage();
-		$image_url = '';
+		$file_storage    = new \DataMachine\Core\FilesRepository\FileStorage();
+		$image_url       = '';
 		$image_file_path = $engine->getImagePath();
 		if ( ! empty( $image_file_path ) ) {
 			$image_url = $file_storage->get_public_url( $image_file_path );
@@ -139,7 +140,7 @@ class Instagram extends PublishHandler {
 		$aspect_ratio = $parameters['aspect_ratio'] ?? $handler_config['default_aspect_ratio'] ?? '4:5';
 
 		// Get content based on caption source setting
-		$content = '';
+		$content        = '';
 		$caption_source = $handler_config['caption_source'] ?? 'content';
 
 		switch ( $caption_source ) {
@@ -157,19 +158,19 @@ class Instagram extends PublishHandler {
 
 		$result = InstagramPublishAbility::execute_publish(
 			array(
-				'content' => $content,
-				'image_urls' => $image_urls,
+				'content'      => $content,
+				'image_urls'   => $image_urls,
 				'aspect_ratio' => $aspect_ratio,
-				'source_url' => $engine->getSourceUrl(),
+				'source_url'   => $engine->getSourceUrl(),
 			)
 		);
 
 		if ( $result['success'] ) {
 			return $this->successResponse(
 				array(
-					'media_id' => $result['media_id'] ?? '',
-					'permalink' => $result['permalink'] ?? '',
-					'content' => $content,
+					'media_id'    => $result['media_id'] ?? '',
+					'permalink'   => $result['permalink'] ?? '',
+					'content'     => $content,
 					'image_count' => count( $image_urls ),
 				)
 			);

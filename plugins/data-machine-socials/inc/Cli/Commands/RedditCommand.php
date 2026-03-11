@@ -89,15 +89,15 @@ class RedditCommand {
 		$data   = $result['data'] ?? array();
 
 		$info = array(
-			'name'               => $data['display_name'] ?? $subreddit,
-			'title'              => $data['title'] ?? '',
-			'description'        => $data['public_description'] ?? '',
-			'subscribers'        => $data['subscribers'] ?? 0,
-			'active_users'       => $data['accounts_active'] ?? 0,
-			'created'            => ! empty( $data['created_utc'] ) ? wp_date( 'Y-m-d', intval( $data['created_utc'] ) ) : 'unknown',
-			'over_18'            => ! empty( $data['over18'] ) ? 'yes' : 'no',
-			'subreddit_type'     => $data['subreddit_type'] ?? 'unknown',
-			'url'                => 'https://www.reddit.com/r/' . ( $data['display_name'] ?? $subreddit ),
+			'name'           => $data['display_name'] ?? $subreddit,
+			'title'          => $data['title'] ?? '',
+			'description'    => $data['public_description'] ?? '',
+			'subscribers'    => $data['subscribers'] ?? 0,
+			'active_users'   => $data['accounts_active'] ?? 0,
+			'created'        => ! empty( $data['created_utc'] ) ? wp_date( 'Y-m-d', intval( $data['created_utc'] ) ) : 'unknown',
+			'over_18'        => ! empty( $data['over18'] ) ? 'yes' : 'no',
+			'subreddit_type' => $data['subreddit_type'] ?? 'unknown',
+			'url'            => 'https://www.reddit.com/r/' . ( $data['display_name'] ?? $subreddit ),
 		);
 
 		if ( 'json' === $format ) {
@@ -341,7 +341,7 @@ class RedditCommand {
 		$scores = array_column( $rows, 'score' );
 		sort( $scores );
 		$count  = count( $scores );
-		$median = $count % 2 === 0
+		$median = 0 === $count % 2
 			? ( $scores[ $count / 2 - 1 ] + $scores[ $count / 2 ] ) / 2
 			: $scores[ intval( $count / 2 ) ];
 
@@ -598,6 +598,8 @@ class RedditCommand {
 	 *     wp datamachine-socials reddit status
 	 */
 	public function status( $args, $assoc_args ) {
+		$args;
+		$assoc_args;
 		$auth_abilities = new AuthAbilities();
 		$provider       = $auth_abilities->getProvider( 'reddit' );
 

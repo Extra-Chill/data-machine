@@ -75,8 +75,15 @@ class ReadPinterest extends BaseTool {
 				'Pinterest auth provider not available',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'pinterest', 'status' => 'not_registered' ),
-				array( 'action' => 'configure_pinterest_auth', 'message' => 'Configure Pinterest access token in Data Machine Settings > Auth.', 'tool_hint' => 'authenticate_handler' )
+				array(
+					'provider' => 'pinterest',
+					'status'   => 'not_registered',
+				),
+				array(
+					'action'    => 'configure_pinterest_auth',
+					'message'   => 'Configure Pinterest access token in Data Machine Settings > Auth.',
+					'tool_hint' => 'authenticate_handler',
+				)
 			);
 		}
 
@@ -85,8 +92,15 @@ class ReadPinterest extends BaseTool {
 				'Pinterest is not authenticated',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'pinterest', 'status' => 'not_authenticated' ),
-				array( 'action' => 'authenticate_pinterest', 'message' => 'Set Pinterest access token in Data Machine Settings > Auth > Pinterest.', 'tool_hint' => 'authenticate_handler' )
+				array(
+					'provider' => 'pinterest',
+					'status'   => 'not_authenticated',
+				),
+				array(
+					'action'    => 'authenticate_pinterest',
+					'message'   => 'Set Pinterest access token in Data Machine Settings > Auth > Pinterest.',
+					'tool_hint' => 'authenticate_handler',
+				)
 			);
 		}
 

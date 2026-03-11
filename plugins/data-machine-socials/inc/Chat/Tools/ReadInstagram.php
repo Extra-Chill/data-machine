@@ -84,7 +84,10 @@ class ReadInstagram extends BaseTool {
 				'Instagram auth provider not available',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'instagram', 'status' => 'not_registered' ),
+				array(
+					'provider' => 'instagram',
+					'status'   => 'not_registered',
+				),
 				array(
 					'action'    => 'configure_instagram_auth',
 					'message'   => 'Instagram OAuth needs to be configured in Data Machine Settings > Auth.',
@@ -98,7 +101,10 @@ class ReadInstagram extends BaseTool {
 				'Instagram is not authenticated',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'instagram', 'status' => 'not_authenticated' ),
+				array(
+					'provider' => 'instagram',
+					'status'   => 'not_authenticated',
+				),
 				array(
 					'action'    => 'authenticate_instagram',
 					'message'   => 'Instagram OAuth needs to be connected. Go to Data Machine Settings > Auth > Instagram.',

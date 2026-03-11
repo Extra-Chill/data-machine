@@ -59,7 +59,10 @@ class DeleteTwitter extends BaseTool {
 		$result  = $ability->execute( array( 'tweet_id' => $parameters['tweet_id'] ) );
 
 		if ( $result['success'] ) {
-			return array( 'result' => 'Tweet deleted!', 'tweet_id' => $parameters['tweet_id'] );
+			return array(
+				'result'   => 'Tweet deleted!',
+				'tweet_id' => $parameters['tweet_id'],
+			);
 		}
 
 		return $this->buildErrorResponse( $result['error'] ?? 'Delete failed', $tool_name );

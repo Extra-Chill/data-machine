@@ -35,16 +35,16 @@ class BlueskyAuth extends BaseAuthProvider {
 
 	public function get_config_fields(): array {
 		return array(
-			'username' => array(
-				'label' => __( 'Bluesky Handle', 'data-machine-socials' ),
-				'type' => 'text',
-				'required' => true,
+			'username'     => array(
+				'label'       => __( 'Bluesky Handle', 'data-machine-socials' ),
+				'type'        => 'text',
+				'required'    => true,
 				'description' => __( 'Your Bluesky handle (e.g., user.bsky.social)', 'data-machine-socials' ),
 			),
 			'app_password' => array(
-				'label' => __( 'App Password', 'data-machine-socials' ),
-				'type' => 'password',
-				'required' => true,
+				'label'       => __( 'App Password', 'data-machine-socials' ),
+				'type'        => 'password',
+				'required'    => true,
 				'description' => __( 'Generate an app password at bsky.app/settings/app-passwords', 'data-machine-socials' ),
 			),
 		);
@@ -54,8 +54,8 @@ class BlueskyAuth extends BaseAuthProvider {
 	* Gets authenticated Bluesky session with access token and DID.
 	*/
 	public function get_session() {
-		$config = $this->get_config();
-		$handle = $config['username'] ?? '';
+		$config   = $this->get_config();
+		$handle   = $config['username'] ?? '';
 		$password = $config['app_password'] ?? '';
 
 		if ( empty( $handle ) || empty( $password ) ) {
@@ -73,7 +73,7 @@ class BlueskyAuth extends BaseAuthProvider {
 				'error',
 				'Bluesky authentication failed.',
 				array(
-					'error_code' => $session_data->get_error_code(),
+					'error_code'    => $session_data->get_error_code(),
 					'error_message' => $session_data->get_error_message(),
 				)
 			);
@@ -81,8 +81,8 @@ class BlueskyAuth extends BaseAuthProvider {
 		}
 
 		$access_token = $session_data['accessJwt'] ?? null;
-		$did = $session_data['did'] ?? null;
-		$pds_url = $session_data['pds_url'] ?? null;
+		$did          = $session_data['did'] ?? null;
+		$pds_url      = $session_data['pds_url'] ?? null;
 
 		if ( empty( $access_token ) || empty( $did ) || empty( $pds_url ) ) {
 			do_action(
@@ -90,8 +90,8 @@ class BlueskyAuth extends BaseAuthProvider {
 				'error',
 				'Bluesky session data incomplete after authentication.',
 				array(
-					'has_token' => ! empty( $access_token ),
-					'has_did' => ! empty( $did ),
+					'has_token'   => ! empty( $access_token ),
+					'has_did'     => ! empty( $did ),
 					'has_pds_url' => ! empty( $pds_url ),
 				)
 			);
@@ -112,7 +112,7 @@ class BlueskyAuth extends BaseAuthProvider {
 		$body = wp_json_encode(
 			array(
 				'identifier' => $handle,
-				'password' => $password,
+				'password'   => $password,
 			)
 		);
 
@@ -127,7 +127,7 @@ class BlueskyAuth extends BaseAuthProvider {
 				'headers' => array(
 					'Content-Type' => 'application/json',
 				),
-				'body' => $body,
+				'body'    => $body,
 				'context' => 'Bluesky Authentication',
 			)
 		);
@@ -139,7 +139,7 @@ class BlueskyAuth extends BaseAuthProvider {
 				'Bluesky session request failed.',
 				array(
 					'handle' => $handle,
-					'error' => $result['error'],
+					'error'  => $result['error'],
 				)
 			);
 			return new \WP_Error(
@@ -156,8 +156,8 @@ class BlueskyAuth extends BaseAuthProvider {
 			'debug',
 			'Bluesky session response received.',
 			array(
-				'handle' => $handle,
-				'code' => $response_code,
+				'handle'       => $handle,
+				'code'         => $response_code,
 				'body_snippet' => substr( $response_body, 0, 200 ),
 			)
 		);
@@ -169,7 +169,7 @@ class BlueskyAuth extends BaseAuthProvider {
 				'error',
 				'Failed to decode Bluesky session response JSON.',
 				array(
-					'handle' => $handle,
+					'handle'     => $handle,
 					'json_error' => json_last_error_msg(),
 				)
 			);
@@ -183,8 +183,8 @@ class BlueskyAuth extends BaseAuthProvider {
 					'error',
 					'Bluesky authentication failed with no error message provided.',
 					array(
-						'handle' => $handle,
-						'code' => $response_code,
+						'handle'        => $handle,
+						'code'          => $response_code,
 						'response_data' => $session_data,
 					)
 				);
@@ -201,8 +201,8 @@ class BlueskyAuth extends BaseAuthProvider {
 				'error',
 				'Bluesky authentication failed (non-200 response).',
 				array(
-					'handle' => $handle,
-					'code' => $response_code,
+					'handle'           => $handle,
+					'code'             => $response_code,
 					'response_message' => $error_message,
 				)
 			);
@@ -226,7 +226,7 @@ class BlueskyAuth extends BaseAuthProvider {
 				'debug',
 				'Using PDS URL from session response.',
 				array(
-					'handle' => $handle,
+					'handle'  => $handle,
 					'pds_url' => $session_data['pds_url'],
 				)
 			);
@@ -239,7 +239,7 @@ class BlueskyAuth extends BaseAuthProvider {
 				'debug',
 				'Using default Bluesky PDS URL (pdsUrl not in response).',
 				array(
-					'handle' => $handle,
+					'handle'  => $handle,
 					'pds_url' => $session_data['pds_url'],
 				)
 			);
@@ -249,8 +249,8 @@ class BlueskyAuth extends BaseAuthProvider {
 	}
 
 	public function get_account_details(): ?array {
-		$config = $this->get_config();
-		$handle = $config['username'] ?? '';
+		$config   = $this->get_config();
+		$handle   = $config['username'] ?? '';
 		$password = $config['app_password'] ?? '';
 
 		if ( empty( $handle ) || empty( $password ) ) {
@@ -258,8 +258,8 @@ class BlueskyAuth extends BaseAuthProvider {
 		}
 
 		return array(
-			'handle' => $handle,
-			'configured' => true,
+			'handle'           => $handle,
+			'configured'       => true,
 			'last_verified_at' => time(), // Config doesn't have last_verified, so we just say now/configured
 		);
 	}

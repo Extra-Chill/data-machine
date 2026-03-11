@@ -56,8 +56,14 @@ class UpdateBluesky extends BaseTool {
 				'Bluesky auth provider not available',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'bluesky', 'status' => 'not_registered' ),
-				array( 'action' => 'configure_bluesky_auth', 'message' => 'Bluesky app password needs to be configured.' )
+				array(
+					'provider' => 'bluesky',
+					'status'   => 'not_registered',
+				),
+				array(
+					'action'  => 'configure_bluesky_auth',
+					'message' => 'Bluesky app password needs to be configured.',
+				)
 			);
 		}
 
@@ -66,8 +72,14 @@ class UpdateBluesky extends BaseTool {
 				'Bluesky is not authenticated',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'bluesky', 'status' => 'not_authenticated' ),
-				array( 'action' => 'authenticate_bluesky', 'message' => 'Bluesky app password needs to be connected.' )
+				array(
+					'provider' => 'bluesky',
+					'status'   => 'not_authenticated',
+				),
+				array(
+					'action'  => 'authenticate_bluesky',
+					'message' => 'Bluesky app password needs to be connected.',
+				)
 			);
 		}
 

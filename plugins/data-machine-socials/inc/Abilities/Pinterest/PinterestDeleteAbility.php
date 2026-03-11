@@ -51,7 +51,7 @@ class PinterestDeleteAbility {
 								'description' => __( 'Pinterest pin ID to delete', 'data-machine-socials' ),
 							),
 						),
-						'required' => array( 'pin_id' ),
+						'required'   => array( 'pin_id' ),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
@@ -126,7 +126,7 @@ class PinterestDeleteAbility {
 
 		$status_code = wp_remote_retrieve_response_code( $response );
 
-		if ( $status_code === 204 || $status_code === 200 ) {
+		if ( 204 === $status_code || 200 === $status_code ) {
 			return array(
 				'success' => true,
 				'data'    => array(
@@ -148,7 +148,7 @@ class PinterestDeleteAbility {
 			return null;
 		}
 
-		$auth = new \DataMachine\Abilities\AuthAbilities();
+		$auth     = new \DataMachine\Abilities\AuthAbilities();
 		$provider = $auth->getProvider( 'pinterest' );
 
 		if ( ! $provider instanceof PinterestAuth ) {

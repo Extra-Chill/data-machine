@@ -61,7 +61,7 @@ class FacebookUpdateAbility {
 								'description' => __( 'New post message (for edit action)', 'data-machine-socials' ),
 							),
 						),
-						'required' => array( 'action', 'post_id' ),
+						'required'   => array( 'action', 'post_id' ),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
@@ -166,7 +166,7 @@ class FacebookUpdateAbility {
 			return null;
 		}
 
-		$auth = new \DataMachine\Abilities\AuthAbilities();
+		$auth     = new \DataMachine\Abilities\AuthAbilities();
 		$provider = $auth->getProvider( 'facebook' );
 
 		if ( ! $provider instanceof FacebookAuth ) {
@@ -208,7 +208,7 @@ class FacebookUpdateAbility {
 		$status_code = wp_remote_retrieve_response_code( $response );
 		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
 
-		if ( $status_code !== 200 ) {
+		if ( 200 !== $status_code ) {
 			return array(
 				'success' => false,
 				'error'   => $body['error']['message'] ?? 'Failed to edit post',
@@ -218,8 +218,8 @@ class FacebookUpdateAbility {
 		return array(
 			'success' => true,
 			'data'    => array(
-				'post_id'  => $body['id'] ?? $post_id,
-				'message'  => $message,
+				'post_id' => $body['id'] ?? $post_id,
+				'message' => $message,
 			),
 		);
 	}
@@ -256,7 +256,7 @@ class FacebookUpdateAbility {
 		$status_code = wp_remote_retrieve_response_code( $response );
 		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
 
-		if ( $status_code !== 200 ) {
+		if ( 200 !== $status_code ) {
 			return array(
 				'success' => false,
 				'error'   => $body['error']['message'] ?? 'Failed to update post visibility',
@@ -303,12 +303,12 @@ class FacebookUpdateAbility {
 		$status_code = wp_remote_retrieve_response_code( $response );
 		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
 
-		if ( $status_code === 200 || ( isset( $body['success'] ) && $body['success'] ) ) {
+		if ( 200 === $status_code || ( isset( $body['success'] ) && $body['success'] ) ) {
 			return array(
 				'success' => true,
 				'data'    => array(
-					'post_id'  => $post_id,
-					'deleted'  => true,
+					'post_id' => $post_id,
+					'deleted' => true,
 				),
 			);
 		}

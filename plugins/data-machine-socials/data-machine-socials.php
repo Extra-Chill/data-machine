@@ -103,8 +103,8 @@ function datamachine_socials_bootstrap() {
 	// Register image generation templates
 	add_filter( 'datamachine/image_generation/templates', function ( array $templates ): array {
 		$templates['quote_card'] = \DataMachineSocials\ImageGeneration\Templates\QuoteCard::class;
-		$templates['chart']     = \DataMachineSocials\ImageGeneration\Templates\ChartTemplate::class;
-		$templates['diagram']   = \DataMachineSocials\ImageGeneration\Templates\DiagramTemplate::class;
+		$templates['chart']      = \DataMachineSocials\ImageGeneration\Templates\ChartTemplate::class;
+		$templates['diagram']    = \DataMachineSocials\ImageGeneration\Templates\DiagramTemplate::class;
 		return $templates;
 	} );
 
@@ -150,15 +150,15 @@ function datamachine_socials_enqueue_assets( $hook ) {
 	);
 
 	// Pass data to JavaScript
-	$post_id = get_the_ID();
+	$post_id        = get_the_ID();
 	$featured_image = wp_get_attachment_image_src( get_post_thumbnail_id( $post_id ), 'full' );
 
 	wp_localize_script(
 		'data-machine-socials-editor',
 		'dmsData',
 		array(
-			'postId'      => $post_id,
-			'restNonce'   => wp_create_nonce( 'wp_rest' ),
+			'postId'        => $post_id,
+			'restNonce'     => wp_create_nonce( 'wp_rest' ),
 			'featuredImage' => $featured_image ? array(
 				'id'     => get_post_thumbnail_id( $post_id ),
 				'url'    => $featured_image[0],

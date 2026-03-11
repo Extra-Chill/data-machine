@@ -47,7 +47,7 @@ class ThreadsUpdateAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'action'   => array(
+							'action'    => array(
 								'type'        => 'string',
 								'enum'        => array( 'delete' ),
 								'description' => __( 'Action: delete (remove post)', 'data-machine-socials' ),
@@ -57,7 +57,7 @@ class ThreadsUpdateAbility {
 								'description' => __( 'Threads thread ID', 'data-machine-socials' ),
 							),
 						),
-						'required' => array( 'action', 'thread_id' ),
+						'required'   => array( 'action', 'thread_id' ),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
@@ -130,7 +130,7 @@ class ThreadsUpdateAbility {
 			return null;
 		}
 
-		$auth = new \DataMachine\Abilities\AuthAbilities();
+		$auth     = new \DataMachine\Abilities\AuthAbilities();
 		$provider = $auth->getProvider( 'threads' );
 
 		if ( ! $provider instanceof ThreadsAuth ) {
@@ -163,7 +163,7 @@ class ThreadsUpdateAbility {
 		$status_code = wp_remote_retrieve_response_code( $response );
 		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
 
-		if ( $status_code === 200 || $status_code === 204 ) {
+		if ( 200 === $status_code || 204 === $status_code ) {
 			return array(
 				'success' => true,
 				'data'    => array(

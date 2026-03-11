@@ -67,8 +67,15 @@ class ReadBluesky extends BaseTool {
 				'Bluesky auth provider not available',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'bluesky', 'status' => 'not_registered' ),
-				array( 'action' => 'configure_bluesky_auth', 'message' => 'Configure Bluesky app password in Data Machine Settings > Auth.', 'tool_hint' => 'authenticate_handler' )
+				array(
+					'provider' => 'bluesky',
+					'status'   => 'not_registered',
+				),
+				array(
+					'action'    => 'configure_bluesky_auth',
+					'message'   => 'Configure Bluesky app password in Data Machine Settings > Auth.',
+					'tool_hint' => 'authenticate_handler',
+				)
 			);
 		}
 
@@ -77,8 +84,15 @@ class ReadBluesky extends BaseTool {
 				'Bluesky is not authenticated',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'bluesky', 'status' => 'not_authenticated' ),
-				array( 'action' => 'authenticate_bluesky', 'message' => 'Configure Bluesky handle and app password in Data Machine Settings > Auth.', 'tool_hint' => 'authenticate_handler' )
+				array(
+					'provider' => 'bluesky',
+					'status'   => 'not_authenticated',
+				),
+				array(
+					'action'    => 'authenticate_bluesky',
+					'message'   => 'Configure Bluesky handle and app password in Data Machine Settings > Auth.',
+					'tool_hint' => 'authenticate_handler',
+				)
 			);
 		}
 

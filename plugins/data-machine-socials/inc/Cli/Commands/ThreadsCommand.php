@@ -224,6 +224,8 @@ class ThreadsCommand {
 	 *     wp datamachine-socials threads status
 	 */
 	public function status( $args, $assoc_args ) {
+		$args;
+		$assoc_args;
 		$auth_abilities = new AuthAbilities();
 		$provider       = $auth_abilities->getProvider( 'threads' );
 
@@ -316,6 +318,7 @@ class ThreadsCommand {
 	 *     wp datamachine-socials threads delete 1234567890
 	 */
 	public function delete( $args, $assoc_args ) {
+		$assoc_args;
 		$thread_id = $args[0];
 		$ability   = $this->get_delete_ability();
 

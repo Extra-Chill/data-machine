@@ -36,21 +36,22 @@ class Bluesky extends PublishHandler {
 			BlueskyAuth::class,
 			null,
 			function ( $tools, $handler_slug, $handler_config ) {
+				$handler_config;
 				if ( 'bluesky_publish' === $handler_slug ) {
 					$tools['bluesky_publish'] = array(
-						'class' => self::class,
-						'method' => 'handle_tool_call',
-						'handler' => 'bluesky_publish',
+						'class'       => self::class,
+						'method'      => 'handle_tool_call',
+						'handler'     => 'bluesky_publish',
 						'description' => 'Post content to Bluesky. Supports text and images.',
-						'parameters' => array(
-							'type' => 'object',
+						'parameters'  => array(
+							'type'       => 'object',
 							'properties' => array(
 								'content' => array(
-									'type' => 'string',
+									'type'        => 'string',
 									'description' => 'The text content to post to Bluesky',
 								),
 							),
-							'required' => array( 'content' ),
+							'required'   => array( 'content' ),
 						),
 					);
 				}
@@ -66,17 +67,17 @@ class Bluesky extends PublishHandler {
 	* @return BlueskyAuth|null Auth provider instance or null if unavailable
 	*/
 	private function get_auth() {
-		if ( $this->auth === null ) {
+		if ( null === $this->auth ) {
 			$auth_abilities = new AuthAbilities();
-			$this->auth = $auth_abilities->getProvider( 'bluesky' );
+			$this->auth     = $auth_abilities->getProvider( 'bluesky' );
 
-			if ( $this->auth === null ) {
+			if ( null === $this->auth ) {
 				$this->log(
 					'error',
 					'Bluesky Handler: Authentication service not available',
 					array(
-						'handler' => 'bluesky',
-						'missing_service' => 'bluesky',
+						'handler'             => 'bluesky',
+						'missing_service'     => 'bluesky',
 						'available_providers' => array_keys( $auth_abilities->getAllProviders() ),
 					)
 				);
@@ -85,52 +86,52 @@ class Bluesky extends PublishHandler {
 		return $this->auth;
 	}
 
-protected function executePublish( array $parameters, array $handler_config ): array {
-$engine = $parameters['engine'] ?? null;
-if ( ! $engine instanceof EngineData ) {
-$engine = new EngineData( $parameters['engine_data'] ?? array(), $parameters['job_id'] ?? null );
-}
+	protected function executePublish( array $parameters, array $handler_config ): array {
+		$engine = $parameters['engine'] ?? null;
+		if ( ! $engine instanceof EngineData ) {
+			$engine = new EngineData( $parameters['engine_data'] ?? array(), $parameters['job_id'] ?? null );
+		}
 
-$file_storage = new \DataMachine\Core\FilesRepository\FileStorage();
-$image_url = '';
-$image_file_path = $engine->getImagePath();
-if ( ! empty( $image_file_path ) ) {
-$image_url = $file_storage->get_public_url( $image_file_path );
-}
+		$file_storage    = new \DataMachine\Core\FilesRepository\FileStorage();
+		$image_url       = '';
+		$image_file_path = $engine->getImagePath();
+		if ( ! empty( $image_file_path ) ) {
+			$image_url = $file_storage->get_public_url( $image_file_path );
+		}
 
-$result = BlueskyPublishAbility::execute_publish(
-array(
-'title' => $parameters['title'] ?? '',
-'content' => $parameters['content'] ?? '',
-'image_url' => $image_url,
-'source_url' => $engine->getSourceUrl(),
-)
-);
+		$result = BlueskyPublishAbility::execute_publish(
+		array(
+			'title'      => $parameters['title'] ?? '',
+			'content'    => $parameters['content'] ?? '',
+			'image_url'  => $image_url,
+			'source_url' => $engine->getSourceUrl(),
+		)
+		);
 
-if ( $result['success'] ) {
-return $this->successResponse(
-array(
-'post_uri' => $result['post_id'] ?? '',
-'post_url' => $result['post_url'] ?? '',
-'content' => $parameters['content'] ?? '',
-)
-);
-}
+		if ( $result['success'] ) {
+			return $this->successResponse(
+			array(
+				'post_uri' => $result['post_id'] ?? '',
+				'post_url' => $result['post_url'] ?? '',
+				'content'  => $parameters['content'] ?? '',
+			)
+			);
+		}
 
-return $this->errorResponse(
-$result['error'] ?? 'Bluesky publish failed',
-array(),
-'critical'
-);
-}
+		return $this->errorResponse(
+		$result['error'] ?? 'Bluesky publish failed',
+		array(),
+		'critical'
+		);
+	}
 
 
-/**
-* Returns the user-friendly label for this publish handler.
-*
-* @return string The label.
+	/**
+	Returns the user-friendly label for this publish handler.
+
+	@return string The label.
 */
-public static function get_label(): string {
-return __( 'Post to Bluesky', 'data-machine-socials' );
-}
+	public static function get_label(): string {
+		return __( 'Post to Bluesky', 'data-machine-socials' );
+	}
 }

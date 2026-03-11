@@ -59,7 +59,10 @@ class DeleteThreads extends BaseTool {
 		$result  = $ability->execute( array( 'thread_id' => $parameters['thread_id'] ) );
 
 		if ( $result['success'] ) {
-			return array( 'result' => 'Thread deleted!', 'thread_id' => $parameters['thread_id'] );
+			return array(
+				'result'    => 'Thread deleted!',
+				'thread_id' => $parameters['thread_id'],
+			);
 		}
 
 		return $this->buildErrorResponse( $result['error'] ?? 'Delete failed', $tool_name );

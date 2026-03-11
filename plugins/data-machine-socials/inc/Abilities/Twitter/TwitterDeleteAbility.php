@@ -49,7 +49,7 @@ class TwitterDeleteAbility {
 								'description' => __( 'Tweet ID to delete', 'data-machine-socials' ),
 							),
 						),
-						'required' => array( 'tweet_id' ),
+						'required'   => array( 'tweet_id' ),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
@@ -106,7 +106,7 @@ class TwitterDeleteAbility {
 
 		$http_code = $connection->getLastHttpCode();
 
-		if ( $http_code === 200 ) {
+		if ( 200 === $http_code ) {
 			return array(
 				'success' => true,
 				'data'    => array(
@@ -128,7 +128,7 @@ class TwitterDeleteAbility {
 			return null;
 		}
 
-		$auth = new \DataMachine\Abilities\AuthAbilities();
+		$auth     = new \DataMachine\Abilities\AuthAbilities();
 		$provider = $auth->getProvider( 'twitter' );
 
 		if ( ! $provider instanceof TwitterAuth ) {

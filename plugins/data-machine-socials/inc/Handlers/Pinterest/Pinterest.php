@@ -54,12 +54,12 @@ class Pinterest extends PublishHandler {
 				if ( 'pinterest_publish' === $handler_slug ) {
 					$board_id_description = 'Pinterest board ID override (uses default if omitted)';
 
-		// Inject cached board names when AI decides mode is active.
-		$mode = $handler_config['board_selection_mode'] ?? 'pre_selected';
-		if ( 'ai_decides' === $mode ) {
-			$cached_boards = PinterestBoardsAbility::get_cached_boards();
+					// Inject cached board names when AI decides mode is active.
+					$mode = $handler_config['board_selection_mode'] ?? 'pre_selected';
+					if ( 'ai_decides' === $mode ) {
+						$cached_boards = PinterestBoardsAbility::get_cached_boards();
 						if ( ! empty( $cached_boards ) ) {
-							$board_list = implode( ', ', array_map( function ( $b ) {
+							$board_list           = implode( ', ', array_map( function ( $b ) {
 								return $b['name'] . ' (' . $b['id'] . ')';
 							}, $cached_boards ) );
 							$board_id_description = "Pinterest board ID. Available boards: {$board_list}";
@@ -67,27 +67,27 @@ class Pinterest extends PublishHandler {
 					}
 
 					$tools['pinterest_publish'] = array(
-						'class' => self::class,
-						'method' => 'handle_tool_call',
-						'handler' => 'pinterest_publish',
+						'class'       => self::class,
+						'method'      => 'handle_tool_call',
+						'handler'     => 'pinterest_publish',
 						'description' => 'Pin content to Pinterest with image, title, description, and link.',
-						'parameters' => array(
-							'type' => 'object',
+						'parameters'  => array(
+							'type'       => 'object',
 							'properties' => array(
-								'title' => array(
-									'type' => 'string',
+								'title'       => array(
+									'type'        => 'string',
 									'description' => 'Pin title (max 100 characters)',
 								),
 								'description' => array(
-									'type' => 'string',
+									'type'        => 'string',
 									'description' => 'Pin description (max 500 characters)',
 								),
-								'board_id' => array(
-									'type' => 'string',
+								'board_id'    => array(
+									'type'        => 'string',
 									'description' => $board_id_description,
 								),
 							),
-							'required' => array( 'title', 'description' ),
+							'required'   => array( 'title', 'description' ),
 						),
 					);
 				}
@@ -103,16 +103,16 @@ class Pinterest extends PublishHandler {
 	* @return PinterestAuth|null Auth provider instance or null if unavailable.
 	*/
 	private function get_auth() {
-		if ( $this->auth === null ) {
+		if ( null === $this->auth ) {
 			$auth_abilities = new AuthAbilities();
-			$this->auth = $auth_abilities->getProvider( 'pinterest' );
+			$this->auth     = $auth_abilities->getProvider( 'pinterest' );
 
-			if ( $this->auth === null ) {
+			if ( null === $this->auth ) {
 				$this->log(
 					'error',
 					'Pinterest Handler: Authentication service not available',
 					array(
-						'handler' => 'pinterest',
+						'handler'             => 'pinterest',
 						'available_providers' => array_keys( $auth_abilities->getAllProviders() ),
 					)
 				);
@@ -134,7 +134,7 @@ class Pinterest extends PublishHandler {
 	* }
 	*/
 	protected function executePublish( array $parameters, array $handler_config ): array {
-		$title = $parameters['title'] ?? '';
+		$title       = $parameters['title'] ?? '';
 		$description = $parameters['description'] ?? '';
 
 		$engine = $parameters['engine'] ?? null;
@@ -143,7 +143,7 @@ class Pinterest extends PublishHandler {
 		}
 
 		$source_url = $engine->getSourceUrl();
-		$image_url = $this->resolve_image_url( $engine );
+		$image_url  = $this->resolve_image_url( $engine );
 
 		if ( empty( $image_url ) ) {
 			return $this->errorResponse(
@@ -173,13 +173,13 @@ class Pinterest extends PublishHandler {
 		}
 
 		$payload = array(
-			'board_id' => $board_id,
-			'title' => substr( $title, 0, 100 ),
-			'description' => substr( $description, 0, 500 ),
-			'link' => $source_url,
+			'board_id'     => $board_id,
+			'title'        => substr( $title, 0, 100 ),
+			'description'  => substr( $description, 0, 500 ),
+			'link'         => $source_url,
 			'media_source' => array(
 				'source_type' => 'image_url',
-				'url' => $image_url,
+				'url'         => $image_url,
 			),
 		);
 
@@ -187,10 +187,10 @@ class Pinterest extends PublishHandler {
 			'info',
 			'Pinterest: Creating pin',
 			array(
-				'board_id' => $board_id,
-				'title' => $payload['title'],
+				'board_id'   => $board_id,
+				'title'      => $payload['title'],
 				'source_url' => $source_url,
-				'image_url' => $image_url,
+				'image_url'  => $image_url,
 			)
 		);
 
@@ -200,9 +200,9 @@ class Pinterest extends PublishHandler {
 				array(
 					'headers' => array(
 						'Authorization' => 'Bearer ' . $token,
-						'Content-Type' => 'application/json',
+						'Content-Type'  => 'application/json',
 					),
-					'body' => wp_json_encode( $payload ),
+					'body'    => wp_json_encode( $payload ),
 					'context' => 'Pinterest Pin Creation',
 				)
 			);
@@ -214,7 +214,7 @@ class Pinterest extends PublishHandler {
 				);
 			}
 
-			$status_code = $result['status_code'] ?? 0;
+			$status_code   = $result['status_code'] ?? 0;
 			$response_data = json_decode( $result['data'] ?? '', true );
 
 			if ( 201 === $status_code && ! empty( $response_data['id'] ) ) {
@@ -224,14 +224,14 @@ class Pinterest extends PublishHandler {
 					'info',
 					'Pinterest: Pin created successfully',
 					array(
-						'pin_id' => $pin_id,
+						'pin_id'   => $pin_id,
 						'board_id' => $board_id,
 					)
 				);
 
 				return $this->successResponse(
 					array(
-						'pin_id' => $pin_id,
+						'pin_id'  => $pin_id,
 						'pin_url' => 'https://www.pinterest.com/pin/' . $pin_id . '/',
 					)
 				);
@@ -245,7 +245,7 @@ class Pinterest extends PublishHandler {
 			return $this->errorResponse(
 				$error_msg,
 				array(
-					'http_code' => $status_code,
+					'http_code'    => $status_code,
 					'api_response' => $result['data'] ?? '',
 				)
 			);

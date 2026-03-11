@@ -209,6 +209,8 @@ class BlueskyCommand {
 	 *     wp datamachine-socials bluesky status
 	 */
 	public function status( $args, $assoc_args ) {
+		$args;
+		$assoc_args;
 		$auth_abilities = new AuthAbilities();
 		$provider       = $auth_abilities->getProvider( 'bluesky' );
 
@@ -353,6 +355,7 @@ class BlueskyCommand {
 	 *     wp datamachine-socials bluesky delete "at://did:plc:xxx/app.bsky.feed.post/abc123"
 	 */
 	public function delete( $args, $assoc_args ) {
+		$assoc_args;
 		$post_uri = $args[0];
 		$ability  = $this->get_delete_ability();
 
@@ -380,7 +383,7 @@ class BlueskyCommand {
 	 *
 	 *     wp datamachine-socials bluesky like "at://did:plc:xxx/app.bsky.feed.post/abc123"
 	 */
-	public function like( $args, $assoc_args ) {
+	public function like( $args) {
 		$post_uri = $args[0];
 		$ability  = $this->get_update_ability();
 

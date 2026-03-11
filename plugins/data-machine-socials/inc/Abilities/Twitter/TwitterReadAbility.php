@@ -49,17 +49,17 @@ class TwitterReadAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'action'   => array(
+							'action'           => array(
 								'type'        => 'string',
 								'enum'        => array( 'list', 'get', 'mentions' ),
 								'default'     => 'list',
 								'description' => __( 'Action: list (user timeline), get (single tweet), mentions (user mentions)', 'data-machine-socials' ),
 							),
-							'tweet_id' => array(
+							'tweet_id'         => array(
 								'type'        => 'string',
 								'description' => __( 'Tweet ID (required for get action)', 'data-machine-socials' ),
 							),
-							'limit'    => array(
+							'limit'            => array(
 								'type'        => 'integer',
 								'default'     => 25,
 								'description' => __( 'Number of tweets to return (max 100)', 'data-machine-socials' ),
@@ -173,17 +173,18 @@ class TwitterReadAbility {
 		}
 
 		$response = (array) $response;
-		$tweets   = isset( $response['data'] ) ? array_map( function ( $t ) { return (array) $t; }, $response['data'] ) : array();
+		$tweets   = isset( $response['data'] ) ? array_map( function ( $t ) { return (array) $t;
+		}, $response['data'] ) : array();
 		$meta     = isset( $response['meta'] ) ? (array) $response['meta'] : array();
 
 		return array(
 			'success' => true,
 			'data'    => array(
-				'tweets'           => $tweets,
-				'count'            => count( $tweets ),
-				'next_token'       => $meta['next_token'] ?? null,
-				'has_next'         => ! empty( $meta['next_token'] ),
-				'result_count'     => $meta['result_count'] ?? count( $tweets ),
+				'tweets'       => $tweets,
+				'count'        => count( $tweets ),
+				'next_token'   => $meta['next_token'] ?? null,
+				'has_next'     => ! empty( $meta['next_token'] ),
+				'result_count' => $meta['result_count'] ?? count( $tweets ),
 			),
 		);
 	}
@@ -254,7 +255,8 @@ class TwitterReadAbility {
 		}
 
 		$response = (array) $response;
-		$tweets   = isset( $response['data'] ) ? array_map( function ( $t ) { return (array) $t; }, $response['data'] ) : array();
+		$tweets   = isset( $response['data'] ) ? array_map( function ( $t ) { return (array) $t;
+		}, $response['data'] ) : array();
 		$meta     = isset( $response['meta'] ) ? (array) $response['meta'] : array();
 
 		return array(

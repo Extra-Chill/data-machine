@@ -176,9 +176,9 @@ class InstagramCommentReplyAbility {
 		return array(
 			'success' => true,
 			'data'    => array(
-				'reply_id'    => $body['id'] ?? '',
-				'comment_id'  => $comment_id,
-				'message'     => $message,
+				'reply_id'   => $body['id'] ?? '',
+				'comment_id' => $comment_id,
+				'message'    => $message,
 			),
 		);
 	}

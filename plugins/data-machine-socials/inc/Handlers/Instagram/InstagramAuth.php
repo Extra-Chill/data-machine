@@ -20,10 +20,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
-	const AUTH_URL = 'https://www.instagram.com/oauth/authorize';
-	const TOKEN_URL = 'https://api.instagram.com/oauth/access_token';
+	const AUTH_URL      = 'https://www.instagram.com/oauth/authorize';
+	const TOKEN_URL     = 'https://api.instagram.com/oauth/access_token';
 	const GRAPH_API_URL = 'https://graph.instagram.com';
-	const SCOPES = 'instagram_business_basic,instagram_business_content_publish,instagram_business_manage_messages,instagram_business_manage_comments';
+	const SCOPES        = 'instagram_business_basic,instagram_business_content_publish,instagram_business_manage_messages,instagram_business_manage_comments';
 
 	public function __construct() {
 		parent::__construct( 'instagram' );
@@ -36,16 +36,16 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	 */
 	public function get_config_fields(): array {
 		return array(
-			'app_id' => array(
-				'label' => __( 'App ID', 'data-machine-socials' ),
-				'type' => 'text',
-				'required' => true,
+			'app_id'     => array(
+				'label'       => __( 'App ID', 'data-machine-socials' ),
+				'type'        => 'text',
+				'required'    => true,
 				'description' => __( 'Your Instagram application App ID from developers.facebook.com', 'data-machine-socials' ),
 			),
 			'app_secret' => array(
-				'label' => __( 'App Secret', 'data-machine-socials' ),
-				'type' => 'text',
-				'required' => true,
+				'label'       => __( 'App Secret', 'data-machine-socials' ),
+				'type'        => 'text',
+				'required'    => true,
 				'description' => __( 'Your Instagram application App Secret from developers.facebook.com', 'data-machine-socials' ),
 			),
 		);
@@ -139,12 +139,12 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
 		$config = $this->get_config();
 		$params = array(
-			'client_id' => $config['app_id'] ?? '',
-			'redirect_uri' => $this->get_callback_url(),
-			'scope' => self::SCOPES,
-			'response_type' => 'code',
-			'state' => $state,
-			'enable_fb_login' => '0',
+			'client_id'            => $config['app_id'] ?? '',
+			'redirect_uri'         => $this->get_callback_url(),
+			'scope'                => self::SCOPES,
+			'response_type'        => 'code',
+			'state'                => $state,
+			'enable_fb_login'      => '0',
 			'force_authentication' => '1',
 		);
 
@@ -164,11 +164,11 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			'instagram',
 			self::TOKEN_URL,
 			array(
-				'client_id' => $config['app_id'] ?? '',
+				'client_id'     => $config['app_id'] ?? '',
 				'client_secret' => $config['app_secret'] ?? '',
-				'grant_type' => 'authorization_code',
-				'redirect_uri' => $this->get_callback_url(),
-				'code' => $code,
+				'grant_type'    => 'authorization_code',
+				'redirect_uri'  => $this->get_callback_url(),
+				'code'          => $code,
 			),
 			function ( $short_lived_token_data ) use ( $config ) {
 				// Instagram: Exchange short-lived for long-lived token
@@ -198,11 +198,11 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		do_action( 'datamachine_log', 'debug', 'Instagram OAuth: Exchanging short-lived token for long-lived token' );
 
 		$params = array(
-			'grant_type' => 'ig_exchange_token',
+			'grant_type'    => 'ig_exchange_token',
 			'client_secret' => $config['app_secret'] ?? '',
-			'access_token' => $short_lived_token,
+			'access_token'  => $short_lived_token,
 		);
-		$url = self::GRAPH_API_URL . '/access_token?' . http_build_query( $params );
+		$url    = self::GRAPH_API_URL . '/access_token?' . http_build_query( $params );
 
 		$result = HttpClient::get( $url, array( 'context' => 'Instagram OAuth' ) );
 
@@ -211,8 +211,8 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			return new \WP_Error( 'instagram_oauth_exchange_request_failed', __( 'HTTP error during long-lived token exchange with Instagram.', 'data-machine-socials' ), $result['error'] );
 		}
 
-		$body = $result['data'];
-		$data = json_decode( $body, true );
+		$body      = $result['data'];
+		$data      = json_decode( $body, true );
 		$http_code = $result['status_code'];
 
 		if ( 200 !== $http_code || empty( $data['access_token'] ) ) {
@@ -223,15 +223,15 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				'Instagram OAuth Error: Long-lived token exchange failed',
 				array(
 					'http_code' => $http_code,
-					'response' => $body,
+					'response'  => $body,
 				)
 			);
 			return new \WP_Error( 'instagram_oauth_exchange_failed', $error_message, $data );
 		}
 
 		$long_lived_token = $data['access_token'];
-		$expires_in = $data['expires_in'] ?? 3600 * 24 * 60;
-		$expires_at = time() + intval( $expires_in );
+		$expires_in       = $data['expires_in'] ?? 3600 * 24 * 60;
+		$expires_at       = time() + intval( $expires_in );
 
 		// Fetch username
 		$username = $this->get_username_from_token( $long_lived_token, $user_id );
@@ -242,9 +242,9 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		do_action( 'datamachine_log', 'debug', 'Instagram OAuth: Successfully exchanged for long-lived token', array( 'user_id' => $user_id ) );
 
 		return array(
-			'access_token'    => $long_lived_token,
-			'user_id'         => $user_id,
-			'username'        => $username,
+			'access_token'     => $long_lived_token,
+			'user_id'          => $user_id,
+			'username'         => $username,
 			'token_expires_at' => $expires_at,
 		);
 	}
@@ -271,8 +271,8 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			return new \WP_Error( 'instagram_username_fetch_failed', $result['error'] );
 		}
 
-		$body = $result['data'];
-		$data = json_decode( $body, true );
+		$body      = $result['data'];
+		$data      = json_decode( $body, true );
 		$http_code = $result['status_code'];
 
 		if ( 200 !== $http_code || isset( $data['error'] ) ) {
@@ -283,7 +283,7 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				'Instagram OAuth Error: Username fetch failed',
 				array(
 					'http_code' => $http_code,
-					'response' => $body,
+					'response'  => $body,
 				)
 			);
 			return new \WP_Error( 'instagram_username_fetch_failed', $error_message, $data );

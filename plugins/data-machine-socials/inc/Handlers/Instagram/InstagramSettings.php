@@ -23,27 +23,27 @@ class InstagramSettings extends PublishHandlerSettings {
 	public static function get_fields(): array {
 		$fields = array(
 			'default_aspect_ratio' => array(
-				'type' => 'select',
-				'label' => __( 'Default Aspect Ratio', 'data-machine-socials' ),
+				'type'        => 'select',
+				'label'       => __( 'Default Aspect Ratio', 'data-machine-socials' ),
 				'description' => __( 'Default aspect ratio for images when posting to Instagram', 'data-machine-socials' ),
-				'options' => array(
-					'1:1' => __( 'Square (1:1)', 'data-machine-socials' ),
-					'4:5' => __( 'Portrait (4:5)', 'data-machine-socials' ),
-					'3:4' => __( 'Classic Portrait (3:4)', 'data-machine-socials' ),
+				'options'     => array(
+					'1:1'    => __( 'Square (1:1)', 'data-machine-socials' ),
+					'4:5'    => __( 'Portrait (4:5)', 'data-machine-socials' ),
+					'3:4'    => __( 'Classic Portrait (3:4)', 'data-machine-socials' ),
 					'1.91:1' => __( 'Landscape (1.91:1)', 'data-machine-socials' ),
 				),
-				'default' => '4:5',
+				'default'     => '4:5',
 			),
-			'caption_source' => array(
-				'type' => 'select',
-				'label' => __( 'Caption Source', 'data-machine-socials' ),
+			'caption_source'       => array(
+				'type'        => 'select',
+				'label'       => __( 'Caption Source', 'data-machine-socials' ),
 				'description' => __( 'Where to get the caption from', 'data-machine-socials' ),
-				'options' => array(
-					'content' => __( 'Content field', 'data-machine-socials' ),
+				'options'     => array(
+					'content'      => __( 'Content field', 'data-machine-socials' ),
 					'post_excerpt' => __( 'Post excerpt', 'data-machine-socials' ),
-					'post_title' => __( 'Post title', 'data-machine-socials' ),
+					'post_title'   => __( 'Post title', 'data-machine-socials' ),
 				),
-				'default' => 'content',
+				'default'     => 'content',
 			),
 		);
 

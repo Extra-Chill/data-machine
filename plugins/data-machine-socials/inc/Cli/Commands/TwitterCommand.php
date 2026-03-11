@@ -219,6 +219,8 @@ class TwitterCommand {
 	 *     wp datamachine-socials twitter status
 	 */
 	public function status( $args, $assoc_args ) {
+		$args;
+		$assoc_args;
 		$auth_abilities = new AuthAbilities();
 		$provider       = $auth_abilities->getProvider( 'twitter' );
 
@@ -259,6 +261,7 @@ class TwitterCommand {
 	 *     wp datamachine-socials twitter delete 1234567890
 	 */
 	public function delete( $args, $assoc_args ) {
+		$assoc_args;
 		$tweet_id = $args[0];
 		$ability  = $this->get_delete_ability();
 
@@ -287,6 +290,7 @@ class TwitterCommand {
 	 *     wp datamachine-socials twitter retweet 1234567890
 	 */
 	public function retweet( $args, $assoc_args ) {
+		$assoc_args;
 		$tweet_id = $args[0];
 		$ability  = $this->get_update_ability();
 
@@ -314,7 +318,7 @@ class TwitterCommand {
 	 *
 	 *     wp datamachine-socials twitter like 1234567890
 	 */
-	public function like( $args, $assoc_args ) {
+	public function like( $args) {
 		$tweet_id = $args[0];
 		$ability  = $this->get_update_ability();
 

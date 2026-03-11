@@ -67,7 +67,10 @@ class UpdateFacebook extends BaseTool {
 				'Facebook auth provider not available',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'facebook', 'status' => 'not_registered' ),
+				array(
+					'provider' => 'facebook',
+					'status'   => 'not_registered',
+				),
 				array(
 					'action'    => 'configure_facebook_auth',
 					'message'   => 'Facebook OAuth needs to be configured in Data Machine Settings > Auth.',
@@ -81,7 +84,10 @@ class UpdateFacebook extends BaseTool {
 				'Facebook is not authenticated',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'facebook', 'status' => 'not_authenticated' ),
+				array(
+					'provider' => 'facebook',
+					'status'   => 'not_authenticated',
+				),
 				array(
 					'action'    => 'authenticate_facebook',
 					'message'   => 'Facebook OAuth needs to be connected. Go to Data Machine Settings > Auth > Facebook.',
@@ -125,9 +131,9 @@ class UpdateFacebook extends BaseTool {
 			}
 
 			return array(
-				'result'   => $message,
-				'post_id'  => $result['data']['post_id'] ?? $parameters['post_id'],
-				'data'     => $result['data'],
+				'result'  => $message,
+				'post_id' => $result['data']['post_id'] ?? $parameters['post_id'],
+				'data'    => $result['data'],
 			);
 		}
 

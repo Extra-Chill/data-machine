@@ -49,53 +49,59 @@ class FacebookPublishAbility {
 			wp_register_ability(
 				'datamachine/facebook-publish',
 				array(
-					'label' => __( 'Publish to Facebook', 'data-machine-socials' ),
-					'description' => __( 'Post content to Facebook Pages with optional media', 'data-machine-socials' ),
-					'category' => 'datamachine',
-					'input_schema' => array(
-						'type' => 'object',
-						'required' => array( 'content' ),
+					'label'               => __( 'Publish to Facebook', 'data-machine-socials' ),
+					'description'         => __( 'Post content to Facebook Pages with optional media', 'data-machine-socials' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'content' ),
 						'properties' => array(
-							'title' => array(
-								'type' => 'string',
+							'title'         => array(
+								'type'        => 'string',
 								'description' => 'Post title (optional)',
 							),
-							'content' => array(
-								'type' => 'string',
+							'content'       => array(
+								'type'        => 'string',
 								'description' => 'Post content text',
 							),
-							'image_url' => array(
-								'type' => 'string',
+							'image_url'     => array(
+								'type'        => 'string',
 								'description' => 'URL to image for the post',
-								'format' => 'uri',
+								'format'      => 'uri',
 							),
-							'source_url' => array(
-								'type' => 'string',
+							'source_url'    => array(
+								'type'        => 'string',
 								'description' => 'Source URL to include',
-								'format' => 'uri',
+								'format'      => 'uri',
 							),
 							'link_handling' => array(
-								'type' => 'string',
-								'enum' => array( 'none', 'append', 'comment' ),
+								'type'        => 'string',
+								'enum'        => array( 'none', 'append', 'comment' ),
 								'description' => 'How to handle source URL',
-								'default' => 'append',
+								'default'     => 'append',
 							),
 						),
 					),
-					'output_schema' => array(
-						'type' => 'object',
+					'output_schema'       => array(
+						'type'       => 'object',
 						'properties' => array(
-							'success' => array( 'type' => 'boolean' ),
-							'post_id' => array( 'type' => 'string' ),
-							'post_url' => array( 'type' => 'string', 'format' => 'uri' ),
-							'comment_id' => array( 'type' => 'string' ),
-							'comment_url' => array( 'type' => 'string', 'format' => 'uri' ),
-							'error' => array( 'type' => 'string' ),
+							'success'     => array( 'type' => 'boolean' ),
+							'post_id'     => array( 'type' => 'string' ),
+							'post_url'    => array(
+								'type'   => 'string',
+								'format' => 'uri',
+							),
+							'comment_id'  => array( 'type' => 'string' ),
+							'comment_url' => array(
+								'type'   => 'string',
+								'format' => 'uri',
+							),
+							'error'       => array( 'type' => 'string' ),
 						),
 					),
-					'execute_callback' => array( self::class, 'execute_publish' ),
+					'execute_callback'    => array( self::class, 'execute_publish' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage(),
-					'meta' => array( 'show_in_rest' => true ),
+					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
 
@@ -103,24 +109,24 @@ class FacebookPublishAbility {
 			wp_register_ability(
 				'datamachine/facebook-pages',
 				array(
-					'label' => __( 'Facebook Pages', 'data-machine-socials' ),
-					'description' => __( 'Get connected Facebook pages', 'data-machine-socials' ),
-					'category' => 'datamachine',
-					'input_schema' => array(
-						'type' => 'object',
+					'label'               => __( 'Facebook Pages', 'data-machine-socials' ),
+					'description'         => __( 'Get connected Facebook pages', 'data-machine-socials' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
 						'properties' => array(),
 					),
-					'output_schema' => array(
-						'type' => 'object',
+					'output_schema'       => array(
+						'type'       => 'object',
 						'properties' => array(
 							'success' => array( 'type' => 'boolean' ),
-							'pages' => array( 'type' => 'array' ),
-							'error' => array( 'type' => 'string' ),
+							'pages'   => array( 'type' => 'array' ),
+							'error'   => array( 'type' => 'string' ),
 						),
 					),
-					'execute_callback' => array( self::class, 'get_pages' ),
+					'execute_callback'    => array( self::class, 'get_pages' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage(),
-					'meta' => array( 'show_in_rest' => true ),
+					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
 		};
@@ -139,43 +145,43 @@ class FacebookPublishAbility {
 	 * @return array Response with post details or error.
 	 */
 	public static function execute_publish( array $input ): array {
-		$title = $input['title'] ?? '';
-		$content = $input['content'] ?? '';
-		$image_url = $input['image_url'] ?? '';
-		$source_url = $input['source_url'] ?? '';
+		$title         = $input['title'] ?? '';
+		$content       = $input['content'] ?? '';
+		$image_url     = $input['image_url'] ?? '';
+		$source_url    = $input['source_url'] ?? '';
 		$link_handling = $input['link_handling'] ?? 'append';
 
 		if ( empty( $content ) ) {
 			return array(
 				'success' => false,
-				'error' => 'Content is required',
+				'error'   => 'Content is required',
 			);
 		}
 
-		$auth = new AuthAbilities();
+		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'facebook' );
 
 		if ( ! $provider || ! $provider->is_authenticated() ) {
 			return array(
 				'success' => false,
-				'error' => 'Facebook not authenticated',
+				'error'   => 'Facebook not authenticated',
 			);
 		}
 
-		$page_id = $provider->get_page_id();
+		$page_id           = $provider->get_page_id();
 		$page_access_token = $provider->get_page_access_token();
 
 		if ( empty( $page_id ) ) {
 			return array(
 				'success' => false,
-				'error' => 'Facebook page not found',
+				'error'   => 'Facebook page not found',
 			);
 		}
 
 		if ( empty( $page_access_token ) ) {
 			return array(
 				'success' => false,
-				'error' => 'Facebook page access token not available',
+				'error'   => 'Facebook page access token not available',
 			);
 		}
 
@@ -188,7 +194,7 @@ class FacebookPublishAbility {
 		}
 
 		$post_data = array(
-			'message' => $post_text,
+			'message'      => $post_text,
 			'access_token' => $page_access_token,
 		);
 
@@ -206,7 +212,7 @@ class FacebookPublishAbility {
 		$response = wp_remote_post(
 			$api_url,
 			array(
-				'body' => $post_data,
+				'body'    => $post_data,
 				'timeout' => 30,
 			)
 		);
@@ -214,21 +220,21 @@ class FacebookPublishAbility {
 		if ( is_wp_error( $response ) ) {
 			return array(
 				'success' => false,
-				'error' => $response->get_error_message(),
+				'error'   => $response->get_error_message(),
 			);
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
-		$body = wp_remote_retrieve_body( $response );
-		$data = json_decode( $body, true );
+		$body        = wp_remote_retrieve_body( $response );
+		$data        = json_decode( $body, true );
 
 		if ( $status_code >= 200 && $status_code < 300 && isset( $data['id'] ) ) {
-			$post_id = $data['id'];
+			$post_id  = $data['id'];
 			$post_url = "https://www.facebook.com/{$page_id}/posts/{$post_id}";
 
 			$result = array(
-				'success' => true,
-				'post_id' => $post_id,
+				'success'  => true,
+				'post_id'  => $post_id,
 				'post_url' => $post_url,
 			);
 
@@ -236,7 +242,7 @@ class FacebookPublishAbility {
 			if ( 'comment' === $link_handling && ! empty( $source_url ) && filter_var( $source_url, FILTER_VALIDATE_URL ) ) {
 				$comment = self::post_comment( $post_id, $source_url, $page_access_token );
 				if ( $comment['success'] ) {
-					$result['comment_id'] = $comment['comment_id'];
+					$result['comment_id']  = $comment['comment_id'];
 					$result['comment_url'] = $comment['comment_url'];
 				}
 			}
@@ -251,7 +257,7 @@ class FacebookPublishAbility {
 
 		return array(
 			'success' => false,
-			'error' => $error_msg,
+			'error'   => $error_msg,
 		);
 	}
 
@@ -262,13 +268,14 @@ class FacebookPublishAbility {
 	 * @return array Pages or error.
 	 */
 	public static function get_pages( array $input ): array {
-		$auth = new AuthAbilities();
+		$input;
+		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'facebook' );
 
 		if ( ! $provider || ! $provider->is_authenticated() ) {
 			return array(
 				'success' => false,
-				'error' => 'Facebook not authenticated',
+				'error'   => 'Facebook not authenticated',
 			);
 		}
 
@@ -277,7 +284,7 @@ class FacebookPublishAbility {
 
 		return array(
 			'success' => true,
-			'pages' => $pages,
+			'pages'   => $pages,
 		);
 	}
 
@@ -295,9 +302,9 @@ class FacebookPublishAbility {
 		$response = wp_remote_post(
 			$url,
 			array(
-				'body' => array(
-					'url' => $image_url,
-					'published' => 'false',
+				'body'    => array(
+					'url'          => $image_url,
+					'published'    => 'false',
 					'access_token' => $access_token,
 				),
 				'timeout' => 30,
@@ -309,8 +316,8 @@ class FacebookPublishAbility {
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
-		$body = wp_remote_retrieve_body( $response );
-		$data = json_decode( $body, true );
+		$body        = wp_remote_retrieve_body( $response );
+		$data        = json_decode( $body, true );
 
 		if ( $status_code >= 200 && $status_code < 300 && isset( $data['id'] ) ) {
 			return $data['id'];
@@ -333,8 +340,8 @@ class FacebookPublishAbility {
 		$response = wp_remote_post(
 			$url,
 			array(
-				'body' => array(
-					'message' => $message,
+				'body'    => array(
+					'message'      => $message,
 					'access_token' => $access_token,
 				),
 				'timeout' => 30,
@@ -344,28 +351,28 @@ class FacebookPublishAbility {
 		if ( is_wp_error( $response ) ) {
 			return array(
 				'success' => false,
-				'error' => $response->get_error_message(),
+				'error'   => $response->get_error_message(),
 			);
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
-		$body = wp_remote_retrieve_body( $response );
-		$data = json_decode( $body, true );
+		$body        = wp_remote_retrieve_body( $response );
+		$data        = json_decode( $body, true );
 
 		if ( $status_code >= 200 && $status_code < 300 && isset( $data['id'] ) ) {
-			$comment_id = $data['id'];
+			$comment_id  = $data['id'];
 			$comment_url = "https://www.facebook.com/{$post_id}/?comment_id={$comment_id}";
 
 			return array(
-				'success' => true,
-				'comment_id' => $comment_id,
+				'success'     => true,
+				'comment_id'  => $comment_id,
 				'comment_url' => $comment_url,
 			);
 		}
 
 		return array(
 			'success' => false,
-			'error' => $data['error']['message'] ?? 'Failed to post comment',
+			'error'   => $data['error']['message'] ?? 'Failed to post comment',
 		);
 	}
 
@@ -376,6 +383,6 @@ class FacebookPublishAbility {
 	 * @return string Full URL.
 	 */
 	private static function build_graph_url( string $path ): string {
-		return "https://graph.facebook.com/v23.0/" . ltrim( $path, '/' );
+		return 'https://graph.facebook.com/v23.0/' . ltrim( $path, '/' );
 	}
 }

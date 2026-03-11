@@ -45,7 +45,7 @@ class BlueskyUpdateAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'action'  => array(
+							'action'   => array(
 								'type'        => 'string',
 								'enum'        => array( 'delete', 'like', 'unlike' ),
 								'description' => __( 'Action: delete, like, unlike', 'data-machine-socials' ),
@@ -55,7 +55,7 @@ class BlueskyUpdateAbility {
 								'description' => __( 'Bluesky post URI (at://...)', 'data-machine-socials' ),
 							),
 						),
-						'required' => array( 'action', 'post_uri' ),
+						'required'   => array( 'action', 'post_uri' ),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
@@ -119,7 +119,7 @@ class BlueskyUpdateAbility {
 				return $this->likePost( $session, $post_uri );
 
 			case 'unlike':
-				return $this->unlikePost( $session, $post_uri );
+				return $this->unlikePost( $session);
 
 			default:
 				return array(
@@ -134,7 +134,7 @@ class BlueskyUpdateAbility {
 			return null;
 		}
 
-		$auth = new \DataMachine\Abilities\AuthAbilities();
+		$auth     = new \DataMachine\Abilities\AuthAbilities();
 		$provider = $auth->getProvider( 'bluesky' );
 
 		if ( ! $provider instanceof BlueskyAuth ) {
@@ -146,7 +146,7 @@ class BlueskyUpdateAbility {
 
 	private function deletePost( array $session, string $post_uri ): array {
 		$pds_url = $session['pds_url'];
-		$did      = $session['did'];
+		$did     = $session['did'];
 
 		// Extract the record key from URI: at://did/rkey
 		$parts = parse_url( $post_uri );
@@ -154,7 +154,11 @@ class BlueskyUpdateAbility {
 		$rkey  = basename( $path );
 
 		$url    = $pds_url . '/xrpc/app.bsky.feed.post';
-		$params = array( 'repo' => $did, 'collection' => 'app.bsky.feed.post', 'rkey' => $rkey );
+		$params = array(
+			'repo'       => $did,
+			'collection' => 'app.bsky.feed.post',
+			'rkey'       => $rkey,
+		);
 
 		$response = wp_remote_request(
 			$url,
@@ -163,7 +167,7 @@ class BlueskyUpdateAbility {
 				'timeout' => 30,
 				'headers' => array(
 					'Authorization' => 'Bearer ' . $session['accessJwt'],
-					'Content-Type'   => 'application/json',
+					'Content-Type'  => 'application/json',
 				),
 				'body'    => json_encode( $params ),
 			)
@@ -178,7 +182,7 @@ class BlueskyUpdateAbility {
 
 		$status_code = wp_remote_retrieve_response_code( $response );
 
-		if ( $status_code === 200 || $status_code === 204 ) {
+		if ( 200 === $status_code || 204 === $status_code ) {
 			return array(
 				'success' => true,
 				'data'    => array(
@@ -197,7 +201,7 @@ class BlueskyUpdateAbility {
 
 	private function likePost( array $session, string $post_uri ): array {
 		$pds_url = $session['pds_url'];
-		$did      = $session['did'];
+		$did     = $session['did'];
 
 		$url = $pds_url . '/xrpc/app.bsky.feed.like';
 
@@ -207,13 +211,16 @@ class BlueskyUpdateAbility {
 				'timeout' => 30,
 				'headers' => array(
 					'Authorization' => 'Bearer ' . $session['accessJwt'],
-					'Content-Type'   => 'application/json',
+					'Content-Type'  => 'application/json',
 				),
 				'body'    => json_encode( array(
-					'repo'     => $did,
+					'repo'       => $did,
 					'collection' => 'app.bsky.feed.like',
-					'record'   => array(
-						'subject' => array( 'uri' => $post_uri, 'cid' => '' ),
+					'record'     => array(
+						'subject'   => array(
+							'uri' => $post_uri,
+							'cid' => '',
+						),
 						'createdAt' => gmdate( 'c' ),
 					),
 				) ),
@@ -230,7 +237,7 @@ class BlueskyUpdateAbility {
 		$status_code = wp_remote_retrieve_response_code( $response );
 		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
 
-		if ( $status_code === 200 ) {
+		if ( 200 === $status_code ) {
 			return array(
 				'success' => true,
 				'data'    => array(
@@ -247,9 +254,9 @@ class BlueskyUpdateAbility {
 		);
 	}
 
-	private function unlikePost( array $session, string $post_uri ): array {
+	private function unlikePost( array $session): array {
 		$pds_url = $session['pds_url'];
-		$did      = $session['did'];
+		$did     = $session['did'];
 
 		// Unlike requires the like URI which we don't have stored.
 		// This is a limitation - user would need to query likes first.

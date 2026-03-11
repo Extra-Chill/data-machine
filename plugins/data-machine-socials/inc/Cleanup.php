@@ -86,12 +86,12 @@ class Cleanup {
 
 			if ( filemtime( $file ) < $cutoff ) {
 				if ( wp_delete_file( $file ) !== false ) {
-					$results['deleted']++;
+					++$results['deleted'];
 				} else {
-					$results['errors']++;
+					++$results['errors'];
 				}
 			} else {
-				$results['skipped']++;
+				++$results['skipped'];
 			}
 		}
 
@@ -106,6 +106,7 @@ class Cleanup {
 	 * @return void
 	 */
 	public static function secure_temp_dir(): void {
+		global $wp_filesystem;
 		$upload_dir = wp_upload_dir();
 		$temp_dir   = $upload_dir['basedir'] . '/' . self::TEMP_DIR;
 
@@ -115,7 +116,7 @@ class Cleanup {
 
 		$index_file = $temp_dir . '/index.php';
 		if ( ! file_exists( $index_file ) ) {
-			file_put_contents( $index_file, "<?php\n// Silence is golden.\n" );
+			$wp_filesystem->put_contents( $index_file, "<?php\n// Silence is golden.\n" );
 		}
 	}
 

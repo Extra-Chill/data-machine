@@ -67,8 +67,15 @@ class ReadTwitter extends BaseTool {
 				'Twitter auth provider not available',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'twitter', 'status' => 'not_registered' ),
-				array( 'action' => 'configure_twitter_auth', 'message' => 'Configure Twitter OAuth in Data Machine Settings > Auth.', 'tool_hint' => 'authenticate_handler' )
+				array(
+					'provider' => 'twitter',
+					'status'   => 'not_registered',
+				),
+				array(
+					'action'    => 'configure_twitter_auth',
+					'message'   => 'Configure Twitter OAuth in Data Machine Settings > Auth.',
+					'tool_hint' => 'authenticate_handler',
+				)
 			);
 		}
 
@@ -77,8 +84,15 @@ class ReadTwitter extends BaseTool {
 				'Twitter is not authenticated',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'twitter', 'status' => 'not_authenticated' ),
-				array( 'action' => 'authenticate_twitter', 'message' => 'Connect Twitter via Data Machine Settings > Auth > Twitter.', 'tool_hint' => 'authenticate_handler' )
+				array(
+					'provider' => 'twitter',
+					'status'   => 'not_authenticated',
+				),
+				array(
+					'action'    => 'authenticate_twitter',
+					'message'   => 'Connect Twitter via Data Machine Settings > Auth > Twitter.',
+					'tool_hint' => 'authenticate_handler',
+				)
 			);
 		}
 

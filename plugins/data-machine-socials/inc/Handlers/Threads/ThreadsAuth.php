@@ -20,10 +20,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
-	const AUTH_URL = 'https://graph.facebook.com/oauth/authorize';
-	const TOKEN_URL = 'https://graph.threads.net/oauth/access_token';
+	const AUTH_URL    = 'https://graph.facebook.com/oauth/authorize';
+	const TOKEN_URL   = 'https://graph.threads.net/oauth/access_token';
 	const REFRESH_URL = 'https://graph.threads.net/refresh_access_token';
-	const SCOPES = 'threads_basic,threads_content_publish';
+	const SCOPES      = 'threads_basic,threads_content_publish';
 
 	public function __construct() {
 		parent::__construct( 'threads' );
@@ -36,16 +36,16 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	*/
 	public function get_config_fields(): array {
 		return array(
-			'app_id' => array(
-				'label' => __( 'App ID', 'data-machine-socials' ),
-				'type' => 'text',
-				'required' => true,
+			'app_id'     => array(
+				'label'       => __( 'App ID', 'data-machine-socials' ),
+				'type'        => 'text',
+				'required'    => true,
 				'description' => __( 'Your Threads application App ID from developers.facebook.com', 'data-machine-socials' ),
 			),
 			'app_secret' => array(
-				'label' => __( 'App Secret', 'data-machine-socials' ),
-				'type' => 'text',
-				'required' => true,
+				'label'       => __( 'App Secret', 'data-machine-socials' ),
+				'type'        => 'text',
+				'required'    => true,
 				'description' => __( 'Your Threads application App Secret from developers.facebook.com', 'data-machine-socials' ),
 			),
 		);
@@ -77,7 +77,7 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			'grant_type'   => 'th_refresh_token',
 			'access_token' => $current_token,
 		);
-		$url = self::REFRESH_URL . '?' . http_build_query( $params );
+		$url    = self::REFRESH_URL . '?' . http_build_query( $params );
 
 		$result = HttpClient::get( $url, array( 'context' => 'Threads OAuth' ) );
 
@@ -126,11 +126,11 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
 		$config = $this->get_config();
 		$params = array(
-			'client_id' => $config['app_id'] ?? '',
-			'redirect_uri' => $this->get_callback_url(),
-			'scope' => self::SCOPES,
+			'client_id'     => $config['app_id'] ?? '',
+			'redirect_uri'  => $this->get_callback_url(),
+			'scope'         => self::SCOPES,
 			'response_type' => 'code',
-			'state' => $state,
+			'state'         => $state,
 		);
 
 		return $this->oauth2->get_authorization_url( self::AUTH_URL, $params );
@@ -149,11 +149,11 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			'threads',
 			self::TOKEN_URL,
 			array(
-				'client_id' => $config['app_id'] ?? '',
+				'client_id'     => $config['app_id'] ?? '',
 				'client_secret' => $config['app_secret'] ?? '',
-				'grant_type' => 'authorization_code',
-				'redirect_uri' => $this->get_callback_url(),
-				'code' => $threads_code,
+				'grant_type'    => 'authorization_code',
+				'redirect_uri'  => $this->get_callback_url(),
+				'code'          => $threads_code,
 			),
 			function ( $long_lived_token_data ) {
 				// Build account data from long-lived token
@@ -203,11 +203,11 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		do_action( 'datamachine_log', 'debug', 'Threads OAuth: Exchanging short-lived token for long-lived token' );
 
 		$params = array(
-			'grant_type' => 'th_exchange_token',
+			'grant_type'    => 'th_exchange_token',
 			'client_secret' => $config['app_secret'] ?? '',
-			'access_token' => $short_lived_token,
+			'access_token'  => $short_lived_token,
 		);
-		$url = 'https://graph.threads.net/access_token?' . http_build_query( $params );
+		$url    = 'https://graph.threads.net/access_token?' . http_build_query( $params );
 
 		$result = HttpClient::get( $url, array( 'context' => 'Threads OAuth' ) );
 
@@ -216,8 +216,8 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			return new \WP_Error( 'threads_oauth_exchange_request_failed', __( 'HTTP error during long-lived token exchange with Threads.', 'data-machine-socials' ), $result['error'] );
 		}
 
-		$body = $result['data'];
-		$data = json_decode( $body, true );
+		$body      = $result['data'];
+		$data      = json_decode( $body, true );
 		$http_code = $result['status_code'];
 
 		if ( 200 !== $http_code || empty( $data['access_token'] ) ) {
@@ -228,7 +228,7 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				'Threads OAuth Error: Long-lived token exchange failed',
 				array(
 					'http_code' => $http_code,
-					'response' => $body,
+					'response'  => $body,
 				)
 			);
 			return new \WP_Error( 'threads_oauth_exchange_failed', $error_message, $data );
@@ -241,7 +241,7 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
 		return array(
 			'access_token' => $data['access_token'],
-			'expires_at' => $expires_at,
+			'expires_at'   => $expires_at,
 		);
 	}
 
@@ -267,8 +267,8 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			return new \WP_Error( 'threads_profile_fetch_failed', $result['error'] );
 		}
 
-		$body = $result['data'];
-		$data = json_decode( $body, true );
+		$body      = $result['data'];
+		$data      = json_decode( $body, true );
 		$http_code = $result['status_code'];
 
 		if ( 200 !== $http_code || isset( $data['error'] ) ) {
@@ -279,7 +279,7 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				'Threads OAuth Error: Profile fetch failed',
 				array(
 					'http_code' => $http_code,
-					'response' => $body,
+					'response'  => $body,
 				)
 			);
 			return new \WP_Error( 'threads_profile_fetch_failed', $error_message, $data );
@@ -292,7 +292,7 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				'Threads OAuth Error: Profile fetch response missing ID',
 				array(
 					'http_code' => $http_code,
-					'response' => $body,
+					'response'  => $body,
 				)
 			);
 			return new \WP_Error( 'threads_profile_id_missing', __( 'Profile ID missing in response from Threads.', 'data-machine-socials' ), $data );
@@ -322,18 +322,18 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	*/
 	public function remove_account(): bool {
 		$account = $this->get_account();
-		$token = null;
+		$token   = null;
 
 		if ( ! empty( $account ) && is_array( $account ) && ! empty( $account['access_token'] ) ) {
 			$token = $account['access_token'];
 		}
 
 		if ( $token ) {
-			$url = 'https://graph.facebook.com/v19.0/me/permissions';
+			$url    = 'https://graph.facebook.com/v19.0/me/permissions';
 			$result = HttpClient::delete(
 				$url,
 				array(
-					'body' => array( 'access_token' => $token ),
+					'body'    => array( 'access_token' => $token ),
 					'context' => 'Threads Authentication',
 				)
 			);

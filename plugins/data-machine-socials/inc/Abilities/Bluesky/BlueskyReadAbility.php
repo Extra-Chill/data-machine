@@ -126,7 +126,7 @@ class BlueskyReadAbility {
 
 		switch ( $action ) {
 			case 'list':
-				return $this->listPosts( $pds_url, $access_token, $did ?: $handle, $input );
+				return $this->listPosts( $pds_url, $access_token, $did ? $did : $handle, $input );
 
 			case 'get':
 				if ( empty( $input['post_uri'] ) ) {
@@ -138,7 +138,7 @@ class BlueskyReadAbility {
 				return $this->getPostThread( $pds_url, $access_token, $input['post_uri'] );
 
 			case 'profile':
-				return $this->getProfile( $pds_url, $access_token, $did ?: $handle );
+				return $this->getProfile( $pds_url, $access_token, $did ? $did : $handle );
 
 			default:
 				return array(

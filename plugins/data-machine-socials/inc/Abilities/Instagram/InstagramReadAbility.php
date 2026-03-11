@@ -184,7 +184,7 @@ class InstagramReadAbility {
 			);
 		}
 
-		$limit = min( absint( $input['limit'] ?? 25 ), 100 );
+		$limit  = min( absint( $input['limit'] ?? 25 ), 100 );
 		$params = array(
 			'fields'       => self::LIST_FIELDS,
 			'limit'        => $limit,
@@ -216,15 +216,15 @@ class InstagramReadAbility {
 			);
 		}
 
-		$media = $data['data'] ?? array();
+		$media  = $data['data'] ?? array();
 		$paging = $data['paging'] ?? array();
 
 		return array(
 			'success' => true,
 			'data'    => array(
-				'media'   => $media,
-				'count'   => count( $media ),
-				'cursors' => $paging['cursors'] ?? null,
+				'media'    => $media,
+				'count'    => count( $media ),
+				'cursors'  => $paging['cursors'] ?? null,
 				'has_next' => ! empty( $paging['next'] ),
 			),
 		);
@@ -279,7 +279,7 @@ class InstagramReadAbility {
 	 * @return array Result.
 	 */
 	private function getComments( string $access_token, string $media_id, array $input ): array {
-		$limit = min( absint( $input['limit'] ?? 25 ), 100 );
+		$limit  = min( absint( $input['limit'] ?? 25 ), 100 );
 		$params = array(
 			'fields'       => 'id,text,timestamp,username,like_count',
 			'limit'        => $limit,

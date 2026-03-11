@@ -132,6 +132,7 @@ class RedditAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
 		// Reddit requires Basic Auth for token exchange
 		$token_params['headers'] = array(
+			// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions -- Required for API authentication, not obfuscation.
 			'Authorization' => 'Basic ' . base64_encode( $client_id . ':' . $client_secret ),
 			'User-Agent'    => 'php:DataMachineWPPlugin:v' . DATAMACHINE_VERSION . ' (by /u/' . $developer_username . ')',
 			'Content-Type'  => 'application/x-www-form-urlencoded',
@@ -235,6 +236,7 @@ class RedditAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			$token_url,
 			array(
 				'headers' => array(
+					// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions -- Required for API authentication, not obfuscation.
 					'Authorization' => 'Basic ' . base64_encode( $client_id . ':' . $client_secret ),
 					'User-Agent'    => 'php:DataMachineWPPlugin:v' . DATAMACHINE_VERSION . ' (by /u/' . $developer_username . ')',
 				),

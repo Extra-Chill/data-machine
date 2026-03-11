@@ -56,21 +56,27 @@ class UpdatePinterest extends BaseTool {
 				'Pinterest auth provider not available',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'pinterest', 'status' => 'not_registered' ),
-				array( 'action' => 'configure_pinterest_auth', 'message' => 'Pinterest API token needs to be configured.' )
+				array(
+					'provider' => 'pinterest',
+					'status'   => 'not_registered',
+				),
+				array(
+					'action'  => 'configure_pinterest_auth',
+					'message' => 'Pinterest API token needs to be configured.',
+				)
 			);
 		}
 
 		$ability_instance = new \DataMachineSocials\Abilities\Pinterest\PinterestUpdateAbility();
 		$result           = $ability_instance->execute( array(
 			'action' => sanitize_text_field( $parameters['action'] ),
-			'pin_id'  => sanitize_text_field( $parameters['pin_id'] ),
+			'pin_id' => sanitize_text_field( $parameters['pin_id'] ),
 		) );
 
 		if ( $result['success'] ) {
 			return array(
-				'result'  => 'Pin deleted successfully!',
-				'pin_id'  => $result['data']['pin_id'],
+				'result' => 'Pin deleted successfully!',
+				'pin_id' => $result['data']['pin_id'],
 			);
 		}
 

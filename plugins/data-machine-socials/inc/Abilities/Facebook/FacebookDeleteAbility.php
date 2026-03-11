@@ -51,7 +51,7 @@ class FacebookDeleteAbility {
 								'description' => __( 'Facebook post ID to delete', 'data-machine-socials' ),
 							),
 						),
-						'required' => array( 'post_id' ),
+						'required'   => array( 'post_id' ),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
@@ -126,7 +126,7 @@ class FacebookDeleteAbility {
 		$status_code = wp_remote_retrieve_response_code( $response );
 		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
 
-		if ( $status_code === 200 || ( isset( $body['success'] ) && $body['success'] ) ) {
+		if ( 200 === $status_code || ( isset( $body['success'] ) && $body['success'] ) ) {
 			return array(
 				'success' => true,
 				'data'    => array(
@@ -147,7 +147,7 @@ class FacebookDeleteAbility {
 			return null;
 		}
 
-		$auth = new \DataMachine\Abilities\AuthAbilities();
+		$auth     = new \DataMachine\Abilities\AuthAbilities();
 		$provider = $auth->getProvider( 'facebook' );
 
 		if ( ! $provider instanceof FacebookAuth ) {

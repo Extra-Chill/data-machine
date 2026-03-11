@@ -69,17 +69,17 @@ class PinterestAnalyticsAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'action' => array(
+							'action'     => array(
 								'type'        => 'string',
 								'enum'        => array( 'user', 'pin', 'board' ),
 								'default'     => 'user',
 								'description' => __( 'Analytics type: user (account-wide), pin (single pin), board (board metrics)', 'data-machine-socials' ),
 							),
-							'pin_id' => array(
+							'pin_id'     => array(
 								'type'        => 'string',
 								'description' => __( 'Pinterest pin ID (required for pin action)', 'data-machine-socials' ),
 							),
-							'board_id' => array(
+							'board_id'   => array(
 								'type'        => 'string',
 								'description' => __( 'Pinterest board ID (required for board action)', 'data-machine-socials' ),
 							),
@@ -87,11 +87,11 @@ class PinterestAnalyticsAbility {
 								'type'        => 'string',
 								'description' => __( 'Start date in YYYY-MM-DD format (default: 30 days ago)', 'data-machine-socials' ),
 							),
-							'end_date' => array(
+							'end_date'   => array(
 								'type'        => 'string',
 								'description' => __( 'End date in YYYY-MM-DD format (default: today)', 'data-machine-socials' ),
 							),
-							'metrics' => array(
+							'metrics'    => array(
 								'type'        => 'array',
 								'items'       => array( 'type' => 'string' ),
 								'description' => __( 'Metric types to fetch (default: all). Options: IMPRESSION, SAVE, PIN_CLICK, COMMENT, CLOSEUP', 'data-machine-socials' ),
@@ -212,10 +212,10 @@ class PinterestAnalyticsAbility {
 	 */
 	private function getUserAnalytics( string $token, string $start_date, string $end_date, string $metrics_param ): array {
 		$params = array(
-			'start_date'         => $start_date,
-			'end_date'           => $end_date,
-			'metric_types'       => $metrics_param,
-			'split_field'        => 'NO_SPLIT',
+			'start_date'           => $start_date,
+			'end_date'             => $end_date,
+			'metric_types'         => $metrics_param,
+			'split_field'          => 'NO_SPLIT',
 			'from_claimed_content' => 'BOTH',
 		);
 
@@ -303,7 +303,7 @@ class PinterestAnalyticsAbility {
 		}
 
 		// Build summary
-		$summary = $this->buildSummary( $data );
+		$summary           = $this->buildSummary( $data );
 		$summary['pin_id'] = $pin_id;
 
 		return array(
@@ -359,7 +359,7 @@ class PinterestAnalyticsAbility {
 		}
 
 		// Build summary
-		$summary = $this->buildSummary( $data );
+		$summary             = $this->buildSummary( $data );
 		$summary['board_id'] = $board_id;
 
 		return array(

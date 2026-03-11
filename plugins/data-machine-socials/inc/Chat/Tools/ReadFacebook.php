@@ -67,8 +67,15 @@ class ReadFacebook extends BaseTool {
 				'Facebook auth provider not available',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'facebook', 'status' => 'not_registered' ),
-				array( 'action' => 'configure_facebook_auth', 'message' => 'Configure Facebook OAuth in Data Machine Settings > Auth.', 'tool_hint' => 'authenticate_handler' )
+				array(
+					'provider' => 'facebook',
+					'status'   => 'not_registered',
+				),
+				array(
+					'action'    => 'configure_facebook_auth',
+					'message'   => 'Configure Facebook OAuth in Data Machine Settings > Auth.',
+					'tool_hint' => 'authenticate_handler',
+				)
 			);
 		}
 
@@ -77,8 +84,15 @@ class ReadFacebook extends BaseTool {
 				'Facebook is not authenticated',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'facebook', 'status' => 'not_authenticated' ),
-				array( 'action' => 'authenticate_facebook', 'message' => 'Connect Facebook via Data Machine Settings > Auth > Facebook.', 'tool_hint' => 'authenticate_handler' )
+				array(
+					'provider' => 'facebook',
+					'status'   => 'not_authenticated',
+				),
+				array(
+					'action'    => 'authenticate_facebook',
+					'message'   => 'Connect Facebook via Data Machine Settings > Auth > Facebook.',
+					'tool_hint' => 'authenticate_handler',
+				)
 			);
 		}
 

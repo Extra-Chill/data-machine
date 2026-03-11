@@ -30,15 +30,15 @@ class FacebookSettings extends PublishHandlerSettings {
 			parent::get_common_fields(),
 			array(
 				'link_handling' => array(
-					'type' => 'select',
-					'label' => __( 'Source URL Handling', 'data-machine-socials' ),
+					'type'        => 'select',
+					'label'       => __( 'Source URL Handling', 'data-machine-socials' ),
 					'description' => __( 'Choose how to handle source URLs when posting to Facebook.', 'data-machine-socials' ),
-					'options' => array(
-						'none' => __( 'No URL - exclude source link entirely', 'data-machine-socials' ),
-						'append' => __( 'Append to post - add URL to post content', 'data-machine-socials' ),
+					'options'     => array(
+						'none'    => __( 'No URL - exclude source link entirely', 'data-machine-socials' ),
+						'append'  => __( 'Append to post - add URL to post content', 'data-machine-socials' ),
 						'comment' => __( 'Post as comment - add URL as separate comment', 'data-machine-socials' ),
 					),
-					'default' => 'append',
+					'default'     => 'append',
 				),
 			)
 		);

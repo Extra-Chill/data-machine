@@ -55,7 +55,7 @@ class TwitterUpdateAbility {
 								'description' => __( 'Tweet ID to operate on', 'data-machine-socials' ),
 							),
 						),
-						'required' => array( 'action', 'tweet_id' ),
+						'required'   => array( 'action', 'tweet_id' ),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
@@ -157,7 +157,7 @@ class TwitterUpdateAbility {
 			return null;
 		}
 
-		$auth = new \DataMachine\Abilities\AuthAbilities();
+		$auth     = new \DataMachine\Abilities\AuthAbilities();
 		$provider = $auth->getProvider( 'twitter' );
 
 		if ( ! $provider instanceof TwitterAuth ) {
@@ -182,7 +182,7 @@ class TwitterUpdateAbility {
 
 		$http_code = $connection->getLastHttpCode();
 
-		if ( $http_code === 200 ) {
+		if ( 200 === $http_code ) {
 			return array(
 				'success' => true,
 				'data'    => array(
@@ -208,7 +208,7 @@ class TwitterUpdateAbility {
 	 */
 	private function retweet( $connection, string $tweet_id ): array {
 		// Need user ID for retweeting.
-		$auth = $this->getAuthProvider();
+		$auth    = $this->getAuthProvider();
 		$account = $auth->get_account_details();
 		$user_id = $account['user_id'] ?? null;
 
@@ -227,7 +227,7 @@ class TwitterUpdateAbility {
 
 		$http_code = $connection->getLastHttpCode();
 
-		if ( $http_code === 200 ) {
+		if ( 200 === $http_code ) {
 			return array(
 				'success' => true,
 				'data'    => array(
@@ -254,7 +254,7 @@ class TwitterUpdateAbility {
 	 */
 	private function unretweet( $connection, string $tweet_id ): array {
 		// Need user ID for unretweeting.
-		$auth = $this->getAuthProvider();
+		$auth    = $this->getAuthProvider();
 		$account = $auth->get_account_details();
 		$user_id = $account['user_id'] ?? null;
 
@@ -272,12 +272,12 @@ class TwitterUpdateAbility {
 
 		$http_code = $connection->getLastHttpCode();
 
-		if ( $http_code === 200 ) {
+		if ( 200 === $http_code ) {
 			return array(
 				'success' => true,
 				'data'    => array(
-					'tweet_id'      => $tweet_id,
-					'unretweeted'   => true,
+					'tweet_id'    => $tweet_id,
+					'unretweeted' => true,
 				),
 			);
 		}
@@ -298,7 +298,7 @@ class TwitterUpdateAbility {
 	 */
 	private function likeTweet( $connection, string $tweet_id ): array {
 		// Need user ID for liking.
-		$auth = $this->getAuthProvider();
+		$auth    = $this->getAuthProvider();
 		$account = $auth->get_account_details();
 		$user_id = $account['user_id'] ?? null;
 
@@ -317,7 +317,7 @@ class TwitterUpdateAbility {
 
 		$http_code = $connection->getLastHttpCode();
 
-		if ( $http_code === 200 ) {
+		if ( 200 === $http_code ) {
 			return array(
 				'success' => true,
 				'data'    => array(
@@ -343,7 +343,7 @@ class TwitterUpdateAbility {
 	 */
 	private function unlikeTweet( $connection, string $tweet_id ): array {
 		// Need user ID for unliking.
-		$auth = $this->getAuthProvider();
+		$auth    = $this->getAuthProvider();
 		$account = $auth->get_account_details();
 		$user_id = $account['user_id'] ?? null;
 
@@ -360,12 +360,12 @@ class TwitterUpdateAbility {
 
 		$http_code = $connection->getLastHttpCode();
 
-		if ( $http_code === 200 ) {
+		if ( 200 === $http_code ) {
 			return array(
 				'success' => true,
 				'data'    => array(
-					'tweet_id'  => $tweet_id,
-					'unliked'   => true,
+					'tweet_id' => $tweet_id,
+					'unliked'  => true,
 				),
 			);
 		}

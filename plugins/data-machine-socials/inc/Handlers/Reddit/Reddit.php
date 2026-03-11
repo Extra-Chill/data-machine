@@ -51,10 +51,10 @@ class Reddit extends FetchHandler {
 	 * @return RedditAuth|null Auth provider instance or null if unavailable
 	 */
 	private function get_oauth_reddit() {
-		if ( $this->oauth_reddit === null ) {
+		if ( null === $this->oauth_reddit ) {
 			$this->oauth_reddit = $this->getAuthProvider( 'reddit' );
 
-			if ( $this->oauth_reddit === null ) {
+			if ( null === $this->oauth_reddit ) {
 				$auth_abilities = new \DataMachine\Abilities\AuthAbilities();
 				do_action(
 					'datamachine_log',

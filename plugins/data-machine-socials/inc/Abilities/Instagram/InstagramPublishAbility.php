@@ -70,52 +70,55 @@ class InstagramPublishAbility {
 			wp_register_ability(
 				'datamachine/instagram-publish',
 				array(
-					'label' => __( 'Publish to Instagram', 'data-machine-socials' ),
-					'description' => __( 'Post content to Instagram with optional media (single image or carousel up to 10 images)', 'data-machine-socials' ),
-					'category' => 'datamachine',
-					'input_schema' => array(
-						'type' => 'object',
-						'required' => array( 'content' ),
+					'label'               => __( 'Publish to Instagram', 'data-machine-socials' ),
+					'description'         => __( 'Post content to Instagram with optional media (single image or carousel up to 10 images)', 'data-machine-socials' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'content' ),
 						'properties' => array(
-							'content' => array(
-								'type' => 'string',
+							'content'      => array(
+								'type'        => 'string',
 								'description' => 'Post caption text (max 2200 characters)',
-								'maxLength' => 2200,
+								'maxLength'   => 2200,
 							),
-							'image_urls' => array(
-								'type' => 'array',
+							'image_urls'   => array(
+								'type'        => 'array',
 								'description' => 'Array of image URLs to post (1-10 for carousel)',
-								'items' => array(
-									'type' => 'string',
+								'items'       => array(
+									'type'   => 'string',
 									'format' => 'uri',
 								),
-								'maxItems' => 10,
+								'maxItems'    => 10,
 							),
 							'aspect_ratio' => array(
-								'type' => 'string',
+								'type'        => 'string',
 								'description' => 'Aspect ratio for images: 1:1, 4:5, 3:4, or 1.91:1',
-								'enum' => array( '1:1', '4:5', '3:4', '1.91:1' ),
-								'default' => '4:5',
+								'enum'        => array( '1:1', '4:5', '3:4', '1.91:1' ),
+								'default'     => '4:5',
 							),
-							'source_url' => array(
-								'type' => 'string',
+							'source_url'   => array(
+								'type'        => 'string',
 								'description' => 'Source URL to include in caption',
+								'format'      => 'uri',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'   => array( 'type' => 'boolean' ),
+							'media_id'  => array( 'type' => 'string' ),
+							'permalink' => array(
+								'type'   => 'string',
 								'format' => 'uri',
 							),
+							'error'     => array( 'type' => 'string' ),
 						),
 					),
-					'output_schema' => array(
-						'type' => 'object',
-						'properties' => array(
-							'success' => array( 'type' => 'boolean' ),
-							'media_id' => array( 'type' => 'string' ),
-							'permalink' => array( 'type' => 'string', 'format' => 'uri' ),
-							'error' => array( 'type' => 'string' ),
-						),
-					),
-					'execute_callback' => array( self::class, 'execute_publish' ),
+					'execute_callback'    => array( self::class, 'execute_publish' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage(),
-					'meta' => array( 'show_in_rest' => true ),
+					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
 
@@ -123,26 +126,26 @@ class InstagramPublishAbility {
 			wp_register_ability(
 				'datamachine/instagram-account',
 				array(
-					'label' => __( 'Instagram Account Info', 'data-machine-socials' ),
-					'description' => __( 'Get authenticated Instagram account details', 'data-machine-socials' ),
-					'category' => 'datamachine',
-					'input_schema' => array(
-						'type' => 'object',
+					'label'               => __( 'Instagram Account Info', 'data-machine-socials' ),
+					'description'         => __( 'Get authenticated Instagram account details', 'data-machine-socials' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
 						'properties' => array(),
 					),
-					'output_schema' => array(
-						'type' => 'object',
+					'output_schema'       => array(
+						'type'       => 'object',
 						'properties' => array(
-							'success' => array( 'type' => 'boolean' ),
-							'user_id' => array( 'type' => 'string' ),
-							'username' => array( 'type' => 'string' ),
+							'success'       => array( 'type' => 'boolean' ),
+							'user_id'       => array( 'type' => 'string' ),
+							'username'      => array( 'type' => 'string' ),
 							'authenticated' => array( 'type' => 'boolean' ),
-							'error' => array( 'type' => 'string' ),
+							'error'         => array( 'type' => 'string' ),
 						),
 					),
-					'execute_callback' => array( self::class, 'get_account' ),
+					'execute_callback'    => array( self::class, 'get_account' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage(),
-					'meta' => array( 'show_in_rest' => true ),
+					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
 		};
@@ -161,15 +164,15 @@ class InstagramPublishAbility {
 	 * @return array Response with post details or error.
 	 */
 	public static function execute_publish( array $input ): array {
-		$content = $input['content'] ?? '';
-		$image_urls = $input['image_urls'] ?? array();
+		$content      = $input['content'] ?? '';
+		$image_urls   = $input['image_urls'] ?? array();
 		$aspect_ratio = $input['aspect_ratio'] ?? '4:5';
-		$source_url = $input['source_url'] ?? '';
+		$source_url   = $input['source_url'] ?? '';
 
 		if ( empty( $content ) ) {
 			return array(
 				'success' => false,
-				'error' => 'Content is required',
+				'error'   => 'Content is required',
 			);
 		}
 
@@ -178,7 +181,7 @@ class InstagramPublishAbility {
 			if ( count( $image_urls ) > self::MAX_CAROUSEL_IMAGES ) {
 				return array(
 					'success' => false,
-					'error' => sprintf( 'Maximum %d images allowed for Instagram carousel', self::MAX_CAROUSEL_IMAGES ),
+					'error'   => sprintf( 'Maximum %d images allowed for Instagram carousel', self::MAX_CAROUSEL_IMAGES ),
 				);
 			}
 
@@ -186,29 +189,29 @@ class InstagramPublishAbility {
 				if ( ! filter_var( $url, FILTER_VALIDATE_URL ) ) {
 					return array(
 						'success' => false,
-						'error' => 'Invalid image URL: ' . $url,
+						'error'   => 'Invalid image URL: ' . $url,
 					);
 				}
 			}
 		}
 
-		$auth = new AuthAbilities();
+		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'instagram' );
 
 		if ( ! $provider || ! $provider->is_authenticated() ) {
 			return array(
 				'success' => false,
-				'error' => 'Instagram not authenticated',
+				'error'   => 'Instagram not authenticated',
 			);
 		}
 
-		$user_id = $provider->get_user_id();
+		$user_id      = $provider->get_user_id();
 		$access_token = $provider->get_valid_access_token();
 
 		if ( empty( $user_id ) || empty( $access_token ) ) {
 			return array(
 				'success' => false,
-				'error' => 'Instagram credentials not available',
+				'error'   => 'Instagram credentials not available',
 			);
 		}
 
@@ -224,12 +227,12 @@ class InstagramPublishAbility {
 		}
 
 		// Create media containers for each image
-		$is_carousel = count( $image_urls ) > 1;
+		$is_carousel   = count( $image_urls ) > 1;
 		$container_ids = array();
 
 		foreach ( $image_urls as $image_url ) {
 			$container_body = array(
-				'image_url' => $image_url,
+				'image_url'    => $image_url,
 				'access_token' => $access_token,
 			);
 
@@ -244,7 +247,7 @@ class InstagramPublishAbility {
 			$response = wp_remote_post(
 				self::GRAPH_API_URL . "/{$user_id}/media",
 				array(
-					'body' => $container_body,
+					'body'    => $container_body,
 					'timeout' => 40,
 				)
 			);
@@ -252,11 +255,11 @@ class InstagramPublishAbility {
 			if ( is_wp_error( $response ) ) {
 				return array(
 					'success' => false,
-					'error' => 'Error creating media container: ' . $response->get_error_message(),
+					'error'   => 'Error creating media container: ' . $response->get_error_message(),
 				);
 			}
 
-			$body = json_decode( wp_remote_retrieve_body( $response ), true );
+			$body        = json_decode( wp_remote_retrieve_body( $response ), true );
 			$status_code = wp_remote_retrieve_response_code( $response );
 
 			if ( empty( $body['id'] ) ) {
@@ -266,7 +269,7 @@ class InstagramPublishAbility {
 				}
 				return array(
 					'success' => false,
-					'error' => $error_msg,
+					'error'   => $error_msg,
 				);
 			}
 
@@ -286,22 +289,22 @@ class InstagramPublishAbility {
 				}
 			}
 
-			if ( $status === 'ERROR' || $status === 'EXPIRED' ) {
+			if ( 'ERROR' === $status || 'EXPIRED' === $status ) {
 				return array(
 					'success' => false,
-					'error' => 'Container status error: ' . $status,
+					'error'   => 'Container status error: ' . $status,
 				);
 			}
 
 			$container_ids[] = $container_id;
 
 			// If not finished, wait for processing
-			if ( $status !== 'FINISHED' ) {
+			if ( 'FINISHED' !== $status ) {
 				$ready = self::wait_for_container( $access_token, $container_id );
 				if ( ! $ready ) {
 					return array(
 						'success' => false,
-						'error' => 'Media processing failed for container: ' . $container_id,
+						'error'   => 'Media processing failed for container: ' . $container_id,
 					);
 				}
 			}
@@ -310,14 +313,14 @@ class InstagramPublishAbility {
 		// Create main container (carousel or single)
 		$main_container_id = null;
 		if ( $is_carousel && count( $container_ids ) > 1 ) {
-			$children = implode( ',', $container_ids );
+			$children      = implode( ',', $container_ids );
 			$carousel_resp = wp_remote_post(
 				self::GRAPH_API_URL . "/{$user_id}/media",
 				array(
-					'body' => array(
-						'media_type' => 'CAROUSEL',
-						'children' => $children,
-						'caption' => $caption,
+					'body'    => array(
+						'media_type'   => 'CAROUSEL',
+						'children'     => $children,
+						'caption'      => $caption,
 						'access_token' => $access_token,
 					),
 					'timeout' => 40,
@@ -327,7 +330,7 @@ class InstagramPublishAbility {
 			if ( is_wp_error( $carousel_resp ) ) {
 				return array(
 					'success' => false,
-					'error' => 'Error creating carousel container: ' . $carousel_resp->get_error_message(),
+					'error'   => 'Error creating carousel container: ' . $carousel_resp->get_error_message(),
 				);
 			}
 
@@ -339,7 +342,7 @@ class InstagramPublishAbility {
 				}
 				return array(
 					'success' => false,
-					'error' => $error_msg,
+					'error'   => $error_msg,
 				);
 			}
 
@@ -350,7 +353,7 @@ class InstagramPublishAbility {
 			// No images - Instagram requires at least one image
 			return array(
 				'success' => false,
-				'error' => 'At least one image is required for Instagram posts',
+				'error'   => 'At least one image is required for Instagram posts',
 			);
 		}
 
@@ -358,8 +361,8 @@ class InstagramPublishAbility {
 		$publish_resp = wp_remote_post(
 			self::GRAPH_API_URL . "/{$user_id}/media_publish",
 			array(
-				'body' => array(
-					'creation_id' => $main_container_id,
+				'body'    => array(
+					'creation_id'  => $main_container_id,
 					'access_token' => $access_token,
 				),
 				'timeout' => 40,
@@ -369,7 +372,7 @@ class InstagramPublishAbility {
 		if ( is_wp_error( $publish_resp ) ) {
 			return array(
 				'success' => false,
-				'error' => 'Error publishing to Instagram: ' . $publish_resp->get_error_message(),
+				'error'   => 'Error publishing to Instagram: ' . $publish_resp->get_error_message(),
 			);
 		}
 
@@ -381,14 +384,14 @@ class InstagramPublishAbility {
 			}
 			return array(
 				'success' => false,
-				'error' => $error_msg,
+				'error'   => $error_msg,
 			);
 		}
 
 		$media_id = $publish_body['id'];
 
 		// Fetch permalink
-		$permalink = null;
+		$permalink      = null;
 		$permalink_resp = wp_remote_get(
 			self::GRAPH_API_URL . "/{$media_id}?fields=id,permalink&access_token={$access_token}",
 			array( 'timeout' => 40 )
@@ -402,8 +405,8 @@ class InstagramPublishAbility {
 		}
 
 		return array(
-			'success' => true,
-			'media_id' => $media_id,
+			'success'   => true,
+			'media_id'  => $media_id,
 			'permalink' => $permalink,
 		);
 	}
@@ -448,22 +451,23 @@ class InstagramPublishAbility {
 	 * @return array Account details or error.
 	 */
 	public static function get_account( array $input ): array {
-		$auth = new AuthAbilities();
+		$input;
+		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'instagram' );
 
 		if ( ! $provider || ! $provider->is_authenticated() ) {
 			return array(
-				'success' => false,
-				'error' => 'Instagram not authenticated',
+				'success'       => false,
+				'error'         => 'Instagram not authenticated',
 				'authenticated' => false,
 			);
 		}
 
 		return array(
-			'success' => true,
+			'success'       => true,
 			'authenticated' => true,
-			'user_id' => $provider->get_user_id() ?? '',
-			'username' => $provider->get_username() ?? '',
+			'user_id'       => $provider->get_user_id() ?? '',
+			'username'      => $provider->get_username() ?? '',
 		);
 	}
 }

@@ -267,7 +267,7 @@ class InstagramCommand {
 	 *
 	 *     wp datamachine-socials instagram reply-comment 1789000000000 "Thanks for listening!"
 	 */
-	public function reply_comment( $args, $assoc_args ) {
+	public function reply_comment( $args) {
 		$comment_id = $args[0] ?? '';
 		$message    = $args[1] ?? '';
 		$ability    = $this->get_comment_reply_ability();
@@ -304,6 +304,8 @@ class InstagramCommand {
 	 *     wp datamachine-socials instagram status
 	 */
 	public function status( $args, $assoc_args ) {
+		$args;
+		$assoc_args;
 		$auth_abilities = new AuthAbilities();
 		$provider       = $auth_abilities->getProvider( 'instagram' );
 
@@ -370,7 +372,7 @@ class InstagramCommand {
 	 *
 	 *     wp datamachine-socials instagram edit-caption 17891234567890 "New caption here"
 	 */
-	public function edit_caption( $args, $assoc_args ) {
+	public function edit_caption( $args) {
 		$media_id = $args[0];
 		$caption  = $args[1] ?? '';
 		$ability  = $this->get_update_ability();
@@ -406,6 +408,7 @@ class InstagramCommand {
 	 *     wp datamachine-socials instagram delete 17891234567890
 	 */
 	public function delete( $args, $assoc_args ) {
+		$assoc_args;
 		$media_id = $args[0];
 		$ability  = $this->get_delete_ability();
 
@@ -434,6 +437,7 @@ class InstagramCommand {
 	 *     wp datamachine-socials instagram archive 17891234567890
 	 */
 	public function archive( $args, $assoc_args ) {
+		$assoc_args;
 		$media_id = $args[0];
 		$ability  = $this->get_update_ability();
 
@@ -507,7 +511,7 @@ class InstagramCommand {
 
 		// Collect image URLs (--image can be repeated)
 		if ( ! empty( $assoc_args['image'] ) ) {
-			$images = is_array( $assoc_args['image'] ) ? $assoc_args['image'] : array( $assoc_args['image'] );
+			$images              = is_array( $assoc_args['image'] ) ? $assoc_args['image'] : array( $assoc_args['image'] );
 			$input['image_urls'] = $images;
 
 			if ( count( $images ) > 10 ) {

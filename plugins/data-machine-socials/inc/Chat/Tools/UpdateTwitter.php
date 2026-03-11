@@ -58,7 +58,10 @@ class UpdateTwitter extends BaseTool {
 				'Twitter auth provider not available',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'twitter', 'status' => 'not_registered' ),
+				array(
+					'provider' => 'twitter',
+					'status'   => 'not_registered',
+				),
 				array(
 					'action'    => 'configure_twitter_auth',
 					'message'   => 'Twitter OAuth needs to be configured in Data Machine Settings > Auth.',
@@ -72,7 +75,10 @@ class UpdateTwitter extends BaseTool {
 				'Twitter is not authenticated',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'twitter', 'status' => 'not_authenticated' ),
+				array(
+					'provider' => 'twitter',
+					'status'   => 'not_authenticated',
+				),
 				array(
 					'action'    => 'authenticate_twitter',
 					'message'   => 'Twitter OAuth needs to be connected. Go to Data Machine Settings > Auth > Twitter.',
@@ -118,9 +124,9 @@ class UpdateTwitter extends BaseTool {
 			}
 
 			return array(
-				'result'    => $message,
-				'tweet_id'  => $result['data']['tweet_id'] ?? $parameters['tweet_id'],
-				'data'      => $result['data'],
+				'result'   => $message,
+				'tweet_id' => $result['data']['tweet_id'] ?? $parameters['tweet_id'],
+				'data'     => $result['data'],
 			);
 		}
 

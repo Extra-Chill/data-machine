@@ -67,8 +67,15 @@ class ReadThreads extends BaseTool {
 				'Threads auth provider not available',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'threads', 'status' => 'not_registered' ),
-				array( 'action' => 'configure_threads_auth', 'message' => 'Configure Threads OAuth in Data Machine Settings > Auth.', 'tool_hint' => 'authenticate_handler' )
+				array(
+					'provider' => 'threads',
+					'status'   => 'not_registered',
+				),
+				array(
+					'action'    => 'configure_threads_auth',
+					'message'   => 'Configure Threads OAuth in Data Machine Settings > Auth.',
+					'tool_hint' => 'authenticate_handler',
+				)
 			);
 		}
 
@@ -77,8 +84,15 @@ class ReadThreads extends BaseTool {
 				'Threads is not authenticated',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'threads', 'status' => 'not_authenticated' ),
-				array( 'action' => 'authenticate_threads', 'message' => 'Connect Threads via Data Machine Settings > Auth > Threads.', 'tool_hint' => 'authenticate_handler' )
+				array(
+					'provider' => 'threads',
+					'status'   => 'not_authenticated',
+				),
+				array(
+					'action'    => 'authenticate_threads',
+					'message'   => 'Connect Threads via Data Machine Settings > Auth > Threads.',
+					'tool_hint' => 'authenticate_handler',
+				)
 			);
 		}
 

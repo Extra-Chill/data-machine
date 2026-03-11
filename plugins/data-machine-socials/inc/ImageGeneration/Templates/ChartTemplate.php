@@ -23,20 +23,20 @@ class ChartTemplate implements TemplateInterface {
 	/**
 	 * Layout constants.
 	 */
-	private const PADDING       = 60;
+	private const PADDING      = 60;
 	private const CHART_MARGIN = 40;
-	private const LEGEND_SIZE   = 24;
+	private const LEGEND_SIZE  = 24;
 
 	/**
 	 * Default colors — brand-consistent palette.
 	 */
 	private const COLORS = array(
-		'background'  => array( 255, 255, 255 ),
-		'title'       => array( 26, 26, 26 ),
-		'axis'        => array( 180, 180, 180 ),
-		'axis_label'  => array( 100, 100, 100 ),
-		'grid'        => array( 230, 230, 230 ),
-		'legend'      => array( 60, 60, 60 ),
+		'background' => array( 255, 255, 255 ),
+		'title'      => array( 26, 26, 26 ),
+		'axis'       => array( 180, 180, 180 ),
+		'axis_label' => array( 100, 100, 100 ),
+		'grid'       => array( 230, 230, 230 ),
+		'legend'     => array( 60, 60, 60 ),
 	);
 
 	public function get_id(): string {
@@ -53,22 +53,22 @@ class ChartTemplate implements TemplateInterface {
 
 	public function get_fields(): array {
 		return array(
-			'chart_type' => array(
+			'chart_type'    => array(
 				'label'    => 'Chart Type',
 				'type'     => 'string',
 				'required' => true,
 			),
-			'title'      => array(
+			'title'         => array(
 				'label'    => 'Chart Title',
 				'type'     => 'string',
 				'required' => false,
 			),
-			'labels'     => array(
+			'labels'        => array(
 				'label'    => 'Labels',
 				'type'     => 'array',
 				'required' => true,
 			),
-			'values'     => array(
+			'values'        => array(
 				'label'    => 'Values',
 				'type'     => 'array',
 				'required' => true,
@@ -116,11 +116,11 @@ class ChartTemplate implements TemplateInterface {
 		$renderer->register_font( 'body', 'helvetica.ttf' );
 
 		// Allocate colors.
-		$bg_color     = $renderer->color_rgb( 'background', self::COLORS['background'] );
-		$title_color  = $renderer->color_rgb( 'title', self::COLORS['title'] );
-		$axis_color   = $renderer->color_rgb( 'axis', self::COLORS['axis'] );
-		$grid_color   = $renderer->color_rgb( 'grid', self::COLORS['grid'] );
-		$label_color  = $renderer->color_rgb( 'axis_label', self::COLORS['axis_label'] );
+		$bg_color    = $renderer->color_rgb( 'background', self::COLORS['background'] );
+		$title_color = $renderer->color_rgb( 'title', self::COLORS['title'] );
+		$axis_color  = $renderer->color_rgb( 'axis', self::COLORS['axis'] );
+		$grid_color  = $renderer->color_rgb( 'grid', self::COLORS['grid'] );
+		$label_color = $renderer->color_rgb( 'axis_label', self::COLORS['axis_label'] );
 
 		$renderer->fill( $bg_color );
 
@@ -182,7 +182,7 @@ class ChartTemplate implements TemplateInterface {
 		}
 
 		// Draw bars.
-		$colors = $renderer->get_chart_palette( $count );
+		$colors   = $renderer->get_chart_palette( $count );
 		$baseline = $area['y'] + $area['height'];
 
 		foreach ( $values as $i => $val ) {
@@ -221,14 +221,15 @@ class ChartTemplate implements TemplateInterface {
 		$step_x = $area['width'] / ( $count > 1 ? $count - 1 : 1 );
 
 		foreach ( $values as $i => $val ) {
-			$x = $area['x'] + (int) ( $i * $step_x );
-			$y = $area['y'] + $area['height'] - (int) ( ( $val / $max_val ) * $area['height'] );
+			$x        = $area['x'] + (int) ( $i * $step_x );
+			$y        = $area['y'] + $area['height'] - (int) ( ( $val / $max_val ) * $area['height'] );
 			$points[] = array( $x, $y );
 		}
 
 		// Draw lines between points.
-		$line_color = $renderer->color( 'line', 83, 148, 11 ); // Brand green.
-		for ( $i = 0; $i < count( $points ) - 1; $i++ ) {
+		$line_color   = $renderer->color( 'line', 83, 148, 11 ); // Brand green.
+		$points_count = count( $points );
+		for ( $i = 0; $i < $points_count - 1; $i++ ) {
 			$renderer->draw_line( $points[ $i ][0], $points[ $i ][1], $points[ $i + 1 ][0], $points[ $i + 1 ][1], $line_color, 3 );
 		}
 
@@ -251,9 +252,9 @@ class ChartTemplate implements TemplateInterface {
 	 * Render a pie chart.
 	 */
 	private function render_pie_chart( GDRenderer $renderer, array $labels, array $values, array $area ): ?string {
-		$total   = array_sum( $values );
-		$count   = count( $values );
-		$colors  = $renderer->get_chart_palette( $count );
+		$total  = array_sum( $values );
+		$count  = count( $values );
+		$colors = $renderer->get_chart_palette( $count );
 
 		$center_x = $area['x'] + (int) ( $area['width'] / 2 );
 		$center_y = $area['y'] + (int) ( $area['height'] / 2 );
@@ -276,7 +277,7 @@ class ChartTemplate implements TemplateInterface {
 		$legend_x = self::PADDING;
 
 		foreach ( $labels as $i => $label ) {
-			$val_str = $values[ $i ] ?? 0;
+			$val_str     = $values[ $i ] ?? 0;
 			$legend_text = "{$label}: {$val_str}";
 
 			$renderer->filled_rect( $legend_x, $legend_y - 12, $legend_x + 12, $legend_y, $colors[ $i ], true );
@@ -300,12 +301,12 @@ class ChartTemplate implements TemplateInterface {
 		$steps = max( 36, (int) ( abs( $sweep_deg ) / 5 ) );
 
 		// Draw the slice as a polygon.
-		$points = array();
+		$points   = array();
 		$points[] = $cx;
 		$points[] = $cy;
 
 		for ( $i = 0; $i <= $steps; $i++ ) {
-			$angle = deg2rad( $start_deg + ( $sweep_deg * $i / $steps ) );
+			$angle    = deg2rad( $start_deg + ( $sweep_deg * $i / $steps ) );
 			$points[] = $cx + (int) ( $radius * cos( $angle ) );
 			$points[] = $cy + (int) ( $radius * sin( $angle ) );
 		}
