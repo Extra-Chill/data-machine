@@ -148,7 +148,7 @@ class AIStep extends Step {
 		if ( ! empty( $this->dataPackets ) ) {
 			$messages[] = array(
 				'role'    => 'user',
-				'content' => wp_json_encode( array( 'data_packets' => $this->dataPackets ), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE ),
+				'content' => wp_json_encode( array( 'data_packets' => self::sanitizeDataPacketsForAi( $this->dataPackets ) ), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE ),
 			);
 		}
 
@@ -256,6 +256,61 @@ class AIStep extends Step {
 
 		// Process loop results into data packets
 		return self::processLoopResults( $loop_result, $this->dataPackets, $payload, $available_tools );
+	}
+
+	/**
+	 * Remove local-only file paths before serializing data packets to AI.
+	 *
+	 * Fetch handlers may include file_info.file_path so downstream runtime steps
+	 * can attach images or access files. That internal path should not be exposed
+	 * in the AI-visible JSON payload because models can copy it into generated
+	 * content. The original packets remain unchanged for runtime use.
+	 *
+	 * @param array $data_packets Original data packets.
+	 * @return array Sanitized copy safe for AI serialization.
+	 */
+	public static function sanitizeDataPacketsForAi( array $data_packets ): array {
+		$sanitized_packets = array();
+
+		foreach ( $data_packets as $packet ) {
+			if ( ! is_array( $packet ) ) {
+				$sanitized_packets[] = $packet;
+				continue;
+			}
+
+			$sanitized_packet = $packet;
+
+			if ( isset( $sanitized_packet['data'] ) && is_array( $sanitized_packet['data'] ) ) {
+				$sanitized_packet['data'] = self::sanitizePacketDataForAi( $sanitized_packet['data'] );
+			}
+
+			$sanitized_packets[] = $sanitized_packet;
+		}
+
+		return $sanitized_packets;
+	}
+
+	/**
+	 * Remove internal file path fields from packet data.
+	 *
+	 * @param array $packet_data Packet data array.
+	 * @return array Sanitized packet data.
+	 */
+	private static function sanitizePacketDataForAi( array $packet_data ): array {
+		if ( ! isset( $packet_data['file_info'] ) || ! is_array( $packet_data['file_info'] ) ) {
+			return $packet_data;
+		}
+
+		$sanitized_file_info = $packet_data['file_info'];
+		unset( $sanitized_file_info['file_path'] );
+
+		if ( empty( $sanitized_file_info ) ) {
+			unset( $packet_data['file_info'] );
+			return $packet_data;
+		}
+
+		$packet_data['file_info'] = $sanitized_file_info;
+		return $packet_data;
 	}
 
 	/**
