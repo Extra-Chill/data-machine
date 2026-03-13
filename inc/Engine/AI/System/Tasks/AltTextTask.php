@@ -168,6 +168,32 @@ class AltTextTask extends SystemTask {
 	}
 
 	/**
+	 * Get editable prompt definitions for this task.
+	 *
+	 * @return array Prompt definitions keyed by prompt key.
+	 * @since 0.41.0
+	 */
+	public function getPromptDefinitions(): array {
+		return array(
+			'generate' => array(
+				'label'       => __( 'Alt Text Prompt', 'data-machine' ),
+				'description' => __( 'Prompt used to generate alt text for images.', 'data-machine' ),
+				'default'     => "Write alt text for the provided image using these guidelines:\n"
+					. "- Write 1-2 sentences describing the image\n"
+					. "- Don't start with 'Image of' or 'Photo of'\n"
+					. "- Capitalize first word, end with period\n"
+					. "- Describe what's visually present, focus on purpose\n"
+					. "- For complex images (charts/diagrams), provide brief summary only\n\n"
+					. "Return ONLY the alt text, nothing else.\n\n"
+					. "Context:\n{{context}}",
+				'variables'   => array(
+					'context' => 'Attachment title, caption, description, and parent post title',
+				),
+			),
+		);
+	}
+
+	/**
 	 * Build the AI prompt with contextual information.
 	 *
 	 * @param int $attachment_id Attachment ID.
@@ -197,19 +223,9 @@ class AltTextTask extends SystemTask {
 			}
 		}
 
-		$prompt = "Write alt text for the provided image using these guidelines:\n"
-			. "- Write 1-2 sentences describing the image\n"
-			. "- Don't start with 'Image of' or 'Photo of'\n"
-			. "- Capitalize first word, end with period\n"
-			. "- Describe what's visually present, focus on purpose\n"
-			. "- For complex images (charts/diagrams), provide brief summary only\n\n"
-			. 'Return ONLY the alt text, nothing else.';
+		$context = ! empty( $context_lines ) ? implode( "\n", $context_lines ) : '';
 
-		if ( ! empty( $context_lines ) ) {
-			$prompt .= "\n\nContext:\n" . implode( "\n", $context_lines );
-		}
-
-		return $prompt;
+		return $this->buildPromptFromTemplate( 'generate', array( 'context' => $context ) );
 	}
 
 	/**

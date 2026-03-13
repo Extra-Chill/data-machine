@@ -15,6 +15,7 @@ use WP_REST_Server;
 use WP_REST_Request;
 use WP_Error;
 use DataMachine\Engine\AI\System\SystemAgent;
+use DataMachine\Engine\AI\System\Tasks\SystemTask;
 use DataMachine\Core\Database\Jobs\JobsOperations;
 
 if ( ! defined('ABSPATH') ) {
@@ -61,6 +62,89 @@ class System {
 				'permission_callback' => function () {
 					return PermissionHelper::can( 'manage_settings' );
 				},
+			)
+		);
+
+		// System task prompt definitions — list all editable prompts across tasks.
+		register_rest_route(
+			'datamachine/v1',
+			'/system/tasks/prompts',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( self::class, 'get_prompts' ),
+				'permission_callback' => function () {
+					return PermissionHelper::can( 'manage_settings' );
+				},
+			)
+		);
+
+		// Get/set/reset a specific prompt override.
+		register_rest_route(
+			'datamachine/v1',
+			'/system/tasks/prompts/(?P<task_type>[a-z_]+)/(?P<prompt_key>[a-z_]+)',
+			array(
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( self::class, 'get_prompt' ),
+					'permission_callback' => function () {
+						return PermissionHelper::can( 'manage_settings' );
+					},
+					'args'                => array(
+						'task_type'  => array(
+							'required'          => true,
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_key',
+						),
+						'prompt_key' => array(
+							'required'          => true,
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_key',
+						),
+					),
+				),
+				array(
+					'methods'             => 'PUT',
+					'callback'            => array( self::class, 'set_prompt' ),
+					'permission_callback' => function () {
+						return PermissionHelper::can( 'manage_settings' );
+					},
+					'args'                => array(
+						'task_type'  => array(
+							'required'          => true,
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_key',
+						),
+						'prompt_key' => array(
+							'required'          => true,
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_key',
+						),
+						'prompt'     => array(
+							'required'    => true,
+							'type'        => 'string',
+							'description' => __( 'The prompt override text.', 'data-machine' ),
+						),
+					),
+				),
+				array(
+					'methods'             => WP_REST_Server::DELETABLE,
+					'callback'            => array( self::class, 'reset_prompt' ),
+					'permission_callback' => function () {
+						return PermissionHelper::can( 'manage_settings' );
+					},
+					'args'                => array(
+						'task_type'  => array(
+							'required'          => true,
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_key',
+						),
+						'prompt_key' => array(
+							'required'          => true,
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_key',
+						),
+					),
+				),
 			)
 		);
 	}
@@ -113,6 +197,208 @@ class System {
 			'success' => true,
 			'data'    => $tasks,
 		) );
+	}
+
+	/**
+	 * Get all prompt definitions across all system tasks.
+	 *
+	 * Returns each task's editable prompts with their defaults,
+	 * current overrides (if any), and available template variables.
+	 *
+	 * @param WP_REST_Request $request Request object.
+	 * @return \WP_REST_Response
+	 * @since 0.41.0
+	 */
+	public static function get_prompts( WP_REST_Request $request ) {
+		$request;
+		$system_agent = SystemAgent::getInstance();
+		$handlers     = $system_agent->getTaskHandlers();
+		$overrides    = SystemTask::getAllPromptOverrides();
+
+		$prompts = array();
+
+		foreach ( $handlers as $task_type => $handler_class ) {
+			if ( ! class_exists( $handler_class ) ) {
+				continue;
+			}
+
+			$task        = new $handler_class();
+			$definitions = $task->getPromptDefinitions();
+
+			if ( empty( $definitions ) ) {
+				continue;
+			}
+
+			foreach ( $definitions as $prompt_key => $definition ) {
+				$has_override = isset( $overrides[ $task_type ][ $prompt_key ] )
+					&& '' !== $overrides[ $task_type ][ $prompt_key ];
+
+				$prompts[] = array(
+					'task_type'    => $task_type,
+					'prompt_key'   => $prompt_key,
+					'label'        => $definition['label'],
+					'description'  => $definition['description'],
+					'default'      => $definition['default'],
+					'variables'    => $definition['variables'],
+					'has_override' => $has_override,
+					'override'     => $has_override ? $overrides[ $task_type ][ $prompt_key ] : null,
+				);
+			}
+		}
+
+		return rest_ensure_response( array(
+			'success' => true,
+			'data'    => $prompts,
+		) );
+	}
+
+	/**
+	 * Get a specific prompt's definition and current value.
+	 *
+	 * @param WP_REST_Request $request Request with task_type and prompt_key.
+	 * @return \WP_REST_Response|WP_Error
+	 * @since 0.41.0
+	 */
+	public static function get_prompt( WP_REST_Request $request ) {
+		$task_type  = $request->get_param( 'task_type' );
+		$prompt_key = $request->get_param( 'prompt_key' );
+
+		$definition = self::resolve_prompt_definition( $task_type, $prompt_key );
+
+		if ( is_wp_error( $definition ) ) {
+			return $definition;
+		}
+
+		$overrides    = SystemTask::getAllPromptOverrides();
+		$has_override = isset( $overrides[ $task_type ][ $prompt_key ] )
+			&& '' !== $overrides[ $task_type ][ $prompt_key ];
+
+		return rest_ensure_response( array(
+			'success' => true,
+			'data'    => array(
+				'task_type'    => $task_type,
+				'prompt_key'   => $prompt_key,
+				'label'        => $definition['label'],
+				'description'  => $definition['description'],
+				'default'      => $definition['default'],
+				'variables'    => $definition['variables'],
+				'has_override' => $has_override,
+				'override'     => $has_override ? $overrides[ $task_type ][ $prompt_key ] : null,
+				'effective'    => $has_override ? $overrides[ $task_type ][ $prompt_key ] : $definition['default'],
+			),
+		) );
+	}
+
+	/**
+	 * Set a prompt override for a specific task prompt.
+	 *
+	 * @param WP_REST_Request $request Request with task_type, prompt_key, and prompt.
+	 * @return \WP_REST_Response|WP_Error
+	 * @since 0.41.0
+	 */
+	public static function set_prompt( WP_REST_Request $request ) {
+		$task_type  = $request->get_param( 'task_type' );
+		$prompt_key = $request->get_param( 'prompt_key' );
+		$prompt     = $request->get_param( 'prompt' );
+
+		$definition = self::resolve_prompt_definition( $task_type, $prompt_key );
+
+		if ( is_wp_error( $definition ) ) {
+			return $definition;
+		}
+
+		if ( empty( $prompt ) ) {
+			return new WP_Error(
+				'empty_prompt',
+				__( 'Prompt text cannot be empty. Use DELETE to reset to default.', 'data-machine' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$saved = SystemTask::setPromptOverride( $task_type, $prompt_key, $prompt );
+
+		return rest_ensure_response( array(
+			'success' => $saved,
+			'data'    => array(
+				'task_type'  => $task_type,
+				'prompt_key' => $prompt_key,
+				'override'   => $prompt,
+			),
+		) );
+	}
+
+	/**
+	 * Reset a prompt override to default (remove the override).
+	 *
+	 * @param WP_REST_Request $request Request with task_type and prompt_key.
+	 * @return \WP_REST_Response|WP_Error
+	 * @since 0.41.0
+	 */
+	public static function reset_prompt( WP_REST_Request $request ) {
+		$task_type  = $request->get_param( 'task_type' );
+		$prompt_key = $request->get_param( 'prompt_key' );
+
+		$definition = self::resolve_prompt_definition( $task_type, $prompt_key );
+
+		if ( is_wp_error( $definition ) ) {
+			return $definition;
+		}
+
+		// Set empty string to remove override.
+		$reset = SystemTask::setPromptOverride( $task_type, $prompt_key, '' );
+
+		return rest_ensure_response( array(
+			'success' => $reset,
+			'data'    => array(
+				'task_type'  => $task_type,
+				'prompt_key' => $prompt_key,
+				'default'    => $definition['default'],
+			),
+		) );
+	}
+
+	/**
+	 * Resolve and validate a prompt definition by task_type and prompt_key.
+	 *
+	 * @param string $task_type  Task type identifier.
+	 * @param string $prompt_key Prompt key within the task.
+	 * @return array|WP_Error The prompt definition or error.
+	 * @since 0.41.0
+	 */
+	private static function resolve_prompt_definition( string $task_type, string $prompt_key ) {
+		$system_agent = SystemAgent::getInstance();
+		$handlers     = $system_agent->getTaskHandlers();
+
+		if ( ! isset( $handlers[ $task_type ] ) ) {
+			return new WP_Error(
+				'invalid_task_type',
+				sprintf( __( 'Unknown task type: %s', 'data-machine' ), $task_type ),
+				array( 'status' => 404 )
+			);
+		}
+
+		$handler_class = $handlers[ $task_type ];
+
+		if ( ! class_exists( $handler_class ) ) {
+			return new WP_Error(
+				'task_class_missing',
+				sprintf( __( 'Task handler class not found: %s', 'data-machine' ), $handler_class ),
+				array( 'status' => 500 )
+			);
+		}
+
+		$task        = new $handler_class();
+		$definitions = $task->getPromptDefinitions();
+
+		if ( ! isset( $definitions[ $prompt_key ] ) ) {
+			return new WP_Error(
+				'invalid_prompt_key',
+				sprintf( __( 'Unknown prompt key "%s" for task type "%s".', 'data-machine' ), $prompt_key, $task_type ),
+				array( 'status' => 404 )
+			);
+		}
+
+		return $definitions[ $prompt_key ];
 	}
 
 	/**

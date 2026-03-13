@@ -332,6 +332,33 @@ class InternalLinkingTask extends SystemTask {
 	}
 
 	/**
+	 * Get editable prompt definitions for this task.
+	 *
+	 * @return array Prompt definitions keyed by prompt key.
+	 * @since 0.41.0
+	 */
+	public function getPromptDefinitions(): array {
+		return array(
+			'insert_link' => array(
+				'label'       => __( 'Internal Link Insertion Prompt', 'data-machine' ),
+				'description' => __( 'Prompt used to weave internal links into existing paragraph text.', 'data-machine' ),
+				'default'     => "Here is a paragraph from a blog post. Weave in a link to the URL below by wrapping "
+					. "a relevant existing phrase in an anchor tag. Do NOT add new text or change meaning. "
+					. "Return ONLY the updated paragraph HTML. If no natural insertion point exists, "
+					. "return the paragraph unchanged.\n\n"
+					. "URL: {{url}}\n"
+					. "Title: {{title}}\n\n"
+					. "Paragraph:\n{{paragraph}}",
+				'variables'   => array(
+					'url'       => 'URL of the related post to link to',
+					'title'     => 'Title of the related post',
+					'paragraph' => 'The paragraph HTML to insert the link into',
+				),
+			),
+		);
+	}
+
+	/**
 	 * Build AI prompt for a single paragraph + link insertion.
 	 *
 	 * @param string $paragraph_html The paragraph innerHTML.
@@ -339,13 +366,14 @@ class InternalLinkingTask extends SystemTask {
 	 * @return string Prompt text.
 	 */
 	private function buildBlockPrompt( string $paragraph_html, array $related_post ): string {
-		return 'Here is a paragraph from a blog post. Weave in a link to the URL below by wrapping '
-			. 'a relevant existing phrase in an anchor tag. Do NOT add new text or change meaning. '
-			. 'Return ONLY the updated paragraph HTML. If no natural insertion point exists, '
-			. "return the paragraph unchanged.\n\n"
-			. 'URL: ' . $related_post['url'] . "\n"
-			. 'Title: ' . $related_post['title'] . "\n\n"
-			. "Paragraph:\n" . $paragraph_html;
+		return $this->buildPromptFromTemplate(
+			'insert_link',
+			array(
+				'url'       => $related_post['url'],
+				'title'     => $related_post['title'],
+				'paragraph' => $paragraph_html,
+			)
+		);
 	}
 
 	/**

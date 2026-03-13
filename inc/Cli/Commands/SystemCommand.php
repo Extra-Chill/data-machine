@@ -13,6 +13,8 @@ namespace DataMachine\Cli\Commands;
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\SystemAbilities;
+use DataMachine\Engine\AI\System\SystemAgent;
+use DataMachine\Engine\AI\System\Tasks\SystemTask;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -158,5 +160,282 @@ class SystemCommand extends BaseCommand {
 		WP_CLI::success( $result['message'] );
 		WP_CLI::log( sprintf( 'Title:  %s', $result['title'] ) );
 		WP_CLI::log( sprintf( 'Method: %s', $result['method'] ) );
+	}
+
+	/**
+	 * List all editable system task prompts.
+	 *
+	 * Shows each task's editable prompts with their labels and override status.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - csv
+	 *   - yaml
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine system prompts
+	 *     wp datamachine system prompts --format=json
+	 *
+	 * @subcommand prompts
+	 */
+	public function prompts( array $args, array $assoc_args ): void {
+		$format       = $assoc_args['format'] ?? 'table';
+		$system_agent = SystemAgent::getInstance();
+		$handlers     = $system_agent->getTaskHandlers();
+		$overrides    = SystemTask::getAllPromptOverrides();
+
+		$rows = array();
+
+		foreach ( $handlers as $task_type => $handler_class ) {
+			if ( ! class_exists( $handler_class ) ) {
+				continue;
+			}
+
+			$task        = new $handler_class();
+			$definitions = $task->getPromptDefinitions();
+
+			if ( empty( $definitions ) ) {
+				continue;
+			}
+
+			foreach ( $definitions as $prompt_key => $definition ) {
+				$has_override = isset( $overrides[ $task_type ][ $prompt_key ] )
+					&& '' !== $overrides[ $task_type ][ $prompt_key ];
+
+				$rows[] = array(
+					'task_type'    => $task_type,
+					'prompt_key'   => $prompt_key,
+					'label'        => $definition['label'],
+					'has_override' => $has_override ? 'yes' : 'no',
+					'variables'    => implode( ', ', array_keys( $definition['variables'] ) ),
+				);
+			}
+		}
+
+		if ( empty( $rows ) ) {
+			WP_CLI::log( 'No editable prompts found.' );
+			return;
+		}
+
+		$this->format_items( $rows, array( 'task_type', 'prompt_key', 'label', 'has_override', 'variables' ), $assoc_args );
+	}
+
+	/**
+	 * Get the current (effective) prompt for a task.
+	 *
+	 * Shows the override if set, otherwise the default template.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <task_type>
+	 * : Task type identifier (e.g. alt_text_generation).
+	 *
+	 * <prompt_key>
+	 * : Prompt key within the task (e.g. generate).
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine system prompt-get alt_text_generation generate
+	 *     wp datamachine system prompt-get daily_memory_generation memory_cleanup --format=json
+	 *
+	 * @subcommand prompt-get
+	 */
+	public function prompt_get( array $args, array $assoc_args ): void {
+		$task_type  = $args[0] ?? '';
+		$prompt_key = $args[1] ?? '';
+		$format     = $assoc_args['format'] ?? 'table';
+
+		if ( empty( $task_type ) || empty( $prompt_key ) ) {
+			WP_CLI::error( 'Both task_type and prompt_key are required.' );
+			return;
+		}
+
+		$resolved = $this->resolve_task_prompt( $task_type, $prompt_key );
+
+		if ( null === $resolved ) {
+			return; // Error already logged.
+		}
+
+		list( $definition, $task ) = $resolved;
+
+		$overrides    = SystemTask::getAllPromptOverrides();
+		$has_override = isset( $overrides[ $task_type ][ $prompt_key ] )
+			&& '' !== $overrides[ $task_type ][ $prompt_key ];
+		$effective    = $has_override ? $overrides[ $task_type ][ $prompt_key ] : $definition['default'];
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( wp_json_encode( array(
+				'task_type'    => $task_type,
+				'prompt_key'   => $prompt_key,
+				'label'        => $definition['label'],
+				'description'  => $definition['description'],
+				'has_override' => $has_override,
+				'variables'    => $definition['variables'],
+				'effective'    => $effective,
+				'default'      => $definition['default'],
+				'override'     => $has_override ? $overrides[ $task_type ][ $prompt_key ] : null,
+			), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		WP_CLI::log( sprintf( 'Task:        %s', $task_type ) );
+		WP_CLI::log( sprintf( 'Prompt:      %s', $prompt_key ) );
+		WP_CLI::log( sprintf( 'Label:       %s', $definition['label'] ) );
+		WP_CLI::log( sprintf( 'Description: %s', $definition['description'] ) );
+		WP_CLI::log( sprintf( 'Override:    %s', $has_override ? 'yes' : 'no (using default)' ) );
+		WP_CLI::log( sprintf( 'Variables:   %s', implode( ', ', array_map(
+			function ( $k, $v ) {
+				return "{{" . $k . "}} — " . $v;
+			},
+			array_keys( $definition['variables'] ),
+			array_values( $definition['variables'] )
+		) ) ) );
+		WP_CLI::log( '' );
+		WP_CLI::log( '--- Effective Prompt ---' );
+		WP_CLI::log( $effective );
+	}
+
+	/**
+	 * Set a prompt override for a task.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <task_type>
+	 * : Task type identifier.
+	 *
+	 * <prompt_key>
+	 * : Prompt key within the task.
+	 *
+	 * <prompt>
+	 * : The override prompt text. Use {{variable}} placeholders.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine system prompt-set alt_text_generation generate "Write a brief alt text. Context: {{context}}"
+	 *
+	 * @subcommand prompt-set
+	 */
+	public function prompt_set( array $args, array $assoc_args ): void {
+		$task_type  = $args[0] ?? '';
+		$prompt_key = $args[1] ?? '';
+		$prompt     = $args[2] ?? '';
+
+		if ( empty( $task_type ) || empty( $prompt_key ) || empty( $prompt ) ) {
+			WP_CLI::error( 'task_type, prompt_key, and prompt text are all required.' );
+			return;
+		}
+
+		$resolved = $this->resolve_task_prompt( $task_type, $prompt_key );
+
+		if ( null === $resolved ) {
+			return;
+		}
+
+		$saved = SystemTask::setPromptOverride( $task_type, $prompt_key, $prompt );
+
+		if ( $saved ) {
+			WP_CLI::success( sprintf( 'Prompt override set for %s/%s.', $task_type, $prompt_key ) );
+		} else {
+			WP_CLI::error( 'Failed to save prompt override.' );
+		}
+	}
+
+	/**
+	 * Reset a prompt override to default.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <task_type>
+	 * : Task type identifier.
+	 *
+	 * <prompt_key>
+	 * : Prompt key within the task.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine system prompt-reset alt_text_generation generate
+	 *
+	 * @subcommand prompt-reset
+	 */
+	public function prompt_reset( array $args, array $assoc_args ): void {
+		$task_type  = $args[0] ?? '';
+		$prompt_key = $args[1] ?? '';
+
+		if ( empty( $task_type ) || empty( $prompt_key ) ) {
+			WP_CLI::error( 'Both task_type and prompt_key are required.' );
+			return;
+		}
+
+		$resolved = $this->resolve_task_prompt( $task_type, $prompt_key );
+
+		if ( null === $resolved ) {
+			return;
+		}
+
+		$reset = SystemTask::setPromptOverride( $task_type, $prompt_key, '' );
+
+		if ( $reset ) {
+			WP_CLI::success( sprintf( 'Prompt override removed for %s/%s (using default).', $task_type, $prompt_key ) );
+		} else {
+			WP_CLI::error( 'Failed to reset prompt override.' );
+		}
+	}
+
+	/**
+	 * Resolve and validate a task prompt definition.
+	 *
+	 * @param string $task_type  Task type identifier.
+	 * @param string $prompt_key Prompt key.
+	 * @return array|null [definition, task] or null on error.
+	 */
+	private function resolve_task_prompt( string $task_type, string $prompt_key ): ?array {
+		$system_agent = SystemAgent::getInstance();
+		$handlers     = $system_agent->getTaskHandlers();
+
+		if ( ! isset( $handlers[ $task_type ] ) ) {
+			WP_CLI::error( sprintf( 'Unknown task type: %s', $task_type ) );
+			return null;
+		}
+
+		$handler_class = $handlers[ $task_type ];
+
+		if ( ! class_exists( $handler_class ) ) {
+			WP_CLI::error( sprintf( 'Task handler class not found: %s', $handler_class ) );
+			return null;
+		}
+
+		$task        = new $handler_class();
+		$definitions = $task->getPromptDefinitions();
+
+		if ( ! isset( $definitions[ $prompt_key ] ) ) {
+			$available = ! empty( $definitions ) ? implode( ', ', array_keys( $definitions ) ) : 'none';
+			WP_CLI::error( sprintf(
+				'Unknown prompt key "%s" for task "%s". Available: %s',
+				$prompt_key,
+				$task_type,
+				$available
+			) );
+			return null;
+		}
+
+		return array( $definitions[ $prompt_key ], $task );
 	}
 }

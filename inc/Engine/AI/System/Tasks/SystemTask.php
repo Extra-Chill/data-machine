@@ -64,6 +64,163 @@ abstract class SystemTask {
 	}
 
 	/**
+	 * Option key for storing system task prompt overrides.
+	 *
+	 * Stored as: datamachine_task_prompts[task_type][prompt_key] = string
+	 *
+	 * @since 0.41.0
+	 */
+	private const PROMPT_OVERRIDES_OPTION = 'datamachine_task_prompts';
+
+	/**
+	 * Cached prompt overrides (loaded once per request).
+	 *
+	 * @var array|null
+	 * @since 0.41.0
+	 */
+	private static ?array $prompt_overrides_cache = null;
+
+	/**
+	 * Get prompt definitions for this task.
+	 *
+	 * Tasks with AI prompts override this to declare their editable prompts.
+	 * Each prompt has a key, label, description, default template, and available
+	 * context variables (for interpolation).
+	 *
+	 * @return array<string, array{label: string, description: string, default: string, variables: array<string, string>}>
+	 * @since 0.41.0
+	 */
+	public function getPromptDefinitions(): array {
+		return array();
+	}
+
+	/**
+	 * Resolve a prompt by key — returns override if set, default otherwise.
+	 *
+	 * @param string $prompt_key The prompt key (from getPromptDefinitions).
+	 * @return string The resolved prompt template.
+	 * @since 0.41.0
+	 */
+	protected function resolvePrompt( string $prompt_key ): string {
+		$definitions = $this->getPromptDefinitions();
+
+		if ( ! isset( $definitions[ $prompt_key ] ) ) {
+			return '';
+		}
+
+		$overrides = self::getAllPromptOverrides();
+		$task_type = $this->getTaskType();
+
+		if ( isset( $overrides[ $task_type ][ $prompt_key ] ) && '' !== $overrides[ $task_type ][ $prompt_key ] ) {
+			return $overrides[ $task_type ][ $prompt_key ];
+		}
+
+		return $definitions[ $prompt_key ]['default'];
+	}
+
+	/**
+	 * Interpolate context variables into a prompt template.
+	 *
+	 * Replaces {{variable_name}} placeholders with provided values.
+	 * Undefined variables are left as-is (not replaced).
+	 *
+	 * @param string $template  Prompt template with {{variable}} placeholders.
+	 * @param array  $variables Key-value pairs of variable_name => value.
+	 * @return string Interpolated prompt text.
+	 * @since 0.41.0
+	 */
+	protected function interpolatePrompt( string $template, array $variables ): string {
+		foreach ( $variables as $key => $value ) {
+			$template = str_replace( '{{' . $key . '}}', (string) $value, $template );
+		}
+
+		return $template;
+	}
+
+	/**
+	 * Resolve and interpolate a prompt in one call.
+	 *
+	 * Convenience method combining resolvePrompt() + interpolatePrompt().
+	 *
+	 * @param string $prompt_key The prompt key.
+	 * @param array  $variables  Context variables for interpolation.
+	 * @return string The final prompt text.
+	 * @since 0.41.0
+	 */
+	protected function buildPromptFromTemplate( string $prompt_key, array $variables = array() ): string {
+		$template = $this->resolvePrompt( $prompt_key );
+		return $this->interpolatePrompt( $template, $variables );
+	}
+
+	/**
+	 * Get all prompt overrides from the database.
+	 *
+	 * @return array Overrides keyed by task_type then prompt_key.
+	 * @since 0.41.0
+	 */
+	public static function getAllPromptOverrides(): array {
+		if ( null === self::$prompt_overrides_cache ) {
+			self::$prompt_overrides_cache = get_option( self::PROMPT_OVERRIDES_OPTION, array() );
+		}
+
+		return self::$prompt_overrides_cache;
+	}
+
+	/**
+	 * Set a prompt override for a specific task and prompt key.
+	 *
+	 * @param string $task_type  Task type identifier.
+	 * @param string $prompt_key Prompt key within the task.
+	 * @param string $prompt     The override prompt text. Empty string removes the override.
+	 * @return bool True on success.
+	 * @since 0.41.0
+	 */
+	public static function setPromptOverride( string $task_type, string $prompt_key, string $prompt ): bool {
+		$overrides = self::getAllPromptOverrides();
+
+		if ( '' === $prompt ) {
+			// Remove the override — fall back to default.
+			unset( $overrides[ $task_type ][ $prompt_key ] );
+
+			// Clean up empty task-level arrays.
+			if ( isset( $overrides[ $task_type ] ) && empty( $overrides[ $task_type ] ) ) {
+				unset( $overrides[ $task_type ] );
+			}
+		} else {
+			if ( ! isset( $overrides[ $task_type ] ) ) {
+				$overrides[ $task_type ] = array();
+			}
+			$overrides[ $task_type ][ $prompt_key ] = $prompt;
+		}
+
+		self::$prompt_overrides_cache = $overrides;
+		return update_option( self::PROMPT_OVERRIDES_OPTION, $overrides );
+	}
+
+	/**
+	 * Reset all prompt overrides for a task (revert to defaults).
+	 *
+	 * @param string $task_type Task type identifier.
+	 * @return bool True on success.
+	 * @since 0.41.0
+	 */
+	public static function resetPromptOverrides( string $task_type ): bool {
+		$overrides = self::getAllPromptOverrides();
+		unset( $overrides[ $task_type ] );
+		self::$prompt_overrides_cache = $overrides;
+		return update_option( self::PROMPT_OVERRIDES_OPTION, $overrides );
+	}
+
+	/**
+	 * Clear the prompt overrides cache.
+	 *
+	 * @since 0.41.0
+	 */
+	public static function clearPromptCache(): void {
+		self::$prompt_overrides_cache = null;
+	}
+
+	/**
 	 * Resolve the effective system-context model for this job.
 	 *
 	 * Prefers the explicit agent_id stored in task params or nested context.
