@@ -34,6 +34,11 @@ WP_CLI::add_command( 'datamachine batch', Commands\BatchCommand::class );
 WP_CLI::add_command( 'datamachine image', Commands\ImageCommand::class );
 WP_CLI::add_command( 'datamachine github', Commands\GitHubCommand::class );
 WP_CLI::add_command( 'datamachine auth', Commands\AuthCommand::class );
+WP_CLI::add_command( 'datamachine system', Commands\SystemCommand::class );
+WP_CLI::add_command( 'datamachine handlers', Commands\HandlersCommand::class );
+WP_CLI::add_command( 'datamachine taxonomy', Commands\TaxonomyCommand::class );
+WP_CLI::add_command( 'datamachine step-types', Commands\StepTypesCommand::class );
+WP_CLI::add_command( 'datamachine processed-items', Commands\ProcessedItemsCommand::class );
 
 // Aliases for AI agent compatibility (singular/plural variants).
 WP_CLI::add_command( 'datamachine setting', Commands\SettingsCommand::class );
@@ -50,3 +55,6 @@ WP_CLI::add_command( 'datamachine analytics', Commands\AnalyticsCommand::class )
 WP_CLI::add_command( 'datamachine meta-description', Commands\MetaDescriptionCommand::class );
 WP_CLI::add_command( 'datamachine indexnow', Commands\IndexNowCommand::class );
 WP_CLI::add_command( 'datamachine chat', Commands\ChatCommand::class );
+WP_CLI::add_command( 'datamachine handler', Commands\HandlersCommand::class );
+WP_CLI::add_command( 'datamachine step-type', Commands\StepTypesCommand::class );
+WP_CLI::add_command( 'datamachine processed-item', Commands\ProcessedItemsCommand::class );
