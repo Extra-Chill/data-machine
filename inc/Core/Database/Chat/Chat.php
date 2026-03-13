@@ -122,15 +122,27 @@ class Chat extends BaseRepository {
 			}
 		}
 
-		// Best-effort index creation / normalization.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP KEY agent_type', $table_name ) );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP KEY user_agent', $table_name ) );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD KEY context (context)', $table_name ) );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD KEY user_context (user_id, context)', $table_name ) );
+		// Idempotent index normalization: drop legacy, add new — only when needed.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$indexes = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i', $table_name ) );
+		$existing_keys = array_unique( array_column( $indexes, 'Key_name' ) );
+
+		if ( in_array( 'agent_type', $existing_keys, true ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP KEY agent_type', $table_name ) );
+		}
+		if ( in_array( 'user_agent', $existing_keys, true ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP KEY user_agent', $table_name ) );
+		}
+		if ( ! in_array( 'context', $existing_keys, true ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD KEY context (context)', $table_name ) );
+		}
+		if ( ! in_array( 'user_context', $existing_keys, true ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD KEY user_context (user_id, context)', $table_name ) );
+		}
 	}
 
 	/**
