@@ -478,6 +478,9 @@ function datamachine_activate_for_site() {
 	// Backfill agent_id on pipelines, flows, and jobs from user_id→owner_id mapping (idempotent).
 	datamachine_backfill_agent_ids();
 
+	// Assign orphaned resources (agent_id IS NULL) to sole agent on single-agent installs (idempotent).
+	datamachine_assign_orphaned_resources_to_sole_agent();
+
 	// Clean up legacy per-agent-type log level options (idempotent).
 	foreach ( array( 'pipeline', 'chat', 'system' ) as $legacy_agent_type ) {
 		delete_option( "datamachine_log_level_{$legacy_agent_type}" );

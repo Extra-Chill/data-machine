@@ -279,6 +279,12 @@ class Flows {
 			'user_id'     => PermissionHelper::acting_user_id(),
 		);
 
+		// Carry agent_id from body params or query string (agent interceptor).
+		$scoped_agent_id = PermissionHelper::resolve_scoped_agent_id( $request );
+		if ( null !== $scoped_agent_id ) {
+			$input['agent_id'] = $scoped_agent_id;
+		}
+
 		if ( $request->get_param( 'flow_config' ) ) {
 			$input['flow_config'] = $request->get_param( 'flow_config' );
 		}

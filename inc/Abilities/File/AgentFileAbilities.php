@@ -274,17 +274,26 @@ class AgentFileAbilities {
 		$dm      = new DirectoryManager();
 		$user_id = $dm->get_effective_user_id( (int) ( $input['user_id'] ?? 0 ) );
 
-		$agent_dir = $dm->resolve_agent_directory( array(
+		$shared_dir = $dm->get_shared_directory();
+		$agent_dir  = $dm->resolve_agent_directory( array(
 			'agent_id' => (int) ( $input['agent_id'] ?? 0 ),
 			'user_id'  => $user_id,
 		) );
-		$user_dir  = $dm->get_user_directory( $user_id );
+		$user_dir   = $dm->get_user_directory( $user_id );
 
 		$files = array();
 		$seen  = array();
 
-		// Agent identity layer first (wins on conflicts), then user layer.
-		foreach ( array( $agent_dir, $user_dir ) as $dir ) {
+		// Scan directories in priority order: shared (site-wide), agent identity, user.
+		// Agent layer wins on filename conflicts with user layer.
+		// Shared layer is always included (tagged separately, read-only in UI).
+		$layers = array(
+			'shared' => $shared_dir,
+			'agent'  => $agent_dir,
+			'user'   => $user_dir,
+		);
+
+		foreach ( $layers as $layer => $dir ) {
 			if ( ! file_exists( $dir ) ) {
 				continue;
 			}
@@ -305,6 +314,7 @@ class AgentFileAbilities {
 						'size'     => filesize( $filepath ),
 						'modified' => gmdate( 'c', filemtime( $filepath ) ),
 						'type'     => 'core',
+						'layer'    => $layer,
 					);
 					$seen[ $entry ] = true;
 				}
@@ -566,6 +576,12 @@ class AgentFileAbilities {
 		$user_path = $dm->get_user_directory( $user_id ) . '/' . $filename;
 		if ( file_exists( $user_path ) ) {
 			return $user_path;
+		}
+
+		// Shared layer (site-wide files like SITE.md).
+		$shared_path = $dm->get_shared_directory() . '/' . $filename;
+		if ( file_exists( $shared_path ) ) {
+			return $shared_path;
 		}
 
 		return null;

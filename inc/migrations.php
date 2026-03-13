@@ -871,6 +871,109 @@ function datamachine_backfill_agent_ids(): void {
 }
 
 /**
+ * Assign orphaned resources to the sole agent on single-agent installs.
+ *
+ * Handles the case where pipelines, flows, and jobs were created before
+ * agent scoping existed (user_id=0, agent_id=NULL). If exactly one agent
+ * exists, assigns all unowned resources to it.
+ *
+ * Idempotent: runs once per install, skipped if multi-agent (>1 agent).
+ *
+ * @since 0.41.0
+ */
+function datamachine_assign_orphaned_resources_to_sole_agent(): void {
+	if ( get_option( 'datamachine_orphaned_resources_assigned', false ) ) {
+		return;
+	}
+
+	global $wpdb;
+
+	$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+
+	// Only proceed for single-agent installs.
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+	$agent_count = (int) $wpdb->get_var(
+		$wpdb->prepare( 'SELECT COUNT(*) FROM %i', $wpdb->prefix . 'datamachine_agents' )
+	);
+
+	if ( 1 !== $agent_count ) {
+		// 0 agents: nothing to assign to. >1 agents: ambiguous, skip.
+		update_option( 'datamachine_orphaned_resources_assigned', true, true );
+		return;
+	}
+
+	// Get the sole agent's ID.
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+	$agent_id = (int) $wpdb->get_var(
+		$wpdb->prepare( 'SELECT agent_id FROM %i LIMIT 1', $wpdb->prefix . 'datamachine_agents' )
+	);
+
+	if ( $agent_id <= 0 ) {
+		update_option( 'datamachine_orphaned_resources_assigned', true, true );
+		return;
+	}
+
+	$tables = array(
+		$wpdb->prefix . 'datamachine_pipelines',
+		$wpdb->prefix . 'datamachine_flows',
+		$wpdb->prefix . 'datamachine_jobs',
+	);
+
+	$total_assigned = 0;
+
+	foreach ( $tables as $table ) {
+		// Check table exists.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$table_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+		if ( ! $table_exists ) {
+			continue;
+		}
+
+		// Check agent_id column exists.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$col = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'agent_id'",
+				DB_NAME,
+				$table
+			)
+		);
+		if ( null === $col ) {
+			continue;
+		}
+
+		// Assign orphaned rows (agent_id IS NULL) to the sole agent.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix.
+		$updated = $wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$table} SET agent_id = %d WHERE agent_id IS NULL",
+				$agent_id
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL
+
+		if ( false !== $updated ) {
+			$total_assigned += $updated;
+		}
+	}
+
+	update_option( 'datamachine_orphaned_resources_assigned', true, true );
+
+	if ( $total_assigned > 0 ) {
+		do_action(
+			'datamachine_log',
+			'info',
+			'Assigned orphaned resources to sole agent',
+			array(
+				'agent_id'     => $agent_id,
+				'rows_updated' => $total_assigned,
+			)
+		);
+	}
+}
+
+/**
  * Re-schedule all flows with non-manual scheduling on plugin activation.
  *
  * Ensures scheduled flows resume after plugin reactivation.
