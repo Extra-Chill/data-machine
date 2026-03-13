@@ -4,12 +4,17 @@
  * Global dropdown for switching the active agent across all DM admin pages.
  * Persists selection via Zustand (localStorage). Invalidates all TanStack Query
  * caches when agent changes so data refetches with the new scope.
+ *
+ * Always visible when agents exist (even a single agent — the user needs to see
+ * what agent is active). Includes a "+ Create Agent" action and a create button
+ * when no agents exist yet.
  */
 
 /**
  * WordPress dependencies
  */
-import { SelectControl } from '@wordpress/components';
+import { useState, useEffect } from '@wordpress/element';
+import { SelectControl, Button } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 /**
  * External dependencies
@@ -20,30 +25,89 @@ import { useQueryClient } from '@tanstack/react-query';
  */
 import { useAgents, AGENTS_KEY } from '@shared/queries/agents';
 import { useAgentStore } from '@shared/stores/agentStore';
+import CreateAgentModal from './CreateAgentModal';
+
+/**
+ * Special value for the "+ Create Agent" option in the dropdown.
+ */
+const CREATE_AGENT_VALUE = '__create__';
 
 /**
  * Agent switcher dropdown.
  *
- * Shows "All Agents" + each available agent. Hidden when only one agent exists
- * (single-agent installs don't need a switcher).
+ * Shows current agent + all available agents + "Create Agent" action.
+ * When no agents exist, renders a create button instead of a dropdown.
  *
- * @return {React.ReactElement|null} Switcher or null.
+ * @return {React.ReactElement|null} Switcher, create button, or null while loading.
  */
 export default function AgentSwitcher() {
 	const { data: agents = [], isLoading } = useAgents();
 	const { selectedAgentId, setSelectedAgentId } = useAgentStore();
 	const queryClient = useQueryClient();
+	const [ showCreateModal, setShowCreateModal ] = useState( false );
 
-	// Don't render until loaded, or if 0-1 agents (nothing to switch).
-	if ( isLoading || agents.length <= 1 ) {
+	// Auto-select the sole agent when only one exists and none is selected.
+	// Also auto-select if the previously-selected agent no longer exists.
+	useEffect( () => {
+		if ( agents.length === 0 ) {
+			return;
+		}
+
+		const selectedExists = agents.some(
+			( a ) => a.agent_id === selectedAgentId
+		);
+
+		if ( selectedAgentId === null || ! selectedExists ) {
+			if ( agents.length === 1 ) {
+				setSelectedAgentId( agents[ 0 ].agent_id );
+			} else if ( ! selectedExists && selectedAgentId !== null ) {
+				// Selected agent was deleted — clear selection.
+				setSelectedAgentId( null );
+			}
+		}
+	}, [ agents, selectedAgentId, setSelectedAgentId ] );
+
+	// Don't render until the agents list has loaded.
+	if ( isLoading ) {
 		return null;
 	}
 
+	// No agents at all — show a create button.
+	if ( agents.length === 0 ) {
+		return (
+			<div className="datamachine-agent-switcher datamachine-agent-switcher--empty">
+				<Button
+					variant="primary"
+					size="compact"
+					onClick={ () => setShowCreateModal( true ) }
+				>
+					{ __( 'Create Agent', 'data-machine' ) }
+				</Button>
+				{ showCreateModal && (
+					<CreateAgentModal
+						onClose={ () => setShowCreateModal( false ) }
+						onCreated={ ( agent ) => {
+							if ( agent?.agent_id ) {
+								setSelectedAgentId( agent.agent_id );
+							}
+						} }
+					/>
+				) }
+			</div>
+		);
+	}
+
+	// Build dropdown options: agents + create action.
 	const options = [
-		{
-			label: __( 'All Agents', 'data-machine' ),
-			value: '',
-		},
+		// Only show "All Agents" when there are multiple agents.
+		...( agents.length > 1
+			? [
+					{
+						label: __( 'All Agents', 'data-machine' ),
+						value: '',
+					},
+				]
+			: [] ),
 		...agents.map( ( agent ) => ( {
 			label:
 				agent.agent_name ||
@@ -51,15 +115,25 @@ export default function AgentSwitcher() {
 				__( 'Unnamed Agent', 'data-machine' ),
 			value: String( agent.agent_id ),
 		} ) ),
+		{
+			label: __( '+ Create Agent', 'data-machine' ),
+			value: CREATE_AGENT_VALUE,
+		},
 	];
 
 	/**
 	 * Handle agent change — update store and invalidate all cached data
 	 * except the agents list itself (that doesn't change per agent).
 	 *
-	 * @param {string} value Selected agent ID or empty string for all.
+	 * @param {string} value Selected agent ID, empty string for all, or create action.
 	 */
 	const handleChange = ( value ) => {
+		// Intercept the create action — open modal, don't change selection.
+		if ( value === CREATE_AGENT_VALUE ) {
+			setShowCreateModal( true );
+			return;
+		}
+
 		const newId = value === '' ? null : Number( value );
 		const currentId = selectedAgentId;
 
@@ -99,6 +173,16 @@ export default function AgentSwitcher() {
 				onChange={ handleChange }
 				__nextHasNoMarginBottom
 			/>
+			{ showCreateModal && (
+				<CreateAgentModal
+					onClose={ () => setShowCreateModal( false ) }
+					onCreated={ ( agent ) => {
+						if ( agent?.agent_id ) {
+							setSelectedAgentId( agent.agent_id );
+						}
+					} }
+				/>
+			) }
 		</div>
 	);
 }
