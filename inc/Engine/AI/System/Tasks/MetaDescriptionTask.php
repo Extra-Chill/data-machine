@@ -178,6 +178,36 @@ class MetaDescriptionTask extends SystemTask {
 	}
 
 	/**
+	 * Get editable prompt definitions for this task.
+	 *
+	 * @return array Prompt definitions keyed by prompt key.
+	 * @since 0.41.0
+	 */
+	public function getPromptDefinitions(): array {
+		return array(
+			'generate' => array(
+				'label'       => __( 'Meta Description Prompt', 'data-machine' ),
+				'description' => __( 'Prompt used to generate meta descriptions for posts.', 'data-machine' ),
+				'default'     => "Write a meta description for the following web page.\n\n"
+					. "Guidelines:\n"
+					. '- Maximum ' . self::MAX_LENGTH . " characters (this is strict — do not exceed)\n"
+					. "- Lead with the direct answer or hook — what will the reader learn or get?\n"
+					. "- Include the primary topic/keyword naturally\n"
+					. "- Create curiosity or value to encourage clicks\n"
+					. "- Do NOT duplicate the title — expand on it\n"
+					. "- Write in a warm, conversational tone\n"
+					. "- No quotes around the description\n"
+					. "- One or two sentences\n\n"
+					. "Return ONLY the meta description text, nothing else.\n\n"
+					. "Page context:\n{{context}}",
+				'variables'   => array(
+					'context' => 'Post title, content excerpt, categories, and tags',
+				),
+			),
+		);
+	}
+
+	/**
 	 * Build the AI prompt with post context.
 	 *
 	 * Note: The current excerpt is intentionally excluded from prompt context
@@ -216,23 +246,9 @@ class MetaDescriptionTask extends SystemTask {
 			$context_lines[] = 'Tags: ' . implode( ', ', $tags );
 		}
 
-		$prompt = "Write a meta description for the following web page.\n\n"
-			. "Guidelines:\n"
-			. '- Maximum ' . self::MAX_LENGTH . " characters (this is strict — do not exceed)\n"
-			. "- Lead with the direct answer or hook — what will the reader learn or get?\n"
-			. "- Include the primary topic/keyword naturally\n"
-			. "- Create curiosity or value to encourage clicks\n"
-			. "- Do NOT duplicate the title — expand on it\n"
-			. "- Write in a warm, conversational tone\n"
-			. "- No quotes around the description\n"
-			. "- One or two sentences\n\n"
-			. 'Return ONLY the meta description text, nothing else.';
+		$context = ! empty( $context_lines ) ? implode( "\n", $context_lines ) : '';
 
-		if ( ! empty( $context_lines ) ) {
-			$prompt .= "\n\nPage context:\n" . implode( "\n", $context_lines );
-		}
-
-		return $prompt;
+		return $this->buildPromptFromTemplate( 'generate', array( 'context' => $context ) );
 	}
 
 	/**

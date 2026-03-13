@@ -129,6 +129,89 @@ class DailyMemoryTask extends SystemTask {
 	}
 
 	/**
+	 * Get editable prompt definitions for this task.
+	 *
+	 * Daily memory has two prompts:
+	 * - daily_summary: synthesizes the day's DM activity into a concise entry
+	 * - memory_cleanup: splits MEMORY.md into persistent vs session-specific content
+	 *
+	 * @return array Prompt definitions keyed by prompt key.
+	 * @since 0.41.0
+	 */
+	public function getPromptDefinitions(): array {
+		return array(
+			'daily_summary'  => array(
+				'label'       => __( 'Daily Summary Prompt', 'data-machine' ),
+				'description' => __( 'Prompt used to synthesize a daily memory entry from the day\'s activity.', 'data-machine' ),
+				'default'     => "You are a system agent generating a daily memory entry for an AI agent's memory library.\n\n"
+					. "Below is a summary of today's activity on this WordPress site — jobs that ran, chat sessions that occurred, and their outcomes.\n\n"
+					. "Your task: Synthesize this into a concise, useful daily memory entry in markdown format. Focus on:\n"
+					. "- What happened (key events, not every job)\n"
+					. "- What was accomplished\n"
+					. "- Notable outcomes, failures, or patterns worth remembering\n"
+					. "- Any context that would help a future agent session understand what this day was about\n\n"
+					. "Keep it concise — a few paragraphs at most. Use ### headings for sections if needed. Do NOT include raw job IDs or technical metadata. Write as if you're creating notes that a colleague would find useful tomorrow.\n\n"
+					. "---\n\n"
+					. "{{context}}",
+				'variables'   => array(
+					'context' => 'Gathered activity context: jobs completed and chat sessions from the day',
+				),
+			),
+			'memory_cleanup' => array(
+				'label'       => __( 'Memory Cleanup Prompt', 'data-machine' ),
+				'description' => __( 'Prompt used to split MEMORY.md into persistent knowledge and session-specific content for archival.', 'data-machine' ),
+				'default'     => "You are a system agent responsible for keeping an AI agent's MEMORY.md file lean and useful.\n\n"
+					. "MEMORY.md is injected into every AI context window, so it must contain ONLY persistent knowledge that is useful across ALL sessions. Session-specific detail belongs in daily memory files, not in MEMORY.md.\n\n"
+					. "## Your Task\n\n"
+					. "Read the MEMORY.md content below and split it into two parts:\n\n"
+					. "### 1. PERSISTENT (stays in MEMORY.md)\n"
+					. "Content that should remain because it is useful in every future session:\n"
+					. "- Architecture decisions and patterns (how systems are built)\n"
+					. "- Configuration facts (paths, URLs, credentials locations, tool names)\n"
+					. "- Active project state (what's deployed, what's in progress — NOT session logs)\n"
+					. "- Key relationships (repos, people, services and how they connect)\n"
+					. "- Lessons learned that prevent repeating mistakes (the RULE, not the story)\n"
+					. "- Current status of long-running efforts (just the state, not the history)\n\n"
+					. "Condense aggressively:\n"
+					. "- Collapse detailed PR/commit histories into one-line status summaries\n"
+					. "- Remove \"Session N did X\" narratives — extract only the lasting fact\n"
+					. "- Merge duplicate/overlapping sections\n"
+					. "- Remove anything already captured in daily memory files\n"
+					. "- Drop version numbers (they go stale — check live instead)\n"
+					. "- Drop \"Lessons Learned (continued)\" sprawl — keep only unique, actionable rules\n\n"
+					. "### 2. ARCHIVED (moves to daily memory file for {{date}})\n"
+					. "Content that is session-specific or historical detail:\n"
+					. "- Detailed PR descriptions and commit-by-commit narratives\n"
+					. "- \"What we did in this session\" logs\n"
+					. "- Debugging stories and investigation traces\n"
+					. "- Temporary state that will change soon\n"
+					. "- Redundant detail already covered by a condensed persistent entry\n\n"
+					. "## Output Format\n\n"
+					. "You MUST output your response in EXACTLY this format with these delimiters:\n\n"
+					. "===PERSISTENT===\n"
+					. "(cleaned MEMORY.md content here — start with the # header, include all sections)\n\n"
+					. "===ARCHIVED===\n"
+					. "(session-specific content extracted from MEMORY.md, organized by topic)\n\n"
+					. "## Rules\n"
+					. "- NEVER drop information entirely — if it's not persistent, it goes to ARCHIVED\n"
+					. "- The persistent section should ideally be under {{max_size}} (currently it is much larger)\n"
+					. "- Preserve the ## section header structure in MEMORY.md\n"
+					. "- Keep the # Agent Memory top-level header\n"
+					. "- If a section is entirely session-specific, archive the whole section\n"
+					. "- If a section has a mix, keep the persistent facts and archive the detail\n\n"
+					. "---\n\n"
+					. "## Current MEMORY.md Content\n\n"
+					. "{{memory_content}}",
+				'variables'   => array(
+					'memory_content' => 'Current full content of MEMORY.md',
+					'date'           => 'Target date for archival context (YYYY-MM-DD)',
+					'max_size'       => 'Recommended maximum file size (human-readable, e.g. "8 KB")',
+				),
+			),
+		);
+	}
+
+	/**
 	 * Clean up MEMORY.md by archiving session-specific content to the daily file.
 	 *
 	 * Reads the full MEMORY.md, sends it to AI with instructions to separate
@@ -370,64 +453,15 @@ class DailyMemoryTask extends SystemTask {
 	 */
 	private function buildCleanupPrompt( string $memory_content, string $date ): string {
 		$max_size = size_format( AgentMemory::MAX_FILE_SIZE );
-		return <<<PROMPT
-You are a system agent responsible for keeping an AI agent's MEMORY.md file lean and useful.
 
-MEMORY.md is injected into every AI context window, so it must contain ONLY persistent knowledge that is useful across ALL sessions. Session-specific detail belongs in daily memory files, not in MEMORY.md.
-
-## Your Task
-
-Read the MEMORY.md content below and split it into two parts:
-
-### 1. PERSISTENT (stays in MEMORY.md)
-Content that should remain because it is useful in every future session:
-- Architecture decisions and patterns (how systems are built)
-- Configuration facts (paths, URLs, credentials locations, tool names)
-- Active project state (what's deployed, what's in progress — NOT session logs)
-- Key relationships (repos, people, services and how they connect)
-- Lessons learned that prevent repeating mistakes (the RULE, not the story)
-- Current status of long-running efforts (just the state, not the history)
-
-Condense aggressively:
-- Collapse detailed PR/commit histories into one-line status summaries
-- Remove "Session N did X" narratives — extract only the lasting fact
-- Merge duplicate/overlapping sections
-- Remove anything already captured in daily memory files
-- Drop version numbers (they go stale — check live instead)
-- Drop "Lessons Learned (continued)" sprawl — keep only unique, actionable rules
-
-### 2. ARCHIVED (moves to daily memory file for {$date})
-Content that is session-specific or historical detail:
-- Detailed PR descriptions and commit-by-commit narratives
-- "What we did in this session" logs
-- Debugging stories and investigation traces
-- Temporary state that will change soon
-- Redundant detail already covered by a condensed persistent entry
-
-## Output Format
-
-You MUST output your response in EXACTLY this format with these delimiters:
-
-===PERSISTENT===
-(cleaned MEMORY.md content here — start with the # header, include all sections)
-
-===ARCHIVED===
-(session-specific content extracted from MEMORY.md, organized by topic)
-
-## Rules
-- NEVER drop information entirely — if it's not persistent, it goes to ARCHIVED
-- The persistent section should ideally be under {$max_size} (currently it is much larger)
-- Preserve the ## section header structure in MEMORY.md
-- Keep the # Agent Memory top-level header
-- If a section is entirely session-specific, archive the whole section
-- If a section has a mix, keep the persistent facts and archive the detail
-
----
-
-## Current MEMORY.md Content
-
-{$memory_content}
-PROMPT;
+		return $this->buildPromptFromTemplate(
+			'memory_cleanup',
+			array(
+				'memory_content' => $memory_content,
+				'date'           => $date,
+				'max_size'       => $max_size,
+			)
+		);
 	}
 
 	/**
@@ -550,22 +584,9 @@ PROMPT;
 	 * @return string
 	 */
 	private function buildPrompt( string $context ): string {
-		return <<<PROMPT
-You are a system agent generating a daily memory entry for an AI agent's memory library.
-
-Below is a summary of today's activity on this WordPress site — jobs that ran, chat sessions that occurred, and their outcomes.
-
-Your task: Synthesize this into a concise, useful daily memory entry in markdown format. Focus on:
-- What happened (key events, not every job)
-- What was accomplished
-- Notable outcomes, failures, or patterns worth remembering
-- Any context that would help a future agent session understand what this day was about
-
-Keep it concise — a few paragraphs at most. Use ### headings for sections if needed. Do NOT include raw job IDs or technical metadata. Write as if you're creating notes that a colleague would find useful tomorrow.
-
----
-
-{$context}
-PROMPT;
+		return $this->buildPromptFromTemplate(
+			'daily_summary',
+			array( 'context' => $context )
+		);
 	}
 }
