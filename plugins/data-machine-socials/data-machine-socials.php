@@ -18,7 +18,7 @@ if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
-define( 'DATAMACHINE_SOCIALS_VERSION', '0.2.1' );
+define( 'DATAMACHINE_SOCIALS_VERSION', '0.3.0' );
 define( 'DATAMACHINE_SOCIALS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_SOCIALS_URL', plugin_dir_url( __FILE__ ) );
 

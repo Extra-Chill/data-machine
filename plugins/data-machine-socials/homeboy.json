@@ -19,6 +19,10 @@
     {
       "file": "data-machine-socials.php",
       "pattern": "Version:\\s*([\\d.]+)"
+    },
+    {
+      "file": "data-machine-socials.php",
+      "pattern": "DATAMACHINE_SOCIALS_VERSION',\\s*'([0-9.]+)'"
     }
   ]
 }
