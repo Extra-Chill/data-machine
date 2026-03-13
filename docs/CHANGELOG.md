@@ -2,6 +2,21 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.40.1] - 2026-03-13
+
+### Changed
+- replace agent type with context and agent ids
+
+### Fixed
+- sync version targets to 0.40.0 — missed in v0.40.0 release
+- add agent switcher to tabs header, refactor Manage tab
+- redact local file paths from AI payloads
+- defensive cleanup for orphaned scheduled actions
+- Resolve audit issues #717, #722, #775
+- Log level filter not applying in logs page
+- Filter tools by context in pipeline UI
+- centralize plugin defaults for settings UI
+
 ## [0.40.0] - 2026-03-10
 
 ### Added
