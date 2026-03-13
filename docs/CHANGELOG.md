@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.40.2] - 2026-03-13
+
+### Fixed
+- make ensure_context_column index migration idempotent — check before DROP/ADD to avoid DB errors on every page load
+
 ## [0.40.1] - 2026-03-13
 
 ### Changed
