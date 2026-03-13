@@ -241,9 +241,16 @@ class AgentFiles {
 	// =========================================================================
 
 	public static function list_agent_files( WP_REST_Request $request ) {
-		$result = self::getAbilities()->executeListAgentFiles( array(
+		$input = array(
 			'user_id' => self::resolve_scoped_user_id( $request ),
-		) );
+		);
+
+		$agent_id = $request->get_param( 'agent_id' );
+		if ( null !== $agent_id && '' !== $agent_id ) {
+			$input['agent_id'] = (int) $agent_id;
+		}
+
+		$result = self::getAbilities()->executeListAgentFiles( $input );
 
 		if ( ! $result['success'] ) {
 			return new WP_Error( 'list_agent_files_error', $result['error'], array( 'status' => 500 ) );
@@ -256,10 +263,17 @@ class AgentFiles {
 	}
 
 	public static function get_agent_file( WP_REST_Request $request ) {
-		$result = self::getAbilities()->executeGetAgentFile( array(
+		$input = array(
 			'filename' => sanitize_file_name( wp_unslash( $request['filename'] ) ),
 			'user_id'  => self::resolve_scoped_user_id( $request ),
-		) );
+		);
+
+		$agent_id = $request->get_param( 'agent_id' );
+		if ( null !== $agent_id && '' !== $agent_id ) {
+			$input['agent_id'] = (int) $agent_id;
+		}
+
+		$result = self::getAbilities()->executeGetAgentFile( $input );
 
 		if ( ! $result['success'] ) {
 			$status = false !== strpos( $result['error'] ?? '', 'not found' ) ? 404 : 400;
@@ -279,11 +293,18 @@ class AgentFiles {
 			$content = $request->get_body();
 		}
 
-		$result = self::getAbilities()->executeWriteAgentFile( array(
+		$input = array(
 			'filename' => sanitize_file_name( wp_unslash( $request['filename'] ) ),
 			'content'  => $content,
 			'user_id'  => self::resolve_scoped_user_id( $request ),
-		) );
+		);
+
+		$agent_id = $request->get_param( 'agent_id' );
+		if ( null !== $agent_id && '' !== $agent_id ) {
+			$input['agent_id'] = (int) $agent_id;
+		}
+
+		$result = self::getAbilities()->executeWriteAgentFile( $input );
 
 		if ( ! $result['success'] ) {
 			$status = 400;
@@ -311,10 +332,17 @@ class AgentFiles {
 			);
 		}
 
-		$result = self::getAbilities()->executeDeleteAgentFile( array(
+		$input = array(
 			'filename' => $filename,
 			'user_id'  => self::resolve_scoped_user_id( $request ),
-		) );
+		);
+
+		$agent_id = $request->get_param( 'agent_id' );
+		if ( null !== $agent_id && '' !== $agent_id ) {
+			$input['agent_id'] = (int) $agent_id;
+		}
+
+		$result = self::getAbilities()->executeDeleteAgentFile( $input );
 
 		if ( ! $result['success'] ) {
 			$status = false !== strpos( $result['error'] ?? '', 'not found' ) ? 404 : 400;

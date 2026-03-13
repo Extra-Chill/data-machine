@@ -386,14 +386,21 @@ class Pipelines {
 		}
 
 		$abilities = new PipelineAbilities();
-		$result    = $abilities->executeCreatePipeline(
-			array(
-				'pipeline_name' => $params['pipeline_name'],
-				'steps'         => $params['steps'] ?? array(),
-				'flow_config'   => $params['flow_config'] ?? array(),
-				'user_id'       => PermissionHelper::acting_user_id(),
-			)
+
+		$input = array(
+			'pipeline_name' => $params['pipeline_name'],
+			'steps'         => $params['steps'] ?? array(),
+			'flow_config'   => $params['flow_config'] ?? array(),
+			'user_id'       => PermissionHelper::acting_user_id(),
 		);
+
+		// Carry agent_id from body params or query string (agent interceptor).
+		$scoped_agent_id = PermissionHelper::resolve_scoped_agent_id( $request );
+		if ( null !== $scoped_agent_id ) {
+			$input['agent_id'] = $scoped_agent_id;
+		}
+
+		$result = $abilities->executeCreatePipeline( $input );
 
 		if ( ! $result['success'] ) {
 			return new \WP_Error(

@@ -231,16 +231,30 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 		: [];
 	const dailySummary = files?.find( ( f ) => f.type === 'daily_summary' );
 
-	// Sort core files: SOUL.md first, then alphabetical.
-	const sortedCoreFiles = [ ...coreFiles ].sort( ( a, b ) => {
-		if ( a.filename === SOUL_FILE ) {
-			return -1;
-		}
-		if ( b.filename === SOUL_FILE ) {
-			return 1;
-		}
-		return a.filename.localeCompare( b.filename );
-	} );
+	// Group files by layer (shared, agent, user).
+	const sharedFiles = coreFiles.filter( ( f ) => f.layer === 'shared' );
+	const agentFiles = coreFiles.filter(
+		( f ) => f.layer === 'agent' || ( ! f.layer && f.filename !== 'USER.md' )
+	);
+	const userFiles = coreFiles.filter(
+		( f ) => f.layer === 'user' || ( ! f.layer && f.filename === 'USER.md' )
+	);
+
+	// Sort within each layer: SOUL.md first, then alphabetical.
+	const sortLayer = ( items ) =>
+		[ ...items ].sort( ( a, b ) => {
+			if ( a.filename === SOUL_FILE ) {
+				return -1;
+			}
+			if ( b.filename === SOUL_FILE ) {
+				return 1;
+			}
+			return a.filename.localeCompare( b.filename );
+		} );
+
+	const sortedSharedFiles = sortLayer( sharedFiles );
+	const sortedAgentFiles = sortLayer( agentFiles );
+	const sortedUserFiles = sortLayer( userFiles );
 
 	if ( isLoading ) {
 		return (
@@ -323,68 +337,86 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 			) }
 
 			<div className="datamachine-agent-file-items">
-				{ /* Core files section */ }
-				{ sortedCoreFiles.map( ( file ) => {
-					const isSoul = file.filename === SOUL_FILE;
-					const selected = isSelected( selectedFile, 'core', {
-						filename: file.filename,
-					} );
+				{ /* Render a layer section with header and file items */ }
+				{ [ ...( sortedSharedFiles.length > 0
+					? [ { label: 'Site', files: sortedSharedFiles, layerKey: 'shared' } ]
+					: [] ),
+				...( sortedAgentFiles.length > 0
+					? [ { label: 'Agent', files: sortedAgentFiles, layerKey: 'agent' } ]
+					: [] ),
+				...( sortedUserFiles.length > 0
+					? [ { label: 'User', files: sortedUserFiles, layerKey: 'user' } ]
+					: [] ),
+				].map( ( section ) => (
+					<div key={ section.layerKey } className="datamachine-agent-file-layer">
+						<div className="datamachine-agent-file-layer-header">
+							<span className="datamachine-agent-file-layer-label">
+								{ section.label }
+							</span>
+						</div>
+						{ section.files.map( ( file ) => {
+							const selected = isSelected( selectedFile, 'core', {
+								filename: file.filename,
+							} );
+							const isShared = section.layerKey === 'shared';
 
-					return (
-						<div
-							key={ file.filename }
-							className={ `datamachine-agent-file-item${
-								selected ? ' is-selected' : ''
-							}` }
-							onClick={ () =>
-								onSelectFile( {
-									type: 'core',
-									filename: file.filename,
-								} )
-							}
-							role="button"
-							tabIndex={ 0 }
-							onKeyDown={ ( e ) => {
-								if (
-									e.key === 'Enter' ||
-									e.key === ' '
-								) {
-									onSelectFile( {
-										type: 'core',
-										filename: file.filename,
-									} );
-								}
-							} }
-						>
-							<div className="datamachine-agent-file-item-info">
-								<span className="datamachine-agent-file-item-name">
-									{ file.filename }
-								</span>
-								<span className="datamachine-agent-file-item-meta">
-									{ formatSize( file.size ) }
-									{ file.modified &&
-										` \u00b7 ${ formatDate(
-											file.modified
-										) }` }
-								</span>
-							</div>
-							{ ! PROTECTED_FILES.includes( file.filename ) && (
-								<button
-									className="datamachine-agent-file-item-delete"
-									title={ `Delete ${ file.filename }` }
-									onClick={ ( e ) => {
-										e.stopPropagation();
-										setDeleteConfirm( file.filename );
+							return (
+								<div
+									key={ file.filename }
+									className={ `datamachine-agent-file-item${
+										selected ? ' is-selected' : ''
+									}${ isShared ? ' is-shared' : '' }` }
+									onClick={ () =>
+										onSelectFile( {
+											type: 'core',
+											filename: file.filename,
+										} )
+									}
+									role="button"
+									tabIndex={ 0 }
+									onKeyDown={ ( e ) => {
+										if (
+											e.key === 'Enter' ||
+											e.key === ' '
+										) {
+											onSelectFile( {
+												type: 'core',
+												filename: file.filename,
+											} );
+										}
 									} }
 								>
-									&#x1f5d1;
-								</button>
-							) }
-						</div>
-					);
-				} ) }
+									<div className="datamachine-agent-file-item-info">
+										<span className="datamachine-agent-file-item-name">
+											{ file.filename }
+										</span>
+										<span className="datamachine-agent-file-item-meta">
+											{ formatSize( file.size ) }
+											{ file.modified &&
+												` \u00b7 ${ formatDate(
+													file.modified
+												) }` }
+										</span>
+									</div>
+									{ ! PROTECTED_FILES.includes( file.filename ) && ! isShared && (
+										<button
+											className="datamachine-agent-file-item-delete"
+											title={ `Delete ${ file.filename }` }
+											onClick={ ( e ) => {
+												e.stopPropagation();
+												setDeleteConfirm( file.filename );
+											} }
+										>
+											&#x1f5d1;
+										</button>
+									) }
+								</div>
+							);
+						} ) }
+					</div>
+				) ) }
 
-				{ sortedCoreFiles.length === 0 && ! isAdding && (
+				{ coreFiles.length === 0 && ! isAdding && (
 					<div className="datamachine-agent-file-list-empty">
 						No files yet.
 					</div>

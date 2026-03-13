@@ -9,6 +9,18 @@
  * Internal dependencies
  */
 import { client } from '@shared/utils/api';
+import { useAgentStore } from '@shared/stores/agentStore';
+
+/**
+ * Get agent_id payload for mutations.
+ * Returns an object with agent_id if one is selected, or empty object.
+ *
+ * @return {Object} { agent_id: number } or {}.
+ */
+const getAgentPayload = () => {
+	const { selectedAgentId } = useAgentStore.getState();
+	return selectedAgentId ? { agent_id: selectedAgentId } : {};
+};
 
 /**
  * Pipeline Operations
@@ -34,7 +46,10 @@ export const fetchPipelines = async ( pipelineId = null ) => {
  * @return {Promise<Object>} Created pipeline data
  */
 export const createPipeline = async ( name ) => {
-	return await client.post( '/pipelines', { pipeline_name: name } );
+	return await client.post( '/pipelines', {
+		pipeline_name: name,
+		...getAgentPayload(),
+	} );
 };
 
 /**
@@ -192,6 +207,7 @@ export const createFlow = async ( pipelineId, flowName ) => {
 	return await client.post( '/flows', {
 		pipeline_id: pipelineId,
 		flow_name: flowName,
+		...getAgentPayload(),
 	} );
 };
 
