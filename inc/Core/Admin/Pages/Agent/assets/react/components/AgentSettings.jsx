@@ -147,13 +147,13 @@ const AgentSettings = () => {
 										updateField( 'default_model', model )
 									}
 									applyDefaults={ false }
-									providerLabel="Global Default Provider"
-									modelLabel="Global Default Model"
+									providerLabel="Default Provider"
+									modelLabel="Default Model"
 								/>
 							</div>
 							<p className="description">
-								Fallback provider and model used when no
-								agent-specific override is set below.
+								The default provider and model used for all
+								contexts unless overridden below.
 							</p>
 						</td>
 					</tr>
@@ -171,9 +171,10 @@ const AgentSettings = () => {
 										marginBottom: '16px',
 									} }
 								>
-									Assign different providers and models to
-									each execution context. Leave empty to use the
-									global default above.
+									The same agent runs in different contexts
+									with different toolkits. Override the default
+									model for specific contexts — leave empty to
+									use the default above.
 								</p>
 								{ ( providersData?.contexts || [] ).map(
 									( contextItem ) => {
