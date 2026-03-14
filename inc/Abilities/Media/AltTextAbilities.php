@@ -13,7 +13,7 @@ namespace DataMachine\Abilities\Media;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\PluginSettings;
-use DataMachine\Engine\AI\System\SystemAgent;
+use DataMachine\Engine\Tasks\TaskScheduler;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -243,8 +243,7 @@ class AltTextAbilities {
 			);
 		}
 
-		$systemAgent = SystemAgent::getInstance();
-		$batch       = $systemAgent->scheduleBatch(
+		$batch = TaskScheduler::scheduleBatch(
 			'alt_text_generation',
 			$item_params,
 			array(
@@ -259,7 +258,7 @@ class AltTextAbilities {
 				'queued_count'   => 0,
 				'attachment_ids' => array(),
 				'message'        => 'Failed to schedule batch.',
-				'error'          => 'System Agent batch scheduling failed.',
+				'error'          => 'Task batch scheduling failed.',
 			);
 		}
 
@@ -271,7 +270,7 @@ class AltTextAbilities {
 			'message'        => sprintf(
 				'Alt text generation batch scheduled for %d attachment(s) (chunks of %d).',
 				count( $eligible ),
-				$batch['chunk_size'] ?? SystemAgent::BATCH_CHUNK_SIZE
+				$batch['chunk_size'] ?? TaskScheduler::BATCH_CHUNK_SIZE
 			),
 		);
 	}
@@ -379,8 +378,7 @@ class AltTextAbilities {
 			return;
 		}
 
-		$systemAgent = SystemAgent::getInstance();
-		$systemAgent->scheduleTask(
+		TaskScheduler::schedule(
 			'alt_text_generation',
 			array(
 				'attachment_id' => $attachment_id,

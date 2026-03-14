@@ -17,7 +17,7 @@ use DataMachine\Cli\AgentResolver;
 use DataMachine\Cli\UserResolver;
 use DataMachine\Abilities\JobAbilities;
 use DataMachine\Core\Database\Jobs\Jobs;
-use DataMachine\Engine\AI\System\SystemAgent;
+use DataMachine\Engine\Tasks\TaskRegistry;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -1014,8 +1014,7 @@ class JobsCommand extends BaseCommand {
 		}
 
 		// Resolve task handlers.
-		$system_agent = SystemAgent::getInstance();
-		$handlers     = $system_agent->getTaskHandlers();
+		$handlers = TaskRegistry::getHandlers();
 
 		$total_reverted = 0;
 		$total_skipped  = 0;
