@@ -82,18 +82,6 @@ class TaskRegistryTest extends WP_UnitTestCase {
 		$this->assertSame( 'TestCustomTaskClass', TaskRegistry::getHandler( 'test_custom_task' ) );
 	}
 
-	public function test_legacy_filter_backward_compat(): void {
-		add_filter( 'datamachine_system_agent_tasks', function ( $tasks ) {
-			$tasks['legacy_custom_task'] = 'LegacyTaskClass';
-			return $tasks;
-		} );
-
-		TaskRegistry::reset();
-
-		$this->assertTrue( TaskRegistry::isRegistered( 'legacy_custom_task' ) );
-		$this->assertSame( 'LegacyTaskClass', TaskRegistry::getHandler( 'legacy_custom_task' ) );
-	}
-
 	public function test_reset_clears_cache(): void {
 		TaskRegistry::getHandlers(); // Populate cache.
 		TaskRegistry::reset();

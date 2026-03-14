@@ -3,8 +3,7 @@
  * System Agent Service Provider.
  *
  * Registers task infrastructure: built-in task handlers, Action Scheduler
- * hooks, and scheduled task management. Bridges the legacy SystemAgent
- * singleton with the new TaskRegistry and TaskScheduler classes.
+ * hooks, and scheduled task management.
  *
  * @package DataMachine\Engine\AI\System
  * @since 0.22.4
@@ -36,7 +35,6 @@ class SystemAgentServiceProvider {
 	 */
 	public function __construct() {
 		$this->registerTaskHandlers();
-		$this->registerBackwardCompatFilter();
 		$this->initializeRegistry();
 		$this->registerActionSchedulerHooks();
 		$this->manageDailyMemorySchedule();
@@ -51,31 +49,6 @@ class SystemAgentServiceProvider {
 		add_filter(
 			'datamachine_tasks',
 			array( $this, 'getBuiltInTasks' )
-		);
-	}
-
-	/**
-	 * Register backward-compatible filter bridge.
-	 *
-	 * Any third-party code hooking the old `datamachine_system_agent_tasks`
-	 * filter will have its tasks merged into the new `datamachine_tasks` filter.
-	 *
-	 * @since 0.37.0
-	 */
-	private function registerBackwardCompatFilter(): void {
-		add_filter(
-			'datamachine_tasks',
-			function ( array $tasks ): array {
-				/**
-				 * Legacy filter for registering system agent tasks.
-				 *
-				 * @deprecated 0.37.0 Use the `datamachine_tasks` filter instead.
-				 * @param array $tasks Task type => handler class name mapping.
-				 */
-				return apply_filters( 'datamachine_system_agent_tasks', $tasks );
-			},
-			// Run after built-in tasks (priority 10) so legacy filter sees them.
-			20
 		);
 	}
 
@@ -110,14 +83,8 @@ class SystemAgentServiceProvider {
 
 	/**
 	 * Register Action Scheduler hooks.
-	 *
-	 * Registers hooks for both new and legacy AS action names.
-	 * New actions use `datamachine_task_*` prefix.
-	 * Legacy actions (`datamachine_system_agent_*`) are kept for
-	 * in-flight jobs scheduled before the upgrade.
 	 */
 	private function registerActionSchedulerHooks(): void {
-		// New action names.
 		add_action(
 			'datamachine_task_handle',
 			array( $this, 'handleScheduledTask' )
@@ -125,17 +92,6 @@ class SystemAgentServiceProvider {
 
 		add_action(
 			'datamachine_task_process_batch',
-			array( $this, 'handleBatchChunk' )
-		);
-
-		// Legacy action names — handle in-flight jobs from before upgrade.
-		add_action(
-			'datamachine_system_agent_handle_task',
-			array( $this, 'handleScheduledTask' )
-		);
-
-		add_action(
-			'datamachine_system_agent_process_batch',
 			array( $this, 'handleBatchChunk' )
 		);
 

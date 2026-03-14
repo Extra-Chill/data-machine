@@ -33,27 +33,15 @@ class SystemAgentServiceProviderTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'image_generation', $tasks );
 	}
 
-	public function test_new_task_handle_action_is_registered(): void {
+	public function test_task_handle_action_is_registered(): void {
 		$this->assertIsInt(
 			has_action( 'datamachine_task_handle', [ $this->provider, 'handleScheduledTask' ] )
 		);
 	}
 
-	public function test_new_task_process_batch_action_is_registered(): void {
+	public function test_task_process_batch_action_is_registered(): void {
 		$this->assertIsInt(
 			has_action( 'datamachine_task_process_batch', [ $this->provider, 'handleBatchChunk' ] )
-		);
-	}
-
-	public function test_legacy_handle_task_action_is_registered(): void {
-		$this->assertIsInt(
-			has_action( 'datamachine_system_agent_handle_task', [ $this->provider, 'handleScheduledTask' ] )
-		);
-	}
-
-	public function test_legacy_process_batch_action_is_registered(): void {
-		$this->assertIsInt(
-			has_action( 'datamachine_system_agent_process_batch', [ $this->provider, 'handleBatchChunk' ] )
 		);
 	}
 
