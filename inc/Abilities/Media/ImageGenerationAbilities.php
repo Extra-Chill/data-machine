@@ -19,7 +19,7 @@ use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\RequestBuilder;
-use DataMachine\Engine\AI\System\SystemAgent;
+use DataMachine\Engine\Tasks\TaskScheduler;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -237,8 +237,7 @@ class ImageGenerationAbilities {
 			$context['position'] = sanitize_text_field( $input['position'] );
 		}
 
-		$systemAgent = SystemAgent::getInstance();
-		$jobId       = $systemAgent->scheduleTask(
+		$jobId = TaskScheduler::schedule(
 			'image_generation',
 			array(
 				'prediction_id'   => $prediction['id'],

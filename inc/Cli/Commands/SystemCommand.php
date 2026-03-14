@@ -13,7 +13,7 @@ namespace DataMachine\Cli\Commands;
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\SystemAbilities;
-use DataMachine\Engine\AI\System\SystemAgent;
+use DataMachine\Engine\Tasks\TaskRegistry;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 
 defined( 'ABSPATH' ) || exit;
@@ -189,9 +189,8 @@ class SystemCommand extends BaseCommand {
 	 */
 	public function prompts( array $args, array $assoc_args ): void {
 		$format       = $assoc_args['format'] ?? 'table';
-		$system_agent = SystemAgent::getInstance();
-		$handlers     = $system_agent->getTaskHandlers();
-		$overrides    = SystemTask::getAllPromptOverrides();
+		$handlers  = TaskRegistry::getHandlers();
+		$overrides = SystemTask::getAllPromptOverrides();
 
 		$rows = array();
 
@@ -407,8 +406,7 @@ class SystemCommand extends BaseCommand {
 	 * @return array|null [definition, task] or null on error.
 	 */
 	private function resolve_task_prompt( string $task_type, string $prompt_key ): ?array {
-		$system_agent = SystemAgent::getInstance();
-		$handlers     = $system_agent->getTaskHandlers();
+		$handlers = TaskRegistry::getHandlers();
 
 		if ( ! isset( $handlers[ $task_type ] ) ) {
 			WP_CLI::error( sprintf( 'Unknown task type: %s', $task_type ) );

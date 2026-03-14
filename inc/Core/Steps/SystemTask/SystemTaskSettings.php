@@ -52,13 +52,12 @@ class SystemTaskSettings extends SettingsHandler {
 	private static function getTaskOptions(): array {
 		$options = array();
 
-		// SystemAgent may not be initialized during early bootstrap.
-		if ( ! class_exists( '\DataMachine\Engine\AI\System\SystemAgent' ) ) {
+		// TaskRegistry may not be initialized during early bootstrap.
+		if ( ! class_exists( '\DataMachine\Engine\Tasks\TaskRegistry' ) ) {
 			return $options;
 		}
 
-		$system_agent = \DataMachine\Engine\AI\System\SystemAgent::getInstance();
-		$handlers     = $system_agent->getTaskHandlers();
+		$handlers = \DataMachine\Engine\Tasks\TaskRegistry::getHandlers();
 
 		foreach ( $handlers as $task_type => $handler_class ) {
 			$label = ucfirst( str_replace( '_', ' ', $task_type ) );

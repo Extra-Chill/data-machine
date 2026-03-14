@@ -14,7 +14,7 @@ use DataMachine\Abilities\PermissionHelper;
 use WP_REST_Server;
 use WP_REST_Request;
 use WP_Error;
-use DataMachine\Engine\AI\System\SystemAgent;
+use DataMachine\Engine\Tasks\TaskRegistry;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 use DataMachine\Core\Database\Jobs\JobsOperations;
 
@@ -178,8 +178,7 @@ class System {
 	 */
 	public static function get_tasks( WP_REST_Request $request ) {
 		$request;
-		$system_agent = SystemAgent::getInstance();
-		$registry     = $system_agent->getTaskRegistry();
+		$registry = TaskRegistry::getRegistry();
 		$last_runs    = self::get_last_runs( array_keys( $registry ) );
 
 		// Merge last-run data into each task entry.
@@ -211,9 +210,8 @@ class System {
 	 */
 	public static function get_prompts( WP_REST_Request $request ) {
 		$request;
-		$system_agent = SystemAgent::getInstance();
-		$handlers     = $system_agent->getTaskHandlers();
-		$overrides    = SystemTask::getAllPromptOverrides();
+		$handlers  = TaskRegistry::getHandlers();
+		$overrides = SystemTask::getAllPromptOverrides();
 
 		$prompts = array();
 
@@ -366,8 +364,7 @@ class System {
 	 * @since 0.41.0
 	 */
 	private static function resolve_prompt_definition( string $task_type, string $prompt_key ) {
-		$system_agent = SystemAgent::getInstance();
-		$handlers     = $system_agent->getTaskHandlers();
+		$handlers = TaskRegistry::getHandlers();
 
 		if ( ! isset( $handlers[ $task_type ] ) ) {
 			return new WP_Error(
