@@ -82,7 +82,7 @@ class InstagramPublishAbility {
 				'datamachine/instagram-publish',
 				array(
 					'label'               => __( 'Publish to Instagram', 'data-machine-socials' ),
-				'description'         => __( 'Post content to Instagram — supports single image, carousel (up to 10 images), and Reel (video)', 'data-machine-socials' ),
+				'description'         => __( 'Post content to Instagram — supports single image, carousel (up to 10 images), Reel (video), and Story (image or video)', 'data-machine-socials' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -95,8 +95,8 @@ class InstagramPublishAbility {
 						),
 						'media_kind'     => array(
 							'type'        => 'string',
-							'description' => 'Type of media to publish: image (default), carousel, or reel',
-							'enum'        => array( 'image', 'carousel', 'reel' ),
+							'description' => 'Type of media to publish: image (default), carousel, reel, or story',
+							'enum'        => array( 'image', 'carousel', 'reel', 'story' ),
 							'default'     => 'image',
 						),
 						'image_urls'     => array(
@@ -110,7 +110,7 @@ class InstagramPublishAbility {
 						),
 						'video_url'      => array(
 							'type'        => 'string',
-							'description' => 'Public video URL for Reel publishing (required when media_kind is reel)',
+							'description' => 'Public video URL for Reel or Story publishing',
 							'format'      => 'uri',
 						),
 						'cover_url'      => array(
@@ -122,6 +122,11 @@ class InstagramPublishAbility {
 							'type'        => 'boolean',
 							'description' => 'Whether to share the Reel to the main feed (default true)',
 							'default'     => true,
+						),
+						'story_image_url' => array(
+							'type'        => 'string',
+							'description' => 'Image URL for Story publishing (use this or video_url for stories)',
+							'format'      => 'uri',
 						),
 						'aspect_ratio'   => array(
 							'type'        => 'string',
@@ -197,6 +202,7 @@ class InstagramPublishAbility {
 	 * - image (default): single image post
 	 * - carousel: multi-image carousel (auto-detected from image_urls count)
 	 * - reel: video Reel via container flow
+	 * - story: ephemeral Story (image or video, 24h lifespan)
 	 *
 	 * @param array $input Ability input with publish parameters.
 	 * @return array Response with post details or error.
@@ -248,6 +254,10 @@ class InstagramPublishAbility {
 		// Route to appropriate publish flow.
 		if ( 'reel' === $media_kind ) {
 			return self::publish_reel( $input, $user_id, $access_token, $caption );
+		}
+
+		if ( 'story' === $media_kind ) {
+			return self::publish_story( $input, $user_id, $access_token );
 		}
 
 		return self::publish_image( $input, $user_id, $access_token, $caption );
@@ -522,14 +532,112 @@ class InstagramPublishAbility {
 	}
 
 	/**
+	 * Publish a Story to Instagram.
+	 *
+	 * Stories support a single image or video and are ephemeral (24h lifespan).
+	 * Uses the Instagram Graph API container flow with media_type=STORIES.
+	 *
+	 * Note: Stories do not support captions via the API. The content param is
+	 * accepted but not sent to the API (logged for tracking purposes only).
+	 *
+	 * @param array  $input        Ability input.
+	 * @param string $user_id      Instagram user ID.
+	 * @param string $access_token Valid access token.
+	 * @return array Result.
+	 */
+	private static function publish_story( array $input, string $user_id, string $access_token ): array {
+		$story_image_url = $input['story_image_url'] ?? '';
+		$video_url       = $input['video_url'] ?? '';
+
+		// Stories require exactly one media source: image or video.
+		if ( empty( $story_image_url ) && empty( $video_url ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'story_image_url or video_url is required for Story publishing',
+			);
+		}
+
+		// Build the container request body.
+		$container_body = array(
+			'media_type'   => 'STORIES',
+			'access_token' => $access_token,
+		);
+
+		if ( ! empty( $video_url ) ) {
+			if ( ! filter_var( $video_url, FILTER_VALIDATE_URL ) ) {
+				return array(
+					'success' => false,
+					'error'   => 'Invalid video URL: ' . $video_url,
+				);
+			}
+			$container_body['video_url'] = $video_url;
+		} else {
+			if ( ! filter_var( $story_image_url, FILTER_VALIDATE_URL ) ) {
+				return array(
+					'success' => false,
+					'error'   => 'Invalid story image URL: ' . $story_image_url,
+				);
+			}
+			$container_body['image_url'] = $story_image_url;
+		}
+
+		// Step 1: Create the Story container.
+		$response = wp_remote_post(
+			self::GRAPH_API_URL . "/{$user_id}/media",
+			array(
+				'body'    => $container_body,
+				'timeout' => 60,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Error creating Story container: ' . $response->get_error_message(),
+			);
+		}
+
+		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+		if ( empty( $body['id'] ) ) {
+			$error_msg = 'No container ID returned for Story';
+			if ( isset( $body['error']['message'] ) ) {
+				$error_msg .= ': ' . $body['error']['message'];
+			}
+			return array(
+				'success' => false,
+				'error'   => $error_msg,
+			);
+		}
+
+		$container_id = $body['id'];
+
+		// Step 2: Wait for processing.
+		// Video stories need longer polling; image stories are usually instant.
+		$max_retries = ! empty( $video_url ) ? self::VIDEO_POLL_MAX_RETRIES : 10;
+		$interval    = ! empty( $video_url ) ? self::VIDEO_POLL_INTERVAL : 1;
+
+		$ready = self::wait_for_container( $access_token, $container_id, $max_retries, $interval );
+		if ( ! $ready ) {
+			return array(
+				'success' => false,
+				'error'   => 'Story media processing failed or timed out for container: ' . $container_id,
+			);
+		}
+
+		// Step 3: Publish.
+		return self::publish_container( $user_id, $access_token, $container_id, 'story' );
+	}
+
+	/**
 	 * Publish a prepared container to Instagram and fetch the permalink.
 	 *
-	 * Shared final step for image, carousel, and reel flows.
+	 * Shared final step for image, carousel, reel, and story flows.
 	 *
 	 * @param string $user_id        Instagram user ID.
 	 * @param string $access_token   Valid access token.
 	 * @param string $container_id   Container ID from media creation.
-	 * @param string $media_kind     Media kind identifier (image, carousel, reel).
+	 * @param string $media_kind     Media kind identifier (image, carousel, reel, story).
 	 * @return array Result with success, media_id, media_kind, permalink.
 	 */
 	private static function publish_container( string $user_id, string $access_token, string $container_id, string $media_kind ): array {

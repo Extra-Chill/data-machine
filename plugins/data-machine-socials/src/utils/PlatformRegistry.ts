@@ -17,7 +17,7 @@ export const PLATFORMS: Record<string, PlatformConfig> = {
 		charLimit: 2200,
 		supportsCarousel: true,
 		supportsVideo: true,
-		supportedMediaKinds: ['image', 'carousel', 'reel'],
+		supportedMediaKinds: ['image', 'carousel', 'reel', 'story'],
 		requiresAuth: true,
 		bestPractices: {
 			optimalLength: 138,
