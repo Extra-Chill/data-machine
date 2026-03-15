@@ -681,6 +681,16 @@ class LinksCommand extends BaseCommand {
 	 * default: post
 	 * ---
 	 *
+	 * [--scope=<scope>]
+	 * : Link scope to check.
+	 * ---
+	 * default: internal
+	 * options:
+	 *   - internal
+	 *   - external
+	 *   - all
+	 * ---
+	 *
 	 * [--limit=<number>]
 	 * : Maximum unique URLs to check.
 	 * ---
@@ -708,8 +718,14 @@ class LinksCommand extends BaseCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     # Check for broken links
+	 *     # Check for broken internal links (default)
 	 *     wp datamachine links broken
+	 *
+	 *     # Check for broken external links
+	 *     wp datamachine links broken --scope=external
+	 *
+	 *     # Check both internal and external
+	 *     wp datamachine links broken --scope=all
 	 *
 	 *     # Limit to 50 URL checks
 	 *     wp datamachine links broken --limit=50
@@ -722,14 +738,21 @@ class LinksCommand extends BaseCommand {
 	public function broken( array $args, array $assoc_args ): void {
 		$format    = $assoc_args['format'] ?? 'table';
 		$post_type = $assoc_args['post_type'] ?? 'post';
+		$scope     = $assoc_args['scope'] ?? 'internal';
 		$limit     = absint( $assoc_args['limit'] ?? 200 );
 		$timeout   = absint( $assoc_args['timeout'] ?? 5 );
 
-		WP_CLI::log( sprintf( 'Checking up to %d unique URLs for broken links...', $limit ) );
+		$scope_label = 'internal' === $scope ? 'internal' : ( 'external' === $scope ? 'external' : 'internal + external' );
+		WP_CLI::log( sprintf( 'Checking up to %d unique %s URLs for broken links...', $limit, $scope_label ) );
+
+		if ( 'external' === $scope || 'all' === $scope ) {
+			WP_CLI::log( 'External checks include per-domain rate limiting and HEAD→GET fallback.' );
+		}
 
 		$result = InternalLinkingAbilities::checkBrokenLinks(
 			array(
 				'post_type' => $post_type,
+				'scope'     => $scope,
 				'limit'     => $limit,
 				'timeout'   => $timeout,
 			)
@@ -756,16 +779,22 @@ class LinksCommand extends BaseCommand {
 		}
 
 		if ( empty( $result['broken_links'] ) ) {
-			WP_CLI::success( sprintf( 'No broken links found (%d URLs checked).', $urls_checked ) );
+			WP_CLI::success( sprintf( 'No broken %s links found (%d URLs checked).', $scope_label, $urls_checked ) );
 			return;
+		}
+
+		// Include anchor_text column for external scope.
+		$fields = array( 'source_id', 'source_title', 'broken_url', 'status_code' );
+		if ( 'external' === $scope || 'all' === $scope ) {
+			$fields[] = 'anchor_text';
 		}
 
 		$this->format_items(
 			$result['broken_links'],
-			array( 'source_id', 'source_title', 'broken_url', 'status_code' ),
+			$fields,
 			$assoc_args
 		);
 
-		WP_CLI::warning( sprintf( '%d broken link(s) found across %d URLs checked.', $broken_count, $urls_checked ) );
+		WP_CLI::warning( sprintf( '%d broken %s link(s) found across %d URLs checked.', $broken_count, $scope_label, $urls_checked ) );
 	}
 }

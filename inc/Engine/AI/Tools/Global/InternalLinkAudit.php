@@ -8,7 +8,7 @@
  * Available actions:
  * - audit:   Scan content and build link graph (cached 24hr).
  * - orphans: Get orphaned posts from cached graph.
- * - broken:  HTTP HEAD checks for broken internal links.
+ * - broken:  HTTP HEAD checks for broken links (internal, external, or all).
  *
  * @package DataMachine\Engine\AI\Tools\Global
  * @since 0.32.0
@@ -89,7 +89,7 @@ class InternalLinkAudit extends BaseTool {
 		return array(
 			'class'           => __CLASS__,
 			'method'          => 'handle_tool_call',
-			'description'     => 'Audit internal links on this WordPress site. Three actions: "audit" scans post content to build a link graph (cached 24hr), "orphans" lists posts with zero inbound links from the cached graph, "broken" performs HTTP HEAD checks on cached links to find broken URLs (expensive). Always run "audit" first, then use "orphans" or "broken" for specific checks.',
+			'description'     => 'Audit links on this WordPress site. Three actions: "audit" scans post content to build a link graph (cached 24hr), "orphans" lists posts with zero inbound links from the cached graph, "broken" performs HTTP HEAD checks on cached links to find broken URLs (expensive, supports internal/external/all scope). Always run "audit" first, then use "orphans" or "broken" for specific checks.',
 			'requires_config' => false,
 			'parameters'      => array(
 				'action'    => array(
@@ -112,6 +112,12 @@ class InternalLinkAudit extends BaseTool {
 					'type'        => 'boolean',
 					'required'    => false,
 					'description' => 'Force rebuild even if cached graph exists (audit action only).',
+				),
+				'scope'     => array(
+					'type'        => 'string',
+					'required'    => false,
+					'description' => 'Link scope for broken action: "internal" (default), "external", or "all".',
+					'enum'        => array( 'internal', 'external', 'all' ),
 				),
 				'limit'     => array(
 					'type'        => 'integer',
