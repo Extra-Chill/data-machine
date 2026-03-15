@@ -623,6 +623,68 @@ class InstagramCommand {
 	}
 
 	/**
+	 * Publish a Story to Instagram.
+	 *
+	 * Publishes an ephemeral Instagram Story from an image or video URL.
+	 * Stories are visible for 24 hours and do not support captions via the API.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--image=<url>]
+	 * : Public URL of an image for the Story. Use either --image or --video.
+	 *
+	 * [--video=<url>]
+	 * : Public URL of a video for the Story. Use either --image or --video.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Publish an image Story
+	 *     wp datamachine-socials instagram publish-story --image=https://example.com/photo.jpg
+	 *
+	 *     # Publish a video Story
+	 *     wp datamachine-socials instagram publish-story --video=https://example.com/clip.mp4
+	 */
+	public function publish_story( $args, $assoc_args ) {
+		$args; // unused positional args.
+		$image_url = $assoc_args['image'] ?? '';
+		$video_url = $assoc_args['video'] ?? '';
+
+		if ( empty( $image_url ) && empty( $video_url ) ) {
+			WP_CLI::error( 'An image or video URL is required. Use --image=<url> or --video=<url>.' );
+		}
+
+		if ( ! empty( $image_url ) && ! empty( $video_url ) ) {
+			WP_CLI::error( 'Provide either --image or --video, not both.' );
+		}
+
+		$publish_ability = $this->get_publish_ability();
+
+		$input = array(
+			'content'    => 'Story', // Content is required by the ability but not used for Stories.
+			'media_kind' => 'story',
+		);
+
+		if ( ! empty( $video_url ) ) {
+			$input['video_url'] = $video_url;
+			WP_CLI::log( 'Publishing video Story to Instagram...' );
+			WP_CLI::log( 'Video processing may take up to 60 seconds.' );
+		} else {
+			$input['story_image_url'] = $image_url;
+			WP_CLI::log( 'Publishing image Story to Instagram...' );
+		}
+
+		$result = $publish_ability->execute( $input );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Story published to Instagram!' );
+		WP_CLI::log( 'Media ID:  ' . ( $result['media_id'] ?? '' ) );
+		WP_CLI::log( 'Permalink: ' . ( $result['permalink'] ?? '(Stories may not have permalinks)' ) );
+	}
+
+	/**
 	 * Get the Instagram publish ability.
 	 *
 	 * @return \DataMachineSocials\Abilities\Instagram\InstagramPublishAbility

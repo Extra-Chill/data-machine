@@ -206,6 +206,7 @@ function datamachine_socials_load_chat_tools() {
 	new \DataMachineSocials\Chat\Tools\UpdateInstagram();
 	new \DataMachineSocials\Chat\Tools\ReplyInstagramComment();
 	new \DataMachineSocials\Chat\Tools\PublishReelInstagram();
+	new \DataMachineSocials\Chat\Tools\PublishStoryInstagram();
 	new \DataMachineSocials\Chat\Tools\ReadThreads();
 	new \DataMachineSocials\Chat\Tools\ReadFacebook();
 	new \DataMachineSocials\Chat\Tools\UpdateFacebook();

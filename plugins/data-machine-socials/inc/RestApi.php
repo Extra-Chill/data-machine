@@ -78,7 +78,7 @@ class RestApi {
 				'media_kind'   => array(
 					'type'    => 'string',
 					'default' => 'image',
-					'enum'    => array( 'image', 'carousel', 'reel' ),
+					'enum'    => array( 'image', 'carousel', 'reel', 'story' ),
 				),
 				'video_url'    => array(
 					'type'   => 'string',
@@ -405,6 +405,25 @@ class RestApi {
 				),
 			),
 		) );
+
+		// Instagram Story publish.
+		register_rest_route( self::NAMESPACE, '/instagram/story', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'instagram_publish_story' ),
+			'permission_callback' => array( __CLASS__, 'check_publish_permission' ),
+			'args'                => array(
+				'image_url' => array(
+					'type'              => 'string',
+					'format'            => 'uri',
+					'sanitize_callback' => 'sanitize_url',
+				),
+				'video_url' => array(
+					'type'              => 'string',
+					'format'            => 'uri',
+					'sanitize_callback' => 'sanitize_url',
+				),
+			),
+		) );
 	}
 
 	/**
@@ -626,6 +645,39 @@ class RestApi {
 	}
 
 	/**
+	 * Publish an Instagram Story.
+	 */
+	public static function instagram_publish_story( \WP_REST_Request $request ) {
+		$params = $request->get_json_params() ? $request->get_json_params() : $request->get_body_params();
+
+		$image_url = $params['image_url'] ?? '';
+		$video_url = $params['video_url'] ?? '';
+
+		if ( empty( $image_url ) && empty( $video_url ) ) {
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => 'image_url or video_url is required',
+			), 400 );
+		}
+
+		$input = array(
+			'content'    => 'Story',
+			'media_kind' => 'story',
+		);
+
+		if ( ! empty( $video_url ) ) {
+			$input['video_url'] = sanitize_url( $video_url );
+		} else {
+			$input['story_image_url'] = sanitize_url( $image_url );
+		}
+
+		$ability = new \DataMachineSocials\Abilities\Instagram\InstagramPublishAbility();
+		$result  = $ability::execute_publish( $input );
+
+		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
+	}
+
+	/**
 	 * Check if user can edit posts
 	 */
 	public static function check_edit_permission() {
@@ -684,7 +736,7 @@ class RestApi {
 				'charLimit'          => 2200,
 				'supportsCarousel'   => true,
 				'supportsVideo'      => true,
-				'supportedMediaKinds' => array( 'image', 'carousel', 'reel' ),
+				'supportedMediaKinds' => array( 'image', 'carousel', 'reel', 'story' ),
 			),
 			'twitter'   => array(
 				'label'              => 'Twitter / X',
@@ -762,13 +814,23 @@ class RestApi {
 			);
 		}
 
-		// Images required for image/carousel posts, video_url required for reels.
+		// Validate media: reels need video_url, stories need image or video, others need images.
 		if ( 'reel' === $media_kind ) {
 			if ( empty( $video_url ) ) {
 				return new \WP_REST_Response(
 					array(
 						'success' => false,
 						'error'   => 'video_url is required for Reel publishing',
+					),
+					400
+				);
+			}
+		} elseif ( 'story' === $media_kind ) {
+			if ( empty( $video_url ) && empty( $images ) ) {
+				return new \WP_REST_Response(
+					array(
+						'success' => false,
+						'error'   => 'image or video_url is required for Story publishing',
 					),
 					400
 				);
@@ -877,13 +939,20 @@ class RestApi {
 			'source_url' => $source_url,
 		);
 
-		// Pass through reel-specific params when applicable.
+		// Pass through media-kind-specific params when applicable.
 		$media_kind = $extra['media_kind'] ?? 'image';
 		if ( 'reel' === $media_kind ) {
 			$input['media_kind']    = 'reel';
 			$input['video_url']     = $extra['video_url'] ?? '';
 			$input['cover_url']     = $extra['cover_url'] ?? '';
 			$input['share_to_feed'] = $extra['share_to_feed'] ?? true;
+		} elseif ( 'story' === $media_kind ) {
+			$input['media_kind'] = 'story';
+			$input['video_url']  = $extra['video_url'] ?? '';
+			// For stories, image comes from story_image_url or first image_url.
+			if ( ! empty( $image_urls[0] ) && empty( $extra['video_url'] ) ) {
+				$input['story_image_url'] = $image_urls[0];
+			}
 		}
 
 		$result = $ability->execute( $input );
