@@ -248,6 +248,16 @@ class FetchWordPressMediaAbility {
 				$source_url = get_permalink( $post->post_parent ) ?? '';
 			}
 
+			// Set the appropriate engine data key based on media type.
+			$engine_data = array(
+				'source_url' => $source_url,
+			);
+			if ( strpos( $file_type, 'video/' ) === 0 ) {
+				$engine_data['video_file_path'] = $file_path;
+			} else {
+				$engine_data['image_file_path'] = $file_path;
+			}
+
 			$eligible_items[] = array(
 				'title'     => $content_data['title'] ?? '',
 				'content'   => $content_data['content'] ?? '',
@@ -262,7 +272,8 @@ class FetchWordPressMediaAbility {
 					'file_size'              => $file_size,
 					'site_name'              => $site_name,
 					'source_url'             => $source_url,
-					'image_file_path'        => $file_path,
+					'image_file_path'        => strpos( $file_type, 'video/' ) !== 0 ? $file_path : '',
+					'_engine_data'           => $engine_data,
 				),
 				'file_info' => $file_info,
 			);

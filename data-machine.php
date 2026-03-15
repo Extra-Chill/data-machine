@@ -136,6 +136,9 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/SystemAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Media/AltTextAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Media/ImageGenerationAbilities.php';
+	require_once __DIR__ . '/inc/Abilities/Media/VideoAbilities.php';
+	require_once __DIR__ . '/inc/Core/FilesRepository/VideoValidator.php';
+	require_once __DIR__ . '/inc/Core/FilesRepository/VideoMetadata.php';
 	require_once __DIR__ . '/inc/Abilities/SEO/MetaDescriptionAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/SEO/IndexNowAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Media/ImageTemplateAbilities.php';
@@ -186,6 +189,7 @@ function datamachine_run_datamachine_plugin() {
 		new \DataMachine\Engine\AI\System\SystemAgentServiceProvider();
 		new \DataMachine\Abilities\Media\AltTextAbilities();
 		new \DataMachine\Abilities\Media\ImageGenerationAbilities();
+		new \DataMachine\Abilities\Media\VideoAbilities();
 		new \DataMachine\Abilities\SEO\MetaDescriptionAbilities();
 		new \DataMachine\Abilities\SEO\IndexNowAbilities();
 		new \DataMachine\Abilities\Media\ImageTemplateAbilities();

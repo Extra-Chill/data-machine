@@ -175,6 +175,16 @@ class EngineData {
 	}
 
 	/**
+	 * Get the Video File Path (from Files Repository).
+	 *
+	 * @since 0.42.0
+	 * @return string|null Absolute file path or null.
+	 */
+	public function getVideoPath(): ?string {
+		return $this->get( 'video_file_path' );
+	}
+
+	/**
 	 * Return the raw snapshot array.
 	 */
 	public function all(): array {

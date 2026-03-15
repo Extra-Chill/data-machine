@@ -108,6 +108,7 @@ abstract class PublishHandler {
 				),
 				'source_url' => $engine->getSourceUrl(),
 				'image_path' => $engine->getImagePath(),
+				'video_path' => $engine->getVideoPath(),
 			)
 		);
 	}
@@ -124,6 +125,7 @@ abstract class PublishHandler {
 				'source_url'      => null,
 				'image_file_path' => null,
 				'image_url'       => null,
+				'video_file_path' => null,
 			);
 		}
 		return datamachine_get_engine_data( $job_id );
@@ -160,6 +162,37 @@ abstract class PublishHandler {
 	protected function validateImage( string $image_file_path ): array {
 		$image_validator = new \DataMachine\Core\FilesRepository\ImageValidator();
 		$validation      = $image_validator->validate_repository_file( $image_file_path );
+
+		return array(
+			'valid'     => $validation['valid'] ?? false,
+			'errors'    => $validation['errors'] ?? array(),
+			'mime_type' => $validation['mime_type'] ?? null,
+			'size'      => $validation['size'] ?? 0,
+		);
+	}
+
+	/**
+	 * Get video file path from engine data.
+	 *
+	 * @since 0.42.0
+	 * @param int $job_id Job identifier
+	 * @return string|null Video file path
+	 */
+	protected function getVideoFilePath( int $job_id ): ?string {
+		$engine_data = $this->getEngineData( $job_id );
+		return $engine_data['video_file_path'] ?? null;
+	}
+
+	/**
+	 * Validate repository video file.
+	 *
+	 * @since 0.42.0
+	 * @param string $video_file_path Path to video file
+	 * @return array Validation result with valid, errors, mime_type, size
+	 */
+	protected function validateVideo( string $video_file_path ): array {
+		$video_validator = new \DataMachine\Core\FilesRepository\VideoValidator();
+		$validation      = $video_validator->validate_repository_file( $video_file_path );
 
 		return array(
 			'valid'     => $validation['valid'] ?? false,
