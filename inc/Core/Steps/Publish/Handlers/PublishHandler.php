@@ -206,6 +206,81 @@ abstract class PublishHandler {
 	}
 
 	/**
+	 * Resolve media URLs from engine data.
+	 *
+	 * Validates file paths via core MediaValidator and returns public URLs.
+	 * Includes fallbacks to URLs already in engine data and WordPress featured images.
+	 *
+	 * Resolution order for images:
+	 * 1. image_file_path → validate → public URL (pipeline flow)
+	 * 2. image_url in engine data (already a URL)
+	 * 3. WordPress featured image from source_url
+	 * 4. attachment_url in engine data
+	 *
+	 * Resolution order for video:
+	 * 1. video_file_path → validate → public URL (pipeline flow)
+	 *
+	 * @since 0.42.0
+	 * @param \DataMachine\Core\EngineData $engine Engine data instance.
+	 * @return array{image_url: string, video_url: string, image_file_path: string, video_file_path: string}
+	 */
+	protected function resolveMediaUrls( \DataMachine\Core\EngineData $engine ): array {
+		$file_storage = new \DataMachine\Core\FilesRepository\FileStorage();
+		$result       = array(
+			'image_url'       => '',
+			'video_url'       => '',
+			'image_file_path' => '',
+			'video_file_path' => '',
+		);
+
+		// Video: file path → validate → public URL.
+		$video_file_path = $engine->getVideoPath();
+		if ( ! empty( $video_file_path ) ) {
+			$validation = $this->validateVideo( $video_file_path );
+			if ( $validation['valid'] ) {
+				$result['video_url']       = $file_storage->get_public_url( $video_file_path );
+				$result['video_file_path'] = $video_file_path;
+			}
+		}
+
+		// Image: file path → public URL.
+		$image_file_path = $engine->getImagePath();
+		if ( ! empty( $image_file_path ) ) {
+			$result['image_url']       = $file_storage->get_public_url( $image_file_path );
+			$result['image_file_path'] = $image_file_path;
+			return $result;
+		}
+
+		// Image fallback: URL already in engine data.
+		$image_url = $engine->get( 'image_url' );
+		if ( ! empty( $image_url ) && filter_var( $image_url, FILTER_VALIDATE_URL ) ) {
+			$result['image_url'] = $image_url;
+			return $result;
+		}
+
+		// Image fallback: WordPress featured image from source URL.
+		$source_url = $engine->getSourceUrl();
+		if ( ! empty( $source_url ) ) {
+			$post_id = url_to_postid( $source_url );
+			if ( $post_id > 0 ) {
+				$thumbnail_url = get_the_post_thumbnail_url( $post_id, 'full' );
+				if ( ! empty( $thumbnail_url ) ) {
+					$result['image_url'] = $thumbnail_url;
+					return $result;
+				}
+			}
+		}
+
+		// Image fallback: attachment_url in engine data.
+		$attachment_url = $engine->get( 'attachment_url' );
+		if ( ! empty( $attachment_url ) && filter_var( $attachment_url, FILTER_VALIDATE_URL ) ) {
+			$result['image_url'] = $attachment_url;
+		}
+
+		return $result;
+	}
+
+	/**
 	 * Create standardized success response.
 	 *
 	 * @param array $data Result data (post_id, post_url, etc.)
