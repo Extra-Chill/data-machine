@@ -16,7 +16,8 @@ export const PLATFORMS: Record<string, PlatformConfig> = {
 		defaultAspectRatio: '4:5',
 		charLimit: 2200,
 		supportsCarousel: true,
-		supportsVideo: false,
+		supportsVideo: true,
+		supportedMediaKinds: ['image', 'carousel', 'reel'],
 		requiresAuth: true,
 		bestPractices: {
 			optimalLength: 138,

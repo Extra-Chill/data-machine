@@ -103,9 +103,7 @@ class InstagramDeleteAbility {
 			);
 		}
 
-		$media_id = $input['media_id'];
-
-		return $this->deleteMedia( $access_token);
+		return $this->deleteMedia( $access_token, $input['media_id'] );
 	}
 
 	private function getAuthProvider(): ?InstagramAuth {
@@ -123,13 +121,53 @@ class InstagramDeleteAbility {
 		return $provider;
 	}
 
-	private function deleteMedia( string $access_token): array {
-		$access_token;
-		// Note: Instagram API doesn't have a direct delete endpoint for all media types.
-		// This is a limitation - recommend archiving instead.
+	/**
+	 * Delete a media item via the Instagram Graph API.
+	 *
+	 * Note: The Instagram API may not support deletion for all media types.
+	 * If deletion fails, consider archiving instead (datamachine/instagram-update with action: archive).
+	 *
+	 * @param string $access_token Valid access token.
+	 * @param string $media_id     Media ID to delete.
+	 * @return array Result.
+	 */
+	private function deleteMedia( string $access_token, string $media_id ): array {
+		$url = self::GRAPH_API_URL . '/' . rawurlencode( $media_id );
+
+		$response = wp_remote_request(
+			$url,
+			array(
+				'method'  => 'DELETE',
+				'timeout' => 30,
+				'body'    => array(
+					'access_token' => $access_token,
+				),
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return array(
+				'success' => false,
+				'error'   => $response->get_error_message(),
+			);
+		}
+
+		$status_code = wp_remote_retrieve_response_code( $response );
+		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
+
+		if ( 200 === $status_code || 204 === $status_code ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'media_id' => $media_id,
+					'deleted'  => true,
+				),
+			);
+		}
+
 		return array(
 			'success' => false,
-			'error'   => 'Delete not supported for this media type via API. Consider archiving instead.',
+			'error'   => $body['error']['message'] ?? 'Delete failed. The Instagram API may not support deletion for this media type. Consider archiving instead.',
 		);
 	}
 }

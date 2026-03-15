@@ -3,8 +3,8 @@
  * Instagram Publish Ability
  *
  * Primitive ability for publishing content to Instagram with support for
- * single images and carousels (up to 10 images). Uses async container
- * creation pattern from Instagram Graph API.
+ * single images, carousels (up to 10 images), and Reels (video).
+ * Uses async container creation pattern from Instagram Graph API.
  *
  * Ported from post-to-instagram plugin.
  *
@@ -49,6 +49,17 @@ class InstagramPublishAbility {
 	const MAX_CAPTION_LENGTH = 2200;
 
 	/**
+	 * Maximum retries for video container processing.
+	 * Videos take longer than images to process.
+	 */
+	const VIDEO_POLL_MAX_RETRIES = 30;
+
+	/**
+	 * Seconds to sleep between video container status polls.
+	 */
+	const VIDEO_POLL_INTERVAL = 2;
+
+	/**
 	 * Constructor.
 	 */
 	public function __construct() {
@@ -71,52 +82,74 @@ class InstagramPublishAbility {
 				'datamachine/instagram-publish',
 				array(
 					'label'               => __( 'Publish to Instagram', 'data-machine-socials' ),
-					'description'         => __( 'Post content to Instagram with optional media (single image or carousel up to 10 images)', 'data-machine-socials' ),
-					'category'            => 'datamachine',
-					'input_schema'        => array(
-						'type'       => 'object',
-						'required'   => array( 'content' ),
-						'properties' => array(
-							'content'      => array(
-								'type'        => 'string',
-								'description' => 'Post caption text (max 2200 characters)',
-								'maxLength'   => 2200,
-							),
-							'image_urls'   => array(
-								'type'        => 'array',
-								'description' => 'Array of image URLs to post (1-10 for carousel)',
-								'items'       => array(
-									'type'   => 'string',
-									'format' => 'uri',
-								),
-								'maxItems'    => 10,
-							),
-							'aspect_ratio' => array(
-								'type'        => 'string',
-								'description' => 'Aspect ratio for images: 1:1, 4:5, 3:4, or 1.91:1',
-								'enum'        => array( '1:1', '4:5', '3:4', '1.91:1' ),
-								'default'     => '4:5',
-							),
-							'source_url'   => array(
-								'type'        => 'string',
-								'description' => 'Source URL to include in caption',
-								'format'      => 'uri',
-							),
+				'description'         => __( 'Post content to Instagram — supports single image, carousel (up to 10 images), and Reel (video)', 'data-machine-socials' ),
+				'category'            => 'datamachine',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'content' ),
+					'properties' => array(
+						'content'        => array(
+							'type'        => 'string',
+							'description' => 'Post caption text (max 2200 characters)',
+							'maxLength'   => 2200,
 						),
-					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success'   => array( 'type' => 'boolean' ),
-							'media_id'  => array( 'type' => 'string' ),
-							'permalink' => array(
+						'media_kind'     => array(
+							'type'        => 'string',
+							'description' => 'Type of media to publish: image (default), carousel, or reel',
+							'enum'        => array( 'image', 'carousel', 'reel' ),
+							'default'     => 'image',
+						),
+						'image_urls'     => array(
+							'type'        => 'array',
+							'description' => 'Array of image URLs to post (1-10 for carousel, 1 for single image)',
+							'items'       => array(
 								'type'   => 'string',
 								'format' => 'uri',
 							),
-							'error'     => array( 'type' => 'string' ),
+							'maxItems'    => 10,
+						),
+						'video_url'      => array(
+							'type'        => 'string',
+							'description' => 'Public video URL for Reel publishing (required when media_kind is reel)',
+							'format'      => 'uri',
+						),
+						'cover_url'      => array(
+							'type'        => 'string',
+							'description' => 'Optional cover image URL for Reel',
+							'format'      => 'uri',
+						),
+						'share_to_feed'  => array(
+							'type'        => 'boolean',
+							'description' => 'Whether to share the Reel to the main feed (default true)',
+							'default'     => true,
+						),
+						'aspect_ratio'   => array(
+							'type'        => 'string',
+							'description' => 'Aspect ratio for images: 1:1, 4:5, 3:4, or 1.91:1',
+							'enum'        => array( '1:1', '4:5', '3:4', '1.91:1' ),
+							'default'     => '4:5',
+						),
+						'source_url'     => array(
+							'type'        => 'string',
+							'description' => 'Source URL to include in caption',
+							'format'      => 'uri',
 						),
 					),
-					'execute_callback'    => array( self::class, 'execute_publish' ),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'    => array( 'type' => 'boolean' ),
+						'media_id'   => array( 'type' => 'string' ),
+						'media_kind' => array( 'type' => 'string' ),
+						'permalink'  => array(
+							'type'   => 'string',
+							'format' => 'uri',
+						),
+						'error'      => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( self::class, 'execute_publish' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
@@ -160,14 +193,18 @@ class InstagramPublishAbility {
 	/**
 	 * Execute Instagram publish.
 	 *
+	 * Routes to the appropriate publishing flow based on media_kind:
+	 * - image (default): single image post
+	 * - carousel: multi-image carousel (auto-detected from image_urls count)
+	 * - reel: video Reel via container flow
+	 *
 	 * @param array $input Ability input with publish parameters.
 	 * @return array Response with post details or error.
 	 */
 	public static function execute_publish( array $input ): array {
-		$content      = $input['content'] ?? '';
-		$image_urls   = $input['image_urls'] ?? array();
-		$aspect_ratio = $input['aspect_ratio'] ?? '4:5';
-		$source_url   = $input['source_url'] ?? '';
+		$content    = $input['content'] ?? '';
+		$media_kind = $input['media_kind'] ?? 'image';
+		$source_url = $input['source_url'] ?? '';
 
 		if ( empty( $content ) ) {
 			return array(
@@ -176,25 +213,7 @@ class InstagramPublishAbility {
 			);
 		}
 
-		// Validate image URLs
-		if ( ! empty( $image_urls ) ) {
-			if ( count( $image_urls ) > self::MAX_CAROUSEL_IMAGES ) {
-				return array(
-					'success' => false,
-					'error'   => sprintf( 'Maximum %d images allowed for Instagram carousel', self::MAX_CAROUSEL_IMAGES ),
-				);
-			}
-
-			foreach ( $image_urls as $url ) {
-				if ( ! filter_var( $url, FILTER_VALIDATE_URL ) ) {
-					return array(
-						'success' => false,
-						'error'   => 'Invalid image URL: ' . $url,
-					);
-				}
-			}
-		}
-
+		// Auth check.
 		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'instagram' );
 
@@ -215,18 +234,57 @@ class InstagramPublishAbility {
 			);
 		}
 
-		// Build caption with source URL if provided
+		// Build caption with source URL if provided.
 		$caption = $content;
 		if ( ! empty( $source_url ) ) {
 			$caption .= "\n\n" . $source_url;
 		}
 
-		// Truncate to max caption length
+		// Truncate to max caption length.
 		if ( mb_strlen( $caption ) > self::MAX_CAPTION_LENGTH ) {
 			$caption = mb_substr( $caption, 0, self::MAX_CAPTION_LENGTH - 3 ) . '...';
 		}
 
-		// Create media containers for each image
+		// Route to appropriate publish flow.
+		if ( 'reel' === $media_kind ) {
+			return self::publish_reel( $input, $user_id, $access_token, $caption );
+		}
+
+		return self::publish_image( $input, $user_id, $access_token, $caption );
+	}
+
+	/**
+	 * Publish an image or carousel to Instagram.
+	 *
+	 * @param array  $input        Ability input.
+	 * @param string $user_id      Instagram user ID.
+	 * @param string $access_token Valid access token.
+	 * @param string $caption      Prepared caption text.
+	 * @return array Result.
+	 */
+	private static function publish_image( array $input, string $user_id, string $access_token, string $caption ): array {
+		$image_urls = $input['image_urls'] ?? array();
+
+		// Validate image URLs.
+		if ( ! empty( $image_urls ) ) {
+			if ( count( $image_urls ) > self::MAX_CAROUSEL_IMAGES ) {
+				return array(
+					'success' => false,
+					'error'   => sprintf( 'Maximum %d images allowed for Instagram carousel', self::MAX_CAROUSEL_IMAGES ),
+				);
+			}
+
+			foreach ( $image_urls as $url ) {
+				if ( ! filter_var( $url, FILTER_VALIDATE_URL ) ) {
+					return array(
+						'success' => false,
+						'error'   => 'Invalid image URL: ' . $url,
+					);
+				}
+			}
+		}
+
+		// Create media containers for each image.
 		$is_carousel   = count( $image_urls ) > 1;
 		$container_ids = array();
 
@@ -236,8 +294,8 @@ class InstagramPublishAbility {
 				'access_token' => $access_token,
 			);
 
-			// For single images, include caption
-			// For carousel items, omit caption (goes on carousel container)
+			// For single images, include caption.
+			// For carousel items, omit caption (goes on carousel container).
 			if ( $is_carousel ) {
 				$container_body['is_carousel_item'] = 'true';
 			} else {
@@ -259,8 +317,7 @@ class InstagramPublishAbility {
 				);
 			}
 
-			$body        = json_decode( wp_remote_retrieve_body( $response ), true );
-			$status_code = wp_remote_retrieve_response_code( $response );
+			$body = json_decode( wp_remote_retrieve_body( $response ), true );
 
 			if ( empty( $body['id'] ) ) {
 				$error_msg = 'No container ID returned for image';
@@ -275,7 +332,7 @@ class InstagramPublishAbility {
 
 			$container_id = $body['id'];
 
-			// Check initial status
+			// Check initial status.
 			$status_resp = wp_remote_get(
 				self::GRAPH_API_URL . "/{$container_id}?fields=status_code&access_token={$access_token}",
 				array( 'timeout' => 40 )
@@ -298,7 +355,7 @@ class InstagramPublishAbility {
 
 			$container_ids[] = $container_id;
 
-			// If not finished, wait for processing
+			// If not finished, wait for processing.
 			if ( 'FINISHED' !== $status ) {
 				$ready = self::wait_for_container( $access_token, $container_id );
 				if ( ! $ready ) {
@@ -310,8 +367,9 @@ class InstagramPublishAbility {
 			}
 		}
 
-		// Create main container (carousel or single)
+		// Create main container (carousel or single).
 		$main_container_id = null;
+		$media_kind        = 'image';
 		if ( $is_carousel && count( $container_ids ) > 1 ) {
 			$children      = implode( ',', $container_ids );
 			$carousel_resp = wp_remote_post(
@@ -347,22 +405,139 @@ class InstagramPublishAbility {
 			}
 
 			$main_container_id = $carousel_body['id'];
+			$media_kind        = 'carousel';
 		} elseif ( count( $container_ids ) === 1 ) {
 			$main_container_id = $container_ids[0];
 		} else {
-			// No images - Instagram requires at least one image
+			// No images - Instagram requires at least one image.
 			return array(
 				'success' => false,
 				'error'   => 'At least one image is required for Instagram posts',
 			);
 		}
 
-		// Publish to Instagram
+		return self::publish_container( $user_id, $access_token, $main_container_id, $media_kind );
+	}
+
+	/**
+	 * Publish a Reel (video) to Instagram.
+	 *
+	 * Uses the Instagram Graph API container flow:
+	 * 1. POST /{user_id}/media with media_type=REELS and video_url
+	 * 2. Poll container status until FINISHED (video processing)
+	 * 3. POST /{user_id}/media_publish with creation_id
+	 *
+	 * @param array  $input        Ability input.
+	 * @param string $user_id      Instagram user ID.
+	 * @param string $access_token Valid access token.
+	 * @param string $caption      Prepared caption text.
+	 * @return array Result.
+	 */
+	private static function publish_reel( array $input, string $user_id, string $access_token, string $caption ): array {
+		$video_url     = $input['video_url'] ?? '';
+		$cover_url     = $input['cover_url'] ?? '';
+		$share_to_feed = $input['share_to_feed'] ?? true;
+
+		if ( empty( $video_url ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'video_url is required for Reel publishing',
+			);
+		}
+
+		if ( ! filter_var( $video_url, FILTER_VALIDATE_URL ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Invalid video URL: ' . $video_url,
+			);
+		}
+
+		// Build the container request body.
+		$container_body = array(
+			'media_type'    => 'REELS',
+			'video_url'     => $video_url,
+			'caption'       => $caption,
+			'share_to_feed' => $share_to_feed ? 'true' : 'false',
+			'access_token'  => $access_token,
+		);
+
+		if ( ! empty( $cover_url ) ) {
+			if ( ! filter_var( $cover_url, FILTER_VALIDATE_URL ) ) {
+				return array(
+					'success' => false,
+					'error'   => 'Invalid cover URL: ' . $cover_url,
+				);
+			}
+			$container_body['cover_url'] = $cover_url;
+		}
+
+		// Step 1: Create the Reel container.
+		$response = wp_remote_post(
+			self::GRAPH_API_URL . "/{$user_id}/media",
+			array(
+				'body'    => $container_body,
+				'timeout' => 60,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Error creating Reel container: ' . $response->get_error_message(),
+			);
+		}
+
+		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+		if ( empty( $body['id'] ) ) {
+			$error_msg = 'No container ID returned for Reel';
+			if ( isset( $body['error']['message'] ) ) {
+				$error_msg .= ': ' . $body['error']['message'];
+			}
+			return array(
+				'success' => false,
+				'error'   => $error_msg,
+			);
+		}
+
+		$container_id = $body['id'];
+
+		// Step 2: Wait for video processing (longer timeout than images).
+		$ready = self::wait_for_container(
+			$access_token,
+			$container_id,
+			self::VIDEO_POLL_MAX_RETRIES,
+			self::VIDEO_POLL_INTERVAL
+		);
+
+		if ( ! $ready ) {
+			return array(
+				'success' => false,
+				'error'   => 'Reel video processing failed or timed out for container: ' . $container_id,
+			);
+		}
+
+		// Step 3: Publish.
+		return self::publish_container( $user_id, $access_token, $container_id, 'reel' );
+	}
+
+	/**
+	 * Publish a prepared container to Instagram and fetch the permalink.
+	 *
+	 * Shared final step for image, carousel, and reel flows.
+	 *
+	 * @param string $user_id        Instagram user ID.
+	 * @param string $access_token   Valid access token.
+	 * @param string $container_id   Container ID from media creation.
+	 * @param string $media_kind     Media kind identifier (image, carousel, reel).
+	 * @return array Result with success, media_id, media_kind, permalink.
+	 */
+	private static function publish_container( string $user_id, string $access_token, string $container_id, string $media_kind ): array {
 		$publish_resp = wp_remote_post(
 			self::GRAPH_API_URL . "/{$user_id}/media_publish",
 			array(
 				'body'    => array(
-					'creation_id'  => $main_container_id,
+					'creation_id'  => $container_id,
 					'access_token' => $access_token,
 				),
 				'timeout' => 40,
@@ -390,7 +565,7 @@ class InstagramPublishAbility {
 
 		$media_id = $publish_body['id'];
 
-		// Fetch permalink
+		// Fetch permalink.
 		$permalink      = null;
 		$permalink_resp = wp_remote_get(
 			self::GRAPH_API_URL . "/{$media_id}?fields=id,permalink&access_token={$access_token}",
@@ -405,9 +580,10 @@ class InstagramPublishAbility {
 		}
 
 		return array(
-			'success'   => true,
-			'media_id'  => $media_id,
-			'permalink' => $permalink,
+			'success'    => true,
+			'media_id'   => $media_id,
+			'media_kind' => $media_kind,
+			'permalink'  => $permalink,
 		);
 	}
 
@@ -416,12 +592,14 @@ class InstagramPublishAbility {
 	 *
 	 * @param string $access_token Access token.
 	 * @param string $container_id Container ID.
+	 * @param int    $max_retries  Maximum poll attempts (default 10 for images).
+	 * @param int    $interval     Seconds between polls (default 1 for images).
 	 * @return bool True if container is ready.
 	 */
-	private static function wait_for_container( string $access_token, string $container_id ): bool {
+	private static function wait_for_container( string $access_token, string $container_id, int $max_retries = 10, int $interval = 1 ): bool {
 		$url = self::GRAPH_API_URL . "/{$container_id}?fields=status_code&access_token={$access_token}";
 
-		for ( $i = 0; $i < 10; $i++ ) {
+		for ( $i = 0; $i < $max_retries; $i++ ) {
 			$response = wp_remote_get( $url, array( 'timeout' => 10 ) );
 
 			if ( is_wp_error( $response ) ) {
@@ -438,7 +616,7 @@ class InstagramPublishAbility {
 				return false;
 			}
 
-			sleep( 1 );
+			sleep( $interval );
 		}
 
 		return false;
