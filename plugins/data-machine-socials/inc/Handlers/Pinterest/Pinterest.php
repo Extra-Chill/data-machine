@@ -19,7 +19,6 @@ use DataMachineSocials\Abilities\Pinterest\PinterestBoardsAbility;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\Steps\Publish\Handlers\PublishHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
-
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -143,11 +142,13 @@ class Pinterest extends PublishHandler {
 		}
 
 		$source_url = $engine->getSourceUrl();
-		$image_url  = $this->resolve_image_url( $engine );
+		$media     = $this->resolveMediaUrls( $engine );
+		$image_url = $media['image_url'];
+		$video_url = $media['video_url'];
 
-		if ( empty( $image_url ) ) {
+		if ( empty( $image_url ) && empty( $video_url ) ) {
 			return $this->errorResponse(
-				'No publicly accessible image URL found for pin',
+				'No publicly accessible media URL found for pin',
 				array( 'source_url' => $source_url )
 			);
 		}
@@ -172,15 +173,26 @@ class Pinterest extends PublishHandler {
 			);
 		}
 
+		// Build media source — prefer video for video pins, fall back to image.
+		if ( ! empty( $video_url ) ) {
+			$media_source = array(
+				'source_type' => 'video_id',
+				'cover_image_url' => $image_url ?: '',
+				'url'         => $video_url,
+			);
+		} else {
+			$media_source = array(
+				'source_type' => 'image_url',
+				'url'         => $image_url,
+			);
+		}
+
 		$payload = array(
 			'board_id'     => $board_id,
 			'title'        => substr( $title, 0, 100 ),
 			'description'  => substr( $description, 0, 500 ),
 			'link'         => $source_url,
-			'media_source' => array(
-				'source_type' => 'image_url',
-				'url'         => $image_url,
-			),
+			'media_source' => $media_source,
 		);
 
 		$this->log(
@@ -306,43 +318,6 @@ class Pinterest extends PublishHandler {
 	*/
 	public function get_cached_boards(): array {
 		return PinterestAbilities::get_cached_boards();
-	}
-
-	/**
-	* Resolve a publicly accessible image URL for the pin.
-	*
-	* Checks engine data for image_url, then falls back to the WordPress
-	* post's featured image URL.
-	*
-	* @param EngineData $engine Engine data instance.
-	* @return string|null Public image URL or null if unavailable.
-	*/
-	private function resolve_image_url( EngineData $engine ): ?string {
-		// Check engine data for a stored image URL.
-		$image_url = $engine->get( 'image_url' );
-		if ( ! empty( $image_url ) && filter_var( $image_url, FILTER_VALIDATE_URL ) ) {
-			return $image_url;
-		}
-
-		// Fall back to WordPress post featured image.
-		$source_url = $engine->getSourceUrl();
-		if ( ! empty( $source_url ) ) {
-			$post_id = url_to_postid( $source_url );
-			if ( $post_id > 0 ) {
-				$thumbnail_url = get_the_post_thumbnail_url( $post_id, 'full' );
-				if ( ! empty( $thumbnail_url ) ) {
-					return $thumbnail_url;
-				}
-			}
-		}
-
-		// Check for attachment_url in engine data.
-		$attachment_url = $engine->get( 'attachment_url' );
-		if ( ! empty( $attachment_url ) && filter_var( $attachment_url, FILTER_VALIDATE_URL ) ) {
-			return $attachment_url;
-		}
-
-		return null;
 	}
 
 	/**

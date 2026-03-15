@@ -25,3 +25,4 @@ wp-content/uploads/
 # Temporary files
 *.tmp
 *.temp
+.phpunit.result.cache

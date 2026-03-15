@@ -462,6 +462,20 @@ class InstagramPublishAbility {
 			);
 		}
 
+		// Pre-publish validation via core video-metadata if local path is available.
+		$video_file_path = $input['video_file_path'] ?? '';
+		if ( ! empty( $video_file_path ) && file_exists( $video_file_path ) ) {
+			$metadata = \DataMachine\Core\FilesRepository\VideoMetadata::extract( $video_file_path );
+
+			// Instagram Reels: max 15 min, H.264 codec recommended.
+			if ( ! empty( $metadata['duration'] ) && $metadata['duration'] > 900 ) {
+				return array(
+					'success' => false,
+					'error'   => sprintf( 'Video duration (%.0fs) exceeds Instagram Reels maximum (900s)', $metadata['duration'] ),
+				);
+			}
+		}
+
 		// Build the container request body.
 		$container_body = array(
 			'media_type'    => 'REELS',

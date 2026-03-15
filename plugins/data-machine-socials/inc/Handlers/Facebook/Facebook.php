@@ -18,7 +18,6 @@ use DataMachine\Core\EngineData;
 use DataMachine\Core\Steps\Publish\Handlers\PublishHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 use DataMachineSocials\Abilities\Facebook\FacebookPublishAbility;
-
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly
 }
@@ -102,22 +101,23 @@ class Facebook extends PublishHandler {
 			$engine = new EngineData( $parameters['engine_data'] ?? array(), $parameters['job_id'] ?? null );
 		}
 
-		$file_storage    = new \DataMachine\Core\FilesRepository\FileStorage();
-		$image_url       = '';
-		$image_file_path = $engine->getImagePath();
-		if ( ! empty( $image_file_path ) ) {
-			$image_url = $file_storage->get_public_url( $image_file_path );
-		}
+		$media     = $this->resolveMediaUrls( $engine );
+		$image_url = $media['image_url'];
+		$video_url = $media['video_url'];
 
-		$result = FacebookPublishAbility::execute_publish(
-		array(
+		$publish_input = array(
 			'title'         => $parameters['title'] ?? '',
 			'content'       => $parameters['content'] ?? '',
 			'image_url'     => $image_url,
 			'source_url'    => $engine->getSourceUrl(),
 			'link_handling' => $handler_config['link_handling'] ?? 'append',
-		)
 		);
+
+		if ( ! empty( $video_url ) ) {
+			$publish_input['video_url'] = $video_url;
+		}
+
+		$result = FacebookPublishAbility::execute_publish( $publish_input );
 
 		if ( $result['success'] ) {
 			return $this->successResponse(
