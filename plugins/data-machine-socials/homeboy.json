@@ -1,24 +1,14 @@
 {
-  "baselines": {
-    "lint": {
-      "context_id": "data-machine-socials",
-      "created_at": "2026-03-11T05:53:44Z",
-      "item_count": 0,
-      "known_fingerprints": [],
-      "metadata": {
-        "findings_count": 0
-      }
-    }
-  },
-  "changelog_target": "docs/CHANGELOG.md",
+  "auto_cleanup": false,
   "extensions": {
     "wordpress": {}
   },
   "id": "data-machine-socials",
+  "remote_path": "",
   "version_targets": [
     {
       "file": "data-machine-socials.php",
-      "pattern": "Version:\\s*([\\d.]+)"
+      "pattern": "Version:\\s*([0-9.]+)"
     },
     {
       "file": "data-machine-socials.php",

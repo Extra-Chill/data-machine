@@ -1,0 +1,31 @@
+{
+  "layer_rules": [
+    {
+      "name": "cli-uses-ability-registry",
+      "forbid": {
+        "glob": "inc/Cli/**/*.php",
+        "patterns": [
+          "new \\DataMachineSocials\\Abilities\\"
+        ]
+      }
+    },
+    {
+      "name": "rest-uses-ability-registry",
+      "forbid": {
+        "glob": "inc/RestApi.php",
+        "patterns": [
+          "new \\DataMachineSocials\\Abilities\\"
+        ]
+      }
+    },
+    {
+      "name": "chat-tools-use-ability-registry",
+      "forbid": {
+        "glob": "inc/Chat/**/*.php",
+        "patterns": [
+          "new \\DataMachineSocials\\Abilities\\"
+        ]
+      }
+    }
+  ]
+}
