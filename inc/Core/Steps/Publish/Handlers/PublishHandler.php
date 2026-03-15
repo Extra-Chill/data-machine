@@ -154,14 +154,15 @@ abstract class PublishHandler {
 	}
 
 	/**
-	 * Validate repository image file.
+	 * Validate a repository media file using the given validator.
 	 *
-	 * @param string $image_file_path Path to image file
-	 * @return array Validation result with valid, errors, mime_type, size
+	 * @since 0.42.0
+	 * @param string                                           $file_path Path to media file.
+	 * @param \DataMachine\Core\FilesRepository\MediaValidator $validator  Validator instance.
+	 * @return array Validation result with valid, errors, mime_type, size.
 	 */
-	protected function validateImage( string $image_file_path ): array {
-		$image_validator = new \DataMachine\Core\FilesRepository\ImageValidator();
-		$validation      = $image_validator->validate_repository_file( $image_file_path );
+	protected function validateMedia( string $file_path, \DataMachine\Core\FilesRepository\MediaValidator $validator ): array {
+		$validation = $validator->validate_repository_file( $file_path );
 
 		return array(
 			'valid'     => $validation['valid'] ?? false,
@@ -169,6 +170,16 @@ abstract class PublishHandler {
 			'mime_type' => $validation['mime_type'] ?? null,
 			'size'      => $validation['size'] ?? 0,
 		);
+	}
+
+	/**
+	 * Validate repository image file.
+	 *
+	 * @param string $image_file_path Path to image file
+	 * @return array Validation result with valid, errors, mime_type, size
+	 */
+	protected function validateImage( string $image_file_path ): array {
+		return $this->validateMedia( $image_file_path, new \DataMachine\Core\FilesRepository\ImageValidator() );
 	}
 
 	/**
@@ -191,15 +202,7 @@ abstract class PublishHandler {
 	 * @return array Validation result with valid, errors, mime_type, size
 	 */
 	protected function validateVideo( string $video_file_path ): array {
-		$video_validator = new \DataMachine\Core\FilesRepository\VideoValidator();
-		$validation      = $video_validator->validate_repository_file( $video_file_path );
-
-		return array(
-			'valid'     => $validation['valid'] ?? false,
-			'errors'    => $validation['errors'] ?? array(),
-			'mime_type' => $validation['mime_type'] ?? null,
-			'size'      => $validation['size'] ?? 0,
-		);
+		return $this->validateMedia( $video_file_path, new \DataMachine\Core\FilesRepository\VideoValidator() );
 	}
 
 	/**

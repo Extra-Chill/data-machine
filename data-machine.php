@@ -137,8 +137,6 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/Media/AltTextAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Media/ImageGenerationAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Media/VideoAbilities.php';
-	require_once __DIR__ . '/inc/Core/FilesRepository/VideoValidator.php';
-	require_once __DIR__ . '/inc/Core/FilesRepository/VideoMetadata.php';
 	require_once __DIR__ . '/inc/Abilities/SEO/MetaDescriptionAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/SEO/IndexNowAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Media/ImageTemplateAbilities.php';
