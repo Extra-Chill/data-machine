@@ -154,6 +154,9 @@ class AltTextTask extends SystemTask {
 			'description'     => 'Automatically generate alt text for uploaded images using AI vision.',
 			'setting_key'     => 'alt_text_auto_generate_enabled',
 			'default_enabled' => true,
+			'trigger'         => 'Auto on image upload',
+			'trigger_type'    => 'event',
+			'supports_run'    => true,
 		);
 	}
 

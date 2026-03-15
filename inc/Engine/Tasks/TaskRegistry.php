@@ -107,6 +107,9 @@ class TaskRegistry {
 				'description'     => '',
 				'setting_key'     => null,
 				'default_enabled' => true,
+				'trigger'         => 'On demand',
+				'trigger_type'    => 'manual',
+				'supports_run'    => false,
 			);
 
 			if ( method_exists( $handler_class, 'getTaskMeta' ) ) {
@@ -129,6 +132,9 @@ class TaskRegistry {
 				'setting_key'     => $meta['setting_key'],
 				'default_enabled' => $meta['default_enabled'],
 				'enabled'         => $enabled,
+				'trigger'         => $meta['trigger'],
+				'trigger_type'    => $meta['trigger_type'],
+				'supports_run'    => $meta['supports_run'],
 			);
 		}
 

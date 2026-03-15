@@ -15,6 +15,7 @@ use WP_REST_Server;
 use WP_REST_Request;
 use WP_Error;
 use DataMachine\Engine\Tasks\TaskRegistry;
+use DataMachine\Engine\Tasks\TaskScheduler;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 use DataMachine\Core\Database\Jobs\JobsOperations;
 
@@ -62,6 +63,26 @@ class System {
 				'permission_callback' => function () {
 					return PermissionHelper::can( 'manage_settings' );
 				},
+			)
+		);
+
+		// Run a system task immediately.
+		register_rest_route(
+			'datamachine/v1',
+			'/system/tasks/(?P<task_type>[a-z_]+)/run',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( self::class, 'run_task' ),
+				'permission_callback' => function () {
+					return PermissionHelper::can( 'manage_settings' );
+				},
+				'args'                => array(
+					'task_type' => array(
+						'required'          => true,
+						'type'              => 'string',
+						'sanitize_callback' => 'sanitize_key',
+					),
+				),
 			)
 		);
 
@@ -189,12 +210,65 @@ class System {
 			$tasks[] = array_merge( $meta, array(
 				'last_run_at' => $last_run ? $last_run['completed_at'] : null,
 				'last_status' => $last_run ? $last_run['status'] : null,
+				'run_count'   => $last_run ? ( $last_run['run_count'] ?? 0 ) : 0,
 			) );
 		}
 
 		return rest_ensure_response( array(
 			'success' => true,
 			'data'    => $tasks,
+		) );
+	}
+
+	/**
+	 * Run a system task immediately.
+	 *
+	 * @param WP_REST_Request $request Request with task_type.
+	 * @return \WP_REST_Response|WP_Error
+	 * @since 0.42.0
+	 */
+	public static function run_task( WP_REST_Request $request ) {
+		$task_type = $request->get_param( 'task_type' );
+
+		if ( ! TaskRegistry::isRegistered( $task_type ) ) {
+			return new WP_Error(
+				'invalid_task_type',
+				sprintf( __( 'Unknown task type: %s', 'data-machine' ), $task_type ),
+				array( 'status' => 404 )
+			);
+		}
+
+		$registry = TaskRegistry::getRegistry();
+		$meta     = $registry[ $task_type ] ?? array();
+
+		if ( empty( $meta['supports_run'] ) ) {
+			return new WP_Error(
+				'task_not_runnable',
+				sprintf( __( 'Task "%s" does not support manual execution.', 'data-machine' ), $task_type ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$job_id = TaskScheduler::schedule( $task_type, array(
+			'source'       => 'admin_run_now',
+			'triggered_by' => get_current_user_id(),
+		) );
+
+		if ( ! $job_id ) {
+			return new WP_Error(
+				'schedule_failed',
+				__( 'Failed to schedule task.', 'data-machine' ),
+				array( 'status' => 500 )
+			);
+		}
+
+		return rest_ensure_response( array(
+			'success' => true,
+			'data'    => array(
+				'task_type' => $task_type,
+				'job_id'    => $job_id,
+				'message'   => sprintf( __( '%s scheduled (Job #%d).', 'data-machine' ), $meta['label'] ?? $task_type, $job_id ),
+			),
 		) );
 	}
 
@@ -399,13 +473,13 @@ class System {
 	}
 
 	/**
-	 * Get the most recent completed job for each task type.
+	 * Get the most recent job and total run count for each task type.
 	 *
-	 * Queries the jobs table for system-sourced jobs, using
-	 * JSON_EXTRACT to match task_type from engine_data.
+	 * Queries both system and pipeline_system_task sources so the UI
+	 * reflects all task executions regardless of trigger path.
 	 *
 	 * @param array $task_types List of task type identifiers.
-	 * @return array<string, array> Task type => last job row.
+	 * @return array<string, array> Task type => { last job row + run_count }.
 	 * @since 0.32.0
 	 */
 	private static function get_last_runs( array $task_types ): array {
@@ -418,13 +492,12 @@ class System {
 		$results = array();
 
 		foreach ( $task_types as $task_type ) {
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$row = $wpdb->get_row(
 				$wpdb->prepare(
 					"SELECT job_id, status, created_at, completed_at
 					 FROM {$table}
-					 WHERE source = 'system'
+					 WHERE source IN ('system', 'pipeline_system_task')
 					 AND JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.task_type')) = %s
 					 ORDER BY job_id DESC
 					 LIMIT 1",
@@ -432,10 +505,29 @@ class System {
 				),
 				ARRAY_A
 			);
+
+			$count = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*)
+					 FROM {$table}
+					 WHERE source IN ('system', 'pipeline_system_task')
+					 AND JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.task_type')) = %s",
+					$task_type
+				)
+			);
 			// phpcs:enable WordPress.DB.PreparedSQL
 
 			if ( $row ) {
+				$row['run_count'] = (int) $count;
 				$results[ $task_type ] = $row;
+			} elseif ( $count > 0 ) {
+				$results[ $task_type ] = array(
+					'job_id'       => null,
+					'status'       => null,
+					'created_at'   => null,
+					'completed_at' => null,
+					'run_count'    => (int) $count,
+				);
 			}
 		}
 

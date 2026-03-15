@@ -706,3 +706,131 @@
 	color: #646970;
 	font-style: italic;
 }
+
+/* --- System Tasks Tab --- */
+
+.datamachine-system-tasks-loading {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 40px 20px;
+	justify-content: center;
+	color: #646970;
+}
+
+.datamachine-system-tasks-empty {
+	padding: 40px 20px;
+	text-align: center;
+	color: #646970;
+}
+
+.datamachine-task-cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+	gap: 16px;
+}
+
+.datamachine-task-card {
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+	display: flex;
+	flex-direction: column;
+}
+
+.datamachine-task-card.is-disabled {
+	opacity: 0.6;
+}
+
+.datamachine-task-card-header {
+	padding: 16px;
+	border-bottom: 1px solid #f0f0f1;
+}
+
+.datamachine-task-card-title {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 6px;
+}
+
+.datamachine-task-card-title strong {
+	font-size: 14px;
+}
+
+.datamachine-task-card-description {
+	margin: 0;
+	font-size: 13px;
+	color: #646970;
+	line-height: 1.5;
+}
+
+.datamachine-task-toggle {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 12px;
+	color: #646970;
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.datamachine-task-toggle input {
+	margin: 0;
+}
+
+.datamachine-task-card-meta {
+	padding: 12px 16px;
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.datamachine-task-card-meta-item {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	font-size: 13px;
+}
+
+.datamachine-task-card-meta-label {
+	color: #646970;
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: 0.3px;
+}
+
+.datamachine-task-card-meta-value {
+	color: #1e1e1e;
+	text-align: right;
+}
+
+.datamachine-task-card-actions {
+	padding: 12px 16px;
+	border-top: 1px solid #f0f0f1;
+	background: #f6f7f7;
+}
+
+/* Status indicators */
+.datamachine-status--success {
+	color: #00a32a;
+}
+
+.datamachine-status--error {
+	color: #d63638;
+}
+
+.datamachine-status--muted {
+	color: #a7aaad;
+}
+
+.datamachine-status--info {
+	color: #2271b1;
+}
+
+@media screen and (max-width: 782px) {
+	.datamachine-task-cards {
+		grid-template-columns: 1fr;
+	}
+}
