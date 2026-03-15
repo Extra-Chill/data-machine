@@ -144,7 +144,10 @@ class WordPress extends PublishHandler {
 			}
 		}
 
-		// Delegate to ability
+		// Resolve media from engine data.
+		$media = $this->resolveMediaUrls( $engine );
+
+		// Delegate to ability.
 		$ability_input = array(
 			'title'                  => $parameters['title'] ?? '',
 			'content'                => $parameters['content'] ?? '',
@@ -152,7 +155,8 @@ class WordPress extends PublishHandler {
 			'post_status'            => WordPressSettingsResolver::getPostStatus( $handler_config ),
 			'post_author'            => WordPressSettingsResolver::getPostAuthor( $handler_config ),
 			'taxonomies'             => $taxonomies,
-			'featured_image_path'    => $engine->getImagePath(),
+			'featured_image_path'    => $media['image_file_path'],
+			'featured_image_url'     => $media['image_url'],
 			'source_url'             => $engine->getSourceUrl(),
 			'add_source_attribution' => true,
 			'job_id'                 => $parameters['job_id'] ?? null,
