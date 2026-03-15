@@ -102,21 +102,9 @@ class Threads extends PublishHandler {
 			$engine = new EngineData( $parameters['engine_data'] ?? array(), $parameters['job_id'] ?? null );
 		}
 
-		$file_storage    = new \DataMachine\Core\FilesRepository\FileStorage();
-		$image_url       = '';
-		$video_url       = '';
-		$image_file_path = $engine->getImagePath();
-		$video_file_path = $engine->getVideoPath();
-
-		if ( ! empty( $video_file_path ) ) {
-			$validation = $this->validateVideo( $video_file_path );
-			if ( $validation['valid'] ) {
-				$video_url = $file_storage->get_public_url( $video_file_path );
-			}
-		}
-		if ( ! empty( $image_file_path ) ) {
-			$image_url = $file_storage->get_public_url( $image_file_path );
-		}
+		$media     = $this->resolveMediaUrls( $engine );
+		$image_url = $media['image_url'];
+		$video_url = $media['video_url'];
 
 		$publish_input = array(
 			'content'    => $parameters['content'] ?? '',

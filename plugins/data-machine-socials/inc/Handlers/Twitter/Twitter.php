@@ -18,7 +18,6 @@ use DataMachine\Core\EngineData;
 use DataMachine\Core\Steps\Publish\Handlers\PublishHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 use DataMachineSocials\Abilities\Twitter\TwitterPublishAbility;
-
 defined( 'ABSPATH' ) || exit;
 
 /**

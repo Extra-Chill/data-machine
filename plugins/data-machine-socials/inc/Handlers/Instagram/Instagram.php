@@ -117,26 +117,11 @@ class Instagram extends PublishHandler {
 			$engine = new EngineData( $parameters['engine_data'] ?? array(), $parameters['job_id'] ?? null );
 		}
 
-		$file_storage = new \DataMachine\Core\FilesRepository\FileStorage();
-
 		// Resolve media from engine data — video takes priority (becomes a Reel).
-		$video_file_path = $engine->getVideoPath();
-		$image_file_path = $engine->getImagePath();
-		$video_url       = '';
-		$image_url       = '';
-
-		if ( ! empty( $video_file_path ) ) {
-			$validation = $this->validateVideo( $video_file_path );
-			if ( $validation['valid'] ) {
-				$video_url = $file_storage->get_public_url( $video_file_path );
-			} else {
-				$this->log( 'warning', 'Instagram: Video validation failed, falling back to image', array( 'errors' => $validation['errors'] ) );
-			}
-		}
-
-		if ( ! empty( $image_file_path ) ) {
-			$image_url = $file_storage->get_public_url( $image_file_path );
-		}
+		$media          = $this->resolveMediaUrls( $engine );
+		$video_url      = $media['video_url'];
+		$video_file_path = $media['video_file_path'];
+		$image_url      = $media['image_url'];
 
 		// Build image URLs array.
 		$image_urls = array();
