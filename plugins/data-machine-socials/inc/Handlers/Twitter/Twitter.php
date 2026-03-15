@@ -117,9 +117,16 @@ class Twitter extends PublishHandler {
 			$engine = new EngineData( $parameters['engine_data'] ?? array(), $parameters['job_id'] ?? null );
 		}
 
+		// Resolve media path — prefer video over image for Twitter.
+		$media_path = $engine->getVideoPath();
+		if ( empty( $media_path ) ) {
+			$media_path = $engine->getImagePath();
+		}
+
 		$result = TwitterPublishAbility::execute_publish(
 		array(
 			'content'       => $parameters['content'] ?? '',
+			'media_path'    => $media_path,
 			'image_path'    => $engine->getImagePath(),
 			'source_url'    => $engine->getSourceUrl(),
 			'link_handling' => $handler_config['link_handling'] ?? 'append',

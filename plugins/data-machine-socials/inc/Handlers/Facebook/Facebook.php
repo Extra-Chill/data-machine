@@ -104,20 +104,33 @@ class Facebook extends PublishHandler {
 
 		$file_storage    = new \DataMachine\Core\FilesRepository\FileStorage();
 		$image_url       = '';
+		$video_url       = '';
 		$image_file_path = $engine->getImagePath();
+		$video_file_path = $engine->getVideoPath();
+
+		if ( ! empty( $video_file_path ) ) {
+			$validation = $this->validateVideo( $video_file_path );
+			if ( $validation['valid'] ) {
+				$video_url = $file_storage->get_public_url( $video_file_path );
+			}
+		}
 		if ( ! empty( $image_file_path ) ) {
 			$image_url = $file_storage->get_public_url( $image_file_path );
 		}
 
-		$result = FacebookPublishAbility::execute_publish(
-		array(
+		$publish_input = array(
 			'title'         => $parameters['title'] ?? '',
 			'content'       => $parameters['content'] ?? '',
 			'image_url'     => $image_url,
 			'source_url'    => $engine->getSourceUrl(),
 			'link_handling' => $handler_config['link_handling'] ?? 'append',
-		)
 		);
+
+		if ( ! empty( $video_url ) ) {
+			$publish_input['video_url'] = $video_url;
+		}
+
+		$result = FacebookPublishAbility::execute_publish( $publish_input );
 
 		if ( $result['success'] ) {
 			return $this->successResponse(

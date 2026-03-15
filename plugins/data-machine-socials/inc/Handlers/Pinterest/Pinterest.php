@@ -144,10 +144,11 @@ class Pinterest extends PublishHandler {
 
 		$source_url = $engine->getSourceUrl();
 		$image_url  = $this->resolve_image_url( $engine );
+		$video_url  = $this->resolve_video_url( $engine );
 
-		if ( empty( $image_url ) ) {
+		if ( empty( $image_url ) && empty( $video_url ) ) {
 			return $this->errorResponse(
-				'No publicly accessible image URL found for pin',
+				'No publicly accessible media URL found for pin',
 				array( 'source_url' => $source_url )
 			);
 		}
@@ -172,15 +173,26 @@ class Pinterest extends PublishHandler {
 			);
 		}
 
+		// Build media source — prefer video for video pins, fall back to image.
+		if ( ! empty( $video_url ) ) {
+			$media_source = array(
+				'source_type' => 'video_id',
+				'cover_image_url' => $image_url ?: '',
+				'url'         => $video_url,
+			);
+		} else {
+			$media_source = array(
+				'source_type' => 'image_url',
+				'url'         => $image_url,
+			);
+		}
+
 		$payload = array(
 			'board_id'     => $board_id,
 			'title'        => substr( $title, 0, 100 ),
 			'description'  => substr( $description, 0, 500 ),
 			'link'         => $source_url,
-			'media_source' => array(
-				'source_type' => 'image_url',
-				'url'         => $image_url,
-			),
+			'media_source' => $media_source,
 		);
 
 		$this->log(
@@ -343,6 +355,28 @@ class Pinterest extends PublishHandler {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Resolve a publicly accessible video URL for a video pin.
+	 *
+	 * @since 0.4.0
+	 * @param EngineData $engine Engine data instance.
+	 * @return string|null Public video URL or null if unavailable.
+	 */
+	private function resolve_video_url( EngineData $engine ): ?string {
+		$video_file_path = $engine->getVideoPath();
+		if ( empty( $video_file_path ) ) {
+			return null;
+		}
+
+		$validation = $this->validateVideo( $video_file_path );
+		if ( ! $validation['valid'] ) {
+			return null;
+		}
+
+		$file_storage = new \DataMachine\Core\FilesRepository\FileStorage();
+		return $file_storage->get_public_url( $video_file_path );
 	}
 
 	/**

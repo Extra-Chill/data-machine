@@ -146,7 +146,7 @@ class TwitterPublishAbility {
 	 */
 	public static function execute_publish( array $input ): array {
 		$content       = $input['content'] ?? '';
-		$image_path    = $input['image_path'] ?? '';
+		$media_path    = $input['media_path'] ?? $input['image_path'] ?? '';
 		$source_url    = $input['source_url'] ?? '';
 		$link_handling = $input['link_handling'] ?? 'append';
 
@@ -184,13 +184,13 @@ class TwitterPublishAbility {
 			$v2_payload = array( 'text' => $tweet_text );
 			$media_id   = null;
 
-			// Handle image upload if provided
-			if ( ! empty( $image_path ) && file_exists( $image_path ) ) {
-				$media_id = self::upload_media( $connection, $image_path );
+			// Handle media upload if provided — supports images and video via core validation.
+			if ( ! empty( $media_path ) && file_exists( $media_path ) ) {
+				$media_id = self::upload_media( $connection, $media_path );
 				if ( ! $media_id ) {
 					return array(
 						'success' => false,
-						'error'   => 'Failed to upload image',
+						'error'   => 'Failed to upload media',
 					);
 				}
 			}
@@ -304,23 +304,32 @@ class TwitterPublishAbility {
 	/**
 	 * Upload media to Twitter.
 	 *
+	 * Validates the file using core MediaValidator (ImageValidator or VideoValidator)
+	 * and uploads via Twitter's chunked media upload API. Supports both images and video.
+	 *
 	 * @param object $connection TwitterOAuth connection.
-	 * @param string $image_path Path to image file.
+	 * @param string $media_path Path to media file (image or video).
 	 * @return string|null Media ID or null on failure.
 	 */
-	private static function upload_media( $connection, string $image_path ): ?string {
-		if ( ! file_exists( $image_path ) ) {
+	private static function upload_media( $connection, string $media_path ): ?string {
+		if ( ! file_exists( $media_path ) ) {
 			return null;
 		}
 
-		$finfo     = new \finfo( FILEINFO_MIME_TYPE );
-		$mime_type = $finfo->file( $image_path );
+		// Use core MediaValidator for MIME type and file validation.
+		$is_video  = \DataMachine\Core\FilesRepository\VideoValidator::is_video_extension( $media_path );
+		$validator = $is_video
+			? new \DataMachine\Core\FilesRepository\VideoValidator()
+			: new \DataMachine\Core\FilesRepository\ImageValidator();
 
-		if ( ! in_array( $mime_type, array( 'image/jpeg', 'image/png', 'image/gif', 'image/webp' ), true ) ) {
+		$validation = $validator->validate_repository_file( $media_path );
+		if ( ! $validation['valid'] ) {
 			return null;
 		}
 
-		$file_size = filesize( $image_path );
+		$mime_type      = $validation['mime_type'];
+		$file_size      = $validation['size'];
+		$media_category = $is_video ? 'tweet_video' : 'tweet_image';
 
 		// INIT
 		$connection->setApiVersion( '1.1' );
@@ -329,7 +338,7 @@ class TwitterPublishAbility {
 			array(
 				'command'        => 'INIT',
 				'media_type'     => $mime_type,
-				'media_category' => 'tweet_image',
+				'media_category' => $media_category,
 				'total_bytes'    => $file_size,
 			)
 		);
@@ -341,7 +350,7 @@ class TwitterPublishAbility {
 		$media_id = $init_response->media_id_string;
 
 		// APPEND
-		$handle        = fopen( $image_path, 'rb' );
+		$handle        = fopen( $media_path, 'rb' );
 		$segment_index = 0;
 		$chunk_size    = 1048576; // 1MB
 
@@ -370,12 +379,37 @@ class TwitterPublishAbility {
 			)
 		);
 
-		if ( isset( $finalize_response->media_id_string ) ) {
-			$connection->setApiVersion( '2' );
-			return $finalize_response->media_id_string;
+		if ( ! isset( $finalize_response->media_id_string ) ) {
+			return null;
 		}
 
-		return null;
+		// Video requires async processing — poll STATUS until complete.
+		if ( $is_video && isset( $finalize_response->processing_info ) ) {
+			$processing = $finalize_response->processing_info;
+			while ( isset( $processing->state ) && 'succeeded' !== $processing->state ) {
+				if ( 'failed' === $processing->state ) {
+					return null;
+				}
+				$wait = $processing->check_after_secs ?? 5;
+				sleep( $wait );
+
+				$status_response = $connection->get(
+					'media/upload',
+					array(
+						'command'  => 'STATUS',
+						'media_id' => $media_id,
+					)
+				);
+
+				$processing = $status_response->processing_info ?? null;
+				if ( null === $processing ) {
+					break; // No more processing info — assume done.
+				}
+			}
+		}
+
+		$connection->setApiVersion( '2' );
+		return $finalize_response->media_id_string;
 	}
 
 	/**

@@ -117,29 +117,48 @@ class Instagram extends PublishHandler {
 			$engine = new EngineData( $parameters['engine_data'] ?? array(), $parameters['job_id'] ?? null );
 		}
 
-		// Get image URL from engine data
-		$file_storage    = new \DataMachine\Core\FilesRepository\FileStorage();
-		$image_url       = '';
+		$file_storage = new \DataMachine\Core\FilesRepository\FileStorage();
+
+		// Resolve media from engine data — video takes priority (becomes a Reel).
+		$video_file_path = $engine->getVideoPath();
 		$image_file_path = $engine->getImagePath();
+		$video_url       = '';
+		$image_url       = '';
+
+		if ( ! empty( $video_file_path ) ) {
+			$validation = $this->validateVideo( $video_file_path );
+			if ( $validation['valid'] ) {
+				$video_url = $file_storage->get_public_url( $video_file_path );
+			} else {
+				$this->log( 'warning', 'Instagram: Video validation failed, falling back to image', array( 'errors' => $validation['errors'] ) );
+			}
+		}
+
 		if ( ! empty( $image_file_path ) ) {
 			$image_url = $file_storage->get_public_url( $image_file_path );
 		}
 
-		// Build image URLs array
+		// Build image URLs array.
 		$image_urls = array();
 		if ( ! empty( $image_url ) ) {
 			$image_urls[] = $image_url;
 		}
 
-		// If additional images provided in parameters
+		// If additional images provided in parameters.
 		if ( ! empty( $parameters['image_urls'] ) && is_array( $parameters['image_urls'] ) ) {
 			$image_urls = array_merge( $image_urls, $parameters['image_urls'] );
 		}
 
-		// Get aspect ratio from config or parameters
+		// Get aspect ratio from config or parameters.
 		$aspect_ratio = $parameters['aspect_ratio'] ?? $handler_config['default_aspect_ratio'] ?? '4:5';
 
-		// Get content based on caption source setting
+		// Auto-detect media_kind: if video is present, publish as Reel.
+		$media_kind = 'image';
+		if ( ! empty( $video_url ) ) {
+			$media_kind = 'reel';
+		}
+
+		// Get content based on caption source setting.
 		$content        = '';
 		$caption_source = $handler_config['caption_source'] ?? 'content';
 
@@ -156,19 +175,27 @@ class Instagram extends PublishHandler {
 				break;
 		}
 
-		$result = InstagramPublishAbility::execute_publish(
-			array(
-				'content'      => $content,
-				'image_urls'   => $image_urls,
-				'aspect_ratio' => $aspect_ratio,
-				'source_url'   => $engine->getSourceUrl(),
-			)
+		$publish_input = array(
+			'content'      => $content,
+			'media_kind'   => $media_kind,
+			'image_urls'   => $image_urls,
+			'aspect_ratio' => $aspect_ratio,
+			'source_url'   => $engine->getSourceUrl(),
 		);
+
+		// Pass video URL and file path for Reel publishing (file path enables pre-publish validation).
+		if ( ! empty( $video_url ) ) {
+			$publish_input['video_url']       = $video_url;
+			$publish_input['video_file_path'] = $video_file_path;
+		}
+
+		$result = InstagramPublishAbility::execute_publish( $publish_input );
 
 		if ( $result['success'] ) {
 			return $this->successResponse(
 				array(
 					'media_id'    => $result['media_id'] ?? '',
+					'media_kind'  => $result['media_kind'] ?? $media_kind,
 					'permalink'   => $result['permalink'] ?? '',
 					'content'     => $content,
 					'image_count' => count( $image_urls ),

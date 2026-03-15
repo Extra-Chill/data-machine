@@ -96,6 +96,7 @@ class Threads extends PublishHandler {
 	}
 
 	protected function executePublish( array $parameters, array $handler_config ): array {
+		$handler_config;
 		$engine = $parameters['engine'] ?? null;
 		if ( ! $engine instanceof EngineData ) {
 			$engine = new EngineData( $parameters['engine_data'] ?? array(), $parameters['job_id'] ?? null );
@@ -103,18 +104,31 @@ class Threads extends PublishHandler {
 
 		$file_storage    = new \DataMachine\Core\FilesRepository\FileStorage();
 		$image_url       = '';
+		$video_url       = '';
 		$image_file_path = $engine->getImagePath();
+		$video_file_path = $engine->getVideoPath();
+
+		if ( ! empty( $video_file_path ) ) {
+			$validation = $this->validateVideo( $video_file_path );
+			if ( $validation['valid'] ) {
+				$video_url = $file_storage->get_public_url( $video_file_path );
+			}
+		}
 		if ( ! empty( $image_file_path ) ) {
 			$image_url = $file_storage->get_public_url( $image_file_path );
 		}
 
-		$result = ThreadsPublishAbility::execute_publish(
-		array(
+		$publish_input = array(
 			'content'    => $parameters['content'] ?? '',
 			'image_url'  => $image_url,
 			'source_url' => $engine->getSourceUrl(),
-		)
 		);
+
+		if ( ! empty( $video_url ) ) {
+			$publish_input['video_url'] = $video_url;
+		}
+
+		$result = ThreadsPublishAbility::execute_publish( $publish_input );
 
 		if ( $result['success'] ) {
 			return $this->successResponse(
