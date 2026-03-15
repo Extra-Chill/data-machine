@@ -2,6 +2,25 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.41.0] - 2026-03-15
+
+### Added
+- redesign System Tasks tab with cards, trigger info, and Run Now
+- make system task AI prompts editable via REST API and CLI
+- add CLI commands for system, handlers, taxonomy, step-types, and processed-items
+
+### Changed
+- extract TaskRegistry and TaskScheduler from SystemAgent
+- make memory cleanup default prompt universal
+
+### Fixed
+- resolve all npm security vulnerabilities via overrides
+- remove AI model config from Manage tab, clarify Configuration labels
+- enqueue shared tab styles on Logs admin page
+- add migration to assign orphaned resources to sole agent
+- surface shared layer in Memory tab, pass agent_id in create endpoints, add layer grouping
+- always show agent switcher and provide create-agent path in UI
+
 ## [0.40.2] - 2026-03-13
 
 ### Fixed
