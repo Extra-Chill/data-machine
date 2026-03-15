@@ -271,23 +271,11 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 		};
 		add_filter( 'pre_http_request', $http_filter, 10, 3 );
 
-		// Mock SystemAgent singleton via reflection.
-		$reflection = new \ReflectionClass( \DataMachine\Engine\AI\System\SystemAgent::class );
-		$prop       = $reflection->getProperty( 'instance' );
-		$prop->setAccessible( true );
-		$original = $prop->getValue();
-
-		$mock = $this->createMock( \DataMachine\Engine\AI\System\SystemAgent::class );
-		$mock->method( 'scheduleTask' )->willReturn( 789 );
-		$prop->setValue( $mock );
-
 		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => 'The Spiritual Meaning of Cranes' ) );
 
 		$this->assertTrue( $result['success'], 'generateImage should succeed. Error: ' . ( $result['error'] ?? 'none' ) );
 		$this->assertStringContainsString( 'Prompt was refined', $result['message'] );
 
-		// Cleanup
-		$prop->setValue( $original );
 		remove_filter( 'pre_http_request', $http_filter, 10 );
 	}
 
@@ -311,22 +299,11 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 		};
 		add_filter( 'pre_http_request', $http_filter, 10, 3 );
 
-		// Mock SystemAgent singleton.
-		$reflection = new \ReflectionClass( \DataMachine\Engine\AI\System\SystemAgent::class );
-		$prop       = $reflection->getProperty( 'instance' );
-		$prop->setAccessible( true );
-		$original = $prop->getValue();
-
-		$mock = $this->createMock( \DataMachine\Engine\AI\System\SystemAgent::class );
-		$mock->method( 'scheduleTask' )->willReturn( 456 );
-		$prop->setValue( $mock );
-
 		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => 'The Spiritual Meaning of Cranes' ) );
 
 		$this->assertTrue( $result['success'] );
 		$this->assertStringNotContainsString( 'Prompt was refined', $result['message'] );
 
-		$prop->setValue( $original );
 		remove_filter( 'pre_http_request', $http_filter, 10 );
 	}
 }

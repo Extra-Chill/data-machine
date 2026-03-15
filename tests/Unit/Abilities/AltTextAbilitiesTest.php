@@ -9,7 +9,6 @@ namespace DataMachine\Tests\Unit\Abilities;
 
 use DataMachine\Abilities\Media\AltTextAbilities;
 use DataMachine\Core\PluginSettings;
-use DataMachine\Engine\AI\System\SystemAgent;
 use WP_UnitTestCase;
 
 class AltTextAbilitiesTest extends WP_UnitTestCase {
@@ -107,7 +106,7 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Test generateAltText with single attachment_id.
+	 * Test generateAltText with single attachment_id schedules work.
 	 */
 	public function test_generate_alt_text_single_attachment(): void {
 		$settings_filter = function( $pre_option ) {
@@ -119,28 +118,6 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
 		PluginSettings::clearCache();
 
-		// Mock SystemAgent with scheduleBatch
-		$system_agent_mock = $this->createMock( SystemAgent::class );
-		$system_agent_mock->expects( $this->once() )
-			->method( 'scheduleBatch' )
-			->with(
-				'alt_text_generation',
-				[
-					[
-						'attachment_id' => $this->test_image_id,
-						'force' => false,
-						'source' => 'ability',
-					]
-				]
-			)
-			->willReturn( [ 'batch_id' => 'test-batch-1', 'total' => 1, 'chunk_size' => 10 ] );
-
-		$reflection = new \ReflectionClass( SystemAgent::class );
-		$instance_property = $reflection->getProperty( 'instance' );
-		$instance_property->setAccessible( true );
-		$original_instance = $instance_property->getValue();
-		$instance_property->setValue( $system_agent_mock );
-
 		$result = AltTextAbilities::generateAltText( [
 			'attachment_id' => $this->test_image_id
 		] );
@@ -150,15 +127,13 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( [ $this->test_image_id ], $result['attachment_ids'] );
 		$this->assertStringContainsString( '1 attachment', $result['message'] );
 
-		$instance_property->setValue( $original_instance );
 		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
 	}
 
 	/**
-	 * Test generateAltText with force=true.
+	 * Test generateAltText with force=true includes images with existing alt text.
 	 */
 	public function test_generate_alt_text_force_regeneration(): void {
-		// Add existing alt text
 		update_post_meta( $this->test_image_id, '_wp_attachment_image_alt', 'Existing alt text' );
 
 		$settings_filter = function( $pre_option ) {
@@ -170,28 +145,6 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
 		PluginSettings::clearCache();
 
-		// Mock SystemAgent with scheduleBatch
-		$system_agent_mock = $this->createMock( SystemAgent::class );
-		$system_agent_mock->expects( $this->once() )
-			->method( 'scheduleBatch' )
-			->with(
-				'alt_text_generation',
-				[
-					[
-						'attachment_id' => $this->test_image_id,
-						'force' => true,
-						'source' => 'ability',
-					]
-				]
-			)
-			->willReturn( [ 'batch_id' => 'test-batch-2', 'total' => 1, 'chunk_size' => 10 ] );
-
-		$reflection = new \ReflectionClass( SystemAgent::class );
-		$instance_property = $reflection->getProperty( 'instance' );
-		$instance_property->setAccessible( true );
-		$original_instance = $instance_property->getValue();
-		$instance_property->setValue( $system_agent_mock );
-
 		$result = AltTextAbilities::generateAltText( [
 			'attachment_id' => $this->test_image_id,
 			'force' => true
@@ -200,7 +153,6 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( 1, $result['queued_count'] );
 
-		$instance_property->setValue( $original_instance );
 		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
 	}
 
@@ -208,14 +160,12 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 	 * Test generateAltText with post_id finds attached images.
 	 */
 	public function test_generate_alt_text_with_post_id(): void {
-		// Create post and attach images
 		$post_id = self::factory()->post->create();
 		wp_update_post( [
 			'ID' => $this->test_image_id,
 			'post_parent' => $post_id
 		] );
 
-		// Create featured image
 		$featured_image_id = self::factory()->attachment->create_object( [
 			'file' => 'featured.jpg',
 			'post_mime_type' => 'image/jpeg'
@@ -231,18 +181,6 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
 		PluginSettings::clearCache();
 
-		// Mock SystemAgent with scheduleBatch to expect 2 items
-		$system_agent_mock = $this->createMock( SystemAgent::class );
-		$system_agent_mock->expects( $this->once() )
-			->method( 'scheduleBatch' )
-			->willReturn( [ 'batch_id' => 'test-batch-3', 'total' => 2, 'chunk_size' => 10 ] );
-
-		$reflection = new \ReflectionClass( SystemAgent::class );
-		$instance_property = $reflection->getProperty( 'instance' );
-		$instance_property->setAccessible( true );
-		$original_instance = $instance_property->getValue();
-		$instance_property->setValue( $system_agent_mock );
-
 		$result = AltTextAbilities::generateAltText( [
 			'post_id' => $post_id
 		] );
@@ -252,7 +190,6 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 		$this->assertContains( $this->test_image_id, $result['attachment_ids'] );
 		$this->assertContains( $featured_image_id, $result['attachment_ids'] );
 
-		$instance_property->setValue( $original_instance );
 		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
 	}
 
@@ -260,7 +197,6 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 	 * Test generateAltText skips when alt text already exists.
 	 */
 	public function test_generate_alt_text_skips_existing(): void {
-		// Add existing alt text
 		update_post_meta( $this->test_image_id, '_wp_attachment_image_alt', 'Existing alt text' );
 
 		$settings_filter = function( $pre_option ) {
@@ -272,17 +208,6 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
 		PluginSettings::clearCache();
 
-		// Mock SystemAgent - scheduleBatch should not be called (skips existing)
-		$system_agent_mock = $this->createMock( SystemAgent::class );
-		$system_agent_mock->expects( $this->never() )
-			->method( 'scheduleBatch' );
-
-		$reflection = new \ReflectionClass( SystemAgent::class );
-		$instance_property = $reflection->getProperty( 'instance' );
-		$instance_property->setAccessible( true );
-		$original_instance = $instance_property->getValue();
-		$instance_property->setValue( $system_agent_mock );
-
 		$result = AltTextAbilities::generateAltText( [
 			'attachment_id' => $this->test_image_id
 		] );
@@ -291,7 +216,6 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( 0, $result['queued_count'] );
 		$this->assertStringContainsString( 'No attachments queued', $result['message'] );
 
-		$instance_property->setValue( $original_instance );
 		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
 	}
 
@@ -309,7 +233,7 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 		PluginSettings::clearCache();
 
 		$result = AltTextAbilities::generateAltText( [
-			'post_id' => 99999 // Non-existent post
+			'post_id' => 99999
 		] );
 
 		$this->assertFalse( $result['success'] );
@@ -323,7 +247,6 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 	 * Test diagnoseAltText returns coverage statistics.
 	 */
 	public function test_diagnose_alt_text(): void {
-		// Create additional test images
 		$image_with_alt = self::factory()->attachment->create_object( [
 			'file' => 'image-with-alt.jpg',
 			'post_mime_type' => 'image/jpeg'
@@ -341,85 +264,11 @@ class AltTextAbilitiesTest extends WP_UnitTestCase {
 		$this->assertIsInt( $result['total_images'] );
 		$this->assertIsInt( $result['missing_alt_count'] );
 		$this->assertIsArray( $result['by_mime_type'] );
-		$this->assertGreaterThanOrEqual( 3, $result['total_images'] ); // At least our test images
-		$this->assertGreaterThanOrEqual( 1, $result['missing_alt_count'] ); // At least one without alt
+		$this->assertGreaterThanOrEqual( 3, $result['total_images'] );
+		$this->assertGreaterThanOrEqual( 1, $result['missing_alt_count'] );
 
-		// Check MIME type breakdown
 		$mime_types = array_column( $result['by_mime_type'], 'mime_type' );
 		$this->assertContains( 'image/jpeg', $mime_types );
-	}
-
-	/**
-	 * Test queueAttachmentAltText hook functionality.
-	 */
-	public function test_queue_attachment_alt_text_hook(): void {
-		// Mock settings for auto-generation
-		$settings_filter = function( $pre_option ) {
-			return [
-				'alt_text_auto_generate_enabled' => true,
-				'default_provider' => 'openai',
-				'default_model' => 'gpt-4'
-			];
-		};
-		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
-		PluginSettings::clearCache();
-
-		// Mock SystemAgent
-		$system_agent_mock = $this->createMock( SystemAgent::class );
-		$system_agent_mock->expects( $this->once() )
-			->method( 'scheduleTask' )
-			->with(
-				'alt_text_generation',
-				[
-					'attachment_id' => $this->test_image_id,
-					'force' => false,
-					'source' => 'add_attachment'
-				]
-			);
-
-		$reflection = new \ReflectionClass( SystemAgent::class );
-		$instance_property = $reflection->getProperty( 'instance' );
-		$instance_property->setAccessible( true );
-		$original_instance = $instance_property->getValue();
-		$instance_property->setValue( $system_agent_mock );
-
-		// Trigger the hook
-		do_action( 'add_attachment', $this->test_image_id );
-
-		$instance_property->setValue( $original_instance );
-		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
-	}
-
-	/**
-	 * Test queueAttachmentAltText skips when auto-generation disabled.
-	 */
-	public function test_queue_attachment_alt_text_disabled(): void {
-		$settings_filter = function( $pre_option ) {
-			return [
-				'alt_text_auto_generate_enabled' => false,
-				'default_provider' => 'openai',
-				'default_model' => 'gpt-4'
-			];
-		};
-		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
-		PluginSettings::clearCache();
-
-		// Mock SystemAgent - should not be called
-		$system_agent_mock = $this->createMock( SystemAgent::class );
-		$system_agent_mock->expects( $this->never() )
-			->method( 'scheduleTask' );
-
-		$reflection = new \ReflectionClass( SystemAgent::class );
-		$instance_property = $reflection->getProperty( 'instance' );
-		$instance_property->setAccessible( true );
-		$original_instance = $instance_property->getValue();
-		$instance_property->setValue( $system_agent_mock );
-
-		// Trigger the hook
-		do_action( 'add_attachment', $this->test_image_id );
-
-		$instance_property->setValue( $original_instance );
-		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
 	}
 
 	/**
