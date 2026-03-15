@@ -15,6 +15,7 @@ namespace DataMachine\Cli\Commands;
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\Media\ImageGenerationAbilities;
+use DataMachine\Abilities\Media\ImageOptimizationAbilities;
 use DataMachine\Abilities\Media\ImageTemplateAbilities;
 
 defined( 'ABSPATH' ) || exit;
@@ -371,5 +372,227 @@ class ImageCommand extends BaseCommand {
 		);
 
 		$this->format_items( $items, array( 'setting', 'value' ), $assoc_args );
+	}
+
+	/**
+	 * Diagnose image optimization issues in the media library.
+	 *
+	 * Scans for oversized images, missing WebP variants, and reports
+	 * potential savings from compression.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--size_threshold=<bytes>]
+	 * : File size threshold in bytes. Images larger are flagged.
+	 * ---
+	 * default: 204800
+	 * ---
+	 *
+	 * [--limit=<number>]
+	 * : Maximum images to scan.
+	 * ---
+	 * default: 500
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - csv
+	 * ---
+	 *
+	 * [--fields=<fields>]
+	 * : Limit output to specific fields (comma-separated).
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Diagnose with default 200KB threshold
+	 *     wp datamachine image diagnose
+	 *
+	 *     # Flag images over 100KB
+	 *     wp datamachine image diagnose --size_threshold=102400
+	 *
+	 *     # JSON output
+	 *     wp datamachine image diagnose --format=json
+	 *
+	 * @subcommand diagnose
+	 */
+	public function diagnose( array $args, array $assoc_args ): void {
+		$format         = $assoc_args['format'] ?? 'table';
+		$size_threshold = absint( $assoc_args['size_threshold'] ?? ImageOptimizationAbilities::DEFAULT_SIZE_THRESHOLD );
+		$limit          = absint( $assoc_args['limit'] ?? 500 );
+
+		WP_CLI::log( sprintf( 'Scanning up to %d images (threshold: %s)...', $limit, size_format( $size_threshold ) ) );
+
+		$result = ImageOptimizationAbilities::diagnoseImages(
+			array(
+				'size_threshold' => $size_threshold,
+				'limit'          => $limit,
+			)
+		);
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( \wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			return;
+		}
+
+		$total   = $result['total_images'] ?? 0;
+		$over    = $result['oversized_count'] ?? 0;
+		$webp    = $result['missing_webp_count'] ?? 0;
+		$savings = $result['potential_savings_hr'] ?? '0 B';
+
+		WP_CLI::log( '' );
+		WP_CLI::log( sprintf( 'Total images scanned:  %d', $total ) );
+		WP_CLI::log( sprintf( 'Total size:            %s', $result['total_size_hr'] ?? '0 B' ) );
+		WP_CLI::log( sprintf( 'Oversized (>%s):  %d', $result['size_threshold_hr'] ?? '200 KB', $over ) );
+		WP_CLI::log( sprintf( 'Missing WebP:          %d', $webp ) );
+		WP_CLI::log( sprintf( 'Potential savings:     ~%s', $savings ) );
+		WP_CLI::log( '' );
+
+		$oversized = $result['oversized_images'] ?? array();
+		if ( empty( $oversized ) ) {
+			WP_CLI::success( 'No oversized images found.' );
+			return;
+		}
+
+		$this->format_items(
+			$oversized,
+			array( 'attachment_id', 'title', 'file_size_hr', 'dimensions', 'mime_type', 'has_webp' ),
+			$assoc_args
+		);
+
+		WP_CLI::warning( sprintf(
+			'%d oversized image(s) found. Run "wp datamachine image optimize" to compress them.',
+			$over
+		) );
+	}
+
+	/**
+	 * Optimize oversized images in the media library.
+	 *
+	 * Compresses images and generates WebP variants using WordPress image
+	 * editor (Imagick or GD). No external API dependencies.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--attachment_id=<id>]
+	 * : Specific attachment ID to optimize.
+	 *
+	 * [--size_threshold=<bytes>]
+	 * : Only optimize images larger than this (bytes).
+	 * ---
+	 * default: 204800
+	 * ---
+	 *
+	 * [--quality=<number>]
+	 * : JPEG/WebP compression quality (1-100).
+	 * ---
+	 * default: 82
+	 * ---
+	 *
+	 * [--no-webp]
+	 * : Skip WebP generation.
+	 *
+	 * [--limit=<number>]
+	 * : Maximum images to optimize.
+	 * ---
+	 * default: 50
+	 * ---
+	 *
+	 * [--dry-run]
+	 * : Preview what would be optimized without making changes.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Optimize all oversized images
+	 *     wp datamachine image optimize
+	 *
+	 *     # Dry run to preview
+	 *     wp datamachine image optimize --dry-run
+	 *
+	 *     # Optimize a specific image at quality 75
+	 *     wp datamachine image optimize --attachment_id=1527 --quality=75
+	 *
+	 *     # Skip WebP generation
+	 *     wp datamachine image optimize --no-webp
+	 *
+	 * @subcommand optimize
+	 */
+	public function optimize( array $args, array $assoc_args ): void {
+		$format         = $assoc_args['format'] ?? 'table';
+		$attachment_id  = absint( $assoc_args['attachment_id'] ?? 0 );
+		$size_threshold = absint( $assoc_args['size_threshold'] ?? ImageOptimizationAbilities::DEFAULT_SIZE_THRESHOLD );
+		$quality        = absint( $assoc_args['quality'] ?? ImageOptimizationAbilities::DEFAULT_QUALITY );
+		$webp           = ! isset( $assoc_args['no-webp'] );
+		$limit          = absint( $assoc_args['limit'] ?? 50 );
+		$dry_run        = isset( $assoc_args['dry-run'] );
+
+		if ( $dry_run ) {
+			WP_CLI::log( 'Dry run — previewing what would be optimized...' );
+		} else {
+			WP_CLI::log( sprintf( 'Optimizing images (quality: %d, WebP: %s)...', $quality, $webp ? 'yes' : 'no' ) );
+		}
+
+		$result = ImageOptimizationAbilities::optimizeImages(
+			array(
+				'attachment_id'  => $attachment_id,
+				'size_threshold' => $size_threshold,
+				'quality'        => $quality,
+				'webp'           => $webp,
+				'limit'          => $limit,
+				'dry_run'        => $dry_run,
+			)
+		);
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( \wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			return;
+		}
+
+		if ( empty( $result['success'] ) ) {
+			WP_CLI::error( $result['error'] ?? 'Optimization failed.' );
+			return;
+		}
+
+		if ( $dry_run ) {
+			$preview = $result['would_optimize'] ?? array();
+			if ( empty( $preview ) ) {
+				WP_CLI::success( 'No images need optimization.' );
+				return;
+			}
+
+			$this->format_items(
+				$preview,
+				array( 'attachment_id', 'title', 'file_size', 'mime_type' ),
+				$assoc_args
+			);
+
+			WP_CLI::log( $result['message'] ?? '' );
+			return;
+		}
+
+		$queued = $result['queued_count'] ?? 0;
+		if ( 0 === $queued ) {
+			WP_CLI::success( 'No oversized images found to optimize.' );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] ?? sprintf( '%d image(s) queued for optimization.', $queued ) );
+
+		if ( ! empty( $result['batch_id'] ) ) {
+			WP_CLI::log( sprintf( 'Batch ID: %d — track progress with: wp datamachine jobs list --parent_id=%d', $result['batch_id'], $result['batch_id'] ) );
+		}
 	}
 }

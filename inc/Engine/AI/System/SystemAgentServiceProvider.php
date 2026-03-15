@@ -17,6 +17,7 @@ use DataMachine\Engine\AI\System\Tasks\AltTextTask;
 use DataMachine\Engine\AI\System\Tasks\DailyMemoryTask;
 use DataMachine\Engine\AI\System\Tasks\GitHubIssueTask;
 use DataMachine\Engine\AI\System\Tasks\ImageGenerationTask;
+use DataMachine\Engine\AI\System\Tasks\ImageOptimizationTask;
 use DataMachine\Engine\AI\System\Tasks\InternalLinkingTask;
 use DataMachine\Engine\AI\System\Tasks\MetaDescriptionTask;
 use DataMachine\Engine\Tasks\TaskRegistry;
@@ -60,6 +61,7 @@ class SystemAgentServiceProvider {
 	 */
 	public function getBuiltInTasks( array $tasks ): array {
 		$tasks['image_generation']            = ImageGenerationTask::class;
+		$tasks['image_optimization']          = ImageOptimizationTask::class;
 		$tasks['alt_text_generation']         = AltTextTask::class;
 		$tasks['github_create_issue']         = GitHubIssueTask::class;
 		$tasks['internal_linking']            = InternalLinkingTask::class;
