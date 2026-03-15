@@ -237,7 +237,7 @@ class InternalLinkingAbilities {
 				'datamachine/check-broken-links',
 				array(
 					'label'               => 'Check Broken Links',
-					'description'         => 'HTTP HEAD check internal links from the cached link graph to find broken URLs. Expensive — runs audit first if no cache.',
+					'description'         => 'HTTP HEAD check links from the cached link graph to find broken URLs. Supports internal, external, or all links via scope. External checks include per-domain rate limiting and HEAD→GET fallback.',
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -247,9 +247,15 @@ class InternalLinkingAbilities {
 								'description' => 'Post type scope. Default: post.',
 								'default'     => 'post',
 							),
+							'scope'     => array(
+								'type'        => 'string',
+								'description' => 'Link scope: internal, external, or all. Default: internal.',
+								'enum'        => array( 'internal', 'external', 'all' ),
+								'default'     => 'internal',
+							),
 							'limit'     => array(
 								'type'        => 'integer',
-								'description' => 'Maximum URLs to check. Default: 200.',
+								'description' => 'Maximum unique URLs to check. Default: 200.',
 								'default'     => 200,
 							),
 							'timeout'   => array(
@@ -263,6 +269,7 @@ class InternalLinkingAbilities {
 						'type'       => 'object',
 						'properties' => array(
 							'success'      => array( 'type' => 'boolean' ),
+							'scope'        => array( 'type' => 'string' ),
 							'urls_checked' => array( 'type' => 'integer' ),
 							'broken_count' => array( 'type' => 'integer' ),
 							'broken_links' => array(
@@ -702,12 +709,14 @@ class InternalLinkingAbilities {
 	}
 
 	/**
-	 * Check for broken internal links via HTTP HEAD requests.
+	 * Check for broken links via HTTP HEAD requests.
 	 *
-	 * Reads all internal link URLs from the cached graph and performs
-	 * HEAD requests to find broken ones. Expensive — isolated from audit.
+	 * Supports internal links (default), external links, or both via scope param.
+	 * External checks include per-domain rate limiting, HEAD→GET fallback for
+	 * sites that block HEAD, and anchor text in results.
 	 *
 	 * @since 0.32.0
+	 * @since 0.42.0 Added scope parameter for external link checking.
 	 *
 	 * @param array $input Ability input.
 	 * @return array Ability response.
@@ -716,7 +725,12 @@ class InternalLinkingAbilities {
 		$post_type  = sanitize_text_field( $input['post_type'] ?? 'post' );
 		$limit      = absint( $input['limit'] ?? 200 );
 		$timeout    = absint( $input['timeout'] ?? 5 );
+		$scope      = sanitize_text_field( $input['scope'] ?? 'internal' );
 		$from_cache = true;
+
+		if ( ! in_array( $scope, array( 'internal', 'external', 'all' ), true ) ) {
+			$scope = 'internal';
+		}
 
 		$graph = get_transient( self::GRAPH_TRANSIENT_KEY );
 		if ( false === $graph || ! is_array( $graph ) || ( $graph['post_type'] ?? '' ) !== $post_type ) {
@@ -728,52 +742,98 @@ class InternalLinkingAbilities {
 			$from_cache = false;
 		}
 
-		$all_links = $graph['_all_links'] ?? array();
+		// Build URL → source mapping based on scope.
+		$url_sources = array(); // url => array of {source_id, anchor_text}.
+		$id_to_title = $graph['_id_to_title'] ?? array();
 
-		// Deduplicate URLs to check.
-		$url_sources   = array(); // url => array of source post IDs.
-		$checked_count = 0;
-
-		foreach ( $all_links as $link ) {
-			$url = $link['target_url'] ?? '';
-			if ( empty( $url ) ) {
-				continue;
+		if ( 'internal' === $scope || 'all' === $scope ) {
+			$all_links = $graph['_all_links'] ?? array();
+			foreach ( $all_links as $link ) {
+				$url = $link['target_url'] ?? '';
+				if ( empty( $url ) ) {
+					continue;
+				}
+				if ( ! isset( $url_sources[ $url ] ) ) {
+					$url_sources[ $url ] = array();
+				}
+				$url_sources[ $url ][] = array(
+					'source_id'   => $link['source_id'] ?? 0,
+					'anchor_text' => '',
+				);
 			}
-			if ( ! isset( $url_sources[ $url ] ) ) {
-				$url_sources[ $url ] = array();
-			}
-			$url_sources[ $url ][] = $link['source_id'] ?? 0;
 		}
 
-		$broken       = array();
-		$broken_count = 0;
-		$id_to_title  = $graph['_id_to_title'] ?? array();
+		if ( 'external' === $scope || 'all' === $scope ) {
+			$all_external = $graph['_all_external_links'] ?? array();
+			foreach ( $all_external as $link ) {
+				$url = $link['target_url'] ?? '';
+				if ( empty( $url ) ) {
+					continue;
+				}
+				if ( ! isset( $url_sources[ $url ] ) ) {
+					$url_sources[ $url ] = array();
+				}
+				$url_sources[ $url ][] = array(
+					'source_id'   => $link['source_id'] ?? 0,
+					'anchor_text' => $link['anchor_text'] ?? '',
+				);
+			}
+		}
 
-		foreach ( $url_sources as $url => $source_ids ) {
+		$broken        = array();
+		$broken_count  = 0;
+		$checked_count = 0;
+		$is_external   = 'external' === $scope || 'all' === $scope;
+
+		// Per-domain rate limiting for external checks (tracks last request time).
+		$domain_last_request = array();
+		$rate_limit_delay    = 1; // Minimum seconds between requests to same domain.
+
+		foreach ( $url_sources as $url => $sources ) {
 			if ( $limit > 0 && $checked_count >= $limit ) {
 				break;
 			}
 
-			$response = wp_remote_head(
-				$url,
-				array(
-					'timeout'     => $timeout,
-					'redirection' => 3,
-				)
-			);
+			// Per-domain rate limiting for external URLs.
+			if ( $is_external ) {
+				$domain = wp_parse_url( $url, PHP_URL_HOST );
+				if ( $domain && isset( $domain_last_request[ $domain ] ) ) {
+					$elapsed = microtime( true ) - $domain_last_request[ $domain ];
+					if ( $elapsed < $rate_limit_delay ) {
+						usleep( (int) ( ( $rate_limit_delay - $elapsed ) * 1000000 ) );
+					}
+				}
+			}
+
+			$status = self::checkUrlStatus( $url, $timeout, $is_external );
 			++$checked_count;
 
-			$status = wp_remote_retrieve_response_code( $response );
-			$is_ok  = $status >= 200 && $status < 400;
+			if ( $is_external ) {
+				$domain = wp_parse_url( $url, PHP_URL_HOST );
+				if ( $domain ) {
+					$domain_last_request[ $domain ] = microtime( true );
+				}
+			}
+
+			$is_ok = $status >= 200 && $status < 400;
 
 			if ( ! $is_ok ) {
-				foreach ( array_unique( $source_ids ) as $source_id ) {
+				// Deduplicate source IDs for this URL.
+				$seen_sources = array();
+				foreach ( $sources as $source ) {
+					$source_id = $source['source_id'] ?? 0;
+					if ( isset( $seen_sources[ $source_id ] ) ) {
+						continue;
+					}
+					$seen_sources[ $source_id ] = true;
+
 					++$broken_count;
 					$broken[] = array(
 						'source_id'    => $source_id,
-						'source_title' => $id_to_title[ $source_id ] ?? '',
+						'source_title' => $id_to_title[ $source_id ] ?? get_the_title( $source_id ),
 						'broken_url'   => $url,
-						'status_code'  => $status ? $status : 0,
+						'status_code'  => $status,
+						'anchor_text'  => $source['anchor_text'] ?? '',
 					);
 				}
 			}
@@ -781,11 +841,66 @@ class InternalLinkingAbilities {
 
 		return array(
 			'success'      => true,
+			'scope'        => $scope,
 			'urls_checked' => $checked_count,
 			'broken_count' => $broken_count,
 			'broken_links' => $broken,
 			'from_cache'   => $from_cache,
 		);
+	}
+
+	/**
+	 * Check a single URL's HTTP status.
+	 *
+	 * Uses HEAD first for efficiency. For external URLs, falls back to GET
+	 * with a range header when HEAD returns 405 or 403 (some servers block HEAD).
+	 *
+	 * @since 0.42.0
+	 *
+	 * @param string $url        URL to check.
+	 * @param int    $timeout    Request timeout in seconds.
+	 * @param bool   $is_external Whether this is an external URL (enables GET fallback).
+	 * @return int HTTP status code (0 for connection failures/timeouts).
+	 */
+	private static function checkUrlStatus( string $url, int $timeout, bool $is_external ): int {
+		$response = wp_remote_head(
+			$url,
+			array(
+				'timeout'     => $timeout,
+				'redirection' => 3,
+				'user-agent'  => 'DataMachine/LinkChecker (WordPress; +' . home_url() . ')',
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return 0;
+		}
+
+		$status = wp_remote_retrieve_response_code( $response );
+
+		// Some external servers block HEAD requests — fall back to GET.
+		if ( $is_external && ( 405 === $status || 403 === $status ) ) {
+			$get_response = wp_remote_get(
+				$url,
+				array(
+					'timeout'     => $timeout,
+					'redirection' => 3,
+					'headers'     => array( 'Range' => 'bytes=0-0' ),
+					'user-agent'  => 'DataMachine/LinkChecker (WordPress; +' . home_url() . ')',
+				)
+			);
+
+			if ( ! is_wp_error( $get_response ) ) {
+				$get_status = wp_remote_retrieve_response_code( $get_response );
+				// 206 (Partial Content) means the server supports Range and the URL is alive.
+				if ( 206 === $get_status || ( $get_status >= 200 && $get_status < 400 ) ) {
+					return $get_status;
+				}
+				return $get_status;
+			}
+		}
+
+		return $status ? $status : 0;
 	}
 
 	/**
@@ -899,12 +1014,15 @@ class InternalLinkingAbilities {
 			$outbound[ $post->ID ] = array();
 		}
 
+		$all_external_links = array();
+
 		foreach ( $posts as $post ) {
 			$content = $post->post_content;
 			if ( empty( $content ) ) {
 				continue;
 			}
 
+			// Internal links.
 			$links = self::extractInternalLinks( $content, $home_host );
 
 			foreach ( $links as $link_url ) {
@@ -935,6 +1053,17 @@ class InternalLinkingAbilities {
 					'target_url' => $link_url,
 					'target_id'  => $target_id,
 					'resolved'   => null !== $target_id,
+				);
+			}
+
+			// External links.
+			$external = self::extractExternalLinks( $content, $home_host );
+			foreach ( $external as $ext_link ) {
+				$all_external_links[] = array(
+					'source_id'   => $post->ID,
+					'target_url'  => $ext_link['url'],
+					'anchor_text' => $ext_link['anchor_text'],
+					'domain'      => $ext_link['domain'],
 				);
 			}
 		}
@@ -985,8 +1114,9 @@ class InternalLinkingAbilities {
 			'orphaned_posts' => $orphaned,
 			'top_linked'     => $top_linked,
 			// Internal data for broken link checker (not exposed in REST).
-			'_all_links'     => $all_links,
-			'_id_to_title'   => $id_to_title,
+			'_all_links'          => $all_links,
+			'_all_external_links' => $all_external_links,
+			'_id_to_title'        => $id_to_title,
 		);
 	}
 
@@ -1039,6 +1169,75 @@ class InternalLinkingAbilities {
 		}
 
 		return array_unique( $links );
+	}
+
+	/**
+	 * Extract external link URLs and anchor text from HTML content.
+	 *
+	 * Inverse of extractInternalLinks — keeps links pointing to hosts
+	 * other than the site. Returns both URL and anchor text for reporting.
+	 *
+	 * @since 0.42.0
+	 *
+	 * @param string $html      HTML content to parse.
+	 * @param string $home_host Site hostname for comparison.
+	 * @return array Array of arrays with 'url' and 'anchor_text' keys.
+	 */
+	private static function extractExternalLinks( string $html, string $home_host ): array {
+		$links = array();
+
+		// Match href AND capture the full tag + inner text for anchor extraction.
+		if ( ! preg_match_all( '/<a\s[^>]*href=["\']([^"\'#]+)["\'][^>]*>(.*?)<\/a>/is', $html, $matches, PREG_SET_ORDER ) ) {
+			return $links;
+		}
+
+		$seen = array();
+
+		foreach ( $matches as $match ) {
+			$url         = $match[1];
+			$anchor_text = wp_strip_all_tags( $match[2] );
+
+			// Skip non-http URLs.
+			if ( preg_match( '/^(mailto:|tel:|javascript:|data:)/i', $url ) ) {
+				continue;
+			}
+
+			// Skip relative URLs (they're internal).
+			if ( 0 === strpos( $url, '/' ) && 0 !== strpos( $url, '//' ) ) {
+				continue;
+			}
+
+			// Parse and check host — keep only external.
+			$parsed = wp_parse_url( $url );
+			$host   = $parsed['host'] ?? '';
+
+			if ( empty( $host ) || strcasecmp( $host, $home_host ) === 0 ) {
+				continue;
+			}
+
+			// Normalize URL (keep query string for external — different pages).
+			$clean_url = ( $parsed['scheme'] ?? 'https' ) . '://' . $parsed['host'];
+			if ( ! empty( $parsed['path'] ) ) {
+				$clean_url .= $parsed['path'];
+			}
+			if ( ! empty( $parsed['query'] ) ) {
+				$clean_url .= '?' . $parsed['query'];
+			}
+
+			// Deduplicate by URL within a single post.
+			if ( isset( $seen[ $clean_url ] ) ) {
+				continue;
+			}
+			$seen[ $clean_url ] = true;
+
+			$links[] = array(
+				'url'         => $clean_url,
+				'anchor_text' => trim( $anchor_text ),
+				'domain'      => $host,
+			);
+		}
+
+		return $links;
 	}
 
 	/**
