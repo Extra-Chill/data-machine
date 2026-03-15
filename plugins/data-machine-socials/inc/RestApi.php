@@ -867,23 +867,16 @@ class RestApi {
 			if ( ! $result['success'] ) {
 				$errors[] = $platform . ': ' . $result['error'];
 			}
-		}
 
-		// Track the post.
-		if ( $post_id ) {
-			$shared = get_post_meta( $post_id, '_dms_shared_posts', true );
-			if ( ! is_array( $shared ) ) {
-				$shared = array();
+			// Track successful shares via SocialShareTracker.
+			if ( $post_id && ! empty( $result['success'] ) ) {
+				\DataMachineSocials\Tracking\SocialShareTracker::record_from_result(
+					$post_id,
+					$platform,
+					$result,
+					array( 'media_kind' => $media_kind )
+				);
 			}
-
-			$shared[] = array(
-				'timestamp'  => time(),
-				'platforms'  => $platforms,
-				'images'     => count( $images ),
-				'media_kind' => $media_kind,
-			);
-
-			update_post_meta( $post_id, '_dms_shared_posts', $shared );
 		}
 
 		return new \WP_REST_Response(
@@ -967,10 +960,11 @@ class RestApi {
 
 		if ( ! empty( $result['success'] ) ) {
 			return array(
-				'platform'  => $platform,
-				'success'   => true,
-				'media_id'  => $result['media_id'] ?? null,
-				'permalink' => $result['permalink'] ?? null,
+				'platform'         => $platform,
+				'success'          => true,
+				'platform_post_id' => \DataMachineSocials\Tracking\SocialShareTracker::extract_platform_post_id( $platform, $result ),
+				'platform_url'     => \DataMachineSocials\Tracking\SocialShareTracker::extract_platform_url( $platform, $result ),
+				'media_kind'       => $result['media_kind'] ?? null,
 			);
 		}
 
@@ -1031,17 +1025,22 @@ class RestApi {
 	}
 
 	/**
-	 * Get post status
+	 * Get post sharing status and history.
 	 */
 	public static function get_post_status( \WP_REST_Request $request ) {
-		$post_id = $request->get_param( 'post_id' );
+		$post_id  = intval( $request->get_param( 'post_id' ) );
+		$platform = $request->get_param( 'platform' );
 
-		$shared = get_post_meta( $post_id, '_dms_shared_posts', true );
+		$tracker = \DataMachineSocials\Tracking\SocialShareTracker::class;
 
-		if ( ! is_array( $shared ) ) {
-			$shared = array();
-		}
+		$shares    = $tracker::get_shares( $post_id, $platform ?: null );
+		$platforms = $tracker::get_shared_platforms( $post_id );
 
-		return new \WP_REST_Response( $shared );
+		return new \WP_REST_Response( array(
+			'post_id'   => $post_id,
+			'platforms' => $platforms,
+			'shares'    => $shares,
+			'count'     => count( $shares ),
+		) );
 	}
 }
