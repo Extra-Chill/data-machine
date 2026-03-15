@@ -2,6 +2,8 @@
  * Type definitions for Data Machine Socials
  */
 
+export type MediaKind = 'image' | 'carousel' | 'reel' | 'story';
+
 export interface PlatformConfig {
 	slug: string;
 	label: string;
@@ -12,6 +14,7 @@ export interface PlatformConfig {
 	charLimit: number;
 	supportsCarousel: boolean;
 	supportsVideo: boolean;
+	supportedMediaKinds?: MediaKind[];
 	requiresAuth: boolean;
 	requiresBoard?: boolean;
 	bestPractices: {
@@ -66,6 +69,10 @@ export interface CrossPostPayload {
 	images: SelectedImage[];
 	caption: string;
 	aspectRatio: string;
+	mediaKind?: MediaKind;
+	videoUrl?: string;
+	coverUrl?: string;
+	shareToFeed?: boolean;
 }
 
 export interface CrossPostResponse {

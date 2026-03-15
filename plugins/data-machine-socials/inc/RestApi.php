@@ -60,23 +60,39 @@ class RestApi {
 				'callback'            => array( __CLASS__, 'cross_post' ),
 				'permission_callback' => array( __CLASS__, 'check_publish_permission' ),
 				'args'                => array(
-					'platforms'    => array(
-						'required' => true,
-						'type'     => 'array',
-					),
-					'images'       => array(
-						'required' => true,
-						'type'     => 'array',
-					),
-					'caption'      => array(
-						'required' => true,
-						'type'     => 'string',
-					),
-					'aspect_ratio' => array(
-						'type'    => 'string',
-						'default' => '4:5',
-					),
+				'platforms'    => array(
+					'required' => true,
+					'type'     => 'array',
 				),
+				'images'       => array(
+					'type' => 'array',
+				),
+				'caption'      => array(
+					'required' => true,
+					'type'     => 'string',
+				),
+				'aspect_ratio' => array(
+					'type'    => 'string',
+					'default' => '4:5',
+				),
+				'media_kind'   => array(
+					'type'    => 'string',
+					'default' => 'image',
+					'enum'    => array( 'image', 'carousel', 'reel' ),
+				),
+				'video_url'    => array(
+					'type'   => 'string',
+					'format' => 'uri',
+				),
+				'cover_url'    => array(
+					'type'   => 'string',
+					'format' => 'uri',
+				),
+				'share_to_feed' => array(
+					'type'    => 'boolean',
+					'default' => true,
+				),
+			),
 			)
 		);
 
@@ -355,6 +371,40 @@ class RestApi {
 				),
 			),
 		) );
+
+		// Instagram Reel publish.
+		register_rest_route( self::NAMESPACE, '/instagram/reel', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'instagram_publish_reel' ),
+			'permission_callback' => array( __CLASS__, 'check_publish_permission' ),
+			'args'                => array(
+				'caption'       => array(
+					'type'              => 'string',
+					'required'          => true,
+					'sanitize_callback' => 'sanitize_textarea_field',
+				),
+				'video_url'     => array(
+					'type'              => 'string',
+					'required'          => true,
+					'format'            => 'uri',
+					'sanitize_callback' => 'sanitize_url',
+				),
+				'cover_url'     => array(
+					'type'              => 'string',
+					'format'            => 'uri',
+					'sanitize_callback' => 'sanitize_url',
+				),
+				'share_to_feed' => array(
+					'type'    => 'boolean',
+					'default' => true,
+				),
+				'source_url'    => array(
+					'type'              => 'string',
+					'format'            => 'uri',
+					'sanitize_callback' => 'sanitize_url',
+				),
+			),
+		) );
 	}
 
 	/**
@@ -535,6 +585,47 @@ class RestApi {
 	}
 
 	/**
+	 * Publish an Instagram Reel.
+	 */
+	public static function instagram_publish_reel( \WP_REST_Request $request ) {
+		$params = $request->get_json_params() ? $request->get_json_params() : $request->get_body_params();
+
+		if ( empty( $params['caption'] ) ) {
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => 'caption is required',
+			), 400 );
+		}
+
+		if ( empty( $params['video_url'] ) ) {
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => 'video_url is required',
+			), 400 );
+		}
+
+		$input = array(
+			'content'       => sanitize_textarea_field( $params['caption'] ),
+			'media_kind'    => 'reel',
+			'video_url'     => sanitize_url( $params['video_url'] ),
+			'share_to_feed' => $params['share_to_feed'] ?? true,
+		);
+
+		if ( ! empty( $params['cover_url'] ) ) {
+			$input['cover_url'] = sanitize_url( $params['cover_url'] );
+		}
+
+		if ( ! empty( $params['source_url'] ) ) {
+			$input['source_url'] = sanitize_url( $params['source_url'] );
+		}
+
+		$ability = new \DataMachineSocials\Abilities\Instagram\InstagramPublishAbility();
+		$result  = $ability::execute_publish( $input );
+
+		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
+	}
+
+	/**
 	 * Check if user can edit posts
 	 */
 	public static function check_edit_permission() {
@@ -592,6 +683,8 @@ class RestApi {
 				'defaultAspectRatio' => '4:5',
 				'charLimit'          => 2200,
 				'supportsCarousel'   => true,
+				'supportsVideo'      => true,
+				'supportedMediaKinds' => array( 'image', 'carousel', 'reel' ),
 			),
 			'twitter'   => array(
 				'label'              => 'Twitter / X',
@@ -648,12 +741,16 @@ class RestApi {
 	 * Cross-platform post
 	 */
 	public static function cross_post( \WP_REST_Request $request ) {
-		$params       = $request->get_json_params();
-		$platforms    = $params['platforms'] ?? array();
-		$images       = $params['images'] ?? array();
-		$caption      = sanitize_textarea_field( $params['caption'] ?? '' );
-		$post_id      = intval( $params['post_id'] ?? 0 );
-		$aspect_ratio = sanitize_text_field( $params['aspect_ratio'] ?? '4:5' );
+		$params        = $request->get_json_params();
+		$platforms     = $params['platforms'] ?? array();
+		$images        = $params['images'] ?? array();
+		$caption       = sanitize_textarea_field( $params['caption'] ?? '' );
+		$post_id       = intval( $params['post_id'] ?? 0 );
+		$aspect_ratio  = sanitize_text_field( $params['aspect_ratio'] ?? '4:5' );
+		$media_kind    = sanitize_text_field( $params['media_kind'] ?? 'image' );
+		$video_url     = sanitize_url( $params['video_url'] ?? '' );
+		$cover_url     = sanitize_url( $params['cover_url'] ?? '' );
+		$share_to_feed = $params['share_to_feed'] ?? true;
 
 		if ( empty( $platforms ) ) {
 			return new \WP_REST_Response(
@@ -665,7 +762,18 @@ class RestApi {
 			);
 		}
 
-		if ( empty( $images ) ) {
+		// Images required for image/carousel posts, video_url required for reels.
+		if ( 'reel' === $media_kind ) {
+			if ( empty( $video_url ) ) {
+				return new \WP_REST_Response(
+					array(
+						'success' => false,
+						'error'   => 'video_url is required for Reel publishing',
+					),
+					400
+				);
+			}
+		} elseif ( empty( $images ) ) {
 			return new \WP_REST_Response(
 				array(
 					'success' => false,
@@ -678,12 +786,20 @@ class RestApi {
 		$results = array();
 		$errors  = array();
 
-		// Get source URL
+		// Get source URL.
 		$source_url = $post_id ? get_permalink( $post_id ) : '';
 
-		// Post to each platform
+		// Build extra params for reel publishing.
+		$extra = array(
+			'media_kind'    => $media_kind,
+			'video_url'     => $video_url,
+			'cover_url'     => $cover_url,
+			'share_to_feed' => $share_to_feed,
+		);
+
+		// Post to each platform.
 		foreach ( $platforms as $platform ) {
-			$result    = self::post_to_platform( $platform, $images, $caption, $source_url );
+			$result    = self::post_to_platform( $platform, $images, $caption, $source_url, $extra );
 			$results[] = $result;
 
 			if ( ! $result['success'] ) {
@@ -691,7 +807,7 @@ class RestApi {
 			}
 		}
 
-		// Track the post
+		// Track the post.
 		if ( $post_id ) {
 			$shared = get_post_meta( $post_id, '_dms_shared_posts', true );
 			if ( ! is_array( $shared ) ) {
@@ -699,9 +815,10 @@ class RestApi {
 			}
 
 			$shared[] = array(
-				'timestamp' => time(),
-				'platforms' => $platforms,
-				'images'    => count( $images ),
+				'timestamp'  => time(),
+				'platforms'  => $platforms,
+				'images'     => count( $images ),
+				'media_kind' => $media_kind,
 			);
 
 			update_post_meta( $post_id, '_dms_shared_posts', $shared );
@@ -717,9 +834,16 @@ class RestApi {
 	}
 
 	/**
-	 * Post to individual platform
+	 * Post to individual platform.
+	 *
+	 * @param string $platform   Platform slug.
+	 * @param array  $images     Array of image objects with 'url' key.
+	 * @param string $caption    Post caption.
+	 * @param string $source_url Source URL to attribute.
+	 * @param array  $extra      Extra params (media_kind, video_url, cover_url, share_to_feed).
+	 * @return array Result.
 	 */
-	private static function post_to_platform( string $platform, array $images, string $caption, string $source_url ): array {
+	private static function post_to_platform( string $platform, array $images, string $caption, string $source_url, array $extra = array() ): array {
 		$ability_slug = "datamachine/{$platform}-publish";
 
 		if ( ! function_exists( 'wp_get_ability' ) ) {
@@ -747,11 +871,22 @@ class RestApi {
 			$images
 		);
 
-		$result = $ability->execute( array(
+		$input = array(
 			'content'    => $caption,
 			'image_urls' => $image_urls,
 			'source_url' => $source_url,
-		) );
+		);
+
+		// Pass through reel-specific params when applicable.
+		$media_kind = $extra['media_kind'] ?? 'image';
+		if ( 'reel' === $media_kind ) {
+			$input['media_kind']    = 'reel';
+			$input['video_url']     = $extra['video_url'] ?? '';
+			$input['cover_url']     = $extra['cover_url'] ?? '';
+			$input['share_to_feed'] = $extra['share_to_feed'] ?? true;
+		}
+
+		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
 			return array(

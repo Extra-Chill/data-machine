@@ -544,6 +544,85 @@ class InstagramCommand {
 	}
 
 	/**
+	 * Publish a Reel (video) to Instagram.
+	 *
+	 * Posts a video as an Instagram Reel. The video must be hosted at
+	 * a publicly accessible URL.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <caption>
+	 * : The caption text for the Reel.
+	 *
+	 * --video=<url>
+	 * : Public URL of the video file (required).
+	 *
+	 * [--cover=<url>]
+	 * : Optional cover image URL for the Reel.
+	 *
+	 * [--no-feed]
+	 * : Don't share the Reel to the main profile feed.
+	 *
+	 * [--source-url=<url>]
+	 * : Source URL to attribute.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Publish a Reel
+	 *     wp datamachine-socials instagram publish-reel "Check this out!" --video=https://example.com/clip.mp4
+	 *
+	 *     # Reel with cover image
+	 *     wp datamachine-socials instagram publish-reel "New track" --video=https://example.com/clip.mp4 --cover=https://example.com/thumb.jpg
+	 *
+	 *     # Reel without sharing to feed
+	 *     wp datamachine-socials instagram publish-reel "Behind the scenes" --video=https://example.com/bts.mp4 --no-feed
+	 */
+	public function publish_reel( $args, $assoc_args ) {
+		$caption = $args[0] ?? '';
+
+		if ( empty( $caption ) ) {
+			WP_CLI::error( 'Caption is required.' );
+		}
+
+		if ( empty( $assoc_args['video'] ) ) {
+			WP_CLI::error( 'Video URL is required. Use --video=<url>.' );
+		}
+
+		$publish_ability = $this->get_publish_ability();
+
+		$input = array(
+			'content'    => $caption,
+			'media_kind' => 'reel',
+			'video_url'  => $assoc_args['video'],
+		);
+
+		if ( ! empty( $assoc_args['cover'] ) ) {
+			$input['cover_url'] = $assoc_args['cover'];
+		}
+
+		if ( isset( $assoc_args['no-feed'] ) ) {
+			$input['share_to_feed'] = false;
+		}
+
+		if ( ! empty( $assoc_args['source-url'] ) ) {
+			$input['source_url'] = $assoc_args['source-url'];
+		}
+
+		WP_CLI::log( 'Publishing Reel to Instagram...' );
+		WP_CLI::log( 'Video processing may take up to 60 seconds.' );
+
+		$result = $publish_ability->execute( $input );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Reel published to Instagram!' );
+		WP_CLI::log( 'Media ID:  ' . ( $result['media_id'] ?? '' ) );
+		WP_CLI::log( 'Permalink: ' . ( $result['permalink'] ?? '' ) );
+	}
+
+	/**
 	 * Get the Instagram publish ability.
 	 *
 	 * @return \DataMachineSocials\Abilities\Instagram\InstagramPublishAbility
