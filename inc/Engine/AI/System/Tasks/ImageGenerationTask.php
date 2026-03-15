@@ -762,6 +762,9 @@ class ImageGenerationTask extends SystemTask {
 			'description'     => 'Generate images via Replicate API and assign as featured images or insert into content.',
 			'setting_key'     => null,
 			'default_enabled' => true,
+			'trigger'         => 'AI tool call',
+			'trigger_type'    => 'tool',
+			'supports_run'    => false,
 		);
 	}
 

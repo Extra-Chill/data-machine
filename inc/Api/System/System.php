@@ -65,6 +65,26 @@ class System {
 			)
 		);
 
+		// Run a system task immediately.
+		register_rest_route(
+			'datamachine/v1',
+			'/system/tasks/(?P<task_type>[a-z_]+)/run',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( self::class, 'run_task' ),
+				'permission_callback' => function () {
+					return PermissionHelper::can( 'manage_settings' );
+				},
+				'args'                => array(
+					'task_type' => array(
+						'required'          => true,
+						'type'              => 'string',
+						'sanitize_callback' => 'sanitize_key',
+					),
+				),
+			)
+		);
+
 		// System task prompt definitions — list all editable prompts across tasks.
 		register_rest_route(
 			'datamachine/v1',
@@ -189,12 +209,53 @@ class System {
 			$tasks[] = array_merge( $meta, array(
 				'last_run_at' => $last_run ? $last_run['completed_at'] : null,
 				'last_status' => $last_run ? $last_run['status'] : null,
+				'run_count'   => $last_run ? ( $last_run['run_count'] ?? 0 ) : 0,
 			) );
 		}
 
 		return rest_ensure_response( array(
 			'success' => true,
 			'data'    => $tasks,
+		) );
+	}
+
+	/**
+	 * Run a system task immediately via the run-task ability.
+	 *
+	 * @param WP_REST_Request $request Request with task_type.
+	 * @return \WP_REST_Response|WP_Error
+	 * @since 0.42.0
+	 */
+	public static function run_task( WP_REST_Request $request ) {
+		$task_type = $request->get_param( 'task_type' );
+
+		$ability = wp_get_ability( 'datamachine/run-task' );
+
+		if ( ! $ability ) {
+			return new WP_Error(
+				'ability_not_found',
+				__( 'The run-task ability is not registered.', 'data-machine' ),
+				array( 'status' => 500 )
+			);
+		}
+
+		$result = $ability->execute( array( 'task_type' => $task_type ) );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		if ( empty( $result['success'] ) ) {
+			return new WP_Error(
+				'run_task_failed',
+				$result['error'] ?? __( 'Failed to run task.', 'data-machine' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		return rest_ensure_response( array(
+			'success' => true,
+			'data'    => $result,
 		) );
 	}
 
@@ -399,13 +460,13 @@ class System {
 	}
 
 	/**
-	 * Get the most recent completed job for each task type.
+	 * Get the most recent job and total run count for each task type.
 	 *
-	 * Queries the jobs table for system-sourced jobs, using
-	 * JSON_EXTRACT to match task_type from engine_data.
+	 * Queries both system and pipeline_system_task sources so the UI
+	 * reflects all task executions regardless of trigger path.
 	 *
 	 * @param array $task_types List of task type identifiers.
-	 * @return array<string, array> Task type => last job row.
+	 * @return array<string, array> Task type => { last job row + run_count }.
 	 * @since 0.32.0
 	 */
 	private static function get_last_runs( array $task_types ): array {
@@ -418,13 +479,12 @@ class System {
 		$results = array();
 
 		foreach ( $task_types as $task_type ) {
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$row = $wpdb->get_row(
 				$wpdb->prepare(
 					"SELECT job_id, status, created_at, completed_at
 					 FROM {$table}
-					 WHERE source = 'system'
+					 WHERE source IN ('system', 'pipeline_system_task')
 					 AND JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.task_type')) = %s
 					 ORDER BY job_id DESC
 					 LIMIT 1",
@@ -432,10 +492,29 @@ class System {
 				),
 				ARRAY_A
 			);
+
+			$count = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*)
+					 FROM {$table}
+					 WHERE source IN ('system', 'pipeline_system_task')
+					 AND JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.task_type')) = %s",
+					$task_type
+				)
+			);
 			// phpcs:enable WordPress.DB.PreparedSQL
 
 			if ( $row ) {
+				$row['run_count'] = (int) $count;
 				$results[ $task_type ] = $row;
+			} elseif ( $count > 0 ) {
+				$results[ $task_type ] = array(
+					'job_id'       => null,
+					'status'       => null,
+					'created_at'   => null,
+					'completed_at' => null,
+					'run_count'    => (int) $count,
+				);
 			}
 		}
 

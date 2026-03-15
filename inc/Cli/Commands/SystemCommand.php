@@ -163,6 +163,58 @@ class SystemCommand extends BaseCommand {
 	}
 
 	/**
+	 * Run a system task immediately.
+	 *
+	 * Triggers a registered system task for immediate execution via the
+	 * datamachine/run-task ability. Only tasks with supports_run: true
+	 * can be triggered (currently alt_text_generation and daily_memory_generation).
+	 *
+	 * ## OPTIONS
+	 *
+	 * <task_type>
+	 * : The task type to run (e.g. alt_text_generation, daily_memory_generation).
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine system run daily_memory_generation
+	 *     wp datamachine system run alt_text_generation --format=json
+	 *
+	 * @subcommand run
+	 */
+	public function run( array $args, array $assoc_args ): void {
+		$task_type = $args[0] ?? '';
+		$format    = $assoc_args['format'] ?? 'table';
+
+		if ( empty( $task_type ) ) {
+			WP_CLI::error( 'Task type is required. Use: wp datamachine system run <task_type>' );
+			return;
+		}
+
+		$result = SystemAbilities::runTask( array( 'task_type' => $task_type ) );
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? $result['message'] ?? 'Failed to run task.' );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] );
+	}
+
+	/**
 	 * List all editable system task prompts.
 	 *
 	 * Shows each task's editable prompts with their labels and override status.

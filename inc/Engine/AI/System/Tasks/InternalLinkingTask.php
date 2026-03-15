@@ -265,6 +265,9 @@ class InternalLinkingTask extends SystemTask {
 			'description'     => 'Semantically weave internal links into published post content using AI.',
 			'setting_key'     => null,
 			'default_enabled' => true,
+			'trigger'         => 'On demand via CLI, chat, or pipeline',
+			'trigger_type'    => 'manual',
+			'supports_run'    => false,
 		);
 	}
 

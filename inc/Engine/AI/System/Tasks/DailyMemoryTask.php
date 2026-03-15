@@ -125,6 +125,9 @@ class DailyMemoryTask extends SystemTask {
 			'description'     => 'AI-generated daily summary of activity and automatic MEMORY.md cleanup — archives session-specific content to daily files.',
 			'setting_key'     => 'daily_memory_enabled',
 			'default_enabled' => false,
+			'trigger'         => 'Daily at midnight UTC',
+			'trigger_type'    => 'cron',
+			'supports_run'    => true,
 		);
 	}
 

@@ -17,6 +17,7 @@ use DataMachine\Engine\AI\RequestBuilder;
 use DataMachine\Core\Database\Chat\Chat as ChatDatabase;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\Tasks\TaskScheduler;
+use DataMachine\Engine\Tasks\TaskRegistry;
 
 defined('ABSPATH') || exit;
 
@@ -43,6 +44,7 @@ class SystemAbilities {
 			$this->registerSessionTitleAbility();
 			$this->registerHealthCheckAbility();
 			$this->registerGitHubIssueAbility();
+			$this->registerRunTaskAbility();
 		};
 
 		if ( doing_action( 'wp_abilities_api_init' ) ) {
@@ -333,6 +335,108 @@ class SystemAbilities {
 				'permission_callback' => fn() => PermissionHelper::can_manage(),
 				'meta'                => array( 'show_in_rest' => true ),
 			)
+		);
+	}
+
+	/**
+	 * Register the run-task ability.
+	 *
+	 * Generic ability for manually triggering any registered system task
+	 * that supports manual execution (supports_run: true in task meta).
+	 *
+	 * @since 0.42.0
+	 */
+	private function registerRunTaskAbility(): void {
+		wp_register_ability(
+			'datamachine/run-task',
+			array(
+				'label'               => __( 'Run System Task', 'data-machine' ),
+				'description'         => __( 'Manually trigger a registered system task for immediate execution.', 'data-machine' ),
+				'category'            => 'datamachine',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(
+						'task_type' => array(
+							'type'        => 'string',
+							'description' => 'Registered task type identifier (e.g. alt_text_generation, daily_memory_generation).',
+						),
+					),
+					'required'   => array( 'task_type' ),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'   => array( 'type' => 'boolean' ),
+						'task_type' => array( 'type' => 'string' ),
+						'job_id'    => array( 'type' => array( 'integer', 'null' ) ),
+						'message'   => array( 'type' => 'string' ),
+						'error'     => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( __CLASS__, 'runTask' ),
+				'permission_callback' => fn() => PermissionHelper::can_manage(),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	/**
+	 * Execute the run-task ability.
+	 *
+	 * @param array $input { task_type: string }
+	 * @return array Result with success, job_id, message.
+	 * @since 0.42.0
+	 */
+	public static function runTask( array $input ): array {
+		$task_type = $input['task_type'] ?? '';
+
+		if ( empty( $task_type ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'task_type is required.',
+				'message' => 'Specify which task to run.',
+			);
+		}
+
+		if ( ! TaskRegistry::isRegistered( $task_type ) ) {
+			return array(
+				'success' => false,
+				'error'   => "Unknown task type: {$task_type}",
+				'message' => 'Task type is not registered.',
+			);
+		}
+
+		$registry = TaskRegistry::getRegistry();
+		$meta     = $registry[ $task_type ] ?? array();
+
+		if ( empty( $meta['supports_run'] ) ) {
+			return array(
+				'success' => false,
+				'error'   => "Task '{$task_type}' does not support manual execution.",
+				'message' => 'This task can only be triggered by its configured event or schedule.',
+			);
+		}
+
+		$job_id = TaskScheduler::schedule( $task_type, array(
+			'source'       => 'admin_run_now',
+			'triggered_by' => get_current_user_id(),
+		) );
+
+		if ( ! $job_id ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to schedule task.',
+				'message' => 'TaskScheduler returned false — check logs for details.',
+			);
+		}
+
+		$label = $meta['label'] ?? $task_type;
+
+		return array(
+			'success'   => true,
+			'task_type' => $task_type,
+			'job_id'    => $job_id,
+			'message'   => "{$label} scheduled (Job #{$job_id}).",
 		);
 	}
 

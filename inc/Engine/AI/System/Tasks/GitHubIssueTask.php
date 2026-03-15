@@ -64,6 +64,9 @@ class GitHubIssueTask extends SystemTask {
 			'description'     => 'Create GitHub issues via the GitHub REST API.',
 			'setting_key'     => null,
 			'default_enabled' => true,
+			'trigger'         => 'AI tool call',
+			'trigger_type'    => 'tool',
+			'supports_run'    => false,
 		);
 	}
 }
