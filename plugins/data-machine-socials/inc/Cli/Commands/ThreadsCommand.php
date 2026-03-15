@@ -276,7 +276,7 @@ class ThreadsCommand {
 			WP_CLI::error( 'datamachine/threads-read ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Threads\ThreadsReadAbility();
+		return $ability;
 	}
 
 	private function get_update_ability() {
@@ -289,7 +289,7 @@ class ThreadsCommand {
 			WP_CLI::error( 'datamachine/threads-update ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Threads\ThreadsUpdateAbility();
+		return $ability;
 	}
 
 	private function get_delete_ability() {
@@ -302,7 +302,7 @@ class ThreadsCommand {
 			WP_CLI::error( 'datamachine/threads-delete ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Threads\ThreadsDeleteAbility();
+		return $ability;
 	}
 
 	/**

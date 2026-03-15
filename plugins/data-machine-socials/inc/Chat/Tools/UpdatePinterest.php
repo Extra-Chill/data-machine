@@ -67,7 +67,7 @@ class UpdatePinterest extends BaseTool {
 			);
 		}
 
-		$ability_instance = new \DataMachineSocials\Abilities\Pinterest\PinterestUpdateAbility();
+		$ability_instance = $ability;
 		$result           = $ability_instance->execute( array(
 			'action' => sanitize_text_field( $parameters['action'] ),
 			'pin_id' => sanitize_text_field( $parameters['pin_id'] ),

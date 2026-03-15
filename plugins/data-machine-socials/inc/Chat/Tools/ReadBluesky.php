@@ -96,7 +96,7 @@ class ReadBluesky extends BaseTool {
 			);
 		}
 
-		$ability_instance = new \DataMachineSocials\Abilities\Bluesky\BlueskyReadAbility();
+		$ability_instance = $ability;
 		$input            = array( 'action' => sanitize_text_field( $action ) );
 
 		if ( ! empty( $parameters['post_uri'] ) ) {

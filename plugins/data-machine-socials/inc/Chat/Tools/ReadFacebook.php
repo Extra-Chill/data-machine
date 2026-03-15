@@ -96,7 +96,7 @@ class ReadFacebook extends BaseTool {
 			);
 		}
 
-		$ability_instance = new \DataMachineSocials\Abilities\Facebook\FacebookReadAbility();
+		$ability_instance = $ability;
 		$input            = array( 'action' => sanitize_text_field( $action ) );
 
 		if ( ! empty( $parameters['post_id'] ) ) {

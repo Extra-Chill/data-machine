@@ -83,7 +83,7 @@ class UpdateThreads extends BaseTool {
 			);
 		}
 
-		$ability_instance = new \DataMachineSocials\Abilities\Threads\ThreadsUpdateAbility();
+		$ability_instance = $ability;
 		$result           = $ability_instance->execute( array(
 			'action'    => sanitize_text_field( $parameters['action'] ),
 			'thread_id' => sanitize_text_field( $parameters['thread_id'] ),

@@ -100,7 +100,7 @@ class ReplyInstagramComment extends BaseTool {
 			return $this->buildErrorResponse( 'datamachine/instagram-comment-reply ability not registered', $tool_name );
 		}
 
-		$ability_instance = new \DataMachineSocials\Abilities\Instagram\InstagramCommentReplyAbility();
+		$ability_instance = $ability;
 		$result           = $ability_instance->execute(
 			array(
 				'comment_id' => sanitize_text_field( $parameters['comment_id'] ),

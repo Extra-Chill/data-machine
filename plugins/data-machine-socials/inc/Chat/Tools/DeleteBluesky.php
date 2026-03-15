@@ -55,8 +55,11 @@ class DeleteBluesky extends BaseTool {
 			);
 		}
 
-		$ability = new \DataMachineSocials\Abilities\Bluesky\BlueskyDeleteAbility();
-		$result  = $ability->execute( array( 'post_uri' => $parameters['post_uri'] ) );
+		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/bluesky-delete' ) : null;
+		if ( ! $ability ) {
+			return $this->buildErrorResponse( 'datamachine/bluesky-delete ability not registered', $tool_name );
+		}
+		$result = $ability->execute( array( 'post_uri' => $parameters['post_uri'] ) );
 
 		if ( $result['success'] ) {
 			return array(

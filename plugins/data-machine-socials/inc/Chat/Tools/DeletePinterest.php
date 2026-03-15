@@ -55,8 +55,11 @@ class DeletePinterest extends BaseTool {
 			);
 		}
 
-		$ability = new \DataMachineSocials\Abilities\Pinterest\PinterestDeleteAbility();
-		$result  = $ability->execute( array( 'pin_id' => $parameters['pin_id'] ) );
+		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/pinterest-delete' ) : null;
+		if ( ! $ability ) {
+			return $this->buildErrorResponse( 'datamachine/pinterest-delete ability not registered', $tool_name );
+		}
+		$result = $ability->execute( array( 'pin_id' => $parameters['pin_id'] ) );
 
 		if ( $result['success'] ) {
 			return array(

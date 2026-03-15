@@ -97,7 +97,7 @@ class UpdateTwitter extends BaseTool {
 			return $this->buildErrorResponse( 'datamachine/twitter-update ability not registered', $tool_name );
 		}
 
-		$ability_instance = new \DataMachineSocials\Abilities\Twitter\TwitterUpdateAbility();
+		$ability_instance = $ability;
 		$result           = $ability_instance->execute( array(
 			'action'   => sanitize_text_field( $action ),
 			'tweet_id' => sanitize_text_field( $parameters['tweet_id'] ),

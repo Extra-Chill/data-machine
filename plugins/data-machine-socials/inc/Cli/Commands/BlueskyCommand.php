@@ -313,7 +313,7 @@ class BlueskyCommand {
 			WP_CLI::error( 'datamachine/bluesky-read ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Bluesky\BlueskyReadAbility();
+		return $ability;
 	}
 
 	private function get_update_ability() {
@@ -326,7 +326,7 @@ class BlueskyCommand {
 			WP_CLI::error( 'datamachine/bluesky-update ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Bluesky\BlueskyUpdateAbility();
+		return $ability;
 	}
 
 	private function get_delete_ability() {
@@ -339,7 +339,7 @@ class BlueskyCommand {
 			WP_CLI::error( 'datamachine/bluesky-delete ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Bluesky\BlueskyDeleteAbility();
+		return $ability;
 	}
 
 	/**
@@ -409,6 +409,6 @@ class BlueskyCommand {
 			WP_CLI::error( 'datamachine/bluesky-publish ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Bluesky\BlueskyPublishAbility();
+		return $ability;
 	}
 }

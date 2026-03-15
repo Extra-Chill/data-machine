@@ -104,7 +104,7 @@ class ReadPinterest extends BaseTool {
 			);
 		}
 
-		$ability_instance = new \DataMachineSocials\Abilities\Pinterest\PinterestReadAbility();
+		$ability_instance = $ability;
 		$input            = array( 'action' => sanitize_text_field( $action ) );
 
 		if ( ! empty( $parameters['pin_id'] ) ) {

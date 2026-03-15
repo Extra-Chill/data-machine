@@ -55,8 +55,11 @@ class DeleteFacebook extends BaseTool {
 			);
 		}
 
-		$ability = new \DataMachineSocials\Abilities\Facebook\FacebookDeleteAbility();
-		$result  = $ability->execute( array( 'post_id' => $parameters['post_id'] ) );
+		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/facebook-delete' ) : null;
+		if ( ! $ability ) {
+			return $this->buildErrorResponse( 'datamachine/facebook-delete ability not registered', $tool_name );
+		}
+		$result = $ability->execute( array( 'post_id' => $parameters['post_id'] ) );
 
 		if ( $result['success'] ) {
 			return array(

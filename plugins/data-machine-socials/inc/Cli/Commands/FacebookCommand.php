@@ -277,7 +277,7 @@ class FacebookCommand {
 			WP_CLI::error( 'datamachine/facebook-read ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Facebook\FacebookReadAbility();
+		return $ability;
 	}
 
 	private function get_update_ability() {
@@ -290,7 +290,7 @@ class FacebookCommand {
 			WP_CLI::error( 'datamachine/facebook-update ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Facebook\FacebookUpdateAbility();
+		return $ability;
 	}
 
 	private function get_delete_ability() {
@@ -303,7 +303,7 @@ class FacebookCommand {
 			WP_CLI::error( 'datamachine/facebook-delete ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Facebook\FacebookDeleteAbility();
+		return $ability;
 	}
 
 	/**

@@ -460,31 +460,37 @@ class RestApi {
 		$route  = $request->get_route();
 		$params = $request->get_params();
 
-		$ability_map = array(
-			'instagram' => \DataMachineSocials\Abilities\Instagram\InstagramReadAbility::class,
-			'threads'   => \DataMachineSocials\Abilities\Threads\ThreadsReadAbility::class,
-			'facebook'  => \DataMachineSocials\Abilities\Facebook\FacebookReadAbility::class,
-			'twitter'   => \DataMachineSocials\Abilities\Twitter\TwitterReadAbility::class,
-			'bluesky'   => \DataMachineSocials\Abilities\Bluesky\BlueskyReadAbility::class,
-			'pinterest' => \DataMachineSocials\Abilities\Pinterest\PinterestReadAbility::class,
+		$slug_map = array(
+			'instagram' => 'datamachine/instagram-read',
+			'threads'   => 'datamachine/threads-read',
+			'facebook'  => 'datamachine/facebook-read',
+			'twitter'   => 'datamachine/twitter-read',
+			'bluesky'   => 'datamachine/bluesky-read',
+			'pinterest' => 'datamachine/pinterest-read',
 		);
 
 		$platform = null;
-		foreach ( $ability_map as $key => $class ) {
+		foreach ( $slug_map as $key => $slug ) {
 			if ( strpos( $route, "/{$key}/" ) !== false ) {
 				$platform = $key;
 				break;
 			}
 		}
 
-		if ( ! $platform || ! isset( $ability_map[ $platform ] ) ) {
+		if ( ! $platform || ! isset( $slug_map[ $platform ] ) ) {
 			return new \WP_REST_Response( array(
 				'success' => false,
 				'error'   => 'Unknown platform',
 			), 400 );
 		}
 
-		$ability = new $ability_map[ $platform ]();
+		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( $slug_map[ $platform ] ) : null;
+		if ( ! $ability ) {
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => $slug_map[ $platform ] . ' ability not registered',
+			), 500 );
+		}
 		$input   = array_filter( $params, function ( $v ) { return '' !== $v && null !== $v;
 		} );
 		$result  = $ability->execute( $input );
@@ -499,24 +505,24 @@ class RestApi {
 		$route  = $request->get_route();
 		$params = $request->get_json_params() ? $request->get_json_params() : $request->get_body_params();
 
-		$ability_map = array(
-			'instagram' => \DataMachineSocials\Abilities\Instagram\InstagramUpdateAbility::class,
-			'twitter'   => \DataMachineSocials\Abilities\Twitter\TwitterUpdateAbility::class,
-			'facebook'  => \DataMachineSocials\Abilities\Facebook\FacebookUpdateAbility::class,
-			'threads'   => \DataMachineSocials\Abilities\Threads\ThreadsUpdateAbility::class,
-			'bluesky'   => \DataMachineSocials\Abilities\Bluesky\BlueskyUpdateAbility::class,
-			'pinterest' => \DataMachineSocials\Abilities\Pinterest\PinterestUpdateAbility::class,
+		$slug_map = array(
+			'instagram' => 'datamachine/instagram-update',
+			'twitter'   => 'datamachine/twitter-update',
+			'facebook'  => 'datamachine/facebook-update',
+			'threads'   => 'datamachine/threads-update',
+			'bluesky'   => 'datamachine/bluesky-update',
+			'pinterest' => 'datamachine/pinterest-update',
 		);
 
 		$platform = null;
-		foreach ( $ability_map as $key => $class ) {
+		foreach ( $slug_map as $key => $slug ) {
 			if ( strpos( $route, "/{$key}/" ) !== false ) {
 				$platform = $key;
 				break;
 			}
 		}
 
-		if ( ! $platform || ! isset( $ability_map[ $platform ] ) ) {
+		if ( ! $platform || ! isset( $slug_map[ $platform ] ) ) {
 			return new \WP_REST_Response( array(
 				'success' => false,
 				'error'   => 'Unknown platform or update not supported',
@@ -552,8 +558,14 @@ class RestApi {
 			), 400 );
 		}
 
-		$ability = new $ability_map[ $platform ]();
-		$input   = array(
+		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( $slug_map[ $platform ] ) : null;
+		if ( ! $ability ) {
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => $slug_map[ $platform ] . ' ability not registered',
+			), 500 );
+		}
+		$input = array(
 			'action'  => sanitize_text_field( $params['action'] ),
 			$id_field => sanitize_text_field( $params[ $id_field ] ),
 		);
@@ -592,8 +604,11 @@ class RestApi {
 			), 400 );
 		}
 
-		$ability = new \DataMachineSocials\Abilities\Instagram\InstagramCommentReplyAbility();
-		$result  = $ability->execute(
+		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/instagram-comment-reply' ) : null;
+		if ( ! $ability ) {
+			return new \WP_REST_Response( array( 'success' => false, 'error' => 'Ability not registered' ), 500 );
+		}
+		$result = $ability->execute(
 			array(
 				'comment_id' => sanitize_text_field( $params['comment_id'] ),
 				'message'    => sanitize_textarea_field( $params['message'] ),
@@ -638,8 +653,11 @@ class RestApi {
 			$input['source_url'] = sanitize_url( $params['source_url'] );
 		}
 
-		$ability = new \DataMachineSocials\Abilities\Instagram\InstagramPublishAbility();
-		$result  = $ability::execute_publish( $input );
+		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/instagram-publish' ) : null;
+		if ( ! $ability ) {
+			return new \WP_REST_Response( array( 'success' => false, 'error' => 'Ability not registered' ), 500 );
+		}
+		$result = $ability->execute( $input );
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
 	}
@@ -671,8 +689,11 @@ class RestApi {
 			$input['story_image_url'] = sanitize_url( $image_url );
 		}
 
-		$ability = new \DataMachineSocials\Abilities\Instagram\InstagramPublishAbility();
-		$result  = $ability::execute_publish( $input );
+		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/instagram-publish' ) : null;
+		if ( ! $ability ) {
+			return new \WP_REST_Response( array( 'success' => false, 'error' => 'Ability not registered' ), 500 );
+		}
+		$result = $ability->execute( $input );
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
 	}

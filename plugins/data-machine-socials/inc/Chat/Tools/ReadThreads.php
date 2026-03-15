@@ -96,7 +96,7 @@ class ReadThreads extends BaseTool {
 			);
 		}
 
-		$ability_instance = new \DataMachineSocials\Abilities\Threads\ThreadsReadAbility();
+		$ability_instance = $ability;
 		$input            = array( 'action' => sanitize_text_field( $action ) );
 
 		if ( ! empty( $parameters['thread_id'] ) ) {

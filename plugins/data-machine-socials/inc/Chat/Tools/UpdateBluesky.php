@@ -83,7 +83,7 @@ class UpdateBluesky extends BaseTool {
 			);
 		}
 
-		$ability_instance = new \DataMachineSocials\Abilities\Bluesky\BlueskyUpdateAbility();
+		$ability_instance = $ability;
 		$result           = $ability_instance->execute( array(
 			'action'   => sanitize_text_field( $parameters['action'] ),
 			'post_uri' => sanitize_text_field( $parameters['post_uri'] ),

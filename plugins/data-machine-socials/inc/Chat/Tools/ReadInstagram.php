@@ -141,7 +141,7 @@ class ReadInstagram extends BaseTool {
 		}
 
 		// Execute via ability (which handles token retrieval internally).
-		$ability_instance = new \DataMachineSocials\Abilities\Instagram\InstagramReadAbility();
+		$ability_instance = $ability;
 		$result           = $ability_instance->execute( $input );
 
 		if ( ! $this->isAbilitySuccess( $result ) ) {

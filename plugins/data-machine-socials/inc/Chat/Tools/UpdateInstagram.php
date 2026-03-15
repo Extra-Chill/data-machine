@@ -133,7 +133,7 @@ class UpdateInstagram extends BaseTool {
 		}
 
 		// Execute via ability (which handles token retrieval internally).
-		$ability_instance = new \DataMachineSocials\Abilities\Instagram\InstagramUpdateAbility();
+		$ability_instance = $ability;
 		$result           = $ability_instance->execute( $input );
 
 		// Format response for AI.

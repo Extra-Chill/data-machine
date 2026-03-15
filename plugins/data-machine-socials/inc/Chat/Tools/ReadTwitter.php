@@ -96,7 +96,7 @@ class ReadTwitter extends BaseTool {
 			);
 		}
 
-		$ability_instance = new \DataMachineSocials\Abilities\Twitter\TwitterReadAbility();
+		$ability_instance = $ability;
 		$input            = array( 'action' => sanitize_text_field( $action ) );
 
 		if ( ! empty( $parameters['tweet_id'] ) ) {

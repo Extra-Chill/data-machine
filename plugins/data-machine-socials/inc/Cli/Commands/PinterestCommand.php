@@ -294,7 +294,7 @@ class PinterestCommand {
 			WP_CLI::error( 'datamachine/pinterest-read ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Pinterest\PinterestReadAbility();
+		return $ability;
 	}
 
 	private function get_update_ability() {
@@ -307,7 +307,7 @@ class PinterestCommand {
 			WP_CLI::error( 'datamachine/pinterest-update ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Pinterest\PinterestUpdateAbility();
+		return $ability;
 	}
 
 	private function get_delete_ability() {
@@ -320,7 +320,7 @@ class PinterestCommand {
 			WP_CLI::error( 'datamachine/pinterest-delete ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Pinterest\PinterestDeleteAbility();
+		return $ability;
 	}
 
 	/**

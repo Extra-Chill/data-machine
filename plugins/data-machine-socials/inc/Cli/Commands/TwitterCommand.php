@@ -432,7 +432,7 @@ class TwitterCommand {
 			WP_CLI::error( 'datamachine/twitter-read ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Twitter\TwitterReadAbility();
+		return $ability;
 	}
 
 	private function get_update_ability() {
@@ -445,7 +445,7 @@ class TwitterCommand {
 			WP_CLI::error( 'datamachine/twitter-update ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Twitter\TwitterUpdateAbility();
+		return $ability;
 	}
 
 	private function get_delete_ability() {
@@ -458,7 +458,7 @@ class TwitterCommand {
 			WP_CLI::error( 'datamachine/twitter-delete ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Twitter\TwitterDeleteAbility();
+		return $ability;
 	}
 
 	private function get_publish_ability() {
@@ -471,6 +471,6 @@ class TwitterCommand {
 			WP_CLI::error( 'datamachine/twitter-publish ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Twitter\TwitterPublishAbility();
+		return $ability;
 	}
 }

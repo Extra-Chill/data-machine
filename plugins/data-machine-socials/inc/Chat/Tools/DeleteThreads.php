@@ -55,8 +55,11 @@ class DeleteThreads extends BaseTool {
 			);
 		}
 
-		$ability = new \DataMachineSocials\Abilities\Threads\ThreadsDeleteAbility();
-		$result  = $ability->execute( array( 'thread_id' => $parameters['thread_id'] ) );
+		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/threads-delete' ) : null;
+		if ( ! $ability ) {
+			return $this->buildErrorResponse( 'datamachine/threads-delete ability not registered', $tool_name );
+		}
+		$result = $ability->execute( array( 'thread_id' => $parameters['thread_id'] ) );
 
 		if ( $result['success'] ) {
 			return array(

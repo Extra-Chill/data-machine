@@ -699,7 +699,7 @@ class InstagramCommand {
 			WP_CLI::error( 'datamachine/instagram-publish ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Instagram\InstagramPublishAbility();
+		return $ability;
 	}
 
 	/**
@@ -717,7 +717,7 @@ class InstagramCommand {
 			WP_CLI::error( 'datamachine/instagram-read ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Instagram\InstagramReadAbility();
+		return $ability;
 	}
 
 	/**
@@ -735,7 +735,7 @@ class InstagramCommand {
 			WP_CLI::error( 'datamachine/instagram-update ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Instagram\InstagramUpdateAbility();
+		return $ability;
 	}
 
 	/**
@@ -753,7 +753,7 @@ class InstagramCommand {
 			WP_CLI::error( 'datamachine/instagram-delete ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Instagram\InstagramDeleteAbility();
+		return $ability;
 	}
 
 	/**
@@ -771,6 +771,6 @@ class InstagramCommand {
 			WP_CLI::error( 'datamachine/instagram-comment-reply ability not registered.' );
 		}
 
-		return new \DataMachineSocials\Abilities\Instagram\InstagramCommentReplyAbility();
+		return $ability;
 	}
 }

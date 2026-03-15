@@ -106,7 +106,7 @@ class UpdateFacebook extends BaseTool {
 			return $this->buildErrorResponse( 'datamachine/facebook-update ability not registered', $tool_name );
 		}
 
-		$ability_instance = new \DataMachineSocials\Abilities\Facebook\FacebookUpdateAbility();
+		$ability_instance = $ability;
 		$result           = $ability_instance->execute( array(
 			'action'  => sanitize_text_field( $action ),
 			'post_id' => sanitize_text_field( $parameters['post_id'] ),
