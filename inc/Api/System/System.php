@@ -15,7 +15,6 @@ use WP_REST_Server;
 use WP_REST_Request;
 use WP_Error;
 use DataMachine\Engine\Tasks\TaskRegistry;
-use DataMachine\Engine\Tasks\TaskScheduler;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 use DataMachine\Core\Database\Jobs\JobsOperations;
 
@@ -221,7 +220,7 @@ class System {
 	}
 
 	/**
-	 * Run a system task immediately.
+	 * Run a system task immediately via the run-task ability.
 	 *
 	 * @param WP_REST_Request $request Request with task_type.
 	 * @return \WP_REST_Response|WP_Error
@@ -230,45 +229,33 @@ class System {
 	public static function run_task( WP_REST_Request $request ) {
 		$task_type = $request->get_param( 'task_type' );
 
-		if ( ! TaskRegistry::isRegistered( $task_type ) ) {
+		$ability = wp_get_ability( 'datamachine/run-task' );
+
+		if ( ! $ability ) {
 			return new WP_Error(
-				'invalid_task_type',
-				sprintf( __( 'Unknown task type: %s', 'data-machine' ), $task_type ),
-				array( 'status' => 404 )
-			);
-		}
-
-		$registry = TaskRegistry::getRegistry();
-		$meta     = $registry[ $task_type ] ?? array();
-
-		if ( empty( $meta['supports_run'] ) ) {
-			return new WP_Error(
-				'task_not_runnable',
-				sprintf( __( 'Task "%s" does not support manual execution.', 'data-machine' ), $task_type ),
-				array( 'status' => 400 )
-			);
-		}
-
-		$job_id = TaskScheduler::schedule( $task_type, array(
-			'source'       => 'admin_run_now',
-			'triggered_by' => get_current_user_id(),
-		) );
-
-		if ( ! $job_id ) {
-			return new WP_Error(
-				'schedule_failed',
-				__( 'Failed to schedule task.', 'data-machine' ),
+				'ability_not_found',
+				__( 'The run-task ability is not registered.', 'data-machine' ),
 				array( 'status' => 500 )
+			);
+		}
+
+		$result = $ability->execute( array( 'task_type' => $task_type ) );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		if ( empty( $result['success'] ) ) {
+			return new WP_Error(
+				'run_task_failed',
+				$result['error'] ?? __( 'Failed to run task.', 'data-machine' ),
+				array( 'status' => 400 )
 			);
 		}
 
 		return rest_ensure_response( array(
 			'success' => true,
-			'data'    => array(
-				'task_type' => $task_type,
-				'job_id'    => $job_id,
-				'message'   => sprintf( __( '%s scheduled (Job #%d).', 'data-machine' ), $meta['label'] ?? $task_type, $job_id ),
-			),
+			'data'    => $result,
 		) );
 	}
 
