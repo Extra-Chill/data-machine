@@ -13,7 +13,8 @@ namespace DataMachine\Cli\Commands;
 
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
-use DataMachine\Engine\AI\System\SystemAgent;
+use DataMachine\Engine\Tasks\TaskScheduler;
+use DataMachine\Engine\Tasks\TaskRegistry;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -51,8 +52,7 @@ class BatchCommand extends BaseCommand {
 	 * @subcommand list
 	 */
 	public function list_batches( $args, $assoc_args ): void {
-		$system_agent = SystemAgent::getInstance();
-		$batches      = $system_agent->listBatches();
+		$batches = TaskScheduler::listBatches();
 
 		if ( empty( $batches ) ) {
 			WP_CLI::log( 'No batch operations found.' );
@@ -138,8 +138,7 @@ class BatchCommand extends BaseCommand {
 			WP_CLI::error( 'Please provide a valid batch job ID.' );
 		}
 
-		$system_agent = SystemAgent::getInstance();
-		$status       = $system_agent->getBatchStatus( $batch_job_id );
+		$status = TaskScheduler::getBatchStatus( $batch_job_id );
 
 		if ( null === $status ) {
 			WP_CLI::error( "Batch #{$batch_job_id} not found or not a batch job." );
@@ -215,8 +214,7 @@ class BatchCommand extends BaseCommand {
 			WP_CLI::error( 'Please provide a valid batch job ID.' );
 		}
 
-		$system_agent = SystemAgent::getInstance();
-		$result       = $system_agent->cancelBatch( $batch_job_id );
+		$result = TaskScheduler::cancelBatch( $batch_job_id );
 
 		if ( ! $result ) {
 			WP_CLI::error( "Could not cancel batch #{$batch_job_id}. Not found or not a batch job." );

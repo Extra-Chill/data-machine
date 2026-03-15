@@ -2,8 +2,8 @@
 /**
  * System Agent Service Provider.
  *
- * Registers the System Agent infrastructure including built-in tasks,
- * singleton instantiation, and Action Scheduler hooks.
+ * Registers task infrastructure: built-in task handlers, Action Scheduler
+ * hooks, and scheduled task management.
  *
  * @package DataMachine\Engine\AI\System
  * @since 0.22.4
@@ -19,6 +19,8 @@ use DataMachine\Engine\AI\System\Tasks\GitHubIssueTask;
 use DataMachine\Engine\AI\System\Tasks\ImageGenerationTask;
 use DataMachine\Engine\AI\System\Tasks\InternalLinkingTask;
 use DataMachine\Engine\AI\System\Tasks\MetaDescriptionTask;
+use DataMachine\Engine\Tasks\TaskRegistry;
+use DataMachine\Engine\Tasks\TaskScheduler;
 use DataMachine\Core\PluginSettings;
 
 class SystemAgentServiceProvider {
@@ -29,24 +31,23 @@ class SystemAgentServiceProvider {
 	const DAILY_MEMORY_HOOK = 'datamachine_system_agent_daily_memory';
 
 	/**
-	 * Constructor - registers all System Agent components.
+	 * Constructor - registers all task infrastructure.
 	 */
 	public function __construct() {
 		$this->registerTaskHandlers();
-		$this->instantiateSystemAgent();
+		$this->initializeRegistry();
 		$this->registerActionSchedulerHooks();
 		$this->manageDailyMemorySchedule();
 	}
 
 	/**
-	 * Register built-in task handlers.
+	 * Register built-in task handlers on the new filter.
 	 *
-	 * Hooks the datamachine_system_agent_tasks filter to register
-	 * the core task types provided by Data Machine.
+	 * Hooks the datamachine_tasks filter to register the core task types.
 	 */
 	private function registerTaskHandlers(): void {
 		add_filter(
-			'datamachine_system_agent_tasks',
+			'datamachine_tasks',
 			array( $this, 'getBuiltInTasks' )
 		);
 	}
@@ -69,29 +70,28 @@ class SystemAgentServiceProvider {
 	}
 
 	/**
-	 * Instantiate the SystemAgent singleton.
+	 * Initialize the TaskRegistry.
 	 *
-	 * This ensures the SystemAgent is initialized and task handlers
-	 * are loaded early in the WordPress lifecycle.
+	 * Ensures the registry is loaded early in the WordPress lifecycle
+	 * so task handlers are available for scheduling.
+	 *
+	 * @since 0.37.0
 	 */
-	private function instantiateSystemAgent(): void {
-		SystemAgent::getInstance();
+	private function initializeRegistry(): void {
+		TaskRegistry::load();
 	}
 
 	/**
 	 * Register Action Scheduler hooks.
-	 *
-	 * Registers the hook that Action Scheduler will call to execute
-	 * system agent tasks.
 	 */
 	private function registerActionSchedulerHooks(): void {
 		add_action(
-			'datamachine_system_agent_handle_task',
+			'datamachine_task_handle',
 			array( $this, 'handleScheduledTask' )
 		);
 
 		add_action(
-			'datamachine_system_agent_process_batch',
+			'datamachine_task_process_batch',
 			array( $this, 'handleBatchChunk' )
 		);
 
@@ -143,14 +143,10 @@ class SystemAgentServiceProvider {
 	/**
 	 * Handle the daily memory generation Action Scheduler callback.
 	 *
-	 * Delegates to SystemAgent::scheduleTask() which creates a job
-	 * and executes the DailyMemoryTask.
-	 *
 	 * @since 0.32.0
 	 */
 	public function handleDailyMemoryGeneration(): void {
-		$system_agent = SystemAgent::getInstance();
-		$system_agent->scheduleTask( 'daily_memory_generation', array(
+		TaskScheduler::schedule( 'daily_memory_generation', array(
 			'date' => gmdate( 'Y-m-d' ),
 		) );
 	}
@@ -158,29 +154,21 @@ class SystemAgentServiceProvider {
 	/**
 	 * Handle Action Scheduler task callback.
 	 *
-	 * This is the callback function that Action Scheduler calls when
-	 * a system agent task is ready for execution.
-	 *
 	 * @param int $jobId Job ID from DM Jobs table.
 	 */
 	public function handleScheduledTask( int $jobId ): void {
-		$systemAgent = SystemAgent::getInstance();
-		$systemAgent->handleTask( $jobId );
+		TaskScheduler::handleTask( $jobId );
 	}
 
 	/**
 	 * Handle a batch chunk (Action Scheduler callback).
-	 *
-	 * Processes the next chunk of items from a batch and schedules
-	 * the following chunk if items remain.
 	 *
 	 * @since 0.32.0
 	 *
 	 * @param string $batchId Batch identifier.
 	 */
 	public function handleBatchChunk( string $batchId ): void {
-		$systemAgent = SystemAgent::getInstance();
-		$systemAgent->processBatchChunk( $batchId );
+		TaskScheduler::processBatchChunk( $batchId );
 	}
 
 	/**
@@ -205,7 +193,7 @@ class SystemAgentServiceProvider {
 				do_action(
 					'datamachine_log',
 					'warning',
-					"System Agent: Gave up waiting for post_id after {$max_attempts} attempts (pipeline job #{$pipelineJobId})",
+					"Deferred featured image: Gave up waiting for post_id after {$max_attempts} attempts (pipeline job #{$pipelineJobId})",
 					array(
 						'attachment_id'   => $attachmentId,
 						'pipeline_job_id' => $pipelineJobId,
@@ -215,7 +203,7 @@ class SystemAgentServiceProvider {
 				return;
 			}
 
-			// Reschedule
+			// Reschedule.
 			if ( function_exists( 'as_schedule_single_action' ) ) {
 				as_schedule_single_action(
 					time() + 15,
@@ -231,7 +219,7 @@ class SystemAgentServiceProvider {
 			return;
 		}
 
-		// Don't overwrite existing featured image
+		// Don't overwrite existing featured image.
 		if ( has_post_thumbnail( $post_id ) ) {
 			return;
 		}
@@ -242,8 +230,8 @@ class SystemAgentServiceProvider {
 			'datamachine_log',
 			$result ? 'info' : 'warning',
 			$result
-				? "System Agent: Deferred featured image set on post #{$post_id} (attempt #{$attempt})"
-				: "System Agent: Failed to set deferred featured image on post #{$post_id}",
+				? "Deferred featured image set on post #{$post_id} (attempt #{$attempt})"
+				: "Failed to set deferred featured image on post #{$post_id}",
 			array(
 				'post_id'         => $post_id,
 				'attachment_id'   => $attachmentId,

@@ -20,7 +20,7 @@ namespace DataMachine\Abilities;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\PluginSettings;
-use DataMachine\Engine\AI\System\SystemAgent;
+use DataMachine\Engine\Tasks\TaskScheduler;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -450,8 +450,7 @@ class InternalLinkingAbilities {
 			);
 		}
 
-		$systemAgent = SystemAgent::getInstance();
-		$batch       = $systemAgent->scheduleBatch(
+		$batch = TaskScheduler::scheduleBatch(
 			'internal_linking',
 			$item_params,
 			array(
@@ -466,7 +465,7 @@ class InternalLinkingAbilities {
 				'queued_count' => 0,
 				'post_ids'     => array(),
 				'message'      => 'Failed to schedule batch.',
-				'error'        => 'System Agent batch scheduling failed.',
+				'error'        => 'Task batch scheduling failed.',
 			);
 		}
 
@@ -478,7 +477,7 @@ class InternalLinkingAbilities {
 			'message'      => sprintf(
 				'Internal linking batch scheduled for %d post(s) (chunks of %d).',
 				count( $eligible ),
-				$batch['chunk_size'] ?? SystemAgent::BATCH_CHUNK_SIZE
+				$batch['chunk_size'] ?? TaskScheduler::BATCH_CHUNK_SIZE
 			),
 		);
 	}

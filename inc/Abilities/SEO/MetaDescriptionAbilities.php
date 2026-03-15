@@ -16,7 +16,7 @@ namespace DataMachine\Abilities\SEO;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\PluginSettings;
-use DataMachine\Engine\AI\System\SystemAgent;
+use DataMachine\Engine\Tasks\TaskScheduler;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -204,8 +204,7 @@ class MetaDescriptionAbilities {
 			);
 		}
 
-		$systemAgent = SystemAgent::getInstance();
-		$batch       = $systemAgent->scheduleBatch(
+		$batch = TaskScheduler::scheduleBatch(
 			'meta_description_generation',
 			$item_params,
 			array(
@@ -219,7 +218,7 @@ class MetaDescriptionAbilities {
 				'success'      => false,
 				'queued_count' => 0,
 				'post_ids'     => array(),
-				'error'        => 'System Agent batch scheduling failed.',
+				'error'        => 'Task batch scheduling failed.',
 			);
 		}
 

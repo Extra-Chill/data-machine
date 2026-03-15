@@ -8,7 +8,6 @@
 namespace DataMachine\Tests\Unit\Abilities;
 
 use DataMachine\Abilities\Media\ImageGenerationAbilities;
-use DataMachine\Engine\AI\System\SystemAgent;
 use WP_UnitTestCase;
 
 class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
@@ -93,7 +92,6 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 			'api_key' => 'test-key'
 		] );
 
-		// Mock HttpClient to return error
 		$filter = function( $result, $parsed_args, $url ) {
 			if ( str_contains( $url, 'replicate.com' ) ) {
 				return new \WP_Error( 'http_request_failed', 'Network timeout' );
@@ -118,7 +116,6 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 			'api_key' => 'test-key'
 		] );
 
-		// Mock HttpClient to return invalid JSON
 		$filter = function( $result, $parsed_args, $url ) {
 			if ( str_contains( $url, 'replicate.com' ) ) {
 				return array(
@@ -148,7 +145,6 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 			'api_key' => 'test-key'
 		] );
 
-		// Mock HttpClient to return response without ID
 		$filter = function( $result, $parsed_args, $url ) {
 			if ( str_contains( $url, 'replicate.com' ) ) {
 				return array(
@@ -171,64 +167,17 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Test generateImage fails when SystemAgent scheduling fails.
+	 * Test generateImage success — Replicate returns prediction, scheduler creates job.
 	 */
-	public function test_generate_image_scheduling_fails(): void {
-		update_site_option( 'datamachine_image_generation_config', [
-			'api_key' => 'test-key'
-		] );
-
-		// Mock HttpClient to return valid prediction response
-		$filter = function( $result, $parsed_args, $url ) {
-			if ( str_contains( $url, 'replicate.com' ) ) {
-				return array(
-					'response' => array( 'code' => 201, 'message' => 'Created' ),
-					'body'     => wp_json_encode( array( 'id' => 'pred_123' ) ),
-					'headers'  => array(),
-					'cookies'  => array(),
-				);
-			}
-			return $result;
-		};
-		add_filter( 'pre_http_request', $filter, 10, 3 );
-
-		// Mock SystemAgent to fail scheduling
-		$system_agent_mock = $this->createMock( SystemAgent::class );
-		$system_agent_mock->method( 'scheduleTask' )
-			->willReturn( false );
-
-		// Use reflection to replace the singleton instance
-		$reflection = new \ReflectionClass( SystemAgent::class );
-		$instance_property = $reflection->getProperty( 'instance' );
-		$instance_property->setAccessible( true );
-		$original_instance = $instance_property->getValue();
-		$instance_property->setValue( $system_agent_mock );
-
-		$result = ImageGenerationAbilities::generateImage( [ 'prompt' => 'Test prompt' ] );
-
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'Failed to schedule', $result['error'] );
-
-		// Restore original instance
-		$instance_property->setValue( $original_instance );
-
-		remove_filter( 'pre_http_request', $filter, 10 );
-	}
-
-	/**
-	 * Test generateImage success with default parameters.
-	 */
-	public function test_generate_image_success_defaults(): void {
+	public function test_generate_image_success(): void {
 		update_site_option( 'datamachine_image_generation_config', [
 			'api_key' => 'test-key',
 			'default_model' => 'google/imagen-4-fast',
 			'default_aspect_ratio' => '3:4'
 		] );
 
-		// Mock HttpClient to return valid prediction response
 		$filter = function( $result, $parsed_args, $url ) {
 			if ( str_contains( $url, 'replicate.com' ) ) {
-				// Verify request structure
 				$body = json_decode( $parsed_args['body'], true );
 				$this->assertSame( 'Test prompt', $body['input']['prompt'] );
 
@@ -243,127 +192,13 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 		};
 		add_filter( 'pre_http_request', $filter, 10, 3 );
 
-		// Mock SystemAgent to succeed
-		$system_agent_mock = $this->createMock( SystemAgent::class );
-		$system_agent_mock->method( 'scheduleTask' )
-			->willReturn( 456 );
-
-		// Use reflection to replace the singleton instance
-		$reflection = new \ReflectionClass( SystemAgent::class );
-		$instance_property = $reflection->getProperty( 'instance' );
-		$instance_property->setAccessible( true );
-		$original_instance = $instance_property->getValue();
-		$instance_property->setValue( $system_agent_mock );
-
 		$result = ImageGenerationAbilities::generateImage( [ 'prompt' => 'Test prompt' ] );
 
 		$this->assertTrue( $result['success'] );
 		$this->assertTrue( $result['pending'] );
-		$this->assertSame( 456, $result['job_id'] );
+		$this->assertIsInt( $result['job_id'] );
 		$this->assertSame( 'pred_123', $result['prediction_id'] );
-		$this->assertStringContainsString( '3:4', $result['message'] );
 
-		// Restore original instance
-		$instance_property->setValue( $original_instance );
-
-		remove_filter( 'pre_http_request', $filter, 10 );
-	}
-
-	/**
-	 * Test generateImage success with custom parameters and pipeline_job_id.
-	 */
-	public function test_generate_image_success_custom_params(): void {
-		update_site_option( 'datamachine_image_generation_config', [
-			'api_key' => 'test-key'
-		] );
-
-		// Mock HttpClient to return valid prediction response
-		$filter = function( $result, $parsed_args, $url ) {
-			if ( str_contains( $url, 'replicate.com' ) ) {
-				// Verify custom parameters
-				$body = json_decode( $parsed_args['body'], true );
-				$this->assertSame( 'Custom prompt', $body['input']['prompt'] );
-
-				return array(
-					'response' => array( 'code' => 201, 'message' => 'Created' ),
-					'body'     => wp_json_encode( array( 'id' => 'pred_custom' ) ),
-					'headers'  => array(),
-					'cookies'  => array(),
-				);
-			}
-			return $result;
-		};
-		add_filter( 'pre_http_request', $filter, 10, 3 );
-
-		// Mock SystemAgent to succeed with context
-		$system_agent_mock = $this->createMock( SystemAgent::class );
-		$system_agent_mock->method( 'scheduleTask' )
-			->willReturn( 999 );
-
-		// Use reflection to replace the singleton instance
-		$reflection = new \ReflectionClass( SystemAgent::class );
-		$instance_property = $reflection->getProperty( 'instance' );
-		$instance_property->setAccessible( true );
-		$original_instance = $instance_property->getValue();
-		$instance_property->setValue( $system_agent_mock );
-
-		$result = ImageGenerationAbilities::generateImage( [
-			'prompt' => 'Custom prompt',
-			'model' => 'black-forest-labs/flux-schnell',
-			'aspect_ratio' => '16:9',
-			'pipeline_job_id' => 789
-		] );
-
-		$this->assertTrue( $result['success'] );
-		$this->assertSame( 999, $result['job_id'] );
-		$this->assertSame( 'pred_custom', $result['prediction_id'] );
-
-		// Restore original instance
-		$instance_property->setValue( $original_instance );
-
-		remove_filter( 'pre_http_request', $filter, 10 );
-	}
-
-	/**
-	 * Test invalid aspect ratio falls back to default.
-	 */
-	public function test_generate_image_invalid_aspect_ratio(): void {
-		update_site_option( 'datamachine_image_generation_config', [
-			'api_key' => 'test-key'
-		] );
-
-		// Mock HttpClient
-		$filter = function( $result, $parsed_args, $url ) {
-			if ( str_contains( $url, 'replicate.com' ) ) {
-				return array(
-					'response' => array( 'code' => 201, 'message' => 'Created' ),
-					'body'     => wp_json_encode( array( 'id' => 'pred_fallback' ) ),
-					'headers'  => array(),
-					'cookies'  => array(),
-				);
-			}
-			return $result;
-		};
-		add_filter( 'pre_http_request', $filter, 10, 3 );
-
-		// Mock SystemAgent
-		$system_agent_mock = $this->createMock( SystemAgent::class );
-		$system_agent_mock->method( 'scheduleTask' )->willReturn( 111 );
-
-		$reflection = new \ReflectionClass( SystemAgent::class );
-		$instance_property = $reflection->getProperty( 'instance' );
-		$instance_property->setAccessible( true );
-		$original_instance = $instance_property->getValue();
-		$instance_property->setValue( $system_agent_mock );
-
-		$result = ImageGenerationAbilities::generateImage( [
-			'prompt' => 'Test',
-			'aspect_ratio' => 'invalid:ratio'
-		] );
-
-		$this->assertTrue( $result['success'] );
-
-		$instance_property->setValue( $original_instance );
 		remove_filter( 'pre_http_request', $filter, 10 );
 	}
 

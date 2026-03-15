@@ -24,7 +24,7 @@ use DataMachine\Core\Steps\Step;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\JobStatus;
-use DataMachine\Engine\AI\System\SystemAgent;
+use DataMachine\Engine\Tasks\TaskRegistry;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -109,8 +109,7 @@ class SystemTaskStep extends Step {
 		}
 
 		// Verify task type is registered.
-		$system_agent = SystemAgent::getInstance();
-		$handlers     = $system_agent->getTaskHandlers();
+		$handlers = TaskRegistry::getHandlers();
 
 		if ( ! isset( $handlers[ $task_type ] ) ) {
 			$available = implode( ', ', array_keys( $handlers ) );
@@ -151,8 +150,7 @@ class SystemTaskStep extends Step {
 		}
 
 		// Resolve the task handler class.
-		$system_agent  = SystemAgent::getInstance();
-		$handlers      = $system_agent->getTaskHandlers();
+		$handlers = TaskRegistry::getHandlers();
 		$handler_class = $handlers[ $task_type ];
 
 		// Create a child job for independent tracking.

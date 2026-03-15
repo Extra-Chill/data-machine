@@ -1,57 +1,39 @@
 <?php
 /**
- * System Agent - Core async task orchestration.
+ * Task Scheduler - Async task scheduling and execution.
  *
- * Manages async task scheduling and execution for tools that need background
- * processing. Integrates with DM Jobs for tracking and Action Scheduler for
- * execution timing. Routes completed results back to originating contexts.
+ * Handles scheduling individual tasks and batches via Action Scheduler,
+ * with DM Jobs for tracking. This replaces the scheduling functionality
+ * that was previously embedded in the SystemAgent singleton.
  *
- * @package DataMachine\Engine\AI\System
- * @since 0.22.4
+ * @package DataMachine\Engine\Tasks
+ * @since 0.37.0
  */
 
-namespace DataMachine\Engine\AI\System;
+namespace DataMachine\Engine\Tasks;
 
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\JobStatus;
 
-class SystemAgent {
+class TaskScheduler {
 
 	/**
-	 * Singleton instance.
+	 * Default chunk size for batch scheduling.
 	 *
-	 * @var SystemAgent|null
+	 * Controls how many individual tasks are created per batch cycle.
+	 * Between cycles, other task types can run in Action Scheduler.
 	 */
-	private static ?SystemAgent $instance = null;
+	const BATCH_CHUNK_SIZE = 10;
 
 	/**
-	 * Registered task handlers.
+	 * Delay in seconds between batch chunks.
 	 *
-	 * @var array<string, string> Task type => handler class name mapping.
+	 * Gives Action Scheduler time to process other pending actions
+	 * between bulk task chunks.
 	 */
-	private array $taskHandlers = array();
-
-	/**
-	 * Private constructor for singleton pattern.
-	 */
-	private function __construct() {
-		$this->loadTaskHandlers();
-	}
-
-	/**
-	 * Get singleton instance.
-	 *
-	 * @return SystemAgent
-	 */
-	public static function getInstance(): SystemAgent {
-		if ( null === self::$instance ) {
-			self::$instance = new self();
-		}
-
-		return self::$instance;
-	}
+	const BATCH_CHUNK_DELAY = 30;
 
 	/**
 	 * Schedule an async task.
@@ -65,12 +47,12 @@ class SystemAgent {
 	 * @param int    $parentJobId Parent job ID for hierarchy (batch parent, pipeline parent).
 	 * @return int|false Job ID on success, false on failure.
 	 */
-	public function scheduleTask( string $taskType, array $params, array $context = array(), int $parentJobId = 0 ): int|false {
-		if ( ! isset( $this->taskHandlers[ $taskType ] ) ) {
+	public static function schedule( string $taskType, array $params, array $context = array(), int $parentJobId = 0 ): int|false {
+		if ( ! TaskRegistry::isRegistered( $taskType ) ) {
 			do_action(
 				'datamachine_log',
 				'error',
-				"System Agent: Unknown task type '{$taskType}'",
+				"TaskScheduler: Unknown task type '{$taskType}'",
 				array(
 					'task_type' => $taskType,
 					'context'   => 'system',
@@ -81,7 +63,7 @@ class SystemAgent {
 			return false;
 		}
 
-		// Create DM Job — matches Jobs::create_job() schema
+		// Create DM Job.
 		$jobs_db  = new Jobs();
 		$job_data = array(
 			'pipeline_id' => 'direct',
@@ -101,7 +83,7 @@ class SystemAgent {
 			do_action(
 				'datamachine_log',
 				'error',
-				'System Agent: Failed to create job for task',
+				'TaskScheduler: Failed to create job for task',
 				array(
 					'task_type' => $taskType,
 					'context'   => 'system',
@@ -110,17 +92,17 @@ class SystemAgent {
 			return false;
 		}
 
-		// Store task params in engine_data
+		// Store task params in engine_data.
 		$jobs_db->store_engine_data( (int) $job_id, array_merge( $params, array(
 			'task_type'    => $taskType,
 			'context'      => $context,
 			'scheduled_at' => current_time( 'mysql' ),
 		) ) );
 
-		// Mark job as processing
+		// Mark job as processing.
 		$jobs_db->start_job( (int) $job_id, JobStatus::PROCESSING );
 
-		// Schedule Action Scheduler action
+		// Schedule Action Scheduler action.
 		if ( function_exists( 'as_schedule_single_action' ) ) {
 			$args = array(
 				'job_id' => $job_id,
@@ -128,7 +110,7 @@ class SystemAgent {
 
 			$action_id = as_schedule_single_action(
 				time(),
-				'datamachine_system_agent_handle_task',
+				'datamachine_task_handle',
 				$args,
 				'data-machine'
 			);
@@ -137,10 +119,10 @@ class SystemAgent {
 				do_action(
 					'datamachine_log',
 					'info',
-					"System Agent task scheduled: {$taskType} (Job #{$job_id})",
+					"Task scheduled: {$taskType} (Job #{$job_id})",
 					array(
-						'job_id'     => $job_id,
-						'action_id'  => $action_id,
+						'job_id'    => $job_id,
+						'action_id' => $action_id,
 						'task_type' => $taskType,
 						'context'   => 'system',
 						'params'    => $params,
@@ -150,32 +132,16 @@ class SystemAgent {
 
 				return $job_id;
 			} else {
-				// Action Scheduler failed - mark job as failed
+				// Action Scheduler failed — mark job as failed.
 				$jobs_db->complete_job( $job_id, JobStatus::failed( 'Failed to schedule Action Scheduler action' )->toString() );
 				return false;
 			}
 		} else {
-			// Action Scheduler not available
+			// Action Scheduler not available.
 			$jobs_db->complete_job( $job_id, JobStatus::failed( 'Action Scheduler not available' )->toString() );
 			return false;
 		}
 	}
-
-	/**
-	 * Default chunk size for batch scheduling.
-	 *
-	 * Controls how many individual tasks are created per batch cycle.
-	 * Between cycles, other task types can run in Action Scheduler.
-	 */
-	const BATCH_CHUNK_SIZE = 10;
-
-	/**
-	 * Delay in seconds between batch chunks.
-	 *
-	 * Gives Action Scheduler time to process other pending actions
-	 * between bulk task chunks.
-	 */
-	const BATCH_CHUNK_DELAY = 30;
 
 	/**
 	 * Schedule a batch of tasks with chunked execution.
@@ -184,20 +150,18 @@ class SystemAgent {
 	 * in a transient and processes them in chunks. Between chunks, other
 	 * task types can run — preventing queue flooding.
 	 *
-	 * @since 0.32.0
-	 *
 	 * @param string $taskType   Task type identifier (must be registered).
 	 * @param array  $itemParams Array of parameter arrays, one per task.
 	 * @param array  $context    Shared context for all tasks in the batch.
 	 * @param int    $chunkSize  Items per chunk (default: BATCH_CHUNK_SIZE).
 	 * @return array{batch_id: string, total: int, chunk_size: int}|false Batch info or false on failure.
 	 */
-	public function scheduleBatch( string $taskType, array $itemParams, array $context = array(), int $chunkSize = 0 ): array|false {
-		if ( ! isset( $this->taskHandlers[ $taskType ] ) ) {
+	public static function scheduleBatch( string $taskType, array $itemParams, array $context = array(), int $chunkSize = 0 ): array|false {
+		if ( ! TaskRegistry::isRegistered( $taskType ) ) {
 			do_action(
 				'datamachine_log',
 				'error',
-				"System Agent: Cannot schedule batch for unknown task type '{$taskType}'",
+				"TaskScheduler: Cannot schedule batch for unknown task type '{$taskType}'",
 				array(
 					'task_type' => $taskType,
 					'context'   => 'system',
@@ -219,7 +183,7 @@ class SystemAgent {
 		if ( count( $itemParams ) <= $chunkSize ) {
 			$job_ids = array();
 			foreach ( $itemParams as $params ) {
-				$job_id = $this->scheduleTask( $taskType, $params, $context );
+				$job_id = self::schedule( $taskType, $params, $context );
 				if ( $job_id ) {
 					$job_ids[] = $job_id;
 				}
@@ -287,7 +251,7 @@ class SystemAgent {
 
 		$action_id = as_schedule_single_action(
 			time(),
-			'datamachine_system_agent_process_batch',
+			'datamachine_task_process_batch',
 			array( 'batch_id' => $batch_id ),
 			'data-machine'
 		);
@@ -304,7 +268,7 @@ class SystemAgent {
 			'datamachine_log',
 			'info',
 			sprintf(
-				'System Agent batch scheduled: %s (%d items in chunks of %d)',
+				'Task batch scheduled: %s (%d items in chunks of %d)',
 				$taskType,
 				count( $itemParams ),
 				$chunkSize
@@ -312,10 +276,10 @@ class SystemAgent {
 			array(
 				'batch_id'     => $batch_id,
 				'batch_job_id' => $batch_job_id,
-				'task_type'  => $taskType,
-				'context'    => 'system',
-				'total'      => count( $itemParams ),
-				'chunk_size' => $chunkSize,
+				'task_type'    => $taskType,
+				'context'      => 'system',
+				'total'        => count( $itemParams ),
+				'chunk_size'   => $chunkSize,
 			)
 		);
 
@@ -335,11 +299,9 @@ class SystemAgent {
 	 * individual tasks for each, then schedules the next chunk (if any)
 	 * with a delay to allow other task types to execute between chunks.
 	 *
-	 * @since 0.32.0
-	 *
 	 * @param string $batchId Batch identifier.
 	 */
-	public function processBatchChunk( string $batchId ): void {
+	public static function processBatchChunk( string $batchId ): void {
 		$transient_key = 'datamachine_batch_' . md5( $batchId );
 		$batch_data    = get_transient( $transient_key );
 
@@ -347,7 +309,7 @@ class SystemAgent {
 			do_action(
 				'datamachine_log',
 				'warning',
-				"System Agent: Batch {$batchId} not found or expired",
+				"TaskScheduler: Batch {$batchId} not found or expired",
 				array(
 					'batch_id' => $batchId,
 					'context'  => 'system',
@@ -379,14 +341,14 @@ class SystemAgent {
 					do_action(
 						'datamachine_log',
 						'info',
-						sprintf( 'System Agent batch cancelled: %s (at %d/%d)', $task_type, $offset, $total ),
+						sprintf( 'Task batch cancelled: %s (at %d/%d)', $task_type, $offset, $total ),
 						array(
 							'batch_id'     => $batchId,
 							'batch_job_id' => $batch_job_id,
-						'task_type' => $task_type,
-						'context'   => 'system',
-						'offset'    => $offset,
-						'total'     => $total,
+							'task_type'    => $task_type,
+							'context'      => 'system',
+							'offset'       => $offset,
+							'total'        => $total,
 						)
 					);
 					return;
@@ -399,7 +361,7 @@ class SystemAgent {
 		$scheduled = 0;
 
 		foreach ( $chunk as $params ) {
-			$job_id = $this->scheduleTask( $task_type, $params, $context, $batch_job_id );
+			$job_id = self::schedule( $task_type, $params, $context, $batch_job_id );
 			if ( $job_id ) {
 				++$scheduled;
 			}
@@ -409,20 +371,18 @@ class SystemAgent {
 
 		// Update parent batch job progress.
 		if ( $batch_job_id > 0 ) {
-			if ( ! isset( $jobs_db ) ) {
-				$jobs_db = new Jobs();
-			}
-			$parent_data                    = $jobs_db->retrieve_engine_data( $batch_job_id );
+			$progress_db                    = $jobs_db ?? new Jobs();
+			$parent_data                    = $progress_db->retrieve_engine_data( $batch_job_id );
 			$parent_data['offset']          = min( $new_offset, $total );
 			$parent_data['tasks_scheduled'] = ( $parent_data['tasks_scheduled'] ?? 0 ) + $scheduled;
-			$jobs_db->store_engine_data( $batch_job_id, $parent_data );
+			$progress_db->store_engine_data( $batch_job_id, $parent_data );
 		}
 
 		do_action(
 			'datamachine_log',
 			'info',
 			sprintf(
-				'System Agent batch chunk processed: %s (%d/%d, scheduled %d)',
+				'Task batch chunk processed: %s (%d/%d, scheduled %d)',
 				$task_type,
 				min( $new_offset, $total ),
 				$total,
@@ -431,12 +391,12 @@ class SystemAgent {
 			array(
 				'batch_id'     => $batchId,
 				'batch_job_id' => $batch_job_id,
-				'task_type'  => $task_type,
-				'context'    => 'system',
-				'offset'     => $offset,
-				'chunk_size' => $chunk_size,
-				'scheduled'  => $scheduled,
-				'remaining'  => max( 0, $total - $new_offset ),
+				'task_type'    => $task_type,
+				'context'      => 'system',
+				'offset'       => $offset,
+				'chunk_size'   => $chunk_size,
+				'scheduled'    => $scheduled,
+				'remaining'    => max( 0, $total - $new_offset ),
 			)
 		);
 
@@ -447,7 +407,7 @@ class SystemAgent {
 
 			as_schedule_single_action(
 				time() + self::BATCH_CHUNK_DELAY,
-				'datamachine_system_agent_process_batch',
+				'datamachine_task_process_batch',
 				array( 'batch_id' => $batchId ),
 				'data-machine'
 			);
@@ -456,27 +416,112 @@ class SystemAgent {
 			delete_transient( $transient_key );
 
 			if ( $batch_job_id > 0 ) {
-				if ( ! isset( $jobs_db ) ) {
-					$jobs_db = new Jobs();
-				}
-				$parent_data                 = $jobs_db->retrieve_engine_data( $batch_job_id );
+				$complete_db                 = $jobs_db ?? new Jobs();
+				$parent_data                 = $complete_db->retrieve_engine_data( $batch_job_id );
 				$parent_data['completed_at'] = current_time( 'mysql' );
-				$jobs_db->store_engine_data( $batch_job_id, $parent_data );
-				$jobs_db->complete_job( $batch_job_id, JobStatus::COMPLETED );
+				$complete_db->store_engine_data( $batch_job_id, $parent_data );
+				$complete_db->complete_job( $batch_job_id, JobStatus::COMPLETED );
 			}
 
 			do_action(
 				'datamachine_log',
 				'info',
-				sprintf( 'System Agent batch complete: %s (%d items)', $task_type, $total ),
+				sprintf( 'Task batch complete: %s (%d items)', $task_type, $total ),
 				array(
 					'batch_id'     => $batchId,
 					'batch_job_id' => $batch_job_id,
-					'task_type' => $task_type,
-					'context'   => 'system',
-					'total'     => $total,
+					'task_type'    => $task_type,
+					'context'      => 'system',
+					'total'        => $total,
 				)
 			);
+		}
+	}
+
+	/**
+	 * Handle a scheduled task (Action Scheduler callback).
+	 *
+	 * Loads the job, determines the task type, and delegates to the
+	 * appropriate handler for execution.
+	 *
+	 * @param int $jobId Job ID from DM Jobs table.
+	 */
+	public static function handleTask( int $jobId ): void {
+		$jobs_db = new Jobs();
+		$job     = $jobs_db->get_job( $jobId );
+
+		if ( ! $job ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				"TaskScheduler: Job {$jobId} not found",
+				array(
+					'job_id'  => $jobId,
+					'context' => 'system',
+				)
+			);
+			return;
+		}
+
+		$engine_data = $job['engine_data'] ?? array();
+		$task_type   = $engine_data['task_type'] ?? '';
+
+		if ( empty( $task_type ) ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				"TaskScheduler: No task type found in job {$jobId}",
+				array(
+					'job_id'      => $jobId,
+					'context'     => 'system',
+					'engine_data' => $engine_data,
+				)
+			);
+
+			$jobs_db->complete_job( $jobId, JobStatus::failed( 'No task type found' )->toString() );
+			return;
+		}
+
+		$handler_class = TaskRegistry::getHandler( $task_type );
+
+		if ( ! $handler_class ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				"TaskScheduler: Unknown task type '{$task_type}' for job {$jobId}",
+				array(
+					'job_id'    => $jobId,
+					'task_type' => $task_type,
+					'context'   => 'system',
+				)
+			);
+
+			$jobs_db->complete_job( $jobId, JobStatus::failed( "Unknown task type: {$task_type}" )->toString() );
+			return;
+		}
+
+		// Instantiate and execute the task handler.
+		try {
+			$handler = new $handler_class();
+			$handler->execute( $jobId, $engine_data );
+		} catch ( \Throwable $e ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				"Task execution failed for job {$jobId}: " . $e->getMessage(),
+				array(
+					'job_id'         => $jobId,
+					'task_type'      => $task_type,
+					'context'        => 'system',
+					'handler_class'  => $handler_class,
+					'exception'      => $e->getMessage(),
+					'exception_file' => $e->getFile(),
+					'exception_line' => $e->getLine(),
+				)
+			);
+
+			// Mark job as failed due to exception.
+			$jobs_db->complete_job( $jobId, JobStatus::failed( 'Task execution exception: ' . $e->getMessage() )->toString() );
 		}
 	}
 
@@ -485,12 +530,10 @@ class SystemAgent {
 	 *
 	 * Reads the parent batch job and counts child job statuses.
 	 *
-	 * @since 0.33.0
-	 *
 	 * @param int $batchJobId Parent batch job ID.
 	 * @return array|null Batch status or null if not found.
 	 */
-	public function getBatchStatus( int $batchJobId ): ?array {
+	public static function getBatchStatus( int $batchJobId ): ?array {
 		$jobs_db = new Jobs();
 		$job     = $jobs_db->get_job( $batchJobId );
 
@@ -552,12 +595,10 @@ class SystemAgent {
 	 * Sets the cancelled flag on the parent batch job. The next
 	 * processBatchChunk() call will see it and stop scheduling.
 	 *
-	 * @since 0.33.0
-	 *
 	 * @param int $batchJobId Parent batch job ID.
 	 * @return bool True on success, false if not found or not a batch.
 	 */
-	public function cancelBatch( int $batchJobId ): bool {
+	public static function cancelBatch( int $batchJobId ): bool {
 		$jobs_db = new Jobs();
 		$job     = $jobs_db->get_job( $batchJobId );
 
@@ -581,16 +622,16 @@ class SystemAgent {
 			delete_transient( $transient_key );
 		}
 
-			do_action(
-				'datamachine_log',
-				'info',
-				sprintf( 'System Agent batch cancelled: job #%d (%s)', $batchJobId, $engine_data['task_type'] ?? '' ),
-				array(
-					'batch_job_id' => $batchJobId,
-					'task_type'    => $engine_data['task_type'] ?? '',
-					'context'      => 'system',
-				)
-			);
+		do_action(
+			'datamachine_log',
+			'info',
+			sprintf( 'Task batch cancelled: job #%d (%s)', $batchJobId, $engine_data['task_type'] ?? '' ),
+			array(
+				'batch_job_id' => $batchJobId,
+				'task_type'    => $engine_data['task_type'] ?? '',
+				'context'      => 'system',
+			)
+		);
 
 		return true;
 	}
@@ -598,11 +639,9 @@ class SystemAgent {
 	/**
 	 * Find all batch parent jobs.
 	 *
-	 * @since 0.33.0
-	 *
 	 * @return array Array of batch job records.
 	 */
-	public function listBatches(): array {
+	public static function listBatches(): array {
 		global $wpdb;
 		$table = $wpdb->prefix . 'datamachine_jobs';
 
@@ -628,162 +667,5 @@ class SystemAgent {
 		}
 
 		return $results;
-	}
-
-	/**
-	 * Handle a scheduled task (Action Scheduler callback).
-	 *
-	 * Loads the job, determines the task type, and delegates to the
-	 * appropriate handler for execution.
-	 *
-	 * @param int $jobId Job ID from DM Jobs table.
-	 */
-	public function handleTask( int $jobId ): void {
-		$jobs_db = new Jobs();
-		$job     = $jobs_db->get_job( $jobId );
-
-		if ( ! $job ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				"System Agent: Job {$jobId} not found",
-				array(
-					'job_id'  => $jobId,
-					'context' => 'system',
-				)
-			);
-			return;
-		}
-
-		$engine_data = $job['engine_data'] ?? array();
-		$task_type   = $engine_data['task_type'] ?? '';
-
-		if ( empty( $task_type ) ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				"System Agent: No task type found in job {$jobId}",
-				array(
-					'job_id'      => $jobId,
-					'context'     => 'system',
-					'engine_data' => $engine_data,
-				)
-			);
-
-			$jobs_db->complete_job( $jobId, JobStatus::failed( 'No task type found' )->toString() );
-			return;
-		}
-
-		if ( ! isset( $this->taskHandlers[ $task_type ] ) ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				"System Agent: Unknown task type '{$task_type}' for job {$jobId}",
-				array(
-					'job_id'    => $jobId,
-					'task_type' => $task_type,
-					'context'   => 'system',
-				)
-			);
-
-			$jobs_db->complete_job( $jobId, JobStatus::failed( "Unknown task type: {$task_type}" )->toString() );
-			return;
-		}
-
-		// Instantiate and execute the task handler
-		$handler_class = $this->taskHandlers[ $task_type ];
-
-		try {
-			$handler = new $handler_class();
-			$handler->execute( $jobId, $engine_data );
-		} catch ( \Throwable $e ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				"System Agent task execution failed for job {$jobId}: " . $e->getMessage(),
-				array(
-					'job_id'         => $jobId,
-					'task_type'      => $task_type,
-					'context'        => 'system',
-					'handler_class'  => $handler_class,
-					'exception'      => $e->getMessage(),
-					'exception_file' => $e->getFile(),
-					'exception_line' => $e->getLine(),
-				)
-			);
-
-			// Mark job as failed due to exception
-			$jobs_db->complete_job( $jobId, JobStatus::failed( 'Task execution exception: ' . $e->getMessage() )->toString() );
-		}
-	}
-
-	/**
-	 * Load task handlers from filter.
-	 *
-	 * Uses the datamachine_system_agent_tasks filter to allow registration
-	 * of task type => handler class mappings.
-	 */
-	private function loadTaskHandlers(): void {
-		/**
-		 * Filter to register System Agent task handlers.
-		 *
-		 * @param array $handlers Task type => handler class name mapping.
-		 */
-		$this->taskHandlers = apply_filters( 'datamachine_system_agent_tasks', array() );
-	}
-
-	/**
-	 * Get registered task handlers (for debugging/admin purposes).
-	 *
-	 * @return array<string, string> Task type => handler class mappings.
-	 */
-	public function getTaskHandlers(): array {
-		return $this->taskHandlers;
-	}
-
-	/**
-	 * Get the full task registry with metadata for the admin UI.
-	 *
-	 * Iterates registered handlers, reads static getTaskMeta() from each,
-	 * and merges with current enabled state from PluginSettings.
-	 *
-	 * @return array<string, array> Task type => metadata array.
-	 * @since 0.32.0
-	 */
-	public function getTaskRegistry(): array {
-		$registry = array();
-
-		foreach ( $this->taskHandlers as $task_type => $handler_class ) {
-			$meta = array(
-				'label'           => '',
-				'description'     => '',
-				'setting_key'     => null,
-				'default_enabled' => true,
-			);
-
-			if ( method_exists( $handler_class, 'getTaskMeta' ) ) {
-				$meta = array_merge( $meta, $handler_class::getTaskMeta() );
-			}
-
-			// Resolve current enabled state from settings.
-			$enabled = true;
-			if ( ! empty( $meta['setting_key'] ) ) {
-				$enabled = (bool) \DataMachine\Core\PluginSettings::get(
-					$meta['setting_key'],
-					$meta['default_enabled']
-				);
-			}
-
-			$registry[ $task_type ] = array(
-				'task_type'       => $task_type,
-				'label'           => $meta['label'] ? $meta['label'] : ucfirst( str_replace( '_', ' ', $task_type ) ),
-				'description'     => $meta['description'],
-				'setting_key'     => $meta['setting_key'],
-				'default_enabled' => $meta['default_enabled'],
-				'enabled'         => $enabled,
-			);
-		}
-
-		return $registry;
 	}
 }

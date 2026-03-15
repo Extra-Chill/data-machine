@@ -305,18 +305,17 @@ abstract class BaseTool {
 	/**
 	 * Build pending response for async tasks.
 	 *
-	 * Schedules a task with the System Agent and returns a pending response
+	 * Schedules a task with the TaskScheduler and returns a pending response
 	 * that indicates the task is being processed in the background.
 	 *
-	 * @param string $taskType   Task type identifier for System Agent.
+	 * @param string $taskType   Registered task type identifier.
 	 * @param array  $taskParams Task parameters to pass to the handler.
 	 * @param array  $context    Context for routing results back.
 	 * @param string $toolName   Tool name for the response.
 	 * @return array Pending response array.
 	 */
 	protected function buildPendingResponse( string $taskType, array $taskParams, array $context = array(), string $toolName = '' ): array {
-		$systemAgent = \DataMachine\Engine\AI\System\SystemAgent::getInstance();
-		$jobId       = $systemAgent->scheduleTask( $taskType, $taskParams, $context );
+		$jobId = \DataMachine\Engine\Tasks\TaskScheduler::schedule( $taskType, $taskParams, $context );
 
 		if ( ! $jobId ) {
 			return $this->buildErrorResponse( 'Failed to schedule async task.', $toolName );

@@ -16,7 +16,7 @@ use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Engine\AI\RequestBuilder;
 use DataMachine\Core\Database\Chat\Chat as ChatDatabase;
 use DataMachine\Core\PluginSettings;
-use DataMachine\Engine\AI\System\SystemAgent;
+use DataMachine\Engine\Tasks\TaskScheduler;
 
 defined('ABSPATH') || exit;
 
@@ -328,7 +328,7 @@ class SystemAbilities {
 					),
 				),
 				'execute_callback'    => function ( array $input ) {
-					return SystemAgent::getInstance()->scheduleTask( 'github_create_issue', $input );
+					return TaskScheduler::schedule( 'github_create_issue', $input );
 				},
 				'permission_callback' => fn() => PermissionHelper::can_manage(),
 				'meta'                => array( 'show_in_rest' => true ),
