@@ -9,60 +9,155 @@ Data Machine uses **WordPress itself as the memory layer.** Not a vector databas
 WordPress already solves persistent storage:
 
 - **Files on disk** — `wp-content/uploads` for markdown documents the agent reads
-- **MySQL** — custom tables for chat sessions and job history
-- **REST API** — programmatic CRUD for memory files
+- **MySQL** — custom tables for chat sessions, job history, agent registry, and logs
+- **REST API** — programmatic CRUD for memory files and daily memory
 - **Admin UI** — human-editable through the WordPress dashboard
-- **Action Scheduler** — cron-like cleanup and scheduled workflows
+- **Action Scheduler** — cron-like cleanup, scheduled workflows, and daily memory generation
 - **Hooks system** — extensible injection points for custom memory sources
+- **Abilities API** — structured operations for reading, writing, and searching memory
 
 No separate infrastructure. The memory lives where the content lives.
 
 ## Memory Architecture
 
-Three layers, each serving a different purpose:
+Four layers, each serving a different purpose:
 
 ### 1. Agent Files — Identity and Knowledge
 
-**Location:** `wp-content/uploads/datamachine-files/agents/{agent_slug}/` (per-agent) or `wp-content/uploads/datamachine-files/agent/` (legacy shared)
+**Location:** Three-layer directory system under `wp-content/uploads/datamachine-files/`:
+
+| Layer | Directory | Contents |
+|-------|-----------|----------|
+| **Shared** (site-wide) | `shared/` | `SITE.md`, `RULES.md` — site-level context shared by all agents |
+| **Agent** (identity) | `agents/{agent_slug}/` | `SOUL.md`, `MEMORY.md`, `daily/` — agent-specific identity and knowledge |
+| **User** (personal) | `users/{user_id}/` | `USER.md`, `MEMORY.md` — user preferences and user-scoped knowledge |
 
 Markdown files stored on the WordPress filesystem. The agent reads these to know who it is, who it works with, and what it knows.
 
-Data Machine ships with three core memory files, each with a distinct purpose:
+Data Machine ships with core memory files across layers:
 
-**SOUL.md** — Agent identity. Who the agent is, how it communicates, what rules it follows. Injected into every AI request. Rarely changes.
+**SITE.md** — Site-wide context. Information about the WordPress site that all agents share. Lives in the shared layer.
 
-**USER.md** — Information about the human. Timezone, preferences, communication style, background. Created on activation with a starter template. Injected into every AI request.
+**RULES.md** — Site-wide rules. Behavioral constraints that apply to every agent. Lives in the shared layer.
 
-**MEMORY.md** — Accumulated knowledge. Facts, decisions, lessons learned, project state. Grows and changes over time as the agent learns. Injected into every AI request.
+**SOUL.md** — Agent identity. Who the agent is, how it communicates, what rules it follows. Injected into every AI request. Rarely changes. Lives in the agent layer.
 
-All three are loaded by the **MemoryFileRegistry** and injected as a group via the **CoreMemoryFilesDirective** at Priority 20. They are protected from deletion — clear contents instead of deleting.
+**MEMORY.md** — Accumulated knowledge. Facts, decisions, lessons learned, project state. Grows and changes over time as the agent learns. Exists in both agent and user layers.
 
-**Additional files** serve workflow-specific purposes — editorial strategies, project briefs, content plans. Each pipeline can select which additional files it needs, so a social media workflow doesn't carry the weight of a full content strategy. These are injected at Priority 40 (per-pipeline).
+**USER.md** — Information about the human. Timezone, preferences, communication style, background. Lives in the user layer.
+
+The **CoreMemoryFilesDirective** loads core files directly from the three layer directories (shared → agent → user), then loads any custom files registered via the **MemoryFileRegistry**. Core files are not loaded from the registry — the registry is for extensions only.
+
+**Additional files** serve workflow-specific purposes — editorial strategies, project briefs, content plans. Each pipeline can select which additional files it needs, so a social media workflow doesn't carry the weight of a full content strategy. These are injected at Priority 40 (per-pipeline) or Priority 45 (per-flow).
 
 **Technical details:**
 - Protected by `index.php` silence files (standard WordPress pattern)
 - CRUD via REST API: `GET/PUT/DELETE /datamachine/v1/files/agent/{filename}`
 - Editable through the WordPress admin Agent page
 - No serialization — plain markdown, human-readable, git-friendly
-- All three core files created on activation with starter templates
+- Core files created on activation with starter templates
+- Discover paths via `wp datamachine agent paths --allow-root`
 
-### 2. Chat Sessions — Conversation Memory
+### 2. Daily Memory — Temporal Knowledge
+
+**Location:** `agents/{agent_slug}/daily/YYYY/MM/DD.md`
+
+Daily memory files capture session-specific knowledge organized by date. Two-phase system:
+
+1. **Daily Summary** (Phase 1): At the end of each day, Data Machine gathers completed jobs and chat sessions, synthesizes them via AI, and appends the result to the daily file.
+2. **MEMORY.md Cleanup** (Phase 2): If MEMORY.md exceeds the size threshold (`MAX_FILE_SIZE = 8KB`), AI splits content into persistent facts and session-specific details. Persistent content stays in MEMORY.md; archived content moves to the daily file.
+
+This keeps MEMORY.md lean while preserving the full temporal record in daily files.
+
+**DailyMemoryTask** runs as a system task (`daily_memory_generation`) on a daily cron schedule. Both phases use editable AI prompts via the `getPromptDefinitions()` system.
+
+**Pipeline integration:** The **DailyMemorySelectorDirective** (Priority 46) injects daily memory into pipeline AI requests. Four selection modes:
+
+| Mode | Description |
+|------|-------------|
+| `recent_days` | Last N days (max 90) |
+| `specific_dates` | Explicit date list |
+| `date_range` | From/to date filtering |
+| `months` | All dates in selected months |
+
+Total injection capped at 100KB. Files sorted newest-first.
+
+### 3. Chat Sessions — Conversation Memory
 
 **Storage:** Custom MySQL table `{prefix}_datamachine_chat_sessions`
 
-Full conversation history persisted in the database. Sessions survive page reloads and browser restarts. Configurable retention (default 90 days) with automatic cleanup via Action Scheduler.
+Full conversation history persisted in the database. Sessions survive page reloads and browser restarts. Agent-scoped via `agent_id` column. Configurable retention with automatic cleanup via Action Scheduler.
 
-### 3. Pipeline Context — Workflow Memory
+### 4. Pipeline Context — Workflow Memory
 
 **Location:** `wp-content/uploads/datamachine-files/pipeline-{id}/context/`
 
 Per-pipeline documents that provide background for specific workflows. Job execution data stored as JSON creates an audit trail of what was processed — transient working memory cleaned by retention policies.
 
+## Multi-Agent Architecture
+
+Data Machine supports multiple agents on a single WordPress installation. Each agent has its own identity, memory, and resource scope.
+
+### Agent Registry
+
+Agents are stored in the `datamachine_agents` table with:
+- **Unique slug** — used for directory naming and CLI reference
+- **Owner** — WordPress user who created the agent
+- **Config** — JSON configuration (AI provider preferences, etc.)
+- **Status** — `active` or `inactive`
+
+### Access Control
+
+The `datamachine_agent_access` table implements role-based access:
+
+| Role | Level | Permissions |
+|------|-------|-------------|
+| `viewer` | 0 | Read agent resources |
+| `operator` | 1 | Read + execute workflows |
+| `admin` | 2 | Full control including configuration |
+
+### Resource Scoping
+
+All major resources carry an `agent_id` column:
+- **Pipelines** — each pipeline belongs to an agent
+- **Flows** — each flow belongs to an agent
+- **Jobs** — each job runs under an agent
+- **Chat sessions** — each conversation is agent-scoped
+
+The `PermissionHelper` class provides methods for agent-level access checks:
+- `resolve_scoped_agent_id()` — determines which agent context applies
+- `can_access_agent()` — checks if a user has the required role
+- `owns_agent_resource()` — verifies resource ownership
+
+### Agent Management
+
+```bash
+# List agents
+wp datamachine agents list --allow-root
+
+# Create agent
+wp datamachine agents create --slug=my-agent --name="My Agent" --allow-root
+
+# Rename agent (moves filesystem directory + updates DB)
+wp datamachine agents rename old-slug new-slug --allow-root
+
+# Discover file paths for an agent
+wp datamachine agent paths --agent=my-agent --allow-root
+```
+
 ## Core Memory Files
 
 The difference between useful memory and noise is structure. Each core file has a specific job.
 
-### SOUL.md — Who the Agent Is
+### SITE.md — Site-Wide Context (Shared Layer)
+
+SITE.md contains information about the WordPress installation that all agents share. Site URL, environment details, shared conventions.
+
+### RULES.md — Site-Wide Rules (Shared Layer)
+
+RULES.md holds behavioral constraints that apply to every agent regardless of identity. Security policies, coding standards, deployment rules.
+
+### SOUL.md — Who the Agent Is (Agent Layer)
 
 SOUL.md is **identity, not knowledge.** It should contain things that are true about the agent regardless of what it's working on:
 
@@ -93,7 +188,7 @@ I am the voice of example.com — a music and culture publication.
 
 That's memory, not identity. Put it in MEMORY.md.
 
-### USER.md — Who the Human Is
+### USER.md — Who the Human Is (User Layer)
 
 USER.md holds **information about the human the agent works with.** This is separate from agent identity and agent knowledge because it serves a different purpose — it helps the agent adapt to its user.
 
@@ -117,9 +212,9 @@ Created on activation with a starter template, same as SOUL.md and MEMORY.md.
 <!-- Schedule, availability, things the agent should know about how you work -->
 ```
 
-### MEMORY.md — What the Agent Knows
+### MEMORY.md — What the Agent Knows (Agent + User Layers)
 
-MEMORY.md is the agent's **accumulated knowledge** — facts, decisions, lessons, context that builds up over time. Structure it for scanability:
+MEMORY.md is the agent's **accumulated knowledge** — facts, decisions, lessons, context that builds up over time. It exists in both the agent layer (shared agent knowledge) and user layer (user-specific knowledge). Structure it for scanability:
 
 - **Use clear section headers** — the agent needs to find relevant info quickly
 - **Be factual, not narrative** — bullet points over paragraphs
@@ -158,6 +253,13 @@ wp_execute_ability('datamachine/update-agent-memory', [
     'mode'    => 'append',
 ])
 
+# Search across memory
+wp_execute_ability('datamachine/search-agent-memory', [
+    'query' => 'theme',
+    'user_id' => 1,
+    'agent_id' => 1,
+])
+
 # List all sections
 wp_execute_ability('datamachine/list-agent-memory-sections')
 ```
@@ -175,45 +277,57 @@ Create a new file when a body of knowledge is:
 **Naming conventions:**
 - Lowercase with hyphens: `content-strategy.md`, `seo-guidelines.md`
 - Be descriptive: `content-briefing.md` is better than `notes.md`
-- Core files (SOUL.md, USER.md, MEMORY.md) are uppercase by convention — additional files are lowercase
+- Core files (SOUL.md, USER.md, MEMORY.md, SITE.md, RULES.md) are uppercase by convention — additional files are lowercase
 
 ### File Size Awareness
 
 Agent memory files are injected as system messages. Every token counts against the context window.
 
+- **SITE.md**: Keep under 300 words. Shared site facts.
+- **RULES.md**: Keep under 300 words. Universal behavioral rules.
 - **SOUL.md**: Keep under 500 words. Identity should be concise.
 - **USER.md**: Keep under 300 words. Key facts about the human.
-- **MEMORY.md**: Aim for under 2,000 words. Prune aggressively.
+- **MEMORY.md**: Target under 8KB (`MAX_FILE_SIZE`). The DailyMemoryTask automatically archives excess to daily files.
 - **Additional files**: Keep focused. A 5,000-word strategy doc injected into a simple social media pipeline is wasteful.
 
 If a file grows unwieldy, that's a signal to split it or prune it.
 
 ## How Memory Gets Into AI Prompts
 
-Data Machine uses a **directive system** — a priority-ordered chain that injects context into every AI request. Priorities are spaced by 10 to allow future additions without rebasing.
+Data Machine uses a **directive system** — a priority-ordered chain that injects context into every AI request.
 
-| Priority | Directive | Scope | What It Injects |
-|----------|-----------|-------|-----------------|
-| 10 | Plugin Core | All | Base Data Machine identity |
-| **20** | **Core Memory Files** | **All** | **SOUL.md, USER.md, MEMORY.md (via registry)** |
-| 40 | Pipeline Memory Files | Pipeline | Per-pipeline selected additional files |
-| 50 | Pipeline System Prompt | Pipeline | Workflow instructions |
-| 60 | Pipeline Context Files | Pipeline | Uploaded reference materials |
-| 70 | Tool Definitions | All | Available tools and schemas |
-| 80 | Site Context | All | WordPress metadata |
+| Priority | Directive | Context | What It Injects |
+|----------|-----------|---------|-----------------|
+| 10 | `PipelineCoreDirective` | Pipeline | Base Data Machine identity for pipelines |
+| **15** | **`ChatAgentDirective`** | **Chat** | **Chat agent identity and instructions** |
+| **20** | **`CoreMemoryFilesDirective`** | **All** | **SITE.md, RULES.md, SOUL.md, MEMORY.md, USER.md from layer dirs + custom registry files** |
+| **20** | **`SystemAgentDirective`** | **System** | **System task agent identity** |
+| 40 | `PipelineMemoryFilesDirective` | Pipeline | Per-pipeline selected additional files |
+| **45** | **`ChatPipelinesDirective`** | **Chat** | **Pipeline/flow context for chat** |
+| **45** | **`FlowMemoryFilesDirective`** | **Pipeline** | **Per-flow selected additional files** |
+| **46** | **`DailyMemorySelectorDirective`** | **Pipeline** | **Selected daily memory files based on flow config** |
+| 50 | `PipelineSystemPromptDirective` | Pipeline | Workflow instructions |
+| 80 | `SiteContextDirective` | All | WordPress metadata (filterable/replaceable) |
 
 ### Core Memory Files (Priority 20)
 
-The **CoreMemoryFilesDirective** reads all files registered in the **MemoryFileRegistry** and injects them as system messages. The registry is a pure container — no hardcoded files. Everything registers through the same public API:
+The **CoreMemoryFilesDirective** loads files in two stages:
+
+**Stage 1 — Layer directories:** Loads core files directly from the three-layer directory structure:
+```
+shared/SITE.md → shared/RULES.md → agents/{slug}/SOUL.md → agents/{slug}/MEMORY.md → users/{id}/USER.md → users/{id}/MEMORY.md
+```
+
+**Stage 2 — Custom registry:** Loads any additional files registered in the **MemoryFileRegistry** (excluding SOUL.md, USER.md, MEMORY.md which are already loaded from layers):
 
 ```php
-// Default registrations in bootstrap.php
+// Default registrations in bootstrap.php (used for registry tracking, not loading)
 MemoryFileRegistry::register( 'SOUL.md', 10 );
 MemoryFileRegistry::register( 'USER.md', 20 );
 MemoryFileRegistry::register( 'MEMORY.md', 30 );
 ```
 
-The priority number within the registry determines **load order** (SOUL.md first, then USER.md, then MEMORY.md). Missing files are silently skipped. Empty files are silently skipped.
+The priority number within the registry determines **load order** for custom files. Missing files are silently skipped. Empty files are silently skipped.
 
 Plugins and themes can register their own memory files through the same API:
 
@@ -229,10 +343,18 @@ MemoryFileRegistry::deregister( 'USER.md' );
 
 Each pipeline can select additional agent files beyond the core set. Configure via the "Agent Memory Files" section in the pipeline settings UI. Core files (SOUL.md, USER.md, MEMORY.md) are excluded from the picker since they're always injected at Priority 20.
 
+### Flow Memory Files (Priority 45)
+
+Each flow can independently select additional memory files, allowing flow-level customization beyond pipeline defaults.
+
+### Daily Memory Files (Priority 46)
+
+Flows can configure daily memory injection through the `daily_memory` flow config setting. See the [Daily Memory section](#2-daily-memory--temporal-knowledge) for selection modes.
+
 ```
-"Daily Music News"    -> [content-strategy.md]
+"Daily Music News"    -> [content-strategy.md] + recent 7 days daily memory
 "Social Media Posts"  -> []
-"Album Reviews"       -> [content-strategy.md, content-briefing.md]
+"Album Reviews"       -> [content-strategy.md, content-briefing.md] + specific dates
 ```
 
 Different workflows access different slices of knowledge. This is deliberate — selective memory injection over RAG means you know exactly what context the agent has, with no embedding cost and no hallucination from irrelevant similarity matches.
@@ -254,6 +376,42 @@ AGENTS.md (at site root)
 
 The agent wakes up with identity, user context, and knowledge already loaded. Updates to the files on disk take effect on the next session — no deployment needed.
 
+### Discovering Memory File Paths
+
+The canonical way to find agent memory file paths is via WP-CLI:
+
+```bash
+# Discover all paths for the current agent
+wp datamachine agent paths --allow-root
+
+# For a specific agent
+wp datamachine agent paths --agent=my-agent --allow-root
+
+# Table format for readability
+wp datamachine agent paths --format=table --allow-root
+```
+
+Output structure:
+```json
+{
+    "agent_slug": "chubes-bot",
+    "user_id": 1,
+    "layers": {
+        "shared": "/path/to/datamachine-files/shared",
+        "agent": "/path/to/datamachine-files/agents/chubes-bot",
+        "user": "/path/to/datamachine-files/users/1"
+    },
+    "files": {
+        "SITE.md": { "layer": "shared", "path": "...", "exists": true },
+        "SOUL.md": { "layer": "agent", "path": "...", "exists": true },
+        "MEMORY.md": { "layer": "agent", "path": "...", "exists": true },
+        "USER.md": { "layer": "user", "path": "...", "exists": true }
+    }
+}
+```
+
+This is the recommended discovery method for external consumers (CI scripts, AGENTS.md generators, etc.) rather than hardcoding paths.
+
 ### Reading Memory via REST API
 
 Remote agents can read and write memory files over HTTP:
@@ -268,41 +426,71 @@ curl -X PUT https://example.com/wp-json/datamachine/v1/files/agent/MEMORY.md \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: text/plain" \
   --data-binary @MEMORY.md
+
+# List daily memory files
+curl -s https://example.com/wp-json/datamachine/v1/files/agent/daily \
+  -H "Authorization: Bearer $TOKEN"
+
+# Read a specific daily file
+curl -s https://example.com/wp-json/datamachine/v1/files/agent/daily/2026/03/15 \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 This makes WordPress the single source of truth for agent memory, regardless of where the agent runs.
 
 ### Reading Memory via WP-CLI
 
-Agents with shell access can read files directly:
+Agents with shell access can use workspace commands for structured access:
 
 ```bash
-# Read directly from disk (replace {agent_slug} with actual agent slug)
-cat wp-content/uploads/datamachine-files/agents/{agent_slug}/MEMORY.md
+# Discover file paths (canonical command for external consumers)
+wp datamachine agent paths --allow-root
 
-# List all agent files
-ls wp-content/uploads/datamachine-files/agents/{agent_slug}/
+# Read memory file via workspace
+wp datamachine workspace read MEMORY.md --allow-root
+
+# List agent directory contents
+wp datamachine workspace ls agents/my-agent/ --allow-root
+
+# Read daily memory
+wp datamachine memory daily read --date=2026-03-15 --allow-root
+
+# Search daily memory
+wp datamachine memory daily search --query="deployment" --allow-root
 ```
 
 ### The Key Principle
 
-However the agent consumes memory — directives, AGENTS.md injection, REST API, direct file read — the **files on disk are the source of truth.** All paths lead to the same markdown documents in the agent's directory (`wp-content/uploads/datamachine-files/agents/{agent_slug}/`).
+However the agent consumes memory — directives, AGENTS.md injection, REST API, WP-CLI, direct file read — the **files on disk are the source of truth.** All paths lead to the same markdown documents organized in the three-layer directory structure.
 
 ## Memory Maintenance
 
-Memory degrades if you never maintain it. Agent files need periodic attention.
+Memory degrades if you never maintain it. Agent files need periodic attention — and Data Machine automates much of this.
+
+### Automated Maintenance: DailyMemoryTask
+
+The `DailyMemoryTask` system task handles routine memory maintenance automatically:
+
+1. **Daily summaries** — synthesizes the day's activity into a daily file
+2. **MEMORY.md pruning** — when MEMORY.md exceeds 8KB, AI separates persistent facts from session-specific details, archiving temporal content to daily files
+
+Enable via Settings → System Tasks → Daily Memory, or:
+```bash
+wp datamachine system run daily_memory_generation --allow-root
+```
 
 ### Review Cadence
 
+- **SITE.md / RULES.md**: Review when site infrastructure or policies change.
 - **SOUL.md**: Review quarterly. Identity shouldn't change often, but verify rules and context are still accurate.
 - **USER.md**: Review when circumstances change. New timezone, new preferences, new role.
-- **MEMORY.md**: Review monthly. Remove stale info, consolidate duplicate entries, update facts that have changed.
+- **MEMORY.md**: Automatically maintained by DailyMemoryTask. Manual review monthly for accuracy.
 - **Workflow files**: Review when the workflow changes. A content strategy from six months ago may be actively misleading.
 
 ### Signs Memory Needs Attention
 
 - The agent keeps making the same mistake → missing or incorrect info in memory
-- MEMORY.md exceeds 2,000 words → time to prune or split
+- MEMORY.md exceeds 8KB → DailyMemoryTask should be enabled
 - The agent references outdated facts → stale entries need removal
 - A pipeline behaves inconsistently → check which memory files are attached
 
@@ -312,31 +500,38 @@ Both humans and agents can update memory files:
 
 - **Humans** edit via the WordPress admin Agent page or any text editor with server access
 - **Agents** update via REST API, Abilities API, or direct file write during workflows
+- **DailyMemoryTask** automatically archives session-specific content from MEMORY.md
 - **Pipelines** can include memory-update steps that append learned information
 
-The most effective pattern is **agent writes, human reviews** — the agent appends what it learns, and the human periodically curates for accuracy and relevance.
+The most effective pattern is **agent writes, human reviews** — the agent appends what it learns, DailyMemoryTask keeps it pruned, and the human periodically curates for accuracy and relevance.
 
 ## Memory Lifecycle
 
 ### Creation
 
-- **SOUL.md, USER.md, MEMORY.md**: Created on plugin activation with starter templates. Existing files are never overwritten.
-- **Additional files**: Created via REST API, admin UI, or by the agent itself
-- **Chat sessions**: Created on first message in a conversation
-- **Job data**: Created during pipeline execution
+- **SITE.md, RULES.md**: Created on layered architecture migration. Shared across all agents.
+- **SOUL.md, MEMORY.md**: Created per-agent on agent creation or plugin activation.
+- **USER.md**: Created per-user on plugin activation with starter template.
+- **Daily files**: Created automatically by DailyMemoryTask or daily memory write operations.
+- **Additional files**: Created via REST API, admin UI, or by the agent itself.
+- **Chat sessions**: Created on first message in a conversation.
+- **Job data**: Created during pipeline execution.
 
 ### Updates
 
 - **Agent files**: Updated via REST API, Abilities API, or admin UI. Changes take effect on the next AI request — no restart needed.
-- **Chat sessions**: Grow with each message exchange
-- **Job data**: Accumulated during multi-step execution
+- **Daily files**: Appended by DailyMemoryTask; writable via REST API and Abilities.
+- **Chat sessions**: Grow with each message exchange.
+- **Job data**: Accumulated during multi-step execution.
 
 ### Cleanup
 
 - **Chat sessions**: Retention-based (default 90 days) via Action Scheduler
 - **Orphaned sessions**: Auto-cleaned after 1 hour if empty
 - **Job data**: Cleaned by FileCleanup based on retention policies
-- **Agent files**: Manual only — no auto-cleanup
+- **MEMORY.md**: Automatically pruned by DailyMemoryTask when oversized
+- **Agent files**: Manual only — no auto-cleanup (except MEMORY.md pruning)
+- **Daily files**: Manual only — no auto-cleanup
 
 ## Design Decisions
 
@@ -344,17 +539,26 @@ The most effective pattern is **agent writes, human reviews** — the agent appe
 
 Agent memory is stored as **files on disk**, not in `wp_options` or custom tables. Files are human-readable, git-friendly, have no serialization overhead, and match the mental model of "documents the agent reads."
 
-### Registry over hardcoded directives
+### Three-layer directory architecture
 
-Core memory files register through the same `MemoryFileRegistry` API that plugins and themes use. Nothing is special-cased — SOUL.md, USER.md, and MEMORY.md are just the default registrations. This makes the system extensible without modifying core code.
+The shared/agent/user layer separation serves distinct purposes:
+- **Shared** — site-wide facts all agents need (SITE.md, RULES.md)
+- **Agent** — identity and accumulated knowledge specific to one agent (SOUL.md, MEMORY.md)
+- **User** — human preferences that follow the user across agents (USER.md)
+
+This means a single WordPress site can host multiple agents with distinct identities while sharing common site context.
+
+### Layer directories over registry for core files
+
+Core memory files (SITE.md, RULES.md, SOUL.md, MEMORY.md, USER.md) are loaded directly from their layer directories by `CoreMemoryFilesDirective`. The `MemoryFileRegistry` is used only for custom extensions. This keeps the core loading path simple and predictable while maintaining extensibility for plugins.
 
 ### Selective injection over RAG
 
 Each pipeline explicitly selects which additional memory files it needs. No embeddings, no similarity search. This is deterministic (you know exactly what context the agent has), simple to debug, and appropriate for the scale — agent memory is typically kilobytes, not gigabytes.
 
-### WordPress uploads over custom storage
+### Daily memory for temporal knowledge
 
-Files live in `wp-content/uploads/datamachine-files/agents/{agent_slug}/` (per-agent) or `wp-content/uploads/datamachine-files/agent/` (legacy shared). WordPress backup tools include them automatically, standard permissions apply, and no custom mount configuration is needed.
+Rather than letting MEMORY.md grow indefinitely, the daily memory system provides a natural temporal archive. Current facts stay in MEMORY.md; historical context is preserved in daily files and can be selectively injected when needed.
 
 ## REST API Reference
 
@@ -367,6 +571,15 @@ Files live in `wp-content/uploads/datamachine-files/agents/{agent_slug}/` (per-a
 | `PUT` | `/datamachine/v1/files/agent/{filename}` | Create or update (raw body = content) |
 | `DELETE` | `/datamachine/v1/files/agent/{filename}` | Delete file (blocked for SOUL.md, MEMORY.md) |
 
+### Daily Memory Files
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/datamachine/v1/files/agent/daily` | List daily memory files (grouped by month) |
+| `GET` | `/datamachine/v1/files/agent/daily/{YYYY}/{MM}/{DD}` | Get daily file content |
+| `PUT` | `/datamachine/v1/files/agent/daily/{YYYY}/{MM}/{DD}` | Write daily file |
+| `DELETE` | `/datamachine/v1/files/agent/daily/{YYYY}/{MM}/{DD}` | Delete daily file |
+
 ### Flow Files
 
 | Method | Endpoint | Description |
@@ -375,15 +588,67 @@ Files live in `wp-content/uploads/datamachine-files/agents/{agent_slug}/` (per-a
 | `POST` | `/datamachine/v1/files` | Upload file (multipart form) |
 | `DELETE` | `/datamachine/v1/files/{filename}?flow_step_id={id}` | Delete flow file |
 
-All endpoints require `manage_options` capability.
+All agent file endpoints support a `user_id` parameter for multi-agent scoping. Requires authentication.
 
-### Agent Memory Abilities (WordPress 6.9+)
+### Agent Memory Abilities
 
 | Ability | Description |
 |---------|-------------|
 | `datamachine/get-agent-memory` | Read full file or a specific section |
 | `datamachine/update-agent-memory` | Set or append to a section |
+| `datamachine/search-agent-memory` | Search across memory files (supports `user_id`, `agent_id`) |
 | `datamachine/list-agent-memory-sections` | List all `##` section headers |
+
+### Daily Memory Abilities
+
+| Ability | Description |
+|---------|-------------|
+| `datamachine/daily-memory-read` | Read daily file by date (defaults to today) |
+| `datamachine/daily-memory-write` | Write or append to daily file |
+| `datamachine/daily-memory-list` | List all daily files grouped by month |
+| `datamachine/search-daily-memory` | Search daily files with date range and context |
+| `datamachine/daily-memory-delete` | Delete daily file by date |
+
+All daily memory abilities accept `user_id` and `agent_id` for multi-agent scoping.
+
+## WP-CLI Reference
+
+### Agent Path Discovery
+
+```bash
+# Canonical discovery command — returns all layer paths and file locations
+wp datamachine agent paths --allow-root
+
+# Resolve for a specific agent
+wp datamachine agent paths --agent=my-agent --allow-root
+
+# Table format
+wp datamachine agent paths --format=table --allow-root
+
+# Relative paths (useful for AGENTS.md generators)
+wp datamachine agent paths --relative --allow-root
+```
+
+### Agent Management
+
+```bash
+wp datamachine agents list --allow-root
+wp datamachine agents create --slug=bot --name="My Bot" --allow-root
+wp datamachine agents rename old-slug new-slug --allow-root
+```
+
+### Workspace Commands
+
+```bash
+wp datamachine workspace path --allow-root
+wp datamachine workspace list --allow-root
+wp datamachine workspace read <file> --allow-root
+wp datamachine workspace ls <dir> --allow-root
+wp datamachine workspace write <file> --content="..." --allow-root
+wp datamachine workspace edit <file> --old="..." --new="..." --allow-root
+wp datamachine workspace clone <repo-url> --allow-root
+wp datamachine workspace git status --repo=<name> --allow-root
+```
 
 ## Extending the Memory System
 
@@ -415,7 +680,7 @@ add_filter('datamachine_directives', function($directives) {
 });
 ```
 
-The directive class implements `DirectiveInterface` and returns system messages:
+The directive class implements `DirectiveInterface` and returns system messages with one of three output types:
 
 ```php
 class CustomMemory implements \DataMachine\Engine\AI\Directives\DirectiveInterface {
@@ -427,13 +692,18 @@ class CustomMemory implements \DataMachine\Engine\AI\Directives\DirectiveInterfa
     ): array {
         return [
             [
-                'type'    => 'system_text',
+                'type'    => 'system_text',    // or 'system_json' or 'system_file'
                 'content' => 'Custom memory content here',
             ],
         ];
     }
 }
 ```
+
+**Valid output types:**
+- `system_text` — requires `content` (string)
+- `system_json` — requires `label` (string) and `data` (array)
+- `system_file` — requires `file_path` (string) and `mime_type` (string)
 
 ### Custom Site Context
 
