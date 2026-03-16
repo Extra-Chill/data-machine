@@ -1,0 +1,19 @@
+{
+  "auto_cleanup": false,
+  "changelog_target": "docs/CHANGELOG.md",
+  "extensions": {
+    "wordpress": {}
+  },
+  "id": "",
+  "remote_path": "",
+  "version_targets": [
+    {
+      "file": "data-machine-events.php",
+      "pattern": "Version:\\s*([0-9.]+)"
+    },
+    {
+      "file": "data-machine-events.php",
+      "pattern": "DATAMACHINE_EVENTS_VERSION',\\s*'([0-9.]+)'"
+    }
+  ]
+}
