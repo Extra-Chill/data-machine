@@ -29,8 +29,8 @@ Four layers, each serving a different purpose:
 | Layer | Directory | Contents |
 |-------|-----------|----------|
 | **Shared** (site-wide) | `shared/` | `SITE.md`, `RULES.md` — site-level context shared by all agents |
-| **Agent** (identity) | `agents/{agent_slug}/` | `SOUL.md`, `MEMORY.md`, `daily/` — agent-specific identity and knowledge |
-| **User** (personal) | `users/{user_id}/` | `USER.md`, `MEMORY.md` — user preferences and user-scoped knowledge |
+| **Agent** (identity + knowledge) | `agents/{agent_slug}/` | `SOUL.md`, `MEMORY.md`, `daily/` — agent-specific identity and knowledge |
+| **User** (personal) | `users/{user_id}/` | `USER.md` — user preferences that follow the human across agents |
 
 Markdown files stored on the WordPress filesystem. The agent reads these to know who it is, who it works with, and what it knows.
 
@@ -42,7 +42,7 @@ Data Machine ships with core memory files across layers:
 
 **SOUL.md** — Agent identity. Who the agent is, how it communicates, what rules it follows. Injected into every AI request. Rarely changes. Lives in the agent layer.
 
-**MEMORY.md** — Accumulated knowledge. Facts, decisions, lessons learned, project state. Grows and changes over time as the agent learns. Exists in both agent and user layers.
+**MEMORY.md** — Accumulated knowledge. Facts, decisions, lessons learned, project state. Grows and changes over time as the agent learns. Lives in the agent layer.
 
 **USER.md** — Information about the human. Timezone, preferences, communication style, background. Lives in the user layer.
 
@@ -212,9 +212,9 @@ Created on activation with a starter template, same as SOUL.md and MEMORY.md.
 <!-- Schedule, availability, things the agent should know about how you work -->
 ```
 
-### MEMORY.md — What the Agent Knows (Agent + User Layers)
+### MEMORY.md — What the Agent Knows (Agent Layer)
 
-MEMORY.md is the agent's **accumulated knowledge** — facts, decisions, lessons, context that builds up over time. It exists in both the agent layer (shared agent knowledge) and user layer (user-specific knowledge). Structure it for scanability:
+MEMORY.md is the agent's **accumulated knowledge** — facts, decisions, lessons, context that builds up over time. It lives in the agent layer alongside SOUL.md. Structure it for scanability:
 
 - **Use clear section headers** — the agent needs to find relevant info quickly
 - **Be factual, not narrative** — bullet points over paragraphs
@@ -300,7 +300,7 @@ Data Machine uses a **directive system** — a priority-ordered chain that injec
 |----------|-----------|---------|-----------------|
 | 10 | `PipelineCoreDirective` | Pipeline | Base Data Machine identity for pipelines |
 | **15** | **`ChatAgentDirective`** | **Chat** | **Chat agent identity and instructions** |
-| **20** | **`CoreMemoryFilesDirective`** | **All** | **SITE.md, RULES.md, SOUL.md, MEMORY.md, USER.md from layer dirs + custom registry files** |
+| **20** | **`CoreMemoryFilesDirective`** | **All** | **SITE.md, RULES.md (shared), SOUL.md, MEMORY.md (agent), USER.md (user) + custom registry files** |
 | **20** | **`SystemAgentDirective`** | **System** | **System task agent identity** |
 | 40 | `PipelineMemoryFilesDirective` | Pipeline | Per-pipeline selected additional files |
 | **45** | **`ChatPipelinesDirective`** | **Chat** | **Pipeline/flow context for chat** |
@@ -315,7 +315,7 @@ The **CoreMemoryFilesDirective** loads files in two stages:
 
 **Stage 1 — Layer directories:** Loads core files directly from the three-layer directory structure:
 ```
-shared/SITE.md → shared/RULES.md → agents/{slug}/SOUL.md → agents/{slug}/MEMORY.md → users/{id}/USER.md → users/{id}/MEMORY.md
+shared/SITE.md → shared/RULES.md → agents/{slug}/SOUL.md → agents/{slug}/MEMORY.md → users/{id}/USER.md
 ```
 
 **Stage 2 — Custom registry:** Loads any additional files registered in the **MemoryFileRegistry** (excluding SOUL.md, USER.md, MEMORY.md which are already loaded from layers):
@@ -543,14 +543,14 @@ Agent memory is stored as **files on disk**, not in `wp_options` or custom table
 
 The shared/agent/user layer separation serves distinct purposes:
 - **Shared** — site-wide facts all agents need (SITE.md, RULES.md)
-- **Agent** — identity and accumulated knowledge specific to one agent (SOUL.md, MEMORY.md)
-- **User** — human preferences that follow the user across agents (USER.md)
+- **Agent** — identity and accumulated knowledge specific to one agent (SOUL.md, MEMORY.md, daily/)
+- **User** — human preferences that follow the user across agents (USER.md only)
 
 This means a single WordPress site can host multiple agents with distinct identities while sharing common site context.
 
 ### Layer directories over registry for core files
 
-Core memory files (SITE.md, RULES.md, SOUL.md, MEMORY.md, USER.md) are loaded directly from their layer directories by `CoreMemoryFilesDirective`. The `MemoryFileRegistry` is used only for custom extensions. This keeps the core loading path simple and predictable while maintaining extensibility for plugins.
+Core memory files are loaded directly from their layer directories by `CoreMemoryFilesDirective`: SITE.md and RULES.md from shared, SOUL.md and MEMORY.md from agent, USER.md from user. The `MemoryFileRegistry` is used only for custom extensions. This keeps the core loading path simple, predictable, and each file in exactly one layer.
 
 ### Selective injection over RAG
 
