@@ -23,7 +23,7 @@ class GitHubTools extends BaseTool {
 	 * Constructor — register all GitHub tools as global tools.
 	 */
 	public function __construct() {
-		$contexts = array( 'chat', 'pipeline', 'standalone' );
+		$contexts = array( 'chat', 'pipeline' );
 		$this->registerTool( 'list_github_issues', array( $this, 'getListIssuesDefinition' ), $contexts );
 		$this->registerTool( 'get_github_issue', array( $this, 'getGetIssueDefinition' ), $contexts );
 		$this->registerTool( 'manage_github_issue', array( $this, 'getManageIssueDefinition' ), $contexts );

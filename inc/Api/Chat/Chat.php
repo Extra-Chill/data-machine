@@ -205,10 +205,10 @@ class Chat {
 					'context'    => array(
 						'type'              => 'string',
 						'required'          => false,
-						'description'       => __( 'Context filter (chat, pipeline, system, standalone)', 'data-machine' ),
+						'description'       => __( 'Context filter (chat, pipeline, system)', 'data-machine' ),
 						'sanitize_callback' => 'sanitize_text_field',
 						'validate_callback' => function ( $param ) {
-							return in_array( $param, array( 'chat', 'pipeline', 'system', 'standalone' ), true );
+							return in_array( $param, array( 'chat', 'pipeline', 'system' ), true );
 						},
 					),
 					'agent_id'   => array(

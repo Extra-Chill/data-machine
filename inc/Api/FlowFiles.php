@@ -221,9 +221,9 @@ class FlowFiles {
 	 * Get file context array from flow ID.
 	 *
 	 * Supports database flows (numeric ID), direct execution ('direct'),
-	 * and standalone jobs (null flow_id).
+	 * and jobs without flow context (null flow_id).
 	 *
-	 * @param int|string|null $flow_id Flow ID, 'direct', or null for standalone.
+	 * @param int|string|null $flow_id Flow ID, 'direct', or null.
 	 * @return array Context array with pipeline_id and flow_id.
 	 */
 	public static function get_file_context( int|string|null $flow_id ): array {

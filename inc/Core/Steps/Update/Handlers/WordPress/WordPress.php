@@ -11,6 +11,7 @@ namespace DataMachine\Core\Steps\Update\Handlers\WordPress;
 
 use DataMachine\Core\Steps\Update\Handlers\UpdateHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
+use DataMachine\Core\Steps\Update\Handlers\WordPress\WordPressSettings;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -28,7 +29,7 @@ class WordPress extends UpdateHandler {
 			'Update existing WordPress posts and pages',
 			false,
 			null,
-			null,
+			WordPressSettings::class,
 			array( self::class, 'registerTools' )
 		);
 	}

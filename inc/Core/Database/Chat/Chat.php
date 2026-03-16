@@ -50,7 +50,7 @@ class Chat extends BaseRepository {
             metadata LONGTEXT NULL COMMENT 'JSON object for session metadata',
             provider VARCHAR(50) NULL COMMENT 'AI provider (anthropic, openai, etc)',
             model VARCHAR(100) NULL COMMENT 'AI model identifier',
-	            context VARCHAR(20) NOT NULL DEFAULT 'chat' COMMENT 'Execution context: chat, pipeline, system, standalone',
+	            context VARCHAR(20) NOT NULL DEFAULT 'chat' COMMENT 'Execution context: chat, pipeline, system',
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             expires_at DATETIME NULL COMMENT 'Auto-cleanup timestamp',
@@ -190,7 +190,7 @@ class Chat extends BaseRepository {
 	 *
 	 * @param int    $user_id  WordPress user ID
 	 * @param array  $metadata Optional session metadata
-	 * @param string $context  Execution context (chat, pipeline, system, standalone)
+	 * @param string $context  Execution context (chat, pipeline, system)
 	 * @return string Session ID (UUID)
 	 */
 	public function create_session(

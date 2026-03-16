@@ -20,7 +20,7 @@ use DataMachine\Core\FilesRepository\DirectoryManager;
 class AgentMemory extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'agent_memory', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline', 'standalone' ) );
+		$this->registerTool( 'agent_memory', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ) );
 	}
 
 	/**

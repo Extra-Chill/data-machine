@@ -447,7 +447,7 @@ class ToolManager {
 	/**
 	 * Get tools for REST API response.
 	 *
-	 * @param string|null $context Optional context to filter tools ('pipeline', 'chat', 'standalone', 'system').
+	 * @param string|null $context Optional context to filter tools ('pipeline', 'chat', 'system').
 	 *                            When null, returns all tools.
 	 * @return array Tools formatted for API
 	 */

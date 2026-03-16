@@ -33,7 +33,7 @@ function datamachine_normalize_engine_config( $config ): array {
 /**
  * Get file context array from flow ID.
  *
- * @param int|string|null $flow_id Flow ID, 'direct', or null for standalone.
+ * @param int|string|null $flow_id Flow ID, 'direct', or null.
  * @return array Context array with pipeline/flow metadata.
  */
 function datamachine_get_file_context( int|string|null $flow_id ): array {

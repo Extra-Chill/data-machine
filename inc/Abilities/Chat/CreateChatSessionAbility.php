@@ -52,7 +52,7 @@ class CreateChatSessionAbility {
 							'context'    => array(
 								'type'        => 'string',
 								'default'     => 'chat',
-								'description' => __( 'Execution context (chat, pipeline, system, standalone).', 'data-machine' ),
+								'description' => __( 'Execution context (chat, pipeline, system).', 'data-machine' ),
 							),
 							'source'     => array(
 								'type'        => 'string',

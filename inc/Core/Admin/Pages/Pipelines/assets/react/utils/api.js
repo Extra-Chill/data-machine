@@ -533,7 +533,7 @@ export const getProviders = async () => {
 /**
  * Get available tools
  *
- * @param {string|null} context - Optional context filter ('pipeline', 'chat', 'standalone', 'system')
+ * @param {string|null} context - Optional context filter ('pipeline', 'chat', 'system')
  * @return {Promise<Object>} Tools configuration
  */
 export const getTools = async ( context = null ) => {

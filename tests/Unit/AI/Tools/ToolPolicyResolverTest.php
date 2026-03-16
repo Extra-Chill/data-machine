@@ -29,27 +29,6 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	// ============================================
-	// STANDALONE CONTEXT
-	// ============================================
-
-	public function test_standalone_returns_global_tools(): void {
-		$tools = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_STANDALONE,
-		) );
-
-		$this->assertIsArray( $tools );
-		$this->assertArrayHasKey( 'web_fetch', $tools );
-	}
-
-	public function test_standalone_excludes_chat_tools(): void {
-		$tools = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_STANDALONE,
-		) );
-
-		$this->assertArrayNotHasKey( 'update_flow', $tools );
-	}
-
-	// ============================================
 	// CHAT CONTEXT
 	// ============================================
 
@@ -174,7 +153,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 	public function test_deny_list_removes_tools(): void {
 		$tools = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_STANDALONE,
+			'context' => ToolPolicyResolver::CONTEXT_CHAT,
 			'deny'    => array( 'web_fetch' ),
 		) );
 
@@ -183,7 +162,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 	public function test_deny_list_overrides_allowlist(): void {
 		$tools = $this->resolver->resolve( array(
-			'context'    => ToolPolicyResolver::CONTEXT_STANDALONE,
+			'context'    => ToolPolicyResolver::CONTEXT_CHAT,
 			'allow_only' => array( 'web_fetch' ),
 			'deny'       => array( 'web_fetch' ),
 		) );
@@ -197,7 +176,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 	public function test_allowlist_narrows_tools(): void {
 		$tools = $this->resolver->resolve( array(
-			'context'    => ToolPolicyResolver::CONTEXT_STANDALONE,
+			'context'    => ToolPolicyResolver::CONTEXT_CHAT,
 			'allow_only' => array( 'web_fetch' ),
 		) );
 
@@ -207,7 +186,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 	public function test_allowlist_with_nonexistent_tool_returns_empty(): void {
 		$tools = $this->resolver->resolve( array(
-			'context'    => ToolPolicyResolver::CONTEXT_STANDALONE,
+			'context'    => ToolPolicyResolver::CONTEXT_CHAT,
 			'allow_only' => array( 'completely_fake_tool_xyz' ),
 		) );
 
@@ -231,7 +210,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		}, 10, 3 );
 
 		$tools = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_STANDALONE,
+			'context' => ToolPolicyResolver::CONTEXT_CHAT,
 		) );
 
 		$this->assertArrayHasKey( 'injected_tool', $tools );
@@ -270,23 +249,56 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'web_fetch', $tools );
 	}
 
-	public function test_unknown_context_falls_back_to_standalone(): void {
+	public function test_unknown_context_returns_empty_tools(): void {
+		// Unknown contexts resolve via the generic gatherer — no tools
+		// are registered for this context, so the result is empty.
+		// This is correct: custom contexts only get tools that explicitly
+		// declare them, making the system extensible.
 		$tools = $this->resolver->resolve( array(
 			'context' => 'unknown_context_type',
 		) );
 
 		$this->assertIsArray( $tools );
-		$this->assertArrayHasKey( 'web_fetch', $tools );
+		$this->assertEmpty( $tools );
 	}
 
-	public function test_getContexts_returns_all_four_presets(): void {
+	public function test_custom_context_resolves_registered_tools(): void {
+		// Third parties can register tools with custom contexts and
+		// resolve them through the same path as built-in contexts.
+		add_filter( 'datamachine_tools', function ( $tools ) {
+			$tools['custom_automation_tool'] = array(
+				'label'       => 'Custom Automation Tool',
+				'description' => 'Only available in the automation context.',
+				'class'       => 'NonExistentClass',
+				'method'      => 'handle_tool_call',
+				'parameters'  => array(),
+				'contexts'    => array( 'automation' ),
+			);
+			return $tools;
+		} );
+
+		ToolManager::clearCache();
+
+		$tools = $this->resolver->resolve( array(
+			'context' => 'automation',
+		) );
+
+		$this->assertArrayHasKey( 'custom_automation_tool', $tools );
+
+		// Built-in tools that don't declare 'automation' are excluded.
+		$this->assertArrayNotHasKey( 'web_fetch', $tools );
+
+		remove_all_filters( 'datamachine_tools' );
+		ToolManager::clearCache();
+	}
+
+	public function test_getContexts_returns_all_three_presets(): void {
 		$contexts = ToolPolicyResolver::getContexts();
 
 		$this->assertArrayHasKey( ToolPolicyResolver::CONTEXT_PIPELINE, $contexts );
 		$this->assertArrayHasKey( ToolPolicyResolver::CONTEXT_CHAT, $contexts );
-		$this->assertArrayHasKey( ToolPolicyResolver::CONTEXT_STANDALONE, $contexts );
 		$this->assertArrayHasKey( ToolPolicyResolver::CONTEXT_SYSTEM, $contexts );
-		$this->assertCount( 4, $contexts );
+		$this->assertCount( 3, $contexts );
 	}
 
 	// ============================================
@@ -307,7 +319,6 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	public function test_surface_constants_alias_context_constants(): void {
 		$this->assertSame( ToolPolicyResolver::CONTEXT_PIPELINE, ToolPolicyResolver::SURFACE_PIPELINE );
 		$this->assertSame( ToolPolicyResolver::CONTEXT_CHAT, ToolPolicyResolver::SURFACE_CHAT );
-		$this->assertSame( ToolPolicyResolver::CONTEXT_STANDALONE, ToolPolicyResolver::SURFACE_STANDALONE );
 		$this->assertSame( ToolPolicyResolver::CONTEXT_SYSTEM, ToolPolicyResolver::SURFACE_SYSTEM );
 	}
 
@@ -362,11 +373,11 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 	public function test_no_agent_id_means_no_restrictions(): void {
 		$tools_without = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_STANDALONE,
+			'context' => ToolPolicyResolver::CONTEXT_CHAT,
 		) );
 
 		$tools_with_zero = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_STANDALONE,
+			'context'  => ToolPolicyResolver::CONTEXT_CHAT,
 			'agent_id' => 0,
 		) );
 
@@ -377,11 +388,11 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		$agent_id = $this->createAgentWithPolicy( null );
 
 		$tools_no_agent = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_STANDALONE,
+			'context' => ToolPolicyResolver::CONTEXT_CHAT,
 		) );
 
 		$tools_with_agent = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_STANDALONE,
+			'context'  => ToolPolicyResolver::CONTEXT_CHAT,
 			'agent_id' => $agent_id,
 		) );
 
@@ -395,7 +406,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		) );
 
 		$tools = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_STANDALONE,
+			'context'  => ToolPolicyResolver::CONTEXT_CHAT,
 			'agent_id' => $agent_id,
 		) );
 
@@ -411,7 +422,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		) );
 
 		$tools = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_STANDALONE,
+			'context'  => ToolPolicyResolver::CONTEXT_CHAT,
 			'agent_id' => $agent_id,
 		) );
 
@@ -426,7 +437,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		) );
 
 		$tools = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_STANDALONE,
+			'context'  => ToolPolicyResolver::CONTEXT_CHAT,
 			'agent_id' => $agent_id,
 		) );
 
@@ -440,11 +451,11 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		) );
 
 		$tools_no_agent = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_STANDALONE,
+			'context' => ToolPolicyResolver::CONTEXT_CHAT,
 		) );
 
 		$tools_with_agent = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_STANDALONE,
+			'context'  => ToolPolicyResolver::CONTEXT_CHAT,
 			'agent_id' => $agent_id,
 		) );
 
@@ -453,11 +464,11 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 	public function test_nonexistent_agent_id_no_restrictions(): void {
 		$tools_no_agent = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_STANDALONE,
+			'context' => ToolPolicyResolver::CONTEXT_CHAT,
 		) );
 
 		$tools_bad_id = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_STANDALONE,
+			'context'  => ToolPolicyResolver::CONTEXT_CHAT,
 			'agent_id' => 999999,
 		) );
 
@@ -472,7 +483,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		) );
 
 		$tools = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_STANDALONE,
+			'context'  => ToolPolicyResolver::CONTEXT_CHAT,
 			'agent_id' => $agent_id,
 			'deny'     => array( 'web_fetch' ),
 		) );
@@ -517,11 +528,11 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		) );
 
 		$tools_no_agent = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_STANDALONE,
+			'context' => ToolPolicyResolver::CONTEXT_CHAT,
 		) );
 
 		$tools_with_agent = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_STANDALONE,
+			'context'  => ToolPolicyResolver::CONTEXT_CHAT,
 			'agent_id' => $agent_id,
 		) );
 
@@ -535,11 +546,11 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		) );
 
 		$tools_no_agent = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_STANDALONE,
+			'context' => ToolPolicyResolver::CONTEXT_CHAT,
 		) );
 
 		$tools_with_agent = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_STANDALONE,
+			'context'  => ToolPolicyResolver::CONTEXT_CHAT,
 			'agent_id' => $agent_id,
 		) );
 

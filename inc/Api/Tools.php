@@ -47,7 +47,7 @@ class Tools {
 				'args'                => array(
 					'context' => array(
 						'type'        => 'string',
-						'enum'        => array( 'pipeline', 'chat', 'standalone', 'system' ),
+						'enum'        => array( 'pipeline', 'chat', 'system' ),
 						'required'    => false,
 						'description' => 'Filter tools by execution context. Returns only tools available in the specified context.',
 					),

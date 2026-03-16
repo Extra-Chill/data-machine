@@ -250,7 +250,7 @@ class ImageGenerationTask extends SystemTask {
 		$pipeline_job_id = $context['pipeline_job_id'] ?? 0;
 		$direct_post_id  = $context['post_id'] ?? 0;
 
-		// Direct post_id takes priority (standalone/direct ability calls)
+		// Direct post_id takes priority (direct ability calls)
 		if ( ! empty( $direct_post_id ) ) {
 			$post_id = (int) $direct_post_id;
 		} elseif ( ! empty( $pipeline_job_id ) ) {

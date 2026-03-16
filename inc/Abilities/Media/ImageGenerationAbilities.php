@@ -98,7 +98,7 @@ class ImageGenerationAbilities {
 							),
 							'post_id'         => array(
 								'type'        => 'integer',
-								'description' => 'Post ID to set the generated image as featured image (for standalone/direct calls).',
+								'description' => 'Post ID to set the generated image as featured image (for direct calls).',
 							),
 
 							'mode'            => array(

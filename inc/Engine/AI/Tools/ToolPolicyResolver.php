@@ -4,14 +4,14 @@
  *
  * Single entry point for determining which tools are available for any
  * execution context. Reads from the unified `datamachine_tools` registry
- * and filters by context (pipeline/chat/standalone/system), then applies
+ * and filters by context (pipeline/chat/system), then applies
  * per-agent tool policies from agent_config.
  *
  * Resolution precedence (highest to lowest):
  * 1. Explicit deny list (always wins)
  * 2. Per-agent tool policy (deny/allow mode from agent_config)
  * 3. Context-level allow_only (narrows to explicit subset)
- * 4. Context preset (pipeline/chat/standalone/system)
+ * 4. Context preset (pipeline/chat/system)
  * 5. Global enablement settings
  * 6. Tool configuration requirements
  *
@@ -30,18 +30,16 @@ class ToolPolicyResolver {
 	/**
 	 * Context presets define which tool pools are available.
 	 */
-	public const CONTEXT_PIPELINE   = 'pipeline';
-	public const CONTEXT_CHAT       = 'chat';
-	public const CONTEXT_STANDALONE = 'standalone';
-	public const CONTEXT_SYSTEM     = 'system';
+	public const CONTEXT_PIPELINE = 'pipeline';
+	public const CONTEXT_CHAT     = 'chat';
+	public const CONTEXT_SYSTEM   = 'system';
 
 	/**
 	 * @deprecated Use CONTEXT_* constants instead.
 	 */
-	public const SURFACE_PIPELINE   = self::CONTEXT_PIPELINE;
-	public const SURFACE_CHAT       = self::CONTEXT_CHAT;
-	public const SURFACE_STANDALONE = self::CONTEXT_STANDALONE;
-	public const SURFACE_SYSTEM     = self::CONTEXT_SYSTEM;
+	public const SURFACE_PIPELINE = self::CONTEXT_PIPELINE;
+	public const SURFACE_CHAT     = self::CONTEXT_CHAT;
+	public const SURFACE_SYSTEM   = self::CONTEXT_SYSTEM;
 
 	private ToolManager $tool_manager;
 
@@ -110,13 +108,14 @@ class ToolPolicyResolver {
 	 * @return array Tools array.
 	 */
 	private function gatherByContext( string $context_type, array $context ): array {
-		return match ( $context_type ) {
-			self::CONTEXT_PIPELINE   => $this->gatherPipelineTools( $context ),
-			self::CONTEXT_CHAT       => $this->gatherChatTools( $context ),
-			self::CONTEXT_STANDALONE => $this->gatherStandaloneTools( $context ),
-			self::CONTEXT_SYSTEM     => $this->gatherSystemTools( $context ),
-			default                  => $this->gatherFallbackTools( $context ),
-		};
+		// Pipeline has special handling for adjacent step handler tools.
+		if ( self::CONTEXT_PIPELINE === $context_type ) {
+			return $this->gatherPipelineTools( $context );
+		}
+
+		// All other contexts (chat, system, and any custom contexts) use
+		// the generic gatherer — filter tools by their declared contexts.
+		return $this->gatherToolsForContext( $context_type );
 	}
 
 	/**
@@ -185,32 +184,34 @@ class ToolPolicyResolver {
 	}
 
 	/**
-	 * Chat context: all tools with 'chat' context.
+	 * Gather tools for any context string.
 	 *
-	 * Tools with configuration requirements go through is_tool_available().
-	 * Chat-only tools (those without requires_config) are included if they
-	 * resolve to a valid definition.
+	 * Filters the tool registry by declared contexts, then applies availability
+	 * and enablement checks. Works with built-in contexts (chat, system) and
+	 * any custom context — third parties can register tools with custom context
+	 * strings and resolve them through the same path.
+	 *
+	 * @param string $context_type Context string to filter by (e.g. 'chat', 'system', 'automation').
+	 * @return array Available tools for this context.
 	 */
-	private function gatherChatTools( array $context ): array {
+	private function gatherToolsForContext( string $context_type ): array {
 		$available_tools = array();
 
-		$all_tools  = $this->tool_manager->get_all_tools();
-		$chat_tools = $this->filterByContext( $all_tools, 'chat' );
+		$all_tools      = $this->tool_manager->get_all_tools();
+		$context_tools  = $this->filterByContext( $all_tools, $context_type );
 
-		foreach ( $chat_tools as $tool_name => $tool_config ) {
+		foreach ( $context_tools as $tool_name => $tool_config ) {
 			if ( ! is_array( $tool_config ) || empty( $tool_config ) ) {
 				continue;
 			}
 
 			// Tools with requires_config go through availability checks.
-			// Tools without it (chat-only management tools) are always available.
+			// Tools without it are always available unless globally disabled.
 			if ( ! empty( $tool_config['requires_config'] ) ) {
 				if ( ! $this->tool_manager->is_tool_available( $tool_name, null ) ) {
 					continue;
 				}
 			} elseif ( ! $this->tool_manager->is_globally_enabled( $tool_name ) ) {
-				// Check global enablement for tools that can be disabled.
-				// For tools not in the disabled list, is_globally_enabled returns true.
 				continue;
 			}
 
@@ -218,55 +219,6 @@ class ToolPolicyResolver {
 		}
 
 		return $available_tools;
-	}
-
-	/**
-	 * Standalone context: tools with 'standalone' context.
-	 *
-	 * For standalone jobs that need AI tool access without pipeline context.
-	 */
-	private function gatherStandaloneTools( array $context ): array {
-		$available_tools = array();
-
-		$all_tools        = $this->tool_manager->get_all_tools();
-		$standalone_tools = $this->filterByContext( $all_tools, 'standalone' );
-
-		foreach ( $standalone_tools as $tool_name => $tool_config ) {
-			if ( is_array( $tool_config ) && $this->tool_manager->is_tool_available( $tool_name, null ) ) {
-				$available_tools[ $tool_name ] = $tool_config;
-			}
-		}
-
-		return $available_tools;
-	}
-
-	/**
-	 * System context: tools with 'system' context.
-	 *
-	 * Only includes tools that system tasks explicitly need.
-	 * Today most system tasks call abilities directly, but this provides
-	 * the hook point for when system tasks need AI tool access.
-	 */
-	private function gatherSystemTools( array $context ): array {
-		$available_tools = array();
-
-		$all_tools    = $this->tool_manager->get_all_tools();
-		$system_tools = $this->filterByContext( $all_tools, 'system' );
-
-		foreach ( $system_tools as $tool_name => $tool_config ) {
-			if ( is_array( $tool_config ) && $this->tool_manager->is_tool_available( $tool_name, null ) ) {
-				$available_tools[ $tool_name ] = $tool_config;
-			}
-		}
-
-		return $available_tools;
-	}
-
-	/**
-	 * Fallback: standalone tools for unknown contexts.
-	 */
-	private function gatherFallbackTools( array $context ): array {
-		return $this->gatherStandaloneTools( $context );
 	}
 
 	/**
@@ -352,10 +304,9 @@ class ToolPolicyResolver {
 	 */
 	public static function getContexts(): array {
 		return array(
-			self::CONTEXT_PIPELINE   => 'Pipeline execution with handler tools from adjacent steps',
-			self::CONTEXT_CHAT       => 'Chat interaction with full management tools',
-			self::CONTEXT_STANDALONE => 'Standalone job execution with global tools only',
-			self::CONTEXT_SYSTEM     => 'System task execution with minimal toolset',
+			self::CONTEXT_PIPELINE => 'Pipeline execution with handler tools from adjacent steps',
+			self::CONTEXT_CHAT     => 'Chat interaction with full management tools',
+			self::CONTEXT_SYSTEM   => 'System task execution with minimal toolset',
 		);
 	}
 

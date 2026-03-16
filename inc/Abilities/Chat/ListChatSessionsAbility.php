@@ -60,7 +60,7 @@ class ListChatSessionsAbility {
 							),
 							'context'    => array(
 								'type'        => 'string',
-								'description' => __( 'Context filter (chat, pipeline, system, standalone).', 'data-machine' ),
+								'description' => __( 'Context filter (chat, pipeline, system).', 'data-machine' ),
 							),
 						),
 						'required'   => array( 'user_id' ),

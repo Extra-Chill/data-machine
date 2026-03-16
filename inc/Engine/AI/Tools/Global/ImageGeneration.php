@@ -26,7 +26,7 @@ class ImageGeneration extends BaseTool {
 
 	public function __construct() {
 		$this->registerConfigurationHandlers( 'image_generation' );
-		$this->registerTool( 'image_generation', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline', 'standalone' ) );
+		$this->registerTool( 'image_generation', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ) );
 	}
 
 	/**

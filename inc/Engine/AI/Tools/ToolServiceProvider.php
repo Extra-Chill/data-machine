@@ -4,7 +4,7 @@
  *
  * Centralizes registration of all tools via the unified `datamachine_tools` filter.
  * Each tool declares a `contexts` array specifying where it's available
- * (e.g. 'chat', 'pipeline', 'standalone').
+ * (e.g. 'chat', 'pipeline').
  *
  * @package DataMachine\Engine\AI\Tools
  * @since   0.27.0
@@ -14,7 +14,7 @@ namespace DataMachine\Engine\AI\Tools;
 
 defined( 'ABSPATH' ) || exit;
 
-// Tools available in chat, pipeline, and standalone contexts.
+// Tools available in chat and pipeline contexts.
 use DataMachine\Engine\AI\Tools\Global\AgentDailyMemory;
 use DataMachine\Engine\AI\Tools\Global\AgentMemory;
 use DataMachine\Engine\AI\Tools\Global\AmazonAffiliateLink;
@@ -71,7 +71,7 @@ class ToolServiceProvider {
 	/**
 	 * Register all tools.
 	 *
-	 * Tools with contexts ['chat', 'pipeline', 'standalone'] are registered
+	 * Tools with contexts ['chat', 'pipeline'] are registered
 	 * first because chat-only tools may depend on handlers and step types
 	 * that they provide.
 	 */
@@ -83,7 +83,7 @@ class ToolServiceProvider {
 	 * Register all tools with their context declarations.
 	 */
 	private static function registerTools(): void {
-		// Tools available in chat, pipeline, and standalone contexts.
+		// Tools available in chat and pipeline contexts.
 		new AgentDailyMemory();
 		new AgentMemory();
 		new AmazonAffiliateLink();

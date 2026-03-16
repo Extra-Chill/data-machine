@@ -27,7 +27,7 @@ class ChatCommand extends BaseCommand {
 	 * : User ID to list sessions for. Defaults to current user.
 	 *
 	 * [--context=<type>]
-	 * : Filter by execution context (chat, pipeline, system, standalone).
+	 * : Filter by execution context (chat, pipeline, system).
 	 *
 	 * [--limit=<n>]
 	 * : Maximum number of sessions to return.
@@ -210,7 +210,7 @@ class ChatCommand extends BaseCommand {
 	 * : First-class agent ID for this session.
 	 *
 	 * [--context=<type>]
-	 * : Execution context (chat, pipeline, system, standalone).
+	 * : Execution context (chat, pipeline, system).
 	 * ---
 	 * default: chat
 	 * ---
