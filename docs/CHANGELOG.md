@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.43.2] - 2026-03-16
+
+### Fixed
+- resolve undefined $agent_id and $job_snapshot in AIStep::executeStep()
+
 ## [0.43.1] - 2026-03-16
 
 ### Fixed
