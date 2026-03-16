@@ -20,9 +20,12 @@ import { useAgentFiles } from '../../queries/pipelines';
 import DailyMemorySelector from './DailyMemorySelector';
 
 /**
- * Files to exclude from the memory files picker (always injected separately).
+ * Core registered files are always injected at Priority 20 by
+ * CoreMemoryFilesDirective. The picker only shows additional files
+ * that pipelines/flows can opt into. We filter using the `registered`
+ * flag from the API response — registered files with `protected: true`
+ * are always-injected core files and should be excluded from the picker.
  */
-const EXCLUDED_FILES = [ 'SOUL.md', 'USER.md', 'MEMORY.md' ];
 
 /**
  * Default daily memory config.
@@ -67,11 +70,13 @@ export default function MemoryFilesSelector( {
 
 	const loading = loadingAgent || loadingSelected;
 
-	// Filter out core files, non-text files, and daily_summary type.
+	// Filter out always-injected core files, non-text files, and daily_summary type.
+	// Core files (registered + protected) are always injected at Priority 20.
 	const availableFiles = agentFiles
 		.filter( ( f ) => f.type !== 'daily_summary' )
+		.filter( ( f ) => ! ( f.registered && f.protected ) )
 		.map( ( f ) => ( typeof f === 'string' ? f : f.name || f.filename ) )
-		.filter( ( name ) => name && ! EXCLUDED_FILES.includes( name ) );
+		.filter( Boolean );
 
 	const handleToggle = ( filename, checked ) => {
 		setLocalSelected( ( prev ) =>

@@ -46,7 +46,7 @@ Data Machine ships with core memory files across layers:
 
 **USER.md** — Information about the human. Timezone, preferences, communication style, background. Lives in the user layer.
 
-The **CoreMemoryFilesDirective** loads core files directly from the three layer directories (shared → agent → user), then loads any custom files registered via the **MemoryFileRegistry**. Core files are not loaded from the registry — the registry is for extensions only.
+The **CoreMemoryFilesDirective** loads all files from the **MemoryFileRegistry**, resolving each to its layer directory. Core and custom files use the same registration API — the `datamachine_memory_files` action hook provides the extension point for third parties.
 
 **Additional files** serve workflow-specific purposes — editorial strategies, project briefs, content plans. Each pipeline can select which additional files it needs, so a social media workflow doesn't carry the weight of a full content strategy. These are injected at Priority 40 (per-pipeline) or Priority 45 (per-flow).
 
@@ -311,23 +311,24 @@ Data Machine uses a **directive system** — a priority-ordered chain that injec
 
 ### Core Memory Files (Priority 20)
 
-The **CoreMemoryFilesDirective** loads files in two stages:
+The **CoreMemoryFilesDirective** loads all files from the **MemoryFileRegistry**, resolving each to its layer directory:
 
-**Stage 1 — Layer directories:** Loads core files directly from the three-layer directory structure:
 ```
-shared/SITE.md → shared/RULES.md → agents/{slug}/SOUL.md → agents/{slug}/MEMORY.md → users/{id}/USER.md
+Registry priority order → resolve layer → read file → inject as system message
 ```
 
-**Stage 2 — Custom registry:** Loads any additional files registered in the **MemoryFileRegistry** (excluding SOUL.md, USER.md, MEMORY.md which are already loaded from layers):
+All core files register through the same API that plugins use:
 
 ```php
-// Default registrations in bootstrap.php (used for registry tracking, not loading)
-MemoryFileRegistry::register( 'SOUL.md', 10 );
-MemoryFileRegistry::register( 'USER.md', 20 );
-MemoryFileRegistry::register( 'MEMORY.md', 30 );
+// From bootstrap.php — these are just the defaults.
+MemoryFileRegistry::register( 'SITE.md',   10, [ 'layer' => 'shared', 'protected' => true ] );
+MemoryFileRegistry::register( 'RULES.md',  15, [ 'layer' => 'shared', 'protected' => true ] );
+MemoryFileRegistry::register( 'SOUL.md',   20, [ 'layer' => 'agent',  'protected' => true ] );
+MemoryFileRegistry::register( 'USER.md',   25, [ 'layer' => 'user',   'protected' => true ] );
+MemoryFileRegistry::register( 'MEMORY.md', 30, [ 'layer' => 'agent',  'protected' => true ] );
 ```
 
-The priority number within the registry determines **load order** for custom files. Missing files are silently skipped. Empty files are silently skipped.
+The priority number determines **load order**. Missing files are silently skipped. Empty files are silently skipped. Third parties register additional files through the same `register()` API or the `datamachine_memory_files` action hook.
 
 Plugins and themes can register their own memory files through the same API:
 
@@ -548,9 +549,9 @@ The shared/agent/user layer separation serves distinct purposes:
 
 This means a single WordPress site can host multiple agents with distinct identities while sharing common site context.
 
-### Layer directories over registry for core files
+### Registry-driven loading with layer resolution
 
-Core memory files are loaded directly from their layer directories by `CoreMemoryFilesDirective`: SITE.md and RULES.md from shared, SOUL.md and MEMORY.md from agent, USER.md from user. The `MemoryFileRegistry` is used only for custom extensions. This keeps the core loading path simple, predictable, and each file in exactly one layer.
+All memory files — core and custom — register through the same `MemoryFileRegistry` API. Each registration specifies its layer (`shared`, `agent`, `user`), and the `CoreMemoryFilesDirective` resolves each file to the correct directory at runtime. This makes the system fully extensible: plugins register files in any layer through the same API that core uses. No special-casing, no hardcoded file lists.
 
 ### Selective injection over RAG
 
@@ -654,16 +655,65 @@ wp datamachine workspace git status --repo=<name> --allow-root
 
 ### Register Custom Memory Files
 
-Add files to the core injection (Priority 20) via the registry:
+Add files to the core injection (Priority 20) via the registry. Each file specifies its **layer**, which determines where it lives and who can see it:
 
 ```php
 use DataMachine\Engine\AI\MemoryFileRegistry;
 
-// Register a file to be injected into all AI calls
-MemoryFileRegistry::register( 'brand-guidelines.md', 40 );
+// Agent-layer file — scoped to a single agent.
+MemoryFileRegistry::register( 'brand-guidelines.md', 40, [
+    'layer'       => MemoryFileRegistry::LAYER_AGENT,
+    'label'       => 'Brand Guidelines',
+    'description' => 'Voice, tone, and visual brand standards.',
+] );
+
+// Shared-layer file — visible to ALL agents on the site.
+MemoryFileRegistry::register( 'editorial-policy.md', 45, [
+    'layer'       => MemoryFileRegistry::LAYER_SHARED,
+    'label'       => 'Editorial Policy',
+    'description' => 'Site-wide editorial standards.',
+] );
+
+// User-layer file — visible to ALL agents for a specific user.
+MemoryFileRegistry::register( 'work-context.md', 50, [
+    'layer'       => MemoryFileRegistry::LAYER_USER,
+    'label'       => 'Work Context',
+    'description' => 'User-specific project context.',
+] );
+
+// Protected file — cannot be deleted.
+MemoryFileRegistry::register( 'compliance.md', 12, [
+    'layer'     => MemoryFileRegistry::LAYER_SHARED,
+    'protected' => true,
+    'label'     => 'Compliance Rules',
+] );
 ```
 
-The file must exist in the agent's directory (`wp-content/uploads/datamachine-files/agents/{agent_slug}/`). Missing files are silently skipped.
+**Registration arguments:**
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `layer` | string | `'agent'` | One of `shared`, `agent`, `user` |
+| `protected` | bool | `false` | Protected files cannot be deleted or blanked |
+| `label` | string | *derived from filename* | Human-readable display label |
+| `description` | string | `''` | Purpose description shown in the admin UI |
+
+Files are resolved to their layer directory at runtime. Missing files are silently skipped.
+
+### Extension Hook
+
+Third parties can register files via the `datamachine_memory_files` action, which fires once per request when the registry is first consumed:
+
+```php
+add_action( 'datamachine_memory_files', function( $current_files ) {
+    // Inspect existing registrations if needed.
+    // Register additional files via the standard API.
+    MemoryFileRegistry::register( 'my-plugin-context.md', 60, [
+        'layer' => MemoryFileRegistry::LAYER_AGENT,
+        'label' => 'My Plugin Context',
+    ] );
+} );
+```
 
 ### Custom Directives
 
