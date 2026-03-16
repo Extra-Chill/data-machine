@@ -4,7 +4,7 @@ Tags: events, calendar, ticketmaster, eventbrite, import, venues, api
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.2
-Stable tag: 0.14.2
+Stable tag: 0.15.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -264,4 +264,4 @@ Yes! Data Machine Events uses dedicated CSS files (no inline styles) and follows
 == Upgrade Notice ==
 
 = 1.0.0 =
-Welcome to Data Machine Events! This is the initial release with Data Machine plugin integration. Please review the setup guide after activation. 
+Welcome to Data Machine Events! This is the initial release with Data Machine plugin integration. Please review the setup guide after activation.

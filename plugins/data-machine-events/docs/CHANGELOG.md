@@ -2,6 +2,18 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.15.0] - 2026-03-16
+
+### Added
+- map Dice FM event prices
+
+### Changed
+- centralize free event price formatting
+
+### Fixed
+- correct homeboy.json — id is data-machine-events, fix version patterns
+- sync readme.txt stable tag to 0.14.2
+
 ## [0.14.2] - 2026-03-09
 
 ### Fixed
