@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.43.1] - 2026-03-16
+
+### Fixed
+- enable publish dedup by default, add source-URL dedup, forward pre-selected taxonomies
+- apply lint autofix — 46 files, 97 errors → 19, 249 warnings → 6
+
 ## [0.43.0] - 2026-03-16
 
 ### Added
