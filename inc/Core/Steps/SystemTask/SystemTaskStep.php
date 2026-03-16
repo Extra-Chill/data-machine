@@ -150,7 +150,7 @@ class SystemTaskStep extends Step {
 		}
 
 		// Resolve the task handler class.
-		$handlers = TaskRegistry::getHandlers();
+		$handlers      = TaskRegistry::getHandlers();
 		$handler_class = $handlers[ $task_type ];
 
 		// Create a child job for independent tracking.

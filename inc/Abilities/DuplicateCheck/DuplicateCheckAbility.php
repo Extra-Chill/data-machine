@@ -70,36 +70,36 @@ class DuplicateCheckAbility {
 					'type'       => 'object',
 					'required'   => array( 'title' ),
 					'properties' => array(
-						'title'          => array(
+						'title'         => array(
 							'type'        => 'string',
 							'description' => __( 'Title or topic to check for duplicates', 'data-machine' ),
 						),
-						'post_type'      => array(
+						'post_type'     => array(
 							'type'        => 'string',
 							'description' => __( 'WordPress post type to check against (default: "post")', 'data-machine' ),
 						),
-						'lookback_days'  => array(
+						'lookback_days' => array(
 							'type'        => 'integer',
 							'description' => __( 'How many days back to search (default: 14)', 'data-machine' ),
 						),
-						'scope'          => array(
+						'scope'         => array(
 							'type'        => 'string',
 							'enum'        => array( 'published', 'queue', 'both' ),
 							'description' => __( 'What to check: published posts, queue items, or both (default: "published")', 'data-machine' ),
 						),
-						'flow_id'        => array(
+						'flow_id'       => array(
 							'type'        => 'integer',
 							'description' => __( 'Flow ID for queue check (required when scope includes queue)', 'data-machine' ),
 						),
-						'flow_step_id'   => array(
+						'flow_step_id'  => array(
 							'type'        => 'string',
 							'description' => __( 'Flow step ID for queue check (required when scope includes queue)', 'data-machine' ),
 						),
-						'threshold'      => array(
+						'threshold'     => array(
 							'type'        => 'number',
 							'description' => __( 'Jaccard similarity threshold for queue checks (default: 0.65)', 'data-machine' ),
 						),
-						'context'        => array(
+						'context'       => array(
 							'type'        => 'object',
 							'description' => __( 'Domain-specific context for extension strategies (e.g., venue, startDate, ticketUrl for events)', 'data-machine' ),
 						),
@@ -478,8 +478,8 @@ class DuplicateCheckAbility {
 				'info',
 				'DuplicateCheck: found matching queue item',
 				array(
-					'title'  => $title,
-					'match'  => $best_match,
+					'title' => $title,
+					'match' => $best_match,
 				)
 			);
 

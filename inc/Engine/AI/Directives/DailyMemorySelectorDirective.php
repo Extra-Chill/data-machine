@@ -109,7 +109,7 @@ class DailyMemorySelectorDirective implements DirectiveInterface {
 				break;
 			}
 
-			$outputs[]   = array(
+			$outputs[]    = array(
 				'type'    => 'system_text',
 				'content' => "## Daily Memory: {$date}\n{$content}",
 			);
@@ -254,8 +254,8 @@ class DailyMemorySelectorDirective implements DirectiveInterface {
 		}
 
 		// Get all available dates.
-		$all      = $daily->list_all();
-		$dates    = array();
+		$all   = $daily->list_all();
+		$dates = array();
 
 		foreach ( $all['months'] as $month_key => $days ) {
 			list( $year, $month ) = explode( '/', $month_key );

@@ -75,7 +75,7 @@ class ChatCommand extends BaseCommand {
 		$offset  = max( 0, (int) ( $assoc_args['offset'] ?? 0 ) );
 		$context = ! empty( $assoc_args['context'] ) ? sanitize_text_field( $assoc_args['context'] ) : null;
 
-		$chat_db = new ChatDatabase();
+		$chat_db  = new ChatDatabase();
 		$sessions = $chat_db->get_user_sessions( $user_id, $limit, $offset, $context );
 		$total    = $chat_db->get_user_session_count( $user_id, $context );
 
@@ -87,13 +87,13 @@ class ChatCommand extends BaseCommand {
 		// Flatten for display.
 		$display_items = array();
 		foreach ( $sessions as $session ) {
-			$metadata = $session['metadata'] ?? array();
+			$metadata        = $session['metadata'] ?? array();
 			$display_items[] = array(
-				'session_id'   => $session['session_id'],
-				'title'        => $session['title'] ?? '(untitled)',
-				'context'      => $session['context'] ?? 'chat',
+				'session_id'    => $session['session_id'],
+				'title'         => $session['title'] ?? '(untitled)',
+				'context'       => $session['context'] ?? 'chat',
 				'message_count' => $metadata['message_count'] ?? 0,
-				'created_at'   => $metadata['started_at'] ?? $session['created_at'] ?? '-',
+				'created_at'    => $metadata['started_at'] ?? $session['created_at'] ?? '-',
 			);
 		}
 
@@ -170,11 +170,11 @@ class ChatCommand extends BaseCommand {
 
 		WP_CLI::log( WP_CLI::colorize( '%BSession Metadata:%n' ) );
 		WP_CLI::log( "  Session ID:   {$session['session_id']}" );
-		WP_CLI::log( "  Title:        " . ( $session['title'] ?? '(untitled)' ) );
-		WP_CLI::log( "  Context:      " . ( $session['context'] ?? 'chat' ) );
+		WP_CLI::log( '  Title:        ' . ( $session['title'] ?? '(untitled)' ) );
+		WP_CLI::log( '  Context:      ' . ( $session['context'] ?? 'chat' ) );
 		WP_CLI::log( "  User ID:      {$session['user_id']}" );
-		WP_CLI::log( "  Started:      " . ( $metadata['started_at'] ?? '-' ) );
-		WP_CLI::log( "  Messages:     " . count( $messages ) );
+		WP_CLI::log( '  Started:      ' . ( $metadata['started_at'] ?? '-' ) );
+		WP_CLI::log( '  Messages:     ' . count( $messages ) );
 
 		if ( ! empty( $messages ) ) {
 			WP_CLI::log( '' );
@@ -182,8 +182,8 @@ class ChatCommand extends BaseCommand {
 
 			$display_messages = array();
 			foreach ( $messages as $msg ) {
-				$role = $msg['role'] ?? 'unknown';
-				$content = $msg['content'] ?? '';
+				$role      = $msg['role'] ?? 'unknown';
+				$content   = $msg['content'] ?? '';
 				$truncated = mb_strlen( $content ) > 100
 					? mb_substr( $content, 0, 97 ) . '...'
 					: $content;
@@ -241,7 +241,7 @@ class ChatCommand extends BaseCommand {
 			'source'        => $source,
 		);
 
-		$chat_db = new ChatDatabase();
+		$chat_db    = new ChatDatabase();
 		$session_id = $chat_db->create_session( $user_id, $agent_id, $metadata, $context );
 
 		if ( empty( $session_id ) ) {
@@ -378,6 +378,6 @@ class ChatCommand extends BaseCommand {
 			return (int) $assoc_args['user'];
 		}
 
-		return get_current_user_id() ?: 1;
+		return get_current_user_id() ? get_current_user_id() : 1;
 	}
 }

@@ -235,14 +235,14 @@ class LogAbilities {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'     => array( 'type' => 'boolean' ),
-							'file'        => array( 'type' => 'string' ),
-							'entries'     => array( 'type' => 'array' ),
-							'total'       => array( 'type' => 'integer' ),
-							'filtered'    => array( 'type' => 'integer' ),
-							'file_size'   => array( 'type' => 'integer' ),
+							'success'       => array( 'type' => 'boolean' ),
+							'file'          => array( 'type' => 'string' ),
+							'entries'       => array( 'type' => 'array' ),
+							'total'         => array( 'type' => 'integer' ),
+							'filtered'      => array( 'type' => 'integer' ),
+							'file_size'     => array( 'type' => 'integer' ),
 							'last_modified' => array( 'type' => 'string' ),
-							'error'       => array( 'type' => 'string' ),
+							'error'         => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( self::class, 'readDebugLog' ),
@@ -471,7 +471,7 @@ class LogAbilities {
 		// Filter by search.
 		if ( $search ) {
 			$search_lower = strtolower( $search );
-			$parsed = array_filter( $parsed, function ( $entry ) use ( $search_lower ) {
+			$parsed       = array_filter( $parsed, function ( $entry ) use ( $search_lower ) {
 				return str_contains( strtolower( $entry['message'] ), $search_lower )
 					|| str_contains( strtolower( $entry['file'] ?? '' ), $search_lower );
 			});
@@ -517,7 +517,7 @@ class LogAbilities {
 		$line_buffer = '';
 
 		while ( $pos > 0 && count( $found_lines ) < $lines ) {
-			$pos--;
+			--$pos;
 			fseek( $handle, $pos, SEEK_SET );
 			$char = fgetc( $handle );
 
@@ -569,13 +569,13 @@ class LogAbilities {
 			$message_part  = $matches[3];
 
 			// Parse timestamp (WordPress format: 01-Jan-2026 12:34:56+00:00).
-			$timestamp = strtotime( $timestamp_str ) ?: 0;
+			$timestamp = strtotime( $timestamp_str ) ? strtotime( $timestamp_str ) : 0;
 
 			// Extract file and line from message if present.
-			$file = null;
+			$file        = null;
 			$line_number = null;
 			if ( preg_match( '/in\s+(.+\.php)(?:\s+on\s+line\s+(\d+))?$/i', $message_part, $file_matches ) ) {
-				$file = $file_matches[1];
+				$file        = $file_matches[1];
 				$line_number = isset( $file_matches[2] ) ? (int) $file_matches[2] : null;
 				// Remove file/line from message for cleaner output.
 				$message_part = trim( preg_replace( '/\s*in\s+.+\.php(?:\s+on\s+line\s+\d+)?$/i', '', $message_part ) );
@@ -630,24 +630,24 @@ class LogAbilities {
 		$level = strtoupper( trim( $level ) );
 
 		$map = array(
-			'FATAL ERROR'     => 'FATAL',
-			'FATAL'           => 'FATAL',
-			'ERROR'           => 'ERROR',
-			'WARNING'         => 'WARNING',
-			'PARSE ERROR'     => 'PARSE',
-			'PARSE'           => 'PARSE',
-			'NOTICE'          => 'NOTICE',
-			'STRICT'          => 'NOTICE',
-			'DEPRECATED'      => 'DEPRECATED',
-			'CORE ERROR'      => 'FATAL',
-			'CORE WARNING'    => 'WARNING',
-			'COMPILE ERROR'   => 'FATAL',
-			'COMPILE WARNING' => 'WARNING',
-			'USER ERROR'      => 'ERROR',
-			'USER WARNING'    => 'WARNING',
-			'USER NOTICE'     => 'NOTICE',
-			'USER DEPRECATED' => 'DEPRECATED',
-			'RECOVERABLE ERROR' => 'ERROR',
+			'FATAL ERROR'           => 'FATAL',
+			'FATAL'                 => 'FATAL',
+			'ERROR'                 => 'ERROR',
+			'WARNING'               => 'WARNING',
+			'PARSE ERROR'           => 'PARSE',
+			'PARSE'                 => 'PARSE',
+			'NOTICE'                => 'NOTICE',
+			'STRICT'                => 'NOTICE',
+			'DEPRECATED'            => 'DEPRECATED',
+			'CORE ERROR'            => 'FATAL',
+			'CORE WARNING'          => 'WARNING',
+			'COMPILE ERROR'         => 'FATAL',
+			'COMPILE WARNING'       => 'WARNING',
+			'USER ERROR'            => 'ERROR',
+			'USER WARNING'          => 'WARNING',
+			'USER NOTICE'           => 'NOTICE',
+			'USER DEPRECATED'       => 'DEPRECATED',
+			'RECOVERABLE ERROR'     => 'ERROR',
 			'CATCHABLE FATAL ERROR' => 'ERROR',
 		);
 

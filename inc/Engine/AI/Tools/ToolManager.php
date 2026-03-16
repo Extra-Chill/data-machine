@@ -125,7 +125,7 @@ class ToolManager {
 			);
 		}
 
-		// Handle unified registry wrapper: ['_callable' => callable, 'contexts' => [...]]
+		// Handle unified registry wrapper: ['_callable' becomes callable, 'contexts' becomes [...]]
 		$contexts = array();
 		if ( is_array( $definition ) && isset( $definition['_callable'] ) ) {
 			$contexts   = $definition['contexts'] ?? array();

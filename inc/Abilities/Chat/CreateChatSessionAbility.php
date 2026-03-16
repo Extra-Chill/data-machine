@@ -41,24 +41,24 @@ class CreateChatSessionAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'user_id'    => array(
+							'user_id'  => array(
 								'type'        => 'integer',
 								'description' => __( 'User ID who owns the session.', 'data-machine' ),
 							),
-							'agent_id'   => array(
+							'agent_id' => array(
 								'type'        => 'integer',
 								'description' => __( 'First-class agent ID for this session.', 'data-machine' ),
 							),
-							'context'    => array(
+							'context'  => array(
 								'type'        => 'string',
 								'default'     => 'chat',
 								'description' => __( 'Execution context (chat, pipeline, system).', 'data-machine' ),
 							),
-							'source'     => array(
+							'source'   => array(
 								'type'        => 'string',
 								'description' => __( 'Session source identifier (e.g. ping, chat).', 'data-machine' ),
 							),
-							'metadata'   => array(
+							'metadata' => array(
 								'type'        => 'object',
 								'description' => __( 'Additional metadata for the session.', 'data-machine' ),
 							),

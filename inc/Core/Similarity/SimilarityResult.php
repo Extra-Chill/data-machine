@@ -20,11 +20,11 @@ class SimilarityResult {
 	/**
 	 * Strategy constants.
 	 */
-	const STRATEGY_EXACT    = 'exact';
-	const STRATEGY_PREFIX   = 'prefix';
-	const STRATEGY_EDIT     = 'levenshtein';
-	const STRATEGY_JACCARD  = 'jaccard';
-	const STRATEGY_NONE     = 'none';
+	const STRATEGY_EXACT   = 'exact';
+	const STRATEGY_PREFIX  = 'prefix';
+	const STRATEGY_EDIT    = 'levenshtein';
+	const STRATEGY_JACCARD = 'jaccard';
+	const STRATEGY_NONE    = 'none';
 
 	/**
 	 * Whether the comparison matched.
@@ -73,13 +73,13 @@ class SimilarityResult {
 	 * @param string $normalized_b Normalized second input.
 	 */
 	public function __construct(
-		bool $match,
+		bool $match_value,
 		float $score,
 		string $strategy,
 		string $normalized_a = '',
 		string $normalized_b = ''
 	) {
-		$this->match        = $match;
+		$this->match        = $match_value;
 		$this->score        = $score;
 		$this->strategy     = $strategy;
 		$this->normalized_a = $normalized_a;

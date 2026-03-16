@@ -72,8 +72,8 @@ function datamachine_migrate_handler_keys_to_plural() {
 			if ( isset( $step['handler_slugs'] ) && is_array( $step['handler_slugs'] ) ) {
 				// Ensure handler_configs exists when handler_slugs does.
 				if ( ! isset( $step['handler_configs'] ) || ! is_array( $step['handler_configs'] ) ) {
-					$primary                = $step['handler_slugs'][0] ?? '';
-					$config                 = $step['handler_config'] ?? array();
+					$primary                 = $step['handler_slugs'][0] ?? '';
+					$config                  = $step['handler_config'] ?? array();
 					$step['handler_configs'] = ! empty( $primary ) ? array( $primary => $config ) : array();
 					$changed                 = true;
 				}
@@ -776,7 +776,7 @@ function datamachine_backfill_agent_ids(): void {
 	);
 
 	// Cache of user_id → agent_id to avoid repeated lookups.
-	$agent_map = array();
+	$agent_map  = array();
 	$backfilled = 0;
 
 	foreach ( $tables as $table ) {
@@ -824,7 +824,7 @@ function datamachine_backfill_agent_ids(): void {
 					$access_repo->bootstrap_owner_access( (int) $agent['agent_id'], $user_id );
 				} else {
 					// Try to create agent for this user.
-					$created_id = datamachine_resolve_or_create_agent_id( $user_id );
+					$created_id            = datamachine_resolve_or_create_agent_id( $user_id );
 					$agent_map[ $user_id ] = $created_id;
 
 					if ( $created_id > 0 ) {

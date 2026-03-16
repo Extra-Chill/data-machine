@@ -1104,15 +1104,15 @@ class InternalLinkingAbilities {
 		$inbound_total  = array_sum( $inbound );
 
 		return array(
-			'success'        => true,
-			'post_type'      => $post_type,
-			'total_scanned'  => $total_scanned,
-			'total_links'    => $total_links,
-			'orphaned_count' => count( $orphaned ),
-			'avg_outbound'   => $total_scanned > 0 ? round( $outbound_total / $total_scanned, 2 ) : 0,
-			'avg_inbound'    => $total_scanned > 0 ? round( $inbound_total / $total_scanned, 2 ) : 0,
-			'orphaned_posts' => $orphaned,
-			'top_linked'     => $top_linked,
+			'success'             => true,
+			'post_type'           => $post_type,
+			'total_scanned'       => $total_scanned,
+			'total_links'         => $total_links,
+			'orphaned_count'      => count( $orphaned ),
+			'avg_outbound'        => $total_scanned > 0 ? round( $outbound_total / $total_scanned, 2 ) : 0,
+			'avg_inbound'         => $total_scanned > 0 ? round( $inbound_total / $total_scanned, 2 ) : 0,
+			'orphaned_posts'      => $orphaned,
+			'top_linked'          => $top_linked,
 			// Internal data for broken link checker (not exposed in REST).
 			'_all_links'          => $all_links,
 			'_all_external_links' => $all_external_links,

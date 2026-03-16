@@ -79,7 +79,7 @@ class VideoMetadata {
 		if ( self::is_ffprobe_available() ) {
 			$ffprobe_data = self::extract_via_ffprobe( $file_path );
 			if ( null !== $ffprobe_data ) {
-				$result = array_merge( $result, $ffprobe_data );
+				$result            = array_merge( $result, $ffprobe_data );
 				$result['ffprobe'] = true;
 				return $result;
 			}
@@ -146,13 +146,13 @@ class VideoMetadata {
 		$stream = $json['streams'][0] ?? array();
 
 		$result = array(
-			'duration' => null,
-			'width'    => null,
-			'height'   => null,
-			'codec'    => null,
-			'bitrate'  => null,
+			'duration'  => null,
+			'width'     => null,
+			'height'    => null,
+			'codec'     => null,
+			'bitrate'   => null,
 			'framerate' => null,
-			'format'   => null,
+			'format'    => null,
 		);
 
 		// Duration (from format, more reliable than stream).

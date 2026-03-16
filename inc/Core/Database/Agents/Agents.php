@@ -234,7 +234,7 @@ class Agents extends BaseRepository {
 
 		foreach ( $rows as &$row ) {
 			if ( ! empty( $row['agent_config'] ) ) {
-				$decoded              = json_decode( $row['agent_config'], true );
+				$decoded             = json_decode( $row['agent_config'], true );
 				$row['agent_config'] = is_array( $decoded ) ? $decoded : array();
 			}
 		}

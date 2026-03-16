@@ -93,9 +93,9 @@ class Providers {
 				array(
 					'success' => true,
 					'data'    => array(
-						'providers'    => $providers,
-						'defaults'     => $defaults,
-						'contexts'     => $contexts,
+						'providers'      => $providers,
+						'defaults'       => $defaults,
+						'contexts'       => $contexts,
 						'context_models' => $context_models,
 					),
 				)

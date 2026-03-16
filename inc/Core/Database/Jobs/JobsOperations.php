@@ -71,10 +71,10 @@ class JobsOperations extends BaseRepository {
 		$agent_id      = isset( $job_data['agent_id'] ) ? absint( $job_data['agent_id'] ) : null;
 
 		$data = array(
-			'user_id'     => $user_id,
-			'source'      => $source,
-			'label'       => $label,
-			'status'      => 'pending',
+			'user_id' => $user_id,
+			'source'  => $source,
+			'label'   => $label,
+			'status'  => 'pending',
 		);
 
 		$format = array( '%d', '%s', '%s', '%s' );

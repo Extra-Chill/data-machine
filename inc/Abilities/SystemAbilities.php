@@ -628,10 +628,10 @@ class SystemAbilities {
 					'error',
 					'Session title AI generation failed',
 					array(
-					'error'   => $response['error'] ?? 'Unknown error',
-					'context' => 'system',
-				)
-			);
+						'error'   => $response['error'] ?? 'Unknown error',
+						'context' => 'system',
+					)
+				);
 					return null;
 			}
 

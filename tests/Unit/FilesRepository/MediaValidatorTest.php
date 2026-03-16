@@ -92,12 +92,13 @@ class MediaValidatorTest extends WP_UnitTestCase {
 	 * Skipped when running as root since root can read any file.
 	 */
 	public function test_unreadable_file_error(): void {
+		global $wp_filesystem;
 		if ( function_exists( 'posix_getuid' ) && posix_getuid() === 0 ) {
 			$this->markTestSkipped( 'Cannot test unreadable files when running as root.' );
 		}
 
 		$temp_file = tempnam( sys_get_temp_dir(), 'dm-media-test-' );
-		file_put_contents( $temp_file, 'test' );
+		$wp_filesystem->put_contents( $temp_file, 'test' );
 		chmod( $temp_file, 0000 );
 
 		$image_result = ( new ImageValidator() )->validate_repository_file( $temp_file );

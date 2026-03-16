@@ -22,7 +22,7 @@ class PluginSettings {
 
 	public const DEFAULT_MAX_TURNS = 25;
 
-	private static ?array $cache = null;
+	private static ?array $cache            = null;
 	private static array $agent_model_cache = array();
 
 	/**
@@ -172,7 +172,7 @@ class PluginSettings {
 	 * @return array{ provider: string, model: string }
 	 */
 	public static function resolveModelForAgentContext( ?int $agent_id, string $context ): array {
-		$agent_id = (int) $agent_id;
+		$agent_id  = (int) $agent_id;
 		$cache_key = $agent_id . ':' . $context;
 
 		if ( isset( self::$agent_model_cache[ $cache_key ] ) ) {
@@ -246,7 +246,7 @@ class PluginSettings {
 	 * @return void
 	 */
 	public static function clearCache(): void {
-		self::$cache = null;
+		self::$cache             = null;
 		self::$agent_model_cache = array();
 	}
 

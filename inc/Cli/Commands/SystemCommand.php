@@ -240,7 +240,7 @@ class SystemCommand extends BaseCommand {
 	 * @subcommand prompts
 	 */
 	public function prompts( array $args, array $assoc_args ): void {
-		$format       = $assoc_args['format'] ?? 'table';
+		$format    = $assoc_args['format'] ?? 'table';
 		$handlers  = TaskRegistry::getHandlers();
 		$overrides = SystemTask::getAllPromptOverrides();
 
@@ -354,7 +354,7 @@ class SystemCommand extends BaseCommand {
 		WP_CLI::log( sprintf( 'Override:    %s', $has_override ? 'yes' : 'no (using default)' ) );
 		WP_CLI::log( sprintf( 'Variables:   %s', implode( ', ', array_map(
 			function ( $k, $v ) {
-				return "{{" . $k . "}} — " . $v;
+				return '{{' . $k . '}} — ' . $v;
 			},
 			array_keys( $definition['variables'] ),
 			array_values( $definition['variables'] )
