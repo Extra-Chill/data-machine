@@ -146,14 +146,13 @@ class DailyMemoryTask extends SystemTask {
 			'daily_summary'  => array(
 				'label'       => __( 'Daily Summary Prompt', 'data-machine' ),
 				'description' => __( 'Prompt used to synthesize a daily memory entry from the day\'s activity.', 'data-machine' ),
-				'default'     => "You are a system agent generating a daily memory entry for an AI agent's memory library.\n\n"
-					. "Below is a summary of today's activity on this WordPress site — jobs that ran, chat sessions that occurred, and their outcomes.\n\n"
-					. "Your task: Synthesize this into a concise, useful daily memory entry in markdown format. Focus on:\n"
-					. "- What happened (key events, not every job)\n"
-					. "- What was accomplished\n"
+				'default'     => "Write a daily memory entry from today's activity data below.\n\n"
+					. "This entry will be stored in your daily memory files — the ones you already know about from your memory. Write it as your own notes for future sessions.\n\n"
+					. "Focus on:\n"
+					. "- Key events and what was accomplished (not every individual job)\n"
 					. "- Notable outcomes, failures, or patterns worth remembering\n"
-					. "- Any context that would help a future agent session understand what this day was about\n\n"
-					. "Keep it concise — a few paragraphs at most. Use ### headings for sections if needed. Do NOT include raw job IDs or technical metadata. Write as if you're creating notes that a colleague would find useful tomorrow.\n\n"
+					. "- Context that would help you in a future session understand what today was about\n\n"
+					. "Keep it concise — a few paragraphs at most. Use ### headings if needed. Skip raw job IDs and technical metadata. Write in your own voice.\n\n"
 					. "---\n\n"
 					. "{{context}}",
 				'variables'   => array(
@@ -163,21 +162,18 @@ class DailyMemoryTask extends SystemTask {
 			'memory_cleanup' => array(
 				'label'       => __( 'Memory Cleanup Prompt', 'data-machine' ),
 				'description' => __( 'Prompt used to split MEMORY.md into persistent knowledge and session-specific content for archival.', 'data-machine' ),
-				'default'     => "You are maintaining an AI agent's MEMORY.md file. This file is injected into every AI context window, so it must stay lean — only persistent knowledge that helps across all future sessions.\n\n"
+				'default'     => "Clean up your MEMORY.md. You can see its current content in your system context above — it's the same file. It needs to stay lean because it's injected into every session.\n\n"
 					. "## Principle\n\n"
-					. "Ask yourself for each piece of content: \"Would a fresh session need this to do its job?\" If yes, it's persistent. If it only makes sense in the context of a specific session or time period, it should be archived.\n\n"
-					. "## Your Task\n\n"
-					. "Split the MEMORY.md content below into two parts:\n\n"
+					. "For each piece of content ask: \"Would a fresh session need this to do its job?\" If yes, keep it. If it only makes sense in the context of a specific session or time period, archive it.\n\n"
+					. "## Split into two parts:\n\n"
 					. "### PERSISTENT — stays in MEMORY.md\n"
-					. "Knowledge that is useful regardless of when or why the next session runs:\n"
 					. "- How things work (architecture, patterns, conventions)\n"
 					. "- Where things are (paths, URLs, config locations, tool names)\n"
-					. "- Current state of ongoing work (just the status, not the journey)\n"
+					. "- Current state of ongoing work (status, not the journey)\n"
 					. "- Rules and constraints learned from experience\n"
 					. "- Relationships between systems, people, and services\n\n"
-					. "When condensing, prefer the **lasting fact** over the **story of how we learned it**. Merge overlapping entries. Remove detail that duplicates what's already in daily files or source code.\n\n"
+					. "Prefer the **lasting fact** over the **story of how you learned it**. Merge overlapping entries. Remove detail that duplicates what's in daily files or source code.\n\n"
 					. "### ARCHIVED — moves to the daily file for {{date}}\n"
-					. "Content tied to a specific session, investigation, or moment in time:\n"
 					. "- Play-by-play narratives of what happened in a session\n"
 					. "- Debugging traces and investigation logs\n"
 					. "- Temporary state that will be outdated soon\n"

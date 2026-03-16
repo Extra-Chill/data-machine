@@ -345,10 +345,11 @@ class InternalLinkingTask extends SystemTask {
 			'insert_link' => array(
 				'label'       => __( 'Internal Link Insertion Prompt', 'data-machine' ),
 				'description' => __( 'Prompt used to weave internal links into existing paragraph text.', 'data-machine' ),
-				'default'     => "Here is a paragraph from a blog post. Weave in a link to the URL below by wrapping "
-					. "a relevant existing phrase in an anchor tag. Do NOT add new text or change meaning. "
-					. "Return ONLY the updated paragraph HTML. If no natural insertion point exists, "
-					. "return the paragraph unchanged.\n\n"
+				'default'     => "Weave an internal link into this paragraph by wrapping a relevant existing phrase in an anchor tag.\n\n"
+					. "Rules:\n"
+					. "- Do NOT add new text or change meaning\n"
+					. "- Return ONLY the updated paragraph HTML\n"
+					. "- If no natural insertion point exists, return the paragraph unchanged\n\n"
 					. "URL: {{url}}\n"
 					. "Title: {{title}}\n\n"
 					. "Paragraph:\n{{paragraph}}",
