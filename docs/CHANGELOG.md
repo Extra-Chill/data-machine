@@ -2,6 +2,19 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.42.0] - 2026-03-16
+
+### Added
+- image optimization system task — diagnose + fix oversized images
+- broken external link detection
+- update WordPress handler to use resolveMediaUrls()
+- add resolveMediaUrls() to PublishHandler base class
+- add core video primitives — upload, validation, metadata, and pipeline plumbing
+
+### Changed
+- rename VideoAbilities to MediaAbilities, abilities to upload-media/validate-media
+- extract MediaValidator base class from ImageValidator and VideoValidator
+
 ## [0.41.0] - 2026-03-15
 
 ### Added
