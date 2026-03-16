@@ -8,7 +8,7 @@
  *
  * Priority Order in Directive System:
  * 1. Priority 10 - Plugin Core Directive
- * 2. Priority 20 - Core Memory Files (SOUL.md, USER.md, MEMORY.md, etc.)
+ * 2. Priority 20 - Core Memory Files (SITE.md, RULES.md, SOUL.md, MEMORY.md, USER.md)
  * 3. Priority 40 - Pipeline Memory Files (per-pipeline selectable)
  * 4. Priority 50 - Pipeline System Prompt
  * 5. Priority 60 - Pipeline Context Files

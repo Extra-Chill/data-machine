@@ -66,12 +66,14 @@ Automated content workflows that run on schedules.
 
 ## Memory System
 
-Agent files live in `{uploads}/datamachine-files/agent/` and are injected as system context into every AI call:
+Agent memory uses a three-layer directory system under `{uploads}/datamachine-files/`. Core files are injected as system context into every AI call:
 
-- **SOUL.md** — identity, voice, rules (always injected)
-- **USER.md** — human user profile (always injected)
-- **MEMORY.md** — accumulated knowledge (always injected)
-- **daily/YYYY/MM/DD.md** — temporal session logs
+- **shared/SITE.md** — site-wide context (shared layer)
+- **shared/RULES.md** — site-wide rules (shared layer)
+- **agents/{slug}/SOUL.md** — identity, voice, rules (agent layer)
+- **agents/{slug}/MEMORY.md** — accumulated knowledge (agent layer)
+- **users/{id}/USER.md** — human user profile (user layer)
+- **agents/{slug}/daily/YYYY/MM/DD.md** — temporal session logs
 
 Manage via `wp datamachine agent` (aliased as `wp datamachine memory`). Run `wp help datamachine agent` to see all subcommands.
 

@@ -8,7 +8,7 @@ Data Machine turns a WordPress site into an agent runtime — persistent identit
 
 - **Pipelines** — Multi-step workflows: fetch content, process with AI, publish anywhere
 - **Abilities API** — Typed, permissioned functions that agents and extensions call (`datamachine/upload-media`, `datamachine/validate-media`, etc.)
-- **Agent memory** — Persistent SOUL.md, USER.md, MEMORY.md files that define who the agent is and what it knows
+- **Agent memory** — Layered markdown files (SOUL.md + MEMORY.md in agent layer, USER.md in user layer) injected into every AI context
 - **Multi-agent** — Multiple agents with scoped pipelines, flows, jobs, and filesystem directories
 - **Workspace** — Managed directory for repo clones and file operations with security sandboxing
 - **Self-scheduling** — Agents schedule their own recurring tasks using flows, prompt queues, and Agent Pings

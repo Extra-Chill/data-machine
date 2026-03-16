@@ -105,7 +105,6 @@ Reads core memory files from three directory layers and injects them as system m
 
 **User Layer** (per-user):
 - `USER.md` — User-specific preferences and context
-- `MEMORY.md` — User persistent memory
 
 **Custom registered files** — Any additional files registered via `MemoryFileRegistry` are also loaded from the agent directory.
 

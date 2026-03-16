@@ -37,7 +37,7 @@ Specialized directive for the conversational chat interface. It instructs the ag
 Defines the system agent identity for internal operations — session title generation, GitHub issue creation, and system maintenance tasks. Dynamically lists available GitHub repos at runtime.
 
 ### CoreMemoryFilesDirective (Priority 20)
-Reads memory files from three directory layers (site shared, per-agent, per-user) and injects them as system messages. Self-healing — creates missing agent files before reading. Applied to **all** agent types.
+Reads core memory files from three directory layers and injects them as system messages: SITE.md + RULES.md (shared), SOUL.md + MEMORY.md (agent), USER.md (user). Self-healing — creates missing agent files before reading. Applied to **all** agent types.
 
 ### PipelineMemoryFilesDirective (Priority 40)
 Injects agent memory files selected for a specific pipeline. Files are stored in the agent directory and selected per-pipeline via the admin UI. SOUL.md is excluded (always injected separately at Priority 20). This enables pipelines to access strategy documents, reference material, or other persistent context.

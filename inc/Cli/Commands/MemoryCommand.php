@@ -2,9 +2,9 @@
 /**
  * WP-CLI Agent Command
  *
- * Provides CLI access to the agent Memory Library — core agent files
- * (SOUL.md, USER.md, MEMORY.md), MEMORY.md section operations, and
- * daily memory (YYYY/MM/DD.md).
+ * Provides CLI access to the agent Memory Library — core memory files
+ * across layers (SOUL.md + MEMORY.md in agent layer, USER.md in user layer),
+ * MEMORY.md section operations, and daily memory (YYYY/MM/DD.md).
  *
  * Primary command: `wp datamachine agent`.
  * Backwards-compatible alias: `wp datamachine memory`.

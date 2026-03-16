@@ -2,9 +2,10 @@
 /**
  * Core Memory Files Directive - Priority 20
  *
- * Loads agent memory files from the MemoryFileRegistry and injects them
- * into every AI call. The registry is a pure container — this directive
- * just reads from it.
+ * Loads core memory files from three directory layers and injects them
+ * into every AI call: SITE.md + RULES.md (shared), SOUL.md + MEMORY.md
+ * (agent), USER.md (user). Custom files from the MemoryFileRegistry are
+ * loaded separately from the agent directory.
  *
  * Priority Order in Directive System:
  * 1. Priority 10 - Plugin Core Directive (agent identity)
@@ -77,10 +78,6 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 			array(
 				'directory' => $user_dir,
 				'filename'  => 'USER.md',
-			),
-			array(
-				'directory' => $user_dir,
-				'filename'  => 'MEMORY.md',
 			),
 		);
 

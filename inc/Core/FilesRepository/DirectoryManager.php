@@ -31,7 +31,7 @@ class DirectoryManager {
 	private static bool $agent_files_ensured = false;
 
 	/**
-	 * Ensure default agent files exist (SOUL.md, USER.md, MEMORY.md).
+	 * Ensure default memory files exist across layers (SOUL.md + MEMORY.md in agent, USER.md in user).
 	 *
 	 * Lazy self-healing: runs at most once per PHP request on the first
 	 * call. If any registered memory files are missing, recreates them
