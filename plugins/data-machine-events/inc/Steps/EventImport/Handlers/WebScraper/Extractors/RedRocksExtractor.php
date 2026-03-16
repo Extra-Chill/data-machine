@@ -32,12 +32,8 @@ class RedRocksExtractor extends BaseExtractor {
 	}
 
 	public function extract( string $html, string $source_url ): array {
-		$dom = new \DOMDocument();
-		libxml_use_internal_errors( true );
-		$dom->loadHTML( '<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD );
-		libxml_clear_errors();
-
-		$xpath       = new \DOMXPath( $dom );
+		$loaded = $this->loadDom( $html );
+		$xpath  = $loaded['xpath'];
 		$event_nodes = $xpath->query( "//*[contains(@class, 'card-event')]" );
 
 		if ( 0 === $event_nodes->length ) {
@@ -163,19 +159,11 @@ class RedRocksExtractor extends BaseExtractor {
 		}
 	}
 
+	/**
+	 * @deprecated Use BaseExtractor::parseTimeString() instead.
+	 */
 	private function normalizeTime( string $time ): string {
-		$time = strtolower( trim( $time ) );
-
-		if ( strpos( $time, ':' ) === false ) {
-			$time = preg_replace( '/(\d+)\s*(am|pm)/i', '$1:00 $2', $time );
-		}
-
-		$timestamp = strtotime( $time );
-		if ( false !== $timestamp ) {
-			return date( 'H:i', $timestamp );
-		}
-
-		return '';
+		return $this->parseTimeString( $time );
 	}
 
 	private function parseImage( array &$event, \DOMXPath $xpath, \DOMElement $node ): void {

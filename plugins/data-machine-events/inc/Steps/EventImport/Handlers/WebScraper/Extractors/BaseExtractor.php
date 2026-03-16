@@ -238,4 +238,153 @@ abstract class BaseExtractor implements ExtractorInterface {
 	protected function formatStructuredPrice( ?float $min = null, ?float $max = null, string $currency = 'USD', ?bool $is_free = null ): string {
 		return PriceFormatter::formatStructured( $min, $max, $currency, $is_free );
 	}
+
+	/**
+	 * Infer a full Y-m-d date from month name and day number.
+	 *
+	 * Assumes the current year. If that date has already passed,
+	 * bumps to the next year. Useful for venue calendars that
+	 * display "January 15" without a year.
+	 *
+	 * @since 0.15.1
+	 * @param string $month Month name (e.g., "January", "Jan")
+	 * @param string $day   Day number (e.g., "15")
+	 * @return string Date in Y-m-d format, or empty string on failure.
+	 */
+	protected function inferDateFromMonthDay( string $month, string $day ): string {
+		$year     = (int) gmdate( 'Y' );
+		$date_str = "{$month} {$day} {$year}";
+
+		try {
+			$dt    = new \DateTime( $date_str );
+			$today = new \DateTime( 'today' );
+
+			if ( $dt < $today ) {
+				$dt->modify( '+1 year' );
+			}
+
+			return $dt->format( 'Y-m-d' );
+		} catch ( \Exception $e ) {
+			return '';
+		}
+	}
+
+	/**
+	 * Load an HTML string into a DOMDocument + DOMXPath pair.
+	 *
+	 * Eliminates the repeated 5-line DOM bootstrap boilerplate
+	 * across extractors.
+	 *
+	 * @since 0.15.1
+	 * @param string $html Raw HTML content.
+	 * @return array{dom: \DOMDocument, xpath: \DOMXPath}
+	 */
+	protected function loadDom( string $html ): array {
+		$dom = new \DOMDocument();
+		libxml_use_internal_errors( true );
+		$dom->loadHTML( '<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD );
+		libxml_clear_errors();
+
+		return array(
+			'dom'   => $dom,
+			'xpath' => new \DOMXPath( $dom ),
+		);
+	}
+
+	/**
+	 * Merge page-level venue data into an event array.
+	 *
+	 * Fills in venue name and address fields that are empty in the
+	 * event but present in the page-level venue data.
+	 *
+	 * @since 0.15.1
+	 * @param array $event      Event data array.
+	 * @param array $page_venue Page-level venue data from PageVenueExtractor.
+	 * @return array Event with merged venue data.
+	 */
+	protected function mergePageVenueData( array $event, array $page_venue ): array {
+		$fields = array( 'venue', 'venueAddress', 'venueCity', 'venueState', 'venueZip', 'venueCountry', 'venueTimezone' );
+
+		foreach ( $fields as $field ) {
+			if ( empty( $event[ $field ] ) && ! empty( $page_venue[ $field ] ) ) {
+				$event[ $field ] = $page_venue[ $field ];
+			}
+		}
+
+		return $event;
+	}
+
+	/**
+	 * Fetch a URL via HttpClient with standard error handling.
+	 *
+	 * Centralizes the repeated pattern of HttpClient::get() + success check
+	 * that appears in many extractors.
+	 *
+	 * @since 0.15.1
+	 * @param string $url     URL to fetch.
+	 * @param array  $args    Optional wp_remote_get args.
+	 * @param string $context Short description for logging (e.g., "Firebase events").
+	 * @return string|null Response body, or null on failure.
+	 */
+	protected function fetchUrl( string $url, array $args = array(), string $context = '' ): ?string {
+		if ( ! class_exists( '\\DataMachine\\Core\\HttpClient' ) ) {
+			return null;
+		}
+
+		$defaults = array( 'timeout' => 15 );
+		$args     = array_merge( $defaults, $args );
+		$result   = \DataMachine\Core\HttpClient::get( $url, $args );
+
+		if ( empty( $result['success'] ) ) {
+			if ( '' !== $context ) {
+				do_action(
+					'datamachine_log',
+					'debug',
+					"BaseExtractor::fetchUrl failed for {$context}",
+					array(
+						'url'         => $url,
+						'status_code' => $result['status_code'] ?? 0,
+					)
+				);
+			}
+			return null;
+		}
+
+		return $result['body'] ?? null;
+	}
+
+	/**
+	 * Resolve a relative URL against a base URL.
+	 *
+	 * @since 0.15.1
+	 * @param string $url      Possibly relative URL.
+	 * @param string $base_url Base URL for resolution.
+	 * @return string Absolute URL.
+	 */
+	protected function resolveUrl( string $url, string $base_url ): string {
+		if ( empty( $url ) ) {
+			return '';
+		}
+
+		if ( preg_match( '#^https?://#i', $url ) ) {
+			return $url;
+		}
+
+		if ( str_starts_with( $url, '//' ) ) {
+			$scheme = wp_parse_url( $base_url, PHP_URL_SCHEME ) ?: 'https';
+			return $scheme . ':' . $url;
+		}
+
+		$parts = wp_parse_url( $base_url );
+		$base  = ( $parts['scheme'] ?? 'https' ) . '://' . ( $parts['host'] ?? '' );
+
+		if ( str_starts_with( $url, '/' ) ) {
+			return $base . $url;
+		}
+
+		$path = $parts['path'] ?? '/';
+		$dir  = substr( $path, 0, (int) strrpos( $path, '/' ) + 1 );
+
+		return $base . $dir . $url;
+	}
 }

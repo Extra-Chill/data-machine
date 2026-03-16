@@ -24,12 +24,8 @@ class MusicItemExtractor extends BaseExtractor {
 	}
 
 	public function extract( string $html, string $source_url ): array {
-		$dom = new \DOMDocument();
-		libxml_use_internal_errors( true );
-		$dom->loadHTML( '<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD );
-		libxml_clear_errors();
-
-		$xpath       = new \DOMXPath( $dom );
+		$loaded = $this->loadDom( $html );
+		$xpath  = $loaded['xpath'];
 		$event_nodes = $xpath->query( "//*[contains(concat(' ', normalize-space(@class), ' '), ' music__item ')]" );
 
 		if ( 0 === $event_nodes->length ) {
@@ -55,24 +51,7 @@ class MusicItemExtractor extends BaseExtractor {
 		return 'music_item';
 	}
 
-	/**
-	 * Merge page-level venue data into event for missing fields.
-	 */
-	private function mergePageVenueData( array $event, array $page_venue ): array {
-		$address_fields = array( 'venueAddress', 'venueCity', 'venueState', 'venueZip', 'venueCountry' );
-
-		foreach ( $address_fields as $field ) {
-			if ( empty( $event[ $field ] ) && ! empty( $page_venue[ $field ] ) ) {
-				$event[ $field ] = $page_venue[ $field ];
-			}
-		}
-
-		if ( empty( $event['venue'] ) && ! empty( $page_venue['venue'] ) ) {
-			$event['venue'] = $page_venue['venue'];
-		}
-
-		return $event;
-	}
+	// mergePageVenueData() is inherited from BaseExtractor.
 
 	/**
 	 * Normalize music item event node to standardized format.

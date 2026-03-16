@@ -238,30 +238,9 @@ class CraftpeakExtractor extends BaseExtractor {
 	}
 
 	/**
-	 * Infer full date from month and day, adding year.
-	 *
-	 * If the date has already passed this year, assumes next year.
-	 *
-	 * @param string $month Month name (e.g., "January")
-	 * @param string $day Day number
-	 * @return string Date in Y-m-d format
+	 * @deprecated Use BaseExtractor::inferDateFromMonthDay() instead.
 	 */
 	private function inferDate( string $month, string $day ): string {
-		$year     = (int) date( 'Y' );
-		$date_str = "$month $day $year";
-
-		try {
-			$dt    = new \DateTime( $date_str );
-			$today = new \DateTime( 'today' );
-
-			// If date is in the past, assume next year
-			if ( $dt < $today ) {
-				$dt->modify( '+1 year' );
-			}
-
-			return $dt->format( 'Y-m-d' );
-		} catch ( \Exception $e ) {
-			return '';
-		}
+		return $this->inferDateFromMonthDay( $month, $day );
 	}
 }

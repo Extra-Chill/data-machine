@@ -24,12 +24,8 @@ class RhpEventsExtractor extends BaseExtractor {
 	}
 
 	public function extract( string $html, string $source_url ): array {
-		$dom = new \DOMDocument();
-		libxml_use_internal_errors( true );
-		$dom->loadHTML( '<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD );
-		libxml_clear_errors();
-
-		$xpath       = new \DOMXPath( $dom );
+		$loaded = $this->loadDom( $html );
+		$xpath  = $loaded['xpath'];
 		$event_nodes = $xpath->query( "//*[contains(@class, 'rhpSingleEvent')]" );
 
 		if ( 0 === $event_nodes->length ) {
@@ -52,28 +48,7 @@ class RhpEventsExtractor extends BaseExtractor {
 		return $events;
 	}
 
-	/**
-	 * Merge page-level venue data into event for missing fields.
-	 *
-	 * @param array $event Event data
-	 * @param array $page_venue Page-level venue data from PageVenueExtractor
-	 * @return array Event with merged venue data
-	 */
-	private function mergePageVenueData( array $event, array $page_venue ): array {
-		$address_fields = array( 'venueAddress', 'venueCity', 'venueState', 'venueZip', 'venueCountry' );
-
-		foreach ( $address_fields as $field ) {
-			if ( empty( $event[ $field ] ) && ! empty( $page_venue[ $field ] ) ) {
-				$event[ $field ] = $page_venue[ $field ];
-			}
-		}
-
-		if ( empty( $event['venue'] ) && ! empty( $page_venue['venue'] ) ) {
-			$event['venue'] = $page_venue['venue'];
-		}
-
-		return $event;
-	}
+	// mergePageVenueData() is inherited from BaseExtractor.
 
 	public function getMethod(): string {
 		return 'rhp_events';
@@ -208,22 +183,10 @@ class RhpEventsExtractor extends BaseExtractor {
 	}
 
 	/**
-	 * Normalize time string to H:i format.
+	 * @deprecated Use BaseExtractor::parseTimeString() instead.
 	 */
 	private function normalizeTime( string $time ): string {
-		$time = strtolower( trim( $time ) );
-
-		// Add :00 if no minutes
-		if ( ! strpos( $time, ':' ) ) {
-			$time = preg_replace( '/(\d+)\s*(am|pm)?/i', '$1:00 $2', $time );
-		}
-
-		$timestamp = strtotime( $time );
-		if ( false !== $timestamp ) {
-			return date( 'H:i', $timestamp );
-		}
-
-		return '';
+		return $this->parseTimeString( $time );
 	}
 
 	/**

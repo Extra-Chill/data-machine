@@ -148,19 +148,11 @@ class FreshtixExtractor extends BaseExtractor {
 		}
 	}
 
+	/**
+	 * @deprecated Use BaseExtractor::parseTimeString() instead.
+	 */
 	private function normalizeTime( string $time ): string {
-		$time = strtolower( trim( $time ) );
-
-		if ( strpos( $time, ':' ) === false ) {
-			$time = preg_replace( '/(\d+)\s*(am|pm)/i', '$1:00 $2', $time );
-		}
-
-		$timestamp = strtotime( $time );
-		if ( false !== $timestamp ) {
-			return date( 'H:i', $timestamp );
-		}
-
-		return '';
+		return $this->parseTimeString( $time );
 	}
 
 	private function parseVenue( array &$event, array $raw, array $venue_data ): void {

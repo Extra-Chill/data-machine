@@ -24,12 +24,8 @@ class MicrodataExtractor extends BaseExtractor {
 	}
 
 	public function extract( string $html, string $source_url ): array {
-		$dom = new \DOMDocument();
-		libxml_use_internal_errors( true );
-		$dom->loadHTML( $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD );
-		libxml_clear_errors();
-
-		$xpath = new \DOMXPath( $dom );
+		$loaded = $this->loadDom( $html );
+		$xpath  = $loaded['xpath'];
 
 		$event_elements = $xpath->query( "//*[@itemtype='https://schema.org/Event' or @itemtype='http://schema.org/Event']" );
 

@@ -543,65 +543,42 @@ class SquarespaceExtractor extends BaseExtractor {
 	}
 
 	/**
-	 * Attempt to extract date from text if structure is missing it.
+	 * Extract date from text description or date label.
+	 *
+	 * Handles formats like "January 15, 2026", "Jan 15", "January 15th".
+	 * If no year is present and the date has passed, assumes next year.
+	 *
+	 * @param array  $event Event array to update.
+	 * @param string $text  Text containing a date.
 	 */
 	private function extractDateFromText( array &$event, string $text ): void {
 		if ( empty( $text ) ) {
 			return;
 		}
 
-		// Simple regex for common date formats in descriptions
-		// e.g., "January 15, 2026" or "Jan 15"
 		$months = 'January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
+
 		if ( preg_match( '/(' . $months . ')\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?/i', $text, $matches ) ) {
 			$month = $matches[1];
 			$day   = $matches[2];
-			$year  = ! empty( $matches[3] ) ? $matches[3] : date( 'Y' );
 
-			try {
-				$dt = new \DateTime( "$month $day $year" );
-				// If it's in the past, assume next year
-				if ( $dt < new \DateTime( 'today' ) && empty( $matches[3] ) ) {
-					$dt->modify( '+1 year' );
+			if ( ! empty( $matches[3] ) ) {
+				try {
+					$dt = new \DateTime( "{$month} {$day} {$matches[3]}" );
+					$event['startDate'] = $dt->format( 'Y-m-d' );
+				} catch ( \Exception $e ) {
+					return;
 				}
-				$event['startDate'] = $dt->format( 'Y-m-d' );
-			} catch ( \Exception $e ) {
+			} else {
+				$event['startDate'] = $this->inferDateFromMonthDay( $month, $day );
 			}
 		}
 	}
 
 	/**
-	 * Parse text date format from User Items List blocks.
-	 *
-	 * Handles formats like "January 16, 2026" or "Jan 16" commonly found
-	 * in Squarespace User Items List event dates.
-	 *
-	 * @since 0.9.17
-	 * @param array  $event Event array to update
-	 * @param string $text  Date text to parse
+	 * @deprecated Use extractDateFromText() instead.
 	 */
 	private function parseTextDate( array &$event, string $text ): void {
-		if ( empty( $text ) ) {
-			return;
-		}
-
-		$months = 'January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
-
-		if ( preg_match( '/(' . $months . ')\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?/i', $text, $matches ) ) {
-			$month = $matches[1];
-			$day   = $matches[2];
-			$year  = ! empty( $matches[3] ) ? $matches[3] : gmdate( 'Y' );
-
-			try {
-				$dt = new \DateTime( "$month $day $year" );
-
-				if ( $dt < new \DateTime( 'today' ) && empty( $matches[3] ) ) {
-					$dt->modify( '+1 year' );
-				}
-				$event['startDate'] = $dt->format( 'Y-m-d' );
-			} catch ( \Exception $e ) {
-				return;
-			}
-		}
+		$this->extractDateFromText( $event, $text );
 	}
 }
