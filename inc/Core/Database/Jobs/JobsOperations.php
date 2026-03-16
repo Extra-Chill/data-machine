@@ -37,10 +37,10 @@ class JobsOperations extends BaseRepository {
 		// Database flow: both must be valid numeric IDs > 0
 		$is_database_flow = ( is_numeric( $pipeline_id ) && (int) $pipeline_id > 0 && is_numeric( $flow_id ) && (int) $flow_id > 0 );
 
-		// Standalone: both are null (no pipeline/flow context)
-		$is_standalone = ( null === $pipeline_id && null === $flow_id );
+		// No pipeline/flow context: both are null.
+		$is_contextless = ( null === $pipeline_id && null === $flow_id );
 
-		if ( ! $is_direct_execution && ! $is_database_flow && ! $is_standalone ) {
+		if ( ! $is_direct_execution && ! $is_database_flow && ! $is_contextless ) {
 			do_action(
 				'datamachine_log',
 				'error',
@@ -53,15 +53,15 @@ class JobsOperations extends BaseRepository {
 			return false;
 		}
 
-		// Normalize to string for database storage (null stays null for standalone)
+		// Normalize to string for database storage (null stays null when no context).
 		if ( $is_database_flow ) {
 			$pipeline_id = (string) absint( $pipeline_id );
 			$flow_id     = (string) absint( $flow_id );
 		}
-		// Direct and standalone keep their values ('direct' or null)
+		// Direct and contextless keep their values ('direct' or null).
 
 		// Sanitize source — accept any string, don't gatekeep values.
-		$default_source = $is_standalone ? 'standalone' : ( $is_direct_execution ? 'direct' : 'pipeline' );
+		$default_source = $is_contextless ? 'direct' : ( $is_direct_execution ? 'direct' : 'pipeline' );
 		$source         = sanitize_key( $job_data['source'] ?? $default_source );
 
 		$label = isset( $job_data['label'] ) ? sanitize_text_field( $job_data['label'] ) : null;
@@ -85,7 +85,7 @@ class JobsOperations extends BaseRepository {
 		}
 
 		// Only include pipeline_id/flow_id when they have values (NULL omission lets DB default apply).
-		if ( ! $is_standalone ) {
+		if ( ! $is_contextless ) {
 			$data['pipeline_id'] = $pipeline_id;
 			$data['flow_id']     = $flow_id;
 			$format[]            = '%s';

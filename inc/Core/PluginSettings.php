@@ -120,7 +120,7 @@ class PluginSettings {
 	 * 4. Network global default_provider / default_model
 	 * 5. Empty strings
 	 *
-	 * @param string $context Execution context: 'chat', 'pipeline', 'system', 'standalone'.
+	 * @param string $context Execution context: 'chat', 'pipeline', 'system'.
 	 * @return array{ provider: string, model: string }
 	 */
 	public static function getContextModel( string $context ): array {
@@ -236,11 +236,6 @@ class PluginSettings {
 				'id'          => 'system',
 				'label'       => __( 'System Agent', 'data-machine' ),
 				'description' => __( 'Background tasks like alt text generation and issue creation.', 'data-machine' ),
-			),
-			array(
-				'id'          => 'standalone',
-				'label'       => __( 'Standalone Context', 'data-machine' ),
-				'description' => __( 'Direct or ad-hoc execution outside pipeline and chat flows.', 'data-machine' ),
 			),
 		);
 	}

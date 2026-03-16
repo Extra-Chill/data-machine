@@ -8,7 +8,8 @@
  * Supports three execution modes:
  * - 'direct': Direct execution without database persistence (CLI tools, ephemeral workflows)
  * - 'flow': Standard flow-based execution with full pipeline/flow context
- * - 'standalone': Job execution without pipeline/flow context (system tasks, ad-hoc jobs)
+ * - 'standalone': Job execution without pipeline/flow context (system tasks, ad-hoc jobs).
+ *   Uses the default model — no separate model override needed.
  *
  * In direct mode, pipeline_id and flow_id are set to the string 'direct' for consistent
  * end-to-end traceability throughout the system.

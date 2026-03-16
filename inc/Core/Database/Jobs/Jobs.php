@@ -125,7 +125,7 @@ class Jobs {
 		// pipeline_id and flow_id are VARCHAR to support multiple execution modes:
 		// - Numeric string: database flow execution (e.g. '123')
 		// - 'direct': ephemeral workflow execution
-		// - NULL: standalone job execution (no pipeline/flow)
+		// - NULL: job execution without pipeline/flow context
 		// status is VARCHAR(255) to support compound statuses with reasons
 		$sql = "CREATE TABLE $table_name (
             job_id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -211,7 +211,7 @@ class Jobs {
 			);
 		}
 
-		// Migrate pipeline_id column: bigint -> varchar(20) NULL for standalone job support
+		// Migrate pipeline_id column: bigint -> varchar(20) NULL for contextless job support
 		if ( isset( $columns['pipeline_id'] ) && 'bigint' === $columns['pipeline_id']->DATA_TYPE ) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
@@ -227,7 +227,7 @@ class Jobs {
 			);
 		}
 
-		// Migrate flow_id column: bigint -> varchar(20) NULL for standalone job support
+		// Migrate flow_id column: bigint -> varchar(20) NULL for contextless job support
 		if ( isset( $columns['flow_id'] ) && 'bigint' === $columns['flow_id']->DATA_TYPE ) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
@@ -243,7 +243,7 @@ class Jobs {
 			);
 		}
 
-		// Migrate pipeline_id/flow_id from NOT NULL to NULL for standalone job support.
+		// Migrate pipeline_id/flow_id from NOT NULL to NULL for contextless job support.
 		// Runs on existing varchar(20) installs that haven't been updated yet.
 		if ( isset( $columns['pipeline_id'] ) && 'varchar' === $columns['pipeline_id']->DATA_TYPE && 'NO' === $columns['pipeline_id']->IS_NULLABLE ) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange

@@ -27,7 +27,7 @@ abstract class BaseTool {
 	 *
 	 * All tools register via the single `datamachine_tools` filter. Each tool
 	 * must declare its contexts — the surfaces where it's available (e.g.
-	 * 'chat', 'pipeline', 'standalone').
+	 * 'chat', 'pipeline').
 	 *
 	 * When the definition is a callable (for lazy evaluation), the contexts
 	 * are stored alongside so they're available before the callable is resolved.

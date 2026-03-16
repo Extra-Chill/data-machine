@@ -14,7 +14,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class WebFetch extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'web_fetch', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline', 'standalone' ) );
+		$this->registerTool( 'web_fetch', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ) );
 	}
 
 	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {

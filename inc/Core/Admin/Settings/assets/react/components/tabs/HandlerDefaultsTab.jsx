@@ -66,20 +66,22 @@ const HandlerDefaultsTab = () => {
 				Existing flows are not affected.
 			</p>
 
-			<div className="datamachine-step-types-list">
-				{ Object.entries( data ).map(
-					( [ stepTypeSlug, stepTypeData ] ) => (
-						<StepTypeAccordion
-							key={ stepTypeSlug }
-							stepTypeSlug={ stepTypeSlug }
-							stepTypeData={ stepTypeData }
-							expandedHandler={ expandedHandler }
-							setExpandedHandler={ setExpandedHandler }
-							onSave={ handleSave }
-							savingHandler={ savingHandler }
-						/>
-					)
-				) }
+		<div className="datamachine-step-types-list">
+			{ Object.entries( data )
+				.filter(
+					( [ , stepTypeData ] ) => stepTypeData.uses_handler
+				)
+				.map( ( [ stepTypeSlug, stepTypeData ] ) => (
+					<StepTypeAccordion
+						key={ stepTypeSlug }
+						stepTypeSlug={ stepTypeSlug }
+						stepTypeData={ stepTypeData }
+						expandedHandler={ expandedHandler }
+						setExpandedHandler={ setExpandedHandler }
+						onSave={ handleSave }
+						savingHandler={ savingHandler }
+					/>
+				) ) }
 			</div>
 		</div>
 	);
