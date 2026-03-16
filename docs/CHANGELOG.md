@@ -2,6 +2,19 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.43.0] - 2026-03-16
+
+### Added
+- add editable AI prompts to system tasks UI
+
+### Changed
+- Extensible memory file layers — registry-driven, decoupled, layer-aware
+- Remove user-layer MEMORY.md — agent-only, period
+- remove standalone tool context — redundant with default model
+
+### Fixed
+- make daily memory parameter explicitly nullable
+
 ## [0.42.0] - 2026-03-16
 
 ### Added
