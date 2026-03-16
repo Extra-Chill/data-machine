@@ -324,7 +324,7 @@ class AgentFiles {
 		$filename = sanitize_file_name( wp_unslash( $request['filename'] ) );
 
 		// Defense-in-depth: block deletion of protected files at the REST layer.
-		if ( in_array( $filename, FileConstants::PROTECTED_FILES, true ) ) {
+		if ( FileConstants::is_protected( $filename ) ) {
 			return new WP_Error(
 				'delete_agent_file_error',
 				sprintf( 'Cannot delete protected file: %s', $filename ),

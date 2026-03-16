@@ -3,11 +3,15 @@
  * Agent File Abilities
  *
  * Abilities API primitives for agent memory file operations.
- * Handles the agent identity layer (SOUL.md, MEMORY.md, custom files)
- * and composes with the user layer (USER.md) for a unified view.
+ * Supports all three layers (shared, agent, user) with routing
+ * driven by the MemoryFileRegistry for registered files.
+ *
+ * New files default to the agent layer. A `layer` parameter can
+ * explicitly target shared or user layers.
  *
  * @package DataMachine\Abilities\File
  * @since   0.38.0
+ * @since   0.42.0 Layer-aware CRUD via MemoryFileRegistry.
  */
 
 namespace DataMachine\Abilities\File;
@@ -16,6 +20,7 @@ use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\FilesRepository\DailyMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Core\FilesRepository\FilesystemHelper;
+use DataMachine\Engine\AI\MemoryFileRegistry;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -61,7 +66,7 @@ class AgentFileAbilities {
 			'datamachine/list-agent-files',
 			array(
 				'label'               => __( 'List Agent Files', 'data-machine' ),
-				'description'         => __( 'List memory files from the agent identity and user layers.', 'data-machine' ),
+				'description'         => __( 'List memory files from all layers (shared, agent, user).', 'data-machine' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -130,7 +135,7 @@ class AgentFileAbilities {
 			'datamachine/write-agent-file',
 			array(
 				'label'               => __( 'Write Agent File', 'data-machine' ),
-				'description'         => __( 'Write or update content for an agent memory file. Protected files cannot be blanked.', 'data-machine' ),
+				'description'         => __( 'Write or update content for a memory file. Layer is resolved from the registry, or can be explicitly specified.', 'data-machine' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -138,11 +143,16 @@ class AgentFileAbilities {
 					'properties' => array(
 						'filename' => array(
 							'type'        => 'string',
-							'description' => __( 'Name of the agent file to write', 'data-machine' ),
+							'description' => __( 'Name of the memory file to write', 'data-machine' ),
 						),
 						'content'  => array(
 							'type'        => 'string',
 							'description' => __( 'Content to write to the file', 'data-machine' ),
+						),
+						'layer'    => array(
+							'type'        => 'string',
+							'description' => __( 'Target layer: shared, agent, or user. For registered files, defaults to the registered layer. For new files, defaults to agent.', 'data-machine' ),
+							'enum'        => array( 'shared', 'agent', 'user' ),
 						),
 						'user_id'  => array(
 							'type'        => 'integer',
@@ -156,6 +166,7 @@ class AgentFileAbilities {
 					'properties' => array(
 						'success'  => array( 'type' => 'boolean' ),
 						'filename' => array( 'type' => 'string' ),
+						'layer'    => array( 'type' => 'string' ),
 						'error'    => array( 'type' => 'string' ),
 					),
 				),
@@ -171,7 +182,7 @@ class AgentFileAbilities {
 			'datamachine/delete-agent-file',
 			array(
 				'label'               => __( 'Delete Agent File', 'data-machine' ),
-				'description'         => __( 'Delete an agent memory file. Protected files (SOUL.md, MEMORY.md) cannot be deleted.', 'data-machine' ),
+				'description'         => __( 'Delete a memory file. Protected files cannot be deleted.', 'data-machine' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -208,7 +219,7 @@ class AgentFileAbilities {
 			'datamachine/upload-agent-file',
 			array(
 				'label'               => __( 'Upload Agent File', 'data-machine' ),
-				'description'         => __( 'Upload a file to the agent memory directory.', 'data-machine' ),
+				'description'         => __( 'Upload a file to a memory layer directory.', 'data-machine' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -224,6 +235,11 @@ class AgentFileAbilities {
 								'error'    => array( 'type' => 'integer' ),
 								'size'     => array( 'type' => 'integer' ),
 							),
+						),
+						'layer'     => array(
+							'type'        => 'string',
+							'description' => __( 'Target layer for the uploaded file. Default agent.', 'data-machine' ),
+							'enum'        => array( 'shared', 'agent', 'user' ),
 						),
 						'user_id'   => array(
 							'type'        => 'integer',
@@ -263,7 +279,7 @@ class AgentFileAbilities {
 	// =========================================================================
 
 	/**
-	 * List agent memory files from both identity and user layers.
+	 * List agent memory files from all layers.
 	 *
 	 * @param array $input Input parameters.
 	 * @return array Result with files list.
@@ -309,12 +325,17 @@ class AgentFileAbilities {
 
 				$filepath = "{$dir}/{$entry}";
 				if ( is_file( $filepath ) ) {
+					$registry_meta  = MemoryFileRegistry::get( $entry );
 					$files[]        = array(
-						'filename' => $entry,
-						'size'     => filesize( $filepath ),
-						'modified' => gmdate( 'c', filemtime( $filepath ) ),
-						'type'     => 'core',
-						'layer'    => $layer,
+						'filename'    => $entry,
+						'size'        => filesize( $filepath ),
+						'modified'    => gmdate( 'c', filemtime( $filepath ) ),
+						'type'        => 'core',
+						'layer'       => $registry_meta ? $registry_meta['layer'] : $layer,
+						'protected'   => MemoryFileRegistry::is_protected( $entry ),
+						'registered'  => null !== $registry_meta,
+						'label'       => $registry_meta['label'] ?? self::filename_to_label( $entry ),
+						'description' => $registry_meta['description'] ?? '',
 					);
 					$seen[ $entry ] = true;
 				}
@@ -365,7 +386,7 @@ class AgentFileAbilities {
 		if ( ! $filepath ) {
 			return array(
 				'success' => false,
-				'error'   => sprintf( 'File %s not found in agent directory', $filename ),
+				'error'   => sprintf( 'File %s not found in any layer', $filename ),
 			);
 		}
 
@@ -383,9 +404,12 @@ class AgentFileAbilities {
 	}
 
 	/**
-	 * Write content to an agent file.
+	 * Write content to a memory file.
 	 *
-	 * Routes to the correct layer: USER.md → user dir, everything else → agent identity dir.
+	 * Layer resolution order:
+	 * 1. Explicit `layer` parameter (if provided)
+	 * 2. Registry layer (if file is registered)
+	 * 3. Default: agent layer
 	 *
 	 * @param array $input Input parameters.
 	 * @return array Result with write status.
@@ -394,26 +418,27 @@ class AgentFileAbilities {
 		$filename = sanitize_file_name( $input['filename'] ?? '' );
 		$content  = $input['content'] ?? '';
 
-		if ( in_array( $filename, FileConstants::PROTECTED_FILES, true ) && '' === trim( $content ) ) {
+		if ( MemoryFileRegistry::is_protected( $filename ) && '' === trim( $content ) ) {
 			return array(
 				'success' => false,
 				'error'   => sprintf( 'Cannot write empty content to protected file: %s', $filename ),
 			);
 		}
 
-		$dm         = new DirectoryManager();
-		$user_id    = $dm->get_effective_user_id( (int) ( $input['user_id'] ?? 0 ) );
-		$target_dir = in_array( $filename, FileConstants::USER_LAYER_FILES, true )
-			? $dm->get_user_directory( $user_id )
-			: $dm->resolve_agent_directory( array(
-				'agent_id' => (int) ( $input['agent_id'] ?? 0 ),
-				'user_id'  => $user_id,
-			) );
+		// Resolve target layer.
+		$explicit_layer = $input['layer'] ?? null;
+		$registry_layer = MemoryFileRegistry::get_layer( $filename );
+		$target_layer   = $explicit_layer ?? $registry_layer ?? MemoryFileRegistry::LAYER_AGENT;
+
+		$dm      = new DirectoryManager();
+		$user_id = $dm->get_effective_user_id( (int) ( $input['user_id'] ?? 0 ) );
+
+		$target_dir = $this->resolveLayerDirectory( $dm, $target_layer, $user_id, (int) ( $input['agent_id'] ?? 0 ) );
 
 		if ( ! $dm->ensure_directory_exists( $target_dir ) ) {
 			return array(
 				'success' => false,
-				'error'   => 'Failed to create agent directory',
+				'error'   => 'Failed to create target directory',
 			);
 		}
 
@@ -442,17 +467,21 @@ class AgentFileAbilities {
 			'datamachine_log',
 			'info',
 			'Agent file written via ability',
-			array( 'filename' => $filename )
+			array(
+				'filename' => $filename,
+				'layer'    => $target_layer,
+			)
 		);
 
 		return array(
 			'success'  => true,
 			'filename' => $filename,
+			'layer'    => $target_layer,
 		);
 	}
 
 	/**
-	 * Delete an agent file.
+	 * Delete a memory file.
 	 *
 	 * @param array $input Input parameters.
 	 * @return array Result with deletion status.
@@ -460,7 +489,7 @@ class AgentFileAbilities {
 	public function executeDeleteAgentFile( array $input ): array {
 		$filename = sanitize_file_name( $input['filename'] ?? '' );
 
-		if ( in_array( $filename, FileConstants::PROTECTED_FILES, true ) ) {
+		if ( MemoryFileRegistry::is_protected( $filename ) ) {
 			return array(
 				'success' => false,
 				'error'   => sprintf( 'Cannot delete protected file: %s', $filename ),
@@ -475,7 +504,7 @@ class AgentFileAbilities {
 		if ( ! $filepath ) {
 			return array(
 				'success' => false,
-				'error'   => sprintf( 'File %s not found in agent directory', $filename ),
+				'error'   => sprintf( 'File %s not found in any layer', $filename ),
 			);
 		}
 
@@ -494,12 +523,12 @@ class AgentFileAbilities {
 
 		return array(
 			'success' => true,
-			'message' => sprintf( 'File %s deleted from agent directory', $filename ),
+			'message' => sprintf( 'File %s deleted', $filename ),
 		);
 	}
 
 	/**
-	 * Upload a file to the agent memory directory.
+	 * Upload a file to a memory layer directory.
 	 *
 	 * @param array $input Input parameters.
 	 * @return array Result with updated file list.
@@ -514,28 +543,26 @@ class AgentFileAbilities {
 			);
 		}
 
-		$dm        = new DirectoryManager();
-		$user_id   = $dm->get_effective_user_id( (int) ( $input['user_id'] ?? 0 ) );
-		$agent_id  = (int) ( $input['agent_id'] ?? 0 );
-		$agent_dir = $dm->resolve_agent_directory( array(
-			'agent_id' => $agent_id,
-			'user_id'  => $user_id,
-		) );
+		$dm           = new DirectoryManager();
+		$user_id      = $dm->get_effective_user_id( (int) ( $input['user_id'] ?? 0 ) );
+		$agent_id     = (int) ( $input['agent_id'] ?? 0 );
+		$target_layer = $input['layer'] ?? MemoryFileRegistry::LAYER_AGENT;
+		$target_dir   = $this->resolveLayerDirectory( $dm, $target_layer, $user_id, $agent_id );
 
-		if ( ! $dm->ensure_directory_exists( $agent_dir ) ) {
+		if ( ! $dm->ensure_directory_exists( $target_dir ) ) {
 			return array(
 				'success' => false,
-				'error'   => 'Failed to create agent directory',
+				'error'   => 'Failed to create target directory',
 			);
 		}
 
-		$destination = "{$agent_dir}/{$file['name']}";
+		$destination = "{$target_dir}/{$file['name']}";
 
 		$fs = FilesystemHelper::get();
 		if ( ! $fs || ! $fs->copy( $file['tmp_name'], $destination, true ) ) {
 			return array(
 				'success' => false,
-				'error'   => 'Failed to store file in agent directory',
+				'error'   => 'Failed to store file',
 			);
 		}
 
@@ -551,11 +578,13 @@ class AgentFileAbilities {
 	// =========================================================================
 
 	/**
-	 * Resolve a filename to its absolute path across agent layers.
+	 * Resolve a filename to its absolute path across layers.
 	 *
-	 * Checks the agent identity directory first, then the user directory.
+	 * For registered files, checks the registered layer first.
+	 * Falls back to: agent → user → shared.
 	 *
 	 * @since 0.41.0 Added $agent_id parameter for agent-first resolution.
+	 * @since 0.42.0 Registry-aware layer resolution.
 	 *
 	 * @param DirectoryManager $dm       Directory manager instance.
 	 * @param int              $user_id  Effective user ID.
@@ -568,23 +597,53 @@ class AgentFileAbilities {
 			'agent_id' => $agent_id,
 			'user_id'  => $user_id,
 		) );
-		$agent_path = $agent_dir . '/' . $filename;
-		if ( file_exists( $agent_path ) ) {
-			return $agent_path;
+		$user_dir   = $dm->get_user_directory( $user_id );
+		$shared_dir = $dm->get_shared_directory();
+
+		// If file is registered, check its canonical layer first.
+		$registered_layer = MemoryFileRegistry::get_layer( $filename );
+		if ( $registered_layer ) {
+			$primary_dir  = $this->resolveLayerDirectory( $dm, $registered_layer, $user_id, $agent_id );
+			$primary_path = $primary_dir . '/' . $filename;
+			if ( file_exists( $primary_path ) ) {
+				return $primary_path;
+			}
 		}
 
-		$user_path = $dm->get_user_directory( $user_id ) . '/' . $filename;
-		if ( file_exists( $user_path ) ) {
-			return $user_path;
-		}
-
-		// Shared layer (site-wide files like SITE.md).
-		$shared_path = $dm->get_shared_directory() . '/' . $filename;
-		if ( file_exists( $shared_path ) ) {
-			return $shared_path;
+		// Fallback: check all layers (agent → user → shared).
+		$search_order = array( $agent_dir, $user_dir, $shared_dir );
+		foreach ( $search_order as $dir ) {
+			$path = $dir . '/' . $filename;
+			if ( file_exists( $path ) ) {
+				return $path;
+			}
 		}
 
 		return null;
+	}
+
+	/**
+	 * Resolve a layer identifier to its directory path.
+	 *
+	 * @param DirectoryManager $dm        Directory manager instance.
+	 * @param string           $layer     Layer identifier ('shared', 'agent', 'user').
+	 * @param int              $user_id   Effective user ID.
+	 * @param int              $agent_id  Agent ID.
+	 * @return string Directory path.
+	 */
+	private function resolveLayerDirectory( DirectoryManager $dm, string $layer, int $user_id, int $agent_id = 0 ): string {
+		switch ( $layer ) {
+			case MemoryFileRegistry::LAYER_SHARED:
+				return $dm->get_shared_directory();
+			case MemoryFileRegistry::LAYER_USER:
+				return $dm->get_user_directory( $user_id );
+			case MemoryFileRegistry::LAYER_AGENT:
+			default:
+				return $dm->resolve_agent_directory( array(
+					'agent_id' => $agent_id,
+					'user_id'  => $user_id,
+				) );
+		}
 	}
 
 	/**
@@ -609,5 +668,16 @@ class AgentFileAbilities {
 		}
 
 		return $sanitized;
+	}
+
+	/**
+	 * Derive a human-readable label from a filename.
+	 *
+	 * @param string $filename The filename.
+	 * @return string Label.
+	 */
+	private static function filename_to_label( string $filename ): string {
+		$name = pathinfo( $filename, PATHINFO_FILENAME );
+		return ucwords( str_replace( array( '-', '_' ), ' ', $name ) );
 	}
 }

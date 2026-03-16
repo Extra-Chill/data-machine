@@ -24,7 +24,6 @@ import {
 } from '../queries/agentFiles';
 
 const SOUL_FILE = 'SOUL.md';
-const PROTECTED_FILES = [ 'SOUL.md', 'MEMORY.md' ];
 
 /**
  * Format bytes to human-readable size.
@@ -398,7 +397,7 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 												) }` }
 										</span>
 									</div>
-									{ ! PROTECTED_FILES.includes( file.filename ) && ! isShared && (
+									{ ! file.protected && ! isShared && (
 										<button
 											className="datamachine-agent-file-item-delete"
 											title={ `Delete ${ file.filename }` }

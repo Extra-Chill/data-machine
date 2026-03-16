@@ -3,11 +3,17 @@
  * Memory File Registry
  *
  * Central registry for agent memory files injected into AI calls.
- * Pure container — no hardcoded files. Everything registers through
- * the same public API.
+ * Each file has a layer (shared, agent, user), priority, protection
+ * status, and optional metadata. Core files register through the same
+ * API that plugins and themes use.
+ *
+ * Extension point: the `datamachine_memory_files` filter fires once
+ * per request when the registry is first consumed, allowing third
+ * parties to register additional files.
  *
  * @package DataMachine\Engine\AI
  * @since   0.30.0
+ * @since   0.42.0 Added layer-aware registration with metadata.
  */
 
 namespace DataMachine\Engine\AI;
@@ -17,27 +23,63 @@ defined( 'ABSPATH' ) || exit;
 class MemoryFileRegistry {
 
 	/**
+	 * Valid layer identifiers.
+	 */
+	const LAYER_SHARED = 'shared';
+	const LAYER_AGENT  = 'agent';
+	const LAYER_USER   = 'user';
+
+	/**
 	 * Registered memory files.
 	 *
-	 * @var array<string, int> Filename => priority.
+	 * @var array<string, array> Filename => file metadata.
 	 */
 	private static array $files = array();
 
 	/**
+	 * Whether the filter has been applied.
+	 *
+	 * @var bool
+	 */
+	private static bool $filter_applied = false;
+
+	/**
 	 * Register a memory file.
 	 *
-	 * @param string $filename Filename relative to the agent directory.
-	 * @param int    $priority Sort order. Lower numbers load first.
+	 * @since 0.42.0 Accepts $args array with layer, protected, label, description.
+	 *
+	 * @param string    $filename Filename (e.g. 'SOUL.md', 'brand-guidelines.md').
+	 * @param int       $priority Sort order. Lower numbers load first.
+	 * @param array     $args     {
+	 *     Optional. Registration arguments.
+	 *
+	 *     @type string $layer       One of 'shared', 'agent', 'user'. Default 'agent'.
+	 *     @type bool   $protected   Whether the file is protected from deletion. Default false.
+	 *     @type string $label       Human-readable display label. Default derived from filename.
+	 *     @type string $description Optional description of the file's purpose.
+	 * }
 	 * @return void
 	 */
-	public static function register( string $filename, int $priority = 50 ): void {
+	public static function register( string $filename, int $priority = 50, array $args = array() ): void {
 		$filename = sanitize_file_name( $filename );
 
 		if ( empty( $filename ) ) {
 			return;
 		}
 
-		self::$files[ $filename ] = $priority;
+		$layer = $args['layer'] ?? self::LAYER_AGENT;
+		if ( ! in_array( $layer, array( self::LAYER_SHARED, self::LAYER_AGENT, self::LAYER_USER ), true ) ) {
+			$layer = self::LAYER_AGENT;
+		}
+
+		self::$files[ $filename ] = array(
+			'filename'    => $filename,
+			'priority'    => $priority,
+			'layer'       => $layer,
+			'protected'   => (bool) ( $args['protected'] ?? false ),
+			'label'       => $args['label'] ?? self::filename_to_label( $filename ),
+			'description' => $args['description'] ?? '',
+		);
 	}
 
 	/**
@@ -57,18 +99,52 @@ class MemoryFileRegistry {
 	 * @return bool
 	 */
 	public static function is_registered( string $filename ): bool {
-		return isset( self::$files[ sanitize_file_name( $filename ) ] );
+		$resolved = self::get_resolved();
+		return isset( $resolved[ sanitize_file_name( $filename ) ] );
+	}
+
+	/**
+	 * Check if a file is protected from deletion.
+	 *
+	 * @param string $filename Filename to check.
+	 * @return bool
+	 */
+	public static function is_protected( string $filename ): bool {
+		$resolved = self::get_resolved();
+		$filename = sanitize_file_name( $filename );
+		return isset( $resolved[ $filename ] ) && $resolved[ $filename ]['protected'];
+	}
+
+	/**
+	 * Get the layer for a registered file.
+	 *
+	 * @param string $filename Filename to look up.
+	 * @return string|null Layer identifier, or null if not registered.
+	 */
+	public static function get_layer( string $filename ): ?string {
+		$resolved = self::get_resolved();
+		$filename = sanitize_file_name( $filename );
+		return $resolved[ $filename ]['layer'] ?? null;
+	}
+
+	/**
+	 * Get metadata for a single file.
+	 *
+	 * @param string $filename Filename to look up.
+	 * @return array|null File metadata, or null if not registered.
+	 */
+	public static function get( string $filename ): ?array {
+		$resolved = self::get_resolved();
+		return $resolved[ sanitize_file_name( $filename ) ] ?? null;
 	}
 
 	/**
 	 * Get all registered files sorted by priority.
 	 *
-	 * @return array<string, int> Filename => priority, sorted ascending.
+	 * @return array<string, array> Filename => metadata, sorted by priority ascending.
 	 */
 	public static function get_all(): array {
-		$files = self::$files;
-		asort( $files );
-		return $files;
+		return self::get_resolved();
 	}
 
 	/**
@@ -77,7 +153,48 @@ class MemoryFileRegistry {
 	 * @return string[]
 	 */
 	public static function get_filenames(): array {
-		return array_keys( self::get_all() );
+		return array_keys( self::get_resolved() );
+	}
+
+	/**
+	 * Get all files for a specific layer.
+	 *
+	 * @param string $layer Layer identifier ('shared', 'agent', 'user').
+	 * @return array<string, array> Filtered and sorted file metadata.
+	 */
+	public static function get_by_layer( string $layer ): array {
+		return array_filter(
+			self::get_resolved(),
+			function ( $meta ) use ( $layer ) {
+				return $meta['layer'] === $layer;
+			}
+		);
+	}
+
+	/**
+	 * Get all protected filenames.
+	 *
+	 * @return string[]
+	 */
+	public static function get_protected_filenames(): array {
+		return array_keys(
+			array_filter(
+				self::get_resolved(),
+				function ( $meta ) {
+					return $meta['protected'];
+				}
+			)
+		);
+	}
+
+	/**
+	 * Get filenames that belong to a specific layer.
+	 *
+	 * @param string $layer Layer identifier.
+	 * @return string[]
+	 */
+	public static function get_layer_filenames( string $layer ): array {
+		return array_keys( self::get_by_layer( $layer ) );
 	}
 
 	/**
@@ -86,6 +203,55 @@ class MemoryFileRegistry {
 	 * @return void
 	 */
 	public static function reset(): void {
-		self::$files = array();
+		self::$files          = array();
+		self::$filter_applied = false;
+	}
+
+	/**
+	 * Get the resolved registry (with filter applied).
+	 *
+	 * The `datamachine_memory_files` filter fires once per request,
+	 * allowing plugins/themes to register additional files.
+	 *
+	 * @return array<string, array> Sorted by priority ascending.
+	 */
+	private static function get_resolved(): array {
+		if ( ! self::$filter_applied ) {
+			/**
+			 * Filter the memory file registry.
+			 *
+			 * Third parties can add files by calling MemoryFileRegistry::register()
+			 * inside this filter callback. The $files array is the current state
+			 * of the registry for inspection — modifications to the array itself
+			 * are ignored; use the register/deregister API instead.
+			 *
+			 * @since 0.42.0
+			 *
+			 * @param array<string, array> $files Current registry state (read-only snapshot).
+			 */
+			do_action( 'datamachine_memory_files', self::$files );
+			self::$filter_applied = true;
+		}
+
+		$files = self::$files;
+		uasort(
+			$files,
+			function ( $a, $b ) {
+				return $a['priority'] <=> $b['priority'];
+			}
+		);
+
+		return $files;
+	}
+
+	/**
+	 * Derive a human-readable label from a filename.
+	 *
+	 * @param string $filename The filename.
+	 * @return string Label.
+	 */
+	private static function filename_to_label( string $filename ): string {
+		$name = pathinfo( $filename, PATHINFO_FILENAME );
+		return ucwords( str_replace( array( '-', '_' ), ' ', $name ) );
 	}
 }

@@ -55,13 +55,47 @@ require_once __DIR__ . '/Engine/AI/Directives/CoreMemoryFilesDirective.php';
 |--------------------------------------------------------------------------
 | Default memory file registrations
 |--------------------------------------------------------------------------
-| These register through the same API any plugin or theme would use.
-| Nothing special about them — they're just the defaults.
+| Core files register through the same API any plugin or theme would use.
+| Each specifies its layer, protection status, and metadata.
 */
 
-\DataMachine\Engine\AI\MemoryFileRegistry::register( 'SOUL.md', 10 );
-\DataMachine\Engine\AI\MemoryFileRegistry::register( 'USER.md', 20 );
-\DataMachine\Engine\AI\MemoryFileRegistry::register( 'MEMORY.md', 30 );
+use DataMachine\Engine\AI\MemoryFileRegistry;
+
+// Shared layer — site-wide context, visible to all agents.
+MemoryFileRegistry::register( 'SITE.md', 10, array(
+	'layer'       => MemoryFileRegistry::LAYER_SHARED,
+	'protected'   => true,
+	'label'       => 'Site Context',
+	'description' => 'Site-wide context shared by all agents.',
+) );
+MemoryFileRegistry::register( 'RULES.md', 15, array(
+	'layer'       => MemoryFileRegistry::LAYER_SHARED,
+	'protected'   => true,
+	'label'       => 'Site Rules',
+	'description' => 'Behavioral constraints that apply to every agent.',
+) );
+
+// Agent layer — identity and knowledge, scoped to a single agent.
+MemoryFileRegistry::register( 'SOUL.md', 20, array(
+	'layer'       => MemoryFileRegistry::LAYER_AGENT,
+	'protected'   => true,
+	'label'       => 'Agent Identity',
+	'description' => 'Agent identity, voice, rules. Rarely changes.',
+) );
+MemoryFileRegistry::register( 'MEMORY.md', 30, array(
+	'layer'       => MemoryFileRegistry::LAYER_AGENT,
+	'protected'   => true,
+	'label'       => 'Agent Memory',
+	'description' => 'Accumulated knowledge. Grows over time.',
+) );
+
+// User layer — human preferences, visible to all agents for this user.
+MemoryFileRegistry::register( 'USER.md', 25, array(
+	'layer'       => MemoryFileRegistry::LAYER_USER,
+	'protected'   => true,
+	'label'       => 'User Profile',
+	'description' => 'Information about the human the agent works with.',
+) );
 // SiteContext is autoloaded (Core\WordPress\SiteContext) — register its cache invalidation hook here.
 add_action( 'init', array( \DataMachine\Core\WordPress\SiteContext::class, 'register_cache_invalidation' ) );
 require_once __DIR__ . '/Api/Chat/ChatAgentDirective.php';

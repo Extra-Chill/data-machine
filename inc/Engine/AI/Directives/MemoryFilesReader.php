@@ -6,22 +6,33 @@
  * Used by both PipelineMemoryFilesDirective and FlowMemoryFilesDirective
  * to avoid duplicating the file-reading logic.
  *
+ * Resolves each file to the correct layer directory using the
+ * MemoryFileRegistry. Falls back to the agent directory for
+ * unregistered files (backward compatibility).
+ *
  * @package DataMachine\Engine\AI\Directives
+ * @since   0.37.0
+ * @since   0.42.0 Layer-aware resolution via MemoryFileRegistry.
  */
 
 namespace DataMachine\Engine\AI\Directives;
 
 use DataMachine\Core\FilesRepository\DirectoryManager;
+use DataMachine\Engine\AI\MemoryFileRegistry;
 
 defined( 'ABSPATH' ) || exit;
 
 class MemoryFilesReader {
 
 	/**
-	 * Read memory files from the agent directory and produce directive outputs.
+	 * Read memory files and produce directive outputs.
+	 *
+	 * Each file is resolved to the directory matching its registered layer.
+	 * Unregistered files fall back to the agent directory.
 	 *
 	 * @since 0.37.0 Added $user_id parameter for multi-agent partitioning.
 	 * @since 0.41.0 Added $agent_id parameter for agent-first resolution.
+	 * @since 0.42.0 Layer-aware resolution via MemoryFileRegistry.
 	 *
 	 * @param array  $memory_files Array of memory filenames.
 	 * @param string $scope_label  Label for logging (e.g. 'Pipeline', 'Flow').
@@ -38,15 +49,27 @@ class MemoryFilesReader {
 
 		$directory_manager = new DirectoryManager();
 		$user_id           = $directory_manager->get_effective_user_id( $user_id );
-		$agent_dir         = $directory_manager->resolve_agent_directory( array(
-			'agent_id' => $agent_id,
-			'user_id'  => $user_id,
-		) );
-		$outputs           = array();
+
+		// Resolve all layer directories once.
+		$layer_dirs = array(
+			MemoryFileRegistry::LAYER_SHARED => $directory_manager->get_shared_directory(),
+			MemoryFileRegistry::LAYER_AGENT  => $directory_manager->resolve_agent_directory( array(
+				'agent_id' => $agent_id,
+				'user_id'  => $user_id,
+			) ),
+			MemoryFileRegistry::LAYER_USER   => $directory_manager->get_user_directory( $user_id ),
+		);
+
+		$outputs = array();
 
 		foreach ( $memory_files as $filename ) {
 			$safe_filename = sanitize_file_name( $filename );
-			$filepath      = "{$agent_dir}/{$safe_filename}";
+
+			// Resolve directory from registry layer, fall back to agent dir.
+			$layer = MemoryFileRegistry::get_layer( $safe_filename );
+			$dir   = $layer_dirs[ $layer ?? MemoryFileRegistry::LAYER_AGENT ];
+
+			$filepath = "{$dir}/{$safe_filename}";
 
 			if ( ! file_exists( $filepath ) ) {
 				do_action(
@@ -56,6 +79,7 @@ class MemoryFilesReader {
 					array(
 						'filename' => $safe_filename,
 						'scope_id' => $scope_id,
+						'layer'    => $layer ?? 'agent (fallback)',
 					)
 				);
 				continue;

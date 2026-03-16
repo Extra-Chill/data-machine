@@ -2,10 +2,12 @@
 /**
  * Core Memory Files Directive - Priority 20
  *
- * Loads core memory files from three directory layers and injects them
- * into every AI call: SITE.md + RULES.md (shared), SOUL.md + MEMORY.md
- * (agent), USER.md (user). Custom files from the MemoryFileRegistry are
- * loaded separately from the agent directory.
+ * Loads memory files from the MemoryFileRegistry and injects them into
+ * every AI call. Files are resolved to their layer directories:
+ *   shared → agents/{slug} → users/{id}
+ *
+ * The registry is the single source of truth for which files exist,
+ * what layer they belong to, and what order they load in.
  *
  * Priority Order in Directive System:
  * 1. Priority 10 - Plugin Core Directive (agent identity)
@@ -18,6 +20,7 @@
  *
  * @package DataMachine\Engine\AI\Directives
  * @since   0.30.0
+ * @since   0.42.0 Driven entirely by MemoryFileRegistry with layer resolution.
  */
 
 namespace DataMachine\Engine\AI\Directives;
@@ -45,69 +48,25 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 
 		$directory_manager = new DirectoryManager();
 		$user_id           = $directory_manager->get_effective_user_id( (int) ( $payload['user_id'] ?? 0 ) );
-		$shared_dir        = $directory_manager->get_shared_directory();
-		$agent_dir         = $directory_manager->resolve_agent_directory( array(
-			'agent_id' => (int) ( $payload['agent_id'] ?? 0 ),
-			'user_id'  => $user_id,
-		) );
-		$user_dir          = $directory_manager->get_user_directory( $user_id );
-		$outputs           = array();
 
-		$core_layer_files = array(
-			// Site layer.
-			array(
-				'directory' => $shared_dir,
-				'filename'  => 'SITE.md',
-			),
-			array(
-				'directory' => $shared_dir,
-				'filename'  => 'RULES.md',
-			),
-
-			// Agent layer.
-			array(
-				'directory' => $agent_dir,
-				'filename'  => 'SOUL.md',
-			),
-			array(
-				'directory' => $agent_dir,
-				'filename'  => 'MEMORY.md',
-			),
-
-			// User layer.
-			array(
-				'directory' => $user_dir,
-				'filename'  => 'USER.md',
-			),
+		// Resolve layer directories once.
+		$layer_dirs = array(
+			MemoryFileRegistry::LAYER_SHARED => $directory_manager->get_shared_directory(),
+			MemoryFileRegistry::LAYER_AGENT  => $directory_manager->resolve_agent_directory( array(
+				'agent_id' => (int) ( $payload['agent_id'] ?? 0 ),
+				'user_id'  => $user_id,
+			) ),
+			MemoryFileRegistry::LAYER_USER   => $directory_manager->get_user_directory( $user_id ),
 		);
 
-		foreach ( $core_layer_files as $entry ) {
-			$filepath = trailingslashit( $entry['directory'] ) . $entry['filename'];
+		$outputs = array();
 
-			if ( ! file_exists( $filepath ) ) {
-				continue;
-			}
+		// Load all registered files, resolved to their layer directory.
+		foreach ( MemoryFileRegistry::get_all() as $filename => $meta ) {
+			$layer = $meta['layer'] ?? MemoryFileRegistry::LAYER_AGENT;
+			$dir   = $layer_dirs[ $layer ] ?? $layer_dirs[ MemoryFileRegistry::LAYER_AGENT ];
 
-			$content = self::get_file_content_for_output( $filepath, $entry['filename'] );
-			if ( null === $content ) {
-				continue;
-			}
-
-			$outputs[] = array(
-				'type'    => 'system_text',
-				'content' => $content,
-			);
-		}
-
-		// Backward-compatible extension point: custom registered memory files
-		// are loaded from the agent identity layer.
-		$custom_files = array_diff(
-			MemoryFileRegistry::get_filenames(),
-			array( 'SOUL.md', 'USER.md', 'MEMORY.md' )
-		);
-
-		foreach ( $custom_files as $filename ) {
-			$filepath = trailingslashit( $agent_dir ) . $filename;
+			$filepath = trailingslashit( $dir ) . $filename;
 
 			if ( ! file_exists( $filepath ) ) {
 				continue;
