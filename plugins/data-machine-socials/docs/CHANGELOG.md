@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.4.0] - 2026-03-16
+
+### Added
+- use core media primitives for video support across all handlers
+- add SocialShareTracker for cross-platform share history
+- add Instagram Story publishing support
+- add Instagram Reel publishing + fix delete ability
+
+### Changed
+- use core PublishHandler::resolveMediaUrls() instead of per-handler duplication
+- route all wrapper layers through wp_get_ability() registry
+
+### Fixed
+- sync DATAMACHINE_SOCIALS_VERSION to 0.3.0 and add constant to homeboy version targets
+
 ## [0.3.0] - 2026-03-11
 
 ### Added
