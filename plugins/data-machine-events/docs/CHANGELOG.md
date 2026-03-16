@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.15.1] - 2026-03-16
+
+### Fixed
+- harden low-confidence event dedupe
+
 ## [0.15.0] - 2026-03-16
 
 ### Added
