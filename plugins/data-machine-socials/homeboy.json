@@ -4,8 +4,8 @@
   "extensions": {
     "wordpress": {}
   },
-  "id": "",
-  "remote_path": "",
+  "id": "data-machine-socials",
+  "remote_path": "wp-content/plugins/data-machine-socials",
   "version_targets": [
     {
       "file": "data-machine-socials.php",
