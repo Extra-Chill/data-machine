@@ -1,22 +1,165 @@
 # Data Machine Architecture
 
-Data Machine is an AI-first WordPress plugin that uses a Pipeline+Flow architecture for automated content processing and publication. It provides multi-provider AI integration with tool-first design patterns, centered around a reliability-first **Single Item Execution Model**.
+Data Machine is an AI-first WordPress plugin that uses a Pipeline+Flow architecture for automated content processing and publication. It provides multi-provider AI integration with tool-first design patterns, centered around a reliability-first **Single Item Execution Model**, with **multi-agent support** and a **layered memory system**.
 
 ## Core Components
 
 ### Pipeline+Flow System
 - **Pipelines**: Reusable templates containing step configurations
 - **Flows**: Configured instances of pipelines with scheduling
-- **Jobs**: Individual executions of flows with status tracking, each processing exactly one item
+- **Jobs**: Individual executions of flows with status tracking, each processing exactly one item. Support parent-child relationships for batch execution via `parent_job_id`.
 
 ### Execution Engine
 Services layer architecture with direct method calls for optimal performance. The engine implements a four-action execution cycle that processes exactly one item per job to ensure maximum reliability and isolation.
 
 ### Database Schema
-- `wp_datamachine_pipelines` - Pipeline templates (reusable)
-- `wp_datamachine_flows` - Flow instances (scheduled + configured)
-- `wp_datamachine_logs` - Centralized system logs for all agent activity (@since v0.4.0)
-- `wp_datamachine_processed_items` - Deduplication tracking per execution
+
+Eight core tables:
+
+| Table | Purpose |
+|-------|---------|
+| `wp_datamachine_pipelines` | Pipeline templates (reusable), with `user_id` and `agent_id` |
+| `wp_datamachine_flows` | Flow instances (scheduled + configured), with `user_id` and `agent_id` |
+| `wp_datamachine_jobs` | Job execution records, with `user_id`, `agent_id`, `parent_job_id`, `source`, `label` |
+| `wp_datamachine_processed_items` | Deduplication tracking per execution |
+| `wp_datamachine_chat_sessions` | Persistent conversation state, with `agent_id`, `title`, `context` |
+| `wp_datamachine_agents` | Agent registry (slug, name, owner, config, status) |
+| `wp_datamachine_agent_access` | Role-based access control (viewer, operator, admin) |
+| `wp_datamachine_logs` | Centralized system logs with agent scoping |
+
+See [Database Schema](core-system/database-schema.md) for full table definitions and relationships.
+
+### Multi-Agent Architecture
+
+Data Machine supports **multiple agents on a single WordPress installation** (@since v0.36.1):
+
+```
+┌─────────────────────────────────────────────────┐
+│                WordPress Site                    │
+│                                                  │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐      │
+│  │ Agent A  │  │ Agent B  │  │ Agent C  │      │
+│  │          │  │          │  │          │      │
+│  │ SOUL.md  │  │ SOUL.md  │  │ SOUL.md  │      │
+│  │ MEMORY.md│  │ MEMORY.md│  │ MEMORY.md│      │
+│  │ daily/   │  │ daily/   │  │ daily/   │      │
+│  │          │  │          │  │          │      │
+│  │ pipelines│  │ pipelines│  │ pipelines│      │
+│  │ flows    │  │ flows    │  │ flows    │      │
+│  │ jobs     │  │ jobs     │  │ jobs     │      │
+│  │ chat     │  │ chat     │  │ chat     │      │
+│  └──────────┘  └──────────┘  └──────────┘      │
+│                                                  │
+│  ┌──────────────────────────────────────────┐   │
+│  │ Shared Layer: SITE.md, RULES.md          │   │
+│  └──────────────────────────────────────────┘   │
+│                                                  │
+│  ┌──────────┐  ┌──────────┐                     │
+│  │ User 1   │  │ User 2   │                     │
+│  │ USER.md  │  │ USER.md  │                     │
+│  └──────────┘  └──────────┘                     │
+└─────────────────────────────────────────────────┘
+```
+
+**Key components:**
+- **Agent Registry** (`datamachine_agents`): Each agent has a unique slug, owner, and configuration
+- **Access Control** (`datamachine_agent_access`): Role-based sharing (viewer < operator < admin)
+- **Resource Scoping**: All pipelines, flows, jobs, and chat sessions carry `agent_id`
+- **Filesystem Isolation**: Each agent gets `agents/{slug}/` for identity files and daily memory
+- **Permission Helper**: `PermissionHelper` resolves agent context and enforces access checks
+
+### Layered Memory Architecture
+
+Agent memory is organized in a **three-layer directory system** under `wp-content/uploads/datamachine-files/`:
+
+```
+datamachine-files/
+├── shared/              # Site-wide (all agents)
+│   ├── SITE.md
+│   └── RULES.md
+├── agents/              # Per-agent identity
+│   ├── agent-a/
+│   │   ├── SOUL.md
+│   │   ├── MEMORY.md
+│   │   └── daily/
+│   │       └── 2026/
+│   │           └── 03/
+│   │               ├── 15.md
+│   │               └── 16.md
+│   └── agent-b/
+│       ├── SOUL.md
+│       └── MEMORY.md
+├── users/               # Per-user preferences
+│   ├── 1/
+│   │   ├── USER.md
+│   │   └── MEMORY.md
+│   └── 2/
+│       └── USER.md
+└── pipeline-{id}/       # Pipeline-scoped files
+    ├── context/
+    └── flow-{id}/
+```
+
+**CoreMemoryFilesDirective** (Priority 20) loads files from layers in order:
+1. `shared/SITE.md` → `shared/RULES.md`
+2. `agents/{slug}/SOUL.md` → `agents/{slug}/MEMORY.md`
+3. `users/{id}/USER.md` → `users/{id}/MEMORY.md`
+4. Custom files from `MemoryFileRegistry` (extensions)
+
+See [WordPress as Agent Memory](core-system/wordpress-as-agent-memory.md) for full memory documentation.
+
+### Daily Memory System
+
+Temporal knowledge management via date-organized files:
+
+- **DailyMemory**: File operations at `agents/{slug}/daily/YYYY/MM/DD.md`
+- **DailyMemoryTask**: System task with two phases:
+  - Phase 1: Synthesizes daily activity (jobs, chat) into daily file
+  - Phase 2: Prunes MEMORY.md when > 8KB, archiving session content to daily file
+- **DailyMemorySelectorDirective** (Priority 46): Injects daily memory into pipeline AI requests with configurable selection modes (recent days, specific dates, date range, months). Capped at 100KB total.
+- **DailyMemoryAbilities**: CRUD + search via Abilities API with multi-agent scoping
+
+### System Tasks Framework
+
+Background AI operations that run outside the normal pipeline model:
+
+```
+┌─────────────────────┐
+│     SystemTask      │  (abstract base)
+│                     │
+│ execute()           │  ← Task-specific logic
+│ completeJob()       │  ← Mark done + store engine_data
+│ failJob()           │  ← Record failure
+│ reschedule()        │  ← Retry with backoff (max 24)
+│ supportsUndo()      │  ← Opt-in undo support
+│ undo()              │  ← Reverse recorded effects
+│ getPromptDefs()     │  ← Editable AI prompts
+│ resolveSystemModel()│  ← Agent-aware model selection
+└─────────────────────┘
+         ▲
+         │ extends
+    ┌────┴────────────────────────────────────┐
+    │                                          │
+ImageGenerationTask  AltTextTask  DailyMemoryTask
+ImageOptimizationTask  InternalLinkingTask
+GitHubIssueTask  MetaDescriptionTask
+```
+
+**Undo System**: Tasks that record effects in `engine_data` can be reversed:
+- `post_content_modified` → restore WordPress revision
+- `post_meta_set` → restore previous value
+- `attachment_created` → delete attachment
+- `featured_image_set` → restore/remove thumbnail
+
+### Workspace System
+
+Secure file management outside the web root for agent operations:
+
+- **Location**: `/var/lib/datamachine/workspace/` (or `DATAMACHINE_WORKSPACE_PATH`)
+- **Git-aware**: Clone, status, pull, add, commit, push, log, diff
+- **File ops**: Read (with pagination), write, edit (find-replace), list directory
+- **Security**: Outside web root; mutating ops are CLI-only (not REST-exposed)
+- **CLI**: `wp datamachine workspace {path,list,clone,remove,show,read,ls,write,edit,git}`
 
 ### Engine Data Architecture
 
@@ -60,6 +203,10 @@ $image_url = $engine_data['image_url'] ?? null;
 - **FlowStepAbilities** - Individual flow step configuration and handler management
 - **PipelineStepAbilities** - Pipeline step template management
 - **ProcessedItemsAbilities** - Deduplication tracking across workflows
+- **AgentAbilities** - Agent CRUD, rename (with filesystem migration), deletion
+- **AgentMemoryAbilities** - Section-based memory read, write, append, search
+- **DailyMemoryAbilities** - Daily memory file CRUD and search
+- **WorkspaceAbilities** - Git-aware workspace file operations
 
 **Benefits**:
 - **3x Performance Improvement**: Direct method calls eliminate filter indirection
@@ -69,10 +216,35 @@ $image_url = $engine_data['image_url'] ?? null;
 - **Backward Compatibility**: Maintains WordPress hook integration
 
 ### Step Types
-- **Fetch**: Data retrieval with clean content processing (Files, RSS, Reddit, Google Sheets, WordPress Local, WordPress Media, WordPress API)
+- **Fetch**: Data retrieval with clean content processing (Files, RSS, Reddit, Google Sheets, WordPress Local, WordPress Media, WordPress API, Workspace)
 - **AI**: Content processing with multi-provider support (OpenAI, Anthropic, Google, Grok)
-- **Publish**: Content distribution with modular handler architecture (Twitter, Facebook, Threads, Bluesky, WordPress with specialized components)
+- **Publish**: Content distribution with modular handler architecture (Twitter, Facebook, Threads, Bluesky, WordPress, Workspace)
 - **Update**: Content modification (WordPress posts/pages)
+- **System Task**: Execute system tasks within pipeline flows
+- **Agent Ping**: Outbound webhook notifications to external agents
+- **Webhook Gate**: Wait for inbound webhook before proceeding
+
+### Directive System
+
+Priority-ordered context injection into every AI request:
+
+| Priority | Directive | Context | Purpose |
+|----------|-----------|---------|---------|
+| 10 | `PipelineCoreDirective` | Pipeline | Base pipeline identity |
+| 15 | `ChatAgentDirective` | Chat | Chat agent instructions |
+| 20 | `CoreMemoryFilesDirective` | All | Layer files + custom registry |
+| 20 | `SystemAgentDirective` | System | System task identity |
+| 40 | `PipelineMemoryFilesDirective` | Pipeline | Per-pipeline memory files |
+| 45 | `ChatPipelinesDirective` | Chat | Pipeline/flow context |
+| 45 | `FlowMemoryFilesDirective` | Pipeline | Per-flow memory files |
+| 46 | `DailyMemorySelectorDirective` | Pipeline | Selected daily memory |
+| 50 | `PipelineSystemPromptDirective` | Pipeline | Workflow instructions |
+| 80 | `SiteContextDirective` | All | WordPress metadata (filterable) |
+
+Directives implement `DirectiveInterface` and return arrays of typed outputs:
+- `system_text` — plain text content
+- `system_json` — labeled structured data
+- `system_file` — file path with MIME type
 
 ### Authentication System
 
@@ -124,6 +296,8 @@ Data Machine v0.2.0 introduced a universal Engine layer (`/inc/Engine/AI/`) that
 **Tool Categories**:
 - Handler-specific tools for publish/update operations
 - Global tools for search and analysis (GoogleSearch, LocalSearch, WebFetch, WordPressPostReader)
+- Workspace-scoped tools (WorkspaceTools, WorkspaceScopedTools) for agent file operations
+- Agent memory tools (AgentMemory, AgentDailyMemory) for runtime memory access
 - Chat-only tools for workflow building (@since v0.4.3):
   - AddPipelineStep, ApiQuery, AuthenticateHandler, ConfigureFlowSteps, ConfigurePipelineStep, CopyFlow, CreateFlow, CreatePipeline, CreateTaxonomyTerm, ExecuteWorkflowTool, GetHandlerDefaults, ManageLogs, ReadLogs, RunFlow, SearchTaxonomyTerms, SetHandlerDefaults, UpdateFlow
 - Automatic tool discovery and three-layer enablement system
@@ -134,6 +308,7 @@ All components self-register via WordPress filters:
 - `chubes_ai_tools` - Register AI tools and capabilities
 - `datamachine_auth_providers` - Register authentication providers
 - `datamachine_step_types` - Register custom step types
+- `datamachine_directives` - Register AI context directives
 - `datamachine_get_oauth1_handler` - OAuth 1.0a handler service discovery
 - `datamachine_get_oauth2_handler` - OAuth 2.0 handler service discovery
 
@@ -142,12 +317,14 @@ All components self-register via WordPress filters:
 Data Machine v0.2.1 introduced modular component systems for enhanced code organization and maintainability:
 
 **FilesRepository Components** (`/inc/Core/FilesRepository/`):
-- **DirectoryManager** - Directory creation and path management
+- **DirectoryManager** - Directory creation, path management, and three-layer resolution
 - **FileStorage** - File operations and flow-isolated storage
 - **FileCleanup** - Retention policy enforcement and cleanup
 - **ImageValidator** - Image validation and metadata extraction
+- **VideoValidator** - Video file validation
 - **RemoteFileDownloader** - Remote file downloading with validation
 - **FileRetrieval** - Data retrieval from file storage
+- **DailyMemory** - Daily memory file operations (read, write, append, search, list)
 
 **WordPress Shared Components** (`/inc/Core/WordPress/`):
 - **TaxonomyHandler** - Taxonomy selection and term creation (skip, AI-decided, pre-selected modes)
@@ -250,7 +427,7 @@ See [HTTP Client](core-system/http-client.md) for implementation details and usa
 
 ### Admin Interface
 
-**Modern React Architecture**: The entire Data Machine admin interface (Pipelines, Logs, Settings, and Jobs) uses a complete React implementation with zero jQuery or AJAX dependencies.
+**Modern React Architecture**: The entire Data Machine admin interface (Pipelines, Logs, Settings, Jobs, and Agents) uses a complete React implementation with zero jQuery or AJAX dependencies.
 
 **React Implementation**:
 - A unified React-based admin UI built with `@wordpress/components`.
@@ -310,10 +487,13 @@ Complete extension system for custom handlers and tools:
 - WordPress Action Scheduler integration
 - Configurable intervals
 - Manual execution support
-- Job failure handling
+- System task scheduling (cron-based)
+- Job failure handling with retry support (max 24 attempts)
 
 ### Security
 - Admin-only access (`manage_options` capability)
+- Multi-agent access control (viewer, operator, admin roles)
 - CSRF protection via WordPress nonces
 - Input sanitization and validation
 - Secure OAuth implementation
+- Workspace outside web root
