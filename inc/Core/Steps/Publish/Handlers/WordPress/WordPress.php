@@ -106,19 +106,43 @@ class WordPress extends PublishHandler {
 
 				if ( SelectionMode::isAiDecides( $selection ) && ! empty( $parameters[ $taxonomy ] ) ) {
 					$taxonomies[ $taxonomy ] = $parameters[ $taxonomy ];
+				} elseif ( SelectionMode::isPreSelected( $selection ) ) {
+					$taxonomies[ $taxonomy ] = $selection;
 				}
 			}
 		}
 
-		// Duplicate detection — check before publishing
-		$dedup_enabled = ! empty( $handler_config['dedup_enabled'] );
+		// Duplicate detection — check before publishing (enabled by default)
+		$dedup_enabled = ! isset( $handler_config['dedup_enabled'] ) || ! empty( $handler_config['dedup_enabled'] );
 		if ( $dedup_enabled ) {
 			$title     = $parameters['title'] ?? '';
 			$post_type = $handler_config['post_type'] ?? '';
 
 			if ( ! empty( $title ) && ! empty( $post_type ) ) {
-				$lookback_days = (int) ( $handler_config['dedup_lookback_days'] ?? DuplicateDetection::DEFAULT_LOOKBACK_DAYS );
-				$existing_id   = DuplicateDetection::findExistingPostByTitle( $title, $post_type, $lookback_days );
+				$lookback_days   = (int) ( $handler_config['dedup_lookback_days'] ?? DuplicateDetection::DEFAULT_LOOKBACK_DAYS );
+				$duplicate_check = wp_get_ability( 'datamachine/check-duplicate' );
+				$source_url      = $engine->getSourceUrl();
+				$existing_id     = null;
+
+				if ( $duplicate_check ) {
+					$duplicate_result = $duplicate_check->execute(
+						array(
+							'title'         => $title,
+							'post_type'     => $post_type,
+							'lookback_days' => $lookback_days,
+							'scope'         => 'published',
+							'source_url'    => $source_url,
+						)
+					);
+
+					if ( is_array( $duplicate_result ) && 'duplicate' === ( $duplicate_result['verdict'] ?? '' ) ) {
+						$existing_id = (int) ( $duplicate_result['match']['post_id'] ?? 0 );
+					}
+				}
+
+				if ( ! $existing_id ) {
+					$existing_id = DuplicateDetection::findExistingPostByTitle( $title, $post_type, $lookback_days );
+				}
 
 				if ( $existing_id ) {
 					$this->log(
@@ -158,7 +182,7 @@ class WordPress extends PublishHandler {
 			'featured_image_path'    => $media['image_file_path'],
 			'featured_image_url'     => $media['image_url'],
 			'source_url'             => $engine->getSourceUrl(),
-			'add_source_attribution' => true,
+			'add_source_attribution' => 'append' === ( $handler_config['link_handling'] ?? 'append' ),
 			'job_id'                 => $parameters['job_id'] ?? null,
 		);
 

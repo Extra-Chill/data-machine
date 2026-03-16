@@ -20,6 +20,7 @@
 namespace DataMachine\Abilities\DuplicateCheck;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\WordPress\PostTracking;
 use DataMachine\Core\Similarity\SimilarityEngine;
 use DataMachine\Core\Similarity\SimilarityResult;
 
@@ -99,6 +100,10 @@ class DuplicateCheckAbility {
 							'type'        => 'number',
 							'description' => __( 'Jaccard similarity threshold for queue checks (default: 0.65)', 'data-machine' ),
 						),
+						'source_url'    => array(
+							'type'        => 'string',
+							'description' => __( 'Canonical source URL to check for exact-match duplicates before title similarity.', 'data-machine' ),
+						),
 						'context'       => array(
 							'type'        => 'object',
 							'description' => __( 'Domain-specific context for extension strategies (e.g., venue, startDate, ticketUrl for events)', 'data-machine' ),
@@ -139,6 +144,7 @@ class DuplicateCheckAbility {
 		$lookback_days = ! empty( $input['lookback_days'] ) ? (int) $input['lookback_days'] : 14;
 		$scope         = ! empty( $input['scope'] ) ? sanitize_text_field( $input['scope'] ) : 'published';
 		$threshold     = ! empty( $input['threshold'] ) ? (float) $input['threshold'] : SimilarityEngine::DEFAULT_JACCARD_THRESHOLD;
+		$source_url    = ! empty( $input['source_url'] ) ? esc_url_raw( $input['source_url'] ) : '';
 		$context       = $input['context'] ?? array();
 
 		if ( empty( $title ) ) {
@@ -181,6 +187,11 @@ class DuplicateCheckAbility {
 
 		// Phase 2: Core published-post title match.
 		if ( in_array( $scope, array( 'published', 'both' ), true ) ) {
+			$source_result = $this->checkPublishedPostsBySourceUrl( $source_url, $post_type, $lookback_days );
+			if ( null !== $source_result ) {
+				return $source_result;
+			}
+
 			$post_result = $this->checkPublishedPosts( $title, $post_type, $lookback_days );
 			if ( null !== $post_result ) {
 				return $post_result;
@@ -419,6 +430,85 @@ class DuplicateCheckAbility {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Check published posts for exact source URL matches.
+	 *
+	 * @param string $source_url    Canonical source URL.
+	 * @param string $post_type     Post type to search.
+	 * @param int    $lookback_days How many days back to search.
+	 * @return array|null Duplicate result or null if clear.
+	 */
+	private function checkPublishedPostsBySourceUrl( string $source_url, string $post_type, int $lookback_days ): ?array {
+		if ( empty( $source_url ) || empty( $post_type ) ) {
+			return null;
+		}
+
+		if ( $lookback_days <= 0 ) {
+			$lookback_days = 14;
+		}
+
+		$cutoff_date = gmdate( 'Y-m-d H:i:s', strtotime( "-{$lookback_days} days" ) );
+
+		$query = new \WP_Query(
+			array(
+				'post_type'      => $post_type,
+				'post_status'    => array( 'publish', 'draft', 'pending' ),
+				'posts_per_page' => 1,
+				'fields'         => 'ids',
+				'no_found_rows'  => true,
+				'date_query'     => array(
+					array(
+						'after'     => $cutoff_date,
+						'inclusive' => true,
+					),
+				),
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Required for source URL dedup.
+				'meta_query'     => array(
+					array(
+						'key'   => PostTracking::SOURCE_URL_META_KEY,
+						'value' => $source_url,
+					),
+				),
+			)
+		);
+
+		if ( empty( $query->posts ) ) {
+			return null;
+		}
+
+		$candidate_id    = (int) $query->posts[0];
+		$candidate_title = get_the_title( $candidate_id );
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'DuplicateCheck: found matching published post by source URL',
+			array(
+				'source_url'     => $source_url,
+				'existing_id'    => $candidate_id,
+				'existing_title' => $candidate_title,
+				'post_type'      => $post_type,
+			)
+		);
+
+		return array(
+			'verdict'  => 'duplicate',
+			'source'   => 'published_post_source_url',
+			'match'    => array(
+				'post_id'    => $candidate_id,
+				'title'      => $candidate_title,
+				'url'        => get_permalink( $candidate_id ),
+				'source_url' => $source_url,
+			),
+			'reason'   => sprintf(
+				'Rejected: source URL already exists on post "%s" (ID %d).',
+				$candidate_title,
+				$candidate_id
+			),
+			'strategy' => 'core_published_source_url',
+		);
 	}
 
 	/**

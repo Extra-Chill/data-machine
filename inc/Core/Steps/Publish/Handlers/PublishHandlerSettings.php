@@ -44,8 +44,8 @@ abstract class PublishHandlerSettings extends SettingsHandler {
 			'dedup_enabled'       => array(
 				'type'        => 'checkbox',
 				'label'       => __( 'Duplicate Detection', 'data-machine' ),
-				'description' => __( 'Skip publishing if a post with a similar title already exists. Prevents cross-flow duplicates when multiple flows process the same content.', 'data-machine' ),
-				'default'     => false,
+				'description' => __( 'Skip publishing if a post with a similar title or source URL already exists. Prevents duplicate posts from parallel jobs, cross-flow overlap, and retry scenarios. Enabled by default.', 'data-machine' ),
+				'default'     => true,
 			),
 			'dedup_lookback_days' => array(
 				'type'        => 'number',
