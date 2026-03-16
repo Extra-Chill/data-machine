@@ -767,7 +767,7 @@ class Flows extends BaseRepository {
 	 * @param array $daily_memory  Optional. Daily memory config array.
 	 * @return bool True on success, false on failure.
 	 */
-	public function update_flow_memory_files( int $flow_id, array $memory_files, array $daily_memory = null ): bool {
+	public function update_flow_memory_files( int $flow_id, array $memory_files, ?array $daily_memory = null ): bool {
 		if ( empty( $flow_id ) ) {
 			return false;
 		}
