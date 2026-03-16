@@ -4,8 +4,7 @@
   "extensions": {
     "wordpress": {}
   },
-  "id": "",
-  "remote_path": "",
+  "id": "data-machine-events",
   "version_targets": [
     {
       "file": "data-machine-events.php",
@@ -13,7 +12,11 @@
     },
     {
       "file": "data-machine-events.php",
-      "pattern": "DATAMACHINE_EVENTS_VERSION',\\s*'([0-9.]+)'"
+      "pattern": "DATA_MACHINE_EVENTS_VERSION.+?([0-9.]+)"
+    },
+    {
+      "file": "readme.txt",
+      "pattern": "(?m)^Stable tag:\\s*([0-9.]+)"
     }
   ]
 }
