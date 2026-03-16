@@ -75,7 +75,7 @@ class ImageOptimizationAbilities {
 							'total_size'         => array( 'type' => 'integer' ),
 							'oversized_count'    => array( 'type' => 'integer' ),
 							'missing_webp_count' => array( 'type' => 'integer' ),
-							'potential_savings'   => array( 'type' => 'integer' ),
+							'potential_savings'  => array( 'type' => 'integer' ),
 							'oversized_images'   => array(
 								'type'  => 'array',
 								'items' => array( 'type' => 'object' ),
@@ -180,7 +180,7 @@ class ImageOptimizationAbilities {
 		$total_size         = 0;
 		$oversized_count    = 0;
 		$missing_webp_count = 0;
-		$potential_savings   = 0;
+		$potential_savings  = 0;
 		$oversized_images   = array();
 
 		foreach ( $attachments as $attachment_id ) {
@@ -189,14 +189,14 @@ class ImageOptimizationAbilities {
 				continue;
 			}
 
-			$file_size = filesize( $file_path );
+			$file_size   = filesize( $file_path );
 			$total_size += $file_size;
-			$metadata   = wp_get_attachment_metadata( $attachment_id );
-			$mime_type  = get_post_mime_type( $attachment_id );
+			$metadata    = wp_get_attachment_metadata( $attachment_id );
+			$mime_type   = get_post_mime_type( $attachment_id );
 
 			// Check for WebP variant.
-			$has_webp    = false;
-			$webp_path   = preg_replace( '/\.(jpe?g|png|gif)$/i', '.webp', $file_path );
+			$has_webp  = false;
+			$webp_path = preg_replace( '/\.(jpe?g|png|gif)$/i', '.webp', $file_path );
 			if ( file_exists( $webp_path ) ) {
 				$has_webp = true;
 			}
@@ -220,7 +220,7 @@ class ImageOptimizationAbilities {
 				++$oversized_count;
 
 				// Estimate savings (target ~60% reduction for heavily oversized).
-				$estimated_savings = (int) ( $file_size * 0.4 );
+				$estimated_savings  = (int) ( $file_size * 0.4 );
 				$potential_savings += $estimated_savings;
 
 				$width  = $metadata['width'] ?? 0;
@@ -242,17 +242,17 @@ class ImageOptimizationAbilities {
 		usort( $oversized_images, fn( $a, $b ) => $b['file_size'] - $a['file_size'] );
 
 		return array(
-			'success'            => true,
-			'total_images'       => count( $attachments ),
-			'total_size'         => $total_size,
-			'total_size_hr'      => size_format( $total_size ),
-			'oversized_count'    => $oversized_count,
-			'missing_webp_count' => $missing_webp_count,
-			'potential_savings'   => $potential_savings,
+			'success'              => true,
+			'total_images'         => count( $attachments ),
+			'total_size'           => $total_size,
+			'total_size_hr'        => size_format( $total_size ),
+			'oversized_count'      => $oversized_count,
+			'missing_webp_count'   => $missing_webp_count,
+			'potential_savings'    => $potential_savings,
 			'potential_savings_hr' => size_format( $potential_savings ),
-			'size_threshold'     => $size_threshold,
-			'size_threshold_hr'  => size_format( $size_threshold ),
-			'oversized_images'   => $oversized_images,
+			'size_threshold'       => $size_threshold,
+			'size_threshold_hr'    => size_format( $size_threshold ),
+			'oversized_images'     => $oversized_images,
 		);
 	}
 
@@ -329,11 +329,11 @@ class ImageOptimizationAbilities {
 			}
 
 			return array(
-				'success'      => true,
-				'queued_count' => 0,
-				'dry_run'      => true,
+				'success'        => true,
+				'queued_count'   => 0,
+				'dry_run'        => true,
 				'would_optimize' => $preview,
-				'message'      => sprintf( '%d image(s) would be optimized (dry run).', count( $preview ) ),
+				'message'        => sprintf( '%d image(s) would be optimized (dry run).', count( $preview ) ),
 			);
 		}
 

@@ -197,8 +197,8 @@ class ToolPolicyResolver {
 	private function gatherToolsForContext( string $context_type ): array {
 		$available_tools = array();
 
-		$all_tools      = $this->tool_manager->get_all_tools();
-		$context_tools  = $this->filterByContext( $all_tools, $context_type );
+		$all_tools     = $this->tool_manager->get_all_tools();
+		$context_tools = $this->filterByContext( $all_tools, $context_type );
 
 		foreach ( $context_tools as $tool_name => $tool_config ) {
 			if ( ! is_array( $tool_config ) || empty( $tool_config ) ) {

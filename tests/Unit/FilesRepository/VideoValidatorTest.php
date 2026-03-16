@@ -33,8 +33,9 @@ class VideoValidatorTest extends WP_UnitTestCase {
 	 * Create a minimal fake video file with given content.
 	 */
 	private function create_test_file( string $filename, string $content = 'fake video content' ): string {
+		global $wp_filesystem;
 		$path = $this->temp_dir . '/' . $filename;
-		file_put_contents( $path, $content );
+		$wp_filesystem->put_contents( $path, $content );
 		return $path;
 	}
 

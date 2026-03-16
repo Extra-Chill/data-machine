@@ -649,10 +649,10 @@ abstract class SystemTask {
 				'debug',
 				"System Agent task rescheduled for job {$jobId} (attempt {$attempts}/{$max_attempts})",
 				array(
-				'job_id'        => $jobId,
-				'task_type'     => $this->getTaskType(),
-				'context'       => 'system',
-				'attempts'      => $attempts,
+					'job_id'        => $jobId,
+					'task_type'     => $this->getTaskType(),
+					'context'       => 'system',
+					'attempts'      => $attempts,
 					'max_attempts'  => $max_attempts,
 					'delay_seconds' => $delaySeconds,
 				)

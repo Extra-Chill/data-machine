@@ -71,23 +71,23 @@ class MediaAbilities {
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
-						'url'         => array(
+						'url'              => array(
 							'type'        => 'string',
 							'description' => 'Remote URL to fetch media from. Either url or file_path is required.',
 						),
-						'file_path'   => array(
+						'file_path'        => array(
 							'type'        => 'string',
 							'description' => 'Local file path of an already-downloaded media file. Either url or file_path is required.',
 						),
-						'filename'    => array(
+						'filename'         => array(
 							'type'        => 'string',
 							'description' => 'Desired filename for storage (default: derived from URL or file_path).',
 						),
-						'pipeline_id' => array(
+						'pipeline_id'      => array(
 							'type'        => 'integer',
 							'description' => 'Pipeline ID for file organization in the repository.',
 						),
-						'flow_id'     => array(
+						'flow_id'          => array(
 							'type'        => 'integer',
 							'description' => 'Flow ID for file organization in the repository.',
 						),
@@ -262,8 +262,8 @@ class MediaAbilities {
 			);
 		}
 
-		$validator  = $this->resolveValidator( $path, $media_type );
-		$detected   = $validator instanceof VideoValidator ? 'video' : 'image';
+		$validator = $this->resolveValidator( $path, $media_type );
+		$detected  = $validator instanceof VideoValidator ? 'video' : 'image';
 
 		// If no constraints provided, do basic validation only.
 		if ( empty( $constraints ) ) {
@@ -279,7 +279,7 @@ class MediaAbilities {
 
 		// Constraint-based validation. For video, get metadata for duration/codec checks.
 		$metadata = array();
-		if ( $detected === 'video' ) {
+		if ( 'video' === $detected ) {
 			$metadata = VideoMetadata::extract( $path );
 		}
 
@@ -338,8 +338,8 @@ class MediaAbilities {
 		$flow_id     = (int) ( $input['flow_id'] ?? 0 );
 
 		$context = array(
-			'pipeline_id' => $pipeline_id ?: 'direct',
-			'flow_id'     => $flow_id ?: 'media-upload',
+			'pipeline_id' => $pipeline_id ? $pipeline_id : 'direct',
+			'flow_id'     => $flow_id ? $flow_id : 'media-upload',
 		);
 
 		$downloader = new RemoteFileDownloader();

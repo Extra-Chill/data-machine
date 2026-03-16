@@ -55,7 +55,7 @@ class FlowFormatter {
 
 			// Apply defaults to the primary handler config.
 			if ( ! empty( $effective_slug ) ) {
-				$primary_config = $step_data['handler_configs'][ $effective_slug ] ?? array();
+				$primary_config                                  = $step_data['handler_configs'][ $effective_slug ] ?? array();
 				$step_data['handler_configs'][ $effective_slug ] = $handler_abilities->applyDefaults(
 					$effective_slug,
 					$primary_config

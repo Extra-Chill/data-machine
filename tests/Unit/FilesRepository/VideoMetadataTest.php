@@ -30,8 +30,9 @@ class VideoMetadataTest extends WP_UnitTestCase {
 	}
 
 	public function test_extract_returns_file_size_and_mime(): void {
+		global $wp_filesystem;
 		$temp_file = tempnam( sys_get_temp_dir(), 'dm-video-test-' );
-		file_put_contents( $temp_file, str_repeat( 'x', 500 ) );
+		$wp_filesystem->put_contents( $temp_file, str_repeat( 'x', 500 ) );
 
 		$result = VideoMetadata::extract( $temp_file );
 
@@ -43,8 +44,9 @@ class VideoMetadataTest extends WP_UnitTestCase {
 	}
 
 	public function test_extract_result_structure(): void {
+		global $wp_filesystem;
 		$temp_file = tempnam( sys_get_temp_dir(), 'dm-video-test-' );
-		file_put_contents( $temp_file, 'fake' );
+		$wp_filesystem->put_contents( $temp_file, 'fake' );
 
 		$result = VideoMetadata::extract( $temp_file );
 

@@ -188,21 +188,21 @@ class Chat {
 				'callback'            => array( self::class, 'list_sessions' ),
 				'permission_callback' => $chat_permission_callback,
 				'args'                => array(
-					'limit'      => array(
+					'limit'    => array(
 						'type'              => 'integer',
 						'required'          => false,
 						'default'           => 20,
 						'description'       => __( 'Maximum sessions to return', 'data-machine' ),
 						'sanitize_callback' => 'absint',
 					),
-					'offset'     => array(
+					'offset'   => array(
 						'type'              => 'integer',
 						'required'          => false,
 						'default'           => 0,
 						'description'       => __( 'Pagination offset', 'data-machine' ),
 						'sanitize_callback' => 'absint',
 					),
-					'context'    => array(
+					'context'  => array(
 						'type'              => 'string',
 						'required'          => false,
 						'description'       => __( 'Context filter (chat, pipeline, system)', 'data-machine' ),
@@ -211,7 +211,7 @@ class Chat {
 							return in_array( $param, array( 'chat', 'pipeline', 'system' ), true );
 						},
 					),
-					'agent_id'   => array(
+					'agent_id' => array(
 						'type'              => 'integer',
 						'required'          => false,
 						'description'       => __( 'Filter sessions by agent ID', 'data-machine' ),
@@ -330,11 +330,11 @@ class Chat {
 		if ( $ability ) {
 			$result = $ability->execute(
 				array(
-					'user_id'    => get_current_user_id(),
-					'agent_id'   => $agent_id,
-					'limit'      => (int) $request->get_param( 'limit' ),
-					'offset'     => (int) $request->get_param( 'offset' ),
-					'context'    => $request->get_param( 'context' ),
+					'user_id'  => get_current_user_id(),
+					'agent_id' => $agent_id,
+					'limit'    => (int) $request->get_param( 'limit' ),
+					'offset'   => (int) $request->get_param( 'offset' ),
+					'context'  => $request->get_param( 'context' ),
 				)
 			);
 
@@ -360,11 +360,11 @@ class Chat {
 			array(
 				'success' => true,
 				'data'    => array(
-					'sessions'   => $sessions,
-					'total'      => $total,
-					'limit'      => $limit,
-					'offset'     => $offset,
-					'context'    => $context,
+					'sessions' => $sessions,
+					'total'    => $total,
+					'limit'    => $limit,
+					'offset'   => $offset,
+					'context'  => $context,
 				),
 			)
 		);

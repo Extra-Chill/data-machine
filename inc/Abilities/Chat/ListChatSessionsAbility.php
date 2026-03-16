@@ -40,25 +40,25 @@ class ListChatSessionsAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'user_id'    => array(
+							'user_id'  => array(
 								'type'        => 'integer',
 								'description' => __( 'User ID to list sessions for.', 'data-machine' ),
 							),
-							'agent_id'   => array(
+							'agent_id' => array(
 								'type'        => array( 'integer', 'null' ),
 								'description' => __( 'Agent ID to filter sessions by. Null or omitted returns all agents.', 'data-machine' ),
 							),
-							'limit'      => array(
+							'limit'    => array(
 								'type'        => 'integer',
 								'default'     => 20,
 								'description' => __( 'Maximum sessions to return (1-100).', 'data-machine' ),
 							),
-							'offset'     => array(
+							'offset'   => array(
 								'type'        => 'integer',
 								'default'     => 0,
 								'description' => __( 'Pagination offset.', 'data-machine' ),
 							),
-							'context'    => array(
+							'context'  => array(
 								'type'        => 'string',
 								'description' => __( 'Context filter (chat, pipeline, system).', 'data-machine' ),
 							),
@@ -68,16 +68,16 @@ class ListChatSessionsAbility {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'    => array( 'type' => 'boolean' ),
-							'sessions'   => array(
+							'success'  => array( 'type' => 'boolean' ),
+							'sessions' => array(
 								'type'  => 'array',
 								'items' => array( 'type' => 'object' ),
 							),
-							'total'      => array( 'type' => 'integer' ),
-							'limit'      => array( 'type' => 'integer' ),
-							'offset'     => array( 'type' => 'integer' ),
-							'context' => array( 'type' => 'string' ),
-							'error'      => array( 'type' => 'string' ),
+							'total'    => array( 'type' => 'integer' ),
+							'limit'    => array( 'type' => 'integer' ),
+							'offset'   => array( 'type' => 'integer' ),
+							'context'  => array( 'type' => 'string' ),
+							'error'    => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'execute' ),
@@ -132,12 +132,12 @@ class ListChatSessionsAbility {
 		$total    = $this->chat_db->get_user_session_count( $user_id, $context, $agent_id );
 
 		return array(
-			'success'    => true,
-			'sessions'   => $sessions,
-			'total'      => $total,
-			'limit'      => $limit,
-			'offset'     => $offset,
-			'context'    => $context,
+			'success'  => true,
+			'sessions' => $sessions,
+			'total'    => $total,
+			'limit'    => $limit,
+			'offset'   => $offset,
+			'context'  => $context,
 		);
 	}
 }

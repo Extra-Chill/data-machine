@@ -179,7 +179,7 @@ class AIStep extends Step {
 		$max_turns = PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
 
 		// Resolve user_id and agent_id from engine snapshot (set by RunFlowAbility).
-		$user_id      = (int) ( $job_snapshot['user_id'] ?? 0 );
+		$user_id = (int) ( $job_snapshot['user_id'] ?? 0 );
 
 		$payload = array(
 			'job_id'       => $this->job_id,

@@ -124,7 +124,7 @@ class Chat extends BaseRepository {
 
 		// Idempotent index normalization: drop legacy, add new — only when needed.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-		$indexes = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i', $table_name ) );
+		$indexes       = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i', $table_name ) );
 		$existing_keys = array_unique( array_column( $indexes, 'Key_name' ) );
 
 		if ( in_array( 'agent_type', $existing_keys, true ) ) {
@@ -227,9 +227,9 @@ class Chat extends BaseRepository {
 				'error',
 				'Failed to create chat session',
 				array(
-					'user_id'    => $user_id,
-					'error'      => $wpdb->last_error,
-					'context'    => $context,
+					'user_id' => $user_id,
+					'error'   => $wpdb->last_error,
+					'context' => $context,
 				)
 			);
 			return '';

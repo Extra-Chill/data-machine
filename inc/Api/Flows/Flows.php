@@ -640,8 +640,8 @@ class Flows {
 			);
 		}
 
-		$memory_files  = $db_flows->get_flow_memory_files( $flow_id );
-		$daily_memory  = $db_flows->get_flow_daily_memory( $flow_id );
+		$memory_files = $db_flows->get_flow_memory_files( $flow_id );
+		$daily_memory = $db_flows->get_flow_daily_memory( $flow_id );
 
 		return rest_ensure_response(
 			array(
@@ -663,10 +663,10 @@ class Flows {
 	 * @return \WP_REST_Response|\WP_Error Response.
 	 */
 	public static function handle_update_memory_files( $request ) {
-		$flow_id       = (int) $request->get_param( 'flow_id' );
-		$params        = $request->get_json_params();
-		$memory_files  = $params['memory_files'] ?? array();
-		$daily_memory  = $params['daily_memory'] ?? null;
+		$flow_id      = (int) $request->get_param( 'flow_id' );
+		$params       = $request->get_json_params();
+		$memory_files = $params['memory_files'] ?? array();
+		$daily_memory = $params['daily_memory'] ?? null;
 
 		$db_flows = new \DataMachine\Core\Database\Flows\Flows();
 		$flow     = $db_flows->get_flow( $flow_id );
@@ -743,7 +743,7 @@ class Flows {
 				break;
 
 			case 'specific_dates':
-				$dates = $config['dates'] ?? array();
+				$dates              = $config['dates'] ?? array();
 				$sanitized['dates'] = array_values(
 					array_filter(
 						array_map(
@@ -768,7 +768,7 @@ class Flows {
 				break;
 
 			case 'months':
-				$months = $config['months'] ?? array();
+				$months              = $config['months'] ?? array();
 				$sanitized['months'] = array_values(
 					array_filter(
 						array_map(

@@ -368,10 +368,10 @@ class DirectoryManager {
 		}
 
 		// 2. System-level default (outside web root).
-		$system_path = '/var/lib/datamachine/workspace';
-		$system_base = dirname( $system_path );
-		$fs          = FilesystemHelper::get();
-		$base_writable = $fs
+		$system_path     = '/var/lib/datamachine/workspace';
+		$system_base     = dirname( $system_path );
+		$fs              = FilesystemHelper::get();
+		$base_writable   = $fs
 			? $fs->is_writable( $system_base )
 			: is_writable( $system_base ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_is_writable
 		$parent_writable = ! $base_writable && ! file_exists( $system_base ) && (

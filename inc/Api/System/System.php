@@ -198,8 +198,8 @@ class System {
 	 */
 	public static function get_tasks( WP_REST_Request $request ) {
 		$request;
-		$registry = TaskRegistry::getRegistry();
-		$last_runs    = self::get_last_runs( array_keys( $registry ) );
+		$registry  = TaskRegistry::getRegistry();
+		$last_runs = self::get_last_runs( array_keys( $registry ) );
 
 		// Merge last-run data into each task entry.
 		$tasks = array();
@@ -451,7 +451,7 @@ class System {
 		if ( ! isset( $definitions[ $prompt_key ] ) ) {
 			return new WP_Error(
 				'invalid_prompt_key',
-				sprintf( __( 'Unknown prompt key "%s" for task type "%s".', 'data-machine' ), $prompt_key, $task_type ),
+				sprintf( __( 'Unknown prompt key "%1$s" for task type "%2$s".', 'data-machine' ), $prompt_key, $task_type ),
 				array( 'status' => 404 )
 			);
 		}
@@ -505,7 +505,7 @@ class System {
 			// phpcs:enable WordPress.DB.PreparedSQL
 
 			if ( $row ) {
-				$row['run_count'] = (int) $count;
+				$row['run_count']      = (int) $count;
 				$results[ $task_type ] = $row;
 			} elseif ( $count > 0 ) {
 				$results[ $task_type ] = array(

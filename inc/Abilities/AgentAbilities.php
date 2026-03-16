@@ -546,7 +546,7 @@ class AgentAbilities {
 				'owner_id'     => (int) $agent['owner_id'],
 				'agent_config' => is_array( $agent['agent_config'] ?? null )
 					? $agent['agent_config']
-					: ( json_decode( $agent['agent_config'] ?? '{}', true ) ?: array() ),
+					: ( json_decode( $agent['agent_config'] ?? '{}', true ) ? json_decode( $agent['agent_config'] ?? '{}', true ) : array() ),
 				'status'       => (string) $agent['status'],
 				'created_at'   => $agent['created_at'] ?? '',
 				'updated_at'   => $agent['updated_at'] ?? '',
@@ -693,7 +693,7 @@ class AgentAbilities {
 					if ( $file->isDir() ) {
 						rmdir( $file->getRealPath() );
 					} else {
-						unlink( $file->getRealPath() );
+						wp_delete_file( $file->getRealPath( ) );
 					}
 				}
 				rmdir( $agent_dir );

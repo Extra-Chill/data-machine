@@ -181,12 +181,14 @@ class LogRepository extends BaseRepository {
 		// Count total.
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		if ( ! empty( $params ) ) {
+			// phpcs:disable WordPress.DB.PreparedSQLPlaceholders -- Dynamic query construction with safe values.
 			$total = (int) $this->wpdb->get_var(
 				$this->wpdb->prepare(
 					"SELECT COUNT(*) FROM {$this->table_name} WHERE {$where_sql}",
 					...$params
 				)
 			);
+			// phpcs:enable WordPress.DB.PreparedSQLPlaceholders
 		} else {
 			$total = (int) $this->wpdb->get_var(
 				"SELECT COUNT(*) FROM {$this->table_name} WHERE {$where_sql}"
@@ -195,6 +197,7 @@ class LogRepository extends BaseRepository {
 
 		// Fetch items.
 		$query_params = array_merge( $params, array( $per_page, $offset ) );
+		// phpcs:disable WordPress.DB.PreparedSQLPlaceholders -- Dynamic query construction with safe values.
 		$items        = $this->wpdb->get_results(
 			$this->wpdb->prepare(
 				"SELECT * FROM {$this->table_name} WHERE {$where_sql} ORDER BY created_at DESC, id DESC LIMIT %d OFFSET %d",
@@ -202,13 +205,14 @@ class LogRepository extends BaseRepository {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQLPlaceholders
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		// Decode context JSON.
 		if ( $items ) {
 			foreach ( $items as &$item ) {
 				if ( ! empty( $item['context'] ) ) {
-					$decoded          = json_decode( $item['context'], true );
+					$decoded         = json_decode( $item['context'], true );
 					$item['context'] = is_array( $decoded ) ? $decoded : array();
 				} else {
 					$item['context'] = array();
@@ -218,7 +222,7 @@ class LogRepository extends BaseRepository {
 		}
 
 		return array(
-			'items' => $items ?: array(),
+			'items' => $items ? $items : array(),
 			'total' => $total,
 			'page'  => $page,
 			'pages' => max( 1, (int) ceil( $total / $per_page ) ),
@@ -233,12 +237,14 @@ class LogRepository extends BaseRepository {
 	 */
 	public function prune_before( string $before_datetime ) {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		return $this->wpdb->query(
 			$this->wpdb->prepare(
 				"DELETE FROM {$this->table_name} WHERE created_at < %s",
 				$before_datetime
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 	}
 
 	/**
@@ -263,7 +269,9 @@ class LogRepository extends BaseRepository {
 	 */
 	public function clear_all() {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		return $this->wpdb->query( "TRUNCATE TABLE {$this->table_name}" );
+		// phpcs:enable WordPress.DB.PreparedSQL
 	}
 
 	/**
@@ -287,6 +295,7 @@ class LogRepository extends BaseRepository {
 
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		if ( ! empty( $params ) ) {
+			// phpcs:disable WordPress.DB.PreparedSQLPlaceholders -- Dynamic query construction with safe values.
 			$row = $this->wpdb->get_row(
 				$this->wpdb->prepare(
 					"SELECT COUNT(*) AS total_entries, MIN(created_at) AS oldest, MAX(created_at) AS newest FROM {$this->table_name} WHERE {$where}",
@@ -294,6 +303,7 @@ class LogRepository extends BaseRepository {
 				),
 				ARRAY_A
 			);
+			// phpcs:enable WordPress.DB.PreparedSQLPlaceholders
 		} else {
 			$row = $this->wpdb->get_row(
 				"SELECT COUNT(*) AS total_entries, MIN(created_at) AS oldest, MAX(created_at) AS newest FROM {$this->table_name} WHERE {$where}",
@@ -326,6 +336,7 @@ class LogRepository extends BaseRepository {
 
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		if ( ! empty( $params ) ) {
+			// phpcs:disable WordPress.DB.PreparedSQLPlaceholders -- Dynamic query construction with safe values.
 			$rows = $this->wpdb->get_results(
 				$this->wpdb->prepare(
 					"SELECT level, COUNT(*) AS cnt FROM {$this->table_name} WHERE {$where} GROUP BY level",
@@ -333,6 +344,7 @@ class LogRepository extends BaseRepository {
 				),
 				ARRAY_A
 			);
+			// phpcs:enable WordPress.DB.PreparedSQLPlaceholders
 		} else {
 			$rows = $this->wpdb->get_results(
 				"SELECT level, COUNT(*) AS cnt FROM {$this->table_name} WHERE {$where} GROUP BY level",

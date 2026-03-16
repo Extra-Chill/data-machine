@@ -145,7 +145,7 @@ abstract class MediaValidator {
 		// Max file size.
 		if ( isset( $constraints['max_file_size'] ) ) {
 			$pass                               = $file_size <= (int) $constraints['max_file_size'];
-			$result['results']['max_file_size']  = $pass;
+			$result['results']['max_file_size'] = $pass;
 			if ( ! $pass ) {
 				$result['valid']    = false;
 				$result['errors'][] = sprintf(
@@ -160,7 +160,7 @@ abstract class MediaValidator {
 		// Allowed MIME types (override default list).
 		if ( isset( $constraints['allowed_mimes'] ) && is_array( $constraints['allowed_mimes'] ) ) {
 			$pass                               = in_array( $mime_type, $constraints['allowed_mimes'], true );
-			$result['results']['allowed_mimes']  = $pass;
+			$result['results']['allowed_mimes'] = $pass;
 			if ( ! $pass ) {
 				$result['valid']    = false;
 				$result['errors'][] = sprintf(
@@ -194,7 +194,7 @@ abstract class MediaValidator {
 		// Duration constraints.
 		if ( isset( $constraints['max_duration'] ) && isset( $metadata['duration'] ) ) {
 			$pass                              = $metadata['duration'] <= (float) $constraints['max_duration'];
-			$result['results']['max_duration']  = $pass;
+			$result['results']['max_duration'] = $pass;
 			if ( ! $pass ) {
 				$result['valid']    = false;
 				$result['errors'][] = sprintf(
@@ -208,7 +208,7 @@ abstract class MediaValidator {
 
 		if ( isset( $constraints['min_duration'] ) && isset( $metadata['duration'] ) ) {
 			$pass                              = $metadata['duration'] >= (float) $constraints['min_duration'];
-			$result['results']['min_duration']  = $pass;
+			$result['results']['min_duration'] = $pass;
 			if ( ! $pass ) {
 				$result['valid']    = false;
 				$result['errors'][] = sprintf(
@@ -222,9 +222,9 @@ abstract class MediaValidator {
 
 		// Codec constraint.
 		if ( isset( $constraints['allowed_codecs'] ) && is_array( $constraints['allowed_codecs'] ) && isset( $metadata['codec'] ) ) {
-			$codec_lower   = strtolower( $metadata['codec'] );
-			$allowed_lower = array_map( 'strtolower', $constraints['allowed_codecs'] );
-			$pass          = in_array( $codec_lower, $allowed_lower, true );
+			$codec_lower                         = strtolower( $metadata['codec'] );
+			$allowed_lower                       = array_map( 'strtolower', $constraints['allowed_codecs'] );
+			$pass                                = in_array( $codec_lower, $allowed_lower, true );
 			$result['results']['allowed_codecs'] = $pass;
 			if ( ! $pass ) {
 				$result['valid']    = false;
@@ -257,7 +257,7 @@ abstract class MediaValidator {
 
 		if ( isset( $constraints['max_width'] ) ) {
 			$pass                           = $width <= (int) $constraints['max_width'];
-			$result['results']['max_width']  = $pass;
+			$result['results']['max_width'] = $pass;
 			if ( ! $pass ) {
 				$result['valid']    = false;
 				$result['errors'][] = sprintf( '%s width (%dpx) exceeds maximum (%dpx)', $label, $width, (int) $constraints['max_width'] );
@@ -266,7 +266,7 @@ abstract class MediaValidator {
 
 		if ( isset( $constraints['max_height'] ) ) {
 			$pass                            = $height <= (int) $constraints['max_height'];
-			$result['results']['max_height']  = $pass;
+			$result['results']['max_height'] = $pass;
 			if ( ! $pass ) {
 				$result['valid']    = false;
 				$result['errors'][] = sprintf( '%s height (%dpx) exceeds maximum (%dpx)', $label, $height, (int) $constraints['max_height'] );
@@ -275,7 +275,7 @@ abstract class MediaValidator {
 
 		if ( isset( $constraints['min_width'] ) ) {
 			$pass                           = $width >= (int) $constraints['min_width'];
-			$result['results']['min_width']  = $pass;
+			$result['results']['min_width'] = $pass;
 			if ( ! $pass ) {
 				$result['valid']    = false;
 				$result['errors'][] = sprintf( '%s width (%dpx) below minimum (%dpx)', $label, $width, (int) $constraints['min_width'] );
@@ -284,7 +284,7 @@ abstract class MediaValidator {
 
 		if ( isset( $constraints['min_height'] ) ) {
 			$pass                            = $height >= (int) $constraints['min_height'];
-			$result['results']['min_height']  = $pass;
+			$result['results']['min_height'] = $pass;
 			if ( ! $pass ) {
 				$result['valid']    = false;
 				$result['errors'][] = sprintf( '%s height (%dpx) below minimum (%dpx)', $label, $height, (int) $constraints['min_height'] );

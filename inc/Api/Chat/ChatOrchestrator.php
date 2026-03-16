@@ -392,7 +392,7 @@ class ChatOrchestrator {
 			$model,
 			array(
 				'context' => 'chat',
-				'user_id'    => $user_id,
+				'user_id' => $user_id,
 			)
 		);
 
@@ -460,9 +460,9 @@ class ChatOrchestrator {
 
 		if ( $ability ) {
 			$input = array(
-				'user_id'    => $user_id,
-				'agent_id'   => $agent_id,
-				'context'    => 'chat',
+				'user_id'  => $user_id,
+				'agent_id' => $agent_id,
+				'context'  => 'chat',
 			);
 
 			if ( $source ) {
@@ -549,14 +549,14 @@ class ChatOrchestrator {
 		$chat_db = new ChatDatabase();
 
 		try {
-			$user_id  = $options['user_id'] ?? 0;
+			$user_id = $options['user_id'] ?? 0;
 
 			if ( $agent_id <= 0 && $user_id > 0 && function_exists( 'datamachine_resolve_or_create_agent_id' ) ) {
 				$agent_id = datamachine_resolve_or_create_agent_id( $user_id );
 			}
 
-			$resolver  = new ToolPolicyResolver();
-			$all_tools = $resolver->resolve( array(
+			$resolver     = new ToolPolicyResolver();
+			$all_tools    = $resolver->resolve( array(
 				'context'  => ToolPolicyResolver::CONTEXT_CHAT,
 				'agent_id' => $agent_id,
 			) );

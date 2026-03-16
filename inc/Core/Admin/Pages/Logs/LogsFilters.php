@@ -40,23 +40,23 @@ function datamachine_register_logs_admin_page_filters() {
 				'position'   => 30,
 				'templates'  => __DIR__ . '/templates/',
 				'assets'     => array(
-				'css' => array(
-					'wp-components'         => array(
-						'file'  => null, // Use WordPress core version
-						'deps'  => array(),
-						'media' => 'all',
+					'css' => array(
+						'wp-components'         => array(
+							'file'  => null, // Use WordPress core version
+							'deps'  => array(),
+							'media' => 'all',
+						),
+						'datamachine-tabs'      => array(
+							'file'  => 'inc/Core/Admin/shared/styles/tabs.css',
+							'deps'  => array(),
+							'media' => 'all',
+						),
+						'datamachine-logs-page' => array(
+							'file'  => 'inc/Core/Admin/Pages/Logs/assets/css/logs-page.css',
+							'deps'  => array(),
+							'media' => 'all',
+						),
 					),
-					'datamachine-tabs'      => array(
-						'file'  => 'inc/Core/Admin/shared/styles/tabs.css',
-						'deps'  => array(),
-						'media' => 'all',
-					),
-					'datamachine-logs-page' => array(
-						'file'  => 'inc/Core/Admin/Pages/Logs/assets/css/logs-page.css',
-						'deps'  => array(),
-						'media' => 'all',
-					),
-				),
 					'js'  => array(
 						'datamachine-logs-react' => array(
 							'file'      => 'inc/Core/Admin/assets/build/logs-react.js',

@@ -151,7 +151,7 @@ class AgentAccess extends BaseRepository {
 		);
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 
-		return $row ?: null;
+		return $row ? $row : null;
 	}
 
 	/**
@@ -190,7 +190,7 @@ class AgentAccess extends BaseRepository {
 			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		}
 
-		return array_map( 'intval', $results ?: array() );
+		return array_map( 'intval', $results ? $results : array() );
 	}
 
 	/**
@@ -211,7 +211,7 @@ class AgentAccess extends BaseRepository {
 		);
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 
-		return $results ?: array();
+		return $results ? $results : array();
 	}
 
 	/**
@@ -272,7 +272,11 @@ class AgentAccess extends BaseRepository {
 	 * @return bool
 	 */
 	private function role_meets_minimum( string $actual_role, string $minimum_role ): bool {
-		$hierarchy = array( 'viewer' => 0, 'operator' => 1, 'admin' => 2 );
+		$hierarchy = array(
+			'viewer'   => 0,
+			'operator' => 1,
+			'admin'    => 2,
+		);
 
 		$actual_level  = $hierarchy[ $actual_role ] ?? -1;
 		$minimum_level = $hierarchy[ $minimum_role ] ?? 0;

@@ -235,7 +235,7 @@ class AgentMemoryAbilities {
 		$user_id  = (int) ( $input['user_id'] ?? 0 );
 		$agent_id = (int) ( $input['agent_id'] ?? 0 );
 		$memory   = new AgentMemory( $user_id, $agent_id );
-		$section = $input['section'] ?? null;
+		$section  = $input['section'] ?? null;
 
 		if ( null === $section || '' === $section ) {
 			return $memory->get_all();
@@ -254,9 +254,9 @@ class AgentMemoryAbilities {
 		$user_id  = (int) ( $input['user_id'] ?? 0 );
 		$agent_id = (int) ( $input['agent_id'] ?? 0 );
 		$memory   = new AgentMemory( $user_id, $agent_id );
-		$section = $input['section'];
-		$content = $input['content'];
-		$mode    = $input['mode'];
+		$section  = $input['section'];
+		$content  = $input['content'];
+		$mode     = $input['mode'];
 
 		if ( 'append' === $mode ) {
 			return $memory->append_to_section( $section, $content );
@@ -275,8 +275,8 @@ class AgentMemoryAbilities {
 		$user_id  = (int) ( $input['user_id'] ?? 0 );
 		$agent_id = (int) ( $input['agent_id'] ?? 0 );
 		$memory   = new AgentMemory( $user_id, $agent_id );
-		$query   = $input['query'];
-		$section = $input['section'] ?? null;
+		$query    = $input['query'];
+		$section  = $input['section'] ?? null;
 
 		return $memory->search( $query, $section );
 	}

@@ -71,12 +71,12 @@ class SettingsAbilities {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'success'      => array( 'type' => 'boolean' ),
-						'settings'     => array( 'type' => 'object' ),
-						'defaults'     => array( 'type' => 'object' ),
+						'success'          => array( 'type' => 'boolean' ),
+						'settings'         => array( 'type' => 'object' ),
+						'defaults'         => array( 'type' => 'object' ),
 						'network_settings' => array( 'type' => 'object' ),
-						'global_tools' => array( 'type' => 'object' ),
-						'error'        => array( 'type' => 'string' ),
+						'global_tools'     => array( 'type' => 'object' ),
+						'error'            => array( 'type' => 'string' ),
 					),
 				),
 				'execute_callback'    => array( $this, 'executeGetSettings' ),
@@ -574,7 +574,7 @@ class SettingsAbilities {
 				}
 
 				if ( is_array( $raw_network_context_models ) ) {
-					$valid_context_ids     = array_column( PluginSettings::getContexts(), 'id' );
+					$valid_context_ids      = array_column( PluginSettings::getContexts(), 'id' );
 					$network_context_models = array();
 					foreach ( $raw_network_context_models as $context => $config ) {
 						if ( in_array( $context, $valid_context_ids, true ) && is_array( $config ) ) {
@@ -624,8 +624,8 @@ class SettingsAbilities {
 		PluginSettings::clearCache();
 
 		// Identify unhandled keys so callers know if something was ignored.
-		$input_keys    = array_keys( $input );
-		$unhandled     = array_diff( $input_keys, $handled_keys );
+		$input_keys = array_keys( $input );
+		$unhandled  = array_diff( $input_keys, $handled_keys );
 
 		$result = array(
 			'success' => true,

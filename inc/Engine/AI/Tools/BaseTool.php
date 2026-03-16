@@ -54,7 +54,7 @@ abstract class BaseTool {
 				} else {
 					// Array definition — merge contexts directly.
 					$toolDefinition['contexts'] = $contexts;
-					$tools[ $toolName ]          = $toolDefinition;
+					$tools[ $toolName ]         = $toolDefinition;
 				}
 				return $tools;
 			}

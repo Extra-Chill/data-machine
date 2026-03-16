@@ -11,8 +11,6 @@
 
 namespace DataMachine\Engine\Actions;
 
-
-
 // Prevent direct access
 if ( ! defined( 'WPINC' ) ) {
 	die;

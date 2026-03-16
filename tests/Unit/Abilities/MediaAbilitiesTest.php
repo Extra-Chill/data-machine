@@ -163,8 +163,9 @@ class MediaAbilitiesTest extends WP_UnitTestCase {
 	 * Test video-metadata returns structured data.
 	 */
 	public function test_video_metadata_returns_structure(): void {
+		global $wp_filesystem;
 		$temp_file = tempnam( sys_get_temp_dir(), 'dm-video-test-' );
-		file_put_contents( $temp_file, str_repeat( 'x', 100 ) );
+		$wp_filesystem->put_contents( $temp_file, str_repeat( 'x', 100 ) );
 
 		$result = $this->abilities->executeVideoMetadata( array(
 			'path' => $temp_file,
