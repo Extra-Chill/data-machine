@@ -6,7 +6,7 @@ AI tools provide capabilities to AI agents for interacting with external service
 
 ### Global Tools (Universal)
 
-Available to all AI agents (pipeline + chat) via `datamachine_global_tools` filter:
+Available to all AI agents (pipeline + chat + standalone) via `datamachine_global_tools` filter:
 
 **Google Search** (`google_search`)
 - **Purpose**: Search Google and return structured JSON results with titles, links, and snippets from external websites. Use for external information, current events, and fact-checking.
@@ -36,6 +36,66 @@ Available to all AI agents (pipeline + chat) via `datamachine_global_tools` filt
 - **Features**: Modifies name, slug, description, parent, and custom meta (e.g., venue_address).
 - **Use Cases**: Correcting venue details, updating artist bios, managing taxonomy hierarchies.
 - **Documentation**: [Update Taxonomy Term](update-taxonomy-term.md)
+
+**Agent Memory** (`agent_memory`) (@since v0.30.0)
+- **Purpose**: Manage persistent agent memory (MEMORY.md) — long-lived knowledge that survives across sessions. Stored as markdown sections (## headers).
+- **Configuration**: None required
+- **Features**: Actions: `list_sections` (see what exists), `get` (read content), `update` (write). Supports `append` mode to add without losing existing content and `set` mode to replace a section entirely. Optional `user_id` for layered memory context.
+- **Use Cases**: Persistent knowledge storage, cross-session state, agent self-improvement
+
+**Agent Daily Memory** (`agent_daily_memory`) (@since v0.33.0)
+- **Purpose**: Manage daily memory journal entries (daily/YYYY/MM/DD.md). Use for session activity, temporal events, and work logs.
+- **Configuration**: None required
+- **Features**: Actions: `write` (record session notes, defaults to append), `read` (review a specific day), `search` (find past entries by keyword), `list` (see which days have entries). Date defaults to today. Supports `from`/`to` range for search.
+- **Use Cases**: Session logging, temporal event tracking, work history review
+
+**Internal Link Audit** (`internal_link_audit`) (@since v0.32.0)
+- **Purpose**: Audit links on the WordPress site. Three actions: `audit` scans post content to build a link graph (cached 24hr), `orphans` lists posts with zero inbound links, `broken` performs HTTP HEAD checks on cached links to find broken URLs.
+- **Configuration**: None required
+- **Features**: Post type and category filtering, force rebuild option, internal/external/all scope for broken link checks, configurable result limits
+- **Use Cases**: SEO link auditing, orphaned content discovery, broken link detection
+
+**GitHub Tools** — multi-tool class (@since v0.33.0)
+- `list_github_issues` — List issues from a GitHub repository with state, label, and pagination filters
+- `get_github_issue` — Get a single GitHub issue with full details including body, labels, and comments
+- `manage_github_issue` — Update, close, or comment on a GitHub issue
+- `list_github_pulls` — List pull requests from a repository with state filtering
+- `list_github_repos` — List GitHub repositories for a user or organization
+- **Configuration**: GitHub PAT required
+- **Use Cases**: Issue tracking, PR monitoring, repository discovery
+
+**GitHub Issue Creator** (`create_github_issue`) (@since v0.24.0)
+- **Purpose**: Create a GitHub issue in a repository. Async — uses System Agent for execution.
+- **Configuration**: GitHub PAT required
+- **Features**: Supports title, body (GitHub Markdown), labels, and repo selection from configured defaults
+- **Use Cases**: Bug reports, feature requests, task tracking from AI workflows
+
+**Workspace Tools** — multi-tool class (@since v0.37.0)
+- `workspace_path` — Get the Data Machine workspace path, optionally ensure it exists
+- `workspace_list` — List repositories currently present in the workspace
+- `workspace_show` — Show detailed repo info (branch, remote, latest commit, dirty count)
+- `workspace_ls` — List directory contents within a workspace repository
+- `workspace_read` — Read a text file from a workspace repo with optional offset/limit for large files
+- **Configuration**: None required
+- **Use Cases**: Repository browsing, code review, workspace navigation
+
+**Image Generation** (`image_generation`)
+- **Purpose**: Generate images using AI models (Google Imagen 4, Flux, etc.) via Replicate. Returns a URL to the generated image. Async — uses System Agent.
+- **Configuration**: Replicate API key required
+- **Features**: Default aspect ratio 3:4 (portrait, ideal for Pinterest/blog featured images). Supports 1:1, 3:4, 4:3, 9:16, 16:9 ratios. Configurable model selection.
+- **Use Cases**: Featured image generation, visual content creation, illustration
+
+**Amazon Affiliate Link** (`amazon_affiliate_link`) (@since v0.24.0)
+- **Purpose**: Search Amazon products and return an affiliate link with the product title, URL, and thumbnail.
+- **Configuration**: Amazon affiliate credentials required
+- **Features**: Single-query product search, returns product title + affiliate URL + thumbnail
+- **Use Cases**: Contextual product recommendations in content, affiliate monetization
+
+**Queue Validator** (`queue_validator`)
+- **Purpose**: Check if a topic already exists as a published post or in a Data Machine queue before generating content. Returns "clear" if no duplicates found, or "duplicate" with match details.
+- **Configuration**: None required
+- **Features**: Title similarity scoring via Jaccard threshold (configurable, default 0.65), checks both published posts and flow queues, supports post type filtering
+- **Use Cases**: Duplicate prevention before content generation, queue hygiene
 
 **Google Search Console** (`google_search_console`) (@since v0.25.0)
 - **Purpose**: Fetch search analytics from Google Search Console — query performance, page stats, URL inspection, and sitemap management.
@@ -127,6 +187,114 @@ Available only to chat AI agents via `datamachine_chat_tools` filter. These spec
 - **Features**: Modify flow names, change scheduling intervals, switch to manual execution
 - **Use Cases**: Workflow organization, schedule adjustments, maintenance operations
 
+**DeletePipeline** (`delete_pipeline`)
+- **Purpose**: Delete a pipeline and all its associated flows
+- **Configuration**: None required
+- **Use Cases**: Pipeline cleanup, workflow removal
+
+**DeleteFlow** (`delete_flow`)
+- **Purpose**: Delete a flow instance
+- **Configuration**: None required
+- **Use Cases**: Flow cleanup, removing unused workflow instances
+
+**CopyFlow** (`copy_flow`) (@since v0.6.25)
+- **Purpose**: Copy a flow to the same or different pipeline. Cross-pipeline requires compatible step structures. Copies handlers, messages, and schedule.
+- **Configuration**: None required
+- **Features**: Override schedule and step configs during copy via optional parameters
+- **Use Cases**: Flow duplication, cross-pipeline flow migration, template instantiation
+
+**ListFlows** (`list_flows`)
+- **Purpose**: List flows with optional filtering by pipeline ID or handler slug. Supports pagination.
+- **Configuration**: None required
+- **Use Cases**: Flow discovery, workflow inventory, dashboard queries
+
+**DeletePipelineStep** (`delete_pipeline_step`)
+- **Purpose**: Remove a step from a pipeline. Cascades removal to all flows on the pipeline.
+- **Configuration**: None required
+- **Use Cases**: Pipeline step cleanup, simplifying workflow structure
+
+**ReorderPipelineSteps** (`reorder_pipeline_steps`)
+- **Purpose**: Reorder steps within a pipeline by providing a new step order array
+- **Configuration**: None required
+- **Use Cases**: Pipeline restructuring, execution order adjustments
+
+**ManageJobs** (`manage_jobs`) (@since v0.24.0)
+- **Purpose**: Manage Data Machine jobs with actions: `list` (with filtering by flow_id, pipeline_id, status), `summary` (counts by status), `delete` (by type: all or failed), `fail` (manually fail a job), `retry` (retry a failed job), `recover` (recover stuck processing jobs).
+- **Configuration**: None required
+- **Use Cases**: Job monitoring, failure recovery, execution management
+
+**ManageLogs** (`manage_logs`) (@since v0.8.2)
+- **Purpose**: Manage Data Machine logs with actions: `clear` (clear logs for agent_id or all), `get_metadata` (get log counts and time range for agent_id or all). Logs are scoped by agent_id.
+- **Configuration**: None required
+- **Use Cases**: Log maintenance, storage management, log metadata inspection
+
+**ReadLogs** (`read_logs`) (@since v0.8.2)
+- **Purpose**: Read Data Machine logs for troubleshooting. Filter by agent_id, job_id, pipeline_id, flow_id (combined with AND logic). Modes: `recent` (default, limited) or `full`.
+- **Configuration**: None required
+- **Use Cases**: Troubleshooting, execution auditing, error investigation
+
+**ManageQueue** (`manage_queue`) (@since v0.24.0)
+- **Purpose**: Manage prompt queues for flow steps with actions: `add`, `list`, `clear`, `remove`, `update`, `move`, `settings`. All actions require flow_id and flow_step_id.
+- **Configuration**: None required
+- **Use Cases**: Queue management, prompt scheduling, content pipeline control
+
+**SendPing** (`send_ping`) (@since v0.24.0)
+- **Purpose**: Send a ping to one or more webhook URLs. Useful for triggering external agents or notifying services.
+- **Configuration**: None required
+- **Features**: Accepts single or newline-separated URLs, optional prompt for receiving agent
+- **Use Cases**: Agent orchestration, webhook notifications, external service triggers
+
+**SystemHealthCheck** (`system_health_check`) (@since v0.24.0)
+- **Purpose**: Run unified health diagnostics for Data Machine and extensions. Returns status of various system components.
+- **Configuration**: None required
+- **Features**: Supports specific check types or "all" for full diagnostics, type-specific options
+- **Use Cases**: System monitoring, proactive issue detection, health reporting
+
+**GetProblemFlows** (`get_problem_flows`)
+- **Purpose**: Identify flows with issues: consecutive failures (broken) or consecutive no-items runs (source exhausted). Configurable threshold.
+- **Configuration**: None required
+- **Use Cases**: Proactive flow monitoring, failure detection, source exhaustion alerts
+
+**GetHandlerDefaults** (`get_handler_defaults`)
+- **Purpose**: Get site-wide handler defaults. Returns defaults for a specific handler or all handlers.
+- **Configuration**: None required
+- **Use Cases**: Configuration discovery, understanding site standards before flow setup
+
+**SetHandlerDefaults** (`set_handler_defaults`)
+- **Purpose**: Set site-wide handler defaults. Establishes standard configuration values that apply to all new flows.
+- **Configuration**: None required
+- **Use Cases**: Standardizing handler configuration, site-wide defaults management
+
+**SearchTaxonomyTerms** (`search_taxonomy_terms`)
+- **Purpose**: Search existing taxonomy terms to discover what terms exist before creating new ones or configuring handler assignments.
+- **Configuration**: None required
+- **Use Cases**: Term discovery, duplicate prevention, handler configuration
+
+**CreateTaxonomyTerm** (`create_taxonomy_term`)
+- **Purpose**: Create a taxonomy term if it does not exist. Supports hierarchical terms with parent assignment.
+- **Configuration**: None required
+- **Use Cases**: Taxonomy setup during flow configuration, creating categories/tags on demand
+
+**AssignTaxonomyTerm** (`assign_taxonomy_term`)
+- **Purpose**: Assign a taxonomy term to one or more posts. Can append to existing terms or replace them.
+- **Configuration**: None required
+- **Use Cases**: Bulk term assignment, content categorization, taxonomy management
+
+**MergeTaxonomyTerms** (`merge_taxonomy_terms`)
+- **Purpose**: Merge two taxonomy terms into one. Reassigns all posts from source to target, optionally merges meta data, then deletes the source term.
+- **Configuration**: None required
+- **Use Cases**: Consolidating duplicate terms, taxonomy cleanup
+
+**AuthenticateHandler** (`authenticate_handler`) (@since v0.6.1)
+- **Purpose**: Manage authentication for handlers with actions: `list` (all handlers requiring auth), `status` (specific handler), `configure` (save credentials), `get_oauth_url` (authorization URL for OAuth), `disconnect` (remove auth).
+- **Configuration**: None required
+- **Use Cases**: Handler authentication setup, OAuth flow management, credential management
+
+**DeleteFile** (`delete_file`)
+- **Purpose**: Delete an uploaded file. Requires flow_step_id to identify the file scope.
+- **Configuration**: None required
+- **Use Cases**: File cleanup, storage management
+
 ### Handler-Specific Tools
 
 Available only when next step matches the handler type, registered via `chubes_ai_tools` filter:
@@ -146,7 +314,7 @@ Available only when next step matches the handler type, registered via `chubes_a
 
 ### Registration System
 
-**Global Tools** (available to all AI agents - pipeline + chat):
+**Global Tools** (available to all AI agents - pipeline + chat + standalone):
 ```php
 // Registered via datamachine_global_tools filter
 add_filter('datamachine_global_tools', function($tools) {
@@ -170,14 +338,25 @@ add_filter('datamachine_global_tools', function($tools) {
 ## Tool Directory Structure
 
 Global tools are located in `/inc/Engine/AI/Tools/Global/`:
+- `AgentMemory.php` - Section-based persistent memory read/write (MEMORY.md)
+- `AgentDailyMemory.php` - Daily memory journal file access (daily/YYYY/MM/DD.md)
+- `AmazonAffiliateLink.php` - Amazon product search with affiliate links
+- `BingWebmaster.php` - Bing Webmaster Tools analytics (delegates to `BingWebmasterAbilities`)
+- `GitHubTools.php` - GitHub repository operations (issues, PRs, repos — multi-tool)
+- `GoogleAnalytics.php` - Google Analytics GA4 data (delegates to `GoogleAnalyticsAbilities`)
 - `GoogleSearch.php` - Web search with Custom Search API
+- `GoogleSearchConsole.php` - Google Search Console analytics (delegates to `GoogleSearchConsoleAbilities`)
+- `ImageGeneration.php` - AI image generation via Replicate (async, System Agent)
+- `InternalLinkAudit.php` - Internal link auditing, orphan detection, broken link checks
 - `LocalSearch.php` - WordPress internal search
+- `PageSpeed.php` - PageSpeed Insights Lighthouse audits (delegates to `PageSpeedAbilities`)
+- `QueueValidator.php` - Flow queue duplicate validation before content generation
 - `WebFetch.php` - Web page content retrieval
 - `WordPressPostReader.php` - Single post analysis
-- `GoogleSearchConsole.php` - Google Search Console analytics (delegates to `GoogleSearchConsoleAbilities`)
-- `BingWebmaster.php` - Bing Webmaster Tools analytics (delegates to `BingWebmasterAbilities`)
-- `GoogleAnalytics.php` - Google Analytics GA4 data (delegates to `GoogleAnalyticsAbilities`)
-- `PageSpeed.php` - PageSpeed Insights Lighthouse audits (delegates to `PageSpeedAbilities`)
+- `WorkspaceTools.php` - Workspace repository operations (list, show, read, browse — multi-tool)
+
+Additional global tools outside the Global directory:
+- `GitHubIssueTool.php` (`/inc/Engine/AI/Tools/`) - GitHub issue creation (async, System Agent)
 
 Analytics abilities are located in `/inc/Abilities/Analytics/`:
 - `GoogleSearchConsoleAbilities.php` - GSC API integration and JWT auth
@@ -186,14 +365,35 @@ Analytics abilities are located in `/inc/Abilities/Analytics/`:
 - `PageSpeedAbilities.php` - PageSpeed Insights API integration
 
 Chat-specific tools at `/inc/Api/Chat/Tools/`:
-- `ExecuteWorkflowTool.php` - Direct workflow execution with Execute API delegation
 - `AddPipelineStep.php` - Add steps to pipelines with flow synchronization
 - `ApiQuery.php` - REST API discovery and queries with comprehensive endpoint documentation
+- `AssignTaxonomyTerm.php` - Assign taxonomy terms to posts
+- `AuthenticateHandler.php` - Handler authentication management (OAuth, credentials)
 - `ConfigureFlowSteps.php` - Flow step configuration (single and bulk modes)
 - `ConfigurePipelineStep.php` - Pipeline-level AI settings configuration
+- `CopyFlow.php` - Flow duplication within or across pipelines
 - `CreateFlow.php` - Flow instance creation with scheduling support
 - `CreatePipeline.php` - Pipeline creation with optional predefined steps
+- `CreateTaxonomyTerm.php` - Taxonomy term creation
+- `DeleteFile.php` - Uploaded file deletion
+- `DeleteFlow.php` - Flow deletion
+- `DeletePipeline.php` - Pipeline and associated flows deletion
+- `DeletePipelineStep.php` - Pipeline step removal with flow cascade
+- `ExecuteWorkflowTool.php` - Direct workflow execution with Execute API delegation
+- `GetHandlerDefaults.php` - Site-wide handler defaults retrieval
+- `GetProblemFlows.php` - Problem flow detection (failures, exhausted sources)
+- `ListFlows.php` - Flow listing with filtering and pagination
+- `ManageJobs.php` - Job management (list, summary, delete, fail, retry, recover)
+- `ManageLogs.php` - Log management (clear, metadata)
+- `ManageQueue.php` - Flow step queue management (add, list, clear, remove, update, move)
+- `MergeTaxonomyTerms.php` - Taxonomy term merging and consolidation
+- `ReadLogs.php` - Log reading with filtering and mode selection
+- `ReorderPipelineSteps.php` - Pipeline step reordering
 - `RunFlow.php` - Flow execution and scheduling with job tracking
+- `SearchTaxonomyTerms.php` - Taxonomy term search and discovery
+- `SendPing.php` - Webhook ping for agent orchestration
+- `SetHandlerDefaults.php` - Site-wide handler defaults configuration
+- `SystemHealthCheck.php` - System health diagnostics
 - `UpdateFlow.php` - Flow property updates and scheduling modifications
 
 Handler-specific tools registered via `chubes_ai_tools` filter using HandlerRegistrationTrait in each handler class.
