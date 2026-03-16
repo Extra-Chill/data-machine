@@ -11,6 +11,7 @@
 namespace DataMachine\Tests\Unit\Abilities;
 
 use DataMachine\Abilities\DuplicateCheck\DuplicateCheckAbility;
+use DataMachine\Core\WordPress\PostTracking;
 use WP_UnitTestCase;
 
 class DuplicateCheckAbilityTest extends WP_UnitTestCase {
@@ -148,6 +149,32 @@ class DuplicateCheckAbilityTest extends WP_UnitTestCase {
 		) );
 
 		$this->assertSame( 'duplicate', $result['verdict'] );
+	}
+
+	public function test_check_duplicate_finds_published_post_by_source_url(): void {
+		$post_id = self::factory()->post->create(
+			array(
+				'post_title'  => 'Original Bonnaroo Story',
+				'post_status' => 'publish',
+				'post_type'   => 'post',
+			)
+		);
+
+		update_post_meta( $post_id, PostTracking::SOURCE_URL_META_KEY, 'https://www.reddit.com/r/bonnaroo/comments/abc123/original_story/' );
+
+		$ability = wp_get_ability( 'datamachine/check-duplicate' );
+		$result  = $ability->execute(
+			array(
+				'title'      => 'Completely Rewritten Bonnaroo Headline',
+				'post_type'  => 'post',
+				'scope'      => 'published',
+				'source_url' => 'https://www.reddit.com/r/bonnaroo/comments/abc123/original_story/',
+			)
+		);
+
+		$this->assertSame( 'duplicate', $result['verdict'] );
+		$this->assertSame( 'published_post_source_url', $result['source'] );
+		$this->assertSame( $post_id, $result['match']['post_id'] );
 	}
 
 	// -----------------------------------------------------------------------

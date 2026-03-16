@@ -11,6 +11,7 @@
 namespace DataMachine\Abilities\Publish;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\WordPress\PostTracking;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
 
 defined( 'ABSPATH' ) || exit;
@@ -318,6 +319,10 @@ class PublishWordPressAbility {
 					'published_url' => get_permalink( $post_id ),
 				)
 			);
+		}
+
+		if ( ! empty( $source_url ) ) {
+			update_post_meta( $post_id, PostTracking::SOURCE_URL_META_KEY, esc_url_raw( $source_url ) );
 		}
 
 		$logs[] = array(

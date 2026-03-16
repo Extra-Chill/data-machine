@@ -31,6 +31,7 @@ class PostTracking {
 	public const HANDLER_META_KEY     = '_datamachine_post_handler';
 	public const FLOW_ID_META_KEY     = '_datamachine_post_flow_id';
 	public const PIPELINE_ID_META_KEY = '_datamachine_post_pipeline_id';
+	public const SOURCE_URL_META_KEY  = '_datamachine_source_url';
 
 	/**
 	 * Store post tracking metadata from tool call context.
