@@ -49,6 +49,127 @@ class EventIdentifierGenerator {
 	}
 
 	/**
+	 * Classify event identity confidence.
+	 *
+	 * High confidence requires date and venue. Medium confidence allows strong
+	 * title + date, but weak/generic titles remain low confidence.
+	 *
+	 * @param string $title     Event title.
+	 * @param string $startDate Event start date/datetime.
+	 * @param string $venue     Venue name.
+	 * @return string One of high|medium|low.
+	 */
+	public static function getIdentityConfidence( string $title, string $startDate, string $venue ): string {
+		if ( '' === trim( $title ) || '' === trim( $startDate ) ) {
+			return 'low';
+		}
+
+		if ( self::isLowConfidenceTitle( $title ) ) {
+			return 'low';
+		}
+
+		if ( '' !== trim( $venue ) ) {
+			return 'high';
+		}
+
+		if ( self::hasSpecificTitleSignal( $title ) ) {
+			return 'medium';
+		}
+
+		return 'low';
+	}
+
+	/**
+	 * Determine whether a title is too generic for aggressive dedupe.
+	 *
+	 * @param string $title Event title.
+	 * @return bool True when the title is too weak/generic.
+	 */
+	public static function isLowConfidenceTitle( string $title ): bool {
+		$normalized = SimilarityEngine::normalizeTitle( $title );
+
+		if ( '' === $normalized ) {
+			return true;
+		}
+
+		$token_count = count( array_filter( explode( ' ', $normalized ) ) );
+		if ( $token_count <= 1 ) {
+			return true;
+		}
+
+		if ( $token_count <= 2 && ! self::hasStrongTokenSignal( $normalized ) ) {
+			return true;
+		}
+
+		if ( self::looksLikeScheduleBlob( $title ) && $token_count <= 6 ) {
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Check whether title has enough specificity to be medium confidence.
+	 *
+	 * @param string $title Event title.
+	 * @return bool True when title appears specific enough.
+	 */
+	public static function hasSpecificTitleSignal( string $title ): bool {
+		$normalized = SimilarityEngine::normalizeTitle( $title );
+		if ( '' === $normalized ) {
+			return false;
+		}
+
+		$token_count = count( array_filter( explode( ' ', $normalized ) ) );
+
+		return $token_count >= 3 && ! self::isLowConfidenceTitle( $title );
+	}
+
+	/**
+	 * Check whether a normalized title includes at least one strong token.
+	 *
+	 * Strong tokens are length-based and generic-agnostic. We deliberately avoid
+	 * hardcoded event/festival words here.
+	 *
+	 * @param string $normalized_title Normalized title.
+	 * @return bool True when any token appears specific enough.
+	 */
+	private static function hasStrongTokenSignal( string $normalized_title ): bool {
+		$tokens = array_filter( explode( ' ', $normalized_title ) );
+
+		foreach ( $tokens as $token ) {
+			if ( strlen( $token ) >= 5 ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Detect schedule/blob style titles structurally.
+	 *
+	 * This catches titles dominated by repeated time ranges or delimiter-heavy
+	 * lineup formatting without hardcoding event-specific vocabulary.
+	 *
+	 * @param string $title Raw title.
+	 * @return bool True when the title looks like a schedule blob.
+	 */
+	private static function looksLikeScheduleBlob( string $title ): bool {
+		$raw = html_entity_decode( $title, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+
+		if ( preg_match_all( '/\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i', $raw ) >= 2 ) {
+			return true;
+		}
+
+		if ( preg_match_all( '/(?:,|\/|\||;|\s[-—]\s)/u', $raw ) >= 4 ) {
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
 	 * Extract core identifying portion of event title
 	 *
 	 * Delegates to the unified SimilarityEngine which consolidates the

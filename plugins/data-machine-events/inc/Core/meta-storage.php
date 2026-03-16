@@ -191,12 +191,12 @@ function data_machine_events_sync_datetime_meta( $post_id, $post, $update ) {
 	foreach ( $blocks as $block ) {
 		if ( 'data-machine-events/event-details' === $block['blockName'] ) {
 			$start_date = $block['attrs']['startDate'] ?? '';
-			$start_time = $block['attrs']['startTime'] ?? '00:00:00';
+			$start_time = $block['attrs']['startTime'] ?? '';
 			$end_date   = $block['attrs']['endDate'] ?? '';
 			$end_time   = $block['attrs']['endTime'] ?? '';
 
-			$start_time_parts = explode( ':', $start_time );
-			if ( count( $start_time_parts ) === 2 ) {
+			$start_time_parts = $start_time ? explode( ':', $start_time ) : array();
+			if ( $start_time && count( $start_time_parts ) === 2 ) {
 				$start_time .= ':00';
 			}
 
@@ -206,20 +206,15 @@ function data_machine_events_sync_datetime_meta( $post_id, $post, $update ) {
 			}
 
 			if ( $start_date ) {
-				$datetime = $start_date . ' ' . $start_time;
+				$effective_start_time = $start_time ? $start_time : '00:00:00';
+				$datetime             = $start_date . ' ' . $effective_start_time;
 				update_post_meta( $post_id, EVENT_DATETIME_META_KEY, $datetime );
 
 				if ( $end_date ) {
-					$effective_end_time = $end_time ? $end_time : '23:59:59';
+					$effective_end_time = $end_time ? $end_time : $effective_start_time;
 					$end_datetime_val   = $end_date . ' ' . $effective_end_time;
 				} else {
-					try {
-						$start_dt = new \DateTime( $datetime );
-						$start_dt->modify( '+3 hours' );
-						$end_datetime_val = $start_dt->format( 'Y-m-d H:i:s' );
-					} catch ( \Exception $e ) {
-						$end_datetime_val = $datetime;
-					}
+					$end_datetime_val = $datetime;
 				}
 				update_post_meta( $post_id, EVENT_END_DATETIME_META_KEY, $end_datetime_val );
 			} else {

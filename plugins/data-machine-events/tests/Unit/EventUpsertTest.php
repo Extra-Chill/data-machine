@@ -142,4 +142,39 @@ class EventUpsertTest extends WP_UnitTestCase {
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'error', $result );
 	}
+
+	public function test_datetime_confidence_none_without_start_date(): void {
+		$method = new \ReflectionMethod( $this->handler, 'getDateTimeConfidence' );
+		$method->setAccessible( true );
+
+		$engine = new \DataMachine\Core\EngineData( array(), 0 );
+
+		$result = $method->invoke(
+			$this->handler,
+			array(
+				'title' => 'Weak Event',
+			),
+			$engine
+		);
+
+		$this->assertSame( 'none', $result );
+	}
+
+	public function test_datetime_confidence_date_only_without_start_time(): void {
+		$method = new \ReflectionMethod( $this->handler, 'getDateTimeConfidence' );
+		$method->setAccessible( true );
+
+		$engine = new \DataMachine\Core\EngineData( array(), 0 );
+
+		$result = $method->invoke(
+			$this->handler,
+			array(
+				'title'     => 'Date Only Event',
+				'startDate' => '2026-03-20',
+			),
+			$engine
+		);
+
+		$this->assertSame( 'date_only', $result );
+	}
 }

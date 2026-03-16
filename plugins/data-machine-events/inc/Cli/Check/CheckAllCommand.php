@@ -64,6 +64,7 @@ class CheckAllCommand {
 		$limit      = $assoc_args['limit'] ?? '10';
 
 		$checks = array(
+			'quality'    => 'Unified Quality Audit',
 			'times'      => 'Time Issues',
 			'venues'     => 'Venue Issues',
 			'encoding'   => 'Encoding Issues',

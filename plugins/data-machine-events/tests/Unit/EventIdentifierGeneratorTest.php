@@ -244,4 +244,23 @@ class EventIdentifierGeneratorTest extends WP_UnitTestCase {
 
 		$this->assertEquals( $engine, $core, 'extractCoreTitle should delegate to SimilarityEngine::normalizeTitle' );
 	}
+
+	public function test_low_confidence_short_non_specific_title(): void {
+		$this->assertTrue( EventIdentifierGenerator::isLowConfidenceTitle( 'Showcase' ) );
+		$this->assertSame( 'low', EventIdentifierGenerator::getIdentityConfidence( 'Showcase', '2026-03-10', '' ) );
+	}
+
+	public function test_specific_title_without_venue_is_medium_confidence(): void {
+		$this->assertFalse( EventIdentifierGenerator::isLowConfidenceTitle( 'The California Honeydrops - Shine Delight Tour 2026' ) );
+		$this->assertSame( 'medium', EventIdentifierGenerator::getIdentityConfidence( 'The California Honeydrops - Shine Delight Tour 2026', '2026-03-10', '' ) );
+	}
+
+	public function test_specific_title_with_venue_is_high_confidence(): void {
+		$this->assertSame( 'high', EventIdentifierGenerator::getIdentityConfidence( 'The California Honeydrops - Shine Delight Tour 2026', '2026-03-10', 'ACL Live' ) );
+	}
+
+	public function test_schedule_blob_title_is_low_confidence(): void {
+		$title = 'Artist A 7pm, Artist B 8:15pm, Artist C 9:30pm';
+		$this->assertTrue( EventIdentifierGenerator::isLowConfidenceTitle( $title ) );
+	}
 }

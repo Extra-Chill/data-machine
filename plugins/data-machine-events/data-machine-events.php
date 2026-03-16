@@ -83,6 +83,7 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	\WP_CLI::add_command( 'data-machine-events check meta-sync', \DataMachineEvents\Cli\Check\CheckMetaSyncCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check duration', \DataMachineEvents\Cli\Check\CheckDurationCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check duplicates', \DataMachineEvents\Cli\Check\CheckDuplicatesCommand::class );
+	\WP_CLI::add_command( 'data-machine-events check quality', \DataMachineEvents\Cli\Check\CheckQualityCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check all', \DataMachineEvents\Cli\Check\CheckAllCommand::class );
 }
 
@@ -219,6 +220,7 @@ class DATAMACHINE_Events {
 		new \DataMachineEvents\Api\Chat\Tools\VenueHealthCheck();
 		new \DataMachineEvents\Api\Chat\Tools\UpdateVenue();
 		new \DataMachineEvents\Api\Chat\Tools\EventHealthCheck();
+		new \DataMachineEvents\Api\Chat\Tools\EventQualityAudit();
 		new \DataMachineEvents\Api\Chat\Tools\UpdateEvent();
 		new \DataMachineEvents\Api\Chat\Tools\GetVenueEvents();
 		new \DataMachineEvents\Api\Chat\Tools\FindBrokenTimezoneEvents();
@@ -304,6 +306,11 @@ class DATAMACHINE_Events {
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/FilterAbilities.php' ) ) {
 			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/FilterAbilities.php';
 			new \DataMachineEvents\Abilities\FilterAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventQualityAuditAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventQualityAuditAbilities.php';
+			new \DataMachineEvents\Abilities\EventQualityAuditAbilities();
 		}
 
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/SettingsAbilities.php' ) ) {

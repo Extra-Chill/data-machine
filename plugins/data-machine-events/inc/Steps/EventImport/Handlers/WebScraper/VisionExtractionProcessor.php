@@ -15,6 +15,7 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper;
 use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\VisionExtractor;
+use DataMachineEvents\Steps\EventImport\EventEngineData;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -130,16 +131,23 @@ class VisionExtractionProcessor {
 
 			// Return minimal packet - AI step will process the image.
 			// Engine data passed via _engine_data for batch fan-out.
+			$engine_data = array(
+				'image_file_path' => $file_path,
+				'source_url'      => $url,
+			);
+
+			$configured_venue_engine_data = EventEngineData::buildConfiguredVenueEngineData( $config );
+			if ( ! empty( $configured_venue_engine_data ) ) {
+				$engine_data = array_merge( $engine_data, $configured_venue_engine_data );
+			}
+
 			return array(
 				array(
 					'source_type'      => 'vision_flyer',
 					'image_url'        => $image_url,
 					'page_url'         => $url,
 					'image_identifier' => $image_identifier,
-					'_engine_data'     => array(
-						'image_file_path' => $file_path,
-						'source_url'      => $url,
-					),
+					'_engine_data'     => $engine_data,
 				),
 			);
 		}

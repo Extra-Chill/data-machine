@@ -68,13 +68,13 @@ class StructuredDataProcessor {
 				continue;
 			}
 
+			$this->applyVenueConfigOverride( $event, $config );
+
 			$event_identifier = \DataMachineEvents\Utilities\EventIdentifierGenerator::generate(
 				$event['title'],
 				$event['startDate'] ?? '',
 				$event['venue'] ?? ''
 			);
-
-			$this->applyVenueConfigOverride( $event, $config );
 
 			$venue_from_config = ! empty( $config['venue'] ) || ! empty( $config['venue_name'] );
 			if ( ! $venue_from_config && empty( trim( (string) ( $event['venue'] ?? '' ) ) ) ) {

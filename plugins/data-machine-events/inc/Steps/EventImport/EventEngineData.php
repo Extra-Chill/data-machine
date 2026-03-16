@@ -20,6 +20,64 @@ if ( ! defined( 'ABSPATH' ) ) {
 class EventEngineData {
 
 	/**
+	 * Build engine data payload from configured venue settings.
+	 *
+	 * This is used when a flow is venue-bound and the source payload is weak.
+	 * It guarantees downstream steps can still rely on venue context.
+	 *
+	 * @param array $config Handler configuration.
+	 * @return array Engine data payload.
+	 */
+	public static function buildConfiguredVenueEngineData( array $config ): array {
+		$venue_name = sanitize_text_field( $config['venue_name'] ?? '' );
+		$venue_meta = array(
+			'address'     => sanitize_text_field( $config['venue_address'] ?? '' ),
+			'city'        => sanitize_text_field( $config['venue_city'] ?? '' ),
+			'state'       => sanitize_text_field( $config['venue_state'] ?? '' ),
+			'zip'         => sanitize_text_field( $config['venue_zip'] ?? '' ),
+			'country'     => sanitize_text_field( $config['venue_country'] ?? '' ),
+			'phone'       => sanitize_text_field( $config['venue_phone'] ?? '' ),
+			'website'     => esc_url_raw( $config['venue_website'] ?? '' ),
+			'capacity'    => ! empty( $config['venue_capacity'] ) ? (string) absint( $config['venue_capacity'] ) : '',
+			'coordinates' => '',
+			'timezone'    => '',
+		);
+
+		if ( '' === $venue_name && ! empty( $config['venue'] ) && is_numeric( $config['venue'] ) ) {
+			$term = get_term( (int) $config['venue'], 'venue' );
+			if ( $term && ! is_wp_error( $term ) ) {
+				$venue_name = $term->name;
+			}
+
+			$stored_meta = \DataMachineEvents\Core\Venue_Taxonomy::get_venue_data( (int) $config['venue'] );
+			$venue_meta  = array_merge( $stored_meta, array_filter( $venue_meta ) );
+		}
+
+		if ( '' === $venue_name ) {
+			return array();
+		}
+
+		$event_data = array(
+			'venue' => $venue_name,
+		);
+
+		$camel_meta = array(
+			'venueAddress'     => $venue_meta['address'] ?? '',
+			'venueCity'        => $venue_meta['city'] ?? '',
+			'venueState'       => $venue_meta['state'] ?? '',
+			'venueZip'         => $venue_meta['zip'] ?? '',
+			'venueCountry'     => $venue_meta['country'] ?? '',
+			'venuePhone'       => $venue_meta['phone'] ?? '',
+			'venueWebsite'     => $venue_meta['website'] ?? '',
+			'venueCoordinates' => $venue_meta['coordinates'] ?? '',
+			'venueCapacity'    => $venue_meta['capacity'] ?? '',
+			'venueTimezone'    => $venue_meta['timezone'] ?? '',
+		);
+
+		return self::buildEngineData( $event_data, $camel_meta );
+	}
+
+	/**
 	 * Store venue context in engine data
 	 *
 	 * @param string $job_id Job ID
