@@ -13,7 +13,7 @@ import { __ } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
-import PromptField from '../shared/PromptField';
+import PromptField from '@shared/components/PromptField';
 import { updateSystemPrompt } from '../../utils/api';
 import { useStepTypes, useTools } from '../../queries/config';
 
