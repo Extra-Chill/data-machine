@@ -191,14 +191,13 @@ class MetaDescriptionTask extends SystemTask {
 			'generate' => array(
 				'label'       => __( 'Meta Description Prompt', 'data-machine' ),
 				'description' => __( 'Prompt used to generate meta descriptions for posts.', 'data-machine' ),
-				'default'     => "Write a meta description for the following web page.\n\n"
+				'default'     => "Write a meta description for this page. Use your knowledge of this site's voice and audience.\n\n"
 					. "Guidelines:\n"
-					. '- Maximum ' . self::MAX_LENGTH . " characters (this is strict — do not exceed)\n"
+					. '- Maximum ' . self::MAX_LENGTH . " characters (strict limit)\n"
 					. "- Lead with the direct answer or hook — what will the reader learn or get?\n"
 					. "- Include the primary topic/keyword naturally\n"
 					. "- Create curiosity or value to encourage clicks\n"
-					. "- Do NOT duplicate the title — expand on it\n"
-					. "- Write in a warm, conversational tone\n"
+					. "- Don't duplicate the title — expand on it\n"
 					. "- No quotes around the description\n"
 					. "- One or two sentences\n\n"
 					. "Return ONLY the meta description text, nothing else.\n\n"

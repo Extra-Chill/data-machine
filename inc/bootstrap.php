@@ -98,8 +98,11 @@ MemoryFileRegistry::register( 'USER.md', 25, array(
 ) );
 // SiteContext is autoloaded (Core\WordPress\SiteContext) — register its cache invalidation hook here.
 add_action( 'init', array( \DataMachine\Core\WordPress\SiteContext::class, 'register_cache_invalidation' ) );
-require_once __DIR__ . '/Api/Chat/ChatAgentDirective.php';
-require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineCoreDirective.php';
+require_once __DIR__ . '/Engine/AI/Directives/SiteContextDirective.php';
+require_once __DIR__ . '/Engine/AI/Directives/DailyMemorySelectorDirective.php';
+require_once __DIR__ . '/Api/Chat/ChatContextDirective.php';
+require_once __DIR__ . '/Api/System/SystemContextDirective.php';
+require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineContextDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineSystemPromptDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineMemoryFilesDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/FlowMemoryFilesDirective.php';
