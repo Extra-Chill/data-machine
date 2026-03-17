@@ -266,6 +266,67 @@ class ThreadsCommand {
 		}
 	}
 
+	/**
+	 * Publish a post to Threads.
+	 *
+	 * Posts content to Threads with optional image and source URL.
+	 * Max 500 characters.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <content>
+	 * : The post content text (max 500 characters).
+	 *
+	 * [--image=<url>]
+	 * : Public URL of an image to attach.
+	 *
+	 * [--source-url=<url>]
+	 * : Source URL to append to the post text.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Simple text post
+	 *     wp datamachine-socials threads publish "New article just dropped!"
+	 *
+	 *     # Post with image
+	 *     wp datamachine-socials threads publish "Check this out" --image=https://example.com/photo.jpg
+	 *
+	 *     # Post with source URL
+	 *     wp datamachine-socials threads publish "Read the full review" --source-url=https://extrachill.com/review
+	 */
+	public function publish( $args, $assoc_args ) {
+		$content = $args[0] ?? '';
+
+		if ( empty( $content ) ) {
+			WP_CLI::error( 'Post content is required.' );
+		}
+
+		$this->get_publish_ability();
+
+		$input = array( 'content' => $content );
+
+		if ( ! empty( $assoc_args['image'] ) ) {
+			$input['image_url'] = $assoc_args['image'];
+			WP_CLI::log( 'Publishing to Threads with image...' );
+		} else {
+			WP_CLI::log( 'Publishing to Threads...' );
+		}
+
+		if ( ! empty( $assoc_args['source-url'] ) ) {
+			$input['source_url'] = $assoc_args['source-url'];
+		}
+
+		$result = \DataMachineSocials\Abilities\Threads\ThreadsPublishAbility::execute_publish( $input );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Published to Threads!' );
+		WP_CLI::log( 'Post ID:  ' . ( $result['post_id'] ?? '' ) );
+		WP_CLI::log( 'Post URL: ' . ( $result['post_url'] ?? '' ) );
+	}
+
 	private function get_ability() {
 		if ( ! function_exists( 'wp_get_ability' ) ) {
 			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
@@ -300,6 +361,19 @@ class ThreadsCommand {
 		$ability = wp_get_ability( 'datamachine/threads-delete' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/threads-delete ability not registered.' );
+		}
+
+		return $ability;
+	}
+
+	private function get_publish_ability() {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/threads-publish' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/threads-publish ability not registered.' );
 		}
 
 		return $ability;

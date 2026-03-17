@@ -267,6 +267,92 @@ class FacebookCommand {
 		}
 	}
 
+	/**
+	 * Publish a post to Facebook.
+	 *
+	 * Posts content to a Facebook Page with optional image and source URL.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <content>
+	 * : The post content text.
+	 *
+	 * [--title=<title>]
+	 * : Optional title to prepend to the post.
+	 *
+	 * [--image=<url>]
+	 * : Image URL to attach to the post.
+	 *
+	 * [--source-url=<url>]
+	 * : Source URL to include in the post.
+	 *
+	 * [--link-handling=<handling>]
+	 * : How to handle the source URL: none, append (default), or comment.
+	 * ---
+	 * default: append
+	 * options:
+	 *   - none
+	 *   - append
+	 *   - comment
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Simple text post
+	 *     wp datamachine-socials facebook publish "Check out our latest article!"
+	 *
+	 *     # Post with image
+	 *     wp datamachine-socials facebook publish "New photo from the show" --image=https://example.com/photo.jpg
+	 *
+	 *     # Post with source URL as comment
+	 *     wp datamachine-socials facebook publish "Great read" --source-url=https://extrachill.com/article --link-handling=comment
+	 */
+	public function publish( $args, $assoc_args ) {
+		$content = $args[0] ?? '';
+
+		if ( empty( $content ) ) {
+			WP_CLI::error( 'Post content is required.' );
+		}
+
+		$this->get_publish_ability();
+
+		$input = array( 'content' => $content );
+
+		if ( ! empty( $assoc_args['title'] ) ) {
+			$input['title'] = $assoc_args['title'];
+		}
+
+		if ( ! empty( $assoc_args['image'] ) ) {
+			$input['image_url'] = $assoc_args['image'];
+			WP_CLI::log( 'Publishing to Facebook with image...' );
+		} else {
+			WP_CLI::log( 'Publishing to Facebook...' );
+		}
+
+		if ( ! empty( $assoc_args['source-url'] ) ) {
+			$input['source_url'] = $assoc_args['source-url'];
+		}
+
+		if ( ! empty( $assoc_args['link-handling'] ) ) {
+			$input['link_handling'] = $assoc_args['link-handling'];
+		}
+
+		$result = \DataMachineSocials\Abilities\Facebook\FacebookPublishAbility::execute_publish( $input );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Published to Facebook!' );
+		WP_CLI::log( 'Post ID:  ' . ( $result['post_id'] ?? '' ) );
+		WP_CLI::log( 'Post URL: ' . ( $result['post_url'] ?? '' ) );
+
+		if ( ! empty( $result['comment_id'] ) ) {
+			WP_CLI::log( 'Comment ID:  ' . $result['comment_id'] );
+			WP_CLI::log( 'Comment URL: ' . ( $result['comment_url'] ?? '' ) );
+		}
+	}
+
 	private function get_ability() {
 		if ( ! function_exists( 'wp_get_ability' ) ) {
 			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
@@ -301,6 +387,19 @@ class FacebookCommand {
 		$ability = wp_get_ability( 'datamachine/facebook-delete' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/facebook-delete ability not registered.' );
+		}
+
+		return $ability;
+	}
+
+	private function get_publish_ability() {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/facebook-publish' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/facebook-publish ability not registered.' );
 		}
 
 		return $ability;

@@ -207,8 +207,14 @@ function datamachine_socials_load_chat_tools() {
 	new \DataMachineSocials\Chat\Tools\ReadInstagram();
 	new \DataMachineSocials\Chat\Tools\UpdateInstagram();
 	new \DataMachineSocials\Chat\Tools\ReplyInstagramComment();
+	new \DataMachineSocials\Chat\Tools\PublishInstagram();
 	new \DataMachineSocials\Chat\Tools\PublishReelInstagram();
 	new \DataMachineSocials\Chat\Tools\PublishStoryInstagram();
+	new \DataMachineSocials\Chat\Tools\PublishTwitter();
+	new \DataMachineSocials\Chat\Tools\PublishFacebook();
+	new \DataMachineSocials\Chat\Tools\PublishBluesky();
+	new \DataMachineSocials\Chat\Tools\PublishThreads();
+	new \DataMachineSocials\Chat\Tools\PublishPinterest();
 	new \DataMachineSocials\Chat\Tools\ReadThreads();
 	new \DataMachineSocials\Chat\Tools\ReadFacebook();
 	new \DataMachineSocials\Chat\Tools\UpdateFacebook();
