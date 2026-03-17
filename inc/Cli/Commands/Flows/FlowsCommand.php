@@ -44,9 +44,9 @@ class FlowsCommand extends BaseCommand {
 	 * : Filter flows using this handler slug (any step that uses this handler).
 	 *
 	 * [--per_page=<number>]
-	 * : Number of flows to return.
+	 * : Number of flows to return. 0 = all (default).
 	 * ---
-	 * default: 20
+	 * default: 0
 	 * ---
 	 *
 	 * [--offset=<number>]
@@ -287,15 +287,12 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		$handler_slug = $assoc_args['handler'] ?? null;
-		$per_page     = (int) ( $assoc_args['per_page'] ?? 20 );
+		$per_page     = (int) ( $assoc_args['per_page'] ?? 0 );
 		$offset       = (int) ( $assoc_args['offset'] ?? 0 );
 		$format       = $assoc_args['format'] ?? 'table';
 
-		if ( $per_page < 1 ) {
-			$per_page = 20;
-		}
-		if ( $per_page > 100 ) {
-			$per_page = 100;
+		if ( $per_page < 0 ) {
+			$per_page = 0;
 		}
 		if ( $offset < 0 ) {
 			$offset = 0;
