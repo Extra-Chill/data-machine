@@ -280,6 +280,81 @@ class PinterestCommand {
 	}
 
 	/**
+	 * Publish a pin to Pinterest.
+	 *
+	 * Creates a new pin with a title, description, and image.
+	 * Requires Pinterest OAuth to be configured.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <title>
+	 * : Pin title (max 100 characters).
+	 *
+	 * --description=<text>
+	 * : Pin description (max 500 characters, required).
+	 *
+	 * --image=<url>
+	 * : Public URL of the image for the pin (required).
+	 *
+	 * [--link=<url>]
+	 * : Destination URL the pin will link to.
+	 *
+	 * [--board=<board_id>]
+	 * : Pinterest board ID. Uses default board if not specified.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Publish a pin
+	 *     wp datamachine-socials pinterest publish "Beautiful sunset" --description="Sunset at Lady Bird Lake" --image=https://example.com/sunset.jpg
+	 *
+	 *     # Pin with link and specific board
+	 *     wp datamachine-socials pinterest publish "New Recipe" --description="Easy pasta recipe" --image=https://example.com/pasta.jpg --link=https://example.com/recipes/pasta --board=123456789
+	 */
+	public function publish( $args, $assoc_args ) {
+		$title = $args[0] ?? '';
+
+		if ( empty( $title ) ) {
+			WP_CLI::error( 'Pin title is required.' );
+		}
+
+		if ( empty( $assoc_args['description'] ) ) {
+			WP_CLI::error( 'Pin description is required. Use --description=<text>.' );
+		}
+
+		if ( empty( $assoc_args['image'] ) ) {
+			WP_CLI::error( 'Image URL is required. Use --image=<url>.' );
+		}
+
+		$this->get_publish_ability();
+
+		$input = array(
+			'title'       => $title,
+			'description' => $assoc_args['description'],
+			'image_url'   => $assoc_args['image'],
+		);
+
+		if ( ! empty( $assoc_args['link'] ) ) {
+			$input['link'] = $assoc_args['link'];
+		}
+
+		if ( ! empty( $assoc_args['board'] ) ) {
+			$input['board_id'] = $assoc_args['board'];
+		}
+
+		WP_CLI::log( 'Publishing pin to Pinterest...' );
+
+		$result = \DataMachineSocials\Abilities\Pinterest\PinterestPublishAbility::execute_publish( $input );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+		}
+
+		WP_CLI::success( 'Pin published to Pinterest!' );
+		WP_CLI::log( 'Pin ID:  ' . ( $result['pin_id'] ?? '' ) );
+		WP_CLI::log( 'Pin URL: ' . ( $result['pin_url'] ?? '' ) );
+	}
+
+	/**
 	 * Get the Pinterest read ability.
 	 *
 	 * @return \DataMachineSocials\Abilities\Pinterest\PinterestReadAbility
@@ -318,6 +393,19 @@ class PinterestCommand {
 		$ability = wp_get_ability( 'datamachine/pinterest-delete' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/pinterest-delete ability not registered.' );
+		}
+
+		return $ability;
+	}
+
+	private function get_publish_ability() {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/pinterest-publish' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/pinterest-publish ability not registered.' );
 		}
 
 		return $ability;
