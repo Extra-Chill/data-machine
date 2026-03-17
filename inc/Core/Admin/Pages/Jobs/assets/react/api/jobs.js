@@ -20,13 +20,19 @@ import { client } from '@shared/utils/api';
  * @param {string} params.status Optional status filter
  * @return {Promise<Object>} Jobs list response
  */
-export const fetchJobs = ( { page = 1, perPage = 50, status } = {} ) => {
+export const fetchJobs = ( {
+	page = 1,
+	perPage = 50,
+	status,
+	hideChildren = true,
+} = {} ) => {
 	const offset = ( page - 1 ) * perPage;
 	const params = {
 		orderby: 'job_id',
 		order: 'DESC',
 		per_page: perPage,
 		offset,
+		hide_children: hideChildren ? 1 : 0,
 	};
 
 	if ( status && status !== 'all' ) {
@@ -34,6 +40,22 @@ export const fetchJobs = ( { page = 1, perPage = 50, status } = {} ) => {
 	}
 
 	return client.get( '/jobs', params );
+};
+
+/**
+ * Fetch child jobs for a batch parent
+ *
+ * @param {number} parentJobId Parent job ID
+ * @return {Promise<Object>} Child jobs list response
+ */
+export const fetchChildJobs = ( parentJobId ) => {
+	return client.get( '/jobs', {
+		parent_job_id: parentJobId,
+		orderby: 'job_id',
+		order: 'ASC',
+		per_page: 100,
+		offset: 0,
+	} );
 };
 
 /**

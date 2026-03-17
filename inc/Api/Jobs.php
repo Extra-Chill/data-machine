@@ -98,13 +98,24 @@ class Jobs {
 						'type'        => 'string',
 						'description' => __( 'Filter by job status', 'data-machine' ),
 					),
-					'user_id'     => array(
-						'required'          => false,
-						'type'              => 'integer',
-						'description'       => __( 'Filter by user ID (admin only, non-admins always see own data)', 'data-machine' ),
-						'sanitize_callback' => 'absint',
-					),
+				'user_id'        => array(
+					'required'          => false,
+					'type'              => 'integer',
+					'description'       => __( 'Filter by user ID (admin only, non-admins always see own data)', 'data-machine' ),
+					'sanitize_callback' => 'absint',
 				),
+				'parent_job_id'  => array(
+					'required'    => false,
+					'type'        => 'integer',
+					'description' => __( 'Filter by parent job ID (for batch child jobs)', 'data-machine' ),
+				),
+				'hide_children'  => array(
+					'required'    => false,
+					'type'        => 'boolean',
+					'default'     => false,
+					'description' => __( 'Hide child jobs from top-level list', 'data-machine' ),
+				),
+			),
 			)
 		);
 
@@ -197,6 +208,12 @@ class Jobs {
 		}
 		if ( $request->get_param( 'status' ) ) {
 			$input['status'] = sanitize_text_field( $request->get_param( 'status' ) );
+		}
+		if ( $request->get_param( 'parent_job_id' ) ) {
+			$input['parent_job_id'] = (int) $request->get_param( 'parent_job_id' );
+		}
+		if ( $request->get_param( 'hide_children' ) ) {
+			$input['hide_children'] = true;
 		}
 
 		$result = self::getAbilities()->executeGetJobs( $input );
