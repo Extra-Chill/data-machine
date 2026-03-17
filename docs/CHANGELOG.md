@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.44.1] - 2026-03-17
+
+### Fixed
+- flows list CLI defaults to all flows instead of 20
+
 ## [0.44.0] - 2026-03-17
 
 ### Added
