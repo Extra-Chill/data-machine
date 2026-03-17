@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.43.3] - 2026-03-17
+
+### Changed
+- replace agent identity directives with context directives
+
+### Fixed
+- prevent schedule reset when scheduling config hasn't changed
+
 ## [0.43.2] - 2026-03-16
 
 ### Fixed
