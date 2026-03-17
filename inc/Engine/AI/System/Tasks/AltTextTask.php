@@ -181,12 +181,14 @@ class AltTextTask extends SystemTask {
 			'generate' => array(
 				'label'       => __( 'Alt Text Prompt', 'data-machine' ),
 				'description' => __( 'Prompt used to generate alt text for images.', 'data-machine' ),
-				'default'     => "Write alt text for the provided image using these guidelines:\n"
-					. "- Write 1-2 sentences describing the image\n"
+				'default'     => "Write alt text for this image.\n\n"
+					. "Guidelines:\n"
+					. "- 1-2 sentences describing the image\n"
 					. "- Don't start with 'Image of' or 'Photo of'\n"
 					. "- Capitalize first word, end with period\n"
-					. "- Describe what's visually present, focus on purpose\n"
-					. "- For complex images (charts/diagrams), provide brief summary only\n\n"
+					. "- Describe what's visually present, focus on its purpose in context\n"
+					. "- For charts/diagrams, provide a brief summary only\n"
+					. "- Match the voice and tone of this site\n\n"
 					. "Return ONLY the alt text, nothing else.\n\n"
 					. "Context:\n{{context}}",
 				'variables'   => array(
