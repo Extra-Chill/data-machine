@@ -16,6 +16,7 @@ import { TabPanel } from '@wordpress/components';
 import GeneralTab from './components/tabs/GeneralTab';
 import ApiKeysTab from './components/tabs/ApiKeysTab';
 import HandlerDefaultsTab from './components/tabs/HandlerDefaultsTab';
+import AuthProvidersTab from './components/tabs/AuthProvidersTab';
 
 const STORAGE_KEY = 'datamachine_settings_active_tab';
 
@@ -23,6 +24,7 @@ const TABS = [
 	{ name: 'general', title: 'General' },
 	{ name: 'api-keys', title: 'API Keys' },
 	{ name: 'handler-defaults', title: 'Handler Defaults' },
+	{ name: 'auth-providers', title: 'Auth Providers' },
 ];
 
 const getInitialTab = () => {
@@ -49,12 +51,14 @@ const SettingsApp = () => {
 					switch ( tab.name ) {
 						case 'general':
 							return <GeneralTab />;
-						case 'api-keys':
-							return <ApiKeysTab />;
-						case 'handler-defaults':
-							return <HandlerDefaultsTab />;
-						default:
-							return <GeneralTab />;
+					case 'api-keys':
+						return <ApiKeysTab />;
+					case 'handler-defaults':
+						return <HandlerDefaultsTab />;
+					case 'auth-providers':
+						return <AuthProvidersTab />;
+					default:
+						return <GeneralTab />;
 					}
 				} }
 			</TabPanel>

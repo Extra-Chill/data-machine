@@ -478,3 +478,189 @@
 .datamachine-toggle-visibility {
     flex-shrink: 0;
 }
+
+/* ========================================================================
+   AUTH PROVIDERS TAB
+   ======================================================================== */
+
+.datamachine-auth-providers-tab {
+    max-width: 900px;
+}
+
+.datamachine-auth-providers-tab > .description {
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+.datamachine-auth-providers-loading,
+.datamachine-auth-providers-empty {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 20px;
+}
+
+.datamachine-auth-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Provider Card */
+.datamachine-auth-card {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 16px;
+    background: #fff;
+}
+
+.datamachine-auth-card--connected {
+    border-left: 3px solid #00a32a;
+}
+
+.datamachine-auth-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.datamachine-auth-card-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.datamachine-auth-card-title strong {
+    font-size: 14px;
+}
+
+/* Auth type badge */
+.datamachine-auth-type-badge {
+    font-size: 11px;
+    font-weight: 500;
+    color: #646970;
+    background: #f0f0f1;
+    padding: 2px 8px;
+    border-radius: 3px;
+}
+
+/* Status badges */
+.datamachine-auth-badge {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 2px 10px;
+    border-radius: 3px;
+}
+
+.datamachine-auth-badge--connected {
+    background: #d1f5d3;
+    color: #00a32a;
+}
+
+.datamachine-auth-badge--configured {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.datamachine-auth-badge--disconnected {
+    background: #f0f0f1;
+    color: #646970;
+}
+
+/* Account details inline */
+.datamachine-auth-account {
+    font-size: 13px;
+    color: #50575e;
+    margin-bottom: 8px;
+}
+
+/* Card notice */
+.datamachine-auth-card-notice {
+    margin: 8px 0 !important;
+}
+
+/* Card actions */
+.datamachine-auth-card-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+/* Config section */
+.datamachine-auth-card-config {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #eee;
+}
+
+/* Callback URL display */
+.datamachine-auth-callback {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    background: #f6f7f7;
+    border-radius: 3px;
+    font-size: 13px;
+}
+
+.datamachine-auth-callback-label {
+    font-weight: 500;
+    flex-shrink: 0;
+}
+
+.datamachine-auth-callback-url {
+    font-size: 12px;
+    word-break: break-all;
+    flex: 1;
+}
+
+.datamachine-auth-callback-copy {
+    flex-shrink: 0;
+}
+
+/* Config form */
+.datamachine-auth-config-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.datamachine-auth-config-field label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 4px;
+    font-size: 13px;
+}
+
+.datamachine-auth-config-field input,
+.datamachine-auth-config-field select {
+    max-width: 400px;
+    width: 100%;
+}
+
+.datamachine-auth-config-field .description {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #646970;
+}
+
+.datamachine-auth-config-actions {
+    margin-top: 4px;
+}
+
+/* Responsive */
+@media screen and (max-width: 782px) {
+    .datamachine-auth-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .datamachine-auth-callback {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

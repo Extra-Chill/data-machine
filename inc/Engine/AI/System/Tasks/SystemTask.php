@@ -564,16 +564,18 @@ abstract class SystemTask {
 	/**
 	 * Complete a job with successful results.
 	 *
-	 * Updates the job's engine_data with the result and marks it as completed.
+	 * Merges the result into existing engine_data (preserving scheduler
+	 * metadata like task_type and context) and marks the job as completed.
 	 *
 	 * @param int   $jobId Job ID.
-	 * @param array $result Result data to store in engine_data.
+	 * @param array $result Result data to merge into engine_data.
 	 */
 	protected function completeJob( int $jobId, array $result ): void {
 		$jobs_db = new Jobs();
 
-		// Store result in engine_data
-		$jobs_db->store_engine_data( $jobId, $result );
+		// Merge result into existing engine_data to preserve scheduler metadata (task_type, context, etc.).
+		$existing = $jobs_db->retrieve_engine_data( $jobId );
+		$jobs_db->store_engine_data( $jobId, array_merge( $existing, $result ) );
 
 		// Mark job as completed
 		$jobs_db->complete_job( $jobId, JobStatus::COMPLETED );
@@ -594,7 +596,8 @@ abstract class SystemTask {
 	/**
 	 * Fail a job with error reason.
 	 *
-	 * Updates the job's engine_data with error details and marks it as failed.
+	 * Merges error details into existing engine_data (preserving scheduler
+	 * metadata like task_type and context) and marks the job as failed.
 	 *
 	 * @param int    $jobId  Job ID.
 	 * @param string $reason Failure reason.
@@ -602,12 +605,13 @@ abstract class SystemTask {
 	protected function failJob( int $jobId, string $reason ): void {
 		$jobs_db = new Jobs();
 
-		// Store error in engine_data
-		$error_data = array(
+		// Merge error into existing engine_data to preserve scheduler metadata.
+		$existing   = $jobs_db->retrieve_engine_data( $jobId );
+		$error_data = array_merge( $existing, array(
 			'error'     => $reason,
 			'failed_at' => current_time( 'mysql' ),
 			'task_type' => $this->getTaskType(),
-		);
+		) );
 		$jobs_db->store_engine_data( $jobId, $error_data );
 
 		// Mark job as failed
