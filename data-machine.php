@@ -112,6 +112,7 @@ function datamachine_run_datamachine_plugin() {
 	\DataMachine\Api\Providers::register();
 	\DataMachine\Api\Analytics::register();
 	\DataMachine\Api\InternalLinks::register();
+	\DataMachine\Api\Email::register();
 
 	// Load abilities
 	require_once __DIR__ . '/inc/Abilities/AuthAbilities.php';
@@ -158,6 +159,7 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/Content/ReplacePostBlocksAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Fetch/GitHubAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Fetch/FetchFilesAbility.php';
+	require_once __DIR__ . '/inc/Abilities/Email/EmailAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Fetch/FetchEmailAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Fetch/FetchRssAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Fetch/FetchWordPressApiAbility.php';
@@ -210,6 +212,7 @@ function datamachine_run_datamachine_plugin() {
 		new \DataMachine\Abilities\Content\ReplacePostBlocksAbility();
 		new \DataMachine\Abilities\Fetch\GitHubAbilities();
 		new \DataMachine\Abilities\Fetch\FetchFilesAbility();
+		new \DataMachine\Abilities\Email\EmailAbilities();
 		new \DataMachine\Abilities\Fetch\FetchEmailAbility();
 		new \DataMachine\Abilities\Fetch\FetchRssAbility();
 		new \DataMachine\Abilities\Fetch\FetchWordPressApiAbility();

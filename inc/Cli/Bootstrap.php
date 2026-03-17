@@ -34,6 +34,7 @@ WP_CLI::add_command( 'datamachine batch', Commands\BatchCommand::class );
 WP_CLI::add_command( 'datamachine image', Commands\ImageCommand::class );
 WP_CLI::add_command( 'datamachine github', Commands\GitHubCommand::class );
 WP_CLI::add_command( 'datamachine auth', Commands\AuthCommand::class );
+WP_CLI::add_command( 'datamachine email', Commands\EmailCommand::class );
 WP_CLI::add_command( 'datamachine system', Commands\SystemCommand::class );
 WP_CLI::add_command( 'datamachine handlers', Commands\HandlersCommand::class );
 WP_CLI::add_command( 'datamachine taxonomy', Commands\TaxonomyCommand::class );

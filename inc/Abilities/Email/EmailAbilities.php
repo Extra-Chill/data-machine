@@ -1,0 +1,537 @@
+<?php
+/**
+ * Email Abilities
+ *
+ * WordPress 6.9 Abilities API primitives for email CRUD operations.
+ * Registers abilities for inbox management: reply, delete, move, flag.
+ *
+ * Send and Fetch abilities are registered separately in their respective files.
+ * This class covers the remaining CRUD operations that require an IMAP connection.
+ *
+ * @package DataMachine\Abilities\Email
+ */
+
+namespace DataMachine\Abilities\Email;
+
+use DataMachine\Abilities\PermissionHelper;
+
+defined( 'ABSPATH' ) || exit;
+
+class EmailAbilities {
+
+	private static bool $registered = false;
+
+	public function __construct() {
+		if ( ! class_exists( 'WP_Ability' ) ) {
+			return;
+		}
+
+		if ( self::$registered ) {
+			return;
+		}
+
+		$this->registerAbilities();
+		self::$registered = true;
+	}
+
+	private function registerAbilities(): void {
+		$register_callback = function () {
+			// Reply to an email.
+			wp_register_ability(
+				'datamachine/email-reply',
+				array(
+					'label'               => __( 'Reply to Email', 'data-machine' ),
+					'description'         => __( 'Send a reply to an email, maintaining thread headers', 'data-machine' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'to', 'subject', 'body', 'in_reply_to' ),
+						'properties' => array(
+							'to'          => array(
+								'type'        => 'string',
+								'description' => __( 'Recipient email address', 'data-machine' ),
+							),
+							'subject'     => array(
+								'type'        => 'string',
+								'description' => __( 'Reply subject (typically Re: original subject)', 'data-machine' ),
+							),
+							'body'        => array(
+								'type'        => 'string',
+								'description' => __( 'Reply body content', 'data-machine' ),
+							),
+							'in_reply_to' => array(
+								'type'        => 'string',
+								'description' => __( 'Message-ID of the email being replied to', 'data-machine' ),
+							),
+							'references'  => array(
+								'type'        => 'string',
+								'default'     => '',
+								'description' => __( 'References header chain for threading', 'data-machine' ),
+							),
+							'cc'          => array(
+								'type'    => 'string',
+								'default' => '',
+							),
+							'content_type' => array(
+								'type'    => 'string',
+								'default' => 'text/html',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'message' => array( 'type' => 'string' ),
+							'error'   => array( 'type' => 'string' ),
+							'logs'    => array( 'type' => 'array' ),
+						),
+					),
+					'execute_callback'    => array( $this, 'executeReply' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			// Delete an email via IMAP.
+			wp_register_ability(
+				'datamachine/email-delete',
+				array(
+					'label'               => __( 'Delete Email', 'data-machine' ),
+					'description'         => __( 'Delete (expunge) an email by UID from the IMAP server', 'data-machine' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'uid' ),
+						'properties' => array(
+							'uid'    => array(
+								'type'        => 'integer',
+								'description' => __( 'Message UID to delete', 'data-machine' ),
+							),
+							'folder' => array(
+								'type'    => 'string',
+								'default' => 'INBOX',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'message' => array( 'type' => 'string' ),
+							'error'   => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( $this, 'executeDelete' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			// Move an email to a different folder.
+			wp_register_ability(
+				'datamachine/email-move',
+				array(
+					'label'               => __( 'Move Email', 'data-machine' ),
+					'description'         => __( 'Move an email to a different IMAP folder', 'data-machine' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'uid', 'destination' ),
+						'properties' => array(
+							'uid'         => array(
+								'type'        => 'integer',
+								'description' => __( 'Message UID to move', 'data-machine' ),
+							),
+							'destination' => array(
+								'type'        => 'string',
+								'description' => __( 'Target folder (e.g., Archive, Trash, [Gmail]/All Mail)', 'data-machine' ),
+							),
+							'folder'      => array(
+								'type'    => 'string',
+								'default' => 'INBOX',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'message' => array( 'type' => 'string' ),
+							'error'   => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( $this, 'executeMove' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			// Flag/unflag an email.
+			wp_register_ability(
+				'datamachine/email-flag',
+				array(
+					'label'               => __( 'Flag Email', 'data-machine' ),
+					'description'         => __( 'Set or clear IMAP flags on an email (Seen, Flagged, etc.)', 'data-machine' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'uid', 'flag' ),
+						'properties' => array(
+							'uid'    => array(
+								'type'        => 'integer',
+								'description' => __( 'Message UID', 'data-machine' ),
+							),
+							'flag'   => array(
+								'type'        => 'string',
+								'description' => __( 'IMAP flag: Seen, Flagged, Answered, Deleted, Draft', 'data-machine' ),
+							),
+							'action' => array(
+								'type'    => 'string',
+								'default' => 'set',
+								'description' => __( 'set or clear the flag', 'data-machine' ),
+							),
+							'folder' => array(
+								'type'    => 'string',
+								'default' => 'INBOX',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'message' => array( 'type' => 'string' ),
+							'error'   => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( $this, 'executeFlag' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			// Test IMAP connection.
+			wp_register_ability(
+				'datamachine/email-test-connection',
+				array(
+					'label'               => __( 'Test Email Connection', 'data-machine' ),
+					'description'         => __( 'Test IMAP connection with stored credentials', 'data-machine' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => new \stdClass(),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'       => array( 'type' => 'boolean' ),
+							'message'       => array( 'type' => 'string' ),
+							'mailbox_info'  => array( 'type' => 'object' ),
+							'error'         => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( $this, 'executeTestConnection' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+		};
+
+		if ( doing_action( 'wp_abilities_api_init' ) ) {
+			$register_callback();
+		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
+			add_action( 'wp_abilities_api_init', $register_callback );
+		}
+	}
+
+	public function checkPermission(): bool {
+		return PermissionHelper::can_manage();
+	}
+
+	/**
+	 * Reply to an email with threading headers.
+	 */
+	public function executeReply( array $input ): array {
+		$headers = array();
+
+		$content_type = $input['content_type'] ?? 'text/html';
+		$headers[]    = "Content-Type: {$content_type}; charset=UTF-8";
+
+		// Threading headers.
+		if ( ! empty( $input['in_reply_to'] ) ) {
+			$headers[] = 'In-Reply-To: ' . $input['in_reply_to'];
+		}
+
+		$references = $input['references'] ?? '';
+		if ( ! empty( $input['in_reply_to'] ) ) {
+			$references = trim( $references . ' ' . $input['in_reply_to'] );
+		}
+		if ( ! empty( $references ) ) {
+			$headers[] = 'References: ' . $references;
+		}
+
+		if ( ! empty( $input['cc'] ) ) {
+			$cc_list = array_map( 'trim', explode( ',', $input['cc'] ) );
+			foreach ( $cc_list as $cc ) {
+				if ( is_email( $cc ) ) {
+					$headers[] = 'Cc: ' . $cc;
+				}
+			}
+		}
+
+		$to = array_map( 'trim', explode( ',', $input['to'] ) );
+		$to = array_filter( $to, 'is_email' );
+
+		if ( empty( $to ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'No valid recipient address',
+			);
+		}
+
+		$sent = wp_mail( $to, $input['subject'], $input['body'], $headers );
+
+		if ( $sent ) {
+			return array(
+				'success' => true,
+				'message' => 'Reply sent to ' . implode( ', ', $to ),
+				'logs'    => array(),
+			);
+		}
+
+		global $phpmailer;
+		$error = 'wp_mail() returned false';
+		if ( isset( $phpmailer ) && $phpmailer instanceof \PHPMailer\PHPMailer\PHPMailer ) {
+			$error = $phpmailer->ErrorInfo ?: $error;
+		}
+
+		return array(
+			'success' => false,
+			'error'   => $error,
+		);
+	}
+
+	/**
+	 * Delete an email from the IMAP server.
+	 */
+	public function executeDelete( array $input ): array {
+		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
+		if ( is_array( $connection ) && ! ( $connection['success'] ?? true ) ) {
+			return $connection;
+		}
+
+		$uid = (int) $input['uid'];
+		imap_delete( $connection, (string) $uid, FT_UID );
+		imap_expunge( $connection );
+		imap_close( $connection );
+
+		return array(
+			'success' => true,
+			'message' => sprintf( 'Message UID %d deleted', $uid ),
+		);
+	}
+
+	/**
+	 * Move an email to a different folder.
+	 */
+	public function executeMove( array $input ): array {
+		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
+		if ( is_array( $connection ) && ! ( $connection['success'] ?? true ) ) {
+			return $connection;
+		}
+
+		$uid         = (int) $input['uid'];
+		$destination = $input['destination'];
+
+		$moved = imap_mail_move( $connection, (string) $uid, $destination, CP_UID );
+		if ( ! $moved ) {
+			$error = imap_last_error();
+			imap_close( $connection );
+			return array(
+				'success' => false,
+				'error'   => 'Move failed: ' . $error,
+			);
+		}
+
+		imap_expunge( $connection );
+		imap_close( $connection );
+
+		return array(
+			'success' => true,
+			'message' => sprintf( 'Message UID %d moved to %s', $uid, $destination ),
+		);
+	}
+
+	/**
+	 * Set or clear a flag on an email.
+	 */
+	public function executeFlag( array $input ): array {
+		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
+		if ( is_array( $connection ) && ! ( $connection['success'] ?? true ) ) {
+			return $connection;
+		}
+
+		$uid  = (int) $input['uid'];
+		$flag = '\\' . ucfirst( strtolower( $input['flag'] ) );
+
+		$valid_flags = array( '\\Seen', '\\Flagged', '\\Answered', '\\Deleted', '\\Draft' );
+		if ( ! in_array( $flag, $valid_flags, true ) ) {
+			imap_close( $connection );
+			return array(
+				'success' => false,
+				'error'   => 'Invalid flag. Valid flags: Seen, Flagged, Answered, Deleted, Draft',
+			);
+		}
+
+		$action = $input['action'] ?? 'set';
+		if ( 'clear' === $action ) {
+			$result = imap_clearflag_full( $connection, (string) $uid, $flag, ST_UID );
+		} else {
+			$result = imap_setflag_full( $connection, (string) $uid, $flag, ST_UID );
+		}
+
+		imap_close( $connection );
+
+		if ( ! $result ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to ' . $action . ' flag ' . $flag,
+			);
+		}
+
+		return array(
+			'success' => true,
+			'message' => sprintf( 'Flag %s %s on UID %d', $flag, $action === 'clear' ? 'cleared' : 'set', $uid ),
+		);
+	}
+
+	/**
+	 * Test the IMAP connection with stored credentials.
+	 */
+	public function executeTestConnection( array $input ): array {
+		if ( ! function_exists( 'imap_open' ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'PHP IMAP extension is not installed',
+			);
+		}
+
+		$auth = $this->getAuthProvider();
+		if ( ! $auth || ! $auth->is_authenticated() ) {
+			return array(
+				'success' => false,
+				'error'   => 'IMAP credentials not configured',
+			);
+		}
+
+		$mailbox = $this->buildMailboxString(
+			$auth->getHost(),
+			$auth->getPort(),
+			$auth->getEncryption(),
+			'INBOX'
+		);
+
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		$connection = @imap_open( $mailbox, $auth->getUser(), $auth->getPassword() );
+
+		if ( false === $connection ) {
+			return array(
+				'success' => false,
+				'error'   => 'Connection failed: ' . imap_last_error(),
+			);
+		}
+
+		$check = imap_check( $connection );
+		$info  = array(
+			'mailbox'   => $check->Mailbox ?? '',
+			'messages'  => $check->Nmsgs ?? 0,
+			'recent'    => $check->Recent ?? 0,
+			'connected' => true,
+		);
+
+		// List available folders.
+		$folders     = imap_list( $connection, $this->buildMailboxString( $auth->getHost(), $auth->getPort(), $auth->getEncryption(), '' ), '*' );
+		$folder_list = array();
+		if ( is_array( $folders ) ) {
+			$prefix = $this->buildMailboxString( $auth->getHost(), $auth->getPort(), $auth->getEncryption(), '' );
+			foreach ( $folders as $folder ) {
+				$folder_list[] = str_replace( $prefix, '', imap_utf7_decode( $folder ) );
+			}
+		}
+		$info['folders'] = $folder_list;
+
+		imap_close( $connection );
+
+		return array(
+			'success'      => true,
+			'message'      => sprintf( 'Connected to %s — %d messages in INBOX', $auth->getHost(), $info['messages'] ),
+			'mailbox_info' => $info,
+		);
+	}
+
+	/**
+	 * Open an IMAP connection using stored credentials.
+	 *
+	 * @param string $folder Mail folder.
+	 * @return resource|array IMAP connection or error array.
+	 */
+	private function connect( string $folder = 'INBOX' ) {
+		if ( ! function_exists( 'imap_open' ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'PHP IMAP extension is not installed',
+			);
+		}
+
+		$auth = $this->getAuthProvider();
+		if ( ! $auth || ! $auth->is_authenticated() ) {
+			return array(
+				'success' => false,
+				'error'   => 'IMAP credentials not configured',
+			);
+		}
+
+		$mailbox = $this->buildMailboxString(
+			$auth->getHost(),
+			$auth->getPort(),
+			$auth->getEncryption(),
+			$folder
+		);
+
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		$connection = @imap_open( $mailbox, $auth->getUser(), $auth->getPassword() );
+
+		if ( false === $connection ) {
+			return array(
+				'success' => false,
+				'error'   => 'IMAP connection failed: ' . imap_last_error(),
+			);
+		}
+
+		return $connection;
+	}
+
+	/**
+	 * Get the IMAP auth provider.
+	 *
+	 * @return \DataMachine\Core\Steps\Fetch\Handlers\Email\EmailAuth|null
+	 */
+	private function getAuthProvider(): ?object {
+		$providers = apply_filters( 'datamachine_auth_providers', array() );
+		return $providers['email_imap'] ?? null;
+	}
+
+	/**
+	 * Build IMAP mailbox connection string.
+	 */
+	private function buildMailboxString( string $host, int $port, string $encryption, string $folder ): string {
+		$flags = match ( $encryption ) {
+			'ssl'   => '/imap/ssl/validate-cert',
+			'tls'   => '/imap/tls/validate-cert',
+			default => '/imap/notls',
+		};
+
+		return sprintf( '{%s:%d%s}%s', $host, $port, $flags, $folder );
+	}
+}
