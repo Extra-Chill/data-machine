@@ -16,6 +16,9 @@ class GetFlowsAbility {
 
 	use FlowHelpers;
 
+	/**
+	 * Default per_page for REST/chat callers. CLI defaults to 0 (all).
+	 */
 	private const DEFAULT_PER_PAGE = 20;
 
 	public function __construct() {
@@ -62,9 +65,8 @@ class GetFlowsAbility {
 							'per_page'     => array(
 								'type'        => 'integer',
 								'default'     => self::DEFAULT_PER_PAGE,
-								'minimum'     => 1,
-								'maximum'     => 100,
-								'description' => __( 'Number of flows per page', 'data-machine' ),
+								'minimum'     => 0,
+								'description' => __( 'Number of flows per page. 0 = return all flows (no pagination).', 'data-machine' ),
 							),
 							'offset'       => array(
 								'type'        => 'integer',
@@ -122,6 +124,9 @@ class GetFlowsAbility {
 			$offset       = (int) ( $input['offset'] ?? 0 );
 			$output_mode  = $input['output_mode'] ?? 'full';
 
+			// per_page=0 means "return all" — used by CLI. Use PHP_INT_MAX to bypass pagination.
+			$effective_per_page = ( 0 === $per_page ) ? PHP_INT_MAX : $per_page;
+
 			if ( ! in_array( $output_mode, array( 'full', 'summary', 'ids' ), true ) ) {
 				$output_mode = 'full';
 			}
@@ -164,10 +169,10 @@ class GetFlowsAbility {
 			$total = 0;
 
 			if ( $pipeline_id ) {
-				$flows = $this->db_flows->get_flows_for_pipeline_paginated( $pipeline_id, $per_page, $offset );
+				$flows = $this->db_flows->get_flows_for_pipeline_paginated( $pipeline_id, $effective_per_page, $offset );
 				$total = $this->db_flows->count_flows_for_pipeline( $pipeline_id );
 			} else {
-				$flows = $this->getAllFlowsPaginated( $per_page, $offset, $user_id, $agent_id );
+				$flows = $this->getAllFlowsPaginated( $effective_per_page, $offset, $user_id, $agent_id );
 				$total = $this->countAllFlows( $user_id, $agent_id );
 			}
 
