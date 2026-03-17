@@ -6,11 +6,12 @@
  * Wraps InternalLinkingAbilities API primitives.
  *
  * Subcommands:
- * - crosslink — Queue system agent link insertion.
- * - diagnose  — Meta-based coverage report.
- * - audit     — Scan content, build + cache link graph.
- * - orphans   — List orphaned posts (zero inbound links).
- * - broken    — HTTP HEAD checks for broken internal links.
+ * - crosslink      — Queue system agent link insertion.
+ * - diagnose       — Meta-based coverage report.
+ * - audit          — Scan content, build + cache link graph.
+ * - orphans        — List orphaned posts (zero inbound links).
+ * - opportunities  — Ranked linking opportunities (GSC traffic + link graph).
+ * - broken         — HTTP HEAD checks for broken internal links.
  *
  * @package DataMachine\Cli\Commands
  * @since 0.24.0
@@ -528,6 +529,118 @@ class LinksCommand extends BaseCommand {
 		);
 
 		WP_CLI::success( sprintf( '%d orphaned post(s) out of %d scanned.', $orphaned_count, $total_scanned ) );
+	}
+
+	/**
+	 * Rank internal linking opportunities by combining GSC traffic with link graph data.
+	 *
+	 * High-traffic pages with few inbound internal links are the best opportunities
+	 * for internal linking. Score = clicks * (1 / (inbound_links + 1)).
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--limit=<number>]
+	 * : Number of results to return.
+	 * ---
+	 * default: 20
+	 * ---
+	 *
+	 * [--category=<slug>]
+	 * : Filter to posts in a specific category.
+	 *
+	 * [--min-clicks=<number>]
+	 * : Minimum GSC clicks to include a page.
+	 * ---
+	 * default: 5
+	 * ---
+	 *
+	 * [--days=<days>]
+	 * : GSC lookback period in days.
+	 * ---
+	 * default: 28
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - csv
+	 * ---
+	 *
+	 * [--fields=<fields>]
+	 * : Limit output to specific fields (comma-separated).
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Top 20 linking opportunities
+	 *     wp datamachine links opportunities
+	 *
+	 *     # Top 10 opportunities in a category
+	 *     wp datamachine links opportunities --category=music-history --limit=10
+	 *
+	 *     # Pages with at least 20 clicks, JSON output
+	 *     wp datamachine links opportunities --min-clicks=20 --format=json
+	 *
+	 *     # 90-day lookback
+	 *     wp datamachine links opportunities --days=90 --limit=5
+	 *
+	 * @subcommand opportunities
+	 */
+	public function opportunities( array $args, array $assoc_args ): void {
+		$format     = $assoc_args['format'] ?? 'table';
+		$limit      = absint( $assoc_args['limit'] ?? 20 );
+		$category   = sanitize_text_field( $assoc_args['category'] ?? '' );
+		$min_clicks = absint( $assoc_args['min-clicks'] ?? 5 );
+		$days       = absint( $assoc_args['days'] ?? 28 );
+
+		WP_CLI::log( 'Loading link graph and GSC traffic data...' );
+
+		$result = InternalLinkingAbilities::getLinkOpportunities(
+			array(
+				'limit'      => $limit,
+				'category'   => $category,
+				'min_clicks' => $min_clicks,
+				'days'       => $days,
+			)
+		);
+
+		if ( empty( $result['success'] ) ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to get link opportunities.' );
+			return;
+		}
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( \wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			return;
+		}
+
+		$opportunities = $result['opportunities'] ?? array();
+
+		if ( empty( $opportunities ) ) {
+			WP_CLI::success( sprintf(
+				'No opportunities found (min %d clicks, %d-day window, %d pages with GSC data).',
+				$min_clicks,
+				$days,
+				$result['pages_with_traffic'] ?? 0
+			) );
+			return;
+		}
+
+		$this->format_items(
+			$opportunities,
+			array( 'score', 'clicks', 'impressions', 'position', 'inbound_links', 'outbound_links', 'post_id', 'slug' ),
+			$assoc_args
+		);
+
+		WP_CLI::success( sprintf(
+			'%d opportunity(s) found from %d pages with GSC traffic (%d-day window).',
+			count( $opportunities ),
+			$result['pages_with_traffic'] ?? 0,
+			$days
+		) );
 	}
 
 	// Removed: inject-category subcommand (v0.42.0).

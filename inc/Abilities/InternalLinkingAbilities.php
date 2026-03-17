@@ -5,12 +5,13 @@
  * Ability endpoints for AI-powered internal link insertion and diagnostics.
  * Delegates async execution to the System Agent infrastructure.
  *
- * Five abilities:
- * - datamachine/internal-linking      — Queue system agent link insertion.
+ * Six abilities:
+ * - datamachine/internal-linking        — Queue system agent link insertion.
  * - datamachine/diagnose-internal-links — Meta-based coverage report.
- * - datamachine/audit-internal-links   — Scan content, build + cache link graph.
- * - datamachine/get-orphaned-posts     — Read orphaned posts from cached graph.
- * - datamachine/check-broken-links     — HTTP HEAD checks on cached graph links.
+ * - datamachine/audit-internal-links    — Scan content, build + cache link graph.
+ * - datamachine/get-orphaned-posts      — Read orphaned posts from cached graph.
+ * - datamachine/check-broken-links      — HTTP HEAD checks on cached graph links.
+ * - datamachine/link-opportunities      — Ranked linking opportunities from GSC + link graph.
  *
  * @package DataMachine\Abilities
  * @since 0.24.0
@@ -280,6 +281,65 @@ class InternalLinkingAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'checkBrokenLinks' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/link-opportunities',
+				array(
+					'label'               => 'Link Opportunities',
+					'description'         => 'Rank internal linking opportunities by combining GSC traffic data with the link graph. High-traffic pages with few inbound links score highest.',
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'limit'      => array(
+								'type'        => 'integer',
+								'description' => 'Number of results to return. Default: 20.',
+								'default'     => 20,
+							),
+							'category'   => array(
+								'type'        => 'string',
+								'description' => 'Category slug to filter by.',
+							),
+							'min_clicks' => array(
+								'type'        => 'integer',
+								'description' => 'Minimum GSC clicks to include a page. Default: 5.',
+								'default'     => 5,
+							),
+							'days'       => array(
+								'type'        => 'integer',
+								'description' => 'GSC lookback period in days. Default: 28.',
+								'default'     => 28,
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'            => array( 'type' => 'boolean' ),
+							'pages_with_traffic' => array( 'type' => 'integer' ),
+							'opportunities'      => array(
+								'type'  => 'array',
+								'items' => array(
+									'type'       => 'object',
+									'properties' => array(
+										'score'          => array( 'type' => 'number' ),
+										'clicks'         => array( 'type' => 'number' ),
+										'impressions'    => array( 'type' => 'number' ),
+										'position'       => array( 'type' => 'number' ),
+										'inbound_links'  => array( 'type' => 'integer' ),
+										'outbound_links' => array( 'type' => 'integer' ),
+										'post_id'        => array( 'type' => 'integer' ),
+										'slug'           => array( 'type' => 'string' ),
+									),
+								),
+							),
+						),
+					),
+					'execute_callback'    => array( self::class, 'getLinkOpportunities' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
@@ -844,6 +904,223 @@ class InternalLinkingAbilities {
 		}
 
 		return $status ? $status : 0;
+	}
+
+	/**
+	 * Get ranked internal linking opportunities by combining GSC traffic with link graph.
+	 *
+	 * Pages with high search traffic but few inbound internal links are the best
+	 * candidates for internal linking. Score = clicks * (1 / (inbound_links + 1)).
+	 *
+	 * @since 0.43.0
+	 *
+	 * @param array $input Ability input.
+	 * @return array Ability response.
+	 */
+	public static function getLinkOpportunities( array $input = array() ): array {
+		$limit      = absint( $input['limit'] ?? 20 );
+		$category   = sanitize_text_field( $input['category'] ?? '' );
+		$min_clicks = absint( $input['min_clicks'] ?? 5 );
+		$days       = absint( $input['days'] ?? 28 );
+
+		// 1. Load the link graph from transient (run audit if not cached).
+		$graph = get_transient( self::GRAPH_TRANSIENT_KEY );
+		if ( false === $graph || ! is_array( $graph ) ) {
+			$graph = self::buildLinkGraph( 'post', '', array() );
+			if ( isset( $graph['error'] ) ) {
+				return array(
+					'success' => false,
+					'error'   => 'Failed to build link graph: ' . $graph['error'],
+				);
+			}
+			set_transient( self::GRAPH_TRANSIENT_KEY, $graph, self::GRAPH_CACHE_TTL );
+		}
+
+		// Build inbound/outbound counts from the link graph's _all_links data.
+		$inbound_counts  = array();
+		$outbound_counts = array();
+
+		// Initialize from orphaned_posts (0 inbound).
+		foreach ( $graph['orphaned_posts'] ?? array() as $orphan ) {
+			$pid = $orphan['post_id'] ?? 0;
+			if ( $pid > 0 ) {
+				$inbound_counts[ $pid ] = 0;
+			}
+		}
+
+		// Initialize from top_linked (has inbound count).
+		foreach ( $graph['top_linked'] ?? array() as $top ) {
+			$pid = $top['post_id'] ?? 0;
+			if ( $pid > 0 ) {
+				$inbound_counts[ $pid ] = (int) ( $top['inbound'] ?? 0 );
+			}
+		}
+
+		// Rebuild full counts from _all_links for accuracy.
+		$all_links = $graph['_all_links'] ?? array();
+		foreach ( $all_links as $link ) {
+			$source_id = $link['source_id'] ?? 0;
+			$target_id = $link['target_id'] ?? null;
+
+			if ( $source_id > 0 ) {
+				if ( ! isset( $outbound_counts[ $source_id ] ) ) {
+					$outbound_counts[ $source_id ] = 0;
+				}
+				++$outbound_counts[ $source_id ];
+			}
+
+			if ( null !== $target_id && $target_id > 0 && $target_id !== $source_id ) {
+				if ( ! isset( $inbound_counts[ $target_id ] ) ) {
+					$inbound_counts[ $target_id ] = 0;
+				}
+				++$inbound_counts[ $target_id ];
+			}
+		}
+
+		// 2. Fetch GSC page stats via the ability.
+		$gsc_ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/google-search-console' ) : null;
+
+		if ( ! $gsc_ability ) {
+			return array(
+				'success' => false,
+				'error'   => 'Google Search Console ability not available. Ensure Data Machine analytics is configured.',
+			);
+		}
+
+		$start_date = gmdate( 'Y-m-d', strtotime( "-{$days} days" ) );
+		$end_date   = gmdate( 'Y-m-d', strtotime( '-3 days' ) );
+
+		$gsc_result = $gsc_ability->execute(
+			array(
+				'action'     => 'page_stats',
+				'start_date' => $start_date,
+				'end_date'   => $end_date,
+				'limit'      => 5000,
+			)
+		);
+
+		if ( empty( $gsc_result['success'] ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to fetch GSC data: ' . ( $gsc_result['error'] ?? 'Unknown error' ),
+			);
+		}
+
+		$gsc_rows = $gsc_result['results'] ?? array();
+
+		// 3. For each page with GSC traffic, look up post ID and count inbound links.
+		$category_post_ids = null;
+		if ( ! empty( $category ) ) {
+			$term = get_term_by( 'slug', $category, 'category' );
+			if ( ! $term ) {
+				return array(
+					'success' => false,
+					'error'   => "Category '{$category}' not found.",
+				);
+			}
+			$cat_posts = get_posts(
+				array(
+					'post_type'   => 'post',
+					'post_status' => 'publish',
+					'category'    => $term->term_id,
+					'fields'      => 'ids',
+					'numberposts' => -1,
+				)
+			);
+			$category_post_ids = array_flip( $cat_posts );
+		}
+
+		// Aggregate GSC rows by post ID (GSC may return multiple URL variants per page).
+		$traffic_by_post = array();
+
+		foreach ( $gsc_rows as $row ) {
+			$keys   = $row['keys'] ?? array();
+			$page   = $keys[0] ?? '';
+			$clicks = (float) ( $row['clicks'] ?? 0 );
+
+			if ( empty( $page ) ) {
+				continue;
+			}
+
+			// Resolve URL to post ID.
+			$post_id = url_to_postid( $page );
+			if ( 0 === $post_id ) {
+				continue;
+			}
+
+			// Aggregate traffic by post ID.
+			if ( ! isset( $traffic_by_post[ $post_id ] ) ) {
+				$traffic_by_post[ $post_id ] = array(
+					'clicks'      => 0,
+					'impressions' => 0,
+					'position'    => 0,
+					'row_count'   => 0,
+				);
+			}
+
+			$traffic_by_post[ $post_id ]['clicks']      += (int) $clicks;
+			$traffic_by_post[ $post_id ]['impressions']  += (int) ( $row['impressions'] ?? 0 );
+			$traffic_by_post[ $post_id ]['position']     += (float) ( $row['position'] ?? 0 );
+			++$traffic_by_post[ $post_id ]['row_count'];
+		}
+
+		$opportunities = array();
+
+		foreach ( $traffic_by_post as $post_id => $traffic ) {
+			if ( $traffic['clicks'] < $min_clicks ) {
+				continue;
+			}
+
+			// Verify the post exists and is published.
+			$post = get_post( $post_id );
+			if ( ! $post || 'publish' !== $post->post_status || 'post' !== $post->post_type ) {
+				continue;
+			}
+
+			// Category filter.
+			if ( null !== $category_post_ids && ! isset( $category_post_ids[ $post_id ] ) ) {
+				continue;
+			}
+
+			$inbound  = $inbound_counts[ $post_id ] ?? 0;
+			$outbound = $outbound_counts[ $post_id ] ?? 0;
+
+			// Average position across URL variants.
+			$avg_position = $traffic['row_count'] > 0 ? $traffic['position'] / $traffic['row_count'] : 0;
+
+			// 4. Score: clicks * (1 / (inbound_links + 1)).
+			$score = $traffic['clicks'] * ( 1 / ( $inbound + 1 ) );
+
+			$opportunities[] = array(
+				'score'          => round( $score, 2 ),
+				'clicks'         => $traffic['clicks'],
+				'impressions'    => $traffic['impressions'],
+				'position'       => round( $avg_position, 1 ),
+				'inbound_links'  => $inbound,
+				'outbound_links' => $outbound,
+				'post_id'        => $post_id,
+				'slug'           => $post->post_name,
+			);
+		}
+
+		// 5. Sort by opportunity_score descending.
+		usort(
+			$opportunities,
+			function ( $a, $b ) {
+				return $b['score'] <=> $a['score'];
+			}
+		);
+
+		// 6. Limit results.
+		if ( $limit > 0 && count( $opportunities ) > $limit ) {
+			$opportunities = array_slice( $opportunities, 0, $limit );
+		}
+
+		return array(
+			'success'            => true,
+			'pages_with_traffic' => count( $gsc_rows ),
+			'opportunities'      => $opportunities,
+		);
 	}
 
 	/**
