@@ -555,6 +555,205 @@ class EmailCommand extends BaseCommand {
 	}
 
 	/**
+	 * Move all emails matching a search to a folder.
+	 *
+	 * ## OPTIONS
+	 *
+	 * --search=<criteria>
+	 * : IMAP search criteria (e.g., FROM "github.com", SUBJECT "newsletter").
+	 *
+	 * --destination=<folder>
+	 * : Target folder (e.g., Archive, [Gmail]/GitHub, [Gmail]/Spam).
+	 *
+	 * [--folder=<folder>]
+	 * : Source folder.
+	 * ---
+	 * default: INBOX
+	 * ---
+	 *
+	 * [--max=<count>]
+	 * : Maximum messages to move (safety limit).
+	 * ---
+	 * default: 500
+	 * ---
+	 *
+	 * [--yes]
+	 * : Skip confirmation prompt.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine email batch-move --search='FROM "github.com"' --destination="[Gmail]/GitHub"
+	 *     wp datamachine email batch-move --search='FROM "linkedin.com"' --destination="[Gmail]/Trash" --yes
+	 *     wp datamachine email batch-move --search='SUBJECT "newsletter"' --destination=Newsletters --max=100
+	 *
+	 * @subcommand batch-move
+	 */
+	public function batch_move( array $args, array $assoc_args ): void {
+		$ability = wp_get_ability( 'datamachine/email-batch-move' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'Batch move ability not available.' );
+		}
+
+		$search      = $assoc_args['search'] ?? '';
+		$destination = $assoc_args['destination'] ?? '';
+
+		if ( empty( $search ) || empty( $destination ) ) {
+			WP_CLI::error( 'Both --search and --destination are required.' );
+		}
+
+		if ( ! isset( $assoc_args['yes'] ) ) {
+			WP_CLI::confirm( "Move all messages matching '{$search}' to '{$destination}'?" );
+		}
+
+		$result = $ability->execute( array(
+			'search'      => $search,
+			'destination' => $destination,
+			'folder'      => $assoc_args['folder'] ?? 'INBOX',
+			'max'         => (int) ( $assoc_args['max'] ?? 500 ),
+		) );
+
+		if ( $result['success'] ?? false ) {
+			WP_CLI::success( $result['message'] ?? 'Batch move complete.' );
+		} else {
+			WP_CLI::error( $result['error'] ?? 'Batch move failed.' );
+		}
+	}
+
+	/**
+	 * Set or clear a flag on all emails matching a search.
+	 *
+	 * ## OPTIONS
+	 *
+	 * --search=<criteria>
+	 * : IMAP search criteria.
+	 *
+	 * <flag>
+	 * : Flag: Seen, Flagged, Answered, Deleted, Draft.
+	 *
+	 * [--action=<action>]
+	 * : set or clear the flag.
+	 * ---
+	 * default: set
+	 * options:
+	 *   - set
+	 *   - clear
+	 * ---
+	 *
+	 * [--folder=<folder>]
+	 * : Mail folder.
+	 * ---
+	 * default: INBOX
+	 * ---
+	 *
+	 * [--max=<count>]
+	 * : Maximum messages to flag (safety limit).
+	 * ---
+	 * default: 500
+	 * ---
+	 *
+	 * [--yes]
+	 * : Skip confirmation prompt.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine email batch-flag --search='FROM "linkedin.com"' Seen
+	 *     wp datamachine email batch-flag --search='FROM "github.com"' Seen --action=clear
+	 *     wp datamachine email batch-flag --search=UNSEEN Flagged --max=10
+	 *
+	 * @subcommand batch-flag
+	 */
+	public function batch_flag( array $args, array $assoc_args ): void {
+		$ability = wp_get_ability( 'datamachine/email-batch-flag' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'Batch flag ability not available.' );
+		}
+
+		$search = $assoc_args['search'] ?? '';
+		$flag   = $args[0] ?? '';
+		$action = $assoc_args['action'] ?? 'set';
+
+		if ( empty( $search ) || empty( $flag ) ) {
+			WP_CLI::error( 'Both --search and a flag argument are required.' );
+		}
+
+		if ( ! isset( $assoc_args['yes'] ) ) {
+			WP_CLI::confirm( "{$action} flag '{$flag}' on all messages matching '{$search}'?" );
+		}
+
+		$result = $ability->execute( array(
+			'search' => $search,
+			'flag'   => $flag,
+			'action' => $action,
+			'folder' => $assoc_args['folder'] ?? 'INBOX',
+			'max'    => (int) ( $assoc_args['max'] ?? 500 ),
+		) );
+
+		if ( $result['success'] ?? false ) {
+			WP_CLI::success( $result['message'] ?? 'Batch flag complete.' );
+		} else {
+			WP_CLI::error( $result['error'] ?? 'Batch flag failed.' );
+		}
+	}
+
+	/**
+	 * Delete all emails matching a search.
+	 *
+	 * ## OPTIONS
+	 *
+	 * --search=<criteria>
+	 * : IMAP search criteria.
+	 *
+	 * [--folder=<folder>]
+	 * : Mail folder.
+	 * ---
+	 * default: INBOX
+	 * ---
+	 *
+	 * [--max=<count>]
+	 * : Maximum messages to delete (safety limit).
+	 * ---
+	 * default: 100
+	 * ---
+	 *
+	 * [--yes]
+	 * : Skip confirmation prompt.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine email batch-delete --search='FROM "spam@example.com"'
+	 *     wp datamachine email batch-delete --search='SUBJECT "unsubscribe" BEFORE "1-Jan-2025"' --max=200 --yes
+	 *
+	 * @subcommand batch-delete
+	 */
+	public function batch_delete( array $args, array $assoc_args ): void {
+		$ability = wp_get_ability( 'datamachine/email-batch-delete' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'Batch delete ability not available.' );
+		}
+
+		$search = $assoc_args['search'] ?? '';
+		if ( empty( $search ) ) {
+			WP_CLI::error( '--search is required.' );
+		}
+
+		if ( ! isset( $assoc_args['yes'] ) ) {
+			WP_CLI::confirm( "DELETE all messages matching '{$search}'? This cannot be undone." );
+		}
+
+		$result = $ability->execute( array(
+			'search' => $search,
+			'folder' => $assoc_args['folder'] ?? 'INBOX',
+			'max'    => (int) ( $assoc_args['max'] ?? 100 ),
+		) );
+
+		if ( $result['success'] ?? false ) {
+			WP_CLI::success( $result['message'] ?? 'Batch delete complete.' );
+		} else {
+			WP_CLI::error( $result['error'] ?? 'Batch delete failed.' );
+		}
+	}
+
+	/**
 	 * Test the IMAP connection.
 	 *
 	 * ## EXAMPLES

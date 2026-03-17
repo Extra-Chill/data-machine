@@ -149,6 +149,57 @@ class Email {
 			)
 		);
 
+		// Batch move.
+		register_rest_route(
+			self::NAMESPACE,
+			'/email/batch/move',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( self::class, 'handle_batch_move' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => array(
+					'search'      => array( 'type' => 'string', 'required' => true ),
+					'destination' => array( 'type' => 'string', 'required' => true ),
+					'folder'      => array( 'type' => 'string', 'default' => 'INBOX' ),
+					'max'         => array( 'type' => 'integer', 'default' => 500 ),
+				),
+			)
+		);
+
+		// Batch flag.
+		register_rest_route(
+			self::NAMESPACE,
+			'/email/batch/flag',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( self::class, 'handle_batch_flag' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => array(
+					'search' => array( 'type' => 'string', 'required' => true ),
+					'flag'   => array( 'type' => 'string', 'required' => true ),
+					'action' => array( 'type' => 'string', 'default' => 'set' ),
+					'folder' => array( 'type' => 'string', 'default' => 'INBOX' ),
+					'max'    => array( 'type' => 'integer', 'default' => 500 ),
+				),
+			)
+		);
+
+		// Batch delete.
+		register_rest_route(
+			self::NAMESPACE,
+			'/email/batch/delete',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( self::class, 'handle_batch_delete' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => array(
+					'search' => array( 'type' => 'string', 'required' => true ),
+					'folder' => array( 'type' => 'string', 'default' => 'INBOX' ),
+					'max'    => array( 'type' => 'integer', 'default' => 100 ),
+				),
+			)
+		);
+
 		// Test connection.
 		register_rest_route(
 			self::NAMESPACE,
@@ -313,6 +364,54 @@ class Email {
 			'flag'   => $request->get_param( 'flag' ),
 			'action' => $request->get_param( 'action' ) ?? 'set',
 			'folder' => $request->get_param( 'folder' ) ?? 'INBOX',
+		) );
+
+		return self::to_response( $result );
+	}
+
+	public static function handle_batch_move( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$ability = wp_get_ability( 'datamachine/email-batch-move' );
+		if ( ! $ability ) {
+			return new \WP_Error( 'ability_not_found', 'Batch move ability not available', array( 'status' => 500 ) );
+		}
+
+		$result = $ability->execute( array(
+			'search'      => $request->get_param( 'search' ),
+			'destination' => $request->get_param( 'destination' ),
+			'folder'      => $request->get_param( 'folder' ) ?? 'INBOX',
+			'max'         => (int) ( $request->get_param( 'max' ) ?? 500 ),
+		) );
+
+		return self::to_response( $result );
+	}
+
+	public static function handle_batch_flag( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$ability = wp_get_ability( 'datamachine/email-batch-flag' );
+		if ( ! $ability ) {
+			return new \WP_Error( 'ability_not_found', 'Batch flag ability not available', array( 'status' => 500 ) );
+		}
+
+		$result = $ability->execute( array(
+			'search' => $request->get_param( 'search' ),
+			'flag'   => $request->get_param( 'flag' ),
+			'action' => $request->get_param( 'action' ) ?? 'set',
+			'folder' => $request->get_param( 'folder' ) ?? 'INBOX',
+			'max'    => (int) ( $request->get_param( 'max' ) ?? 500 ),
+		) );
+
+		return self::to_response( $result );
+	}
+
+	public static function handle_batch_delete( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$ability = wp_get_ability( 'datamachine/email-batch-delete' );
+		if ( ! $ability ) {
+			return new \WP_Error( 'ability_not_found', 'Batch delete ability not available', array( 'status' => 500 ) );
+		}
+
+		$result = $ability->execute( array(
+			'search' => $request->get_param( 'search' ),
+			'folder' => $request->get_param( 'folder' ) ?? 'INBOX',
+			'max'    => (int) ( $request->get_param( 'max' ) ?? 100 ),
 		) );
 
 		return self::to_response( $result );

@@ -211,6 +211,144 @@ class EmailAbilities {
 				)
 			);
 
+			// Batch move: search → move all matches.
+			wp_register_ability(
+				'datamachine/email-batch-move',
+				array(
+					'label'               => __( 'Batch Move Emails', 'data-machine' ),
+					'description'         => __( 'Move all emails matching a search to a destination folder', 'data-machine' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'search', 'destination' ),
+						'properties' => array(
+							'search'      => array(
+								'type'        => 'string',
+								'description' => __( 'IMAP search criteria (e.g., FROM "github.com")', 'data-machine' ),
+							),
+							'destination' => array(
+								'type'        => 'string',
+								'description' => __( 'Target folder (e.g., [Gmail]/GitHub, Archive)', 'data-machine' ),
+							),
+							'folder'      => array(
+								'type'    => 'string',
+								'default' => 'INBOX',
+							),
+							'max'         => array(
+								'type'        => 'integer',
+								'default'     => 500,
+								'description' => __( 'Maximum messages to move (safety limit)', 'data-machine' ),
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'       => array( 'type' => 'boolean' ),
+							'message'       => array( 'type' => 'string' ),
+							'moved_count'   => array( 'type' => 'integer' ),
+							'total_matches' => array( 'type' => 'integer' ),
+							'error'         => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( $this, 'executeBatchMove' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			// Batch flag: search → flag/unflag all matches.
+			wp_register_ability(
+				'datamachine/email-batch-flag',
+				array(
+					'label'               => __( 'Batch Flag Emails', 'data-machine' ),
+					'description'         => __( 'Set or clear a flag on all emails matching a search', 'data-machine' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'search', 'flag' ),
+						'properties' => array(
+							'search' => array(
+								'type'        => 'string',
+								'description' => __( 'IMAP search criteria', 'data-machine' ),
+							),
+							'flag'   => array(
+								'type'        => 'string',
+								'description' => __( 'Flag: Seen, Flagged, Answered, Deleted, Draft', 'data-machine' ),
+							),
+							'action' => array(
+								'type'    => 'string',
+								'default' => 'set',
+								'description' => __( 'set or clear', 'data-machine' ),
+							),
+							'folder' => array(
+								'type'    => 'string',
+								'default' => 'INBOX',
+							),
+							'max'    => array(
+								'type'    => 'integer',
+								'default' => 500,
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'        => array( 'type' => 'boolean' ),
+							'message'        => array( 'type' => 'string' ),
+							'flagged_count'  => array( 'type' => 'integer' ),
+							'total_matches'  => array( 'type' => 'integer' ),
+							'error'          => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( $this, 'executeBatchFlag' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			// Batch delete: search → delete all matches.
+			wp_register_ability(
+				'datamachine/email-batch-delete',
+				array(
+					'label'               => __( 'Batch Delete Emails', 'data-machine' ),
+					'description'         => __( 'Delete all emails matching a search', 'data-machine' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'search' ),
+						'properties' => array(
+							'search' => array(
+								'type'        => 'string',
+								'description' => __( 'IMAP search criteria', 'data-machine' ),
+							),
+							'folder' => array(
+								'type'    => 'string',
+								'default' => 'INBOX',
+							),
+							'max'    => array(
+								'type'        => 'integer',
+								'default'     => 100,
+								'description' => __( 'Maximum messages to delete (safety limit, lower default)', 'data-machine' ),
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'        => array( 'type' => 'boolean' ),
+							'message'        => array( 'type' => 'string' ),
+							'deleted_count'  => array( 'type' => 'integer' ),
+							'total_matches'  => array( 'type' => 'integer' ),
+							'error'          => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( $this, 'executeBatchDelete' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
 			// Test IMAP connection.
 			wp_register_ability(
 				'datamachine/email-test-connection',
@@ -467,6 +605,162 @@ class EmailAbilities {
 			'success'      => true,
 			'message'      => sprintf( 'Connected to %s — %d messages in INBOX', $auth->getHost(), $info['messages'] ),
 			'mailbox_info' => $info,
+		);
+	}
+
+	/**
+	 * Batch move: search → move all matches to destination.
+	 */
+	public function executeBatchMove( array $input ): array {
+		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
+		if ( is_array( $connection ) && ! ( $connection['success'] ?? true ) ) {
+			return $connection;
+		}
+
+		$search      = $input['search'];
+		$destination = $input['destination'];
+		$max         = (int) ( $input['max'] ?? 500 );
+
+		$uids = imap_search( $connection, $search, SE_UID );
+		if ( false === $uids || empty( $uids ) ) {
+			imap_close( $connection );
+			return array(
+				'success'       => true,
+				'message'       => 'No messages matching search criteria',
+				'moved_count'   => 0,
+				'total_matches' => 0,
+			);
+		}
+
+		$total   = count( $uids );
+		$to_move = array_slice( $uids, 0, $max );
+		$moved   = 0;
+
+		// Use comma-separated UID range for batch operation (much faster than per-message).
+		$uid_set = implode( ',', $to_move );
+		$result  = imap_mail_move( $connection, $uid_set, $destination, CP_UID );
+
+		if ( $result ) {
+			$moved = count( $to_move );
+			imap_expunge( $connection );
+		}
+
+		imap_close( $connection );
+
+		$message = sprintf( 'Moved %d messages to %s', $moved, $destination );
+		if ( $total > $max ) {
+			$message .= sprintf( ' (%d more remain — run again to continue)', $total - $max );
+		}
+
+		return array(
+			'success'       => true,
+			'message'       => $message,
+			'moved_count'   => $moved,
+			'total_matches' => $total,
+		);
+	}
+
+	/**
+	 * Batch flag: search → set/clear flag on all matches.
+	 */
+	public function executeBatchFlag( array $input ): array {
+		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
+		if ( is_array( $connection ) && ! ( $connection['success'] ?? true ) ) {
+			return $connection;
+		}
+
+		$search = $input['search'];
+		$flag   = '\\' . ucfirst( strtolower( $input['flag'] ) );
+		$action = $input['action'] ?? 'set';
+		$max    = (int) ( $input['max'] ?? 500 );
+
+		$valid_flags = array( '\\Seen', '\\Flagged', '\\Answered', '\\Deleted', '\\Draft' );
+		if ( ! in_array( $flag, $valid_flags, true ) ) {
+			imap_close( $connection );
+			return array(
+				'success' => false,
+				'error'   => 'Invalid flag. Valid: Seen, Flagged, Answered, Deleted, Draft',
+			);
+		}
+
+		$uids = imap_search( $connection, $search, SE_UID );
+		if ( false === $uids || empty( $uids ) ) {
+			imap_close( $connection );
+			return array(
+				'success'       => true,
+				'message'       => 'No messages matching search criteria',
+				'flagged_count' => 0,
+				'total_matches' => 0,
+			);
+		}
+
+		$total   = count( $uids );
+		$to_flag = array_slice( $uids, 0, $max );
+		$uid_set = implode( ',', $to_flag );
+
+		if ( 'clear' === $action ) {
+			imap_clearflag_full( $connection, $uid_set, $flag, ST_UID );
+		} else {
+			imap_setflag_full( $connection, $uid_set, $flag, ST_UID );
+		}
+
+		imap_close( $connection );
+
+		$verb    = 'clear' === $action ? 'cleared' : 'set';
+		$message = sprintf( '%s %s on %d messages', ucfirst( $verb ), $flag, count( $to_flag ) );
+		if ( $total > $max ) {
+			$message .= sprintf( ' (%d more remain)', $total - $max );
+		}
+
+		return array(
+			'success'       => true,
+			'message'       => $message,
+			'flagged_count' => count( $to_flag ),
+			'total_matches' => $total,
+		);
+	}
+
+	/**
+	 * Batch delete: search → delete all matches.
+	 */
+	public function executeBatchDelete( array $input ): array {
+		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
+		if ( is_array( $connection ) && ! ( $connection['success'] ?? true ) ) {
+			return $connection;
+		}
+
+		$search = $input['search'];
+		$max    = (int) ( $input['max'] ?? 100 );
+
+		$uids = imap_search( $connection, $search, SE_UID );
+		if ( false === $uids || empty( $uids ) ) {
+			imap_close( $connection );
+			return array(
+				'success'        => true,
+				'message'        => 'No messages matching search criteria',
+				'deleted_count'  => 0,
+				'total_matches'  => 0,
+			);
+		}
+
+		$total     = count( $uids );
+		$to_delete = array_slice( $uids, 0, $max );
+		$uid_set   = implode( ',', $to_delete );
+
+		imap_delete( $connection, $uid_set, FT_UID );
+		imap_expunge( $connection );
+		imap_close( $connection );
+
+		$message = sprintf( 'Deleted %d messages', count( $to_delete ) );
+		if ( $total > $max ) {
+			$message .= sprintf( ' (%d more remain — run again to continue)', $total - $max );
+		}
+
+		return array(
+			'success'        => true,
+			'message'        => $message,
+			'deleted_count'  => count( $to_delete ),
+			'total_matches'  => $total,
 		);
 	}
 
