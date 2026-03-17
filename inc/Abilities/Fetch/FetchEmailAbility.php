@@ -5,6 +5,11 @@
  * Abilities API primitive for retrieving emails from an IMAP inbox.
  * Pure data retrieval — no dedup, no pipeline context.
  *
+ * Supports three modes:
+ * - List mode (headers_only=true): fast header-only fetch for browsing
+ * - Detail mode (uid=N): fetch a single message with full body
+ * - Full mode (default): fetch messages with bodies (pipeline use)
+ *
  * Uses PHP's native imap_* functions for broad provider compatibility
  * (Gmail, Outlook, Fastmail, self-hosted, etc.).
  *
@@ -83,6 +88,21 @@ class FetchEmailAbility {
 								'default'     => 10,
 								'description' => __( 'Maximum number of messages to retrieve', 'data-machine' ),
 							),
+							'offset'               => array(
+								'type'        => 'integer',
+								'default'     => 0,
+								'description' => __( 'Number of messages to skip (for pagination)', 'data-machine' ),
+							),
+							'uid'                  => array(
+								'type'        => 'integer',
+								'default'     => 0,
+								'description' => __( 'Fetch a single message by UID (detail mode)', 'data-machine' ),
+							),
+							'headers_only'         => array(
+								'type'        => 'boolean',
+								'default'     => false,
+								'description' => __( 'Fetch headers only (fast list mode — no body parsing)', 'data-machine' ),
+							),
 							'mark_as_read'         => array(
 								'type'        => 'boolean',
 								'default'     => false,
@@ -98,16 +118,19 @@ class FetchEmailAbility {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success' => array( 'type' => 'boolean' ),
-							'data'    => array(
+							'success'     => array( 'type' => 'boolean' ),
+							'data'        => array(
 								'type'       => 'object',
 								'properties' => array(
-									'items' => array( 'type' => 'array' ),
-									'count' => array( 'type' => 'integer' ),
+									'items'         => array( 'type' => 'array' ),
+									'count'         => array( 'type' => 'integer' ),
+									'total_matches' => array( 'type' => 'integer' ),
+									'offset'        => array( 'type' => 'integer' ),
+									'has_more'      => array( 'type' => 'boolean' ),
 								),
 							),
-							'error'   => array( 'type' => 'string' ),
-							'logs'    => array( 'type' => 'array' ),
+							'error'       => array( 'type' => 'string' ),
+							'logs'        => array( 'type' => 'array' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'execute' ),
@@ -136,13 +159,17 @@ class FetchEmailAbility {
 	/**
 	 * Execute email fetch.
 	 *
+	 * Three modes:
+	 * - uid > 0: fetch single message (detail view)
+	 * - headers_only: fast header scan (list view)
+	 * - default: fetch with bodies (pipeline mode)
+	 *
 	 * @param array $input Input parameters.
 	 * @return array Result with items or error.
 	 */
 	public function execute( array $input ): array {
 		$logs = array();
 
-		// Check IMAP extension.
 		if ( ! function_exists( 'imap_open' ) ) {
 			$logs[] = array(
 				'level'   => 'error',
@@ -157,7 +184,6 @@ class FetchEmailAbility {
 
 		$config = $this->normalizeConfig( $input );
 
-		// Build IMAP connection string.
 		$mailbox = $this->buildMailboxString(
 			$config['imap_host'],
 			$config['imap_port'],
@@ -165,28 +191,11 @@ class FetchEmailAbility {
 			$config['folder']
 		);
 
-		$logs[] = array(
-			'level'   => 'debug',
-			'message' => 'Email Fetch: Connecting to ' . $config['imap_host'],
-			'data'    => array(
-				'host'       => $config['imap_host'],
-				'port'       => $config['imap_port'],
-				'encryption' => $config['imap_encryption'],
-				'folder'     => $config['folder'],
-				'search'     => $config['search_criteria'],
-			),
-		);
-
-		// Suppress warnings — imap_open triggers PHP warnings on auth failure.
 		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 		$connection = @imap_open( $mailbox, $config['imap_user'], $config['imap_password'] );
 
 		if ( false === $connection ) {
 			$imap_error = imap_last_error();
-			$logs[]     = array(
-				'level'   => 'error',
-				'message' => 'Email Fetch: Connection failed - ' . $imap_error,
-			);
 			return array(
 				'success' => false,
 				'error'   => 'IMAP connection failed: ' . $imap_error,
@@ -194,40 +203,80 @@ class FetchEmailAbility {
 			);
 		}
 
-		$logs[] = array(
-			'level'   => 'info',
-			'message' => 'Email Fetch: Connected successfully',
-		);
+		// Single message fetch by UID (detail mode).
+		if ( ! empty( $config['uid'] ) ) {
+			$item = $this->fetchMessage( $connection, (int) $config['uid'], $config );
+			imap_close( $connection );
+
+			if ( null === $item ) {
+				return array(
+					'success' => false,
+					'error'   => 'Message UID ' . $config['uid'] . ' not found',
+					'logs'    => $logs,
+				);
+			}
+
+			return array(
+				'success' => true,
+				'data'    => array(
+					'items'         => array( $item ),
+					'count'         => 1,
+					'total_matches' => 1,
+					'offset'        => 0,
+					'has_more'      => false,
+				),
+				'logs' => $logs,
+			);
+		}
 
 		// Search for messages.
 		$message_ids = imap_search( $connection, $config['search_criteria'], SE_UID );
 
 		if ( false === $message_ids || empty( $message_ids ) ) {
 			imap_close( $connection );
-			$logs[] = array(
-				'level'   => 'info',
-				'message' => 'Email Fetch: No messages matching criteria',
-			);
 			return array(
 				'success' => true,
 				'data'    => array(
-					'items' => array(),
-					'count' => 0,
+					'items'         => array(),
+					'count'         => 0,
+					'total_matches' => 0,
+					'offset'        => 0,
+					'has_more'      => false,
 				),
-				'logs'    => $logs,
+				'logs' => $logs,
 			);
 		}
 
-		// Limit to max_messages (most recent first).
-		$message_ids = array_reverse( $message_ids );
-		$message_ids = array_slice( $message_ids, 0, $config['max_messages'] );
+		// Most recent first.
+		$message_ids   = array_reverse( $message_ids );
+		$total_matches = count( $message_ids );
+		$offset        = (int) $config['offset'];
+		$max           = (int) $config['max_messages'];
+
+		// Apply pagination.
+		if ( $offset > 0 ) {
+			$message_ids = array_slice( $message_ids, $offset );
+		}
+		$message_ids = array_slice( $message_ids, 0, $max );
+		$has_more    = ( $offset + count( $message_ids ) ) < $total_matches;
 
 		$items = array();
 
-		foreach ( $message_ids as $uid ) {
-			$item = $this->fetchMessage( $connection, $uid, $config );
-			if ( null !== $item ) {
-				$items[] = $item;
+		if ( $config['headers_only'] ) {
+			// Fast header-only mode — no body parsing, no structure fetching.
+			foreach ( $message_ids as $uid ) {
+				$item = $this->fetchHeaders( $connection, $uid );
+				if ( null !== $item ) {
+					$items[] = $item;
+				}
+			}
+		} else {
+			// Full mode — bodies + attachments.
+			foreach ( $message_ids as $uid ) {
+				$item = $this->fetchMessage( $connection, $uid, $config );
+				if ( null !== $item ) {
+					$items[] = $item;
+				}
 			}
 		}
 
@@ -246,21 +295,92 @@ class FetchEmailAbility {
 
 		$logs[] = array(
 			'level'   => 'info',
-			'message' => sprintf( 'Email Fetch: Retrieved %d messages', count( $items ) ),
+			'message' => sprintf(
+				'Email Fetch: Retrieved %d of %d messages (offset %d)',
+				count( $items ),
+				$total_matches,
+				$offset
+			),
 		);
 
 		return array(
 			'success' => true,
 			'data'    => array(
-				'items' => $items,
-				'count' => count( $items ),
+				'items'         => $items,
+				'count'         => count( $items ),
+				'total_matches' => $total_matches,
+				'offset'        => $offset,
+				'has_more'      => $has_more,
 			),
-			'logs'    => $logs,
+			'logs' => $logs,
 		);
 	}
 
 	/**
-	 * Fetch a single message by UID.
+	 * Fetch headers only for a message (fast list mode).
+	 *
+	 * No body parsing, no structure fetching, no attachment scanning.
+	 * Just From, Subject, Date, UID, and basic flags.
+	 *
+	 * @param resource $connection IMAP connection.
+	 * @param int      $uid        Message UID.
+	 * @return array|null Header data or null on failure.
+	 */
+	private function fetchHeaders( $connection, int $uid ): ?array {
+		$msgno = imap_msgno( $connection, $uid );
+		if ( 0 === $msgno ) {
+			return null;
+		}
+
+		$header_info = imap_headerinfo( $connection, $msgno );
+		if ( false === $header_info ) {
+			return null;
+		}
+
+		$subject    = isset( $header_info->subject ) ? imap_utf8( $header_info->subject ) : '';
+		$from       = $header_info->from[0] ?? null;
+		$from_email = $from ? ( $from->mailbox . '@' . $from->host ) : '';
+		$from_name  = isset( $from->personal ) ? imap_utf8( $from->personal ) : '';
+		$date       = isset( $header_info->date ) ? gmdate( 'Y-m-d\TH:i:s\Z', strtotime( $header_info->date ) ) : '';
+		$message_id = $header_info->message_id ?? '';
+
+		// Read flags.
+		$seen    = ( isset( $header_info->Unseen ) && 'U' === $header_info->Unseen ) ? false : true;
+		$flagged = ( isset( $header_info->Flagged ) && 'F' === $header_info->Flagged );
+
+		// Get to address.
+		$to_address = '';
+		if ( ! empty( $header_info->to ) ) {
+			$to         = $header_info->to[0];
+			$to_address = $to->mailbox . '@' . $to->host;
+		}
+
+		// Get size from overview (fast, no body fetch).
+		$overview = imap_fetch_overview( $connection, (string) $uid, FT_UID );
+		$size     = ( ! empty( $overview ) ) ? ( $overview[0]->size ?? 0 ) : 0;
+
+		return array(
+			'title'    => $subject,
+			'content'  => '',
+			'metadata' => array(
+				'uid'               => $uid,
+				'message_id'        => $message_id,
+				'dedup_key'         => $message_id,
+				'from'              => $from_email,
+				'from_name'         => $from_name,
+				'to'                => $to_address,
+				'date'              => $date,
+				'original_date_gmt' => $date,
+				'seen'              => $seen,
+				'flagged'           => $flagged,
+				'size'              => $size,
+				'in_reply_to'       => $header_info->in_reply_to ?? '',
+			),
+		);
+	}
+
+	/**
+	 * Fetch a single message with full body by UID.
 	 *
 	 * @param resource $connection IMAP connection.
 	 * @param int      $uid        Message UID.
@@ -268,12 +388,16 @@ class FetchEmailAbility {
 	 * @return array|null Message data or null on failure.
 	 */
 	private function fetchMessage( $connection, int $uid, array $config ): ?array {
-		$header_info = imap_headerinfo( $connection, imap_msgno( $connection, $uid ) );
+		$msgno = imap_msgno( $connection, $uid );
+		if ( 0 === $msgno ) {
+			return null;
+		}
+
+		$header_info = imap_headerinfo( $connection, $msgno );
 		if ( false === $header_info ) {
 			return null;
 		}
 
-		// Parse headers.
 		$subject    = isset( $header_info->subject ) ? imap_utf8( $header_info->subject ) : '';
 		$from       = $header_info->from[0] ?? null;
 		$from_email = $from ? ( $from->mailbox . '@' . $from->host ) : '';
@@ -283,14 +407,16 @@ class FetchEmailAbility {
 		$in_reply   = $header_info->in_reply_to ?? '';
 		$references = $header_info->references ?? '';
 
-		// Get to address.
+		$seen    = ( isset( $header_info->Unseen ) && 'U' === $header_info->Unseen ) ? false : true;
+		$flagged = ( isset( $header_info->Flagged ) && 'F' === $header_info->Flagged );
+
 		$to_address = '';
 		if ( ! empty( $header_info->to ) ) {
-			$to       = $header_info->to[0];
+			$to         = $header_info->to[0];
 			$to_address = $to->mailbox . '@' . $to->host;
 		}
 
-		// Fetch body — prefer plain text, fall back to HTML stripped.
+		// Fetch body.
 		$body = $this->fetchBody( $connection, $uid );
 
 		// Check for attachments.
@@ -302,7 +428,6 @@ class FetchEmailAbility {
 			$attachments      = $this->findAttachments( $structure );
 			$attachment_count = count( $attachments );
 
-			// Download first attachment if requested.
 			if ( $config['download_attachments'] && ! empty( $attachments ) ) {
 				$file_info = $this->downloadAttachment( $connection, $uid, $attachments[0] );
 			}
@@ -312,6 +437,7 @@ class FetchEmailAbility {
 			'title'    => $subject,
 			'content'  => $body,
 			'metadata' => array(
+				'uid'               => $uid,
 				'message_id'        => $message_id,
 				'dedup_key'         => $message_id,
 				'from'              => $from_email,
@@ -319,6 +445,8 @@ class FetchEmailAbility {
 				'to'                => $to_address,
 				'date'              => $date,
 				'original_date_gmt' => $date,
+				'seen'              => $seen,
+				'flagged'           => $flagged,
 				'has_attachments'   => $attachment_count > 0,
 				'attachment_count'  => $attachment_count,
 				'in_reply_to'       => $in_reply,
@@ -359,7 +487,7 @@ class FetchEmailAbility {
 		foreach ( $structure->parts as $part_index => $part ) {
 			$part_number = (string) ( $part_index + 1 );
 
-			if ( 0 === ( $part->type ?? -1 ) ) { // Text type.
+			if ( 0 === ( $part->type ?? -1 ) ) {
 				$subtype = strtolower( $part->subtype ?? '' );
 				$body    = imap_fetchbody( $connection, $uid, $part_number, FT_UID );
 				$decoded = $this->decodeBody( $body, $part->encoding ?? 0 );
@@ -391,7 +519,6 @@ class FetchEmailAbility {
 			}
 		}
 
-		// Prefer plain text; fall back to stripped HTML.
 		if ( ! empty( $plain_body ) ) {
 			return $plain_body;
 		}
@@ -405,10 +532,6 @@ class FetchEmailAbility {
 
 	/**
 	 * Decode email body based on encoding type.
-	 *
-	 * @param string $body     Encoded body.
-	 * @param int    $encoding IMAP encoding constant.
-	 * @return string Decoded body.
 	 */
 	private function decodeBody( string $body, int $encoding ): string {
 		switch ( $encoding ) {
@@ -425,9 +548,6 @@ class FetchEmailAbility {
 
 	/**
 	 * Find attachment parts in message structure.
-	 *
-	 * @param object $structure IMAP structure object.
-	 * @return array Array of attachment part info.
 	 */
 	private function findAttachments( object $structure ): array {
 		$attachments = array();
@@ -439,18 +559,16 @@ class FetchEmailAbility {
 		foreach ( $structure->parts as $part_index => $part ) {
 			$part_number = (string) ( $part_index + 1 );
 
-			// Check disposition for attachment.
 			$is_attachment = false;
 			$filename      = '';
 
-			if ( ! empty( $part->disposition ) && strtolower( $part->disposition ) === 'attachment' ) {
+			if ( ! empty( $part->disposition ) && 'attachment' === strtolower( $part->disposition ) ) {
 				$is_attachment = true;
 			}
 
-			// Get filename from dparameters or parameters.
 			if ( ! empty( $part->dparameters ) ) {
 				foreach ( $part->dparameters as $param ) {
-					if ( strtolower( $param->attribute ) === 'filename' ) {
+					if ( 'filename' === strtolower( $param->attribute ) ) {
 						$filename      = $param->value;
 						$is_attachment = true;
 					}
@@ -459,7 +577,7 @@ class FetchEmailAbility {
 
 			if ( empty( $filename ) && ! empty( $part->parameters ) ) {
 				foreach ( $part->parameters as $param ) {
-					if ( strtolower( $param->attribute ) === 'name' ) {
+					if ( 'name' === strtolower( $param->attribute ) ) {
 						$filename      = $param->value;
 						$is_attachment = true;
 					}
@@ -482,11 +600,6 @@ class FetchEmailAbility {
 
 	/**
 	 * Download an attachment to temp storage.
-	 *
-	 * @param resource $connection      IMAP connection.
-	 * @param int      $uid             Message UID.
-	 * @param array    $attachment_info Attachment info from findAttachments().
-	 * @return array|null File info or null on failure.
 	 */
 	private function downloadAttachment( $connection, int $uid, array $attachment_info ): ?array {
 		$body = imap_fetchbody( $connection, $uid, $attachment_info['part_number'], FT_UID );
@@ -499,7 +612,6 @@ class FetchEmailAbility {
 			return null;
 		}
 
-		// Store in WordPress upload directory.
 		$upload_dir = wp_upload_dir();
 		$target_dir = $upload_dir['basedir'] . '/datamachine-files/email-attachments';
 
@@ -525,9 +637,6 @@ class FetchEmailAbility {
 
 	/**
 	 * Get MIME type from IMAP part object.
-	 *
-	 * @param object $part IMAP structure part.
-	 * @return string MIME type string.
 	 */
 	private function getMimeType( object $part ): string {
 		$types = array(
@@ -550,37 +659,19 @@ class FetchEmailAbility {
 
 	/**
 	 * Build IMAP mailbox connection string.
-	 *
-	 * @param string $host       IMAP hostname.
-	 * @param int    $port       IMAP port.
-	 * @param string $encryption Encryption type.
-	 * @param string $folder     Mail folder.
-	 * @return string IMAP mailbox string.
 	 */
 	private function buildMailboxString( string $host, int $port, string $encryption, string $folder ): string {
-		$flags = '';
-
-		switch ( $encryption ) {
-			case 'ssl':
-				$flags = '/imap/ssl/validate-cert';
-				break;
-			case 'tls':
-				$flags = '/imap/tls/validate-cert';
-				break;
-			case 'none':
-			default:
-				$flags = '/imap/notls';
-				break;
-		}
+		$flags = match ( $encryption ) {
+			'ssl'   => '/imap/ssl/validate-cert',
+			'tls'   => '/imap/tls/validate-cert',
+			default => '/imap/notls',
+		};
 
 		return sprintf( '{%s:%d%s}%s', $host, $port, $flags, $folder );
 	}
 
 	/**
 	 * Normalize input configuration with defaults.
-	 *
-	 * @param array $input Raw input.
-	 * @return array Normalized config.
 	 */
 	private function normalizeConfig( array $input ): array {
 		$defaults = array(
@@ -592,6 +683,9 @@ class FetchEmailAbility {
 			'folder'               => 'INBOX',
 			'search_criteria'      => 'UNSEEN',
 			'max_messages'         => 10,
+			'offset'               => 0,
+			'uid'                  => 0,
+			'headers_only'         => false,
 			'mark_as_read'         => false,
 			'download_attachments' => false,
 		);

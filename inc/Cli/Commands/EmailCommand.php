@@ -119,6 +119,15 @@ class EmailCommand extends BaseCommand {
 	 * default: 10
 	 * ---
 	 *
+	 * [--offset=<offset>]
+	 * : Number of messages to skip (for pagination).
+	 * ---
+	 * default: 0
+	 * ---
+	 *
+	 * [--headers-only]
+	 * : Fast mode — fetch headers only, skip body parsing.
+	 *
 	 * [--mark-read]
 	 * : Mark fetched messages as read.
 	 *
@@ -139,14 +148,15 @@ class EmailCommand extends BaseCommand {
 	 * [--fields=<fields>]
 	 * : Comma-separated list of fields to display.
 	 * ---
-	 * default: from,subject,date
+	 * default: uid,from,subject,date
 	 * ---
 	 *
 	 * ## EXAMPLES
 	 *
 	 *     wp datamachine email fetch
-	 *     wp datamachine email fetch --search=ALL --max=5 --format=json
-	 *     wp datamachine email fetch --search='FROM "boss@company.com"' --mark-read
+	 *     wp datamachine email fetch --search=ALL --max=50 --headers-only
+	 *     wp datamachine email fetch --search='FROM "boss@company.com"' --max=5
+	 *     wp datamachine email fetch --search=ALL --max=20 --offset=20
 	 *
 	 * @subcommand fetch
 	 */
@@ -170,6 +180,8 @@ class EmailCommand extends BaseCommand {
 			'folder'               => $assoc_args['folder'] ?? 'INBOX',
 			'search_criteria'      => $assoc_args['search'] ?? 'UNSEEN',
 			'max_messages'         => (int) ( $assoc_args['max'] ?? 10 ),
+			'offset'               => (int) ( $assoc_args['offset'] ?? 0 ),
+			'headers_only'         => isset( $assoc_args['headers-only'] ),
 			'mark_as_read'         => isset( $assoc_args['mark-read'] ),
 			'download_attachments' => isset( $assoc_args['download-attachments'] ),
 		);
@@ -180,7 +192,9 @@ class EmailCommand extends BaseCommand {
 			WP_CLI::error( $result['error'] ?? 'Fetch failed.' );
 		}
 
-		$items = $result['data']['items'] ?? array();
+		$data  = $result['data'] ?? array();
+		$items = $data['items'] ?? array();
+
 		if ( empty( $items ) ) {
 			WP_CLI::success( 'No messages found.' );
 			return;
@@ -191,20 +205,132 @@ class EmailCommand extends BaseCommand {
 		foreach ( $items as $item ) {
 			$meta   = $item['metadata'] ?? array();
 			$rows[] = array(
-				'uid'          => $meta['message_id'] ?? '',
+				'uid'          => $meta['uid'] ?? '',
 				'from'         => $meta['from'] ?? '',
 				'from_name'    => $meta['from_name'] ?? '',
 				'to'           => $meta['to'] ?? '',
 				'subject'      => $item['title'] ?? '',
 				'date'         => $meta['date'] ?? '',
-				'attachments'  => $meta['attachment_count'] ?? 0,
+				'seen'         => ( $meta['seen'] ?? false ) ? 'Y' : 'N',
+				'flagged'      => ( $meta['flagged'] ?? false ) ? '*' : '',
+				'size'         => $meta['size'] ?? '',
+				'attachments'  => $meta['attachment_count'] ?? '',
 				'message_id'   => $meta['message_id'] ?? '',
 				'in_reply_to'  => $meta['in_reply_to'] ?? '',
 			);
 		}
 
-		$fields = explode( ',', $assoc_args['fields'] ?? 'from,subject,date' );
+		$fields = explode( ',', $assoc_args['fields'] ?? 'uid,from,subject,date' );
 		$this->format_items( $rows, $fields, $assoc_args );
+
+		// Pagination info.
+		$total    = $data['total_matches'] ?? 0;
+		$offset   = $data['offset'] ?? 0;
+		$has_more = $data['has_more'] ?? false;
+		$format   = $assoc_args['format'] ?? 'table';
+
+		if ( 'table' === $format && $total > 0 ) {
+			$showing_end = $offset + count( $items );
+			WP_CLI::line( '' );
+			WP_CLI::line( sprintf(
+				'Showing %d–%d of %d matches.%s',
+				$offset + 1,
+				$showing_end,
+				$total,
+				$has_more ? ' Use --offset=' . $showing_end . ' for next page.' : ''
+			) );
+		}
+	}
+
+	/**
+	 * Read a single email by UID.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <uid>
+	 * : Message UID to read.
+	 *
+	 * [--folder=<folder>]
+	 * : Mail folder.
+	 * ---
+	 * default: INBOX
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: text
+	 * options:
+	 *   - text
+	 *   - json
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine email read 12345
+	 *     wp datamachine email read 12345 --format=json
+	 *
+	 * @subcommand read
+	 */
+	public function read( array $args, array $assoc_args ): void {
+		$uid = (int) $args[0];
+		if ( $uid <= 0 ) {
+			WP_CLI::error( 'Invalid message UID.' );
+		}
+
+		$auth = $this->getAuthProvider();
+		if ( ! $auth || ! $auth->is_authenticated() ) {
+			WP_CLI::error( 'IMAP credentials not configured.' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/fetch-email' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'Fetch email ability not available.' );
+		}
+
+		$result = $ability->execute( array(
+			'imap_host'       => $auth->getHost(),
+			'imap_port'       => $auth->getPort(),
+			'imap_encryption' => $auth->getEncryption(),
+			'imap_user'       => $auth->getUser(),
+			'imap_password'   => $auth->getPassword(),
+			'folder'          => $assoc_args['folder'] ?? 'INBOX',
+			'uid'             => $uid,
+		) );
+
+		if ( ! ( $result['success'] ?? false ) ) {
+			WP_CLI::error( $result['error'] ?? 'Message not found.' );
+		}
+
+		$item = $result['data']['items'][0] ?? null;
+		if ( ! $item ) {
+			WP_CLI::error( 'Message not found.' );
+		}
+
+		$format = $assoc_args['format'] ?? 'text';
+		if ( 'json' === $format ) {
+			WP_CLI::line( wp_json_encode( $item, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		// Human-readable text output.
+		$meta = $item['metadata'] ?? array();
+		WP_CLI::line( str_repeat( '─', 60 ) );
+		WP_CLI::line( 'From:    ' . ( $meta['from_name'] ? $meta['from_name'] . ' <' . $meta['from'] . '>' : $meta['from'] ) );
+		WP_CLI::line( 'To:      ' . ( $meta['to'] ?? '' ) );
+		WP_CLI::line( 'Date:    ' . ( $meta['date'] ?? '' ) );
+		WP_CLI::line( 'Subject: ' . ( $item['title'] ?? '' ) );
+
+		if ( ! empty( $meta['in_reply_to'] ) ) {
+			WP_CLI::line( 'Reply-To: ' . $meta['in_reply_to'] );
+		}
+		if ( ! empty( $meta['attachment_count'] ) && $meta['attachment_count'] > 0 ) {
+			WP_CLI::line( 'Attachments: ' . $meta['attachment_count'] );
+		}
+
+		WP_CLI::line( str_repeat( '─', 60 ) );
+		WP_CLI::line( '' );
+		WP_CLI::line( $item['content'] ?? '' );
 	}
 
 	/**

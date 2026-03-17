@@ -58,8 +58,25 @@ class Email {
 					'folder'               => array( 'type' => 'string', 'default' => 'INBOX' ),
 					'search'               => array( 'type' => 'string', 'default' => 'UNSEEN' ),
 					'max'                  => array( 'type' => 'integer', 'default' => 10 ),
+					'offset'               => array( 'type' => 'integer', 'default' => 0 ),
+					'headers_only'         => array( 'type' => 'boolean', 'default' => false ),
 					'mark_as_read'         => array( 'type' => 'boolean', 'default' => false ),
 					'download_attachments' => array( 'type' => 'boolean', 'default' => false ),
+				),
+			)
+		);
+
+		// Read a single email by UID.
+		register_rest_route(
+			self::NAMESPACE,
+			'/email/(?P<uid>\d+)/read',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( self::class, 'handle_read' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => array(
+					'uid'    => array( 'type' => 'integer', 'required' => true ),
+					'folder' => array( 'type' => 'string', 'default' => 'INBOX' ),
 				),
 			)
 		);
@@ -171,11 +188,9 @@ class Email {
 	}
 
 	public static function handle_fetch( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
-		$providers = apply_filters( 'datamachine_auth_providers', array() );
-		$auth      = $providers['email_imap'] ?? null;
-
-		if ( ! $auth || ! $auth->is_authenticated() ) {
-			return new \WP_Error( 'not_configured', 'IMAP credentials not configured', array( 'status' => 400 ) );
+		$auth = self::get_imap_auth();
+		if ( is_wp_error( $auth ) ) {
+			return $auth;
 		}
 
 		$ability = wp_get_ability( 'datamachine/fetch-email' );
@@ -192,11 +207,51 @@ class Email {
 			'folder'               => $request->get_param( 'folder' ) ?? 'INBOX',
 			'search_criteria'      => $request->get_param( 'search' ) ?? 'UNSEEN',
 			'max_messages'         => (int) ( $request->get_param( 'max' ) ?? 10 ),
+			'offset'               => (int) ( $request->get_param( 'offset' ) ?? 0 ),
+			'headers_only'         => (bool) $request->get_param( 'headers_only' ),
 			'mark_as_read'         => (bool) $request->get_param( 'mark_as_read' ),
 			'download_attachments' => (bool) $request->get_param( 'download_attachments' ),
 		) );
 
 		return self::to_response( $result );
+	}
+
+	public static function handle_read( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$auth = self::get_imap_auth();
+		if ( is_wp_error( $auth ) ) {
+			return $auth;
+		}
+
+		$ability = wp_get_ability( 'datamachine/fetch-email' );
+		if ( ! $ability ) {
+			return new \WP_Error( 'ability_not_found', 'Fetch email ability not available', array( 'status' => 500 ) );
+		}
+
+		$result = $ability->execute( array(
+			'imap_host'       => $auth->getHost(),
+			'imap_port'       => $auth->getPort(),
+			'imap_encryption' => $auth->getEncryption(),
+			'imap_user'       => $auth->getUser(),
+			'imap_password'   => $auth->getPassword(),
+			'folder'          => $request->get_param( 'folder' ) ?? 'INBOX',
+			'uid'             => (int) $request->get_param( 'uid' ),
+		) );
+
+		return self::to_response( $result );
+	}
+
+	/**
+	 * Get IMAP auth provider or WP_Error.
+	 */
+	private static function get_imap_auth(): object {
+		$providers = apply_filters( 'datamachine_auth_providers', array() );
+		$auth      = $providers['email_imap'] ?? null;
+
+		if ( ! $auth || ! $auth->is_authenticated() ) {
+			return new \WP_Error( 'not_configured', 'IMAP credentials not configured', array( 'status' => 400 ) );
+		}
+
+		return $auth;
 	}
 
 	public static function handle_reply( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
