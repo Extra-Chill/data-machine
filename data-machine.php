@@ -158,12 +158,14 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/Content/ReplacePostBlocksAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Fetch/GitHubAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Fetch/FetchFilesAbility.php';
+	require_once __DIR__ . '/inc/Abilities/Fetch/FetchEmailAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Fetch/FetchRssAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Fetch/FetchWordPressApiAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Fetch/FetchWordPressMediaAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Fetch/GetWordPressPostAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Fetch/QueryWordPressPostsAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Publish/PublishWordPressAbility.php';
+	require_once __DIR__ . '/inc/Abilities/Publish/SendEmailAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Update/UpdateWordPressAbility.php';
 	// Defer ability instantiation to init so translations are loaded.
 	add_action( 'init', function () {
@@ -208,12 +210,14 @@ function datamachine_run_datamachine_plugin() {
 		new \DataMachine\Abilities\Content\ReplacePostBlocksAbility();
 		new \DataMachine\Abilities\Fetch\GitHubAbilities();
 		new \DataMachine\Abilities\Fetch\FetchFilesAbility();
+		new \DataMachine\Abilities\Fetch\FetchEmailAbility();
 		new \DataMachine\Abilities\Fetch\FetchRssAbility();
 		new \DataMachine\Abilities\Fetch\FetchWordPressApiAbility();
 		new \DataMachine\Abilities\Fetch\FetchWordPressMediaAbility();
 		new \DataMachine\Abilities\Fetch\GetWordPressPostAbility();
 		new \DataMachine\Abilities\Fetch\QueryWordPressPostsAbility();
 		new \DataMachine\Abilities\Publish\PublishWordPressAbility();
+		new \DataMachine\Abilities\Publish\SendEmailAbility();
 		new \DataMachine\Abilities\Update\UpdateWordPressAbility();
 	} );
 }
@@ -274,12 +278,14 @@ function datamachine_load_step_types() {
 function datamachine_load_handlers() {
 	// Publish Handlers (core only - social handlers moved to data-machine-socials plugin)
 	new \DataMachine\Core\Steps\Publish\Handlers\WordPress\WordPress();
+	new \DataMachine\Core\Steps\Publish\Handlers\Email\Email();
 
 	// Fetch Handlers
 	new \DataMachine\Core\Steps\Fetch\Handlers\WordPress\WordPress();
 	new \DataMachine\Core\Steps\Fetch\Handlers\WordPressAPI\WordPressAPI();
 	new \DataMachine\Core\Steps\Fetch\Handlers\WordPressMedia\WordPressMedia();
 	new \DataMachine\Core\Steps\Fetch\Handlers\Rss\Rss();
+	new \DataMachine\Core\Steps\Fetch\Handlers\Email\Email();
 	new \DataMachine\Core\Steps\Fetch\Handlers\Files\Files();
 	new \DataMachine\Core\Steps\Fetch\Handlers\GitHub\GitHub();
 	new \DataMachine\Core\Steps\Fetch\Handlers\Workspace\Workspace();
