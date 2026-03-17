@@ -46,6 +46,55 @@ class FlowScheduling {
 	}
 
 	/**
+	 * Check if the incoming scheduling config matches what's already set.
+	 *
+	 * Compares the meaningful scheduling fields (interval, cron_expression,
+	 * timestamp) to determine if rescheduling would be a no-op. This prevents
+	 * flow updates from resetting the Action Scheduler timer when the schedule
+	 * hasn't actually changed.
+	 *
+	 * @param array       $current         Current scheduling_config from DB.
+	 * @param string|null $interval        Incoming interval key.
+	 * @param string|null $cron_expression Incoming cron expression.
+	 * @param array       $incoming        Full incoming scheduling_config.
+	 * @return bool True if scheduling hasn't changed and can be skipped.
+	 */
+	private static function scheduling_unchanged( array $current, ?string $interval, ?string $cron_expression, array $incoming ): bool {
+		$current_interval = $current['interval'] ?? null;
+
+		// If current is empty/unset and incoming is non-manual, it's a change.
+		if ( empty( $current_interval ) && null !== $interval && 'manual' !== $interval ) {
+			return false;
+		}
+
+		// Both manual — no change.
+		if ( ( 'manual' === $current_interval || null === $current_interval )
+			&& ( 'manual' === $interval || null === $interval ) ) {
+			return true;
+		}
+
+		// Recurring interval comparison.
+		if ( $current_interval === $interval && 'cron' !== $interval && 'one_time' !== $interval ) {
+			return true;
+		}
+
+		// Cron expression comparison.
+		if ( 'cron' === $current_interval && 'cron' === $interval ) {
+			$current_cron = $current['cron_expression'] ?? '';
+			return $current_cron === $cron_expression;
+		}
+
+		// One-time timestamp comparison.
+		if ( 'one_time' === $current_interval && 'one_time' === $interval ) {
+			$current_ts = $current['timestamp'] ?? null;
+			$incoming_ts = $incoming['timestamp'] ?? null;
+			return $current_ts === $incoming_ts;
+		}
+
+		return false;
+	}
+
+	/**
 	 * Validate a cron expression string.
 	 *
 	 * Uses Action Scheduler's bundled CronExpression library — no external dependency.
@@ -167,6 +216,18 @@ class FlowScheduling {
 
 		$interval        = $scheduling_config['interval'] ?? null;
 		$cron_expression = $scheduling_config['cron_expression'] ?? null;
+
+		// Skip re-scheduling if the configuration hasn't actually changed.
+		// Without this guard, any flow update that includes scheduling_config
+		// (even identical to what's already set) would unschedule/reschedule,
+		// resetting the timer and triggering an immediate run.
+		$current_scheduling = $flow['scheduling_config'] ?? array();
+		if ( is_string( $current_scheduling ) ) {
+			$current_scheduling = json_decode( $current_scheduling, true ) ?? array();
+		}
+		if ( self::scheduling_unchanged( $current_scheduling, $interval, $cron_expression, $scheduling_config ) ) {
+			return true;
+		}
 
 		// Handle manual scheduling (unschedule).
 		if ( 'manual' === $interval || null === $interval ) {
