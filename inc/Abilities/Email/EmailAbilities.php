@@ -349,6 +349,85 @@ class EmailAbilities {
 				)
 			);
 
+			// Unsubscribe from a mailing list.
+			wp_register_ability(
+				'datamachine/email-unsubscribe',
+				array(
+					'label'               => __( 'Unsubscribe from Email', 'data-machine' ),
+					'description'         => __( 'Unsubscribe from a mailing list using List-Unsubscribe headers', 'data-machine' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'uid' ),
+						'properties' => array(
+							'uid'    => array(
+								'type'        => 'integer',
+								'description' => __( 'Message UID to unsubscribe from', 'data-machine' ),
+							),
+							'folder' => array(
+								'type'    => 'string',
+								'default' => 'INBOX',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'message' => array( 'type' => 'string' ),
+							'method'  => array( 'type' => 'string' ),
+							'error'   => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( $this, 'executeUnsubscribe' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			// Batch unsubscribe from all matching senders.
+			wp_register_ability(
+				'datamachine/email-batch-unsubscribe',
+				array(
+					'label'               => __( 'Batch Unsubscribe', 'data-machine' ),
+					'description'         => __( 'Unsubscribe from all mailing lists matching a search', 'data-machine' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'search' ),
+						'properties' => array(
+							'search' => array(
+								'type'        => 'string',
+								'description' => __( 'IMAP search criteria', 'data-machine' ),
+							),
+							'folder' => array(
+								'type'    => 'string',
+								'default' => 'INBOX',
+							),
+							'max'    => array(
+								'type'        => 'integer',
+								'default'     => 20,
+								'description' => __( 'Max unique senders to unsubscribe from (deduped by sender)', 'data-machine' ),
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'     => array( 'type' => 'boolean' ),
+							'message'     => array( 'type' => 'string' ),
+							'results'     => array( 'type' => 'array' ),
+							'unsubscribed' => array( 'type' => 'integer' ),
+							'failed'      => array( 'type' => 'integer' ),
+							'no_header'   => array( 'type' => 'integer' ),
+						),
+					),
+					'execute_callback'    => array( $this, 'executeBatchUnsubscribe' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
 			// Test IMAP connection.
 			wp_register_ability(
 				'datamachine/email-test-connection',
@@ -605,6 +684,386 @@ class EmailAbilities {
 			'success'      => true,
 			'message'      => sprintf( 'Connected to %s — %d messages in INBOX', $auth->getHost(), $info['messages'] ),
 			'mailbox_info' => $info,
+		);
+	}
+
+	/**
+	 * Unsubscribe from a mailing list using List-Unsubscribe headers.
+	 *
+	 * Priority order:
+	 * 1. List-Unsubscribe-Post + URL → HTTP POST (RFC 8058 one-click)
+	 * 2. URL without Post header → HTTP POST attempt, fall back to GET
+	 * 3. mailto: → send email via wp_mail()
+	 */
+	public function executeUnsubscribe( array $input ): array {
+		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
+		if ( is_array( $connection ) && ! ( $connection['success'] ?? true ) ) {
+			return $connection;
+		}
+
+		$uid = (int) $input['uid'];
+
+		// Fetch raw headers.
+		$raw_headers = imap_fetchheader( $connection, $uid, FT_UID );
+		if ( empty( $raw_headers ) ) {
+			imap_close( $connection );
+			return array(
+				'success' => false,
+				'error'   => 'Could not fetch message headers',
+			);
+		}
+
+		$parsed = $this->parseUnsubscribeHeaders( $raw_headers );
+		imap_close( $connection );
+
+		if ( empty( $parsed['urls'] ) && empty( $parsed['mailto'] ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'No List-Unsubscribe header found in this message',
+			);
+		}
+
+		// Try One-Click POST first (RFC 8058).
+		if ( $parsed['has_one_click'] && ! empty( $parsed['urls'] ) ) {
+			$url    = $parsed['urls'][0];
+			$result = $this->executeOneClickUnsubscribe( $url );
+			if ( $result['success'] ) {
+				return $result;
+			}
+			// Fall through to other methods if POST failed.
+		}
+
+		// Try URL GET/POST.
+		if ( ! empty( $parsed['urls'] ) ) {
+			foreach ( $parsed['urls'] as $url ) {
+				$result = $this->executeUrlUnsubscribe( $url );
+				if ( $result['success'] ) {
+					return $result;
+				}
+			}
+		}
+
+		// Try mailto.
+		if ( ! empty( $parsed['mailto'] ) ) {
+			$result = $this->executeMailtoUnsubscribe( $parsed['mailto'] );
+			if ( $result['success'] ) {
+				return $result;
+			}
+		}
+
+		return array(
+			'success' => false,
+			'error'   => 'All unsubscribe methods failed',
+		);
+	}
+
+	/**
+	 * Batch unsubscribe: search → unsubscribe from unique senders.
+	 *
+	 * Deduplicates by sender — if you have 100 emails from linkedin.com,
+	 * it only unsubscribes once using the most recent message's headers.
+	 */
+	public function executeBatchUnsubscribe( array $input ): array {
+		$connection = $this->connect( $input['folder'] ?? 'INBOX' );
+		if ( is_array( $connection ) && ! ( $connection['success'] ?? true ) ) {
+			return $connection;
+		}
+
+		$search = $input['search'];
+		$max    = (int) ( $input['max'] ?? 20 );
+
+		$uids = imap_search( $connection, $search, SE_UID );
+		if ( false === $uids || empty( $uids ) ) {
+			imap_close( $connection );
+			return array(
+				'success'      => true,
+				'message'      => 'No messages matching search criteria',
+				'results'      => array(),
+				'unsubscribed' => 0,
+				'failed'       => 0,
+				'no_header'    => 0,
+			);
+		}
+
+		// Most recent first — we want the newest unsubscribe link per sender.
+		$uids = array_reverse( $uids );
+
+		// Deduplicate by sender — one unsubscribe per unique From address.
+		$seen_senders = array();
+		$to_process   = array();
+
+		foreach ( $uids as $uid ) {
+			if ( count( $to_process ) >= $max ) {
+				break;
+			}
+
+			$msgno = imap_msgno( $connection, $uid );
+			if ( 0 === $msgno ) {
+				continue;
+			}
+
+			$header = imap_headerinfo( $connection, $msgno );
+			if ( false === $header || empty( $header->from ) ) {
+				continue;
+			}
+
+			$from = $header->from[0];
+			$sender = $from->mailbox . '@' . $from->host;
+
+			if ( isset( $seen_senders[ $sender ] ) ) {
+				continue;
+			}
+
+			$seen_senders[ $sender ] = true;
+
+			// Fetch unsubscribe headers.
+			$raw = imap_fetchheader( $connection, $uid, FT_UID );
+			$parsed = $this->parseUnsubscribeHeaders( $raw );
+
+			$to_process[] = array(
+				'uid'    => $uid,
+				'sender' => $sender,
+				'parsed' => $parsed,
+			);
+		}
+
+		imap_close( $connection );
+
+		// Now execute unsubscribes (connection closed — these are HTTP/mailto).
+		$results      = array();
+		$unsubscribed = 0;
+		$failed       = 0;
+		$no_header    = 0;
+
+		foreach ( $to_process as $item ) {
+			$parsed = $item['parsed'];
+
+			if ( empty( $parsed['urls'] ) && empty( $parsed['mailto'] ) ) {
+				$results[] = array(
+					'sender'  => $item['sender'],
+					'success' => false,
+					'reason'  => 'no List-Unsubscribe header',
+				);
+				++$no_header;
+				continue;
+			}
+
+			$result = null;
+
+			// Try One-Click POST first.
+			if ( $parsed['has_one_click'] && ! empty( $parsed['urls'] ) ) {
+				$result = $this->executeOneClickUnsubscribe( $parsed['urls'][0] );
+			}
+
+			// Fall back to URL.
+			if ( ( ! $result || ! $result['success'] ) && ! empty( $parsed['urls'] ) ) {
+				$result = $this->executeUrlUnsubscribe( $parsed['urls'][0] );
+			}
+
+			// Fall back to mailto.
+			if ( ( ! $result || ! $result['success'] ) && ! empty( $parsed['mailto'] ) ) {
+				$result = $this->executeMailtoUnsubscribe( $parsed['mailto'] );
+			}
+
+			if ( $result && $result['success'] ) {
+				$results[] = array(
+					'sender'  => $item['sender'],
+					'success' => true,
+					'method'  => $result['method'] ?? 'unknown',
+				);
+				++$unsubscribed;
+			} else {
+				$results[] = array(
+					'sender'  => $item['sender'],
+					'success' => false,
+					'reason'  => $result['error'] ?? 'all methods failed',
+				);
+				++$failed;
+			}
+		}
+
+		return array(
+			'success'      => true,
+			'message'      => sprintf(
+				'Processed %d senders: %d unsubscribed, %d failed, %d had no header',
+				count( $to_process ),
+				$unsubscribed,
+				$failed,
+				$no_header
+			),
+			'results'      => $results,
+			'unsubscribed' => $unsubscribed,
+			'failed'       => $failed,
+			'no_header'    => $no_header,
+		);
+	}
+
+	/**
+	 * Parse List-Unsubscribe and List-Unsubscribe-Post headers.
+	 *
+	 * @param string $raw_headers Raw email headers.
+	 * @return array Parsed data with urls, mailto, has_one_click.
+	 */
+	private function parseUnsubscribeHeaders( string $raw_headers ): array {
+		$unsub_header = '';
+		$post_header  = '';
+		$collecting   = '';
+
+		foreach ( explode( "\n", $raw_headers ) as $line ) {
+			// Continuation line.
+			if ( $collecting && preg_match( '/^\s/', $line ) ) {
+				if ( 'unsub' === $collecting ) {
+					$unsub_header .= ' ' . trim( $line );
+				}
+				if ( 'post' === $collecting ) {
+					$post_header .= ' ' . trim( $line );
+				}
+				continue;
+			}
+			$collecting = '';
+
+			if ( stripos( $line, 'List-Unsubscribe:' ) === 0 ) {
+				$unsub_header = trim( substr( $line, 17 ) );
+				$collecting   = 'unsub';
+			}
+			if ( stripos( $line, 'List-Unsubscribe-Post:' ) === 0 ) {
+				$post_header = trim( substr( $line, 22 ) );
+				$collecting  = 'post';
+			}
+		}
+
+		// Decode MIME-encoded headers.
+		if ( ! empty( $unsub_header ) ) {
+			$unsub_header = imap_utf8( $unsub_header );
+		}
+
+		// Extract URLs and mailto from angle brackets.
+		$urls   = array();
+		$mailto = '';
+
+		if ( preg_match_all( '/<([^>]+)>/', $unsub_header, $matches ) ) {
+			foreach ( $matches[1] as $value ) {
+				if ( strpos( $value, 'mailto:' ) === 0 ) {
+					$mailto = $value;
+				} elseif ( filter_var( $value, FILTER_VALIDATE_URL ) ) {
+					$urls[] = $value;
+				}
+			}
+		}
+
+		$has_one_click = stripos( $post_header, 'List-Unsubscribe=One-Click' ) !== false;
+
+		return array(
+			'urls'          => $urls,
+			'mailto'        => $mailto,
+			'has_one_click' => $has_one_click,
+			'raw'           => $unsub_header,
+		);
+	}
+
+	/**
+	 * RFC 8058 One-Click unsubscribe via HTTP POST.
+	 */
+	private function executeOneClickUnsubscribe( string $url ): array {
+		$response = wp_remote_post( $url, array(
+			'body'    => 'List-Unsubscribe=One-Click',
+			'headers' => array( 'Content-Type' => 'application/x-www-form-urlencoded' ),
+			'timeout' => 15,
+		) );
+
+		if ( is_wp_error( $response ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'POST failed: ' . $response->get_error_message(),
+			);
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+
+		// 2xx = success. Some return 200, others 204.
+		if ( $code >= 200 && $code < 300 ) {
+			return array(
+				'success' => true,
+				'message' => 'Unsubscribed via One-Click POST (HTTP ' . $code . ')',
+				'method'  => 'one-click-post',
+			);
+		}
+
+		return array(
+			'success' => false,
+			'error'   => 'One-Click POST returned HTTP ' . $code,
+		);
+	}
+
+	/**
+	 * Unsubscribe via URL (GET request).
+	 */
+	private function executeUrlUnsubscribe( string $url ): array {
+		$response = wp_remote_get( $url, array(
+			'timeout'   => 15,
+			'sslverify' => true,
+		) );
+
+		if ( is_wp_error( $response ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'GET failed: ' . $response->get_error_message(),
+			);
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+
+		if ( $code >= 200 && $code < 400 ) {
+			return array(
+				'success' => true,
+				'message' => 'Unsubscribe request sent (HTTP ' . $code . ')',
+				'method'  => 'url-get',
+			);
+		}
+
+		return array(
+			'success' => false,
+			'error'   => 'URL request returned HTTP ' . $code,
+		);
+	}
+
+	/**
+	 * Unsubscribe via mailto: — send an email.
+	 */
+	private function executeMailtoUnsubscribe( string $mailto_uri ): array {
+		// Parse mailto:address?subject=...
+		$parts   = wp_parse_url( $mailto_uri );
+		$address = str_replace( 'mailto:', '', $parts['path'] ?? '' );
+
+		if ( empty( $address ) || ! is_email( $address ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Invalid mailto address: ' . $mailto_uri,
+			);
+		}
+
+		$subject = '';
+		if ( ! empty( $parts['query'] ) ) {
+			parse_str( $parts['query'], $query );
+			$subject = $query['subject'] ?? 'unsubscribe';
+		}
+		if ( empty( $subject ) ) {
+			$subject = 'unsubscribe';
+		}
+
+		$sent = wp_mail( $address, $subject, 'unsubscribe' );
+
+		if ( $sent ) {
+			return array(
+				'success' => true,
+				'message' => 'Unsubscribe email sent to ' . $address,
+				'method'  => 'mailto',
+			);
+		}
+
+		return array(
+			'success' => false,
+			'error'   => 'Failed to send unsubscribe email',
 		);
 	}
 

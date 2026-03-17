@@ -200,6 +200,37 @@ class Email {
 			)
 		);
 
+		// Unsubscribe from a single message.
+		register_rest_route(
+			self::NAMESPACE,
+			'/email/(?P<uid>\d+)/unsubscribe',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( self::class, 'handle_unsubscribe' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => array(
+					'uid'    => array( 'type' => 'integer', 'required' => true ),
+					'folder' => array( 'type' => 'string', 'default' => 'INBOX' ),
+				),
+			)
+		);
+
+		// Batch unsubscribe.
+		register_rest_route(
+			self::NAMESPACE,
+			'/email/batch/unsubscribe',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( self::class, 'handle_batch_unsubscribe' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => array(
+					'search' => array( 'type' => 'string', 'required' => true ),
+					'folder' => array( 'type' => 'string', 'default' => 'INBOX' ),
+					'max'    => array( 'type' => 'integer', 'default' => 20 ),
+				),
+			)
+		);
+
 		// Test connection.
 		register_rest_route(
 			self::NAMESPACE,
@@ -412,6 +443,35 @@ class Email {
 			'search' => $request->get_param( 'search' ),
 			'folder' => $request->get_param( 'folder' ) ?? 'INBOX',
 			'max'    => (int) ( $request->get_param( 'max' ) ?? 100 ),
+		) );
+
+		return self::to_response( $result );
+	}
+
+	public static function handle_unsubscribe( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$ability = wp_get_ability( 'datamachine/email-unsubscribe' );
+		if ( ! $ability ) {
+			return new \WP_Error( 'ability_not_found', 'Unsubscribe ability not available', array( 'status' => 500 ) );
+		}
+
+		$result = $ability->execute( array(
+			'uid'    => (int) $request->get_param( 'uid' ),
+			'folder' => $request->get_param( 'folder' ) ?? 'INBOX',
+		) );
+
+		return self::to_response( $result );
+	}
+
+	public static function handle_batch_unsubscribe( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$ability = wp_get_ability( 'datamachine/email-batch-unsubscribe' );
+		if ( ! $ability ) {
+			return new \WP_Error( 'ability_not_found', 'Batch unsubscribe ability not available', array( 'status' => 500 ) );
+		}
+
+		$result = $ability->execute( array(
+			'search' => $request->get_param( 'search' ),
+			'folder' => $request->get_param( 'folder' ) ?? 'INBOX',
+			'max'    => (int) ( $request->get_param( 'max' ) ?? 20 ),
 		) );
 
 		return self::to_response( $result );

@@ -754,6 +754,126 @@ class EmailCommand extends BaseCommand {
 	}
 
 	/**
+	 * Unsubscribe from a mailing list.
+	 *
+	 * Parses the List-Unsubscribe header from the email and executes
+	 * the unsubscribe via One-Click POST, URL GET, or mailto.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <uid>
+	 * : Message UID to unsubscribe from.
+	 *
+	 * [--folder=<folder>]
+	 * : Mail folder.
+	 * ---
+	 * default: INBOX
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine email unsubscribe 83012
+	 *
+	 * @subcommand unsubscribe
+	 */
+	public function unsubscribe( array $args, array $assoc_args ): void {
+		$uid = (int) $args[0];
+		if ( $uid <= 0 ) {
+			WP_CLI::error( 'Invalid message UID.' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/email-unsubscribe' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'Unsubscribe ability not available.' );
+		}
+
+		$result = $ability->execute( array(
+			'uid'    => $uid,
+			'folder' => $assoc_args['folder'] ?? 'INBOX',
+		) );
+
+		if ( $result['success'] ?? false ) {
+			WP_CLI::success( $result['message'] ?? 'Unsubscribed.' );
+		} else {
+			WP_CLI::error( $result['error'] ?? 'Unsubscribe failed.' );
+		}
+	}
+
+	/**
+	 * Unsubscribe from all mailing lists matching a search.
+	 *
+	 * Deduplicates by sender — processes one unsubscribe per unique
+	 * From address using the most recent message's headers.
+	 *
+	 * ## OPTIONS
+	 *
+	 * --search=<criteria>
+	 * : IMAP search criteria.
+	 *
+	 * [--folder=<folder>]
+	 * : Mail folder.
+	 * ---
+	 * default: INBOX
+	 * ---
+	 *
+	 * [--max=<count>]
+	 * : Maximum unique senders to unsubscribe from.
+	 * ---
+	 * default: 20
+	 * ---
+	 *
+	 * [--yes]
+	 * : Skip confirmation prompt.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine email batch-unsubscribe --search='FROM "linkedin.com"'
+	 *     wp datamachine email batch-unsubscribe --search='FROM "dominos.com"' --yes
+	 *     wp datamachine email batch-unsubscribe --search='SUBJECT "newsletter"' --max=10
+	 *
+	 * @subcommand batch-unsubscribe
+	 */
+	public function batch_unsubscribe( array $args, array $assoc_args ): void {
+		$ability = wp_get_ability( 'datamachine/email-batch-unsubscribe' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'Batch unsubscribe ability not available.' );
+		}
+
+		$search = $assoc_args['search'] ?? '';
+		if ( empty( $search ) ) {
+			WP_CLI::error( '--search is required.' );
+		}
+
+		if ( ! isset( $assoc_args['yes'] ) ) {
+			WP_CLI::confirm( "Unsubscribe from all mailing lists matching '{$search}'?" );
+		}
+
+		$result = $ability->execute( array(
+			'search' => $search,
+			'folder' => $assoc_args['folder'] ?? 'INBOX',
+			'max'    => (int) ( $assoc_args['max'] ?? 20 ),
+		) );
+
+		if ( ! ( $result['success'] ?? false ) ) {
+			WP_CLI::error( $result['error'] ?? 'Batch unsubscribe failed.' );
+		}
+
+		// Show results per sender.
+		$results = $result['results'] ?? array();
+		if ( ! empty( $results ) ) {
+			foreach ( $results as $r ) {
+				$status = ( $r['success'] ?? false )
+					? WP_CLI::colorize( '%G✓%n ' . ( $r['method'] ?? '' ) )
+					: WP_CLI::colorize( '%R✗%n ' . ( $r['reason'] ?? 'failed' ) );
+				WP_CLI::line( sprintf( '  %-40s %s', $r['sender'] ?? '', $status ) );
+			}
+			WP_CLI::line( '' );
+		}
+
+		WP_CLI::success( $result['message'] ?? 'Batch unsubscribe complete.' );
+	}
+
+	/**
 	 * Test the IMAP connection.
 	 *
 	 * ## EXAMPLES
