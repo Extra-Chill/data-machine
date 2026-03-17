@@ -220,6 +220,16 @@ class GetJobsAbility {
 			$filters_applied['since'] = $args['since'];
 		}
 
+		if ( isset( $input['parent_job_id'] ) ) {
+			$args['parent_job_id']            = (int) $input['parent_job_id'];
+			$filters_applied['parent_job_id'] = $args['parent_job_id'];
+		}
+
+		if ( ! empty( $input['hide_children'] ) ) {
+			$args['hide_children']            = true;
+			$filters_applied['hide_children'] = true;
+		}
+
 		$jobs  = $this->db_jobs->get_jobs_for_list_table( $args );
 		$total = $this->db_jobs->get_jobs_count( $args );
 

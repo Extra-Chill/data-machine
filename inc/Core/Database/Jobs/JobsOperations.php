@@ -187,6 +187,15 @@ class JobsOperations extends BaseRepository {
 			$where_values[]  = sanitize_text_field( $args['since'] );
 		}
 
+		if ( isset( $args['parent_job_id'] ) ) {
+			$where_clauses[] = 'parent_job_id = %d';
+			$where_values[]  = absint( $args['parent_job_id'] );
+		}
+
+		if ( ! empty( $args['hide_children'] ) ) {
+			$where_clauses[] = '(parent_job_id IS NULL OR parent_job_id = 0)';
+		}
+
 		$where_sql = '';
 		if ( ! empty( $where_clauses ) ) {
 			$where_sql = 'WHERE ' . implode( ' AND ', $where_clauses );
@@ -286,6 +295,15 @@ class JobsOperations extends BaseRepository {
 		if ( ! empty( $args['since'] ) ) {
 			$where_clauses[] = 'j.created_at >= %s';
 			$where_values[]  = sanitize_text_field( $args['since'] );
+		}
+
+		if ( isset( $args['parent_job_id'] ) ) {
+			$where_clauses[] = 'j.parent_job_id = %d';
+			$where_values[]  = absint( $args['parent_job_id'] );
+		}
+
+		if ( ! empty( $args['hide_children'] ) ) {
+			$where_clauses[] = '(j.parent_job_id IS NULL OR j.parent_job_id = 0)';
 		}
 
 		$where_sql = '';

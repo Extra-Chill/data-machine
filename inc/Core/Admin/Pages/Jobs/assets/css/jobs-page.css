@@ -176,6 +176,95 @@
 	margin: 16px 0 0;
 }
 
+/* ========================================================================
+   BATCH HIERARCHY
+   ======================================================================== */
+
+/* Batch parent row */
+.datamachine-batch-parent {
+	background: #f9f9f9;
+}
+
+.datamachine-batch-parent:hover {
+	background: #f0f0f1;
+}
+
+.datamachine-batch-parent.is-expanded {
+	background: #eef3f8;
+	border-bottom: none;
+}
+
+/* Expand/collapse arrow */
+.datamachine-batch-arrow {
+	display: inline-block;
+	width: 16px;
+	font-size: 10px;
+	color: #646970;
+	margin-right: 4px;
+}
+
+/* Batch progress badge */
+.datamachine-batch-badge {
+	display: inline-block;
+	font-size: 11px;
+	font-weight: 500;
+	padding: 2px 8px;
+	border-radius: 3px;
+	margin-left: 8px;
+	vertical-align: middle;
+	background: #f0f0f1;
+	color: #646970;
+}
+
+.datamachine-batch-badge--complete {
+	background: #d1f5d3;
+	color: #00a32a;
+}
+
+.datamachine-batch-badge--warning {
+	background: #fce4e4;
+	color: #d63638;
+}
+
+.datamachine-batch-badge--progress {
+	background: #e7f3ff;
+	color: #0073aa;
+}
+
+/* Child rows */
+.datamachine-child-row {
+	background: #f6f7f7 !important;
+}
+
+.datamachine-child-row td {
+	border-top: 1px solid #eee;
+}
+
+.datamachine-child-id {
+	padding-left: 24px !important;
+}
+
+.datamachine-child-indicator {
+	color: #a0a5aa;
+	margin-right: 6px;
+	font-size: 14px;
+}
+
+.datamachine-child-loading {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 0;
+	color: #646970;
+	font-size: 13px;
+}
+
+.datamachine-child-empty {
+	color: #646970;
+	font-style: italic;
+	padding: 8px 24px !important;
+}
+
 /* Responsive */
 @media screen and (max-width: 782px) {
 	.datamachine-jobs-header {
@@ -187,5 +276,11 @@
 	.datamachine-col-created,
 	.datamachine-col-completed {
 		display: none;
+	}
+
+	.datamachine-batch-badge {
+		display: block;
+		margin-left: 0;
+		margin-top: 4px;
 	}
 }

@@ -19,6 +19,7 @@ import * as jobsApi from '../api/jobs';
 export const jobsKeys = {
 	all: [ 'jobs' ],
 	list: ( params ) => [ ...jobsKeys.all, 'list', params ],
+	children: ( parentJobId ) => [ ...jobsKeys.all, 'children', parentJobId ],
 	pipelines: () => [ 'pipelines', 'dropdown' ],
 	flows: ( pipelineId ) => [ 'flows', 'dropdown', pipelineId ],
 };
@@ -38,6 +39,7 @@ export const useJobs = ( { page = 1, perPage = 50, status } = {} ) =>
 				page,
 				perPage,
 				status,
+				hideChildren: true,
 			} );
 			if ( ! response.success ) {
 				throw new Error( response.message || 'Failed to fetch jobs' );
@@ -75,6 +77,27 @@ export const useClearProcessedItems = () => {
 			jobsApi.clearProcessedItems( clearType, targetId ),
 	} );
 };
+
+/**
+ * Fetch child jobs for a batch parent (lazy-loaded on expand)
+ *
+ * @param {number|null} parentJobId Parent job ID (null = disabled)
+ */
+export const useChildJobs = ( parentJobId ) =>
+	useQuery( {
+		queryKey: jobsKeys.children( parentJobId ),
+		queryFn: async () => {
+			const response = await jobsApi.fetchChildJobs( parentJobId );
+			if ( ! response.success ) {
+				throw new Error(
+					response.message || 'Failed to fetch child jobs'
+				);
+			}
+			return response.data || [];
+		},
+		enabled: !! parentJobId,
+		staleTime: 30 * 1000,
+	} );
 
 /**
  * Fetch pipelines for dropdown
