@@ -43,6 +43,16 @@ class Auth {
 	public static function register_routes() {
 		register_rest_route(
 			'datamachine/v1',
+			'/auth/providers',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( self::class, 'handle_list_providers' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+			)
+		);
+
+		register_rest_route(
+			'datamachine/v1',
 			'/auth/(?P<handler_slug>[a-zA-Z0-9_\-]+)',
 			array(
 				array(
@@ -244,6 +254,77 @@ class Auth {
 				'success' => true,
 				'data'    => null,
 				'message' => $result['message'],
+			)
+		);
+	}
+
+	/**
+	 * List all registered auth providers with status and configuration.
+	 *
+	 * GET /datamachine/v1/auth/providers
+	 *
+	 * Returns each provider with its type (oauth2, oauth1, simple),
+	 * authentication status, config fields, callback URL, and connected
+	 * account details — everything the Settings UI needs.
+	 *
+	 * @since 0.44.1
+	 * @param \WP_REST_Request $request Request object.
+	 * @return \WP_REST_Response Provider list.
+	 */
+	public static function handle_list_providers( $request ) {
+		$request;
+		$abilities = self::getAbilities();
+		$providers = $abilities->getAllProviders();
+
+		$data = array();
+
+		foreach ( $providers as $provider_key => $instance ) {
+			$auth_type = 'simple';
+			if ( $instance instanceof \DataMachine\Core\OAuth\BaseOAuth2Provider ) {
+				$auth_type = 'oauth2';
+			} elseif ( $instance instanceof \DataMachine\Core\OAuth\BaseOAuth1Provider ) {
+				$auth_type = 'oauth1';
+			}
+
+			$is_authenticated = false;
+			if ( method_exists( $instance, 'is_authenticated' ) ) {
+				$is_authenticated = $instance->is_authenticated();
+			}
+
+			$entry = array(
+				'provider_key'     => $provider_key,
+				'label'            => ucfirst( str_replace( '_', ' ', $provider_key ) ),
+				'auth_type'        => $auth_type,
+				'is_configured'    => method_exists( $instance, 'is_configured' ) ? $instance->is_configured() : false,
+				'is_authenticated' => $is_authenticated,
+				'auth_fields'      => method_exists( $instance, 'get_config_fields' ) ? $instance->get_config_fields() : array(),
+				'callback_url'     => null,
+				'account_details'  => null,
+			);
+
+			if ( in_array( $auth_type, array( 'oauth1', 'oauth2' ), true ) && method_exists( $instance, 'get_callback_url' ) ) {
+				$entry['callback_url'] = $instance->get_callback_url();
+			}
+
+			if ( $is_authenticated && method_exists( $instance, 'get_account_details' ) ) {
+				$entry['account_details'] = $instance->get_account_details();
+			}
+
+			$data[] = $entry;
+		}
+
+		// Sort: authenticated first, then alphabetically by label.
+		usort( $data, function ( $a, $b ) {
+			if ( $a['is_authenticated'] !== $b['is_authenticated'] ) {
+				return $a['is_authenticated'] ? -1 : 1;
+			}
+			return strcasecmp( $a['label'], $b['label'] );
+		} );
+
+		return rest_ensure_response(
+			array(
+				'success' => true,
+				'data'    => $data,
 			)
 		);
 	}
