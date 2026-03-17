@@ -141,6 +141,19 @@ abstract class SystemTask {
 	 * Resolve and interpolate a prompt in one call.
 	 *
 	 * Convenience method combining resolvePrompt() + interpolatePrompt().
+	 * After gathering the task's own variables, applies the
+	 * `datamachine_task_prompt_variables` filter so site code can inject
+	 * additional variables (or override existing ones) without modifying
+	 * the task class.
+	 *
+	 * Example usage in a theme or plugin:
+	 *
+	 *     add_filter( 'datamachine_task_prompt_variables', function( $vars, $task_type, $prompt_key ) {
+	 *         if ( 'daily_memory_generation' === $task_type ) {
+	 *             $vars['git_commits'] = my_get_todays_commits();
+	 *         }
+	 *         return $vars;
+	 *     }, 10, 3 );
 	 *
 	 * @param string $prompt_key The prompt key.
 	 * @param array  $variables  Context variables for interpolation.
@@ -148,7 +161,23 @@ abstract class SystemTask {
 	 * @since 0.41.0
 	 */
 	protected function buildPromptFromTemplate( string $prompt_key, array $variables = array() ): string {
-		$template = $this->resolvePrompt( $prompt_key );
+		$template  = $this->resolvePrompt( $prompt_key );
+		$task_type = $this->getTaskType();
+
+		/**
+		 * Filter prompt template variables before interpolation.
+		 *
+		 * Allows site code to inject additional variables or override
+		 * existing ones for any system task prompt. The prompt template
+		 * can reference these via {{variable_name}} placeholders.
+		 *
+		 * @since 0.44.0
+		 * @param array  $variables  Key-value pairs of variable_name => value.
+		 * @param string $task_type  The system task type (e.g. 'daily_memory_generation').
+		 * @param string $prompt_key The prompt key within the task.
+		 */
+		$variables = apply_filters( 'datamachine_task_prompt_variables', $variables, $task_type, $prompt_key );
+
 		return $this->interpolatePrompt( $template, $variables );
 	}
 

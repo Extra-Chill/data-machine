@@ -292,13 +292,32 @@ class System {
 				$has_override = isset( $overrides[ $task_type ][ $prompt_key ] )
 					&& '' !== $overrides[ $task_type ][ $prompt_key ];
 
+				/**
+				 * Filter prompt variable definitions for the admin UI.
+				 *
+				 * Allows site code that registers runtime variables via
+				 * `datamachine_task_prompt_variables` to also declare them
+				 * here so the UI shows them as available placeholders.
+				 *
+				 * @since 0.44.0
+				 * @param array  $variables  Variable name => description map.
+				 * @param string $task_type  The system task type.
+				 * @param string $prompt_key The prompt key within the task.
+				 */
+				$variables = apply_filters(
+					'datamachine_task_prompt_variable_definitions',
+					$definition['variables'] ?? array(),
+					$task_type,
+					$prompt_key
+				);
+
 				$prompts[] = array(
 					'task_type'    => $task_type,
 					'prompt_key'   => $prompt_key,
 					'label'        => $definition['label'],
 					'description'  => $definition['description'],
 					'default'      => $definition['default'],
-					'variables'    => $definition['variables'],
+					'variables'    => $variables,
 					'has_override' => $has_override,
 					'override'     => $has_override ? $overrides[ $task_type ][ $prompt_key ] : null,
 				);

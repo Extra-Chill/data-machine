@@ -93,12 +93,7 @@ const formatDate = ( datetime ) => {
 	}
 };
 
-const TRIGGER_ICONS = {
-	event: '\u26A1',
-	cron: '\u23F0',
-	manual: '\u270B',
-	tool: '\uD83E\uDD16',
-};
+
 
 /**
  * PromptEditor — expandable section for a single prompt definition.
@@ -181,7 +176,6 @@ const TaskCard = ( {
 	const status = formatStatus( task.last_status );
 	const hasToggle = Boolean( task.setting_key );
 	const lastRunDate = formatDate( task.last_run_at );
-	const triggerIcon = TRIGGER_ICONS[ task.trigger_type ] || '';
 	const hasPrompts = prompts.length > 0;
 
 	return (
@@ -220,7 +214,7 @@ const TaskCard = ( {
 						Trigger
 					</span>
 					<span className="datamachine-task-card-meta-value">
-						{ triggerIcon } { task.trigger }
+						{ task.trigger }
 					</span>
 				</div>
 
@@ -272,7 +266,7 @@ const TaskCard = ( {
 						className="button button-secondary button-small"
 						onClick={ () => setShowPrompts( ! showPrompts ) }
 					>
-						{ showPrompts ? 'Hide Prompts' : 'Edit Prompts' }
+						{ showPrompts ? 'Hide Prompt' : 'Edit Prompt' }
 					</button>
 				) }
 			</div>

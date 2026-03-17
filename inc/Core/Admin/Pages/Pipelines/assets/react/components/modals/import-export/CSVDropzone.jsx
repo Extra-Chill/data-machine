@@ -122,7 +122,7 @@ export default function CSVDropzone( {
 				onDrop={ dragDrop.handleDrop.bind( null, handleDrop ) }
 				onClick={ ! disabled ? handleBrowseClick : undefined }
 			>
-				<div className="datamachine-csv-dropzone__icon">📄</div>
+				<div className="datamachine-csv-dropzone__icon"></div>
 
 				<p className="datamachine-csv-dropzone__title">
 					{ fileName

@@ -157,7 +157,7 @@ export default function FileUploadDropzone( {
 				}` }
 				onClick={ ! disabled ? handleBrowseClick : undefined }
 			>
-				<div className="datamachine-dropzone-icon">📁</div>
+				<div className="datamachine-dropzone-icon"></div>
 
 				<p className="datamachine-dropzone-title">
 					{ uploadText || defaultUploadText }
