@@ -2,6 +2,19 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.44.0] - 2026-03-17
+
+### Added
+- add link opportunities command — ranked internal linking opportunities from GSC + link graph
+- add email handler — send and fetch emails
+
+### Changed
+- remove inject-category-links ability and CLI command
+
+### Fixed
+- merge DailyMemoryTask into single prompt, add extensible prompt variables, remove emojis
+- prevent AI step from creating ghost child jobs (#832)
+
 ## [0.43.3] - 2026-03-17
 
 ### Changed
