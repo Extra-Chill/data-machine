@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.16.3] - 2026-03-18
+
+### Fixed
+- require startTime in upsert tool + revert sentinel time suppression
+
 ## [0.16.2] - 2026-03-18
 
 ### Fixed
