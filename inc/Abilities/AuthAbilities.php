@@ -181,6 +181,7 @@ class AuthAbilities {
 			$this->registerSaveAuthConfig();
 			$this->registerSetAuthToken();
 			$this->registerRefreshAuth();
+			$this->registerListProviders();
 		};
 
 		if ( doing_action( 'wp_abilities_api_init' ) ) {
@@ -364,8 +365,99 @@ class AuthAbilities {
 		);
 	}
 
+	private function registerListProviders(): void {
+		wp_register_ability(
+			'datamachine/list-auth-providers',
+			array(
+				'label'               => __( 'List Auth Providers', 'data-machine' ),
+				'description'         => __( 'List all registered authentication providers with status, config fields, and account details.', 'data-machine' ),
+				'category'            => 'datamachine',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'   => array( 'type' => 'boolean' ),
+						'providers' => array( 'type' => 'array' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeListProviders' ),
+				'permission_callback' => array( $this, 'checkPermission' ),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
 	public function checkPermission(): bool {
 		return PermissionHelper::can_manage();
+	}
+
+	/**
+	 * List all registered auth providers with status and configuration.
+	 *
+	 * Returns each provider with its type (oauth2, oauth1, simple),
+	 * authentication status, config fields, callback URL, and connected
+	 * account details.
+	 *
+	 * @since 0.47.0
+	 * @param array $input Ability input (unused).
+	 * @return array Provider list.
+	 */
+	public function executeListProviders( array $input ): array {
+		$input;
+		$providers = $this->getAllProviders();
+
+		$data = array();
+
+		foreach ( $providers as $provider_key => $instance ) {
+			$auth_type = 'simple';
+			if ( $instance instanceof \DataMachine\Core\OAuth\BaseOAuth2Provider ) {
+				$auth_type = 'oauth2';
+			} elseif ( $instance instanceof \DataMachine\Core\OAuth\BaseOAuth1Provider ) {
+				$auth_type = 'oauth1';
+			}
+
+			$is_authenticated = false;
+			if ( method_exists( $instance, 'is_authenticated' ) ) {
+				$is_authenticated = $instance->is_authenticated();
+			}
+
+			$entry = array(
+				'provider_key'     => $provider_key,
+				'label'            => ucfirst( str_replace( '_', ' ', $provider_key ) ),
+				'auth_type'        => $auth_type,
+				'is_configured'    => method_exists( $instance, 'is_configured' ) ? $instance->is_configured() : false,
+				'is_authenticated' => $is_authenticated,
+				'auth_fields'      => method_exists( $instance, 'get_config_fields' ) ? $instance->get_config_fields() : array(),
+				'callback_url'     => null,
+				'account_details'  => null,
+			);
+
+			if ( in_array( $auth_type, array( 'oauth1', 'oauth2' ), true ) && method_exists( $instance, 'get_callback_url' ) ) {
+				$entry['callback_url'] = $instance->get_callback_url();
+			}
+
+			if ( $is_authenticated && method_exists( $instance, 'get_account_details' ) ) {
+				$entry['account_details'] = $instance->get_account_details();
+			}
+
+			$data[] = $entry;
+		}
+
+		// Sort: authenticated first, then alphabetically by label.
+		usort( $data, function ( $a, $b ) {
+			if ( $a['is_authenticated'] !== $b['is_authenticated'] ) {
+				return $a['is_authenticated'] ? -1 : 1;
+			}
+			return strcasecmp( $a['label'], $b['label'] );
+		} );
+
+		return array(
+			'success'   => true,
+			'providers' => $data,
+		);
 	}
 
 	public function executeGetAuthStatus( array $input ): array {
