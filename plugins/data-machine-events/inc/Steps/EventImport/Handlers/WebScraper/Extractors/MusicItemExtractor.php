@@ -208,7 +208,7 @@ class MusicItemExtractor extends BaseExtractor {
 	/**
 	 * Resolve relative URL to absolute.
 	 */
-	private function resolveUrl( string $url, string $source_url ): string {
+	protected function resolveUrl( string $url, string $source_url ): string {
 		if ( strpos( $url, 'http' ) === 0 ) {
 			return esc_url_raw( $url );
 		}
