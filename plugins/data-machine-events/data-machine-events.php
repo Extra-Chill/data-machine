@@ -83,6 +83,7 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	\WP_CLI::add_command( 'data-machine-events check meta-sync', \DataMachineEvents\Cli\Check\CheckMetaSyncCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check duration', \DataMachineEvents\Cli\Check\CheckDurationCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check duplicates', \DataMachineEvents\Cli\Check\CheckDuplicatesCommand::class );
+	\WP_CLI::add_command( 'data-machine-events check clean-duplicates', \DataMachineEvents\Cli\Check\CleanDuplicatesCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check quality', \DataMachineEvents\Cli\Check\CheckQualityCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check all', \DataMachineEvents\Cli\Check\CheckAllCommand::class );
 }

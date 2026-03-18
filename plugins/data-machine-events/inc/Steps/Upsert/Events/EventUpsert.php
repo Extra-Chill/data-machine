@@ -296,8 +296,10 @@ class EventUpsert extends UpdateHandler {
 			return null;
 		}
 
-		// Query events at this venue on this date
-		$args = array(
+		// Query events at this venue on this date.
+		// Use date-only for LIKE query; time comparison is done separately.
+		$date_only = self::extractDateForQuery( $startDate );
+		$args      = array(
 			'post_type'      => Event_Post_Type::POST_TYPE,
 			'posts_per_page' => 10,
 			'post_status'    => array( 'publish', 'draft', 'pending' ),
@@ -311,7 +313,7 @@ class EventUpsert extends UpdateHandler {
 			'meta_query'     => array(
 				array(
 					'key'     => EVENT_DATETIME_META_KEY,
-					'value'   => $startDate,
+					'value'   => $date_only,
 					'compare' => 'LIKE',
 				),
 			),
@@ -384,9 +386,13 @@ class EventUpsert extends UpdateHandler {
 			return true;
 		}
 
-		// Check if both have time components (look for T or space followed by time)
-		$has_time1 = preg_match( '/[T\s]\d{2}:\d{2}/', $datetime1 );
-		$has_time2 = preg_match( '/[T\s]\d{2}:\d{2}/', $datetime2 );
+		// Normalize T separator to space for consistent parsing.
+		$datetime1 = self::normalizeDatetime( $datetime1 );
+		$datetime2 = self::normalizeDatetime( $datetime2 );
+
+		// Check if both have time components (space followed by time)
+		$has_time1 = preg_match( '/\s\d{2}:\d{2}/', $datetime1 );
+		$has_time2 = preg_match( '/\s\d{2}:\d{2}/', $datetime2 );
 
 		// If either lacks time, allow match (can't compare)
 		if ( ! $has_time1 || ! $has_time2 ) {
@@ -405,6 +411,38 @@ class EventUpsert extends UpdateHandler {
 		$diff_hours = abs( $time1 - $time2 ) / 3600;
 
 		return $diff_hours <= $windowHours;
+	}
+
+	/**
+	 * Normalize a datetime string for consistent comparison.
+	 *
+	 * Replaces ISO 8601 'T' separator with space so that LIKE queries
+	 * and string comparisons work against DB-stored values which use
+	 * space separators (e.g. '2026-03-20 21:00:00').
+	 *
+	 * @param string $datetime Datetime string in any common format.
+	 * @return string Normalized datetime with space separator.
+	 */
+	private static function normalizeDatetime( string $datetime ): string {
+		// Replace T separator with space: 2026-03-20T21:00:00 → 2026-03-20 21:00:00
+		return preg_replace( '/(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/', '$1 $2', $datetime );
+	}
+
+	/**
+	 * Extract just the date portion (YYYY-MM-DD) from a datetime string.
+	 *
+	 * Used for LIKE queries against the event datetime meta field.
+	 * The time comparison is done separately in isWithinTimeWindow().
+	 *
+	 * @param string $datetime Datetime or date string.
+	 * @return string Date portion only (YYYY-MM-DD).
+	 */
+	private static function extractDateForQuery( string $datetime ): string {
+		// Handle both "2026-03-20" and "2026-03-20 21:00:00" and "2026-03-20T21:00:00"
+		if ( preg_match( '/^(\d{4}-\d{2}-\d{2})/', $datetime, $matches ) ) {
+			return $matches[1];
+		}
+		return $datetime;
 	}
 
 	/**
@@ -435,7 +473,7 @@ class EventUpsert extends UpdateHandler {
 			$args['meta_query'] = array(
 				array(
 					'key'     => EVENT_DATETIME_META_KEY,
-					'value'   => $startDate,
+					'value'   => self::extractDateForQuery( $startDate ),
 					'compare' => 'LIKE',
 				),
 			);
@@ -525,7 +563,7 @@ class EventUpsert extends UpdateHandler {
 				),
 				array(
 					'key'     => EVENT_DATETIME_META_KEY,
-					'value'   => $startDate,
+					'value'   => self::extractDateForQuery( $startDate ),
 					'compare' => 'LIKE',
 				),
 			),
@@ -570,7 +608,7 @@ class EventUpsert extends UpdateHandler {
 				),
 				array(
 					'key'     => EVENT_DATETIME_META_KEY,
-					'value'   => $startDate,
+					'value'   => self::extractDateForQuery( $startDate ),
 					'compare' => 'LIKE',
 				),
 			),
@@ -627,14 +665,15 @@ class EventUpsert extends UpdateHandler {
 			return null;
 		}
 
-		$args = array(
+		$date_only = self::extractDateForQuery( $startDate );
+		$args      = array(
 			'post_type'      => Event_Post_Type::POST_TYPE,
 			'posts_per_page' => 20,
 			'post_status'    => array( 'publish', 'draft', 'pending' ),
 			'meta_query'     => array(
 				array(
 					'key'     => EVENT_DATETIME_META_KEY,
-					'value'   => $startDate,
+					'value'   => $date_only,
 					'compare' => 'LIKE',
 				),
 			),
