@@ -83,9 +83,9 @@ abstract class FetchHandler {
 		$items = $this->filterProcessed( $items, $context );
 
 		// Apply max_items cap.
-		// Default to 1 to prevent unbounded fan-out when flows lack an
-		// explicit max_items value. Set to 0 for unlimited.
-		$max_items = (int) ( $config['max_items'] ?? 1 );
+		// Default comes from getDefaultMaxItems() which subclasses can override.
+		// Set to 0 for unlimited.
+		$max_items = (int) ( $config['max_items'] ?? $this->getDefaultMaxItems() );
 		if ( $max_items > 0 && count( $items ) > $max_items ) {
 			$items = array_slice( $items, 0, $max_items );
 		}
@@ -180,6 +180,20 @@ abstract class FetchHandler {
 	 */
 	protected function onItemProcessed( ExecutionContext $context, array $item ): void {
 		// No-op in base class. Subclasses override as needed.
+	}
+
+	/**
+	 * Get the default max_items value when not explicitly configured.
+	 *
+	 * Base handlers default to 1 to prevent unbounded fan-out for
+	 * AI-heavy pipelines (RSS, Reddit, etc.). Subclasses like
+	 * EventImportHandler override to 0 (unlimited) since structured
+	 * event scrapers produce clean data that is cheap to process.
+	 *
+	 * @return int Default max items. 0 = unlimited.
+	 */
+	protected function getDefaultMaxItems(): int {
+		return 1;
 	}
 
 	/**
