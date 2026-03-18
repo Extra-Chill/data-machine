@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.16.1] - 2026-03-18
+
+### Fixed
+- MusicItemExtractor::resolveUrl() visibility must match parent
+
 ## [0.16.0] - 2026-03-18
 
 ### Added
