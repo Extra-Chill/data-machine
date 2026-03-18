@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Data Machine Socials
  * Plugin URI: https://github.com/Extra-Chill/data-machine-socials
- * Description: Social media extension for Data Machine. Adds support for Instagram, Twitter, Facebook, Bluesky, Threads, Pinterest, and Reddit.
+ * Description: Social media extension for Data Machine. Adds support for Instagram, Twitter, Facebook, Bluesky, Threads, Pinterest, LinkedIn, and Reddit.
  * Version: 0.4.0
  * Requires at least: 6.9
  * Requires PHP: 8.2
@@ -86,6 +86,12 @@ function datamachine_socials_bootstrap() {
 	new \DataMachineSocials\Abilities\Pinterest\PinterestDeleteAbility();
 	new \DataMachineSocials\Abilities\Pinterest\PinterestAnalyticsAbility();
 
+	// LinkedIn
+	new \DataMachineSocials\Abilities\LinkedIn\LinkedInPublishAbility();
+	new \DataMachineSocials\Abilities\LinkedIn\LinkedInReadAbility();
+	new \DataMachineSocials\Abilities\LinkedIn\LinkedInUpdateAbility();
+	new \DataMachineSocials\Abilities\LinkedIn\LinkedInDeleteAbility();
+
 	// Reddit (Fetch)
 	new \DataMachineSocials\Abilities\Reddit\FetchRedditAbility();
 
@@ -96,6 +102,7 @@ function datamachine_socials_bootstrap() {
 	new \DataMachineSocials\Handlers\Bluesky\Bluesky();
 	new \DataMachineSocials\Handlers\Pinterest\Pinterest();
 	new \DataMachineSocials\Handlers\Instagram\Instagram();
+	new \DataMachineSocials\Handlers\LinkedIn\LinkedIn();
 
 	// Reddit (Fetch)
 	new \DataMachineSocials\Handlers\Reddit\Reddit();
@@ -181,7 +188,9 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/FacebookCommand.php';
 	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/TwitterCommand.php';
 	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/BlueskyCommand.php';
+	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/LinkedInCommand.php';
 	require_once DATAMACHINE_SOCIALS_PATH . 'inc/Cli/Commands/SharesCommand.php';
+	WP_CLI::add_command( 'datamachine-socials linkedin', \DataMachineSocials\Cli\Commands\LinkedInCommand::class );
 	WP_CLI::add_command( 'datamachine-socials pinterest', \DataMachineSocials\Cli\Commands\PinterestCommand::class );
 	WP_CLI::add_command( 'datamachine-socials reddit', \DataMachineSocials\Cli\Commands\RedditCommand::class );
 	WP_CLI::add_command( 'datamachine-socials instagram', \DataMachineSocials\Cli\Commands\InstagramCommand::class );
@@ -225,6 +234,12 @@ function datamachine_socials_load_chat_tools() {
 	new \DataMachineSocials\Chat\Tools\ReadPinterest();
 	new \DataMachineSocials\Chat\Tools\UpdatePinterest();
 	new \DataMachineSocials\Chat\Tools\UpdateThreads();
+
+	// LinkedIn chat tools
+	new \DataMachineSocials\Chat\Tools\PublishLinkedIn();
+	new \DataMachineSocials\Chat\Tools\ReadLinkedIn();
+	new \DataMachineSocials\Chat\Tools\UpdateLinkedIn();
+	new \DataMachineSocials\Chat\Tools\DeleteLinkedIn();
 
 	// Delete chat tools
 	new \DataMachineSocials\Chat\Tools\DeleteInstagram();
