@@ -75,10 +75,12 @@ abstract class FetchHandler {
 			? $result['items']
 			: array( $result );
 
-		// Dedup: filter out already-processed items and mark new ones.
-		// Items with metadata['dedup_key'] participate in dedup.
-		// Items without dedup_key pass through unchanged.
-		$items = $this->dedup( $items, $context );
+		// Dedup: filter out already-processed items.
+		// Items with metadata['dedup_key'] are checked against the processed items
+		// database. Already-processed items are removed. New items are NOT yet
+		// marked — marking happens after the max_items cap so we don't permanently
+		// discard items that simply didn't fit in this batch.
+		$items = $this->filterProcessed( $items, $context );
 
 		// Apply max_items cap.
 		// Default to 1 to prevent unbounded fan-out when flows lack an
@@ -88,24 +90,29 @@ abstract class FetchHandler {
 			$items = array_slice( $items, 0, $max_items );
 		}
 
+		// Now mark the surviving items as processed so they won't be
+		// re-imported on the next run. Items that were cut by max_items
+		// remain unmarked and will be picked up in future runs.
+		$this->markProcessed( $items, $context );
+
 		return $this->toDataPackets( $items, $pipeline_id, $flow_id );
 	}
 
 	/**
-	 * Filter out already-processed items and mark new ones as processed.
+	 * Filter out already-processed items WITHOUT marking new ones.
 	 *
 	 * Items with metadata['dedup_key'] are checked against the processed items
-	 * database. Already-processed items are removed. New items are marked as
-	 * processed and passed to onItemProcessed() for any handler-specific side
-	 * effects.
+	 * database. Already-processed items are removed. New items pass through
+	 * but are NOT marked as processed — that happens in markProcessed() after
+	 * the max_items cap, so items cut by the cap can be picked up next run.
 	 *
 	 * Items without dedup_key are not deduped and pass through unchanged.
 	 *
 	 * @param array            $items   Normalized items array.
 	 * @param ExecutionContext $context Execution context.
-	 * @return array Filtered items array.
+	 * @return array Filtered items array (new items only).
 	 */
-	private function dedup( array $items, ExecutionContext $context ): array {
+	private function filterProcessed( array $items, ExecutionContext $context ): array {
 		$result = array();
 
 		foreach ( $items as $item ) {
@@ -126,16 +133,39 @@ abstract class FetchHandler {
 				continue;
 			}
 
-			// Mark as processed.
-			$context->markItemProcessed( (string) $dedup_key );
-
-			// Hook for handler-specific side effects (e.g., storeItemContext).
-			$this->onItemProcessed( $context, $item );
-
 			$result[] = $item;
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Mark items as processed and fire handler-specific side effects.
+	 *
+	 * Called AFTER max_items cap so only items that will actually be
+	 * imported get marked. Items cut by the cap remain unmarked and
+	 * will be picked up in future fetch cycles.
+	 *
+	 * @param array            $items   Items that survived filtering and capping.
+	 * @param ExecutionContext $context Execution context.
+	 */
+	private function markProcessed( array $items, ExecutionContext $context ): void {
+		foreach ( $items as $item ) {
+			if ( ! is_array( $item ) ) {
+				continue;
+			}
+
+			$dedup_key = $item['metadata']['dedup_key'] ?? null;
+
+			if ( null === $dedup_key || '' === $dedup_key ) {
+				continue;
+			}
+
+			$context->markItemProcessed( (string) $dedup_key );
+
+			// Hook for handler-specific side effects (e.g., storeItemContext).
+			$this->onItemProcessed( $context, $item );
+		}
 	}
 
 	/**
