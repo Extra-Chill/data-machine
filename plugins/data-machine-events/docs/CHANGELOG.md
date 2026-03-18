@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.16.2] - 2026-03-18
+
+### Fixed
+- harden cross-source dedup + add clean-duplicates CLI
+
 ## [0.16.1] - 2026-03-18
 
 ### Fixed
