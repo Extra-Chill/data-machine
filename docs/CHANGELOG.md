@@ -2,6 +2,21 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## Unreleased
+
+### Added
+- Agent runtime auth: bearer tokens, auth middleware, and capability ceiling
+- Auth CLI: set-token and refresh commands for headless credential injection
+- Jobs page: parent/child expand UI with lazy-loaded children
+
+### Changed
+- CI: adopt categorized lint/test auto-issues from homeboy-action
+- Auth REST API refactored to thin wrappers over abilities
+
+### Fixed
+- Batch fan-out child jobs created as processing instead of pending (#858)
+- Jobs page SQL performance: removed CAST from JOINs, added child_count subquery
+
 ## [0.46.1] - 2026-03-18
 
 ### Fixed
