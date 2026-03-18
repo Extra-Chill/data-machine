@@ -154,6 +154,34 @@ class DateGrouper {
 			}
 		}
 
+		// Default sort: continuation events (multi-day events on non-start days)
+		// sort after non-continuation events within each day group. This ensures
+		// events actually starting today appear before ongoing multi-day events.
+		foreach ( $date_groups as $date_key => &$date_group ) {
+			usort(
+				$date_group['events'],
+				function ( $a, $b ) {
+					$a_continuation = ! empty( $a['display_context']['is_continuation'] );
+					$b_continuation = ! empty( $b['display_context']['is_continuation'] );
+
+					if ( $a_continuation !== $b_continuation ) {
+						return $a_continuation ? 1 : -1;
+					}
+
+					// Within the same tier, maintain datetime order.
+					$a_time = $a['datetime'] ?? null;
+					$b_time = $b['datetime'] ?? null;
+
+					if ( $a_time && $b_time ) {
+						return $a_time <=> $b_time;
+					}
+
+					return 0;
+				}
+			);
+		}
+		unset( $date_group );
+
 		// Allow reordering events within each day group.
 		foreach ( $date_groups as $date_key => &$date_group ) {
 			$date_group['events'] = apply_filters(
