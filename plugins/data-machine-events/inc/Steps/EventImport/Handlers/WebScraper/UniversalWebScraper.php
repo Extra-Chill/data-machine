@@ -66,6 +66,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\Craftpeak
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\DuskFmExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\IcsExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\DoStuffExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\WebflowExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\VisionExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SquareOnlineExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\VisionExtractionProcessor;
@@ -134,6 +135,7 @@ class UniversalWebScraper extends EventImportHandler {
 			new SpotHopperExtractor(),
 			new GigwellExtractor(),
 			new DoStuffExtractor(),
+			new WebflowExtractor(),
 			new BandzoogleExtractor(),
 			new GoDaddyExtractor(),
 			new TimelyExtractor(),
