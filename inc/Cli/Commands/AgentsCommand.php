@@ -502,6 +502,231 @@ class AgentsCommand extends BaseCommand {
 	}
 
 	/**
+	 * Manage agent bearer tokens for runtime authentication.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <action>
+	 * : Action: create, revoke, or list.
+	 *
+	 * <slug>
+	 * : Agent slug or numeric ID.
+	 *
+	 * [<token_id>]
+	 * : Token ID (required for revoke).
+	 *
+	 * [--label=<label>]
+	 * : Human-readable label for the token (create only).
+	 *
+	 * [--expires-in=<seconds>]
+	 * : Token expiry in seconds from now (create only). Default: never.
+	 *
+	 * [--capabilities=<json>]
+	 * : JSON array of allowed capabilities (create only). Default: all agent caps.
+	 *
+	 * [--format=<format>]
+	 * : Output format (list only).
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Create a token for an agent
+	 *     wp datamachine agents token create chubes-bot --label="kimaki-prod"
+	 *
+	 *     # Create a token with 90-day expiry
+	 *     wp datamachine agents token create chubes-bot --label="ci" --expires-in=7776000
+	 *
+	 *     # Create a token with restricted capabilities
+	 *     wp datamachine agents token create chubes-bot --capabilities='["datamachine_chat","datamachine_use_tools"]'
+	 *
+	 *     # List tokens for an agent
+	 *     wp datamachine agents token list chubes-bot
+	 *
+	 *     # Revoke a token
+	 *     wp datamachine agents token revoke chubes-bot 3
+	 *
+	 * @subcommand token
+	 */
+	public function token( array $args, array $assoc_args ): void {
+		$action     = $args[0] ?? '';
+		$identifier = $args[1] ?? '';
+
+		if ( empty( $action ) || empty( $identifier ) ) {
+			WP_CLI::error( 'Usage: wp datamachine agents token <create|revoke|list> <slug|id> [token_id] [--label=...] [--expires-in=...]' );
+			return;
+		}
+
+		// Resolve agent.
+		$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+		$agent       = is_numeric( $identifier )
+			? $agents_repo->get_agent( (int) $identifier )
+			: $agents_repo->get_by_slug( sanitize_title( $identifier ) );
+
+		if ( ! $agent ) {
+			WP_CLI::error( sprintf( 'Agent "%s" not found.', $identifier ) );
+			return;
+		}
+
+		$agent_id = (int) $agent['agent_id'];
+
+		$abilities = new \DataMachine\Abilities\AgentTokenAbilities();
+
+		switch ( $action ) {
+			case 'create':
+				$this->tokenCreate( $abilities, $agent, $assoc_args );
+				break;
+
+			case 'list':
+				$this->tokenList( $abilities, $agent_id, $assoc_args );
+				break;
+
+			case 'revoke':
+				$token_id = intval( $args[2] ?? 0 );
+				if ( $token_id <= 0 ) {
+					WP_CLI::error( 'Token ID is required for revoke. Usage: wp datamachine agents token revoke <slug> <token_id>' );
+					return;
+				}
+				$this->tokenRevoke( $abilities, $agent_id, $token_id );
+				break;
+
+			default:
+				WP_CLI::error( "Unknown action: {$action}. Use: create, revoke, list" );
+		}
+	}
+
+	/**
+	 * Create an agent token.
+	 *
+	 * @param \DataMachine\Abilities\AgentTokenAbilities $abilities Token abilities.
+	 * @param array                                      $agent     Agent row.
+	 * @param array                                      $assoc_args CLI arguments.
+	 */
+	private function tokenCreate( $abilities, array $agent, array $assoc_args ): void {
+		$agent_id     = (int) $agent['agent_id'];
+		$label        = $assoc_args['label'] ?? '';
+		$expires_in   = isset( $assoc_args['expires-in'] ) ? intval( $assoc_args['expires-in'] ) : null;
+		$capabilities = null;
+
+		if ( isset( $assoc_args['capabilities'] ) ) {
+			$capabilities = json_decode( $assoc_args['capabilities'], true );
+			if ( ! is_array( $capabilities ) ) {
+				WP_CLI::error( 'Invalid JSON in --capabilities.' );
+				return;
+			}
+		}
+
+		$result = $abilities->executeCreateToken(
+			array(
+				'agent_id'     => $agent_id,
+				'label'        => $label,
+				'capabilities' => $capabilities,
+				'expires_in'   => $expires_in,
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to create token.' );
+			return;
+		}
+
+		WP_CLI::success( 'Token created!' );
+		WP_CLI::log( '' );
+		WP_CLI::log( WP_CLI::colorize( '%YSave this token now — it cannot be retrieved again:%n' ) );
+		WP_CLI::log( '' );
+		WP_CLI::log( '  ' . $result['raw_token'] );
+		WP_CLI::log( '' );
+		WP_CLI::log( sprintf( 'Token ID:    %d', $result['token_id'] ) );
+		WP_CLI::log( sprintf( 'Agent:       %s (ID: %d)', $agent['agent_slug'], $agent_id ) );
+		if ( ! empty( $label ) ) {
+			WP_CLI::log( sprintf( 'Label:       %s', $label ) );
+		}
+		if ( null !== $expires_in ) {
+			$days = intval( $expires_in / DAY_IN_SECONDS );
+			WP_CLI::log( sprintf( 'Expires in:  %d days', $days ) );
+		}
+		if ( null !== $capabilities ) {
+			WP_CLI::log( sprintf( 'Capabilities: %s', implode( ', ', $capabilities ) ) );
+		}
+	}
+
+	/**
+	 * List tokens for an agent.
+	 *
+	 * @param \DataMachine\Abilities\AgentTokenAbilities $abilities  Token abilities.
+	 * @param int                                        $agent_id   Agent ID.
+	 * @param array                                      $assoc_args CLI arguments.
+	 */
+	private function tokenList( $abilities, int $agent_id, array $assoc_args ): void {
+		$result = $abilities->executeListTokens( array( 'agent_id' => $agent_id ) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to list tokens.' );
+			return;
+		}
+
+		$tokens = $result['tokens'] ?? array();
+
+		if ( empty( $tokens ) ) {
+			WP_CLI::warning( 'No tokens found for this agent.' );
+			return;
+		}
+
+		$format = $assoc_args['format'] ?? 'table';
+
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $tokens, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		$items = array();
+		foreach ( $tokens as $token ) {
+			$expired = false;
+			if ( ! empty( $token['expires_at'] ) ) {
+				$expired = strtotime( $token['expires_at'] ) < time();
+			}
+
+			$items[] = array(
+				'token_id'     => $token['token_id'],
+				'prefix'       => $token['token_prefix'] . '...',
+				'label'        => $token['label'] ?: '(none)',
+				'last_used'    => $token['last_used_at'] ?? 'never',
+				'expires'      => $token['expires_at'] ?? 'never',
+				'status'       => $expired ? 'expired' : 'active',
+			);
+		}
+
+		$this->format_items( $items, array( 'token_id', 'prefix', 'label', 'last_used', 'expires', 'status' ), $assoc_args, 'token_id' );
+	}
+
+	/**
+	 * Revoke an agent token.
+	 *
+	 * @param \DataMachine\Abilities\AgentTokenAbilities $abilities Token abilities.
+	 * @param int                                        $agent_id  Agent ID.
+	 * @param int                                        $token_id  Token ID.
+	 */
+	private function tokenRevoke( $abilities, int $agent_id, int $token_id ): void {
+		$result = $abilities->executeRevokeToken(
+			array(
+				'agent_id' => $agent_id,
+				'token_id' => $token_id,
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to revoke token.' );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] ?? 'Token revoked.' );
+	}
+
+	/**
 	 * Resolve a user identifier to a WordPress user ID.
 	 *
 	 * @param string|int $value User ID, login, or email.

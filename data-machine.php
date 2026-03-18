@@ -114,6 +114,9 @@ function datamachine_run_datamachine_plugin() {
 	\DataMachine\Api\InternalLinks::register();
 	\DataMachine\Api\Email::register();
 
+	// Agent runtime authentication middleware.
+	new \DataMachine\Core\Auth\AgentAuthMiddleware();
+
 	// Load abilities
 	require_once __DIR__ . '/inc/Abilities/AuthAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/File/FileConstants.php';
@@ -202,6 +205,7 @@ function datamachine_run_datamachine_plugin() {
 		new \DataMachine\Abilities\AgentPingAbilities();
 		new \DataMachine\Abilities\TaxonomyAbilities();
 		new \DataMachine\Abilities\AgentAbilities();
+		new \DataMachine\Abilities\AgentTokenAbilities();
 		new \DataMachine\Abilities\AgentMemoryAbilities();
 		new \DataMachine\Abilities\DailyMemoryAbilities();
 		new \DataMachine\Abilities\WorkspaceAbilities();
@@ -458,6 +462,7 @@ function datamachine_activate_for_site() {
 	// Ensure first-class agents table exists.
 	\DataMachine\Core\Database\Agents\Agents::create_table();
 	\DataMachine\Core\Database\Agents\AgentAccess::create_table();
+	\DataMachine\Core\Database\Agents\AgentTokens::create_table();
 
 	$db_pipelines = new \DataMachine\Core\Database\Pipelines\Pipelines();
 	$db_pipelines->create_table();
