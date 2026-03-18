@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.16.0] - 2026-03-18
+
+### Added
+- default max_items to unlimited for event import handlers
+
 ## [0.15.2] - 2026-03-18
 
 ### Changed
