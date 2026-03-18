@@ -69,6 +69,8 @@ class PageBoundary {
 		$query           = new WP_Query( $query_args );
 		$total_events    = $query->found_posts;
 		$events_per_date = array();
+		$show_past_param = $params['show_past'] ?? false;
+		$current_date    = current_time( 'Y-m-d' );
 
 		if ( $query->have_posts() ) {
 			foreach ( $query->posts as $post_id ) {
@@ -82,25 +84,38 @@ class PageBoundary {
 				$start_date = date( 'Y-m-d', strtotime( $start_datetime ) );
 				$end_date   = $end_datetime ? date( 'Y-m-d', strtotime( $end_datetime ) ) : $start_date;
 
-				// Check for explicit occurrence dates in block attributes.
-				$post             = get_post( $post_id );
-				$event_data       = EventHydrator::parse_event_data( $post );
-				$occurrence_dates = is_array( $event_data ) ? ( $event_data['occurrenceDates'] ?? array() ) : array();
+				// Fast path: single-day events (vast majority). Skip full post
+				// hydration — only need the meta values we already have.
+				if ( $start_date === $end_date ) {
+					if ( ! isset( $events_per_date[ $start_date ] ) ) {
+						$events_per_date[ $start_date ] = 1;
+					} else {
+						++$events_per_date[ $start_date ];
+					}
+					continue;
+				}
+
+				// Multi-day events: check for explicit occurrence dates, but only
+				// load the full post when the event actually has block content that
+				// might contain occurrenceDates. Use a lightweight meta check first.
+				$occurrence_dates = array();
+				$has_blocks       = get_post_meta( $post_id, '_datamachine_has_occurrence_dates', true );
+
+				if ( $has_blocks ) {
+					$post             = get_post( $post_id );
+					$event_data       = EventHydrator::parse_event_data( $post );
+					$occurrence_dates = is_array( $event_data ) ? ( $event_data['occurrenceDates'] ?? array() ) : array();
+				}
 
 				if ( ! empty( $occurrence_dates ) && is_array( $occurrence_dates ) ) {
 					$event_dates = $occurrence_dates;
-				} elseif ( $start_date !== $end_date ) {
-					$event_dates = MultiDayResolver::get_date_range( $start_date, $end_date, wp_timezone() );
 				} else {
-					$event_dates = array( $start_date );
+					$event_dates = MultiDayResolver::get_date_range( $start_date, $end_date, wp_timezone() );
 				}
 
 				// Filter out past dates when show_past is false.
-				$show_past_param = $params['show_past'] ?? false;
-				$is_expanded     = ( ! empty( $occurrence_dates ) && is_array( $occurrence_dates ) ) || ( $start_date !== $end_date );
-				if ( ! $show_past_param && $is_expanded ) {
-					$current_date = current_time( 'Y-m-d' );
-					$event_dates  = array_filter(
+				if ( ! $show_past_param ) {
+					$event_dates = array_filter(
 						$event_dates,
 						function ( $date ) use ( $current_date ) {
 							return $date >= $current_date;
