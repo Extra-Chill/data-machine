@@ -215,6 +215,78 @@ class Agents {
 				),
 			)
 		);
+
+		// Agent tokens: list and create.
+		register_rest_route(
+			'datamachine/v1',
+			'/agents/(?P<agent_id>\d+)/tokens',
+			array(
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( self::class, 'handle_list_tokens' ),
+					'permission_callback' => $manage_permission,
+					'args'                => array(
+						'agent_id' => array(
+							'type'              => 'integer',
+							'required'          => true,
+							'sanitize_callback' => 'absint',
+						),
+					),
+				),
+				array(
+					'methods'             => WP_REST_Server::CREATABLE,
+					'callback'            => array( self::class, 'handle_create_token' ),
+					'permission_callback' => $manage_permission,
+					'args'                => array(
+						'agent_id'     => array(
+							'type'              => 'integer',
+							'required'          => true,
+							'sanitize_callback' => 'absint',
+						),
+						'label'        => array(
+							'type'              => 'string',
+							'required'          => false,
+							'default'           => '',
+							'description'       => __( 'Human-readable label (e.g., "kimaki-prod").', 'data-machine' ),
+							'sanitize_callback' => 'sanitize_text_field',
+						),
+						'capabilities' => array(
+							'type'        => 'array',
+							'required'    => false,
+							'description' => __( 'Allowed capabilities subset (null = all agent caps).', 'data-machine' ),
+						),
+						'expires_in'   => array(
+							'type'        => 'integer',
+							'required'    => false,
+							'description' => __( 'Token expiry in seconds from now (null = never).', 'data-machine' ),
+						),
+					),
+				),
+			)
+		);
+
+		// Revoke a specific token.
+		register_rest_route(
+			'datamachine/v1',
+			'/agents/(?P<agent_id>\d+)/tokens/(?P<token_id>\d+)',
+			array(
+				'methods'             => WP_REST_Server::DELETABLE,
+				'callback'            => array( self::class, 'handle_revoke_token' ),
+				'permission_callback' => $manage_permission,
+				'args'                => array(
+					'agent_id' => array(
+						'type'              => 'integer',
+						'required'          => true,
+						'sanitize_callback' => 'absint',
+					),
+					'token_id' => array(
+						'type'              => 'integer',
+						'required'          => true,
+						'sanitize_callback' => 'absint',
+					),
+				),
+			)
+		);
 	}
 
 	// ---------------------------------------------------------------
@@ -562,6 +634,77 @@ class Agents {
 				),
 			)
 		);
+	}
+
+	// ---------------------------------------------------------------
+	// Token handlers
+	// ---------------------------------------------------------------
+
+	/**
+	 * Handle GET /agents/{agent_id}/tokens — list tokens.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 * @return \WP_REST_Response|WP_Error
+	 */
+	public static function handle_list_tokens( WP_REST_Request $request ) {
+		$abilities = new \DataMachine\Abilities\AgentTokenAbilities();
+		$result    = $abilities->executeListTokens(
+			array( 'agent_id' => (int) $request->get_param( 'agent_id' ) )
+		);
+
+		if ( empty( $result['success'] ) ) {
+			return new WP_Error( 'list_tokens_failed', $result['error'] ?? 'Failed', array( 'status' => 400 ) );
+		}
+
+		return rest_ensure_response( $result );
+	}
+
+	/**
+	 * Handle POST /agents/{agent_id}/tokens — create a token.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 * @return \WP_REST_Response|WP_Error
+	 */
+	public static function handle_create_token( WP_REST_Request $request ) {
+		$abilities = new \DataMachine\Abilities\AgentTokenAbilities();
+		$result    = $abilities->executeCreateToken(
+			array(
+				'agent_id'     => (int) $request->get_param( 'agent_id' ),
+				'label'        => $request->get_param( 'label' ) ?? '',
+				'capabilities' => $request->get_param( 'capabilities' ),
+				'expires_in'   => $request->get_param( 'expires_in' ),
+			)
+		);
+
+		if ( empty( $result['success'] ) ) {
+			$status = str_contains( $result['error'] ?? '', 'not found' ) ? 404 : 400;
+			return new WP_Error( 'create_token_failed', $result['error'] ?? 'Failed', array( 'status' => $status ) );
+		}
+
+		return rest_ensure_response( $result );
+	}
+
+	/**
+	 * Handle DELETE /agents/{agent_id}/tokens/{token_id} — revoke a token.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 * @return \WP_REST_Response|WP_Error
+	 */
+	public static function handle_revoke_token( WP_REST_Request $request ) {
+		$abilities = new \DataMachine\Abilities\AgentTokenAbilities();
+		$result    = $abilities->executeRevokeToken(
+			array(
+				'agent_id' => (int) $request->get_param( 'agent_id' ),
+				'token_id' => (int) $request->get_param( 'token_id' ),
+			)
+		);
+
+		if ( empty( $result['success'] ) ) {
+			$status = str_contains( $result['error'] ?? '', 'not found' ) ? 404 : 400;
+			return new WP_Error( 'revoke_token_failed', $result['error'] ?? 'Failed', array( 'status' => $status ) );
+		}
+
+		return rest_ensure_response( $result );
 	}
 
 	// ---------------------------------------------------------------
