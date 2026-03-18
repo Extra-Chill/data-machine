@@ -221,9 +221,10 @@ class UniversalWebScraper extends EventImportHandler {
 		}
 
 		// Unified pagination loop
-		$current_url  = $url;
-		$current_page = 1;
-		$visited_urls = array();
+		$current_url       = $url;
+		$current_page      = 1;
+		$visited_urls      = array();
+		$accumulated_items = array();
 
 		while ( $current_page <= self::MAX_PAGES ) {
 			$url_hash = md5( $current_url );
@@ -276,7 +277,48 @@ class UniversalWebScraper extends EventImportHandler {
 			);
 
 			if ( null !== $structured_result ) {
-				return $structured_result;
+				// Accumulate items from structured extraction and continue
+				// pagination instead of returning immediately. This allows
+				// multi-page APIs (e.g. Tribe Events with 9 pages) to be
+				// fully scraped in a single fetch cycle.
+				$page_items = isset( $structured_result['items'] ) ? $structured_result['items'] : array( $structured_result );
+				$accumulated_items = array_merge( $accumulated_items, $page_items );
+
+				$context->log(
+					'info',
+					'Universal Web Scraper: Accumulated structured items from page',
+					array(
+						'page'             => $current_page,
+						'page_items'       => count( $page_items ),
+						'total_items'      => count( $accumulated_items ),
+						'source_url'       => $current_url,
+					)
+				);
+
+				// Check for next page — structured sources often have pagination
+				$next_url = $this->findNextPage( $current_url, $html_content, $context );
+				if ( null === $next_url ) {
+					break;
+				}
+
+				$current_url = $next_url;
+				++$current_page;
+
+				$context->log(
+					'info',
+					'Universal Web Scraper: Moving to next page',
+					array(
+						'page'     => $current_page,
+						'next_url' => $next_url,
+					)
+				);
+				continue;
+			}
+
+			// If we already have accumulated items from prior pages but this
+			// page has no structured data, stop accumulating.
+			if ( ! empty( $accumulated_items ) ) {
+				break;
 			}
 
 			// Fall back to HTML section extraction
@@ -328,6 +370,19 @@ class UniversalWebScraper extends EventImportHandler {
 					'next_url' => $next_url,
 				)
 			);
+		}
+
+		// Return accumulated items from structured extraction across all pages.
+		if ( ! empty( $accumulated_items ) ) {
+			$context->log(
+				'info',
+				'Universal Web Scraper: Returning accumulated items from all pages',
+				array(
+					'total_items'  => count( $accumulated_items ),
+					'pages_loaded' => $current_page,
+				)
+			);
+			return array( 'items' => $accumulated_items );
 		}
 
 		return array();
