@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.17.0] - 2026-03-18
+
+### Added
+- add Webflow CMS extractor for venue event pages
+
 ## [0.16.3] - 2026-03-18
 
 ### Fixed
