@@ -34,7 +34,7 @@ jobs:
           version: 'latest'
           extension: wordpress
           commands: lint
-          lint-changed-only: true
+          scope: changed
           component: data-machine
           settings: '{"database_type": "mysql"}'
           php-version: '8.2'
@@ -79,7 +79,7 @@ jobs:
           version: 'latest'
           extension: wordpress
           commands: test
-          test-scope: 'changed'
+          scope: changed
           component: data-machine
           settings: '{"database_type": "mysql"}'
           php-version: '8.2'
@@ -110,8 +110,7 @@ jobs:
           version: 'latest'
           extension: wordpress
           commands: audit
-          lint-changed-only: true
+          scope: changed
           component: data-machine
           php-version: '8.2'
           node-version: '20'
-
