@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.46.1] - 2026-03-18
+
+### Fixed
+- remove hardcoded content-type assumptions from skip_item tool
+
 ## [0.46.0] - 2026-03-18
 
 ### Added
