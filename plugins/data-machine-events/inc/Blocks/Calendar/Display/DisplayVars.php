@@ -47,8 +47,6 @@ class DisplayVars {
 			$is_multi_day    = ! empty( $display_context['is_multi_day'] );
 			$is_continuation = ! empty( $display_context['is_continuation'] );
 
-			$has_real_start_time = ! self::is_sentinel_start_time( $start_time );
-
 			if ( $is_multi_day && ! empty( $end_date ) ) {
 				$end_datetime_obj = new DateTime( $end_date, $event_tz );
 
@@ -63,11 +61,9 @@ class DisplayVars {
 						__( 'through %s', 'data-machine-events' ),
 						$end_datetime_obj->format( 'M j' )
 					);
-					if ( $has_real_start_time ) {
-						$formatted_time_display = self::format_time_range( $start_datetime_obj, $end_date, $end_time, $event_tz );
-					}
+					$formatted_time_display = self::format_time_range( $start_datetime_obj, $end_date, $end_time, $event_tz );
 				}
-			} elseif ( $has_real_start_time ) {
+			} else {
 				$formatted_time_display = self::format_time_range( $start_datetime_obj, $end_date, $end_time, $event_tz );
 			}
 		}
@@ -139,22 +135,7 @@ class DisplayVars {
 		return '23:59' === $normalized;
 	}
 
-	/**
-	 * Check if start time is the sentinel value indicating no real time was provided.
-	 *
-	 * When events have no startTime, meta-storage.php stores 00:00:00 as the default.
-	 * This should not display as "12:00 AM" to users.
-	 *
-	 * @param string $time Time string in HH:MM or HH:MM:SS format.
-	 * @return bool True if time is the 00:00 sentinel value or empty.
-	 */
-	public static function is_sentinel_start_time( string $time ): bool {
-		if ( empty( $time ) ) {
-			return true;
-		}
-		$normalized = substr( $time, 0, 5 );
-		return '00:00' === $normalized;
-	}
+
 
 	/**
 	 * Decode unicode escape sequences in strings.
