@@ -314,7 +314,10 @@ class PipelineBatchScheduler {
 		}
 
 		datamachine_set_engine_data( $child_job_id, $child_engine );
-		$this->db_jobs->start_job( $child_job_id );
+
+		// Child job stays 'pending' until Action Scheduler actually picks it up.
+		// ExecuteStepAbility transitions to 'processing' at execution time,
+		// so recover-stuck only catches genuinely stuck jobs.
 
 		// Schedule the next step with this single DataPacket.
 		// Uses the normal engine path — the child is a real pipeline job.
