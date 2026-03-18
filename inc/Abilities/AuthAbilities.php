@@ -179,6 +179,8 @@ class AuthAbilities {
 			$this->registerGetAuthStatus();
 			$this->registerDisconnectAuth();
 			$this->registerSaveAuthConfig();
+			$this->registerSetAuthToken();
+			$this->registerRefreshAuth();
 		};
 
 		if ( doing_action( 'wp_abilities_api_init' ) ) {
@@ -287,6 +289,75 @@ class AuthAbilities {
 					),
 				),
 				'execute_callback'    => array( $this, 'executeSaveAuthConfig' ),
+				'permission_callback' => array( $this, 'checkPermission' ),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	private function registerSetAuthToken(): void {
+		wp_register_ability(
+			'datamachine/set-auth-token',
+			array(
+				'label'               => __( 'Set Auth Token', 'data-machine' ),
+				'description'         => __( 'Manually set authentication token and account data for a handler. Used for migration, CI, and headless auth setup.', 'data-machine' ),
+				'category'            => 'datamachine',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'handler_slug', 'account_data' ),
+					'properties' => array(
+						'handler_slug' => array(
+							'type'        => 'string',
+							'description' => __( 'Handler identifier (e.g., twitter, facebook, linkedin)', 'data-machine' ),
+						),
+						'account_data' => array(
+							'type'        => 'object',
+							'description' => __( 'Account data to store. Must include access_token. Can include any platform-specific fields (user_id, username, token_expires_at, refresh_token, etc.).', 'data-machine' ),
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success' => array( 'type' => 'boolean' ),
+						'message' => array( 'type' => 'string' ),
+						'error'   => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeSetAuthToken' ),
+				'permission_callback' => array( $this, 'checkPermission' ),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	private function registerRefreshAuth(): void {
+		wp_register_ability(
+			'datamachine/refresh-auth',
+			array(
+				'label'               => __( 'Refresh Auth Token', 'data-machine' ),
+				'description'         => __( 'Force a token refresh for an OAuth2 handler. Only works for providers that support token refresh.', 'data-machine' ),
+				'category'            => 'datamachine',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'handler_slug' ),
+					'properties' => array(
+						'handler_slug' => array(
+							'type'        => 'string',
+							'description' => __( 'Handler identifier (e.g., twitter, facebook, linkedin)', 'data-machine' ),
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'    => array( 'type' => 'boolean' ),
+						'message'    => array( 'type' => 'string' ),
+						'expires_at' => array( 'type' => array( 'string', 'null' ) ),
+						'error'      => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeRefreshAuth' ),
 				'permission_callback' => array( $this, 'checkPermission' ),
 				'meta'                => array( 'show_in_rest' => true ),
 			)
@@ -521,6 +592,181 @@ class AuthAbilities {
 		return array(
 			'success' => false,
 			'error'   => __( 'Failed to save configuration', 'data-machine' ),
+		);
+	}
+
+	/**
+	 * Manually set authentication token and account data for a handler.
+	 *
+	 * Bypasses OAuth flow to directly inject credentials. Useful for:
+	 * - Migrating tokens from another plugin
+	 * - CI/headless environments where browser OAuth is impossible
+	 * - Restoring credentials from backup
+	 *
+	 * @since 0.47.0
+	 * @param array $input Input with handler_slug and account_data.
+	 * @return array Result.
+	 */
+	public function executeSetAuthToken( array $input ): array {
+		$handler_slug = sanitize_text_field( $input['handler_slug'] ?? '' );
+		$account_data = $input['account_data'] ?? array();
+
+		if ( empty( $handler_slug ) ) {
+			return array(
+				'success' => false,
+				'error'   => __( 'Handler slug is required', 'data-machine' ),
+			);
+		}
+
+		if ( empty( $account_data ) || ! is_array( $account_data ) ) {
+			return array(
+				'success' => false,
+				'error'   => __( 'Account data is required and must be an object', 'data-machine' ),
+			);
+		}
+
+		if ( empty( $account_data['access_token'] ) ) {
+			return array(
+				'success' => false,
+				'error'   => __( 'access_token is required in account_data', 'data-machine' ),
+			);
+		}
+
+		$auth_instance = $this->getProviderForHandler( $handler_slug );
+
+		if ( ! $auth_instance ) {
+			return array(
+				'success' => false,
+				'error'   => __( 'Authentication provider not found', 'data-machine' ),
+			);
+		}
+
+		if ( ! method_exists( $auth_instance, 'save_account' ) ) {
+			return array(
+				'success' => false,
+				'error'   => __( 'This handler does not support saving account data', 'data-machine' ),
+			);
+		}
+
+		// Sanitize string values in account data.
+		$sanitized = array();
+		foreach ( $account_data as $key => $value ) {
+			if ( is_string( $value ) ) {
+				$sanitized[ $key ] = sanitize_text_field( $value );
+			} elseif ( is_int( $value ) || is_float( $value ) || is_bool( $value ) || is_null( $value ) ) {
+				$sanitized[ $key ] = $value;
+			} elseif ( is_array( $value ) ) {
+				$sanitized[ $key ] = $value;
+			}
+		}
+
+		$saved = $auth_instance->save_account( $sanitized );
+
+		if ( $saved ) {
+			// Schedule proactive refresh if the provider supports it.
+			if ( method_exists( $auth_instance, 'schedule_proactive_refresh' ) ) {
+				$auth_instance->schedule_proactive_refresh();
+			}
+
+			do_action(
+				'datamachine_log',
+				'info',
+				'Auth: Token set manually via CLI/ability',
+				array(
+					'handler_slug' => $handler_slug,
+					'has_expiry'   => ! empty( $sanitized['token_expires_at'] ),
+				)
+			);
+
+			return array(
+				'success' => true,
+				/* translators: %s: Service name (e.g., Twitter, Facebook) */
+				'message' => sprintf( __( '%s authentication token set successfully', 'data-machine' ), ucfirst( $handler_slug ) ),
+			);
+		}
+
+		return array(
+			'success' => false,
+			'error'   => __( 'Failed to save account data', 'data-machine' ),
+		);
+	}
+
+	/**
+	 * Force a token refresh for an OAuth2 handler.
+	 *
+	 * Calls get_valid_access_token() which handles refresh logic automatically.
+	 * Only works for providers extending BaseOAuth2Provider that implement
+	 * do_refresh_token().
+	 *
+	 * @since 0.47.0
+	 * @param array $input Input with handler_slug.
+	 * @return array Result with new expiry if available.
+	 */
+	public function executeRefreshAuth( array $input ): array {
+		$handler_slug = sanitize_text_field( $input['handler_slug'] ?? '' );
+
+		if ( empty( $handler_slug ) ) {
+			return array(
+				'success' => false,
+				'error'   => __( 'Handler slug is required', 'data-machine' ),
+			);
+		}
+
+		$auth_instance = $this->getProviderForHandler( $handler_slug );
+
+		if ( ! $auth_instance ) {
+			return array(
+				'success' => false,
+				'error'   => __( 'Authentication provider not found', 'data-machine' ),
+			);
+		}
+
+		if ( ! method_exists( $auth_instance, 'is_authenticated' ) || ! $auth_instance->is_authenticated() ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf(
+					/* translators: %s: Service name (e.g., Twitter, Facebook) */
+					__( '%s is not currently authenticated. Connect first before refreshing.', 'data-machine' ),
+					ucfirst( $handler_slug )
+				),
+			);
+		}
+
+		if ( ! method_exists( $auth_instance, 'get_valid_access_token' ) ) {
+			return array(
+				'success' => false,
+				'error'   => __( 'This handler does not support token refresh', 'data-machine' ),
+			);
+		}
+
+		// Force refresh by getting a valid token (handles expiry check + refresh).
+		$new_token = $auth_instance->get_valid_access_token();
+
+		if ( null === $new_token ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf(
+					/* translators: %s: Service name (e.g., Twitter, Facebook) */
+					__( 'Token refresh failed for %s. Re-authorization may be required.', 'data-machine' ),
+					ucfirst( $handler_slug )
+				),
+			);
+		}
+
+		// Get updated account to show new expiry.
+		$expires_at = null;
+		if ( method_exists( $auth_instance, 'get_account' ) ) {
+			$account    = $auth_instance->get_account();
+			$expires_at = ! empty( $account['token_expires_at'] )
+				? wp_date( 'Y-m-d H:i:s', intval( $account['token_expires_at'] ) )
+				: null;
+		}
+
+		return array(
+			'success'    => true,
+			/* translators: %s: Service name (e.g., Twitter, Facebook) */
+			'message'    => sprintf( __( '%s token refreshed successfully', 'data-machine' ), ucfirst( $handler_slug ) ),
+			'expires_at' => $expires_at,
 		);
 	}
 }
