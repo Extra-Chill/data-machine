@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.15.2] - 2026-03-18
+
+### Changed
+- deduplicate shared utilities across web scraper extractors
+
+### Fixed
+- structured data extractors now paginate instead of returning on first page
+- improve multi-day event display and sort order
+
 ## [0.15.1] - 2026-03-16
 
 ### Fixed
