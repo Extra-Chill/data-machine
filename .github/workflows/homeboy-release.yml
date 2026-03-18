@@ -18,6 +18,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.HOMEBOY_APP_ID }}
+          private-key: ${{ secrets.HOMEBOY_APP_PRIVATE_KEY }}
+
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -35,10 +42,11 @@ jobs:
           extension: wordpress
           commands: lint
           component: data-machine
-          settings: '{"database_type": "mysql"}'
+          scope: full
           php-version: '8.2'
           node-version: '20'
           auto-issue: true
+          app-token: ${{ steps.app-token.outputs.token }}
 
   test:
     name: Homeboy Test
@@ -62,6 +70,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.HOMEBOY_APP_ID }}
+          private-key: ${{ secrets.HOMEBOY_APP_PRIVATE_KEY }}
+
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -79,10 +94,11 @@ jobs:
           extension: wordpress
           commands: test
           component: data-machine
-          settings: '{"database_type": "mysql"}'
+          scope: full
           php-version: '8.2'
           node-version: '20'
           auto-issue: true
+          app-token: ${{ steps.app-token.outputs.token }}
 
   audit:
     name: Homeboy Audit
@@ -91,6 +107,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.HOMEBOY_APP_ID }}
+          private-key: ${{ secrets.HOMEBOY_APP_PRIVATE_KEY }}
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -109,6 +132,8 @@ jobs:
           extension: wordpress
           commands: audit
           component: data-machine
+          scope: full
           php-version: '8.2'
           node-version: '20'
           auto-issue: true
+          app-token: ${{ steps.app-token.outputs.token }}
