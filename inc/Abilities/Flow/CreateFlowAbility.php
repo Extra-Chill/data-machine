@@ -170,11 +170,15 @@ class CreateFlowAbility {
 		$scheduling_config = $input['scheduling_config'] ?? array( 'interval' => 'manual' );
 		$flow_config       = $input['flow_config'] ?? array();
 
+		// Store scheduling_config as manual initially. The actual scheduling
+		// (AS recurring action) is created by handle_scheduling_update() below.
+		// If we stored the real interval here, handle_scheduling_update() would
+		// see "nothing changed" and skip creating the AS action.
 		$flow_data = array(
 			'pipeline_id'       => $pipeline_id,
 			'flow_name'         => $flow_name,
 			'flow_config'       => $flow_config,
-			'scheduling_config' => $scheduling_config,
+			'scheduling_config' => array( 'interval' => 'manual' ),
 		);
 
 		if ( null !== $agent_id && $agent_id > 0 ) {
