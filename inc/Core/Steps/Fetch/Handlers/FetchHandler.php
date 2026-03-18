@@ -468,7 +468,7 @@ abstract class FetchHandler {
 			'class'          => SkipItemTool::class,
 			'method'         => 'handle_tool_call',
 			'handler'        => $handler_slug,
-			'description'    => 'Skip processing this item. Use when the item does not meet criteria for this flow (e.g., not a music event, wrong location, irrelevant content). The item will be marked as processed and will not be refetched on subsequent runs.',
+			'description'    => 'Skip processing this item. Use when the item does not meet quality or relevance criteria defined in the pipeline rules (RULES.md). The item will be marked as processed and will not be refetched on subsequent runs.',
 			'parameters'     => array(
 				'reason' => array(
 					'type'        => 'string',
