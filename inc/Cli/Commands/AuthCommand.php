@@ -269,6 +269,232 @@ class AuthCommand extends BaseCommand {
 		$this->showConfig( $handler_slug, $provider, $config_fields, $show_secrets );
 	}
 
+	/**
+	 * Manually set a token and account data for a handler.
+	 *
+	 * Bypasses the OAuth browser flow to directly inject credentials.
+	 * Useful for migrating tokens, CI environments, and headless setups.
+	 *
+	 * The account_data JSON must include at minimum an access_token field.
+	 * Additional fields depend on the platform (e.g., user_id, username,
+	 * token_expires_at, refresh_token, person_id, page_id).
+	 *
+	 * ## OPTIONS
+	 *
+	 * <handler_slug>
+	 * : Handler to set token for (e.g., twitter, facebook, linkedin).
+	 *
+	 * --token=<token>
+	 * : The access token to set.
+	 *
+	 * [--refresh-token=<refresh_token>]
+	 * : Refresh token (for OAuth2 providers with refresh support).
+	 *
+	 * [--expires=<timestamp>]
+	 * : Token expiry as Unix timestamp (e.g., 1720000000).
+	 *
+	 * [--user-id=<user_id>]
+	 * : Platform-specific user/person/page ID.
+	 *
+	 * [--username=<username>]
+	 * : Platform-specific username or display name.
+	 *
+	 * [--json=<json>]
+	 * : Full account data as JSON string. Overrides other flags.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Set a token with expiry
+	 *     wp datamachine auth set-token linkedin --token=AQUvlL... --expires=1720000000 --user-id=abc123
+	 *
+	 *     # Set from full JSON (e.g., migrating from another plugin)
+	 *     wp datamachine auth set-token twitter --json='{"access_token":"...", "user_id":"123", "username":"chubes"}'
+	 *
+	 *     # Minimal token set
+	 *     wp datamachine auth set-token reddit --token=eyJhbGciOi...
+	 *
+	 * @subcommand set-token
+	 */
+	public function set_token( array $args, array $assoc_args ): void {
+		if ( empty( $args[0] ) ) {
+			WP_CLI::error( 'Handler slug is required.' );
+			return;
+		}
+
+		$handler_slug = sanitize_text_field( $args[0] );
+
+		if ( ! $this->abilities->providerExists( $handler_slug ) ) {
+			WP_CLI::error( sprintf( 'Auth provider "%s" not found. Use "wp datamachine auth status" to see available providers.', $handler_slug ) );
+			return;
+		}
+
+		// Build account data from flags or JSON.
+		if ( ! empty( $assoc_args['json'] ) ) {
+			$account_data = json_decode( $assoc_args['json'], true );
+			if ( ! is_array( $account_data ) ) {
+				WP_CLI::error( 'Invalid JSON provided via --json flag.' );
+				return;
+			}
+		} else {
+			if ( empty( $assoc_args['token'] ) ) {
+				WP_CLI::error( 'Either --token or --json is required.' );
+				return;
+			}
+
+			$account_data = array(
+				'access_token'     => $assoc_args['token'],
+				'authenticated_at' => time(),
+			);
+
+			if ( ! empty( $assoc_args['refresh-token'] ) ) {
+				$account_data['refresh_token'] = $assoc_args['refresh-token'];
+			}
+
+			if ( ! empty( $assoc_args['expires'] ) ) {
+				$account_data['token_expires_at'] = intval( $assoc_args['expires'] );
+			}
+
+			if ( ! empty( $assoc_args['user-id'] ) ) {
+				$account_data['user_id']   = $assoc_args['user-id'];
+				$account_data['person_id'] = $assoc_args['user-id'];
+			}
+
+			if ( ! empty( $assoc_args['username'] ) ) {
+				$account_data['username'] = $assoc_args['username'];
+				$account_data['name']     = $assoc_args['username'];
+			}
+		}
+
+		$result = $this->abilities->executeSetAuthToken(
+			array(
+				'handler_slug' => $handler_slug,
+				'account_data' => $account_data,
+			)
+		);
+
+		if ( ! empty( $result['success'] ) ) {
+			WP_CLI::success( $result['message'] ?? sprintf( '%s token set.', ucfirst( $handler_slug ) ) );
+
+			$keys = array_keys( $account_data );
+			WP_CLI::log( sprintf( 'Stored fields: %s', implode( ', ', $keys ) ) );
+
+			if ( ! empty( $account_data['token_expires_at'] ) ) {
+				$expires = wp_date( 'Y-m-d H:i:s', intval( $account_data['token_expires_at'] ) );
+				$days    = max( 0, intval( ( intval( $account_data['token_expires_at'] ) - time() ) / DAY_IN_SECONDS ) );
+				WP_CLI::log( sprintf( 'Token expires: %s (%d days)', $expires, $days ) );
+			}
+		} else {
+			WP_CLI::error( $result['error'] ?? 'Failed to set token.' );
+		}
+	}
+
+	/**
+	 * Force a token refresh for an OAuth2 handler.
+	 *
+	 * Triggers the provider's refresh mechanism. Only works for OAuth2
+	 * providers that support token refresh (e.g., LinkedIn, Facebook,
+	 * Threads, Pinterest, Reddit).
+	 *
+	 * ## OPTIONS
+	 *
+	 * <handler_slug>
+	 * : Handler to refresh (e.g., linkedin, facebook, threads).
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine auth refresh linkedin
+	 *
+	 * @subcommand refresh
+	 */
+	public function refresh( array $args, array $assoc_args ): void {
+		$assoc_args;
+		if ( empty( $args[0] ) ) {
+			WP_CLI::error( 'Handler slug is required. Use "wp datamachine auth status" to see available providers.' );
+			return;
+		}
+
+		$handler_slug = sanitize_text_field( $args[0] );
+
+		if ( ! $this->abilities->providerExists( $handler_slug ) ) {
+			WP_CLI::error( sprintf( 'Auth provider "%s" not found.', $handler_slug ) );
+			return;
+		}
+
+		WP_CLI::log( sprintf( 'Refreshing %s token...', ucfirst( $handler_slug ) ) );
+
+		$result = $this->abilities->executeRefreshAuth(
+			array( 'handler_slug' => $handler_slug )
+		);
+
+		if ( ! empty( $result['success'] ) ) {
+			WP_CLI::success( $result['message'] ?? sprintf( '%s token refreshed.', ucfirst( $handler_slug ) ) );
+
+			if ( ! empty( $result['expires_at'] ) ) {
+				WP_CLI::log( sprintf( 'New expiry: %s', $result['expires_at'] ) );
+			}
+		} else {
+			WP_CLI::error( $result['error'] ?? 'Token refresh failed.' );
+		}
+	}
+
+	/**
+	 * Refresh tokens for all authenticated OAuth2 providers.
+	 *
+	 * Iterates over all registered auth providers and attempts to
+	 * refresh tokens for those that are currently authenticated and
+	 * support token refresh.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine auth refresh-all
+	 *
+	 * @subcommand refresh-all
+	 */
+	public function refresh_all( array $args, array $assoc_args ): void {
+		$args;
+		$assoc_args;
+		$providers = $this->abilities->getAllProviders();
+
+		if ( empty( $providers ) ) {
+			WP_CLI::warning( 'No auth providers registered.' );
+			return;
+		}
+
+		$refreshed = 0;
+		$skipped   = 0;
+		$failed    = 0;
+
+		foreach ( $providers as $key => $provider ) {
+			$authenticated = method_exists( $provider, 'is_authenticated' ) && $provider->is_authenticated();
+			$can_refresh   = method_exists( $provider, 'get_valid_access_token' );
+
+			if ( ! $authenticated || ! $can_refresh ) {
+				++$skipped;
+				continue;
+			}
+
+			$result = $this->abilities->executeRefreshAuth( array( 'handler_slug' => $key ) );
+
+			if ( ! empty( $result['success'] ) ) {
+				$expiry_info = ! empty( $result['expires_at'] ) ? " (expires: {$result['expires_at']})" : '';
+				WP_CLI::log( sprintf( '  %s: refreshed%s', $key, $expiry_info ) );
+				++$refreshed;
+			} else {
+				WP_CLI::log( sprintf( '  %s: FAILED — %s', $key, $result['error'] ?? 'unknown error' ) );
+				++$failed;
+			}
+		}
+
+		WP_CLI::log( '' );
+		WP_CLI::log( sprintf( 'Refreshed: %d | Skipped: %d | Failed: %d', $refreshed, $skipped, $failed ) );
+
+		if ( $failed > 0 ) {
+			WP_CLI::warning( sprintf( '%d provider(s) failed to refresh.', $failed ) );
+		} else {
+			WP_CLI::success( 'All eligible tokens refreshed.' );
+		}
+	}
+
 	// -------------------------------------------------------------------------
 	// Private helpers
 	// -------------------------------------------------------------------------

@@ -2,9 +2,9 @@
 /**
  * REST API Authentication Endpoint
  *
- * Provides REST API access to OAuth and authentication operations.
- * Delegates to AuthAbilities for core logic.
- * Requires WordPress manage_options capability.
+ * Thin REST transport layer for authentication operations.
+ * All business logic lives in AuthAbilities — this file only handles
+ * HTTP concerns (route registration, request parsing, response formatting).
  *
  * @package DataMachine\Api
  */
@@ -41,6 +41,7 @@ class Auth {
 	 * Register /datamachine/v1/auth endpoints
 	 */
 	public static function register_routes() {
+		// List all providers.
 		register_rest_route(
 			'datamachine/v1',
 			'/auth/providers',
@@ -51,6 +52,7 @@ class Auth {
 			)
 		);
 
+		// Disconnect (DELETE) and save config (PUT) for a handler.
 		register_rest_route(
 			'datamachine/v1',
 			'/auth/(?P<handler_slug>[a-zA-Z0-9_\-]+)',
@@ -59,31 +61,18 @@ class Auth {
 					'methods'             => WP_REST_Server::DELETABLE,
 					'callback'            => array( self::class, 'handle_disconnect_account' ),
 					'permission_callback' => array( self::class, 'check_permission' ),
-					'args'                => array(
-						'handler_slug' => array(
-							'required'          => true,
-							'type'              => 'string',
-							'sanitize_callback' => 'sanitize_text_field',
-							'description'       => __( 'Handler identifier (e.g., twitter, facebook)', 'data-machine' ),
-						),
-					),
+					'args'                => self::handler_slug_args(),
 				),
 				array(
 					'methods'             => 'PUT',
 					'callback'            => array( self::class, 'handle_save_auth_config' ),
 					'permission_callback' => array( self::class, 'check_permission' ),
-					'args'                => array(
-						'handler_slug' => array(
-							'required'          => true,
-							'type'              => 'string',
-							'sanitize_callback' => 'sanitize_text_field',
-							'description'       => __( 'Handler identifier', 'data-machine' ),
-						),
-					),
+					'args'                => self::handler_slug_args(),
 				),
 			)
 		);
 
+		// Get auth status for a handler.
 		register_rest_route(
 			'datamachine/v1',
 			'/auth/(?P<handler_slug>[a-zA-Z0-9_\-]+)/status',
@@ -91,20 +80,37 @@ class Auth {
 				'methods'             => 'GET',
 				'callback'            => array( self::class, 'handle_check_oauth_status' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
-				'args'                => array(
-					'handler_slug' => array(
-						'required'          => true,
-						'type'              => 'string',
-						'sanitize_callback' => 'sanitize_text_field',
-						'description'       => __( 'Handler identifier', 'data-machine' ),
-					),
-				),
+				'args'                => self::handler_slug_args(),
+			)
+		);
+
+		// Set token manually.
+		register_rest_route(
+			'datamachine/v1',
+			'/auth/(?P<handler_slug>[a-zA-Z0-9_\-]+)/token',
+			array(
+				'methods'             => 'PUT',
+				'callback'            => array( self::class, 'handle_set_token' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => self::handler_slug_args(),
+			)
+		);
+
+		// Force token refresh.
+		register_rest_route(
+			'datamachine/v1',
+			'/auth/(?P<handler_slug>[a-zA-Z0-9_\-]+)/refresh',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( self::class, 'handle_refresh' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => self::handler_slug_args(),
 			)
 		);
 	}
 
 	/**
-	 * Check if user has permission to manage authentication
+	 * Check if user has permission to manage authentication.
 	 */
 	public static function check_permission( $request ) {
 		$request;
@@ -120,44 +126,37 @@ class Auth {
 	}
 
 	/**
-	 * Handle account disconnection request
+	 * List all registered auth providers.
 	 *
-	 * DELETE /datamachine/v1/auth/{handler_slug}
+	 * GET /datamachine/v1/auth/providers
 	 */
-	public static function handle_disconnect_account( $request ) {
-		$handler_slug = sanitize_text_field( $request->get_param( 'handler_slug' ) );
-
-		$result = self::getAbilities()->executeDisconnectAuth(
-			array( 'handler_slug' => $handler_slug )
-		);
-
-		if ( ! $result['success'] ) {
-			$status = 400;
-			if ( false !== strpos( $result['error'] ?? '', 'not found' ) ) {
-				$status = 404;
-			} elseif ( false !== strpos( $result['error'] ?? '', 'Failed to disconnect' ) ||
-						false !== strpos( $result['error'] ?? '', 'does not support' ) ) {
-				$status = 500;
-			}
-
-			return new \WP_Error(
-				'disconnect_auth_error',
-				$result['error'],
-				array( 'status' => $status )
-			);
-		}
+	public static function handle_list_providers( $request ) {
+		$request;
+		$result = self::getAbilities()->executeListProviders( array() );
 
 		return rest_ensure_response(
 			array(
 				'success' => true,
-				'data'    => null,
-				'message' => $result['message'],
+				'data'    => $result['providers'] ?? array(),
 			)
 		);
 	}
 
 	/**
-	 * Handle OAuth status check request
+	 * Handle account disconnection request.
+	 *
+	 * DELETE /datamachine/v1/auth/{handler_slug}
+	 */
+	public static function handle_disconnect_account( $request ) {
+		$result = self::getAbilities()->executeDisconnectAuth(
+			array( 'handler_slug' => sanitize_text_field( $request->get_param( 'handler_slug' ) ) )
+		);
+
+		return self::ability_to_response( $result, 'disconnect_auth_error' );
+	}
+
+	/**
+	 * Handle OAuth status check request.
 	 *
 	 * GET /datamachine/v1/auth/{handler_slug}/status
 	 */
@@ -169,42 +168,16 @@ class Auth {
 		);
 
 		if ( ! $result['success'] ) {
-			$status = 400;
-			if ( false !== strpos( $result['error'] ?? '', 'not found' ) ) {
-				$status = 404;
-			} elseif ( false !== strpos( $result['error'] ?? '', 'generation' ) ) {
-				$status = 500;
+			return self::ability_to_response( $result, 'get_auth_status_error' );
+		}
+
+		// Pass through relevant fields from the ability result.
+		$data = array( 'handler_slug' => $result['handler_slug'] ?? $handler_slug );
+
+		foreach ( array( 'authenticated', 'requires_auth', 'message', 'oauth_url', 'instructions' ) as $key ) {
+			if ( isset( $result[ $key ] ) ) {
+				$data[ $key ] = $result[ $key ];
 			}
-
-			return new \WP_Error(
-				'get_auth_status_error',
-				$result['error'],
-				array( 'status' => $status )
-			);
-		}
-
-		$data = array(
-			'handler_slug' => $result['handler_slug'] ?? $handler_slug,
-		);
-
-		if ( isset( $result['authenticated'] ) ) {
-			$data['authenticated'] = $result['authenticated'];
-		}
-
-		if ( isset( $result['requires_auth'] ) ) {
-			$data['requires_auth'] = $result['requires_auth'];
-		}
-
-		if ( isset( $result['message'] ) ) {
-			$data['message'] = $result['message'];
-		}
-
-		if ( isset( $result['oauth_url'] ) ) {
-			$data['oauth_url'] = $result['oauth_url'];
-		}
-
-		if ( isset( $result['instructions'] ) ) {
-			$data['instructions'] = $result['instructions'];
 		}
 
 		return rest_ensure_response(
@@ -216,14 +189,13 @@ class Auth {
 	}
 
 	/**
-	 * Handle auth configuration save request
+	 * Handle auth configuration save request.
 	 *
 	 * PUT /datamachine/v1/auth/{handler_slug}
 	 */
 	public static function handle_save_auth_config( $request ) {
 		$handler_slug   = sanitize_text_field( $request->get_param( 'handler_slug' ) );
 		$request_params = $request->get_params();
-
 		unset( $request_params['handler_slug'] );
 
 		$result = self::getAbilities()->executeSaveAuthConfig(
@@ -233,99 +205,89 @@ class Auth {
 			)
 		);
 
-		if ( ! $result['success'] ) {
-			$status = 400;
-			if ( false !== strpos( $result['error'] ?? '', 'not found' ) ) {
-				$status = 404;
-			} elseif ( false !== strpos( $result['error'] ?? '', 'Failed to save' ) ||
-						false !== strpos( $result['error'] ?? '', 'Could not retrieve' ) ) {
-				$status = 500;
-			}
+		return self::ability_to_response( $result, 'save_auth_config_error' );
+	}
 
-			return new \WP_Error(
-				'save_auth_config_error',
-				$result['error'],
-				array( 'status' => $status )
-			);
-		}
+	/**
+	 * Handle manual token injection.
+	 *
+	 * PUT /datamachine/v1/auth/{handler_slug}/token
+	 */
+	public static function handle_set_token( $request ) {
+		$handler_slug = sanitize_text_field( $request->get_param( 'handler_slug' ) );
+		$body         = $request->get_json_params();
 
-		return rest_ensure_response(
+		$result = self::getAbilities()->executeSetAuthToken(
 			array(
-				'success' => true,
-				'data'    => null,
-				'message' => $result['message'],
+				'handler_slug' => $handler_slug,
+				'account_data' => $body,
 			)
+		);
+
+		return self::ability_to_response( $result, 'set_auth_token_error' );
+	}
+
+	/**
+	 * Handle forced token refresh.
+	 *
+	 * POST /datamachine/v1/auth/{handler_slug}/refresh
+	 */
+	public static function handle_refresh( $request ) {
+		$handler_slug = sanitize_text_field( $request->get_param( 'handler_slug' ) );
+
+		$result = self::getAbilities()->executeRefreshAuth(
+			array( 'handler_slug' => $handler_slug )
+		);
+
+		return self::ability_to_response( $result, 'refresh_auth_error' );
+	}
+
+	// -------------------------------------------------------------------------
+	// Shared helpers
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Common handler_slug route args definition.
+	 *
+	 * @return array Route args.
+	 */
+	private static function handler_slug_args(): array {
+		return array(
+			'handler_slug' => array(
+				'required'          => true,
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+				'description'       => __( 'Handler identifier (e.g., twitter, facebook, linkedin)', 'data-machine' ),
+			),
 		);
 	}
 
 	/**
-	 * List all registered auth providers with status and configuration.
+	 * Convert an ability result to a REST response.
 	 *
-	 * GET /datamachine/v1/auth/providers
+	 * Success results are returned as 200 with the ability's data.
+	 * Failure results are returned as WP_Error with an inferred HTTP status.
 	 *
-	 * Returns each provider with its type (oauth2, oauth1, simple),
-	 * authentication status, config fields, callback URL, and connected
-	 * account details — everything the Settings UI needs.
-	 *
-	 * @since 0.44.1
-	 * @param \WP_REST_Request $request Request object.
-	 * @return \WP_REST_Response Provider list.
+	 * @param array  $result     Ability result array.
+	 * @param string $error_code WP_Error code for failures.
+	 * @return \WP_REST_Response|\WP_Error
 	 */
-	public static function handle_list_providers( $request ) {
-		$request;
-		$abilities = self::getAbilities();
-		$providers = $abilities->getAllProviders();
-
-		$data = array();
-
-		foreach ( $providers as $provider_key => $instance ) {
-			$auth_type = 'simple';
-			if ( $instance instanceof \DataMachine\Core\OAuth\BaseOAuth2Provider ) {
-				$auth_type = 'oauth2';
-			} elseif ( $instance instanceof \DataMachine\Core\OAuth\BaseOAuth1Provider ) {
-				$auth_type = 'oauth1';
-			}
-
-			$is_authenticated = false;
-			if ( method_exists( $instance, 'is_authenticated' ) ) {
-				$is_authenticated = $instance->is_authenticated();
-			}
-
-			$entry = array(
-				'provider_key'     => $provider_key,
-				'label'            => ucfirst( str_replace( '_', ' ', $provider_key ) ),
-				'auth_type'        => $auth_type,
-				'is_configured'    => method_exists( $instance, 'is_configured' ) ? $instance->is_configured() : false,
-				'is_authenticated' => $is_authenticated,
-				'auth_fields'      => method_exists( $instance, 'get_config_fields' ) ? $instance->get_config_fields() : array(),
-				'callback_url'     => null,
-				'account_details'  => null,
-			);
-
-			if ( in_array( $auth_type, array( 'oauth1', 'oauth2' ), true ) && method_exists( $instance, 'get_callback_url' ) ) {
-				$entry['callback_url'] = $instance->get_callback_url();
-			}
-
-			if ( $is_authenticated && method_exists( $instance, 'get_account_details' ) ) {
-				$entry['account_details'] = $instance->get_account_details();
-			}
-
-			$data[] = $entry;
+	private static function ability_to_response( array $result, string $error_code ) {
+		if ( ! empty( $result['success'] ) ) {
+			return rest_ensure_response( $result );
 		}
 
-		// Sort: authenticated first, then alphabetically by label.
-		usort( $data, function ( $a, $b ) {
-			if ( $a['is_authenticated'] !== $b['is_authenticated'] ) {
-				return $a['is_authenticated'] ? -1 : 1;
-			}
-			return strcasecmp( $a['label'], $b['label'] );
-		} );
+		$error   = $result['error'] ?? 'Unknown error';
+		$status  = 400;
 
-		return rest_ensure_response(
-			array(
-				'success' => true,
-				'data'    => $data,
-			)
-		);
+		if ( str_contains( $error, 'not found' ) ) {
+			$status = 404;
+		} elseif ( str_contains( $error, 'not authenticated' ) || str_contains( $error, 'not currently authenticated' ) ) {
+			$status = 409;
+		} elseif ( str_contains( $error, 'Failed' ) || str_contains( $error, 'Could not' ) ) {
+			$status = 500;
+		}
+
+		return new \WP_Error( $error_code, $error, array( 'status' => $status ) );
 	}
 }
