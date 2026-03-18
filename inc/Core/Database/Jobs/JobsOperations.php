@@ -314,17 +314,20 @@ class JobsOperations extends BaseRepository {
 		// Build the full query
 		// Note: orderby is validated above, so safe to interpolate
 		// For direct execution jobs, LEFT JOINs will return NULL for pipeline_name/flow_name
+		// JOIN uses j.pipeline_id (varchar) directly against CAST of p.pipeline_id (int) to varchar
+		// for index-friendly matching on the jobs table side.
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 		$query = $this->wpdb->prepare(
-			"SELECT j.*, p.pipeline_name, f.flow_name
+			"SELECT j.*, p.pipeline_name, f.flow_name,
+                 (SELECT COUNT(*) FROM %i c WHERE c.parent_job_id = j.job_id) AS child_count
              FROM %i j
-             LEFT JOIN %i p ON j.pipeline_id = CAST(p.pipeline_id AS CHAR)
-             LEFT JOIN %i f ON j.flow_id = CAST(f.flow_id AS CHAR)
+             LEFT JOIN %i p ON j.pipeline_id = p.pipeline_id
+             LEFT JOIN %i f ON j.flow_id = f.flow_id
              {$where_sql}
              ORDER BY {$orderby} {$order}
              LIMIT %d OFFSET %d",
 			array_merge(
-				array( $this->table_name, $pipelines_table, $flows_table ),
+				array( $this->table_name, $this->table_name, $pipelines_table, $flows_table ),
 				$where_values,
 				array( $per_page, $offset )
 			)
