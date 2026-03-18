@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.17.1] - 2026-03-18
+
+### Changed
+- skip full post hydration for single-day events in pagination
+
 ## [0.17.0] - 2026-03-18
 
 ### Added
