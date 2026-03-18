@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.45.0] - 2026-03-18
+
+### Added
+- add audit subcommand and enhanced clear filters to processed-items CLI
+- display batch parent/child relationships on Jobs page
+
+### Fixed
+- dedup was permanently discarding items cut by max_items cap
+- system task status showing stale failure + add auth providers settings tab
+
 ## [0.44.1] - 2026-03-17
 
 ### Fixed
