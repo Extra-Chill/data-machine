@@ -45,9 +45,15 @@ const formatStatus = ( status ) => {
 };
 
 /**
- * Determine if a job is a batch parent from engine_data.
+ * Determine if a job has child jobs (batch parent or any parent).
+ * Uses child_count from the DB query, falls back to engine_data batch flag.
  */
-const isBatchParent = ( job ) => {
+const hasChildren = ( job ) => {
+	// Prefer the child_count from the SQL subquery (most reliable).
+	if ( job.child_count !== undefined && parseInt( job.child_count, 10 ) > 0 ) {
+		return true;
+	}
+	// Fallback: check engine_data for batch flag.
 	if ( ! job.engine_data ) {
 		return false;
 	}
@@ -207,7 +213,7 @@ const ChildRows = ( { parentJobId } ) => {
  * Single job row — handles expand/collapse for batch parents.
  */
 const JobRow = ( { job, isExpanded, onToggle } ) => {
-	const isBatch = isBatchParent( job );
+	const isBatch = hasChildren( job );
 
 	return (
 		<>
