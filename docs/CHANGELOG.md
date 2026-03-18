@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.48.0] - 2026-03-18
+
+### Fixed
+- create-flow scheduling race — AS action was never registered
+
 ## [0.47.0] - 2026-03-18
 
 ### Added
