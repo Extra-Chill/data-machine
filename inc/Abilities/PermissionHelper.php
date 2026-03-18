@@ -60,6 +60,32 @@ class PermissionHelper {
 	private static int $authenticated_user_id = 0;
 
 	/**
+	 * Acting agent ID when authenticated via agent bearer token.
+	 *
+	 * @since 0.47.0
+	 * @var int|null
+	 */
+	private static ?int $acting_agent_id = null;
+
+	/**
+	 * Owner user ID for the acting agent.
+	 *
+	 * @since 0.47.0
+	 * @var int
+	 */
+	private static int $agent_owner_id = 0;
+
+	/**
+	 * Capability restrictions from the agent's bearer token.
+	 * Null means unrestricted (all agent capabilities apply).
+	 * Array means only these DM capabilities are allowed for this token.
+	 *
+	 * @since 0.47.0
+	 * @var array|null
+	 */
+	private static ?array $agent_token_capabilities = null;
+
+	/**
 	 * Check if current context has admin-level permissions.
 	 *
 	 * Allows execution in:
@@ -97,6 +123,11 @@ class PermissionHelper {
 			return true;
 		}
 
+		// Agent context: token-based authentication with capability ceiling.
+		if ( null !== self::$acting_agent_id ) {
+			return self::agent_can( $action );
+		}
+
 		// Pre-authenticated context: evaluate acting user if provided.
 		if ( self::$authenticated_context ) {
 			if ( self::$authenticated_user_id > 0 ) {
@@ -121,6 +152,11 @@ class PermissionHelper {
 	 * @return int
 	 */
 	public static function acting_user_id(): int {
+		// Agent context: return the owner's user ID.
+		if ( null !== self::$acting_agent_id && self::$agent_owner_id > 0 ) {
+			return self::$agent_owner_id;
+		}
+
 		if ( self::$authenticated_context && self::$authenticated_user_id > 0 ) {
 			return self::$authenticated_user_id;
 		}
@@ -175,6 +211,92 @@ class PermissionHelper {
 	 */
 	public static function is_authenticated_context(): bool {
 		return self::$authenticated_context;
+	}
+
+	/**
+	 * Set agent execution context.
+	 *
+	 * Called by AgentAuthMiddleware after resolving a bearer token.
+	 * Sets the acting agent identity and optional capability restrictions.
+	 *
+	 * @since 0.47.0
+	 *
+	 * @param int        $agent_id     Agent ID.
+	 * @param int        $owner_id     Agent owner's WordPress user ID.
+	 * @param array|null $capabilities Token capability restrictions (null = unrestricted).
+	 */
+	public static function set_agent_context( int $agent_id, int $owner_id, ?array $capabilities = null ): void {
+		self::$acting_agent_id          = $agent_id;
+		self::$agent_owner_id           = $owner_id;
+		self::$agent_token_capabilities = $capabilities;
+	}
+
+	/**
+	 * Clear agent execution context.
+	 *
+	 * @since 0.47.0
+	 */
+	public static function clear_agent_context(): void {
+		self::$acting_agent_id          = null;
+		self::$agent_owner_id           = 0;
+		self::$agent_token_capabilities = null;
+	}
+
+	/**
+	 * Get the acting agent ID, if in agent context.
+	 *
+	 * @since 0.47.0
+	 *
+	 * @return int|null Agent ID or null if not in agent context.
+	 */
+	public static function get_acting_agent_id(): ?int {
+		return self::$acting_agent_id;
+	}
+
+	/**
+	 * Check if currently executing in an agent context.
+	 *
+	 * @since 0.47.0
+	 *
+	 * @return bool True if a bearer token resolved to an agent.
+	 */
+	public static function in_agent_context(): bool {
+		return null !== self::$acting_agent_id;
+	}
+
+	/**
+	 * Check if an agent can perform an action.
+	 *
+	 * Enforces the capability ceiling:
+	 * 1. If token has capability restrictions, check the action is in the allowed list
+	 * 2. Check the owner's WordPress capabilities (the ceiling — agent can never exceed)
+	 *
+	 * @since 0.47.0
+	 *
+	 * @param string $action Action key.
+	 * @return bool
+	 */
+	private static function agent_can( string $action ): bool {
+		// Check token-level capability restrictions.
+		if ( null !== self::$agent_token_capabilities ) {
+			$mapped_capability = self::CAPABILITY_MAP[ $action ] ?? null;
+
+			if ( empty( $mapped_capability ) ) {
+				return false;
+			}
+
+			// Token must explicitly include this capability.
+			if ( ! in_array( $mapped_capability, self::$agent_token_capabilities, true ) ) {
+				return false;
+			}
+		}
+
+		// Ceiling check: owner must have this WordPress capability.
+		if ( self::$agent_owner_id > 0 ) {
+			return self::user_can( self::$agent_owner_id, $action );
+		}
+
+		return false;
 	}
 
 	/**
