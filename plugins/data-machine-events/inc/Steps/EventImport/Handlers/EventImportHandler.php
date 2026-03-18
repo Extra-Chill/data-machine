@@ -50,6 +50,21 @@ abstract class EventImportHandler extends FetchHandler {
 		parent::__construct( $handler_type );
 	}
 
+	/**
+	 * Event import handlers default to unlimited items per run.
+	 *
+	 * Structured event scrapers produce clean, deduped data that is
+	 * cheap to process. The base FetchHandler default of 1 is too
+	 * conservative for event import — it causes most fetched events
+	 * to be discarded after dedup. Individual flows can still set
+	 * max_items in their handler config to override.
+	 *
+	 * @return int 0 = unlimited.
+	 */
+	protected function getDefaultMaxItems(): int {
+		return 0;
+	}
+
 	protected function sanitizeText( string $text ): string {
 		return sanitize_text_field( trim( $text ) );
 	}
