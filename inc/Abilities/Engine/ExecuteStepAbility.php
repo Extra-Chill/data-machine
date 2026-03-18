@@ -102,6 +102,13 @@ class ExecuteStepAbility {
 		$job_id       = (int) ( $input['job_id'] ?? 0 );
 		$flow_step_id = (string) ( $input['flow_step_id'] ?? '' );
 
+		// Transition job to 'processing' now that Action Scheduler is actually
+		// executing it. For parent jobs this is a no-op (already processing via
+		// RunFlowAbility). For batch child jobs this is the real transition from
+		// 'pending' → 'processing', ensuring recover-stuck only catches jobs
+		// that genuinely started but never finished.
+		$this->db_jobs->start_job( $job_id );
+
 		try {
 			$engine_snapshot = datamachine_get_engine_data( $job_id );
 			$engine          = new EngineData( $engine_snapshot, $job_id );

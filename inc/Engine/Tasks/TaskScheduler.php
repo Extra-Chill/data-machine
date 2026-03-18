@@ -99,8 +99,9 @@ class TaskScheduler {
 			'scheduled_at' => current_time( 'mysql' ),
 		) ) );
 
-		// Mark job as processing.
-		$jobs_db->start_job( (int) $job_id, JobStatus::PROCESSING );
+		// Job stays 'pending' until Action Scheduler fires handleTask().
+		// The transition to 'processing' happens there, so recover-stuck
+		// only catches jobs that genuinely started but never finished.
 
 		// Schedule Action Scheduler action.
 		if ( function_exists( 'as_schedule_single_action' ) ) {
@@ -448,7 +449,11 @@ class TaskScheduler {
 	 */
 	public static function handleTask( int $jobId ): void {
 		$jobs_db = new Jobs();
-		$job     = $jobs_db->get_job( $jobId );
+
+		// Transition from 'pending' → 'processing' now that AS is running this.
+		$jobs_db->start_job( $jobId, JobStatus::PROCESSING );
+
+		$job = $jobs_db->get_job( $jobId );
 
 		if ( ! $job ) {
 			do_action(
