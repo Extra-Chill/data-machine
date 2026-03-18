@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.46.0] - 2026-03-18
+
+### Added
+- add getDefaultMaxItems() override point for subclass handlers
+
 ## [0.45.0] - 2026-03-18
 
 ### Added
