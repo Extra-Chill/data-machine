@@ -2,6 +2,18 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.49.0] - 2026-03-19
+
+### Added
+- Enriched SITE.md with site structure, roles, plugin descriptions, and REST namespaces (#872)
+- Consolidated SiteContext into SITE.md with auto-refresh (#871)
+- Network-scoped USER.md and NETWORK.md for multisite (#816, #873)
+- Capture token usage from AI providers (#849)
+
+### Fixed
+- Action Scheduler async dispatch never fired from cron/CLI contexts — 623x throughput improvement
+- Jobs page: replaced Source column with Pipeline, Flow, and Label columns
+
 ## [0.48.0] - 2026-03-18
 
 ### Fixed
