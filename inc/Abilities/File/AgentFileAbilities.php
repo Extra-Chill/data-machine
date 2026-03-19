@@ -626,7 +626,7 @@ class AgentFileAbilities {
 	 * Resolve a layer identifier to its directory path.
 	 *
 	 * @param DirectoryManager $dm        Directory manager instance.
-	 * @param string           $layer     Layer identifier ('shared', 'agent', 'user').
+	 * @param string           $layer     Layer identifier ('shared', 'agent', 'user', 'network').
 	 * @param int              $user_id   Effective user ID.
 	 * @param int              $agent_id  Agent ID.
 	 * @return string Directory path.
@@ -637,6 +637,8 @@ class AgentFileAbilities {
 				return $dm->get_shared_directory();
 			case MemoryFileRegistry::LAYER_USER:
 				return $dm->get_user_directory( $user_id );
+			case MemoryFileRegistry::LAYER_NETWORK:
+				return $dm->get_network_directory();
 			case MemoryFileRegistry::LAYER_AGENT:
 			default:
 				return $dm->resolve_agent_directory( array(

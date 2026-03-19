@@ -4,7 +4,7 @@
  *
  * Loads memory files from the MemoryFileRegistry and injects them into
  * every AI call. Files are resolved to their layer directories:
- *   shared → agents/{slug} → users/{id}
+ *   shared → agents/{slug} → users/{id} → network/
  *
  * The registry is the single source of truth for which files exist,
  * what layer they belong to, and what order they load in.
@@ -51,12 +51,13 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 
 		// Resolve layer directories once.
 		$layer_dirs = array(
-			MemoryFileRegistry::LAYER_SHARED => $directory_manager->get_shared_directory(),
-			MemoryFileRegistry::LAYER_AGENT  => $directory_manager->resolve_agent_directory( array(
+			MemoryFileRegistry::LAYER_SHARED  => $directory_manager->get_shared_directory(),
+			MemoryFileRegistry::LAYER_AGENT   => $directory_manager->resolve_agent_directory( array(
 				'agent_id' => (int) ( $payload['agent_id'] ?? 0 ),
 				'user_id'  => $user_id,
 			) ),
-			MemoryFileRegistry::LAYER_USER   => $directory_manager->get_user_directory( $user_id ),
+			MemoryFileRegistry::LAYER_USER    => $directory_manager->get_user_directory( $user_id ),
+			MemoryFileRegistry::LAYER_NETWORK => $directory_manager->get_network_directory(),
 		);
 
 		$outputs = array();

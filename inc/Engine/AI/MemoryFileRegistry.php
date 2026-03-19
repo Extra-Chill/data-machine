@@ -25,9 +25,10 @@ class MemoryFileRegistry {
 	/**
 	 * Valid layer identifiers.
 	 */
-	const LAYER_SHARED = 'shared';
-	const LAYER_AGENT  = 'agent';
-	const LAYER_USER   = 'user';
+	const LAYER_SHARED  = 'shared';
+	const LAYER_AGENT   = 'agent';
+	const LAYER_USER    = 'user';
+	const LAYER_NETWORK = 'network';
 
 	/**
 	 * Registered memory files.
@@ -53,7 +54,7 @@ class MemoryFileRegistry {
 	 * @param array     $args     {
 	 *     Optional. Registration arguments.
 	 *
-	 *     @type string $layer       One of 'shared', 'agent', 'user'. Default 'agent'.
+	 *     @type string $layer       One of 'shared', 'agent', 'user', 'network'. Default 'agent'.
 	 *     @type bool   $protected   Whether the file is protected from deletion. Default false.
 	 *     @type string $label       Human-readable display label. Default derived from filename.
 	 *     @type string $description Optional description of the file's purpose.
@@ -68,7 +69,7 @@ class MemoryFileRegistry {
 		}
 
 		$layer = $args['layer'] ?? self::LAYER_AGENT;
-		if ( ! in_array( $layer, array( self::LAYER_SHARED, self::LAYER_AGENT, self::LAYER_USER ), true ) ) {
+		if ( ! in_array( $layer, array( self::LAYER_SHARED, self::LAYER_AGENT, self::LAYER_USER, self::LAYER_NETWORK ), true ) ) {
 			$layer = self::LAYER_AGENT;
 		}
 

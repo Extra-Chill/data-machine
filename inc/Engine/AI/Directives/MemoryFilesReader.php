@@ -52,12 +52,13 @@ class MemoryFilesReader {
 
 		// Resolve all layer directories once.
 		$layer_dirs = array(
-			MemoryFileRegistry::LAYER_SHARED => $directory_manager->get_shared_directory(),
-			MemoryFileRegistry::LAYER_AGENT  => $directory_manager->resolve_agent_directory( array(
+			MemoryFileRegistry::LAYER_SHARED  => $directory_manager->get_shared_directory(),
+			MemoryFileRegistry::LAYER_AGENT   => $directory_manager->resolve_agent_directory( array(
 				'agent_id' => $agent_id,
 				'user_id'  => $user_id,
 			) ),
-			MemoryFileRegistry::LAYER_USER   => $directory_manager->get_user_directory( $user_id ),
+			MemoryFileRegistry::LAYER_USER    => $directory_manager->get_user_directory( $user_id ),
+			MemoryFileRegistry::LAYER_NETWORK => $directory_manager->get_network_directory(),
 		);
 
 		$outputs = array();
