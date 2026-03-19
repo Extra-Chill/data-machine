@@ -176,6 +176,24 @@ class ChatOrchestrator {
 			'has_pending_tools' => ! $is_completed,
 		);
 
+		// Accumulate token usage across turns in session metadata.
+		$turn_usage = $result['usage'] ?? array();
+		if ( ! empty( $turn_usage ) && ( $turn_usage['total_tokens'] ?? 0 ) > 0 ) {
+			$existing_session  = $chat_db->get_session( $session_id );
+			$existing_metadata = ! empty( $existing_session['metadata'] ) ? json_decode( $existing_session['metadata'], true ) : array();
+			$existing_usage    = $existing_metadata['token_usage'] ?? array(
+				'prompt_tokens'     => 0,
+				'completion_tokens' => 0,
+				'total_tokens'      => 0,
+			);
+
+			$metadata['token_usage'] = array(
+				'prompt_tokens'     => (int) $existing_usage['prompt_tokens'] + (int) ( $turn_usage['prompt_tokens'] ?? 0 ),
+				'completion_tokens' => (int) $existing_usage['completion_tokens'] + (int) ( $turn_usage['completion_tokens'] ?? 0 ),
+				'total_tokens'      => (int) $existing_usage['total_tokens'] + (int) ( $turn_usage['total_tokens'] ?? 0 ),
+			);
+		}
+
 		if ( $selected_pipeline_id ) {
 			$metadata['selected_pipeline_id'] = $selected_pipeline_id;
 		}
@@ -312,6 +330,21 @@ class ChatOrchestrator {
 			'has_pending_tools' => ! $is_completed,
 		);
 
+		// Accumulate token usage across continuation turns.
+		$turn_usage     = $result['usage'] ?? array();
+		$existing_usage = $metadata['token_usage'] ?? array(
+			'prompt_tokens'     => 0,
+			'completion_tokens' => 0,
+			'total_tokens'      => 0,
+		);
+		if ( ! empty( $turn_usage ) && ( $turn_usage['total_tokens'] ?? 0 ) > 0 ) {
+			$updated_metadata['token_usage'] = array(
+				'prompt_tokens'     => (int) $existing_usage['prompt_tokens'] + (int) ( $turn_usage['prompt_tokens'] ?? 0 ),
+				'completion_tokens' => (int) $existing_usage['completion_tokens'] + (int) ( $turn_usage['completion_tokens'] ?? 0 ),
+				'total_tokens'      => (int) $existing_usage['total_tokens'] + (int) ( $turn_usage['total_tokens'] ?? 0 ),
+			);
+		}
+
 		if ( $selected_pipeline_id ) {
 			$updated_metadata['selected_pipeline_id'] = $selected_pipeline_id;
 		}
@@ -400,16 +433,23 @@ class ChatOrchestrator {
 			return $result;
 		}
 
-		// Update session to completed with ping source.
+		// Update session to completed with ping source and token usage.
+		$ping_metadata = array(
+			'status'        => 'completed',
+			'last_activity' => current_time( 'mysql', true ),
+			'message_count' => count( $result['messages'] ),
+			'source'        => 'ping',
+		);
+
+		$ping_usage = $result['usage'] ?? array();
+		if ( ! empty( $ping_usage ) && ( $ping_usage['total_tokens'] ?? 0 ) > 0 ) {
+			$ping_metadata['token_usage'] = $ping_usage;
+		}
+
 		$chat_db->update_session(
 			$session_id,
 			$result['messages'],
-			array(
-				'status'        => 'completed',
-				'last_activity' => current_time( 'mysql', true ),
-				'message_count' => count( $result['messages'] ),
-				'source'        => 'ping',
-			),
+			$ping_metadata,
 			$provider,
 			$model
 		);
@@ -621,6 +661,7 @@ class ChatOrchestrator {
 				'last_tool_calls'   => $loop_result['last_tool_calls'] ?? array(),
 				'warning'           => $loop_result['warning'] ?? null,
 				'max_turns_reached' => $loop_result['max_turns_reached'] ?? false,
+				'usage'             => $loop_result['usage'] ?? array(),
 			);
 		} catch ( \Throwable $e ) {
 			do_action(

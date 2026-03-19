@@ -256,6 +256,15 @@ class AIStep extends Step {
 			return array();
 		}
 
+		// Store token usage in job engine_data (read-then-merge — store_engine_data is a full overwrite).
+		$usage = $loop_result['usage'] ?? array();
+		if ( ! empty( $usage ) && $this->job_id > 0 && ( $usage['total_tokens'] ?? 0 ) > 0 ) {
+			$jobs_db       = new \DataMachine\Core\Database\Jobs\Jobs();
+			$existing_data = $engine_data;
+			$existing_data['token_usage'] = $usage;
+			$jobs_db->store_engine_data( $this->job_id, $existing_data );
+		}
+
 		// Process loop results into data packets
 		return self::processLoopResults( $loop_result, $this->dataPackets, $payload, $available_tools );
 	}
