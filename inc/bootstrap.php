@@ -104,9 +104,10 @@ MemoryFileRegistry::register( 'NETWORK.md', 5, array(
 	'label'       => 'Network Context',
 	'description' => 'WordPress multisite network topology and shared resources.',
 ) );
-// SiteContext is autoloaded (Core\WordPress\SiteContext) — register its cache invalidation hook here.
-add_action( 'init', array( \DataMachine\Core\WordPress\SiteContext::class, 'register_cache_invalidation' ) );
-require_once __DIR__ . '/Engine/AI/Directives/SiteContextDirective.php';
+// SITE.md auto-regeneration — replaces the former SiteContext + SiteContextDirective system.
+// SITE.md is now the single source of truth for site context, auto-refreshing on structural changes.
+add_action( 'init', 'datamachine_register_site_md_invalidation' );
+
 require_once __DIR__ . '/Engine/AI/Directives/DailyMemorySelectorDirective.php';
 require_once __DIR__ . '/Api/Chat/ChatContextDirective.php';
 require_once __DIR__ . '/Api/System/SystemContextDirective.php';

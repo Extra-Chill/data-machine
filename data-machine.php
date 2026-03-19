@@ -500,6 +500,10 @@ function datamachine_activate_for_site() {
 	// Migrate USER.md to network-scoped paths and create NETWORK.md on multisite (idempotent).
 	datamachine_migrate_user_md_to_network_scope();
 
+	// Regenerate SITE.md with enriched content and clean up legacy SiteContext transient.
+	datamachine_regenerate_site_md();
+	delete_transient( 'datamachine_site_context_data' );
+
 	// Clean up legacy per-agent-type log level options (idempotent).
 	foreach ( array( 'pipeline', 'chat', 'system' ) as $legacy_agent_type ) {
 		delete_option( "datamachine_log_level_{$legacy_agent_type}" );

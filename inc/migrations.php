@@ -336,19 +336,28 @@ MD;
 }
 
 /**
- * Build shared SITE.md scaffold content from WordPress site data.
+ * Build shared SITE.md content from WordPress site data.
+ *
+ * This is the single source of truth for site context injected into AI calls.
+ * Replaces the former SiteContext class + SiteContextDirective which injected
+ * a duplicate JSON blob at priority 80. Now SITE.md contains all the same
+ * data in markdown format, injected once via CoreMemoryFilesDirective.
  *
  * @since 0.36.1
+ * @since 0.48.0 Enriched with post counts, taxonomy details, language, timezone.
  * @return string
  */
 function datamachine_get_site_scaffold_content(): string {
 	$site_name        = get_bloginfo( 'name' ) ? get_bloginfo( 'name' ) : 'WordPress Site';
 	$site_description = get_bloginfo( 'description' ) ? get_bloginfo( 'description' ) : '';
 	$site_url         = home_url();
-	$post_types       = get_post_types( array( 'public' => true ), 'names' );
-	$taxonomies       = get_taxonomies( array( 'public' => true ), 'names' );
-	$active_plugins   = get_option( 'active_plugins', array() );
+	$language         = get_locale();
+	$timezone         = wp_timezone_string();
 	$theme_name       = wp_get_theme()->get( 'Name' ) ? wp_get_theme()->get( 'Name' ) : 'Unknown';
+	$permalink        = get_option( 'permalink_structure', '' );
+
+	// --- Active plugins (exclude Data Machine) ---
+	$active_plugins = get_option( 'active_plugins', array() );
 
 	if ( is_multisite() ) {
 		$network_plugins = array_keys( get_site_option( 'active_sitewide_plugins', array() ) );
@@ -373,6 +382,33 @@ function datamachine_get_site_scaffold_content(): string {
 		$plugin_names[] = $plugin_name;
 	}
 
+	// --- Post types with counts ---
+	$post_types      = get_post_types( array( 'public' => true ), 'objects' );
+	$post_type_lines = array();
+	foreach ( $post_types as $pt ) {
+		$count     = wp_count_posts( $pt->name );
+		$published = isset( $count->publish ) ? (int) $count->publish : 0;
+		$hier      = $pt->hierarchical ? 'hierarchical' : 'flat';
+		$post_type_lines[] = sprintf( '| %s | %s | %d | %s |', $pt->label, $pt->name, $published, $hier );
+	}
+
+	// --- Taxonomies with term counts ---
+	$taxonomies     = get_taxonomies( array( 'public' => true ), 'objects' );
+	$taxonomy_lines = array();
+	foreach ( $taxonomies as $tax ) {
+		$term_count = wp_count_terms( array(
+			'taxonomy'   => $tax->name,
+			'hide_empty' => false,
+		) );
+		if ( is_wp_error( $term_count ) ) {
+			$term_count = 0;
+		}
+		$hier           = $tax->hierarchical ? 'hierarchical' : 'flat';
+		$associated      = implode( ', ', $tax->object_type ?? array() );
+		$taxonomy_lines[] = sprintf( '| %s | %s | %d | %s | %s |', $tax->label, $tax->name, (int) $term_count, $hier, $associated );
+	}
+
+	// --- Build SITE.md ---
 	$lines   = array();
 	$lines[] = '# SITE';
 	$lines[] = '';
@@ -383,20 +419,136 @@ function datamachine_get_site_scaffold_content(): string {
 	}
 	$lines[] = '- **url:** ' . $site_url;
 	$lines[] = '- **theme:** ' . $theme_name;
+	$lines[] = '- **language:** ' . $language;
+	$lines[] = '- **timezone:** ' . $timezone;
+	if ( ! empty( $permalink ) ) {
+		$lines[] = '- **permalinks:** ' . $permalink;
+	}
 	$lines[] = '- **multisite:** ' . ( is_multisite() ? 'true' : 'false' );
 	$lines[] = '';
-	$lines[] = '## Content Model';
-	$lines[] = '- **post_types:** ' . implode( ', ', $post_types );
-	$lines[] = '- **taxonomies:** ' . implode( ', ', $taxonomies );
+
+	$lines[] = '## Post Types';
+	$lines[] = '| Label | Slug | Published | Type |';
+	$lines[] = '|-------|------|-----------|------|';
+	foreach ( $post_type_lines as $line ) {
+		$lines[] = $line;
+	}
 	$lines[] = '';
+
+	$lines[] = '## Taxonomies';
+	$lines[] = '| Label | Slug | Terms | Type | Post Types |';
+	$lines[] = '|-------|------|-------|------|------------|';
+	foreach ( $taxonomy_lines as $line ) {
+		$lines[] = $line;
+	}
+	$lines[] = '';
+
 	$lines[] = '## Active Plugins';
 	if ( ! empty( $plugin_names ) ) {
-		$lines[] = '- ' . implode( "\n- ", $plugin_names );
+		foreach ( $plugin_names as $name ) {
+			$lines[] = '- ' . $name;
+		}
 	} else {
 		$lines[] = '- (none)';
 	}
 
 	return implode( "\n", $lines ) . "\n";
+}
+
+/**
+ * Regenerate SITE.md on disk from current WordPress state.
+ *
+ * Called by invalidation hooks when site structure changes (plugins,
+ * themes, post types, taxonomies, options). Debounced via a short-lived
+ * transient to avoid excessive writes during bulk operations.
+ *
+ * Preserves user-added content below the auto-generated section by
+ * looking for a <!-- CUSTOM --> marker.
+ *
+ * @since 0.48.0
+ * @return void
+ */
+function datamachine_regenerate_site_md(): void {
+	// Debounce: skip if we regenerated in the last 60 seconds.
+	if ( get_transient( 'datamachine_site_md_regenerating' ) ) {
+		return;
+	}
+	set_transient( 'datamachine_site_md_regenerating', 1, 60 );
+
+	// Check the setting — if disabled, skip regeneration.
+	if ( ! \DataMachine\Core\PluginSettings::get( 'site_context_enabled', true ) ) {
+		return;
+	}
+
+	$directory_manager = new \DataMachine\Core\FilesRepository\DirectoryManager();
+	$shared_dir        = $directory_manager->get_shared_directory();
+	$site_md_path      = trailingslashit( $shared_dir ) . 'SITE.md';
+
+	$fs = \DataMachine\Core\FilesRepository\FilesystemHelper::get();
+	if ( ! $fs ) {
+		return;
+	}
+
+	// Preserve user-added content below <!-- CUSTOM --> marker.
+	$custom_content = '';
+	if ( file_exists( $site_md_path ) ) {
+		$existing = $fs->get_contents( $site_md_path );
+		$marker   = '<!-- CUSTOM -->';
+		$pos      = strpos( $existing, $marker );
+		if ( false !== $pos ) {
+			$custom_content = substr( $existing, $pos );
+		}
+	}
+
+	$content = datamachine_get_site_scaffold_content();
+
+	if ( ! empty( $custom_content ) ) {
+		$content .= "\n" . $custom_content;
+	}
+
+	if ( ! is_dir( $shared_dir ) ) {
+		wp_mkdir_p( $shared_dir );
+	}
+
+	$fs->put_contents( $site_md_path, $content, FS_CHMOD_FILE );
+	\DataMachine\Core\FilesRepository\FilesystemHelper::make_group_writable( $site_md_path );
+}
+
+/**
+ * Register hooks that trigger SITE.md regeneration on structural changes.
+ *
+ * These are the same hooks that SiteContext used for cache invalidation,
+ * but now they regenerate the actual file on disk. The debounce in
+ * datamachine_regenerate_site_md() prevents excessive writes.
+ *
+ * @since 0.48.0
+ * @return void
+ */
+function datamachine_register_site_md_invalidation(): void {
+	$callback = 'datamachine_regenerate_site_md';
+
+	// Plugin/theme structural changes — always regenerate.
+	add_action( 'switch_theme', $callback );
+	add_action( 'activated_plugin', $callback );
+	add_action( 'deactivated_plugin', $callback );
+
+	// Post lifecycle — updates published counts.
+	add_action( 'save_post', $callback );
+	add_action( 'delete_post', $callback );
+	add_action( 'wp_trash_post', $callback );
+	add_action( 'untrash_post', $callback );
+
+	// Term lifecycle — updates term counts.
+	add_action( 'create_term', $callback );
+	add_action( 'edit_term', $callback );
+	add_action( 'delete_term', $callback );
+
+	// Site identity changes.
+	add_action( 'update_option_blogname', $callback );
+	add_action( 'update_option_blogdescription', $callback );
+	add_action( 'update_option_home', $callback );
+	add_action( 'update_option_siteurl', $callback );
+	add_action( 'update_option_permalink_structure', $callback );
 }
 
 /**

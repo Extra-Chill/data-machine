@@ -1,81 +1,52 @@
 <?php
 /**
- * Site Context Directive - Priority 80 (Lowest Priority)
+ * Site Context Directive — DEPRECATED.
  *
- * Injects WordPress site context information as the final directive in the
- * AI directive system. Provides comprehensive site metadata including
- * posts, taxonomies, users, and configuration. Toggleable via settings.
+ * This directive previously injected a JSON blob of WordPress site metadata
+ * at priority 80. Site context is now provided entirely by SITE.md via the
+ * CoreMemoryFilesDirective at priority 20.
  *
- * Priority Order in Directive System:
- * 1. Priority 10 - Plugin Core Directive
- * 2. Priority 20 - Core Memory Files (SITE.md, RULES.md, SOUL.md, MEMORY.md, USER.md)
- * 3. Priority 40 - Pipeline Memory Files (per-pipeline selectable)
- * 4. Priority 50 - Pipeline System Prompt
- * 5. Priority 60 - Pipeline Context Files
- * 6. Priority 70 - Tool Definitions and Workflow Context
- * 7. Priority 80 - WordPress Site Context (THIS CLASS)
+ * This class remains as a no-op for backward compatibility with code that
+ * references the class name (e.g., datamachine_site_context_directive filter
+ * consumers). It will be removed in a future major version.
+ *
+ * @package DataMachine\Engine\AI\Directives
+ * @since   0.30.0
+ * @deprecated 0.48.0 Site context is now provided by SITE.md. This directive is a no-op.
  */
 
 namespace DataMachine\Engine\AI\Directives;
-
-use DataMachine\Core\PluginSettings;
-use DataMachine\Core\WordPress\SiteContext;
-use DataMachine\Engine\AI\Directives\DirectiveInterface;
 
 defined( 'ABSPATH' ) || exit;
 
 class SiteContextDirective implements DirectiveInterface {
 
+	/**
+	 * Returns empty outputs — site context is now in SITE.md.
+	 *
+	 * @deprecated 0.48.0
+	 *
+	 * @param string      $provider_name AI provider name.
+	 * @param array       $tools         Available tools.
+	 * @param string|null $step_id       Pipeline step ID.
+	 * @param array       $payload       Additional payload data.
+	 * @return array Always returns empty array.
+	 */
 	public static function get_outputs( string $provider_name, array $tools, ?string $step_id = null, array $payload = array() ): array {
-		if ( ! self::is_site_context_enabled() ) {
-			return array();
-		}
-
-		$context_data = SiteContext::get_context();
-		if ( empty( $context_data ) || ! is_array( $context_data ) ) {
-			do_action( 'datamachine_log', 'warning', 'Site Context Directive: Empty context generated' );
-			return array();
-		}
-
-		return array(
-			array(
-				'type'  => 'system_json',
-				'label' => 'WORDPRESS SITE CONTEXT',
-				'data'  => $context_data,
-			),
-		);
+		return array();
 	}
 
 	/**
-	 * Check if site context injection is enabled in plugin settings.
+	 * Check if site context injection is enabled.
 	 *
-	 * @return bool True if enabled, false otherwise
+	 * @deprecated 0.48.0 Use the site_context_enabled setting directly. Controls SITE.md auto-refresh.
+	 * @return bool
 	 */
 	public static function is_site_context_enabled(): bool {
-		return PluginSettings::get( 'site_context_enabled', true );
+		return \DataMachine\Core\PluginSettings::get( 'site_context_enabled', true );
 	}
 }
 
-/**
- * Allow plugins to override the site context directive class.
- * datamachine-multisite uses this to replace single-site context with multisite context.
- *
- * @param string $directive_class The directive class to use for site context
- * @return string The filtered directive class
- */
-$datamachine_site_context_directive = apply_filters( 'datamachine_site_context_directive', SiteContextDirective::class );
-
-// Register the filtered directive for global context (applies to all AI agents - allows replacement by multisite plugin)
-if ( $datamachine_site_context_directive ) {
-	add_filter(
-		'datamachine_directives',
-		function ( $directives ) use ( $datamachine_site_context_directive ) {
-			$directives[] = array(
-				'class'    => $datamachine_site_context_directive,
-				'priority' => 80,
-				'contexts' => array( 'all' ),
-			);
-			return $directives;
-		}
-	);
-}
+// The directive is no longer registered in the directive system.
+// The class exists purely for backward compatibility with code that
+// references it by name (e.g., datamachine_site_context_directive filter).
