@@ -43,6 +43,7 @@ class AIConversationLoop {
 	 *     @type int    $turn_count      Number of turns executed
 	 *     @type bool   $completed       Whether loop finished naturally (no tool calls)
 	 *     @type array  $last_tool_calls Last set of tool calls (if any)
+	 *     @type array  $usage           Accumulated token usage {prompt_tokens, completion_tokens, total_tokens}
 	 * }
 	 */
 	public function execute(
@@ -62,6 +63,13 @@ class AIConversationLoop {
 		$final_content          = '';
 		$last_tool_calls        = array();
 		$tool_execution_results = array();
+
+		// Accumulate token usage across all turns.
+		$total_usage = array(
+			'prompt_tokens'     => 0,
+			'completion_tokens' => 0,
+			'total_tokens'      => 0,
+		);
 
 		// Track which handler tools have been executed for multi-handler support.
 		// In pipeline mode, conversation should only complete when ALL configured
@@ -116,11 +124,20 @@ class AIConversationLoop {
 					'completed'       => false,
 					'last_tool_calls' => array(),
 					'error'           => $ai_response['error'] ?? 'AI request failed',
+					'usage'           => $total_usage,
 				);
 			}
 
 			$tool_calls = $ai_response['data']['tool_calls'] ?? array();
 			$ai_content = $ai_response['data']['content'] ?? '';
+
+			// Accumulate token usage from this turn.
+			$turn_usage = $ai_response['data']['usage'] ?? array();
+			if ( ! empty( $turn_usage ) ) {
+				$total_usage['prompt_tokens']     += (int) ( $turn_usage['prompt_tokens'] ?? 0 );
+				$total_usage['completion_tokens'] += (int) ( $turn_usage['completion_tokens'] ?? 0 );
+				$total_usage['total_tokens']      += (int) ( $turn_usage['total_tokens'] ?? 0 );
+			}
 
 			// Store final content from this turn
 			if ( ! empty( $ai_content ) ) {
@@ -355,6 +372,7 @@ class AIConversationLoop {
 			'last_tool_calls'        => $last_tool_calls,
 			'tool_execution_results' => $tool_execution_results,
 			'has_pending_tools'      => ! empty( $last_tool_calls ) && ! $conversation_complete,
+			'usage'                  => $total_usage,
 		);
 
 		if ( $turn_count >= $max_turns && ! $conversation_complete ) {
