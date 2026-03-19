@@ -27,6 +27,7 @@ use const DataMachineEvents\Core\EVENT_END_DATETIME_META_KEY;
 use const DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY;
 use function DataMachineEvents\Core\datamachine_normalize_ticket_url;
 use function DataMachineEvents\Core\datamachine_extract_ticket_identity;
+use DataMachine\Core\Similarity\SimilarityEngine;
 use DataMachine\Core\Steps\Update\Handlers\UpdateHandler;
 use DataMachine\Core\WordPress\TaxonomyHandler;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
@@ -91,8 +92,6 @@ class EventUpsert extends UpdateHandler {
 			)
 		);
 
-		// Search for existing event
-		$existing_post_id = $this->findExistingEvent( $title, $venue, $startDate, $ticketUrl );
 		$datetime_confidence = $this->getDateTimeConfidence( $parameters, $engine );
 
 		if ( 'none' === $datetime_confidence ) {
@@ -106,6 +105,47 @@ class EventUpsert extends UpdateHandler {
 				)
 			);
 		}
+
+		// Acquire advisory lock to prevent race conditions between concurrent
+		// flows importing the same event. Lock key is derived from the date and
+		// normalized title so that two flows processing "Eggy" at Charleston Pour
+		// House on 2026-03-20 will serialize instead of both creating a new post.
+		$lock_key = $this->acquireUpsertLock( $title, $startDate );
+
+		try {
+			return $this->executeUpsertWithinLock( $title, $venue, $startDate, $ticketUrl, $parameters, $handler_config, $engine );
+		} finally {
+			$this->releaseUpsertLock( $lock_key );
+		}
+	}
+
+	/**
+	 * Execute the find-or-create logic within an advisory lock.
+	 *
+	 * Separated from executeUpdate() so the lock boundary is clear:
+	 * the lock is held from before findExistingEvent() through the
+	 * completion of createEventPost() or updateEventPost().
+	 *
+	 * @param string     $title         Event title.
+	 * @param string     $venue         Venue name.
+	 * @param string     $startDate     Start date.
+	 * @param string     $ticketUrl     Ticket URL.
+	 * @param array      $parameters    Full tool parameters.
+	 * @param array      $handler_config Handler configuration.
+	 * @param EngineData $engine        Engine data.
+	 * @return array Tool call result.
+	 */
+	private function executeUpsertWithinLock(
+		string $title,
+		string $venue,
+		string $startDate,
+		string $ticketUrl,
+		array $parameters,
+		array $handler_config,
+		EngineData $engine
+	): array {
+		// Search for existing event (now serialized per event identity)
+		$existing_post_id = $this->findExistingEvent( $title, $venue, $startDate, $ticketUrl );
 
 		if ( $existing_post_id ) {
 			// Event exists - check if data changed
@@ -183,6 +223,67 @@ class EventUpsert extends UpdateHandler {
 				)
 			);
 		}
+	}
+
+	/**
+	 * Acquire a MySQL advisory lock for an event identity.
+	 *
+	 * Uses GET_LOCK() to serialize concurrent upserts for the same event.
+	 * The lock key is derived from the date and normalized title, so two
+	 * flows importing the same event will queue instead of racing.
+	 *
+	 * MySQL advisory locks are:
+	 * - Per-connection (each PHP-FPM worker has its own connection)
+	 * - Automatically released on connection close (no leak risk)
+	 * - Non-blocking for unrelated events (different lock keys)
+	 *
+	 * @since 0.17.3
+	 * @param string $title     Event title.
+	 * @param string $startDate Event start date.
+	 * @return string The lock key (needed for release).
+	 */
+	private function acquireUpsertLock( string $title, string $startDate ): string {
+		global $wpdb;
+
+		$date_only       = self::extractDateForQuery( $startDate );
+		$normalized      = SimilarityEngine::normalizeTitle( $title );
+		$lock_key        = 'dme_' . md5( $date_only . '|' . $normalized );
+
+		// MySQL lock names are limited to 64 characters; md5 = 36 + prefix = 40, safe.
+		// Timeout of 10 seconds: long enough for upsert to complete, short enough
+		// not to bottleneck the queue. If lock times out, proceed without it
+		// (better to risk a dupe than deadlock the pipeline).
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$result = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 10)', $lock_key ) );
+
+		if ( '1' !== (string) $result ) {
+			do_action(
+				'datamachine_log',
+				'debug',
+				'Event Upsert: Advisory lock timeout, proceeding without lock',
+				array(
+					'lock_key'        => $lock_key,
+					'title'           => $title,
+					'startDate'       => $startDate,
+					'normalized'      => $normalized,
+				)
+			);
+		}
+
+		return $lock_key;
+	}
+
+	/**
+	 * Release a MySQL advisory lock.
+	 *
+	 * @since 0.17.3
+	 * @param string $lock_key The lock key to release.
+	 */
+	private function releaseUpsertLock( string $lock_key ): void {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$wpdb->query( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_key ) );
 	}
 
 	/**
