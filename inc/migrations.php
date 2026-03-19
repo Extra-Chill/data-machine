@@ -344,7 +344,8 @@ MD;
  * data in markdown format, injected once via CoreMemoryFilesDirective.
  *
  * @since 0.36.1
- * @since 0.48.0 Enriched with post counts, taxonomy details, language, timezone.
+ * @since 0.48.0 Enriched with post counts, taxonomy details, language, timezone,
+ *               site structure, user roles, plugin descriptions, REST namespaces.
  * @return string
  */
 function datamachine_get_site_scaffold_content(): string {
@@ -356,7 +357,7 @@ function datamachine_get_site_scaffold_content(): string {
 	$theme_name       = wp_get_theme()->get( 'Name' ) ? wp_get_theme()->get( 'Name' ) : 'Unknown';
 	$permalink        = get_option( 'permalink_structure', '' );
 
-	// --- Active plugins (exclude Data Machine) ---
+	// --- Active plugins with descriptions (exclude Data Machine) ---
 	$active_plugins = get_option( 'active_plugins', array() );
 
 	if ( is_multisite() ) {
@@ -364,22 +365,27 @@ function datamachine_get_site_scaffold_content(): string {
 		$active_plugins  = array_unique( array_merge( $active_plugins, $network_plugins ) );
 	}
 
-	$plugin_names = array();
+	$plugin_entries = array();
 	foreach ( $active_plugins as $plugin_file ) {
 		$plugin_path = WP_PLUGIN_DIR . '/' . $plugin_file;
 		if ( function_exists( 'get_plugin_data' ) && file_exists( $plugin_path ) ) {
 			$plugin_data = get_plugin_data( $plugin_path, false, false );
 			$plugin_name = ! empty( $plugin_data['Name'] ) ? $plugin_data['Name'] : dirname( $plugin_file );
+			$plugin_desc = ! empty( $plugin_data['Description'] ) ? $plugin_data['Description'] : '';
 		} else {
 			$dir         = dirname( $plugin_file );
 			$plugin_name = '.' === $dir ? str_replace( '.php', '', basename( $plugin_file ) ) : $dir;
+			$plugin_desc = '';
 		}
 
 		if ( 'data-machine' === strtolower( (string) $plugin_name ) || 0 === strpos( $plugin_file, 'data-machine/' ) ) {
 			continue;
 		}
 
-		$plugin_names[] = $plugin_name;
+		$plugin_entries[] = array(
+			'name' => $plugin_name,
+			'desc' => $plugin_desc,
+		);
 	}
 
 	// --- Post types with counts ---
@@ -403,9 +409,77 @@ function datamachine_get_site_scaffold_content(): string {
 		if ( is_wp_error( $term_count ) ) {
 			$term_count = 0;
 		}
-		$hier           = $tax->hierarchical ? 'hierarchical' : 'flat';
+		$hier            = $tax->hierarchical ? 'hierarchical' : 'flat';
 		$associated      = implode( ', ', $tax->object_type ?? array() );
 		$taxonomy_lines[] = sprintf( '| %s | %s | %d | %s | %s |', $tax->label, $tax->name, (int) $term_count, $hier, $associated );
+	}
+
+	// --- Key pages ---
+	$key_pages = array();
+
+	$front_page_id = (int) get_option( 'page_on_front', 0 );
+	if ( $front_page_id > 0 ) {
+		$key_pages[] = sprintf( '- **Front page:** %s (ID %d)', get_the_title( $front_page_id ), $front_page_id );
+	}
+
+	$blog_page_id = (int) get_option( 'page_for_posts', 0 );
+	if ( $blog_page_id > 0 ) {
+		$key_pages[] = sprintf( '- **Blog page:** %s (ID %d)', get_the_title( $blog_page_id ), $blog_page_id );
+	}
+
+	$privacy_page_id = (int) get_option( 'wp_page_for_privacy_policy', 0 );
+	if ( $privacy_page_id > 0 ) {
+		$key_pages[] = sprintf( '- **Privacy page:** %s (ID %d)', get_the_title( $privacy_page_id ), $privacy_page_id );
+	}
+
+	$show_on_front = get_option( 'show_on_front', 'posts' );
+	$key_pages[]   = '- **Homepage displays:** ' . ( 'page' === $show_on_front ? 'static page' : 'latest posts' );
+
+	// --- Menus ---
+	$registered_menus = get_registered_nav_menus();
+	$menu_locations   = get_nav_menu_locations();
+	$menu_lines       = array();
+
+	foreach ( $registered_menus as $location => $description ) {
+		$assigned = 'unassigned';
+		if ( ! empty( $menu_locations[ $location ] ) ) {
+			$menu_obj = wp_get_nav_menu_object( $menu_locations[ $location ] );
+			$assigned = $menu_obj ? $menu_obj->name : 'unassigned';
+		}
+		$menu_lines[] = sprintf( '- **%s** (%s): %s', $description, $location, $assigned );
+	}
+
+	// --- User roles ---
+	$wp_roles       = wp_roles();
+	$role_names     = $wp_roles->get_names();
+	$default_roles  = array( 'administrator', 'editor', 'author', 'contributor', 'subscriber' );
+	$custom_roles   = array_diff( array_keys( $role_names ), $default_roles );
+	$role_lines     = array();
+
+	foreach ( $role_names as $slug => $name ) {
+		$user_count   = count( get_users( array( 'role' => $slug, 'fields' => 'ID', 'number' => 1 ) ) );
+		$is_custom    = in_array( $slug, $custom_roles, true ) ? ' (custom)' : '';
+		$role_lines[] = sprintf( '- %s (`%s`)%s', translate_user_role( $name ), $slug, $is_custom );
+	}
+
+	// --- REST API namespaces (custom only) ---
+	$rest_namespaces    = array();
+	$builtin_prefixes   = array( 'wp/', 'oembed/', 'wp-site-health/' );
+
+	if ( function_exists( 'rest_get_server' ) && did_action( 'rest_api_init' ) ) {
+		$routes = rest_get_server()->get_namespaces();
+		foreach ( $routes as $namespace ) {
+			$is_builtin = false;
+			foreach ( $builtin_prefixes as $prefix ) {
+				if ( 0 === strpos( $namespace . '/', $prefix ) || 'wp' === $namespace ) {
+					$is_builtin = true;
+					break;
+				}
+			}
+			if ( ! $is_builtin ) {
+				$rest_namespaces[] = $namespace;
+			}
+		}
 	}
 
 	// --- Build SITE.md ---
@@ -427,6 +501,23 @@ function datamachine_get_site_scaffold_content(): string {
 	$lines[] = '- **multisite:** ' . ( is_multisite() ? 'true' : 'false' );
 	$lines[] = '';
 
+	// --- Site Structure ---
+	$lines[] = '## Site Structure';
+
+	foreach ( $key_pages as $page_line ) {
+		$lines[] = $page_line;
+	}
+	$lines[] = '';
+
+	if ( ! empty( $menu_lines ) ) {
+		$lines[] = '### Menus';
+		foreach ( $menu_lines as $menu_line ) {
+			$lines[] = $menu_line;
+		}
+		$lines[] = '';
+	}
+
+	// --- Content Model ---
 	$lines[] = '## Post Types';
 	$lines[] = '| Label | Slug | Published | Type |';
 	$lines[] = '|-------|------|-----------|------|';
@@ -443,13 +534,39 @@ function datamachine_get_site_scaffold_content(): string {
 	}
 	$lines[] = '';
 
+	// --- User Roles ---
+	if ( ! empty( $custom_roles ) ) {
+		$lines[] = '## User Roles';
+		foreach ( $role_lines as $role_line ) {
+			$lines[] = $role_line;
+		}
+		$lines[] = '';
+	}
+
+	// --- Active Plugins with descriptions ---
 	$lines[] = '## Active Plugins';
-	if ( ! empty( $plugin_names ) ) {
-		foreach ( $plugin_names as $name ) {
-			$lines[] = '- ' . $name;
+	if ( ! empty( $plugin_entries ) ) {
+		foreach ( $plugin_entries as $entry ) {
+			$desc_suffix = '';
+			if ( ! empty( $entry['desc'] ) ) {
+				// Truncate long descriptions to keep SITE.md scannable.
+				$desc = wp_strip_all_tags( $entry['desc'] );
+				if ( strlen( $desc ) > 120 ) {
+					$desc = substr( $desc, 0, 117 ) . '...';
+				}
+				$desc_suffix = ' — ' . $desc;
+			}
+			$lines[] = '- **' . $entry['name'] . '**' . $desc_suffix;
 		}
 	} else {
 		$lines[] = '- (none)';
+	}
+
+	// --- REST API namespaces ---
+	if ( ! empty( $rest_namespaces ) ) {
+		$lines[] = '';
+		$lines[] = '## REST API';
+		$lines[] = '- **Custom namespaces:** ' . implode( ', ', $rest_namespaces );
 	}
 
 	return implode( "\n", $lines ) . "\n";
@@ -543,12 +660,20 @@ function datamachine_register_site_md_invalidation(): void {
 	add_action( 'edit_term', $callback );
 	add_action( 'delete_term', $callback );
 
-	// Site identity changes.
+	// Site identity and structure changes.
 	add_action( 'update_option_blogname', $callback );
 	add_action( 'update_option_blogdescription', $callback );
 	add_action( 'update_option_home', $callback );
 	add_action( 'update_option_siteurl', $callback );
 	add_action( 'update_option_permalink_structure', $callback );
+	add_action( 'update_option_page_on_front', $callback );
+	add_action( 'update_option_page_for_posts', $callback );
+	add_action( 'update_option_show_on_front', $callback );
+
+	// Menu changes.
+	add_action( 'wp_update_nav_menu', $callback );
+	add_action( 'wp_delete_nav_menu', $callback );
+	add_action( 'wp_update_nav_menu_item', $callback );
 }
 
 /**
