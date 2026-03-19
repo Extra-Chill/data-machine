@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.17.2] - 2026-03-19
+
+### Changed
+- replace N+1 meta queries with single SQL join in date index
+
 ## [0.17.1] - 2026-03-18
 
 ### Changed
