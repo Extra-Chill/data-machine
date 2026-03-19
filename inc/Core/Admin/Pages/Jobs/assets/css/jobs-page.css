@@ -83,16 +83,29 @@
 
 /* Table Column Widths */
 .datamachine-col-job-id {
-	width: 80px;
+	width: 70px;
+}
+
+.datamachine-col-pipeline,
+.datamachine-col-flow {
+	width: 140px;
+}
+
+.datamachine-col-label {
+	/* Flexible — takes remaining space */
+}
+
+.datamachine-col-label-cell {
+	word-break: break-word;
 }
 
 .datamachine-col-status {
-	width: 100px;
+	width: 180px;
 }
 
 .datamachine-col-created,
 .datamachine-col-completed {
-	width: 140px;
+	width: 130px;
 }
 
 /* Job Status Colors - now using shared classes from root.css:
@@ -101,6 +114,24 @@
  * .datamachine-status--warning
  * .datamachine-status--neutral
  */
+
+/* Status detail (compound status reason) */
+.datamachine-status-detail {
+	display: block;
+	font-size: 11px;
+	color: #646970;
+	margin-top: 2px;
+	line-height: 1.3;
+	word-break: break-word;
+}
+
+/* Pipeline/Flow cell styling */
+.datamachine-col-pipeline,
+.datamachine-col-flow {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
 
 
 
@@ -273,6 +304,8 @@
 		gap: 15px;
 	}
 
+	.datamachine-col-label,
+	.datamachine-col-label-cell,
 	.datamachine-col-created,
 	.datamachine-col-completed {
 		display: none;

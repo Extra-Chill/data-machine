@@ -38,10 +38,31 @@ const formatStatus = ( status ) => {
 	if ( ! status ) {
 		return __( 'Unknown', 'data-machine' );
 	}
-	return (
+	// Show base status as the label, full detail on hover via title attr.
+	const formatted =
 		status.charAt( 0 ).toUpperCase() +
-		status.slice( 1 ).replace( /_/g, ' ' )
-	);
+		status.slice( 1 ).replace( /_/g, ' ' );
+	return formatted;
+};
+
+/**
+ * Extract the base status (before " - " detail separator).
+ */
+const getBaseStatus = ( status ) => {
+	if ( ! status ) {
+		return '';
+	}
+	return status.split( ' - ' )[ 0 ];
+};
+
+/**
+ * Get the detail portion of a compound status (after " - ").
+ */
+const getStatusDetail = ( status ) => {
+	if ( ! status || ! status.includes( ' - ' ) ) {
+		return null;
+	}
+	return status.split( ' - ' ).slice( 1 ).join( ' - ' );
 };
 
 /**
@@ -163,7 +184,7 @@ const ChildRows = ( { parentJobId } ) => {
 	if ( isLoading ) {
 		return (
 			<tr className="datamachine-child-row datamachine-child-row--loading">
-				<td colSpan="5">
+				<td colSpan="7">
 					<div className="datamachine-child-loading">
 						<Spinner />
 						<span>
@@ -175,11 +196,24 @@ const ChildRows = ( { parentJobId } ) => {
 		);
 	}
 
-	if ( isError || ! children || children.length === 0 ) {
+	if ( isError ) {
 		return (
 			<tr className="datamachine-child-row">
-				<td colSpan="5" className="datamachine-child-empty">
-					{ __( 'No child jobs found.', 'data-machine' ) }
+				<td colSpan="7" className="datamachine-child-empty">
+					{ __( 'Failed to load child jobs.', 'data-machine' ) }
+				</td>
+			</tr>
+		);
+	}
+
+	if ( ! children || children.length === 0 ) {
+		return (
+			<tr className="datamachine-child-row">
+				<td colSpan="7" className="datamachine-child-empty">
+					{ __(
+						'Child jobs were scheduled but have not been recorded yet.',
+						'data-machine'
+					) }
 				</td>
 			</tr>
 		);
@@ -194,14 +228,26 @@ const ChildRows = ( { parentJobId } ) => {
 				{ child.job_id }
 			</td>
 			<td>
-				{ child.display_label ||
-					child.label ||
-					__( 'Child job', 'data-machine' ) }
+				{ child.pipeline_name || '\u2014' }
 			</td>
 			<td>
-				<span className={ getStatusClass( child.status ) }>
-					{ formatStatus( child.status ) }
+				{ child.flow_name || '\u2014' }
+			</td>
+			<td className="datamachine-col-label-cell">
+				{ child.label || '\u2014' }
+			</td>
+			<td>
+				<span
+					className={ getStatusClass( child.status ) }
+					title={ getStatusDetail( child.status ) || undefined }
+				>
+					{ formatStatus( getBaseStatus( child.status ) || child.status ) }
 				</span>
+				{ getStatusDetail( child.status ) && (
+					<span className="datamachine-status-detail">
+						{ getStatusDetail( child.status ) }
+					</span>
+				) }
 			</td>
 			<td>{ child.created_at_display || '' }</td>
 			<td>{ child.completed_at_display || '' }</td>
@@ -212,6 +258,34 @@ const ChildRows = ( { parentJobId } ) => {
 /**
  * Single job row — handles expand/collapse for batch parents.
  */
+/**
+ * Format pipeline display value.
+ * Shows name for DB pipelines, "Direct" for direct execution, em dash for null.
+ */
+const formatPipeline = ( job ) => {
+	if ( job.pipeline_name ) {
+		return job.pipeline_name;
+	}
+	if ( job.pipeline_id === 'direct' ) {
+		return __( 'Direct', 'data-machine' );
+	}
+	return '\u2014';
+};
+
+/**
+ * Format flow display value.
+ * Shows name for DB flows, "Direct" for direct execution, em dash for null.
+ */
+const formatFlow = ( job ) => {
+	if ( job.flow_name ) {
+		return job.flow_name;
+	}
+	if ( job.flow_id === 'direct' ) {
+		return __( 'Direct', 'data-machine' );
+	}
+	return '\u2014';
+};
+
 const JobRow = ( { job, isExpanded, onToggle } ) => {
 	const isBatch = hasChildren( job );
 
@@ -238,17 +312,27 @@ const JobRow = ( { job, isExpanded, onToggle } ) => {
 					</strong>
 				</td>
 				<td>
-					{ job.display_label ||
-						job.label ||
-						( job.pipeline_name && job.flow_name
-							? `${ job.pipeline_name } \u2192 ${ job.flow_name }`
-							: __( 'Unknown', 'data-machine' ) ) }
+					{ formatPipeline( job ) }
+				</td>
+				<td>
+					{ formatFlow( job ) }
+				</td>
+				<td className="datamachine-col-label-cell">
+					{ job.label || '\u2014' }
 					{ isBatch && <BatchBadge job={ job } /> }
 				</td>
 				<td>
-					<span className={ getStatusClass( job.status ) }>
-						{ formatStatus( job.status ) }
+					<span
+						className={ getStatusClass( job.status ) }
+						title={ getStatusDetail( job.status ) || undefined }
+					>
+						{ formatStatus( getBaseStatus( job.status ) || job.status ) }
 					</span>
+					{ getStatusDetail( job.status ) && (
+						<span className="datamachine-status-detail">
+							{ getStatusDetail( job.status ) }
+						</span>
+					) }
 				</td>
 				<td>{ job.created_at_display || '' }</td>
 				<td>{ job.completed_at_display || '' }</td>
@@ -307,15 +391,23 @@ const JobsTable = ( { jobs, isLoading, isError, error } ) => {
 						<th className="datamachine-col-job-id">
 							{ __( 'Job ID', 'data-machine' ) }
 						</th>
-						<th>{ __( 'Source', 'data-machine' ) }</th>
+						<th className="datamachine-col-pipeline">
+							{ __( 'Pipeline', 'data-machine' ) }
+						</th>
+						<th className="datamachine-col-flow">
+							{ __( 'Flow', 'data-machine' ) }
+						</th>
+						<th className="datamachine-col-label">
+							{ __( 'Label', 'data-machine' ) }
+						</th>
 						<th className="datamachine-col-status">
 							{ __( 'Status', 'data-machine' ) }
 						</th>
 						<th className="datamachine-col-created">
-							{ __( 'Created At', 'data-machine' ) }
+							{ __( 'Created', 'data-machine' ) }
 						</th>
 						<th className="datamachine-col-completed">
-							{ __( 'Completed At', 'data-machine' ) }
+							{ __( 'Completed', 'data-machine' ) }
 						</th>
 					</tr>
 				</thead>
