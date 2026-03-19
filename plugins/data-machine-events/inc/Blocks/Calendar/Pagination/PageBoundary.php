@@ -59,90 +59,106 @@ class PageBoundary {
 	/**
 	 * Compute unique event dates (uncached).
 	 *
+	 * Uses a single SQL query with a JOIN on postmeta to fetch all event
+	 * start/end datetimes at once, then computes date grouping in PHP.
+	 * This replaces the N+1 pattern of WP_Query + per-event get_post_meta
+	 * which caused ~8,000+ queries at 12,500 events.
+	 *
 	 * @param array $params Query parameters.
 	 * @return array Event dates data.
 	 */
 	private static function compute_unique_event_dates( array $params ): array {
-		$query_args           = EventQueryBuilder::build_query_args( $params );
-		$query_args['fields'] = 'ids';
+		global $wpdb;
 
-		$query           = new WP_Query( $query_args );
-		$total_events    = $query->found_posts;
-		$events_per_date = array();
 		$show_past_param = $params['show_past'] ?? false;
 		$current_date    = current_time( 'Y-m-d' );
 
-		if ( $query->have_posts() ) {
-			foreach ( $query->posts as $post_id ) {
-				$start_datetime = get_post_meta( $post_id, EVENT_DATETIME_META_KEY, true );
-				$end_datetime   = get_post_meta( $post_id, EVENT_END_DATETIME_META_KEY, true );
+		// Build WHERE clauses from params for taxonomy/location filtering.
+		$where_clauses = array(
+			"p.post_type = 'data_machine_events'",
+			"p.post_status = 'publish'",
+			"pm_start.meta_key = '" . esc_sql( EVENT_DATETIME_META_KEY ) . "'",
+		);
+		$join_clauses  = array();
+		$query_values  = array();
 
-				if ( ! $start_datetime ) {
-					continue;
-				}
+		if ( ! $show_past_param ) {
+			$where_clauses[] = 'pm_start.meta_value >= %s';
+			$query_values[]  = $current_date . ' 00:00:00';
+		}
 
-				$start_date = date( 'Y-m-d', strtotime( $start_datetime ) );
-				$end_date   = $end_datetime ? date( 'Y-m-d', strtotime( $end_datetime ) ) : $start_date;
+		// Handle location filter from params.
+		if ( ! empty( $params['location'] ) ) {
+			$join_clauses[]  = "INNER JOIN {$wpdb->term_relationships} tr ON p.ID = tr.object_id";
+			$join_clauses[]  = "INNER JOIN {$wpdb->term_taxonomy} tt_filter ON tr.term_taxonomy_id = tt_filter.term_taxonomy_id";
+			$where_clauses[] = "tt_filter.taxonomy = 'location'";
+			$where_clauses[] = 'tt_filter.term_id = %d';
+			$query_values[]  = (int) $params['location'];
+		}
 
-				// Fast path: single-day events (vast majority). Skip full post
-				// hydration — only need the meta values we already have.
-				if ( $start_date === $end_date ) {
-					if ( ! isset( $events_per_date[ $start_date ] ) ) {
-						$events_per_date[ $start_date ] = 1;
-					} else {
-						++$events_per_date[ $start_date ];
+		$joins = implode( ' ', $join_clauses );
+		$where = implode( ' AND ', $where_clauses );
+
+		// Single query: fetch all event IDs with start/end datetimes.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results(
+			empty( $query_values )
+				? "SELECT p.ID, pm_start.meta_value AS start_datetime, pm_end.meta_value AS end_datetime
+				   FROM {$wpdb->posts} p
+				   INNER JOIN {$wpdb->postmeta} pm_start ON p.ID = pm_start.post_id
+				   LEFT JOIN {$wpdb->postmeta} pm_end ON p.ID = pm_end.post_id AND pm_end.meta_key = '" . esc_sql( EVENT_END_DATETIME_META_KEY ) . "'
+				   {$joins}
+				   WHERE {$where}
+				   ORDER BY pm_start.meta_value ASC"
+				: $wpdb->prepare(
+					"SELECT p.ID, pm_start.meta_value AS start_datetime, pm_end.meta_value AS end_datetime
+					FROM {$wpdb->posts} p
+					INNER JOIN {$wpdb->postmeta} pm_start ON p.ID = pm_start.post_id
+					LEFT JOIN {$wpdb->postmeta} pm_end ON p.ID = pm_end.post_id AND pm_end.meta_key = '" . esc_sql( EVENT_END_DATETIME_META_KEY ) . "'
+					{$joins}
+					WHERE {$where}
+					ORDER BY pm_start.meta_value ASC",
+					...$query_values
+				)
+		);
+
+		$total_events    = count( $rows );
+		$events_per_date = array();
+
+		foreach ( $rows as $row ) {
+			$start_date = gmdate( 'Y-m-d', strtotime( $row->start_datetime ) );
+			$end_date   = $row->end_datetime ? gmdate( 'Y-m-d', strtotime( $row->end_datetime ) ) : $start_date;
+
+			if ( $start_date === $end_date ) {
+				$events_per_date[ $start_date ] = ( $events_per_date[ $start_date ] ?? 0 ) + 1;
+				continue;
+			}
+
+			// Multi-day: expand date range in PHP.
+			$event_dates = MultiDayResolver::get_date_range( $start_date, $end_date, wp_timezone() );
+
+			if ( ! $show_past_param ) {
+				$event_dates = array_filter(
+					$event_dates,
+					function ( $date ) use ( $current_date ) {
+						return $date >= $current_date;
 					}
-					continue;
-				}
+				);
+			}
 
-				// Multi-day events: check for explicit occurrence dates, but only
-				// load the full post when the event actually has block content that
-				// might contain occurrenceDates. Use a lightweight meta check first.
-				$occurrence_dates = array();
-				$has_blocks       = get_post_meta( $post_id, '_datamachine_has_occurrence_dates', true );
-
-				if ( $has_blocks ) {
-					$post             = get_post( $post_id );
-					$event_data       = EventHydrator::parse_event_data( $post );
-					$occurrence_dates = is_array( $event_data ) ? ( $event_data['occurrenceDates'] ?? array() ) : array();
-				}
-
-				if ( ! empty( $occurrence_dates ) && is_array( $occurrence_dates ) ) {
-					$event_dates = $occurrence_dates;
-				} else {
-					$event_dates = MultiDayResolver::get_date_range( $start_date, $end_date, wp_timezone() );
-				}
-
-				// Filter out past dates when show_past is false.
-				if ( ! $show_past_param ) {
-					$event_dates = array_filter(
-						$event_dates,
-						function ( $date ) use ( $current_date ) {
-							return $date >= $current_date;
-						}
-					);
-				}
-
-				foreach ( $event_dates as $date ) {
-					if ( isset( $events_per_date[ $date ] ) ) {
-						++$events_per_date[ $date ];
-					} else {
-						$events_per_date[ $date ] = 1;
-					}
-				}
+			foreach ( $event_dates as $date ) {
+				$events_per_date[ $date ] = ( $events_per_date[ $date ] ?? 0 ) + 1;
 			}
 		}
 
-		if ( $params['show_past'] ?? false ) {
+		if ( $show_past_param ) {
 			krsort( $events_per_date );
 		} else {
 			ksort( $events_per_date );
 		}
 
-		$dates = array_keys( $events_per_date );
-
 		return array(
-			'dates'           => $dates,
+			'dates'           => array_keys( $events_per_date ),
 			'total_events'    => $total_events,
 			'events_per_date' => $events_per_date,
 		);
