@@ -497,6 +497,9 @@ function datamachine_activate_for_site() {
 	// Assign orphaned resources (agent_id IS NULL) to sole agent on single-agent installs (idempotent).
 	datamachine_assign_orphaned_resources_to_sole_agent();
 
+	// Migrate USER.md to network-scoped paths and create NETWORK.md on multisite (idempotent).
+	datamachine_migrate_user_md_to_network_scope();
+
 	// Clean up legacy per-agent-type log level options (idempotent).
 	foreach ( array( 'pipeline', 'chat', 'system' ) as $legacy_agent_type ) {
 		delete_option( "datamachine_log_level_{$legacy_agent_type}" );

@@ -894,8 +894,9 @@ class MemoryCommand extends BaseCommand {
 			$agent_dir         = $directory_manager->get_agent_identity_directory_for_user( $effective_user_id );
 		}
 
-		$shared_dir = $directory_manager->get_shared_directory();
-		$user_dir   = $directory_manager->get_user_directory( $effective_user_id );
+		$shared_dir  = $directory_manager->get_shared_directory();
+		$user_dir    = $directory_manager->get_user_directory( $effective_user_id );
+		$network_dir = $directory_manager->get_network_directory();
 
 		$site_root = untrailingslashit( ABSPATH );
 		$relative  = \WP_CLI\Utils\get_flag_value( $assoc_args, 'relative', false );
@@ -922,15 +923,21 @@ class MemoryCommand extends BaseCommand {
 				'layer'     => 'user',
 				'directory' => $user_dir,
 			),
+			array(
+				'file'      => 'NETWORK.md',
+				'layer'     => 'network',
+				'directory' => $network_dir,
+			),
 		);
 
 		$format = \WP_CLI\Utils\get_flag_value( $assoc_args, 'format', 'json' );
 
 		if ( 'json' === $format ) {
 			$layers = array(
-				'shared' => $shared_dir,
-				'agent'  => $agent_dir,
-				'user'   => $user_dir,
+				'shared'  => $shared_dir,
+				'agent'   => $agent_dir,
+				'user'    => $user_dir,
+				'network' => $network_dir,
 			);
 
 			$files          = array();

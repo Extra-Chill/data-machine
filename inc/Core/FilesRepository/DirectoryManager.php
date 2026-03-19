@@ -180,16 +180,68 @@ class DirectoryManager {
 	/**
 	 * Get user layer directory path.
 	 *
+	 * On multisite, users are network-wide so USER.md must live in a
+	 * network-global location — the main site's uploads directory. On
+	 * single-site installs, the path is unchanged.
+	 *
 	 * @since 0.36.1
+	 * @since 0.48.0 Network-scoped on multisite (resolves to main site uploads).
+	 *
 	 * @param int $user_id WordPress user ID.
 	 * @return string Full path to user layer directory.
 	 */
 	public function get_user_directory( int $user_id ): string {
-		$upload_dir = wp_upload_dir();
-		$base       = trailingslashit( $upload_dir['basedir'] ) . self::REPOSITORY_DIR;
-		$user_id    = absint( $user_id );
+		$base    = $this->get_network_base_directory();
+		$user_id = absint( $user_id );
 
 		return "{$base}/users/{$user_id}";
+	}
+
+	/**
+	 * Get network-level directory path.
+	 *
+	 * Returns the network/ subdirectory under the network-global base.
+	 * Used for NETWORK.md and other network-scoped files on multisite.
+	 * On single-site installs, this resolves to the same base as shared/.
+	 *
+	 * @since 0.48.0
+	 * @return string Full path to network directory.
+	 */
+	public function get_network_directory(): string {
+		return $this->get_network_base_directory() . '/network';
+	}
+
+	/**
+	 * Get the network-global base directory for Data Machine files.
+	 *
+	 * On multisite, resolves to the main site's uploads directory so that
+	 * network-scoped files (users/, network/) live in a single location
+	 * regardless of which subsite is active. On single-site installs,
+	 * returns the standard uploads-based path.
+	 *
+	 * @since 0.48.0
+	 * @return string Base directory path (without trailing slash).
+	 */
+	private function get_network_base_directory(): string {
+		if ( ! is_multisite() ) {
+			$upload_dir = wp_upload_dir();
+			return trailingslashit( $upload_dir['basedir'] ) . self::REPOSITORY_DIR;
+		}
+
+		// On multisite, always use the main site's upload directory.
+		// This avoids per-site paths like wp-content/uploads/sites/7/.
+		$current_blog_id = get_current_blog_id();
+		$main_site_id    = get_main_site_id();
+
+		if ( $current_blog_id !== $main_site_id ) {
+			switch_to_blog( $main_site_id );
+			$upload_dir = wp_upload_dir();
+			restore_current_blog();
+		} else {
+			$upload_dir = wp_upload_dir();
+		}
+
+		return trailingslashit( $upload_dir['basedir'] ) . self::REPOSITORY_DIR;
 	}
 
 	/**

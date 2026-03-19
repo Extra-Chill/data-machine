@@ -974,6 +974,230 @@ function datamachine_assign_orphaned_resources_to_sole_agent(): void {
 }
 
 /**
+ * Build NETWORK.md scaffold content from WordPress multisite data.
+ *
+ * Generates a markdown summary of the multisite network topology
+ * including all sites, network-activated plugins, and shared resources.
+ * Returns empty string on single-site installs.
+ *
+ * @since 0.48.0
+ * @return string NETWORK.md content, or empty string if not multisite.
+ */
+function datamachine_get_network_scaffold_content(): string {
+	if ( ! is_multisite() ) {
+		return '';
+	}
+
+	$network      = get_network();
+	$network_name = $network ? $network->site_name : 'WordPress Network';
+	$main_site_id = get_main_site_id();
+	$main_site    = get_site( $main_site_id );
+	$main_url     = $main_site ? $main_site->domain . $main_site->path : home_url();
+
+	// --- Sites ---
+	$sites      = get_sites( array( 'number' => 100 ) );
+	$site_count = get_blog_count();
+
+	$site_lines = array();
+	foreach ( $sites as $site ) {
+		$blog_id = (int) $site->blog_id;
+
+		switch_to_blog( $blog_id );
+		$name  = get_bloginfo( 'name' ) ? get_bloginfo( 'name' ) : 'Site ' . $blog_id;
+		$url   = home_url();
+		$theme = wp_get_theme()->get( 'Name' ) ? wp_get_theme()->get( 'Name' ) : 'Unknown';
+		restore_current_blog();
+
+		$is_main      = ( $blog_id === $main_site_id ) ? ' (main)' : '';
+		$site_lines[] = sprintf( '| %s%s | %s | %s |', $name, $is_main, $url, $theme );
+	}
+
+	// --- Network-activated plugins ---
+	$network_plugins = get_site_option( 'active_sitewide_plugins', array() );
+	$plugin_names    = array();
+
+	foreach ( array_keys( $network_plugins ) as $plugin_file ) {
+		if ( 0 === strpos( $plugin_file, 'data-machine/' ) ) {
+			continue;
+		}
+
+		$plugin_path = WP_PLUGIN_DIR . '/' . $plugin_file;
+		if ( function_exists( 'get_plugin_data' ) && file_exists( $plugin_path ) ) {
+			$plugin_data    = get_plugin_data( $plugin_path, false, false );
+			$plugin_names[] = ! empty( $plugin_data['Name'] ) ? $plugin_data['Name'] : dirname( $plugin_file );
+		} else {
+			$dir            = dirname( $plugin_file );
+			$plugin_names[] = '.' === $dir ? str_replace( '.php', '', basename( $plugin_file ) ) : $dir;
+		}
+	}
+
+	// --- Build content ---
+	$lines   = array();
+	$lines[] = '# Network';
+	$lines[] = '';
+	$lines[] = '## Identity';
+	$lines[] = '- **network_name:** ' . $network_name;
+	$lines[] = '- **primary_site:** ' . $main_url;
+	$lines[] = '- **sites_count:** ' . $site_count;
+	$lines[] = '';
+	$lines[] = '## Sites';
+	$lines[] = '| Site | URL | Theme |';
+	$lines[] = '|------|-----|-------|';
+
+	foreach ( $site_lines as $line ) {
+		$lines[] = $line;
+	}
+
+	$lines[] = '';
+	$lines[] = '## Network Plugins';
+	if ( ! empty( $plugin_names ) ) {
+		foreach ( $plugin_names as $name ) {
+			$lines[] = '- ' . $name;
+		}
+	} else {
+		$lines[] = '- (none)';
+	}
+
+	$lines[] = '';
+	$lines[] = '## Shared Resources';
+	$lines[] = '- **Users:** network-wide (see USER.md)';
+	$lines[] = '- **Media:** per-site uploads';
+
+	return implode( "\n", $lines ) . "\n";
+}
+
+/**
+ * Migrate USER.md from site-scoped to network-scoped paths on multisite.
+ *
+ * On multisite, USER.md was previously stored per-site (under each site's
+ * upload dir). Since WordPress users are network-wide, USER.md should live
+ * in the main site's uploads directory.
+ *
+ * This migration finds the richest (largest) USER.md across all subsites
+ * and copies it to the new network-scoped location. Also creates NETWORK.md
+ * if it doesn't exist.
+ *
+ * Idempotent. Skipped on single-site installs.
+ *
+ * @since 0.48.0
+ * @return void
+ */
+function datamachine_migrate_user_md_to_network_scope(): void {
+	if ( get_option( 'datamachine_user_md_network_migrated', false ) ) {
+		return;
+	}
+
+	// Single-site: nothing to migrate, just mark done.
+	if ( ! is_multisite() ) {
+		update_option( 'datamachine_user_md_network_migrated', true, true );
+		return;
+	}
+
+	$directory_manager = new \DataMachine\Core\FilesRepository\DirectoryManager();
+	$fs                = \DataMachine\Core\FilesRepository\FilesystemHelper::get();
+
+	if ( ! $fs ) {
+		return;
+	}
+
+	// get_user_directory() now returns the network-scoped path.
+	// We need to find USER.md files in old per-site locations and consolidate.
+	$sites = get_sites( array( 'number' => 100 ) );
+
+	// Get all WordPress users to check for USER.md across sites.
+	$users = get_users( array(
+		'fields' => 'ID',
+		'number' => 100,
+	) );
+
+	$migrated_users = 0;
+
+	foreach ( $users as $user_id ) {
+		$user_id = absint( $user_id );
+
+		// New network-scoped destination (from updated get_user_directory).
+		$network_user_dir  = $directory_manager->get_user_directory( $user_id );
+		$network_user_file = trailingslashit( $network_user_dir ) . 'USER.md';
+
+		// If the file already exists at the network location, skip.
+		if ( file_exists( $network_user_file ) ) {
+			continue;
+		}
+
+		// Search all subsites for the richest USER.md for this user.
+		$best_content = '';
+		$best_size    = 0;
+
+		foreach ( $sites as $site ) {
+			$blog_id = (int) $site->blog_id;
+
+			switch_to_blog( $blog_id );
+			$site_upload_dir = wp_upload_dir();
+			restore_current_blog();
+
+			$site_user_file = trailingslashit( $site_upload_dir['basedir'] )
+				. 'datamachine-files/users/' . $user_id . '/USER.md';
+
+			if ( file_exists( $site_user_file ) ) {
+				$size = filesize( $site_user_file );
+				if ( $size > $best_size ) {
+					$best_size    = $size;
+					$best_content = $fs->get_contents( $site_user_file );
+				}
+			}
+		}
+
+		if ( ! empty( $best_content ) ) {
+			if ( ! is_dir( $network_user_dir ) ) {
+				wp_mkdir_p( $network_user_dir );
+			}
+
+			$index_file = trailingslashit( $network_user_dir ) . 'index.php';
+			if ( ! file_exists( $index_file ) ) {
+				$fs->put_contents( $index_file, "<?php\n// Silence is golden.\n", FS_CHMOD_FILE );
+				\DataMachine\Core\FilesRepository\FilesystemHelper::make_group_writable( $index_file );
+			}
+
+			$fs->put_contents( $network_user_file, $best_content, FS_CHMOD_FILE );
+			\DataMachine\Core\FilesRepository\FilesystemHelper::make_group_writable( $network_user_file );
+			++$migrated_users;
+		}
+	}
+
+	// Create NETWORK.md if it doesn't exist.
+	$network_dir = $directory_manager->get_network_directory();
+	if ( ! is_dir( $network_dir ) ) {
+		wp_mkdir_p( $network_dir );
+	}
+
+	$network_md = trailingslashit( $network_dir ) . 'NETWORK.md';
+	if ( ! file_exists( $network_md ) ) {
+		$content = datamachine_get_network_scaffold_content();
+		if ( ! empty( $content ) ) {
+			$fs->put_contents( $network_md, $content, FS_CHMOD_FILE );
+			\DataMachine\Core\FilesRepository\FilesystemHelper::make_group_writable( $network_md );
+		}
+	}
+
+	$network_index = trailingslashit( $network_dir ) . 'index.php';
+	if ( ! file_exists( $network_index ) ) {
+		$fs->put_contents( $network_index, "<?php\n// Silence is golden.\n", FS_CHMOD_FILE );
+		\DataMachine\Core\FilesRepository\FilesystemHelper::make_group_writable( $network_index );
+	}
+
+	update_option( 'datamachine_user_md_network_migrated', true, true );
+
+	if ( $migrated_users > 0 ) {
+		do_action(
+			'datamachine_log',
+			'info',
+			'Migrated USER.md to network-scoped paths',
+			array( 'users_migrated' => $migrated_users )
+		);
+	}
+}
+
+/**
  * Re-schedule all flows with non-manual scheduling on plugin activation.
  *
  * Ensures scheduled flows resume after plugin reactivation.

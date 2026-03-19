@@ -89,12 +89,20 @@ MemoryFileRegistry::register( 'MEMORY.md', 30, array(
 	'description' => 'Accumulated knowledge. Grows over time.',
 ) );
 
-// User layer — human preferences, visible to all agents for this user.
+// User layer — human preferences, network-scoped on multisite.
 MemoryFileRegistry::register( 'USER.md', 25, array(
 	'layer'       => MemoryFileRegistry::LAYER_USER,
 	'protected'   => true,
 	'label'       => 'User Profile',
 	'description' => 'Information about the human the agent works with.',
+) );
+
+// Network layer — multisite topology, only meaningful on multisite installs.
+MemoryFileRegistry::register( 'NETWORK.md', 5, array(
+	'layer'       => MemoryFileRegistry::LAYER_NETWORK,
+	'protected'   => true,
+	'label'       => 'Network Context',
+	'description' => 'WordPress multisite network topology and shared resources.',
 ) );
 // SiteContext is autoloaded (Core\WordPress\SiteContext) — register its cache invalidation hook here.
 add_action( 'init', array( \DataMachine\Core\WordPress\SiteContext::class, 'register_cache_invalidation' ) );
