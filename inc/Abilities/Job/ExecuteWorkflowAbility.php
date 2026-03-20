@@ -489,12 +489,21 @@ class ExecuteWorkflowAbility {
 			$handler_slug   = $step['handler_slug'] ?? '';
 			$handler_config = $step['handler_config'] ?? array();
 
+			// Resolve handler_slugs: explicit handler_slug for non-AI steps,
+			// or enabled_tools for AI steps (tells the AI which tools it must call).
+			$handler_slugs = array();
+			if ( ! empty( $handler_slug ) ) {
+				$handler_slugs = array( $handler_slug );
+			} elseif ( ! empty( $step['enabled_tools'] ) && is_array( $step['enabled_tools'] ) ) {
+				$handler_slugs = $step['enabled_tools'];
+			}
+
 			$flow_config[ $step_id ] = array(
 				'flow_step_id'     => $step_id,
 				'pipeline_step_id' => $pipeline_step_id,
 				'step_type'        => $step['type'],
 				'execution_order'  => $index,
-				'handler_slugs'    => ! empty( $handler_slug ) ? array( $handler_slug ) : array(),
+				'handler_slugs'    => $handler_slugs,
 				'handler_configs'  => ! empty( $handler_slug ) ? array( $handler_slug => $handler_config ) : array(),
 				'user_message'     => $step['user_message'] ?? '',
 				'disabled_tools'   => $step['disabled_tools'] ?? array(),
