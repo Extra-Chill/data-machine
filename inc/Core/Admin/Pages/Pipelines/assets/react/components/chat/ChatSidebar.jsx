@@ -4,12 +4,14 @@
  * Collapsible right sidebar for chat interface.
  * Manages conversation state, session switching, and API interactions.
  * Uses TanStack Query cache as single source of truth for messages.
+ *
+ * UI primitives from @extrachill/chat, orchestration stays DM-specific.
  */
 
 /**
  * WordPress dependencies
  */
-import { useState, useCallback, useRef } from '@wordpress/element';
+import { useState, useCallback, useRef, lazy, Suspense } from '@wordpress/element';
 import { Button } from '@wordpress/components';
 import { close, copy } from '@wordpress/icons';
 import { __ } from '@wordpress/i18n';
@@ -17,6 +19,12 @@ import { __ } from '@wordpress/i18n';
  * External dependencies
  */
 import { useQueryClient } from '@tanstack/react-query';
+import {
+	ChatMessages,
+	ChatInput,
+	TypingIndicator,
+	ErrorBoundary,
+} from '@extrachill/chat';
 /**
  * Internal dependencies
  */
@@ -24,15 +32,30 @@ import { useUIStore } from '../../stores/uiStore';
 import { useChatMutation, useChatSession } from '../../queries/chat';
 import { useChatQueryInvalidation } from '../../hooks/useChatQueryInvalidation';
 import { useChatTurn } from '../../hooks/useChatTurn';
-import ChatMessages from './ChatMessages';
-import ChatInput from './ChatInput';
+import { normalizeMessages } from '../../utils/chatNormalizer';
 import ChatSessionSwitcher from './ChatSessionSwitcher';
 import ChatSessionList from './ChatSessionList';
 import { formatChatAsMarkdown } from '../../utils/formatters';
-import ChatErrorBoundary from './ChatErrorBoundary';
+
+const ReactMarkdown = lazy( () => import( 'react-markdown' ) );
 
 function generateRequestId() {
 	return crypto.randomUUID();
+}
+
+/**
+ * Custom markdown renderer for @extrachill/chat messages.
+ * Uses lazy-loaded react-markdown matching DM's existing pattern.
+ *
+ * @param {string} content - Message content (markdown)
+ * @return {JSX.Element} Rendered content
+ */
+function renderMarkdown( content ) {
+	return (
+		<Suspense fallback={ <div>{ content }</div> }>
+			<ReactMarkdown>{ content }</ReactMarkdown>
+		</Suspense>
+	);
 }
 
 export default function ChatSidebar() {
@@ -59,11 +82,12 @@ export default function ChatSidebar() {
 	const isCreatingSessionRef = useRef( false );
 	const loadingSessionRef = useRef( null );
 
-	// Messages from query cache, with pending message for new sessions
-	const cachedMessages = sessionQuery.data?.conversation ?? [];
-	const messages = pendingUserMessage
-		? [ ...cachedMessages, pendingUserMessage ]
-		: cachedMessages;
+	// Messages from query cache, normalized for @extrachill/chat
+	const rawMessages = sessionQuery.data?.conversation ?? [];
+	const pendingMessages = pendingUserMessage
+		? [ ...rawMessages, pendingUserMessage ]
+		: rawMessages;
+	const messages = normalizeMessages( pendingMessages );
 
 	const handleSend = useCallback(
 		async ( message ) => {
@@ -240,11 +264,12 @@ export default function ChatSidebar() {
 	}, [ clearChatSession ] );
 
 	const handleCopyChat = useCallback( () => {
-		const markdown = formatChatAsMarkdown( messages );
+		// formatChatAsMarkdown expects raw DM format
+		const markdown = formatChatAsMarkdown( rawMessages );
 		navigator.clipboard.writeText( markdown );
 		setIsCopied( true );
 		setTimeout( () => setIsCopied( false ), 2000 );
-	}, [ messages ] );
+	}, [ rawMessages ] );
 
 	// Session-aware loading state - only show loading for the session that initiated the request
 	const isMutationLoading =
@@ -269,7 +294,7 @@ export default function ChatSidebar() {
 				/>
 			</header>
 
-			<ChatErrorBoundary>
+			<ErrorBoundary>
 			{ view === 'chat' ? (
 				<>
 					<div className="datamachine-chat-sidebar__actions">
@@ -294,17 +319,33 @@ export default function ChatSidebar() {
 
 					<ChatMessages
 						messages={ messages }
-						isLoading={ isLoading }
+						showTools={ true }
+						contentFormat="markdown"
+						renderContent={ renderMarkdown }
+						emptyState={
+							! isLoading
+								? __( 'Ask me to create a pipeline, configure a flow, or help with your automations.', 'data-machine' )
+								: null
+						}
+						className="datamachine-chat-messages"
 					/>
 
-					{ isProcessingThisSession && (
-						<div className="datamachine-chat-sidebar__processing">
-							{ __( 'Processing turn', 'data-machine' ) }{ ' ' }
-							{ turnCount }...
-						</div>
-					) }
+					<TypingIndicator
+						visible={ isLoading }
+						label={
+							isProcessingThisSession
+								? `${ __( 'Processing turn', 'data-machine' ) } ${ turnCount }...`
+								: undefined
+						}
+						className="datamachine-chat-typing"
+					/>
 
-					<ChatInput onSend={ handleSend } isLoading={ isLoading } />
+					<ChatInput
+						onSend={ handleSend }
+						disabled={ isLoading }
+						placeholder={ __( 'Ask me to build something…', 'data-machine' ) }
+						className="datamachine-chat-input"
+					/>
 				</>
 			) : (
 				<ChatSessionList
@@ -314,7 +355,7 @@ export default function ChatSidebar() {
 					onSessionDeleted={ handleSessionDeleted }
 				/>
 			) }
-			</ChatErrorBoundary>
+			</ErrorBoundary>
 		</aside>
 	);
 }

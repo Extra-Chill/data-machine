@@ -7,6 +7,11 @@ const defaultConfig = require( '@wordpress/scripts/config/webpack.config' );
  */
 const path = require( 'path' );
 
+const chatPackageSrc = path.resolve(
+	__dirname,
+	'node_modules/@extrachill/chat/src',
+);
+
 module.exports = {
 	...defaultConfig,
 	entry: {
@@ -27,6 +32,34 @@ module.exports = {
 		alias: {
 			...( defaultConfig.resolve?.alias || {} ),
 			'@shared': path.resolve( __dirname, 'inc/Core/Admin/shared' ),
+			// Resolve @extrachill/chat to source (no dist/ in git-installed package)
+			'@extrachill/chat': chatPackageSrc + '/index.ts',
 		},
+		extensions: [
+			'.tsx', '.ts',
+			...( defaultConfig.resolve?.extensions || [ '.jsx', '.js', '.json' ] ),
+		],
+	},
+	module: {
+		...defaultConfig.module,
+		rules: [
+			// TypeScript support for @extrachill/chat source files
+			{
+				test: /\.tsx?$/,
+				include: [ chatPackageSrc ],
+				use: [
+					{
+						loader: require.resolve( 'babel-loader' ),
+						options: {
+							presets: [
+								require.resolve( '@babel/preset-typescript' ),
+								require.resolve( '@babel/preset-react' ),
+							],
+						},
+					},
+				],
+			},
+			...( defaultConfig.module?.rules || [] ),
+		],
 	},
 };
