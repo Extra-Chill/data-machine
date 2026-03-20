@@ -229,6 +229,15 @@ function datamachine_run_datamachine_plugin() {
 		new \DataMachine\Abilities\Publish\SendEmailAbility();
 		new \DataMachine\Abilities\Update\UpdateWordPressAbility();
 	} );
+
+	// Clean up identity index rows when posts are permanently deleted.
+	add_action(
+		'before_delete_post',
+		function ( $post_id ) {
+			$index = new \DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex();
+			$index->delete( (int) $post_id );
+		}
+	);
 }
 
 
@@ -484,6 +493,9 @@ function datamachine_activate_for_site() {
 
 	$db_processed_items = new \DataMachine\Core\Database\ProcessedItems\ProcessedItems();
 	$db_processed_items->create_table();
+
+	$db_identity_index = new \DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex();
+	$db_identity_index->create_table();
 
 	\DataMachine\Core\Database\Chat\Chat::create_table();
 	\DataMachine\Core\Database\Chat\Chat::ensure_context_column();
