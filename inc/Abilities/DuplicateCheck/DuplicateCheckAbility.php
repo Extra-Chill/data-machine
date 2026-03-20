@@ -435,6 +435,9 @@ class DuplicateCheckAbility {
 	/**
 	 * Check published posts for exact source URL matches.
 	 *
+	 * Tries the PostIdentityIndex first (indexed lookup), then falls back
+	 * to meta_query for posts not yet in the index.
+	 *
 	 * @param string $source_url    Canonical source URL.
 	 * @param string $post_type     Post type to search.
 	 * @param int    $lookback_days How many days back to search.
@@ -445,6 +448,49 @@ class DuplicateCheckAbility {
 			return null;
 		}
 
+		// Fast path: check the identity index first (indexed column lookup).
+		$index = new \DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex();
+		$match = $index->find_by_source_url( $source_url );
+
+		if ( $match ) {
+			$candidate_id = (int) $match['post_id'];
+			$post_status  = get_post_status( $candidate_id );
+
+			if ( $post_status && in_array( $post_status, array( 'publish', 'draft', 'pending' ), true ) ) {
+				$candidate_title = get_the_title( $candidate_id );
+
+				do_action(
+					'datamachine_log',
+					'info',
+					'DuplicateCheck: found matching post by source URL (identity index)',
+					array(
+						'source_url'     => $source_url,
+						'existing_id'    => $candidate_id,
+						'existing_title' => $candidate_title,
+						'post_type'      => $post_type,
+					)
+				);
+
+				return array(
+					'verdict'  => 'duplicate',
+					'source'   => 'published_post_source_url',
+					'match'    => array(
+						'post_id'    => $candidate_id,
+						'title'      => $candidate_title,
+						'url'        => get_permalink( $candidate_id ),
+						'source_url' => $source_url,
+					),
+					'reason'   => sprintf(
+						'Rejected: source URL already exists on post "%s" (ID %d).',
+						$candidate_title,
+						$candidate_id
+					),
+					'strategy' => 'core_published_source_url',
+				);
+			}
+		}
+
+		// Fallback: meta_query for posts not yet in the identity index.
 		if ( $lookback_days <= 0 ) {
 			$lookback_days = 14;
 		}
@@ -464,7 +510,7 @@ class DuplicateCheckAbility {
 						'inclusive' => true,
 					),
 				),
-				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Required for source URL dedup.
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Fallback for pre-index posts.
 				'meta_query'     => array(
 					array(
 						'key'   => PostTracking::SOURCE_URL_META_KEY,
@@ -484,7 +530,7 @@ class DuplicateCheckAbility {
 		do_action(
 			'datamachine_log',
 			'info',
-			'DuplicateCheck: found matching published post by source URL',
+			'DuplicateCheck: found matching published post by source URL (meta fallback)',
 			array(
 				'source_url'     => $source_url,
 				'existing_id'    => $candidate_id,
