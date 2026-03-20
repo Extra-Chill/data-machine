@@ -3,46 +3,18 @@ name: Homeboy
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
+    tags: ['v*']
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
+  issues: write
 
 jobs:
-  lint:
-    if: github.event_name == 'pull_request'
-    name: Homeboy Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.2'
-          extensions: mbstring, intl, pdo_sqlite, mysqli
-          tools: composer:v2
-          coverage: none
-
-      - name: Install project dependencies
-        run: composer install --no-interaction --prefer-dist
-
-      - uses: Extra-Chill/homeboy-action@v1
-        with:
-          version: 'latest'
-          extension: wordpress
-          commands: lint
-          scope: changed
-          component: data-machine
-          settings: '{"database_type": "mysql"}'
-          php-version: '8.2'
-          node-version: '20'
-
-  test:
-    if: github.event_name == 'pull_request'
-    name: Homeboy Test
+  homeboy:
+    name: Homeboy
     runs-on: ubuntu-latest
     services:
       mysql:
@@ -63,54 +35,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        continue-on-error: true
         with:
-          php-version: '8.2'
-          extensions: mbstring, intl, pdo_sqlite, mysqli
-          tools: composer:v2
-          coverage: none
+          app-id: ${{ secrets.HOMEBOY_APP_ID }}
+          private-key: ${{ secrets.HOMEBOY_APP_PRIVATE_KEY }}
 
-      - name: Install project dependencies
-        run: composer install --no-interaction --prefer-dist
-
-      - uses: Extra-Chill/homeboy-action@v1
+      - uses: Extra-Chill/homeboy-action@v2
         with:
-          version: 'latest'
-          extension: wordpress
-          commands: test
-          scope: changed
-          component: data-machine
-          settings: '{"database_type": "mysql"}'
-          php-version: '8.2'
-          node-version: '20'
-
-  audit:
-    if: github.event_name == 'pull_request'
-    name: Homeboy Audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.2'
-          extensions: mbstring, intl, pdo_sqlite, mysqli
-          tools: composer:v2
-          coverage: none
-
-      - name: Install project dependencies
-        run: composer install --no-interaction --prefer-dist
-
-      - uses: Extra-Chill/homeboy-action@v1
-        with:
-          version: 'latest'
-          extension: wordpress
-          commands: audit
-          scope: changed
-          component: data-machine
-          php-version: '8.2'
-          node-version: '20'
+          app-token: ${{ steps.app-token.outputs.token || '' }}

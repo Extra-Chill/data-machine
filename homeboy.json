@@ -14,6 +14,8 @@
   "changelog_target": "docs/CHANGELOG.md",
   "extensions": {
     "wordpress": {
+      "php": "8.2",
+      "node": "20",
       "database_type": "mysql",
       "mysql_host": "localhost",
       "mysql_database": "wptests",
