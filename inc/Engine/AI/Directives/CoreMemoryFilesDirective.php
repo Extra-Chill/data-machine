@@ -27,6 +27,7 @@ namespace DataMachine\Engine\AI\Directives;
 
 use DataMachine\Core\FilesRepository\AgentMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
+use DataMachine\Core\FilesRepository\FileScaffolder;
 use DataMachine\Engine\AI\MemoryFileRegistry;
 
 defined( 'ABSPATH' ) || exit;
@@ -60,10 +61,9 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 			MemoryFileRegistry::LAYER_NETWORK => $directory_manager->get_network_directory(),
 		);
 
-		// Auto-scaffold USER.md for users who don't have one yet.
-		$user_md_path = trailingslashit( $layer_dirs[ MemoryFileRegistry::LAYER_USER ] ) . 'USER.md';
-		if ( $user_id > 0 && ! file_exists( $user_md_path ) && function_exists( 'datamachine_scaffold_user_md' ) ) {
-			datamachine_scaffold_user_md( $user_id );
+		// Auto-scaffold missing user-layer files (e.g. USER.md) on first chat.
+		if ( $user_id > 0 ) {
+			FileScaffolder::ensure_layer( MemoryFileRegistry::LAYER_USER, array( 'user_id' => $user_id ) );
 		}
 
 		$outputs = array();
