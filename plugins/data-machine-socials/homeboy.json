@@ -2,7 +2,10 @@
   "auto_cleanup": false,
   "changelog_target": "docs/CHANGELOG.md",
   "extensions": {
-    "wordpress": {}
+    "wordpress": {
+      "php": "8.2",
+      "node": "20"
+    }
   },
   "id": "data-machine-socials",
   "remote_path": "wp-content/plugins/data-machine-socials",
