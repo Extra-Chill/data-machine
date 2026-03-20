@@ -27,7 +27,6 @@ namespace DataMachine\Engine\AI\Directives;
 
 use DataMachine\Core\FilesRepository\AgentMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
-use DataMachine\Core\FilesRepository\FileScaffolder;
 use DataMachine\Engine\AI\MemoryFileRegistry;
 
 defined( 'ABSPATH' ) || exit;
@@ -62,8 +61,12 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 		);
 
 		// Auto-scaffold missing user-layer files (e.g. USER.md) on first chat.
-		if ( $user_id > 0 ) {
-			FileScaffolder::ensure_layer( MemoryFileRegistry::LAYER_USER, array( 'user_id' => $user_id ) );
+		$scaffold_ability = wp_get_ability( 'datamachine/scaffold-memory-file' );
+		if ( $user_id > 0 && $scaffold_ability ) {
+			$scaffold_ability->execute( array(
+				'layer'   => MemoryFileRegistry::LAYER_USER,
+				'user_id' => $user_id,
+			) );
 		}
 
 		$outputs = array();

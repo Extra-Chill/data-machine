@@ -1082,17 +1082,19 @@ function datamachine_copy_directory_recursive( string $source_dir, string $targe
  * @since 0.30.0
  */
 function datamachine_ensure_default_memory_files() {
+	$ability = wp_get_ability( 'datamachine/scaffold-memory-file' );
+	if ( ! $ability ) {
+		return;
+	}
+
 	$default_user_id = \DataMachine\Core\FilesRepository\DirectoryManager::get_default_agent_user_id();
 
-	$context = array( 'user_id' => $default_user_id );
-
-	// Scaffold missing files across all layers for the default agent user.
-	\DataMachine\Core\FilesRepository\FileScaffolder::ensure_layer( 'agent', $context );
-	\DataMachine\Core\FilesRepository\FileScaffolder::ensure_layer( 'user', $context );
+	$ability->execute( array( 'layer' => 'agent', 'user_id' => $default_user_id ) );
+	$ability->execute( array( 'layer' => 'user', 'user_id' => $default_user_id ) );
 }
 
 /**
- * Register default content generators for the FileScaffolder.
+ * Register default content generators for datamachine/scaffold-memory-file.
  *
  * Each generator handles one filename and builds content from the
  * context array (user_id, agent_slug, etc.). Generators are composable

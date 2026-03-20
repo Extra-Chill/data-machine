@@ -401,7 +401,13 @@ class AgentMemory {
 	 */
 	private function ensure_file_exists(): void {
 		if ( ! file_exists( $this->file_path ) ) {
-			FileScaffolder::ensure( 'MEMORY.md', array( 'user_id' => $this->user_id ) );
+			$ability = wp_get_ability( 'datamachine/scaffold-memory-file' );
+			if ( $ability ) {
+				$ability->execute( array(
+					'filename' => 'MEMORY.md',
+					'user_id'  => $this->user_id,
+				) );
+			}
 		}
 	}
 
