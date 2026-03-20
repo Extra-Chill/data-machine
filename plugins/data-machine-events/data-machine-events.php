@@ -217,6 +217,13 @@ class DATAMACHINE_Events {
 			new \DataMachineEvents\Steps\Upsert\Events\EventUpsert();
 		}
 
+		// Register event dedup strategy with DM core's duplicate detection system
+		// and identity writer to keep the PostIdentityIndex in sync.
+		if ( class_exists( 'DataMachine\\Core\\Database\\PostIdentityIndex\\PostIdentityIndex' ) ) {
+			\DataMachineEvents\Core\DuplicateDetection\EventDuplicateStrategy::register();
+			\DataMachineEvents\Core\DuplicateDetection\EventIdentityWriter::register();
+		}
+
 		// Load chat tools - self-register via ToolRegistrationTrait
 		new \DataMachineEvents\Api\Chat\Tools\VenueHealthCheck();
 		new \DataMachineEvents\Api\Chat\Tools\UpdateVenue();
