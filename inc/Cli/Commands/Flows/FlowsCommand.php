@@ -811,20 +811,37 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		if ( null !== $handler_config ) {
-			$step_ability = new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility();
-			$step_result  = $step_ability->execute(
-				array(
-					'flow_step_id'   => $step,
-					'handler_config' => $handler_config,
-				)
+			// --handler-config accepts handler-keyed JSON, e.g. {"reddit":{"subreddit":"test"}}.
+			// Unwrap: the key is the handler slug, the value is the config.
+			$handler_slug       = null;
+			$unwrapped_config   = $handler_config;
+			$handler_config_keys = array_keys( $handler_config );
+
+			// If the top-level keys look like handler slugs (single key wrapping a config object),
+			// unwrap the handler slug from the JSON structure.
+			if ( count( $handler_config_keys ) === 1 && is_array( $handler_config[ $handler_config_keys[0] ] ) ) {
+				$handler_slug     = $handler_config_keys[0];
+				$unwrapped_config = $handler_config[ $handler_slug ];
+			}
+
+			$step_input = array(
+				'flow_step_id'   => $step,
+				'handler_config' => $unwrapped_config,
 			);
+
+			if ( $handler_slug ) {
+				$step_input['handler_slug'] = $handler_slug;
+			}
+
+			$step_ability = new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility();
+			$step_result  = $step_ability->execute( $step_input );
 
 			if ( ! $step_result['success'] ) {
 				WP_CLI::error( $step_result['error'] ?? 'Failed to update handler config' );
 				return;
 			}
 
-			$updated_keys = implode( ', ', array_keys( $handler_config ) );
+			$updated_keys = implode( ', ', array_keys( $unwrapped_config ) );
 			WP_CLI::success( sprintf( 'Handler config updated for step %s: %s', $step, $updated_keys ) );
 		}
 	}
