@@ -33,7 +33,7 @@ class ConfigurePipelineStep extends BaseTool {
 		return array(
 			'class'       => self::class,
 			'method'      => 'handle_tool_call',
-			'description' => 'Configure pipeline-level AI step settings including system prompt, provider, model, and enabled tools. Use this for AI steps after creating a pipeline. For flow-level settings (handler, handler_config, user_message), use configure_flow_steps instead.',
+			'description' => 'Configure pipeline-level AI step settings: system prompt and disabled tools. Model/provider are managed via the context_models site setting, not per-pipeline. For flow-level settings (handler, handler_config, user_message), use configure_flow_steps instead.',
 			'parameters'  => array(
 				'pipeline_step_id' => array(
 					'type'        => 'string',
@@ -44,16 +44,6 @@ class ConfigurePipelineStep extends BaseTool {
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'System prompt for the AI step - defines the AI persona and instructions',
-				),
-				'provider'         => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'AI provider slug (e.g., "anthropic", "openai")',
-				),
-				'model'            => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'AI model identifier (e.g., "claude-sonnet-4", "gpt-4o")',
 				),
 				'disabled_tools'   => array(
 					'type'        => 'array',

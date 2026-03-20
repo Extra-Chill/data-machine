@@ -328,12 +328,7 @@ class CreatePipeline extends BaseTool {
 				'handler_configs' => ! empty( $handler_slug ) ? array( $handler_slug => $handler_config ) : array(),
 			);
 
-			if ( isset( $step['provider'] ) ) {
-				$normalized_step['provider'] = $step['provider'];
-			}
-			if ( isset( $step['model'] ) ) {
-				$normalized_step['model'] = $step['model'];
-			}
+			// provider/model are not stored at pipeline level — context system handles resolution.
 			if ( isset( $step['system_prompt'] ) ) {
 				$normalized_step['system_prompt'] = $step['system_prompt'];
 			}

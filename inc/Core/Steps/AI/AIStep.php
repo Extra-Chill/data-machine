@@ -72,8 +72,11 @@ class AIStep extends Step {
 		$pipeline_step_config = $this->engine->getPipelineStepConfig( $pipeline_step_id );
 		$job_snapshot         = $this->engine->get( 'job' );
 		$agent_id             = (int) ( $job_snapshot['agent_id'] ?? 0 );
-		$pipeline_defaults    = PluginSettings::resolveModelForAgentContext( $agent_id, 'pipeline' );
-		$provider_name        = $pipeline_step_config['provider'] ?? $pipeline_defaults['provider'];
+
+		// Model/provider resolved exclusively via context system (agent → site → network).
+		// Pipeline-level model/provider fields are ignored — context_models is the authority.
+		$context_model = PluginSettings::resolveModelForAgentContext( $agent_id, 'pipeline' );
+		$provider_name = $context_model['provider'];
 		if ( empty( $provider_name ) ) {
 			do_action(
 				'datamachine_fail_job',
@@ -82,8 +85,8 @@ class AIStep extends Step {
 				array(
 					'flow_step_id'     => $this->flow_step_id,
 					'pipeline_step_id' => $pipeline_step_id,
-					'error_message'    => 'AI step requires provider configuration. Please configure an AI provider in step settings or set a default provider in plugin settings.',
-					'solution'         => 'Configure AI provider in pipeline step settings or set default provider in Data Machine settings',
+					'error_message'    => 'AI step requires provider configuration. Set a default provider in Data Machine settings or configure context_models.',
+					'solution'         => 'Set default_provider in Data Machine settings or configure context_models for the pipeline context',
 				)
 			);
 			return false;
@@ -226,8 +229,10 @@ class AIStep extends Step {
 			'engine_data'          => $engine_data,
 		) );
 
-		$pipeline_agent_defaults = PluginSettings::resolveModelForAgentContext( $agent_id, 'pipeline' );
-		$provider_name           = $pipeline_step_config['provider'] ?? $pipeline_agent_defaults['provider'];
+		// Model/provider resolved exclusively via context system — pipeline config is ignored.
+		$context_model = PluginSettings::resolveModelForAgentContext( $agent_id, 'pipeline' );
+		$provider_name = $context_model['provider'];
+		$model_name    = $context_model['model'];
 
 		// Execute conversation loop
 		$loop        = new AIConversationLoop();
@@ -235,7 +240,7 @@ class AIStep extends Step {
 			$messages,
 			$available_tools,
 			$provider_name,
-			$pipeline_step_config['model'] ?? $pipeline_agent_defaults['model'],
+			$model_name,
 			ToolPolicyResolver::CONTEXT_PIPELINE,
 			$payload,
 			$max_turns
