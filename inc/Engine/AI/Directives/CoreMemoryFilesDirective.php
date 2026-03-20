@@ -61,7 +61,7 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 		);
 
 		// Auto-scaffold missing user-layer files (e.g. USER.md) on first chat.
-		$scaffold_ability = wp_get_ability( 'datamachine/scaffold-memory-file' );
+		$scaffold_ability = \DataMachine\Abilities\File\ScaffoldAbilities::get_ability();
 		if ( $user_id > 0 && $scaffold_ability ) {
 			$scaffold_ability->execute( array(
 				'layer'   => MemoryFileRegistry::LAYER_USER,

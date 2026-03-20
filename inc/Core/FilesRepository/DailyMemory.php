@@ -195,7 +195,7 @@ class DailyMemory {
 
 		// If file doesn't exist, scaffold it with date header via ability.
 		if ( ! file_exists( $file_path ) ) {
-			$ability = wp_get_ability( 'datamachine/scaffold-memory-file' );
+			$ability = \DataMachine\Abilities\File\ScaffoldAbilities::get_ability();
 			if ( $ability ) {
 				$ability->execute( array(
 					'filename' => "daily/{$year}/{$month}/{$day}.md",
