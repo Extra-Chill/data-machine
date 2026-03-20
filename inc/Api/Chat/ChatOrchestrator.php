@@ -107,7 +107,7 @@ class ChatOrchestrator {
 					)
 				);
 			} else {
-				$create_result = self::createSession( $user_id );
+				$create_result = self::createSession( $user_id, '', $agent_id );
 
 				if ( is_wp_error( $create_result ) ) {
 					return $create_result;
@@ -495,10 +495,12 @@ class ChatOrchestrator {
 	 * @param string $source  Optional source identifier.
 	 * @return string|WP_Error Session ID on success, WP_Error on failure.
 	 */
-	private static function createSession( int $user_id, string $source = '' ): string|WP_Error {
-		$agent_id = function_exists( 'datamachine_resolve_or_create_agent_id' )
-			? datamachine_resolve_or_create_agent_id( $user_id )
-			: 0;
+	private static function createSession( int $user_id, string $source = '', int $agent_id = 0 ): string|WP_Error {
+		if ( $agent_id <= 0 ) {
+			$agent_id = function_exists( 'datamachine_resolve_or_create_agent_id' )
+				? datamachine_resolve_or_create_agent_id( $user_id )
+				: 0;
+		}
 
 		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/create-chat-session' ) : null;
 
