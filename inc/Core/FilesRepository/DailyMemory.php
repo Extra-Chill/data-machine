@@ -193,10 +193,21 @@ class DailyMemory {
 			);
 		}
 
-		// If file doesn't exist, create with date header.
+		// If file doesn't exist, scaffold it with date header via ability.
 		if ( ! file_exists( $file_path ) ) {
-			$header  = "# {$year}-{$month}-{$day}\n\n";
-			$written = $fs->put_contents( $file_path, $header . $content . "\n" );
+			$ability = wp_get_ability( 'datamachine/scaffold-memory-file' );
+			if ( $ability ) {
+				$ability->execute( array(
+					'filename' => "daily/{$year}/{$month}/{$day}.md",
+					'filepath' => $file_path,
+					'date'     => "{$year}-{$month}-{$day}",
+				) );
+			}
+
+			// Append content after the scaffolded header.
+			$_existing_content = $fs->get_contents( $file_path );
+			$_existing_content = ( false !== $_existing_content ) ? $_existing_content : '';
+			$written           = $fs->put_contents( $file_path, $_existing_content . "\n" . $content . "\n" );
 		} else {
 			$_existing_content = $fs->get_contents( $file_path );
 			$_existing_content = ( false !== $_existing_content ) ? $_existing_content : '';

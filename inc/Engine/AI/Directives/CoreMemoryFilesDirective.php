@@ -60,6 +60,15 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 			MemoryFileRegistry::LAYER_NETWORK => $directory_manager->get_network_directory(),
 		);
 
+		// Auto-scaffold missing user-layer files (e.g. USER.md) on first chat.
+		$scaffold_ability = wp_get_ability( 'datamachine/scaffold-memory-file' );
+		if ( $user_id > 0 && $scaffold_ability ) {
+			$scaffold_ability->execute( array(
+				'layer'   => MemoryFileRegistry::LAYER_USER,
+				'user_id' => $user_id,
+			) );
+		}
+
 		$outputs = array();
 
 		// Load all registered files, resolved to their layer directory.

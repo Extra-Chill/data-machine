@@ -400,41 +400,14 @@ class AgentMemory {
 	 * so a recreated MEMORY.md includes the standard sections.
 	 */
 	private function ensure_file_exists(): void {
-		$fs        = FilesystemHelper::get();
-		$agent_dir = $this->directory_manager->get_agent_identity_directory_for_user( $this->user_id );
-
-		if ( ! $this->directory_manager->ensure_directory_exists( $agent_dir ) ) {
-			return;
-		}
-
-		$index_file = trailingslashit( $agent_dir ) . 'index.php';
-		if ( ! file_exists( $index_file ) ) {
-			$fs = FilesystemHelper::get();
-			if ( $fs ) {
-				$fs->put_contents( $index_file, "<?php\n// Silence is golden.\n", FS_CHMOD_FILE );
-				FilesystemHelper::make_group_writable( $index_file );
-			}
-		}
-
 		if ( ! file_exists( $this->file_path ) ) {
-			$content = "# Agent Memory\n";
-
-			if ( function_exists( 'datamachine_get_scaffold_defaults' ) ) {
-				$defaults = datamachine_get_scaffold_defaults();
-				if ( isset( $defaults['MEMORY.md'] ) ) {
-					$content = $defaults['MEMORY.md'] . "\n";
-				}
+			$ability = wp_get_ability( 'datamachine/scaffold-memory-file' );
+			if ( $ability ) {
+				$ability->execute( array(
+					'filename' => 'MEMORY.md',
+					'user_id'  => $this->user_id,
+				) );
 			}
-
-			$fs->put_contents( $this->file_path, $content );
-			FilesystemHelper::make_group_writable( $this->file_path );
-
-			do_action(
-				'datamachine_log',
-				'notice',
-				'Self-healing: created missing MEMORY.md on write path.',
-				array()
-			);
 		}
 	}
 

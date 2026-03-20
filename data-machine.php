@@ -122,6 +122,7 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/File/FileConstants.php';
 	require_once __DIR__ . '/inc/Abilities/File/AgentFileAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/File/FlowFileAbilities.php';
+	require_once __DIR__ . '/inc/Abilities/File/ScaffoldAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/FlowAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/FlowStepAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/JobAbilities.php';
@@ -177,6 +178,7 @@ function datamachine_run_datamachine_plugin() {
 		new \DataMachine\Abilities\AuthAbilities();
 		new \DataMachine\Abilities\File\AgentFileAbilities();
 		new \DataMachine\Abilities\File\FlowFileAbilities();
+		new \DataMachine\Abilities\File\ScaffoldAbilities();
 		new \DataMachine\Abilities\FlowAbilities();
 		new \DataMachine\Abilities\FlowStepAbilities();
 		new \DataMachine\Abilities\JobAbilities();

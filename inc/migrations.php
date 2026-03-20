@@ -1082,46 +1082,176 @@ function datamachine_copy_directory_recursive( string $source_dir, string $targe
  * @since 0.30.0
  */
 function datamachine_ensure_default_memory_files() {
-	$directory_manager = new \DataMachine\Core\FilesRepository\DirectoryManager();
-	$default_user_id   = \DataMachine\Core\FilesRepository\DirectoryManager::get_default_agent_user_id();
-	$agent_dir         = $directory_manager->get_agent_identity_directory_for_user( $default_user_id );
-	$user_dir          = $directory_manager->get_user_directory( $default_user_id );
-
-	// USER.md belongs in the user layer; everything else in the agent identity layer.
-	$user_layer_files = array( 'USER.md' );
-
-	if ( ! $directory_manager->ensure_directory_exists( $agent_dir ) ) {
-		return;
-	}
-	if ( ! $directory_manager->ensure_directory_exists( $user_dir ) ) {
+	$ability = wp_get_ability( 'datamachine/scaffold-memory-file' );
+	if ( ! $ability ) {
 		return;
 	}
 
-	$fs = \DataMachine\Core\FilesRepository\FilesystemHelper::get();
-	if ( ! $fs ) {
-		return;
+	$default_user_id = \DataMachine\Core\FilesRepository\DirectoryManager::get_default_agent_user_id();
+
+	$ability->execute( array( 'layer' => 'agent', 'user_id' => $default_user_id ) );
+	$ability->execute( array( 'layer' => 'user', 'user_id' => $default_user_id ) );
+}
+
+/**
+ * Register default content generators for datamachine/scaffold-memory-file.
+ *
+ * Each generator handles one filename and builds content from the
+ * context array (user_id, agent_slug, etc.). Generators are composable
+ * via the `datamachine_scaffold_content` filter — plugins can override
+ * or extend any file's default content.
+ *
+ * @since 0.50.0
+ */
+function datamachine_register_scaffold_generators(): void {
+	add_filter( 'datamachine_scaffold_content', 'datamachine_scaffold_user_content', 10, 3 );
+	add_filter( 'datamachine_scaffold_content', 'datamachine_scaffold_soul_content', 10, 3 );
+	add_filter( 'datamachine_scaffold_content', 'datamachine_scaffold_memory_content', 10, 3 );
+	add_filter( 'datamachine_scaffold_content', 'datamachine_scaffold_daily_content', 10, 3 );
+}
+add_action( 'plugins_loaded', 'datamachine_register_scaffold_generators', 5 );
+
+/**
+ * Generate USER.md content from WordPress user profile data.
+ *
+ * @since 0.50.0
+ *
+ * @param string $content  Current content (empty if no prior generator).
+ * @param string $filename Filename being scaffolded.
+ * @param array  $context  Scaffolding context with user_id.
+ * @return string
+ */
+function datamachine_scaffold_user_content( string $content, string $filename, array $context ): string {
+	if ( 'USER.md' !== $filename || '' !== $content ) {
+		return $content;
+	}
+
+	$user_id = (int) ( $context['user_id'] ?? 0 );
+	if ( $user_id <= 0 ) {
+		return $content;
+	}
+
+	$user = get_user_by( 'id', $user_id );
+	if ( ! $user ) {
+		return $content;
+	}
+
+	$about_lines   = array();
+	$about_lines[] = sprintf( '- **Name:** %s', $user->display_name );
+	$about_lines[] = sprintf( '- **Username:** %s', $user->user_login );
+
+	$roles = $user->roles;
+	if ( ! empty( $roles ) ) {
+		$role_name     = ucfirst( reset( $roles ) );
+		$about_lines[] = sprintf( '- **Role:** %s', $role_name );
+	}
+
+	if ( ! empty( $user->user_registered ) ) {
+		$registered    = wp_date( 'F Y', strtotime( $user->user_registered ) );
+		$about_lines[] = sprintf( '- **Member since:** %s', $registered );
+	}
+
+	$post_count = count_user_posts( $user_id, 'post', true );
+	if ( $post_count > 0 ) {
+		$about_lines[] = sprintf( '- **Published posts:** %d', $post_count );
+	}
+
+	$description = get_user_meta( $user_id, 'description', true );
+	if ( ! empty( $description ) ) {
+		$clean_bio     = wp_strip_all_tags( $description );
+		$about_lines[] = sprintf( "\n%s", $clean_bio );
+	}
+
+	$about = implode( "\n", $about_lines );
+
+	return <<<MD
+# User Profile
+
+## About
+{$about}
+
+## Preferences
+<!-- Communication style, topics of interest, working hours, things to remember -->
+
+## Goals
+<!-- What are you working toward? Projects, content themes, skills to develop -->
+MD;
+}
+
+/**
+ * Generate SOUL.md content from site and agent context.
+ *
+ * @since 0.50.0
+ *
+ * @param string $content  Current content.
+ * @param string $filename Filename being scaffolded.
+ * @param array  $context  Scaffolding context.
+ * @return string
+ */
+function datamachine_scaffold_soul_content( string $content, string $filename, array $context ): string {
+	if ( 'SOUL.md' !== $filename || '' !== $content ) {
+		return $content;
 	}
 
 	$defaults = datamachine_get_scaffold_defaults();
+	return $defaults['SOUL.md'] ?? '';
+}
 
-	foreach ( $defaults as $filename => $content ) {
-		$target_dir = in_array( $filename, $user_layer_files, true ) ? $user_dir : $agent_dir;
-		$filepath   = "{$target_dir}/{$filename}";
-
-		if ( file_exists( $filepath ) ) {
-			continue;
-		}
-
-		$fs->put_contents( $filepath, $content . "\n", FS_CHMOD_FILE );
-		\DataMachine\Core\FilesRepository\FilesystemHelper::make_group_writable( $filepath );
-
-		do_action(
-			'datamachine_log',
-			'info',
-			sprintf( 'Self-healing: created missing agent file %s with scaffold defaults.', $filename ),
-			array( 'filename' => $filename )
-		);
+/**
+ * Generate MEMORY.md content from site context.
+ *
+ * @since 0.50.0
+ *
+ * @param string $content  Current content.
+ * @param string $filename Filename being scaffolded.
+ * @param array  $context  Scaffolding context.
+ * @return string
+ */
+function datamachine_scaffold_memory_content( string $content, string $filename, array $context ): string {
+	if ( 'MEMORY.md' !== $filename || '' !== $content ) {
+		return $content;
 	}
+
+	$defaults = datamachine_get_scaffold_defaults();
+	return $defaults['MEMORY.md'] ?? '';
+}
+
+/**
+ * Generate daily memory file content with a date header.
+ *
+ * Matches filenames like 'daily/2026/03/20.md'. The context must
+ * include a 'date' key in YYYY-MM-DD format for the header.
+ *
+ * @since 0.50.0
+ *
+ * @param string $content  Current content.
+ * @param string $filename Logical filename (e.g. 'daily/2026/03/20.md').
+ * @param array  $context  Scaffolding context with 'date'.
+ * @return string
+ */
+function datamachine_scaffold_daily_content( string $content, string $filename, array $context ): string {
+	if ( '' !== $content ) {
+		return $content;
+	}
+
+	// Match daily file pattern: daily/YYYY/MM/DD.md.
+	if ( ! preg_match( '#^daily/\d{4}/\d{2}/\d{2}\.md$#', $filename ) ) {
+		return $content;
+	}
+
+	$date = $context['date'] ?? '';
+	if ( empty( $date ) ) {
+		// Extract date from filename path.
+		if ( preg_match( '#^daily/(\d{4})/(\d{2})/(\d{2})\.md$#', $filename, $m ) ) {
+			$date = "{$m[1]}-{$m[2]}-{$m[3]}";
+		}
+	}
+
+	if ( empty( $date ) ) {
+		return $content;
+	}
+
+	return "# {$date}";
 }
 
 /**
