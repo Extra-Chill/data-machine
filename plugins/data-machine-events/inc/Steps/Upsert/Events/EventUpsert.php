@@ -929,7 +929,7 @@ class EventUpsert extends UpdateHandler {
 	private function createEventPost( array $parameters, array $handler_config, EngineData $engine ): int|\WP_Error {
 		$job_id      = (int) ( $parameters['job_id'] ?? 0 );
 		$post_status = WordPressSettingsResolver::getPostStatus( $handler_config );
-		$post_author = WordPressSettingsResolver::getPostAuthor( $handler_config );
+		$post_author = $this->resolvePostAuthor( $handler_config, $engine );
 
 		// Build event data: engine data takes precedence, then AI params
 		$event_data = $this->buildEventData( $parameters, $handler_config, $engine );
@@ -946,6 +946,20 @@ class EventUpsert extends UpdateHandler {
 
 		if ( is_wp_error( $post_id ) || ! $post_id ) {
 			return $post_id;
+		}
+
+		// Store submission metadata when event was user-submitted.
+		$submission = $engine->get( 'submission' );
+		if ( is_array( $submission ) ) {
+			if ( ! empty( $submission['user_id'] ) ) {
+				update_post_meta( $post_id, '_datamachine_submitted_by', (int) $submission['user_id'] );
+			}
+			if ( ! empty( $submission['contact_name'] ) ) {
+				update_post_meta( $post_id, '_datamachine_submitter_name', sanitize_text_field( $submission['contact_name'] ) );
+			}
+			if ( ! empty( $submission['contact_email'] ) ) {
+				update_post_meta( $post_id, '_datamachine_submitter_email', sanitize_email( $submission['contact_email'] ) );
+			}
 		}
 
 		$this->processEventFeaturedImage( $post_id, $handler_config, $engine );
@@ -975,6 +989,35 @@ class EventUpsert extends UpdateHandler {
 		}
 
 		return $post_id;
+	}
+
+	/**
+	 * Resolve post author for event creation.
+	 *
+	 * When an event is submitted by a logged-in user (via the event submission form),
+	 * their user_id is stored in initial_data['submission']['user_id']. This takes
+	 * priority over handler config defaults so submitted events are attributed to
+	 * the submitter.
+	 *
+	 * Resolution order:
+	 * 1. Submission user_id from engine data (user-submitted events)
+	 * 2. WordPressSettingsResolver (system defaults / handler config / fallbacks)
+	 *
+	 * @param array      $handler_config Handler configuration.
+	 * @param EngineData $engine         Engine snapshot helper.
+	 * @return int Post author ID.
+	 */
+	private function resolvePostAuthor( array $handler_config, EngineData $engine ): int {
+		$submission = $engine->get( 'submission' );
+
+		if ( is_array( $submission ) && ! empty( $submission['user_id'] ) ) {
+			$submitter_id = (int) $submission['user_id'];
+			if ( $submitter_id > 0 && get_userdata( $submitter_id ) ) {
+				return $submitter_id;
+			}
+		}
+
+		return WordPressSettingsResolver::getPostAuthor( $handler_config );
 	}
 
 	/**
