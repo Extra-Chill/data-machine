@@ -11,6 +11,7 @@
  *   FileScaffolder::ensure( 'USER.md', [ 'user_id' => 34 ] );
  *   FileScaffolder::ensure( 'SOUL.md', [ 'agent_slug' => 'studio' ] );
  *   FileScaffolder::ensure_layer( 'user', [ 'user_id' => 34 ] );
+ *   FileScaffolder::ensure_at( '/path/to/daily/2026/03/20.md', 'daily/2026/03/20.md', $ctx );
  *
  * @package DataMachine\Core\FilesRepository
  * @since   0.50.0
@@ -25,7 +26,7 @@ defined( 'ABSPATH' ) || exit;
 class FileScaffolder {
 
 	/**
-	 * Ensure a single registered memory file exists.
+	 * Ensure a registered memory file exists.
 	 *
 	 * Resolves the file's layer directory from context, generates default
 	 * content via the `datamachine_scaffold_content` filter, and writes
@@ -67,6 +68,33 @@ class FileScaffolder {
 	}
 
 	/**
+	 * Ensure a file exists at an explicit path.
+	 *
+	 * For dynamic files not in the MemoryFileRegistry (e.g. daily memory
+	 * files at agent/daily/YYYY/MM/DD.md). Content generation still uses
+	 * the `datamachine_scaffold_content` filter with the logical filename.
+	 *
+	 * @param string $filepath         Full filesystem path for the file.
+	 * @param string $logical_filename Logical name passed to the content filter
+	 *                                 (e.g. 'daily/2026/03/20.md').
+	 * @param array  $context          Scaffolding context.
+	 * @return bool True if file was created.
+	 */
+	public static function ensure_at( string $filepath, string $logical_filename, array $context = array() ): bool {
+		if ( file_exists( $filepath ) ) {
+			return false;
+		}
+
+		$content = self::generate_content( $logical_filename, $context );
+		if ( '' === $content ) {
+			return false;
+		}
+
+		$directory = dirname( $filepath );
+		return self::write_file( $filepath, $directory, $content, $logical_filename, $context );
+	}
+
+	/**
 	 * Ensure all registered files for a given layer exist.
 	 *
 	 * @param string $layer   Layer identifier ('shared', 'agent', 'user', 'network').
@@ -89,7 +117,7 @@ class FileScaffolder {
 	/**
 	 * Generate default content for a file via the filter chain.
 	 *
-	 * @param string $filename Filename.
+	 * @param string $filename Filename (or logical path for dynamic files).
 	 * @param array  $context  Scaffolding context.
 	 * @return string Generated content, or empty string if no generator registered.
 	 */
@@ -104,8 +132,9 @@ class FileScaffolder {
 		 * @since 0.50.0
 		 *
 		 * @param string $content  Default content (empty string).
-		 * @param string $filename The filename being scaffolded.
-		 * @param array  $context  Scaffolding context (user_id, agent_slug, etc.).
+		 * @param string $filename The filename being scaffolded (e.g. 'USER.md',
+		 *                         'SOUL.md', or 'daily/2026/03/20.md').
+		 * @param array  $context  Scaffolding context (user_id, agent_slug, date, etc.).
 		 */
 		$content = apply_filters( 'datamachine_scaffold_content', '', $filename, $context );
 
@@ -119,7 +148,7 @@ class FileScaffolder {
 	 * @param array  $context Scaffolding context.
 	 * @return string|null Directory path, or null if unresolvable.
 	 */
-	private static function resolve_directory( string $layer, array $context ): ?string {
+	public static function resolve_directory( string $layer, array $context ): ?string {
 		$dm = new DirectoryManager();
 
 		switch ( $layer ) {
@@ -137,7 +166,6 @@ class FileScaffolder {
 				return $dm->get_user_directory( $user_id );
 
 			case MemoryFileRegistry::LAYER_AGENT:
-				// Resolve agent directory from slug or ID.
 				$agent_slug = $context['agent_slug'] ?? null;
 				if ( $agent_slug ) {
 					return $dm->get_agent_identity_directory( $agent_slug );
@@ -147,7 +175,6 @@ class FileScaffolder {
 					$slug = $dm->resolve_agent_slug( array( 'agent_id' => $agent_id ) );
 					return $dm->get_agent_identity_directory( $slug );
 				}
-				// Fall back to user-based resolution.
 				$user_id = (int) ( $context['user_id'] ?? 0 );
 				return $dm->get_agent_identity_directory_for_user( $user_id );
 
@@ -177,7 +204,6 @@ class FileScaffolder {
 			return false;
 		}
 
-		// Ensure trailing newline.
 		$fs->put_contents( $filepath, $content . "\n", FS_CHMOD_FILE );
 		FilesystemHelper::make_group_writable( $filepath );
 

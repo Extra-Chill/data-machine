@@ -1105,6 +1105,7 @@ function datamachine_register_scaffold_generators(): void {
 	add_filter( 'datamachine_scaffold_content', 'datamachine_scaffold_user_content', 10, 3 );
 	add_filter( 'datamachine_scaffold_content', 'datamachine_scaffold_soul_content', 10, 3 );
 	add_filter( 'datamachine_scaffold_content', 'datamachine_scaffold_memory_content', 10, 3 );
+	add_filter( 'datamachine_scaffold_content', 'datamachine_scaffold_daily_content', 10, 3 );
 }
 add_action( 'plugins_loaded', 'datamachine_register_scaffold_generators', 5 );
 
@@ -1211,6 +1212,44 @@ function datamachine_scaffold_memory_content( string $content, string $filename,
 
 	$defaults = datamachine_get_scaffold_defaults();
 	return $defaults['MEMORY.md'] ?? '';
+}
+
+/**
+ * Generate daily memory file content with a date header.
+ *
+ * Matches filenames like 'daily/2026/03/20.md'. The context must
+ * include a 'date' key in YYYY-MM-DD format for the header.
+ *
+ * @since 0.50.0
+ *
+ * @param string $content  Current content.
+ * @param string $filename Logical filename (e.g. 'daily/2026/03/20.md').
+ * @param array  $context  Scaffolding context with 'date'.
+ * @return string
+ */
+function datamachine_scaffold_daily_content( string $content, string $filename, array $context ): string {
+	if ( '' !== $content ) {
+		return $content;
+	}
+
+	// Match daily file pattern: daily/YYYY/MM/DD.md.
+	if ( ! preg_match( '#^daily/\d{4}/\d{2}/\d{2}\.md$#', $filename ) ) {
+		return $content;
+	}
+
+	$date = $context['date'] ?? '';
+	if ( empty( $date ) ) {
+		// Extract date from filename path.
+		if ( preg_match( '#^daily/(\d{4})/(\d{2})/(\d{2})\.md$#', $filename, $m ) ) {
+			$date = "{$m[1]}-{$m[2]}-{$m[3]}";
+		}
+	}
+
+	if ( empty( $date ) ) {
+		return $content;
+	}
+
+	return "# {$date}";
 }
 
 /**
