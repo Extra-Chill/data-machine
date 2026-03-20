@@ -422,11 +422,16 @@ function datamachine_remove_capabilities(): void {
 function datamachine_deactivate_plugin() {
 	datamachine_remove_capabilities();
 
-	// Unschedule recurring maintenance actions.
+	// Unschedule all recurring maintenance actions.
 	if ( function_exists( 'as_unschedule_all_actions' ) ) {
 		as_unschedule_all_actions( 'datamachine_cleanup_stale_claims', array(), 'datamachine-maintenance' );
 		as_unschedule_all_actions( 'datamachine_cleanup_failed_jobs', array(), 'datamachine-maintenance' );
+		as_unschedule_all_actions( 'datamachine_cleanup_completed_jobs', array(), 'datamachine-maintenance' );
 		as_unschedule_all_actions( 'datamachine_cleanup_logs', array(), 'datamachine-maintenance' );
+		as_unschedule_all_actions( 'datamachine_cleanup_processed_items', array(), 'datamachine-maintenance' );
+		as_unschedule_all_actions( 'datamachine_cleanup_as_actions', array(), 'datamachine-maintenance' );
+		as_unschedule_all_actions( 'datamachine_cleanup_old_files', array(), 'datamachine-files' );
+		as_unschedule_all_actions( 'datamachine_cleanup_chat_sessions', array(), 'datamachine-chat' );
 	}
 }
 

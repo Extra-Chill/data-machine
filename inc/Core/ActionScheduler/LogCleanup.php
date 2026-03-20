@@ -24,10 +24,11 @@ add_action(
 		 * Filter the maximum log entry age in days before cleanup.
 		 *
 		 * @since 0.37.1
+		 * @since 0.40.0 Default reduced from 30 to 7 days.
 		 *
-		 * @param int $max_age_days Maximum log entry age in days. Default 30.
+		 * @param int $max_age_days Maximum log entry age in days. Default 7.
 		 */
-		$max_age_days = apply_filters( 'datamachine_log_max_age_days', 30 );
+		$max_age_days = apply_filters( 'datamachine_log_max_age_days', 7 );
 
 		$before_datetime = gmdate( 'Y-m-d H:i:s', time() - ( $max_age_days * DAY_IN_SECONDS ) );
 
