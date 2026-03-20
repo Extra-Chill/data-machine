@@ -811,20 +811,41 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		if ( null !== $handler_config ) {
+			// Unwrap handler-keyed JSON, e.g. {"agent_ping":{"prompt":"..."}}.
+			// The outer key is the handler slug; the inner object is the actual config.
+			// This mirrors the --handler-config parsing in createFlow().
+			$resolved_slug   = null;
+			$resolved_config = $handler_config;
+
+			$handler_abilities = new \DataMachine\Abilities\HandlerAbilities();
+			$all_handlers      = $handler_abilities->getAllHandlers();
+
+			if ( 1 === count( $handler_config ) ) {
+				$first_key = array_key_first( $handler_config );
+				if ( isset( $all_handlers[ $first_key ] ) && is_array( $handler_config[ $first_key ] ) ) {
+					$resolved_slug   = $first_key;
+					$resolved_config = $handler_config[ $first_key ];
+				}
+			}
+
 			$step_ability = new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility();
-			$step_result  = $step_ability->execute(
-				array(
-					'flow_step_id'   => $step,
-					'handler_config' => $handler_config,
-				)
+			$step_input   = array(
+				'flow_step_id'   => $step,
+				'handler_config' => $resolved_config,
 			);
+
+			if ( null !== $resolved_slug ) {
+				$step_input['handler_slug'] = $resolved_slug;
+			}
+
+			$step_result = $step_ability->execute( $step_input );
 
 			if ( ! $step_result['success'] ) {
 				WP_CLI::error( $step_result['error'] ?? 'Failed to update handler config' );
 				return;
 			}
 
-			$updated_keys = implode( ', ', array_keys( $handler_config ) );
+			$updated_keys = implode( ', ', array_keys( $resolved_config ) );
 			WP_CLI::success( sprintf( 'Handler config updated for step %s: %s', $step, $updated_keys ) );
 		}
 	}
