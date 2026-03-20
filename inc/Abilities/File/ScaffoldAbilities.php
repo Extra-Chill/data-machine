@@ -104,6 +104,27 @@ class ScaffoldAbilities {
 		);
 	}
 
+	/**
+	 * Get the scaffold ability safely, without triggering _doing_it_wrong.
+	 *
+	 * Returns null if the Abilities API hasn't loaded yet (e.g. in test
+	 * environments or very early execution contexts). All callers should
+	 * use this instead of wp_get_ability() directly.
+	 *
+	 * @since 0.50.0
+	 *
+	 * @return \WP_Ability|null The scaffold ability, or null if not available.
+	 */
+	public static function get_ability(): ?\WP_Ability {
+		if ( ! class_exists( 'WP_Abilities_Registry' ) ) {
+			return null;
+		}
+		if ( ! \WP_Abilities_Registry::get_instance()->is_registered( 'datamachine/scaffold-memory-file' ) ) {
+			return null;
+		}
+		return wp_get_ability( 'datamachine/scaffold-memory-file' );
+	}
+
 	// =========================================================================
 	// Execution
 	// =========================================================================

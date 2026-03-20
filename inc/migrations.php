@@ -1069,7 +1069,7 @@ function datamachine_copy_directory_recursive( string $source_dir, string $targe
  * @since 0.30.0
  */
 function datamachine_ensure_default_memory_files() {
-	$ability = wp_get_ability( 'datamachine/scaffold-memory-file' );
+	$ability = \DataMachine\Abilities\File\ScaffoldAbilities::get_ability();
 	if ( ! $ability ) {
 		return;
 	}
