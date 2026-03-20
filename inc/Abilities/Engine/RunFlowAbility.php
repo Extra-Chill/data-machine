@@ -190,6 +190,13 @@ class RunFlowAbility {
 			'pipeline_config' => $pipeline_config,
 		);
 
+		// Preserve any pre-existing engine data (e.g. initial_data from ExecuteWorkflowAbility
+		// which may contain submission context, webhook payloads, etc.).
+		$existing_data = \DataMachine\Core\EngineData::retrieve( $job_id );
+		if ( ! empty( $existing_data ) ) {
+			$engine_snapshot = array_merge( $existing_data, $engine_snapshot );
+		}
+
 		datamachine_set_engine_data( $job_id, $engine_snapshot );
 
 		$first_flow_step_id = null;
