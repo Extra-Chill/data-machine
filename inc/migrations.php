@@ -1125,6 +1125,116 @@ function datamachine_ensure_default_memory_files() {
 }
 
 /**
+ * Scaffold a USER.md for any WordPress user from their profile data.
+ *
+ * Called on first chat when a user's USER.md does not yet exist.
+ * Pulls available data from the WordPress user profile to create
+ * a useful starting point that the user (or an admin) can customize.
+ *
+ * @since 0.50.0
+ *
+ * @param int $user_id WordPress user ID.
+ * @return bool True if file was created, false otherwise.
+ */
+function datamachine_scaffold_user_md( int $user_id ): bool {
+	if ( $user_id <= 0 ) {
+		return false;
+	}
+
+	$user = get_user_by( 'id', $user_id );
+	if ( ! $user ) {
+		return false;
+	}
+
+	$directory_manager = new \DataMachine\Core\FilesRepository\DirectoryManager();
+	$user_dir          = $directory_manager->get_user_directory( $user_id );
+	$filepath          = trailingslashit( $user_dir ) . 'USER.md';
+
+	// Don't overwrite existing files.
+	if ( file_exists( $filepath ) ) {
+		return false;
+	}
+
+	$fs = \DataMachine\Core\FilesRepository\FilesystemHelper::get();
+	if ( ! $fs ) {
+		return false;
+	}
+
+	if ( ! $directory_manager->ensure_directory_exists( $user_dir ) ) {
+		return false;
+	}
+
+	// Build the about section from WordPress profile data.
+	$about_lines   = array();
+	$about_lines[] = sprintf( '- **Name:** %s', $user->display_name );
+	$about_lines[] = sprintf( '- **Username:** %s', $user->user_login );
+
+	// Role on the site (use primary role).
+	$roles = $user->roles;
+	if ( ! empty( $roles ) ) {
+		$role_name     = ucfirst( reset( $roles ) );
+		$about_lines[] = sprintf( '- **Role:** %s', $role_name );
+	}
+
+	// Member since.
+	if ( ! empty( $user->user_registered ) ) {
+		$registered    = wp_date( 'F Y', strtotime( $user->user_registered ) );
+		$about_lines[] = sprintf( '- **Member since:** %s', $registered );
+	}
+
+	// Published content count.
+	$post_count = count_user_posts( $user_id, 'post', true );
+	if ( $post_count > 0 ) {
+		$about_lines[] = sprintf( '- **Published posts:** %d', $post_count );
+	}
+
+	// Bio from WordPress profile.
+	$description = get_user_meta( $user_id, 'description', true );
+	if ( ! empty( $description ) ) {
+		// Strip HTML tags from bio for clean markdown.
+		$clean_bio     = wp_strip_all_tags( $description );
+		$about_lines[] = sprintf( "\n%s", $clean_bio );
+	}
+
+	$about = implode( "\n", $about_lines );
+
+	$content = <<<MD
+# User Profile
+
+## About
+{$about}
+
+## Preferences
+<!-- Communication style, topics of interest, working hours, things to remember -->
+
+## Goals
+<!-- What are you working toward? Projects, content themes, skills to develop -->
+MD;
+
+	$fs->put_contents( $filepath, $content . "\n", FS_CHMOD_FILE );
+	\DataMachine\Core\FilesRepository\FilesystemHelper::make_group_writable( $filepath );
+
+	// Add index.php for directory listing protection.
+	$index_path = trailingslashit( $user_dir ) . 'index.php';
+	if ( ! file_exists( $index_path ) ) {
+		$fs->put_contents( $index_path, "<?php\n// Silence is golden.\n", FS_CHMOD_FILE );
+		\DataMachine\Core\FilesRepository\FilesystemHelper::make_group_writable( $index_path );
+	}
+
+	do_action(
+		'datamachine_log',
+		'info',
+		sprintf( 'Scaffolded USER.md for user %d (%s) from WordPress profile.', $user_id, $user->user_login ),
+		array(
+			'user_id'  => $user_id,
+			'filepath' => $filepath,
+		)
+	);
+
+	return true;
+}
+
+/**
  * Backfill agent_id on pipelines, flows, and jobs from user_id → owner_id mapping.
  *
  * For existing rows that have user_id > 0 but no agent_id, looks up the agent
