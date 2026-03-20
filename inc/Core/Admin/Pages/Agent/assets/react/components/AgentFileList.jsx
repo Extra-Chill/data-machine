@@ -369,6 +369,7 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 										onSelectFile( {
 											type: 'core',
 											filename: file.filename,
+											editable: file.editable !== false,
 										} )
 									}
 									role="button"
@@ -381,6 +382,7 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 											onSelectFile( {
 												type: 'core',
 												filename: file.filename,
+												editable: file.editable !== false,
 											} );
 										}
 									} }
@@ -388,6 +390,14 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 									<div className="datamachine-agent-file-item-info">
 										<span className="datamachine-agent-file-item-name">
 											{ file.filename }
+											{ file.editable === false && (
+												<span
+													className="datamachine-agent-file-readonly-icon"
+													title="Read-only"
+												>
+													&#x1f512;
+												</span>
+											) }
 										</span>
 										<span className="datamachine-agent-file-item-meta">
 											{ formatSize( file.size ) }

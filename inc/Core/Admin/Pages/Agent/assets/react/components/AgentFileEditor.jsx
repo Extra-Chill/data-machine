@@ -26,8 +26,9 @@ import {
 
 /**
  * Core file editor — uses existing agent file API.
+ * Renders read-only for non-editable files (e.g. SITE.md, NETWORK.md).
  */
-const CoreFileEditor = ( { filename } ) => {
+const CoreFileEditor = ( { filename, editable = true } ) => {
 	const { data: file, isLoading, error } = useAgentFile( filename );
 	const saveMutation = useSaveAgentFile();
 	const [ content, setContent ] = useState( '' );
@@ -82,18 +83,32 @@ const CoreFileEditor = ( { filename } ) => {
 		<div className="datamachine-agent-editor">
 			<div className="datamachine-agent-editor-header">
 				<h3>{ filename }</h3>
+				{ ! editable && (
+					<span className="datamachine-agent-editor-readonly-badge">
+						Read-only
+					</span>
+				) }
 			</div>
+			{ ! editable && (
+				<div className="datamachine-agent-editor-readonly-notice">
+					This file is auto-generated and cannot be edited here.
+					Use PHP filters to extend its content.
+				</div>
+			) }
 			<textarea
 				className="datamachine-agent-editor-textarea code"
 				value={ content }
 				onChange={ handleContentChange }
 				spellCheck={ false }
+				readOnly={ ! editable }
 			/>
-			<SettingsSaveBar
-				hasChanges={ hasChanges }
-				saveStatus={ saveStatus }
-				onSave={ handleSave }
-			/>
+			{ editable && (
+				<SettingsSaveBar
+					hasChanges={ hasChanges }
+					saveStatus={ saveStatus }
+					onSave={ handleSave }
+				/>
+			) }
 		</div>
 	);
 };
@@ -202,7 +217,12 @@ const AgentFileEditor = ( { selectedFile } ) => {
 		);
 	}
 
-	return <CoreFileEditor filename={ selectedFile.filename } />;
+	return (
+		<CoreFileEditor
+			filename={ selectedFile.filename }
+			editable={ selectedFile.editable !== false }
+		/>
+	);
 };
 
 export default AgentFileEditor;

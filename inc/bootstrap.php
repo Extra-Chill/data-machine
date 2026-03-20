@@ -65,14 +65,16 @@ use DataMachine\Engine\AI\MemoryFileRegistry;
 MemoryFileRegistry::register( 'SITE.md', 10, array(
 	'layer'       => MemoryFileRegistry::LAYER_SHARED,
 	'protected'   => true,
+	'editable'    => false,
 	'label'       => 'Site Context',
-	'description' => 'Site-wide context shared by all agents.',
+	'description' => 'Auto-generated site context. Read-only — extend via PHP filters.',
 ) );
 MemoryFileRegistry::register( 'RULES.md', 15, array(
 	'layer'       => MemoryFileRegistry::LAYER_SHARED,
 	'protected'   => true,
+	'editable'    => 'manage_options',
 	'label'       => 'Site Rules',
-	'description' => 'Behavioral constraints that apply to every agent.',
+	'description' => 'Behavioral constraints that apply to every agent. Admin-editable.',
 ) );
 
 // Agent layer — identity and knowledge, scoped to a single agent.
@@ -101,8 +103,9 @@ MemoryFileRegistry::register( 'USER.md', 25, array(
 MemoryFileRegistry::register( 'NETWORK.md', 5, array(
 	'layer'       => MemoryFileRegistry::LAYER_NETWORK,
 	'protected'   => true,
+	'editable'    => false,
 	'label'       => 'Network Context',
-	'description' => 'WordPress multisite network topology and shared resources.',
+	'description' => 'Auto-generated multisite network topology. Read-only — extend via PHP filters.',
 ) );
 // SITE.md auto-regeneration — replaces the former SiteContext + SiteContextDirective system.
 // SITE.md is now the single source of truth for site context, auto-refreshing on structural changes.
