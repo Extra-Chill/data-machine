@@ -21,6 +21,7 @@
 		"yauzl": "^3.2.1"
 	},
 	"dependencies": {
+		"@extrachill/chat": "github:Extra-Chill/chat",
 		"@tanstack/react-query": "^5.90.12",
 		"@tanstack/react-query-devtools": "^5.91.1",
 		"@wordpress/api-fetch": "^7.36.0",
