@@ -512,7 +512,8 @@ class Chat {
 		}
 
 		// --- Extract and resolve params ---
-		$message = sanitize_textarea_field( wp_unslash( $request->get_param( 'message' ) ) );
+		$message  = sanitize_textarea_field( wp_unslash( $request->get_param( 'message' ) ) );
+		$agent_id = (int) $request->get_param( 'agent_id' );
 
 		$provider = $request->get_param( 'provider' );
 		$model    = $request->get_param( 'model' );

@@ -47,6 +47,12 @@ class MemoryFilesReader {
 			return array();
 		}
 
+		// Ensure WP_Filesystem is initialized (not available by default in REST API context).
+		if ( ! $wp_filesystem ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+			WP_Filesystem();
+		}
+
 		$directory_manager = new DirectoryManager();
 		$user_id           = $directory_manager->get_effective_user_id( $user_id );
 
