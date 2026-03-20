@@ -2,7 +2,11 @@
   "auto_cleanup": false,
   "changelog_target": "docs/CHANGELOG.md",
   "extensions": {
-    "wordpress": {}
+    "wordpress": {
+      "php": "8.3",
+      "node": "20",
+      "database_type": "mysql"
+    }
   },
   "id": "data-machine-events",
   "version_targets": [
