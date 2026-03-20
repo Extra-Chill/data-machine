@@ -45,6 +45,10 @@ class MemoryCommand extends BaseCommand {
 	 * [<section>]
 	 * : Section name to read (without ##). If omitted, returns full file.
 	 *
+	 * [--agent=<slug>]
+	 * : Agent slug or numeric ID. When provided, reads that agent's memory
+	 *   instead of the current user's agent.
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     # Read full memory file
@@ -56,7 +60,10 @@ class MemoryCommand extends BaseCommand {
 	 *     # Read lessons learned
 	 *     wp datamachine agent read "Lessons Learned"
 	 *
-	 *     # Read memory for a specific user/agent
+	 *     # Read memory for a specific agent
+	 *     wp datamachine agent read --agent=studio
+	 *
+	 *     # Read memory for a specific user
 	 *     wp datamachine agent read --user=2
 	 *
 	 * @subcommand read
@@ -88,6 +95,9 @@ class MemoryCommand extends BaseCommand {
 	 *
 	 * ## OPTIONS
 	 *
+	 * [--agent=<slug>]
+	 * : Agent slug or numeric ID.
+	 *
 	 * [--format=<format>]
 	 * : Output format.
 	 * ---
@@ -106,6 +116,9 @@ class MemoryCommand extends BaseCommand {
 	 *
 	 *     # List as JSON
 	 *     wp datamachine agent sections --format=json
+	 *
+	 *     # List sections for a specific agent
+	 *     wp datamachine agent sections --agent=studio
 	 *
 	 * @subcommand sections
 	 */
@@ -146,6 +159,9 @@ class MemoryCommand extends BaseCommand {
 	 * <content>
 	 * : Content to write. Use quotes for multi-word content.
 	 *
+	 * [--agent=<slug>]
+	 * : Agent slug or numeric ID.
+	 *
 	 * [--mode=<mode>]
 	 * : Write mode.
 	 * ---
@@ -165,6 +181,9 @@ class MemoryCommand extends BaseCommand {
 	 *
 	 *     # Create a new section
 	 *     wp datamachine agent write "New Section" "Initial content"
+	 *
+	 *     # Write to a specific agent's memory
+	 *     wp datamachine agent write "State" "- Studio agent active" --agent=studio
 	 *
 	 * @subcommand write
 	 */
@@ -212,6 +231,9 @@ class MemoryCommand extends BaseCommand {
 	 * <query>
 	 * : Search term (case-insensitive).
 	 *
+	 * [--agent=<slug>]
+	 * : Agent slug or numeric ID.
+	 *
 	 * [--section=<section>]
 	 * : Limit search to a specific section.
 	 *
@@ -222,6 +244,9 @@ class MemoryCommand extends BaseCommand {
 	 *
 	 *     # Search within a section
 	 *     wp datamachine agent search "docker" --section="Lessons Learned"
+	 *
+	 *     # Search a specific agent's memory
+	 *     wp datamachine agent search "socials" --agent=studio
 	 *
 	 * @subcommand search
 	 */
@@ -277,6 +302,9 @@ class MemoryCommand extends BaseCommand {
 	 *
 	 * [<content>]
 	 * : Content for write/append actions.
+	 *
+	 * [--agent=<slug>]
+	 * : Agent slug or numeric ID.
 	 *
 	 * ## EXAMPLES
 	 *
@@ -537,6 +565,11 @@ class MemoryCommand extends BaseCommand {
 	 * [<filename>]
 	 * : Filename for read/write actions (e.g., SOUL.md, USER.md).
 	 *
+	 * [--agent=<slug>]
+	 * : Agent slug or numeric ID. When provided, operates on that agent's
+	 *   files instead of the current user's agent. Required for managing
+	 *   shared agents in multi-agent setups.
+	 *
 	 * [--days=<days>]
 	 * : Staleness threshold in days for the check action.
 	 * ---
@@ -559,17 +592,29 @@ class MemoryCommand extends BaseCommand {
 	 *     # List all agent files with timestamps and sizes
 	 *     wp datamachine agent files list
 	 *
+	 *     # List files for a specific agent
+	 *     wp datamachine agent files list --agent=studio
+	 *
 	 *     # Read an agent file
 	 *     wp datamachine agent files read SOUL.md
 	 *
+	 *     # Read a specific agent's SOUL.md
+	 *     wp datamachine agent files read SOUL.md --agent=studio
+	 *
 	 *     # Write to an agent file via stdin
 	 *     cat new-soul.md | wp datamachine agent files write SOUL.md
+	 *
+	 *     # Write to a specific agent's file via stdin
+	 *     cat soul.md | wp datamachine agent files write SOUL.md --agent=studio
 	 *
 	 *     # Check for stale files (not updated in 7 days)
 	 *     wp datamachine agent files check
 	 *
 	 *     # Check with custom threshold
 	 *     wp datamachine agent files check --days=14
+	 *
+	 *     # Check a specific agent's files
+	 *     wp datamachine agent files check --agent=studio
 	 *
 	 * @subcommand files
 	 */
