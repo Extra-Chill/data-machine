@@ -491,49 +491,18 @@ class PipelineSteps {
 		$pipeline_config = $pipeline['pipeline_config'] ?? array();
 		$existing_config = $pipeline_config[ $pipeline_step_id ] ?? array();
 
-		// Build step configuration data for AI steps
+		// Build step configuration data for AI steps.
+		// Note: provider/model are NOT configurable at the pipeline step level.
+		// Model resolution is handled by the context system (context_models setting).
 		$step_config_data = array();
 		$api_key_saved    = false;
 
-		// Handle AI step configuration.
-		$has_provider       = $request->has_param( 'provider' );
-		$has_model          = $request->has_param( 'model' );
 		$has_system_prompt  = $request->has_param( 'system_prompt' );
 		$has_disabled_tools = $request->has_param( 'disabled_tools' );
 		$has_api_key        = $request->has_param( 'ai_api_key' );
 
-		$effective_provider = $has_provider
-			? sanitize_text_field( $request->get_param( 'provider' ) )
-			: ( $existing_config['provider'] ?? '' );
-		$effective_model    = $has_model
-			? sanitize_text_field( $request->get_param( 'model' ) )
-			: ( $existing_config['model'] ?? '' );
-		$system_prompt      = $has_system_prompt
-			? sanitize_textarea_field( $request->get_param( 'system_prompt' ) )
-			: null;
-
-		if ( $has_provider ) {
-			$step_config_data['provider'] = $effective_provider;
-		}
-
-		if ( $has_model ) {
-			$step_config_data['model'] = $effective_model;
-
-			$provider_for_model = $has_provider ? $effective_provider : ( $existing_config['provider'] ?? '' );
-
-			if ( ! empty( $provider_for_model ) && ! empty( $effective_model ) ) {
-				if ( ! isset( $step_config_data['providers'] ) ) {
-					$step_config_data['providers'] = array();
-				}
-				if ( ! isset( $step_config_data['providers'][ $provider_for_model ] ) ) {
-					$step_config_data['providers'][ $provider_for_model ] = array();
-				}
-				$step_config_data['providers'][ $provider_for_model ]['model'] = $effective_model;
-			}
-		}
-
 		if ( $has_system_prompt ) {
-			$step_config_data['system_prompt'] = $system_prompt;
+			$step_config_data['system_prompt'] = sanitize_textarea_field( $request->get_param( 'system_prompt' ) );
 		}
 
 		if ( $has_disabled_tools ) {

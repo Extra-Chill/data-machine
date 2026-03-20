@@ -502,11 +502,9 @@ class ExecuteWorkflowAbility {
 				'flow_id'          => 'direct',
 			);
 
-			// Pipeline config (AI settings only)
+			// Pipeline config (AI settings only — model/provider resolved via context system, not stored here).
 			if ( 'ai' === $step['type'] ) {
 				$pipeline_config[ $pipeline_step_id ] = array(
-					'provider'       => $step['provider'] ?? '',
-					'model'          => $step['model'] ?? '',
 					'system_prompt'  => $step['system_prompt'] ?? '',
 					'disabled_tools' => $step['disabled_tools'] ?? array(),
 				);

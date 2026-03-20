@@ -148,7 +148,7 @@ class PipelineStepAbilities {
 			'datamachine/update-pipeline-step',
 			array(
 				'label'               => __( 'Update Pipeline Step', 'data-machine' ),
-				'description'         => __( 'Update pipeline step configuration (system prompt, provider, model, enabled tools).', 'data-machine' ),
+				'description'         => __( 'Update pipeline step configuration (system prompt, disabled tools). Model/provider are configured via context_models setting.', 'data-machine' ),
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -161,14 +161,6 @@ class PipelineStepAbilities {
 						'system_prompt'    => array(
 							'type'        => 'string',
 							'description' => __( 'System prompt for AI step', 'data-machine' ),
-						),
-						'provider'         => array(
-							'type'        => 'string',
-							'description' => __( 'AI provider slug (e.g., "anthropic", "openai")', 'data-machine' ),
-						),
-						'model'            => array(
-							'type'        => 'string',
-							'description' => __( 'AI model identifier', 'data-machine' ),
 						),
 						'disabled_tools'   => array(
 							'type'        => 'array',
@@ -508,14 +500,15 @@ class PipelineStepAbilities {
 		}
 
 		$system_prompt  = $input['system_prompt'] ?? null;
-		$provider       = $input['provider'] ?? null;
-		$model          = $input['model'] ?? null;
 		$disabled_tools = $input['disabled_tools'] ?? null;
 
-		if ( null === $system_prompt && null === $provider && null === $model && null === $disabled_tools ) {
+		// provider/model are no longer configurable at the pipeline step level.
+		// Model resolution is handled exclusively by the context system (context_models setting).
+
+		if ( null === $system_prompt && null === $disabled_tools ) {
 			return array(
 				'success' => false,
-				'error'   => 'At least one of system_prompt, provider, model, or disabled_tools is required',
+				'error'   => 'At least one of system_prompt or disabled_tools is required',
 			);
 		}
 
@@ -547,27 +540,6 @@ class PipelineStepAbilities {
 		if ( null !== $system_prompt ) {
 			$step_config_data['system_prompt'] = wp_unslash( $system_prompt );
 			$updated_fields[]                  = 'system_prompt';
-		}
-
-		if ( null !== $provider ) {
-			$step_config_data['provider'] = sanitize_text_field( $provider );
-			$updated_fields[]             = 'provider';
-		}
-
-		if ( null !== $model ) {
-			$step_config_data['model'] = sanitize_text_field( $model );
-			$updated_fields[]          = 'model';
-
-			$provider_for_model = $provider ?? ( $existing_config['provider'] ?? '' );
-			if ( ! empty( $provider_for_model ) ) {
-				if ( ! isset( $step_config_data['providers'] ) ) {
-					$step_config_data['providers'] = $existing_config['providers'] ?? array();
-				}
-				if ( ! isset( $step_config_data['providers'][ $provider_for_model ] ) ) {
-					$step_config_data['providers'][ $provider_for_model ] = array();
-				}
-				$step_config_data['providers'][ $provider_for_model ]['model'] = sanitize_text_field( $model );
-			}
 		}
 
 		if ( null !== $disabled_tools && is_array( $disabled_tools ) ) {
