@@ -569,7 +569,20 @@ function datamachine_get_site_scaffold_content(): string {
 		$lines[] = '- **Custom namespaces:** ' . implode( ', ', $rest_namespaces );
 	}
 
-	return implode( "\n", $lines ) . "\n";
+	$content = implode( "\n", $lines ) . "\n";
+
+	/**
+	 * Filter the auto-generated SITE.md content.
+	 *
+	 * Allows plugins and themes to append or modify the site context
+	 * that is injected into AI agent calls. SITE.md is read-only in the
+	 * admin UI; this filter is the only extension point.
+	 *
+	 * @since 0.50.0
+	 *
+	 * @param string $content The generated SITE.md markdown content.
+	 */
+	return apply_filters( 'datamachine_site_scaffold_content', $content );
 }
 
 /**
@@ -579,10 +592,11 @@ function datamachine_get_site_scaffold_content(): string {
  * themes, post types, taxonomies, options). Debounced via a short-lived
  * transient to avoid excessive writes during bulk operations.
  *
- * Preserves user-added content below the auto-generated section by
- * looking for a <!-- CUSTOM --> marker.
+ * SITE.md is read-only — it is fully regenerated from live WordPress data.
+ * To extend SITE.md content, use the `datamachine_site_scaffold_content` filter.
  *
  * @since 0.48.0
+ * @since 0.50.0 Removed <!-- CUSTOM --> marker; SITE.md is now read-only.
  * @return void
  */
 function datamachine_regenerate_site_md(): void {
@@ -606,22 +620,7 @@ function datamachine_regenerate_site_md(): void {
 		return;
 	}
 
-	// Preserve user-added content below <!-- CUSTOM --> marker.
-	$custom_content = '';
-	if ( file_exists( $site_md_path ) ) {
-		$existing = $fs->get_contents( $site_md_path );
-		$marker   = '<!-- CUSTOM -->';
-		$pos      = strpos( $existing, $marker );
-		if ( false !== $pos ) {
-			$custom_content = substr( $existing, $pos );
-		}
-	}
-
 	$content = datamachine_get_site_scaffold_content();
-
-	if ( ! empty( $custom_content ) ) {
-		$content .= "\n" . $custom_content;
-	}
 
 	if ( ! is_dir( $shared_dir ) ) {
 		wp_mkdir_p( $shared_dir );
@@ -682,10 +681,13 @@ function datamachine_register_site_md_invalidation(): void {
  * Same pattern as datamachine_regenerate_site_md():
  * - 60-second debounce via transient
  * - Respects site_context_enabled setting
- * - Preserves user-added content below <!-- CUSTOM --> marker
  * - Only runs on multisite installs
  *
+ * NETWORK.md is read-only — fully regenerated from live multisite data.
+ * To extend NETWORK.md content, use the `datamachine_network_scaffold_content` filter.
+ *
  * @since 0.49.1
+ * @since 0.50.0 Removed <!-- CUSTOM --> marker; NETWORK.md is now read-only.
  * @return void
  */
 function datamachine_regenerate_network_md(): void {
@@ -714,25 +716,10 @@ function datamachine_regenerate_network_md(): void {
 		return;
 	}
 
-	// Preserve user-added content below <!-- CUSTOM --> marker.
-	$custom_content = '';
-	if ( file_exists( $network_md_path ) ) {
-		$existing = $fs->get_contents( $network_md_path );
-		$marker   = '<!-- CUSTOM -->';
-		$pos      = strpos( $existing, $marker );
-		if ( false !== $pos ) {
-			$custom_content = substr( $existing, $pos );
-		}
-	}
-
 	$content = datamachine_get_network_scaffold_content();
 
 	if ( empty( $content ) ) {
 		return;
-	}
-
-	if ( ! empty( $custom_content ) ) {
-		$content .= "\n" . $custom_content;
 	}
 
 	if ( ! is_dir( $network_dir ) ) {
@@ -1108,6 +1095,7 @@ function datamachine_register_scaffold_generators(): void {
 	add_filter( 'datamachine_scaffold_content', 'datamachine_scaffold_soul_content', 10, 3 );
 	add_filter( 'datamachine_scaffold_content', 'datamachine_scaffold_memory_content', 10, 3 );
 	add_filter( 'datamachine_scaffold_content', 'datamachine_scaffold_daily_content', 10, 3 );
+	add_filter( 'datamachine_scaffold_content', 'datamachine_scaffold_rules_content', 10, 3 );
 }
 add_action( 'plugins_loaded', 'datamachine_register_scaffold_generators', 5 );
 
@@ -1214,6 +1202,47 @@ function datamachine_scaffold_memory_content( string $content, string $filename,
 
 	$defaults = datamachine_get_scaffold_defaults();
 	return $defaults['MEMORY.md'] ?? '';
+}
+
+/**
+ * Generate RULES.md scaffold content.
+ *
+ * Creates a starter template for site-wide behavioral constraints.
+ * RULES.md is admin-editable and applies to every agent on the site.
+ *
+ * @since 0.50.0
+ *
+ * @param string $content  Current content.
+ * @param string $filename Filename being scaffolded.
+ * @param array  $context  Scaffolding context.
+ * @return string
+ */
+function datamachine_scaffold_rules_content( string $content, string $filename, array $context ): string {
+	if ( 'RULES.md' !== $filename || '' !== $content ) {
+		return $content;
+	}
+
+	$site_name = get_bloginfo( 'name' ) ?: 'this site';
+
+	return <<<MD
+# Site Rules
+
+Behavioral constraints that apply to every agent on {$site_name}.
+
+## General
+- Be helpful, accurate, and concise.
+- Follow the site's voice and tone.
+- Do not make up facts or hallucinate information.
+
+## Safety
+- Never expose private user data.
+- Never run destructive operations without confirmation.
+- When in doubt, ask before acting.
+
+## Content
+- Respect the site's content guidelines.
+- Do not publish or modify content without authorization.
+MD;
 }
 
 /**
@@ -1570,7 +1599,20 @@ function datamachine_get_network_scaffold_content(): string {
 	$lines[] = '- **Users:** network-wide (see USER.md)';
 	$lines[] = '- **Media:** per-site uploads';
 
-	return implode( "\n", $lines ) . "\n";
+	$content = implode( "\n", $lines ) . "\n";
+
+	/**
+	 * Filter the auto-generated NETWORK.md content.
+	 *
+	 * Allows plugins and themes to append or modify the network context
+	 * that is injected into AI agent calls. NETWORK.md is read-only in
+	 * the admin UI; this filter is the only extension point.
+	 *
+	 * @since 0.50.0
+	 *
+	 * @param string $content The generated NETWORK.md markdown content.
+	 */
+	return apply_filters( 'datamachine_network_scaffold_content', $content );
 }
 
 /**

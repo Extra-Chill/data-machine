@@ -728,6 +728,13 @@ class MemoryCommand extends BaseCommand {
 			return;
 		}
 
+		// Editability check — warn for read-only files.
+		$edit_cap = \DataMachine\Engine\AI\MemoryFileRegistry::get_edit_capability( $safe_name );
+		if ( false === $edit_cap ) {
+			WP_CLI::error( sprintf( 'File %s is read-only. It is auto-generated and can only be extended via PHP filters.', $safe_name ) );
+			return;
+		}
+
 		$agent_dir = $this->get_agent_dir( $user_id, $agent_id );
 		$filepath  = $agent_dir . '/' . $safe_name;
 

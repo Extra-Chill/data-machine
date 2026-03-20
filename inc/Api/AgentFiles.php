@@ -287,6 +287,17 @@ class AgentFiles {
 	}
 
 	public static function put_agent_file( WP_REST_Request $request ) {
+		$filename = sanitize_file_name( wp_unslash( $request['filename'] ) );
+
+		// Defense-in-depth: block writes to non-editable files at the REST layer.
+		if ( ! \DataMachine\Engine\AI\MemoryFileRegistry::is_editable( $filename ) ) {
+			$edit_cap = \DataMachine\Engine\AI\MemoryFileRegistry::get_edit_capability( $filename );
+			$message  = false === $edit_cap
+				? sprintf( 'File %s is read-only and cannot be edited.', $filename )
+				: sprintf( 'You do not have permission to edit %s.', $filename );
+			return new WP_Error( 'put_agent_file_error', $message, array( 'status' => 403 ) );
+		}
+
 		// Content may arrive as JSON body param (admin UI) or raw body (API clients).
 		$content = $request->get_param( 'content' );
 		if ( null === $content ) {
@@ -294,7 +305,7 @@ class AgentFiles {
 		}
 
 		$input = array(
-			'filename' => sanitize_file_name( wp_unslash( $request['filename'] ) ),
+			'filename' => $filename,
 			'content'  => $content,
 			'user_id'  => self::resolve_scoped_user_id( $request ),
 		);

@@ -333,6 +333,7 @@ class AgentFileAbilities {
 						'type'        => 'core',
 						'layer'       => $registry_meta ? $registry_meta['layer'] : $layer,
 						'protected'   => MemoryFileRegistry::is_protected( $entry ),
+						'editable'    => MemoryFileRegistry::is_editable( $entry ),
 						'registered'  => null !== $registry_meta,
 						'label'       => $registry_meta['label'] ?? self::filename_to_label( $entry ),
 						'description' => $registry_meta['description'] ?? '',
@@ -417,6 +418,26 @@ class AgentFileAbilities {
 	public function executeWriteAgentFile( array $input ): array {
 		$filename = sanitize_file_name( $input['filename'] ?? '' );
 		$content  = $input['content'] ?? '';
+
+		// Editability gate: check before any write.
+		$user_id_for_edit = (int) ( $input['user_id'] ?? 0 );
+		if ( $user_id_for_edit <= 0 ) {
+			$user_id_for_edit = PermissionHelper::acting_user_id();
+		}
+
+		if ( ! MemoryFileRegistry::is_editable( $filename, $user_id_for_edit ) ) {
+			$edit_cap = MemoryFileRegistry::get_edit_capability( $filename );
+			if ( false === $edit_cap ) {
+				return array(
+					'success' => false,
+					'error'   => sprintf( 'File %s is read-only and cannot be edited.', $filename ),
+				);
+			}
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'You do not have permission to edit %s. Required capability: %s', $filename, $edit_cap ),
+			);
+		}
 
 		if ( MemoryFileRegistry::is_protected( $filename ) && '' === trim( $content ) ) {
 			return array(

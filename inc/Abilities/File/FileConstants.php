@@ -70,6 +70,31 @@ class FileConstants {
 	}
 
 	/**
+	 * Check if a file is editable by the given (or current) user.
+	 *
+	 * @since 0.50.0
+	 *
+	 * @param string $filename Filename to check.
+	 * @param int    $user_id  Optional. User ID. 0 = current user.
+	 * @return bool
+	 */
+	public static function is_editable( string $filename, int $user_id = 0 ): bool {
+		return MemoryFileRegistry::is_editable( $filename, $user_id );
+	}
+
+	/**
+	 * Get the raw edit capability for a file.
+	 *
+	 * @since 0.50.0
+	 *
+	 * @param string $filename Filename to check.
+	 * @return bool|string|null true, false, capability string, or null if unregistered.
+	 */
+	public static function get_edit_capability( string $filename ) {
+		return MemoryFileRegistry::get_edit_capability( $filename );
+	}
+
+	/**
 	 * Legacy constant — kept for backward compatibility.
 	 * Use is_protected() or get_protected_files() instead.
 	 *
