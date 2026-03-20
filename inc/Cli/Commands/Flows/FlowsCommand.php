@@ -536,6 +536,38 @@ class FlowsCommand extends BaseCommand {
 			$step_configs = $decoded ?? array();
 		}
 
+		// Convert --handler-config to step_configs entries.
+		// --handler-config accepts handler-keyed JSON, e.g. {"reddit":{"subreddit":"test"}}.
+		// Each handler slug is resolved to its step type and merged into step_configs.
+		if ( isset( $assoc_args['handler-config'] ) ) {
+			$handler_config_input = json_decode( wp_unslash( $assoc_args['handler-config'] ), true );
+			if ( ! is_array( $handler_config_input ) ) {
+				WP_CLI::error( 'Invalid JSON in --handler-config. Must be a JSON object.' );
+				return;
+			}
+
+			$handler_abilities = new \DataMachine\Abilities\HandlerAbilities();
+			$all_handlers      = $handler_abilities->getAllHandlers();
+
+			foreach ( $handler_config_input as $handler_slug => $config ) {
+				if ( ! isset( $all_handlers[ $handler_slug ] ) ) {
+					WP_CLI::error( "Unknown handler '{$handler_slug}'. Use --handler-config with valid handler slugs." );
+					return;
+				}
+
+				$step_type = $all_handlers[ $handler_slug ]['type'] ?? '';
+				if ( empty( $step_type ) ) {
+					WP_CLI::error( "Cannot determine step type for handler '{$handler_slug}'." );
+					return;
+				}
+
+				$step_configs[ $step_type ] = array(
+					'handler_slug'   => $handler_slug,
+					'handler_config' => $config,
+				);
+			}
+		}
+
 		$scheduling_config = self::build_scheduling_config( $scheduling, $scheduled_at );
 
 		$input = array(
