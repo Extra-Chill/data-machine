@@ -677,6 +677,106 @@ function datamachine_register_site_md_invalidation(): void {
 }
 
 /**
+ * Regenerate NETWORK.md from live WordPress multisite data.
+ *
+ * Same pattern as datamachine_regenerate_site_md():
+ * - 60-second debounce via transient
+ * - Respects site_context_enabled setting
+ * - Preserves user-added content below <!-- CUSTOM --> marker
+ * - Only runs on multisite installs
+ *
+ * @since 0.49.1
+ * @return void
+ */
+function datamachine_regenerate_network_md(): void {
+	if ( ! is_multisite() ) {
+		return;
+	}
+
+	// Debounce: skip if we regenerated in the last 60 seconds.
+	// Use a network-wide transient so subsites don't each trigger a write.
+	if ( get_site_transient( 'datamachine_network_md_regenerating' ) ) {
+		return;
+	}
+	set_site_transient( 'datamachine_network_md_regenerating', 1, 60 );
+
+	// Check the setting — if disabled, skip regeneration.
+	if ( ! \DataMachine\Core\PluginSettings::get( 'site_context_enabled', true ) ) {
+		return;
+	}
+
+	$directory_manager = new \DataMachine\Core\FilesRepository\DirectoryManager();
+	$network_dir       = $directory_manager->get_network_directory();
+	$network_md_path   = trailingslashit( $network_dir ) . 'NETWORK.md';
+
+	$fs = \DataMachine\Core\FilesRepository\FilesystemHelper::get();
+	if ( ! $fs ) {
+		return;
+	}
+
+	// Preserve user-added content below <!-- CUSTOM --> marker.
+	$custom_content = '';
+	if ( file_exists( $network_md_path ) ) {
+		$existing = $fs->get_contents( $network_md_path );
+		$marker   = '<!-- CUSTOM -->';
+		$pos      = strpos( $existing, $marker );
+		if ( false !== $pos ) {
+			$custom_content = substr( $existing, $pos );
+		}
+	}
+
+	$content = datamachine_get_network_scaffold_content();
+
+	if ( empty( $content ) ) {
+		return;
+	}
+
+	if ( ! empty( $custom_content ) ) {
+		$content .= "\n" . $custom_content;
+	}
+
+	if ( ! is_dir( $network_dir ) ) {
+		wp_mkdir_p( $network_dir );
+	}
+
+	$fs->put_contents( $network_md_path, $content, FS_CHMOD_FILE );
+	\DataMachine\Core\FilesRepository\FilesystemHelper::make_group_writable( $network_md_path );
+}
+
+/**
+ * Register hooks that trigger NETWORK.md regeneration on structural changes.
+ *
+ * Only registers on multisite installs. Covers site lifecycle, URL changes,
+ * network plugin activations, and theme switches. The debounce in
+ * datamachine_regenerate_network_md() prevents excessive writes.
+ *
+ * @since 0.49.1
+ * @return void
+ */
+function datamachine_register_network_md_invalidation(): void {
+	if ( ! is_multisite() ) {
+		return;
+	}
+
+	$callback = 'datamachine_regenerate_network_md';
+
+	// Site lifecycle — new sites, deleted sites.
+	add_action( 'wp_initialize_site', $callback );
+	add_action( 'wp_delete_site', $callback );
+	add_action( 'wp_uninitialize_site', $callback );
+
+	// Site identity changes — URL or name changes on any site.
+	add_action( 'update_option_siteurl', $callback );
+	add_action( 'update_option_home', $callback );
+	add_action( 'update_option_blogname', $callback );
+
+	// Plugin/theme structural changes — affects network plugin list.
+	add_action( 'activated_plugin', $callback );
+	add_action( 'deactivated_plugin', $callback );
+	add_action( 'switch_theme', $callback );
+}
+
+/**
  * Migrate existing user_id-scoped agent files to layered architecture.
  *
  * Idempotent migration that:

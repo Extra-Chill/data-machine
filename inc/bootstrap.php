@@ -108,6 +108,10 @@ MemoryFileRegistry::register( 'NETWORK.md', 5, array(
 // SITE.md is now the single source of truth for site context, auto-refreshing on structural changes.
 add_action( 'init', 'datamachine_register_site_md_invalidation' );
 
+// NETWORK.md auto-regeneration — keeps multisite topology in sync with live WordPress state.
+// Only registers hooks on multisite installs (guard is inside the function).
+add_action( 'init', 'datamachine_register_network_md_invalidation' );
+
 require_once __DIR__ . '/Engine/AI/Directives/DailyMemorySelectorDirective.php';
 require_once __DIR__ . '/Api/Chat/ChatContextDirective.php';
 require_once __DIR__ . '/Api/System/SystemContextDirective.php';
