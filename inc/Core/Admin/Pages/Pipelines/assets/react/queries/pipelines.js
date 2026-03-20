@@ -217,24 +217,8 @@ export const useReorderPipelineSteps = () => {
 export const useUpdateSystemPrompt = () => {
 	const queryClient = useQueryClient();
 	return useMutation( {
-		mutationFn: ( {
-			stepId,
-			prompt,
-			provider,
-			model,
-			disabledTools,
-			stepType,
-			pipelineId,
-		} ) =>
-			updateSystemPrompt(
-				stepId,
-				prompt,
-				provider,
-				model,
-				disabledTools,
-				stepType,
-				pipelineId
-			),
+		mutationFn: ( { stepId, prompt, stepType, pipelineId } ) =>
+			updateSystemPrompt( stepId, prompt, stepType, pipelineId ),
 		onSuccess: ( _, { pipelineId } ) => {
 			queryClient.invalidateQueries( { queryKey: [ 'pipelines' ] } );
 			queryClient.invalidateQueries( {

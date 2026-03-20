@@ -143,19 +143,14 @@ export const reorderPipelineSteps = async ( pipelineId, steps ) => {
 export const updateSystemPrompt = async (
 	stepId,
 	prompt,
-	provider,
-	model,
-	disabledTools = [],
 	stepType = 'ai',
 	pipelineId = null
 ) => {
+	// Model/provider/tools are managed via context system, not per-pipeline.
 	const payload = {
 		step_type: stepType,
 		pipeline_id: pipelineId,
-		provider,
-		model,
 		system_prompt: prompt,
-		disabled_tools: disabledTools,
 	};
 
 	return await client.put( `/pipelines/steps/${ stepId }/config`, payload );

@@ -2,6 +2,7 @@
  * Pipeline Step Card Component
  *
  * Display individual pipeline step with configuration.
+ * AI step system prompt is editable inline — no modal needed.
  */
 
 /**
@@ -15,7 +16,7 @@ import { __ } from '@wordpress/i18n';
  */
 import PromptField from '@shared/components/PromptField';
 import { updateSystemPrompt } from '../../utils/api';
-import { useStepTypes, useTools } from '../../queries/config';
+import { useStepTypes } from '../../queries/config';
 
 /**
  * Pipeline Step Card Component
@@ -25,7 +26,6 @@ import { useStepTypes, useTools } from '../../queries/config';
  * @param {number}   props.pipelineId     - Pipeline ID
  * @param {Object}   props.pipelineConfig - AI configuration keyed by pipeline_step_id
  * @param {Function} props.onDelete       - Delete handler
- * @param {Function} props.onConfigure    - Configure handler
  * @return {React.ReactElement} Pipeline step card
  */
 export default function PipelineStepCard( {
@@ -33,14 +33,9 @@ export default function PipelineStepCard( {
 	pipelineId,
 	pipelineConfig,
 	onDelete,
-	onConfigure,
 } ) {
 	// Use TanStack Query for data
 	const { data: stepTypes = {} } = useStepTypes();
-	const { data: toolsData = {} } = useTools();
-	const stepTypeInfo = stepTypes?.[ step.step_type ] || {};
-	const canConfigure = stepTypeInfo.has_pipeline_config === true;
-
 	const isAiStep = step.step_type === 'ai';
 
 	const stepConfig = pipelineConfig[ step.pipeline_step_id ] || null;
@@ -63,9 +58,6 @@ export default function PipelineStepCard( {
 				const response = await updateSystemPrompt(
 					step.pipeline_step_id,
 					prompt,
-					stepConfig.provider,
-					stepConfig.model,
-					[], // disabledTools - empty means no tools disabled (use all global)
 					step.step_type,
 					pipelineId
 				);
@@ -118,67 +110,9 @@ export default function PipelineStepCard( {
 					</strong>
 				</div>
 
-				{ /* AI Configuration Display */ }
+				{ /* AI Step: inline system prompt editor */ }
 				{ isAiStep && stepConfig && (
 					<div className="datamachine-ai-config-display datamachine-step-card-ai-config">
-						<div className="datamachine-step-card-ai-label">
-							<strong>
-								{ __( 'AI Provider:', 'data-machine' ) }
-							</strong>{ ' ' }
-							{ stepConfig.provider || 'Not configured' }
-							{ ' | ' }
-							<strong>
-								{ __( 'Model:', 'data-machine' ) }
-							</strong>{ ' ' }
-							{ stepConfig.model || 'Not configured' }
-						</div>
-						<div className="datamachine-step-card-tools-label">
-							<strong>{ __( 'Tools:', 'data-machine' ) }</strong>{ ' ' }
-							{ ( () => {
-								// Get all globally-enabled tools
-								const globallyEnabledTools = Object.entries(
-									toolsData
-								)
-									.filter(
-										( [ , tool ] ) => tool.globally_enabled
-									)
-									.map( ( [ id ] ) => id );
-
-								// disabled_tools is exclusion list
-								const disabledTools = Array.isArray(
-									stepConfig.disabled_tools
-								)
-									? stepConfig.disabled_tools
-									: [];
-
-								// Effective tools = globally enabled minus disabled
-								const effectiveTools =
-									globallyEnabledTools.filter(
-										( toolId ) =>
-											! disabledTools.includes( toolId )
-									);
-
-								if ( effectiveTools.length === 0 ) {
-									return globallyEnabledTools.length === 0
-										? __(
-												'None configured',
-												'data-machine'
-										  )
-										: __(
-												'None (all disabled)',
-												'data-machine'
-										  );
-								}
-
-								return effectiveTools
-									.map(
-										( toolId ) =>
-											toolsData[ toolId ]?.label || toolId
-									)
-									.join( ', ' );
-							} )() }
-						</div>
-
 						<PromptField
 							label={ __( 'System Prompt', 'data-machine' ) }
 							value={ stepConfig.system_prompt || '' }
@@ -194,16 +128,6 @@ export default function PipelineStepCard( {
 
 				{ /* Action Buttons */ }
 				<div className="datamachine-step-card-actions">
-					{ canConfigure && (
-						<Button
-							variant="secondary"
-							size="small"
-							onClick={ () => onConfigure && onConfigure( step ) }
-						>
-							{ __( 'Configure', 'data-machine' ) }
-						</Button>
-					) }
-
 					<Button
 						variant="secondary"
 						size="small"

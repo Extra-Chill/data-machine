@@ -102,23 +102,6 @@ export default function PipelineCard( {
 	);
 
 	/**
-	 * Handle step configuration
-	 */
-	const handleStepConfigured = useCallback(
-		( step ) => {
-			const currentConfig =
-				pipeline.pipeline_config?.[ step.pipeline_step_id ] || {};
-			openModal( MODAL_TYPES.CONFIGURE_STEP, {
-				pipelineId: pipeline.pipeline_id,
-				pipelineStepId: step.pipeline_step_id,
-				stepType: step.step_type,
-				currentConfig,
-			} );
-		},
-		[ pipeline.pipeline_id, pipeline.pipeline_config, openModal ]
-	);
-
-	/**
 	 * Handle context files modal open
 	 */
 	const handleOpenContextFiles = useCallback( () => {
@@ -155,7 +138,7 @@ export default function PipelineCard( {
 					pipelineConfig={ pipeline.pipeline_config || {} }
 					onStepAdded={ handleStepAdded }
 					onStepRemoved={ handleStepRemoved }
-					onStepConfigured={ handleStepConfigured }
+					onStepConfigured={ null }
 				/>
 
 				<CardDivider />

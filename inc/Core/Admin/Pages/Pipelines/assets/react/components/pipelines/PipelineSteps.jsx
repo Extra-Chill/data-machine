@@ -129,7 +129,6 @@ export default function PipelineSteps( {
 						pipelineId={ pipelineId }
 						pipelineConfig={ pipelineConfig }
 						onDelete={ onStepRemoved }
-						onConfigure={ onStepConfigured }
 					/>
 				</div>
 			);
