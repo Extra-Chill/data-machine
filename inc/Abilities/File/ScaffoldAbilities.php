@@ -63,7 +63,6 @@ class ScaffoldAbilities {
 				'category'            => 'datamachine',
 				'input_schema'        => array(
 					'type'       => 'object',
-					'required'   => array( 'filename' ),
 					'properties' => array(
 						'filename'   => array(
 							'type'        => 'string',
@@ -100,7 +99,7 @@ class ScaffoldAbilities {
 				'permission_callback' => function () {
 					return PermissionHelper::can( 'chat' );
 				},
-				'callback'            => array( __CLASS__, 'execute' ),
+				'execute_callback'    => array( __CLASS__, 'execute' ),
 			)
 		);
 	}
