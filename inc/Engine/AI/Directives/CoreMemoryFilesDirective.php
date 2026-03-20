@@ -105,6 +105,13 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 	 */
 	private static function get_file_content_for_output( string $filepath, string $filename ): ?string {
 		global $wp_filesystem;
+
+		// Ensure WP_Filesystem is initialized (not available by default in REST API context).
+		if ( ! $wp_filesystem ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+			WP_Filesystem();
+		}
+
 		$file_size = filesize( $filepath );
 
 		if ( $file_size > AgentMemory::MAX_FILE_SIZE ) {

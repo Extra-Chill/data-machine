@@ -62,6 +62,7 @@ class ChatOrchestrator {
 		$selected_pipeline_id = (int) ( $options['selected_pipeline_id'] ?? 0 );
 		$max_turns            = $options['max_turns'] ?? PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
 		$request_id           = $options['request_id'] ?? null;
+		$agent_id             = (int) ( $options['agent_id'] ?? 0 );
 
 		$chat_db = new ChatDatabase();
 
@@ -158,6 +159,7 @@ class ChatOrchestrator {
 				'selected_pipeline_id' => $selected_pipeline_id ? $selected_pipeline_id : null,
 				'context'              => 'chat',
 				'user_id'              => $user_id,
+				'agent_id'             => $agent_id,
 			)
 		);
 
@@ -180,7 +182,9 @@ class ChatOrchestrator {
 		$turn_usage = $result['usage'] ?? array();
 		if ( ! empty( $turn_usage ) && ( $turn_usage['total_tokens'] ?? 0 ) > 0 ) {
 			$existing_session  = $chat_db->get_session( $session_id );
-			$existing_metadata = ! empty( $existing_session['metadata'] ) ? json_decode( $existing_session['metadata'], true ) : array();
+			$existing_metadata = ! empty( $existing_session['metadata'] )
+				? ( is_array( $existing_session['metadata'] ) ? $existing_session['metadata'] : json_decode( $existing_session['metadata'], true ) )
+				: array();
 			$existing_usage    = $existing_metadata['token_usage'] ?? array(
 				'prompt_tokens'     => 0,
 				'completion_tokens' => 0,

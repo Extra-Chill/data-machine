@@ -557,6 +557,7 @@ class Chat {
 				'session_id'           => $request->get_param( 'session_id' ),
 				'selected_pipeline_id' => (int) $request->get_param( 'selected_pipeline_id' ),
 				'request_id'           => $request_id,
+				'agent_id'             => $agent_id,
 			)
 		);
 
