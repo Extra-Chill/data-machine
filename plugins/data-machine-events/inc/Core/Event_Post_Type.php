@@ -108,6 +108,43 @@ class Event_Post_Type {
 		add_action( 'manage_' . self::POST_TYPE . '_posts_custom_column', array( __CLASS__, 'render_event_date_column' ), 10, 2 );
 		add_filter( 'manage_edit-' . self::POST_TYPE . '_sortable_columns', array( __CLASS__, 'sortable_event_date_column' ) );
 		add_action( 'pre_get_posts', array( __CLASS__, 'sort_by_event_date' ) );
+		add_action( 'pre_get_posts', array( __CLASS__, 'prevent_taxonomy_archive_404' ) );
+	}
+
+	/**
+	 * Prevent WordPress from returning 404 on paginated taxonomy archives.
+	 *
+	 * The calendar block uses its own date-based pagination (?paged=N), but
+	 * WordPress's main query for /artist/name/page/2/ runs with the default
+	 * posts_per_page. If fewer posts exist than needed for page 2, WP returns
+	 * 404 before the calendar block renders. Setting posts_per_page to 1
+	 * ensures WP finds at least one post (preventing 404) while the calendar
+	 * block handles the real pagination independently.
+	 *
+	 * @param \WP_Query $query The main query.
+	 */
+	public static function prevent_taxonomy_archive_404( $query ) {
+		if ( is_admin() || ! $query->is_main_query() ) {
+			return;
+		}
+
+		if ( ! $query->is_tax() ) {
+			return;
+		}
+
+		$queried_object = $query->get_queried_object();
+		if ( ! $queried_object || ! isset( $queried_object->taxonomy ) ) {
+			return;
+		}
+
+		$event_taxonomies = get_object_taxonomies( self::POST_TYPE );
+		if ( ! in_array( $queried_object->taxonomy, $event_taxonomies, true ) ) {
+			return;
+		}
+
+		// Set high posts_per_page so WordPress never 404s paginated requests.
+		// The calendar block does its own query with posts_per_page=-1.
+		$query->set( 'posts_per_page', 100 );
 	}
 
 	public static function add_event_date_column( $columns ) {
