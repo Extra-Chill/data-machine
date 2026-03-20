@@ -2,6 +2,21 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.18.0] - 2026-03-20
+
+### Added
+- migrate to homeboy-action v2 convention-driven CI
+- add ShowtimeExtractor for convention center CMS (Classic Center, Akins Ford Arena)
+
+### Changed
+- Replace postmeta LIKE scans with PostIdentityIndex for event dedup
+- Attribute event submissions to the submitting user
+
+### Fixed
+- Fix taxonomy archive pagination 404 on shared taxonomies
+- Fix duplicate method declarations in DuplicateDetectionAbilities
+- advisory lock on upsert to prevent cross-flow duplicate events
+
 ## [0.17.2] - 2026-03-19
 
 ### Changed
