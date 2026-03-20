@@ -229,6 +229,80 @@ class ProcessedItems extends BaseRepository {
 	}
 
 	/**
+	 * Delete processed items older than a given number of days.
+	 *
+	 * Used by the scheduled retention cleanup to prevent unbounded growth
+	 * of dedup records. Items older than the threshold are unlikely to be
+	 * re-encountered and can be safely removed.
+	 *
+	 * @since 0.40.0
+	 *
+	 * @param int $older_than_days Delete items older than this many days.
+	 * @return int|false Number of deleted rows, or false on error.
+	 */
+	public function delete_old_processed_items( int $older_than_days ): int|false {
+		if ( $older_than_days < 1 ) {
+			return false;
+		}
+
+		$cutoff_datetime = gmdate( 'Y-m-d H:i:s', time() - ( $older_than_days * DAY_IN_SECONDS ) );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		$result = $this->wpdb->query(
+			$this->wpdb->prepare(
+				'DELETE FROM %i WHERE processed_timestamp < %s',
+				$this->table_name,
+				$cutoff_datetime
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Deleted old processed items',
+			array(
+				'older_than_days' => $older_than_days,
+				'cutoff_datetime' => $cutoff_datetime,
+				'items_deleted'   => false !== $result ? $result : 0,
+				'success'         => false !== $result,
+			)
+		);
+
+		return $result;
+	}
+
+	/**
+	 * Count processed items older than a given number of days.
+	 *
+	 * @since 0.40.0
+	 *
+	 * @param int $older_than_days Count items older than this many days.
+	 * @return int Number of matching items.
+	 */
+	public function count_old_processed_items( int $older_than_days ): int {
+		if ( $older_than_days < 1 ) {
+			return 0;
+		}
+
+		$cutoff_datetime = gmdate( 'Y-m-d H:i:s', time() - ( $older_than_days * DAY_IN_SECONDS ) );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		$count = $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				'SELECT COUNT(*) FROM %i WHERE processed_timestamp < %s',
+				$this->table_name,
+				$cutoff_datetime
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL
+
+		return (int) $count;
+	}
+
+	/**
 	 * Creates or updates the database table schema.
 	 * Should be called on plugin activation.
 	 */

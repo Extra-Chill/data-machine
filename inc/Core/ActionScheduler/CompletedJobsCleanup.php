@@ -1,0 +1,79 @@
+<?php
+/**
+ * Completed Jobs Cleanup
+ *
+ * Periodically removes old completed jobs from the jobs table.
+ * Completed jobs accumulate quickly on active sites because every flow run
+ * creates job records with full engine_data JSON. Without cleanup, this
+ * table becomes the largest consumer of database memory.
+ *
+ * @package DataMachine\Core\ActionScheduler
+ * @since 0.40.0
+ */
+
+namespace DataMachine\Core\ActionScheduler;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Register the cleanup action handler.
+ */
+add_action(
+	'datamachine_cleanup_completed_jobs',
+	function () {
+		$db_jobs = new \DataMachine\Core\Database\Jobs\Jobs();
+
+		/**
+		 * Filter the maximum age (in days) for completed jobs before cleanup.
+		 *
+		 * Jobs with a "completed" status (including compound statuses like
+		 * "completed_no_items") older than this threshold will be deleted.
+		 *
+		 * @since 0.40.0
+		 *
+		 * @param int $max_age_days Maximum age in days. Default 14.
+		 */
+		$max_age_days = (int) apply_filters( 'datamachine_completed_jobs_max_age_days', 14 );
+
+		if ( $max_age_days < 1 ) {
+			$max_age_days = 14;
+		}
+
+		$deleted = $db_jobs->delete_old_jobs( 'completed', $max_age_days );
+
+		if ( false !== $deleted && $deleted > 0 ) {
+			do_action(
+				'datamachine_log',
+				'info',
+				'Scheduled cleanup: deleted old completed jobs',
+				array(
+					'jobs_deleted' => $deleted,
+					'max_age_days' => $max_age_days,
+				)
+			);
+		}
+	}
+);
+
+/**
+ * Schedule the cleanup job after Action Scheduler is initialized.
+ * Only runs in admin context to avoid database queries on frontend.
+ */
+add_action(
+	'action_scheduler_init',
+	function () {
+		if ( ! is_admin() ) {
+			return;
+		}
+
+		if ( ! as_next_scheduled_action( 'datamachine_cleanup_completed_jobs', array(), 'datamachine-maintenance' ) ) {
+			as_schedule_recurring_action(
+				time() + DAY_IN_SECONDS,
+				DAY_IN_SECONDS,
+				'datamachine_cleanup_completed_jobs',
+				array(),
+				'datamachine-maintenance'
+			);
+		}
+	}
+);
