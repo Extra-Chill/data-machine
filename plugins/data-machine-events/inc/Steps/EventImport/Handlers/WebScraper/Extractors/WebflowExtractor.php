@@ -196,13 +196,29 @@ class WebflowExtractor extends BaseExtractor {
 	 * @return array{date: string} With YYYY-MM-DD format.
 	 */
 	private function findDate( string $html, int $current_year ): array {
-		// Look for month + day pattern.
-		if ( ! preg_match( self::DATE_PATTERN, $html, $m ) ) {
-			return array( 'date' => '' );
+		$month_str = '';
+		$day       = 0;
+
+		// First try: month + day in a single text node (e.g., "May 16").
+		if ( preg_match( self::DATE_PATTERN, $html, $m ) ) {
+			$month_str = $m[1];
+			$day       = (int) $m[2];
 		}
 
-		$month_str = $m[1];
-		$day       = (int) $m[2];
+		// Second try: multi-element date pattern where month and day are in
+		// separate elements (e.g., Pearl Street Warehouse Webflow template):
+		//   <div class="event-month">Mar</div><div class="event-day">21</div>
+		if ( empty( $month_str ) || 0 === $day ) {
+			$multi_el_pattern = '/class="[^"]*event-month[^"]*"[^>]*>\s*([A-Za-z]+)\s*<\/\w+>\s*<\w+[^>]*class="[^"]*event-day[^"]*"[^>]*>\s*(\d{1,2})\s*</si';
+			if ( preg_match( $multi_el_pattern, $html, $m2 ) ) {
+				$month_str = $m2[1];
+				$day       = (int) $m2[2];
+			}
+		}
+
+		if ( empty( $month_str ) || $day < 1 ) {
+			return array( 'date' => '' );
+		}
 
 		// Check if a year is present.
 		$year = $current_year;
