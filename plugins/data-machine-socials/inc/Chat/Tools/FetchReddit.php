@@ -32,18 +32,23 @@ class FetchReddit extends BaseTool {
 		return array(
 			'class'       => self::class,
 			'method'      => 'handle_tool_call',
-			'description' => 'Fetch a post from a Reddit subreddit. Returns the first eligible post matching filters (upvotes, comments, timeframe, keywords). Requires Reddit OAuth to be configured.',
+			'description' => 'Fetch posts from Reddit. Provide a subreddit to browse it, or a query to search across all of Reddit. Both can be combined to search within a subreddit. Returns eligible posts matching filters (upvotes, comments, timeframe, keywords). Requires Reddit OAuth to be configured.',
 			'parameters'  => array(
 				'subreddit'         => array(
 					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Subreddit name to fetch from (without "r/", e.g. "jambands", "festivals")',
+					'required'    => false,
+					'description' => 'Subreddit name to fetch from (without "r/", e.g. "jambands", "festivals"). Optional when query is provided.',
+				),
+				'query'             => array(
+					'type'        => 'string',
+					'required'    => false,
+					'description' => 'Search query. Without subreddit, searches all of Reddit. With subreddit, searches within it.',
 				),
 				'sort_by'           => array(
 					'type'        => 'string',
 					'required'    => false,
-					'description' => 'Sort order: hot, new, top, rising, controversial',
-					'enum'        => array( 'hot', 'new', 'top', 'rising', 'controversial' ),
+					'description' => 'Sort order: hot, new, top, rising, controversial, relevance. Use "relevance" for search queries.',
+					'enum'        => array( 'hot', 'new', 'top', 'rising', 'controversial', 'relevance' ),
 				),
 				'timeframe_limit'   => array(
 					'type'        => 'string',
@@ -84,9 +89,9 @@ class FetchReddit extends BaseTool {
 	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
 		$tool_name = 'fetch_reddit';
 
-		// Validate subreddit.
-		if ( empty( $parameters['subreddit'] ) ) {
-			return $this->buildErrorResponse( 'subreddit parameter is required', $tool_name );
+		// Validate: must have subreddit or query.
+		if ( empty( $parameters['subreddit'] ) && empty( $parameters['query'] ) ) {
+			return $this->buildErrorResponse( 'Either subreddit or query parameter is required', $tool_name );
 		}
 
 		// Get auth provider and valid token.
@@ -154,11 +159,16 @@ class FetchReddit extends BaseTool {
 			return $this->buildErrorResponse( 'datamachine/fetch-reddit ability not registered', $tool_name );
 		}
 
+		// Default sort to 'relevance' for search queries.
+		$has_query    = ! empty( $parameters['query'] );
+		$default_sort = $has_query ? 'relevance' : 'hot';
+
 		// Build ability input.
 		$input = array(
-			'subreddit'         => sanitize_text_field( $parameters['subreddit'] ),
+			'subreddit'         => sanitize_text_field( $parameters['subreddit'] ?? '' ),
+			'query'             => sanitize_text_field( $parameters['query'] ?? '' ),
 			'access_token'      => $access_token,
-			'sort_by'           => $parameters['sort_by'] ?? 'hot',
+			'sort_by'           => $parameters['sort_by'] ?? $default_sort,
 			'timeframe_limit'   => $parameters['timeframe_limit'] ?? 'all_time',
 			'min_upvotes'       => absint( $parameters['min_upvotes'] ?? 0 ),
 			'min_comment_count' => absint( $parameters['min_comment_count'] ?? 0 ),
@@ -177,25 +187,31 @@ class FetchReddit extends BaseTool {
 			return $this->buildErrorResponse( $error, $tool_name );
 		}
 
-		if ( empty( $result['data'] ) ) {
+		// The ability returns 'items' for multiple results, 'data' for single.
+		$items = $result['items'] ?? array();
+		if ( empty( $items ) && ! empty( $result['data'] ) ) {
+			$items = array( array( 'data' => $result['data'], 'source_url' => $result['source_url'] ?? '', 'item_id' => $result['item_id'] ?? '' ) );
+		}
+
+		if ( empty( $items ) ) {
+			$context_label = ! empty( $input['subreddit'] ) ? 'r/' . $input['subreddit'] : 'Reddit';
 			return array(
 				'success'   => true,
 				'data'      => null,
-				'message'   => 'No eligible posts found in r/' . $input['subreddit'] . ' with the given filters.',
+				'message'   => 'No eligible posts found on ' . $context_label . ' with the given filters.',
 				'tool_name' => $tool_name,
 				'guidance'  => array(
 					'status'    => 'empty_result',
-					'next_step' => 'Try broadening filters (lower min_upvotes, expand timeframe, remove search terms).',
+					'next_step' => 'Try broadening filters (lower min_upvotes, expand timeframe, remove search terms, or adjust query).',
 				),
 			);
 		}
 
 		return array(
-			'success'    => true,
-			'data'       => $result['data'],
-			'source_url' => $result['source_url'] ?? '',
-			'item_id'    => $result['item_id'] ?? '',
-			'tool_name'  => $tool_name,
+			'success'   => true,
+			'items'     => $items,
+			'count'     => count( $items ),
+			'tool_name' => $tool_name,
 		);
 	}
 }

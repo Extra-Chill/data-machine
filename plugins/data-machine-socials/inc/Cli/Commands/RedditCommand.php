@@ -437,15 +437,20 @@ class RedditCommand {
 	}
 
 	/**
-	 * Fetch a post from a Reddit subreddit.
+	 * Fetch posts from Reddit.
 	 *
-	 * Uses the datamachine/fetch-reddit ability to fetch the first eligible
-	 * post from the given subreddit, applying all configured filters.
+	 * Fetches from a specific subreddit, or searches across all of Reddit
+	 * when --query is provided without a subreddit. Uses the
+	 * datamachine/fetch-reddit ability with all configured filters.
 	 *
 	 * ## OPTIONS
 	 *
-	 * <subreddit>
-	 * : The subreddit name (without "r/").
+	 * [<subreddit>]
+	 * : The subreddit name (without "r/"). Optional when --query is used.
+	 *
+	 * [--query=<query>]
+	 * : Search query. Without a subreddit, searches all of Reddit.
+	 *   With a subreddit, searches within that subreddit.
 	 *
 	 * [--sort=<sort>]
 	 * : Sort order for posts.
@@ -457,6 +462,7 @@ class RedditCommand {
 	 *   - top
 	 *   - rising
 	 *   - controversial
+	 *   - relevance
 	 * ---
 	 *
 	 * [--timeframe=<timeframe>]
@@ -493,7 +499,7 @@ class RedditCommand {
 	 * ---
 	 *
 	 * [--search=<search>]
-	 * : Comma-separated search terms to filter posts.
+	 * : Comma-separated search terms to filter posts locally (client-side).
 	 *
 	 * [--format=<format>]
 	 * : Output format.
@@ -507,20 +513,37 @@ class RedditCommand {
 	 *
 	 * ## EXAMPLES
 	 *
+	 *     # Fetch from a subreddit
 	 *     wp datamachine-socials reddit fetch jambands
 	 *     wp datamachine-socials reddit fetch festivals --sort=top --min-upvotes=50
 	 *     wp datamachine-socials reddit fetch bonnaroo --timeframe=7_days --comments=5
-	 *     wp datamachine-socials reddit fetch sxsw --format=json
+	 *
+	 *     # Global search across all of Reddit
+	 *     wp datamachine-socials reddit fetch --query="best live music calendar" --sort=relevance --timeframe=30_days
+	 *     wp datamachine-socials reddit fetch --query="concert events near me" --min-upvotes=5 --comments=3
+	 *
+	 *     # Search within a specific subreddit
+	 *     wp datamachine-socials reddit fetch Austin --query="live music tonight"
 	 */
 	public function fetch( $args, $assoc_args ) {
-		$subreddit    = $args[0];
+		$subreddit    = $args[0] ?? '';
+		$query        = $assoc_args['query'] ?? '';
 		$access_token = $this->get_access_token();
+
+		// Validate: must have at least one of subreddit or query.
+		if ( empty( $subreddit ) && empty( $query ) ) {
+			WP_CLI::error( 'Provide a subreddit name or --query (or both).' );
+		}
+
+		// Default sort to 'relevance' for search queries.
+		$default_sort = ! empty( $query ) ? 'relevance' : 'hot';
 
 		// Build ability input.
 		$input = array(
 			'subreddit'         => $subreddit,
+			'query'             => $query,
 			'access_token'      => $access_token,
-			'sort_by'           => $assoc_args['sort'] ?? 'hot',
+			'sort_by'           => $assoc_args['sort'] ?? $default_sort,
 			'timeframe_limit'   => $assoc_args['timeframe'] ?? 'all_time',
 			'min_upvotes'       => absint( $assoc_args['min-upvotes'] ?? 0 ),
 			'min_comment_count' => absint( $assoc_args['min-comments'] ?? 0 ),
@@ -532,7 +555,13 @@ class RedditCommand {
 			'download_images'   => false, // CLI doesn't download images by default.
 		);
 
-		WP_CLI::log( "Fetching from r/{$subreddit} (sort: {$input['sort_by']})..." );
+		if ( ! empty( $subreddit ) && ! empty( $query ) ) {
+			WP_CLI::log( "Searching r/{$subreddit} for \"{$query}\" (sort: {$input['sort_by']})..." );
+		} elseif ( ! empty( $query ) ) {
+			WP_CLI::log( "Searching all of Reddit for \"{$query}\" (sort: {$input['sort_by']})..." );
+		} else {
+			WP_CLI::log( "Fetching from r/{$subreddit} (sort: {$input['sort_by']})..." );
+		}
 
 		if ( ! function_exists( 'wp_get_ability' ) ) {
 			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
@@ -549,45 +578,48 @@ class RedditCommand {
 			WP_CLI::error( $result['error'] ?? 'Reddit fetch failed.' );
 		}
 
-		if ( empty( $result['data'] ) ) {
+		// The ability returns 'items' array for multiple results.
+		$items = $result['items'] ?? array();
+
+		// Backward compat: single-result 'data' key.
+		if ( empty( $items ) && ! empty( $result['data'] ) ) {
+			$items = is_array( $result['data'] ) ? array( array( 'data' => $result['data'], 'source_url' => $result['source_url'] ?? '', 'item_id' => $result['item_id'] ?? '' ) ) : array();
+		}
+
+		if ( empty( $items ) ) {
 			WP_CLI::warning( 'No eligible posts found with the given filters.' );
 			return;
 		}
 
-		$data   = $result['data'];
 		$format = $assoc_args['format'] ?? 'table';
 
 		if ( 'json' === $format ) {
-			WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( wp_json_encode( $items, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
 		if ( 'yaml' === $format ) {
-			$this->output_yaml( $data );
+			$this->output_yaml( $items );
 			return;
 		}
 
-		// Table format: show key fields.
-		$metadata = $data['metadata'] ?? array();
-		WP_CLI::success( 'Fetched post from r/' . $subreddit );
-		WP_CLI::log( '' );
-		WP_CLI::log( 'Title:    ' . ( $data['title'] ?? '(none)' ) );
-		WP_CLI::log( 'Author:   ' . ( $metadata['author'] ?? 'unknown' ) );
-		WP_CLI::log( 'Upvotes:  ' . ( $metadata['upvotes'] ?? 0 ) );
-		WP_CLI::log( 'Comments: ' . ( $metadata['comment_count'] ?? 0 ) );
-		WP_CLI::log( 'Date:     ' . ( $metadata['original_date_gmt'] ?? 'unknown' ) );
-		WP_CLI::log( 'URL:      ' . ( $result['source_url'] ?? '' ) );
-
-		$content = $data['content'] ?? '';
-		if ( ! empty( $content ) ) {
-			WP_CLI::log( '' );
-			$preview = mb_substr( $content, 0, 500 );
-			if ( mb_strlen( $content ) > 500 ) {
-				$preview .= '...';
-			}
-			WP_CLI::log( 'Content:' );
-			WP_CLI::log( $preview );
+		// Table format: show all results.
+		$rows = array();
+		foreach ( $items as $item ) {
+			$data     = $item['data'] ?? array();
+			$metadata = $data['metadata'] ?? array();
+			$rows[]   = array(
+				'score'     => $metadata['upvotes'] ?? 0,
+				'comments'  => $metadata['comment_count'] ?? 0,
+				'subreddit' => 'r/' . ( $metadata['subreddit'] ?? '' ),
+				'author'    => $metadata['author'] ?? '[deleted]',
+				'title'     => mb_substr( $data['title'] ?? '', 0, 60 ),
+				'url'       => $item['source_url'] ?? '',
+			);
 		}
+
+		WP_CLI::success( count( $rows ) . ' posts found' );
+		WP_CLI\Utils\format_items( 'table', $rows, array( 'score', 'comments', 'subreddit', 'author', 'title' ) );
 	}
 
 	/**

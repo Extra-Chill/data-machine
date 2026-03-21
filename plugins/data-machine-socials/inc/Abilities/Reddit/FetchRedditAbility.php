@@ -45,11 +45,17 @@ class FetchRedditAbility {
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
-						'required'   => array( 'subreddit', 'access_token' ),
+						'required'   => array( 'access_token' ),
 						'properties' => array(
 							'subreddit'         => array(
 								'type'        => 'string',
-								'description' => __( 'Subreddit name to fetch from', 'data-machine-socials' ),
+								'default'     => '',
+								'description' => __( 'Subreddit name to fetch from. Optional when query is provided for global search.', 'data-machine-socials' ),
+							),
+							'query'             => array(
+								'type'        => 'string',
+								'default'     => '',
+								'description' => __( 'Search query for Reddit global search. When provided without subreddit, searches across all of Reddit. Can also be combined with subreddit to search within it.', 'data-machine-socials' ),
 							),
 							'access_token'      => array(
 								'type'        => 'string',
@@ -57,9 +63,9 @@ class FetchRedditAbility {
 							),
 							'sort_by'           => array(
 								'type'        => 'string',
-								'enum'        => array( 'hot', 'new', 'top', 'rising', 'controversial' ),
+								'enum'        => array( 'hot', 'new', 'top', 'rising', 'controversial', 'relevance' ),
 								'default'     => 'hot',
-								'description' => __( 'Sort order for posts', 'data-machine-socials' ),
+								'description' => __( 'Sort order for posts. Use "relevance" for global search.', 'data-machine-socials' ),
 							),
 							'timeframe_limit'   => array(
 								'type'        => 'string',
@@ -154,6 +160,7 @@ class FetchRedditAbility {
 		$config = $this->normalizeConfig( $input );
 
 		$subreddit             = $config['subreddit'];
+		$query                 = $config['query'];
 		$access_token          = $config['access_token'];
 		$sort                  = $config['sort_by'];
 		$timeframe_limit       = $config['timeframe_limit'];
@@ -166,7 +173,24 @@ class FetchRedditAbility {
 		$max_pages             = $config['max_pages'];
 		$download_images       = $config['download_images'];
 
-		if ( ! preg_match( '/^[a-zA-Z0-9_]+$/', $subreddit ) ) {
+		// Determine mode: global search vs subreddit fetch.
+		$is_global_search = ! empty( $query ) && empty( $subreddit );
+		$is_subreddit_search = ! empty( $query ) && ! empty( $subreddit );
+
+		// Validate: must have either subreddit or query.
+		if ( empty( $subreddit ) && empty( $query ) ) {
+			$logs[] = array(
+				'level'   => 'error',
+				'message' => 'Reddit: Either subreddit or query must be provided.',
+			);
+			return array(
+				'success' => false,
+				'error'   => 'Either subreddit or query must be provided',
+				'logs'    => $logs,
+			);
+		}
+
+		if ( ! empty( $subreddit ) && ! preg_match( '/^[a-zA-Z0-9_]+$/', $subreddit ) ) {
 			$logs[] = array(
 				'level'   => 'error',
 				'message' => 'Reddit: Invalid subreddit name format.',
@@ -179,7 +203,7 @@ class FetchRedditAbility {
 			);
 		}
 
-		$valid_sorts = array( 'hot', 'new', 'top', 'rising', 'controversial' );
+		$valid_sorts = array( 'hot', 'new', 'top', 'rising', 'controversial', 'relevance' );
 		if ( ! in_array( $sort, $valid_sorts, true ) ) {
 			$logs[] = array(
 				'level'   => 'error',
@@ -196,6 +220,17 @@ class FetchRedditAbility {
 			);
 		}
 
+		$mode_label = $is_global_search ? 'global search' : ( $is_subreddit_search ? "r/{$subreddit} search" : "r/{$subreddit}" );
+		$logs[]     = array(
+			'level'   => 'info',
+			'message' => sprintf( 'Reddit: Starting fetch (%s, sort: %s).', $mode_label, $sort ),
+			'data'    => array(
+				'subreddit'       => $subreddit,
+				'query'           => $query,
+				'is_global_search' => $is_global_search,
+			),
+		);
+
 		$after_param    = null;
 		$total_checked  = 0;
 		$pages_fetched  = 0;
@@ -204,35 +239,16 @@ class FetchRedditAbility {
 		while ( $pages_fetched < $max_pages ) {
 			++$pages_fetched;
 
-			$time_param = '';
-			if ( in_array( $sort, array( 'top', 'controversial' ), true ) && 'all_time' !== $timeframe_limit ) {
-				$reddit_time_map = array(
-					'24_hours' => 'day',
-					'72_hours' => 'week',
-					'7_days'   => 'week',
-					'30_days'  => 'month',
-				);
-				if ( isset( $reddit_time_map[ $timeframe_limit ] ) ) {
-					$time_param = '&t=' . $reddit_time_map[ $timeframe_limit ];
-					$logs[]     = array(
-						'level'   => 'debug',
-						'message' => 'Reddit: Using native API time filtering.',
-						'data'    => array(
-							'sort'              => $sort,
-							'timeframe_limit'   => $timeframe_limit,
-							'reddit_time_param' => $reddit_time_map[ $timeframe_limit ],
-						),
-					);
-				}
-			}
-
-			$reddit_url = sprintf(
-				'https://oauth.reddit.com/r/%s/%s.json?limit=%d%s%s',
-				esc_attr( $subreddit ),
-				esc_attr( $sort ),
+			$reddit_url = $this->buildApiUrl(
+				$subreddit,
+				$query,
+				$sort,
+				$timeframe_limit,
 				$fetch_batch_size,
-				$after_param ? '&after=' . urlencode( $after_param ) : '',
-				$time_param
+				$after_param,
+				$is_global_search,
+				$is_subreddit_search,
+				$logs
 			);
 
 			$headers = array(
@@ -324,7 +340,7 @@ class FetchRedditAbility {
 					$logs[] = array(
 						'level'   => 'warning',
 						'message' => 'Reddit: Skipping post with missing data.',
-						'data'    => array( 'subreddit' => $subreddit ),
+						'data'    => array( 'context' => $mode_label ),
 					);
 					continue;
 				}
@@ -415,13 +431,16 @@ class FetchRedditAbility {
 					$image_info = $this->extractImageInfo( $item_data );
 				}
 
+				// Use the post's own subreddit (important for global search results).
+				$post_subreddit = $item_data['subreddit'] ?? $subreddit;
+
 				$metadata = array(
 					'source_type'            => 'reddit',
 					'item_identifier_to_log' => (string) $current_item_id,
 					'original_id'            => $current_item_id,
 					'original_title'         => $title,
 					'original_date_gmt'      => gmdate( 'Y-m-d\TH:i:s\Z', (int) ( $item_data['created_utc'] ?? time() ) ),
-					'subreddit'              => $subreddit,
+					'subreddit'              => $post_subreddit,
 					'upvotes'                => $item_data['score'] ?? 0,
 					'comment_count'          => $item_data['num_comments'] ?? 0,
 					'author'                 => $item_data['author'] ?? '[deleted]',
@@ -524,6 +543,7 @@ class FetchRedditAbility {
 	private function normalizeConfig( array $input ): array {
 		$defaults = array(
 			'subreddit'         => '',
+			'query'             => '',
 			'access_token'      => '',
 			'sort_by'           => 'hot',
 			'timeframe_limit'   => 'all_time',
@@ -538,6 +558,108 @@ class FetchRedditAbility {
 		);
 
 		return array_merge( $defaults, $input );
+	}
+
+	/**
+	 * Build the Reddit API URL based on mode (subreddit browse, subreddit search, or global search).
+	 *
+	 * @param string      $subreddit           Subreddit name (empty for global search).
+	 * @param string      $query               Search query (empty for subreddit browse).
+	 * @param string      $sort                Sort order.
+	 * @param string      $timeframe_limit     Timeframe filter.
+	 * @param int         $fetch_batch_size    Number of posts per page.
+	 * @param string|null $after_param         Pagination cursor.
+	 * @param bool        $is_global_search    Whether this is a global search.
+	 * @param bool        $is_subreddit_search Whether this is a search within a subreddit.
+	 * @param array       &$logs               Log entries array (passed by reference).
+	 * @return string The full Reddit API URL.
+	 */
+	private function buildApiUrl(
+		string $subreddit,
+		string $query,
+		string $sort,
+		string $timeframe_limit,
+		int $fetch_batch_size,
+		?string $after_param,
+		bool $is_global_search,
+		bool $is_subreddit_search,
+		array &$logs
+	): string {
+		$base = 'https://oauth.reddit.com';
+
+		// Map our timeframe values to Reddit's native 't' parameter.
+		$reddit_time_map = array(
+			'24_hours' => 'day',
+			'72_hours' => 'week',
+			'7_days'   => 'week',
+			'30_days'  => 'month',
+			'90_days'  => 'year',
+			'6_months' => 'year',
+			'1_year'   => 'year',
+		);
+
+		if ( $is_global_search || $is_subreddit_search ) {
+			// Search endpoint: /search.json or /r/{subreddit}/search.json
+			$params = array(
+				'q'     => $query,
+				'type'  => 'link',
+				'sort'  => $sort,
+				'limit' => $fetch_batch_size,
+			);
+
+			// Reddit search uses 't' for time filtering on all sort types.
+			if ( 'all_time' !== $timeframe_limit && isset( $reddit_time_map[ $timeframe_limit ] ) ) {
+				$params['t'] = $reddit_time_map[ $timeframe_limit ];
+				$logs[]      = array(
+					'level'   => 'debug',
+					'message' => 'Reddit: Using native search time filtering.',
+					'data'    => array(
+						'timeframe_limit'   => $timeframe_limit,
+						'reddit_time_param' => $reddit_time_map[ $timeframe_limit ],
+					),
+				);
+			}
+
+			if ( $is_subreddit_search ) {
+				$params['restrict_sr'] = 'on';
+				$endpoint              = "/r/{$subreddit}/search.json";
+			} else {
+				$endpoint = '/search.json';
+			}
+
+			if ( $after_param ) {
+				$params['after'] = $after_param;
+			}
+
+			return $base . $endpoint . '?' . http_build_query( $params );
+		}
+
+		// Subreddit browse: /r/{subreddit}/{sort}.json
+		$time_param = '';
+		if ( in_array( $sort, array( 'top', 'controversial' ), true ) && 'all_time' !== $timeframe_limit ) {
+			if ( isset( $reddit_time_map[ $timeframe_limit ] ) ) {
+				$time_param = '&t=' . $reddit_time_map[ $timeframe_limit ];
+				$logs[]     = array(
+					'level'   => 'debug',
+					'message' => 'Reddit: Using native API time filtering.',
+					'data'    => array(
+						'sort'              => $sort,
+						'timeframe_limit'   => $timeframe_limit,
+						'reddit_time_param' => $reddit_time_map[ $timeframe_limit ],
+					),
+				);
+			}
+		}
+
+		return sprintf(
+			'%s/r/%s/%s.json?limit=%d%s%s',
+			$base,
+			esc_attr( $subreddit ),
+			esc_attr( $sort ),
+			$fetch_batch_size,
+			$after_param ? '&after=' . urlencode( $after_param ) : '',
+			$time_param
+		);
 	}
 
 	/**
