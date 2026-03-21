@@ -261,13 +261,12 @@ class AIStep extends Step {
 			return array();
 		}
 
-		// Store token usage in job engine_data (read-then-merge — store_engine_data is a full overwrite).
+		// Store token usage in job engine_data via merge to avoid clobbering
+		// data written by handler tools during the conversation loop (e.g.
+		// event_id, event_url, post_id written via datamachine_merge_engine_data).
 		$usage = $loop_result['usage'] ?? array();
 		if ( ! empty( $usage ) && $this->job_id > 0 && ( $usage['total_tokens'] ?? 0 ) > 0 ) {
-			$jobs_db       = new \DataMachine\Core\Database\Jobs\Jobs();
-			$existing_data = $engine_data;
-			$existing_data['token_usage'] = $usage;
-			$jobs_db->store_engine_data( $this->job_id, $existing_data );
+			datamachine_merge_engine_data( $this->job_id, array( 'token_usage' => $usage ) );
 		}
 
 		// Process loop results into data packets
