@@ -54,7 +54,9 @@ class Agents {
 				array(
 					'methods'             => WP_REST_Server::CREATABLE,
 					'callback'            => array( self::class, 'handle_create' ),
-					'permission_callback' => $manage_permission,
+					'permission_callback' => function () {
+						return PermissionHelper::can( 'manage_agents' ) || PermissionHelper::can( 'create_own_agent' );
+					},
 					'args'                => array(
 						'agent_slug' => array(
 							'type'              => 'string',

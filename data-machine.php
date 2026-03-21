@@ -372,6 +372,7 @@ function datamachine_register_capabilities(): void {
 		'datamachine_chat',
 		'datamachine_use_tools',
 		'datamachine_view_logs',
+		'datamachine_create_own_agent',
 	);
 
 	$administrator = get_role( 'administrator' );
@@ -386,17 +387,20 @@ function datamachine_register_capabilities(): void {
 		$editor->add_cap( 'datamachine_chat' );
 		$editor->add_cap( 'datamachine_use_tools' );
 		$editor->add_cap( 'datamachine_view_logs' );
+		$editor->add_cap( 'datamachine_create_own_agent' );
 	}
 
 	$author = get_role( 'author' );
 	if ( $author ) {
 		$author->add_cap( 'datamachine_chat' );
 		$author->add_cap( 'datamachine_use_tools' );
+		$author->add_cap( 'datamachine_create_own_agent' );
 	}
 
 	$subscriber = get_role( 'subscriber' );
 	if ( $subscriber ) {
 		$subscriber->add_cap( 'datamachine_chat' );
+		$subscriber->add_cap( 'datamachine_create_own_agent' );
 	}
 }
 
@@ -414,6 +418,7 @@ function datamachine_remove_capabilities(): void {
 		'datamachine_chat',
 		'datamachine_use_tools',
 		'datamachine_view_logs',
+		'datamachine_create_own_agent',
 	);
 
 	$roles = array( 'administrator', 'editor', 'author', 'subscriber' );
