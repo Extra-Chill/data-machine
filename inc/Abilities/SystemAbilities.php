@@ -43,7 +43,7 @@ class SystemAbilities {
 		$register_callback = function () {
 			$this->registerSessionTitleAbility();
 			$this->registerHealthCheckAbility();
-			$this->registerGitHubIssueAbility();
+			// registerGitHubIssueAbility moved to data-machine-code extension.
 			$this->registerRunTaskAbility();
 		};
 
@@ -283,60 +283,7 @@ class SystemAbilities {
 		return implode( '; ', $parts );
 	}
 
-	/**
-	 * Register the GitHub issue creation ability.
-	 *
-	 * @since 0.24.0
-	 */
-	private function registerGitHubIssueAbility(): void {
-		wp_register_ability(
-			'datamachine/create-github-issue',
-			array(
-				'label'               => __( 'Create GitHub Issue', 'data-machine' ),
-				'description'         => __( 'Create a GitHub issue via the GitHub REST API', 'data-machine' ),
-				'category'            => 'datamachine',
-				'input_schema'        => array(
-					'type'       => 'object',
-					'properties' => array(
-						'repo'   => array(
-							'type'        => 'string',
-							'description' => 'Repository in owner/repo format',
-						),
-						'title'  => array(
-							'type'        => 'string',
-							'description' => 'Issue title',
-						),
-						'body'   => array(
-							'type'        => 'string',
-							'description' => 'Issue body (Markdown supported)',
-						),
-						'labels' => array(
-							'type'        => 'array',
-							'items'       => array( 'type' => 'string' ),
-							'description' => 'Labels to apply to the issue',
-						),
-					),
-					'required'   => array( 'title' ),
-				),
-				'output_schema'       => array(
-					'type'       => 'object',
-					'properties' => array(
-						'success'      => array( 'type' => 'boolean' ),
-						'pending'      => array( 'type' => 'boolean' ),
-						'job_id'       => array( 'type' => 'integer' ),
-						'issue_url'    => array( 'type' => 'string' ),
-						'issue_number' => array( 'type' => 'integer' ),
-						'html_url'     => array( 'type' => 'string' ),
-					),
-				),
-				'execute_callback'    => function ( array $input ) {
-					return TaskScheduler::schedule( 'github_create_issue', $input );
-				},
-				'permission_callback' => fn() => PermissionHelper::can_manage(),
-				'meta'                => array( 'show_in_rest' => true ),
-			)
-		);
-	}
+	// registerGitHubIssueAbility() moved to data-machine-code extension.
 
 	/**
 	 * Register the run-task ability.

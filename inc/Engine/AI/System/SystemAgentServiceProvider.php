@@ -15,7 +15,7 @@ defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Engine\AI\System\Tasks\AltTextTask;
 use DataMachine\Engine\AI\System\Tasks\DailyMemoryTask;
-use DataMachine\Engine\AI\System\Tasks\GitHubIssueTask;
+// GitHubIssueTask moved to data-machine-code extension.
 use DataMachine\Engine\AI\System\Tasks\ImageGenerationTask;
 use DataMachine\Engine\AI\System\Tasks\ImageOptimizationTask;
 use DataMachine\Engine\AI\System\Tasks\InternalLinkingTask;
@@ -63,7 +63,7 @@ class SystemAgentServiceProvider {
 		$tasks['image_generation']            = ImageGenerationTask::class;
 		$tasks['image_optimization']          = ImageOptimizationTask::class;
 		$tasks['alt_text_generation']         = AltTextTask::class;
-		$tasks['github_create_issue']         = GitHubIssueTask::class;
+		// github_create_issue moved to data-machine-code extension.
 		$tasks['internal_linking']            = InternalLinkingTask::class;
 		$tasks['daily_memory_generation']     = DailyMemoryTask::class;
 		$tasks['meta_description_generation'] = MetaDescriptionTask::class;

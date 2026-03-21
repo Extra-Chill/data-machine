@@ -28,7 +28,7 @@ use DataMachine\Engine\AI\Tools\Global\InternalLinkAudit;
 use DataMachine\Engine\AI\Tools\Global\LocalSearch;
 use DataMachine\Engine\AI\Tools\Global\QueueValidator;
 use DataMachine\Engine\AI\Tools\Global\WebFetch;
-use DataMachine\Engine\AI\Tools\Global\WorkspaceTools;
+// WorkspaceTools moved to data-machine-code extension.
 use DataMachine\Engine\AI\Tools\Global\WordPressPostReader;
 
 // Chat-only tools.
@@ -97,7 +97,7 @@ class ToolServiceProvider {
 		new LocalSearch();
 		new QueueValidator();
 		new WebFetch();
-		new WorkspaceTools();
+		// WorkspaceTools moved to data-machine-code extension.
 		new WordPressPostReader();
 
 		// Chat-only tools.

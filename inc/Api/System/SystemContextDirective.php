@@ -52,8 +52,8 @@ class SystemContextDirective implements \DataMachine\Engine\AI\Directives\Direct
 		. 'When using create_github_issue: include a clear title and detailed body with context, reproduction steps, and relevant log snippets. Use labels to categorize. Route to the most appropriate repo. Never create duplicates.';
 
 		// List available repos dynamically.
-		if ( class_exists( '\DataMachine\Abilities\Fetch\GitHubAbilities' ) ) {
-			$repos = \DataMachine\Abilities\Fetch\GitHubAbilities::getRegisteredRepos();
+		if ( class_exists( '\DataMachineCode\Abilities\GitHubAbilities' ) ) {
+			$repos = \DataMachineCode\Abilities\GitHubAbilities::getRegisteredRepos();
 			if ( ! empty( $repos ) ) {
 				$directive .= "\n\n" . 'Available repositories for issue creation:' . "\n";
 				foreach ( $repos as $entry ) {
