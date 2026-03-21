@@ -32,6 +32,7 @@ trait HandlerRegistrationTrait {
 	 * @param string|null $settingsClass Settings class name
 	 * @param callable|null $aiToolCallback AI tool registration callback
 	 * @param string|null $authProviderKey Optional custom auth provider key for shared authentication
+	 * @param array $meta Optional arbitrary metadata (e.g. charLimit, maxImages). Passed through to /handlers API.
 	 */
 	protected static function registerHandler(
 		string $slug,
@@ -43,14 +44,15 @@ trait HandlerRegistrationTrait {
 		?string $authClass = null,
 		?string $settingsClass = null,
 		?callable $aiToolCallback = null,
-		?string $authProviderKey = null
+		?string $authProviderKey = null,
+		array $meta = array()
 	): void {
 		// Compute auth provider key for both handler metadata and auth registration
 		$provider_key = $authProviderKey ?? $slug;
 
 		// Handler registration
 		add_filter('datamachine_handlers', function($handlers, $step_type = null)
-			use ($slug, $type, $class_name, $label, $description, $requiresAuth, $provider_key) {
+			use ($slug, $type, $class_name, $label, $description, $requiresAuth, $provider_key, $meta) {
 			if ( null === $step_type || $step_type === $type ) {
 				$handlers[ $slug ] = array(
 					'type'              => $type,
@@ -59,6 +61,7 @@ trait HandlerRegistrationTrait {
 					'description'       => $description,
 					'requires_auth'     => $requiresAuth,
 					'auth_provider_key' => $requiresAuth ? $provider_key : null,
+					'meta'              => $meta,
 				);
 			}
 			return $handlers;
