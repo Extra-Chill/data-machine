@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.50.1] - 2026-03-21
+
+### Changed
+- Add engine data fallback for update step when data packets are missing
+
 ## [0.50.0] - 2026-03-21
 
 ### Added
