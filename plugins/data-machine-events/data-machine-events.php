@@ -224,6 +224,9 @@ class DATAMACHINE_Events {
 			\DataMachineEvents\Core\DuplicateDetection\EventIdentityWriter::register();
 		}
 
+		// Notify submitters when their submitted events are published.
+		\DataMachineEvents\Core\SubmissionNotification::register();
+
 		// Load chat tools - self-register via ToolRegistrationTrait
 		new \DataMachineEvents\Api\Chat\Tools\VenueHealthCheck();
 		new \DataMachineEvents\Api\Chat\Tools\UpdateVenue();
