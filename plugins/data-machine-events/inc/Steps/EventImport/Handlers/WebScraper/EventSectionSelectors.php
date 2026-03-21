@@ -110,6 +110,37 @@ final class EventSectionSelectors {
 				'enable_table_row_date_filter' => false,
 			),
 
+			// Div elements with event-related classes (Black Cat DC, hand-coded venue sites)
+			// Many indie venues use simple div.show or div.event instead of <article>.
+			array(
+				'xpath'                        => '//div[contains(concat(" ", normalize-space(@class), " "), " show ")][.//h1 or .//h2]',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//div[contains(concat(" ", normalize-space(@class), " "), " event ")][.//h1 or .//h2]',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//div[contains(concat(" ", normalize-space(@class), " "), " concert ")][.//h1 or .//h2]',
+				'enable_table_row_date_filter' => false,
+			),
+
+			// Show details containers (venues that wrap each show's details in a details div)
+			array(
+				'xpath'                        => '//*[contains(@class, "show-details")]',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//*[contains(@class, "event-details")]',
+				'enable_table_row_date_filter' => false,
+			),
+
+			// Show card link patterns (Webflow venue sites like Union Stage Presents)
+			array(
+				'xpath'                        => '//*[contains(@class, "show-card")]',
+				'enable_table_row_date_filter' => false,
+			),
+
 			// Articles containing time elements (Bricks builder, generic event cards)
 			array(
 				'xpath'                        => '//article[.//time]',
