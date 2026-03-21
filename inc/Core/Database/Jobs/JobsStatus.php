@@ -65,6 +65,11 @@ class JobsStatus extends BaseRepository {
 			return false;
 		}
 
+		// Truncate to fit varchar(255) column. Full reason is preserved in engine_data.
+		if ( strlen( $status ) > 255 ) {
+			$status = substr( $status, 0, 252 ) . '...';
+		}
+
 		$update_data = array(
 			'status'       => $status,
 			'completed_at' => current_time( 'mysql', true ),
@@ -97,6 +102,11 @@ class JobsStatus extends BaseRepository {
 
 		if ( empty( $job_id ) ) {
 			return false;
+		}
+
+		// Truncate to fit varchar(255) column.
+		if ( strlen( $status ) > 255 ) {
+			$status = substr( $status, 0, 252 ) . '...';
 		}
 
 		$update_data = array( 'status' => $status );

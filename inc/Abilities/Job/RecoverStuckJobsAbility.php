@@ -124,6 +124,11 @@ class RecoverStuckJobsAbility {
 		foreach ( $stuck_jobs as $job ) {
 			$status = $job->target_status;
 
+			// Truncate to fit varchar(255) column. Full reason is in engine_data.
+			if ( $status && strlen( $status ) > 255 ) {
+				$status = substr( $status, 0, 252 ) . '...';
+			}
+
 			if ( ! $status || ! JobStatus::isStatusFinal( $status ) ) {
 				++$skipped;
 				$jobs[] = array(
