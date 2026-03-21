@@ -68,7 +68,14 @@ class Twitter extends PublishHandler {
 				}
 				return $tools;
 			},
-			'twitter'
+			'twitter',
+			array(
+				'charLimit'          => 280,
+				'maxImages'          => 4,
+				'aspectRatios'       => array( 'any' ),
+				'defaultAspectRatio' => 'any',
+				'supportsCarousel'   => false,
+			)
 		);
 	}
 

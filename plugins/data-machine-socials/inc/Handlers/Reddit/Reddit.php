@@ -41,7 +41,12 @@ class Reddit extends FetchHandler {
 			true,
 			RedditAuth::class,
 			RedditSettings::class,
-			null
+			null,
+			null,
+			array(
+				'charLimit' => 40000,
+				'scopes'    => 'identity read',
+			)
 		);
 	}
 

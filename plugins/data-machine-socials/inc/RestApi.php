@@ -699,10 +699,81 @@ class RestApi {
 	}
 
 	/**
-	 * Check if user can edit posts
+	 * Get authentication status for all social platforms.
+	 *
+	 * Kept for backward compatibility. Prefer GET /platforms which
+	 * returns auth status alongside platform config in one response.
 	 */
-	public static function check_edit_permission() {
-		return current_user_can( 'edit_posts' );
+	public static function get_auth_status() {
+		$auth_abilities = new AuthAbilities();
+		$providers      = $auth_abilities->getAllProviders();
+
+		$statuses = array();
+
+		foreach ( $providers as $key => $provider ) {
+			// Only include social auth providers (from this plugin's namespace).
+			if ( strpos( get_class( $provider ), 'DataMachineSocials\\' ) === false ) {
+				continue;
+			}
+
+			$statuses[] = array(
+				'platform'      => $key,
+				'authenticated' => $provider->is_authenticated(),
+				'username'      => $provider->get_username(),
+			);
+		}
+
+		return new \WP_REST_Response( $statuses );
+	}
+
+	/**
+	 * Get platform configurations with auth status.
+	 *
+	 * Assembles from DM core's handler registry — each social handler
+	 * self-declares its constraints via the $meta parameter in registerHandler().
+	 * Auth status is folded in from the auth providers filter.
+	 */
+	public static function get_platforms() {
+		$handler_abilities = new \DataMachine\Abilities\HandlerAbilities();
+		$auth_abilities    = new AuthAbilities();
+		$providers         = $auth_abilities->getAllProviders();
+
+		// Get all handlers that registered via HandlerRegistrationTrait.
+		$all_handlers = $handler_abilities->getAllHandlers();
+
+		$platforms = array();
+
+		foreach ( $all_handlers as $slug => $handler ) {
+			$auth_key = $handler['auth_provider_key'] ?? $slug;
+			$provider = $providers[ $auth_key ] ?? null;
+
+			// Skip handlers without an auth provider.
+			if ( ! $provider ) {
+				continue;
+			}
+
+			// Only include handlers whose auth provider is from this plugin.
+			$provider_class = get_class( $provider );
+			if ( strpos( $provider_class, 'DataMachineSocials\\' ) === false ) {
+				continue;
+			}
+
+			$meta = $handler['meta'] ?? array();
+
+			$platforms[ $auth_key ] = array_merge(
+				array(
+					'label' => $handler['label'] ?? $auth_key,
+					'type'  => $handler['type'] ?? 'publish',
+				),
+				$meta,
+				array(
+					'authenticated' => $provider->is_authenticated(),
+					'username'      => $provider->get_username(),
+				)
+			);
+		}
+
+		return new \WP_REST_Response( $platforms );
 	}
 
 	/**

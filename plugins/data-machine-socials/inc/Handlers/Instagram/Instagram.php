@@ -82,7 +82,16 @@ class Instagram extends PublishHandler {
 				}
 				return $tools;
 			},
-			'instagram'
+			'instagram',
+			array(
+				'charLimit'          => 2200,
+				'maxImages'          => 10,
+				'aspectRatios'       => array( '1:1', '4:5', '3:4', '1.91:1' ),
+				'defaultAspectRatio' => '4:5',
+				'supportsCarousel'   => true,
+				'supportsVideo'      => true,
+				'supportedMediaKinds' => array( 'image', 'carousel', 'reel', 'story' ),
+			)
 		);
 	}
 

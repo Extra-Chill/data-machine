@@ -66,7 +66,14 @@ class Facebook extends PublishHandler {
 				}
 				return $tools;
 			},
-			'facebook'
+			'facebook',
+			array(
+				'charLimit'          => 63206,
+				'maxImages'          => 10,
+				'aspectRatios'       => array( 'any' ),
+				'defaultAspectRatio' => 'any',
+				'supportsCarousel'   => true,
+			)
 		);
 	}
 

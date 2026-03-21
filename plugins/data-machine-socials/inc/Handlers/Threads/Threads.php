@@ -66,7 +66,14 @@ class Threads extends PublishHandler {
 				}
 				return $tools;
 			},
-			'threads'
+			'threads',
+			array(
+				'charLimit'          => 500,
+				'maxImages'          => 10,
+				'aspectRatios'       => array( 'any' ),
+				'defaultAspectRatio' => 'any',
+				'supportsCarousel'   => true,
+			)
 		);
 	}
 
