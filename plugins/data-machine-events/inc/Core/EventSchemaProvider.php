@@ -355,8 +355,15 @@ class EventSchemaProvider {
 
 		[$resolved_end_date, $resolved_end_time] = self::resolveEndDate( $event_data, $post_id );
 		if ( ! empty( $resolved_end_date ) ) {
-			$end_time          = ! empty( $resolved_end_time ) ? 'T' . $resolved_end_time : '';
-			$schema['endDate'] = $resolved_end_date . $end_time;
+			$end_time     = ! empty( $resolved_end_time ) ? 'T' . $resolved_end_time : '';
+			$end_date_iso = $resolved_end_date . $end_time;
+
+			// Only include endDate if it differs from startDate.
+			// Identical values mean no real end time was provided — omitting
+			// is better than telling Google the event is zero minutes long.
+			if ( ! isset( $schema['startDate'] ) || $end_date_iso !== $schema['startDate'] ) {
+				$schema['endDate'] = $end_date_iso;
+			}
 		}
 
 		if ( ! empty( $event_data['description'] ) ) {

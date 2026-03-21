@@ -211,12 +211,18 @@ function data_machine_events_sync_datetime_meta( $post_id, $post, $update ) {
 				update_post_meta( $post_id, EVENT_DATETIME_META_KEY, $datetime );
 
 				if ( $end_date ) {
-					$effective_end_time = $end_time ? $end_time : $effective_start_time;
+					// Has explicit end date: use sentinel 23:59:59 when no end time provided.
+					$effective_end_time = $end_time ? $end_time : '23:59:59';
 					$end_datetime_val   = $end_date . ' ' . $effective_end_time;
+					update_post_meta( $post_id, EVENT_END_DATETIME_META_KEY, $end_datetime_val );
+				} elseif ( $end_time ) {
+					// Has end time but no end date: same day, store with start date.
+					$end_datetime_val = $start_date . ' ' . $end_time;
+					update_post_meta( $post_id, EVENT_END_DATETIME_META_KEY, $end_datetime_val );
 				} else {
-					$end_datetime_val = $datetime;
+					// No end date or time: delete stale meta rather than fabricate one.
+					delete_post_meta( $post_id, EVENT_END_DATETIME_META_KEY );
 				}
-				update_post_meta( $post_id, EVENT_END_DATETIME_META_KEY, $end_datetime_val );
 			} else {
 				// No date found, delete meta if it exists.
 				delete_post_meta( $post_id, EVENT_DATETIME_META_KEY );

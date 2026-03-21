@@ -368,24 +368,22 @@ class MetaSyncAbilities {
 
 	/**
 	 * Calculate expected end datetime value from block attributes.
-	 * Used for dry-run preview.
+	 * Used for dry-run preview. Mirrors meta-storage.php logic:
+	 * - Has endDate + endTime: use them.
+	 * - Has endDate, no endTime: use sentinel 23:59:59.
+	 * - Has endTime, no endDate: same day as start.
+	 * - Neither: no end meta (empty string).
 	 *
 	 * @param array $attrs Block attributes
-	 * @return string Expected end datetime value
+	 * @return string Expected end datetime value, or empty if none.
 	 */
 	private function calculateExpectedEndDatetime( array $attrs ): string {
 		$start_date = $attrs['startDate'] ?? '';
-		$start_time = $attrs['startTime'] ?? '00:00:00';
 		$end_date   = $attrs['endDate'] ?? '';
 		$end_time   = $attrs['endTime'] ?? '';
 
 		if ( empty( $start_date ) ) {
 			return '';
-		}
-
-		$start_time_parts = explode( ':', $start_time );
-		if ( count( $start_time_parts ) === 2 ) {
-			$start_time .= ':00';
 		}
 
 		$end_time_parts = explode( ':', $end_time );
@@ -398,12 +396,11 @@ class MetaSyncAbilities {
 			return $end_date . ' ' . $effective_end_time;
 		}
 
-		try {
-			$start_dt = new \DateTime( $start_date . ' ' . $start_time );
-			$start_dt->modify( '+3 hours' );
-			return $start_dt->format( 'Y-m-d H:i:s' );
-		} catch ( \Exception $e ) {
-			return $start_date . ' ' . $start_time;
+		if ( $end_time ) {
+			return $start_date . ' ' . $end_time;
 		}
+
+		// No end date or time — no end meta should exist.
+		return '';
 	}
 }

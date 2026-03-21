@@ -174,10 +174,16 @@ class CheckMetaSyncCommand {
 
 			if ( ! empty( $attrs['endDate'] ) ) {
 				$end_datetime = $attrs['endDate'];
-				if ( ! empty( $attrs['endTime'] ) ) {
-					$end_datetime .= ' ' . $attrs['endTime'];
-				}
+				$end_time     = ! empty( $attrs['endTime'] ) ? $attrs['endTime'] : '23:59:59';
+				$end_datetime .= ' ' . $end_time;
 				update_post_meta( (int) $post_id, '_datamachine_event_end_datetime', $end_datetime );
+			} elseif ( ! empty( $attrs['endTime'] ) ) {
+				// End time but no end date: same day as start.
+				$end_datetime = $attrs['startDate'] . ' ' . $attrs['endTime'];
+				update_post_meta( (int) $post_id, '_datamachine_event_end_datetime', $end_datetime );
+			} else {
+				// No end data: remove stale meta rather than fabricate.
+				delete_post_meta( (int) $post_id, '_datamachine_event_end_datetime' );
 			}
 
 			++$fixed;
