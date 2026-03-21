@@ -92,8 +92,11 @@ function datamachine_socials_bootstrap() {
 	new \DataMachineSocials\Abilities\LinkedIn\LinkedInUpdateAbility();
 	new \DataMachineSocials\Abilities\LinkedIn\LinkedInDeleteAbility();
 
-	// Reddit (Fetch)
+	// Reddit
 	new \DataMachineSocials\Abilities\Reddit\FetchRedditAbility();
+	new \DataMachineSocials\Abilities\Reddit\ReplyRedditAbility();
+	new \DataMachineSocials\Abilities\Reddit\SubmitRedditAbility();
+	new \DataMachineSocials\Abilities\Reddit\VoteRedditAbility();
 
 	// Social Handlers
 	new \DataMachineSocials\Handlers\Twitter\Twitter();
@@ -213,6 +216,8 @@ function datamachine_socials_load_chat_tools() {
 	}
 
 	new \DataMachineSocials\Chat\Tools\FetchReddit();
+	new \DataMachineSocials\Chat\Tools\ReplyReddit();
+	new \DataMachineSocials\Chat\Tools\SubmitReddit();
 	new \DataMachineSocials\Chat\Tools\ReadInstagram();
 	new \DataMachineSocials\Chat\Tools\UpdateInstagram();
 	new \DataMachineSocials\Chat\Tools\ReplyInstagramComment();

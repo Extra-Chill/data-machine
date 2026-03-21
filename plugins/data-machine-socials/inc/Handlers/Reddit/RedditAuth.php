@@ -89,7 +89,7 @@ class RedditAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			'state'         => $state,
 			'redirect_uri'  => $this->get_callback_url(),
 			'duration'      => 'permanent', // Reddit-specific: request refresh token
-			'scope'         => 'identity read', // Reddit-specific scopes
+			'scope'         => 'identity read submit vote', // Reddit-specific scopes
 		);
 
 		return $this->oauth2->get_authorization_url( 'https://www.reddit.com/api/v1/authorize', $params );
