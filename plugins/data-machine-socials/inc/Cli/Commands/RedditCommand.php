@@ -41,6 +41,18 @@ defined( 'ABSPATH' ) || exit;
  *
  *     # Check Reddit auth status
  *     wp datamachine-socials reddit status
+ *
+ *     # Reply to a post or comment
+ *     wp datamachine-socials reddit reply t3_abc123 "Great post!"
+ *
+ *     # Submit a new text post
+ *     wp datamachine-socials reddit submit test --title="Hello World" --text="This is a test post"
+ *
+ *     # Submit a link post
+ *     wp datamachine-socials reddit submit test --title="Check this out" --url="https://example.com"
+ *
+ *     # Upvote a post
+ *     wp datamachine-socials reddit vote t3_abc123 --up
  */
 class RedditCommand {
 
@@ -674,6 +686,270 @@ class RedditCommand {
 				WP_CLI::log( 'Next cron:     ' . wp_date( 'Y-m-d H:i:s', $next_cron ) );
 			}
 		}
+	}
+
+	/**
+	 * Reply to a Reddit post or comment.
+	 *
+	 * Posts a comment in reply to a post or another comment. The thing_id
+	 * must be a Reddit fullname: t3_xxx for posts, t1_xxx for comments.
+	 * You can find these IDs in the URL or via the `fetch` and `posts` commands.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <thing_id>
+	 * : Reddit fullname of the post (t3_xxx) or comment (t1_xxx) to reply to.
+	 *
+	 * <text>
+	 * : Reply text. Supports Reddit markdown.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - yaml
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials reddit reply t3_abc123 "Great post! Check out events.extrachill.com for more."
+	 *     wp datamachine-socials reddit reply t1_def456 "Totally agree with this."
+	 *     wp datamachine-socials reddit reply t3_abc123 "Here's a [link](https://example.com)" --format=json
+	 */
+	public function reply( $args, $assoc_args ) {
+		$thing_id     = $args[0];
+		$text         = $args[1];
+		$format       = $assoc_args['format'] ?? 'table';
+		$access_token = $this->get_access_token();
+
+		$type_label = str_starts_with( $thing_id, 't3_' ) ? 'post' : 'comment';
+		WP_CLI::log( "Replying to {$type_label} {$thing_id}..." );
+
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/reply-reddit' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/reply-reddit ability not registered.' );
+		}
+
+		$result = $ability->execute( array(
+			'thing_id'     => $thing_id,
+			'text'         => $text,
+			'access_token' => $access_token,
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Reddit reply failed.' );
+		}
+
+		$data = $result['data'] ?? array();
+
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		if ( 'yaml' === $format ) {
+			$this->output_yaml( $data );
+			return;
+		}
+
+		WP_CLI::success( "Reply posted to {$type_label} {$thing_id}" );
+		if ( ! empty( $data['comment_url'] ) ) {
+			WP_CLI::log( 'URL:    ' . $data['comment_url'] );
+		}
+		if ( ! empty( $data['comment_id'] ) ) {
+			WP_CLI::log( 'ID:     ' . $data['comment_id'] );
+		}
+		WP_CLI::log( 'Author: ' . ( $data['author'] ?? 'unknown' ) );
+	}
+
+	/**
+	 * Submit a new post to a subreddit.
+	 *
+	 * Creates a self (text) post or link post in the specified subreddit.
+	 * Provide --text for a self post, or --url for a link post.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <subreddit>
+	 * : The subreddit name (without "r/").
+	 *
+	 * --title=<title>
+	 * : Post title (max 300 characters).
+	 *
+	 * [--text=<text>]
+	 * : Self-post body text (markdown). Creates a text post.
+	 *
+	 * [--url=<url>]
+	 * : URL for link posts. Cannot be combined with --text.
+	 *
+	 * [--flair-id=<flair_id>]
+	 * : Flair template ID (if required by subreddit).
+	 *
+	 * [--flair-text=<flair_text>]
+	 * : Flair text.
+	 *
+	 * [--nsfw]
+	 * : Mark as NSFW.
+	 *
+	 * [--spoiler]
+	 * : Mark as spoiler.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - yaml
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials reddit submit test --title="Hello World" --text="Testing from WP-CLI"
+	 *     wp datamachine-socials reddit submit music --title="Check this out" --url="https://example.com/song"
+	 *     wp datamachine-socials reddit submit festivals --title="Festival Guide" --text="Here's our guide..." --format=json
+	 */
+	public function submit( $args, $assoc_args ) {
+		$subreddit    = $args[0];
+		$title        = $assoc_args['title'] ?? '';
+		$text         = $assoc_args['text'] ?? '';
+		$url          = $assoc_args['url'] ?? '';
+		$format       = $assoc_args['format'] ?? 'table';
+		$access_token = $this->get_access_token();
+
+		if ( empty( $title ) ) {
+			WP_CLI::error( '--title is required.' );
+		}
+
+		if ( ! empty( $text ) && ! empty( $url ) ) {
+			WP_CLI::error( 'Cannot combine --text and --url. Use one or the other.' );
+		}
+
+		$kind = ! empty( $url ) ? 'link' : 'self';
+		WP_CLI::log( "Submitting {$kind} post to r/{$subreddit}..." );
+
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/submit-reddit' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/submit-reddit ability not registered.' );
+		}
+
+		$result = $ability->execute( array(
+			'subreddit'    => $subreddit,
+			'title'        => $title,
+			'text'         => $text,
+			'url'          => $url,
+			'flair_id'     => $assoc_args['flair-id'] ?? '',
+			'flair_text'   => $assoc_args['flair-text'] ?? '',
+			'nsfw'         => isset( $assoc_args['nsfw'] ),
+			'spoiler'      => isset( $assoc_args['spoiler'] ),
+			'access_token' => $access_token,
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Reddit submit failed.' );
+		}
+
+		$data = $result['data'] ?? array();
+
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		if ( 'yaml' === $format ) {
+			$this->output_yaml( $data );
+			return;
+		}
+
+		WP_CLI::success( "Post submitted to r/{$subreddit}" );
+		WP_CLI::log( 'Title: ' . ( $data['title'] ?? '' ) );
+		WP_CLI::log( 'Type:  ' . ( $data['kind'] ?? '' ) );
+		if ( ! empty( $data['post_url'] ) ) {
+			WP_CLI::log( 'URL:   ' . $data['post_url'] );
+		}
+		if ( ! empty( $data['post_name'] ) ) {
+			WP_CLI::log( 'Name:  ' . $data['post_name'] );
+		}
+	}
+
+	/**
+	 * Vote on a Reddit post or comment.
+	 *
+	 * Upvote, downvote, or remove your vote from a post or comment.
+	 * Default is upvote. Use --down to downvote or --unvote to remove.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <thing_id>
+	 * : Reddit fullname of the post (t3_xxx) or comment (t1_xxx).
+	 *
+	 * [--up]
+	 * : Upvote (default).
+	 *
+	 * [--down]
+	 * : Downvote.
+	 *
+	 * [--unvote]
+	 * : Remove existing vote.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials reddit vote t3_abc123
+	 *     wp datamachine-socials reddit vote t3_abc123 --up
+	 *     wp datamachine-socials reddit vote t3_abc123 --down
+	 *     wp datamachine-socials reddit vote t1_def456 --unvote
+	 */
+	public function vote( $args, $assoc_args ) {
+		$thing_id     = $args[0];
+		$access_token = $this->get_access_token();
+
+		// Determine direction.
+		if ( isset( $assoc_args['down'] ) ) {
+			$direction = -1;
+			$label     = 'Downvoting';
+		} elseif ( isset( $assoc_args['unvote'] ) ) {
+			$direction = 0;
+			$label     = 'Removing vote from';
+		} else {
+			$direction = 1;
+			$label     = 'Upvoting';
+		}
+
+		WP_CLI::log( "{$label} {$thing_id}..." );
+
+		if ( ! function_exists( 'wp_get_ability' ) ) {
+			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
+		}
+
+		$ability = wp_get_ability( 'datamachine/vote-reddit' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/vote-reddit ability not registered.' );
+		}
+
+		$result = $ability->execute( array(
+			'thing_id'     => $thing_id,
+			'direction'    => $direction,
+			'access_token' => $access_token,
+		) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Reddit vote failed.' );
+		}
+
+		$action = $result['data']['action'] ?? 'voted';
+		WP_CLI::success( "Successfully {$action} {$thing_id}" );
 	}
 
 	/**
