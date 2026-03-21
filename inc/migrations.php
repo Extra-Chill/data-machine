@@ -170,10 +170,12 @@ add_action( 'init', 'datamachine_maybe_run_migrations', 5 );
  * of empty placeholder comments.
  *
  * @since 0.32.0
+ * @since 0.51.0 Accepts optional $agent_name for identity-aware SOUL.md scaffolding.
  *
+ * @param string $agent_name Optional agent display name to include in SOUL.md identity.
  * @return array<string, string> Filename => content map for SOUL.md, USER.md, MEMORY.md.
  */
-function datamachine_get_scaffold_defaults(): array {
+function datamachine_get_scaffold_defaults( string $agent_name = '' ): array {
 	// --- Site metadata ---
 	$site_name    = get_bloginfo( 'name' ) ? get_bloginfo( 'name' ) : 'WordPress Site';
 	$site_tagline = get_bloginfo( 'description' );
@@ -269,11 +271,21 @@ function datamachine_get_scaffold_defaults(): array {
 	$soul_context = implode( "\n", $context_items ) . $multisite_line;
 
 	// --- SOUL.md ---
+	$identity_line = ! empty( $agent_name )
+		? "You are **{$agent_name}**, an AI assistant managing {$site_name}."
+		: "You are an AI assistant managing {$site_name}.";
+
+	$identity_meta = '';
+	if ( ! empty( $agent_name ) ) {
+		$identity_meta = "\n- **Name:** {$agent_name}";
+	}
+
 	$soul = <<<MD
-# Agent Soul
+# Agent Soul — {$site_name}
 
 ## Identity
-You are an AI assistant managing {$site_name}.
+{$identity_line}
+{$identity_meta}
 
 ## Voice & Tone
 Write in a clear, helpful tone.
@@ -1081,6 +1093,54 @@ function datamachine_ensure_default_memory_files() {
 }
 
 /**
+ * Resolve agent display name from scaffolding context.
+ *
+ * Looks up the agent record from the provided context identifiers
+ * (agent_slug, agent_id, or user_id) and returns the display name.
+ * Returns empty string when no agent can be resolved.
+ *
+ * @since 0.51.0
+ *
+ * @param array $context Scaffolding context with agent_slug, agent_id, or user_id.
+ * @return string Agent display name, or empty string.
+ */
+function datamachine_resolve_agent_name_from_context( array $context ): string {
+	if ( ! class_exists( '\\DataMachine\\Core\\Database\\Agents\\Agents' ) ) {
+		return '';
+	}
+
+	$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+
+	// 1) Explicit agent_slug.
+	if ( ! empty( $context['agent_slug'] ) ) {
+		$agent = $agents_repo->get_by_slug( sanitize_title( (string) $context['agent_slug'] ) );
+		if ( ! empty( $agent['agent_name'] ) ) {
+			return (string) $agent['agent_name'];
+		}
+	}
+
+	// 2) Agent ID.
+	$agent_id = (int) ( $context['agent_id'] ?? 0 );
+	if ( $agent_id > 0 ) {
+		$agent = $agents_repo->get_agent( $agent_id );
+		if ( ! empty( $agent['agent_name'] ) ) {
+			return (string) $agent['agent_name'];
+		}
+	}
+
+	// 3) User ID → owner lookup.
+	$user_id = (int) ( $context['user_id'] ?? 0 );
+	if ( $user_id > 0 ) {
+		$agent = $agents_repo->get_by_owner_id( $user_id );
+		if ( ! empty( $agent['agent_name'] ) ) {
+			return (string) $agent['agent_name'];
+		}
+	}
+
+	return '';
+}
+
+/**
  * Register default content generators for datamachine/scaffold-memory-file.
  *
  * Each generator handles one filename and builds content from the
@@ -1169,11 +1229,16 @@ MD;
 /**
  * Generate SOUL.md content from site and agent context.
  *
+ * Uses scaffolding context (agent_slug, agent_id) to resolve the agent's
+ * display name from the database and embed it in the identity section.
+ * Falls back to the generic template when no agent context is available.
+ *
  * @since 0.50.0
+ * @since 0.51.0 Resolves agent_name from context for identity-aware scaffolding.
  *
  * @param string $content  Current content.
  * @param string $filename Filename being scaffolded.
- * @param array  $context  Scaffolding context.
+ * @param array  $context  Scaffolding context with agent_slug, agent_id, or user_id.
  * @return string
  */
 function datamachine_scaffold_soul_content( string $content, string $filename, array $context ): string {
@@ -1181,7 +1246,10 @@ function datamachine_scaffold_soul_content( string $content, string $filename, a
 		return $content;
 	}
 
-	$defaults = datamachine_get_scaffold_defaults();
+	// Resolve agent identity from context.
+	$agent_name = datamachine_resolve_agent_name_from_context( $context );
+
+	$defaults = datamachine_get_scaffold_defaults( $agent_name );
 	return $defaults['SOUL.md'] ?? '';
 }
 

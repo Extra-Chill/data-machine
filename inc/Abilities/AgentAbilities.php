@@ -495,6 +495,16 @@ class AgentAbilities {
 		$agent_dir         = $directory_manager->get_agent_identity_directory( $slug );
 		$directory_manager->ensure_directory_exists( $agent_dir );
 
+		// Scaffold agent-layer memory files (SOUL.md, MEMORY.md) with identity context.
+		$scaffold_ability = \DataMachine\Abilities\File\ScaffoldAbilities::get_ability();
+		if ( $scaffold_ability ) {
+			$scaffold_ability->execute( array(
+				'layer'      => 'agent',
+				'agent_slug' => $slug,
+				'agent_id'   => $agent_id,
+			) );
+		}
+
 		return array(
 			'success'    => true,
 			'agent_id'   => $agent_id,
@@ -620,6 +630,9 @@ class AgentAbilities {
 			);
 		}
 
+		// Capture old name before update for propagation.
+		$old_name = (string) $agent['agent_name'];
+
 		$ok = $agents_repo->update_agent( $agent_id, $update );
 
 		if ( ! $ok ) {
@@ -629,8 +642,104 @@ class AgentAbilities {
 			);
 		}
 
+		// Propagate name change to agent memory files.
+		if ( isset( $update['agent_name'] ) && $update['agent_name'] !== $old_name ) {
+			self::propagateNameChange(
+				(string) $agent['agent_slug'],
+				$old_name,
+				$update['agent_name']
+			);
+		}
+
 		// Return the updated agent.
 		return self::getAgent( array( 'agent_id' => $agent_id ) );
+	}
+
+	/**
+	 * Propagate an agent name change across memory files.
+	 *
+	 * Performs a find-and-replace of the old name with the new name in
+	 * SOUL.md and MEMORY.md. Only touches files that exist and contain
+	 * the old name. Uses whole-word matching to avoid partial replacements.
+	 *
+	 * @since 0.51.0
+	 *
+	 * @param string $agent_slug Agent slug (for directory resolution).
+	 * @param string $old_name   Previous agent display name.
+	 * @param string $new_name   New agent display name.
+	 * @return array { files_updated: string[], files_skipped: string[] }
+	 */
+	private static function propagateNameChange( string $agent_slug, string $old_name, string $new_name ): array {
+		$directory_manager = new DirectoryManager();
+		$agent_dir         = $directory_manager->get_agent_identity_directory( $agent_slug );
+
+		if ( ! is_dir( $agent_dir ) ) {
+			return array(
+				'files_updated' => array(),
+				'files_skipped' => array(),
+			);
+		}
+
+		$target_files  = array( 'SOUL.md', 'MEMORY.md' );
+		$files_updated = array();
+		$files_skipped = array();
+
+		global $wp_filesystem;
+		if ( ! $wp_filesystem ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+			WP_Filesystem();
+		}
+
+		foreach ( $target_files as $filename ) {
+			$filepath = trailingslashit( $agent_dir ) . $filename;
+
+			if ( ! file_exists( $filepath ) ) {
+				$files_skipped[] = $filename;
+				continue;
+			}
+
+			$content = $wp_filesystem->get_contents( $filepath );
+
+			if ( false === $content || false === strpos( $content, $old_name ) ) {
+				$files_skipped[] = $filename;
+				continue;
+			}
+
+			$updated_content = str_replace( $old_name, $new_name, $content );
+
+			if ( $updated_content === $content ) {
+				$files_skipped[] = $filename;
+				continue;
+			}
+
+			$wp_filesystem->put_contents( $filepath, $updated_content, FS_CHMOD_FILE );
+			$files_updated[] = $filename;
+		}
+
+		if ( ! empty( $files_updated ) ) {
+			do_action(
+				'datamachine_log',
+				'info',
+				sprintf(
+					'Agent name changed from "%s" to "%s". Updated: %s.',
+					$old_name,
+					$new_name,
+					implode( ', ', $files_updated )
+				),
+				array(
+					'agent_slug'    => $agent_slug,
+					'old_name'      => $old_name,
+					'new_name'      => $new_name,
+					'files_updated' => $files_updated,
+					'files_skipped' => $files_skipped,
+				)
+			);
+		}
+
+		return array(
+			'files_updated' => $files_updated,
+			'files_skipped' => $files_skipped,
+		);
 	}
 
 	/**
