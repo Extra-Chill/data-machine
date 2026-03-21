@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.51.0] - 2026-03-21
+
+### Added
+- add $meta parameter to HandlerRegistrationTrait
+
+### Fixed
+- engine_data clobber in AIStep + revert UpdateStep fallback + transport safety
+
 ## [0.50.1] - 2026-03-21
 
 ### Changed
