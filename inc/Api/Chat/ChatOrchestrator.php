@@ -118,8 +118,16 @@ class ChatOrchestrator {
 			}
 		}
 
-		// --- Persist user message immediately (survives navigation away) ---
-		$messages[] = ConversationManager::buildConversationMessage( 'user', $message, array( 'type' => 'text' ) );
+		// --- Build user message (text or multi-modal with attachments) ---
+		$attachments = $options['attachments'] ?? array();
+
+		if ( ! empty( $attachments ) ) {
+			$content    = ConversationManager::buildMultiModalContent( $message, $attachments );
+			$metadata   = array( 'type' => 'multimodal', 'attachments' => $attachments );
+			$messages[] = ConversationManager::buildConversationMessage( 'user', $content, $metadata );
+		} else {
+			$messages[] = ConversationManager::buildConversationMessage( 'user', $message, array( 'type' => 'text' ) );
+		}
 
 		$chat_db->update_session(
 			$session_id,
