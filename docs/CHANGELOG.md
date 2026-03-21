@@ -2,6 +2,40 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.50.0] - 2026-03-21
+
+### Added
+- memory file editability — read-only SITE.md/NETWORK.md, admin-gated RULES.md
+- datamachine/scaffold-memory-file ability + daily memory integration
+- unified FileScaffolder for all memory file creation
+- auto-scaffold USER.md from WordPress profile on first chat
+- automatic data retention policies for jobs, logs, processed items, and AS actions
+- migrate to homeboy-action v2 convention-driven CI
+- auto-refresh NETWORK.md on multisite structural changes
+
+### Changed
+- Pass enabled_tools through to handler_slugs in ephemeral workflows
+- Preserve initial_data when RunFlowAbility builds engine snapshot
+- Add PostIdentityIndex table for fast post deduplication
+- add workflow_dispatch trigger for manual runs
+- ability IS the primitive, remove FileScaffolder wrapper
+- enable automated releases via cron schedule
+- replace chat UI primitives with @extrachill/chat shared package
+- Remove pipeline-level model/provider overrides — context system is the authority
+- Admin UI: Remove AI step config modal entirely — prompt is inline, everything else is context-managed
+
+### Fixed
+- Fix package.json version drift: 0.48.0 → 0.49.0
+- Fix readme.txt version drift: 0.48.0 → 0.49.0
+- guard scaffold ability lookups to prevent _doing_it_wrong in tests
+- agent_id scoping for chat sessions + schema nullable types
+- chat REST API crashes from WP_Filesystem null + missing agent_id
+- WP_Filesystem null in REST context + missing agent_id in handle_chat
+- use execute_callback not callback for ability registration
+- declare --agent flag on all agent memory CLI subcommands
+- flows update --handler-config unwraps handler slug correctly
+- flows create respects --handler-config flag
+
 ## [0.49.0] - 2026-03-19
 
 ### Added
