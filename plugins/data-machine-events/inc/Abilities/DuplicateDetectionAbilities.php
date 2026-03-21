@@ -53,16 +53,24 @@ class DuplicateDetectionAbilities {
 	/**
 	 * Register event duplicate strategy on the unified filter.
 	 *
-	 * When core's `datamachine/check-duplicate` ability runs for the
-	 * `event` post type, this strategy fires first (priority 10) and
-	 * uses venue + date + fuzzy title matching.
+	 * When the PostIdentityIndex is available, the strategy is registered
+	 * by EventDuplicateStrategy (priority 5) instead. This legacy strategy
+	 * only registers as a fallback when the identity index doesn't exist yet.
 	 */
 	private function registerStrategy(): void {
+		// Only register the legacy postmeta-based strategy if the new identity
+		// index strategy is NOT available. EventDuplicateStrategy::register()
+		// adds itself at priority 5, so if both are present, the new one wins.
+		if ( class_exists( 'DataMachine\\Core\\Database\\PostIdentityIndex\\PostIdentityIndex' ) ) {
+			return; // EventDuplicateStrategy handles this now.
+		}
 		add_filter( 'datamachine_duplicate_strategies', array( $this, 'addEventStrategy' ) );
 	}
 
 	/**
-	 * Add event duplicate strategy to the strategy registry.
+	 * Add legacy event duplicate strategy to the strategy registry.
+	 *
+	 * @deprecated 0.18.0 Replaced by EventDuplicateStrategy using PostIdentityIndex.
 	 *
 	 * @param array $strategies Existing strategies.
 	 * @return array Strategies with event strategy appended.
@@ -78,10 +86,9 @@ class DuplicateDetectionAbilities {
 	}
 
 	/**
-	 * Event duplicate strategy callback.
+	 * Legacy event duplicate strategy callback.
 	 *
-	 * Called by core's `datamachine/check-duplicate` ability. Checks for
-	 * duplicate events using venue + date + fuzzy title matching.
+	 * @deprecated 0.18.0 Replaced by EventDuplicateStrategy using PostIdentityIndex.
 	 *
 	 * @param array $input { title: string, context: { venue?: string, startDate?: string } }
 	 * @return array Result with verdict key.
@@ -231,7 +238,8 @@ class DuplicateDetectionAbilities {
 	/**
 	 * Find an existing event matching the given identity fields.
 	 *
-	 * Uses fuzzy title + venue matching to find duplicates across sources.
+	 * When the PostIdentityIndex is available, delegates to EventDuplicateStrategy
+	 * for fast indexed lookups. Otherwise falls back to legacy postmeta queries.
 	 *
 	 * @param array $input { title: string, venue?: string, startDate: string }
 	 * @return array { found: bool, post_id?: int, matched_title?: string, matched_venue?: string, match_strategy?: string }
@@ -245,6 +253,49 @@ class DuplicateDetectionAbilities {
 			return array( 'found' => false );
 		}
 
+		// Fast path: use the identity index when available.
+		if ( class_exists( 'DataMachineEvents\\Core\\DuplicateDetection\\EventDuplicateStrategy' )
+			&& class_exists( 'DataMachine\\Core\\Database\\PostIdentityIndex\\PostIdentityIndex' ) ) {
+
+			$result = \DataMachineEvents\Core\DuplicateDetection\EventDuplicateStrategy::check(
+				array(
+					'title'   => $title,
+					'context' => array(
+						'venue'     => $venue,
+						'startDate' => $startDate,
+					),
+				)
+			);
+
+			if ( is_array( $result ) && 'duplicate' === ( $result['verdict'] ?? '' ) ) {
+				$match = $result['match'] ?? array();
+				return array(
+					'found'          => true,
+					'post_id'        => $match['post_id'] ?? 0,
+					'matched_title'  => $match['title'] ?? '',
+					'matched_venue'  => '',
+					'match_strategy' => $result['strategy'] ?? 'identity_index',
+				);
+			}
+
+			return array( 'found' => false );
+		}
+
+		// Legacy fallback: postmeta LIKE queries.
+		return $this->executeFindDuplicateEventLegacy( $title, $venue, $startDate );
+	}
+
+	/**
+	 * Legacy duplicate event search using postmeta LIKE queries.
+	 *
+	 * @deprecated 0.18.0 Replaced by EventDuplicateStrategy using PostIdentityIndex.
+	 *
+	 * @param string $title     Event title.
+	 * @param string $venue     Venue name.
+	 * @param string $startDate Start date.
+	 * @return array Result array.
+	 */
+	private function executeFindDuplicateEventLegacy( string $title, string $venue, string $startDate ): array {
 		// Strategy 1: venue-scoped fuzzy title match.
 		if ( ! empty( $venue ) ) {
 			$venue_term = get_term_by( 'name', $venue, 'venue' );
@@ -265,6 +316,7 @@ class DuplicateDetectionAbilities {
 								'terms'    => $venue_term->term_id,
 							),
 						),
+						// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Legacy fallback, replaced by PostIdentityIndex.
 						'meta_query'     => array(
 							array(
 								'key'     => EVENT_DATETIME_META_KEY,
@@ -295,6 +347,7 @@ class DuplicateDetectionAbilities {
 				'post_type'      => Event_Post_Type::POST_TYPE,
 				'posts_per_page' => 20,
 				'post_status'    => array( 'publish', 'draft', 'pending' ),
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Legacy fallback, replaced by PostIdentityIndex.
 				'meta_query'     => array(
 					array(
 						'key'     => EVENT_DATETIME_META_KEY,
@@ -310,7 +363,6 @@ class DuplicateDetectionAbilities {
 				continue;
 			}
 
-			// Confirm venue if both sides have one.
 			if ( ! empty( $venue ) ) {
 				$candidate_venues = wp_get_post_terms( $candidate->ID, 'venue', array( 'fields' => 'names' ) );
 				$candidate_venue  = ( ! is_wp_error( $candidate_venues ) && ! empty( $candidate_venues ) ) ? $candidate_venues[0] : '';

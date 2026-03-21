@@ -3,7 +3,7 @@
  * Plugin Name: Data Machine Events
  * Plugin URI: https://chubes.net
  * Description: WordPress events plugin with block-first architecture. Features AI-driven event creation via Data Machine integration, Event Details blocks for data storage, Calendar blocks for display, and venue taxonomy management.
- * Version: 0.17.2
+ * Version: 0.18.0
  * Author: Chris Huber
  * Author URI: https://chubes.net
  * License: GPL v2 or later
@@ -28,7 +28,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( file_exists( __DIR__ . '/vendor/autoload.php' ) ) {
 	require_once __DIR__ . '/vendor/autoload.php';
 }
-define( 'DATA_MACHINE_EVENTS_VERSION', '0.17.2' );
+define( 'DATA_MACHINE_EVENTS_VERSION', '0.18.0' );
 define( 'DATA_MACHINE_EVENTS_PLUGIN_FILE', __FILE__ );
 define( 'DATA_MACHINE_EVENTS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DATA_MACHINE_EVENTS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -216,6 +216,16 @@ class DATAMACHINE_Events {
 		if ( class_exists( 'DataMachineEvents\\Steps\\Upsert\\Events\\EventUpsert' ) ) {
 			new \DataMachineEvents\Steps\Upsert\Events\EventUpsert();
 		}
+
+		// Register event dedup strategy with DM core's duplicate detection system
+		// and identity writer to keep the PostIdentityIndex in sync.
+		if ( class_exists( 'DataMachine\\Core\\Database\\PostIdentityIndex\\PostIdentityIndex' ) ) {
+			\DataMachineEvents\Core\DuplicateDetection\EventDuplicateStrategy::register();
+			\DataMachineEvents\Core\DuplicateDetection\EventIdentityWriter::register();
+		}
+
+		// Notify submitters when their submitted events are published.
+		\DataMachineEvents\Core\SubmissionNotification::register();
 
 		// Load chat tools - self-register via ToolRegistrationTrait
 		new \DataMachineEvents\Api\Chat\Tools\VenueHealthCheck();

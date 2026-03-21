@@ -108,6 +108,80 @@ class Event_Post_Type {
 		add_action( 'manage_' . self::POST_TYPE . '_posts_custom_column', array( __CLASS__, 'render_event_date_column' ), 10, 2 );
 		add_filter( 'manage_edit-' . self::POST_TYPE . '_sortable_columns', array( __CLASS__, 'sortable_event_date_column' ) );
 		add_action( 'pre_get_posts', array( __CLASS__, 'sort_by_event_date' ) );
+		add_action( 'pre_get_posts', array( __CLASS__, 'prevent_taxonomy_archive_404' ) );
+		add_action( 'wp', array( __CLASS__, 'fix_taxonomy_archive_404' ) );
+	}
+
+	/**
+	 * Prevent WordPress from returning 404 on paginated taxonomy archives.
+	 *
+	 * Shared taxonomies (e.g. artist, registered on both 'post' and
+	 * 'data_machine_events') cause WordPress's main query to default to the
+	 * 'post' post type. With 0 blog posts matching that artist, WP finds no
+	 * results on page 2+ and returns 404 before the calendar block renders.
+	 *
+	 * Fix: force the post type to events and set posts_per_page high so
+	 * the main query finds results and doesn't prematurely 404.
+	 *
+	 * @param \WP_Query $query The main query.
+	 */
+	public static function prevent_taxonomy_archive_404( $query ) {
+		if ( is_admin() || ! $query->is_main_query() ) {
+			return;
+		}
+
+		// Check query vars directly — conditional tags like is_tax() aren't
+		// reliable inside pre_get_posts because the query hasn't executed yet.
+		$event_taxonomies = get_object_taxonomies( self::POST_TYPE );
+		foreach ( $event_taxonomies as $taxonomy ) {
+			if ( $query->get( $taxonomy ) ) {
+				// Force post type to events so shared taxonomies query the
+				// correct post type instead of defaulting to 'post'.
+				$query->set( 'post_type', self::POST_TYPE );
+
+				// High posts_per_page prevents WordPress from 404-ing paginated
+				// requests. The calendar block does its own query independently.
+				$query->set( 'posts_per_page', 100 );
+				return;
+			}
+		}
+	}
+
+	/**
+	 * Override false 404s on event taxonomy archive pagination.
+	 *
+	 * Even after pre_get_posts sets post_type and posts_per_page, WordPress
+	 * may still flag the page as 404 (e.g., when handle_404 runs its own
+	 * checks). This hook fires after the main query and corrects the status.
+	 *
+	 * @param \WP $wp The WordPress environment object.
+	 */
+	public static function fix_taxonomy_archive_404( $wp ) {
+		if ( is_admin() ) {
+			return;
+		}
+
+		global $wp_query;
+
+		if ( ! $wp_query->is_404() ) {
+			return;
+		}
+
+		// Only fix 404s for event taxonomy archives.
+		$event_taxonomies = get_object_taxonomies( self::POST_TYPE );
+		foreach ( $event_taxonomies as $taxonomy ) {
+			if ( ! empty( $wp_query->query[ $taxonomy ] ) ) {
+				// Verify the term actually exists.
+				$term = get_term_by( 'slug', $wp_query->query[ $taxonomy ], $taxonomy );
+				if ( $term && ! is_wp_error( $term ) ) {
+					$wp_query->is_404  = false;
+					$wp_query->is_tax  = true;
+					$wp_query->is_archive = true;
+					status_header( 200 );
+				}
+				return;
+			}
+		}
 	}
 
 	public static function add_event_date_column( $columns ) {

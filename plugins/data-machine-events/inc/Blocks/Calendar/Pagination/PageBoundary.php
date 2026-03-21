@@ -87,13 +87,42 @@ class PageBoundary {
 			$query_values[]  = $current_date . ' 00:00:00';
 		}
 
-		// Handle location filter from params.
-		if ( ! empty( $params['location'] ) ) {
-			$join_clauses[]  = "INNER JOIN {$wpdb->term_relationships} tr ON p.ID = tr.object_id";
-			$join_clauses[]  = "INNER JOIN {$wpdb->term_taxonomy} tt_filter ON tr.term_taxonomy_id = tt_filter.term_taxonomy_id";
-			$where_clauses[] = "tt_filter.taxonomy = 'location'";
-			$where_clauses[] = 'tt_filter.term_id = %d';
-			$query_values[]  = (int) $params['location'];
+		// Handle taxonomy archive filter (any taxonomy: artist, venue, location, etc.).
+		$archive_taxonomy = $params['archive_taxonomy'] ?? '';
+		$archive_term_id  = $params['archive_term_id'] ?? 0;
+
+		if ( $archive_taxonomy && $archive_term_id ) {
+			$join_clauses[]  = "INNER JOIN {$wpdb->term_relationships} tr_archive ON p.ID = tr_archive.object_id";
+			$join_clauses[]  = "INNER JOIN {$wpdb->term_taxonomy} tt_archive ON tr_archive.term_taxonomy_id = tt_archive.term_taxonomy_id";
+			$where_clauses[] = 'tt_archive.taxonomy = %s';
+			$query_values[]  = $archive_taxonomy;
+			$where_clauses[] = 'tt_archive.term_id = %d';
+			$query_values[]  = (int) $archive_term_id;
+		}
+
+		// Handle additional taxonomy filters from the filter bar.
+		$tax_filters = $params['tax_filters'] ?? array();
+		$filter_index = 0;
+		foreach ( $tax_filters as $taxonomy_slug => $term_ids ) {
+			if ( empty( $term_ids ) || ! is_array( $term_ids ) ) {
+				continue;
+			}
+
+			$alias_tr = 'tr_filter_' . $filter_index;
+			$alias_tt = 'tt_filter_' . $filter_index;
+
+			$join_clauses[]  = "INNER JOIN {$wpdb->term_relationships} {$alias_tr} ON p.ID = {$alias_tr}.object_id";
+			$join_clauses[]  = "INNER JOIN {$wpdb->term_taxonomy} {$alias_tt} ON {$alias_tr}.term_taxonomy_id = {$alias_tt}.term_taxonomy_id";
+			$where_clauses[] = "{$alias_tt}.taxonomy = %s";
+			$query_values[]  = sanitize_key( $taxonomy_slug );
+
+			$placeholders    = implode( ', ', array_fill( 0, count( $term_ids ), '%d' ) );
+			$where_clauses[] = "{$alias_tt}.term_id IN ({$placeholders})";
+			foreach ( $term_ids as $term_id ) {
+				$query_values[] = (int) $term_id;
+			}
+
+			++$filter_index;
 		}
 
 		$joins = implode( ' ', $join_clauses );

@@ -32,6 +32,7 @@ use DataMachine\Core\Steps\Update\Handlers\UpdateHandler;
 use DataMachine\Core\WordPress\TaxonomyHandler;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
 use DataMachine\Core\WordPress\WordPressPublishHelper;
+use DataMachineEvents\Core\DuplicateDetection\EventIdentityWriter;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -144,8 +145,11 @@ class EventUpsert extends UpdateHandler {
 		array $handler_config,
 		EngineData $engine
 	): array {
-		// Search for existing event (now serialized per event identity)
-		$existing_post_id = $this->findExistingEvent( $title, $venue, $startDate, $ticketUrl );
+		// Search for existing event via the core duplicate detection system.
+		// This uses the PostIdentityIndex (indexed lookups) instead of
+		// postmeta LIKE scans. Falls back to the old findExistingEvent()
+		// method if the identity index table doesn't exist yet.
+		$existing_post_id = $this->findExistingEventViaAbility( $title, $venue, $startDate, $ticketUrl );
 
 		if ( $existing_post_id ) {
 			// Event exists - check if data changed
@@ -154,6 +158,9 @@ class EventUpsert extends UpdateHandler {
 			if ( $this->hasDataChanged( $existing_data, $parameters ) ) {
 				// UPDATE existing event
 				$this->updateEventPost( $existing_post_id, $parameters, $handler_config, $engine );
+
+				// Sync identity index after update.
+				EventIdentityWriter::syncIdentityRow( $existing_post_id, $title, datamachine_normalize_ticket_url( $ticketUrl ) ?: null );
 
 				do_action(
 					'datamachine_log',
@@ -205,6 +212,9 @@ class EventUpsert extends UpdateHandler {
 				);
 			}
 
+			// Write identity index row for new event.
+			EventIdentityWriter::syncIdentityRow( $post_id, $title, datamachine_normalize_ticket_url( $ticketUrl ) ?: null );
+
 			do_action(
 				'datamachine_log',
 				'info',
@@ -223,6 +233,57 @@ class EventUpsert extends UpdateHandler {
 				)
 			);
 		}
+	}
+
+	/**
+	 * Find existing event using DM core's duplicate detection system.
+	 *
+	 * Calls the `datamachine/check-duplicate` ability which delegates to
+	 * the registered EventDuplicateStrategy, querying the PostIdentityIndex
+	 * with indexed lookups instead of postmeta LIKE scans.
+	 *
+	 * Falls back to the legacy findExistingEvent() if the ability or
+	 * identity index table is not available.
+	 *
+	 * @param string $title     Event title.
+	 * @param string $venue     Venue name.
+	 * @param string $startDate Start date.
+	 * @param string $ticketUrl Ticket URL.
+	 * @return int|null Post ID if found, null otherwise.
+	 */
+	private function findExistingEventViaAbility( string $title, string $venue, string $startDate, string $ticketUrl ): ?int {
+		// Check if the identity index table class exists (requires DM core >= 0.50.0).
+		if ( ! class_exists( 'DataMachine\\Core\\Database\\PostIdentityIndex\\PostIdentityIndex' ) ) {
+			return $this->findExistingEvent( $title, $venue, $startDate, $ticketUrl );
+		}
+
+		$duplicate_check = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/check-duplicate' ) : null;
+
+		if ( ! $duplicate_check ) {
+			return $this->findExistingEvent( $title, $venue, $startDate, $ticketUrl );
+		}
+
+		$result = $duplicate_check->execute(
+			array(
+				'title'     => $title,
+				'post_type' => Event_Post_Type::POST_TYPE,
+				'scope'     => 'published',
+				'context'   => array(
+					'venue'     => $venue,
+					'startDate' => $startDate,
+					'ticketUrl' => $ticketUrl,
+				),
+			)
+		);
+
+		if ( is_array( $result ) && 'duplicate' === ( $result['verdict'] ?? '' ) ) {
+			$post_id = (int) ( $result['match']['post_id'] ?? 0 );
+			if ( $post_id > 0 ) {
+				return $post_id;
+			}
+		}
+
+		return null;
 	}
 
 	/**
@@ -929,7 +990,7 @@ class EventUpsert extends UpdateHandler {
 	private function createEventPost( array $parameters, array $handler_config, EngineData $engine ): int|\WP_Error {
 		$job_id      = (int) ( $parameters['job_id'] ?? 0 );
 		$post_status = WordPressSettingsResolver::getPostStatus( $handler_config );
-		$post_author = WordPressSettingsResolver::getPostAuthor( $handler_config );
+		$post_author = $this->resolvePostAuthor( $handler_config, $engine );
 
 		// Build event data: engine data takes precedence, then AI params
 		$event_data = $this->buildEventData( $parameters, $handler_config, $engine );
@@ -946,6 +1007,20 @@ class EventUpsert extends UpdateHandler {
 
 		if ( is_wp_error( $post_id ) || ! $post_id ) {
 			return $post_id;
+		}
+
+		// Store submission metadata when event was user-submitted.
+		$submission = $engine->get( 'submission' );
+		if ( is_array( $submission ) ) {
+			if ( ! empty( $submission['user_id'] ) ) {
+				update_post_meta( $post_id, '_datamachine_submitted_by', (int) $submission['user_id'] );
+			}
+			if ( ! empty( $submission['contact_name'] ) ) {
+				update_post_meta( $post_id, '_datamachine_submitter_name', sanitize_text_field( $submission['contact_name'] ) );
+			}
+			if ( ! empty( $submission['contact_email'] ) ) {
+				update_post_meta( $post_id, '_datamachine_submitter_email', sanitize_email( $submission['contact_email'] ) );
+			}
 		}
 
 		$this->processEventFeaturedImage( $post_id, $handler_config, $engine );
@@ -975,6 +1050,35 @@ class EventUpsert extends UpdateHandler {
 		}
 
 		return $post_id;
+	}
+
+	/**
+	 * Resolve post author for event creation.
+	 *
+	 * When an event is submitted by a logged-in user (via the event submission form),
+	 * their user_id is stored in initial_data['submission']['user_id']. This takes
+	 * priority over handler config defaults so submitted events are attributed to
+	 * the submitter.
+	 *
+	 * Resolution order:
+	 * 1. Submission user_id from engine data (user-submitted events)
+	 * 2. WordPressSettingsResolver (system defaults / handler config / fallbacks)
+	 *
+	 * @param array      $handler_config Handler configuration.
+	 * @param EngineData $engine         Engine snapshot helper.
+	 * @return int Post author ID.
+	 */
+	private function resolvePostAuthor( array $handler_config, EngineData $engine ): int {
+		$submission = $engine->get( 'submission' );
+
+		if ( is_array( $submission ) && ! empty( $submission['user_id'] ) ) {
+			$submitter_id = (int) $submission['user_id'];
+			if ( $submitter_id > 0 && get_userdata( $submitter_id ) ) {
+				return $submitter_id;
+			}
+		}
+
+		return WordPressSettingsResolver::getPostAuthor( $handler_config );
 	}
 
 	/**
