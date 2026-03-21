@@ -82,19 +82,45 @@ class EventQueryBuilder {
 		$current_datetime = current_time( 'mysql' );
 		$has_date_range   = ! empty( $params['date_start'] ) || ! empty( $params['date_end'] );
 
+		// Use start_datetime as primary with end_datetime OR fallback.
+		// Most events don't have end_datetime meta (no real end time provided).
+		// An event is "upcoming" if start >= now OR end >= now (still ongoing).
+		// An event is "past" if start < now AND (end < now OR no end meta).
 		if ( $params['show_past'] && ! $params['user_date_range'] ) {
 			$meta_query[] = array(
-				'key'     => EVENT_END_DATETIME_META_KEY,
+				'key'     => EVENT_DATETIME_META_KEY,
 				'value'   => $current_datetime,
 				'compare' => '<',
 				'type'    => 'DATETIME',
 			);
+			$meta_query[] = array(
+				'relation' => 'OR',
+				array(
+					'key'     => EVENT_END_DATETIME_META_KEY,
+					'value'   => $current_datetime,
+					'compare' => '<',
+					'type'    => 'DATETIME',
+				),
+				array(
+					'key'     => EVENT_END_DATETIME_META_KEY,
+					'compare' => 'NOT EXISTS',
+				),
+			);
 		} elseif ( ! $params['show_past'] && ! $params['user_date_range'] ) {
 			$meta_query[] = array(
-				'key'     => EVENT_END_DATETIME_META_KEY,
-				'value'   => $current_datetime,
-				'compare' => '>=',
-				'type'    => 'DATETIME',
+				'relation' => 'OR',
+				array(
+					'key'     => EVENT_DATETIME_META_KEY,
+					'value'   => $current_datetime,
+					'compare' => '>=',
+					'type'    => 'DATETIME',
+				),
+				array(
+					'key'     => EVENT_END_DATETIME_META_KEY,
+					'value'   => $current_datetime,
+					'compare' => '>=',
+					'type'    => 'DATETIME',
+				),
 			);
 		}
 
@@ -228,6 +254,7 @@ class EventQueryBuilder {
 	private static function compute_event_counts(): array {
 		$current_datetime = current_time( 'mysql' );
 
+		// Upcoming: start >= now OR end >= now (still ongoing).
 		$future_query = new WP_Query(
 			array(
 				'post_type'      => Event_Post_Type::POST_TYPE,
@@ -235,6 +262,13 @@ class EventQueryBuilder {
 				'fields'         => 'ids',
 				'posts_per_page' => 1,
 				'meta_query'     => array(
+					'relation' => 'OR',
+					array(
+						'key'     => EVENT_DATETIME_META_KEY,
+						'value'   => $current_datetime,
+						'compare' => '>=',
+						'type'    => 'DATETIME',
+					),
 					array(
 						'key'     => EVENT_END_DATETIME_META_KEY,
 						'value'   => $current_datetime,
@@ -245,6 +279,7 @@ class EventQueryBuilder {
 			)
 		);
 
+		// Past: start < now AND (end < now OR no end meta).
 		$past_query = new WP_Query(
 			array(
 				'post_type'      => Event_Post_Type::POST_TYPE,
@@ -252,11 +287,25 @@ class EventQueryBuilder {
 				'fields'         => 'ids',
 				'posts_per_page' => 1,
 				'meta_query'     => array(
+					'relation' => 'AND',
 					array(
-						'key'     => EVENT_END_DATETIME_META_KEY,
+						'key'     => EVENT_DATETIME_META_KEY,
 						'value'   => $current_datetime,
 						'compare' => '<',
 						'type'    => 'DATETIME',
+					),
+					array(
+						'relation' => 'OR',
+						array(
+							'key'     => EVENT_END_DATETIME_META_KEY,
+							'value'   => $current_datetime,
+							'compare' => '<',
+							'type'    => 'DATETIME',
+						),
+						array(
+							'key'     => EVENT_END_DATETIME_META_KEY,
+							'compare' => 'NOT EXISTS',
+						),
 					),
 				),
 			)
