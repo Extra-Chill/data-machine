@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.54.0] - 2026-03-21
+
+### Added
+- multi-modal chat messages — attachments in REST endpoint, content blocks in conversation
+- ability-linked tool permissions — tools declare which ability they wrap, resolver checks permissions
+
+### Changed
+- extract GitHub + workspace devtools to data-machine-code extension
+
 ## [0.53.0] - 2026-03-21
 
 ### Added
