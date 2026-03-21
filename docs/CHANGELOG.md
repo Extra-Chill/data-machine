@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.52.0] - 2026-03-21
+
+### Added
+- agent self-identity in SOUL.md scaffolding and name-change propagation
+
 ## [0.51.0] - 2026-03-21
 
 ### Added
