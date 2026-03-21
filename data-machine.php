@@ -305,7 +305,7 @@ function datamachine_load_handlers() {
 	new \DataMachine\Core\Steps\Fetch\Handlers\Rss\Rss();
 	new \DataMachine\Core\Steps\Fetch\Handlers\Email\Email();
 	new \DataMachine\Core\Steps\Fetch\Handlers\Files\Files();
-	new \DataMachine\Core\Steps\Fetch\Handlers\GitHub\GitHub();
+	// GitHub handler moved to data-machine-code extension.
 	new \DataMachine\Core\Steps\Fetch\Handlers\Workspace\Workspace();
 
 	// Update Handlers
