@@ -140,7 +140,21 @@ class ScheduleNextStepAbility {
 				$context = datamachine_get_file_context( $flow_id );
 
 				$storage = new FileStorage();
-				$storage->store_data_packet( $dataPackets, $job_id, $context );
+				$result  = $storage->store_data_packet( $dataPackets, $job_id, $context );
+
+				if ( false === $result ) {
+					do_action(
+						'datamachine_log',
+						'error',
+						'Failed to persist data packets to filesystem — step will have no input data',
+						array(
+							'job_id'       => $job_id,
+							'flow_step_id' => $flow_step_id,
+							'flow_id'      => $flow_id,
+							'packet_count' => count( $dataPackets ),
+						)
+					);
+				}
 			}
 		}
 

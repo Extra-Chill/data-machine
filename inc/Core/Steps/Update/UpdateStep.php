@@ -81,41 +81,6 @@ class UpdateStep extends Step {
 			return $this->create_update_entry_from_tool_result( $tool_result_entry, $this->dataPackets, $primary_handler_slug, $this->flow_step_id );
 		}
 
-		// Fallback: check if the handler tool actually ran successfully but data packets
-		// were lost during the AI→update step handoff. Handler tools store results directly
-		// in engine data (e.g. event_id, event_url, post_id) via datamachine_merge_engine_data().
-		// If those exist, the tool completed — the data packets just didn't survive.
-		$engine_evidence = $this->checkEngineDataForHandlerCompletion( $required_handler_slugs );
-		if ( $engine_evidence ) {
-			$this->log(
-				'info',
-				'Update step: handler result missing from data packets but engine data confirms completion',
-				array(
-					'configured_handlers'  => $configured_handler_slugs,
-					'required_handlers'    => $required_handler_slugs,
-					'engine_evidence_keys' => array_keys( $engine_evidence ),
-				)
-			);
-
-			$primary_handler_slug = $required_handler_slugs[0];
-			$packet               = new DataPacket(
-				array(
-					'update_result' => $engine_evidence,
-					'updated_at'    => current_time( 'mysql', true ),
-				),
-				array(
-					'step_type'    => 'update',
-					'handler'      => $primary_handler_slug,
-					'flow_step_id' => $this->flow_step_id,
-					'success'      => true,
-					'executed_via' => 'engine_data_fallback',
-				),
-				'update'
-			);
-
-			return $packet->addTo( $this->dataPackets );
-		}
-
 		$this->log(
 			'warning',
 			'Update step required handler tool was not executed by AI',
@@ -335,45 +300,4 @@ class UpdateStep extends Step {
 		return $results;
 	}
 
-	/**
-	 * Check engine data for evidence that a handler tool completed successfully.
-	 *
-	 * Handler tools (e.g. upsert_event) store results directly in engine data
-	 * via datamachine_merge_engine_data() during execution. If data packets were
-	 * lost during the AI→update step handoff, the engine data still has proof
-	 * the tool ran.
-	 *
-	 * Checks for common handler-result keys that tools write to engine data.
-	 * Returns the evidence as an associative array, or null if no evidence found.
-	 *
-	 * @param array $required_handler_slugs Required handler slugs.
-	 * @return array|null Evidence array or null.
-	 */
-	private function checkEngineDataForHandlerCompletion( array $required_handler_slugs ): ?array {
-		$engine_data = $this->engine->all();
-
-		// Handler tools store these keys in engine data on success.
-		// This is a generic check — any handler that writes to engine data benefits.
-		$evidence_keys = array( 'event_id', 'event_url', 'post_id', 'post_url', 'published_url' );
-		$evidence      = array();
-
-		foreach ( $evidence_keys as $key ) {
-			$value = $engine_data[ $key ] ?? null;
-			if ( null !== $value && '' !== $value ) {
-				$evidence[ $key ] = $value;
-			}
-		}
-
-		if ( empty( $evidence ) ) {
-			return null;
-		}
-
-		// Also check that the handler slug matches what we expect.
-		$post_handler = $engine_data['_datamachine_post_handler'] ?? null;
-		if ( $post_handler && ! in_array( $post_handler, $required_handler_slugs, true ) ) {
-			return null;
-		}
-
-		return $evidence;
-	}
 }
