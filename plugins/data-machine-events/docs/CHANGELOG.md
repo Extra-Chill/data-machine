@@ -2,6 +2,18 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.19.0] - 2026-03-21
+
+### Added
+- add cron and manual dispatch triggers for automated releases
+- migrate to homeboy-action v2 convention-driven CI
+
+### Changed
+- Notify submitters when their event is published
+
+### Fixed
+- resolve merge conflict with main
+
 ## [0.18.0] - 2026-03-20
 
 ### Added
