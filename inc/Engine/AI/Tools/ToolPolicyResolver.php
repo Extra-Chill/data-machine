@@ -22,6 +22,7 @@
 namespace DataMachine\Engine\AI\Tools;
 
 use DataMachine\Core\Database\Agents\Agents;
+use DataMachine\Abilities\PermissionHelper;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -68,36 +69,150 @@ class ToolPolicyResolver {
 	 * }
 	 * @return array Resolved tools array keyed by tool name.
 	 */
+	/**
+	 * Valid access levels for tools without a linked ability, ordered from
+	 * least to most privileged. Used by filterByAccessLevel().
+	 *
+	 * @since 0.54.0
+	 */
+	private const ACCESS_LEVELS = array(
+		'authenticated' => 'datamachine_chat',
+		'author'        => 'datamachine_use_tools',
+		'editor'        => 'datamachine_view_logs',
+		'admin'         => 'datamachine_manage_settings',
+	);
+
 	public function resolve( array $context ): array {
 		// Accept 'context' key, fall back to deprecated 'surface' key.
 		$context_type = $context['context'] ?? $context['surface'] ?? self::CONTEXT_PIPELINE;
 		$deny         = $context['deny'] ?? array();
 		$agent_id     = isset( $context['agent_id'] ) ? (int) $context['agent_id'] : 0;
 
+		// 0. Baseline gate: if the acting user lacks datamachine_use_tools, return no tools.
+		//    Pipeline and system contexts bypass this (they run as admin/cron).
+		if ( self::CONTEXT_CHAT === $context_type && ! PermissionHelper::can( 'use_tools' ) ) {
+			return array();
+		}
+
 		// 1. Gather tools based on context preset.
 		$tools = $this->gatherByContext( $context_type, $context );
 
-		// 2. Apply per-agent tool policy (from agent_config).
+		// 2. Filter by linked ability permissions (from Abilities API).
+		//    Only applies in chat context — pipeline/system run as admin.
+		if ( self::CONTEXT_CHAT === $context_type ) {
+			$tools = $this->filterByAbilityPermissions( $tools );
+		}
+
+		// 3. Apply per-agent tool policy (from agent_config).
 		if ( $agent_id > 0 ) {
 			$agent_policy = $this->getAgentToolPolicy( $agent_id );
 			$tools        = $this->applyAgentPolicy( $tools, $agent_policy );
 		}
 
-		// 3. Apply allowlist if specified (narrows to explicit subset).
+		// 4. Apply allowlist if specified (narrows to explicit subset).
 		$allow_only = $context['allow_only'] ?? array();
 		if ( ! empty( $allow_only ) ) {
 			$tools = array_intersect_key( $tools, array_flip( $allow_only ) );
 		}
 
-		// 4. Apply deny list (always wins).
+		// 5. Apply deny list (always wins).
 		if ( ! empty( $deny ) ) {
 			$tools = array_diff_key( $tools, array_flip( $deny ) );
 		}
 
-		// 5. Allow external filtering of resolved tools.
+		// 6. Allow external filtering of resolved tools.
 		$tools = apply_filters( 'datamachine_resolved_tools', $tools, $context_type, $context );
 
 		return $tools;
+	}
+
+	/**
+	 * Filter tools by their linked ability permissions.
+	 *
+	 * For each tool that declares an `ability` or `abilities` key, checks
+	 * the ability's permission_callback via WP_Abilities_Registry. If ANY
+	 * linked ability fails the permission check, the tool is removed.
+	 *
+	 * Tools without a linked ability fall back to their `access_level` field.
+	 * Tools with neither default to 'admin' (safe fallback — untagged tools
+	 * are admin-only until explicitly categorized).
+	 *
+	 * @since 0.54.0
+	 *
+	 * @param array $tools Resolved tools array keyed by tool name.
+	 * @return array Filtered tools.
+	 */
+	private function filterByAbilityPermissions( array $tools ): array {
+		$registry = function_exists( 'WP_Abilities_Registry' )
+			? null
+			: ( class_exists( 'WP_Abilities_Registry' ) ? \WP_Abilities_Registry::get_instance() : null );
+
+		$filtered = array();
+
+		foreach ( $tools as $name => $tool ) {
+			if ( ! is_array( $tool ) ) {
+				continue;
+			}
+
+			// Collect all ability slugs to check.
+			$ability_slugs = array();
+
+			if ( ! empty( $tool['ability'] ) ) {
+				$ability_slugs[] = $tool['ability'];
+			}
+
+			if ( ! empty( $tool['abilities'] ) && is_array( $tool['abilities'] ) ) {
+				$ability_slugs = array_merge( $ability_slugs, $tool['abilities'] );
+			}
+
+			// Tools with linked abilities: check each ability's permission.
+			if ( ! empty( $ability_slugs ) && $registry ) {
+				$permitted = true;
+
+				foreach ( $ability_slugs as $slug ) {
+					$ability = $registry->get_registered( $slug );
+
+					if ( ! $ability ) {
+						// Ability not registered — deny (safe default).
+						$permitted = false;
+						break;
+					}
+
+					if ( ! $ability->check_permissions() ) {
+						$permitted = false;
+						break;
+					}
+				}
+
+				if ( $permitted ) {
+					$filtered[ $name ] = $tool;
+				}
+
+				continue;
+			}
+
+			// No linked ability — fall back to access_level.
+			$access_level = $tool['access_level'] ?? 'admin';
+
+			if ( $this->checkAccessLevel( $access_level ) ) {
+				$filtered[ $name ] = $tool;
+			}
+		}
+
+		return $filtered;
+	}
+
+	/**
+	 * Check if the current user meets an access level requirement.
+	 *
+	 * @since 0.54.0
+	 *
+	 * @param string $access_level One of: 'authenticated', 'author', 'editor', 'admin'.
+	 * @return bool Whether the current user has sufficient capabilities.
+	 */
+	private function checkAccessLevel( string $access_level ): bool {
+		$required_cap = self::ACCESS_LEVELS[ $access_level ] ?? self::ACCESS_LEVELS['admin'];
+		return current_user_can( $required_cap );
 	}
 
 	/**

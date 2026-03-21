@@ -29,6 +29,11 @@ abstract class BaseTool {
 	 * must declare its contexts — the surfaces where it's available (e.g.
 	 * 'chat', 'pipeline').
 	 *
+	 * Tools should also declare which ability they wrap via the `ability` key
+	 * (or `abilities` for composed tools). The ToolPolicyResolver uses this to
+	 * check the ability's permission_callback before offering the tool to AI agents.
+	 * Tools without an ability declaration default to admin-only access.
+	 *
 	 * When the definition is a callable (for lazy evaluation), the contexts
 	 * are stored alongside so they're available before the callable is resolved.
 	 * The ToolManager merges contexts into the resolved definition.
@@ -37,14 +42,23 @@ abstract class BaseTool {
 	 * calling the method directly. This enables lazy evaluation after translations
 	 * are loaded, preventing WordPress 6.7+ translation timing errors.
 	 *
+	 * @since 0.14.10
+	 * @since 0.54.0 Added ability, abilities, and access_level metadata for permission-aware resolution.
+	 *
 	 * @param string         $toolName       Tool identifier.
 	 * @param array|callable $toolDefinition Tool definition array OR callable that returns it.
 	 * @param array          $contexts       Contexts where this tool is available (e.g. ['chat', 'pipeline']).
+	 * @param array          $meta           Optional metadata for permission resolution. {
+	 *     @type string   $ability      Single ability slug this tool wraps (e.g. 'datamachine/local-search').
+	 *     @type string[] $abilities    Multiple ability slugs for composed tools. ALL must pass permission check.
+	 *     @type string   $access_level Fallback for tools without a linked ability.
+	 *                                  One of: 'authenticated', 'author', 'editor', 'admin'. Default: 'admin'.
+	 * }
 	 */
-	protected function registerTool( string $toolName, array|callable $toolDefinition, array $contexts = array() ): void {
+	protected function registerTool( string $toolName, array|callable $toolDefinition, array $contexts = array(), array $meta = array() ): void {
 		add_filter(
 			'datamachine_tools',
-			function ( $tools ) use ( $toolName, $toolDefinition, $contexts ) {
+			function ( $tools ) use ( $toolName, $toolDefinition, $contexts, $meta ) {
 				if ( is_callable( $toolDefinition ) ) {
 					// Wrap callable with contexts for pre-resolution filtering.
 					$tools[ $toolName ] = array(
@@ -56,6 +70,18 @@ abstract class BaseTool {
 					$toolDefinition['contexts'] = $contexts;
 					$tools[ $toolName ]         = $toolDefinition;
 				}
+
+				// Merge permission metadata into the tool entry.
+				if ( ! empty( $meta['ability'] ) ) {
+					$tools[ $toolName ]['ability'] = $meta['ability'];
+				}
+				if ( ! empty( $meta['abilities'] ) ) {
+					$tools[ $toolName ]['abilities'] = $meta['abilities'];
+				}
+				if ( ! empty( $meta['access_level'] ) ) {
+					$tools[ $toolName ]['access_level'] = $meta['access_level'];
+				}
+
 				return $tools;
 			}
 		);
