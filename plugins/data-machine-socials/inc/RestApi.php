@@ -728,7 +728,7 @@ class RestApi {
 
 		$statuses = array();
 
-		$platforms = array( 'instagram', 'twitter', 'facebook', 'bluesky', 'threads', 'pinterest', 'reddit' );
+		$platforms = array( 'instagram', 'twitter', 'facebook', 'bluesky', 'threads', 'pinterest', 'linkedin', 'reddit' );
 
 		foreach ( $platforms as $platform ) {
 			$provider = $providers[ $platform ] ?? null;
@@ -744,10 +744,12 @@ class RestApi {
 	}
 
 	/**
-	 * Get platform configurations
+	 * Get platform configurations with auth status.
+	 *
+	 * Returns every registered platform's config plus its current
+	 * `authenticated` and `username` fields so callers need only one request.
 	 */
 	public static function get_platforms() {
-		// Return platform configurations from registry
 		$platforms = array(
 			'instagram' => array(
 				'label'              => 'Instagram',
@@ -799,6 +801,14 @@ class RestApi {
 				'charLimit'          => 500,
 				'supportsCarousel'   => false,
 			),
+			'linkedin'  => array(
+				'label'              => 'LinkedIn',
+				'maxImages'          => 9,
+				'aspectRatios'       => array( 'any' ),
+				'defaultAspectRatio' => 'any',
+				'charLimit'          => 3000,
+				'supportsCarousel'   => false,
+			),
 			'reddit'    => array(
 				'label'     => 'Reddit',
 				'type'      => 'fetch',
@@ -806,6 +816,17 @@ class RestApi {
 				'scopes'    => 'identity read',
 			),
 		);
+
+		// Fold auth status into each platform entry.
+		$auth_abilities = new AuthAbilities();
+		$providers      = $auth_abilities->getAllProviders();
+
+		foreach ( $platforms as $slug => &$config ) {
+			$provider              = $providers[ $slug ] ?? null;
+			$config['authenticated'] = $provider ? $provider->is_authenticated() : false;
+			$config['username']      = $provider ? $provider->get_username() : null;
+		}
+		unset( $config );
 
 		return new \WP_REST_Response( $platforms );
 	}
