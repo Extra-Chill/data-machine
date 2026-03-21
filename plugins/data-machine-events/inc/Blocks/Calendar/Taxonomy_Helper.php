@@ -8,8 +8,7 @@
 namespace DataMachineEvents\Blocks\Calendar;
 
 use DataMachineEvents\Core\Event_Post_Type;
-use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
-use const DataMachineEvents\Core\EVENT_END_DATETIME_META_KEY;
+use DataMachineEvents\Blocks\Calendar\Query\DateFilter;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -141,30 +140,28 @@ class Taxonomy_Helper {
 		$where_clauses = '';
 		$params        = array( $taxonomy_slug, $post_type );
 
-		// Date context filtering — uses start_datetime as primary with end_datetime
-		// OR fallback. Most events don't have end_datetime meta (no real end time).
 		if ( ! empty( $date_context ) ) {
-			$joins .= " INNER JOIN {$wpdb->postmeta} pm_start_date ON p.ID = pm_start_date.post_id AND pm_start_date.meta_key = '" . esc_sql( EVENT_DATETIME_META_KEY ) . "'";
-			$joins .= " LEFT JOIN {$wpdb->postmeta} pm_end_date ON p.ID = pm_end_date.post_id AND pm_end_date.meta_key = '" . esc_sql( EVENT_END_DATETIME_META_KEY ) . "'";
-
 			$date_start       = $date_context['date_start'] ?? '';
 			$date_end         = $date_context['date_end'] ?? '';
 			$show_past        = ! empty( $date_context['past'] ) && '1' === $date_context['past'];
 			$current_datetime = current_time( 'mysql' );
 
 			if ( ! empty( $date_start ) && ! empty( $date_end ) ) {
-				// Explicit date range from date picker.
-				$where_clauses .= ' AND pm_start_date.meta_value >= %s AND pm_start_date.meta_value <= %s';
+				$filter = DateFilter::date_range_sql( $wpdb->postmeta );
+				$joins         .= ' ' . $filter['joins'];
+				$where_clauses .= ' AND ' . $filter['where'];
 				$params[]       = $date_start . ' 00:00:00';
 				$params[]       = $date_end . ' 23:59:59';
 			} elseif ( $show_past ) {
-				// Past: start < now AND (end < now OR no end meta).
-				$where_clauses .= ' AND pm_start_date.meta_value < %s AND (pm_end_date.meta_value < %s OR pm_end_date.meta_value IS NULL)';
+				$filter = DateFilter::past_sql( $wpdb->postmeta );
+				$joins         .= ' ' . $filter['joins'];
+				$where_clauses .= ' AND ' . $filter['where'];
 				$params[]       = $current_datetime;
 				$params[]       = $current_datetime;
 			} else {
-				// Upcoming: start >= now OR end >= now (still ongoing).
-				$where_clauses .= ' AND (pm_start_date.meta_value >= %s OR pm_end_date.meta_value >= %s)';
+				$filter = DateFilter::upcoming_sql( $wpdb->postmeta );
+				$joins         .= ' ' . $filter['joins'];
+				$where_clauses .= ' AND ' . $filter['where'];
 				$params[]       = $current_datetime;
 				$params[]       = $current_datetime;
 			}
