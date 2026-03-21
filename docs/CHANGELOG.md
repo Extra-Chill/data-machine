@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.53.0] - 2026-03-21
+
+### Added
+- self-service agent creation for non-admin users
+
 ## [0.52.0] - 2026-03-21
 
 ### Added
