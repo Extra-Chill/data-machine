@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.5.0] - 2026-03-21
+
+### Added
+- add cron and manual dispatch triggers for automated releases
+- add homeboy-action v2 CI pipeline
+- add fullstack LinkedIn integration with OAuth 2.0, CRUD posts, CLI, and chat tools
+- add publish chat tools for all platforms and CLI publish commands for Facebook, Threads, Pinterest
+
+### Fixed
+- resolve merge conflict with main
+- restore homeboy component identity
+
 ## [0.4.0] - 2026-03-16
 
 ### Added
