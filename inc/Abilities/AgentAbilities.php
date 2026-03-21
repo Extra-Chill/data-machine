@@ -112,11 +112,11 @@ class AgentAbilities {
 				'datamachine/create-agent',
 				array(
 					'label'               => 'Create Agent',
-					'description'         => 'Create a new agent identity with filesystem directory and owner access',
+					'description'         => 'Create a new agent identity with filesystem directory and owner access. Admins can create agents for any user. Non-admins with create_own_agent can create one agent for themselves.',
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
-						'required'   => array( 'agent_slug', 'owner_id' ),
+						'required'   => array( 'agent_slug' ),
 						'properties' => array(
 							'agent_slug' => array(
 								'type'        => 'string',
@@ -128,7 +128,7 @@ class AgentAbilities {
 							),
 							'owner_id'   => array(
 								'type'        => 'integer',
-								'description' => 'WordPress user ID of the agent owner.',
+								'description' => 'WordPress user ID of the agent owner. Non-admins can only create agents for themselves (this field is ignored).',
 							),
 							'config'     => array(
 								'type'        => 'object',
@@ -150,7 +150,7 @@ class AgentAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'createAgent' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can_manage() || PermissionHelper::can( 'create_own_agent' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -451,6 +451,63 @@ class AgentAbilities {
 			$name = $slug;
 		}
 
+		// Self-service creation: non-admins can only create agents for themselves.
+		$is_admin = PermissionHelper::can_manage();
+
+		if ( ! $is_admin ) {
+			// Force owner to the acting user — non-admins cannot create agents for others.
+			$owner_id = PermissionHelper::acting_user_id();
+
+			if ( $owner_id <= 0 ) {
+				return array(
+					'success' => false,
+					'error'   => 'Could not determine acting user for self-service agent creation.',
+				);
+			}
+
+			// Enforce per-user agent limit for non-admins.
+			$agents_repo = new Agents();
+			$existing    = $agents_repo->get_by_owner_id( $owner_id );
+
+			/**
+			 * Filter the maximum number of agents a non-admin user can create.
+			 *
+			 * @since 0.52.0
+			 *
+			 * @param int $limit    Maximum agents per user. Default 1.
+			 * @param int $owner_id The user creating the agent.
+			 */
+			$max_agents = (int) apply_filters( 'datamachine_max_agents_per_user', 1, $owner_id );
+
+			if ( $existing && $max_agents <= 1 ) {
+				return array(
+					'success' => false,
+					'error'   => sprintf(
+						'You already have an agent ("%s"). Non-admin users are limited to %d agent.',
+						$existing['agent_name'],
+						$max_agents
+					),
+				);
+			}
+
+			// For limits > 1, count all agents owned by this user.
+			if ( $max_agents > 1 ) {
+				$all_agents = $agents_repo->get_all();
+				$owned      = array_filter( $all_agents, fn( $a ) => (int) $a['owner_id'] === $owner_id );
+
+				if ( count( $owned ) >= $max_agents ) {
+					return array(
+						'success' => false,
+						'error'   => sprintf(
+							'You already have %d agent(s). Non-admin users are limited to %d.',
+							count( $owned ),
+							$max_agents
+						),
+					);
+				}
+			}
+		}
+
 		if ( $owner_id <= 0 ) {
 			return array(
 				'success' => false,
@@ -466,7 +523,7 @@ class AgentAbilities {
 			);
 		}
 
-		$agents_repo = new Agents();
+		$agents_repo = isset( $agents_repo ) ? $agents_repo : new Agents();
 
 		// Check for conflict.
 		$existing = $agents_repo->get_by_slug( $slug );

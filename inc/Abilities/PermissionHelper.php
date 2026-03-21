@@ -28,12 +28,13 @@ class PermissionHelper {
 	 * @var array<string, string>
 	 */
 	private const CAPABILITY_MAP = array(
-		'manage_agents'   => 'datamachine_manage_agents',
-		'manage_flows'    => 'datamachine_manage_flows',
-		'manage_settings' => 'datamachine_manage_settings',
-		'chat'            => 'datamachine_chat',
-		'use_tools'       => 'datamachine_use_tools',
-		'view_logs'       => 'datamachine_view_logs',
+		'manage_agents'    => 'datamachine_manage_agents',
+		'manage_flows'     => 'datamachine_manage_flows',
+		'manage_settings'  => 'datamachine_manage_settings',
+		'chat'             => 'datamachine_chat',
+		'use_tools'        => 'datamachine_use_tools',
+		'view_logs'        => 'datamachine_view_logs',
+		'create_own_agent' => 'datamachine_create_own_agent',
 	);
 
 	/**
