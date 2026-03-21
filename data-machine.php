@@ -154,14 +154,14 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/AgentAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/AgentMemoryAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/DailyMemoryAbilities.php';
-	require_once __DIR__ . '/inc/Abilities/WorkspaceAbilities.php';
+	// WorkspaceAbilities moved to data-machine-code extension.
 	require_once __DIR__ . '/inc/Abilities/ChatAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/InternalLinkingAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Content/BlockSanitizer.php';
 	require_once __DIR__ . '/inc/Abilities/Content/GetPostBlocksAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Content/EditPostBlocksAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Content/ReplacePostBlocksAbility.php';
-	require_once __DIR__ . '/inc/Abilities/Fetch/GitHubAbilities.php';
+	// GitHubAbilities moved to data-machine-code extension.
 	require_once __DIR__ . '/inc/Abilities/Fetch/FetchFilesAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Email/EmailAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Fetch/FetchEmailAbility.php';
@@ -210,13 +210,13 @@ function datamachine_run_datamachine_plugin() {
 		new \DataMachine\Abilities\AgentTokenAbilities();
 		new \DataMachine\Abilities\AgentMemoryAbilities();
 		new \DataMachine\Abilities\DailyMemoryAbilities();
-		new \DataMachine\Abilities\WorkspaceAbilities();
+		// WorkspaceAbilities moved to data-machine-code extension.
 		new \DataMachine\Abilities\ChatAbilities();
 		new \DataMachine\Abilities\InternalLinkingAbilities();
 		new \DataMachine\Abilities\Content\GetPostBlocksAbility();
 		new \DataMachine\Abilities\Content\EditPostBlocksAbility();
 		new \DataMachine\Abilities\Content\ReplacePostBlocksAbility();
-		new \DataMachine\Abilities\Fetch\GitHubAbilities();
+		// GitHubAbilities moved to data-machine-code extension.
 		new \DataMachine\Abilities\Fetch\FetchFilesAbility();
 		new \DataMachine\Abilities\Email\EmailAbilities();
 		new \DataMachine\Abilities\Fetch\FetchEmailAbility();
