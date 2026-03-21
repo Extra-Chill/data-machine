@@ -70,10 +70,17 @@ class EventHydrator {
 
 		$end_datetime = get_post_meta( $post_id, EVENT_END_DATETIME_META_KEY, true );
 		if ( $end_datetime ) {
-			$date_obj = date_create( $end_datetime );
-			if ( $date_obj ) {
-				$event_data['endDate'] = $date_obj->format( 'Y-m-d' );
-				$end_time_from_meta    = $date_obj->format( 'H:i:s' );
+			$end_obj = date_create( $end_datetime );
+			if ( $end_obj ) {
+				// Skip if end datetime is identical to start (legacy data with no real end time).
+				$start_check = $start_datetime ? date_create( $start_datetime ) : null;
+				if ( $start_check && $end_obj->format( 'Y-m-d H:i' ) === $start_check->format( 'Y-m-d H:i' ) ) {
+					// No real end time — don't populate endDate/endTime.
+					return;
+				}
+
+				$event_data['endDate'] = $end_obj->format( 'Y-m-d' );
+				$end_time_from_meta    = $end_obj->format( 'H:i:s' );
 				// Only set if not the sentinel value (23:59:59 means "no end time provided")
 				if ( '23:59:59' !== $end_time_from_meta ) {
 					$event_data['endTime'] = $end_time_from_meta;

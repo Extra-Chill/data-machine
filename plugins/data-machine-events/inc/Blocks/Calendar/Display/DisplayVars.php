@@ -103,6 +103,11 @@ class DisplayVars {
 
 		$end_datetime_obj = new DateTime( $end_date . ' ' . $end_time, $event_tz );
 
+		// Don't show a range when start and end are identical (no real end time).
+		if ( $start_datetime_obj->format( 'Y-m-d H:i' ) === $end_datetime_obj->format( 'Y-m-d H:i' ) ) {
+			return $start_formatted_full;
+		}
+
 		$is_same_day = $start_datetime_obj->format( 'Y-m-d' ) === $end_datetime_obj->format( 'Y-m-d' );
 		if ( ! $is_same_day ) {
 			return $start_formatted_full;
