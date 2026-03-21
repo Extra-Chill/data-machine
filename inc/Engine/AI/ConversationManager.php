@@ -18,17 +18,95 @@ class ConversationManager {
 	/**
 	 * Build standardized conversation message structure.
 	 *
-	 * @param string $role Role identifier (user, assistant, system)
-	 * @param string $content Message content
-	 * @param array  $metadata Optional metadata for the message (e.g., type, tool_data)
-	 * @return array Message array with role, content, and metadata
+	 * Content can be a plain string (text-only messages) or an array of content
+	 * blocks for multi-modal messages (text + images). When an array is provided,
+	 * each element should follow the content block format expected by AI providers:
+	 *
+	 *     [
+	 *         ['type' => 'text', 'text' => 'Describe this image'],
+	 *         ['type' => 'file', 'file_path' => '/path/to/image.jpg', 'mime_type' => 'image/jpeg'],
+	 *     ]
+	 *
+	 * The ai-http-client provider layer (Anthropic, OpenAI, Gemini, OpenRouter)
+	 * already handles array content via process_multimodal_messages().
+	 *
+	 * @since 0.2.1
+	 * @since 0.53.0 Accepts array content for multi-modal messages.
+	 *
+	 * @param string       $role     Role identifier (user, assistant, system).
+	 * @param string|array $content  Message content — string for text, array for multi-modal content blocks.
+	 * @param array        $metadata Optional metadata for the message (e.g., type, tool_data, attachments).
+	 * @return array Message array with role, content, and metadata.
 	 */
-	public static function buildConversationMessage( string $role, string $content, array $metadata = array() ): array {
+	public static function buildConversationMessage( string $role, $content, array $metadata = array() ): array {
 		return array(
 			'role'     => $role,
 			'content'  => $content,
 			'metadata' => array_merge( array( 'timestamp' => gmdate( 'c' ) ), $metadata ),
 		);
+	}
+
+	/**
+	 * Build multi-modal content blocks from text and attachments.
+	 *
+	 * Takes a text message and an array of attachment metadata, and produces
+	 * the content block array format expected by AI providers.
+	 *
+	 * @since 0.53.0
+	 *
+	 * @param string $text        The text portion of the message.
+	 * @param array  $attachments Array of attachment metadata, each with:
+	 *                            - url (string)        Required. Public URL of the media.
+	 *                            - file_path (string)   Optional. Local filesystem path (preferred for Anthropic file uploads).
+	 *                            - mime_type (string)   Optional. MIME type (auto-detected from URL if omitted).
+	 *                            - type (string)        Optional. 'image', 'video', or 'file'. Auto-detected from mime_type.
+	 *                            - media_id (int)       Optional. WordPress attachment ID.
+	 *                            - filename (string)    Optional. Original filename.
+	 * @return array Content blocks array suitable for buildConversationMessage().
+	 */
+	public static function buildMultiModalContent( string $text, array $attachments ): array {
+		$content_blocks = array();
+
+		// Text block first.
+		if ( '' !== $text ) {
+			$content_blocks[] = array(
+				'type' => 'text',
+				'text' => $text,
+			);
+		}
+
+		foreach ( $attachments as $attachment ) {
+			$url       = $attachment['url'] ?? '';
+			$file_path = $attachment['file_path'] ?? '';
+			$mime_type = $attachment['mime_type'] ?? '';
+
+			// Skip empty attachments.
+			if ( empty( $url ) && empty( $file_path ) ) {
+				continue;
+			}
+
+			// Auto-detect MIME type from file path if available.
+			if ( empty( $mime_type ) && ! empty( $file_path ) && file_exists( $file_path ) ) {
+				$mime_type = mime_content_type( $file_path );
+			}
+
+			// Prefer local file path for providers that support direct file upload (Anthropic).
+			if ( ! empty( $file_path ) && file_exists( $file_path ) ) {
+				$content_blocks[] = array(
+					'type'      => 'file',
+					'file_path' => $file_path,
+					'mime_type' => $mime_type,
+				);
+			} elseif ( ! empty( $url ) ) {
+				// Fall back to URL-based image reference.
+				$content_blocks[] = array(
+					'type'      => 'image_url',
+					'image_url' => array( 'url' => $url ),
+				);
+			}
+		}
+
+		return $content_blocks;
 	}
 
 	/**
@@ -94,6 +172,13 @@ class ConversationManager {
 			if ( ! $is_handler_tool ) {
 				$content .= "\n\n" . wp_json_encode( $tool_result['data'] );
 			}
+		}
+
+		// Propagate media attachments from tool results to message metadata.
+		// Tools can include a 'media' array in their result to signal renderable
+		// media (images, videos) that the frontend should display inline.
+		if ( ! empty( $tool_result['media'] ) ) {
+			$metadata['media'] = $tool_result['media'];
 		}
 
 		if ( isset( $tool_result['error'] ) ) {
@@ -337,5 +422,46 @@ class ConversationManager {
 		);
 
 		return self::formatToolResultMessage( $tool_name, $tool_result, array(), false, $turn_count );
+	}
+
+	/**
+	 * Build a standard media entry for tool results.
+	 *
+	 * Tools that produce media (images, videos) should include a 'media'
+	 * array in their result using this format. The frontend detects media
+	 * entries in tool result metadata and renders them inline.
+	 *
+	 * Usage in a tool:
+	 *
+	 *     return [
+	 *         'success' => true,
+	 *         'media'   => [
+	 *             ConversationManager::buildMediaEntry( 'image', $url, $alt_text ),
+	 *         ],
+	 *     ];
+	 *
+	 * @since 0.53.0
+	 *
+	 * @param string $type     Media type: 'image', 'video', or 'file'.
+	 * @param string $url      Public URL of the media.
+	 * @param string $alt      Alt text or description.
+	 * @param int    $media_id Optional WordPress attachment ID.
+	 * @return array Standard media entry.
+	 */
+	public static function buildMediaEntry( string $type, string $url, string $alt = '', int $media_id = 0 ): array {
+		$entry = array(
+			'type' => $type,
+			'url'  => $url,
+		);
+
+		if ( '' !== $alt ) {
+			$entry['alt'] = $alt;
+		}
+
+		if ( $media_id > 0 ) {
+			$entry['media_id'] = $media_id;
+		}
+
+		return $entry;
 	}
 }

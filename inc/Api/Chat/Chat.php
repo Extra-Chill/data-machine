@@ -93,6 +93,21 @@ class Chat {
 						'description'       => __( 'Currently selected pipeline ID for context', 'data-machine' ),
 						'sanitize_callback' => 'absint',
 					),
+					'attachments'          => array(
+						'type'              => 'array',
+						'required'          => false,
+						'description'       => __( 'Media attachments for multi-modal messages. Each item: {url, media_id, mime_type, filename}.', 'data-machine' ),
+						'items'             => array(
+							'type'       => 'object',
+							'properties' => array(
+								'url'       => array( 'type' => 'string' ),
+								'media_id'  => array( 'type' => 'integer' ),
+								'mime_type' => array( 'type' => 'string' ),
+								'filename'  => array( 'type' => 'string' ),
+							),
+						),
+						'sanitize_callback' => array( self::class, 'sanitize_attachments' ),
+					),
 				),
 			)
 		);
@@ -547,6 +562,14 @@ class Chat {
 			);
 		}
 
+		// --- Resolve attachments ---
+		$attachments = $request->get_param( 'attachments' );
+		if ( ! empty( $attachments ) && is_array( $attachments ) ) {
+			$attachments = self::resolve_attachment_paths( $attachments );
+		} else {
+			$attachments = array();
+		}
+
 		// --- Delegate to orchestrator ---
 		$result = ChatOrchestrator::processChat(
 			$message,
@@ -558,6 +581,7 @@ class Chat {
 				'selected_pipeline_id' => (int) $request->get_param( 'selected_pipeline_id' ),
 				'request_id'           => $request_id,
 				'agent_id'             => $agent_id,
+				'attachments'          => $attachments,
 			)
 		);
 
@@ -602,5 +626,109 @@ class Chat {
 				'data'    => $result,
 			)
 		);
+	}
+
+	/**
+	 * Sanitize attachments array from REST request.
+	 *
+	 * @since 0.53.0
+	 *
+	 * @param array $attachments Raw attachments from request.
+	 * @return array Sanitized attachments.
+	 */
+	public static function sanitize_attachments( $attachments ): array {
+		if ( ! is_array( $attachments ) ) {
+			return array();
+		}
+
+		$sanitized = array();
+
+		foreach ( $attachments as $attachment ) {
+			if ( ! is_array( $attachment ) ) {
+				continue;
+			}
+
+			$item = array();
+
+			if ( ! empty( $attachment['url'] ) ) {
+				$item['url'] = esc_url_raw( $attachment['url'] );
+			}
+
+			if ( ! empty( $attachment['media_id'] ) ) {
+				$item['media_id'] = absint( $attachment['media_id'] );
+			}
+
+			if ( ! empty( $attachment['mime_type'] ) ) {
+				$item['mime_type'] = sanitize_mime_type( $attachment['mime_type'] );
+			}
+
+			if ( ! empty( $attachment['filename'] ) ) {
+				$item['filename'] = sanitize_file_name( $attachment['filename'] );
+			}
+
+			// Must have at least a URL or media_id.
+			if ( ! empty( $item['url'] ) || ! empty( $item['media_id'] ) ) {
+				$sanitized[] = $item;
+			}
+		}
+
+		return $sanitized;
+	}
+
+	/**
+	 * Resolve attachment file paths from URLs or media IDs.
+	 *
+	 * Converts REST attachment metadata into the format expected by
+	 * ConversationManager::buildMultiModalContent() — adding file_path
+	 * when possible for providers that support direct file upload.
+	 *
+	 * @since 0.53.0
+	 *
+	 * @param array $attachments Sanitized attachments array.
+	 * @return array Attachments with file_path resolved where possible.
+	 */
+	private static function resolve_attachment_paths( array $attachments ): array {
+		$resolved = array();
+
+		foreach ( $attachments as $attachment ) {
+			$item = $attachment;
+
+			// Resolve media_id to file path and URL.
+			if ( ! empty( $attachment['media_id'] ) ) {
+				$media_id  = (int) $attachment['media_id'];
+				$file_path = get_attached_file( $media_id );
+
+				if ( $file_path && file_exists( $file_path ) ) {
+					$item['file_path'] = $file_path;
+				}
+
+				if ( empty( $item['url'] ) ) {
+					$item['url'] = wp_get_attachment_url( $media_id );
+				}
+
+				if ( empty( $item['mime_type'] ) ) {
+					$item['mime_type'] = get_post_mime_type( $media_id );
+				}
+			}
+
+			// Resolve URL to local file path if it's a local upload.
+			if ( empty( $item['file_path'] ) && ! empty( $item['url'] ) ) {
+				$upload_dir = wp_get_upload_dir();
+				$upload_url = $upload_dir['baseurl'];
+
+				if ( strpos( $item['url'], $upload_url ) === 0 ) {
+					$relative_path = str_replace( $upload_url, '', $item['url'] );
+					$local_path    = $upload_dir['basedir'] . $relative_path;
+
+					if ( file_exists( $local_path ) ) {
+						$item['file_path'] = $local_path;
+					}
+				}
+			}
+
+			$resolved[] = $item;
+		}
+
+		return $resolved;
 	}
 }
