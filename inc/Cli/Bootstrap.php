@@ -42,6 +42,7 @@ WP_CLI::add_command( 'datamachine step-types', Commands\StepTypesCommand::class 
 WP_CLI::add_command( 'datamachine processed-items', Commands\ProcessedItemsCommand::class );
 WP_CLI::add_command( 'datamachine retention', Commands\RetentionCommand::class );
 WP_CLI::add_command( 'datamachine test', Commands\TestCommand::class );
+WP_CLI::add_command( 'datamachine external', Commands\ExternalCommand::class );
 
 // Aliases for AI agent compatibility (singular/plural variants).
 WP_CLI::add_command( 'datamachine setting', Commands\SettingsCommand::class );

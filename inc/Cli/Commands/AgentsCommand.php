@@ -727,6 +727,168 @@ class AgentsCommand extends BaseCommand {
 	}
 
 	/**
+	 * Read or update agent configuration.
+	 *
+	 * Without flags, displays the current config. With --set or --unset,
+	 * modifies individual config keys. Supports dot notation for nested keys.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <slug>
+	 * : Agent slug or numeric ID.
+	 *
+	 * [--set=<pair>]
+	 * : Set a config key (format: key=value). Value is JSON-parsed (arrays, objects, strings, numbers).
+	 *   For arrays, pass JSON: --set='allowed_redirect_uris=["https://example.com/*"]'
+	 *   Can be used multiple times.
+	 *
+	 * [--unset=<key>]
+	 * : Remove a config key. Can be used multiple times.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: json
+	 * options:
+	 *   - json
+	 *   - table
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # View agent config
+	 *     wp datamachine agents config sarai
+	 *
+	 *     # Set allowed redirect URIs
+	 *     wp datamachine agents config sarai --set='allowed_redirect_uris=["saraichinwag.com","https://saraichinwag.com/*"]'
+	 *
+	 *     # Set a single key
+	 *     wp datamachine agents config sarai --set='model=gpt-4o'
+	 *
+	 *     # Remove a key
+	 *     wp datamachine agents config sarai --unset=model
+	 *
+	 *     # Set site_scope (special: updates the agent column directly)
+	 *     wp datamachine agents config sarai --set='site_scope=7'
+	 *     wp datamachine agents config sarai --set='site_scope=null'
+	 *
+	 * @subcommand config
+	 */
+	public function config( array $args, array $assoc_args ): void {
+		$identifier = $args[0] ?? '';
+		$format     = $assoc_args['format'] ?? 'json';
+
+		if ( empty( $identifier ) ) {
+			WP_CLI::error( 'Agent slug or ID is required.' );
+			return;
+		}
+
+		// Resolve agent.
+		$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+		$agent       = is_numeric( $identifier )
+			? $agents_repo->get_agent( (int) $identifier )
+			: $agents_repo->get_by_slug( sanitize_title( $identifier ) );
+
+		if ( ! $agent ) {
+			WP_CLI::error( sprintf( 'Agent "%s" not found.', $identifier ) );
+			return;
+		}
+
+		$agent_id = (int) $agent['agent_id'];
+		$config   = $agent['agent_config'] ?? array();
+		if ( ! is_array( $config ) ) {
+			$config = array();
+		}
+
+		$has_set   = isset( $assoc_args['set'] );
+		$has_unset = isset( $assoc_args['unset'] );
+
+		// Read-only mode.
+		if ( ! $has_set && ! $has_unset ) {
+			if ( empty( $config ) ) {
+				WP_CLI::log( 'Agent config is empty.' );
+				return;
+			}
+
+			if ( 'json' === $format ) {
+				WP_CLI::log( wp_json_encode( $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			} else {
+				$items = array();
+				foreach ( $config as $key => $value ) {
+					$items[] = array(
+						'key'   => $key,
+						'value' => is_array( $value ) ? wp_json_encode( $value, JSON_UNESCAPED_SLASHES ) : (string) $value,
+					);
+				}
+				\WP_CLI\Utils\format_items( 'table', $items, array( 'key', 'value' ) );
+			}
+			return;
+		}
+
+		$site_scope_changed = false;
+
+		// Handle --set flags.
+		if ( $has_set ) {
+			$sets = is_array( $assoc_args['set'] ) ? $assoc_args['set'] : array( $assoc_args['set'] );
+
+			foreach ( $sets as $pair ) {
+				$eq_pos = strpos( $pair, '=' );
+				if ( false === $eq_pos ) {
+					WP_CLI::warning( sprintf( 'Skipping invalid --set value: %s (expected key=value)', $pair ) );
+					continue;
+				}
+
+				$key       = substr( $pair, 0, $eq_pos );
+				$raw_value = substr( $pair, $eq_pos + 1 );
+
+				// Handle site_scope as a special case — it's a column, not agent_config.
+				if ( 'site_scope' === $key ) {
+					$scope_value = ( 'null' === strtolower( $raw_value ) || '' === $raw_value ) ? null : (int) $raw_value;
+					global $wpdb;
+					// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+					$wpdb->update(
+						$wpdb->base_prefix . 'datamachine_agents',
+						array( 'site_scope' => $scope_value ),
+						array( 'agent_id' => $agent_id ),
+						array( null === $scope_value ? null : '%d' ),
+						array( '%d' )
+					);
+					$site_scope_changed = true;
+					WP_CLI::log( sprintf( '  site_scope → %s', null === $scope_value ? 'NULL (network-wide)' : $scope_value ) );
+					continue;
+				}
+
+				// Try JSON decode first (for arrays, objects, numbers, booleans).
+				$decoded = json_decode( $raw_value, true );
+				$value   = ( null !== $decoded || 'null' === $raw_value ) ? $decoded : $raw_value;
+
+				$config[ $key ] = $value;
+				$display = is_array( $value ) ? wp_json_encode( $value, JSON_UNESCAPED_SLASHES ) : (string) $value;
+				WP_CLI::log( sprintf( '  %s → %s', $key, $display ) );
+			}
+		}
+
+		// Handle --unset flags.
+		if ( $has_unset ) {
+			$unsets = is_array( $assoc_args['unset'] ) ? $assoc_args['unset'] : array( $assoc_args['unset'] );
+
+			foreach ( $unsets as $key ) {
+				if ( array_key_exists( $key, $config ) ) {
+					unset( $config[ $key ] );
+					WP_CLI::log( sprintf( '  Removed: %s', $key ) );
+				} else {
+					WP_CLI::warning( sprintf( '  Key not found: %s', $key ) );
+				}
+			}
+		}
+
+		// Save updated config.
+		$agents_repo->update_agent( $agent_id, array( 'agent_config' => $config ) );
+
+		WP_CLI::success( sprintf( 'Config updated for agent "%s".', $agent['agent_slug'] ) );
+	}
+
+	/**
 	 * Resolve a user identifier to a WordPress user ID.
 	 *
 	 * @param string|int $value User ID, login, or email.
