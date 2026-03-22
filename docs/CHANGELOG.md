@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.55.1] - 2026-03-22
+
+### Changed
+- batch next-run and service lookups in FlowFormatter
+
 ## [0.55.0] - 2026-03-22
 
 ### Added
