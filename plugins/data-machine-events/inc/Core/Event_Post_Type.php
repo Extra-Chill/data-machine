@@ -120,8 +120,9 @@ class Event_Post_Type {
 	 * 'post' post type. With 0 blog posts matching that artist, WP finds no
 	 * results on page 2+ and returns 404 before the calendar block renders.
 	 *
-	 * Fix: force the post type to events and set posts_per_page high so
-	 * the main query finds results and doesn't prematurely 404.
+	 * Fix: force the post type to events and use a minimal query so the
+	 * main query finds at least one result and doesn't prematurely 404.
+	 * The calendar block does its own independent query for display.
 	 *
 	 * @param \WP_Query $query The main query.
 	 */
@@ -139,9 +140,11 @@ class Event_Post_Type {
 				// correct post type instead of defaulting to 'post'.
 				$query->set( 'post_type', self::POST_TYPE );
 
-				// High posts_per_page prevents WordPress from 404-ing paginated
-				// requests. The calendar block does its own query independently.
-				$query->set( 'posts_per_page', 100 );
+				// Minimal query — we only need ≥1 result to prevent the 404.
+				// The calendar block runs its own query for actual display.
+				$query->set( 'posts_per_page', 1 );
+				$query->set( 'fields', 'ids' );
+				$query->set( 'no_found_rows', true );
 				return;
 			}
 		}
