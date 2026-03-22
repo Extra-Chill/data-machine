@@ -34,6 +34,16 @@ class AgentTokens extends BaseRepository {
 	const TOKEN_PREFIX = 'datamachine_';
 
 	/**
+	 * Use network-level prefix so tokens are shared across the multisite network.
+	 *
+	 * @return string
+	 */
+	protected static function get_table_prefix(): string {
+		global $wpdb;
+		return $wpdb->base_prefix;
+	}
+
+	/**
 	 * Create agent_tokens table.
 	 *
 	 * @return void
@@ -41,7 +51,7 @@ class AgentTokens extends BaseRepository {
 	public static function create_table(): void {
 		global $wpdb;
 
-		$table_name      = $wpdb->prefix . self::TABLE_NAME;
+		$table_name      = $wpdb->base_prefix . self::TABLE_NAME;
 		$charset_collate = $wpdb->get_charset_collate();
 
 		$sql = "CREATE TABLE {$table_name} (

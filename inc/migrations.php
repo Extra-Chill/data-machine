@@ -1497,7 +1497,7 @@ function datamachine_assign_orphaned_resources_to_sole_agent(): void {
 	// Only proceed for single-agent installs.
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 	$agent_count = (int) $wpdb->get_var(
-		$wpdb->prepare( 'SELECT COUNT(*) FROM %i', $wpdb->prefix . 'datamachine_agents' )
+		$wpdb->prepare( 'SELECT COUNT(*) FROM %i', $wpdb->base_prefix . 'datamachine_agents' )
 	);
 
 	if ( 1 !== $agent_count ) {
@@ -1509,7 +1509,7 @@ function datamachine_assign_orphaned_resources_to_sole_agent(): void {
 	// Get the sole agent's ID.
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 	$agent_id = (int) $wpdb->get_var(
-		$wpdb->prepare( 'SELECT agent_id FROM %i LIMIT 1', $wpdb->prefix . 'datamachine_agents' )
+		$wpdb->prepare( 'SELECT agent_id FROM %i LIMIT 1', $wpdb->base_prefix . 'datamachine_agents' )
 	);
 
 	if ( $agent_id <= 0 ) {
@@ -1874,6 +1874,185 @@ function datamachine_activate_scheduled_flows() {
 			'Flows re-scheduled on plugin activation',
 			array(
 				'scheduled_count' => $scheduled_count,
+			)
+		);
+	}
+}
+
+/**
+ * Migrate per-site agent rows to the network-scoped table.
+ *
+ * On multisite, agent tables previously used $wpdb->prefix (per-site).
+ * This migration consolidates per-site agent rows into the network table
+ * ($wpdb->base_prefix) and sets site_scope to the originating blog_id.
+ *
+ * Deduplication: if an agent_slug already exists in the network table,
+ * the per-site row is skipped (the network table wins).
+ *
+ * Idempotent — guarded by a network-level site option.
+ *
+ * @since 0.52.0
+ */
+function datamachine_migrate_agents_to_network_scope() {
+	if ( ! is_multisite() ) {
+		return;
+	}
+
+	if ( get_site_option( 'datamachine_agents_network_migrated' ) ) {
+		return;
+	}
+
+	global $wpdb;
+
+	$network_agents_table  = $wpdb->base_prefix . 'datamachine_agents';
+	$network_access_table  = $wpdb->base_prefix . 'datamachine_agent_access';
+	$network_tokens_table  = $wpdb->base_prefix . 'datamachine_agent_tokens';
+	$migrated_agents       = 0;
+	$migrated_access       = 0;
+
+	$sites = get_sites( array( 'fields' => 'ids' ) );
+
+	foreach ( $sites as $blog_id ) {
+		$site_prefix = $wpdb->get_blog_prefix( $blog_id );
+
+		// Skip the main site — its prefix IS the base_prefix, so the table is already network-level.
+		if ( $site_prefix === $wpdb->base_prefix ) {
+			// Set site_scope on existing main-site agents that don't have one yet.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$wpdb->query(
+				$wpdb->prepare(
+					"UPDATE `{$network_agents_table}` SET site_scope = %d WHERE site_scope IS NULL",
+					(int) $blog_id
+				)
+			);
+			continue;
+		}
+
+		$site_agents_table = $site_prefix . 'datamachine_agents';
+		$site_access_table = $site_prefix . 'datamachine_agent_access';
+		$site_tokens_table = $site_prefix . 'datamachine_agent_tokens';
+
+		// Check if per-site agents table exists.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$table_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $site_agents_table ) );
+		if ( ! $table_exists ) {
+			continue;
+		}
+
+		// Get all agents from the per-site table.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$site_agents = $wpdb->get_results( "SELECT * FROM `{$site_agents_table}`", ARRAY_A );
+
+		if ( empty( $site_agents ) ) {
+			continue;
+		}
+
+		foreach ( $site_agents as $agent ) {
+			$old_agent_id = (int) $agent['agent_id'];
+
+			// Check if slug already exists in network table.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$existing = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT agent_id FROM `{$network_agents_table}` WHERE agent_slug = %s",
+					$agent['agent_slug']
+				),
+				ARRAY_A
+			);
+
+			if ( $existing ) {
+				// Slug already exists in network table — skip this agent.
+				continue;
+			}
+
+			// Insert into network table with site_scope.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$wpdb->insert(
+				$network_agents_table,
+				array(
+					'agent_slug'   => $agent['agent_slug'],
+					'agent_name'   => $agent['agent_name'],
+					'owner_id'     => (int) $agent['owner_id'],
+					'site_scope'   => (int) $blog_id,
+					'agent_config' => $agent['agent_config'],
+					'status'       => $agent['status'],
+					'created_at'   => $agent['created_at'],
+					'updated_at'   => $agent['updated_at'],
+				),
+				array( '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s' )
+			);
+
+			$new_agent_id = (int) $wpdb->insert_id;
+
+			if ( $new_agent_id <= 0 ) {
+				continue;
+			}
+
+			++$migrated_agents;
+
+			// Migrate access grants for this agent.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$site_access = $wpdb->get_results(
+				$wpdb->prepare( "SELECT * FROM `{$site_access_table}` WHERE agent_id = %d", $old_agent_id ),
+				ARRAY_A
+			);
+
+			foreach ( $site_access as $access ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+				$wpdb->insert(
+					$network_access_table,
+					array(
+						'agent_id'   => $new_agent_id,
+						'user_id'    => (int) $access['user_id'],
+						'role'       => $access['role'],
+						'granted_at' => $access['granted_at'],
+					),
+					array( '%d', '%d', '%s', '%s' )
+				);
+				++$migrated_access;
+			}
+
+			// Migrate tokens for this agent (if any).
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$token_table_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $site_tokens_table ) );
+			if ( $token_table_exists ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$site_tokens = $wpdb->get_results(
+					$wpdb->prepare( "SELECT * FROM `{$site_tokens_table}` WHERE agent_id = %d", $old_agent_id ),
+					ARRAY_A
+				);
+
+				foreach ( $site_tokens as $token ) {
+					// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+					$wpdb->insert(
+						$network_tokens_table,
+						array(
+							'agent_id'     => $new_agent_id,
+							'token_hash'   => $token['token_hash'],
+							'token_prefix' => $token['token_prefix'],
+							'label'        => $token['label'],
+							'capabilities' => $token['capabilities'],
+							'last_used_at' => $token['last_used_at'],
+							'expires_at'   => $token['expires_at'],
+							'created_at'   => $token['created_at'],
+						),
+						array( '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
+					);
+				}
+			}
+		}
+	}
+
+	update_site_option( 'datamachine_agents_network_migrated', true );
+
+	if ( $migrated_agents > 0 || $migrated_access > 0 ) {
+		do_action(
+			'datamachine_log',
+			'info',
+			'Migrated per-site agents to network-scoped tables',
+			array(
+				'agents_migrated' => $migrated_agents,
+				'access_migrated' => $migrated_access,
 			)
 		);
 	}
