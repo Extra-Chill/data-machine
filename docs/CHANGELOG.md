@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.54.1] - 2026-03-22
+
+### Changed
+- drop cron schedule — push to main covers release
+
+### Fixed
+- truncate job status to varchar(255) limit before DB write
+- remove GitHub handler instantiation missed in extraction
+
 ## [0.54.0] - 2026-03-21
 
 ### Added
