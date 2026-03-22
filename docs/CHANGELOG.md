@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.55.2] - 2026-03-22
+
+### Changed
+- add 'list' output mode that skips handler enrichment
+
 ## [0.55.1] - 2026-03-22
 
 ### Changed
