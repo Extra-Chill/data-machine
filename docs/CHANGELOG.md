@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.54.2] - 2026-03-22
+
+### Fixed
+- save requested schedule on flow creation instead of manual-first workaround
+
 ## [0.54.1] - 2026-03-22
 
 ### Changed
