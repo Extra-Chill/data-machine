@@ -109,6 +109,8 @@ trait FlowHelpers {
 	/**
 	 * Format flows array based on output mode.
 	 *
+	 * Batches the latest-job lookup into a single query instead of N+1.
+	 *
 	 * @param array  $flows Array of flow data.
 	 * @param string $output_mode Output mode (full, summary, ids).
 	 * @return array Formatted flows.
@@ -118,9 +120,15 @@ trait FlowHelpers {
 			return $this->formatIds( $flows );
 		}
 
+		// Batch-fetch latest jobs for all flows in one query.
+		$flow_ids    = array_map( fn( $f ) => (int) $f['flow_id'], $flows );
+		$latest_jobs = ! empty( $flow_ids )
+			? $this->db_jobs->get_latest_jobs_by_flow_ids( $flow_ids )
+			: array();
+
 		return array_map(
-			function ( $flow ) use ( $output_mode ) {
-				return $this->formatFlowByMode( $flow, $output_mode );
+			function ( $flow ) use ( $output_mode, $latest_jobs ) {
+				return $this->formatFlowByMode( $flow, $output_mode, $latest_jobs );
 			},
 			$flows
 		);
@@ -129,32 +137,38 @@ trait FlowHelpers {
 	/**
 	 * Format single flow based on output mode.
 	 *
-	 * @param array  $flow Flow data.
-	 * @param string $output_mode Output mode (full, summary).
+	 * @param array      $flow Flow data.
+	 * @param string     $output_mode Output mode (full, summary).
+	 * @param array|null $latest_jobs Pre-fetched latest jobs keyed by flow_id.
 	 * @return array Formatted flow.
 	 */
-	protected function formatFlowByMode( array $flow, string $output_mode ) {
+	protected function formatFlowByMode( array $flow, string $output_mode, ?array $latest_jobs = null ) {
 		if ( 'ids' === $output_mode ) {
 			return (int) $flow['flow_id'];
 		}
 
 		if ( 'summary' === $output_mode ) {
-			return $this->formatSummary( $flow );
+			return $this->formatSummary( $flow, $latest_jobs );
 		}
 
-		return $this->formatFull( $flow );
+		return $this->formatFull( $flow, $latest_jobs );
 	}
 
 	/**
 	 * Format flow with full data including latest job status.
 	 *
-	 * @param array $flow Flow data.
+	 * @param array      $flow Flow data.
+	 * @param array|null $latest_jobs Pre-fetched latest jobs keyed by flow_id (avoids N+1).
 	 * @return array Formatted flow with full data.
 	 */
-	protected function formatFull( array $flow ): array {
-		$flow_id     = (int) $flow['flow_id'];
-		$latest_jobs = $this->db_jobs->get_latest_jobs_by_flow_ids( array( $flow_id ) );
-		$latest_job  = $latest_jobs[ $flow_id ] ?? null;
+	protected function formatFull( array $flow, ?array $latest_jobs = null ): array {
+		$flow_id = (int) $flow['flow_id'];
+
+		if ( null === $latest_jobs ) {
+			$latest_jobs = $this->db_jobs->get_latest_jobs_by_flow_ids( array( $flow_id ) );
+		}
+
+		$latest_job = $latest_jobs[ $flow_id ] ?? null;
 
 		return FlowFormatter::format_flow_for_response( $flow, $latest_job );
 	}
@@ -162,13 +176,18 @@ trait FlowHelpers {
 	/**
 	 * Format flow with summary fields only.
 	 *
-	 * @param array $flow Flow data.
+	 * @param array      $flow Flow data.
+	 * @param array|null $latest_jobs Pre-fetched latest jobs keyed by flow_id (avoids N+1).
 	 * @return array Formatted flow summary.
 	 */
-	protected function formatSummary( array $flow ): array {
-		$flow_id     = (int) $flow['flow_id'];
-		$latest_jobs = $this->db_jobs->get_latest_jobs_by_flow_ids( array( $flow_id ) );
-		$latest_job  = $latest_jobs[ $flow_id ] ?? null;
+	protected function formatSummary( array $flow, ?array $latest_jobs = null ): array {
+		$flow_id = (int) $flow['flow_id'];
+
+		if ( null === $latest_jobs ) {
+			$latest_jobs = $this->db_jobs->get_latest_jobs_by_flow_ids( array( $flow_id ) );
+		}
+
+		$latest_job = $latest_jobs[ $flow_id ] ?? null;
 
 		return array(
 			'flow_id'         => $flow_id,
@@ -196,6 +215,9 @@ trait FlowHelpers {
 	/**
 	 * Get all flows with pagination.
 	 *
+	 * Uses a single DB query with LIMIT/OFFSET instead of loading all flows
+	 * across all pipelines and slicing in PHP.
+	 *
 	 * @param int      $per_page Items per page.
 	 * @param int      $offset   Pagination offset.
 	 * @param int|null $user_id  Optional user ID filter.
@@ -203,53 +225,20 @@ trait FlowHelpers {
 	 * @return array Paginated flows.
 	 */
 	protected function getAllFlowsPaginated( int $per_page, int $offset, ?int $user_id = null, ?int $agent_id = null ): array {
-		if ( null !== $agent_id ) {
-			$all_flows = $this->db_flows->get_all_flows( null, $agent_id );
-			return array_slice( $all_flows, $offset, $per_page );
-		}
-
-		if ( null !== $user_id ) {
-			$all_flows = $this->db_flows->get_all_flows( $user_id );
-			return array_slice( $all_flows, $offset, $per_page );
-		}
-
-		$all_pipelines = $this->db_pipelines->get_pipelines_list();
-		$all_flows     = array();
-
-		foreach ( $all_pipelines as $pipeline ) {
-			$pipeline_flows = $this->db_flows->get_flows_for_pipeline( $pipeline['pipeline_id'] );
-			$all_flows      = array_merge( $all_flows, $pipeline_flows );
-		}
-
-		return array_slice( $all_flows, $offset, $per_page );
+		return $this->db_flows->get_all_flows_paginated( $per_page, $offset, $user_id, $agent_id );
 	}
 
 	/**
-	 * Count all flows across all pipelines.
+	 * Count all flows with optional user/agent filter.
+	 *
+	 * Single COUNT(*) query instead of loading all pipelines and summing per-pipeline counts.
 	 *
 	 * @param int|null $user_id  Optional user ID filter.
 	 * @param int|null $agent_id Optional agent ID filter (takes priority over user_id).
 	 * @return int Total flow count.
 	 */
 	protected function countAllFlows( ?int $user_id = null, ?int $agent_id = null ): int {
-		if ( null !== $agent_id ) {
-			$all_flows = $this->db_flows->get_all_flows( null, $agent_id );
-			return count( $all_flows );
-		}
-
-		if ( null !== $user_id ) {
-			$all_flows = $this->db_flows->get_all_flows( $user_id );
-			return count( $all_flows );
-		}
-
-		$all_pipelines = $this->db_pipelines->get_pipelines_list();
-		$total         = 0;
-
-		foreach ( $all_pipelines as $pipeline ) {
-			$total += $this->db_flows->count_flows_for_pipeline( $pipeline['pipeline_id'] );
-		}
-
-		return $total;
+		return $this->db_flows->count_all_flows( $user_id, $agent_id );
 	}
 
 	/**

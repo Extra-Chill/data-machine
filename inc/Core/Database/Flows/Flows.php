@@ -375,6 +375,84 @@ class Flows extends BaseRepository {
 	}
 
 	/**
+	 * Get all flows with pagination (single query, no per-pipeline loop).
+	 *
+	 * @since 0.54.2
+	 *
+	 * @param int      $per_page  Number of flows per page.
+	 * @param int      $offset    Offset for pagination.
+	 * @param int|null $user_id   Optional user ID filter.
+	 * @param int|null $agent_id  Optional agent ID filter (takes priority over user_id).
+	 * @return array Paginated flows.
+	 */
+	public function get_all_flows_paginated( int $per_page = 20, int $offset = 0, ?int $user_id = null, ?int $agent_id = null ): array {
+		$where        = '';
+		$where_values = array();
+
+		if ( null !== $agent_id ) {
+			$where          = ' WHERE agent_id = %d';
+			$where_values[] = $agent_id;
+		} elseif ( null !== $user_id ) {
+			$where          = ' WHERE user_id = %d';
+			$where_values[] = $user_id;
+		}
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
+		$flows = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				"SELECT * FROM %i{$where} ORDER BY pipeline_id ASC, flow_id ASC LIMIT %d OFFSET %d",
+				array_merge( array( $this->table_name ), $where_values, array( $per_page, $offset ) )
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
+
+		if ( null === $flows ) {
+			return array();
+		}
+
+		foreach ( $flows as &$flow ) {
+			$flow['flow_config']       = json_decode( $flow['flow_config'], true ) ?? array();
+			$flow['scheduling_config'] = json_decode( $flow['scheduling_config'], true ) ?? array();
+		}
+
+		return $flows;
+	}
+
+	/**
+	 * Count all flows with optional user/agent filter.
+	 *
+	 * @since 0.54.2
+	 *
+	 * @param int|null $user_id  Optional user ID filter.
+	 * @param int|null $agent_id Optional agent ID filter (takes priority over user_id).
+	 * @return int Total flow count.
+	 */
+	public function count_all_flows( ?int $user_id = null, ?int $agent_id = null ): int {
+		$where        = '';
+		$where_values = array();
+
+		if ( null !== $agent_id ) {
+			$where          = ' WHERE agent_id = %d';
+			$where_values[] = $agent_id;
+		} elseif ( null !== $user_id ) {
+			$where          = ' WHERE user_id = %d';
+			$where_values[] = $user_id;
+		}
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
+		$count = $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				"SELECT COUNT(*) FROM %i{$where}",
+				array_merge( array( $this->table_name ), $where_values )
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
+
+		return (int) ( $count ?? 0 );
+	}
+
+	/**
 	 * Get flows with consecutive failures or consecutive no-items at or above threshold.
 	 *
 	 * Returns flows that either:
