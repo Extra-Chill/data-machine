@@ -117,6 +117,9 @@ function datamachine_run_datamachine_plugin() {
 	// Agent runtime authentication middleware.
 	new \DataMachine\Core\Auth\AgentAuthMiddleware();
 
+	// Agent browser-based authorization flow.
+	new \DataMachine\Core\Auth\AgentAuthorize();
+
 	// Load abilities
 	require_once __DIR__ . '/inc/Abilities/AuthAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/File/FileConstants.php';
