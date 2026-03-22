@@ -1,0 +1,12 @@
+parameters:
+    phpVersion: 80200
+    level: 0
+    paths:
+        - inc
+        - data-machine.php
+    scanDirectories:
+        - vendor
+    bootstrapFiles:
+        - vendor/php-stubs/wordpress-stubs/wordpress-stubs.php
+    excludePaths:
+        - vendor
