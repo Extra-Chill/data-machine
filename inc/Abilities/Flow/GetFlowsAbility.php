@@ -76,9 +76,9 @@ class GetFlowsAbility {
 							),
 							'output_mode'  => array(
 								'type'        => 'string',
-								'enum'        => array( 'full', 'summary', 'ids' ),
+								'enum'        => array( 'full', 'list', 'summary', 'ids' ),
 								'default'     => 'full',
-								'description' => __( 'Output mode: full=all data with latest job status, summary=key fields only, ids=just flow_ids', 'data-machine' ),
+								'description' => __( 'Output mode: full=all data with handler enrichment, list=flow data with status (no handler enrichment), summary=key fields only, ids=just flow_ids', 'data-machine' ),
 							),
 						),
 					),
@@ -127,7 +127,7 @@ class GetFlowsAbility {
 			// per_page=0 means "return all" — used by CLI. Use PHP_INT_MAX to bypass pagination.
 			$effective_per_page = ( 0 === $per_page ) ? PHP_INT_MAX : $per_page;
 
-			if ( ! in_array( $output_mode, array( 'full', 'summary', 'ids' ), true ) ) {
+			if ( ! in_array( $output_mode, array( 'full', 'list', 'summary', 'ids' ), true ) ) {
 				$output_mode = 'full';
 			}
 

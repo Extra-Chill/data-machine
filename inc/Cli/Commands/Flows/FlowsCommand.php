@@ -300,6 +300,11 @@ class FlowsCommand extends BaseCommand {
 
 		$scoping = AgentResolver::buildScopingInput( $assoc_args );
 		$ability = new \DataMachine\Abilities\FlowAbilities();
+
+		// Use 'list' mode for multi-flow views (skips expensive handler enrichment).
+		// Use 'full' mode for single-flow detail views.
+		$output_mode = $flow_id ? 'full' : 'list';
+
 		$result  = $ability->executeAbility(
 			array_merge(
 				$scoping,
@@ -309,7 +314,7 @@ class FlowsCommand extends BaseCommand {
 					'handler_slug' => $handler_slug,
 					'per_page'     => $per_page,
 					'offset'       => $offset,
-					'output_mode'  => 'full',
+					'output_mode'  => $output_mode,
 				)
 			)
 		);

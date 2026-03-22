@@ -156,6 +156,10 @@ trait FlowHelpers {
 			return $this->formatSummary( $flow, $latest_jobs );
 		}
 
+		if ( 'list' === $output_mode ) {
+			return $this->formatList( $flow, $latest_jobs, $next_runs );
+		}
+
 		return $this->formatFull( $flow, $latest_jobs, $next_runs );
 	}
 
@@ -200,6 +204,42 @@ trait FlowHelpers {
 			'flow_name'       => $flow['flow_name'] ?? '',
 			'pipeline_id'     => $flow['pipeline_id'] ?? null,
 			'last_run_status' => $latest_job['status'] ?? null,
+		);
+	}
+
+	/**
+	 * Format flow for list views — includes flow_config and scheduling
+	 * but skips the expensive handler settings enrichment in FlowFormatter.
+	 *
+	 * @param array       $flow Flow data.
+	 * @param array|null  $latest_jobs Pre-fetched latest jobs keyed by flow_id.
+	 * @param array|null  $next_runs   Pre-fetched next run times keyed by flow_id.
+	 * @return array Flow data with status fields added.
+	 */
+	protected function formatList( array $flow, ?array $latest_jobs = null, ?array $next_runs = null ): array {
+		$flow_id    = (int) $flow['flow_id'];
+		$latest_job = null !== $latest_jobs ? ( $latest_jobs[ $flow_id ] ?? null ) : null;
+
+		$scheduling_config = $flow['scheduling_config'] ?? array();
+		$last_run_at       = $latest_job['created_at'] ?? null;
+
+		$next_run = null;
+		if ( null !== $next_runs && array_key_exists( $flow_id, $next_runs ) ) {
+			$next_run = $next_runs[ $flow_id ];
+		}
+
+		return array(
+			'flow_id'           => $flow_id,
+			'flow_name'         => $flow['flow_name'] ?? '',
+			'pipeline_id'       => isset( $flow['pipeline_id'] ) ? (int) $flow['pipeline_id'] : null,
+			'flow_config'       => $flow['flow_config'] ?? array(),
+			'scheduling_config' => $scheduling_config,
+			'last_run'          => $last_run_at,
+			'last_run_status'   => $latest_job['status'] ?? null,
+			'last_run_display'  => \DataMachine\Core\Admin\DateFormatter::format_for_display( $last_run_at ),
+			'is_running'        => $latest_job && null === $latest_job['completed_at'],
+			'next_run'          => $next_run,
+			'next_run_display'  => \DataMachine\Core\Admin\DateFormatter::format_for_display( $next_run ),
 		);
 	}
 
