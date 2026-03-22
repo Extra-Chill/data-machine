@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.55.0] - 2026-03-22
+
+### Added
+- validate interval keys at creation time and add human-friendly aliases
+
+### Changed
+- fix N+1 queries in flows list — single query for flows and batched job lookup
+
 ## [0.54.2] - 2026-03-22
 
 ### Fixed
