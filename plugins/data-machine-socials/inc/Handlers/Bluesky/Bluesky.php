@@ -34,7 +34,7 @@ class Bluesky extends PublishHandler {
 			'Post content to Bluesky social network',
 			true,
 			BlueskyAuth::class,
-			null,
+			BlueskySettings::class,
 			function ( $tools, $handler_slug, $handler_config ) {
 				$handler_config;
 				if ( 'bluesky_publish' === $handler_slug ) {

@@ -218,6 +218,7 @@ function datamachine_socials_load_chat_tools() {
 	new \DataMachineSocials\Chat\Tools\FetchReddit();
 	new \DataMachineSocials\Chat\Tools\ReplyReddit();
 	new \DataMachineSocials\Chat\Tools\SubmitReddit();
+	new \DataMachineSocials\Chat\Tools\VoteReddit();
 	new \DataMachineSocials\Chat\Tools\ReadInstagram();
 	new \DataMachineSocials\Chat\Tools\UpdateInstagram();
 	new \DataMachineSocials\Chat\Tools\ReplyInstagramComment();
