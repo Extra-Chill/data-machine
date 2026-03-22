@@ -11,7 +11,7 @@
 /**
  * WordPress dependencies
  */
-import { useState, useCallback } from '@wordpress/element';
+import { useState, useCallback, useEffect } from '@wordpress/element';
 import { Button, Notice } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 
@@ -112,14 +112,25 @@ const InlineAccountDetails = ( { account } ) => {
 const ConfigForm = ( { provider, onSave, isSaving } ) => {
 	const fields = provider.auth_fields || {};
 	const fieldEntries = Object.entries( fields );
+	const savedConfig = provider.config_values || {};
 
 	const [ values, setValues ] = useState( () => {
 		const initial = {};
 		fieldEntries.forEach( ( [ key, field ] ) => {
-			initial[ key ] = field.default || '';
+			// Use saved config value, fall back to field default or empty string.
+			initial[ key ] = savedConfig[ key ] ?? field.default ?? '';
 		} );
 		return initial;
 	} );
+
+	// Sync values when savedConfig changes (e.g., after save/refetch).
+	useEffect( () => {
+		const updated = {};
+		fieldEntries.forEach( ( [ key, field ] ) => {
+			updated[ key ] = savedConfig[ key ] ?? field.default ?? '';
+		} );
+		setValues( updated );
+	}, [ savedConfig, fieldEntries ] );
 
 	if ( fieldEntries.length === 0 ) {
 		return (

@@ -431,6 +431,7 @@ class AuthAbilities {
 				'is_configured'    => method_exists( $instance, 'is_configured' ) ? $instance->is_configured() : false,
 				'is_authenticated' => $is_authenticated,
 				'auth_fields'      => method_exists( $instance, 'get_config_fields' ) ? $instance->get_config_fields() : array(),
+				'config_values'    => method_exists( $instance, 'get_config' ) ? $instance->get_config() : array(),
 				'callback_url'     => null,
 				'account_details'  => null,
 			);
