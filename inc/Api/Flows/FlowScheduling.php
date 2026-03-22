@@ -199,9 +199,12 @@ class FlowScheduling {
 	 *
 	 * @param int   $flow_id Flow ID
 	 * @param array $scheduling_config Scheduling configuration
+	 * @param bool  $force Skip the unchanged guard. Use when creating a new flow
+	 *                     whose DB row already has the target interval (avoids the
+	 *                     old "save as manual first" workaround).
 	 * @return bool|\WP_Error True on success, WP_Error on failure
 	 */
-	public static function handle_scheduling_update( $flow_id, $scheduling_config ) {
+	public static function handle_scheduling_update( $flow_id, $scheduling_config, bool $force = false ) {
 		$db_flows = new \DataMachine\Core\Database\Flows\Flows();
 
 		// Validate flow exists.
@@ -221,12 +224,15 @@ class FlowScheduling {
 		// Without this guard, any flow update that includes scheduling_config
 		// (even identical to what's already set) would unschedule/reschedule,
 		// resetting the timer and triggering an immediate run.
-		$current_scheduling = $flow['scheduling_config'] ?? array();
-		if ( is_string( $current_scheduling ) ) {
-			$current_scheduling = json_decode( $current_scheduling, true ) ?? array();
-		}
-		if ( self::scheduling_unchanged( $current_scheduling, $interval, $cron_expression, $scheduling_config ) ) {
-			return true;
+		// Skipped when $force is true (new flow creation).
+		if ( ! $force ) {
+			$current_scheduling = $flow['scheduling_config'] ?? array();
+			if ( is_string( $current_scheduling ) ) {
+				$current_scheduling = json_decode( $current_scheduling, true ) ?? array();
+			}
+			if ( self::scheduling_unchanged( $current_scheduling, $interval, $cron_expression, $scheduling_config ) ) {
+				return true;
+			}
 		}
 
 		// Handle manual scheduling (unschedule).

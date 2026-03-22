@@ -170,15 +170,14 @@ class CreateFlowAbility {
 		$scheduling_config = $input['scheduling_config'] ?? array( 'interval' => 'manual' );
 		$flow_config       = $input['flow_config'] ?? array();
 
-		// Store scheduling_config as manual initially. The actual scheduling
-		// (AS recurring action) is created by handle_scheduling_update() below.
-		// If we stored the real interval here, handle_scheduling_update() would
-		// see "nothing changed" and skip creating the AS action.
+		// Store the requested scheduling_config immediately so the DB reflects
+		// the caller's intent. handle_scheduling_update() is called with
+		// $force=true to bypass the unchanged guard and create the AS action.
 		$flow_data = array(
 			'pipeline_id'       => $pipeline_id,
 			'flow_name'         => $flow_name,
 			'flow_config'       => $flow_config,
-			'scheduling_config' => array( 'interval' => 'manual' ),
+			'scheduling_config' => $scheduling_config,
 		);
 
 		if ( null !== $agent_id && $agent_id > 0 ) {
@@ -212,17 +211,21 @@ class CreateFlowAbility {
 		}
 
 		if ( isset( $scheduling_config['interval'] ) && 'manual' !== $scheduling_config['interval'] ) {
-			$scheduling_result = FlowScheduling::handle_scheduling_update( $flow_id, $scheduling_config );
+			$scheduling_result = FlowScheduling::handle_scheduling_update( $flow_id, $scheduling_config, true );
 			if ( is_wp_error( $scheduling_result ) ) {
 				do_action(
 					'datamachine_log',
 					'error',
-					'Failed to schedule flow with Action Scheduler',
+					'Failed to schedule flow — reverting to manual',
 					array(
 						'flow_id' => $flow_id,
 						'error'   => $scheduling_result->get_error_message(),
 					)
 				);
+
+				// Revert to manual so the DB doesn't claim a schedule that
+				// has no backing AS action.
+				$this->db_flows->update_flow_scheduling( $flow_id, array( 'interval' => 'manual' ) );
 			}
 		}
 
