@@ -220,6 +220,11 @@ class FlowScheduling {
 		$interval        = $scheduling_config['interval'] ?? null;
 		$cron_expression = $scheduling_config['cron_expression'] ?? null;
 
+		// Resolve aliases (e.g. every_6_hours → qtrdaily) before any comparison.
+		if ( null !== $interval && function_exists( 'datamachine_resolve_interval_alias' ) ) {
+			$interval = datamachine_resolve_interval_alias( $interval );
+		}
+
 		// Skip re-scheduling if the configuration hasn't actually changed.
 		// Without this guard, any flow update that includes scheduling_config
 		// (even identical to what's already set) would unschedule/reschedule,
