@@ -109,7 +109,7 @@ trait FlowHelpers {
 	/**
 	 * Format flows array based on output mode.
 	 *
-	 * Batches the latest-job lookup into a single query instead of N+1.
+	 * Batches both latest-job and next-run lookups into single queries (N+1 → 2).
 	 *
 	 * @param array  $flows Array of flow data.
 	 * @param string $output_mode Output mode (full, summary, ids).
@@ -120,15 +120,19 @@ trait FlowHelpers {
 			return $this->formatIds( $flows );
 		}
 
-		// Batch-fetch latest jobs for all flows in one query.
+		// Batch-fetch latest jobs and next-run times for all flows.
 		$flow_ids    = array_map( fn( $f ) => (int) $f['flow_id'], $flows );
 		$latest_jobs = ! empty( $flow_ids )
 			? $this->db_jobs->get_latest_jobs_by_flow_ids( $flow_ids )
 			: array();
 
+		$next_runs = ( 'full' === $output_mode && ! empty( $flow_ids ) )
+			? FlowFormatter::batch_get_next_run_times( $flow_ids )
+			: array();
+
 		return array_map(
-			function ( $flow ) use ( $output_mode, $latest_jobs ) {
-				return $this->formatFlowByMode( $flow, $output_mode, $latest_jobs );
+			function ( $flow ) use ( $output_mode, $latest_jobs, $next_runs ) {
+				return $this->formatFlowByMode( $flow, $output_mode, $latest_jobs, $next_runs );
 			},
 			$flows
 		);
@@ -140,9 +144,10 @@ trait FlowHelpers {
 	 * @param array      $flow Flow data.
 	 * @param string     $output_mode Output mode (full, summary).
 	 * @param array|null $latest_jobs Pre-fetched latest jobs keyed by flow_id.
+	 * @param array|null $next_runs   Pre-fetched next run times keyed by flow_id.
 	 * @return array Formatted flow.
 	 */
-	protected function formatFlowByMode( array $flow, string $output_mode, ?array $latest_jobs = null ) {
+	protected function formatFlowByMode( array $flow, string $output_mode, ?array $latest_jobs = null, ?array $next_runs = null ) {
 		if ( 'ids' === $output_mode ) {
 			return (int) $flow['flow_id'];
 		}
@@ -151,7 +156,7 @@ trait FlowHelpers {
 			return $this->formatSummary( $flow, $latest_jobs );
 		}
 
-		return $this->formatFull( $flow, $latest_jobs );
+		return $this->formatFull( $flow, $latest_jobs, $next_runs );
 	}
 
 	/**
@@ -159,9 +164,10 @@ trait FlowHelpers {
 	 *
 	 * @param array      $flow Flow data.
 	 * @param array|null $latest_jobs Pre-fetched latest jobs keyed by flow_id (avoids N+1).
+	 * @param array|null $next_runs   Pre-fetched next run times keyed by flow_id (avoids N+1).
 	 * @return array Formatted flow with full data.
 	 */
-	protected function formatFull( array $flow, ?array $latest_jobs = null ): array {
+	protected function formatFull( array $flow, ?array $latest_jobs = null, ?array $next_runs = null ): array {
 		$flow_id = (int) $flow['flow_id'];
 
 		if ( null === $latest_jobs ) {
@@ -170,7 +176,7 @@ trait FlowHelpers {
 
 		$latest_job = $latest_jobs[ $flow_id ] ?? null;
 
-		return FlowFormatter::format_flow_for_response( $flow, $latest_job );
+		return FlowFormatter::format_flow_for_response( $flow, $latest_job, $next_runs );
 	}
 
 	/**

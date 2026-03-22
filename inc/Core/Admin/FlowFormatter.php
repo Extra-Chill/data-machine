@@ -22,14 +22,27 @@ class FlowFormatter {
 	 *
 	 * @param array      $flow       Flow data from database
 	 * @param array|null $latest_job Latest job for this flow (optional, for batch efficiency)
+	 * @param array|null $next_runs  Pre-fetched next run times keyed by flow_id (optional, for batch efficiency)
 	 * @return array Formatted flow data
 	 */
-	public static function format_flow_for_response( array $flow, ?array $latest_job = null ): array {
+	/**
+	 * Cached service instances to avoid re-creation per flow in batch formatting.
+	 */
+	private static ?HandlerAbilities $handler_abilities_cache = null;
+	private static ?object $settings_display_cache = null;
+
+	public static function format_flow_for_response( array $flow, ?array $latest_job = null, ?array $next_runs = null ): array {
 		$flow_config = $flow['flow_config'] ?? array();
 
-		$handler_abilities = new HandlerAbilities();
+		if ( null === self::$handler_abilities_cache ) {
+			self::$handler_abilities_cache = new HandlerAbilities();
+		}
+		if ( null === self::$settings_display_cache ) {
+			self::$settings_display_cache = new \DataMachine\Core\Steps\Settings\SettingsDisplayService();
+		}
 
-		$settings_display_service = new \DataMachine\Core\Steps\Settings\SettingsDisplayService();
+		$handler_abilities        = self::$handler_abilities_cache;
+		$settings_display_service = self::$settings_display_cache;
 
 		foreach ( $flow_config as $flow_step_id => &$step_data ) {
 			$step_type      = $step_data['step_type'] ?? '';
@@ -83,7 +96,12 @@ class FlowFormatter {
 		$last_run_status = $latest_job['status'] ?? null;
 		$is_running      = $latest_job && null === $latest_job['completed_at'];
 
-		$next_run = self::get_next_run_time( $flow_id );
+		// Use batch-fetched next run if available, fall back to per-flow lookup.
+		if ( null !== $next_runs && array_key_exists( $flow_id, $next_runs ) ) {
+			$next_run = $next_runs[ $flow_id ];
+		} else {
+			$next_run = self::get_next_run_time( $flow_id );
+		}
 
 		return array(
 			'flow_id'           => $flow_id,
@@ -114,5 +132,70 @@ class FlowFormatter {
 		$next_timestamp = as_next_scheduled_action( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
 
 		return $next_timestamp ? wp_date( 'Y-m-d H:i:s', $next_timestamp, new \DateTimeZone( 'UTC' ) ) : null;
+	}
+
+	/**
+	 * Batch-fetch next run times for multiple flows in a single query.
+	 *
+	 * Replaces per-flow as_next_scheduled_action() calls (N queries → 1).
+	 *
+	 * @since 0.55.0
+	 *
+	 * @param array $flow_ids Array of flow IDs.
+	 * @return array<int, string|null> Flow ID → next run datetime (UTC) or null.
+	 */
+	public static function batch_get_next_run_times( array $flow_ids ): array {
+		$result = array_fill_keys( $flow_ids, null );
+
+		if ( empty( $flow_ids ) ) {
+			return $result;
+		}
+
+		global $wpdb;
+		$table = $wpdb->prefix . 'actionscheduler_actions';
+
+		// Build args JSON patterns for each flow_id.
+		// AS stores args as JSON: [flow_id] (serialized array with one int element).
+		$conditions = array();
+		$values     = array( $table );
+		foreach ( $flow_ids as $fid ) {
+			$conditions[] = 'args = %s';
+			$values[]     = wp_json_encode( array( (int) $fid ) );
+		}
+
+		if ( empty( $conditions ) ) {
+			return $result;
+		}
+
+		$where_args = implode( ' OR ', $conditions );
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT args, MIN(scheduled_date_gmt) as next_run
+				FROM %i
+				WHERE hook = 'datamachine_run_flow_now'
+				AND status = 'pending'
+				AND ({$where_args})
+				GROUP BY args",
+				$values
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
+
+		if ( ! $rows ) {
+			return $result;
+		}
+
+		foreach ( $rows as $row ) {
+			$args = json_decode( $row['args'], true );
+			if ( is_array( $args ) && isset( $args[0] ) ) {
+				$fid            = (int) $args[0];
+				$result[ $fid ] = $row['next_run'];
+			}
+		}
+
+		return $result;
 	}
 }
