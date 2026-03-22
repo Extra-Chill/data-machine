@@ -124,8 +124,20 @@ class AgentAuthorize {
 		$redirect_uri = esc_url_raw( $request->get_param( 'redirect_uri' ) );
 		$label        = sanitize_text_field( $request->get_param( 'label' ) );
 
-		// Validate redirect_uri.
-		$uri_error = $this->validate_redirect_uri( $redirect_uri );
+		// Look up the agent first — we need it for redirect URI validation.
+		$agents_repo = new Agents();
+		$agent       = $agents_repo->get_by_slug( $agent_slug );
+
+		if ( ! $agent ) {
+			return new \WP_Error(
+				'agent_not_found',
+				sprintf( 'Agent "%s" not found.', $agent_slug ),
+				array( 'status' => 404 )
+			);
+		}
+
+		// Validate redirect_uri against agent's allowed URIs.
+		$uri_error = $this->validate_redirect_uri( $redirect_uri, $agent );
 		if ( $uri_error ) {
 			return $uri_error;
 		}
@@ -146,18 +158,6 @@ class AgentAuthorize {
 
 			header( 'Location: ' . $login_url );
 			exit;
-		}
-
-		// Look up the agent.
-		$agents_repo = new Agents();
-		$agent       = $agents_repo->get_by_slug( $agent_slug );
-
-		if ( ! $agent ) {
-			return new \WP_Error(
-				'agent_not_found',
-				sprintf( 'Agent "%s" not found.', $agent_slug ),
-				array( 'status' => 404 )
-			);
 		}
 
 		// Check user has access to this agent.
@@ -189,10 +189,15 @@ class AgentAuthorize {
 		$action       = sanitize_text_field( $request->get_param( 'action' ) );
 		$nonce        = $request->get_param( '_wpnonce' );
 
-		// Validate redirect_uri.
-		$uri_error = $this->validate_redirect_uri( $redirect_uri );
-		if ( $uri_error ) {
-			return $uri_error;
+		// Look up agent for redirect URI validation.
+		$agents_repo = new Agents();
+		$agent_for_uri = $agents_repo->get_by_slug( $agent_slug );
+
+		if ( $agent_for_uri ) {
+			$uri_error = $this->validate_redirect_uri( $redirect_uri, $agent_for_uri );
+			if ( $uri_error ) {
+				return $uri_error;
+			}
 		}
 
 		// Must be logged in.
@@ -294,14 +299,20 @@ class AgentAuthorize {
 	}
 
 	/**
-	 * Validate redirect_uri is safe.
+	 * Validate redirect_uri against the agent's allowed URIs.
 	 *
-	 * Allows: localhost (any port), 127.0.0.1, and same-site URLs.
+	 * Always allows: localhost (any port), 127.0.0.1, same-site URLs.
+	 * External domains must be registered in the agent's config:
+	 * agent_config.allowed_redirect_uris = ["https://saraichinwag.com/*"]
 	 *
-	 * @param string $uri Redirect URI.
+	 * This scopes the blast radius per-agent — a compromised agent can only
+	 * redirect to its own registered domains, not arbitrary URLs.
+	 *
+	 * @param string     $uri   Redirect URI.
+	 * @param array|null $agent Agent row (with decoded agent_config).
 	 * @return \WP_Error|null Error or null if valid.
 	 */
-	private function validate_redirect_uri( string $uri ): ?\WP_Error {
+	private function validate_redirect_uri( string $uri, ?array $agent = null ): ?\WP_Error {
 		if ( empty( $uri ) ) {
 			return new \WP_Error(
 				'missing_redirect_uri',
@@ -313,30 +324,68 @@ class AgentAuthorize {
 		$parsed = wp_parse_url( $uri );
 		$host   = $parsed['host'] ?? '';
 
-		// Allow localhost.
+		// Always allow localhost (local agent development).
 		if ( in_array( $host, array( 'localhost', '127.0.0.1', '::1' ), true ) ) {
 			return null;
 		}
 
-		// Allow same network (*.extrachill.com or the network domain).
+		// Always allow same network (*.extrachill.com or the network domain).
 		$site_host = wp_parse_url( network_home_url(), PHP_URL_HOST );
 		if ( $host === $site_host || str_ends_with( $host, '.' . $site_host ) ) {
 			return null;
 		}
 
-		// Allow registered external domains (filterable for third-party agents).
-		$allowed_domains = apply_filters( 'datamachine_authorize_allowed_domains', array() );
-		foreach ( $allowed_domains as $domain ) {
-			if ( $host === $domain || str_ends_with( $host, '.' . $domain ) ) {
-				return null;
+		// Check agent's allowed_redirect_uris in agent_config.
+		if ( $agent ) {
+			$config       = $agent['agent_config'] ?? array();
+			$allowed_uris = $config['allowed_redirect_uris'] ?? array();
+
+			foreach ( $allowed_uris as $pattern ) {
+				if ( $this->uri_matches_pattern( $uri, $pattern ) ) {
+					return null;
+				}
 			}
 		}
 
 		return new \WP_Error(
 			'invalid_redirect_uri',
-			sprintf( 'redirect_uri host "%s" is not allowed. Use localhost or a same-site URL, or register the domain via datamachine_authorize_allowed_domains filter.', $host ),
+			sprintf(
+				'redirect_uri host "%s" is not allowed for agent "%s". Register it in the agent\'s allowed_redirect_uris config.',
+				$host,
+				$agent['agent_slug'] ?? 'unknown'
+			),
 			array( 'status' => 400 )
 		);
+	}
+
+	/**
+	 * Check if a URI matches an allowed pattern.
+	 *
+	 * Supports:
+	 * - Exact match: "https://saraichinwag.com/callback"
+	 * - Wildcard path: "https://saraichinwag.com/*"
+	 * - Domain-only: "saraichinwag.com" (matches any path on that domain)
+	 *
+	 * @param string $uri     The redirect URI to check.
+	 * @param string $pattern The allowed pattern.
+	 * @return bool
+	 */
+	private function uri_matches_pattern( string $uri, string $pattern ): bool {
+		// Domain-only pattern (no scheme).
+		if ( ! str_contains( $pattern, '://' ) ) {
+			$parsed = wp_parse_url( $uri );
+			$host   = $parsed['host'] ?? '';
+			return $host === $pattern || str_ends_with( $host, '.' . $pattern );
+		}
+
+		// Wildcard path pattern.
+		if ( str_ends_with( $pattern, '/*' ) ) {
+			$base = rtrim( substr( $pattern, 0, -2 ), '/' );
+			return str_starts_with( rtrim( $uri, '/' ), $base );
+		}
+
+		// Exact match.
+		return rtrim( $uri, '/' ) === rtrim( $pattern, '/' );
 	}
 
 	/**

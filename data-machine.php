@@ -120,6 +120,9 @@ function datamachine_run_datamachine_plugin() {
 	// Agent browser-based authorization flow.
 	new \DataMachine\Core\Auth\AgentAuthorize();
 
+	// Agent auth callback handler (receives tokens from external DM instances).
+	new \DataMachine\Core\Auth\AgentAuthCallback();
+
 	// Load abilities
 	require_once __DIR__ . '/inc/Abilities/AuthAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/File/FileConstants.php';
