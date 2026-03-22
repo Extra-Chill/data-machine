@@ -460,11 +460,30 @@ function datamachine_deactivate_plugin() {
  * @param bool $network_wide Whether the plugin is being network-activated.
  */
 function datamachine_activate_plugin( $network_wide = false ) {
+	// Agent tables are network-scoped — create once regardless of activation mode.
+	datamachine_create_network_agent_tables();
+
 	if ( is_multisite() && $network_wide ) {
 		datamachine_for_each_site( 'datamachine_activate_for_site' );
 	} else {
 		datamachine_activate_for_site();
 	}
+}
+
+/**
+ * Create network-scoped agent tables.
+ *
+ * Agent identity, tokens, and access grants are shared across the multisite
+ * network, following the WordPress pattern where wp_users/wp_usermeta use
+ * base_prefix while per-site content uses site-specific prefixes.
+ *
+ * Safe to call multiple times — dbDelta is idempotent.
+ */
+function datamachine_create_network_agent_tables() {
+	\DataMachine\Core\Database\Agents\Agents::create_table();
+	\DataMachine\Core\Database\Agents\Agents::ensure_site_scope_column();
+	\DataMachine\Core\Database\Agents\AgentAccess::create_table();
+	\DataMachine\Core\Database\Agents\AgentTokens::create_table();
 }
 
 /**
@@ -480,10 +499,9 @@ function datamachine_activate_for_site() {
 	// Create logs table first — other table migrations log messages during creation.
 	\DataMachine\Core\Database\Logs\LogRepository::create_table();
 
-	// Ensure first-class agents table exists.
-	\DataMachine\Core\Database\Agents\Agents::create_table();
-	\DataMachine\Core\Database\Agents\AgentAccess::create_table();
-	\DataMachine\Core\Database\Agents\AgentTokens::create_table();
+	// Agent tables are network-scoped (base_prefix) — ensure they exist.
+	// Safe to call per-site because dbDelta + base_prefix is idempotent.
+	datamachine_create_network_agent_tables();
 
 	$db_pipelines = new \DataMachine\Core\Database\Pipelines\Pipelines();
 	$db_pipelines->create_table();
@@ -523,6 +541,9 @@ function datamachine_activate_for_site() {
 
 	// Migrate USER.md to network-scoped paths and create NETWORK.md on multisite (idempotent).
 	datamachine_migrate_user_md_to_network_scope();
+
+	// Migrate per-site agents to network-scoped tables (idempotent).
+	datamachine_migrate_agents_to_network_scope();
 
 	// Regenerate SITE.md with enriched content and clean up legacy SiteContext transient.
 	datamachine_regenerate_site_md();

@@ -24,6 +24,16 @@ class Agents extends BaseRepository {
 	const TABLE_NAME = 'datamachine_agents';
 
 	/**
+	 * Use network-level prefix so agents are shared across the multisite network.
+	 *
+	 * @return string
+	 */
+	protected static function get_table_prefix(): string {
+		global $wpdb;
+		return $wpdb->base_prefix;
+	}
+
+	/**
 	 * Create agents table.
 	 *
 	 * @return void
@@ -31,7 +41,7 @@ class Agents extends BaseRepository {
 	public static function create_table(): void {
 		global $wpdb;
 
-		$table_name      = $wpdb->prefix . self::TABLE_NAME;
+		$table_name      = $wpdb->base_prefix . self::TABLE_NAME;
 		$charset_collate = $wpdb->get_charset_collate();
 
 		$sql = "CREATE TABLE {$table_name} (
@@ -39,6 +49,7 @@ class Agents extends BaseRepository {
 			agent_slug VARCHAR(200) NOT NULL,
 			agent_name VARCHAR(200) NOT NULL,
 			owner_id BIGINT(20) UNSIGNED NOT NULL,
+			site_scope BIGINT(20) UNSIGNED NULL DEFAULT NULL,
 			agent_config LONGTEXT NULL,
 			status VARCHAR(20) NOT NULL DEFAULT 'active',
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -46,11 +57,33 @@ class Agents extends BaseRepository {
 			PRIMARY KEY (agent_id),
 			UNIQUE KEY agent_slug (agent_slug),
 			KEY owner_id (owner_id),
-			KEY status (status)
+			KEY status (status),
+			KEY site_scope (site_scope)
 		) {$charset_collate};";
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
+	}
+
+	/**
+	 * Ensure site_scope column exists on existing installs.
+	 *
+	 * @return void
+	 */
+	public static function ensure_site_scope_column(): void {
+		global $wpdb;
+
+		$table_name = $wpdb->base_prefix . self::TABLE_NAME;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$column = $wpdb->get_var( "SHOW COLUMNS FROM `{$table_name}` LIKE 'site_scope'" );
+
+		if ( ! $column ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$wpdb->query( "ALTER TABLE `{$table_name}` ADD COLUMN site_scope BIGINT(20) UNSIGNED NULL DEFAULT NULL AFTER owner_id" );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$wpdb->query( "ALTER TABLE `{$table_name}` ADD KEY site_scope (site_scope)" );
+		}
 	}
 
 	/**

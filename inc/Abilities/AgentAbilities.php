@@ -830,12 +830,12 @@ class AgentAbilities {
 
 		// Delete access grants.
 		global $wpdb;
-		$access_table = $wpdb->prefix . 'datamachine_agent_access';
+		$access_table = $wpdb->base_prefix . 'datamachine_agent_access';
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$wpdb->delete( $access_table, array( 'agent_id' => $agent_id ) );
 
 		// Delete agent record.
-		$agents_table = $wpdb->prefix . 'datamachine_agents';
+		$agents_table = $wpdb->base_prefix . 'datamachine_agents';
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$deleted = $wpdb->delete( $agents_table, array( 'agent_id' => $agent_id ) );
 

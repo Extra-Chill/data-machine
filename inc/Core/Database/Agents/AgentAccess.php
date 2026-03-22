@@ -34,6 +34,16 @@ class AgentAccess extends BaseRepository {
 	const VALID_ROLES = array( 'admin', 'operator', 'viewer' );
 
 	/**
+	 * Use network-level prefix so access grants are shared across the multisite network.
+	 *
+	 * @return string
+	 */
+	protected static function get_table_prefix(): string {
+		global $wpdb;
+		return $wpdb->base_prefix;
+	}
+
+	/**
 	 * Create agent_access table.
 	 *
 	 * @return void
@@ -41,7 +51,7 @@ class AgentAccess extends BaseRepository {
 	public static function create_table(): void {
 		global $wpdb;
 
-		$table_name      = $wpdb->prefix . self::TABLE_NAME;
+		$table_name      = $wpdb->base_prefix . self::TABLE_NAME;
 		$charset_collate = $wpdb->get_charset_collate();
 
 		$sql = "CREATE TABLE {$table_name} (

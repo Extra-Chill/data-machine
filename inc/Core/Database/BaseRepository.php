@@ -42,7 +42,22 @@ abstract class BaseRepository {
 	public function __construct() {
 		global $wpdb;
 		$this->wpdb       = $wpdb;
-		$this->table_name = $wpdb->prefix . static::TABLE_NAME;
+		$this->table_name = static::get_table_prefix() . static::TABLE_NAME;
+	}
+
+	/**
+	 * Get the table prefix for this repository.
+	 *
+	 * Defaults to $wpdb->prefix (per-site). Network-scoped repositories
+	 * (agents, tokens, access) override this to return $wpdb->base_prefix
+	 * so their tables are shared across the multisite network, following
+	 * the same pattern WordPress uses for wp_users and wp_usermeta.
+	 *
+	 * @return string Table prefix.
+	 */
+	protected static function get_table_prefix(): string {
+		global $wpdb;
+		return $wpdb->prefix;
 	}
 
 	/**
