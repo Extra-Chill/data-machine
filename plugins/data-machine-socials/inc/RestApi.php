@@ -784,6 +784,13 @@ class RestApi {
 	}
 
 	/**
+	 * Check if user can edit posts (used for read/update endpoints)
+	 */
+	public static function check_edit_permission() {
+		return current_user_can( 'edit_posts' );
+	}
+
+	/**
 	 * Check if user can upload files
 	 */
 	public static function check_upload_permission() {

@@ -324,7 +324,7 @@ class Pinterest extends PublishHandler {
 	* @return array Array of cached boards.
 	*/
 	public function get_cached_boards(): array {
-		return PinterestAbilities::get_cached_boards();
+		return PinterestBoardsAbility::get_cached_boards();
 	}
 
 	/**
