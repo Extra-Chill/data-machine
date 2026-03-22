@@ -2,6 +2,21 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.20.0] - 2026-03-22
+
+### Added
+- add month-heading schedule block selector for text-based venue calendars
+- add HTML section selectors for div.show, div.event, show-details, show-card patterns
+
+### Changed
+- centralize upcoming/past date filter into DateFilter utility
+- drop cron schedule — push to main covers release
+
+### Fixed
+- handle multi-element date patterns in WebflowExtractor (fixes #140)
+- calendar query and taxonomy counts use start_datetime as primary
+- stop fabricating identical end datetime when no real end time exists
+
 ## [0.19.0] - 2026-03-21
 
 ### Added
