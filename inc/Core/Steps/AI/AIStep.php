@@ -101,6 +101,39 @@ class AIStep extends Step {
 	 * @return array
 	 */
 	protected function executeStep(): array {
+
+		// Pre-AI dedup gate: allow extensions to short-circuit the AI step
+		// when the work has already been done (e.g., event already exists in
+		// the database). This saves AI credits by skipping the conversation
+		// entirely when identity fields in engine_data match an existing record.
+		//
+		// Filter returns null to proceed normally, or an array with:
+		//   'skip'   => true
+		//   'reason' => string (for logging)
+		//   'status' => string (job status override, e.g. 'completed_no_items')
+		$pre_check = apply_filters( 'datamachine_pre_ai_step_check', null, $this->engine, $this->flow_step_config, $this->job_id );
+
+		if ( is_array( $pre_check ) && ! empty( $pre_check['skip'] ) ) {
+			$status = $pre_check['status'] ?? \DataMachine\Core\JobStatus::COMPLETED_NO_ITEMS;
+			$reason = $pre_check['reason'] ?? 'pre-AI check determined processing is unnecessary';
+
+			$this->engine->set( 'job_status', $status );
+
+			do_action(
+				'datamachine_log',
+				'info',
+				'AIStep: Skipped by pre-AI check — ' . $reason,
+				array(
+					'job_id'       => $this->job_id,
+					'flow_step_id' => $this->flow_step_id,
+					'reason'       => $reason,
+					'status'       => $status,
+				)
+			);
+
+			return $this->dataPackets;
+		}
+
 		$configured_message = trim( $this->flow_step_config['user_message'] ?? '' );
 		$queue_enabled      = (bool) ( $this->flow_step_config['queue_enabled'] ?? false );
 		$prompt_queue       = $this->flow_step_config['prompt_queue'] ?? array();
