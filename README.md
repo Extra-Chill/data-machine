@@ -10,7 +10,7 @@ Data Machine turns a WordPress site into an agent runtime — persistent identit
 - **Abilities API** — Typed, permissioned functions that agents and extensions call (`datamachine/upload-media`, `datamachine/validate-media`, etc.)
 - **Agent memory** — Layered markdown files (SOUL.md + MEMORY.md in agent layer, USER.md in user layer) injected into every AI context
 - **Multi-agent** — Multiple agents with scoped pipelines, flows, jobs, and filesystem directories
-- **Workspace** — Managed directory for repo clones and file operations with security sandboxing
+- **Workspace** — Managed directory for repo clones and file operations with security sandboxing (CLI commands in data-machine-code extension)
 - **Self-scheduling** — Agents schedule their own recurring tasks using flows, prompt queues, and Agent Pings
 
 ## Architecture
@@ -35,7 +35,7 @@ One agent, three operational modes — same identity and memory, different tools
 |---------|---------|-------|
 | **Pipeline** | Automated workflow execution | Handler-specific tools scoped to the current step |
 | **Chat** | Conversational interface in wp-admin | 30+ management tools (flows, pipelines, jobs, logs, memory, content) |
-| **System** | Background infrastructure tasks | Alt text, daily memory, image generation, internal linking, meta descriptions, GitHub issues |
+| **System** | Background infrastructure tasks | Alt text, daily memory, image generation, internal linking, meta descriptions (GitHub issues in data-machine-code extension) |
 
 Configure AI provider and model per context in Settings. Each context falls back to the global default if no override is set.
 
@@ -88,8 +88,8 @@ Pipelines are built from **step types**. Some use pluggable **handlers** — int
 
 | Step Type | Core Handlers | Extension Handlers |
 |-----------|---------------|-------------------|
-| **Fetch** | RSS, WordPress (local posts), WordPress API (remote), WordPress Media, Files, GitHub | Google Sheets, Reddit, social platforms |
-| **Publish** | WordPress, Workspace | Twitter, Instagram, Facebook, Threads, Bluesky, Pinterest, Google Sheets, Slack, Discord |
+| **Fetch** | RSS, WordPress (local posts), WordPress API (remote), WordPress Media, Files | GitHub, Google Sheets, Reddit, social platforms (in extensions) |
+| **Publish** | WordPress, Workspace (in data-machine-code extension) | Twitter, Instagram, Facebook, Threads, Bluesky, Pinterest, Google Sheets, Slack, Discord (in extensions) |
 | **Update** | WordPress posts with AI enhancement | — |
 
 ### Self-contained steps
@@ -131,7 +131,7 @@ Background AI tasks that run on hooks or schedules:
 | **Daily Memory** | Consolidate MEMORY.md, archive to daily files |
 | **Internal Linking** | AI-powered internal link suggestions |
 | **Meta Descriptions** | Generate SEO meta descriptions |
-| **GitHub Issues** | Create issues from pipeline findings |
+| **GitHub Issues** | Create issues from pipeline findings (in data-machine-code extension) |
 
 Tasks support undo via the Job Undo system (revision-based rollback for post content, meta, attachments, featured images).
 
