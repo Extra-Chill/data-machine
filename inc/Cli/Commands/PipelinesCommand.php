@@ -367,18 +367,17 @@ class PipelinesCommand extends BaseCommand {
 	}
 
 	/**
-	 * Extract location context from a pipeline's flows.
+	 * Extract a config summary from a pipeline's flows.
 	 *
-	 * Scans flow configs for TM coordinates, Dice city, or location taxonomy
-	 * term to provide at-a-glance location context in list output.
+	 * Scans flow handler configs for distinguishing values — coordinates,
+	 * city names, URLs, taxonomy term IDs. Domain-agnostic: reads raw
+	 * config keys without assuming any specific taxonomy or handler.
 	 *
 	 * @param array $flows Pipeline's flows array.
-	 * @return string Location summary (e.g. "32.77,-79.93" or "Charleston" or "—").
+	 * @return string Config summary or "—".
 	 */
 	private function extractPipelineLocation( array $flows ): string {
-		$coords    = '';
-		$dice_city = '';
-		$location  = '';
+		$parts = array();
 
 		foreach ( $flows as $flow ) {
 			$config = $flow['flow_config'] ?? array();
@@ -389,49 +388,36 @@ class PipelinesCommand extends BaseCommand {
 			foreach ( $config as $step ) {
 				$handler_configs = $step['handler_configs'] ?? array();
 
-				foreach ( $handler_configs as $handler_slug => $hconfig ) {
-					// TM coordinates.
-					if ( ! empty( $hconfig['location'] ) && strpos( $hconfig['location'], ',' ) !== false && empty( $coords ) ) {
-						$coords = $hconfig['location'];
+				foreach ( $handler_configs as $hconfig ) {
+					// Coordinates (any handler that has a location field with lat,lon).
+					if ( ! empty( $hconfig['location'] ) && strpos( $hconfig['location'], ',' ) !== false ) {
+						$parts[] = $hconfig['location'];
 					}
 
-					// Dice city.
-					if ( 'dice_fm' === $handler_slug && ! empty( $hconfig['city'] ) && empty( $dice_city ) ) {
-						$dice_city = $hconfig['city'];
+					// City name (any handler that has a city field).
+					if ( ! empty( $hconfig['city'] ) ) {
+						$parts[] = $hconfig['city'];
 					}
 
-					// Location taxonomy term.
-					if ( ! empty( $hconfig['taxonomy_location_selection'] ) && empty( $location ) ) {
-						$term_val = $hconfig['taxonomy_location_selection'];
-						if ( is_numeric( $term_val ) ) {
-							$term = get_term( (int) $term_val, 'location' );
-							if ( $term && ! is_wp_error( $term ) ) {
-								$parent = $term->parent ? get_term( $term->parent, 'location' ) : null;
-								$location = $term->name;
-								if ( $parent && ! is_wp_error( $parent ) ) {
-									$location .= ', ' . $parent->name;
-								}
+					// Taxonomy term selections (any taxonomy_*_selection config).
+					foreach ( $hconfig as $key => $val ) {
+						if ( strpos( $key, 'taxonomy_' ) === 0 && strpos( $key, '_selection' ) !== false ) {
+							if ( ! empty( $val ) && 'skip' !== $val && 'ai_decides' !== $val ) {
+								$parts[] = $val;
 							}
-						} else {
-							$location = $term_val;
 						}
 					}
 				}
 			}
+
+			// Stop after first flow with useful config.
+			if ( ! empty( $parts ) ) {
+				break;
+			}
 		}
 
-		// Return most useful identifier.
-		if ( $location ) {
-			return $location;
-		}
-		if ( $dice_city ) {
-			return $dice_city;
-		}
-		if ( $coords ) {
-			return $coords;
-		}
-
-		return '—';
+		$summary = implode( ' | ', array_unique( $parts ) );
+		return $summary ?: '—';
 	}
 
 	/**

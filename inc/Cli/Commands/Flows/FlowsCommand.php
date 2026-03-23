@@ -895,12 +895,9 @@ class FlowsCommand extends BaseCommand {
 	/**
 	 * Extract a concise config summary from flow handler configs.
 	 *
-	 * Shows the key distinguishing config per handler type:
-	 * - ticketmaster: coordinates + radius
-	 * - dice_fm: city name
-	 * - universal_web_scraper / web_scraper: source URL or venue name
-	 * - rss: feed URL
-	 * - upsert_event: location taxonomy term
+	 * Domain-agnostic: reads raw config values without assuming any
+	 * specific taxonomy, handler, or post type. Surfaces distinguishing
+	 * values like coordinates, city names, URLs, and taxonomy selections.
 	 *
 	 * @param array $flow Flow data.
 	 * @return string Config summary (max ~60 chars).
@@ -912,62 +909,55 @@ class FlowsCommand extends BaseCommand {
 		foreach ( $flow_config as $step_data ) {
 			$handler_configs = $step_data['handler_configs'] ?? array();
 
-			foreach ( $handler_configs as $handler_slug => $hconfig ) {
-				switch ( $handler_slug ) {
-					case 'ticketmaster':
-						$loc = $hconfig['location'] ?? '';
-						$rad = $hconfig['radius'] ?? '';
-						if ( $loc ) {
-							$parts[] = $loc . ( $rad ? " r={$rad}" : '' );
-						}
-						break;
+			foreach ( $handler_configs as $hconfig ) {
+				if ( ! is_array( $hconfig ) ) {
+					continue;
+				}
 
-					case 'dice_fm':
-						$city = $hconfig['city'] ?? '';
-						if ( $city ) {
-							$parts[] = "city={$city}";
-						}
-						break;
+				// Coordinates (location field with lat,lon).
+				if ( ! empty( $hconfig['location'] ) && strpos( $hconfig['location'], ',' ) !== false ) {
+					$loc = $hconfig['location'];
+					$rad = $hconfig['radius'] ?? '';
+					$parts[] = $loc . ( $rad ? " r={$rad}" : '' );
+				}
 
-					case 'universal_web_scraper':
-					case 'web_scraper':
-						$url  = $hconfig['source_url'] ?? '';
-						$name = $hconfig['venue_name'] ?? '';
-						if ( $name ) {
-							$parts[] = $name;
-						} elseif ( $url ) {
-							// Show just the domain.
-							$host = wp_parse_url( $url, PHP_URL_HOST );
-							$parts[] = $host ?: $url;
-						}
-						break;
+				// City name.
+				if ( ! empty( $hconfig['city'] ) ) {
+					$parts[] = "city={$hconfig['city']}";
+				}
 
-					case 'rss':
-						$url = $hconfig['feed_url'] ?? $hconfig['url'] ?? '';
-						if ( $url ) {
-							$host = wp_parse_url( $url, PHP_URL_HOST );
-							$parts[] = $host ?: $url;
-						}
-						break;
+				// Source URL — show domain only.
+				if ( ! empty( $hconfig['source_url'] ) ) {
+					$host = wp_parse_url( $hconfig['source_url'], PHP_URL_HOST );
+					$parts[] = $host ?: $hconfig['source_url'];
+				}
 
-					case 'upsert_event':
-						$loc_term = $hconfig['taxonomy_location_selection'] ?? '';
-						if ( $loc_term && is_numeric( $loc_term ) ) {
-							$term = get_term( (int) $loc_term, 'location' );
-							if ( $term && ! is_wp_error( $term ) ) {
-								$parts[] = "loc={$term->name}";
-							}
-						} elseif ( $loc_term && 'skip' !== $loc_term && 'ai_decides' !== $loc_term ) {
-							$parts[] = "loc={$loc_term}";
+				// Venue/source name.
+				if ( ! empty( $hconfig['venue_name'] ) ) {
+					$parts[] = $hconfig['venue_name'];
+				}
+
+				// Feed URL — show domain only.
+				$feed_url = $hconfig['feed_url'] ?? $hconfig['url'] ?? '';
+				if ( $feed_url && empty( $hconfig['source_url'] ) ) {
+					$host = wp_parse_url( $feed_url, PHP_URL_HOST );
+					$parts[] = $host ?: $feed_url;
+				}
+
+				// Taxonomy term selections (any taxonomy_*_selection key).
+				foreach ( $hconfig as $key => $val ) {
+					if ( strpos( $key, 'taxonomy_' ) === 0 && strpos( $key, '_selection' ) !== false ) {
+						if ( ! empty( $val ) && 'skip' !== $val && 'ai_decides' !== $val ) {
+							$tax_name = str_replace( array( 'taxonomy_', '_selection' ), '', $key );
+							$parts[] = "{$tax_name}={$val}";
 						}
-						break;
+					}
 				}
 			}
 		}
 
 		$summary = implode( ' | ', array_unique( $parts ) );
 
-		// Truncate if too long.
 		if ( mb_strlen( $summary ) > 60 ) {
 			$summary = mb_substr( $summary, 0, 57 ) . '...';
 		}
