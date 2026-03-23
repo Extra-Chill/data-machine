@@ -19,8 +19,7 @@
 
 namespace DataMachineEvents\Blocks\Calendar\Query;
 
-use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
-use const DataMachineEvents\Core\EVENT_END_DATETIME_META_KEY;
+use DataMachineEvents\Core\EventDatesTable;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -29,76 +28,105 @@ if ( ! defined( 'ABSPATH' ) ) {
 class DateFilter {
 
 	/**
-	 * WP_Query meta_query for upcoming events.
+	 * Apply "upcoming" date filter via posts_clauses.
+	 *
+	 * Adds a JOIN on the event_dates table and a WHERE clause that selects
+	 * events whose start_datetime >= $datetime OR end_datetime >= $datetime.
 	 *
 	 * @param string $datetime MySQL datetime to compare against.
-	 * @return array meta_query clause.
+	 * @return callable Filter callback (must be removed after WP_Query runs).
 	 */
-	public static function upcoming_meta_query( string $datetime ): array {
-		return array(
-			'relation'    => 'OR',
-			'event_start' => array(
-				'key'     => EVENT_DATETIME_META_KEY,
-				'value'   => $datetime,
-				'compare' => '>=',
-			),
-			'event_end'   => array(
-				'key'     => EVENT_END_DATETIME_META_KEY,
-				'value'   => $datetime,
-				'compare' => '>=',
-			),
-		);
+	public static function apply_upcoming_filter( string $datetime ): callable {
+		$filter = function ( $clauses ) use ( $datetime ) {
+			global $wpdb;
+			$table = EventDatesTable::table_name();
+
+			if ( strpos( $clauses['join'], $table ) === false ) {
+				$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
+			}
+
+			$date_where = $wpdb->prepare(
+				'(ed.start_datetime >= %s OR ed.end_datetime >= %s)',
+				$datetime,
+				$datetime
+			);
+			$clauses['where'] .= " AND {$date_where}";
+
+			return $clauses;
+		};
+
+		add_filter( 'posts_clauses', $filter, 10, 1 );
+		return $filter;
 	}
 
 	/**
-	 * WP_Query meta_query for past events.
+	 * Apply "past" date filter via posts_clauses.
 	 *
 	 * @param string $datetime MySQL datetime to compare against.
-	 * @return array meta_query clauses (two entries for AND nesting).
+	 * @return callable Filter callback.
 	 */
-	public static function past_meta_query( string $datetime ): array {
-		return array(
-			'relation'    => 'AND',
-			'event_start' => array(
-				'key'     => EVENT_DATETIME_META_KEY,
-				'value'   => $datetime,
-				'compare' => '<',
-			),
-			array(
-				'relation'  => 'OR',
-				'event_end' => array(
-					'key'     => EVENT_END_DATETIME_META_KEY,
-					'value'   => $datetime,
-					'compare' => '<',
-				),
-				array(
-					'key'     => EVENT_END_DATETIME_META_KEY,
-					'compare' => 'NOT EXISTS',
-				),
-			),
-		);
+	public static function apply_past_filter( string $datetime ): callable {
+		$filter = function ( $clauses ) use ( $datetime ) {
+			global $wpdb;
+			$table = EventDatesTable::table_name();
+
+			if ( strpos( $clauses['join'], $table ) === false ) {
+				$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
+			}
+
+			$date_where = $wpdb->prepare(
+				'(ed.start_datetime < %s AND (ed.end_datetime < %s OR ed.end_datetime IS NULL))',
+				$datetime,
+				$datetime
+			);
+			$clauses['where'] .= " AND {$date_where}";
+
+			return $clauses;
+		};
+
+		add_filter( 'posts_clauses', $filter, 10, 1 );
+		return $filter;
+	}
+
+	/**
+	 * Apply event date ordering via posts_clauses.
+	 *
+	 * Ensures the ed JOIN exists and overrides ORDER BY to use ed.start_datetime.
+	 *
+	 * @param string $direction 'ASC' or 'DESC'.
+	 * @return callable Filter callback.
+	 */
+	public static function apply_date_orderby( string $direction = 'ASC' ): callable {
+		$direction = strtoupper( $direction ) === 'DESC' ? 'DESC' : 'ASC';
+
+		$filter = function ( $clauses ) use ( $direction ) {
+			global $wpdb;
+			$table = EventDatesTable::table_name();
+
+			if ( strpos( $clauses['join'], $table ) === false ) {
+				$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
+			}
+
+			$clauses['orderby'] = "ed.start_datetime {$direction}";
+
+			return $clauses;
+		};
+
+		add_filter( 'posts_clauses', $filter, 10, 1 );
+		return $filter;
 	}
 
 	/**
 	 * Raw SQL fragments for upcoming events.
 	 *
-	 * Returns JOIN and WHERE clauses. The caller must supply `$wpdb`
-	 * table references and call `$wpdb->prepare()` on the WHERE.
-	 *
-	 * The returned WHERE uses `%s` placeholders — pass `$datetime` twice
-	 * as the corresponding prepare() values.
-	 *
-	 * @param string $postmeta_table Full postmeta table name (e.g. $wpdb->postmeta).
 	 * @return array{joins: string, where: string, param_count: int}
 	 */
-	public static function upcoming_sql( string $postmeta_table ): array {
-		$start_key = esc_sql( EVENT_DATETIME_META_KEY );
-		$end_key   = esc_sql( EVENT_END_DATETIME_META_KEY );
+	public static function upcoming_sql(): array {
+		$table = EventDatesTable::table_name();
 
 		return array(
-			'joins'       => "INNER JOIN {$postmeta_table} pm_start ON p.ID = pm_start.post_id AND pm_start.meta_key = '{$start_key}'"
-				. " LEFT JOIN {$postmeta_table} pm_end ON p.ID = pm_end.post_id AND pm_end.meta_key = '{$end_key}'",
-			'where'       => '(pm_start.meta_value >= %s OR pm_end.meta_value >= %s)',
+			'joins'       => "INNER JOIN {$table} ed ON p.ID = ed.post_id",
+			'where'       => '(ed.start_datetime >= %s OR ed.end_datetime >= %s)',
 			'param_count' => 2,
 		);
 	}
@@ -106,17 +134,14 @@ class DateFilter {
 	/**
 	 * Raw SQL fragments for past events.
 	 *
-	 * @param string $postmeta_table Full postmeta table name.
 	 * @return array{joins: string, where: string, param_count: int}
 	 */
-	public static function past_sql( string $postmeta_table ): array {
-		$start_key = esc_sql( EVENT_DATETIME_META_KEY );
-		$end_key   = esc_sql( EVENT_END_DATETIME_META_KEY );
+	public static function past_sql(): array {
+		$table = EventDatesTable::table_name();
 
 		return array(
-			'joins'       => "INNER JOIN {$postmeta_table} pm_start ON p.ID = pm_start.post_id AND pm_start.meta_key = '{$start_key}'"
-				. " LEFT JOIN {$postmeta_table} pm_end ON p.ID = pm_end.post_id AND pm_end.meta_key = '{$end_key}'",
-			'where'       => '(pm_start.meta_value < %s AND (pm_end.meta_value < %s OR pm_end.meta_value IS NULL))',
+			'joins'       => "INNER JOIN {$table} ed ON p.ID = ed.post_id",
+			'where'       => '(ed.start_datetime < %s AND (ed.end_datetime < %s OR ed.end_datetime IS NULL))',
 			'param_count' => 2,
 		);
 	}
@@ -124,20 +149,14 @@ class DateFilter {
 	/**
 	 * Raw SQL fragments for a date range filter.
 	 *
-	 * Filters events whose start_datetime falls within the range.
-	 * Also includes the standard start/end JOIN for consistency.
-	 *
-	 * @param string $postmeta_table Full postmeta table name.
 	 * @return array{joins: string, where: string, param_count: int}
 	 */
-	public static function date_range_sql( string $postmeta_table ): array {
-		$start_key = esc_sql( EVENT_DATETIME_META_KEY );
-		$end_key   = esc_sql( EVENT_END_DATETIME_META_KEY );
+	public static function date_range_sql(): array {
+		$table = EventDatesTable::table_name();
 
 		return array(
-			'joins'       => "INNER JOIN {$postmeta_table} pm_start ON p.ID = pm_start.post_id AND pm_start.meta_key = '{$start_key}'"
-				. " LEFT JOIN {$postmeta_table} pm_end ON p.ID = pm_end.post_id AND pm_end.meta_key = '{$end_key}'",
-			'where'       => '(pm_start.meta_value >= %s AND pm_start.meta_value <= %s)',
+			'joins'       => "INNER JOIN {$table} ed ON p.ID = ed.post_id",
+			'where'       => '(ed.start_datetime >= %s AND ed.start_datetime <= %s)',
 			'param_count' => 2,
 		);
 	}

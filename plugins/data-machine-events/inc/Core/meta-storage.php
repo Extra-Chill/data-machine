@@ -208,25 +208,31 @@ function data_machine_events_sync_datetime_meta( $post_id, $post, $update ) {
 			if ( $start_date ) {
 				$effective_start_time = $start_time ? $start_time : '00:00:00';
 				$datetime             = $start_date . ' ' . $effective_start_time;
-				update_post_meta( $post_id, EVENT_DATETIME_META_KEY, $datetime );
 
 				if ( $end_date ) {
-					// Has explicit end date: use sentinel 23:59:59 when no end time provided.
 					$effective_end_time = $end_time ? $end_time : '23:59:59';
 					$end_datetime_val   = $end_date . ' ' . $effective_end_time;
-					update_post_meta( $post_id, EVENT_END_DATETIME_META_KEY, $end_datetime_val );
 				} elseif ( $end_time ) {
-					// Has end time but no end date: same day, store with start date.
 					$end_datetime_val = $start_date . ' ' . $end_time;
-					update_post_meta( $post_id, EVENT_END_DATETIME_META_KEY, $end_datetime_val );
 				} else {
-					// No end date or time: delete stale meta rather than fabricate one.
-					delete_post_meta( $post_id, EVENT_END_DATETIME_META_KEY );
+					$end_datetime_val = null;
 				}
+
+				EventDatesTable::upsert( $post_id, $datetime, $end_datetime_val );
+
+				/**
+				 * Fires after event dates are written to the event_dates table.
+				 *
+				 * Replaces the `updated_post_meta`/`added_post_meta` hooks that
+				 * previously fired from update_post_meta() calls.
+				 *
+				 * @param int         $post_id        Post ID.
+				 * @param string      $start_datetime Start datetime.
+				 * @param string|null $end_datetime   End datetime or null.
+				 */
+				do_action( 'datamachine_event_dates_updated', $post_id, $datetime, $end_datetime_val );
 			} else {
-				// No date found, delete meta if it exists.
-				delete_post_meta( $post_id, EVENT_DATETIME_META_KEY );
-				delete_post_meta( $post_id, EVENT_END_DATETIME_META_KEY );
+				EventDatesTable::delete( $post_id );
 			}
 
 			// Sync ticket URL for duplicate detection queries.
@@ -242,3 +248,13 @@ function data_machine_events_sync_datetime_meta( $post_id, $post, $update ) {
 	}
 }
 add_action( 'save_post', __NAMESPACE__ . '\\data_machine_events_sync_datetime_meta', 10, 3 );
+
+/**
+ * Get event dates from the dedicated event_dates table.
+ *
+ * @param int $post_id Post ID.
+ * @return object|null Object with start_datetime and end_datetime properties, or null.
+ */
+function datamachine_get_event_dates( int $post_id ): ?object {
+	return EventDatesTable::get( $post_id );
+}

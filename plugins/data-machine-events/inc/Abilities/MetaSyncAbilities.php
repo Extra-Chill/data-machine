@@ -269,13 +269,14 @@ class MetaSyncAbilities {
 				continue;
 			}
 
-			$before_datetime   = get_post_meta( $event_id, Event_Post_Type::EVENT_DATE_META_KEY, true );
-			$before_end        = get_post_meta( $event_id, '_datamachine_event_end_datetime', true );
+			$before_dates      = \DataMachineEvents\Core\EventDatesTable::get( $event_id );
+			$before_datetime   = $before_dates ? $before_dates->start_datetime : '';
+			$before_end        = $before_dates ? $before_dates->end_datetime : '';
 			$before_ticket_url = get_post_meta( $event_id, '_datamachine_ticket_url', true );
 
 			$before = array(
-				'_datamachine_event_datetime'     => $before_datetime ? $before_datetime : null,
-				'_datamachine_event_end_datetime' => $before_end ? $before_end : null,
+				'_datamachine_event_datetime'     => ! empty( $before_datetime ) ? $before_datetime : null,
+				'_datamachine_event_end_datetime' => ! empty( $before_end ) ? $before_end : null,
 				'_datamachine_ticket_url'         => $before_ticket_url ? $before_ticket_url : null,
 			);
 
@@ -283,8 +284,9 @@ class MetaSyncAbilities {
 				\DataMachineEvents\Core\data_machine_events_sync_datetime_meta( $event_id, $post, true );
 			}
 
-			$after_datetime   = $dry_run ? $this->calculateExpectedDatetime( $block_attrs ) : get_post_meta( $event_id, Event_Post_Type::EVENT_DATE_META_KEY, true );
-			$after_end        = $dry_run ? $this->calculateExpectedEndDatetime( $block_attrs ) : get_post_meta( $event_id, '_datamachine_event_end_datetime', true );
+			$after_dates      = $dry_run ? null : \DataMachineEvents\Core\EventDatesTable::get( $event_id );
+			$after_datetime   = $dry_run ? $this->calculateExpectedDatetime( $block_attrs ) : ( $after_dates ? $after_dates->start_datetime : '' );
+			$after_end        = $dry_run ? $this->calculateExpectedEndDatetime( $block_attrs ) : ( $after_dates ? $after_dates->end_datetime : '' );
 			$after_ticket_url = $dry_run ? ( $block_attrs['ticketUrl'] ?? null ) : get_post_meta( $event_id, '_datamachine_ticket_url', true );
 
 			$after = array(

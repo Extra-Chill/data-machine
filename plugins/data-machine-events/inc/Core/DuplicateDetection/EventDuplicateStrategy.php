@@ -24,7 +24,6 @@ namespace DataMachineEvents\Core\DuplicateDetection;
 use DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
 use DataMachineEvents\Core\Event_Post_Type;
-use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
 use const DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY;
 use function DataMachineEvents\Core\datamachine_normalize_ticket_url;
 use function DataMachineEvents\Core\datamachine_extract_ticket_identity;
@@ -209,7 +208,8 @@ class EventDuplicateStrategy {
 			}
 
 			// Check time window.
-			$existing_datetime = get_post_meta( $post_id, EVENT_DATETIME_META_KEY, true );
+			$candidate_dates   = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+			$existing_datetime = $candidate_dates ? $candidate_dates->start_datetime : '';
 			if ( ! self::isWithinTimeWindow( $startDate, $existing_datetime ) ) {
 				continue;
 			}
@@ -313,7 +313,8 @@ class EventDuplicateStrategy {
 				continue;
 			}
 
-			$existing_datetime = get_post_meta( $post_id, EVENT_DATETIME_META_KEY, true );
+			$candidate_dates   = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+			$existing_datetime = $candidate_dates ? $candidate_dates->start_datetime : '';
 			if ( ! self::isWithinTimeWindow( $startDate, $existing_datetime ) ) {
 				continue;
 			}

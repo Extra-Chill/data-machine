@@ -10,8 +10,7 @@
 
 namespace DataMachineEvents\Core;
 
-use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
-use const DataMachineEvents\Core\EVENT_END_DATETIME_META_KEY;
+
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -418,7 +417,8 @@ class EventSchemaProvider {
 			return array( '', '' );
 		}
 
-		$start_datetime = get_post_meta( $post_id, EVENT_DATETIME_META_KEY, true );
+		$dates          = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+		$start_datetime = $dates ? $dates->start_datetime : '';
 		if ( empty( $start_datetime ) ) {
 			return array( '', '' );
 		}
@@ -446,7 +446,8 @@ class EventSchemaProvider {
 			return array( '', '' );
 		}
 
-		$end_datetime = get_post_meta( $post_id, EVENT_END_DATETIME_META_KEY, true );
+		$dates        = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+		$end_datetime = $dates ? $dates->end_datetime : '';
 		if ( empty( $end_datetime ) ) {
 			return array( '', '' );
 		}

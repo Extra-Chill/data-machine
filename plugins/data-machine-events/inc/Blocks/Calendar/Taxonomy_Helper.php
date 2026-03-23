@@ -147,19 +147,19 @@ class Taxonomy_Helper {
 			$current_datetime = current_time( 'mysql' );
 
 			if ( ! empty( $date_start ) && ! empty( $date_end ) ) {
-				$filter = DateFilter::date_range_sql( $wpdb->postmeta );
+				$filter = DateFilter::date_range_sql();
 				$joins         .= ' ' . $filter['joins'];
 				$where_clauses .= ' AND ' . $filter['where'];
 				$params[]       = $date_start . ' 00:00:00';
 				$params[]       = $date_end . ' 23:59:59';
 			} elseif ( $show_past ) {
-				$filter = DateFilter::past_sql( $wpdb->postmeta );
+				$filter = DateFilter::past_sql();
 				$joins         .= ' ' . $filter['joins'];
 				$where_clauses .= ' AND ' . $filter['where'];
 				$params[]       = $current_datetime;
 				$params[]       = $current_datetime;
 			} else {
-				$filter = DateFilter::upcoming_sql( $wpdb->postmeta );
+				$filter = DateFilter::upcoming_sql();
 				$joins         .= ' ' . $filter['joins'];
 				$where_clauses .= ' AND ' . $filter['where'];
 				$params[]       = $current_datetime;

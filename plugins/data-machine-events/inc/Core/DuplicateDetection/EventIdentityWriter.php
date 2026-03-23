@@ -14,7 +14,6 @@ namespace DataMachineEvents\Core\DuplicateDetection;
 
 use DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex;
 use DataMachineEvents\Core\Event_Post_Type;
-use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
 use const DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY;
 
 defined( 'ABSPATH' ) || exit;
@@ -25,29 +24,41 @@ class EventIdentityWriter {
 	 * Register hooks to keep identity rows in sync with event posts.
 	 */
 	public static function register(): void {
-		// Update identity row when event meta is saved (covers both create and update).
-		add_action( 'updated_post_meta', array( static::class, 'onMetaChange' ), 10, 4 );
-		add_action( 'added_post_meta', array( static::class, 'onMetaChange' ), 10, 4 );
+		add_action( 'datamachine_event_dates_updated', array( static::class, 'onEventDatesUpdated' ), 10, 3 );
+		// Keep ticket URL meta hook for identity sync.
+		add_action( 'updated_post_meta', array( static::class, 'onTicketUrlMetaChange' ), 10, 4 );
+		add_action( 'added_post_meta', array( static::class, 'onTicketUrlMetaChange' ), 10, 4 );
 	}
 
 	/**
-	 * React to postmeta changes and sync the identity index.
+	 * React to event dates table writes and sync the identity index.
 	 *
-	 * Triggered when _datamachine_event_datetime or _datamachine_ticket_url
-	 * is written/updated. Rebuilds the full identity row from current state.
+	 * @param int         $post_id        Post ID.
+	 * @param string      $start_datetime Start datetime.
+	 * @param string|null $end_datetime   End datetime or null.
+	 */
+	public static function onEventDatesUpdated( int $post_id, string $start_datetime, ?string $end_datetime ): void {
+		$post_type = get_post_type( $post_id );
+		if ( Event_Post_Type::POST_TYPE !== $post_type ) {
+			return;
+		}
+
+		self::syncIdentityRow( $post_id );
+	}
+
+	/**
+	 * React to ticket URL postmeta changes only.
 	 *
 	 * @param int    $meta_id    Meta row ID.
 	 * @param int    $post_id    Post ID.
 	 * @param string $meta_key   Meta key.
 	 * @param mixed  $meta_value Meta value.
 	 */
-	public static function onMetaChange( $meta_id, $post_id, $meta_key, $meta_value ): void {
-		// Only react to event identity meta keys.
-		if ( EVENT_DATETIME_META_KEY !== $meta_key && EVENT_TICKET_URL_META_KEY !== $meta_key ) {
+	public static function onTicketUrlMetaChange( $meta_id, $post_id, $meta_key, $meta_value ): void {
+		if ( EVENT_TICKET_URL_META_KEY !== $meta_key ) {
 			return;
 		}
 
-		// Only for event posts.
 		$post_type = get_post_type( $post_id );
 		if ( Event_Post_Type::POST_TYPE !== $post_type ) {
 			return;
@@ -72,7 +83,8 @@ class EventIdentityWriter {
 			return;
 		}
 
-		$datetime = get_post_meta( $post_id, EVENT_DATETIME_META_KEY, true );
+		$dates = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+		$datetime = $dates ? $dates->start_datetime : '';
 		if ( empty( $datetime ) ) {
 			return;
 		}

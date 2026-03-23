@@ -123,16 +123,24 @@ class TicketUrlResyncAbilities {
 		);
 
 		if ( $future_only ) {
-			$args['meta_query'] = array(
-				array(
-					'key'     => '_datamachine_event_datetime',
-					'value'   => current_time( 'Y-m-d' ),
-					'compare' => '>=',
-				),
-			);
+			$future_date        = current_time( 'Y-m-d' );
+			$future_date_filter = function ( $clauses ) use ( $future_date ) {
+				global $wpdb;
+				$table = \DataMachineEvents\Core\EventDatesTable::table_name();
+				if ( strpos( $clauses['join'], $table ) === false ) {
+					$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
+				}
+				$clauses['where'] .= $wpdb->prepare( ' AND ed.start_datetime >= %s', $future_date );
+				return $clauses;
+			};
+			add_filter( 'posts_clauses', $future_date_filter );
 		}
 
 		$events  = get_posts( $args );
+
+		if ( $future_only ) {
+			remove_filter( 'posts_clauses', $future_date_filter );
+		}
 		$updated = 0;
 		$skipped = 0;
 		$changes = array();

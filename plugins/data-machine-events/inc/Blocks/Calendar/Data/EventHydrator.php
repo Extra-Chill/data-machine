@@ -13,8 +13,6 @@ namespace DataMachineEvents\Blocks\Calendar\Data;
 
 use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Core\Promoter_Taxonomy;
-use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
-use const DataMachineEvents\Core\EVENT_END_DATETIME_META_KEY;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -59,7 +57,8 @@ class EventHydrator {
 	 * @param array $event_data Event data array (modified by reference).
 	 */
 	private static function hydrate_datetime_from_meta( int $post_id, array &$event_data ): void {
-		$start_datetime = get_post_meta( $post_id, EVENT_DATETIME_META_KEY, true );
+		$dates          = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+		$start_datetime = $dates ? $dates->start_datetime : '';
 		if ( $start_datetime ) {
 			$date_obj = date_create( $start_datetime );
 			if ( $date_obj ) {
@@ -68,7 +67,7 @@ class EventHydrator {
 			}
 		}
 
-		$end_datetime = get_post_meta( $post_id, EVENT_END_DATETIME_META_KEY, true );
+		$end_datetime = $dates ? $dates->end_datetime : '';
 		if ( $end_datetime ) {
 			$end_obj = date_create( $end_datetime );
 			if ( $end_obj ) {

@@ -53,6 +53,7 @@ if ( ! function_exists( 'data_machine_events_sanitize_query_params' ) ) {
 
 // Load core meta storage (monitors Event Details block saves)
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/meta-storage.php';
+require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/EventDatesTable.php';
 
 // Load performance optimizations (transient-cached last-modified queries).
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/performance.php';
@@ -90,6 +91,24 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	\WP_CLI::add_command( 'data-machine-events check clean-duplicates', \DataMachineEvents\Cli\Check\CleanDuplicatesCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check quality', \DataMachineEvents\Cli\Check\CheckQualityCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check all', \DataMachineEvents\Cli\Check\CheckAllCommand::class );
+}
+
+if ( defined( 'WP_CLI' ) && WP_CLI ) {
+	\WP_CLI::add_command( 'datamachine-events backfill-event-dates', function( $args, $assoc_args ) {
+		\DataMachineEvents\Core\EventDatesTable::create_table();
+		\WP_CLI::log( 'Table ensured. Starting backfill...' );
+
+		$total = \DataMachineEvents\Core\EventDatesTable::backfill(
+			500,
+			function( $count ) {
+				if ( $count % 500 === 0 ) {
+					\WP_CLI::log( "Backfilled {$count} events..." );
+				}
+			}
+		);
+
+		\WP_CLI::success( "Backfilled {$total} events into datamachine_event_dates table." );
+	});
 }
 
 if ( defined( 'WP_CLI' ) && WP_CLI && file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Cli/UpdateEventCommand.php' ) ) {
@@ -449,6 +468,7 @@ class DATAMACHINE_Events {
 	}
 
 	public function activate() {
+		\DataMachineEvents\Core\EventDatesTable::create_table();
 		$this->register_post_types();
 		$this->register_taxonomies();
 		flush_rewrite_rules();

@@ -130,7 +130,8 @@ class CheckMetaSyncCommand {
 				continue;
 			}
 
-			$meta_start = get_post_meta( $event->ID, '_datamachine_event_datetime', true );
+			$dates = \DataMachineEvents\Core\EventDatesTable::get( $event->ID );
+			$meta_start = $dates ? $dates->start_datetime : '';
 
 			if ( empty( $meta_start ) ) {
 				$result[] = array(
@@ -170,21 +171,17 @@ class CheckMetaSyncCommand {
 				$start_datetime .= ' ' . $attrs['startTime'];
 			}
 
-			update_post_meta( (int) $post_id, '_datamachine_event_datetime', $start_datetime );
-
 			if ( ! empty( $attrs['endDate'] ) ) {
 				$end_datetime = $attrs['endDate'];
 				$end_time     = ! empty( $attrs['endTime'] ) ? $attrs['endTime'] : '23:59:59';
 				$end_datetime .= ' ' . $end_time;
-				update_post_meta( (int) $post_id, '_datamachine_event_end_datetime', $end_datetime );
 			} elseif ( ! empty( $attrs['endTime'] ) ) {
-				// End time but no end date: same day as start.
 				$end_datetime = $attrs['startDate'] . ' ' . $attrs['endTime'];
-				update_post_meta( (int) $post_id, '_datamachine_event_end_datetime', $end_datetime );
 			} else {
-				// No end data: remove stale meta rather than fabricate.
-				delete_post_meta( (int) $post_id, '_datamachine_event_end_datetime' );
+				$end_datetime = null;
 			}
+
+			\DataMachineEvents\Core\EventDatesTable::upsert( (int) $post_id, $start_datetime, $end_datetime );
 
 			++$fixed;
 			\WP_CLI::log( sprintf( 'Synced: %d — %s', $post_id, $event['title'] ?? '' ) );

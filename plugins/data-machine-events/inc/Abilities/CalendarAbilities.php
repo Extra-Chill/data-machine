@@ -268,8 +268,9 @@ class CalendarAbilities {
 			}
 		}
 
-		$query_args   = EventQueryBuilder::build_query_args( $query_params );
-		$events_query = new WP_Query( $query_args );
+		$built         = EventQueryBuilder::build_query_args( $query_params );
+		$events_query  = new WP_Query( $built['args'] );
+		$built['cleanup']();
 
 		$event_counts = EventQueryBuilder::get_event_counts();
 
