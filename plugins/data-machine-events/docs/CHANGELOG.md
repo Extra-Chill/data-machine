@@ -2,6 +2,19 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.21.0] - 2026-03-23
+
+### Added
+- progressive day-level calendar rendering: server renders first day only, subsequent days load via REST on scroll
+- `day-loader.ts` client module: prefetches all deferred days immediately on page load, IntersectionObserver gates DOM injection
+- progressive rendering spec at `docs/progressive-calendar-rendering.md`
+
+### Changed
+- `PageBoundary::compute_unique_event_dates()` uses `DATE()` in SQL and drops post IDs — cold query ~960ms → ~500ms with full multi-day expansion preserved
+- `prevent_taxonomy_archive_404` reduced to `posts_per_page=1, fields=ids, no_found_rows=true` — results were never displayed
+- `CalendarAbilities` accepts `progressive` param for partial hydration (first day only)
+- homepage HTML payload reduced from 4,949 KB to 693 KB (86%), DOM nodes from 9,526 to 1,704
+
 ## [0.20.0] - 2026-03-22
 
 ### Added
