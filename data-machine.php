@@ -314,13 +314,12 @@ function datamachine_load_handlers() {
 	new \DataMachine\Core\Steps\Fetch\Handlers\Email\Email();
 	new \DataMachine\Core\Steps\Fetch\Handlers\Files\Files();
 	// GitHub handler moved to data-machine-code extension.
-	new \DataMachine\Core\Steps\Fetch\Handlers\Workspace\Workspace();
+	// Workspace fetch handler moved to data-machine-code extension.
 
 	// Update Handlers
 	new \DataMachine\Core\Steps\Update\Handlers\WordPress\WordPress();
 
-	// Workspace publish handler
-	new \DataMachine\Core\Steps\Publish\Handlers\Workspace\Workspace();
+	// Workspace publish handler moved to data-machine-code extension.
 }
 
 /**
