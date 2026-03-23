@@ -432,6 +432,32 @@ class ExecuteStepAbility {
 			$next_flow_step_id = $navigator->get_next_flow_step_id( $flow_step_id, $payload );
 
 			if ( $next_flow_step_id ) {
+				$packet_count = count( $dataPackets );
+
+				// Inline continuation: when a step produces 0-1 DataPackets,
+				// schedule the next step directly on the same job instead of
+				// creating child jobs. This eliminates recursive fan-out where
+				// children spawn grandchildren (e.g., AI step → update step).
+				//
+				// Fan-out is only meaningful when a step produces MULTIPLE
+				// packets that need parallel processing (e.g., fetch step
+				// producing one packet per event). A single packet is just
+				// the same job continuing to the next step.
+				if ( $packet_count <= 1 ) {
+					do_action(
+						'datamachine_schedule_next_step',
+						$job_id,
+						$next_flow_step_id,
+						$dataPackets
+					);
+
+					return array(
+						'success'      => true,
+						'step_success' => true,
+						'outcome'      => 'inline_continuation',
+					);
+				}
+
 				// Fan out: each DataPacket becomes its own child job
 				// continuing through the remaining pipeline steps.
 				$engine_snapshot = datamachine_get_engine_data( $job_id );
