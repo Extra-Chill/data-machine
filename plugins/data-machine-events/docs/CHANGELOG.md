@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.24.0] - 2026-03-23
+
+### Added
+- pre-AI event dedup gate skips AI when event already exists
+
+### Changed
+- denormalize post_status into event_dates to eliminate posts table JOIN
+- add concurrency group to cancel stale PR runs
+
 ## [0.23.0] - 2026-03-23
 
 ### Added
