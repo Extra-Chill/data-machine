@@ -2,6 +2,21 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.23.0] - 2026-03-23
+
+### Added
+- add query-events ability as single event query primitive
+- replace event datetime postmeta with dedicated event_dates table
+
+### Changed
+- cache get_lastpostmodified to avoid slow query on high-write sites
+- remove CAST(AS DATETIME) and eliminate double postmeta JOINs
+- blocks declare their own style dependencies via block.json
+
+### Fixed
+- stop flushing entire transient group on every event save
+- enqueue root CSS from calendar render.php for archive pages
+
 ## [0.22.1] - 2026-03-23
 
 ### Fixed
