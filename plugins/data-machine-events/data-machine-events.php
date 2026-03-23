@@ -484,54 +484,37 @@ class DATAMACHINE_Events {
 	}
 
 	public function register_blocks() {
+		// Register shared design tokens as a named style handle.
+		// Each block declares this as a style dependency via block.json,
+		// so WordPress auto-enqueues it whenever any block renders —
+		// no has_block() checks or manual enqueuing needed.
+		wp_register_style(
+			'data-machine-events-root',
+			DATA_MACHINE_EVENTS_PLUGIN_URL . 'inc/Blocks/root.css',
+			array( 'dashicons' ),
+			filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/root.css' )
+		);
+
+		// Register Leaflet CDN assets for event-details block (single venue maps).
+		// The events-map block bundles Leaflet via webpack and does not need these handles.
+		wp_register_style( 'leaflet', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css', array(), '1.9.4' );
+		wp_register_script( 'leaflet', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', array(), '1.9.4', true );
+
+		// Register venue map JS for event-details block.
+		wp_register_script(
+			'data-machine-events-venue-map',
+			DATA_MACHINE_EVENTS_PLUGIN_URL . 'assets/js/venue-map.js',
+			array( 'leaflet' ),
+			filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/venue-map.js' ),
+			true
+		);
+
 		register_block_type( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/Calendar' );
 		register_block_type( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/EventDetails' );
 		register_block_type( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/EventsMap' );
 
-		// Register Leaflet CDN assets for blocks that still use them (event-details).
-		// The events-map block bundles Leaflet via webpack and no longer needs these handles.
-		wp_register_style( 'leaflet', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css', array(), '1.9.4' );
-		wp_register_script( 'leaflet', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', array(), '1.9.4', true );
-
 		// Initialize calendar cache invalidation hooks
 		\DataMachineEvents\Blocks\Calendar\Cache_Invalidator::init();
-
-		// Enqueue root CSS custom properties when any block is present
-		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_root_styles' ) );
-		add_action( 'enqueue_block_assets', array( $this, 'enqueue_root_styles' ) );
-	}
-
-	public function enqueue_root_styles() {
-		if ( has_block( 'data-machine-events/calendar' ) || has_block( 'data-machine-events/event-details' ) || has_block( 'data-machine-events/events-map' ) || is_singular( \DataMachineEvents\Core\Event_Post_Type::POST_TYPE ) ) {
-			wp_enqueue_style(
-				'data-machine-events-root',
-				DATA_MACHINE_EVENTS_PLUGIN_URL . 'inc/Blocks/root.css',
-				array(),
-				filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/root.css' )
-			);
-
-			wp_enqueue_style( 'dashicons' );
-		}
-
-		// Enqueue Leaflet CDN assets for event-details block (single venue maps).
-		// The events-map block bundles Leaflet via webpack and does not need CDN assets.
-		$needs_leaflet = has_block( 'data-machine-events/event-details' )
-			|| is_singular( \DataMachineEvents\Core\Event_Post_Type::POST_TYPE );
-
-		if ( $needs_leaflet ) {
-			wp_enqueue_style( 'leaflet' );
-		}
-
-		if ( has_block( 'data-machine-events/event-details' ) || is_singular( \DataMachineEvents\Core\Event_Post_Type::POST_TYPE ) ) {
-			// Custom venue map initialization (single venue maps).
-			wp_enqueue_script(
-				'data-machine-events-venue-map',
-				DATA_MACHINE_EVENTS_PLUGIN_URL . 'assets/js/venue-map.js',
-				array( 'leaflet' ),
-				filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/venue-map.js' ),
-				true
-			);
-		}
 	}
 
 	public function register_block_category( $block_categories, $editor_context ) {

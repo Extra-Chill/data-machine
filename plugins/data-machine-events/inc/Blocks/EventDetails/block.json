@@ -8,6 +8,7 @@
     "description": "Display and edit event details including date, time, venue, and other information.",
     "textdomain": "data-machine-events",
     "editorScript": "file:./build/index.js",
+    "style": ["data-machine-events-root", "leaflet"],
     "editorStyle": "file:./style.css",
     "viewStyle": "file:./build/frontend.css",
     "attributes": {

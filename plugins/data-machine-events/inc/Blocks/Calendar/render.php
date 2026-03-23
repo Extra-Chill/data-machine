@@ -169,18 +169,6 @@ if ( ! empty( $archive_context['taxonomy'] ) && ! empty( $archive_context['term_
 
 \DataMachineEvents\Blocks\Calendar\Template_Loader::init();
 
-// Ensure root CSS custom properties are loaded whenever the calendar block renders.
-// This covers programmatic do_blocks() calls (archive templates) where has_block() returns false.
-if ( ! wp_style_is( 'data-machine-events-root', 'enqueued' ) ) {
-	wp_enqueue_style(
-		'data-machine-events-root',
-		DATA_MACHINE_EVENTS_PLUGIN_URL . 'inc/Blocks/root.css',
-		array(),
-		filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/root.css' )
-	);
-	wp_enqueue_style( 'dashicons' );
-}
-
 $block_id           = isset( $block ) && isset( $block->clientId ) ? (string) $block->clientId : uniqid( 'dm', true );
 $instance_id        = 'data-machine-calendar-' . substr( preg_replace( '/[^a-z0-9]/', '', strtolower( $block_id ) ), 0, 12 );
 $wrapper_attributes = get_block_wrapper_attributes(

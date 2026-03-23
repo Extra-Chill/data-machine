@@ -206,8 +206,10 @@ $event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_
 	</div>
 
 	<?php
-	// Display venue map if coordinates are available
+	// Display venue map if coordinates are available.
+	// Venue-map JS is registered in register_blocks() and enqueued here when needed.
 	if ( $venue_data && ! empty( $venue_data['coordinates'] ) ) {
+		wp_enqueue_script( 'data-machine-events-venue-map' );
 		$coords = explode( ',', $venue_data['coordinates'] );
 		if ( count( $coords ) === 2 ) {
 			$lat = trim( $coords[0] );

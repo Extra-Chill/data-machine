@@ -41,7 +41,7 @@
 	"textdomain": "data-machine-events",
 	"editorScript": "file:./build/index.js",
 	"editorStyle": "file:./editor.css",
-	"style": "file:./style.css",
+	"style": ["file:./style.css", "data-machine-events-root"],
 	"viewStyle": "file:./build/frontend.css",
 	"viewScript": "file:./build/frontend.js",
 	"render": "file:./render.php"
