@@ -2,6 +2,22 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.56.0] - 2026-03-23
+
+### Added
+- config context columns in CLI: `pipelines list` shows location/coordinates, `flows list` shows handler config summary (coordinates, city, domain, venue name, taxonomy selections)
+- per-agent redirect URI validation and auth callback handler
+- browser-based agent authorization flow
+- universal handler dry-run command (`wp datamachine test`)
+
+### Fixed
+- `scheduling_unchanged()` now verifies AS action exists via `as_next_scheduled_action()` before skipping re-schedule — prevents orphaned flows when AS wasn't loaded during CLI creation
+- remove hardcoded `location` taxonomy from CLI config summary — core reads `taxonomy_*_selection` keys generically
+- show OAuth callback feedback and populate saved config values in settings
+
+### Changed
+- migrate agent tables to network scope (base_prefix)
+
 ## [0.55.2] - 2026-03-22
 
 ### Changed
