@@ -104,8 +104,11 @@ class WordPress extends PublishHandler {
 				$field_key = "taxonomy_{$taxonomy}_selection";
 				$selection = $handler_config[ $field_key ] ?? SelectionMode::SKIP;
 
-				if ( SelectionMode::isAiDecides( $selection ) && ! empty( $parameters[ $taxonomy ] ) ) {
-					$taxonomies[ $taxonomy ] = $parameters[ $taxonomy ];
+				// Get the parameter name (e.g., 'post_tag' -> 'tags')
+				$param_name = TaxonomyHandler::getParameterName( $taxonomy );
+
+				if ( SelectionMode::isAiDecides( $selection ) && ! empty( $parameters[ $param_name ] ) ) {
+					$taxonomies[ $taxonomy ] = $parameters[ $param_name ];
 				} elseif ( SelectionMode::isPreSelected( $selection ) ) {
 					$taxonomies[ $taxonomy ] = $selection;
 				}
