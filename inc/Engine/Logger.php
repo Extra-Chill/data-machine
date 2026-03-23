@@ -64,12 +64,32 @@ function datamachine_resolve_agent_id( array $context = array() ): ?int {
  * Resolves agent_id from context or PermissionHelper, resolves user_id,
  * and inserts into the datamachine_logs table via LogRepository.
  *
+ * Respects the configured minimum log level (`datamachine_log_level` option).
+ * Messages below the minimum severity are silently discarded.
+ *
  * @param string             $level   Log level string (debug, info, warning, error, critical).
  * @param string|\Stringable $message Message to log.
  * @param array              $context Optional context data.
  */
 function datamachine_log_message( string $level, string|\Stringable $message, array $context = array() ): void {
 	try {
+		// Gate: discard messages below the configured minimum log level.
+		$severity_map = array(
+			'debug'    => 0,
+			'info'     => 1,
+			'warning'  => 2,
+			'error'    => 3,
+			'critical' => 4,
+		);
+
+		$min_level    = get_option( 'datamachine_log_level', 'info' );
+		$min_severity = $severity_map[ $min_level ] ?? 1;
+		$msg_severity = $severity_map[ $level ] ?? 0;
+
+		if ( $msg_severity < $min_severity ) {
+			return;
+		}
+
 		$repo     = new LogRepository();
 		$agent_id = datamachine_resolve_agent_id( $context );
 
