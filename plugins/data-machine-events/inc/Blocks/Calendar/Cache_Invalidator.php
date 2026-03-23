@@ -69,6 +69,15 @@ class Cache_Invalidator {
 	public static function invalidate_all(): void {
 		global $wpdb;
 
+		// Find calendar-specific transient keys before deleting from DB.
+		$transient_keys = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT REPLACE(option_name, '_transient_', '') FROM {$wpdb->options} WHERE option_name LIKE %s",
+				'_transient_' . CalendarCache::PREFIX . '%'
+			)
+		);
+
+		// Delete from DB (for non-persistent cache environments).
 		$wpdb->query(
 			$wpdb->prepare(
 				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
@@ -77,8 +86,12 @@ class Cache_Invalidator {
 			)
 		);
 
-		if ( function_exists( 'wp_cache_flush_group' ) ) {
-			wp_cache_flush_group( 'transient' );
+		// Delete specific keys from object cache instead of flushing the entire
+		// transient group. Flushing the group killed ALL transients site-wide on
+		// every event save, preventing any transient from surviving pipeline activity.
+		foreach ( $transient_keys as $key ) {
+			wp_cache_delete( $key, 'transient' );
+			wp_cache_delete( $key, 'site-transient' );
 		}
 	}
 }
