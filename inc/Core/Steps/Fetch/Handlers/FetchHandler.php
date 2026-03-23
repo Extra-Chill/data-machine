@@ -472,7 +472,7 @@ abstract class FetchHandler {
 			'parameters'     => array(
 				'reason' => array(
 					'type'        => 'string',
-					'description' => 'Brief explanation of why this item is being skipped (e.g., "not a music event", "comedy show", "wrong location")',
+					'description' => 'Concise skip reason, 2-5 words max. Examples: "not a music event", "comedy show", "wrong location", "duplicate event", "past event". Do NOT write sentences — just the category.',
 					'required'    => true,
 				),
 			),
