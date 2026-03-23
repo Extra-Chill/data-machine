@@ -367,9 +367,10 @@ class PermissionHelper {
 	 * Determines which agent's data should be returned based on the request:
 	 * - If `agent_id` param is present and caller has access → use that agent_id
 	 * - If caller is admin and no `agent_id` param → return null (all agents)
-	 * - If caller is non-admin → resolve their accessible agent IDs
+	 * - If caller is non-admin → resolve via ownership, then access grants
 	 *
 	 * @since 0.41.0
+	 * @since 0.57.0 Non-admin fallback checks access grants when user owns no agent.
 	 *
 	 * @param \WP_REST_Request $request REST request.
 	 * @param string           $action  Action key for admin check (default: 'manage_flows').
@@ -402,13 +403,21 @@ class PermissionHelper {
 			return null;
 		}
 
-		// Non-admin with no explicit agent_id: resolve via owner_id lookup.
+		// Non-admin with no explicit agent_id: resolve via owner_id first.
 		$user_id     = self::acting_user_id();
 		$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
 		$agent       = $agents_repo->get_by_owner_id( $user_id );
 
 		if ( $agent ) {
 			return (int) $agent['agent_id'];
+		}
+
+		// Fallback: check access grants (user may have access to an agent they don't own).
+		$access_repo    = new \DataMachine\Core\Database\Agents\AgentAccess();
+		$accessible_ids = $access_repo->get_agent_ids_for_user( $user_id );
+
+		if ( ! empty( $accessible_ids ) ) {
+			return $accessible_ids[0];
 		}
 
 		// No agent found — return 0 which will match nothing (safe fallback).

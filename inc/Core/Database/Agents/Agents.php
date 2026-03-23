@@ -248,18 +248,48 @@ class Agents extends BaseRepository {
 	}
 
 	/**
-	 * Get all agents.
+	 * Get all agents, optionally filtered by site scope.
+	 *
+	 * Mirrors WordPress core's multisite user scoping pattern:
+	 * - Default (no args): returns ALL agents (network-wide view)
+	 * - With site_id: returns agents scoped to that site OR network-wide (site_scope IS NULL)
 	 *
 	 * @since 0.38.0
+	 * @since 0.57.0 Added $args parameter with site_id filtering.
+	 *
+	 * @param array $args {
+	 *     Optional. Query arguments.
+	 *
+	 *     @type int|null $site_id Blog ID to filter by. Agents with this site_scope
+	 *                             OR site_scope IS NULL (network-wide) are returned.
+	 *                             Default null (no filtering — all agents).
+	 * }
 	 * @return array List of agent rows.
 	 */
-	public function get_all(): array {
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-		$rows = $this->wpdb->get_results(
-			$this->wpdb->prepare( 'SELECT * FROM %i ORDER BY agent_id ASC', $this->table_name ),
-			ARRAY_A
-		);
-		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+	public function get_all( array $args = array() ): array {
+		$site_id = $args['site_id'] ?? null;
+
+		if ( null !== $site_id ) {
+			$site_id = (int) $site_id;
+
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+			$rows = $this->wpdb->get_results(
+				$this->wpdb->prepare(
+					'SELECT * FROM %i WHERE site_scope = %d OR site_scope IS NULL ORDER BY agent_id ASC',
+					$this->table_name,
+					$site_id
+				),
+				ARRAY_A
+			);
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		} else {
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+			$rows = $this->wpdb->get_results(
+				$this->wpdb->prepare( 'SELECT * FROM %i ORDER BY agent_id ASC', $this->table_name ),
+				ARRAY_A
+			);
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		}
 
 		if ( ! $rows ) {
 			return array();

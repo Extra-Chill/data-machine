@@ -401,14 +401,21 @@ class AgentAbilities {
 	}
 
 	/**
-	 * List all registered agents.
+	 * List registered agents, scoped to the current site.
+	 *
+	 * On multisite, returns agents with site_scope matching the current blog_id
+	 * OR site_scope IS NULL (network-wide). This mirrors WordPress core's default
+	 * of scoping user queries to the current site via wp_N_capabilities meta.
+	 *
+	 * @since 0.38.0
+	 * @since 0.57.0 Added site_scope filtering and site_scope in output.
 	 *
 	 * @param array $input Input parameters (unused).
 	 * @return array Result.
 	 */
 	public static function listAgents( array $input ): array { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- Required by WP_Ability interface.
 		$agents_repo = new Agents();
-		$rows        = $agents_repo->get_all();
+		$rows        = $agents_repo->get_all( array( 'site_id' => get_current_blog_id() ) );
 
 		$agents = array();
 
@@ -418,6 +425,7 @@ class AgentAbilities {
 				'agent_slug' => (string) $row['agent_slug'],
 				'agent_name' => (string) $row['agent_name'],
 				'owner_id'   => (int) $row['owner_id'],
+				'site_scope' => isset( $row['site_scope'] ) ? (int) $row['site_scope'] : null,
 				'status'     => (string) $row['status'],
 			);
 		}
