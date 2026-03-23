@@ -362,6 +362,11 @@ class DATAMACHINE_Events {
 			new \DataMachineEvents\Abilities\UpcomingCountAbilities();
 		}
 
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventDateQueryAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventDateQueryAbilities.php';
+			new \DataMachineEvents\Abilities\EventDateQueryAbilities();
+		}
+
 		$this->registerSystemHealthChecks();
 	}
 

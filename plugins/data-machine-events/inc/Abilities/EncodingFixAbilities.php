@@ -17,7 +17,7 @@
 
 namespace DataMachineEvents\Abilities;
 
-use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Abilities\EventDateQueryAbilities;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -219,42 +219,13 @@ class EncodingFixAbilities {
 	 * @return array|\WP_Error Array of WP_Post objects or WP_Error
 	 */
 	private function queryEvents( string $scope ): array|\WP_Error {
-		$order = 'ASC';
-		if ( 'past' === $scope ) {
-			$order = 'DESC';
-		}
+		$ability = new EventDateQueryAbilities();
+		$result  = $ability->executeQueryEvents( array(
+			'scope' => $scope,
+			'order' => 'past' === $scope ? 'DESC' : 'ASC',
+		) );
 
-		$args = array(
-			'post_type'      => Event_Post_Type::POST_TYPE,
-			'post_status'    => 'publish',
-			'posts_per_page' => -1,
-			'orderby'        => 'none',
-			'order'          => $order,
-		);
-
-		$now = current_time( 'Y-m-d H:i:s' );
-
-		$event_date_filter = function ( $clauses ) use ( $scope, $now, $order ) {
-			global $wpdb;
-			$table = \DataMachineEvents\Core\EventDatesTable::table_name();
-			if ( strpos( $clauses['join'], $table ) === false ) {
-				$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
-			}
-			if ( 'upcoming' === $scope ) {
-				$clauses['where'] .= $wpdb->prepare( ' AND ed.start_datetime >= %s', $now );
-			} elseif ( 'past' === $scope ) {
-				$clauses['where'] .= $wpdb->prepare( ' AND ed.start_datetime < %s', $now );
-			}
-			$clauses['orderby'] = 'ed.start_datetime ' . $order;
-			return $clauses;
-		};
-		add_filter( 'posts_clauses', $event_date_filter );
-
-		$query = new \WP_Query( $args );
-
-		remove_filter( 'posts_clauses', $event_date_filter );
-
-		return $query->posts;
+		return $result['posts'];
 	}
 
 	/**

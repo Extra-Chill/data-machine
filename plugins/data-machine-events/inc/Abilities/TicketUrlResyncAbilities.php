@@ -17,7 +17,7 @@
 
 namespace DataMachineEvents\Abilities;
 
-use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Abilities\EventDateQueryAbilities;
 use function DataMachineEvents\Core\datamachine_normalize_ticket_url;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -114,33 +114,16 @@ class TicketUrlResyncAbilities {
 		$limit       = (int) ( $input['limit'] ?? self::DEFAULT_LIMIT );
 		$future_only = $input['future_only'] ?? false;
 
-		$args = array(
-			'post_type'      => Event_Post_Type::POST_TYPE,
-			'posts_per_page' => $limit,
-			'post_status'    => 'any',
-			'orderby'        => 'date',
-			'order'          => 'DESC',
+		$event_query = new EventDateQueryAbilities();
+		$query_input = array(
+			'scope'    => $future_only ? 'upcoming' : 'all',
+			'per_page' => $limit,
+			'status'   => 'any',
+			'order'    => 'DESC',
 		);
 
-		if ( $future_only ) {
-			$future_date        = current_time( 'Y-m-d' );
-			$future_date_filter = function ( $clauses ) use ( $future_date ) {
-				global $wpdb;
-				$table = \DataMachineEvents\Core\EventDatesTable::table_name();
-				if ( strpos( $clauses['join'], $table ) === false ) {
-					$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
-				}
-				$clauses['where'] .= $wpdb->prepare( ' AND ed.start_datetime >= %s', $future_date );
-				return $clauses;
-			};
-			add_filter( 'posts_clauses', $future_date_filter );
-		}
-
-		$events  = get_posts( $args );
-
-		if ( $future_only ) {
-			remove_filter( 'posts_clauses', $future_date_filter );
-		}
+		$result = $event_query->executeQueryEvents( $query_input );
+		$events = $result['posts'];
 		$updated = 0;
 		$skipped = 0;
 		$changes = array();

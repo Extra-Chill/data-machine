@@ -21,6 +21,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * @deprecated 0.24.0 Use data-machine-events/query-events ability
+ *             (EventDateQueryAbilities::executeQueryEvents) instead.
+ */
 class EventQueryBuilder {
 
 	/**

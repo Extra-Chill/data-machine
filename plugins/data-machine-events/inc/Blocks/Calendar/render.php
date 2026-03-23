@@ -17,7 +17,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 use DataMachineEvents\Abilities\CalendarAbilities;
 use DataMachineEvents\Abilities\FilterAbilities;
-use DataMachineEvents\Blocks\Calendar\Taxonomy_Helper;
 use DataMachineEvents\Blocks\Calendar\Query\ScopeResolver;
 
 if ( wp_is_json_request() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
@@ -155,7 +154,7 @@ if ( ! empty( $archive_context['taxonomy'] ) && ! empty( $archive_context['term_
 
 	$has_other_archive_taxonomy_terms = false;
 	if ( isset( $taxonomies_with_counts[ $archive_context['taxonomy'] ] ) ) {
-		$archive_terms = Taxonomy_Helper::flatten_hierarchy( $taxonomies_with_counts[ $archive_context['taxonomy'] ]['terms'] ?? array() );
+		$archive_terms = FilterAbilities::flatten_hierarchy( $taxonomies_with_counts[ $archive_context['taxonomy'] ]['terms'] ?? array() );
 		foreach ( $archive_terms as $term_data ) {
 			if ( (int) ( $term_data['term_id'] ?? 0 ) !== (int) $archive_context['term_id'] ) {
 				$has_other_archive_taxonomy_terms = true;

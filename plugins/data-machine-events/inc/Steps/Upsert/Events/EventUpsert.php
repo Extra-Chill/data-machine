@@ -472,35 +472,16 @@ class EventUpsert extends UpdateHandler {
 		}
 
 		// Query events at this venue on this date.
-		// Use date-only for LIKE query; time comparison is done separately.
+		// Use date-only matching; time comparison is done separately.
 		$date_only = self::extractDateForQuery( $startDate );
-		$args      = array(
-			'post_type'      => Event_Post_Type::POST_TYPE,
-			'posts_per_page' => 10,
-			'post_status'    => array( 'publish', 'draft', 'pending' ),
-			'tax_query'      => array(
-				array(
-					'taxonomy' => 'venue',
-					'field'    => 'term_id',
-					'terms'    => $venue_term->term_id,
-				),
-			),
-		);
-
-		$date_filter = function ( $clauses ) use ( $date_only ) {
-			global $wpdb;
-			$table = \DataMachineEvents\Core\EventDatesTable::table_name();
-			if ( strpos( $clauses['join'], $table ) === false ) {
-				$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
-			}
-			$clauses['where'] .= $wpdb->prepare( ' AND DATE(ed.start_datetime) = %s', $date_only );
-			return $clauses;
-		};
-		add_filter( 'posts_clauses', $date_filter );
-
-		$candidates = get_posts( $args );
-
-		remove_filter( 'posts_clauses', $date_filter );
+		$ability   = new \DataMachineEvents\Abilities\EventDateQueryAbilities();
+		$result    = $ability->executeQueryEvents( array(
+			'date_match'  => $date_only,
+			'tax_filters' => array( 'venue' => array( $venue_term->term_id ) ),
+			'per_page'    => 10,
+			'status'      => 'any',
+		) );
+		$candidates = $result['posts'];
 
 		if ( empty( $candidates ) ) {
 			return null;
@@ -643,32 +624,32 @@ class EventUpsert extends UpdateHandler {
 	private function findEventByExactTitle( string $title, string $venue, string $startDate ): ?int {
 		$low_confidence_title = EventIdentifierGenerator::isLowConfidenceTitle( $title );
 
-		$args = array(
-			'post_type'      => Event_Post_Type::POST_TYPE,
-			'title'          => $title,
-			'posts_per_page' => 1,
-			'post_status'    => array( 'publish', 'draft', 'pending' ),
-			'fields'         => 'ids',
-		);
-
 		if ( ! empty( $startDate ) ) {
 			$exact_date_only = self::extractDateForQuery( $startDate );
-			$date_filter     = function ( $clauses ) use ( $exact_date_only ) {
-				global $wpdb;
-				$table = \DataMachineEvents\Core\EventDatesTable::table_name();
-				if ( strpos( $clauses['join'], $table ) === false ) {
-					$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
+			$ability         = new \DataMachineEvents\Abilities\EventDateQueryAbilities();
+			$result          = $ability->executeQueryEvents( array(
+				'date_match' => $exact_date_only,
+				'per_page'   => -1,
+				'fields'     => 'ids',
+				'status'     => 'any',
+			) );
+			// Filter to exact title match in PHP.
+			$posts = array();
+			foreach ( $result['posts'] as $candidate_id ) {
+				if ( get_the_title( $candidate_id ) === $title ) {
+					$posts[] = $candidate_id;
+					break;
 				}
-				$clauses['where'] .= $wpdb->prepare( ' AND DATE(ed.start_datetime) = %s', $exact_date_only );
-				return $clauses;
-			};
-			add_filter( 'posts_clauses', $date_filter );
-		}
-
-		$posts = get_posts( $args );
-
-		if ( ! empty( $startDate ) ) {
-			remove_filter( 'posts_clauses', $date_filter );
+			}
+		} else {
+			$args = array(
+				'post_type'      => Event_Post_Type::POST_TYPE,
+				'title'          => $title,
+				'posts_per_page' => 1,
+				'post_status'    => array( 'publish', 'draft', 'pending' ),
+				'fields'         => 'ids',
+			);
+			$posts = get_posts( $args );
 		}
 
 		if ( ! empty( $posts ) ) {
@@ -740,34 +721,21 @@ class EventUpsert extends UpdateHandler {
 
 		// Strategy A: exact match on stored normalized URL
 		$ticket_date_only = self::extractDateForQuery( $startDate );
-		$args             = array(
-			'post_type'      => Event_Post_Type::POST_TYPE,
-			'posts_per_page' => 1,
-			'post_status'    => array( 'publish', 'draft', 'pending' ),
-			'fields'         => 'ids',
-			'meta_query'     => array(
+		$ability          = new \DataMachineEvents\Abilities\EventDateQueryAbilities();
+		$result_a         = $ability->executeQueryEvents( array(
+			'date_match'  => $ticket_date_only,
+			'per_page'    => 1,
+			'fields'      => 'ids',
+			'status'      => 'any',
+			'meta_query'  => array(
 				array(
 					'key'     => EVENT_TICKET_URL_META_KEY,
 					'value'   => $normalized_url,
 					'compare' => '=',
 				),
 			),
-		);
-
-		$ticket_date_filter_a = function ( $clauses ) use ( $ticket_date_only ) {
-			global $wpdb;
-			$table = \DataMachineEvents\Core\EventDatesTable::table_name();
-			if ( strpos( $clauses['join'], $table ) === false ) {
-				$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
-			}
-			$clauses['where'] .= $wpdb->prepare( ' AND DATE(ed.start_datetime) = %s', $ticket_date_only );
-			return $clauses;
-		};
-		add_filter( 'posts_clauses', $ticket_date_filter_a );
-
-		$posts = get_posts( $args );
-
-		remove_filter( 'posts_clauses', $ticket_date_filter_a );
+		) );
+		$posts = $result_a['posts'];
 
 		if ( ! empty( $posts ) ) {
 			do_action(
@@ -793,33 +761,19 @@ class EventUpsert extends UpdateHandler {
 		}
 
 		// Search all events on the same date and compare their canonical identities
-		$date_args = array(
-			'post_type'      => Event_Post_Type::POST_TYPE,
-			'posts_per_page' => 50,
-			'post_status'    => array( 'publish', 'draft', 'pending' ),
-			'fields'         => 'ids',
-			'meta_query'     => array(
+		$result_b   = $ability->executeQueryEvents( array(
+			'date_match'  => $ticket_date_only,
+			'per_page'    => 50,
+			'fields'      => 'ids',
+			'status'      => 'any',
+			'meta_query'  => array(
 				array(
 					'key'     => EVENT_TICKET_URL_META_KEY,
 					'compare' => 'EXISTS',
 				),
 			),
-		);
-
-		$ticket_date_filter_b = function ( $clauses ) use ( $ticket_date_only ) {
-			global $wpdb;
-			$table = \DataMachineEvents\Core\EventDatesTable::table_name();
-			if ( strpos( $clauses['join'], $table ) === false ) {
-				$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
-			}
-			$clauses['where'] .= $wpdb->prepare( ' AND DATE(ed.start_datetime) = %s', $ticket_date_only );
-			return $clauses;
-		};
-		add_filter( 'posts_clauses', $ticket_date_filter_b );
-
-		$candidates = get_posts( $date_args );
-
-		remove_filter( 'posts_clauses', $ticket_date_filter_b );
+		) );
+		$candidates = $result_b['posts'];
 
 		foreach ( $candidates as $candidate_id ) {
 			$stored_url       = get_post_meta( $candidate_id, EVENT_TICKET_URL_META_KEY, true );
@@ -871,26 +825,13 @@ class EventUpsert extends UpdateHandler {
 		}
 
 		$date_only = self::extractDateForQuery( $startDate );
-		$args      = array(
-			'post_type'      => Event_Post_Type::POST_TYPE,
-			'posts_per_page' => 20,
-			'post_status'    => array( 'publish', 'draft', 'pending' ),
-		);
-
-		$date_filter = function ( $clauses ) use ( $date_only ) {
-			global $wpdb;
-			$table = \DataMachineEvents\Core\EventDatesTable::table_name();
-			if ( strpos( $clauses['join'], $table ) === false ) {
-				$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
-			}
-			$clauses['where'] .= $wpdb->prepare( ' AND DATE(ed.start_datetime) = %s', $date_only );
-			return $clauses;
-		};
-		add_filter( 'posts_clauses', $date_filter );
-
-		$candidates = get_posts( $args );
-
-		remove_filter( 'posts_clauses', $date_filter );
+		$ability   = new \DataMachineEvents\Abilities\EventDateQueryAbilities();
+		$result    = $ability->executeQueryEvents( array(
+			'date_match' => $date_only,
+			'per_page'   => 20,
+			'status'     => 'any',
+		) );
+		$candidates = $result['posts'];
 
 		if ( empty( $candidates ) ) {
 			return null;

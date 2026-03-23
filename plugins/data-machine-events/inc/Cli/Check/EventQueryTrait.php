@@ -11,8 +11,6 @@
 
 namespace DataMachineEvents\Cli\Check;
 
-use DataMachineEvents\Core\Event_Post_Type;
-
 trait EventQueryTrait {
 
 	/**
@@ -23,43 +21,19 @@ trait EventQueryTrait {
 	 * @return \WP_Post[] Array of post objects.
 	 */
 	private function query_events( string $scope, int $days_ahead = 90 ): array {
-		$order = 'ASC';
-		if ( 'past' === $scope ) {
-			$order = 'DESC';
-		}
-
-		$args = array(
-			'post_type'      => Event_Post_Type::POST_TYPE,
-			'post_status'    => 'publish',
-			'posts_per_page' => -1,
-			'orderby'        => 'none',
-			'order'          => $order,
+		$input = array(
+			'scope' => $scope,
+			'order' => 'past' === $scope ? 'DESC' : 'ASC',
 		);
 
-		$now = current_time( 'Y-m-d H:i:s' );
+		if ( 'upcoming' === $scope && $days_ahead > 0 ) {
+			$input['days_ahead'] = $days_ahead;
+		}
 
-		$event_date_filter = function ( $clauses ) use ( $scope, $now, $days_ahead, $order ) {
-			global $wpdb;
-			$table = \DataMachineEvents\Core\EventDatesTable::table_name();
-			if ( strpos( $clauses['join'], $table ) === false ) {
-				$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
-			}
-			if ( 'upcoming' === $scope ) {
-				$end_date = gmdate( 'Y-m-d H:i:s', strtotime( "+{$days_ahead} days" ) );
-				$clauses['where'] .= $wpdb->prepare( ' AND ed.start_datetime BETWEEN %s AND %s', $now, $end_date );
-			} elseif ( 'past' === $scope ) {
-				$clauses['where'] .= $wpdb->prepare( ' AND ed.start_datetime < %s', $now );
-			}
-			$clauses['orderby'] = 'ed.start_datetime ' . $order;
-			return $clauses;
-		};
-		add_filter( 'posts_clauses', $event_date_filter );
+		$ability = new \DataMachineEvents\Abilities\EventDateQueryAbilities();
+		$result  = $ability->executeQueryEvents( $input );
 
-		$query = new \WP_Query( $args );
-
-		remove_filter( 'posts_clauses', $event_date_filter );
-
-		return $query->posts;
+		return $result['posts'];
 	}
 
 	/**

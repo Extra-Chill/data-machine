@@ -28,6 +28,8 @@ class PageBoundary {
 	 *
 	 * Multi-day events are expanded to count on each spanned date.
 	 *
+	 * @deprecated Use CalendarAbilities::get_unique_event_dates() instead. Moved in 0.16.0.
+	 *
 	 * @param array $params Query parameters.
 	 * @return array {
 	 *     @type array $dates           Ordered array of unique date strings (Y-m-d).
@@ -58,6 +60,8 @@ class PageBoundary {
 	 * to count on each spanned date. This reduces cold query time from
 	 * ~960ms to ~500ms at 25,000 events by eliminating the ID column
 	 * and gmdate() parsing in PHP.
+	 *
+	 * @deprecated Use CalendarAbilities::compute_unique_event_dates() instead. Moved in 0.16.0.
 	 *
 	 * @param array $params Query parameters.
 	 * @return array Event dates data.

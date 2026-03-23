@@ -15,15 +15,24 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Taxonomy data processing with hierarchy building and post count calculations
+ * Taxonomy data processing with hierarchy building and post count calculations.
+ *
+ * @deprecated Use FilterAbilities methods instead. This class is kept only for
+ *             backward compatibility and will be removed in a future release.
+ * @see \DataMachineEvents\Abilities\FilterAbilities
  */
 class Taxonomy_Helper {
 
 	/**
-	 * Get all taxonomies with event counts using real-time cross-filtering
+	 * Get all taxonomies with event counts using real-time cross-filtering.
 	 *
-	 * @param array $active_filters Active filter selections keyed by taxonomy slug.
-	 * @param array $date_context Optional date filtering context (date_start, date_end, past).
+	 * @deprecated Use FilterAbilities::executeGetFilterOptions() or the private
+	 *             get_all_taxonomies_with_counts() method on FilterAbilities.
+	 * @see \DataMachineEvents\Abilities\FilterAbilities
+	 *
+	 * @param array      $active_filters Active filter selections keyed by taxonomy slug.
+	 * @param array      $date_context   Optional date filtering context (date_start, date_end, past).
+	 * @param array|null $tax_query_override Optional taxonomy query override.
 	 * @return array Structured taxonomy data with hierarchy and event counts.
 	 */
 	public static function get_all_taxonomies_with_counts( $active_filters = array(), $date_context = array(), $tax_query_override = null ) {
@@ -58,12 +67,16 @@ class Taxonomy_Helper {
 	}
 
 	/**
-	 * Get terms in a taxonomy filtered by allowed term IDs
+	 * Get terms in a taxonomy filtered by allowed term IDs.
 	 *
-	 * @param string     $taxonomy_slug Taxonomy to get terms for.
+	 * @deprecated Use the private get_taxonomy_hierarchy() method on FilterAbilities.
+	 * @see \DataMachineEvents\Abilities\FilterAbilities
+	 *
+	 * @param string     $taxonomy_slug   Taxonomy to get terms for.
 	 * @param array|null $allowed_term_ids Limit to these term IDs, or null for all.
-	 * @param array      $date_context Optional date filtering context.
-	 * @param array      $active_filters Optional active taxonomy filters for cross-filtering.
+	 * @param array      $date_context    Optional date filtering context.
+	 * @param array      $active_filters  Optional active taxonomy filters for cross-filtering.
+	 * @param array|null $tax_query_override Optional taxonomy query override.
 	 * @return array Hierarchical term structure with event counts.
 	 */
 	public static function get_taxonomy_hierarchy( $taxonomy_slug, $allowed_term_ids = null, $date_context = array(), $active_filters = array(), $tax_query_override = null ) {

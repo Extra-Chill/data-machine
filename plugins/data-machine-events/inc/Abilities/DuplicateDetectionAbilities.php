@@ -17,6 +17,7 @@
 namespace DataMachineEvents\Abilities;
 
 use DataMachine\Core\Similarity\SimilarityEngine;
+use DataMachineEvents\Abilities\EventDateQueryAbilities;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
 use DataMachineEvents\Core\Event_Post_Type;
 use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
@@ -304,33 +305,14 @@ class DuplicateDetectionAbilities {
 			}
 
 			if ( $venue_term ) {
-				$dedup_date_filter_1 = function ( $clauses ) use ( $startDate ) {
-					global $wpdb;
-					$table = \DataMachineEvents\Core\EventDatesTable::table_name();
-					if ( strpos( $clauses['join'], $table ) === false ) {
-						$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
-					}
-					$clauses['where'] .= $wpdb->prepare( ' AND DATE(ed.start_datetime) = %s', $startDate );
-					return $clauses;
-				};
-				add_filter( 'posts_clauses', $dedup_date_filter_1 );
-
-				$candidates = get_posts(
-					array(
-						'post_type'      => Event_Post_Type::POST_TYPE,
-						'posts_per_page' => 10,
-						'post_status'    => array( 'publish', 'draft', 'pending' ),
-						'tax_query'      => array(
-							array(
-								'taxonomy' => 'venue',
-								'field'    => 'term_id',
-								'terms'    => $venue_term->term_id,
-							),
-						),
-					)
-				);
-
-				remove_filter( 'posts_clauses', $dedup_date_filter_1 );
+				$event_query = new EventDateQueryAbilities();
+				$result      = $event_query->executeQueryEvents( array(
+					'date_match'  => $startDate,
+					'tax_filters' => array( 'venue' => array( $venue_term->term_id ) ),
+					'per_page'    => 10,
+					'status'      => 'any',
+				) );
+				$candidates = $result['posts'];
 
 				foreach ( $candidates as $candidate ) {
 					if ( EventIdentifierGenerator::titlesMatch( $title, $candidate->post_title ) ) {
@@ -347,26 +329,13 @@ class DuplicateDetectionAbilities {
 		}
 
 		// Strategy 2: date-scoped fuzzy title + venue confirmation.
-		$dedup_date_filter_2 = function ( $clauses ) use ( $startDate ) {
-			global $wpdb;
-			$table = \DataMachineEvents\Core\EventDatesTable::table_name();
-			if ( strpos( $clauses['join'], $table ) === false ) {
-				$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
-			}
-			$clauses['where'] .= $wpdb->prepare( ' AND DATE(ed.start_datetime) = %s', $startDate );
-			return $clauses;
-		};
-		add_filter( 'posts_clauses', $dedup_date_filter_2 );
-
-		$candidates = get_posts(
-			array(
-				'post_type'      => Event_Post_Type::POST_TYPE,
-				'posts_per_page' => 20,
-				'post_status'    => array( 'publish', 'draft', 'pending' ),
-			)
-		);
-
-		remove_filter( 'posts_clauses', $dedup_date_filter_2 );
+		$event_query = new EventDateQueryAbilities();
+		$result      = $event_query->executeQueryEvents( array(
+			'date_match' => $startDate,
+			'per_page'   => 20,
+			'status'     => 'any',
+		) );
+		$candidates = $result['posts'];
 
 		foreach ( $candidates as $candidate ) {
 			if ( ! EventIdentifierGenerator::titlesMatch( $title, $candidate->post_title ) ) {

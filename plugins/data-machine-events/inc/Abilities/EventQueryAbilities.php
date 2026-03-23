@@ -177,6 +177,9 @@ class EventQueryAbilities {
 			$query_args['date_query'] = $date_query;
 		}
 
+		// @todo Migrate to EventDateQueryAbilities when it supports WordPress date_query
+		// (published_before/published_after). The ability only handles event date filtering,
+		// not WP publish date filtering, so we keep the inline posts_clauses for now.
 		$venue_event_filter = function ( $clauses ) {
 			global $wpdb;
 			$table = \DataMachineEvents\Core\EventDatesTable::table_name();
