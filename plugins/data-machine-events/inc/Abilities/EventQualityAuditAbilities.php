@@ -253,34 +253,36 @@ class EventQualityAuditAbilities {
 			'post_type'      => Event_Post_Type::POST_TYPE,
 			'post_status'    => 'publish',
 			'posts_per_page' => -1,
-			'orderby'        => 'event_start',
+			'orderby'        => 'none',
 			'order'          => 'ASC',
 		);
 
 		$today = current_time( 'Y-m-d' );
-		if ( 'upcoming' === $scope ) {
-			$args['meta_query'] = array(
-				'event_start' => array(
-					'key'     => '_datamachine_event_datetime',
-					'value'   => array( $today . ' 00:00:00', gmdate( 'Y-m-d 23:59:59', strtotime( '+' . $days_ahead . ' days', strtotime( $today ) ) ) ),
-					'compare' => 'BETWEEN',
-				),
-			);
-		} elseif ( 'past' === $scope ) {
-			$args['meta_query'] = array(
-				'event_start' => array(
-					'key'     => '_datamachine_event_datetime',
-					'value'   => $today . ' 00:00:00',
-					'compare' => '<',
-				),
-			);
-		}
+
+		$date_filter = function ( $clauses ) use ( $scope, $today, $days_ahead ) {
+			global $wpdb;
+			$table = \DataMachineEvents\Core\EventDatesTable::table_name();
+			if ( strpos( $clauses['join'], $table ) === false ) {
+				$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
+			}
+			if ( 'upcoming' === $scope ) {
+				$end_date = gmdate( 'Y-m-d 23:59:59', strtotime( '+' . $days_ahead . ' days', strtotime( $today ) ) );
+				$clauses['where'] .= $wpdb->prepare( ' AND ed.start_datetime BETWEEN %s AND %s', $today . ' 00:00:00', $end_date );
+			} elseif ( 'past' === $scope ) {
+				$clauses['where'] .= $wpdb->prepare( ' AND ed.start_datetime < %s', $today . ' 00:00:00' );
+			}
+			$clauses['orderby'] = 'ed.start_datetime ASC';
+			return $clauses;
+		};
+		add_filter( 'posts_clauses', $date_filter );
 
 		if ( $flow_id > 0 ) {
-			$args['meta_query'][] = array(
-				'key'     => '_datamachine_post_flow_id',
-				'value'   => (string) $flow_id,
-				'compare' => '=',
+			$args['meta_query'] = array(
+				array(
+					'key'     => '_datamachine_post_flow_id',
+					'value'   => (string) $flow_id,
+					'compare' => '=',
+				),
 			);
 		}
 
@@ -295,6 +297,9 @@ class EventQualityAuditAbilities {
 		}
 
 		$posts = get_posts( $args );
+
+		remove_filter( 'posts_clauses', $date_filter );
+
 		return is_array( $posts ) ? $posts : array();
 	}
 

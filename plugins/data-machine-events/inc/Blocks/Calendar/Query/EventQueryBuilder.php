@@ -15,8 +15,7 @@ namespace DataMachineEvents\Blocks\Calendar\Query;
 use WP_Query;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Blocks\Calendar\Geo_Query;
-use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
-use const DataMachineEvents\Core\EVENT_END_DATETIME_META_KEY;
+use DataMachineEvents\Core\EventDatesTable;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -27,8 +26,13 @@ class EventQueryBuilder {
 	/**
 	 * Build WP_Query arguments for calendar events.
 	 *
+	 * Date filtering and ordering use posts_clauses filters on the
+	 * event_dates table instead of meta_query. Returns both the query
+	 * args and a cleanup callable that MUST be invoked after the
+	 * WP_Query runs to remove the posts_clauses filters.
+	 *
 	 * @param array $params Query parameters.
-	 * @return array WP_Query arguments.
+	 * @return array{ args: array, cleanup: callable } WP_Query arguments and cleanup function.
 	 */
 	public static function build_query_args( array $params ): array {
 		$defaults = array(
@@ -54,10 +58,6 @@ class EventQueryBuilder {
 
 		/**
 		 * Filter the base query constraint for calendar events.
-		 *
-		 * @param array|null $tax_query_override The base tax_query constraint (null if none).
-		 * @param array      $context Request context.
-		 * @return array|null Modified tax_query constraint or null to remove constraint.
 		 */
 		$params['tax_query_override'] = apply_filters(
 			'data_machine_events_calendar_base_query',
@@ -73,70 +73,71 @@ class EventQueryBuilder {
 			'post_type'      => Event_Post_Type::POST_TYPE,
 			'post_status'    => 'publish',
 			'posts_per_page' => -1,
-			'orderby'        => 'event_start',
-			'order'          => $params['show_past'] ? 'DESC' : 'ASC',
+			// Ordering handled by posts_clauses filter below.
+			'orderby'        => 'none',
 		);
 
-		$meta_query       = array( 'relation' => 'AND' );
+		// Collect all posts_clauses filter callbacks for cleanup.
+		$filters = array();
+
 		$current_datetime = current_time( 'mysql' );
-		$has_date_range   = ! empty( $params['date_start'] ) || ! empty( $params['date_end'] );
 
-		// Track whether DateFilter adds the 'event_start' named clause for ordering.
-		$has_event_start_clause = false;
-
+		// Apply date filter + ordering via posts_clauses.
 		if ( $params['show_past'] && ! $params['user_date_range'] ) {
-			$meta_query[]           = DateFilter::past_meta_query( $current_datetime );
-			$has_event_start_clause = true;
+			$filters[] = DateFilter::apply_past_filter( $current_datetime );
+			$filters[] = DateFilter::apply_date_orderby( 'DESC' );
 		} elseif ( ! $params['show_past'] && ! $params['user_date_range'] ) {
-			$meta_query[]           = DateFilter::upcoming_meta_query( $current_datetime );
-			$has_event_start_clause = true;
+			$filters[] = DateFilter::apply_upcoming_filter( $current_datetime );
+			$filters[] = DateFilter::apply_date_orderby( 'ASC' );
+		} else {
+			// user_date_range mode — just apply ordering.
+			$filters[] = DateFilter::apply_date_orderby( $params['show_past'] ? 'DESC' : 'ASC' );
 		}
 
-		if ( ! empty( $params['date_start'] ) ) {
-			$start_datetime = ! empty( $params['time_start'] )
-				? $params['date_start'] . ' ' . $params['time_start']
-				: $params['date_start'] . ' 00:00:00';
+		// Date range boundaries via posts_clauses.
+		if ( ! empty( $params['date_start'] ) || ! empty( $params['date_end'] ) ) {
+			$date_start = $params['date_start'];
+			$date_end   = $params['date_end'];
+			$time_start = $params['time_start'];
+			$time_end   = $params['time_end'];
 
-			// Include events that START on/after the boundary OR that END on/after it.
-			// This ensures multi-day events that started before the page boundary
-			// but span into it are still returned.
-			$meta_query[] = array(
-				'relation' => 'OR',
-				array(
-					'key'     => EVENT_DATETIME_META_KEY,
-					'value'   => $start_datetime,
-					'compare' => '>=',
-				),
-				array(
-					'key'     => EVENT_END_DATETIME_META_KEY,
-					'value'   => $start_datetime,
-					'compare' => '>=',
-				),
-			);
+			$date_range_filter = function ( $clauses ) use ( $date_start, $date_end, $time_start, $time_end ) {
+				global $wpdb;
+				$table = EventDatesTable::table_name();
+
+				if ( strpos( $clauses['join'], $table ) === false ) {
+					$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
+				}
+
+				if ( ! empty( $date_start ) ) {
+					$start_datetime = ! empty( $time_start )
+						? $date_start . ' ' . $time_start
+						: $date_start . ' 00:00:00';
+
+					$clauses['where'] .= $wpdb->prepare(
+						' AND (ed.start_datetime >= %s OR ed.end_datetime >= %s)',
+						$start_datetime,
+						$start_datetime
+					);
+				}
+
+				if ( ! empty( $date_end ) ) {
+					$end_datetime = ! empty( $time_end )
+						? $date_end . ' ' . $time_end
+						: $date_end . ' 23:59:59';
+
+					$clauses['where'] .= $wpdb->prepare(
+						' AND ed.start_datetime <= %s',
+						$end_datetime
+					);
+				}
+
+				return $clauses;
+			};
+
+			add_filter( 'posts_clauses', $date_range_filter );
+			$filters[] = $date_range_filter;
 		}
-
-		if ( ! empty( $params['date_end'] ) ) {
-			$end_datetime = ! empty( $params['time_end'] )
-				? $params['date_end'] . ' ' . $params['time_end']
-				: $params['date_end'] . ' 23:59:59';
-
-			$meta_query[] = array(
-				'key'     => EVENT_DATETIME_META_KEY,
-				'value'   => $end_datetime,
-				'compare' => '<=',
-			);
-		}
-
-		// When DateFilter wasn't applied (user_date_range mode), add a standalone
-		// named clause so 'orderby' => 'event_start' resolves without a redundant JOIN.
-		if ( ! $has_event_start_clause ) {
-			$meta_query['event_start'] = array(
-				'key'     => EVENT_DATETIME_META_KEY,
-				'compare' => 'EXISTS',
-			);
-		}
-
-		$query_args['meta_query'] = $meta_query;
 
 		if ( $params['tax_query_override'] ) {
 			$query_args['tax_query'] = $params['tax_query_override'];
@@ -163,7 +164,6 @@ class EventQueryBuilder {
 						'operator' => 'IN',
 					);
 				} else {
-					// No venues within radius — force empty result set.
 					$tax_query[] = array(
 						'taxonomy' => 'venue',
 						'field'    => 'term_id',
@@ -197,7 +197,19 @@ class EventQueryBuilder {
 			$query_args['s'] = $params['search_query'];
 		}
 
-		return apply_filters( 'data_machine_events_calendar_query_args', $query_args, $params );
+		$query_args = apply_filters( 'data_machine_events_calendar_query_args', $query_args, $params );
+
+		// Return args + cleanup callable that removes all posts_clauses filters.
+		$cleanup = function () use ( $filters ) {
+			foreach ( $filters as $filter ) {
+				remove_filter( 'posts_clauses', $filter );
+			}
+		};
+
+		return array(
+			'args'    => $query_args,
+			'cleanup' => $cleanup,
+		);
 	}
 
 	/**
@@ -228,25 +240,27 @@ class EventQueryBuilder {
 	private static function compute_event_counts(): array {
 		$current_datetime = current_time( 'mysql' );
 
-		$future_query = new WP_Query(
+		$upcoming_filter = DateFilter::apply_upcoming_filter( $current_datetime );
+		$future_query    = new WP_Query(
 			array(
 				'post_type'      => Event_Post_Type::POST_TYPE,
 				'post_status'    => 'publish',
 				'fields'         => 'ids',
 				'posts_per_page' => 1,
-				'meta_query'     => DateFilter::upcoming_meta_query( $current_datetime ),
 			)
 		);
+		remove_filter( 'posts_clauses', $upcoming_filter );
 
-		$past_query = new WP_Query(
+		$past_filter = DateFilter::apply_past_filter( $current_datetime );
+		$past_query  = new WP_Query(
 			array(
 				'post_type'      => Event_Post_Type::POST_TYPE,
 				'post_status'    => 'publish',
 				'fields'         => 'ids',
 				'posts_per_page' => 1,
-				'meta_query'     => DateFilter::past_meta_query( $current_datetime ),
 			)
 		);
+		remove_filter( 'posts_clauses', $past_filter );
 
 		return array(
 			'past'   => $past_query->found_posts,

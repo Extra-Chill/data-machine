@@ -13,8 +13,6 @@
 namespace DataMachineEvents\Blocks\Calendar\Pagination;
 
 use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
-use const DataMachineEvents\Core\EVENT_DATETIME_META_KEY;
-use const DataMachineEvents\Core\EVENT_END_DATETIME_META_KEY;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -69,18 +67,18 @@ class PageBoundary {
 
 		$show_past_param = $params['show_past'] ?? false;
 		$current_date    = current_time( 'Y-m-d' );
+		$ed_table        = \DataMachineEvents\Core\EventDatesTable::table_name();
 
 		// Build WHERE clauses from params for taxonomy/location filtering.
 		$where_clauses = array(
 			"p.post_type = 'data_machine_events'",
 			"p.post_status = 'publish'",
-			"pm_start.meta_key = '" . esc_sql( EVENT_DATETIME_META_KEY ) . "'",
 		);
 		$join_clauses  = array();
 		$query_values  = array();
 
 		if ( ! $show_past_param ) {
-			$where_clauses[] = 'pm_start.meta_value >= %s';
+			$where_clauses[] = 'ed.start_datetime >= %s';
 			$query_values[]  = $current_date . ' 00:00:00';
 		}
 
@@ -129,21 +127,19 @@ class PageBoundary {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$rows = $wpdb->get_results(
 			empty( $query_values )
-				? "SELECT DATE(pm_start.meta_value) AS start_date, DATE(pm_end.meta_value) AS end_date
+				? "SELECT DATE(ed.start_datetime) AS start_date, DATE(ed.end_datetime) AS end_date
 				   FROM {$wpdb->posts} p
-				   INNER JOIN {$wpdb->postmeta} pm_start ON p.ID = pm_start.post_id
-				   LEFT JOIN {$wpdb->postmeta} pm_end ON p.ID = pm_end.post_id AND pm_end.meta_key = '" . esc_sql( EVENT_END_DATETIME_META_KEY ) . "'
+				   INNER JOIN {$ed_table} ed ON p.ID = ed.post_id
 				   {$joins}
 				   WHERE {$where}
-				   ORDER BY pm_start.meta_value ASC"
+				   ORDER BY ed.start_datetime ASC"
 				: $wpdb->prepare(
-					"SELECT DATE(pm_start.meta_value) AS start_date, DATE(pm_end.meta_value) AS end_date
+					"SELECT DATE(ed.start_datetime) AS start_date, DATE(ed.end_datetime) AS end_date
 					FROM {$wpdb->posts} p
-					INNER JOIN {$wpdb->postmeta} pm_start ON p.ID = pm_start.post_id
-					LEFT JOIN {$wpdb->postmeta} pm_end ON p.ID = pm_end.post_id AND pm_end.meta_key = '" . esc_sql( EVENT_END_DATETIME_META_KEY ) . "'
+					INNER JOIN {$ed_table} ed ON p.ID = ed.post_id
 					{$joins}
 					WHERE {$where}
-					ORDER BY pm_start.meta_value ASC",
+					ORDER BY ed.start_datetime ASC",
 					...$query_values
 				)
 		);

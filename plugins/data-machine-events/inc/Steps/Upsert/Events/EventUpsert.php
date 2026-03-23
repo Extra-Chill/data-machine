@@ -485,16 +485,22 @@ class EventUpsert extends UpdateHandler {
 					'terms'    => $venue_term->term_id,
 				),
 			),
-			'meta_query'     => array(
-				array(
-					'key'     => EVENT_DATETIME_META_KEY,
-					'value'   => $date_only,
-					'compare' => 'LIKE',
-				),
-			),
 		);
 
+		$date_filter = function ( $clauses ) use ( $date_only ) {
+			global $wpdb;
+			$table = \DataMachineEvents\Core\EventDatesTable::table_name();
+			if ( strpos( $clauses['join'], $table ) === false ) {
+				$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
+			}
+			$clauses['where'] .= $wpdb->prepare( ' AND DATE(ed.start_datetime) = %s', $date_only );
+			return $clauses;
+		};
+		add_filter( 'posts_clauses', $date_filter );
+
 		$candidates = get_posts( $args );
+
+		remove_filter( 'posts_clauses', $date_filter );
 
 		if ( empty( $candidates ) ) {
 			return null;
@@ -507,7 +513,8 @@ class EventUpsert extends UpdateHandler {
 			}
 
 			// Check time window if both events have time data
-			$existing_datetime = get_post_meta( $candidate->ID, EVENT_DATETIME_META_KEY, true );
+			$candidate_dates   = \DataMachineEvents\Core\EventDatesTable::get( $candidate->ID );
+			$existing_datetime = $candidate_dates ? $candidate_dates->start_datetime : '';
 			if ( ! $this->isWithinTimeWindow( $startDate, $existing_datetime ) ) {
 				do_action(
 					'datamachine_log',
@@ -645,16 +652,24 @@ class EventUpsert extends UpdateHandler {
 		);
 
 		if ( ! empty( $startDate ) ) {
-			$args['meta_query'] = array(
-				array(
-					'key'     => EVENT_DATETIME_META_KEY,
-					'value'   => self::extractDateForQuery( $startDate ),
-					'compare' => 'LIKE',
-				),
-			);
+			$exact_date_only = self::extractDateForQuery( $startDate );
+			$date_filter     = function ( $clauses ) use ( $exact_date_only ) {
+				global $wpdb;
+				$table = \DataMachineEvents\Core\EventDatesTable::table_name();
+				if ( strpos( $clauses['join'], $table ) === false ) {
+					$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
+				}
+				$clauses['where'] .= $wpdb->prepare( ' AND DATE(ed.start_datetime) = %s', $exact_date_only );
+				return $clauses;
+			};
+			add_filter( 'posts_clauses', $date_filter );
 		}
 
 		$posts = get_posts( $args );
+
+		if ( ! empty( $startDate ) ) {
+			remove_filter( 'posts_clauses', $date_filter );
+		}
 
 		if ( ! empty( $posts ) ) {
 			$post_id = $posts[0];
@@ -724,27 +739,35 @@ class EventUpsert extends UpdateHandler {
 		}
 
 		// Strategy A: exact match on stored normalized URL
-		$args = array(
+		$ticket_date_only = self::extractDateForQuery( $startDate );
+		$args             = array(
 			'post_type'      => Event_Post_Type::POST_TYPE,
 			'posts_per_page' => 1,
 			'post_status'    => array( 'publish', 'draft', 'pending' ),
 			'fields'         => 'ids',
 			'meta_query'     => array(
-				'relation' => 'AND',
 				array(
 					'key'     => EVENT_TICKET_URL_META_KEY,
 					'value'   => $normalized_url,
 					'compare' => '=',
 				),
-				array(
-					'key'     => EVENT_DATETIME_META_KEY,
-					'value'   => self::extractDateForQuery( $startDate ),
-					'compare' => 'LIKE',
-				),
 			),
 		);
 
+		$ticket_date_filter_a = function ( $clauses ) use ( $ticket_date_only ) {
+			global $wpdb;
+			$table = \DataMachineEvents\Core\EventDatesTable::table_name();
+			if ( strpos( $clauses['join'], $table ) === false ) {
+				$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
+			}
+			$clauses['where'] .= $wpdb->prepare( ' AND DATE(ed.start_datetime) = %s', $ticket_date_only );
+			return $clauses;
+		};
+		add_filter( 'posts_clauses', $ticket_date_filter_a );
+
 		$posts = get_posts( $args );
+
+		remove_filter( 'posts_clauses', $ticket_date_filter_a );
 
 		if ( ! empty( $posts ) ) {
 			do_action(
@@ -776,20 +799,27 @@ class EventUpsert extends UpdateHandler {
 			'post_status'    => array( 'publish', 'draft', 'pending' ),
 			'fields'         => 'ids',
 			'meta_query'     => array(
-				'relation' => 'AND',
 				array(
 					'key'     => EVENT_TICKET_URL_META_KEY,
 					'compare' => 'EXISTS',
 				),
-				array(
-					'key'     => EVENT_DATETIME_META_KEY,
-					'value'   => self::extractDateForQuery( $startDate ),
-					'compare' => 'LIKE',
-				),
 			),
 		);
 
+		$ticket_date_filter_b = function ( $clauses ) use ( $ticket_date_only ) {
+			global $wpdb;
+			$table = \DataMachineEvents\Core\EventDatesTable::table_name();
+			if ( strpos( $clauses['join'], $table ) === false ) {
+				$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
+			}
+			$clauses['where'] .= $wpdb->prepare( ' AND DATE(ed.start_datetime) = %s', $ticket_date_only );
+			return $clauses;
+		};
+		add_filter( 'posts_clauses', $ticket_date_filter_b );
+
 		$candidates = get_posts( $date_args );
+
+		remove_filter( 'posts_clauses', $ticket_date_filter_b );
 
 		foreach ( $candidates as $candidate_id ) {
 			$stored_url       = get_post_meta( $candidate_id, EVENT_TICKET_URL_META_KEY, true );
@@ -845,16 +875,22 @@ class EventUpsert extends UpdateHandler {
 			'post_type'      => Event_Post_Type::POST_TYPE,
 			'posts_per_page' => 20,
 			'post_status'    => array( 'publish', 'draft', 'pending' ),
-			'meta_query'     => array(
-				array(
-					'key'     => EVENT_DATETIME_META_KEY,
-					'value'   => $date_only,
-					'compare' => 'LIKE',
-				),
-			),
 		);
 
+		$date_filter = function ( $clauses ) use ( $date_only ) {
+			global $wpdb;
+			$table = \DataMachineEvents\Core\EventDatesTable::table_name();
+			if ( strpos( $clauses['join'], $table ) === false ) {
+				$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
+			}
+			$clauses['where'] .= $wpdb->prepare( ' AND DATE(ed.start_datetime) = %s', $date_only );
+			return $clauses;
+		};
+		add_filter( 'posts_clauses', $date_filter );
+
 		$candidates = get_posts( $args );
+
+		remove_filter( 'posts_clauses', $date_filter );
 
 		if ( empty( $candidates ) ) {
 			return null;
@@ -865,7 +901,8 @@ class EventUpsert extends UpdateHandler {
 				continue;
 			}
 
-			$existing_datetime = get_post_meta( $candidate->ID, EVENT_DATETIME_META_KEY, true );
+			$candidate_dates   = \DataMachineEvents\Core\EventDatesTable::get( $candidate->ID );
+			$existing_datetime = $candidate_dates ? $candidate_dates->start_datetime : '';
 			if ( ! $this->isWithinTimeWindow( $startDate, $existing_datetime ) ) {
 				continue;
 			}
@@ -1191,7 +1228,8 @@ class EventUpsert extends UpdateHandler {
 			return;
 		}
 
-		$start_datetime = get_post_meta( $post_id, EVENT_DATETIME_META_KEY, true );
+		$dates          = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+		$start_datetime = $dates ? $dates->start_datetime : '';
 		if ( empty( $start_datetime ) ) {
 			return;
 		}
@@ -1218,7 +1256,8 @@ class EventUpsert extends UpdateHandler {
 			return;
 		}
 
-		$end_datetime = get_post_meta( $post_id, EVENT_END_DATETIME_META_KEY, true );
+		$dates        = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+		$end_datetime = $dates ? $dates->end_datetime : '';
 		if ( empty( $end_datetime ) ) {
 			return;
 		}

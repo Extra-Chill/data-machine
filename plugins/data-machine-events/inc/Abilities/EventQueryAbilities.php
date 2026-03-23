@@ -162,14 +162,8 @@ class EventQueryAbilities {
 			'post_type'      => Event_Post_Type::POST_TYPE,
 			'post_status'    => $status,
 			'posts_per_page' => $limit,
-			'orderby'        => 'event_start',
+			'orderby'        => 'none',
 			'order'          => 'DESC',
-			'meta_query'     => array(
-				'event_start' => array(
-					'key'     => '_datamachine_event_datetime',
-					'compare' => 'EXISTS',
-				),
-			),
 			'tax_query'      => array(
 				array(
 					'taxonomy' => 'venue',
@@ -183,13 +177,28 @@ class EventQueryAbilities {
 			$query_args['date_query'] = $date_query;
 		}
 
+		$venue_event_filter = function ( $clauses ) {
+			global $wpdb;
+			$table = \DataMachineEvents\Core\EventDatesTable::table_name();
+			if ( strpos( $clauses['join'], $table ) === false ) {
+				$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
+			}
+			$clauses['orderby'] = 'ed.start_datetime DESC';
+			return $clauses;
+		};
+		add_filter( 'posts_clauses', $venue_event_filter );
+
 		$query               = new \WP_Query( $query_args );
+
+		remove_filter( 'posts_clauses', $venue_event_filter );
+
 		$events              = array();
 		$include_description = ! empty( $input['include_description'] );
 
 		foreach ( $query->posts as $post ) {
-			$start_date = get_post_meta( $post->ID, '_datamachine_event_datetime', true );
-			$end_date   = get_post_meta( $post->ID, '_datamachine_event_end_datetime', true );
+			$dates      = \DataMachineEvents\Core\EventDatesTable::get( $post->ID );
+			$start_date = $dates ? $dates->start_datetime : null;
+			$end_date   = $dates ? $dates->end_datetime : null;
 
 			$event_data = array(
 				'post_id'    => $post->ID,

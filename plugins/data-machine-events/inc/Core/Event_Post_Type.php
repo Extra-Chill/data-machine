@@ -206,7 +206,8 @@ class Event_Post_Type {
 			return;
 		}
 
-		$event_datetime = get_post_meta( $post_id, self::EVENT_DATE_META_KEY, true );
+		$dates          = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+		$event_datetime = $dates ? $dates->start_datetime : '';
 
 		if ( ! $event_datetime ) {
 			echo '<span class="datamachine-no-date">' . esc_html__( 'No date set', 'data-machine-events' ) . '</span>';
@@ -246,8 +247,19 @@ class Event_Post_Type {
 		$orderby = $query->get( 'orderby' );
 
 		if ( 'event_date' === $orderby ) {
-			$query->set( 'meta_key', self::EVENT_DATE_META_KEY );
-			$query->set( 'orderby', 'meta_value' );
+			$sort_direction = $query->get( 'order' ) ?: 'ASC';
+			add_filter(
+				'posts_clauses',
+				function ( $clauses ) use ( $sort_direction ) {
+					global $wpdb;
+					$table = \DataMachineEvents\Core\EventDatesTable::table_name();
+					if ( strpos( $clauses['join'], $table ) === false ) {
+						$clauses['join'] .= " LEFT JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
+					}
+					$clauses['orderby'] = 'ed.start_datetime ' . $sort_direction;
+					return $clauses;
+				}
+			);
 		}
 	}
 

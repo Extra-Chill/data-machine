@@ -220,40 +220,42 @@ class TimezoneAbilities {
 	}
 
 	private function queryEvents( string $scope, int $days_ahead ): array {
+		$order = 'ASC';
+		if ( 'past' === $scope ) {
+			$order = 'DESC';
+		}
+
 		$args = array(
 			'post_type'      => Event_Post_Type::POST_TYPE,
 			'post_status'    => 'publish',
 			'posts_per_page' => -1,
-			'orderby'        => 'meta_value',
-			'meta_key'       => Event_Post_Type::EVENT_DATE_META_KEY,
-			'order'          => 'ASC',
+			'orderby'        => 'none',
+			'order'          => $order,
 		);
 
 		$now = current_time( 'Y-m-d H:i:s' );
 
-		if ( 'upcoming' === $scope ) {
-			$end_date           = gmdate( 'Y-m-d H:i:s', strtotime( "+{$days_ahead} days" ) );
-			$args['meta_query'] = array(
-				array(
-					'key'     => Event_Post_Type::EVENT_DATE_META_KEY,
-					'value'   => array( $now, $end_date ),
-					'compare' => 'BETWEEN',
-					'type'    => 'DATETIME',
-				),
-			);
-		} elseif ( 'past' === $scope ) {
-			$args['meta_query'] = array(
-				array(
-					'key'     => Event_Post_Type::EVENT_DATE_META_KEY,
-					'value'   => $now,
-					'compare' => '<',
-					'type'    => 'DATETIME',
-				),
-			);
-			$args['order']      = 'DESC';
-		}
+		$event_date_filter = function ( $clauses ) use ( $scope, $now, $days_ahead, $order ) {
+			global $wpdb;
+			$table = \DataMachineEvents\Core\EventDatesTable::table_name();
+			if ( strpos( $clauses['join'], $table ) === false ) {
+				$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
+			}
+			if ( 'upcoming' === $scope ) {
+				$end_date = gmdate( 'Y-m-d H:i:s', strtotime( "+{$days_ahead} days" ) );
+				$clauses['where'] .= $wpdb->prepare( ' AND ed.start_datetime BETWEEN %s AND %s', $now, $end_date );
+			} elseif ( 'past' === $scope ) {
+				$clauses['where'] .= $wpdb->prepare( ' AND ed.start_datetime < %s', $now );
+			}
+			$clauses['orderby'] = 'ed.start_datetime ' . $order;
+			return $clauses;
+		};
+		add_filter( 'posts_clauses', $event_date_filter );
 
 		$query = new \WP_Query( $args );
+
+		remove_filter( 'posts_clauses', $event_date_filter );
+
 		return $query->posts;
 	}
 

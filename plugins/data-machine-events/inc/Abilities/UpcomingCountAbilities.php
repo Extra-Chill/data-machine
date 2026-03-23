@@ -117,11 +117,12 @@ class UpcomingCountAbilities {
 
 		global $wpdb;
 
-		$today = gmdate( 'Y-m-d 00:00:00' );
+		$today    = gmdate( 'Y-m-d 00:00:00' );
+		$ed_table = \DataMachineEvents\Core\EventDatesTable::table_name();
 
 		$parent_clause = $exclude_roots ? 'AND tt.parent != 0' : '';
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT t.term_id, t.name, t.slug, COUNT(DISTINCT p.ID) AS event_count
@@ -129,12 +130,11 @@ class UpcomingCountAbilities {
 				INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
 				INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
 				INNER JOIN {$wpdb->posts} p ON tr.object_id = p.ID
-				INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+				INNER JOIN {$ed_table} ed ON p.ID = ed.post_id
 				WHERE tt.taxonomy = %s
 				AND p.post_type = 'data_machine_events'
 				AND p.post_status = 'publish'
-				AND pm.meta_key = '_datamachine_event_datetime'
-				AND pm.meta_value >= %s
+				AND ed.start_datetime >= %s
 				{$parent_clause}
 				GROUP BY t.term_id
 				ORDER BY event_count DESC",

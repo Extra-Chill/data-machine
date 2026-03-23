@@ -177,7 +177,8 @@ class CleanDuplicatesCommand {
 	private function find_duplicates( array $events ): array {
 		$by_date = array();
 		foreach ( $events as $event ) {
-			$start_meta = get_post_meta( $event->ID, '_datamachine_event_datetime', true );
+			$dates      = \DataMachineEvents\Core\EventDatesTable::get( $event->ID );
+			$start_meta = $dates ? $dates->start_datetime : '';
 			$date       = $start_meta ? substr( $start_meta, 0, 10 ) : '';
 
 			if ( empty( $date ) ) {

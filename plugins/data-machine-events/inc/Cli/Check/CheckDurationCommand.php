@@ -171,33 +171,33 @@ class CheckDurationCommand {
 	private function find_long_span_events( int $max_days, string $scope ): array {
 		global $wpdb;
 
-		$now = current_time( 'Y-m-d H:i:s' );
+		$now      = current_time( 'Y-m-d H:i:s' );
+		$ed_table = \DataMachineEvents\Core\EventDatesTable::table_name();
 
 		$where_scope = '';
 		if ( 'upcoming' === $scope ) {
-			$where_scope = $wpdb->prepare( ' AND end_meta.meta_value >= %s', $now );
+			$where_scope = $wpdb->prepare( ' AND ed.end_datetime >= %s', $now );
 		} elseif ( 'past' === $scope ) {
-			$where_scope = $wpdb->prepare( ' AND end_meta.meta_value < %s', $now );
+			$where_scope = $wpdb->prepare( ' AND ed.end_datetime < %s', $now );
 		}
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$results = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT p.ID, p.post_title, p.post_content,
-					start_meta.meta_value AS start_dt,
-					end_meta.meta_value AS end_dt,
-					DATEDIFF(end_meta.meta_value, start_meta.meta_value) AS span_days,
+					ed.start_datetime AS start_dt,
+					ed.end_datetime AS end_dt,
+					DATEDIFF(ed.end_datetime, ed.start_datetime) AS span_days,
 					handler_meta.meta_value AS pipeline_id
 				FROM {$wpdb->posts} p
-				INNER JOIN {$wpdb->postmeta} start_meta
-					ON p.ID = start_meta.post_id AND start_meta.meta_key = '_datamachine_event_datetime'
-				INNER JOIN {$wpdb->postmeta} end_meta
-					ON p.ID = end_meta.post_id AND end_meta.meta_key = '_datamachine_event_end_datetime'
+				INNER JOIN {$ed_table} ed
+					ON p.ID = ed.post_id
 				LEFT JOIN {$wpdb->postmeta} handler_meta
 					ON p.ID = handler_meta.post_id AND handler_meta.meta_key = '_datamachine_post_pipeline_id'
 				WHERE p.post_type = %s
 					AND p.post_status = 'publish'
-					AND DATEDIFF(end_meta.meta_value, start_meta.meta_value) > %d
+					AND ed.end_datetime IS NOT NULL
+					AND DATEDIFF(ed.end_datetime, ed.start_datetime) > %d
 					{$where_scope}
 				ORDER BY span_days DESC",
 				Event_Post_Type::POST_TYPE,

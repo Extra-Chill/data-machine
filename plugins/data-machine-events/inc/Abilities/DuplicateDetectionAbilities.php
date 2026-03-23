@@ -304,6 +304,17 @@ class DuplicateDetectionAbilities {
 			}
 
 			if ( $venue_term ) {
+				$dedup_date_filter_1 = function ( $clauses ) use ( $startDate ) {
+					global $wpdb;
+					$table = \DataMachineEvents\Core\EventDatesTable::table_name();
+					if ( strpos( $clauses['join'], $table ) === false ) {
+						$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
+					}
+					$clauses['where'] .= $wpdb->prepare( ' AND DATE(ed.start_datetime) = %s', $startDate );
+					return $clauses;
+				};
+				add_filter( 'posts_clauses', $dedup_date_filter_1 );
+
 				$candidates = get_posts(
 					array(
 						'post_type'      => Event_Post_Type::POST_TYPE,
@@ -316,16 +327,10 @@ class DuplicateDetectionAbilities {
 								'terms'    => $venue_term->term_id,
 							),
 						),
-						// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Legacy fallback, replaced by PostIdentityIndex.
-						'meta_query'     => array(
-							array(
-								'key'     => EVENT_DATETIME_META_KEY,
-								'value'   => $startDate,
-								'compare' => 'LIKE',
-							),
-						),
 					)
 				);
+
+				remove_filter( 'posts_clauses', $dedup_date_filter_1 );
 
 				foreach ( $candidates as $candidate ) {
 					if ( EventIdentifierGenerator::titlesMatch( $title, $candidate->post_title ) ) {
@@ -342,21 +347,26 @@ class DuplicateDetectionAbilities {
 		}
 
 		// Strategy 2: date-scoped fuzzy title + venue confirmation.
+		$dedup_date_filter_2 = function ( $clauses ) use ( $startDate ) {
+			global $wpdb;
+			$table = \DataMachineEvents\Core\EventDatesTable::table_name();
+			if ( strpos( $clauses['join'], $table ) === false ) {
+				$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
+			}
+			$clauses['where'] .= $wpdb->prepare( ' AND DATE(ed.start_datetime) = %s', $startDate );
+			return $clauses;
+		};
+		add_filter( 'posts_clauses', $dedup_date_filter_2 );
+
 		$candidates = get_posts(
 			array(
 				'post_type'      => Event_Post_Type::POST_TYPE,
 				'posts_per_page' => 20,
 				'post_status'    => array( 'publish', 'draft', 'pending' ),
-				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Legacy fallback, replaced by PostIdentityIndex.
-				'meta_query'     => array(
-					array(
-						'key'     => EVENT_DATETIME_META_KEY,
-						'value'   => $startDate,
-						'compare' => 'LIKE',
-					),
-				),
 			)
 		);
+
+		remove_filter( 'posts_clauses', $dedup_date_filter_2 );
 
 		foreach ( $candidates as $candidate ) {
 			if ( ! EventIdentifierGenerator::titlesMatch( $title, $candidate->post_title ) ) {
