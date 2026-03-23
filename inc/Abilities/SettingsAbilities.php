@@ -128,14 +128,7 @@ class SettingsAbilities {
 								'time_limit'         => array( 'type' => 'integer' ),
 							),
 						),
-						'github_pat'                     => array(
-							'type'        => 'string',
-							'description' => 'GitHub Personal Access Token for GitHub integration.',
-						),
-						'github_default_repo'            => array(
-							'type'        => 'string',
-							'description' => 'Default GitHub repository in owner/repo format.',
-						),
+						// GitHub settings moved to data-machine-code extension.
 						'network_settings'               => array(
 							'type'        => 'object',
 							'description' => 'Network-wide defaults (multisite). Keys: default_provider, default_model, context_models.',
@@ -542,16 +535,7 @@ class SettingsAbilities {
 			$handled_keys[]               = 'queue_tuning';
 		}
 
-		// GitHub integration settings.
-		if ( isset( $input['github_pat'] ) ) {
-			$all_settings['github_pat'] = sanitize_text_field( $input['github_pat'] );
-			$handled_keys[]             = 'github_pat';
-		}
-
-		if ( isset( $input['github_default_repo'] ) ) {
-			$all_settings['github_default_repo'] = sanitize_text_field( $input['github_default_repo'] );
-			$handled_keys[]                      = 'github_default_repo';
-		}
+		// GitHub integration settings moved to data-machine-code extension.
 
 		// Network-wide defaults (requires super admin on multisite).
 		if ( isset( $input['network_settings'] ) && is_array( $input['network_settings'] ) ) {
