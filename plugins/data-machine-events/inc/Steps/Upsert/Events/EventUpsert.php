@@ -311,22 +311,33 @@ class EventUpsert extends UpdateHandler {
 		$lock_key        = 'dme_' . md5( $date_only . '|' . $normalized );
 
 		// MySQL lock names are limited to 64 characters; md5 = 36 + prefix = 40, safe.
-		// Timeout of 10 seconds: long enough for upsert to complete, short enough
-		// not to bottleneck the queue. If lock times out, proceed without it
-		// (better to risk a dupe than deadlock the pipeline).
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$result = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 10)', $lock_key ) );
+		// Try up to 3 times with increasing timeouts (5s, 10s, 15s).
+		// If all attempts fail, proceed without lock — better to risk a dupe
+		// than deadlock the pipeline entirely.
+		$timeouts = array( 5, 10, 15 );
+		$acquired = false;
 
-		if ( '1' !== (string) $result ) {
+		foreach ( $timeouts as $attempt => $timeout ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$result = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $lock_key, $timeout ) );
+
+			if ( '1' === (string) $result ) {
+				$acquired = true;
+				break;
+			}
+		}
+
+		if ( ! $acquired ) {
 			do_action(
 				'datamachine_log',
-				'debug',
-				'Event Upsert: Advisory lock timeout, proceeding without lock',
+				'warning',
+				'Event Upsert: Advisory lock failed after 3 attempts, proceeding without lock',
 				array(
 					'lock_key'        => $lock_key,
 					'title'           => $title,
 					'startDate'       => $startDate,
 					'normalized'      => $normalized,
+					'total_wait_secs' => array_sum( $timeouts ),
 				)
 			);
 		}
@@ -437,12 +448,14 @@ class EventUpsert extends UpdateHandler {
 			return null;
 		}
 
-		// Find venue term — try exact name first, then slug-based lookup
+		// Find venue term — cascading lookup: exact name → slug → normalized name.
 		$venue_term = get_term_by( 'name', $venue, 'venue' );
 		if ( ! $venue_term ) {
-			// Try slug-based lookup to catch minor name variations
 			$venue_slug = sanitize_title( $venue );
 			$venue_term = get_term_by( 'slug', $venue_slug, 'venue' );
+		}
+		if ( ! $venue_term ) {
+			$venue_term = \DataMachineEvents\Core\Venue_Taxonomy::find_venue_by_normalized_name_public( $venue );
 		}
 		if ( ! $venue_term ) {
 			do_action(
