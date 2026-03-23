@@ -250,6 +250,13 @@ class EventEngineData {
 			}
 		}
 
+		// Event title — stored in engine_data so pre-AI dedup gate can
+		// check the PostIdentityIndex before burning AI tokens.
+		$title = $event_data['title'] ?? '';
+		if ( '' !== $title ) {
+			$payload['title'] = $title;
+		}
+
 		// Core event fields.
 		$core_fields = array(
 			'startDate' => $event_data['startDate'] ?? '',

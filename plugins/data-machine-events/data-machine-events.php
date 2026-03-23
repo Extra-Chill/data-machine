@@ -245,6 +245,7 @@ class DATAMACHINE_Events {
 		if ( class_exists( 'DataMachine\\Core\\Database\\PostIdentityIndex\\PostIdentityIndex' ) ) {
 			\DataMachineEvents\Core\DuplicateDetection\EventDuplicateStrategy::register();
 			\DataMachineEvents\Core\DuplicateDetection\EventIdentityWriter::register();
+			\DataMachineEvents\Core\DuplicateDetection\PreAIEventDedupGate::register();
 		}
 
 		// Notify submitters when their submitted events are published.
