@@ -158,7 +158,6 @@ wp datamachine settings         # Plugin settings
 wp datamachine posts            # Query Data Machine-created posts
 wp datamachine logs             # Log operations
 wp datamachine memory           # Agent memory read/write
-wp datamachine workspace        # Workspace file operations
 wp datamachine handlers         # List registered handlers
 wp datamachine step-types       # List registered step types
 wp datamachine chat             # Chat agent interface
@@ -167,7 +166,6 @@ wp datamachine links            # Internal linking
 wp datamachine blocks           # Gutenberg block operations
 wp datamachine image            # Image generation
 wp datamachine meta-description # SEO meta descriptions
-wp datamachine github           # GitHub integration
 wp datamachine auth             # OAuth provider management
 wp datamachine taxonomy         # Taxonomy operations
 wp datamachine batch            # Batch operations

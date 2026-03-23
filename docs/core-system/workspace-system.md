@@ -1,5 +1,7 @@
 # Workspace System
 
+> **Important:** The workspace system has been moved to the `data-machine-code` extension plugin as of v0.45.0. This documentation is preserved for reference. Install the extension to use workspace functionality.
+
 The workspace system provides a managed external directory where Data Machine agents can clone, read, write, and perform Git operations on repositories. Unlike agent memory files (which live inside `wp-content/uploads/`), workspace repos live **outside the web root** for security and to support build tooling that shouldn't be publicly accessible.
 
 ## Overview
@@ -11,7 +13,7 @@ The workspace system consists of:
 3. **WorkspaceAbilities** — WordPress 6.9 Abilities API (16 abilities)
 4. **WorkspaceTools / WorkspaceScopedTools** — AI chat tools for global and handler-scoped access
 5. **Fetch and Publish handlers** — pipeline integration for reading from and writing to workspace repos
-6. **CLI** — full `wp datamachine workspace` command set
+6. **CLI** — full `wp datamachine-code workspace` command set (in extension)
 
 ## Workspace Directory
 
@@ -164,7 +166,9 @@ Read-only abilities have `show_in_rest: true`. Mutating abilities have `show_in_
 
 ### Global Tools (WorkspaceTools)
 
-**Source:** `inc/Engine/AI/Tools/Global/WorkspaceTools.php`
+> **Note:** WorkspaceTools have been moved to the `data-machine-code` extension plugin.
+
+**Source:** `inc/Engine/AI/Tools/Global/WorkspaceTools.php` (in extension)
 **Tool ID:** Various (`workspace_path`, `workspace_list`, `workspace_show`, `workspace_ls`, `workspace_read`)
 **Contexts:** `chat`, `pipeline`, `standalone`
 

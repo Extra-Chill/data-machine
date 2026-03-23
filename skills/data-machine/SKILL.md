@@ -79,7 +79,7 @@ Manage via `wp datamachine agent` (aliased as `wp datamachine memory`). Run `wp 
 
 ## AI Tools (During Pipeline Execution)
 
-When running inside a pipeline, the AI step has access to tools. These are NOT CLI commands — they're available to the AI model during flow execution. Key tools include: local_search, image_generation, agent_memory, web_fetch, wordpress_post_reader, google_search, google_search_console, bing_webmaster, skip_item, queue_validator, github_create_issue.
+When running inside a pipeline, the AI step has access to tools. These are NOT CLI commands — they're available to the AI model during flow execution. Key tools include: local_search, image_generation, agent_memory, web_fetch, wordpress_post_reader, google_search, google_search_console, bing_webmaster, skip_item, queue_validator.
 
 The tool list is managed by the plugin and may grow. Check pipeline logs to see which tools are available.
 

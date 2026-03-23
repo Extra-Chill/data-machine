@@ -1,6 +1,8 @@
 # WP-CLI Commands
 
-Data Machine provides 25 WP-CLI command namespaces for managing pipelines, flows, jobs, agents, workspace, and more from the command line. All commands are registered under the `datamachine` namespace via `inc/Cli/Bootstrap.php`.
+Data Machine provides 23 WP-CLI command namespaces for managing pipelines, flows, jobs, agents, and more from the command line. All commands are registered under the `datamachine` namespace via `inc/Cli/Bootstrap.php`.
+
+> **Note:** The `wp datamachine workspace` and `wp datamachine github` commands have been moved to the `data-machine-code` extension plugin.
 
 ## Available Commands
 
@@ -249,56 +251,6 @@ wp datamachine agent paths
 wp datamachine agent paths --agent=my-agent --format=json
 ```
 
-**Options**: `--user`, `--agent`, `--format`, `--relative`
-
-### datamachine workspace
-
-Manage the agent workspace (cloned repositories). **Since**: 0.31.0
-
-```bash
-# Show workspace path
-wp datamachine workspace path
-wp datamachine workspace path --ensure  # create if missing
-
-# List repos
-wp datamachine workspace list
-
-# Clone a repository
-wp datamachine workspace clone https://github.com/user/repo.git
-wp datamachine workspace clone https://github.com/user/repo.git --name=my-repo
-
-# Show repo info (branch, remote, dirty status)
-wp datamachine workspace show my-repo
-
-# Read a file
-wp datamachine workspace read my-repo src/index.php
-wp datamachine workspace read my-repo src/index.php --offset=10 --limit=50
-
-# List directory contents
-wp datamachine workspace ls my-repo src/
-
-# Write a file
-wp datamachine workspace write my-repo src/config.php --content="<?php // config"
-echo "content" | wp datamachine workspace write my-repo src/file.txt
-
-# Edit a file (find and replace)
-wp datamachine workspace edit my-repo src/file.php --old="oldText" --new="newText"
-wp datamachine workspace edit my-repo src/file.php --old="oldText" --new="newText" --replace-all
-
-# Git operations
-wp datamachine workspace git status my-repo
-wp datamachine workspace git pull my-repo
-wp datamachine workspace git add my-repo --path=src/
-wp datamachine workspace git commit my-repo "commit message"
-wp datamachine workspace git push my-repo
-wp datamachine workspace git log my-repo --limit=10
-wp datamachine workspace git diff my-repo --staged
-
-# Remove a repo
-wp datamachine workspace remove my-repo --yes
-```
-
-### datamachine system
 
 System tasks and health checks. **Since**: 0.41.0
 
@@ -335,37 +287,6 @@ wp datamachine batch status 42
 
 # Cancel a running batch
 wp datamachine batch cancel 42
-```
-
-### datamachine github
-
-GitHub integration. **Since**: 0.33.0
-
-```bash
-# Check integration status
-wp datamachine github status
-
-# List issues
-wp datamachine github issues --repo=user/repo --state=open --labels=bug
-
-# View an issue
-wp datamachine github view 42 --repo=user/repo
-
-# Close an issue
-wp datamachine github close 42 --repo=user/repo --comment="Fixed in v1.2"
-
-# Comment on an issue
-wp datamachine github comment 42 "Working on this" --repo=user/repo
-
-# List pull requests
-wp datamachine github pulls --repo=user/repo --state=open
-
-# List repos for a user/org
-wp datamachine github repos Extra-Chill
-```
-
-**Options**: `--repo`, `--state`, `--labels`, `--assignee`, `--per_page`, `--page`, `--format`
-
 ### datamachine image
 
 Image generation and optimization. **Since**: 0.33.0
@@ -754,15 +675,3 @@ fi
 wp datamachine agent read
 wp datamachine agent write "## Status" "All systems operational"
 wp datamachine agent search "operational"
-```
-
-### Workspace git workflow
-
-```bash
-# Clone, edit, commit, push
-wp datamachine workspace clone https://github.com/user/repo.git
-wp datamachine workspace edit repo src/config.php --old="v1.0" --new="v1.1"
-wp datamachine workspace git add repo --path=src/config.php
-wp datamachine workspace git commit repo "bump version to 1.1"
-wp datamachine workspace git push repo
-```

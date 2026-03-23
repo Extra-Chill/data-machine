@@ -55,22 +55,17 @@ Available to all AI agents (pipeline + chat + standalone) via `datamachine_globa
 - **Features**: Post type and category filtering, force rebuild option, internal/external/all scope for broken link checks, configurable result limits
 - **Use Cases**: SEO link auditing, orphaned content discovery, broken link detection
 
-**GitHub Tools** — multi-tool class (@since v0.33.0)
+**GitHub Tools** — multi-tool class (@since v0.24.0, **moved to data-machine-code extension**)
+- `create_github_issue` — Create a GitHub issue in a repository. Async — uses System Agent for execution.
 - `list_github_issues` — List issues from a GitHub repository with state, label, and pagination filters
 - `get_github_issue` — Get a single GitHub issue with full details including body, labels, and comments
 - `manage_github_issue` — Update, close, or comment on a GitHub issue
 - `list_github_pulls` — List pull requests from a repository with state filtering
 - `list_github_repos` — List GitHub repositories for a user or organization
 - **Configuration**: GitHub PAT required
-- **Use Cases**: Issue tracking, PR monitoring, repository discovery
-
-**GitHub Issue Creator** (`create_github_issue`) (@since v0.24.0)
-- **Purpose**: Create a GitHub issue in a repository. Async — uses System Agent for execution.
-- **Configuration**: GitHub PAT required
-- **Features**: Supports title, body (GitHub Markdown), labels, and repo selection from configured defaults
 - **Use Cases**: Bug reports, feature requests, task tracking from AI workflows
 
-**Workspace Tools** — multi-tool class (@since v0.37.0)
+**Workspace Tools** — multi-tool class (@since v0.37.0, **moved to data-machine-code extension**)
 - `workspace_path` — Get the Data Machine workspace path, optionally ensure it exists
 - `workspace_list` — List repositories currently present in the workspace
 - `workspace_show` — Show detailed repo info (branch, remote, latest commit, dirty count)
@@ -353,10 +348,10 @@ Global tools are located in `/inc/Engine/AI/Tools/Global/`:
 - `QueueValidator.php` - Flow queue duplicate validation before content generation
 - `WebFetch.php` - Web page content retrieval
 - `WordPressPostReader.php` - Single post analysis
-- `WorkspaceTools.php` - Workspace repository operations (list, show, read, browse — multi-tool)
+- `WorkspaceTools.php` - Workspace repository operations (**moved to data-machine-code extension**)
 
 Additional global tools outside the Global directory:
-- `GitHubIssueTool.php` (`/inc/Engine/AI/Tools/`) - GitHub issue creation (async, System Agent)
+- `GitHubIssueTool.php` (`/inc/Engine/AI/Tools/`) - GitHub issue creation (**moved to data-machine-code extension**)
 
 Analytics abilities are located in `/inc/Abilities/Analytics/`:
 - `GoogleSearchConsoleAbilities.php` - GSC API integration and JWT auth
