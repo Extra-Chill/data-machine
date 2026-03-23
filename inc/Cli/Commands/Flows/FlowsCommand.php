@@ -30,7 +30,7 @@ class FlowsCommand extends BaseCommand {
 	 *
 	 * @var array
 	 */
-	private array $default_fields = array( 'id', 'name', 'pipeline_id', 'handlers', 'schedule', 'max_items', 'prompt', 'status', 'next_run' );
+	private array $default_fields = array( 'id', 'name', 'pipeline_id', 'handlers', 'config', 'schedule', 'max_items', 'status', 'next_run' );
 
 	/**
 	 * Get flows with optional filtering.
@@ -346,6 +346,7 @@ class FlowsCommand extends BaseCommand {
 					'name'        => $flow['flow_name'],
 					'pipeline_id' => $flow['pipeline_id'],
 					'handlers'    => $this->extractHandlers( $flow ),
+					'config'      => $this->extractConfigSummary( $flow ),
 					'schedule'    => $this->extractSchedule( $flow ),
 					'max_items'   => $this->extractMaxItems( $flow ),
 					'prompt'      => $this->extractPrompt( $flow ),
@@ -889,6 +890,89 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		return implode( ', ', array_unique( $handlers ) );
+	}
+
+	/**
+	 * Extract a concise config summary from flow handler configs.
+	 *
+	 * Shows the key distinguishing config per handler type:
+	 * - ticketmaster: coordinates + radius
+	 * - dice_fm: city name
+	 * - universal_web_scraper / web_scraper: source URL or venue name
+	 * - rss: feed URL
+	 * - upsert_event: location taxonomy term
+	 *
+	 * @param array $flow Flow data.
+	 * @return string Config summary (max ~60 chars).
+	 */
+	private function extractConfigSummary( array $flow ): string {
+		$flow_config = $flow['flow_config'] ?? array();
+		$parts       = array();
+
+		foreach ( $flow_config as $step_data ) {
+			$handler_configs = $step_data['handler_configs'] ?? array();
+
+			foreach ( $handler_configs as $handler_slug => $hconfig ) {
+				switch ( $handler_slug ) {
+					case 'ticketmaster':
+						$loc = $hconfig['location'] ?? '';
+						$rad = $hconfig['radius'] ?? '';
+						if ( $loc ) {
+							$parts[] = $loc . ( $rad ? " r={$rad}" : '' );
+						}
+						break;
+
+					case 'dice_fm':
+						$city = $hconfig['city'] ?? '';
+						if ( $city ) {
+							$parts[] = "city={$city}";
+						}
+						break;
+
+					case 'universal_web_scraper':
+					case 'web_scraper':
+						$url  = $hconfig['source_url'] ?? '';
+						$name = $hconfig['venue_name'] ?? '';
+						if ( $name ) {
+							$parts[] = $name;
+						} elseif ( $url ) {
+							// Show just the domain.
+							$host = wp_parse_url( $url, PHP_URL_HOST );
+							$parts[] = $host ?: $url;
+						}
+						break;
+
+					case 'rss':
+						$url = $hconfig['feed_url'] ?? $hconfig['url'] ?? '';
+						if ( $url ) {
+							$host = wp_parse_url( $url, PHP_URL_HOST );
+							$parts[] = $host ?: $url;
+						}
+						break;
+
+					case 'upsert_event':
+						$loc_term = $hconfig['taxonomy_location_selection'] ?? '';
+						if ( $loc_term && is_numeric( $loc_term ) ) {
+							$term = get_term( (int) $loc_term, 'location' );
+							if ( $term && ! is_wp_error( $term ) ) {
+								$parts[] = "loc={$term->name}";
+							}
+						} elseif ( $loc_term && 'skip' !== $loc_term && 'ai_decides' !== $loc_term ) {
+							$parts[] = "loc={$loc_term}";
+						}
+						break;
+				}
+			}
+		}
+
+		$summary = implode( ' | ', array_unique( $parts ) );
+
+		// Truncate if too long.
+		if ( mb_strlen( $summary ) > 60 ) {
+			$summary = mb_substr( $summary, 0, 57 ) . '...';
+		}
+
+		return $summary ?: '—';
 	}
 
 	/**
