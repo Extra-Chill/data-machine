@@ -298,17 +298,25 @@ class Agents {
 	/**
 	 * Handle GET /agents — list agents the current user can access.
 	 *
-	 * Admins see all agents. Other users see only agents they have access to.
+	 * Mirrors WordPress core's multisite user scoping: queries are scoped to the
+	 * current site by default. Agents with site_scope matching the current blog_id
+	 * OR site_scope IS NULL (network-wide) are returned. Admins see all matching
+	 * agents; non-admins see only agents they have explicit access grants for.
+	 *
+	 * @since 0.41.0
+	 * @since 0.57.0 Added site_scope filtering based on current blog_id.
 	 *
 	 * @param WP_REST_Request $request REST request.
 	 * @return \WP_REST_Response|WP_Error
 	 */
 	public static function handle_list( WP_REST_Request $request ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found
-		$agents_repo = new AgentsRepository();
-		$user_id     = get_current_user_id();
+		$agents_repo  = new AgentsRepository();
+		$user_id      = get_current_user_id();
+		$current_site = get_current_blog_id();
 
 		if ( PermissionHelper::can( 'manage_agents' ) ) {
-			$all_agents = $agents_repo->get_all();
+			// Admins see agents scoped to the current site + network-wide agents.
+			$all_agents = $agents_repo->get_all( array( 'site_id' => $current_site ) );
 		} else {
 			$access_repo    = new AgentAccess();
 			$accessible_ids = $access_repo->get_agent_ids_for_user( $user_id );
@@ -322,10 +330,16 @@ class Agents {
 				);
 			}
 
+			// Filter accessible agents by site scope (current site + network-wide).
 			$all_agents = array();
 			foreach ( $accessible_ids as $agent_id ) {
 				$agent = $agents_repo->get_agent( $agent_id );
-				if ( $agent ) {
+				if ( ! $agent ) {
+					continue;
+				}
+
+				$scope = $agent['site_scope'] ?? null;
+				if ( null === $scope || (int) $scope === $current_site ) {
 					$all_agents[] = $agent;
 				}
 			}
@@ -716,6 +730,9 @@ class Agents {
 	/**
 	 * Shape an agent row for list output (excludes config which may contain secrets).
 	 *
+	 * @since 0.41.0
+	 * @since 0.57.0 Added site_scope to output.
+	 *
 	 * @param array $agent Agent database row.
 	 * @return array Shaped output.
 	 */
@@ -725,6 +742,7 @@ class Agents {
 			'agent_slug' => (string) $agent['agent_slug'],
 			'agent_name' => (string) $agent['agent_name'],
 			'owner_id'   => (int) $agent['owner_id'],
+			'site_scope' => isset( $agent['site_scope'] ) ? (int) $agent['site_scope'] : null,
 			'status'     => (string) $agent['status'],
 			'created_at' => $agent['created_at'] ?? '',
 			'updated_at' => $agent['updated_at'] ?? '',
