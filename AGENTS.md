@@ -48,29 +48,6 @@ This file provides a concise, present-tense technical reference for contributors
 - Ability execution: Each ability implements `execute_callback` with `permission_callback` (checks `manage_options` or WP_CLI)
 - REST API endpoints, CLI commands, and Chat tools delegate to abilities for business logic
 
-Build system
-
-- **Homeboy** is used for all build operations (versioning, packaging, deployment)
-- Homeboy provides full WordPress test environment for running tests (no local WordPress setup required)
-- Build command: `homeboy build data-machine` - runs tests, lints code, builds frontend, creates production ZIP
-- Test command: `homeboy test data-machine` - runs PHPUnit tests using homeboy's WordPress environment
-- Lint command: `homeboy lint data-machine` - runs PHP CodeSniffer with WordPress coding standards
-- Auto-fix: `homeboy lint data-machine --fix` - runs PHPCBF to auto-fix formatting issues before validating
-
-Testing
-
-- PHPUnit tests located in `tests/Unit/` directory
-- Tests use `WP_UnitTestCase` with homeboy's WordPress test environment
-- Run tests: `homeboy test data-machine` (uses homeboy's WordPress installation)
-- Run build: `homeboy build data-machine` (runs tests, lints code, builds frontend assets, creates production ZIP)
-
-Abilities API
-
-- WordPress 6.9 Abilities API provides standardized capability discovery and execution for all Data Machine operations
-- Ability classes in `inc/Abilities/`: PipelineAbilities, PipelineStepAbilities, FlowAbilities, FlowStepAbilities, JobAbilities, FileAbilities, ProcessedItemsAbilities, SettingsAbilities, AuthAbilities, LogAbilities, HandlerAbilities, StepTypeAbilities, PostQueryAbilities, LocalSearchAbilities
-- Category registration: `datamachine` category registered via `wp_register_ability_category()` on `wp_abilities_api_categories_init` hook
-- Ability execution: Each ability implements `execute_callback` with `permission_callback` (checks `manage_options` or WP_CLI)
-- REST API endpoints, CLI commands, and Chat tools delegate to abilities for business logic
 
 Engine & execution
 
@@ -118,6 +95,7 @@ Agent guidance (for automated editors)
 - Use present-tense language and remove references to deleted functionality or historical counts.
 - Do not modify source code when aligning documentation unless explicitly authorized.
 - Do not create new top-level documentation directories. Creating or updating `.md` files is allowed only within existing directories.
+- **Extension-based commands**: The `wp datamachine workspace` and `wp datamachine github` commands have been moved to the `data-machine-code` extension plugin. Core documentation should not reference these commands.
 
 Agent orchestration patterns
 

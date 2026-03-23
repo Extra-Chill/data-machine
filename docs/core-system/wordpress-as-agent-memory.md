@@ -441,23 +441,24 @@ This makes WordPress the single source of truth for agent memory, regardless of 
 
 ### Reading Memory via WP-CLI
 
-Agents with shell access can use workspace commands for structured access:
+Agents with shell access can use the `agent` command for structured access:
 
 ```bash
 # Discover file paths (canonical command for external consumers)
 wp datamachine agent paths --allow-root
 
-# Read memory file via workspace
-wp datamachine workspace read MEMORY.md --allow-root
+# Read memory file
+wp datamachine agent files read SOUL.md --allow-root
+wp datamachine agent files read MEMORY.md --allow-root
 
 # List agent directory contents
-wp datamachine workspace ls agents/my-agent/ --allow-root
+wp datamachine agent files list --allow-root
 
 # Read daily memory
-wp datamachine memory daily read --date=2026-03-15 --allow-root
+wp datamachine agent daily read 2026-03-15 --allow-root
 
 # Search daily memory
-wp datamachine memory daily search --query="deployment" --allow-root
+wp datamachine agent daily search "deployment" --allow-root
 ```
 
 ### The Key Principle
@@ -638,18 +639,17 @@ wp datamachine agents create --slug=bot --name="My Bot" --allow-root
 wp datamachine agents rename old-slug new-slug --allow-root
 ```
 
-### Workspace Commands
+### Agent File Commands
 
 ```bash
-wp datamachine workspace path --allow-root
-wp datamachine workspace list --allow-root
-wp datamachine workspace read <file> --allow-root
-wp datamachine workspace ls <dir> --allow-root
-wp datamachine workspace write <file> --content="..." --allow-root
-wp datamachine workspace edit <file> --old="..." --new="..." --allow-root
-wp datamachine workspace clone <repo-url> --allow-root
-wp datamachine workspace git status --repo=<name> --allow-root
+wp datamachine agent paths --allow-root
+wp datamachine agent files list --allow-root
+wp datamachine agent files read <file> --allow-root
+wp datamachine agent files write <file> --content="..." --allow-root
+wp datamachine agent files edit <file> --old="..." --new="..." --allow-root
 ```
+
+> **Note:** For workspace/git operations, install the `data-machine-code` extension and use `wp datamachine-code workspace`.
 
 ## Extending the Memory System
 

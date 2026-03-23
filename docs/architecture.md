@@ -153,13 +153,13 @@ GitHubIssueTask  MetaDescriptionTask
 
 ### Workspace System
 
-Secure file management outside the web root for agent operations:
+Secure file management outside the web root for agent operations. **Moved to data-machine-code extension.**
 
 - **Location**: `/var/lib/datamachine/workspace/` (or `DATAMACHINE_WORKSPACE_PATH`)
 - **Git-aware**: Clone, status, pull, add, commit, push, log, diff
 - **File ops**: Read (with pagination), write, edit (find-replace), list directory
 - **Security**: Outside web root; mutating ops are CLI-only (not REST-exposed)
-- **CLI**: `wp datamachine workspace {path,list,clone,remove,show,read,ls,write,edit,git}`
+- **CLI**: `wp datamachine-code workspace {path,list,clone,remove,show,read,ls,write,edit,git}`
 
 ### Engine Data Architecture
 
@@ -296,7 +296,7 @@ Data Machine v0.2.0 introduced a universal Engine layer (`/inc/Engine/AI/`) that
 **Tool Categories**:
 - Handler-specific tools for publish/update operations
 - Global tools for search and analysis (GoogleSearch, LocalSearch, WebFetch, WordPressPostReader)
-- Workspace-scoped tools (WorkspaceTools, WorkspaceScopedTools) for agent file operations
+- Workspace-scoped tools (WorkspaceTools, WorkspaceScopedTools) for agent file operations (**moved to data-machine-code extension**)
 - Agent memory tools (AgentMemory, AgentDailyMemory) for runtime memory access
 - Chat-only tools for workflow building (@since v0.4.3):
   - AddPipelineStep, ApiQuery, AuthenticateHandler, ConfigureFlowSteps, ConfigurePipelineStep, CopyFlow, CreateFlow, CreatePipeline, CreateTaxonomyTerm, ExecuteWorkflowTool, GetHandlerDefaults, ManageLogs, ReadLogs, RunFlow, SearchTaxonomyTerms, SetHandlerDefaults, UpdateFlow
