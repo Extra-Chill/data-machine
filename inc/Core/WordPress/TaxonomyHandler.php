@@ -241,7 +241,7 @@ class TaxonomyHandler {
 	 * @param string $taxonomy_name WordPress taxonomy name
 	 * @return string Corresponding parameter name for AI tools
 	 */
-	private function getParameterName( string $taxonomy_name ): string {
+	public static function getParameterName( string $taxonomy_name ): string {
 		if ( 'category' === $taxonomy_name ) {
 			return 'category';
 		} elseif ( 'post_tag' === $taxonomy_name ) {
