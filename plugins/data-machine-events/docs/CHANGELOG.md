@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.22.0] - 2026-03-23
+
+### Added
+- add upcoming event counts ability for badge count optimization
+
+### Fixed
+- sync readme.txt stable tag to 0.21.0
+- sync version constant to 0.21.0
+- harden venue dedup with normalized name matching and unified creation path
+
 ## [0.21.0] - 2026-03-23
 
 ### Added
