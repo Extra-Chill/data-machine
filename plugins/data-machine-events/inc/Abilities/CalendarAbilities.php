@@ -238,6 +238,36 @@ class CalendarAbilities {
 			}
 		}
 
+		// Determine progressive rendering: only query the first day's events
+		// when the page has enough events to benefit from deferred loading.
+		$progressive    = $input['progressive'] ?? false;
+		$deferred_dates = array();
+
+		if ( $progressive && $range_start && $range_end ) {
+			// Get the dates within this page's range.
+			$page_dates = array_filter(
+				$unique_dates,
+				function ( $d ) use ( $range_start, $range_end ) {
+					return $d >= $range_start && $d <= $range_end;
+				}
+			);
+			$page_dates = array_values( $page_dates );
+
+			// Only go progressive if enough events on this page.
+			$page_event_total = 0;
+			foreach ( $page_dates as $d ) {
+				$page_event_total += $events_per_date[ $d ] ?? 0;
+			}
+
+			if ( $page_event_total >= EventRenderer::PROGRESSIVE_THRESHOLD && count( $page_dates ) > 1 ) {
+				// Query only the first day.
+				$first_date                 = $page_dates[0];
+				$query_params['date_start'] = $first_date;
+				$query_params['date_end']   = $first_date;
+				$deferred_dates             = array_slice( $page_dates, 1 );
+			}
+		}
+
 		$query_args   = EventQueryBuilder::build_query_args( $query_params );
 		$events_query = new WP_Query( $query_args );
 
@@ -247,8 +277,8 @@ class CalendarAbilities {
 		$paged_date_groups = DateGrouper::group_events_by_date(
 			$paged_events,
 			$show_past,
-			$range_start,
-			$range_end
+			$query_params['date_start'],
+			$query_params['date_end']
 		);
 
 		$gaps_detected = array();
@@ -271,6 +301,7 @@ class CalendarAbilities {
 				'past'   => $event_counts['past'],
 				'future' => $event_counts['future'],
 			),
+			'deferred_dates'    => $deferred_dates,
 		);
 
 		if ( $include_html ) {
@@ -285,7 +316,9 @@ class CalendarAbilities {
 				$date_boundaries,
 				$events_query->post_count,
 				$total_event_count,
-				$event_counts
+				$event_counts,
+				$deferred_dates,
+				$events_per_date
 			);
 		}
 
@@ -336,6 +369,8 @@ class CalendarAbilities {
 	 * @param int   $event_count Events on this page
 	 * @param int   $total_event_count Total events across all pages
 	 * @param array $event_counts Past/future counts
+	 * @param array $deferred_dates Dates to render as deferred shells
+	 * @param array $events_per_date Event counts per date for deferred shells
 	 * @return array HTML strings for each component
 	 */
 	private function renderHtml(
@@ -348,9 +383,11 @@ class CalendarAbilities {
 		array $date_boundaries,
 		int $event_count,
 		int $total_event_count,
-		array $event_counts
+		array $event_counts,
+		array $deferred_dates = array(),
+		array $events_per_date = array()
 	): array {
-		$events_html = EventRenderer::render_date_groups( $paged_date_groups, $gaps_detected, $include_gaps );
+		$events_html = EventRenderer::render_date_groups( $paged_date_groups, $gaps_detected, $include_gaps, $deferred_dates, $events_per_date );
 
 		$pagination_html = Pagination::render_pagination( $current_page, $max_pages, $show_past );
 

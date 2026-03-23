@@ -27,6 +27,7 @@ import { initFilterModal, destroyFilterModal } from './modules/filter-modal';
 import { initNavigation } from './modules/navigation';
 import { getFilterState, destroyFilterState } from './modules/filter-state';
 import { initLazyRender, destroyLazyRender } from './modules/lazy-render';
+import { initDayLoader, destroyDayLoader } from './modules/day-loader';
 import { initGeoSync, destroyGeoSync } from './modules/geo-sync';
 
 import type { FlatpickrInstance } from './types';
@@ -48,6 +49,7 @@ function initCalendarInstance( calendar: HTMLElement ): void {
 	filterState.restoreFromStorage();
 
 	initLazyRender( calendar );
+	initDayLoader( calendar );
 	initCarousel( calendar );
 
 	initDatePicker( calendar, function () {
@@ -82,8 +84,10 @@ function initCalendarInstance( calendar: HTMLElement ): void {
 		'data-machine-calendar-content-updated',
 		function () {
 			destroyLazyRender( calendar );
+			destroyDayLoader( calendar );
 			destroyCarousel( calendar );
 			initLazyRender( calendar );
+			initDayLoader( calendar );
 			initCarousel( calendar );
 		}
 	);
@@ -161,6 +165,7 @@ window.addEventListener( 'beforeunload', function () {
 			destroyDatePicker( calendar );
 			destroyCarousel( calendar );
 			destroyLazyRender( calendar );
+			destroyDayLoader( calendar );
 			destroyGeoSync( calendar );
 			destroyFilterState( calendar );
 		} );

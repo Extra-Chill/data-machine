@@ -105,6 +105,7 @@ $result    = $abilities->executeGetCalendarPage(
 		'geo_radius_unit'  => $geo_radius_unit,
 		'include_html'     => true,
 		'include_gaps'     => true,
+		'progressive'      => true,
 	)
 );
 

@@ -3,7 +3,10 @@
  * Event Renderer
  *
  * Renders date groups and individual events as HTML using templates.
- * Handles lazy-loading placeholders for events beyond the fold.
+ * Supports two modes:
+ * - Full: renders all events inline (with lazy placeholders after threshold).
+ * - Progressive: renders first day fully, subsequent days as deferred shells
+ *   that load via REST on scroll (see day-loader.ts).
  *
  * @package DataMachineEvents\Blocks\Calendar\Display
  * @since   0.14.0
@@ -26,22 +29,32 @@ class EventRenderer {
 	const LAZY_RENDER_THRESHOLD = 5;
 
 	/**
+	 * Minimum event count on the page to enable progressive rendering.
+	 * Pages with fewer events than this render fully (no deferred days).
+	 */
+	const PROGRESSIVE_THRESHOLD = 50;
+
+	/**
 	 * Render date groups as HTML.
 	 *
 	 * Iterates through date groups, rendering time-gap separators
 	 * and event items using templates.
 	 *
-	 * @param array $paged_date_groups Date-grouped events from DateGrouper.
-	 * @param array $gaps_detected     Time gaps from DateGrouper::detect_time_gaps().
-	 * @param bool  $include_gaps      Whether to render time-gap separators.
+	 * @param array  $paged_date_groups Date-grouped events from DateGrouper.
+	 * @param array  $gaps_detected     Time gaps from DateGrouper::detect_time_gaps().
+	 * @param bool   $include_gaps      Whether to render time-gap separators.
+	 * @param array  $deferred_dates    Dates to render as deferred shells (progressive mode).
+	 * @param array  $events_per_date   Event counts per date for deferred shell labels.
 	 * @return string Rendered HTML.
 	 */
 	public static function render_date_groups(
 		array $paged_date_groups,
 		array $gaps_detected = array(),
-		bool $include_gaps = true
+		bool $include_gaps = true,
+		array $deferred_dates = array(),
+		array $events_per_date = array()
 	): string {
-		if ( empty( $paged_date_groups ) ) {
+		if ( empty( $paged_date_groups ) && empty( $deferred_dates ) ) {
 			ob_start();
 			Template_Loader::include_template( 'no-events' );
 			return ob_get_clean();
@@ -49,6 +62,7 @@ class EventRenderer {
 
 		ob_start();
 
+		// Render date groups that have event data (first day in progressive mode, or all in full mode).
 		foreach ( $paged_date_groups as $date_key => $date_group ) {
 			$date_obj        = $date_group['date_obj'];
 			$events_for_date = $date_group['events'];
@@ -111,7 +125,55 @@ class EventRenderer {
 			echo '</div><!-- .data-machine-date-group -->';
 		}
 
+		// Render deferred date groups (progressive mode — shells only, loaded via REST on scroll).
+		foreach ( $deferred_dates as $date_string ) {
+			$date_obj             = date_create( $date_string, wp_timezone() );
+			$day_of_week          = strtolower( $date_obj->format( 'l' ) );
+			$formatted_date_label = $date_obj->format( 'l, F jS' );
+			$event_count          = $events_per_date[ $date_string ] ?? 0;
+
+			Template_Loader::include_template(
+				'date-group',
+				array(
+					'date_obj'             => $date_obj,
+					'day_of_week'          => $day_of_week,
+					'formatted_date_label' => $formatted_date_label,
+					'events_count'         => $event_count,
+				)
+			);
+
+			self::render_deferred_day_container( $event_count );
+
+			echo '</div><!-- .data-machine-date-group -->';
+		}
+
 		return ob_get_clean();
+	}
+
+	/**
+	 * Render a deferred day container with skeleton placeholders.
+	 *
+	 * Outputs an empty events wrapper marked with data-deferred="true"
+	 * for the client-side day-loader to populate via REST.
+	 *
+	 * @param int $event_count Number of events for skeleton count hint.
+	 */
+	private static function render_deferred_day_container( int $event_count ): void {
+		$skeleton_count = min( $event_count, self::LAZY_RENDER_THRESHOLD );
+		?>
+		<div class="data-machine-events-wrapper" data-deferred="true">
+			<?php for ( $i = 0; $i < $skeleton_count; $i++ ) : ?>
+				<div class="data-machine-event-item data-machine-event-placeholder">
+					<div class="data-machine-placeholder-skeleton">
+						<div class="data-machine-skeleton-badges"></div>
+						<div class="data-machine-skeleton-title"></div>
+						<div class="data-machine-skeleton-meta"></div>
+						<div class="data-machine-skeleton-button"></div>
+					</div>
+				</div>
+			<?php endfor; ?>
+		</div><!-- .data-machine-events-wrapper -->
+		<?php
 	}
 
 	/**
