@@ -36,18 +36,16 @@ class DateFilter {
 	 */
 	public static function upcoming_meta_query( string $datetime ): array {
 		return array(
-			'relation' => 'OR',
-			array(
+			'relation'    => 'OR',
+			'event_start' => array(
 				'key'     => EVENT_DATETIME_META_KEY,
 				'value'   => $datetime,
 				'compare' => '>=',
-				'type'    => 'DATETIME',
 			),
-			array(
+			'event_end'   => array(
 				'key'     => EVENT_END_DATETIME_META_KEY,
 				'value'   => $datetime,
 				'compare' => '>=',
-				'type'    => 'DATETIME',
 			),
 		);
 	}
@@ -60,20 +58,18 @@ class DateFilter {
 	 */
 	public static function past_meta_query( string $datetime ): array {
 		return array(
-			'relation' => 'AND',
-			array(
+			'relation'    => 'AND',
+			'event_start' => array(
 				'key'     => EVENT_DATETIME_META_KEY,
 				'value'   => $datetime,
 				'compare' => '<',
-				'type'    => 'DATETIME',
 			),
 			array(
-				'relation' => 'OR',
-				array(
+				'relation'  => 'OR',
+				'event_end' => array(
 					'key'     => EVENT_END_DATETIME_META_KEY,
 					'value'   => $datetime,
 					'compare' => '<',
-					'type'    => 'DATETIME',
 				),
 				array(
 					'key'     => EVENT_END_DATETIME_META_KEY,

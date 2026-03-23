@@ -73,8 +73,7 @@ class EventQueryBuilder {
 			'post_type'      => Event_Post_Type::POST_TYPE,
 			'post_status'    => 'publish',
 			'posts_per_page' => -1,
-			'meta_key'       => EVENT_DATETIME_META_KEY,
-			'orderby'        => 'meta_value',
+			'orderby'        => 'event_start',
 			'order'          => $params['show_past'] ? 'DESC' : 'ASC',
 		);
 
@@ -82,10 +81,15 @@ class EventQueryBuilder {
 		$current_datetime = current_time( 'mysql' );
 		$has_date_range   = ! empty( $params['date_start'] ) || ! empty( $params['date_end'] );
 
+		// Track whether DateFilter adds the 'event_start' named clause for ordering.
+		$has_event_start_clause = false;
+
 		if ( $params['show_past'] && ! $params['user_date_range'] ) {
-			$meta_query[] = DateFilter::past_meta_query( $current_datetime );
+			$meta_query[]           = DateFilter::past_meta_query( $current_datetime );
+			$has_event_start_clause = true;
 		} elseif ( ! $params['show_past'] && ! $params['user_date_range'] ) {
-			$meta_query[] = DateFilter::upcoming_meta_query( $current_datetime );
+			$meta_query[]           = DateFilter::upcoming_meta_query( $current_datetime );
+			$has_event_start_clause = true;
 		}
 
 		if ( ! empty( $params['date_start'] ) ) {
@@ -102,13 +106,11 @@ class EventQueryBuilder {
 					'key'     => EVENT_DATETIME_META_KEY,
 					'value'   => $start_datetime,
 					'compare' => '>=',
-					'type'    => 'DATETIME',
 				),
 				array(
 					'key'     => EVENT_END_DATETIME_META_KEY,
 					'value'   => $start_datetime,
 					'compare' => '>=',
-					'type'    => 'DATETIME',
 				),
 			);
 		}
@@ -122,7 +124,15 @@ class EventQueryBuilder {
 				'key'     => EVENT_DATETIME_META_KEY,
 				'value'   => $end_datetime,
 				'compare' => '<=',
-				'type'    => 'DATETIME',
+			);
+		}
+
+		// When DateFilter wasn't applied (user_date_range mode), add a standalone
+		// named clause so 'orderby' => 'event_start' resolves without a redundant JOIN.
+		if ( ! $has_event_start_clause ) {
+			$meta_query['event_start'] = array(
+				'key'     => EVENT_DATETIME_META_KEY,
+				'compare' => 'EXISTS',
 			);
 		}
 

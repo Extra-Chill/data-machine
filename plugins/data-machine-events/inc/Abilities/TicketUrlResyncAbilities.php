@@ -128,7 +128,6 @@ class TicketUrlResyncAbilities {
 					'key'     => '_datamachine_event_datetime',
 					'value'   => current_time( 'Y-m-d' ),
 					'compare' => '>=',
-					'type'    => 'DATE',
 				),
 			);
 		}

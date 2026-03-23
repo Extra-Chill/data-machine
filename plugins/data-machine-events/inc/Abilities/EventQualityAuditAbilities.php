@@ -253,28 +253,25 @@ class EventQualityAuditAbilities {
 			'post_type'      => Event_Post_Type::POST_TYPE,
 			'post_status'    => 'publish',
 			'posts_per_page' => -1,
-			'orderby'        => 'meta_value',
-			'meta_key'       => '_datamachine_event_datetime',
+			'orderby'        => 'event_start',
 			'order'          => 'ASC',
 		);
 
 		$today = current_time( 'Y-m-d' );
 		if ( 'upcoming' === $scope ) {
 			$args['meta_query'] = array(
-				array(
+				'event_start' => array(
 					'key'     => '_datamachine_event_datetime',
 					'value'   => array( $today . ' 00:00:00', gmdate( 'Y-m-d 23:59:59', strtotime( '+' . $days_ahead . ' days', strtotime( $today ) ) ) ),
 					'compare' => 'BETWEEN',
-					'type'    => 'DATETIME',
 				),
 			);
 		} elseif ( 'past' === $scope ) {
 			$args['meta_query'] = array(
-				array(
+				'event_start' => array(
 					'key'     => '_datamachine_event_datetime',
 					'value'   => $today . ' 00:00:00',
 					'compare' => '<',
-					'type'    => 'DATETIME',
 				),
 			);
 		}

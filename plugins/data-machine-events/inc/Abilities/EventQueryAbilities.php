@@ -162,9 +162,14 @@ class EventQueryAbilities {
 			'post_type'      => Event_Post_Type::POST_TYPE,
 			'post_status'    => $status,
 			'posts_per_page' => $limit,
-			'orderby'        => 'meta_value',
-			'meta_key'       => '_datamachine_event_datetime',
+			'orderby'        => 'event_start',
 			'order'          => 'DESC',
+			'meta_query'     => array(
+				'event_start' => array(
+					'key'     => '_datamachine_event_datetime',
+					'compare' => 'EXISTS',
+				),
+			),
 			'tax_query'      => array(
 				array(
 					'taxonomy' => 'venue',
