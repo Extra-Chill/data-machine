@@ -46,20 +46,26 @@ class FlowScheduling {
 	}
 
 	/**
-	 * Check if the incoming scheduling config matches what's already set.
+	 * Check if the incoming scheduling config matches what's already set
+	 * AND that the Action Scheduler action actually exists.
 	 *
 	 * Compares the meaningful scheduling fields (interval, cron_expression,
 	 * timestamp) to determine if rescheduling would be a no-op. This prevents
 	 * flow updates from resetting the Action Scheduler timer when the schedule
 	 * hasn't actually changed.
 	 *
+	 * Also verifies the AS action is actually pending — if the DB config says
+	 * "daily" but no AS action exists (e.g. AS wasn't loaded during initial
+	 * creation in CLI context), this returns false to force re-scheduling.
+	 *
 	 * @param array       $current         Current scheduling_config from DB.
 	 * @param string|null $interval        Incoming interval key.
 	 * @param string|null $cron_expression Incoming cron expression.
 	 * @param array       $incoming        Full incoming scheduling_config.
+	 * @param int         $flow_id         Flow ID for AS action verification.
 	 * @return bool True if scheduling hasn't changed and can be skipped.
 	 */
-	private static function scheduling_unchanged( array $current, ?string $interval, ?string $cron_expression, array $incoming ): bool {
+	private static function scheduling_unchanged( array $current, ?string $interval, ?string $cron_expression, array $incoming, int $flow_id = 0 ): bool {
 		$current_interval = $current['interval'] ?? null;
 
 		// If current is empty/unset and incoming is non-manual, it's a change.
@@ -73,25 +79,43 @@ class FlowScheduling {
 			return true;
 		}
 
+		// Config matches — but verify the AS action actually exists.
+		// The DB config can claim "daily" while no AS action was persisted
+		// (e.g. Action Scheduler wasn't fully loaded during CLI creation).
+		$config_matches = false;
+
 		// Recurring interval comparison.
 		if ( $current_interval === $interval && 'cron' !== $interval && 'one_time' !== $interval ) {
-			return true;
+			$config_matches = true;
 		}
 
 		// Cron expression comparison.
 		if ( 'cron' === $current_interval && 'cron' === $interval ) {
-			$current_cron = $current['cron_expression'] ?? '';
-			return $current_cron === $cron_expression;
+			$current_cron   = $current['cron_expression'] ?? '';
+			$config_matches = ( $current_cron === $cron_expression );
 		}
 
 		// One-time timestamp comparison.
 		if ( 'one_time' === $current_interval && 'one_time' === $interval ) {
-			$current_ts = $current['timestamp'] ?? null;
-			$incoming_ts = $incoming['timestamp'] ?? null;
-			return $current_ts === $incoming_ts;
+			$current_ts     = $current['timestamp'] ?? null;
+			$incoming_ts    = $incoming['timestamp'] ?? null;
+			$config_matches = ( $current_ts === $incoming_ts );
 		}
 
-		return false;
+		if ( ! $config_matches ) {
+			return false;
+		}
+
+		// Config matches — verify the AS action is actually pending.
+		if ( $flow_id > 0 && function_exists( 'as_next_scheduled_action' ) ) {
+			$next = as_next_scheduled_action( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
+			if ( false === $next ) {
+				// DB says scheduled but no AS action exists — force re-schedule.
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	/**
@@ -235,7 +259,7 @@ class FlowScheduling {
 			if ( is_string( $current_scheduling ) ) {
 				$current_scheduling = json_decode( $current_scheduling, true ) ?? array();
 			}
-			if ( self::scheduling_unchanged( $current_scheduling, $interval, $cron_expression, $scheduling_config ) ) {
+			if ( self::scheduling_unchanged( $current_scheduling, $interval, $cron_expression, $scheduling_config, (int) $flow_id ) ) {
 				return true;
 			}
 		}
