@@ -187,12 +187,9 @@ class EventDuplicateStrategy {
 			return null;
 		}
 
-		// Resolve venue to term ID.
-		$venue_term = get_term_by( 'name', $venue, 'venue' );
-		if ( ! $venue_term ) {
-			$venue_slug = sanitize_title( $venue );
-			$venue_term = get_term_by( 'slug', $venue_slug, 'venue' );
-		}
+		// Resolve venue to term ID with cascading lookup:
+		// exact name → slug → normalized name (strips punctuation, dashes, case).
+		$venue_term = self::resolveVenueTerm( $venue );
 		if ( ! $venue_term ) {
 			return null;
 		}
@@ -404,6 +401,40 @@ class EventDuplicateStrategy {
 	private static function isValidPost( int $post_id ): bool {
 		$status = get_post_status( $post_id );
 		return $status && in_array( $status, array( 'publish', 'draft', 'pending' ), true );
+	}
+
+	/**
+	 * Resolve a venue name to a WP_Term with cascading lookup.
+	 *
+	 * Tries in order:
+	 * 1. Exact name match
+	 * 2. Slug-based match (catches minor name variations)
+	 * 3. Normalized name match (strips punctuation, dashes, apostrophes, case)
+	 *
+	 * @param string $venue Venue name from import source.
+	 * @return \WP_Term|null Resolved venue term or null.
+	 */
+	private static function resolveVenueTerm( string $venue ): ?\WP_Term {
+		// 1. Exact name match.
+		$venue_term = get_term_by( 'name', $venue, 'venue' );
+		if ( $venue_term ) {
+			return $venue_term;
+		}
+
+		// 2. Slug-based lookup.
+		$venue_slug = sanitize_title( $venue );
+		$venue_term = get_term_by( 'slug', $venue_slug, 'venue' );
+		if ( $venue_term ) {
+			return $venue_term;
+		}
+
+		// 3. Normalized name match via Venue_Taxonomy.
+		$venue_term = \DataMachineEvents\Core\Venue_Taxonomy::find_venue_by_normalized_name_public( $venue );
+		if ( $venue_term ) {
+			return $venue_term;
+		}
+
+		return null;
 	}
 
 	/**

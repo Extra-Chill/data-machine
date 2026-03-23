@@ -89,6 +89,15 @@ class Venue_Taxonomy {
 	/**
 	 * Find or create a venue with given name and metadata
 	 *
+	 * Matching cascade:
+	 * 1. Address-based matching (normalized street + city comparison)
+	 * 2. Exact name match
+	 * 3. "The" prefix toggle ("The Royal American" ↔ "Royal American")
+	 * 4. Normalized name matching (strips punctuation, dashes, case, articles)
+	 *    Catches: "Saturn - Birmingham" = "Saturn Birmingham",
+	 *             "Reggie's Rock Club" = "Reggies Rock Club",
+	 *             "RADIO/EAST" = "Radio East"
+	 *
 	 * @param string $venue_name Venue name
 	 * @param array $venue_data Venue metadata (address, city, state, etc.)
 	 * @return array Array with keys: term_id, was_created
@@ -130,6 +139,13 @@ class Venue_Taxonomy {
 			if ( ! empty( $alt_name ) ) {
 				$existing = get_term_by( 'name', $alt_name, 'venue' );
 			}
+		}
+
+		// Normalized name matching: catches punctuation, dash, and case variants.
+		// e.g. "Saturn - Birmingham" = "Saturn Birmingham",
+		//      "Reggie's Rock Club" = "Reggies Rock Club"
+		if ( ! $existing ) {
+			$existing = self::find_venue_by_normalized_name( $venue_name );
 		}
 
 		if ( $existing ) {
@@ -174,6 +190,111 @@ class Venue_Taxonomy {
 			'term_id'     => $term_id,
 			'was_created' => true,
 		);
+	}
+
+	/**
+	 * Find an existing venue by normalized name comparison.
+	 *
+	 * Normalizes both the input name and all existing venue names by:
+	 * - Decoding HTML entities
+	 * - Lowercasing
+	 * - Removing articles ("the", "a", "an")
+	 * - Stripping all non-alphanumeric characters (punctuation, dashes, apostrophes)
+	 * - Collapsing whitespace
+	 *
+	 * This catches variants that exact name matching misses:
+	 * - "Saturn - Birmingham" vs "Saturn Birmingham"
+	 * - "Reggie's Rock Club" vs "Reggies Rock Club"
+	 * - "RADIO/EAST" vs "Radio East"
+	 * - "Emo's-Austin" vs "Emo's Austin"
+	 * - "Lo-Fi Brewing" vs "Lofi Brewing"
+	 *
+	 * Requires the normalized name to be at least 3 characters to avoid
+	 * false matches on very short names.
+	 *
+	 * @param string $venue_name Venue name to search for.
+	 * @return \WP_Term|null Matching term or null.
+	 */
+	private static function find_venue_by_normalized_name( string $venue_name ): ?\WP_Term {
+		$normalized_input = self::normalize_venue_name_for_matching( $venue_name );
+
+		if ( strlen( $normalized_input ) < 3 ) {
+			return null;
+		}
+
+		$venues = get_terms(
+			array(
+				'taxonomy'   => 'venue',
+				'hide_empty' => false,
+				'number'     => 0,
+			)
+		);
+
+		if ( is_wp_error( $venues ) || empty( $venues ) ) {
+			return null;
+		}
+
+		foreach ( $venues as $venue ) {
+			$normalized_existing = self::normalize_venue_name_for_matching( $venue->name );
+
+			if ( $normalized_input === $normalized_existing ) {
+				do_action(
+					'datamachine_log',
+					'info',
+					'Venue matched via normalized name',
+					array(
+						'input_name'    => $venue_name,
+						'matched_name'  => $venue->name,
+						'matched_id'    => $venue->term_id,
+						'normalized_as' => $normalized_input,
+					)
+				);
+				return $venue;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Normalize a venue name for matching purposes.
+	 *
+	 * Strips punctuation, dashes, apostrophes, articles, and case
+	 * to produce a canonical form for comparison.
+	 *
+	 * @param string $name Venue name.
+	 * @return string Normalized name.
+	 */
+	public static function normalize_venue_name_for_matching( string $name ): string {
+		// Decode HTML entities: &amp; → &, &#8217; → '
+		$text = html_entity_decode( $name, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+
+		// Lowercase.
+		$text = strtolower( $text );
+
+		// Remove articles at the start.
+		$text = preg_replace( '/^(the|a|an)\s+/i', '', $text );
+
+		// Remove all non-alphanumeric characters (keeps spaces).
+		$text = preg_replace( '/[^a-z0-9\s]/', '', $text );
+
+		// Collapse whitespace and trim.
+		$text = trim( preg_replace( '/\s+/', ' ', $text ) );
+
+		return $text;
+	}
+
+	/**
+	 * Public accessor for normalized name venue lookup.
+	 *
+	 * Used by EventDuplicateStrategy to resolve venue names that differ
+	 * in punctuation, dashes, or case from the stored term name.
+	 *
+	 * @param string $venue_name Venue name to search for.
+	 * @return \WP_Term|null Matching term or null.
+	 */
+	public static function find_venue_by_normalized_name_public( string $venue_name ): ?\WP_Term {
+		return self::find_venue_by_normalized_name( $venue_name );
 	}
 
 	/**
