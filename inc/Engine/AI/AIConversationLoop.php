@@ -330,6 +330,15 @@ class AIConversationLoop {
 						$turn_count
 					);
 					$messages[]          = $tool_result_message;
+
+					// Break out of the foreach when conversation is complete.
+					// This is multi-handler safe: $conversation_complete only becomes true
+					// when ALL configured handlers have fired (or legacy single-handler mode).
+					// Without this break, remaining tool calls in the same AI response batch
+					// would still execute, wasting credits on duplicate/unnecessary calls.
+					if ( $conversation_complete ) {
+						break;
+					}
 				}
 			} else {
 				// No tool calls = conversation complete

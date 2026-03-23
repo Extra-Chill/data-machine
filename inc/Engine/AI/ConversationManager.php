@@ -282,7 +282,13 @@ class ConversationManager {
 	}
 
 	/**
-	 * Validate if a tool call is a duplicate of the previous tool call.
+	 * Validate if a tool call is a duplicate of any previous tool call in the conversation.
+	 *
+	 * Scans the ENTIRE conversation history (not just the most recent tool call)
+	 * to catch non-consecutive duplicates. For example: AI calls upsert_event(A),
+	 * then some other tool, then upsert_event(A) again — the old logic only checked
+	 * the immediately previous call and would miss this. This broader check prevents
+	 * wasted AI credits on duplicate tool executions.
 	 *
 	 * @param string $tool_name Tool name to validate
 	 * @param array  $tool_parameters Tool parameters to validate
@@ -297,7 +303,7 @@ class ConversationManager {
 			);
 		}
 
-		$previous_tool_call = null;
+		// Scan ALL previous tool_call messages, not just the most recent one.
 		for ( $i = count( $conversation_messages ) - 1; $i >= 0; $i-- ) {
 			$message = $conversation_messages[ $i ];
 
@@ -316,29 +322,13 @@ class ConversationManager {
 				continue;
 			}
 
-			$previous_tool_call = array(
-				'tool_name'  => $prev_tool_name,
-				'parameters' => $prev_parameters,
-			);
-			break;
-		}
-
-		if ( ! $previous_tool_call ) {
-			return array(
-				'is_duplicate' => false,
-				'message'      => '',
-			);
-		}
-
-		$is_duplicate = ( $previous_tool_call['tool_name'] === $tool_name ) &&
-						( $previous_tool_call['parameters'] === $tool_parameters );
-
-		if ( $is_duplicate ) {
-			$correction_message = "You just called the {$tool_name} tool with the exact same parameters as your previous action. Please try a different approach or use different parameters instead.";
-			return array(
-				'is_duplicate' => true,
-				'message'      => $correction_message,
-			);
+			if ( $prev_tool_name === $tool_name && $prev_parameters === $tool_parameters ) {
+				$correction_message = "You already called the {$tool_name} tool with these exact parameters earlier in this conversation. That call already executed successfully. Do not retry — move on to the next step or end the conversation.";
+				return array(
+					'is_duplicate' => true,
+					'message'      => $correction_message,
+				);
+			}
 		}
 
 		return array(
@@ -418,7 +408,7 @@ class ConversationManager {
 	public static function generateDuplicateToolCallMessage( string $tool_name, int $turn_count = 0 ): array {
 		$tool_result = array(
 			'success' => false,
-			'error'   => 'Duplicate tool call - same parameters as previous action. Try a different approach.',
+			'error'   => "DUPLICATE REJECTED: You already called {$tool_name} with these exact parameters earlier in this conversation and it succeeded. Do NOT call it again. Do NOT call skip_item about this. The task is done — end the conversation.",
 		);
 
 		return self::formatToolResultMessage( $tool_name, $tool_result, array(), false, $turn_count );
