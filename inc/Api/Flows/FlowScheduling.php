@@ -363,6 +363,18 @@ class FlowScheduling {
 			'data-machine'
 		);
 
+		// Verify the AS action was actually persisted before writing
+		// the schedule to the DB. AS can silently drop actions when its
+		// tables aren't ready (e.g. CLI context during plugin activation).
+		$next = as_next_scheduled_action( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
+		if ( false === $next ) {
+			return new \WP_Error(
+				'schedule_not_persisted',
+				'Action Scheduler accepted the schedule but no pending action was found. AS tables may not be ready.',
+				array( 'status' => 500 )
+			);
+		}
+
 		$db_flows->update_flow_scheduling(
 			$flow_id,
 			array(
@@ -414,6 +426,16 @@ class FlowScheduling {
 			array( $flow_id ),
 			'data-machine'
 		);
+
+		// Verify the AS action was actually persisted.
+		$next = as_next_scheduled_action( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
+		if ( false === $next ) {
+			return new \WP_Error(
+				'schedule_not_persisted',
+				'Action Scheduler accepted the cron schedule but no pending action was found.',
+				array( 'status' => 500 )
+			);
+		}
 
 		// Compute next run for storage.
 		$next_run = null;
