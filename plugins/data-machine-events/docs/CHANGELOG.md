@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.22.1] - 2026-03-23
+
+### Fixed
+- update calendar block version for CSS cache busting
+
 ## [0.22.0] - 2026-03-23
 
 ### Added
