@@ -54,6 +54,10 @@ if ( ! function_exists( 'data_machine_events_sanitize_query_params' ) ) {
 // Load core meta storage (monitors Event Details block saves)
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/meta-storage.php';
 
+// Load performance optimizations (transient-cached last-modified queries).
+require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/performance.php';
+\DataMachineEvents\Core\cache_last_post_time();
+
 	// Load REST API routes (modular)
 if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php' ) ) {
 	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php';
