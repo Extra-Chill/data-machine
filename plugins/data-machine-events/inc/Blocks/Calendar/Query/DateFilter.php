@@ -119,14 +119,21 @@ class DateFilter {
 	/**
 	 * Raw SQL fragments for upcoming events.
 	 *
+	 * Uses ed.post_status = 'publish' to avoid joining the posts table.
+	 * Set $include_status to false if the caller already joins posts and
+	 * filters post_status there (e.g. WP_Query consumers).
+	 *
+	 * @param bool   $include_status Whether to include post_status filter. Default true.
+	 * @param string $join_column    Column to join ed.post_id on. Default 'p.ID'.
 	 * @return array{joins: string, where: string, param_count: int}
 	 */
-	public static function upcoming_sql(): array {
+	public static function upcoming_sql( bool $include_status = true, string $join_column = 'p.ID' ): array {
 		$table = EventDatesTable::table_name();
+		$status_clause = $include_status ? " AND ed.post_status = 'publish'" : '';
 
 		return array(
-			'joins'       => "INNER JOIN {$table} ed ON p.ID = ed.post_id",
-			'where'       => '(ed.start_datetime >= %s OR ed.end_datetime >= %s)',
+			'joins'       => "INNER JOIN {$table} ed ON {$join_column} = ed.post_id",
+			'where'       => "(ed.start_datetime >= %s OR ed.end_datetime >= %s){$status_clause}",
 			'param_count' => 2,
 		);
 	}
@@ -134,14 +141,17 @@ class DateFilter {
 	/**
 	 * Raw SQL fragments for past events.
 	 *
+	 * @param bool   $include_status Whether to include post_status filter. Default true.
+	 * @param string $join_column    Column to join ed.post_id on. Default 'p.ID'.
 	 * @return array{joins: string, where: string, param_count: int}
 	 */
-	public static function past_sql(): array {
+	public static function past_sql( bool $include_status = true, string $join_column = 'p.ID' ): array {
 		$table = EventDatesTable::table_name();
+		$status_clause = $include_status ? " AND ed.post_status = 'publish'" : '';
 
 		return array(
-			'joins'       => "INNER JOIN {$table} ed ON p.ID = ed.post_id",
-			'where'       => '(ed.start_datetime < %s AND (ed.end_datetime < %s OR ed.end_datetime IS NULL))',
+			'joins'       => "INNER JOIN {$table} ed ON {$join_column} = ed.post_id",
+			'where'       => "(ed.start_datetime < %s AND (ed.end_datetime < %s OR ed.end_datetime IS NULL)){$status_clause}",
 			'param_count' => 2,
 		);
 	}
@@ -149,14 +159,17 @@ class DateFilter {
 	/**
 	 * Raw SQL fragments for a date range filter.
 	 *
+	 * @param bool   $include_status Whether to include post_status filter. Default true.
+	 * @param string $join_column    Column to join ed.post_id on. Default 'p.ID'.
 	 * @return array{joins: string, where: string, param_count: int}
 	 */
-	public static function date_range_sql(): array {
+	public static function date_range_sql( bool $include_status = true, string $join_column = 'p.ID' ): array {
 		$table = EventDatesTable::table_name();
+		$status_clause = $include_status ? " AND ed.post_status = 'publish'" : '';
 
 		return array(
-			'joins'       => "INNER JOIN {$table} ed ON p.ID = ed.post_id",
-			'where'       => '(ed.start_datetime >= %s AND ed.start_datetime <= %s)',
+			'joins'       => "INNER JOIN {$table} ed ON {$join_column} = ed.post_id",
+			'where'       => "(ed.start_datetime >= %s AND ed.start_datetime <= %s){$status_clause}",
 			'param_count' => 2,
 		);
 	}

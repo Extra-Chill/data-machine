@@ -5,9 +5,9 @@
  * Counts upcoming events grouped by taxonomy term. This is the raw data
  * primitive powering homepage badges, cross-site links, and market reports.
  *
- * The query joins postmeta (_datamachine_event_datetime >= today) to filter
- * only future events, then GROUP BY term for counts. On 35K+ events this
- * takes ~7s, so consumers should always cache the results.
+ * The query joins event_dates (start_datetime >= today, post_status = 'publish')
+ * to filter only future published events, then GROUP BY term for counts.
+ * Skips the posts table entirely via denormalized post_status column.
  *
  * @package DataMachineEvents\Abilities
  */
@@ -122,18 +122,17 @@ class UpcomingCountAbilities {
 
 		$parent_clause = $exclude_roots ? 'AND tt.parent != 0' : '';
 
+		// Uses ed.post_status to avoid joining the posts table (3s → <100ms).
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT t.term_id, t.name, t.slug, COUNT(DISTINCT p.ID) AS event_count
+				"SELECT t.term_id, t.name, t.slug, COUNT(DISTINCT tr.object_id) AS event_count
 				FROM {$wpdb->term_relationships} tr
 				INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
 				INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
-				INNER JOIN {$wpdb->posts} p ON tr.object_id = p.ID
-				INNER JOIN {$ed_table} ed ON p.ID = ed.post_id
+				INNER JOIN {$ed_table} ed ON tr.object_id = ed.post_id
 				WHERE tt.taxonomy = %s
-				AND p.post_type = 'data_machine_events'
-				AND p.post_status = 'publish'
+				AND ed.post_status = 'publish'
 				AND ed.start_datetime >= %s
 				{$parent_clause}
 				GROUP BY t.term_id

@@ -6,6 +6,10 @@
  * postmeta-based event datetime storage. Provides schema creation via
  * dbDelta(), backfill from postmeta, and helper read/write functions.
  *
+ * The table includes a denormalized post_status column so that queries
+ * can filter to published events without joining the posts table (which
+ * is the primary bottleneck on sites with 30K+ events).
+ *
  * @package DataMachineEvents\Core
  * @since   0.23.0
  */
@@ -41,9 +45,11 @@ class EventDatesTable {
 			post_id        BIGINT UNSIGNED NOT NULL,
 			start_datetime DATETIME NOT NULL,
 			end_datetime   DATETIME DEFAULT NULL,
+			post_status    VARCHAR(20) NOT NULL DEFAULT 'publish',
 			PRIMARY KEY (post_id),
 			KEY start_datetime (start_datetime),
-			KEY end_datetime (end_datetime)
+			KEY end_datetime (end_datetime),
+			KEY status_start (post_status, start_datetime)
 		) ENGINE=InnoDB {$charset};";
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -67,9 +73,14 @@ class EventDatesTable {
 	 * @param int         $post_id        Post ID.
 	 * @param string      $start_datetime MySQL datetime string.
 	 * @param string|null $end_datetime   MySQL datetime string or null.
+	 * @param string|null $post_status    Post status (auto-detected from post if null).
 	 */
-	public static function upsert( int $post_id, string $start_datetime, ?string $end_datetime = null ): void {
+	public static function upsert( int $post_id, string $start_datetime, ?string $end_datetime = null, ?string $post_status = null ): void {
 		global $wpdb;
+
+		if ( null === $post_status ) {
+			$post_status = get_post_status( $post_id ) ?: 'publish';
+		}
 
 		$wpdb->replace(
 			self::table_name(),
@@ -77,8 +88,29 @@ class EventDatesTable {
 				'post_id'        => $post_id,
 				'start_datetime' => $start_datetime,
 				'end_datetime'   => $end_datetime,
+				'post_status'    => $post_status,
 			),
-			array( '%d', '%s', $end_datetime ? '%s' : null )
+			array( '%d', '%s', $end_datetime ? '%s' : null, '%s' )
+		);
+	}
+
+	/**
+	 * Update the post_status column for an event.
+	 *
+	 * Called from transition_post_status hook to keep denormalized status in sync.
+	 *
+	 * @param int    $post_id     Post ID.
+	 * @param string $post_status New post status.
+	 */
+	public static function update_status( int $post_id, string $post_status ): void {
+		global $wpdb;
+
+		$wpdb->update(
+			self::table_name(),
+			array( 'post_status' => $post_status ),
+			array( 'post_id' => $post_id ),
+			array( '%s' ),
+			array( '%d' )
 		);
 	}
 
@@ -137,8 +169,10 @@ class EventDatesTable {
 				$wpdb->prepare(
 					"SELECT pm_start.post_id,
 							pm_start.meta_value AS start_datetime,
-							pm_end.meta_value AS end_datetime
+							pm_end.meta_value AS end_datetime,
+							p.post_status
 					FROM {$wpdb->postmeta} pm_start
+					INNER JOIN {$wpdb->posts} p ON pm_start.post_id = p.ID
 					LEFT JOIN {$table} ed ON pm_start.post_id = ed.post_id
 					LEFT JOIN {$wpdb->postmeta} pm_end
 						ON pm_start.post_id = pm_end.post_id
@@ -158,7 +192,8 @@ class EventDatesTable {
 				self::upsert(
 					(int) $row->post_id,
 					$row->start_datetime,
-					$row->end_datetime ?: null
+					$row->end_datetime ?: null,
+					$row->post_status
 				);
 				++$total;
 			}

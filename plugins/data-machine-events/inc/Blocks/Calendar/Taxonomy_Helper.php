@@ -147,11 +147,10 @@ class Taxonomy_Helper {
 	public static function get_batch_term_counts( $taxonomy_slug, $date_context = array(), $active_filters = array(), $tax_query_override = null ) {
 		global $wpdb;
 
-		$post_type = Event_Post_Type::POST_TYPE;
-
 		$joins         = '';
 		$where_clauses = '';
-		$params        = array( $taxonomy_slug, $post_type );
+		$params        = array( $taxonomy_slug );
+		$has_date_filter = false;
 
 		if ( ! empty( $date_context ) ) {
 			$date_start       = $date_context['date_start'] ?? '';
@@ -160,23 +159,26 @@ class Taxonomy_Helper {
 			$current_datetime = current_time( 'mysql' );
 
 			if ( ! empty( $date_start ) && ! empty( $date_end ) ) {
-				$filter = DateFilter::date_range_sql();
+				$filter = DateFilter::date_range_sql( true, 'tr.object_id' );
 				$joins         .= ' ' . $filter['joins'];
 				$where_clauses .= ' AND ' . $filter['where'];
 				$params[]       = $date_start . ' 00:00:00';
 				$params[]       = $date_end . ' 23:59:59';
+				$has_date_filter = true;
 			} elseif ( $show_past ) {
-				$filter = DateFilter::past_sql();
+				$filter = DateFilter::past_sql( true, 'tr.object_id' );
 				$joins         .= ' ' . $filter['joins'];
 				$where_clauses .= ' AND ' . $filter['where'];
 				$params[]       = $current_datetime;
 				$params[]       = $current_datetime;
+				$has_date_filter = true;
 			} else {
-				$filter = DateFilter::upcoming_sql();
+				$filter = DateFilter::upcoming_sql( true, 'tr.object_id' );
 				$joins         .= ' ' . $filter['joins'];
 				$where_clauses .= ' AND ' . $filter['where'];
 				$params[]       = $current_datetime;
 				$params[]       = $current_datetime;
+				$has_date_filter = true;
 			}
 		}
 
@@ -194,7 +196,7 @@ class Taxonomy_Helper {
 				$alias_tr     = "base_tr_{$base_join_index}";
 				$alias_tt     = "base_tt_{$base_join_index}";
 
-				$joins .= " INNER JOIN {$wpdb->term_relationships} {$alias_tr} ON p.ID = {$alias_tr}.object_id";
+				$joins .= " INNER JOIN {$wpdb->term_relationships} {$alias_tr} ON tr.object_id = {$alias_tr}.object_id";
 				$joins .= " INNER JOIN {$wpdb->term_taxonomy} {$alias_tt} ON {$alias_tr}.term_taxonomy_id = {$alias_tt}.term_taxonomy_id";
 
                 // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -220,7 +222,7 @@ class Taxonomy_Helper {
 			$alias_tr = "cross_tr_{$join_index}";
 			$alias_tt = "cross_tt_{$join_index}";
 
-			$joins .= " INNER JOIN {$wpdb->term_relationships} {$alias_tr} ON p.ID = {$alias_tr}.object_id";
+			$joins .= " INNER JOIN {$wpdb->term_relationships} {$alias_tr} ON tr.object_id = {$alias_tr}.object_id";
 			$joins .= " INNER JOIN {$wpdb->term_taxonomy} {$alias_tt} ON {$alias_tr}.term_taxonomy_id = {$alias_tt}.term_taxonomy_id";
 
             // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -231,22 +233,42 @@ class Taxonomy_Helper {
 			++$join_index;
 		}
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$query = $wpdb->prepare(
-			"SELECT tt.term_id, COUNT(DISTINCT tr.object_id) as event_count
-            FROM {$wpdb->term_relationships} tr
-            INNER JOIN {$wpdb->term_taxonomy} tt 
-                ON tr.term_taxonomy_id = tt.term_taxonomy_id
-            INNER JOIN {$wpdb->posts} p 
-                ON tr.object_id = p.ID
-            {$joins}
-            WHERE tt.taxonomy = %s
-            AND p.post_type = %s
-            AND p.post_status = 'publish'
-            {$where_clauses}
-            GROUP BY tt.term_id",
-			$params
-		);
+		// When a date filter is active, event_dates provides post_status filtering
+		// so we can skip the expensive posts table JOIN entirely.
+		if ( $has_date_filter ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$query = $wpdb->prepare(
+				"SELECT tt.term_id, COUNT(DISTINCT tr.object_id) as event_count
+				FROM {$wpdb->term_relationships} tr
+				INNER JOIN {$wpdb->term_taxonomy} tt
+					ON tr.term_taxonomy_id = tt.term_taxonomy_id
+				{$joins}
+				WHERE tt.taxonomy = %s
+				{$where_clauses}
+				GROUP BY tt.term_id",
+				$params
+			);
+		} else {
+			// No date filter — fall back to posts JOIN for type/status filtering.
+			$post_type = Event_Post_Type::POST_TYPE;
+			array_splice( $params, 1, 0, array( $post_type ) );
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$query = $wpdb->prepare(
+				"SELECT tt.term_id, COUNT(DISTINCT tr.object_id) as event_count
+				FROM {$wpdb->term_relationships} tr
+				INNER JOIN {$wpdb->term_taxonomy} tt
+					ON tr.term_taxonomy_id = tt.term_taxonomy_id
+				INNER JOIN {$wpdb->posts} p
+					ON tr.object_id = p.ID
+				{$joins}
+				WHERE tt.taxonomy = %s
+				AND p.post_type = %s
+				AND p.post_status = 'publish'
+				{$where_clauses}
+				GROUP BY tt.term_id",
+				$params
+			);
+		}
 
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$results = $wpdb->get_results( $query );

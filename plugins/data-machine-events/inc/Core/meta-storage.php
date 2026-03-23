@@ -250,6 +250,29 @@ function data_machine_events_sync_datetime_meta( $post_id, $post, $update ) {
 add_action( 'save_post', __NAMESPACE__ . '\\data_machine_events_sync_datetime_meta', 10, 3 );
 
 /**
+ * Sync post_status to event_dates table on status transitions.
+ *
+ * Keeps the denormalized post_status column in sync so that date queries
+ * can filter by status without joining the full posts table.
+ *
+ * @param string  $new_status New post status.
+ * @param string  $old_status Old post status.
+ * @param WP_Post $post       Post object.
+ */
+function data_machine_events_sync_status( $new_status, $old_status, $post ) {
+	if ( Event_Post_Type::POST_TYPE !== $post->post_type ) {
+		return;
+	}
+
+	if ( $new_status === $old_status ) {
+		return;
+	}
+
+	EventDatesTable::update_status( $post->ID, $new_status );
+}
+add_action( 'transition_post_status', __NAMESPACE__ . '\\data_machine_events_sync_status', 10, 3 );
+
+/**
  * Get event dates from the dedicated event_dates table.
  *
  * @param int $post_id Post ID.
