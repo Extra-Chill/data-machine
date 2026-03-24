@@ -226,7 +226,7 @@ class EditPostBlocksAbility {
 				continue;
 			}
 
-			$new_html                            = str_replace( $find, $replace, $inner_html );
+			$new_html                            = self::smart_text_replace( $inner_html, $find, $replace );
 			$blocks[ $block_index ]['innerHTML'] = $new_html;
 
 			// Also update innerContent entries that match.
@@ -234,7 +234,7 @@ class EditPostBlocksAbility {
 				$blocks[ $block_index ]['innerContent'] = array_map(
 					function ( $content ) use ( $find, $replace ) {
 						if ( is_string( $content ) ) {
-							return str_replace( $find, $replace, $content );
+							return self::smart_text_replace( $content, $find, $replace );
 						}
 						return $content;
 					},
@@ -297,5 +297,51 @@ class EditPostBlocksAbility {
 			'post_url'        => get_permalink( $post_id ),
 			'changes_applied' => $changes,
 		);
+	}
+
+	/**
+	 * HTML-aware text replacement.
+	 *
+	 * Splits content into HTML tags and text nodes, only performs
+	 * replacement within text nodes. This prevents corruption of
+	 * HTML attributes (href, class, src, etc.) when the search text
+	 * matches attribute values.
+	 *
+	 * Ported from Wordsurf's edit_post tool.
+	 *
+	 * @since 0.58.0
+	 *
+	 * @param string $content        HTML content.
+	 * @param string $find           Text to search for.
+	 * @param string $replace        Replacement text.
+	 * @param bool   $case_sensitive Case-sensitive search (default true).
+	 * @return string Modified content.
+	 */
+	private static function smart_text_replace( string $content, string $find, string $replace, bool $case_sensitive = true ): string {
+		// No HTML tags — simple replacement.
+		if ( false === strpos( $content, '<' ) ) {
+			return $case_sensitive
+				? str_replace( $find, $replace, $content )
+				: str_ireplace( $find, $replace, $content );
+		}
+
+		// Split into HTML tags and text nodes.
+		$parts  = preg_split( '/(<[^>]+>)/', $content, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY );
+		$result = '';
+
+		foreach ( $parts as $part ) {
+			// HTML tag — pass through untouched.
+			if ( str_starts_with( $part, '<' ) && str_ends_with( $part, '>' ) ) {
+				$result .= $part;
+				continue;
+			}
+
+			// Text node — safe to replace.
+			$result .= $case_sensitive
+				? str_replace( $find, $replace, $part )
+				: str_ireplace( $find, $replace, $part );
+		}
+
+		return $result;
 	}
 }
