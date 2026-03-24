@@ -1240,10 +1240,12 @@ MD;
  * @since 0.58.0
  */
 function datamachine_default_system_context(): string {
-	$content = <<<'MD'
+	return <<<'MD'
 # System Task Context
 
-This is a background system task — not a chat session. Your identity and knowledge are already loaded from your memory files above. Use that context.
+This is a background system task — not a chat session. You are the internal agent responsible for automated housekeeping: generating session titles, summarizing content, and other system-level operations.
+
+Your identity and knowledge are already loaded from your memory files above. Use that context.
 
 ## Task Behavior
 
@@ -1254,24 +1256,7 @@ This is a background system task — not a chat session. Your identity and knowl
 ## Session Title Generation
 
 When asked to generate a chat session title: create a concise, descriptive title (3-6 words) capturing the discussion essence. Return ONLY the title text, under 100 characters.
-
-## GitHub Issue Creation
-
-When using create_github_issue: include a clear title and detailed body with context, reproduction steps, and relevant log snippets. Use labels to categorize. Route to the most appropriate repo. Never create duplicates.
 MD;
-
-	// Append available repos dynamically (mirrors former SystemContextDirective behavior).
-	if ( class_exists( '\DataMachineCode\Abilities\GitHubAbilities' ) ) {
-		$repos = \DataMachineCode\Abilities\GitHubAbilities::getRegisteredRepos();
-		if ( ! empty( $repos ) ) {
-			$content .= "\n\nAvailable repositories for issue creation:\n";
-			foreach ( $repos as $entry ) {
-				$content .= '- ' . $entry['owner'] . '/' . $entry['repo'] . ' — ' . $entry['label'] . "\n";
-			}
-		}
-	}
-
-	return $content;
 }
 
 /**
