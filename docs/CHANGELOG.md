@@ -2,6 +2,26 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.57.0] - 2026-03-24
+
+### Added
+- add datamachine_pre_ai_step_check filter for pre-AI dedup
+- scope agent dropdown to current site using site_scope column
+
+### Changed
+- add concurrency group to cancel stale PR runs
+
+### Fixed
+- use get_blog_option() for multisite log level check
+- silence fan-out grandchild handler-miss noise in UpdateStep
+- inline continuation for single-packet step transitions
+- prevent duplicate tool calls with full conversation history dedup
+- enforce concise skip_item reasons (2-5 words max)
+- add log level gate to prevent debug/info writes when level is set higher
+- Use correct parameter name when assigning taxonomies
+- sync package.json version to 0.56.0 (manual release left versions split)
+- verify AS action persistence inside FlowScheduling primitive
+
 ## [0.56.0] - 2026-03-23
 
 ### Added
