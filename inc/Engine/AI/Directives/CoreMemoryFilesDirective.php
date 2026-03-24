@@ -93,6 +93,30 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 			);
 		}
 
+		// Load context-specific memory file (contexts/{context}.md).
+		// The context slug comes from the payload, which the PromptBuilder
+		// passes through from the execution context ('chat', 'pipeline', 'system', etc.).
+		$context = $payload['context'] ?? '';
+		if ( ! empty( $context ) ) {
+			$agent_context = array(
+				'agent_id' => (int) ( $payload['agent_id'] ?? 0 ),
+				'user_id'  => $user_id,
+			);
+			$contexts_dir  = $directory_manager->get_contexts_directory( $agent_context );
+			$context_file  = sanitize_file_name( $context ) . '.md';
+			$context_path  = trailingslashit( $contexts_dir ) . $context_file;
+
+			if ( file_exists( $context_path ) ) {
+				$content = self::get_file_content_for_output( $context_path, "contexts/{$context_file}" );
+				if ( null !== $content ) {
+					$outputs[] = array(
+						'type'    => 'system_text',
+						'content' => $content,
+					);
+				}
+			}
+		}
+
 		return $outputs;
 	}
 

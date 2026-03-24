@@ -75,3 +75,21 @@ export const deleteDailyFile = async ( year, month, day ) => {
 		method: 'DELETE',
 	} );
 };
+
+// Context memory file operations.
+
+export const getContextFile = async ( slug ) => {
+	const config = getConfig();
+	return apiFetch( {
+		path: `/${ config.restNamespace }/files/agent/contexts/${ slug }`,
+	} );
+};
+
+export const putContextFile = async ( slug, content ) => {
+	const config = getConfig();
+	return apiFetch( {
+		path: `/${ config.restNamespace }/files/agent/contexts/${ slug }`,
+		method: 'PUT',
+		data: { content },
+	} );
+};

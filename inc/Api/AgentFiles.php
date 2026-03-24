@@ -118,6 +118,73 @@ class AgentFiles {
 			)
 		);
 
+		// Context memory file routes.
+		$context_slug_arg = array(
+			'required'          => true,
+			'type'              => 'string',
+			'sanitize_callback' => 'sanitize_title',
+			'validate_callback' => function ( $value ) {
+				return (bool) preg_match( '/^[a-z0-9][a-z0-9-]*$/', $value );
+			},
+		);
+
+		// GET /files/agent/contexts — List context memory files.
+		register_rest_route(
+			'datamachine/v1',
+			'/files/agent/contexts',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( self::class, 'list_context_files' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => array( 'user_id' => $user_id_arg ),
+			)
+		);
+
+		// GET /files/agent/contexts/{slug} — Read a context file.
+		register_rest_route(
+			'datamachine/v1',
+			'/files/agent/contexts/(?P<context_slug>[a-z0-9][a-z0-9-]*)',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( self::class, 'get_context_file' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => array(
+					'context_slug' => $context_slug_arg,
+					'user_id'      => $user_id_arg,
+				),
+			)
+		);
+
+		// PUT /files/agent/contexts/{slug} — Create or update a context file.
+		register_rest_route(
+			'datamachine/v1',
+			'/files/agent/contexts/(?P<context_slug>[a-z0-9][a-z0-9-]*)',
+			array(
+				'methods'             => WP_REST_Server::EDITABLE,
+				'callback'            => array( self::class, 'put_context_file' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => array(
+					'context_slug' => $context_slug_arg,
+					'user_id'      => $user_id_arg,
+				),
+			)
+		);
+
+		// DELETE /files/agent/contexts/{slug} — Delete a context file.
+		register_rest_route(
+			'datamachine/v1',
+			'/files/agent/contexts/(?P<context_slug>[a-z0-9][a-z0-9-]*)',
+			array(
+				'methods'             => WP_REST_Server::DELETABLE,
+				'callback'            => array( self::class, 'delete_context_file' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => array(
+					'context_slug' => $context_slug_arg,
+					'user_id'      => $user_id_arg,
+				),
+			)
+		);
+
 		// Daily memory file routes.
 		$daily_date_args = array(
 			'user_id' => $user_id_arg,
@@ -444,6 +511,152 @@ class AgentFiles {
 		return rest_ensure_response( array(
 			'success' => true,
 			'message' => $result['message'],
+		) );
+	}
+
+	// =========================================================================
+	// Context memory file handlers
+	// =========================================================================
+
+	/**
+	 * Resolve the contexts directory for the current agent.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 * @return string Full path to the contexts directory.
+	 */
+	private static function resolve_contexts_dir( WP_REST_Request $request ): string {
+		$dm = new \DataMachine\Core\FilesRepository\DirectoryManager();
+		$user_id = $dm->get_effective_user_id( self::resolve_scoped_user_id( $request ) );
+
+		$context = array( 'user_id' => $user_id );
+
+		$agent_id = $request->get_param( 'agent_id' );
+		if ( null !== $agent_id && '' !== $agent_id ) {
+			$context['agent_id'] = (int) $agent_id;
+		}
+
+		return $dm->get_contexts_directory( $context );
+	}
+
+	/**
+	 * List all context memory files.
+	 */
+	public static function list_context_files( WP_REST_Request $request ) {
+		$dir = self::resolve_contexts_dir( $request );
+
+		$files = array();
+		if ( is_dir( $dir ) ) {
+			foreach ( glob( trailingslashit( $dir ) . '*.md' ) as $filepath ) {
+				$filename = basename( $filepath );
+				$slug     = pathinfo( $filename, PATHINFO_FILENAME );
+				$files[]  = array(
+					'slug'     => $slug,
+					'filename' => $filename,
+					'size'     => filesize( $filepath ),
+					'modified' => gmdate( 'c', filemtime( $filepath ) ),
+				);
+			}
+		}
+
+		return rest_ensure_response( array(
+			'success' => true,
+			'data'    => $files,
+		) );
+	}
+
+	/**
+	 * Read a context memory file.
+	 */
+	public static function get_context_file( WP_REST_Request $request ) {
+		$dir      = self::resolve_contexts_dir( $request );
+		$slug     = sanitize_title( $request['context_slug'] );
+		$filepath = trailingslashit( $dir ) . $slug . '.md';
+
+		if ( ! file_exists( $filepath ) ) {
+			return new WP_Error( 'not_found', "Context file '{$slug}.md' not found.", array( 'status' => 404 ) );
+		}
+
+		global $wp_filesystem;
+		if ( ! $wp_filesystem ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+			\WP_Filesystem();
+		}
+
+		return rest_ensure_response( array(
+			'success' => true,
+			'data'    => array(
+				'slug'     => $slug,
+				'filename' => $slug . '.md',
+				'content'  => $wp_filesystem->get_contents( $filepath ),
+				'size'     => filesize( $filepath ),
+				'modified' => gmdate( 'c', filemtime( $filepath ) ),
+			),
+		) );
+	}
+
+	/**
+	 * Create or update a context memory file.
+	 */
+	public static function put_context_file( WP_REST_Request $request ) {
+		$dir  = self::resolve_contexts_dir( $request );
+		$slug = sanitize_title( $request['context_slug'] );
+
+		// Ensure the contexts directory exists.
+		$dm = new \DataMachine\Core\FilesRepository\DirectoryManager();
+		if ( ! $dm->ensure_directory_exists( $dir ) ) {
+			return new WP_Error( 'create_dir_failed', 'Failed to create contexts directory.', array( 'status' => 500 ) );
+		}
+
+		$content = $request->get_param( 'content' );
+		if ( null === $content ) {
+			$content = $request->get_body();
+		}
+
+		global $wp_filesystem;
+		if ( ! $wp_filesystem ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+			\WP_Filesystem();
+		}
+
+		$filepath = trailingslashit( $dir ) . $slug . '.md';
+		$written  = $wp_filesystem->put_contents( $filepath, $content, FS_CHMOD_FILE );
+
+		if ( ! $written ) {
+			return new WP_Error( 'write_failed', "Failed to write context file '{$slug}.md'.", array( 'status' => 500 ) );
+		}
+
+		return rest_ensure_response( array(
+			'success'  => true,
+			'slug'     => $slug,
+			'filename' => $slug . '.md',
+		) );
+	}
+
+	/**
+	 * Delete a context memory file.
+	 */
+	public static function delete_context_file( WP_REST_Request $request ) {
+		$dir      = self::resolve_contexts_dir( $request );
+		$slug     = sanitize_title( $request['context_slug'] );
+		$filepath = trailingslashit( $dir ) . $slug . '.md';
+
+		if ( ! file_exists( $filepath ) ) {
+			return new WP_Error( 'not_found', "Context file '{$slug}.md' not found.", array( 'status' => 404 ) );
+		}
+
+		global $wp_filesystem;
+		if ( ! $wp_filesystem ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+			\WP_Filesystem();
+		}
+
+		if ( ! $wp_filesystem->delete( $filepath ) ) {
+			return new WP_Error( 'delete_failed', "Failed to delete context file '{$slug}.md'.", array( 'status' => 500 ) );
+		}
+
+		return rest_ensure_response( array(
+			'success' => true,
+			'message' => "Context file '{$slug}.md' deleted.",
 		) );
 	}
 

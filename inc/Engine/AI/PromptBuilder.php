@@ -101,6 +101,12 @@ class PromptBuilder {
 			}
 		);
 
+		// Ensure directives can access the current execution context
+		// for context-scoped memory file loading (contexts/{context}.md).
+		if ( ! isset( $payload['context'] ) ) {
+			$payload['context'] = $context;
+		}
+
 		$conversation_messages = $this->messages;
 		$directive_outputs     = array();
 		$applied_directives    = array();

@@ -343,6 +343,33 @@ class AgentFileAbilities {
 			}
 		}
 
+		// Include context memory files.
+		$agent_context = array(
+			'agent_id' => (int) ( $input['agent_id'] ?? 0 ),
+			'user_id'  => $user_id,
+		);
+		$contexts_dir = $dm->get_contexts_directory( $agent_context );
+
+		if ( is_dir( $contexts_dir ) ) {
+			foreach ( glob( trailingslashit( $contexts_dir ) . '*.md' ) as $filepath ) {
+				$filename = basename( $filepath );
+				$slug     = pathinfo( $filename, PATHINFO_FILENAME );
+				$files[]  = array(
+					'filename'    => $filename,
+					'size'        => filesize( $filepath ),
+					'modified'    => gmdate( 'c', filemtime( $filepath ) ),
+					'type'        => 'context',
+					'layer'       => 'context',
+					'protected'   => false,
+					'editable'    => true,
+					'registered'  => false,
+					'label'       => ucfirst( $slug ) . ' Context',
+					'description' => "Context-scoped instructions loaded when execution context is '{$slug}'.",
+					'context_slug' => $slug,
+				);
+			}
+		}
+
 		// Include daily memory summary.
 		$daily        = new DailyMemory( $user_id, (int) ( $input['agent_id'] ?? 0 ) );
 		$daily_result = $daily->list_all();
