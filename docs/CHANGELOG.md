@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.57.1] - 2026-03-24
+
+### Fixed
+- filter non-handler packets before fan-out to prevent dead grandchildren
+
 ## [0.57.0] - 2026-03-24
 
 ### Added
