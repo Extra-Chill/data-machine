@@ -1,7 +1,9 @@
 /**
  * Chat API Queries
  *
- * TanStack Query hooks for chat endpoint interactions.
+ * TanStack Query hooks for chat session management.
+ * Message sending and continuation loops are handled by
+ * @extrachill/chat's useChat hook — see ChatSidebar.jsx.
  */
 
 /**
@@ -16,76 +18,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
  * Internal dependencies
  */
 import { client } from '@shared/utils/api';
-
-/**
- * Fetch existing chat session
- *
- * @param {string|null} sessionId - Session ID to fetch
- * @return {Object} TanStack Query object with session data
- */
-export function useChatSession( sessionId ) {
-	return useQuery( {
-		queryKey: [ 'chat-session', sessionId ],
-		queryFn: async () => {
-			const response = await apiFetch( {
-				path: `/datamachine/v1/chat/${ sessionId }`,
-				method: 'GET',
-			} );
-
-			if ( ! response.success ) {
-				throw new Error(
-					response.message || 'Failed to fetch session'
-				);
-			}
-
-			return response.data;
-		},
-		enabled: !! sessionId,
-		staleTime: Infinity,
-		retry: false,
-	} );
-}
-
-/**
- * Send a chat message mutation
- *
- * @return {Object} TanStack Query mutation object
- */
-export function useChatMutation() {
-	const queryClient = useQueryClient();
-
-	return useMutation( {
-		mutationFn: async ( {
-			message,
-			sessionId,
-			selectedPipelineId,
-			requestId,
-		} ) => {
-			const response = await apiFetch( {
-				path: '/datamachine/v1/chat',
-				method: 'POST',
-				headers: {
-					'X-Request-ID': requestId,
-				},
-				data: {
-					message,
-					session_id: sessionId || undefined,
-					selected_pipeline_id: selectedPipelineId || undefined,
-				},
-			} );
-
-			if ( ! response.success ) {
-				throw new Error( response.message || 'Chat request failed' );
-			}
-
-			return response.data;
-		},
-		onSuccess: () => {
-			// Invalidate sessions list to reflect new/updated session
-			queryClient.invalidateQueries( { queryKey: [ 'chat-sessions' ] } );
-		},
-	} );
-}
 
 /**
  * Fetch list of chat sessions for current user

@@ -2,24 +2,26 @@
  * ChatSidebar Component
  *
  * Collapsible right sidebar for chat interface.
- * Manages conversation state, session switching, and API interactions.
- * Uses TanStack Query cache as single source of truth for messages.
+ * Uses @extrachill/chat's useChat hook for all conversation state,
+ * continuation loops, and API communication.
  *
- * UI primitives from @extrachill/chat, orchestration stays DM-specific.
+ * DM-specific concerns (pipeline context, TanStack Query cache
+ * invalidation, UI store) are wired via hook callbacks.
  */
 
 /**
  * WordPress dependencies
  */
-import { useState, useCallback, useRef, lazy, Suspense } from '@wordpress/element';
+import { useState, useCallback, lazy, Suspense } from '@wordpress/element';
 import { Button } from '@wordpress/components';
 import { close, copy } from '@wordpress/icons';
 import { __ } from '@wordpress/i18n';
+import apiFetch from '@wordpress/api-fetch';
 /**
  * External dependencies
  */
-import { useQueryClient } from '@tanstack/react-query';
 import {
+	useChat,
 	ChatMessages,
 	ChatInput,
 	TypingIndicator,
@@ -29,23 +31,15 @@ import {
  * Internal dependencies
  */
 import { useUIStore } from '../../stores/uiStore';
-import { useChatMutation, useChatSession } from '../../queries/chat';
 import { useChatQueryInvalidation } from '../../hooks/useChatQueryInvalidation';
-import { useChatTurn } from '../../hooks/useChatTurn';
-import { normalizeMessages } from '../../utils/chatNormalizer';
 import ChatSessionSwitcher from './ChatSessionSwitcher';
 import ChatSessionList from './ChatSessionList';
 import { formatChatAsMarkdown } from '../../utils/formatters';
 
 const ReactMarkdown = lazy( () => import( 'react-markdown' ) );
 
-function generateRequestId() {
-	return crypto.randomUUID();
-}
-
 /**
  * Custom markdown renderer for @extrachill/chat messages.
- * Uses lazy-loaded react-markdown matching DM's existing pattern.
  *
  * @param {string} content - Message content (markdown)
  * @return {JSX.Element} Rendered content
@@ -66,188 +60,58 @@ export default function ChatSidebar() {
 		clearChatSession,
 		selectedPipelineId,
 	} = useUIStore();
-	const queryClient = useQueryClient();
-	const [ pendingUserMessage, setPendingUserMessage ] = useState( null );
 	const [ isCopied, setIsCopied ] = useState( false );
-	const [ view, setView ] = useState( 'chat' ); // 'chat' | 'sessions'
-	const chatMutation = useChatMutation();
-	const sessionQuery = useChatSession( chatSessionId );
+	const [ view, setView ] = useState( 'chat' );
 	const { invalidateFromToolCalls } = useChatQueryInvalidation();
-	const {
-		processToCompletion,
-		isProcessing,
-		processingSessionId,
-		turnCount,
-	} = useChatTurn();
-	const isCreatingSessionRef = useRef( false );
-	const loadingSessionRef = useRef( null );
 
-	// Messages from query cache, normalized for @extrachill/chat
-	const rawMessages = sessionQuery.data?.conversation ?? [];
-	const pendingMessages = pendingUserMessage
-		? [ ...rawMessages, pendingUserMessage ]
-		: rawMessages;
-	const messages = normalizeMessages( pendingMessages );
+	const handleToolCalls = useCallback(
+		( toolCalls ) => {
+			invalidateFromToolCalls( toolCalls, selectedPipelineId );
+		},
+		[ invalidateFromToolCalls, selectedPipelineId ]
+	);
 
-	const handleSend = useCallback(
-		async ( message ) => {
-			const isNewSession = ! chatSessionId;
-			if ( isNewSession && isCreatingSessionRef.current ) {
-				return;
-			}
-			if ( isNewSession ) {
-				isCreatingSessionRef.current = true;
-			}
-
-			// Generate request ID once per send - survives retries for deduplication
-			const requestId = generateRequestId();
-
-			const userMessage = { role: 'user', content: message };
-
-			if ( isNewSession ) {
-				// No session yet — use temp pending state
-				setPendingUserMessage( userMessage );
-			} else {
-				// Optimistic update to query cache
-				queryClient.setQueryData(
-					[ 'chat-session', chatSessionId ],
-					( old ) => {
-						if ( ! old ) {
-							return old;
-						}
-						return {
-							...old,
-							conversation: [
-								...( old.conversation || [] ),
-								userMessage,
-							],
-						};
-					}
-				);
-			}
-
-			// Track which session is loading for session-aware UI
-			loadingSessionRef.current = chatSessionId || 'new';
-
-			try {
-				// Initial request executes first turn
-				const response = await chatMutation.mutateAsync( {
-					message,
-					sessionId: chatSessionId,
-					selectedPipelineId,
-					requestId,
-				} );
-
-				const responseSessionId = response.session_id;
-
-				if (
-					responseSessionId &&
-					responseSessionId !== chatSessionId
-				) {
-					setChatSessionId( responseSessionId );
-				}
-
-				if ( response.conversation ) {
-					// Server returned full conversation — seed the cache
-					queryClient.setQueryData(
-						[ 'chat-session', responseSessionId ],
-						( old ) => ( {
-							...( old || {} ),
-							conversation: response.conversation,
-						} )
-					);
-				}
-
-				// Clear pending message now that session exists
-				if ( isNewSession ) {
-					setPendingUserMessage( null );
-				}
-
-				invalidateFromToolCalls(
-					response.tool_calls,
-					selectedPipelineId
-				);
-
-				// Continue processing if not complete (turn-by-turn polling)
-				if ( ! response.completed && responseSessionId ) {
-					await processToCompletion(
-						responseSessionId,
-						queryClient,
-						response.max_turns,
-						selectedPipelineId
-					);
-				}
-			} catch ( error ) {
-				const errorContent =
-					error.message ||
-					__(
-						'Something went wrong. Check the logs for details.',
-						'data-machine'
-					);
-				const errorMessage = {
-					role: 'assistant',
-					content: errorContent,
-				};
-
-				// Clear pending message on error
-				if ( isNewSession ) {
-					setPendingUserMessage( null );
-				}
-
-				const targetSessionId = chatSessionId;
-				if ( targetSessionId ) {
-					queryClient.setQueryData(
-						[ 'chat-session', targetSessionId ],
-						( old ) => {
-							if ( ! old ) {
-								return old;
-							}
-							return {
-								...old,
-								conversation: [
-									...( old.conversation || [] ),
-									errorMessage,
-								],
-							};
-						}
-					);
-				}
-
-				if ( error.message?.includes( 'not found' ) ) {
-					clearChatSession();
-				}
-			} finally {
-				loadingSessionRef.current = null;
-				if ( isNewSession ) {
-					isCreatingSessionRef.current = false;
-				}
+	const chat = useChat( {
+		basePath: '/datamachine/v1/chat',
+		fetchFn: apiFetch,
+		metadata: {
+			selected_pipeline_id: selectedPipelineId || undefined,
+		},
+		sessionContext: 'chat',
+		initialSessionId: chatSessionId || undefined,
+		onToolCalls: handleToolCalls,
+		onError: ( error ) => {
+			if ( error.message?.includes( 'not found' ) ) {
+				clearChatSession();
 			}
 		},
-		[
-			chatSessionId,
-			setChatSessionId,
-			clearChatSession,
-			chatMutation,
-			selectedPipelineId,
-			invalidateFromToolCalls,
-			processToCompletion,
-			queryClient,
-		]
+	} );
+
+	// Sync session ID changes back to UI store.
+	if ( chat.sessionId && chat.sessionId !== chatSessionId ) {
+		setChatSessionId( chat.sessionId );
+	}
+
+	const handleSend = useCallback(
+		( message ) => {
+			chat.sendMessage( message );
+		},
+		[ chat ]
 	);
 
 	const handleNewConversation = useCallback( () => {
 		clearChatSession();
-		setPendingUserMessage( null );
+		chat.newSession();
 		setView( 'chat' );
-	}, [ clearChatSession ] );
+	}, [ clearChatSession, chat ] );
 
 	const handleSelectSession = useCallback(
 		( sessionId ) => {
 			setChatSessionId( sessionId );
-			setPendingUserMessage( null );
+			chat.switchSession( sessionId );
 			setView( 'chat' );
 		},
-		[ setChatSessionId ]
+		[ setChatSessionId, chat ]
 	);
 
 	const handleShowMore = useCallback( () => {
@@ -260,25 +124,21 @@ export default function ChatSidebar() {
 
 	const handleSessionDeleted = useCallback( () => {
 		clearChatSession();
-		setPendingUserMessage( null );
-	}, [ clearChatSession ] );
+		chat.newSession();
+	}, [ clearChatSession, chat ] );
 
 	const handleCopyChat = useCallback( () => {
-		// formatChatAsMarkdown expects raw DM format
-		const markdown = formatChatAsMarkdown( rawMessages );
+		const markdown = formatChatAsMarkdown( chat.messages );
 		navigator.clipboard.writeText( markdown );
 		setIsCopied( true );
 		setTimeout( () => setIsCopied( false ), 2000 );
-	}, [ rawMessages ] );
+	}, [ chat.messages ] );
 
-	// Session-aware loading state - only show loading for the session that initiated the request
-	const isMutationLoading =
-		chatMutation.isPending &&
-		loadingSessionRef.current === ( chatSessionId || 'new' );
-	const isProcessingThisSession =
-		isProcessing && processingSessionId === chatSessionId;
+	// Session-aware loading — only show for the session that initiated the request.
 	const isLoading =
-		sessionQuery.isLoading || isMutationLoading || isProcessingThisSession;
+		chat.isLoading &&
+		( ! chat.processingSessionId ||
+			chat.processingSessionId === chatSessionId );
 
 	return (
 		<aside className="datamachine-chat-sidebar">
@@ -308,7 +168,7 @@ export default function ChatSidebar() {
 							variant="tertiary"
 							onClick={ handleCopyChat }
 							className="datamachine-chat-sidebar__copy"
-							disabled={ messages.length === 0 }
+							disabled={ chat.messages.length === 0 }
 							icon={ copy }
 						>
 							{ isCopied
@@ -318,7 +178,7 @@ export default function ChatSidebar() {
 					</div>
 
 					<ChatMessages
-						messages={ messages }
+						messages={ chat.messages }
 						showTools={ true }
 						contentFormat="markdown"
 						renderContent={ renderMarkdown }
@@ -333,8 +193,8 @@ export default function ChatSidebar() {
 					<TypingIndicator
 						visible={ isLoading }
 						label={
-							isProcessingThisSession
-								? `${ __( 'Processing turn', 'data-machine' ) } ${ turnCount }...`
+							chat.turnCount > 0
+								? `${ __( 'Processing turn', 'data-machine' ) } ${ chat.turnCount }...`
 								: undefined
 						}
 						className="datamachine-chat-typing"
