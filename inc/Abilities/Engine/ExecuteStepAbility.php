@@ -458,14 +458,47 @@ class ExecuteStepAbility {
 					);
 				}
 
-				// Fan out: each DataPacket becomes its own child job
+				// Filter packets before fan-out: only handler-complete packets
+				// carry data that downstream steps (UpdateStep) can use.
+				// Non-handler packets (tool_result, ai_response) would create
+				// child jobs guaranteed to fail with 'required_handler_tool_not_called'.
+				$handler_packets = array_values(
+					array_filter(
+						$dataPackets,
+						function ( $packet ) {
+							return ( $packet['metadata']['source_type'] ?? '' ) === 'ai_handler_complete';
+						}
+					)
+				);
+
+				// If filtering removed all packets, keep the originals — the step
+				// may not require handlers, or the packets may use a different convention.
+				$fanout_packets = ! empty( $handler_packets ) ? $handler_packets : $dataPackets;
+
+				// After filtering, check if we're back to ≤1 packet — inline instead of fan-out.
+				if ( count( $fanout_packets ) <= 1 ) {
+					do_action(
+						'datamachine_schedule_next_step',
+						$job_id,
+						$next_flow_step_id,
+						$fanout_packets
+					);
+
+					return array(
+						'success'      => true,
+						'step_success' => true,
+						'outcome'      => 'inline_continuation',
+					);
+				}
+
+				// Fan out: each handler DataPacket becomes its own child job
 				// continuing through the remaining pipeline steps.
 				$engine_snapshot = datamachine_get_engine_data( $job_id );
 				$batch_scheduler = new PipelineBatchScheduler();
 				$batch_result    = $batch_scheduler->fanOut(
 					$job_id,
 					$next_flow_step_id,
-					$dataPackets,
+					$fanout_packets,
 					$engine_snapshot
 				);
 
