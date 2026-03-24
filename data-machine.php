@@ -223,6 +223,7 @@ function datamachine_run_datamachine_plugin() {
 		new \DataMachine\Abilities\Content\GetPostBlocksAbility();
 		new \DataMachine\Abilities\Content\EditPostBlocksAbility();
 		new \DataMachine\Abilities\Content\ReplacePostBlocksAbility();
+		new \DataMachine\Abilities\Content\InsertContentAbility();
 		// GitHubAbilities moved to data-machine-code extension.
 		new \DataMachine\Abilities\Fetch\FetchFilesAbility();
 		new \DataMachine\Abilities\Email\EmailAbilities();
