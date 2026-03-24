@@ -82,7 +82,13 @@ function datamachine_log_message( string $level, string|\Stringable $message, ar
 			'critical' => 4,
 		);
 
-		$min_level    = get_option( 'datamachine_log_level', 'info' );
+		// Use get_blog_option() with the current blog ID to ensure we read the
+		// log level from the same site whose log table we're about to write to.
+		// Plain get_option() can return the wrong site's setting on multisite when
+		// the calling context doesn't match the $wpdb->prefix (e.g., REST API on
+		// blog 1 triggering events-site pipeline logging via switch_to_blog).
+		$blog_id      = is_multisite() ? get_current_blog_id() : 0;
+		$min_level    = $blog_id ? get_blog_option( $blog_id, 'datamachine_log_level', 'info' ) : get_option( 'datamachine_log_level', 'info' );
 		$min_severity = $severity_map[ $min_level ] ?? 1;
 		$msg_severity = $severity_map[ $level ] ?? 0;
 
