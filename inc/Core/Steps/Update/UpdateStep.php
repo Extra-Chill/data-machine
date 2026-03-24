@@ -81,6 +81,22 @@ class UpdateStep extends Step {
 			return $this->create_update_entry_from_tool_result( $tool_result_entry, $this->dataPackets, $primary_handler_slug, $this->flow_step_id );
 		}
 
+		// Fan-out child jobs often receive a data packet that doesn't contain
+		// the handler result — a sibling job got it instead. This is expected
+		// behavior, not a failure. Complete silently to avoid log noise.
+		if ( $this->isFanOutChild() ) {
+			$this->log(
+				'debug',
+				'Fan-out child missing handler result (sibling handled it)',
+				array(
+					'required_handler_slugs'    => $required_handler_slugs,
+					'missing_required_handlers' => $missing_required_handlers,
+				)
+			);
+
+			return $this->buildFanOutSkipPacket( $configured_handler_slugs, $required_handler_slugs, $missing_required_handlers );
+		}
+
 		$this->log(
 			'warning',
 			'Update step required handler tool was not executed by AI',
@@ -195,6 +211,58 @@ class UpdateStep extends Step {
 		);
 
 		return $packet->addTo( $dataPackets );
+	}
+
+	/**
+	 * Check if this job is a fan-out child (has a parent job).
+	 *
+	 * Fan-out children receive individual data packets from the parent's
+	 * output. Only one sibling gets the handler result — the rest are
+	 * expected to miss it. This is normal, not a failure.
+	 *
+	 * @return bool
+	 */
+	private function isFanOutChild(): bool {
+		$engine_data = $this->engine_data ?? array();
+		$job_context = $engine_data['job'] ?? array();
+		return ! empty( $job_context['parent_job_id'] );
+	}
+
+	/**
+	 * Build a skip packet for fan-out children that don't have the handler result.
+	 *
+	 * Uses status_override = 'completed_no_items' so the routing layer
+	 * completes the job silently instead of logging a noisy failure.
+	 *
+	 * @param array $configured_handler_slugs Configured handler slugs.
+	 * @param array $required_handler_slugs   Required handler slugs.
+	 * @param array $missing_required_handlers Missing required handlers.
+	 * @return array
+	 */
+	private function buildFanOutSkipPacket( array $configured_handler_slugs, array $required_handler_slugs, array $missing_required_handlers ): array {
+		// Set job_status override in engine_data so the routing layer
+		// completes with 'completed_no_items' instead of a generic 'completed'.
+		datamachine_merge_engine_data( $this->job_id, array(
+			'job_status' => 'completed_no_items',
+		) );
+
+		$packet = new DataPacket(
+			array(
+				'update_result' => array(),
+				'updated_at'    => current_time( 'mysql', true ),
+			),
+			array(
+				'step_type'                 => 'update',
+				'handler'                   => $required_handler_slugs[0] ?? ( $configured_handler_slugs[0] ?? '' ),
+				'flow_step_id'              => $this->flow_step_id,
+				'success'                   => true,
+				'fanout_sibling_handled'    => true,
+				'missing_required_handlers' => $missing_required_handlers,
+			),
+			'update'
+		);
+
+		return $packet->addTo( $this->dataPackets );
 	}
 
 	/**
