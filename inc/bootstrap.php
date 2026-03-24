@@ -115,6 +115,7 @@ add_action( 'init', 'datamachine_register_site_md_invalidation' );
 // Only registers hooks on multisite installs (guard is inside the function).
 add_action( 'init', 'datamachine_register_network_md_invalidation' );
 
+require_once __DIR__ . '/Engine/AI/Directives/ClientContextDirective.php';
 require_once __DIR__ . '/Engine/AI/Directives/DailyMemorySelectorDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineSystemPromptDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineMemoryFilesDirective.php';

@@ -107,6 +107,11 @@ class Chat {
 						),
 						'sanitize_callback' => array( self::class, 'sanitize_attachments' ),
 					),
+					'client_context'       => array(
+						'type'              => 'object',
+						'required'          => false,
+						'description'       => __( 'Client-side context for the AI agent. Arbitrary key-value pairs describing what the user is currently doing (active tab, draft ID, screen, etc). Injected as a system message.', 'data-machine' ),
+					),
 				),
 			)
 		);
@@ -569,6 +574,12 @@ class Chat {
 			$attachments = array();
 		}
 
+		// --- Resolve client context ---
+		$client_context = $request->get_param( 'client_context' );
+		if ( ! is_array( $client_context ) ) {
+			$client_context = array();
+		}
+
 		// --- Delegate to orchestrator ---
 		$result = ChatOrchestrator::processChat(
 			$message,
@@ -581,6 +592,7 @@ class Chat {
 				'request_id'           => $request_id,
 				'agent_id'             => $agent_id,
 				'attachments'          => $attachments,
+				'client_context'       => $client_context,
 			)
 		);
 

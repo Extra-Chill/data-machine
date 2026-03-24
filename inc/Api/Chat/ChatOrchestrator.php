@@ -168,6 +168,7 @@ class ChatOrchestrator {
 				'context'              => 'chat',
 				'user_id'              => $user_id,
 				'agent_id'             => $agent_id,
+				'client_context'       => $options['client_context'] ?? array(),
 			)
 		);
 
@@ -614,6 +615,8 @@ class ChatOrchestrator {
 				'context'  => ToolPolicyResolver::CONTEXT_CHAT,
 				'agent_id' => $agent_id,
 			) );
+			$client_context = $options['client_context'] ?? array();
+
 			$loop_context = array(
 				'session_id' => $session_id,
 				'user_id'    => $user_id,
@@ -621,6 +624,9 @@ class ChatOrchestrator {
 			);
 			if ( $selected_pipeline_id ) {
 				$loop_context['selected_pipeline_id'] = $selected_pipeline_id;
+			}
+			if ( ! empty( $client_context ) ) {
+				$loop_context['client_context'] = $client_context;
 			}
 
 			$loop        = new AIConversationLoop();
