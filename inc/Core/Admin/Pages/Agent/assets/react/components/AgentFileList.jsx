@@ -224,9 +224,15 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 		} ) );
 	}, [] );
 
-	// Separate core files from daily summary.
+	// Separate core files from daily summary and context files.
 	const coreFiles = files
-		? files.filter( ( f ) => f.type !== 'daily_summary' )
+		? files.filter(
+				( f ) =>
+					f.type !== 'daily_summary' && f.type !== 'context'
+		  )
+		: [];
+	const contextFiles = files
+		? files.filter( ( f ) => f.type === 'context' )
 		: [];
 	const dailySummary = files?.find( ( f ) => f.type === 'daily_summary' );
 
@@ -253,6 +259,7 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 
 	const sortedSharedFiles = sortLayer( sharedFiles );
 	const sortedAgentFiles = sortLayer( agentFiles );
+	const sortedContextFiles = sortLayer( contextFiles );
 	const sortedUserFiles = sortLayer( userFiles );
 
 	if ( isLoading ) {
@@ -343,6 +350,9 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 				...( sortedAgentFiles.length > 0
 					? [ { label: 'Agent', files: sortedAgentFiles, layerKey: 'agent' } ]
 					: [] ),
+				...( sortedContextFiles.length > 0
+					? [ { label: 'Contexts', files: sortedContextFiles, layerKey: 'context' } ]
+					: [] ),
 				...( sortedUserFiles.length > 0
 					? [ { label: 'User', files: sortedUserFiles, layerKey: 'user' } ]
 					: [] ),
@@ -353,39 +363,55 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 								{ section.label }
 							</span>
 						</div>
-						{ section.files.map( ( file ) => {
-							const selected = isSelected( selectedFile, 'core', {
-								filename: file.filename,
-							} );
-							const isShared = section.layerKey === 'shared';
+					{ section.files.map( ( file ) => {
+						const isContext =
+							section.layerKey === 'context';
+						const selectType = isContext
+							? 'context'
+							: 'core';
+						const selected = isContext
+							? selectedFile?.type === 'context' &&
+							  selectedFile?.contextSlug ===
+									file.context_slug
+							: isSelected( selectedFile, 'core', {
+									filename: file.filename,
+							  } );
+						const isShared = section.layerKey === 'shared';
 
-							return (
-								<div
-									key={ file.filename }
-									className={ `datamachine-agent-file-item${
-										selected ? ' is-selected' : ''
-									}${ isShared ? ' is-shared' : '' }` }
-									onClick={ () =>
-										onSelectFile( {
-											type: 'core',
-											filename: file.filename,
-											editable: file.editable !== false,
-										} )
+						const handleSelect = () => {
+							if ( isContext ) {
+								onSelectFile( {
+									type: 'context',
+									contextSlug: file.context_slug,
+									filename: file.filename,
+								} );
+							} else {
+								onSelectFile( {
+									type: 'core',
+									filename: file.filename,
+									editable:
+										file.editable !== false,
+								} );
+							}
+						};
+
+						return (
+							<div
+								key={ file.filename }
+								className={ `datamachine-agent-file-item${
+									selected ? ' is-selected' : ''
+								}${ isShared ? ' is-shared' : '' }` }
+								onClick={ handleSelect }
+								role="button"
+								tabIndex={ 0 }
+								onKeyDown={ ( e ) => {
+									if (
+										e.key === 'Enter' ||
+										e.key === ' '
+									) {
+										handleSelect();
 									}
-									role="button"
-									tabIndex={ 0 }
-									onKeyDown={ ( e ) => {
-										if (
-											e.key === 'Enter' ||
-											e.key === ' '
-										) {
-											onSelectFile( {
-												type: 'core',
-												filename: file.filename,
-												editable: file.editable !== false,
-											} );
-										}
-									} }
+								} }
 								>
 									<div className="datamachine-agent-file-item-info">
 										<span className="datamachine-agent-file-item-name">

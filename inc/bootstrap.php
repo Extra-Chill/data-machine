@@ -116,9 +116,6 @@ add_action( 'init', 'datamachine_register_site_md_invalidation' );
 add_action( 'init', 'datamachine_register_network_md_invalidation' );
 
 require_once __DIR__ . '/Engine/AI/Directives/DailyMemorySelectorDirective.php';
-require_once __DIR__ . '/Api/Chat/ChatContextDirective.php';
-require_once __DIR__ . '/Api/System/SystemContextDirective.php';
-require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineContextDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineSystemPromptDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineMemoryFilesDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/FlowMemoryFilesDirective.php';

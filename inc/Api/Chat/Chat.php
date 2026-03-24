@@ -22,7 +22,6 @@ use WP_REST_Request;
 use WP_Error;
 
 require_once __DIR__ . '/ChatPipelinesDirective.php';
-require_once __DIR__ . '/ChatContextDirective.php';
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
