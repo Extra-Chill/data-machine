@@ -2,6 +2,18 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.58.0] - 2026-03-24
+
+### Added
+- move InsertContentAbility to core alongside other content abilities
+- HTML-aware smart text replace in EditPostBlocksAbility
+- context-scoped agent memory files (contexts/{context}.md)
+
+### Changed
+- add client_context parameter and ClientContextDirective for chat
+- Remove workspace infrastructure from core (moved to extension)
+- migrate ChatSidebar to @extrachill/chat useChat hook
+
 ## [0.57.1] - 2026-03-24
 
 ### Fixed
