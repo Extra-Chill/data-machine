@@ -17,6 +17,7 @@ use DataMachine\Abilities\FlowStep\GetFlowStepsAbility;
 use DataMachine\Abilities\FlowStep\UpdateFlowStepAbility;
 use DataMachine\Abilities\FlowStep\ConfigureFlowStepsAbility;
 use DataMachine\Abilities\FlowStep\ValidateFlowStepsConfigAbility;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -30,6 +31,7 @@ class FlowStepAbilities {
 	private ValidateFlowStepsConfigAbility $validate_flow_steps_config;
 
 	public function __construct() {
+		add_action('wp_abilities_api_init', array( $this, 'abilities_api_init' ));
 		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
 			return;
 		}

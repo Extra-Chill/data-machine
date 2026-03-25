@@ -18,6 +18,7 @@ use DataMachine\Abilities\Content\GetPostBlocksAbility;
 use DataMachine\Abilities\Content\ReplacePostBlocksAbility;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\RequestBuilder;
+use DataMachine\Engine\AI\System\Tasks\Traits\HasSupportsUndo;
 
 class InternalLinkingTask extends SystemTask {
 

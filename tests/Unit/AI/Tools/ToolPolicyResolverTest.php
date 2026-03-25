@@ -50,7 +50,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'update_flow', $tools );
 	}
 
-	public function test_chat_tools_pass_availability_check(): void {
+ 	public function test_chat_tools_pass_availability_check(): void {
 		$tools = $this->resolver->resolve( array(
 			'context' => ToolPolicyResolver::CONTEXT_CHAT,
 		) );
@@ -58,6 +58,76 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		foreach ( $tools as $tool_name => $tool_config ) {
 			$this->assertIsArray( $tool_config, "Tool '{$tool_name}' should have array config" );
 		}
+	}
+
+	public function test_chat_does_not_require_use_tools_cap_by_default(): void {
+		add_filter( 'user_has_cap', array( $this, 'deny_all_datamachine_caps' ), 10, 4 );
+
+		add_filter( 'datamachine_tools', function ( $tools ) {
+			$tools['test_authenticated_tool'] = array(
+				'label'        => 'Test Authenticated Tool',
+				'description'  => 'Visible to authenticated users.',
+				'class'        => 'NonExistentClass',
+				'method'       => 'handle_tool_call',
+				'parameters'   => array(),
+				'contexts'     => array( 'chat' ),
+				'access_level' => 'authenticated',
+			);
+
+			return $tools;
+		} );
+
+		ToolManager::clearCache();
+
+		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
+		wp_set_current_user( $user_id );
+
+		$tools = $this->resolver->resolve( array(
+			'context' => ToolPolicyResolver::CONTEXT_CHAT,
+		) );
+
+		$this->assertArrayHasKey( 'test_authenticated_tool', $tools );
+
+		remove_filter( 'user_has_cap', array( $this, 'deny_all_datamachine_caps' ), 10 );
+		remove_all_filters( 'datamachine_tools' );
+		wp_set_current_user( 0 );
+		ToolManager::clearCache();
+	}
+
+	public function test_chat_can_restore_legacy_use_tools_gate_via_filter(): void {
+		add_filter( 'user_has_cap', array( $this, 'deny_all_datamachine_caps' ), 10, 4 );
+		add_filter( 'datamachine_require_use_tools_for_chat_tools', '__return_true' );
+
+		add_filter( 'datamachine_tools', function ( $tools ) {
+			$tools['test_authenticated_tool'] = array(
+				'label'        => 'Test Authenticated Tool',
+				'description'  => 'Visible to authenticated users.',
+				'class'        => 'NonExistentClass',
+				'method'       => 'handle_tool_call',
+				'parameters'   => array(),
+				'contexts'     => array( 'chat' ),
+				'access_level' => 'authenticated',
+			);
+
+			return $tools;
+		} );
+
+		ToolManager::clearCache();
+
+		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
+		wp_set_current_user( $user_id );
+
+		$tools = $this->resolver->resolve( array(
+			'context' => ToolPolicyResolver::CONTEXT_CHAT,
+		) );
+
+		$this->assertEmpty( $tools );
+
+		remove_filter( 'user_has_cap', array( $this, 'deny_all_datamachine_caps' ), 10 );
+		remove_filter( 'datamachine_require_use_tools_for_chat_tools', '__return_true' );
+		remove_all_filters( 'datamachine_tools' );
+		wp_set_current_user( 0 );
+		ToolManager::clearCache();
 	}
 
 	public function test_chat_allows_public_tools_for_anonymous_users(): void {
@@ -114,6 +184,36 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey( 'test_untagged_tool', $tools );
 
 		remove_all_filters( 'datamachine_tools' );
+		ToolManager::clearCache();
+	}
+>>>>>>> main
+			return $tools;
+		} );
+
+		ToolManager::clearCache();
+
+<<<<<<< HEAD
+=======
+		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
+		wp_set_current_user( $user_id );
+
+>>>>>>> main
+		$tools = $this->resolver->resolve( array(
+			'context' => ToolPolicyResolver::CONTEXT_CHAT,
+		) );
+
+<<<<<<< HEAD
+		$this->assertArrayNotHasKey( 'test_untagged_tool', $tools );
+
+		remove_all_filters( 'datamachine_tools' );
+=======
+		$this->assertEmpty( $tools );
+
+		remove_filter( 'user_has_cap', array( $this, 'deny_all_datamachine_caps' ), 10 );
+		remove_filter( 'datamachine_require_use_tools_for_chat_tools', '__return_true' );
+		remove_all_filters( 'datamachine_tools' );
+		wp_set_current_user( 0 );
+>>>>>>> main
 		ToolManager::clearCache();
 	}
 
@@ -426,6 +526,21 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		$slug = 'test-agent-' . wp_generate_uuid4();
 
 		return $agents_repo->create_if_missing( $slug, 'Test Agent', 1, $config );
+	}
+
+	/**
+	 * Deny all Data Machine caps while leaving normal login intact.
+	 */
+	public function deny_all_datamachine_caps( array $allcaps, array $caps, array $args, $user ): array {
+		unset( $args, $user );
+
+		foreach ( array_keys( $allcaps ) as $cap ) {
+			if ( str_starts_with( $cap, 'datamachine_' ) ) {
+				$allcaps[ $cap ] = false;
+			}
+		}
+
+		return $allcaps;
 	}
 
 	public function test_no_agent_id_means_no_restrictions(): void {

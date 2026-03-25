@@ -89,9 +89,23 @@ class ToolPolicyResolver {
 		$deny         = $context['deny'] ?? array();
 		$agent_id     = isset( $context['agent_id'] ) ? (int) $context['agent_id'] : 0;
 
-		// 0. Baseline gate: if the acting user lacks datamachine_use_tools, return no tools.
-		//    Pipeline and system contexts bypass this (they run as admin/cron).
-		if ( self::CONTEXT_CHAT === $context_type && ! PermissionHelper::can( 'use_tools' ) ) {
+		// 0. Optional legacy baseline gate.
+		//
+		// Historically chat tool resolution short-circuited to zero tools when the
+		// acting user lacked datamachine_use_tools. That made chat tool access an
+		// all-or-nothing switch and blocked lower-privilege tool tiers for regular
+		// authenticated users.
+		//
+		// Going forward, chat tool visibility should be resolved per-tool via:
+		// - linked ability permission callbacks
+		// - explicit access_level metadata
+		// - agent tool policy
+		//
+		// The legacy behavior is still available behind a filter for installs that
+		// want to preserve the coarse gate during migration.
+		$require_use_tools_for_chat = apply_filters( 'datamachine_require_use_tools_for_chat_tools', false, $context );
+
+		if ( self::CONTEXT_CHAT === $context_type && $require_use_tools_for_chat && ! PermissionHelper::can( 'use_tools' ) ) {
 			return array();
 		}
 

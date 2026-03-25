@@ -22,6 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class WordPressMedia extends FetchHandler {
 
 	use HandlerRegistrationTrait;
+	use DataMachine\Core\Steps\Fetch\Handlers\Files\Files;
 
 	public function __construct() {
 		parent::__construct( 'wordpress_media' );

@@ -42,6 +42,7 @@ class AgentAuthMiddleware {
 	 * Register the authentication filter.
 	 */
 	public function __construct() {
+		add_action('rest_api_init', array( $this, 'rest_api_init' ));
 		add_filter( 'rest_authentication_errors', array( $this, 'authenticate' ), 90 );
 	}
 
@@ -147,11 +148,11 @@ class AgentAuthMiddleware {
 			'debug',
 			'Agent auth: token authenticated',
 			array(
-				'agent_id'    => $agent_id,
-				'agent_slug'  => $agent['agent_slug'],
-				'owner_id'    => $owner_id,
-				'token_id'    => $token_id,
-				'token_label' => $token_record['label'] ?? '',
+				'agent_id'             => $agent_id,
+				'agent_slug'           => $agent['agent_slug'],
+				'owner_id'             => $owner_id,
+				'token_id'             => $token_id,
+				'token_label'          => $token_record['label'] ?? '',
 				'has_cap_restrictions' => null !== $token_capabilities,
 			)
 		);

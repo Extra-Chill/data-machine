@@ -404,9 +404,9 @@ function datamachine_get_site_scaffold_content(): string {
 	$post_types      = get_post_types( array( 'public' => true ), 'objects' );
 	$post_type_lines = array();
 	foreach ( $post_types as $pt ) {
-		$count     = wp_count_posts( $pt->name );
-		$published = isset( $count->publish ) ? (int) $count->publish : 0;
-		$hier      = $pt->hierarchical ? 'hierarchical' : 'flat';
+		$count             = wp_count_posts( $pt->name );
+		$published         = isset( $count->publish ) ? (int) $count->publish : 0;
+		$hier              = $pt->hierarchical ? 'hierarchical' : 'flat';
 		$post_type_lines[] = sprintf( '| %s | %s | %d | %s |', $pt->label, $pt->name, $published, $hier );
 	}
 
@@ -421,8 +421,8 @@ function datamachine_get_site_scaffold_content(): string {
 		if ( is_wp_error( $term_count ) ) {
 			$term_count = 0;
 		}
-		$hier            = $tax->hierarchical ? 'hierarchical' : 'flat';
-		$associated      = implode( ', ', $tax->object_type ?? array() );
+		$hier             = $tax->hierarchical ? 'hierarchical' : 'flat';
+		$associated       = implode( ', ', $tax->object_type ?? array() );
 		$taxonomy_lines[] = sprintf( '| %s | %s | %d | %s | %s |', $tax->label, $tax->name, (int) $term_count, $hier, $associated );
 	}
 
@@ -462,21 +462,25 @@ function datamachine_get_site_scaffold_content(): string {
 	}
 
 	// --- User roles ---
-	$wp_roles       = wp_roles();
-	$role_names     = $wp_roles->get_names();
-	$default_roles  = array( 'administrator', 'editor', 'author', 'contributor', 'subscriber' );
-	$custom_roles   = array_diff( array_keys( $role_names ), $default_roles );
-	$role_lines     = array();
+	$wp_roles      = wp_roles();
+	$role_names    = $wp_roles->get_names();
+	$default_roles = array( 'administrator', 'editor', 'author', 'contributor', 'subscriber' );
+	$custom_roles  = array_diff( array_keys( $role_names ), $default_roles );
+	$role_lines    = array();
 
 	foreach ( $role_names as $slug => $name ) {
-		$user_count   = count( get_users( array( 'role' => $slug, 'fields' => 'ID', 'number' => 1 ) ) );
+		$user_count   = count( get_users( array(
+			'role'   => $slug,
+			'fields' => 'ID',
+			'number' => 1,
+		) ) );
 		$is_custom    = in_array( $slug, $custom_roles, true ) ? ' (custom)' : '';
 		$role_lines[] = sprintf( '- %s (`%s`)%s', translate_user_role( $name ), $slug, $is_custom );
 	}
 
 	// --- REST API namespaces (custom only) ---
-	$rest_namespaces    = array();
-	$builtin_prefixes   = array( 'wp/', 'oembed/', 'wp-site-health/' );
+	$rest_namespaces  = array();
+	$builtin_prefixes = array( 'wp/', 'oembed/', 'wp-site-health/' );
 
 	if ( function_exists( 'rest_get_server' ) && did_action( 'rest_api_init' ) ) {
 		$routes = rest_get_server()->get_namespaces();
@@ -1088,8 +1092,14 @@ function datamachine_ensure_default_memory_files() {
 
 	$default_user_id = \DataMachine\Core\FilesRepository\DirectoryManager::get_default_agent_user_id();
 
-	$ability->execute( array( 'layer' => 'agent', 'user_id' => $default_user_id ) );
-	$ability->execute( array( 'layer' => 'user', 'user_id' => $default_user_id ) );
+	$ability->execute( array(
+		'layer'   => 'agent',
+		'user_id' => $default_user_id,
+	) );
+	$ability->execute( array(
+		'layer'   => 'user',
+		'user_id' => $default_user_id,
+	) );
 
 	// Scaffold default context memory files (contexts/{context}.md).
 	datamachine_ensure_default_context_files( $default_user_id );
@@ -1106,7 +1116,7 @@ function datamachine_ensure_default_memory_files() {
  * @param int $user_id Default agent user ID.
  */
 function datamachine_ensure_default_context_files( int $user_id ): void {
-	$dm          = new \DataMachine\Core\FilesRepository\DirectoryManager();
+	$dm           = new \DataMachine\Core\FilesRepository\DirectoryManager();
 	$contexts_dir = $dm->get_contexts_directory( array( 'user_id' => $user_id ) );
 
 	if ( ! $dm->ensure_directory_exists( $contexts_dir ) ) {
@@ -1431,6 +1441,7 @@ function datamachine_scaffold_soul_content( string $content, string $filename, a
  * @return string
  */
 function datamachine_scaffold_memory_content( string $content, string $filename, array $context ): string {
+	unset( $context );
 	if ( 'MEMORY.md' !== $filename || '' !== $content ) {
 		return $content;
 	}
@@ -1453,11 +1464,12 @@ function datamachine_scaffold_memory_content( string $content, string $filename,
  * @return string
  */
 function datamachine_scaffold_rules_content( string $content, string $filename, array $context ): string {
+	unset( $context );
 	if ( 'RULES.md' !== $filename || '' !== $content ) {
 		return $content;
 	}
 
-	$site_name = get_bloginfo( 'name' ) ?: 'this site';
+	$site_name = get_bloginfo( 'name' ) ? get_bloginfo( 'name' ) : 'this site';
 
 	return <<<MD
 # Site Rules
@@ -2071,11 +2083,11 @@ function datamachine_migrate_agents_to_network_scope() {
 
 	global $wpdb;
 
-	$network_agents_table  = $wpdb->base_prefix . 'datamachine_agents';
-	$network_access_table  = $wpdb->base_prefix . 'datamachine_agent_access';
-	$network_tokens_table  = $wpdb->base_prefix . 'datamachine_agent_tokens';
-	$migrated_agents       = 0;
-	$migrated_access       = 0;
+	$network_agents_table = $wpdb->base_prefix . 'datamachine_agents';
+	$network_access_table = $wpdb->base_prefix . 'datamachine_agent_access';
+	$network_tokens_table = $wpdb->base_prefix . 'datamachine_agent_tokens';
+	$migrated_agents      = 0;
+	$migrated_access      = 0;
 
 	$sites = get_sites( array( 'fields' => 'ids' ) );
 
@@ -2087,11 +2099,13 @@ function datamachine_migrate_agents_to_network_scope() {
 			// Set site_scope on existing main-site agents that don't have one yet.
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$wpdb->query(
+				// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 				$wpdb->prepare(
 					"UPDATE `{$network_agents_table}` SET site_scope = %d WHERE site_scope IS NULL",
 					(int) $blog_id
 				)
 			);
+				// phpcs:enable WordPress.DB.PreparedSQL
 			continue;
 		}
 
@@ -2119,6 +2133,7 @@ function datamachine_migrate_agents_to_network_scope() {
 
 			// Check if slug already exists in network table.
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$existing = $wpdb->get_row(
 				$wpdb->prepare(
 					"SELECT agent_id FROM `{$network_agents_table}` WHERE agent_slug = %s",
@@ -2126,6 +2141,7 @@ function datamachine_migrate_agents_to_network_scope() {
 				),
 				ARRAY_A
 			);
+			// phpcs:enable WordPress.DB.PreparedSQL
 
 			if ( $existing ) {
 				// Slug already exists in network table — skip this agent.
@@ -2159,10 +2175,12 @@ function datamachine_migrate_agents_to_network_scope() {
 
 			// Migrate access grants for this agent.
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$site_access = $wpdb->get_results(
 				$wpdb->prepare( "SELECT * FROM `{$site_access_table}` WHERE agent_id = %d", $old_agent_id ),
 				ARRAY_A
 			);
+			// phpcs:enable WordPress.DB.PreparedSQL
 
 			foreach ( $site_access as $access ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
@@ -2184,10 +2202,12 @@ function datamachine_migrate_agents_to_network_scope() {
 			$token_table_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $site_tokens_table ) );
 			if ( $token_table_exists ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 				$site_tokens = $wpdb->get_results(
 					$wpdb->prepare( "SELECT * FROM `{$site_tokens_table}` WHERE agent_id = %d", $old_agent_id ),
 					ARRAY_A
 				);
+				// phpcs:enable WordPress.DB.PreparedSQL
 
 				foreach ( $site_tokens as $token ) {
 					// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
