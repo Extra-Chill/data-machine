@@ -16,7 +16,6 @@ use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\PluginSettings;
-use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 

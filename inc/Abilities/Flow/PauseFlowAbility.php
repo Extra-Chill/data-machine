@@ -116,8 +116,8 @@ class PauseFlowAbility {
 		$details = array();
 
 		foreach ( $flows as $flow ) {
-			$fid        = (int) $flow['flow_id'];
-			$scheduling = $flow['scheduling_config'] ?? array();
+			$fid              = (int) $flow['flow_id'];
+			$scheduling       = $flow['scheduling_config'] ?? array();
 
 			// Already paused — skip.
 			if ( isset( $scheduling['enabled'] ) && false === $scheduling['enabled'] ) {

@@ -10,7 +10,6 @@
 namespace DataMachine\Api;
 
 use DataMachine\Abilities\PermissionHelper;
-use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;

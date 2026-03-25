@@ -417,7 +417,7 @@ class PipelinesCommand extends BaseCommand {
 		}
 
 		$summary = implode( ' | ', array_unique( $parts ) );
-		return $summary ? $summary : '—';
+		return $summary ?: '—';
 	}
 
 	/**

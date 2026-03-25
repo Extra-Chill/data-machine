@@ -17,8 +17,6 @@ defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Engine\AI\Tools\BaseTool;
 use DataMachine\Core\FilesRepository\DirectoryManager;
-use DataMachine\Engine\AI\Tools\Global\Traits\HasIsConfigured;
-use DataMachine\Engine\AI\Tools\Global\AgentMemory;
 
 class AgentDailyMemory extends BaseTool {
 

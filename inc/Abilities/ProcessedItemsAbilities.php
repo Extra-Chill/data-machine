@@ -15,7 +15,6 @@ namespace DataMachine\Abilities;
 use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
-use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 

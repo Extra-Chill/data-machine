@@ -17,7 +17,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 use DataMachine\Abilities\StepTypeAbilities;
 use DataMachine\Engine\AI\Tools\BaseTool;
-use DataMachine\Api\Chat\Tools\CreateFlow;
 
 class CreatePipeline extends BaseTool {
 

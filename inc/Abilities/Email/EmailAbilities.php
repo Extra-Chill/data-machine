@@ -47,28 +47,28 @@ class EmailAbilities {
 						'type'       => 'object',
 						'required'   => array( 'to', 'subject', 'body', 'in_reply_to' ),
 						'properties' => array(
-							'to'           => array(
+							'to'          => array(
 								'type'        => 'string',
 								'description' => __( 'Recipient email address', 'data-machine' ),
 							),
-							'subject'      => array(
+							'subject'     => array(
 								'type'        => 'string',
 								'description' => __( 'Reply subject (typically Re: original subject)', 'data-machine' ),
 							),
-							'body'         => array(
+							'body'        => array(
 								'type'        => 'string',
 								'description' => __( 'Reply body content', 'data-machine' ),
 							),
-							'in_reply_to'  => array(
+							'in_reply_to' => array(
 								'type'        => 'string',
 								'description' => __( 'Message-ID of the email being replied to', 'data-machine' ),
 							),
-							'references'   => array(
+							'references'  => array(
 								'type'        => 'string',
 								'default'     => '',
 								'description' => __( 'References header chain for threading', 'data-machine' ),
 							),
-							'cc'           => array(
+							'cc'          => array(
 								'type'    => 'string',
 								'default' => '',
 							),
@@ -187,8 +187,8 @@ class EmailAbilities {
 								'description' => __( 'IMAP flag: Seen, Flagged, Answered, Deleted, Draft', 'data-machine' ),
 							),
 							'action' => array(
-								'type'        => 'string',
-								'default'     => 'set',
+								'type'    => 'string',
+								'default' => 'set',
 								'description' => __( 'set or clear the flag', 'data-machine' ),
 							),
 							'folder' => array(
@@ -277,8 +277,8 @@ class EmailAbilities {
 								'description' => __( 'Flag: Seen, Flagged, Answered, Deleted, Draft', 'data-machine' ),
 							),
 							'action' => array(
-								'type'        => 'string',
-								'default'     => 'set',
+								'type'    => 'string',
+								'default' => 'set',
 								'description' => __( 'set or clear', 'data-machine' ),
 							),
 							'folder' => array(
@@ -294,11 +294,11 @@ class EmailAbilities {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'       => array( 'type' => 'boolean' ),
-							'message'       => array( 'type' => 'string' ),
-							'flagged_count' => array( 'type' => 'integer' ),
-							'total_matches' => array( 'type' => 'integer' ),
-							'error'         => array( 'type' => 'string' ),
+							'success'        => array( 'type' => 'boolean' ),
+							'message'        => array( 'type' => 'string' ),
+							'flagged_count'  => array( 'type' => 'integer' ),
+							'total_matches'  => array( 'type' => 'integer' ),
+							'error'          => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'executeBatchFlag' ),
@@ -336,11 +336,11 @@ class EmailAbilities {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'       => array( 'type' => 'boolean' ),
-							'message'       => array( 'type' => 'string' ),
-							'deleted_count' => array( 'type' => 'integer' ),
-							'total_matches' => array( 'type' => 'integer' ),
-							'error'         => array( 'type' => 'string' ),
+							'success'        => array( 'type' => 'boolean' ),
+							'message'        => array( 'type' => 'string' ),
+							'deleted_count'  => array( 'type' => 'integer' ),
+							'total_matches'  => array( 'type' => 'integer' ),
+							'error'          => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'executeBatchDelete' ),
@@ -414,12 +414,12 @@ class EmailAbilities {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'      => array( 'type' => 'boolean' ),
-							'message'      => array( 'type' => 'string' ),
-							'results'      => array( 'type' => 'array' ),
+							'success'     => array( 'type' => 'boolean' ),
+							'message'     => array( 'type' => 'string' ),
+							'results'     => array( 'type' => 'array' ),
 							'unsubscribed' => array( 'type' => 'integer' ),
-							'failed'       => array( 'type' => 'integer' ),
-							'no_header'    => array( 'type' => 'integer' ),
+							'failed'      => array( 'type' => 'integer' ),
+							'no_header'   => array( 'type' => 'integer' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'executeBatchUnsubscribe' ),
@@ -442,10 +442,10 @@ class EmailAbilities {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'      => array( 'type' => 'boolean' ),
-							'message'      => array( 'type' => 'string' ),
-							'mailbox_info' => array( 'type' => 'object' ),
-							'error'        => array( 'type' => 'string' ),
+							'success'       => array( 'type' => 'boolean' ),
+							'message'       => array( 'type' => 'string' ),
+							'mailbox_info'  => array( 'type' => 'object' ),
+							'error'         => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'executeTestConnection' ),
@@ -520,7 +520,7 @@ class EmailAbilities {
 		global $phpmailer;
 		$error = 'wp_mail() returned false';
 		if ( isset( $phpmailer ) && $phpmailer instanceof \PHPMailer\PHPMailer\PHPMailer ) {
-			$error = $phpmailer->ErrorInfo ? $phpmailer->ErrorInfo : $error;
+			$error = $phpmailer->ErrorInfo ?: $error;
 		}
 
 		return array(
@@ -619,7 +619,7 @@ class EmailAbilities {
 
 		return array(
 			'success' => true,
-			'message' => sprintf( 'Flag %s %s on UID %d', $flag, 'clear' === $action ? 'cleared' : 'set', $uid ),
+			'message' => sprintf( 'Flag %s %s on UID %d', $flag, $action === 'clear' ? 'cleared' : 'set', $uid ),
 		);
 	}
 
@@ -627,7 +627,6 @@ class EmailAbilities {
 	 * Test the IMAP connection with stored credentials.
 	 */
 	public function executeTestConnection( array $input ): array {
-		unset( $input );
 		if ( ! function_exists( 'imap_open' ) ) {
 			return array(
 				'success' => false,
@@ -808,7 +807,7 @@ class EmailAbilities {
 				continue;
 			}
 
-			$from   = $header->from[0];
+			$from = $header->from[0];
 			$sender = $from->mailbox . '@' . $from->host;
 
 			if ( isset( $seen_senders[ $sender ] ) ) {
@@ -818,7 +817,7 @@ class EmailAbilities {
 			$seen_senders[ $sender ] = true;
 
 			// Fetch unsubscribe headers.
-			$raw    = imap_fetchheader( $connection, $uid, FT_UID );
+			$raw = imap_fetchheader( $connection, $uid, FT_UID );
 			$parsed = $this->parseUnsubscribeHeaders( $raw );
 
 			$to_process[] = array(
@@ -1196,10 +1195,10 @@ class EmailAbilities {
 		if ( false === $uids || empty( $uids ) ) {
 			imap_close( $connection );
 			return array(
-				'success'       => true,
-				'message'       => 'No messages matching search criteria',
-				'deleted_count' => 0,
-				'total_matches' => 0,
+				'success'        => true,
+				'message'        => 'No messages matching search criteria',
+				'deleted_count'  => 0,
+				'total_matches'  => 0,
 			);
 		}
 
@@ -1217,10 +1216,10 @@ class EmailAbilities {
 		}
 
 		return array(
-			'success'       => true,
-			'message'       => $message,
-			'deleted_count' => count( $to_delete ),
-			'total_matches' => $total,
+			'success'        => true,
+			'message'        => $message,
+			'deleted_count'  => count( $to_delete ),
+			'total_matches'  => $total,
 		);
 	}
 

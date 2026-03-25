@@ -344,6 +344,8 @@ class InternalLinkingAbilities {
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
+
+	
 		};
 
 		if ( doing_action( 'wp_abilities_api_init' ) ) {
@@ -1016,7 +1018,7 @@ class InternalLinkingAbilities {
 					'error'   => "Category '{$category}' not found.",
 				);
 			}
-			$cat_posts         = get_posts(
+			$cat_posts = get_posts(
 				array(
 					'post_type'   => 'post',
 					'post_status' => 'publish',
@@ -1057,8 +1059,8 @@ class InternalLinkingAbilities {
 			}
 
 			$traffic_by_post[ $post_id ]['clicks']      += (int) $clicks;
-			$traffic_by_post[ $post_id ]['impressions'] += (int) ( $row['impressions'] ?? 0 );
-			$traffic_by_post[ $post_id ]['position']    += (float) ( $row['position'] ?? 0 );
+			$traffic_by_post[ $post_id ]['impressions']  += (int) ( $row['impressions'] ?? 0 );
+			$traffic_by_post[ $post_id ]['position']     += (float) ( $row['position'] ?? 0 );
 			++$traffic_by_post[ $post_id ]['row_count'];
 		}
 

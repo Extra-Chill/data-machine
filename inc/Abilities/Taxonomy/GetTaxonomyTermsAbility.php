@@ -13,7 +13,6 @@ namespace DataMachine\Abilities\Taxonomy;
 use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Core\WordPress\TaxonomyHandler;
-use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 

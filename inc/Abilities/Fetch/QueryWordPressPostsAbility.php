@@ -11,8 +11,6 @@
 namespace DataMachine\Abilities\Fetch;
 
 use DataMachine\Abilities\PermissionHelper;
-use DataMachine\Abilities\Fetch\Traits\HasApplyKeywordSearch;
-use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -275,17 +273,17 @@ class QueryWordPressPostsAbility {
 				'title'    => $title,
 				'content'  => $content,
 				'metadata' => array(
-					'source_type'       => 'wordpress_local',
-					'item_identifier'   => $post_id,
-					'original_id'       => $post_id,
-					'original_title'    => $title,
-					'original_date_gmt' => $post->post_date_gmt,
-					'post_type'         => $post->post_type,
-					'post_status'       => $post->post_status,
-					'site_name'         => $site_name,
-					'permalink'         => get_permalink( $post_id ) ?? '',
-					'excerpt'           => $post->post_excerpt,
-					'author'            => get_the_author_meta( 'display_name', (int) $post->post_author ),
+					'source_type'            => 'wordpress_local',
+					'item_identifier'        => $post_id,
+					'original_id'            => $post_id,
+					'original_title'         => $title,
+					'original_date_gmt'      => $post->post_date_gmt,
+					'post_type'              => $post->post_type,
+					'post_status'            => $post->post_status,
+					'site_name'              => $site_name,
+					'permalink'              => get_permalink( $post_id ) ?? '',
+					'excerpt'                => $post->post_excerpt,
+					'author'                 => get_the_author_meta( 'display_name', (int) $post->post_author ),
 				),
 			);
 

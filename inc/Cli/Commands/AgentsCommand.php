@@ -691,12 +691,12 @@ class AgentsCommand extends BaseCommand {
 			}
 
 			$items[] = array(
-				'token_id'  => $token['token_id'],
-				'prefix'    => $token['token_prefix'] . '...',
-				'label'     => $token['label'] ? $token['label'] : '(none)',
-				'last_used' => $token['last_used_at'] ?? 'never',
-				'expires'   => $token['expires_at'] ?? 'never',
-				'status'    => $expired ? 'expired' : 'active',
+				'token_id'     => $token['token_id'],
+				'prefix'       => $token['token_prefix'] . '...',
+				'label'        => $token['label'] ?: '(none)',
+				'last_used'    => $token['last_used_at'] ?? 'never',
+				'expires'      => $token['expires_at'] ?? 'never',
+				'status'       => $expired ? 'expired' : 'active',
 			);
 		}
 
@@ -863,7 +863,7 @@ class AgentsCommand extends BaseCommand {
 				$value   = ( null !== $decoded || 'null' === $raw_value ) ? $decoded : $raw_value;
 
 				$config[ $key ] = $value;
-				$display        = is_array( $value ) ? wp_json_encode( $value, JSON_UNESCAPED_SLASHES ) : (string) $value;
+				$display = is_array( $value ) ? wp_json_encode( $value, JSON_UNESCAPED_SLASHES ) : (string) $value;
 				WP_CLI::log( sprintf( '  %s → %s', $key, $display ) );
 			}
 		}

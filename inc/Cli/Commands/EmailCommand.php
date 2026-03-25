@@ -205,18 +205,18 @@ class EmailCommand extends BaseCommand {
 		foreach ( $items as $item ) {
 			$meta   = $item['metadata'] ?? array();
 			$rows[] = array(
-				'uid'         => $meta['uid'] ?? '',
-				'from'        => $meta['from'] ?? '',
-				'from_name'   => $meta['from_name'] ?? '',
-				'to'          => $meta['to'] ?? '',
-				'subject'     => $item['title'] ?? '',
-				'date'        => $meta['date'] ?? '',
-				'seen'        => ( $meta['seen'] ?? false ) ? 'Y' : 'N',
-				'flagged'     => ( $meta['flagged'] ?? false ) ? '*' : '',
-				'size'        => $meta['size'] ?? '',
-				'attachments' => $meta['attachment_count'] ?? '',
-				'message_id'  => $meta['message_id'] ?? '',
-				'in_reply_to' => $meta['in_reply_to'] ?? '',
+				'uid'          => $meta['uid'] ?? '',
+				'from'         => $meta['from'] ?? '',
+				'from_name'    => $meta['from_name'] ?? '',
+				'to'           => $meta['to'] ?? '',
+				'subject'      => $item['title'] ?? '',
+				'date'         => $meta['date'] ?? '',
+				'seen'         => ( $meta['seen'] ?? false ) ? 'Y' : 'N',
+				'flagged'      => ( $meta['flagged'] ?? false ) ? '*' : '',
+				'size'         => $meta['size'] ?? '',
+				'attachments'  => $meta['attachment_count'] ?? '',
+				'message_id'   => $meta['message_id'] ?? '',
+				'in_reply_to'  => $meta['in_reply_to'] ?? '',
 			);
 		}
 

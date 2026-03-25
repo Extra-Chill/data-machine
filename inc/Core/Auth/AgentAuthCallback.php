@@ -169,7 +169,6 @@ class AgentAuthCallback {
 	 * @return \WP_REST_Response
 	 */
 	public function list_external_tokens( \WP_REST_Request $request ): \WP_REST_Response {
-		unset( $request );
 		$tokens = get_option( self::OPTION_KEY, array() );
 		$result = array();
 

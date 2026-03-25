@@ -14,7 +14,6 @@ use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Core\NetworkSettings;
 use DataMachine\Core\PluginSettings;
-use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 

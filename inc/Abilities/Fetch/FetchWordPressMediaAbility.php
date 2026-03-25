@@ -11,8 +11,6 @@
 namespace DataMachine\Abilities\Fetch;
 
 use DataMachine\Abilities\PermissionHelper;
-use DataMachine\Abilities\Fetch\Traits\HasApplyKeywordSearch;
-use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -264,18 +262,18 @@ class FetchWordPressMediaAbility {
 				'title'     => $content_data['title'] ?? '',
 				'content'   => $content_data['content'] ?? '',
 				'metadata'  => array(
-					'source_type'       => 'wordpress_media',
-					'item_identifier'   => $post->ID,
-					'original_id'       => $post->ID,
-					'parent_post_id'    => $post->post_parent,
-					'original_title'    => $title,
-					'original_date_gmt' => $post->post_date_gmt,
-					'mime_type'         => $file_type,
-					'file_size'         => $file_size,
-					'site_name'         => $site_name,
-					'source_url'        => $source_url,
-					'image_file_path'   => strpos( $file_type, 'video/' ) !== 0 ? $file_path : '',
-					'_engine_data'      => $engine_data,
+					'source_type'            => 'wordpress_media',
+					'item_identifier'        => $post->ID,
+					'original_id'            => $post->ID,
+					'parent_post_id'         => $post->post_parent,
+					'original_title'         => $title,
+					'original_date_gmt'      => $post->post_date_gmt,
+					'mime_type'              => $file_type,
+					'file_size'              => $file_size,
+					'site_name'              => $site_name,
+					'source_url'             => $source_url,
+					'image_file_path'        => strpos( $file_type, 'video/' ) !== 0 ? $file_path : '',
+					'_engine_data'           => $engine_data,
 				),
 				'file_info' => $file_info,
 			);

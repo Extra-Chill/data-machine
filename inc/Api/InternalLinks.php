@@ -19,7 +19,6 @@ namespace DataMachine\Api;
 
 use DataMachine\Abilities\PermissionHelper;
 use WP_REST_Server;
-use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;

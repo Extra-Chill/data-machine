@@ -681,7 +681,7 @@ class ExecuteStepAbility {
 			'Deferred mark-as-processed on pipeline completion',
 			array(
 				'job_id'             => $job_id,
-				'item_identifier'    => $item_identifier,
+				'item_identifier'            => $item_identifier,
 				'source_type'        => $source_type,
 				'fetch_flow_step_id' => $fetch_flow_step_id,
 			)
