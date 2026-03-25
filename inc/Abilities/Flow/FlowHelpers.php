@@ -222,6 +222,7 @@ trait FlowHelpers {
 
 		$scheduling_config = $flow['scheduling_config'] ?? array();
 		$last_run_at       = $latest_job['created_at'] ?? null;
+		$is_enabled        = \DataMachine\Core\Database\Flows\Flows::is_flow_enabled( $scheduling_config );
 
 		$next_run = null;
 		if ( null !== $next_runs && array_key_exists( $flow_id, $next_runs ) ) {
@@ -234,6 +235,7 @@ trait FlowHelpers {
 			'pipeline_id'       => isset( $flow['pipeline_id'] ) ? (int) $flow['pipeline_id'] : null,
 			'flow_config'       => $flow['flow_config'] ?? array(),
 			'scheduling_config' => $scheduling_config,
+			'enabled'           => $is_enabled,
 			'last_run'          => $last_run_at,
 			'last_run_status'   => $latest_job['status'] ?? null,
 			'last_run_display'  => \DataMachine\Core\Admin\DateFormatter::format_for_display( $last_run_at ),

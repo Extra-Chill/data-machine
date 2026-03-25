@@ -18,6 +18,8 @@ use DataMachine\Abilities\Flow\CreateFlowAbility;
 use DataMachine\Abilities\Flow\UpdateFlowAbility;
 use DataMachine\Abilities\Flow\DeleteFlowAbility;
 use DataMachine\Abilities\Flow\DuplicateFlowAbility;
+use DataMachine\Abilities\Flow\PauseFlowAbility;
+use DataMachine\Abilities\Flow\ResumeFlowAbility;
 use DataMachine\Abilities\Flow\QueueAbility;
 use DataMachine\Abilities\Flow\WebhookTriggerAbility;
 
@@ -32,6 +34,8 @@ class FlowAbilities {
 	private UpdateFlowAbility $update_flow;
 	private DeleteFlowAbility $delete_flow;
 	private DuplicateFlowAbility $duplicate_flow;
+	private PauseFlowAbility $pause_flow;
+	private ResumeFlowAbility $resume_flow;
 	private QueueAbility $queue;
 	private WebhookTriggerAbility $webhook_trigger;
 
@@ -48,6 +52,8 @@ class FlowAbilities {
 		$this->update_flow     = new UpdateFlowAbility();
 		$this->delete_flow     = new DeleteFlowAbility();
 		$this->duplicate_flow  = new DuplicateFlowAbility();
+		$this->pause_flow      = new PauseFlowAbility();
+		$this->resume_flow     = new ResumeFlowAbility();
 		$this->webhook_trigger = new WebhookTriggerAbility();
 
 		self::$registered = true;
@@ -146,6 +152,36 @@ class FlowAbilities {
 			$this->duplicate_flow = new DuplicateFlowAbility();
 		}
 		return $this->duplicate_flow->execute( $input );
+	}
+
+	/**
+	 * Execute pause-flow ability.
+	 *
+	 * @since 0.59.0
+	 *
+	 * @param array $input Input parameters (flow_id, pipeline_id, or agent_id).
+	 * @return array Result with pause counts.
+	 */
+	public function executePauseFlow( array $input ): array {
+		if ( ! isset( $this->pause_flow ) ) {
+			$this->pause_flow = new PauseFlowAbility();
+		}
+		return $this->pause_flow->execute( $input );
+	}
+
+	/**
+	 * Execute resume-flow ability.
+	 *
+	 * @since 0.59.0
+	 *
+	 * @param array $input Input parameters (flow_id, pipeline_id, or agent_id).
+	 * @return array Result with resume counts.
+	 */
+	public function executeResumeFlow( array $input ): array {
+		if ( ! isset( $this->resume_flow ) ) {
+			$this->resume_flow = new ResumeFlowAbility();
+		}
+		return $this->resume_flow->execute( $input );
 	}
 
 	/**
