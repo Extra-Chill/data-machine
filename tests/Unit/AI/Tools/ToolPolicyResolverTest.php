@@ -60,6 +60,63 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		}
 	}
 
+	public function test_chat_allows_public_tools_for_anonymous_users(): void {
+		wp_set_current_user( 0 );
+
+		add_filter( 'datamachine_tools', function ( $tools ) {
+			$tools['test_public_tool'] = array(
+				'label'        => 'Test Public Tool',
+				'description'  => 'Visible without login.',
+				'class'        => 'NonExistentClass',
+				'method'       => 'handle_tool_call',
+				'parameters'   => array(),
+				'contexts'     => array( 'chat' ),
+				'access_level' => 'public',
+			);
+
+			return $tools;
+		} );
+
+		ToolManager::clearCache();
+
+		$tools = $this->resolver->resolve( array(
+			'context' => ToolPolicyResolver::CONTEXT_CHAT,
+		) );
+
+		$this->assertArrayHasKey( 'test_public_tool', $tools );
+
+		remove_all_filters( 'datamachine_tools' );
+		ToolManager::clearCache();
+	}
+
+	public function test_chat_keeps_untagged_tools_admin_only_for_anonymous_users(): void {
+		wp_set_current_user( 0 );
+
+		add_filter( 'datamachine_tools', function ( $tools ) {
+			$tools['test_untagged_tool'] = array(
+				'label'       => 'Test Untagged Tool',
+				'description' => 'No access metadata.',
+				'class'       => 'NonExistentClass',
+				'method'      => 'handle_tool_call',
+				'parameters'  => array(),
+				'contexts'    => array( 'chat' ),
+			);
+
+			return $tools;
+		} );
+
+		ToolManager::clearCache();
+
+		$tools = $this->resolver->resolve( array(
+			'context' => ToolPolicyResolver::CONTEXT_CHAT,
+		) );
+
+		$this->assertArrayNotHasKey( 'test_untagged_tool', $tools );
+
+		remove_all_filters( 'datamachine_tools' );
+		ToolManager::clearCache();
+	}
+
 	// ============================================
 	// PIPELINE CONTEXT
 	// ============================================
