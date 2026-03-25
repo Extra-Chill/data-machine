@@ -198,7 +198,7 @@ class LogRepository extends BaseRepository {
 		// Fetch items.
 		$query_params = array_merge( $params, array( $per_page, $offset ) );
 		// phpcs:disable WordPress.DB.PreparedSQLPlaceholders -- Dynamic query construction with safe values.
-		$items        = $this->wpdb->get_results(
+		$items = $this->wpdb->get_results(
 			$this->wpdb->prepare(
 				"SELECT * FROM {$this->table_name} WHERE {$where_sql} ORDER BY created_at DESC, id DESC LIMIT %d OFFSET %d",
 				...$query_params
@@ -305,10 +305,12 @@ class LogRepository extends BaseRepository {
 			);
 			// phpcs:enable WordPress.DB.PreparedSQLPlaceholders
 		} else {
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$row = $this->wpdb->get_row(
 				"SELECT COUNT(*) AS total_entries, MIN(created_at) AS oldest, MAX(created_at) AS newest FROM {$this->table_name} WHERE {$where}",
 				ARRAY_A
 			);
+			// phpcs:enable WordPress.DB.PreparedSQL
 		}
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
@@ -346,10 +348,12 @@ class LogRepository extends BaseRepository {
 			);
 			// phpcs:enable WordPress.DB.PreparedSQLPlaceholders
 		} else {
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$rows = $this->wpdb->get_results(
 				"SELECT level, COUNT(*) AS cnt FROM {$this->table_name} WHERE {$where} GROUP BY level",
 				ARRAY_A
 			);
+			// phpcs:enable WordPress.DB.PreparedSQL
 		}
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 

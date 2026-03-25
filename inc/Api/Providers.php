@@ -13,6 +13,7 @@ namespace DataMachine\Api;
 
 use DataMachine\Core\PluginSettings;
 use WP_REST_Server;
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;

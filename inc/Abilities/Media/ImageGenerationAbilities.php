@@ -20,6 +20,7 @@ use DataMachine\Core\HttpClient;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\RequestBuilder;
 use DataMachine\Engine\Tasks\TaskScheduler;
+use DataMachine\Abilities\Analytics\Traits\HasGetConfig;
 
 defined( 'ABSPATH' ) || exit;
 

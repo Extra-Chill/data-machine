@@ -29,7 +29,7 @@ class FlowFormatter {
 	 * Cached service instances to avoid re-creation per flow in batch formatting.
 	 */
 	private static ?HandlerAbilities $handler_abilities_cache = null;
-	private static ?object $settings_display_cache = null;
+	private static ?object $settings_display_cache            = null;
 
 	public static function format_flow_for_response( array $flow, ?array $latest_job = null, ?array $next_runs = null ): array {
 		$flow_config = $flow['flow_config'] ?? array();

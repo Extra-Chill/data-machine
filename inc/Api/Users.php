@@ -13,6 +13,7 @@ use DataMachine\Abilities\PermissionHelper;
 use WP_REST_Request;
 use WP_REST_Server;
 use WP_Error;
+use DataMachine\Api\Email;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;

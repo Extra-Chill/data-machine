@@ -46,27 +46,27 @@ class ReplacePostBlocksAbility {
 								'description' => __( 'Post ID to edit', 'data-machine' ),
 							),
 							'replacements' => array(
-							'type'        => 'array',
-							'description' => __( 'Array of block replacement operations', 'data-machine' ),
-							'items'       => array(
-								'type'       => 'object',
-								'required'   => array( 'block_index', 'new_content' ),
-								'properties' => array(
-									'block_index' => array(
-										'type'        => 'integer',
-										'description' => __( 'Zero-based block index to replace', 'data-machine' ),
-									),
-									'new_content' => array(
-										'type'        => 'string',
-										'description' => __( 'New innerHTML for the block', 'data-machine' ),
+								'type'        => 'array',
+								'description' => __( 'Array of block replacement operations', 'data-machine' ),
+								'items'       => array(
+									'type'       => 'object',
+									'required'   => array( 'block_index', 'new_content' ),
+									'properties' => array(
+										'block_index' => array(
+											'type'        => 'integer',
+											'description' => __( 'Zero-based block index to replace', 'data-machine' ),
+										),
+										'new_content' => array(
+											'type'        => 'string',
+											'description' => __( 'New innerHTML for the block', 'data-machine' ),
+										),
 									),
 								),
 							),
-						),
-						'preview'      => array(
-							'type'        => 'boolean',
-							'description' => __( 'When true, return diff preview without applying changes', 'data-machine' ),
-						),
+							'preview'      => array(
+								'type'        => 'boolean',
+								'description' => __( 'When true, return diff preview without applying changes', 'data-machine' ),
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -288,11 +288,11 @@ class ReplacePostBlocksAbility {
 			}, $changes );
 
 			return array(
-				'success' => true,
-				'preview' => true,
-				'post_id' => $post_id,
-				'diff_id' => $diff_id,
-				'diff'    => array(
+				'success'         => true,
+				'preview'         => true,
+				'post_id'         => $post_id,
+				'diff_id'         => $diff_id,
+				'diff'            => array(
 					'diffId'             => $diff_id,
 					'diffType'           => 'replace',
 					'originalContent'    => implode( "\n", array_column( $diffs, 'originalContent' ) ),
