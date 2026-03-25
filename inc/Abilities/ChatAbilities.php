@@ -27,7 +27,6 @@ class ChatAbilities {
 	private CreateChatSessionAbility $create_session;
 
 	public function __construct() {
-		add_action('wp_abilities_api_init', array( $this, 'abilities_api_init' ));
 		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
 			return;
 		}

@@ -65,7 +65,7 @@ class SkipItemTool {
 		// Get item identifier and source type from engine data (set by fetch handler)
 		$item_identifier = $engine->get( 'item_identifier' );
 		$source_type     = $engine->get( 'source_type' );
-		$flow_step_id    = $parameters['flow_step_id'] ?? $engine->get( 'flow_step_id' );
+		$flow_step_id = $parameters['flow_step_id'] ?? $engine->get( 'flow_step_id' );
 
 		// Mark item as processed so it won't be refetched
 		if ( $flow_step_id && $item_identifier && $source_type ) {
@@ -82,11 +82,11 @@ class SkipItemTool {
 				'info',
 				'SkipItemTool: Item marked as processed (skipped)',
 				array(
-					'job_id'          => $job_id,
-					'flow_step_id'    => $flow_step_id,
-					'item_identifier' => $item_identifier,
-					'source_type'     => $source_type,
-					'reason'          => $reason,
+					'job_id'       => $job_id,
+					'flow_step_id' => $flow_step_id,
+					'item_identifier'      => $item_identifier,
+					'source_type'  => $source_type,
+					'reason'       => $reason,
 				)
 			);
 		} else {
@@ -95,11 +95,11 @@ class SkipItemTool {
 				'warning',
 				'SkipItemTool: Could not mark item as processed - missing identifiers',
 				array(
-					'job_id'          => $job_id,
-					'flow_step_id'    => $flow_step_id,
-					'item_identifier' => $item_identifier,
-					'source_type'     => $source_type,
-					'reason'          => $reason,
+					'job_id'       => $job_id,
+					'flow_step_id' => $flow_step_id,
+					'item_identifier'      => $item_identifier,
+					'source_type'  => $source_type,
+					'reason'       => $reason,
 				)
 			);
 		}
@@ -120,11 +120,11 @@ class SkipItemTool {
 		);
 
 		return array(
-			'success'         => true,
-			'message'         => "Item skipped: {$reason}",
-			'status'          => $status->toString(),
-			'item_identifier' => $item_identifier,
-			'tool_name'       => 'skip_item',
+			'success'   => true,
+			'message'   => "Item skipped: {$reason}",
+			'status'    => $status->toString(),
+			'item_identifier'   => $item_identifier,
+			'tool_name' => 'skip_item',
 		);
 	}
 }

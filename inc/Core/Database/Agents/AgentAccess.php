@@ -12,7 +12,6 @@
 namespace DataMachine\Core\Database\Agents;
 
 use DataMachine\Core\Database\BaseRepository;
-use DataMachine\Core\Database\Agents\Agents;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;

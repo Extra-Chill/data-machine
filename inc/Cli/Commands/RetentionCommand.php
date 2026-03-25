@@ -69,7 +69,7 @@ class RetentionCommand extends BaseCommand {
 
 		$policy_items = array();
 		foreach ( $policies as $domain => $policy ) {
-			$size_info      = $sizes[ $domain ] ?? array();
+			$size_info       = $sizes[ $domain ] ?? array();
 			$policy_items[] = array(
 				'domain'    => $domain,
 				'retention' => $policy['retention'],
@@ -158,8 +158,8 @@ class RetentionCommand extends BaseCommand {
 		}
 
 		// 3. Logs.
-		$log_days  = (int) apply_filters( 'datamachine_log_max_age_days', 7 );
-		$count     = $this->count_old_logs( $log_days );
+		$log_days = (int) apply_filters( 'datamachine_log_max_age_days', 7 );
+		$count    = $this->count_old_logs( $log_days );
 		$results[] = array(
 			'domain'    => 'Pipeline logs',
 			'threshold' => $log_days . ' days',
@@ -186,8 +186,8 @@ class RetentionCommand extends BaseCommand {
 		}
 
 		// 5. Action Scheduler actions + logs.
-		$as_days   = (int) apply_filters( 'datamachine_as_actions_max_age_days', 7 );
-		$as_count  = $this->count_old_as_actions( $as_days );
+		$as_days  = (int) apply_filters( 'datamachine_as_actions_max_age_days', 7 );
+		$as_count = $this->count_old_as_actions( $as_days );
 		$results[] = array(
 			'domain'    => 'AS actions + logs',
 			'threshold' => $as_days . ' days',
@@ -286,7 +286,6 @@ class RetentionCommand extends BaseCommand {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$results = $wpdb->get_results(
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			// phpcs:disable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders -- Table name from $wpdb->prefix, not user input.
 			$wpdb->prepare(
 				"SELECT table_name, table_rows,
 					ROUND((data_length + index_length) / 1024 / 1024, 1) AS size_mb
@@ -296,7 +295,6 @@ class RetentionCommand extends BaseCommand {
 				...$unique_tables
 			)
 		);
-			// phpcs:enable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders
 
 		$table_data = array();
 		if ( $results ) {
@@ -353,7 +351,6 @@ class RetentionCommand extends BaseCommand {
 		$logs_table    = $wpdb->prefix . 'actionscheduler_logs';
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$actions_count = (int) $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT COUNT(*) FROM {$actions_table}
@@ -362,10 +359,8 @@ class RetentionCommand extends BaseCommand {
 				$cutoff
 			)
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$logs_count = (int) $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT COUNT(*) FROM {$logs_table} l
@@ -375,7 +370,6 @@ class RetentionCommand extends BaseCommand {
 				$cutoff
 			)
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL
 
 		return $actions_count + $logs_count;
 	}

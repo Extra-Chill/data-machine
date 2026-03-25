@@ -19,7 +19,6 @@ namespace DataMachine\Engine\AI\Tools\Global;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Engine\AI\Tools\BaseTool;
-use DataMachine\Engine\AI\Tools\Global\Traits\HasIsConfigured;
 
 class InternalLinkAudit extends BaseTool {
 

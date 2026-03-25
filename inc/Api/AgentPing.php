@@ -14,7 +14,6 @@ namespace DataMachine\Api;
 use WP_REST_Server;
 use WP_REST_Request;
 use WP_REST_Response;
-use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;

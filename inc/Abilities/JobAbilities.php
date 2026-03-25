@@ -22,7 +22,6 @@ use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Abilities\Job\JobsSummaryAbility;
 use DataMachine\Abilities\Job\FailJobAbility;
 use DataMachine\Abilities\Job\RetryJobAbility;
-use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -41,7 +40,6 @@ class JobAbilities {
 	private RetryJobAbility $retry_job;
 
 	public function __construct() {
-		add_action('wp_abilities_api_init', array( $this, 'abilities_api_init' ));
 		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
 			return;
 		}

@@ -15,7 +15,6 @@ defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\HttpClient;
 use DataMachine\Engine\AI\Tools\BaseTool;
-use DataMachine\Abilities\Analytics\Traits\HasGetConfig;
 
 class AmazonAffiliateLink extends BaseTool {
 

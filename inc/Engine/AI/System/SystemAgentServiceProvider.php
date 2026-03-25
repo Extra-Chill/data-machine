@@ -60,9 +60,9 @@ class SystemAgentServiceProvider {
 	 * @return array Task handlers including built-in ones.
 	 */
 	public function getBuiltInTasks( array $tasks ): array {
-		$tasks['image_generation']    = ImageGenerationTask::class;
-		$tasks['image_optimization']  = ImageOptimizationTask::class;
-		$tasks['alt_text_generation'] = AltTextTask::class;
+		$tasks['image_generation']            = ImageGenerationTask::class;
+		$tasks['image_optimization']          = ImageOptimizationTask::class;
+		$tasks['alt_text_generation']         = AltTextTask::class;
 		// github_create_issue moved to data-machine-code extension.
 		$tasks['internal_linking']            = InternalLinkingTask::class;
 		$tasks['daily_memory_generation']     = DailyMemoryTask::class;

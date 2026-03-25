@@ -15,7 +15,6 @@ use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\FilesRepository\FileCleanup;
 use DataMachine\Core\FilesRepository\FileStorage;
-use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 

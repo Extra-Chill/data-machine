@@ -32,46 +32,16 @@ class Email {
 				'callback'            => array( self::class, 'handle_send' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
-					'to'           => array(
-						'type'     => 'string',
-						'required' => true,
-					),
-					'subject'      => array(
-						'type'     => 'string',
-						'required' => true,
-					),
-					'body'         => array(
-						'type'     => 'string',
-						'required' => true,
-					),
-					'cc'           => array(
-						'type'    => 'string',
-						'default' => '',
-					),
-					'bcc'          => array(
-						'type'    => 'string',
-						'default' => '',
-					),
-					'from_name'    => array(
-						'type'    => 'string',
-						'default' => '',
-					),
-					'from_email'   => array(
-						'type'    => 'string',
-						'default' => '',
-					),
-					'reply_to'     => array(
-						'type'    => 'string',
-						'default' => '',
-					),
-					'content_type' => array(
-						'type'    => 'string',
-						'default' => 'text/html',
-					),
-					'attachments'  => array(
-						'type'    => 'array',
-						'default' => array(),
-					),
+					'to'           => array( 'type' => 'string', 'required' => true ),
+					'subject'      => array( 'type' => 'string', 'required' => true ),
+					'body'         => array( 'type' => 'string', 'required' => true ),
+					'cc'           => array( 'type' => 'string', 'default' => '' ),
+					'bcc'          => array( 'type' => 'string', 'default' => '' ),
+					'from_name'    => array( 'type' => 'string', 'default' => '' ),
+					'from_email'   => array( 'type' => 'string', 'default' => '' ),
+					'reply_to'     => array( 'type' => 'string', 'default' => '' ),
+					'content_type' => array( 'type' => 'string', 'default' => 'text/html' ),
+					'attachments'  => array( 'type' => 'array', 'default' => array() ),
 				),
 			)
 		);
@@ -85,34 +55,13 @@ class Email {
 				'callback'            => array( self::class, 'handle_fetch' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
-					'folder'               => array(
-						'type'    => 'string',
-						'default' => 'INBOX',
-					),
-					'search'               => array(
-						'type'    => 'string',
-						'default' => 'UNSEEN',
-					),
-					'max'                  => array(
-						'type'    => 'integer',
-						'default' => 10,
-					),
-					'offset'               => array(
-						'type'    => 'integer',
-						'default' => 0,
-					),
-					'headers_only'         => array(
-						'type'    => 'boolean',
-						'default' => false,
-					),
-					'mark_as_read'         => array(
-						'type'    => 'boolean',
-						'default' => false,
-					),
-					'download_attachments' => array(
-						'type'    => 'boolean',
-						'default' => false,
-					),
+					'folder'               => array( 'type' => 'string', 'default' => 'INBOX' ),
+					'search'               => array( 'type' => 'string', 'default' => 'UNSEEN' ),
+					'max'                  => array( 'type' => 'integer', 'default' => 10 ),
+					'offset'               => array( 'type' => 'integer', 'default' => 0 ),
+					'headers_only'         => array( 'type' => 'boolean', 'default' => false ),
+					'mark_as_read'         => array( 'type' => 'boolean', 'default' => false ),
+					'download_attachments' => array( 'type' => 'boolean', 'default' => false ),
 				),
 			)
 		);
@@ -126,14 +75,8 @@ class Email {
 				'callback'            => array( self::class, 'handle_read' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
-					'uid'    => array(
-						'type'     => 'integer',
-						'required' => true,
-					),
-					'folder' => array(
-						'type'    => 'string',
-						'default' => 'INBOX',
-					),
+					'uid'    => array( 'type' => 'integer', 'required' => true ),
+					'folder' => array( 'type' => 'string', 'default' => 'INBOX' ),
 				),
 			)
 		);
@@ -147,34 +90,13 @@ class Email {
 				'callback'            => array( self::class, 'handle_reply' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
-					'to'           => array(
-						'type'     => 'string',
-						'required' => true,
-					),
-					'subject'      => array(
-						'type'     => 'string',
-						'required' => true,
-					),
-					'body'         => array(
-						'type'     => 'string',
-						'required' => true,
-					),
-					'in_reply_to'  => array(
-						'type'     => 'string',
-						'required' => true,
-					),
-					'references'   => array(
-						'type'    => 'string',
-						'default' => '',
-					),
-					'cc'           => array(
-						'type'    => 'string',
-						'default' => '',
-					),
-					'content_type' => array(
-						'type'    => 'string',
-						'default' => 'text/html',
-					),
+					'to'           => array( 'type' => 'string', 'required' => true ),
+					'subject'      => array( 'type' => 'string', 'required' => true ),
+					'body'         => array( 'type' => 'string', 'required' => true ),
+					'in_reply_to'  => array( 'type' => 'string', 'required' => true ),
+					'references'   => array( 'type' => 'string', 'default' => '' ),
+					'cc'           => array( 'type' => 'string', 'default' => '' ),
+					'content_type' => array( 'type' => 'string', 'default' => 'text/html' ),
 				),
 			)
 		);
@@ -188,14 +110,8 @@ class Email {
 				'callback'            => array( self::class, 'handle_delete' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
-					'uid'    => array(
-						'type'     => 'integer',
-						'required' => true,
-					),
-					'folder' => array(
-						'type'    => 'string',
-						'default' => 'INBOX',
-					),
+					'uid'    => array( 'type' => 'integer', 'required' => true ),
+					'folder' => array( 'type' => 'string', 'default' => 'INBOX' ),
 				),
 			)
 		);
@@ -209,18 +125,9 @@ class Email {
 				'callback'            => array( self::class, 'handle_move' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
-					'uid'         => array(
-						'type'     => 'integer',
-						'required' => true,
-					),
-					'destination' => array(
-						'type'     => 'string',
-						'required' => true,
-					),
-					'folder'      => array(
-						'type'    => 'string',
-						'default' => 'INBOX',
-					),
+					'uid'         => array( 'type' => 'integer', 'required' => true ),
+					'destination' => array( 'type' => 'string', 'required' => true ),
+					'folder'      => array( 'type' => 'string', 'default' => 'INBOX' ),
 				),
 			)
 		);
@@ -234,22 +141,10 @@ class Email {
 				'callback'            => array( self::class, 'handle_flag' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
-					'uid'    => array(
-						'type'     => 'integer',
-						'required' => true,
-					),
-					'flag'   => array(
-						'type'     => 'string',
-						'required' => true,
-					),
-					'action' => array(
-						'type'    => 'string',
-						'default' => 'set',
-					),
-					'folder' => array(
-						'type'    => 'string',
-						'default' => 'INBOX',
-					),
+					'uid'    => array( 'type' => 'integer', 'required' => true ),
+					'flag'   => array( 'type' => 'string', 'required' => true ),
+					'action' => array( 'type' => 'string', 'default' => 'set' ),
+					'folder' => array( 'type' => 'string', 'default' => 'INBOX' ),
 				),
 			)
 		);
@@ -263,22 +158,10 @@ class Email {
 				'callback'            => array( self::class, 'handle_batch_move' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
-					'search'      => array(
-						'type'     => 'string',
-						'required' => true,
-					),
-					'destination' => array(
-						'type'     => 'string',
-						'required' => true,
-					),
-					'folder'      => array(
-						'type'    => 'string',
-						'default' => 'INBOX',
-					),
-					'max'         => array(
-						'type'    => 'integer',
-						'default' => 500,
-					),
+					'search'      => array( 'type' => 'string', 'required' => true ),
+					'destination' => array( 'type' => 'string', 'required' => true ),
+					'folder'      => array( 'type' => 'string', 'default' => 'INBOX' ),
+					'max'         => array( 'type' => 'integer', 'default' => 500 ),
 				),
 			)
 		);
@@ -292,26 +175,11 @@ class Email {
 				'callback'            => array( self::class, 'handle_batch_flag' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
-					'search' => array(
-						'type'     => 'string',
-						'required' => true,
-					),
-					'flag'   => array(
-						'type'     => 'string',
-						'required' => true,
-					),
-					'action' => array(
-						'type'    => 'string',
-						'default' => 'set',
-					),
-					'folder' => array(
-						'type'    => 'string',
-						'default' => 'INBOX',
-					),
-					'max'    => array(
-						'type'    => 'integer',
-						'default' => 500,
-					),
+					'search' => array( 'type' => 'string', 'required' => true ),
+					'flag'   => array( 'type' => 'string', 'required' => true ),
+					'action' => array( 'type' => 'string', 'default' => 'set' ),
+					'folder' => array( 'type' => 'string', 'default' => 'INBOX' ),
+					'max'    => array( 'type' => 'integer', 'default' => 500 ),
 				),
 			)
 		);
@@ -325,18 +193,9 @@ class Email {
 				'callback'            => array( self::class, 'handle_batch_delete' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
-					'search' => array(
-						'type'     => 'string',
-						'required' => true,
-					),
-					'folder' => array(
-						'type'    => 'string',
-						'default' => 'INBOX',
-					),
-					'max'    => array(
-						'type'    => 'integer',
-						'default' => 100,
-					),
+					'search' => array( 'type' => 'string', 'required' => true ),
+					'folder' => array( 'type' => 'string', 'default' => 'INBOX' ),
+					'max'    => array( 'type' => 'integer', 'default' => 100 ),
 				),
 			)
 		);
@@ -350,14 +209,8 @@ class Email {
 				'callback'            => array( self::class, 'handle_unsubscribe' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
-					'uid'    => array(
-						'type'     => 'integer',
-						'required' => true,
-					),
-					'folder' => array(
-						'type'    => 'string',
-						'default' => 'INBOX',
-					),
+					'uid'    => array( 'type' => 'integer', 'required' => true ),
+					'folder' => array( 'type' => 'string', 'default' => 'INBOX' ),
 				),
 			)
 		);
@@ -371,18 +224,9 @@ class Email {
 				'callback'            => array( self::class, 'handle_batch_unsubscribe' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
-					'search' => array(
-						'type'     => 'string',
-						'required' => true,
-					),
-					'folder' => array(
-						'type'    => 'string',
-						'default' => 'INBOX',
-					),
-					'max'    => array(
-						'type'    => 'integer',
-						'default' => 20,
-					),
+					'search' => array( 'type' => 'string', 'required' => true ),
+					'folder' => array( 'type' => 'string', 'default' => 'INBOX' ),
+					'max'    => array( 'type' => 'integer', 'default' => 20 ),
 				),
 			)
 		);
@@ -634,7 +478,6 @@ class Email {
 	}
 
 	public static function handle_test_connection( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
-		unset( $request );
 		$ability = wp_get_ability( 'datamachine/email-test-connection' );
 		if ( ! $ability ) {
 			return new \WP_Error( 'ability_not_found', 'Email test connection ability not available', array( 'status' => 500 ) );

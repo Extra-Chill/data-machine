@@ -18,7 +18,6 @@ use DataMachine\Abilities\Taxonomy\CreateTaxonomyTermAbility;
 use DataMachine\Abilities\Taxonomy\UpdateTaxonomyTermAbility;
 use DataMachine\Abilities\Taxonomy\DeleteTaxonomyTermAbility;
 use DataMachine\Abilities\Taxonomy\ResolveTermAbility;
-use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -33,7 +32,6 @@ class TaxonomyAbilities {
 	private ResolveTermAbility $resolve_term;
 
 	public function __construct() {
-		add_action('wp_abilities_api_init', array( $this, 'abilities_api_init' ));
 		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
 			return;
 		}
