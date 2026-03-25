@@ -274,7 +274,7 @@ class QueryWordPressPostsAbility {
 				'content'  => $content,
 				'metadata' => array(
 					'source_type'            => 'wordpress_local',
-					'item_identifier_to_log' => $post_id,
+					'item_identifier'        => $post_id,
 					'original_id'            => $post_id,
 					'original_title'         => $title,
 					'original_date_gmt'      => $post->post_date_gmt,

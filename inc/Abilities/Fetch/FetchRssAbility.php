@@ -255,7 +255,7 @@ class FetchRssAbility {
 
 			$metadata = array(
 				'source_type'            => 'rss',
-				'item_identifier_to_log' => $guid,
+				'item_identifier'        => $guid,
 				'original_id'            => $guid,
 				'original_title'         => $title,
 				'original_date_gmt'      => $pub_date ? gmdate( 'Y-m-d\TH:i:s\Z', strtotime( $pub_date ) ) : null,

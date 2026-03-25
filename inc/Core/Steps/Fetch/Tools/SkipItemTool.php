@@ -63,17 +63,17 @@ class SkipItemTool {
 		}
 
 		// Get item identifier and source type from engine data (set by fetch handler)
-		$item_id      = $engine->get( 'item_id' );
-		$source_type  = $engine->get( 'source_type' );
+		$item_identifier = $engine->get( 'item_identifier' );
+		$source_type     = $engine->get( 'source_type' );
 		$flow_step_id = $parameters['flow_step_id'] ?? $engine->get( 'flow_step_id' );
 
 		// Mark item as processed so it won't be refetched
-		if ( $flow_step_id && $item_id && $source_type ) {
+		if ( $flow_step_id && $item_identifier && $source_type ) {
 			do_action(
 				'datamachine_mark_item_processed',
 				$flow_step_id,
 				$source_type,
-				$item_id,
+				$item_identifier,
 				$job_id
 			);
 
@@ -84,7 +84,7 @@ class SkipItemTool {
 				array(
 					'job_id'       => $job_id,
 					'flow_step_id' => $flow_step_id,
-					'item_id'      => $item_id,
+					'item_identifier'      => $item_identifier,
 					'source_type'  => $source_type,
 					'reason'       => $reason,
 				)
@@ -97,7 +97,7 @@ class SkipItemTool {
 				array(
 					'job_id'       => $job_id,
 					'flow_step_id' => $flow_step_id,
-					'item_id'      => $item_id,
+					'item_identifier'      => $item_identifier,
 					'source_type'  => $source_type,
 					'reason'       => $reason,
 				)
@@ -123,7 +123,7 @@ class SkipItemTool {
 			'success'   => true,
 			'message'   => "Item skipped: {$reason}",
 			'status'    => $status->toString(),
-			'item_id'   => $item_id,
+			'item_identifier'   => $item_identifier,
 			'tool_name' => 'skip_item',
 		);
 	}

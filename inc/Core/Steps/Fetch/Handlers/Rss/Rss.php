@@ -81,9 +81,9 @@ class Rss extends FetchHandler {
 		foreach ( $items as &$item ) {
 			$guid = $item['metadata']['guid'] ?? ( $item['metadata']['original_id'] ?? '' );
 
-			// Set dedup_key for centralized dedup in FetchHandler::dedup().
+			// Set item_identifier for centralized dedup in FetchHandler::dedup().
 			if ( $guid ) {
-				$item['metadata']['dedup_key'] = $guid;
+				$item['metadata']['item_identifier'] = $guid;
 			}
 
 			// Download image if present.

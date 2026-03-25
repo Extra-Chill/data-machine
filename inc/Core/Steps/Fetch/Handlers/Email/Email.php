@@ -101,7 +101,7 @@ class Email extends FetchHandler {
 			return array();
 		}
 
-		// Items already have dedup_key (message_id) set by ability.
+		// Items already have item_identifier (message_id) set by ability.
 		return array( 'items' => $items );
 	}
 

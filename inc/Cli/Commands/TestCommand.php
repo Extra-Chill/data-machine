@@ -353,7 +353,7 @@ class TestCommand extends BaseCommand {
 			);
 
 			// Collect metadata keys (excluding internal ones).
-			$internal_keys = array( 'source_type', 'pipeline_id', 'flow_id', 'handler', 'dedup_key' );
+			$internal_keys = array( 'source_type', 'pipeline_id', 'flow_id', 'handler', 'item_identifier' );
 			foreach ( array_keys( $metadata ) as $mk ) {
 				if ( ! in_array( $mk, $internal_keys, true ) ) {
 					$all_metadata_keys[ $mk ] = true;

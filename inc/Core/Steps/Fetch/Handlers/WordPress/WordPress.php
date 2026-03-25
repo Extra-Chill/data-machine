@@ -96,9 +96,8 @@ class WordPress extends FetchHandler {
 			'content'  => $data['content'],
 			'metadata' => array(
 				'source_type'            => 'wordpress_local',
-				'item_identifier_to_log' => $post_id,
+				'item_identifier'        => (string) $post_id,
 				'original_id'            => $post_id,
-				'dedup_key'              => (string) $post_id,
 				'original_title'         => $data['title'],
 				'original_date_gmt'      => $data['publish_date'],
 				'post_type'              => $data['post_type'],
@@ -183,9 +182,9 @@ class WordPress extends FetchHandler {
 		foreach ( $items as &$item ) {
 			$post_id = $item['metadata']['original_id'] ?? '';
 
-			// Set dedup_key for centralized dedup in FetchHandler::dedup().
+			// Set item_identifier for centralized dedup in FetchHandler::dedup().
 			if ( $post_id ) {
-				$item['metadata']['dedup_key'] = (string) $post_id;
+				$item['metadata']['item_identifier'] = (string) $post_id;
 			}
 
 			// Append excerpt to content if present.

@@ -281,7 +281,7 @@ class FetchWordPressApiAbility {
 				'content'  => wp_strip_all_tags( $content ),
 				'metadata' => array(
 					'source_type'            => 'rest_api',
-					'item_identifier_to_log' => $unique_id,
+					'item_identifier'        => $unique_id,
 					'original_id'            => $item_id,
 					'original_title'         => $title,
 					'original_date_gmt'      => $item_date,

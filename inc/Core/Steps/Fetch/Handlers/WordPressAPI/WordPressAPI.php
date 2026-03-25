@@ -103,13 +103,6 @@ class WordPressAPI extends FetchHandler {
 		$processed_items = array();
 
 		foreach ( $items as &$item ) {
-			$item_id = $item['metadata']['item_identifier_to_log'] ?? '';
-
-			// Set dedup_key for centralized dedup in FetchHandler::dedup().
-			if ( ! empty( $item_id ) ) {
-				$item['metadata']['dedup_key'] = $item_id;
-			}
-
 			// Download image if present in file_info.
 			if ( isset( $item['file_info'] ) && ! empty( $item['file_info']['url'] ) ) {
 				$image_url = $item['file_info']['url'];

@@ -219,15 +219,15 @@ class ExecutionContext {
 	 *
 	 * In direct mode, always returns false (no deduplication).
 	 *
-	 * @param string $item_id Item identifier
+	 * @param string $item_identifier Item identifier
 	 * @return bool True if already processed
 	 */
-	public function isItemProcessed( string $item_id ): bool {
+	public function isItemProcessed( string $item_identifier ): bool {
 		if ( $this->isDirect() || $this->isStandalone() || ! $this->flow_step_id ) {
 			return false;
 		}
 		$db_processed_items = new ProcessedItems();
-		return $db_processed_items->has_item_been_processed( $this->flow_step_id, $this->handler_type, $item_id );
+		return $db_processed_items->has_item_been_processed( $this->flow_step_id, $this->handler_type, $item_identifier );
 	}
 
 	/**
@@ -235,9 +235,9 @@ class ExecutionContext {
 	 *
 	 * In direct mode, does nothing (no deduplication tracking).
 	 *
-	 * @param string $item_id Item identifier
+	 * @param string $item_identifier Item identifier
 	 */
-	public function markItemProcessed( string $item_id ): void {
+	public function markItemProcessed( string $item_identifier ): void {
 		if ( $this->isDirect() || $this->isStandalone() || ! $this->flow_step_id ) {
 			return;
 		}
@@ -245,7 +245,7 @@ class ExecutionContext {
 			'datamachine_mark_item_processed',
 			$this->flow_step_id,
 			$this->handler_type,
-			$item_id,
+			$item_identifier,
 			$this->job_id
 		);
 	}

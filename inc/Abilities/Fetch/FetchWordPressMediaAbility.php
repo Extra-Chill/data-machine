@@ -263,7 +263,7 @@ class FetchWordPressMediaAbility {
 				'content'   => $content_data['content'] ?? '',
 				'metadata'  => array(
 					'source_type'            => 'wordpress_media',
-					'item_identifier_to_log' => $post->ID,
+					'item_identifier'        => $post->ID,
 					'original_id'            => $post->ID,
 					'parent_post_id'         => $post->post_parent,
 					'original_title'         => $title,

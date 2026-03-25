@@ -457,8 +457,8 @@ class ExecuteStepAbility {
 					if ( in_array( $step_type, array( 'fetch', 'event_import' ), true ) && ! empty( $dataPackets ) ) {
 						$packet_meta = $dataPackets[0]['metadata'] ?? array();
 						$seed_data   = array();
-						if ( ! empty( $packet_meta['dedup_key'] ) ) {
-							$seed_data['item_id'] = $packet_meta['dedup_key'];
+						if ( ! empty( $packet_meta['item_identifier'] ) ) {
+							$seed_data['item_identifier'] = $packet_meta['item_identifier'];
 						}
 						if ( ! empty( $packet_meta['source_type'] ) ) {
 							$seed_data['source_type'] = $packet_meta['source_type'];
@@ -627,7 +627,7 @@ class ExecuteStepAbility {
 	 * Mark a completed job's source item as processed.
 	 *
 	 * Called when the LAST step in a pipeline completes successfully.
-	 * Reads the dedup key (item_id), source type, and fetch step ID
+	 * Reads the dedup key (item_identifier), source type, and fetch step ID
 	 * from the job's engine_data — these were seeded during fetch and
 	 * propagated through fan-out child creation.
 	 *
@@ -642,10 +642,10 @@ class ExecuteStepAbility {
 	private function markCompletedItemProcessed( int $job_id ): void {
 		$engine_data = datamachine_get_engine_data( $job_id );
 
-		$item_id     = $engine_data['item_id'] ?? null;
-		$source_type = $engine_data['source_type'] ?? null;
+		$item_identifier = $engine_data['item_identifier'] ?? null;
+		$source_type     = $engine_data['source_type'] ?? null;
 
-		if ( empty( $item_id ) || empty( $source_type ) ) {
+		if ( empty( $item_identifier ) || empty( $source_type ) ) {
 			return;
 		}
 
@@ -671,7 +671,7 @@ class ExecuteStepAbility {
 			'datamachine_mark_item_processed',
 			$fetch_flow_step_id,
 			$source_type,
-			$item_id,
+			$item_identifier,
 			$job_id
 		);
 
@@ -681,7 +681,7 @@ class ExecuteStepAbility {
 			'Deferred mark-as-processed on pipeline completion',
 			array(
 				'job_id'             => $job_id,
-				'item_id'            => $item_id,
+				'item_identifier'            => $item_identifier,
 				'source_type'        => $source_type,
 				'fetch_flow_step_id' => $fetch_flow_step_id,
 			)

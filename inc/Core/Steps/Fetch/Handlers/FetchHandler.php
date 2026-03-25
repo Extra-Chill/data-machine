@@ -76,7 +76,7 @@ abstract class FetchHandler {
 			: array( $result );
 
 		// Dedup: filter out already-processed items.
-		// Items with metadata['dedup_key'] are checked against the processed items
+		// Items with metadata['item_identifier'] are checked against the processed items
 		// database. Already-processed items are removed. New items are NOT yet
 		// marked — marking happens after the max_items cap so we don't permanently
 		// discard items that simply didn't fit in this batch.
@@ -106,13 +106,13 @@ abstract class FetchHandler {
 	/**
 	 * Filter out already-processed items WITHOUT marking new ones.
 	 *
-	 * Items with metadata['dedup_key'] are checked against the processed items
+	 * Items with metadata['item_identifier'] are checked against the processed items
 	 * database. Already-processed items are removed. New items pass through
 	 * but are NOT marked as processed here — marking is deferred to
 	 * ExecuteStepAbility::markCompletedItemProcessed() when the full pipeline
 	 * completes successfully, so failed downstream steps don't cause dropped items.
 	 *
-	 * Items without dedup_key are not deduped and pass through unchanged.
+	 * Items without item_identifier are not deduped and pass through unchanged.
 	 *
 	 * @param array            $items   Normalized items array.
 	 * @param ExecutionContext $context Execution context.
@@ -126,16 +126,16 @@ abstract class FetchHandler {
 				continue;
 			}
 
-			$dedup_key = $item['metadata']['dedup_key'] ?? null;
+			$item_identifier = $item['metadata']['item_identifier'] ?? null;
 
-			// No dedup_key — pass through.
-			if ( null === $dedup_key || '' === $dedup_key ) {
+			// No item_identifier — pass through.
+			if ( null === $item_identifier || '' === $item_identifier ) {
 				$result[] = $item;
 				continue;
 			}
 
 			// Already processed — skip.
-			if ( $context->isItemProcessed( (string) $dedup_key ) ) {
+			if ( $context->isItemProcessed( (string) $item_identifier ) ) {
 				continue;
 			}
 
@@ -161,13 +161,13 @@ abstract class FetchHandler {
 				continue;
 			}
 
-			$dedup_key = $item['metadata']['dedup_key'] ?? null;
+			$item_identifier = $item['metadata']['item_identifier'] ?? null;
 
-			if ( null === $dedup_key || '' === $dedup_key ) {
+			if ( null === $item_identifier || '' === $item_identifier ) {
 				continue;
 			}
 
-			$context->markItemProcessed( (string) $dedup_key );
+			$context->markItemProcessed( (string) $item_identifier );
 
 			// Hook for handler-specific side effects (e.g., storeItemContext).
 			$this->onItemProcessed( $context, $item );

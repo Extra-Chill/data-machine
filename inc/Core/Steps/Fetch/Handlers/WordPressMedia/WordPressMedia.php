@@ -81,13 +81,6 @@ class WordPressMedia extends FetchHandler {
 		$processed_items = array();
 
 		foreach ( $items as $item ) {
-			$item_id = $item['metadata']['item_identifier_to_log'] ?? '';
-
-			// Set dedup_key for centralized dedup in FetchHandler::dedup().
-			if ( ! empty( $item_id ) ) {
-				$item['metadata']['dedup_key'] = (string) $item_id;
-			}
-
 			$processed_items[] = $item;
 		}
 

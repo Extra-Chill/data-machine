@@ -313,15 +313,15 @@ class PipelineBatchScheduler {
 			$child_engine = array_merge( $child_engine, $item_engine_data );
 		}
 
-		// Seed dedup context (item_id + source_type) from DataPacket metadata.
+		// Seed dedup context (item_identifier + source_type) from DataPacket metadata.
 		// This enables deferred mark-as-processed: when the child job completes
 		// its last step, ExecuteStepAbility reads these to mark the item as
 		// processed. Previously set by FetchHandler::onItemProcessed() on the
 		// parent, but now the fetch step no longer marks items eagerly.
-		$dedup_key   = $single_packet['metadata']['dedup_key'] ?? null;
+		$item_identifier   = $single_packet['metadata']['item_identifier'] ?? null;
 		$source_type = $single_packet['metadata']['source_type'] ?? null;
-		if ( ! empty( $dedup_key ) ) {
-			$child_engine['item_id'] = $dedup_key;
+		if ( ! empty( $item_identifier ) ) {
+			$child_engine['item_identifier'] = $item_identifier;
 		}
 		if ( ! empty( $source_type ) ) {
 			$child_engine['source_type'] = $source_type;

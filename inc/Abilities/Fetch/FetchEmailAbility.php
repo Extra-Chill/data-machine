@@ -365,7 +365,7 @@ class FetchEmailAbility {
 			'metadata' => array(
 				'uid'               => $uid,
 				'message_id'        => $message_id,
-				'dedup_key'         => $message_id,
+				'item_identifier'         => $message_id,
 				'from'              => $from_email,
 				'from_name'         => $from_name,
 				'to'                => $to_address,
@@ -439,7 +439,7 @@ class FetchEmailAbility {
 			'metadata' => array(
 				'uid'               => $uid,
 				'message_id'        => $message_id,
-				'dedup_key'         => $message_id,
+				'item_identifier'         => $message_id,
 				'from'              => $from_email,
 				'from_name'         => $from_name,
 				'to'                => $to_address,
