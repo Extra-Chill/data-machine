@@ -533,7 +533,7 @@ class UniversalWebScraper extends EventImportHandler {
 					'flow_id'          => $context->getFlowId(),
 					'original_title'   => 'HTML Section from ' . parse_url( $current_url, PHP_URL_HOST ),
 					'event_identifier' => $event_section['identifier'],
-					'dedup_key'        => $event_section['identifier'],
+					'item_identifier'        => $event_section['identifier'],
 					'import_timestamp' => time(),
 				),
 			);
@@ -619,9 +619,9 @@ class UniversalWebScraper extends EventImportHandler {
 			'import_timestamp'  => time(),
 		);
 
-		// Pass through dedup_key from VisionExtractionProcessor.
+		// Pass through item_identifier from VisionExtractionProcessor.
 		if ( ! empty( $vision_data['image_identifier'] ) ) {
-			$metadata['dedup_key'] = $vision_data['image_identifier'];
+			$metadata['item_identifier'] = $vision_data['image_identifier'];
 		}
 
 		// Pass through per-item engine data for batch fan-out.

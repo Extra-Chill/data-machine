@@ -120,7 +120,7 @@ class EventFlyer extends EventImportHandler {
 				'flow_id'          => $context->getFlowId(),
 				'original_title'   => $event_data['title'] ? $event_data['title'] : $image_file['original_name'],
 				'event_identifier' => $event_identifier,
-				'dedup_key'        => $file_identifier,
+				'item_identifier'        => $file_identifier,
 				'import_timestamp' => time(),
 				'image_file_path'  => $image_file['persistent_path'],
 				'_engine_data'     => $engine_data,

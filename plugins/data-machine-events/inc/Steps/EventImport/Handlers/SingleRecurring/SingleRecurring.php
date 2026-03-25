@@ -129,7 +129,7 @@ class SingleRecurring extends EventImportHandler {
 				'flow_id'          => $context->getFlowId(),
 				'original_title'   => $event_title,
 				'event_identifier' => $event_identifier,
-				'dedup_key'        => $event_identifier,
+				'item_identifier'        => $event_identifier,
 				'import_timestamp' => time(),
 				'_engine_data'     => $engine_data,
 			),

@@ -289,11 +289,11 @@ class EventEngineData {
 	 * refetched on subsequent runs.
 	 *
 	 * @param int $job_id Job ID
-	 * @param string $item_id Item identifier (event_identifier, uid, etc.)
+	 * @param string $item_identifier Item identifier (event_identifier, uid, etc.)
 	 * @param string $source_type Source type (universal_web_scraper, ics_calendar, etc.)
 	 * @since 0.8.31
 	 */
-	public static function storeItemContext( int $job_id, string $item_id, string $source_type ): void {
+	public static function storeItemContext( int $job_id, string $item_identifier, string $source_type ): void {
 		if ( $job_id <= 0 || ! function_exists( 'datamachine_merge_engine_data' ) ) {
 			return;
 		}
@@ -301,7 +301,7 @@ class EventEngineData {
 		datamachine_merge_engine_data(
 			$job_id,
 			array(
-				'item_id'     => $item_id,
+				'item_identifier'     => $item_identifier,
 				'source_type' => $source_type,
 			)
 		);
