@@ -14,6 +14,7 @@ namespace DataMachine\Engine\AI\System\Tasks;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\HttpClient;
+use DataMachine\Engine\AI\System\Tasks\Traits\HasSupportsUndo;
 
 class ImageGenerationTask extends SystemTask {
 

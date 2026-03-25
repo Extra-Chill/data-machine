@@ -23,6 +23,7 @@ defined( 'ABSPATH' ) || exit;
 class ResumeFlowAbility {
 
 	use FlowHelpers;
+	use DataMachine\Abilities\Flow\PauseFlowAbility;
 
 	public function __construct() {
 		$this->initDatabases();

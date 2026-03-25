@@ -60,6 +60,74 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		}
 	}
 
+	public function test_chat_does_not_require_use_tools_cap_by_default(): void {
+		add_filter( 'user_has_cap', array( $this, 'deny_all_datamachine_caps' ), 10, 4 );
+
+		add_filter( 'datamachine_tools', function ( $tools ) {
+			$tools['test_authenticated_tool'] = array(
+				'label'        => 'Test Authenticated Tool',
+				'description'  => 'Visible to authenticated users.',
+				'class'        => 'NonExistentClass',
+				'method'       => 'handle_tool_call',
+				'parameters'   => array(),
+				'contexts'     => array( 'chat' ),
+				'access_level' => 'authenticated',
+			);
+			return $tools;
+		} );
+
+		ToolManager::clearCache();
+
+		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
+		wp_set_current_user( $user_id );
+
+		$tools = $this->resolver->resolve( array(
+			'context' => ToolPolicyResolver::CONTEXT_CHAT,
+		) );
+
+		$this->assertArrayHasKey( 'test_authenticated_tool', $tools );
+
+		remove_filter( 'user_has_cap', array( $this, 'deny_all_datamachine_caps' ), 10 );
+		remove_all_filters( 'datamachine_tools' );
+		wp_set_current_user( 0 );
+		ToolManager::clearCache();
+	}
+
+	public function test_chat_can_restore_legacy_use_tools_gate_via_filter(): void {
+		add_filter( 'user_has_cap', array( $this, 'deny_all_datamachine_caps' ), 10, 4 );
+		add_filter( 'datamachine_require_use_tools_for_chat_tools', '__return_true' );
+
+		add_filter( 'datamachine_tools', function ( $tools ) {
+			$tools['test_authenticated_tool'] = array(
+				'label'        => 'Test Authenticated Tool',
+				'description'  => 'Visible to authenticated users.',
+				'class'        => 'NonExistentClass',
+				'method'       => 'handle_tool_call',
+				'parameters'   => array(),
+				'contexts'     => array( 'chat' ),
+				'access_level' => 'authenticated',
+			);
+			return $tools;
+		} );
+
+		ToolManager::clearCache();
+
+		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
+		wp_set_current_user( $user_id );
+
+		$tools = $this->resolver->resolve( array(
+			'context' => ToolPolicyResolver::CONTEXT_CHAT,
+		) );
+
+		$this->assertEmpty( $tools );
+
+		remove_filter( 'user_has_cap', array( $this, 'deny_all_datamachine_caps' ), 10 );
+		remove_filter( 'datamachine_require_use_tools_for_chat_tools', '__return_true' );
+		remove_all_filters( 'datamachine_tools' );
+		wp_set_current_user( 0 );
+		ToolManager::clearCache();
+	}
+
 	// ============================================
 	// PIPELINE CONTEXT
 	// ============================================
@@ -369,6 +437,21 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		$slug = 'test-agent-' . wp_generate_uuid4();
 
 		return $agents_repo->create_if_missing( $slug, 'Test Agent', 1, $config );
+	}
+
+	/**
+	 * Deny all Data Machine caps while leaving normal login intact.
+	 */
+	public function deny_all_datamachine_caps( array $allcaps, array $caps, array $args, $user ): array {
+		unset( $args, $user );
+
+		foreach ( array_keys( $allcaps ) as $cap ) {
+			if ( str_starts_with( $cap, 'datamachine_' ) ) {
+				$allcaps[ $cap ] = false;
+			}
+		}
+
+		return $allcaps;
 	}
 
 	public function test_no_agent_id_means_no_restrictions(): void {

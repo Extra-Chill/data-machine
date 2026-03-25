@@ -13,6 +13,7 @@ defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Abilities\Fetch\GetWordPressPostAbility;
 use DataMachine\Engine\AI\Tools\BaseTool;
+use DataMachine\Engine\AI\Tools\Global\Traits\HasIsConfigured;
 
 class WordPressPostReader extends BaseTool {
 
