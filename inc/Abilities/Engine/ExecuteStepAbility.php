@@ -389,6 +389,12 @@ class ExecuteStepAbility {
 
 		// Status override: complete with override status and clean up.
 		if ( $status_override ) {
+			// Mark item as processed if the override indicates successful completion
+			// (e.g. agent_skipped is intentional, completed is success).
+			// Failed overrides should NOT mark items as processed.
+			if ( str_starts_with( $status_override, JobStatus::FAILED ) === false ) {
+				$this->markCompletedItemProcessed( $job_id );
+			}
 			$this->db_jobs->complete_job( $job_id, $status_override );
 
 			do_action(
@@ -444,6 +450,24 @@ class ExecuteStepAbility {
 				// producing one packet per event). A single packet is just
 				// the same job continuing to the next step.
 				if ( $packet_count <= 1 ) {
+					// For fetch/event_import steps with a single item (inline continuation),
+					// seed dedup context into engine_data so markCompletedItemProcessed()
+					// can find it when the last step completes. For fan-out children this
+					// is handled in PipelineBatchScheduler::createChildJob().
+					if ( in_array( $step_type, array( 'fetch', 'event_import' ), true ) && ! empty( $dataPackets ) ) {
+						$packet_meta = $dataPackets[0]['metadata'] ?? array();
+						$seed_data   = array();
+						if ( ! empty( $packet_meta['dedup_key'] ) ) {
+							$seed_data['item_id'] = $packet_meta['dedup_key'];
+						}
+						if ( ! empty( $packet_meta['source_type'] ) ) {
+							$seed_data['source_type'] = $packet_meta['source_type'];
+						}
+						if ( ! empty( $seed_data ) ) {
+							datamachine_merge_engine_data( $job_id, $seed_data );
+						}
+					}
+
 					do_action(
 						'datamachine_schedule_next_step',
 						$job_id,
@@ -509,6 +533,11 @@ class ExecuteStepAbility {
 					'batch'        => $batch_result,
 				);
 			}
+
+			// Mark this item as processed now that the full pipeline succeeded.
+			// Deferred from the fetch step to prevent "dropped events" where
+			// an item is marked processed but a downstream step fails.
+			$this->markCompletedItemProcessed( $job_id );
 
 			$this->db_jobs->complete_job( $job_id, JobStatus::COMPLETED );
 			$cleanup = new FileCleanup();
@@ -591,6 +620,71 @@ class ExecuteStepAbility {
 			'success'      => true,
 			'step_success' => false,
 			'outcome'      => 'failed',
+		);
+	}
+
+	/**
+	 * Mark a completed job's source item as processed.
+	 *
+	 * Called when the LAST step in a pipeline completes successfully.
+	 * Reads the dedup key (item_id), source type, and fetch step ID
+	 * from the job's engine_data — these were seeded during fetch and
+	 * propagated through fan-out child creation.
+	 *
+	 * This deferred approach prevents "dropped events" where the fetch
+	 * step marks an item as processed but a downstream step (AI, update)
+	 * fails. Without this, the item would never be retried because the
+	 * dedup filter would skip it on the next fetch run.
+	 *
+	 * @since 0.58.1
+	 * @param int $job_id The completing job ID.
+	 */
+	private function markCompletedItemProcessed( int $job_id ): void {
+		$engine_data = datamachine_get_engine_data( $job_id );
+
+		$item_id     = $engine_data['item_id'] ?? null;
+		$source_type = $engine_data['source_type'] ?? null;
+
+		if ( empty( $item_id ) || empty( $source_type ) ) {
+			return;
+		}
+
+		// Find the fetch/event_import step's flow_step_id from flow_config.
+		// The processed items table is keyed by flow_step_id, so we need the
+		// fetch step's ID (not the current step's) for dedup to work correctly.
+		$fetch_flow_step_id = null;
+		$flow_config        = $engine_data['flow_config'] ?? array();
+
+		foreach ( $flow_config as $step_id => $config ) {
+			$step_type = $config['step_type'] ?? '';
+			if ( in_array( $step_type, array( 'fetch', 'event_import' ), true ) ) {
+				$fetch_flow_step_id = $step_id;
+				break;
+			}
+		}
+
+		if ( empty( $fetch_flow_step_id ) ) {
+			return;
+		}
+
+		do_action(
+			'datamachine_mark_item_processed',
+			$fetch_flow_step_id,
+			$source_type,
+			$item_id,
+			$job_id
+		);
+
+		do_action(
+			'datamachine_log',
+			'debug',
+			'Deferred mark-as-processed on pipeline completion',
+			array(
+				'job_id'             => $job_id,
+				'item_id'            => $item_id,
+				'source_type'        => $source_type,
+				'fetch_flow_step_id' => $fetch_flow_step_id,
+			)
 		);
 	}
 

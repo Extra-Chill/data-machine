@@ -90,10 +90,15 @@ abstract class FetchHandler {
 			$items = array_slice( $items, 0, $max_items );
 		}
 
-		// Now mark the surviving items as processed so they won't be
-		// re-imported on the next run. Items that were cut by max_items
-		// remain unmarked and will be picked up in future runs.
-		$this->markProcessed( $items, $context );
+		// NOTE: Items are NOT marked as processed here. Marking is deferred
+		// to ExecuteStepAbility::markCompletedItemProcessed() which runs when
+		// the LAST step in the pipeline completes successfully for each item.
+		// This prevents "dropped events" where a fetch marks an item as processed
+		// but a downstream step (AI, update) fails — the item would never be
+		// retried because the dedup filter would skip it on the next run.
+		//
+		// Items cut by max_items remain naturally unmarked and will be picked
+		// up in future fetch cycles.
 
 		return $this->toDataPackets( $items, $pipeline_id, $flow_id );
 	}
@@ -103,8 +108,9 @@ abstract class FetchHandler {
 	 *
 	 * Items with metadata['dedup_key'] are checked against the processed items
 	 * database. Already-processed items are removed. New items pass through
-	 * but are NOT marked as processed — that happens in markProcessed() after
-	 * the max_items cap, so items cut by the cap can be picked up next run.
+	 * but are NOT marked as processed here — marking is deferred to
+	 * ExecuteStepAbility::markCompletedItemProcessed() when the full pipeline
+	 * completes successfully, so failed downstream steps don't cause dropped items.
 	 *
 	 * Items without dedup_key are not deduped and pass through unchanged.
 	 *
