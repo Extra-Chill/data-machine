@@ -2,6 +2,19 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.59.0] - 2026-03-25
+
+### Added
+- Add flow pause/resume with non-destructive enabled boolean
+
+### Changed
+- standardize on item_identifier as canonical name for processed item dedup key
+
+### Fixed
+- drop orphaned per-site agent tables after network migration
+- defer markProcessed to pipeline completion to prevent dropped events
+- align InsertContentAbility tool registration with datamachine_tools filter signature
+
 ## [0.58.0] - 2026-03-24
 
 ### Added
