@@ -76,6 +76,7 @@ class ToolPolicyResolver {
 	 * @since 0.54.0
 	 */
 	private const ACCESS_LEVELS = array(
+		'public'        => '',
 		'authenticated' => 'datamachine_chat',
 		'author'        => 'datamachine_use_tools',
 		'editor'        => 'datamachine_view_logs',
@@ -221,10 +222,14 @@ class ToolPolicyResolver {
 	 *
 	 * @since 0.54.0
 	 *
-	 * @param string $access_level One of: 'authenticated', 'author', 'editor', 'admin'.
+	 * @param string $access_level One of: 'public', 'authenticated', 'author', 'editor', 'admin'.
 	 * @return bool Whether the current user has sufficient capabilities.
 	 */
 	private function checkAccessLevel( string $access_level ): bool {
+		if ( 'public' === $access_level ) {
+			return true;
+		}
+
 		$required_cap = self::ACCESS_LEVELS[ $access_level ] ?? self::ACCESS_LEVELS['admin'];
 		return current_user_can( $required_cap );
 	}
