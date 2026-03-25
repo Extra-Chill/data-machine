@@ -46,23 +46,27 @@ class ReplacePostBlocksAbility {
 								'description' => __( 'Post ID to edit', 'data-machine' ),
 							),
 							'replacements' => array(
-								'type'        => 'array',
-								'description' => __( 'Array of block replacement operations', 'data-machine' ),
-								'items'       => array(
-									'type'       => 'object',
-									'required'   => array( 'block_index', 'new_content' ),
-									'properties' => array(
-										'block_index' => array(
-											'type'        => 'integer',
-											'description' => __( 'Zero-based block index to replace', 'data-machine' ),
-										),
-										'new_content' => array(
-											'type'        => 'string',
-											'description' => __( 'New innerHTML for the block', 'data-machine' ),
-										),
+							'type'        => 'array',
+							'description' => __( 'Array of block replacement operations', 'data-machine' ),
+							'items'       => array(
+								'type'       => 'object',
+								'required'   => array( 'block_index', 'new_content' ),
+								'properties' => array(
+									'block_index' => array(
+										'type'        => 'integer',
+										'description' => __( 'Zero-based block index to replace', 'data-machine' ),
+									),
+									'new_content' => array(
+										'type'        => 'string',
+										'description' => __( 'New innerHTML for the block', 'data-machine' ),
 									),
 								),
 							),
+						),
+						'preview'      => array(
+							'type'        => 'boolean',
+							'description' => __( 'When true, return diff preview without applying changes', 'data-machine' ),
+						),
 						),
 					),
 					'output_schema'       => array(
@@ -114,7 +118,7 @@ class ReplacePostBlocksAbility {
 		return array(
 			'class'       => self::class,
 			'method'      => 'handleChatToolCall',
-			'description' => 'Replace entire Gutenberg block content by index. Use get_post_blocks first to find the right indices. Ideal for AI-rewritten paragraphs.',
+			'description' => 'Replace entire Gutenberg block content by index. Use get_post_blocks first to find the right indices. Ideal for AI-rewritten paragraphs. Set preview=true to return a diff preview without applying changes.',
 			'parameters'  => array(
 				'post_id'      => array(
 					'type'        => 'integer',
@@ -125,6 +129,10 @@ class ReplacePostBlocksAbility {
 					'type'        => 'array',
 					'required'    => true,
 					'description' => 'Array of { block_index, new_content } operations',
+				),
+				'preview'      => array(
+					'type'        => 'boolean',
+					'description' => 'When true, return diff preview data without applying changes. The user can then accept or reject.',
 				),
 			),
 		);
@@ -157,6 +165,7 @@ class ReplacePostBlocksAbility {
 	public static function execute( array $input ): array {
 		$post_id      = absint( $input['post_id'] ?? 0 );
 		$replacements = $input['replacements'] ?? array();
+		$preview      = ! empty( $input['preview'] );
 
 		if ( $post_id <= 0 ) {
 			return array(
@@ -226,11 +235,13 @@ class ReplacePostBlocksAbility {
 			}
 
 			$changes[] = array(
-				'block_index' => $block_index,
-				'block_name'  => $blocks[ $block_index ]['blockName'] ?? 'unknown',
-				'old_length'  => strlen( $old_html ),
-				'new_length'  => strlen( $new_content ),
-				'success'     => true,
+				'block_index'        => $block_index,
+				'block_name'         => $blocks[ $block_index ]['blockName'] ?? 'unknown',
+				'old_length'         => strlen( $old_html ),
+				'new_length'         => strlen( $new_content ),
+				'originalContent'    => $old_html,
+				'replacementContent' => $new_content,
+				'success'            => true,
 			);
 		}
 
@@ -246,7 +257,55 @@ class ReplacePostBlocksAbility {
 		}
 
 		$new_content = BlockSanitizer::sanitizeAndSerialize( $blocks );
-		$result      = wp_update_post(
+
+		// --- Preview mode: store pending edit, return diff data ---
+		if ( $preview ) {
+			$diff_id = PendingDiffStore::generate_id();
+
+			// Build per-block diff data for the frontend.
+			$diffs = array();
+			foreach ( $successful as $change ) {
+				$diffs[] = array(
+					'block_index'        => $change['block_index'],
+					'originalContent'    => $change['originalContent'],
+					'replacementContent' => $change['replacementContent'],
+				);
+			}
+
+			PendingDiffStore::store( $diff_id, array(
+				'type'    => 'replace_post_blocks',
+				'post_id' => $post_id,
+				'input'   => array(
+					'post_id'      => $post_id,
+					'replacements' => $replacements,
+				),
+			) );
+
+			// Strip raw HTML from the changes returned to the AI.
+			$clean_changes = array_map( function ( $c ) {
+				unset( $c['originalContent'], $c['replacementContent'] );
+				return $c;
+			}, $changes );
+
+			return array(
+				'success' => true,
+				'preview' => true,
+				'post_id' => $post_id,
+				'diff_id' => $diff_id,
+				'diff'    => array(
+					'diffId'             => $diff_id,
+					'diffType'           => 'replace',
+					'originalContent'    => implode( "\n", array_column( $diffs, 'originalContent' ) ),
+					'replacementContent' => implode( "\n", array_column( $diffs, 'replacementContent' ) ),
+					'replacements'       => $diffs,
+				),
+				'blocks_replaced' => $clean_changes,
+				'message'         => 'Preview generated. Accept or reject to apply changes.',
+			);
+		}
+
+		// --- Normal mode: apply immediately ---
+		$result = wp_update_post(
 			array(
 				'ID'           => $post_id,
 				'post_content' => $new_content,
@@ -273,11 +332,17 @@ class ReplacePostBlocksAbility {
 			)
 		);
 
+		// Strip raw HTML from changes in normal mode too (not needed in response).
+		$clean_changes = array_map( function ( $c ) {
+			unset( $c['originalContent'], $c['replacementContent'] );
+			return $c;
+		}, $changes );
+
 		return array(
 			'success'         => true,
 			'post_id'         => $post_id,
 			'post_url'        => get_permalink( $post_id ),
-			'blocks_replaced' => $changes,
+			'blocks_replaced' => $clean_changes,
 		);
 	}
 }
