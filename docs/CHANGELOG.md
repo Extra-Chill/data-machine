@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.60.0] - 2026-03-25
+
+### Added
+- preview mode for content abilities + server-side diff resolution
+
 ## [0.59.0] - 2026-03-25
 
 ### Added
