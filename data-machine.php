@@ -164,9 +164,11 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/ChatAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/InternalLinkingAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Content/BlockSanitizer.php';
+	require_once __DIR__ . '/inc/Abilities/Content/PendingDiffStore.php';
 	require_once __DIR__ . '/inc/Abilities/Content/GetPostBlocksAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Content/EditPostBlocksAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Content/ReplacePostBlocksAbility.php';
+	require_once __DIR__ . '/inc/Abilities/Content/ResolveDiffAbility.php';
 	// GitHubAbilities moved to data-machine-code extension.
 	require_once __DIR__ . '/inc/Abilities/Fetch/FetchFilesAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Email/EmailAbilities.php';
@@ -224,6 +226,7 @@ function datamachine_run_datamachine_plugin() {
 		new \DataMachine\Abilities\Content\EditPostBlocksAbility();
 		new \DataMachine\Abilities\Content\ReplacePostBlocksAbility();
 		new \DataMachine\Abilities\Content\InsertContentAbility();
+		new \DataMachine\Abilities\Content\ResolveDiffAbility();
 		// GitHubAbilities moved to data-machine-code extension.
 		new \DataMachine\Abilities\Fetch\FetchFilesAbility();
 		new \DataMachine\Abilities\Email\EmailAbilities();

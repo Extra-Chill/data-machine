@@ -46,28 +46,32 @@ class EditPostBlocksAbility {
 								'type'        => 'integer',
 								'description' => __( 'Post ID to edit', 'data-machine' ),
 							),
-							'edits'   => array(
-								'type'        => 'array',
-								'description' => __( 'Array of edit operations', 'data-machine' ),
-								'items'       => array(
-									'type'       => 'object',
-									'required'   => array( 'block_index', 'find', 'replace' ),
-									'properties' => array(
-										'block_index' => array(
-											'type'        => 'integer',
-											'description' => __( 'Zero-based block index to edit', 'data-machine' ),
-										),
-										'find'        => array(
-											'type'        => 'string',
-											'description' => __( 'Text to find within the block', 'data-machine' ),
-										),
-										'replace'     => array(
-											'type'        => 'string',
-											'description' => __( 'Replacement text', 'data-machine' ),
-										),
+					'edits'   => array(
+							'type'        => 'array',
+							'description' => __( 'Array of edit operations', 'data-machine' ),
+							'items'       => array(
+								'type'       => 'object',
+								'required'   => array( 'block_index', 'find', 'replace' ),
+								'properties' => array(
+									'block_index' => array(
+										'type'        => 'integer',
+										'description' => __( 'Zero-based block index to edit', 'data-machine' ),
+									),
+									'find'        => array(
+										'type'        => 'string',
+										'description' => __( 'Text to find within the block', 'data-machine' ),
+									),
+									'replace'     => array(
+										'type'        => 'string',
+										'description' => __( 'Replacement text', 'data-machine' ),
 									),
 								),
 							),
+						),
+						'preview' => array(
+							'type'        => 'boolean',
+							'description' => __( 'When true, return diff preview without applying changes', 'data-machine' ),
+						),
 						),
 					),
 					'output_schema'       => array(
@@ -119,7 +123,7 @@ class EditPostBlocksAbility {
 		return array(
 			'class'       => self::class,
 			'method'      => 'handleChatToolCall',
-			'description' => 'Surgical find/replace within specific Gutenberg blocks by index. Use get_post_blocks first to identify target blocks and indices.',
+			'description' => 'Surgical find/replace within specific Gutenberg blocks by index. Use get_post_blocks first to identify target blocks and indices. Set preview=true to return a diff preview without applying changes.',
 			'parameters'  => array(
 				'post_id' => array(
 					'type'        => 'integer',
@@ -130,6 +134,10 @@ class EditPostBlocksAbility {
 					'type'        => 'array',
 					'required'    => true,
 					'description' => 'Array of { block_index, find, replace } operations',
+				),
+				'preview' => array(
+					'type'        => 'boolean',
+					'description' => 'When true, return diff preview data without applying changes. The user can then accept or reject.',
 				),
 			),
 		);
@@ -162,6 +170,7 @@ class EditPostBlocksAbility {
 	public static function execute( array $input ): array {
 		$post_id = absint( $input['post_id'] ?? 0 );
 		$edits   = $input['edits'] ?? array();
+		$preview = ! empty( $input['preview'] );
 
 		if ( $post_id <= 0 ) {
 			return array(
@@ -251,7 +260,7 @@ class EditPostBlocksAbility {
 			);
 		}
 
-		// Only save if at least one edit succeeded.
+		// Only save/preview if at least one edit succeeded.
 		$successful = array_filter( $changes, fn( $c ) => ! empty( $c['success'] ) );
 
 		if ( empty( $successful ) ) {
@@ -264,7 +273,52 @@ class EditPostBlocksAbility {
 		}
 
 		$new_content = BlockSanitizer::sanitizeAndSerialize( $blocks );
-		$result      = wp_update_post(
+
+		// --- Preview mode: store pending edit, return diff data ---
+		if ( $preview ) {
+			$diff_id = PendingDiffStore::generate_id();
+
+			// Build per-edit diff data for the frontend.
+			$diffs = array();
+			foreach ( $edits as $edit ) {
+				$block_index = absint( $edit['block_index'] ?? 0 );
+				if ( $block_index < $total_blocks && ! empty( $edit['find'] ) ) {
+					$diffs[] = array(
+						'block_index'        => $block_index,
+						'originalContent'    => $edit['find'],
+						'replacementContent' => $edit['replace'] ?? '',
+					);
+				}
+			}
+
+			PendingDiffStore::store( $diff_id, array(
+				'type'    => 'edit_post_blocks',
+				'post_id' => $post_id,
+				'input'   => array(
+					'post_id' => $post_id,
+					'edits'   => $edits,
+				),
+			) );
+
+			return array(
+				'success' => true,
+				'preview' => true,
+				'post_id' => $post_id,
+				'diff_id' => $diff_id,
+				'diff'    => array(
+					'diffId'             => $diff_id,
+					'diffType'           => 'edit',
+					'originalContent'    => implode( "\n", array_column( $diffs, 'originalContent' ) ),
+					'replacementContent' => implode( "\n", array_column( $diffs, 'replacementContent' ) ),
+					'edits'              => $diffs,
+				),
+				'changes_applied' => $changes,
+				'message'         => 'Preview generated. Accept or reject to apply changes.',
+			);
+		}
+
+		// --- Normal mode: apply immediately ---
+		$result = wp_update_post(
 			array(
 				'ID'           => $post_id,
 				'post_content' => $new_content,
