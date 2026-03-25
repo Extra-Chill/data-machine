@@ -701,9 +701,24 @@ class Flows extends BaseRepository {
 	}
 
 	/**
+	 * Check if a flow is enabled (not paused).
+	 *
+	 * A flow is enabled by default. It is disabled when scheduling_config.enabled === false.
+	 *
+	 * @since 0.59.0
+	 *
+	 * @param array $scheduling_config Scheduling configuration array.
+	 * @return bool True if the flow is enabled.
+	 */
+	public static function is_flow_enabled( array $scheduling_config ): bool {
+		return ! isset( $scheduling_config['enabled'] ) || false !== $scheduling_config['enabled'];
+	}
+
+	/**
 	 * Get flows ready for execution based on scheduling.
 	 *
 	 * Uses jobs table to determine last run time (single source of truth).
+	 * Skips paused flows (enabled=false in scheduling_config).
 	 *
 	 * Note: No user_id filter here — the scheduler must run ALL users' flows.
 	 * User-scoping happens at the pipeline/flow management level, not execution.
@@ -712,12 +727,16 @@ class Flows extends BaseRepository {
 
 		$current_time = current_time( 'mysql', true );
 
-		// Get all non-manual flows
+		// Get all non-manual, enabled flows.
+		// Exclude paused flows (enabled=false) and manual flows at the query level.
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$flows = $this->wpdb->get_results(
 			$this->wpdb->prepare(
-				"SELECT * FROM %i WHERE JSON_EXTRACT(scheduling_config, '$.interval') != 'manual' ORDER BY flow_id ASC",
+				"SELECT * FROM %i
+				WHERE JSON_EXTRACT(scheduling_config, '$.interval') != 'manual'
+				AND (JSON_EXTRACT(scheduling_config, '$.enabled') IS NULL OR JSON_EXTRACT(scheduling_config, '$.enabled') != false)
+				ORDER BY flow_id ASC",
 				$this->table_name
 			),
 			ARRAY_A
@@ -774,6 +793,11 @@ class Flows extends BaseRepository {
 		}
 
 		if ( 'manual' === $scheduling_config['interval'] ) {
+			return false;
+		}
+
+		// Skip paused flows.
+		if ( ! self::is_flow_enabled( $scheduling_config ) ) {
 			return false;
 		}
 

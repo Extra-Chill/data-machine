@@ -105,6 +105,22 @@ class RunFlowAbility {
 			);
 		}
 
+		// Check if flow is paused (enabled=false). Safety net for AS hooks
+		// that were already queued before the flow was paused.
+		$scheduling_config = $flow['scheduling_config'] ?? array();
+		if ( ! \DataMachine\Core\Database\Flows\Flows::is_flow_enabled( $scheduling_config ) ) {
+			do_action(
+				'datamachine_log',
+				'info',
+				'Flow execution skipped - flow is paused',
+				array( 'flow_id' => $flow_id )
+			);
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Flow %d is paused.', $flow_id ),
+			);
+		}
+
 		$pipeline_id = (int) $flow['pipeline_id'];
 
 		// Use provided job_id or create new one (for scheduled/recurring flows).

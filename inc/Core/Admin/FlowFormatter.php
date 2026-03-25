@@ -103,15 +103,18 @@ class FlowFormatter {
 			$next_run = self::get_next_run_time( $flow_id );
 		}
 
+		$is_enabled = \DataMachine\Core\Database\Flows\Flows::is_flow_enabled( $scheduling_config );
+
 		return array(
 			'flow_id'           => $flow_id,
 			'flow_name'         => $flow['flow_name'] ?? '',
 			'pipeline_id'       => isset( $flow['pipeline_id'] ) ? (int) $flow['pipeline_id'] : null,
 			'flow_config'       => $flow_config,
 			'scheduling_config' => $scheduling_config,
+			'enabled'           => $is_enabled,
 			'last_run'          => $last_run_at,
 			'last_run_status'   => $last_run_status,
-			'last_run_display'  => DateFormatter::format_for_display( $last_run_at),
+			'last_run_display'  => DateFormatter::format_for_display( $last_run_at ),
 			'is_running'        => $is_running,
 			'next_run'          => $next_run,
 			'next_run_display'  => DateFormatter::format_for_display( $next_run ),

@@ -123,6 +123,12 @@ class FlowsCommand extends BaseCommand {
 	 * [--dry-run]
 	 * : Validate without creating (create subcommand).
 	 *
+	 * [--pipeline=<id>]
+	 * : Pipeline ID for pause/resume scoping.
+	 *
+	 * [--agent=<slug_or_id>]
+	 * : Agent slug or ID for scoping (pause/resume/list).
+	 *
 	 * [--yes]
 	 * : Skip confirmation prompt (delete subcommand).
 	 *
@@ -172,6 +178,21 @@ class FlowsCommand extends BaseCommand {
 	 *
 	 *     # Detach a memory file from a flow
 	 *     wp datamachine flows memory-files 42 --remove=content-briefing.md
+	 *
+	 *     # Pause a single flow
+	 *     wp datamachine flows pause 42
+	 *
+	 *     # Pause all flows in a pipeline
+	 *     wp datamachine flows pause --pipeline=12
+	 *
+	 *     # Pause all flows for an agent
+	 *     wp datamachine flows pause --agent=my-agent
+	 *
+	 *     # Resume a single flow
+	 *     wp datamachine flows resume 42
+	 *
+	 *     # Resume all flows for an agent
+	 *     wp datamachine flows resume --agent=my-agent
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		$flow_id     = null;
@@ -211,6 +232,18 @@ class FlowsCommand extends BaseCommand {
 				return;
 			}
 			$this->memoryFiles( (int) $args[1], $assoc_args );
+			return;
+		}
+
+		// Handle 'pause' subcommand: `flows pause 42` or `flows pause --pipeline=12`.
+		if ( ! empty( $args ) && 'pause' === $args[0] ) {
+			$this->pauseFlows( array_slice( $args, 1 ), $assoc_args );
+			return;
+		}
+
+		// Handle 'resume' subcommand: `flows resume 42` or `flows resume --pipeline=12`.
+		if ( ! empty( $args ) && 'resume' === $args[0] ) {
+			$this->resumeFlows( array_slice( $args, 1 ), $assoc_args );
 			return;
 		}
 
@@ -387,6 +420,8 @@ class FlowsCommand extends BaseCommand {
 		$scheduling = $flow['scheduling_config'] ?? array();
 		$interval   = $scheduling['interval'] ?? 'manual';
 
+		$is_paused = isset( $scheduling['enabled'] ) && false === $scheduling['enabled'];
+
 		WP_CLI::log( sprintf( 'Flow ID:      %d', $flow['flow_id'] ) );
 		WP_CLI::log( sprintf( 'Name:         %s', $flow['flow_name'] ) );
 		WP_CLI::log( sprintf( 'Pipeline ID:  %s', $flow['pipeline_id'] ?? 'N/A' ) );
@@ -395,6 +430,9 @@ class FlowsCommand extends BaseCommand {
 			WP_CLI::log( sprintf( 'Scheduling:   cron (%s) — %s', $scheduling['cron_expression'], $cron_desc ) );
 		} else {
 			WP_CLI::log( sprintf( 'Scheduling:   %s', $interval ) );
+		}
+		if ( $is_paused ) {
+			WP_CLI::log( 'Status:       PAUSED' );
 		}
 		WP_CLI::log( sprintf( 'Last run:     %s', $flow['last_run_display'] ?? 'Never' ) );
 		WP_CLI::log( sprintf( 'Next run:     %s', $flow['next_run_display'] ?? 'Not scheduled' ) );
@@ -1003,12 +1041,18 @@ class FlowsCommand extends BaseCommand {
 	private function extractSchedule( array $flow ): string {
 		$scheduling_config = $flow['scheduling_config'] ?? array();
 		$interval          = $scheduling_config['interval'] ?? 'manual';
+		$is_paused         = isset( $scheduling_config['enabled'] ) && false === $scheduling_config['enabled'];
 
+		$label = $interval;
 		if ( 'cron' === $interval && ! empty( $scheduling_config['cron_expression'] ) ) {
-			return 'cron:' . $scheduling_config['cron_expression'];
+			$label = 'cron:' . $scheduling_config['cron_expression'];
 		}
 
-		return (string) $interval;
+		if ( $is_paused ) {
+			$label .= ' (paused)';
+		}
+
+		return $label;
 	}
 
 	/**
@@ -1361,6 +1405,119 @@ class FlowsCommand extends BaseCommand {
 		);
 
 		\WP_CLI\Utils\format_items( $format, $items, array( 'filename' ) );
+	}
+
+	/**
+	 * Pause one or more flows.
+	 *
+	 * Preserves the original schedule so flows can be resumed later.
+	 *
+	 * ## USAGE
+	 *
+	 *     wp datamachine flows pause <flow_id>
+	 *     wp datamachine flows pause --pipeline=<id>
+	 *     wp datamachine flows pause --agent=<slug_or_id>
+	 *
+	 * @param array $args       Positional args (optional flow_id).
+	 * @param array $assoc_args Associative args (--pipeline, --agent).
+	 */
+	private function pauseFlows( array $args, array $assoc_args ): void {
+		$input = $this->buildPauseResumeInput( $args, $assoc_args );
+		if ( null === $input ) {
+			return; // Error already printed.
+		}
+
+		$ability = new \DataMachine\Abilities\FlowAbilities();
+		$result  = $ability->executePauseFlow( $input );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to pause flows' );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] ?? 'Flows paused.' );
+
+		$format = $assoc_args['format'] ?? 'table';
+		if ( 'json' === $format ) {
+			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+		} else {
+			foreach ( $result['flows'] ?? array() as $detail ) {
+				WP_CLI::log( sprintf( '  Flow %d: %s', $detail['flow_id'], $detail['status'] ) );
+			}
+		}
+	}
+
+	/**
+	 * Resume one or more paused flows.
+	 *
+	 * Re-registers Action Scheduler hooks from the preserved schedule.
+	 *
+	 * ## USAGE
+	 *
+	 *     wp datamachine flows resume <flow_id>
+	 *     wp datamachine flows resume --pipeline=<id>
+	 *     wp datamachine flows resume --agent=<slug_or_id>
+	 *
+	 * @param array $args       Positional args (optional flow_id).
+	 * @param array $assoc_args Associative args (--pipeline, --agent).
+	 */
+	private function resumeFlows( array $args, array $assoc_args ): void {
+		$input = $this->buildPauseResumeInput( $args, $assoc_args );
+		if ( null === $input ) {
+			return; // Error already printed.
+		}
+
+		$ability = new \DataMachine\Abilities\FlowAbilities();
+		$result  = $ability->executeResumeFlow( $input );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to resume flows' );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] ?? 'Flows resumed.' );
+
+		$format = $assoc_args['format'] ?? 'table';
+		if ( 'json' === $format ) {
+			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+		} else {
+			foreach ( $result['flows'] ?? array() as $detail ) {
+				$line = sprintf( '  Flow %d: %s', $detail['flow_id'], $detail['status'] );
+				if ( ! empty( $detail['error'] ) ) {
+					$line .= ' — ' . $detail['error'];
+				}
+				WP_CLI::log( $line );
+			}
+		}
+	}
+
+	/**
+	 * Build input array for pause/resume from CLI args.
+	 *
+	 * @param array $args       Positional args.
+	 * @param array $assoc_args Associative args.
+	 * @return array|null Input array, or null on validation error.
+	 */
+	private function buildPauseResumeInput( array $args, array $assoc_args ): ?array {
+		$flow_id     = ! empty( $args[0] ) ? (int) $args[0] : null;
+		$pipeline_id = isset( $assoc_args['pipeline'] ) ? (int) $assoc_args['pipeline'] : ( isset( $assoc_args['pipeline_id'] ) ? (int) $assoc_args['pipeline_id'] : null );
+		$agent_id    = AgentResolver::resolve( $assoc_args );
+
+		if ( null === $flow_id && null === $pipeline_id && null === $agent_id ) {
+			WP_CLI::error( 'Must provide a flow ID, --pipeline=<id>, or --agent=<slug_or_id>.' );
+			return null;
+		}
+
+		$input = array();
+		if ( null !== $flow_id ) {
+			$input['flow_id'] = $flow_id;
+		} elseif ( null !== $pipeline_id ) {
+			$input['pipeline_id'] = $pipeline_id;
+		} elseif ( null !== $agent_id ) {
+			$input['agent_id'] = $agent_id;
+		}
+
+		return $input;
 	}
 
 	/**
