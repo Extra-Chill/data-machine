@@ -553,6 +553,9 @@ function datamachine_activate_for_site() {
 	// Migrate per-site agents to network-scoped tables (idempotent).
 	datamachine_migrate_agents_to_network_scope();
 
+	// Drop orphaned per-site agent tables left behind by the migration (idempotent).
+	datamachine_drop_orphaned_agent_tables();
+
 	// Regenerate SITE.md with enriched content and clean up legacy SiteContext transient.
 	datamachine_regenerate_site_md();
 	delete_transient( 'datamachine_site_context_data' );

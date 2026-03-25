@@ -2224,3 +2224,77 @@ function datamachine_migrate_agents_to_network_scope() {
 		);
 	}
 }
+
+/**
+ * Drop orphaned per-site agent tables after network migration.
+ *
+ * After datamachine_migrate_agents_to_network_scope() has consolidated
+ * all agent data into the network-scoped tables (base_prefix), the
+ * per-site copies (e.g. c8c_7_datamachine_agents) serve no purpose.
+ * They can't be queried (all repositories use base_prefix) and their
+ * presence is confusing.
+ *
+ * This function drops the orphaned per-site agent, access, and token
+ * tables for every subsite. Idempotent — safe to call multiple times.
+ * Only runs on multisite after the network migration flag is set.
+ *
+ * @since 0.43.0
+ */
+function datamachine_drop_orphaned_agent_tables() {
+	if ( ! is_multisite() ) {
+		return;
+	}
+
+	if ( ! get_site_option( 'datamachine_agents_network_migrated' ) ) {
+		return;
+	}
+
+	if ( get_site_option( 'datamachine_orphaned_agent_tables_dropped' ) ) {
+		return;
+	}
+
+	global $wpdb;
+
+	$table_suffixes = array(
+		'datamachine_agents',
+		'datamachine_agent_access',
+		'datamachine_agent_tokens',
+	);
+
+	$sites   = get_sites( array( 'fields' => 'ids' ) );
+	$dropped = 0;
+
+	foreach ( $sites as $blog_id ) {
+		$site_prefix = $wpdb->get_blog_prefix( $blog_id );
+
+		// Skip the main site — its prefix IS the base_prefix,
+		// so these are the canonical network tables.
+		if ( $site_prefix === $wpdb->base_prefix ) {
+			continue;
+		}
+
+		foreach ( $table_suffixes as $suffix ) {
+			$table_name = $site_prefix . $suffix;
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table_name ) );
+
+			if ( $exists ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$wpdb->query( "DROP TABLE `{$table_name}`" );
+				++$dropped;
+			}
+		}
+	}
+
+	update_site_option( 'datamachine_orphaned_agent_tables_dropped', true );
+
+	if ( $dropped > 0 ) {
+		do_action(
+			'datamachine_log',
+			'info',
+			'Dropped orphaned per-site agent tables after network migration',
+			array( 'tables_dropped' => $dropped )
+		);
+	}
+}
