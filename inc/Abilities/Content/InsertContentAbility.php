@@ -88,39 +88,58 @@ class InsertContentAbility {
 	 * Register as a chat tool.
 	 */
 	private function register_chat_tool(): void {
-		add_filter( 'datamachine_tools', function ( array $tools, string $context ): array {
+		add_filter(
+			'datamachine_tools',
+			function ( $tools ) {
+				$tools['insert_content'] = array(
+					'_callable' => array( self::class, 'getChatTool' ),
+					'contexts'  => array( 'chat', 'pipeline', 'system', 'editor' ),
+				);
+				return $tools;
+			}
+		);
+	}
 
-			$tools[] = array(
-				'name'        => 'insert_content',
-				'description' => 'Insert new content into a WordPress post at a specific position (beginning, end, or after a specific paragraph). Shows proposed insertion as a diff block for user review.',
-				'parameters'  => array(
-					'type'       => 'object',
-					'required'   => array( 'post_id', 'content', 'position' ),
-					'properties' => array(
-						'post_id'               => array(
-							'type'        => 'integer',
-							'description' => 'The post ID to insert content into.',
-						),
-						'content'               => array(
-							'type'        => 'string',
-							'description' => 'The new content to insert (wrapped in paragraph blocks automatically).',
-						),
-						'position'              => array(
-							'type'        => 'string',
-							'enum'        => array( 'beginning', 'end', 'after_paragraph' ),
-							'description' => 'Where to insert the content.',
-						),
-						'target_paragraph_text' => array(
-							'type'        => 'string',
-							'description' => 'Required when position is "after_paragraph". A short phrase (3-8 words) from the target paragraph.',
-						),
-					),
+	/**
+	 * Chat tool definition.
+	 *
+	 * @return array
+	 */
+	public static function getChatTool(): array {
+		return array(
+			'class'       => self::class,
+			'method'      => 'handleChatToolCall',
+			'description' => 'Insert new content into a WordPress post at a specific position (beginning, end, or after a specific paragraph). Shows proposed insertion as a diff block for user review.',
+			'parameters'  => array(
+				'post_id'               => array(
+					'type'        => 'integer',
+					'description' => 'The post ID to insert content into.',
 				),
-				'execute'     => fn( $params ) => self::execute( $params ),
-			);
+				'content'               => array(
+					'type'        => 'string',
+					'description' => 'The new content to insert (wrapped in paragraph blocks automatically).',
+				),
+				'position'              => array(
+					'type'        => 'string',
+					'enum'        => array( 'beginning', 'end', 'after_paragraph' ),
+					'description' => 'Where to insert the content.',
+				),
+				'target_paragraph_text' => array(
+					'type'        => 'string',
+					'description' => 'Required when position is "after_paragraph". A short phrase (3-8 words) from the target paragraph.',
+				),
+			),
+		);
+	}
 
-			return $tools;
-		}, 10, 2 );
+	/**
+	 * Handle chat tool call.
+	 *
+	 * @param array $params Tool parameters.
+	 * @return array Result.
+	 */
+	public static function handleChatToolCall( array $params ): array {
+		return self::execute( $params );
 	}
 
 	/**
