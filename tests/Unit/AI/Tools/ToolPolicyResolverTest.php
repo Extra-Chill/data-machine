@@ -186,36 +186,6 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		remove_all_filters( 'datamachine_tools' );
 		ToolManager::clearCache();
 	}
->>>>>>> main
-			return $tools;
-		} );
-
-		ToolManager::clearCache();
-
-<<<<<<< HEAD
-=======
-		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
-		wp_set_current_user( $user_id );
-
->>>>>>> main
-		$tools = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
-		) );
-
-<<<<<<< HEAD
-		$this->assertArrayNotHasKey( 'test_untagged_tool', $tools );
-
-		remove_all_filters( 'datamachine_tools' );
-=======
-		$this->assertEmpty( $tools );
-
-		remove_filter( 'user_has_cap', array( $this, 'deny_all_datamachine_caps' ), 10 );
-		remove_filter( 'datamachine_require_use_tools_for_chat_tools', '__return_true' );
-		remove_all_filters( 'datamachine_tools' );
-		wp_set_current_user( 0 );
->>>>>>> main
-		ToolManager::clearCache();
-	}
 
 	// ============================================
 	// PIPELINE CONTEXT
