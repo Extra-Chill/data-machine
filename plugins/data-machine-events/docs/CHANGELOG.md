@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.24.1] - 2026-03-25
+
+### Changed
+- standardize on item_identifier for processed item dedup key
+
 ## [0.24.0] - 2026-03-23
 
 ### Added
