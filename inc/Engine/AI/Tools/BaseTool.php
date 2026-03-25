@@ -52,7 +52,7 @@ abstract class BaseTool {
 	 *     @type string   $ability      Single ability slug this tool wraps (e.g. 'datamachine/local-search').
 	 *     @type string[] $abilities    Multiple ability slugs for composed tools. ALL must pass permission check.
 	 *     @type string   $access_level Fallback for tools without a linked ability.
-	 *                                  One of: 'authenticated', 'author', 'editor', 'admin'. Default: 'admin'.
+	 *                                  One of: 'public', 'authenticated', 'author', 'editor', 'admin'. Default: 'admin'.
 	 * }
 	 */
 	protected function registerTool( string $toolName, array|callable $toolDefinition, array $contexts = array(), array $meta = array() ): void {
