@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.24.3] - 2026-03-26
+
+### Fixed
+- remove theme-specific breakout class from event details
+
 ## [0.24.2] - 2026-03-26
 
 ### Fixed
