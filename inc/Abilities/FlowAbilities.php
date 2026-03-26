@@ -22,6 +22,7 @@ use DataMachine\Abilities\Flow\PauseFlowAbility;
 use DataMachine\Abilities\Flow\ResumeFlowAbility;
 use DataMachine\Abilities\Flow\QueueAbility;
 use DataMachine\Abilities\Flow\WebhookTriggerAbility;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -40,6 +41,7 @@ class FlowAbilities {
 	private WebhookTriggerAbility $webhook_trigger;
 
 	public function __construct() {
+		add_action('wp_abilities_api_init', array( $this, 'abilities_api_init' ));
 		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
 			return;
 		}

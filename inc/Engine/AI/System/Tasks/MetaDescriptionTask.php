@@ -20,6 +20,7 @@ defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\RequestBuilder;
+use DataMachine\Engine\AI\System\Tasks\Traits\HasSupportsUndo;
 
 class MetaDescriptionTask extends SystemTask {
 

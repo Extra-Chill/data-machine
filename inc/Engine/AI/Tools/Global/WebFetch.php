@@ -10,6 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 use DataMachine\Core\HttpClient;
 use DataMachine\Engine\AI\Tools\BaseTool;
+use DataMachine\Engine\AI\Tools\Global\Traits\HasIsConfigured;
 
 class WebFetch extends BaseTool {
 

@@ -16,6 +16,7 @@ namespace DataMachine\Api;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\ProcessedItemsAbilities;
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;

@@ -18,6 +18,7 @@ use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\HttpClient;
 use DataMachine\Core\WordPress\PostTracking;
+use DataMachine\Core\Steps\Fetch\Handlers\FetchHandler;
 
 defined( 'ABSPATH' ) || exit;
 

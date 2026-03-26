@@ -1,6 +1,6 @@
 # Files Endpoint
 
-**Implementation**: `inc/Api/Files.php`, `inc/Api/AgentFiles.php`
+**Implementation**: `inc/Core/Steps/Fetch/Handlers/Files/Files.php`, `inc/Api/AgentFiles.php`
 
 **Base URL**: `/wp-json/datamachine/v1/files`
 
@@ -8,7 +8,7 @@
 
 The Files endpoint handles two distinct scopes:
 
-1. **Flow files** — File uploads for pipeline processing with flow-isolated storage, security validation, and automatic URL generation (`inc/Api/Files.php`)
+1. **Flow files** — File uploads for pipeline processing with flow-isolated storage, security validation, and automatic URL generation (`inc/Core/Steps/Fetch/Handlers/Files/Files.php`)
 2. **Agent files** — Agent memory file management with 3-layer directory resolution for SOUL.md, MEMORY.md, USER.md, and daily memory journals (`inc/Api/AgentFiles.php`)
 
 ## Authentication
@@ -130,7 +130,7 @@ Delete a file by filename.
 **Implementation**: `inc/Api/AgentFiles.php` (@since v0.38.0)
 
 Agent files use a 3-layer directory resolution system:
-1. **Shared layer** (`shared/`) — Site-wide files like SITE.md
+1. **Shared layer** (`inc/Core/Admin/Pages/Pipelines/assets/react/components/shared/`) — Site-wide files like SITE.md
 2. **Agent layer** (`agents/{slug}/`) — Agent-specific files: SOUL.md, MEMORY.md
 3. **User layer** (`users/{id}/`) — User-specific files: USER.md
 
@@ -561,5 +561,5 @@ curl -X POST https://example.com/wp-json/datamachine/v1/files \
 ---
 
 **Base URL**: `/wp-json/datamachine/v1/files`
-**Implementation**: `inc/Api/Files.php` (flow files), `inc/Api/AgentFiles.php` (agent files)
+**Implementation**: `inc/Core/Steps/Fetch/Handlers/Files/Files.php` (flow files), `inc/Api/AgentFiles.php` (agent files)
 **Max File Size**: WordPress `wp_max_upload_size()` setting
