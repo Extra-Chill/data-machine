@@ -26,6 +26,7 @@ import {
 	ChatInput,
 	TypingIndicator,
 	ErrorBoundary,
+	copyChatAsMarkdown,
 } from '@extrachill/chat';
 /**
  * Internal dependencies
@@ -34,7 +35,6 @@ import { useUIStore } from '../../stores/uiStore';
 import { useChatQueryInvalidation } from '../../hooks/useChatQueryInvalidation';
 import ChatSessionSwitcher from './ChatSessionSwitcher';
 import ChatSessionList from './ChatSessionList';
-import { formatChatAsMarkdown } from '../../utils/formatters';
 
 const ReactMarkdown = lazy( () => import( 'react-markdown' ) );
 
@@ -128,10 +128,10 @@ export default function ChatSidebar() {
 	}, [ clearChatSession, chat ] );
 
 	const handleCopyChat = useCallback( () => {
-		const markdown = formatChatAsMarkdown( chat.messages );
-		navigator.clipboard.writeText( markdown );
-		setIsCopied( true );
-		setTimeout( () => setIsCopied( false ), 2000 );
+		copyChatAsMarkdown( chat.messages ).then( () => {
+			setIsCopied( true );
+			setTimeout( () => setIsCopied( false ), 2000 );
+		} );
 	}, [ chat.messages ] );
 
 	// Session-aware loading — only show for the session that initiated the request.
