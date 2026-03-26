@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.24.2] - 2026-03-26
+
+### Fixed
+- use shared full-width breakout for event details
+
 ## [0.24.1] - 2026-03-25
 
 ### Changed
