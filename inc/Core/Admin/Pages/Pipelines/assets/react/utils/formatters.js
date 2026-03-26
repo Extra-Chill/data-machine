@@ -105,50 +105,6 @@ export const formatRelativeTime = ( dateString ) => {
 	return date.toLocaleDateString();
 };
 
-/**
- * Get display title for a chat session.
- *
- * @param {Object} session - Session object with title and first_message
- * @return {string} Display title
- */
-/**
- * Format chat messages as Markdown for clipboard export.
- *
- * @param {Array} messages - Array of chat message objects
- * @return {string} Markdown-formatted string
- */
-export function formatChatAsMarkdown( messages ) {
-	return messages
-		.filter( ( msg ) => {
-			const type = msg.metadata?.type;
-			// Exclude assistant tool_call messages (action info is in tool_result content)
-			if ( msg.role === 'assistant' && type === 'tool_call' ) {
-				return false;
-			}
-			return msg.role === 'user' || msg.role === 'assistant';
-		} )
-		.map( ( msg ) => {
-			const type = msg.metadata?.type;
-			const timestamp = msg.metadata?.timestamp
-				? new Date( msg.metadata.timestamp ).toLocaleString()
-				: '';
-			const timestampStr = timestamp ? ` (${ timestamp })` : '';
-
-			// Tool results: clearly labeled (these have role 'user' but aren't user messages)
-			if ( type === 'tool_result' ) {
-				const toolName = msg.metadata?.tool_name || 'Tool';
-				const success = msg.metadata?.success;
-				const status = success === false ? 'FAILED' : 'SUCCESS';
-				return `**Tool Response (${ toolName } - ${ status })${ timestampStr }:**\n${ msg.content }`;
-			}
-
-			// Regular user/assistant messages
-			const role = msg.role === 'user' ? 'User' : 'Assistant';
-			return `**${ role }${ timestampStr }:**\n${ msg.content }`;
-		} )
-		.join( '\n\n---\n\n' );
-}
-
 export const getSessionTitle = ( session ) => {
 	if ( session.title ) {
 		return session.title;

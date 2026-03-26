@@ -229,11 +229,25 @@ class ResolveDiffAbility {
 			case 'replace_post_blocks':
 				return ReplacePostBlocksAbility::execute( $input );
 
+			case 'insert_content':
+				return self::apply_insert_content( $input );
+
 			default:
 				return array(
 					'success' => false,
 					'error'   => sprintf( 'Unknown pending diff type: %s', $type ),
 				);
 		}
+	}
+
+	/**
+	 * Apply an insert-content diff.
+	 *
+	 * @param array $input Original insert input.
+	 * @return array
+	 */
+	private static function apply_insert_content( array $input ): array {
+		$input['preview'] = false;
+		return InsertContentAbility::execute( $input );
 	}
 }

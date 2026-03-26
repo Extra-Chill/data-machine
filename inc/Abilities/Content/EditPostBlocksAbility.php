@@ -291,29 +291,32 @@ class EditPostBlocksAbility {
 				}
 			}
 
-			PendingDiffStore::store( $diff_id, array(
+			$diff = CanonicalDiffPreview::build( array(
+				'diff_id'             => $diff_id,
+				'diff_type'           => 'edit',
+				'original_content'    => implode( "\n", array_column( $diffs, 'originalContent' ) ),
+				'replacement_content' => implode( "\n", array_column( $diffs, 'replacementContent' ) ),
+				'summary'             => 'Preview generated. Accept or reject to apply changes.',
+				'items'               => $diffs,
+			) );
+
+			CanonicalDiffPreview::store_pending( $diff_id, array(
 				'type'    => 'edit_post_blocks',
 				'post_id' => $post_id,
 				'input'   => array(
 					'post_id' => $post_id,
 					'edits'   => $edits,
 				),
+				'diff'    => $diff,
 			) );
 
-			return array(
-				'success' => true,
-				'preview' => true,
-				'post_id' => $post_id,
-				'diff_id' => $diff_id,
-				'diff'    => array(
-					'diffId'             => $diff_id,
-					'diffType'           => 'edit',
-					'originalContent'    => implode( "\n", array_column( $diffs, 'originalContent' ) ),
-					'replacementContent' => implode( "\n", array_column( $diffs, 'replacementContent' ) ),
-					'edits'              => $diffs,
-				),
-				'changes_applied' => $changes,
-				'message'         => 'Preview generated. Accept or reject to apply changes.',
+			return CanonicalDiffPreview::response(
+				$post_id,
+				'Preview generated. Accept or reject to apply changes.',
+				$diff,
+				array(
+					'changes_applied' => $changes,
+				)
 			);
 		}
 

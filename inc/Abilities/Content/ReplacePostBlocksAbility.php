@@ -272,13 +272,23 @@ class ReplacePostBlocksAbility {
 				);
 			}
 
-			PendingDiffStore::store( $diff_id, array(
+			$diff = CanonicalDiffPreview::build( array(
+				'diff_id'             => $diff_id,
+				'diff_type'           => 'replace',
+				'original_content'    => implode( "\n", array_column( $diffs, 'originalContent' ) ),
+				'replacement_content' => implode( "\n", array_column( $diffs, 'replacementContent' ) ),
+				'summary'             => 'Preview generated. Accept or reject to apply changes.',
+				'items'               => $diffs,
+			) );
+
+			CanonicalDiffPreview::store_pending( $diff_id, array(
 				'type'    => 'replace_post_blocks',
 				'post_id' => $post_id,
 				'input'   => array(
 					'post_id'      => $post_id,
 					'replacements' => $replacements,
 				),
+				'diff'    => $diff,
 			) );
 
 			// Strip raw HTML from the changes returned to the AI.
@@ -287,20 +297,13 @@ class ReplacePostBlocksAbility {
 				return $c;
 			}, $changes );
 
-			return array(
-				'success' => true,
-				'preview' => true,
-				'post_id' => $post_id,
-				'diff_id' => $diff_id,
-				'diff'    => array(
-					'diffId'             => $diff_id,
-					'diffType'           => 'replace',
-					'originalContent'    => implode( "\n", array_column( $diffs, 'originalContent' ) ),
-					'replacementContent' => implode( "\n", array_column( $diffs, 'replacementContent' ) ),
-					'replacements'       => $diffs,
-				),
-				'blocks_replaced' => $clean_changes,
-				'message'         => 'Preview generated. Accept or reject to apply changes.',
+			return CanonicalDiffPreview::response(
+				$post_id,
+				'Preview generated. Accept or reject to apply changes.',
+				$diff,
+				array(
+					'blocks_replaced' => $clean_changes,
+				)
 			);
 		}
 

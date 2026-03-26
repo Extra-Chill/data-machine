@@ -2,8 +2,8 @@
 /**
  * InsertContentAbility — positional content insertion with diff preview.
  *
- * Inserts new content at the beginning, end, or after a specific paragraph
- * in a post. Returns diff block data for frontend accept/reject review.
+	 * Inserts new content at the beginning, end, or after a specific paragraph
+	 * in a post. Returns canonical diff preview data for frontend/editor review.
  *
  * Ported from Wordsurf's insert_content tool (Phase 2 migration).
  *
@@ -67,8 +67,8 @@ class InsertContentAbility {
 					'type'       => 'object',
 					'properties' => array(
 						'success'            => array( 'type' => 'boolean' ),
-						'diff_block_content' => array( 'type' => 'string' ),
 						'diff_id'            => array( 'type' => 'string' ),
+						'diff'               => array( 'type' => 'object' ),
 					),
 				),
 				'execute_callback'    => array( self::class, 'execute' ),
@@ -109,7 +109,7 @@ class InsertContentAbility {
 		return array(
 			'class'       => self::class,
 			'method'      => 'handleChatToolCall',
-			'description' => 'Insert new content into a WordPress post at a specific position (beginning, end, or after a specific paragraph). Shows proposed insertion as a diff block for user review.',
+			'description' => 'Insert new content into a WordPress post at a specific position (beginning, end, or after a specific paragraph). Returns a canonical preview diff for user review.',
 			'parameters'  => array(
 				'post_id'               => array(
 					'type'        => 'integer',
@@ -146,13 +146,14 @@ class InsertContentAbility {
 	 * Execute the insert content ability.
 	 *
 	 * @param array $input Input parameters.
-	 * @return array Result with diff block data.
+	 * @return array Result with canonical diff preview data.
 	 */
 	public static function execute( array $input ): array {
 		$post_id               = absint( $input['post_id'] ?? 0 );
 		$content               = $input['content'] ?? '';
 		$position              = $input['position'] ?? 'end';
 		$target_paragraph_text = $input['target_paragraph_text'] ?? '';
+		$preview               = ! array_key_exists( 'preview', $input ) || ! empty( $input['preview'] );
 
 		if ( $post_id <= 0 || '' === $content ) {
 			return array(
@@ -184,31 +185,36 @@ class InsertContentAbility {
 		}
 
 		$current_content = $post->post_content;
+		$current_blocks  = parse_blocks( $current_content );
 
 		// Wrap content in paragraph block.
 		$block_content = "\n\n<!-- wp:paragraph -->\n<p>" . wp_kses_post( $content ) . "</p>\n<!-- /wp:paragraph -->";
 
 		$insertion_point = '';
+		$block_index      = count( $current_blocks );
 
-		switch ( $position ) {
-			case 'beginning':
-				$new_content     = $block_content . "\n\n" . $current_content;
-				$insertion_point = 'at the beginning of the post';
-				break;
+			switch ( $position ) {
+				case 'beginning':
+					$new_content     = $block_content . "\n\n" . $current_content;
+					$insertion_point = 'at the beginning of the post';
+					$block_index     = 0;
+					break;
 
-			case 'end':
-				$new_content     = $current_content . $block_content;
-				$insertion_point = 'at the end of the post';
-				break;
+				case 'end':
+					$new_content     = $current_content . $block_content;
+					$insertion_point = 'at the end of the post';
+					$block_index     = count( $current_blocks );
+					break;
 
 			case 'after_paragraph':
 				$result = self::insert_after_paragraph( $current_content, $block_content, $target_paragraph_text );
 				if ( ! $result['success'] ) {
 					return $result;
-				}
-				$new_content     = $result['content'];
-				$insertion_point = $result['insertion_point'];
-				break;
+					}
+					$new_content     = $result['content'];
+					$insertion_point = $result['insertion_point'];
+					$block_index     = (int) ( $result['block_index'] ?? count( $current_blocks ) );
+					break;
 
 			default:
 				return array(
@@ -217,36 +223,83 @@ class InsertContentAbility {
 				);
 		}
 
-		$diff_id = 'diff_' . wp_generate_uuid4();
+		if ( ! $preview ) {
+			$update = wp_update_post(
+				array(
+					'ID'           => $post_id,
+					'post_content' => $new_content,
+				),
+				true
+			);
 
-		// Build diff block for frontend rendering.
-		$diff_attributes = wp_json_encode( array(
-			'diffId'             => $diff_id,
-			'diffType'           => 'insert',
-			'originalContent'    => '',
-			'replacementContent' => $content,
-			'status'             => 'pending',
-			'toolCallId'         => $input['_original_call_id'] ?? '',
-			'editType'           => 'content',
-			'searchPattern'      => '',
-			'caseSensitive'      => false,
-			'isPreview'          => true,
-			'position'           => $position,
-			'insertionPoint'     => $insertion_point,
+			if ( is_wp_error( $update ) ) {
+				return array(
+					'success' => false,
+					'post_id' => $post_id,
+					'error'   => 'Failed to save: ' . $update->get_error_message(),
+				);
+			}
+
+			return array(
+				'success'        => true,
+				'post_id'        => $post_id,
+				'post_url'       => get_permalink( $post_id ),
+				'position'       => $position,
+				'insertion_point'=> $insertion_point,
+				'new_content'    => $new_content,
+			);
+		}
+
+		$diff_id = PendingDiffStore::generate_id();
+
+		$diff = CanonicalDiffPreview::build( array(
+			'diff_id'             => $diff_id,
+			'diff_type'           => 'insert',
+			'original_content'    => '',
+			'replacement_content' => $content,
+			'summary'             => sprintf( 'Prepared content insertion %s.', $insertion_point ),
+			'position'            => $position,
+			'insertion_point'     => $insertion_point,
+			'items'               => array(
+				array(
+					'blockIndex'         => $block_index,
+					'originalContent'    => '',
+					'replacementContent' => $content,
+				),
+			),
+			'editor'              => array(
+				'toolCallId'         => $input['_original_call_id'] ?? '',
+				'editType'           => 'content',
+				'searchPattern'      => '',
+				'caseSensitive'      => false,
+				'isPreview'          => true,
+				'previewBlockContent'=> $block_content,
+				'originalBlockContent' => '',
+				'originalBlockType'  => 'core/paragraph',
+			),
 		) );
 
-		$diff_block_content = "<!-- wp:datamachine/diff {$diff_attributes} -->\n<!-- /wp:datamachine/diff -->";
+		CanonicalDiffPreview::store_pending( $diff_id, array(
+			'type'    => 'insert_content',
+			'post_id' => $post_id,
+			'input'   => array(
+				'post_id'               => $post_id,
+				'content'               => $content,
+				'position'              => $position,
+				'target_paragraph_text' => $target_paragraph_text,
+			),
+			'diff'    => $diff,
+		) );
 
-		return array(
-			'success'            => true,
-			'message'            => sprintf( 'Prepared content insertion %s. User must accept or reject the diff block.', $insertion_point ),
-			'post_id'            => $post_id,
-			'position'           => $position,
-			'insertion_point'    => $insertion_point,
-			'diff_id'            => $diff_id,
-			'diff_block_content' => $diff_block_content,
-			'new_content'        => $new_content,
-			'action_required'    => 'User must accept or reject the diff block in the editor.',
+		return CanonicalDiffPreview::response(
+			$post_id,
+			sprintf( 'Prepared content insertion %s. Accept or reject to apply changes.', $insertion_point ),
+			$diff,
+			array(
+				'position'        => $position,
+				'insertion_point' => $insertion_point,
+				'new_content'     => $new_content,
+			)
 		);
 	}
 
@@ -304,6 +357,7 @@ class InsertContentAbility {
 		return array(
 			'success'         => true,
 			'content'         => implode( '', $parts ),
+			'block_index'     => $target_index + 1,
 			'insertion_point' => sprintf( "after the paragraph containing '%s'", $target_text ),
 		);
 	}
