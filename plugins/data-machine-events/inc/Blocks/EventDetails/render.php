@@ -82,6 +82,10 @@ $has_more_occurrences = count( $occurrence_dates ) > count( $upcoming_occurrence
 $block_classes = array( 'data-machine-event-details' );
 if ( ! empty( $attributes['align'] ) ) {
 	$block_classes[] = 'align' . $attributes['align'];
+
+	if ( 'full' === $attributes['align'] ) {
+		$block_classes[] = 'full-width-breakout';
+	}
 }
 $block_class = implode( ' ', $block_classes );
 

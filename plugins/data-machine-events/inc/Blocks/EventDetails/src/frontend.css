@@ -184,9 +184,6 @@
 
 .data-machine-event-details.alignfull {
     max-width: none;
-    margin-left: calc(-100vw / 2 + 100% / 2);
-    margin-right: calc(-100vw / 2 + 100% / 2);
-    width: 100vw;
 }
 
 /* Venue Map Section */
