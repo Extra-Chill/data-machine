@@ -237,8 +237,9 @@ class TwitterCommand {
 
 		$details = $provider->get_account_details();
 		if ( $details ) {
-			if ( ! empty( $details['screen_name'] ) ) {
-				WP_CLI::log( 'Handle:        @' . $details['screen_name'] );
+			$username = $provider->get_username();
+			if ( $username ) {
+				WP_CLI::log( 'Handle:        @' . $username );
 			}
 			if ( ! empty( $details['user_id'] ) ) {
 				WP_CLI::log( 'User ID:       ' . $details['user_id'] );

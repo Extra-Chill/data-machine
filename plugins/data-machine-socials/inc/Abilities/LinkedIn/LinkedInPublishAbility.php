@@ -274,7 +274,7 @@ class LinkedInPublishAbility {
 		return array(
 			'success'   => true,
 			'person_id' => $account['person_id'] ?? '',
-			'name'      => $account['name'] ?? '',
+			'username'  => $provider->get_username() ?? '',
 			'email'     => $account['email'] ?? '',
 		);
 	}

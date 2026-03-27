@@ -118,10 +118,10 @@ class TwitterPublishAbility {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'     => array( 'type' => 'boolean' ),
-							'screen_name' => array( 'type' => 'string' ),
-							'user_id'     => array( 'type' => 'string' ),
-							'error'       => array( 'type' => 'string' ),
+							'success'  => array( 'type' => 'boolean' ),
+							'username' => array( 'type' => 'string' ),
+							'user_id'  => array( 'type' => 'string' ),
+							'error'    => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( self::class, 'get_account' ),
@@ -203,10 +203,9 @@ class TwitterPublishAbility {
 			$http_code = $connection->getLastHttpCode();
 
 			if ( 201 === $http_code && isset( $response->data->id ) ) {
-				$tweet_id    = $response->data->id;
-				$account     = $provider->get_account_details();
-				$screen_name = $account['screen_name'] ?? 'twitter';
-				$tweet_url   = "https://twitter.com/{$screen_name}/status/{$tweet_id}";
+				$tweet_id = $response->data->id;
+				$username = $provider->get_username() ?? 'twitter';
+				$tweet_url = "https://twitter.com/{$username}/status/{$tweet_id}";
 
 				$result = array(
 					'success'   => true,
@@ -216,7 +215,7 @@ class TwitterPublishAbility {
 
 				// Handle reply tweet for source URL
 				if ( 'reply' === $link_handling && ! empty( $source_url ) ) {
-					$reply = self::post_reply( $connection, $tweet_id, $source_url, $screen_name );
+					$reply = self::post_reply( $connection, $tweet_id, $source_url, $username );
 					if ( $reply['success'] ) {
 						$result['reply_tweet_id']  = $reply['reply_tweet_id'];
 						$result['reply_tweet_url'] = $reply['reply_tweet_url'];
@@ -264,9 +263,9 @@ class TwitterPublishAbility {
 		$account = $provider->get_account_details();
 
 		return array(
-			'success'     => true,
-			'screen_name' => $account['screen_name'] ?? '',
-			'user_id'     => $account['user_id'] ?? '',
+			'success'  => true,
+			'username' => $provider->get_username() ?? '',
+			'user_id'  => $account['user_id'] ?? '',
 		);
 	}
 

@@ -253,11 +253,9 @@ class FacebookCommand {
 
 		$details = $provider->get_account_details();
 		if ( $details ) {
-			if ( ! empty( $details['page_name'] ) ) {
-				WP_CLI::log( 'Page:          ' . $details['page_name'] );
-			}
-			if ( ! empty( $details['user_name'] ) ) {
-				WP_CLI::log( 'User:          ' . $details['user_name'] );
+			$username = $provider->get_username();
+			if ( $username ) {
+				WP_CLI::log( 'Page:          ' . $username );
 			}
 		}
 

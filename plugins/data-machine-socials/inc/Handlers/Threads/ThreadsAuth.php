@@ -169,14 +169,11 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 					);
 				}
 
-				$page_name = $posting_entity_info['name'] ?? 'Unknown Page/User';
-
 				return array(
 					'access_token'     => $access_token,
 					'token_type'       => 'bearer',
-					'username'         => $page_name,
+					'username'         => $posting_entity_info['name'] ?? null,
 					'page_id'          => $posting_entity_info['id'],
-					'page_name'        => $page_name,
 					'authenticated_at' => time(),
 					'token_expires_at' => $token_expires_at,
 				);

@@ -185,11 +185,9 @@ class LinkedInAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 					'token_type'       => 'bearer',
 					'token_expires_at' => $expires_at,
 					'person_id'        => $profile['sub'] ?? '',
-					'username'         => $profile['name'] ?? 'Unknown',
-					'name'             => $profile['name'] ?? 'Unknown',
+					'username'         => $profile['name'] ?? null,
 					'email'            => $profile['email'] ?? '',
 					'picture'          => $profile['picture'] ?? '',
-					'vanity_name'      => $profile['vanity_name'] ?? '',
 					'authenticated_at' => time(),
 				);
 

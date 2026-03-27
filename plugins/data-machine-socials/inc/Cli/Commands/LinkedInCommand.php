@@ -338,8 +338,9 @@ class LinkedInCommand {
 
 		$details = $provider->get_account_details();
 		if ( $details ) {
-			if ( ! empty( $details['name'] ) ) {
-				WP_CLI::log( 'Name:          ' . $details['name'] );
+			$username = $provider->get_username();
+			if ( $username ) {
+				WP_CLI::log( 'Name:          ' . $username );
 			}
 			if ( ! empty( $details['email'] ) ) {
 				WP_CLI::log( 'Email:         ' . $details['email'] );
