@@ -664,10 +664,10 @@ class AuthAbilities {
 					'error'   => __( 'Handler does not support saving config', 'data-machine' ),
 				);
 			}
-		} elseif ( method_exists( $auth_instance, 'save_account' ) ) {
-			$saved = $auth_instance->save_account( $config_data );
 		} elseif ( method_exists( $auth_instance, 'save_config' ) ) {
 			$saved = $auth_instance->save_config( $config_data );
+		} elseif ( method_exists( $auth_instance, 'save_account' ) ) {
+			$saved = $auth_instance->save_account( $config_data );
 		} else {
 			return array(
 				'success' => false,
