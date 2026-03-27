@@ -22,8 +22,9 @@
  * 14. GoDaddy website builder
  * 15. Timely Event Discovery (FullCalendar.js)
  * 16. Elfsight Events Calendar (shy.elfsight.com API)
- * 17. Schema.org JSON-LD
- * 18. WordPress (Tribe Events, WP REST)
+ * 17. Eventbrite (organizer pages, individual event pages)
+ * 18. Schema.org JSON-LD
+ * 19. WordPress (Tribe Events, WP REST)
  * 19. Prekindle ticketing
  * 20. Wix Events JSON (wix-warmup-data)
  * 21. RHP Events WordPress plugin HTML
@@ -68,6 +69,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\IcsExtrac
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\DoStuffExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\WebflowExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\ShowtimeExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\EventbriteExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\VisionExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SquareOnlineExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\VisionExtractionProcessor;
@@ -142,6 +144,7 @@ class UniversalWebScraper extends EventImportHandler {
 			new GoDaddyExtractor(),
 			new TimelyExtractor(),
 			new ElfsightEventsExtractor(),
+			new EventbriteExtractor(),
 			new JsonLdExtractor(),
 			new WordPressExtractor(),
 			new PrekindleExtractor(),
