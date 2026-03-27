@@ -33,6 +33,19 @@ class BlueskyAuth extends BaseAuthProvider {
 		! empty( $config['app_password'] );
 	}
 
+	/**
+	 * Get the Bluesky handle.
+	 *
+	 * Bluesky stores the handle in config (not account) because it uses
+	 * app-password auth rather than OAuth token exchange.
+	 *
+	 * @return string|null Handle or null
+	 */
+	public function get_username(): ?string {
+		$config = $this->get_config();
+		return ! empty( $config['username'] ) ? $config['username'] : null;
+	}
+
 	public function get_config_fields(): array {
 		return array(
 			'username'     => array(

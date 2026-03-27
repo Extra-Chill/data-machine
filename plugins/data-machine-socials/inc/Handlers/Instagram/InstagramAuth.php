@@ -116,18 +116,8 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		return $account['user_id'];
 	}
 
-	/**
-	 * Get stored Instagram username
-	 *
-	 * @return string|null Username or null
-	 */
-	public function get_username(): ?string {
-		$account = $this->get_account();
-		if ( empty( $account ) || ! is_array( $account ) || empty( $account['username'] ) ) {
-			return null;
-		}
-		return $account['username'];
-	}
+	// get_username() is inherited from BaseAuthProvider.
+	// Instagram already stores username under the canonical 'username' key.
 
 	/**
 	 * Get authorization URL for Instagram OAuth

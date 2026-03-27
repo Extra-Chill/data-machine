@@ -177,12 +177,15 @@ class TwitterAuth extends \DataMachine\Core\OAuth\BaseOAuth1Provider {
 			$api_key,
 			$api_secret,
 			function ( $access_token_data ) {
-				// Build account data from Twitter response
+				$screen_name = $access_token_data['screen_name'] ?? null;
+
+				// Build account data from Twitter response.
 				return array(
 					'access_token'        => $access_token_data['oauth_token'],
 					'access_token_secret' => $access_token_data['oauth_token_secret'],
 					'user_id'             => $access_token_data['user_id'] ?? null,
-					'screen_name'         => $access_token_data['screen_name'] ?? null,
+					'username'            => $screen_name,
+					'screen_name'         => $screen_name,
 					'last_verified_at'    => time(),
 				);
 			},

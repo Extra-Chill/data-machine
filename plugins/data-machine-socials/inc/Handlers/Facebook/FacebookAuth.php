@@ -327,14 +327,17 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 					$user_profile_name = $profile_info['name'] ?? 'ErrorFetchingName';
 				}
 
+				$page_name = $page_credentials['name'] ?? '';
+
 				return array(
 					'user_access_token' => $access_token,
 					'page_access_token' => $page_credentials['access_token'],
 					'token_type'        => 'bearer',
 					'user_id'           => $user_profile_id,
+					'username'          => $page_name,
 					'user_name'         => $user_profile_name,
 					'page_id'           => $page_credentials['id'],
-					'page_name'         => $page_credentials['name'],
+					'page_name'         => $page_name,
 					'authenticated_at'  => time(),
 					'token_expires_at'  => $token_expires_at,
 				);
