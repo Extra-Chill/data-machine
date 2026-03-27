@@ -24,11 +24,10 @@ Four layers, each serving a different purpose:
 
 ### 1. Agent Files — Identity and Knowledge
 
-**Location:** Three-layer directory system under `wp-content/uploads/datamachine-files/`:
 
 | Layer | Directory | Contents |
 |-------|-----------|----------|
-| **Shared** (site-wide) | `shared/` | `SITE.md`, `RULES.md` — site-level context shared by all agents |
+| **Shared** (site-wide) | `inc/Core/Admin/Pages/Pipelines/assets/react/components/shared/` | `SITE.md`, `RULES.md` — site-level context shared by all agents |
 | **Agent** (identity + knowledge) | `agents/{agent_slug}/` | `SOUL.md`, `MEMORY.md`, `daily/` — agent-specific identity and knowledge |
 | **User** (personal) | `users/{user_id}/` | `USER.md` — user preferences that follow the human across agents |
 

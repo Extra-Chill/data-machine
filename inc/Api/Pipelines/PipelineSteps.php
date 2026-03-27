@@ -15,6 +15,7 @@ use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\PipelineStepAbilities;
 use DataMachine\Abilities\StepTypeAbilities;
 use WP_REST_Server;
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;

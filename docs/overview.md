@@ -49,7 +49,6 @@ Data Machine supports **multiple agents on a single WordPress installation** (@s
 - **Access Control**: The `datamachine_agent_access` table implements role-based access (viewer, operator, admin) for sharing agents across WordPress users.
 - **Resource Scoping**: All major resources (pipelines, flows, jobs, chat sessions) carry an `agent_id` column. Queries filter by agent context automatically.
 - **Filesystem Isolation**: Each agent gets its own directory under `agents/{slug}/` for identity files (SOUL.md, MEMORY.md) and daily memory.
-- **Three-Layer Directory System**: Memory files are organized into shared (site-wide), agent (identity), and user (personal) layers under `wp-content/uploads/datamachine-files/`.
 
 See [Multi-Agent Architecture](core-system/wordpress-as-agent-memory.md#multi-agent-architecture) for details.
 
@@ -63,7 +62,7 @@ Markdown files organized in three layers:
 
 | Layer | Directory | Contents |
 |-------|-----------|----------|
-| **Shared** | `shared/` | SITE.md, RULES.md (site-wide context) |
+| **Shared** | `inc/Core/Admin/Pages/Pipelines/assets/react/components/shared/` | SITE.md, RULES.md (site-wide context) |
 | **Agent** | `agents/{slug}/` | SOUL.md, MEMORY.md (agent identity and knowledge) |
 | **User** | `users/{id}/` | USER.md, MEMORY.md (human preferences) |
 
