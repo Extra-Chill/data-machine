@@ -1030,6 +1030,13 @@ class EventUpsert extends UpdateHandler {
 		$engine_data_array                                     = $engine instanceof EngineData ? $engine->all() : array();
 		$this->taxonomy_handler->processTaxonomies( $post_id, $parameters, $handler_config_for_tax, $engine_data_array );
 
+		/**
+		 * Fires after all taxonomy terms have been assigned to an event.
+		 *
+		 * @param int $post_id Event post ID.
+		 */
+		do_action( 'datamachine_event_taxonomy_processed', $post_id );
+
 		if ( $job_id ) {
 			datamachine_merge_engine_data(
 				$job_id,
@@ -1107,6 +1114,13 @@ class EventUpsert extends UpdateHandler {
 		$handler_config_for_tax['taxonomy_promoter_selection'] = 'skip';
 		$engine_data_array                                     = $engine instanceof EngineData ? $engine->all() : array();
 		$this->taxonomy_handler->processTaxonomies( $post_id, $parameters, $handler_config_for_tax, $engine_data_array );
+
+		/**
+		 * Fires after all taxonomy terms have been assigned to an event.
+		 *
+		 * @param int $post_id Event post ID.
+		 */
+		do_action( 'datamachine_event_taxonomy_processed', $post_id );
 	}
 
 	/**
