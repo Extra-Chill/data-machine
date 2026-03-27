@@ -25,19 +25,21 @@ class JsonLdExtractor extends BaseExtractor {
 			return array();
 		}
 
+		$events = array();
+
 		foreach ( $matches[1] as $json_content ) {
 			$data = json_decode( trim( $json_content ), true );
 			if ( json_last_error() !== JSON_ERROR_NONE || empty( $data ) ) {
 				continue;
 			}
 
-			$event = $this->findAndParseEvent( $data, $source_url );
-			if ( null !== $event ) {
-				return array( $event );
+			$found = $this->findAllEvents( $data, $source_url );
+			if ( ! empty( $found ) ) {
+				$events = array_merge( $events, $found );
 			}
 		}
 
-		return array();
+		return $events;
 	}
 
 	public function getMethod(): string {
@@ -45,42 +47,64 @@ class JsonLdExtractor extends BaseExtractor {
 	}
 
 	/**
-	 * Find and parse Event object from JSON-LD data.
+	 * Find and parse all Event objects from JSON-LD data.
 	 *
-	 * @param array $data JSON-LD data
-	 * @param string $source_url Source URL
-	 * @return array|null Parsed event or null
+	 * @param array  $data       JSON-LD data.
+	 * @param string $source_url Source URL.
+	 * @return array Array of parsed events (may be empty).
 	 */
-	private function findAndParseEvent( array $data, string $source_url ): ?array {
+	private function findAllEvents( array $data, string $source_url ): array {
+		$events = array();
+
 		if ( isset( $data['@type'] ) && 'Event' === $data['@type'] ) {
-			return $this->parseEvent( $data, $source_url );
+			$parsed = $this->parseEvent( $data, $source_url );
+			if ( null !== $parsed ) {
+				$events[] = $parsed;
+			}
+			return $events;
 		}
 
 		if ( isset( $data['@graph'] ) && is_array( $data['@graph'] ) ) {
 			foreach ( $data['@graph'] as $item ) {
 				if ( isset( $item['@type'] ) && 'Event' === $item['@type'] ) {
-					return $this->parseEvent( $item, $source_url );
+					$parsed = $this->parseEvent( $item, $source_url );
+					if ( null !== $parsed ) {
+						$events[] = $parsed;
+					}
 				}
+			}
+			if ( ! empty( $events ) ) {
+				return $events;
 			}
 		}
 
-		// Handle ItemList with ListItem elements (Eventbrite pattern)
+		// Handle ItemList with ListItem elements.
 		if ( isset( $data['@type'] ) && 'ItemList' === $data['@type'] && isset( $data['itemListElement'] ) ) {
 			foreach ( $data['itemListElement'] as $list_item ) {
 				if ( ! is_array( $list_item ) ) {
 					continue;
 				}
-				// ListItem wraps the actual item
+				$event_data = null;
+				// ListItem wraps the actual item.
 				if ( isset( $list_item['@type'] ) && 'ListItem' === $list_item['@type'] && isset( $list_item['item'] ) ) {
 					$nested = $list_item['item'];
 					if ( isset( $nested['@type'] ) && 'Event' === $nested['@type'] ) {
-						return $this->parseEvent( $nested, $source_url );
+						$event_data = $nested;
 					}
 				}
-				// Direct Event in itemListElement (fallback)
-				if ( isset( $list_item['@type'] ) && 'Event' === $list_item['@type'] ) {
-					return $this->parseEvent( $list_item, $source_url );
+				// Direct Event in itemListElement (fallback).
+				if ( null === $event_data && isset( $list_item['@type'] ) && 'Event' === $list_item['@type'] ) {
+					$event_data = $list_item;
 				}
+				if ( null !== $event_data ) {
+					$parsed = $this->parseEvent( $event_data, $source_url );
+					if ( null !== $parsed ) {
+						$events[] = $parsed;
+					}
+				}
+			}
+			if ( ! empty( $events ) ) {
+				return $events;
 			}
 		}
 
@@ -91,20 +115,26 @@ class JsonLdExtractor extends BaseExtractor {
 				}
 
 				if ( isset( $item['@type'] ) && 'Event' === $item['@type'] ) {
-					return $this->parseEvent( $item, $source_url );
+					$parsed = $this->parseEvent( $item, $source_url );
+					if ( null !== $parsed ) {
+						$events[] = $parsed;
+					}
 				}
 
 				if ( isset( $item['@graph'] ) && is_array( $item['@graph'] ) ) {
 					foreach ( $item['@graph'] as $graph_item ) {
 						if ( isset( $graph_item['@type'] ) && 'Event' === $graph_item['@type'] ) {
-							return $this->parseEvent( $graph_item, $source_url );
+							$parsed = $this->parseEvent( $graph_item, $source_url );
+							if ( null !== $parsed ) {
+								$events[] = $parsed;
+							}
 						}
 					}
 				}
 			}
 		}
 
-		return null;
+		return $events;
 	}
 
 	private function isList( array $data ): bool {

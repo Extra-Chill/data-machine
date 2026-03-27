@@ -33,13 +33,17 @@ class MicrodataExtractor extends BaseExtractor {
 			return array();
 		}
 
-		$event = $this->parseEventElement( $xpath, $event_elements->item( 0 ) );
+		$events = array();
 
-		if ( empty( $event['title'] ) || empty( $event['startDate'] ) ) {
-			return array();
+		for ( $i = 0; $i < $event_elements->length; $i++ ) {
+			$event = $this->parseEventElement( $xpath, $event_elements->item( $i ) );
+
+			if ( ! empty( $event['title'] ) && ! empty( $event['startDate'] ) ) {
+				$events[] = $event;
+			}
 		}
 
-		return array( $event );
+		return $events;
 	}
 
 	public function getMethod(): string {
