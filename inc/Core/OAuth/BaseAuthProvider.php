@@ -134,6 +134,21 @@ abstract class BaseAuthProvider {
 	}
 
 	/**
+	 * Get the authenticated username for this provider.
+	 *
+	 * All providers should store username under the canonical 'username'
+	 * key in account data. Override only if the provider stores it
+	 * elsewhere (e.g. in config rather than account).
+	 *
+	 * @since 0.2.7
+	 * @return string|null Username or null if not available
+	 */
+	public function get_username(): ?string {
+		$account = $this->get_account();
+		return ! empty( $account['username'] ) ? $account['username'] : null;
+	}
+
+	/**
 	 * Get account details for display (Optional)
 	 *
 	 * @return array|null Account details or null
