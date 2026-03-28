@@ -367,5 +367,4 @@ class UpdateStep extends Step {
 
 		return $results;
 	}
-
 }

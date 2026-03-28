@@ -11,6 +11,7 @@
 namespace DataMachine\Api\Pipelines;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;

@@ -470,4 +470,8 @@ class FlowScheduling {
 
 		return true;
 	}
+
+	public function __construct() {
+		add_action('rest_api_init', array( $this, 'rest_api_init' ));
+	}
 }

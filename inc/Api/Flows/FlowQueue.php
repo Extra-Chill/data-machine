@@ -12,6 +12,7 @@ namespace DataMachine\Api\Flows;
 
 use DataMachine\Abilities\PermissionHelper;
 use WP_REST_Server;
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;

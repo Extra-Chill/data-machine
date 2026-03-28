@@ -123,7 +123,10 @@ class ChatOrchestrator {
 
 		if ( ! empty( $attachments ) ) {
 			$content    = ConversationManager::buildMultiModalContent( $message, $attachments );
-			$metadata   = array( 'type' => 'multimodal', 'attachments' => $attachments );
+			$metadata   = array(
+				'type'        => 'multimodal',
+				'attachments' => $attachments,
+			);
 			$messages[] = ConversationManager::buildConversationMessage( 'user', $content, $metadata );
 		} else {
 			$messages[] = ConversationManager::buildConversationMessage( 'user', $message, array( 'type' => 'text' ) );
@@ -610,8 +613,8 @@ class ChatOrchestrator {
 				$agent_id = datamachine_resolve_or_create_agent_id( $user_id );
 			}
 
-			$resolver     = new ToolPolicyResolver();
-			$all_tools    = $resolver->resolve( array(
+			$resolver       = new ToolPolicyResolver();
+			$all_tools      = $resolver->resolve( array(
 				'context'  => ToolPolicyResolver::CONTEXT_CHAT,
 				'agent_id' => $agent_id,
 			) );

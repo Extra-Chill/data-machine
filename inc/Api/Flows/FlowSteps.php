@@ -15,6 +15,7 @@ use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\FlowStepAbilities;
 use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Abilities\StepTypeAbilities;
+use DataMachine\Api\Traits\HasRegister;
 
 
 if ( ! defined( 'WPINC' ) ) {

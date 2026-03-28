@@ -14,6 +14,7 @@ namespace DataMachine\Api;
 use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Abilities\StepTypeAbilities;
 use WP_REST_Server;
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
