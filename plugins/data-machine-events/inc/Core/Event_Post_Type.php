@@ -109,6 +109,7 @@ class Event_Post_Type {
 		add_filter( 'manage_edit-' . self::POST_TYPE . '_sortable_columns', array( __CLASS__, 'sortable_event_date_column' ) );
 		add_action( 'pre_get_posts', array( __CLASS__, 'sort_by_event_date' ) );
 		add_action( 'pre_get_posts', array( __CLASS__, 'prevent_taxonomy_archive_404' ) );
+		add_filter( 'redirect_canonical', array( __CLASS__, 'prevent_paged_canonical_redirect' ), 10, 2 );
 		add_action( 'wp', array( __CLASS__, 'fix_taxonomy_archive_404' ) );
 	}
 
@@ -153,6 +154,40 @@ class Event_Post_Type {
 				return;
 			}
 		}
+	}
+
+	/**
+	 * Prevent canonical redirect from stripping ?paged on event taxonomy archives.
+	 *
+	 * WordPress's redirect_canonical() sees that the main query resolved to
+	 * page 1 (because prevent_taxonomy_archive_404 resets paged) and tries
+	 * to strip the ?paged parameter. But the Calendar block needs ?paged to
+	 * know which page to display. Disable the redirect when paged is set on
+	 * an event taxonomy archive.
+	 *
+	 * @param string $redirect_url  The URL WordPress wants to redirect to.
+	 * @param string $requested_url The original requested URL.
+	 * @return string|false The redirect URL, or false to cancel the redirect.
+	 */
+	public static function prevent_paged_canonical_redirect( $redirect_url, $requested_url ) {
+		if ( is_admin() ) {
+			return $redirect_url;
+		}
+
+		// Only intervene when paged is present in the request.
+		if ( empty( $_GET['paged'] ) ) {
+			return $redirect_url;
+		}
+
+		// Check if this is an event taxonomy archive.
+		$event_taxonomies = get_object_taxonomies( self::POST_TYPE );
+		foreach ( $event_taxonomies as $taxonomy ) {
+			if ( get_query_var( $taxonomy ) ) {
+				return false;
+			}
+		}
+
+		return $redirect_url;
 	}
 
 	/**
