@@ -145,6 +145,11 @@ class Event_Post_Type {
 				$query->set( 'posts_per_page', 1 );
 				$query->set( 'fields', 'ids' );
 				$query->set( 'no_found_rows', true );
+
+				// Reset paged to 1 so WordPress doesn't 404 on paginated
+				// requests. The calendar block reads the real page number
+				// from $_GET['paged'] independently.
+				$query->set( 'paged', 1 );
 				return;
 			}
 		}
@@ -175,7 +180,12 @@ class Event_Post_Type {
 		foreach ( $event_taxonomies as $taxonomy ) {
 			if ( ! empty( $wp_query->query[ $taxonomy ] ) ) {
 				// Verify the term actually exists.
-				$term = get_term_by( 'slug', $wp_query->query[ $taxonomy ], $taxonomy );
+				// For hierarchical taxonomies the query var contains the
+				// full path (e.g. usa/texas/houston) but the DB slug is
+				// just the leaf segment (houston). Use basename() to
+				// extract the leaf slug for lookup.
+				$slug = basename( $wp_query->query[ $taxonomy ] );
+				$term = get_term_by( 'slug', $slug, $taxonomy );
 				if ( $term && ! is_wp_error( $term ) ) {
 					$wp_query->is_404  = false;
 					$wp_query->is_tax  = true;
