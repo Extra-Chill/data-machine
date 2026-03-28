@@ -155,6 +155,7 @@ class UniversalWebScraper extends EventImportHandler {
 			new ElfsightEventsExtractor(),
 			new EventbriteExtractor(),
 			new JsonLdExtractor(),
+			new GenericHtmlEventsExtractor(),
 			new WordPressExtractor(),
 			new PrekindleExtractor(),
 			new WixEventsExtractor(),
