@@ -110,6 +110,12 @@ function datamachine_socials_bootstrap() {
 	// Reddit (Fetch)
 	new \DataMachineSocials\Handlers\Reddit\Reddit();
 
+	// Register task handlers for DM Task System.
+	add_filter( 'datamachine_tasks', function ( array $tasks ): array {
+		$tasks['social_cross_post'] = \DataMachineSocials\Tasks\SocialCrossPostTask::class;
+		return $tasks;
+	} );
+
 	// Register image generation templates
 	add_filter( 'datamachine/image_generation/templates', function ( array $templates ): array {
 		$templates['quote_card'] = \DataMachineSocials\ImageGeneration\Templates\QuoteCard::class;
