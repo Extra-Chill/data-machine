@@ -21,6 +21,8 @@ use DataMachine\Core\FilesRepository\DailyMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Core\FilesRepository\FilesystemHelper;
 use DataMachine\Engine\AI\MemoryFileRegistry;
+use DataMachine\Abilities\Traits\HasCheckPermission;
+use DataMachine\Abilities\File\FlowFileAbilities;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -348,23 +350,23 @@ class AgentFileAbilities {
 			'agent_id' => (int) ( $input['agent_id'] ?? 0 ),
 			'user_id'  => $user_id,
 		);
-		$contexts_dir = $dm->get_contexts_directory( $agent_context );
+		$contexts_dir  = $dm->get_contexts_directory( $agent_context );
 
 		if ( is_dir( $contexts_dir ) ) {
 			foreach ( glob( trailingslashit( $contexts_dir ) . '*.md' ) as $filepath ) {
 				$filename = basename( $filepath );
 				$slug     = pathinfo( $filename, PATHINFO_FILENAME );
 				$files[]  = array(
-					'filename'    => $filename,
-					'size'        => filesize( $filepath ),
-					'modified'    => gmdate( 'c', filemtime( $filepath ) ),
-					'type'        => 'context',
-					'layer'       => 'context',
-					'protected'   => false,
-					'editable'    => true,
-					'registered'  => false,
-					'label'       => ucfirst( $slug ) . ' Context',
-					'description' => "Context-scoped instructions loaded when execution context is '{$slug}'.",
+					'filename'     => $filename,
+					'size'         => filesize( $filepath ),
+					'modified'     => gmdate( 'c', filemtime( $filepath ) ),
+					'type'         => 'context',
+					'layer'        => 'context',
+					'protected'    => false,
+					'editable'     => true,
+					'registered'   => false,
+					'label'        => ucfirst( $slug ) . ' Context',
+					'description'  => "Context-scoped instructions loaded when execution context is '{$slug}'.",
 					'context_slug' => $slug,
 				);
 			}

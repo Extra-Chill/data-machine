@@ -102,7 +102,7 @@ Modal state is also held in the UI store (`activeModal`, `modalData`) but is not
 
 The Pipelines UI calls REST endpoints through `inc/Core/Admin/Pages/Pipelines/assets/react/utils/api.js` (a wrapper around `@wordpress/api-fetch` that reads the nonce/namespace from `window.dataMachineConfig`).
 
-For the authoritative list of endpoints used by the UI, refer to `inc/Core/Admin/Pages/Pipelines/assets/react/utils/api.js` and the PHP REST controllers under `data-machine/inc/Api/`.
+For the authoritative list of endpoints used by the UI, refer to `inc/Core/Admin/Pages/Pipelines/assets/react/utils/api.js` and the PHP REST controllers under `inc/Api/`.
 
 ### Benefits of React Architecture
 

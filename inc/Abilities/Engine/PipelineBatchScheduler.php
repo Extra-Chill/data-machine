@@ -318,8 +318,8 @@ class PipelineBatchScheduler {
 		// its last step, ExecuteStepAbility reads these to mark the item as
 		// processed. Previously set by FetchHandler::onItemProcessed() on the
 		// parent, but now the fetch step no longer marks items eagerly.
-		$item_identifier   = $single_packet['metadata']['item_identifier'] ?? null;
-		$source_type = $single_packet['metadata']['source_type'] ?? null;
+		$item_identifier = $single_packet['metadata']['item_identifier'] ?? null;
+		$source_type     = $single_packet['metadata']['source_type'] ?? null;
 		if ( ! empty( $item_identifier ) ) {
 			$child_engine['item_identifier'] = $item_identifier;
 		}

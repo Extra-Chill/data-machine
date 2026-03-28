@@ -13,6 +13,8 @@
 namespace DataMachine\Core\OAuth;
 
 use DataMachine\Core\HttpClient;
+use DataMachine\Core\OAuth\OAuth1Handler;
+use DataMachine\Core\OAuth\OAuth1Handler;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;

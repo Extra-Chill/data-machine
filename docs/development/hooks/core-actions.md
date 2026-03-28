@@ -2,7 +2,6 @@
 
 Comprehensive reference for all WordPress actions used by Data Machine for pipeline execution, data processing, and system operations.
 
-**Note**: Most core operations use the Abilities API (`DataMachine\Abilities`) for direct method calls. These actions remain primarily for extensibility and backward compatibility.
 
 ## Abilities API Integration
 
@@ -364,4 +363,3 @@ Input data is sanitized before processing:
 $pipeline_name = sanitize_text_field($data['pipeline_name'] ?? '');
 $config_json = wp_json_encode($config_data);
 ```
-

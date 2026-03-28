@@ -13,6 +13,7 @@ namespace DataMachine\Abilities\Publish;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\WordPress\PostTracking;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 

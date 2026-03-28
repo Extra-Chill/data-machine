@@ -19,6 +19,7 @@ namespace DataMachine\Abilities\Analytics;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
+use DataMachine\Abilities\Analytics\Traits\HasGetConfig;
 
 defined( 'ABSPATH' ) || exit;
 
