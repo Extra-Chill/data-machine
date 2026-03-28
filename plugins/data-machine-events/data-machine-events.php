@@ -55,6 +55,19 @@ if ( ! function_exists( 'data_machine_events_sanitize_query_params' ) ) {
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/meta-storage.php';
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/EventDatesTable.php';
 
+// Global alias — meta-storage.php is namespaced so this makes the public API accessible globally.
+if ( ! function_exists( 'datamachine_get_event_dates' ) ) {
+	/**
+	 * Get event dates from the dedicated event_dates table.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return object|null Object with start_datetime and end_datetime, or null.
+	 */
+	function datamachine_get_event_dates( int $post_id ): ?object {
+		return \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+	}
+}
+
 // Load performance optimizations (transient-cached last-modified queries).
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/performance.php';
 \DataMachineEvents\Core\cache_last_post_time();
