@@ -242,6 +242,15 @@ class SquarespaceExtractor extends BaseExtractor {
 					}
 				}
 
+				// 3. Probe common event collection paths via JSON API.
+				// Squarespace events are often on a separate collection page
+				// (e.g. /events, /shows) that the homepage doesn't reference
+				// via Summary Blocks.
+				$probed = $this->probeEventCollectionPaths( $source_url );
+				if ( ! empty( $probed ) ) {
+					return $probed;
+				}
+
 				return $data;
 			}
 		}
@@ -327,6 +336,65 @@ class SquarespaceExtractor extends BaseExtractor {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Probe common Squarespace event collection paths via JSON API.
+	 *
+	 * When the source URL's JSON has no upcoming/past arrays, this method
+	 * tries common paths like /events, /shows, /calendar to find the actual
+	 * events collection. Returns the first collection that has events.
+	 *
+	 * @param string $source_url Original source URL.
+	 * @return array JSON data from the first matching collection, or empty array.
+	 */
+	private function probeEventCollectionPaths( string $source_url ): array {
+		$parsed   = wp_parse_url( $source_url );
+		$base_url = ( $parsed['scheme'] ?? 'https' ) . '://' . ( $parsed['host'] ?? '' );
+		$current  = rtrim( $parsed['path'] ?? '', '/' );
+
+		$paths = array(
+			'/events',
+			'/shows',
+			'/calendar',
+			'/upcoming-events',
+			'/upcoming-shows',
+			'/live-events',
+			'/live-music',
+			'/event-listings',
+			'/schedule',
+			'/music',
+		);
+
+		foreach ( $paths as $path ) {
+			if ( rtrim( $path, '/' ) === $current ) {
+				continue;
+			}
+
+			$test_url = $base_url . $path . '?format=json';
+			$response = \DataMachine\Core\HttpClient::get(
+				$test_url,
+				array(
+					'timeout' => 10,
+					'context' => 'Squarespace Extractor Collection Probe',
+				)
+			);
+
+			if ( ! $response['success'] || empty( $response['data'] ) ) {
+				continue;
+			}
+
+			$test_data = json_decode( $response['data'], true );
+			if ( json_last_error() !== JSON_ERROR_NONE ) {
+				continue;
+			}
+
+			if ( ! empty( $test_data['upcoming'] ) || ! empty( $test_data['past'] ) ) {
+				return $test_data;
+			}
+		}
+
+		return array();
 	}
 
 	public function getMethod(): string {
