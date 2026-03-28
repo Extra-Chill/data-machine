@@ -77,6 +77,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\Nocodeflo
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\ShowareExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\ShowtimeExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\EventbriteExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\GenericHtmlEventsExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\VisionExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SquareOnlineExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\VisionExtractionProcessor;
