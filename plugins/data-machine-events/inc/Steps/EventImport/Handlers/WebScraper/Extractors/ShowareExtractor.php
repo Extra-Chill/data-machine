@@ -113,10 +113,10 @@ class ShowareExtractor extends BaseExtractor {
 	 * Fetch the main page to establish session cookies.
 	 *
 	 * Showare's API proxy requires session cookies from the initial page load.
-	 * We make a GET request and capture the response cookies.
+	 * We make a GET request and capture the response cookies via wp_remote_retrieve_cookies().
 	 *
 	 * @param string $base_url Base URL of the Showare site.
-	 * @return array Cookies array for use in subsequent requests.
+	 * @return array WP_Http_Cookie objects for use in subsequent requests.
 	 */
 	private function getSessionCookies( string $base_url ): array {
 		if ( ! class_exists( '\\DataMachine\\Core\\HttpClient' ) ) {
@@ -131,18 +131,19 @@ class ShowareExtractor extends BaseExtractor {
 			)
 		);
 
-		if ( empty( $result['success'] ) ) {
+		if ( empty( $result['success'] ) || empty( $result['response'] ) ) {
 			return array();
 		}
 
-		return $result['cookies'] ?? array();
+		// Extract cookies from the raw WP HTTP response.
+		return wp_remote_retrieve_cookies( $result['response'] );
 	}
 
 	/**
 	 * Fetch performances from the Showare API proxy.
 	 *
 	 * @param string $base_url        Base URL.
-	 * @param array  $session_cookies Session cookies from initial page load.
+	 * @param array  $session_cookies WP_Http_Cookie objects from initial page load.
 	 * @return array Parsed API response data or empty array.
 	 */
 	private function fetchPerformances( string $base_url, array $session_cookies ): array {
@@ -166,11 +167,15 @@ class ShowareExtractor extends BaseExtractor {
 			)
 		);
 
-		if ( empty( $result['success'] ) || empty( $result['body'] ) ) {
+		if ( empty( $result['success'] ) ) {
 			return array();
 		}
 
-		$body = $result['body'];
+		$body = $result['data'] ?? $result['body'] ?? '';
+		if ( empty( $body ) ) {
+			return array();
+		}
+
 		$data = json_decode( $body, true );
 
 		if ( json_last_error() !== JSON_ERROR_NONE ) {
