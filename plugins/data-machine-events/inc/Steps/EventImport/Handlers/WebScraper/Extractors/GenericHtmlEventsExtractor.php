@@ -30,13 +30,13 @@ class GenericHtmlEventsExtractor extends BaseExtractor {
 	 * Matched in order — first match wins.
 	 */
 	private const CONTAINER_PATTERNS = array(
-		// Cactus Club / custom WP themes.
-		'eventEntryInner'   => '/<div[^>]+class="[^"]*eventEntryInner[^"]*"[^>]*>(.*?)<\/(?:div|article)>\s*<\/(?:div|article)>/is',
-		// Generic event-entry patterns.
-		'event-entry'       => '/<(?:div|article|li)[^>]+class="[^"]*event-entry[^"]*"[^>]*>(.*?)<\/(?:div|article|li)>/is',
-		'event-item'        => '/<(?:div|article|li)[^>]+class="[^"]*event-item[^"]*"[^>]*>(.*?)<\/(?:div|article|li)>/is',
-		'event-card'        => '/<(?:div|article|li)[^>]+class="[^"]*event-card[^"]*"[^>]*>(.*?)<\/(?:div|article|li)>/is',
-		'event-listing'     => '/<(?:div|article|li)[^>]+class="[^"]*event-listing[^"]*"[^>]*>(.*?)<\/(?:div|article|li)>/is',
+		// Cactus Club / custom WP themes — uses <!-- eof eventEntryInner --> comment as delimiter.
+		'eventEntryInner'   => '/<div[^>]+class="[^"]*eventEntryInner[^"]*"[^>]*>(.*?)<!-- eof eventEntryInner -->/is',
+		// Generic event-entry patterns — use </article> or next opening tag as delimiter.
+		'event-entry'       => '/<(?:div|article|li)[^>]+class="[^"]*event-entry[^"]*"[^>]*>(.*?)<\/(?:article|li)>/is',
+		'event-item'        => '/<(?:div|article|li)[^>]+class="[^"]*event-item[^"]*"[^>]*>(.*?)<\/(?:article|li)>/is',
+		'event-card'        => '/<(?:div|article|li)[^>]+class="[^"]*event-card[^"]*"[^>]*>(.*?)<\/(?:article|li)>/is',
+		'event-listing'     => '/<(?:div|article|li)[^>]+class="[^"]*event-listing[^"]*"[^>]*>(.*?)<\/(?:article|li)>/is',
 	);
 
 	/**
@@ -79,8 +79,22 @@ class GenericHtmlEventsExtractor extends BaseExtractor {
 	private const MIN_CONTAINERS = 3;
 
 	public function canExtract( string $html ): bool {
+		// Quick string check before running regexes.
+		$has_event_classes = (
+			substr_count( $html, 'eventEntryInner' ) >= self::MIN_CONTAINERS
+			|| substr_count( $html, 'event-entry' ) >= self::MIN_CONTAINERS
+			|| substr_count( $html, 'event-item' ) >= self::MIN_CONTAINERS
+			|| substr_count( $html, 'event-card' ) >= self::MIN_CONTAINERS
+			|| substr_count( $html, 'event-listing' ) >= self::MIN_CONTAINERS
+		);
+
+		if ( ! $has_event_classes ) {
+			return false;
+		}
+
+		// Confirm at least one container pattern actually matches.
 		foreach ( self::CONTAINER_PATTERNS as $pattern ) {
-			if ( preg_match_all( $pattern, $html, $matches ) && count( $matches[1] ) >= self::MIN_CONTAINERS ) {
+			if ( preg_match( $pattern, $html ) ) {
 				return true;
 			}
 		}
