@@ -2,6 +2,25 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.25.0] - 2026-03-28
+
+### Added
+- add EventbriteExtractor for organizer page scraping
+
+### Changed
+- Add Nocodeflow and Showare extractors for new market coverage
+- Reduce cluster aggressiveness: radius 40→25, disable at zoom 14 instead of 16
+- Optimize map block: marker clustering, SQL bounds filtering, marker diffing, API limit
+- Centralize event date queries into UpcomingFilter + eliminate SQL_CALC_FOUND_ROWS
+- Prevent canonical redirect from stripping ?paged on taxonomy archives
+
+### Fixed
+- Fix Showare extractor cookie handling to use wp_remote_retrieve_cookies
+- Fix JSON API paginator failing to advance past page 2
+- Fix pagination 404 on discovery and taxonomy archive pages
+- add datamachine_event_taxonomy_processed action after taxonomy assignment
+- JsonLdExtractor and MicrodataExtractor now return ALL events
+
 ## [0.24.3] - 2026-03-26
 
 ### Fixed
