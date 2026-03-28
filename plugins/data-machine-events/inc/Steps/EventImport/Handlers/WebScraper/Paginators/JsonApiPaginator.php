@@ -38,6 +38,9 @@ class JsonApiPaginator implements PaginatorInterface {
 	/**
 	 * Get the next page URL from JSON pagination metadata.
 	 *
+	 * Falls back to extracting the current page from the URL query string
+	 * when the JSON response doesn't include a `page` key (e.g. Tribe Events v1 API).
+	 *
 	 * @param string $current_url Current page URL.
 	 * @param string $content     JSON response content.
 	 * @return string|null Next page URL, or null if no more pages.
@@ -49,7 +52,7 @@ class JsonApiPaginator implements PaginatorInterface {
 			return null;
 		}
 
-		$current_page = (int) ( $data['page'] ?? 1 );
+		$current_page = isset( $data['page'] ) ? (int) $data['page'] : $this->getPageFromUrl( $current_url );
 		$total_pages  = (int) ( $data['total_pages'] ?? 1 );
 
 		if ( $current_page >= $total_pages ) {
@@ -66,6 +69,24 @@ class JsonApiPaginator implements PaginatorInterface {
 	 */
 	public function getMethod(): string {
 		return 'json_api';
+	}
+
+	/**
+	 * Extract the current page number from a URL's query string.
+	 *
+	 * @param string $url URL to extract page from.
+	 * @return int Page number (defaults to 1 if not present).
+	 */
+	private function getPageFromUrl( string $url ): int {
+		$parsed = wp_parse_url( $url );
+		if ( empty( $parsed['query'] ) ) {
+			return 1;
+		}
+
+		$query = array();
+		parse_str( $parsed['query'], $query );
+
+		return isset( $query['page'] ) ? (int) $query['page'] : 1;
 	}
 
 	/**
