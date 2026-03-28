@@ -402,11 +402,11 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 
 		// Initialize marker cluster group.
 		const clusterGroup = L.markerClusterGroup( {
-			maxClusterRadius: 40,
+			maxClusterRadius: 25,
 			spiderfyOnMaxZoom: true,
 			showCoverageOnHover: false,
 			zoomToBoundsOnClick: true,
-			disableClusteringAtZoom: 16,
+			disableClusteringAtZoom: 14,
 			chunkedLoading: true,
 			chunkInterval: 100,
 			chunkDelay: 10,
