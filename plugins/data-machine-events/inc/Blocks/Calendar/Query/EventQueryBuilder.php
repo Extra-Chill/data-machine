@@ -118,11 +118,7 @@ class EventQueryBuilder {
 						? $date_start . ' ' . $time_start
 						: $date_start . ' 00:00:00';
 
-					$clauses['where'] .= $wpdb->prepare(
-						' AND (ed.start_datetime >= %s OR ed.end_datetime >= %s)',
-						$start_datetime,
-						$start_datetime
-					);
+					$clauses['where'] .= ' AND ' . UpcomingFilter::range_start_where( $start_datetime );
 				}
 
 				if ( ! empty( $date_end ) ) {

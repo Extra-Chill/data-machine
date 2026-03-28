@@ -15,8 +15,8 @@
 namespace DataMachineEvents\Abilities;
 
 use DataMachineEvents\Blocks\Calendar\Geo_Query;
+use DataMachineEvents\Blocks\Calendar\Query\UpcomingFilter;
 use DataMachineEvents\Core\Event_Post_Type;
-use DataMachineEvents\Core\EventDatesTable;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -353,8 +353,8 @@ class FilterAbilities {
 	/**
 	 * Get event counts for all terms in a taxonomy with a single query.
 	 *
-	 * Uses direct SQL with EventDatesTable for date filtering instead of
-	 * DateFilter, since this method does GROUP BY with cross-taxonomy filtering.
+	 * Uses UpcomingFilter for date filtering SQL fragments.
+	 * This method does GROUP BY with cross-taxonomy filtering.
 	 *
 	 * @param string     $taxonomy_slug     Taxonomy to count events for.
 	 * @param array      $date_context      Optional date filtering context.
@@ -377,19 +377,22 @@ class FilterAbilities {
 			$show_past        = ! empty( $date_context['past'] ) && '1' === $date_context['past'];
 			$current_datetime = current_time( 'mysql' );
 
-			$ed_table = EventDatesTable::table_name();
-			$joins   .= " INNER JOIN {$ed_table} ed ON p.ID = ed.post_id";
-
 			if ( ! empty( $date_start ) && ! empty( $date_end ) ) {
-				$where_clauses .= ' AND (ed.start_datetime >= %s AND ed.start_datetime <= %s)';
+				$filter = UpcomingFilter::date_range_sql( false, 'p.ID' );
+				$joins         .= ' ' . $filter['joins'];
+				$where_clauses .= ' AND ' . $filter['where'];
 				$params[]       = $date_start . ' 00:00:00';
 				$params[]       = $date_end . ' 23:59:59';
 			} elseif ( $show_past ) {
-				$where_clauses .= ' AND (ed.start_datetime < %s AND (ed.end_datetime < %s OR ed.end_datetime IS NULL))';
+				$filter = UpcomingFilter::past_sql( false, 'p.ID' );
+				$joins         .= ' ' . $filter['joins'];
+				$where_clauses .= ' AND ' . $filter['where'];
 				$params[]       = $current_datetime;
 				$params[]       = $current_datetime;
 			} else {
-				$where_clauses .= ' AND (ed.start_datetime >= %s OR ed.end_datetime >= %s)';
+				$filter = UpcomingFilter::upcoming_sql( false, 'p.ID' );
+				$joins         .= ' ' . $filter['joins'];
+				$where_clauses .= ' AND ' . $filter['where'];
 				$params[]       = $current_datetime;
 				$params[]       = $current_datetime;
 			}

@@ -5,16 +5,19 @@
  * Single source of truth for the condition that determines whether an
  * event is upcoming or past. Exposes the logic in two formats:
  *
- *  - meta_query():    WP_Query meta_query arrays (for EventQueryBuilder)
- *  - sql():           Raw SQL joins + WHERE fragments (for Taxonomy_Helper,
- *                     PageBoundary, calendar-stats, and any other raw query)
+ *  - apply_*_filter(): posts_clauses hooks for WP_Query consumers
+ *  - *_sql():          Raw SQL joins + WHERE fragments for raw queries
  *
  * Definition:
  *   upcoming = start >= $datetime  OR  end >= $datetime
  *   past     = start <  $datetime  AND (end < $datetime OR end IS NULL)
  *
+ * All queries delegate to UpcomingFilter as the single source of truth
+ * for event date conditions.
+ *
  * @package DataMachineEvents\Blocks\Calendar\Query
  * @since   0.19.0
+ * @see     UpcomingFilter
  */
 
 namespace DataMachineEvents\Blocks\Calendar\Query;
@@ -31,7 +34,8 @@ class DateFilter {
 	 * Apply "upcoming" date filter via posts_clauses.
 	 *
 	 * Adds a JOIN on the event_dates table and a WHERE clause that selects
-	 * events whose start_datetime >= $datetime OR end_datetime >= $datetime.
+ 	 * events whose start_datetime >= $datetime OR end_datetime >= $datetime.
+	 * Delegates to UpcomingFilter for the WHERE clause.
 	 *
 	 * @param string $datetime MySQL datetime to compare against.
 	 * @return callable Filter callback (must be removed after WP_Query runs).
@@ -45,12 +49,7 @@ class DateFilter {
 				$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
 			}
 
-			$date_where = $wpdb->prepare(
-				'(ed.start_datetime >= %s OR ed.end_datetime >= %s)',
-				$datetime,
-				$datetime
-			);
-			$clauses['where'] .= " AND {$date_where}";
+			$clauses['where'] .= ' AND ' . UpcomingFilter::upcoming_where( $datetime );
 
 			return $clauses;
 		};
@@ -74,12 +73,7 @@ class DateFilter {
 				$clauses['join'] .= " INNER JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
 			}
 
-			$date_where = $wpdb->prepare(
-				'(ed.start_datetime < %s AND (ed.end_datetime < %s OR ed.end_datetime IS NULL))',
-				$datetime,
-				$datetime
-			);
-			$clauses['where'] .= " AND {$date_where}";
+			$clauses['where'] .= ' AND ' . UpcomingFilter::past_where( $datetime );
 
 			return $clauses;
 		};
@@ -119,23 +113,14 @@ class DateFilter {
 	/**
 	 * Raw SQL fragments for upcoming events.
 	 *
-	 * Uses ed.post_status = 'publish' to avoid joining the posts table.
-	 * Set $include_status to false if the caller already joins posts and
-	 * filters post_status there (e.g. WP_Query consumers).
+	 * Delegates to UpcomingFilter for index-optimized UNION ALL query.
 	 *
 	 * @param bool   $include_status Whether to include post_status filter. Default true.
 	 * @param string $join_column    Column to join ed.post_id on. Default 'p.ID'.
 	 * @return array{joins: string, where: string, param_count: int}
 	 */
 	public static function upcoming_sql( bool $include_status = true, string $join_column = 'p.ID' ): array {
-		$table = EventDatesTable::table_name();
-		$status_clause = $include_status ? " AND ed.post_status = 'publish'" : '';
-
-		return array(
-			'joins'       => "INNER JOIN {$table} ed ON {$join_column} = ed.post_id",
-			'where'       => "(ed.start_datetime >= %s OR ed.end_datetime >= %s){$status_clause}",
-			'param_count' => 2,
-		);
+		return UpcomingFilter::upcoming_sql( $include_status, $join_column );
 	}
 
 	/**
@@ -146,14 +131,7 @@ class DateFilter {
 	 * @return array{joins: string, where: string, param_count: int}
 	 */
 	public static function past_sql( bool $include_status = true, string $join_column = 'p.ID' ): array {
-		$table = EventDatesTable::table_name();
-		$status_clause = $include_status ? " AND ed.post_status = 'publish'" : '';
-
-		return array(
-			'joins'       => "INNER JOIN {$table} ed ON {$join_column} = ed.post_id",
-			'where'       => "(ed.start_datetime < %s AND (ed.end_datetime < %s OR ed.end_datetime IS NULL)){$status_clause}",
-			'param_count' => 2,
-		);
+		return UpcomingFilter::past_sql( $include_status, $join_column );
 	}
 
 	/**
@@ -164,13 +142,6 @@ class DateFilter {
 	 * @return array{joins: string, where: string, param_count: int}
 	 */
 	public static function date_range_sql( bool $include_status = true, string $join_column = 'p.ID' ): array {
-		$table = EventDatesTable::table_name();
-		$status_clause = $include_status ? " AND ed.post_status = 'publish'" : '';
-
-		return array(
-			'joins'       => "INNER JOIN {$table} ed ON {$join_column} = ed.post_id",
-			'where'       => "(ed.start_datetime >= %s AND ed.start_datetime <= %s){$status_clause}",
-			'param_count' => 2,
-		);
+		return UpcomingFilter::date_range_sql( $include_status, $join_column );
 	}
 }

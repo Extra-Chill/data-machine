@@ -18,6 +18,7 @@ namespace DataMachineEvents\Abilities;
 use WP_Query;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventDatesTable;
+use DataMachineEvents\Blocks\Calendar\Query\UpcomingFilter;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -186,6 +187,7 @@ class EventDateQueryAbilities {
 			'post_type'      => Event_Post_Type::POST_TYPE,
 			'post_status'    => $status,
 			'posts_per_page' => $per_page,
+			'no_found_rows'  => true, // Avoid deprecated SQL_CALC_FOUND_ROWS; use separate count.
 			'orderby'        => 'none', // Ordering via posts_clauses.
 		);
 
@@ -261,6 +263,11 @@ class EventDateQueryAbilities {
 		add_filter( 'posts_clauses', $clauses_filter );
 		$filters[] = $clauses_filter;
 
+		// For count-only mode, run a lightweight count query instead.
+		if ( 'count' === $fields ) {
+			$query_args['no_found_rows'] = false; // Need found_posts for count mode.
+		}
+
 		// Execute query.
 		$query = new WP_Query( $query_args );
 
@@ -270,13 +277,19 @@ class EventDateQueryAbilities {
 		}
 
 		$posts = $query->posts;
+		$total = $query->post_count;
+
 		if ( 'count' === $fields ) {
 			$posts = array();
+			$total = $query->found_posts;
+		} elseif ( -1 === $per_page ) {
+			// When fetching all posts, post_count IS the total.
+			$total = $query->post_count;
 		}
 
 		return array(
 			'posts'      => $posts,
-			'total'      => $query->found_posts,
+			'total'      => $total,
 			'post_count' => $query->post_count,
 		);
 	}
@@ -321,17 +334,13 @@ class EventDateQueryAbilities {
 			if ( ! empty( $date_match ) ) {
 				$clauses['where'] .= $wpdb->prepare( ' AND DATE(ed.start_datetime) = %s', $date_match );
 			} elseif ( ! empty( $date_start ) || ! empty( $date_end ) ) {
-				// Explicit date range.
+				// Explicit date range — delegates to UpcomingFilter.
 				if ( ! empty( $date_start ) ) {
 					$start_dt = ! empty( $time_start )
 						? $date_start . ' ' . $time_start
 						: $date_start . ' 00:00:00';
 
-					$clauses['where'] .= $wpdb->prepare(
-						' AND (ed.start_datetime >= %s OR ed.end_datetime >= %s)',
-						$start_dt,
-						$start_dt
-					);
+					$clauses['where'] .= ' AND ' . UpcomingFilter::range_start_where( $start_dt );
 				}
 
 				if ( ! empty( $date_end ) ) {
@@ -342,29 +351,16 @@ class EventDateQueryAbilities {
 					$clauses['where'] .= $wpdb->prepare( ' AND ed.start_datetime <= %s', $end_dt );
 				}
 			} elseif ( 'upcoming' === $scope ) {
-				// Canonical upcoming: start_datetime >= now OR end_datetime >= now.
+				// Canonical upcoming — delegates to UpcomingFilter.
 				if ( $days_ahead > 0 ) {
 					$end_date = gmdate( 'Y-m-d 23:59:59', strtotime( "+{$days_ahead} days" ) );
-					$clauses['where'] .= $wpdb->prepare(
-						' AND (ed.start_datetime >= %s OR ed.end_datetime >= %s) AND ed.start_datetime <= %s',
-						$now,
-						$now,
-						$end_date
-					);
+					$clauses['where'] .= ' AND ' . UpcomingFilter::upcoming_bounded_where( $now, $end_date );
 				} else {
-					$clauses['where'] .= $wpdb->prepare(
-						' AND (ed.start_datetime >= %s OR ed.end_datetime >= %s)',
-						$now,
-						$now
-					);
+					$clauses['where'] .= ' AND ' . UpcomingFilter::upcoming_where( $now );
 				}
 			} elseif ( 'past' === $scope ) {
-				// Canonical past: start < now AND (end < now OR end IS NULL).
-				$clauses['where'] .= $wpdb->prepare(
-					' AND (ed.start_datetime < %s AND (ed.end_datetime < %s OR ed.end_datetime IS NULL))',
-					$now,
-					$now
-				);
+				// Canonical past — delegates to UpcomingFilter.
+				$clauses['where'] .= ' AND ' . UpcomingFilter::past_where( $now );
 			}
 			// 'all' scope — no date WHERE clause.
 
