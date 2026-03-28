@@ -9,29 +9,34 @@
  * 1. AEG/AXS JSON (aegwebprod.blob.core.windows.net)
  * 2. Red Rocks (redrocksonline.com)
  * 3. Freshtix (*.freshtix.com)
- * 4. Firebase Realtime Database (firebaseio.com)
- * 5. ICS Feed (direct .ics files, Tockify, Google Calendar exports)
- * 6. Embedded Calendar (Google Calendar iframe → ICS feed)
- * 7. DoStuff Media API (Waterloo Records, Do512)
+ * 4. Showare/accesso ticketing (swApi.js → apiproxy.asp → /v1/performances)
+ * 5. Firebase Realtime Database (firebaseio.com)
+ * 6. ICS Feed (direct .ics files, Tockify, Google Calendar exports)
+ * 7. Embedded Calendar (Google Calendar iframe → ICS feed)
  * 8. Squarespace context (Static.SQUARESPACE_CONTEXT)
  * 9. Craftpeak/Arryved (craft brewery CMS with Label theme)
  * 10. Dusk.fm/BeatGig venue calendar (data-beatgig-embed → __NEXT_DATA__)
  * 11. SpotHopper API (spothopperapp.com)
  * 12. Gigwell booking platform (gigwell-gigstream)
- * 13. Bandzoogle calendar
- * 14. GoDaddy website builder
- * 15. Timely Event Discovery (FullCalendar.js)
- * 16. Elfsight Events Calendar (shy.elfsight.com API)
- * 17. Eventbrite (organizer pages, individual event pages)
- * 18. Schema.org JSON-LD
- * 19. WordPress (Tribe Events, WP REST)
- * 19. Prekindle ticketing
- * 20. Wix Events JSON (wix-warmup-data)
- * 21. RHP Events WordPress plugin HTML
- * 22. OpenDate.io JSON
- * 23. Schema.org microdata
- * 24. AI-enhanced HTML pattern matching (Fallback)
- * 25. AI Vision flyer extraction (Final Fallback)
+ * 13. DoStuff Media API (Waterloo Records, Do512)
+ * 14. Nocodeflow calendar (Webflow + nocodeflow.net widget with data-date attributes)
+ * 15. Webflow CMS (w-dyn-item dynamic collection lists)
+ * 16. Showtime/Hybrid Framework (convention centers, arenas)
+ * 17. Bandzoogle calendar
+ * 18. GoDaddy website builder
+ * 19. Timely Event Discovery (FullCalendar.js)
+ * 20. Elfsight Events Calendar (shy.elfsight.com API)
+ * 21. Eventbrite (organizer pages, individual event pages)
+ * 22. Schema.org JSON-LD
+ * 23. WordPress (Tribe Events, WP REST)
+ * 24. Prekindle ticketing
+ * 25. Wix Events JSON (wix-warmup-data)
+ * 26. MusicItem CSS pattern (music__item/music__artist)
+ * 27. RHP Events WordPress plugin HTML
+ * 28. OpenDate.io JSON
+ * 29. Schema.org microdata
+ * 30. AI-enhanced HTML pattern matching (Fallback)
+ * 31. AI Vision flyer extraction (Final Fallback)
  *     - Square Online (__BOOTSTRAP_STATE__ JSON images)
  *     - Standard HTML <img> tag detection
  *
@@ -68,6 +73,8 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\DuskFmExt
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\IcsExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\DoStuffExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\WebflowExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\NocodeflowExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\ShowareExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\ShowtimeExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\EventbriteExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\VisionExtractor;
@@ -129,6 +136,7 @@ class UniversalWebScraper extends EventImportHandler {
 			new AegAxsExtractor(),
 			new RedRocksExtractor(),
 			new FreshtixExtractor(),
+			new ShowareExtractor(),
 			new FirebaseExtractor(),
 			new IcsExtractor(),
 			new EmbeddedCalendarExtractor(),
@@ -138,6 +146,7 @@ class UniversalWebScraper extends EventImportHandler {
 			new SpotHopperExtractor(),
 			new GigwellExtractor(),
 			new DoStuffExtractor(),
+			new NocodeflowExtractor(),
 			new WebflowExtractor(),
 			new ShowtimeExtractor(),
 			new BandzoogleExtractor(),
