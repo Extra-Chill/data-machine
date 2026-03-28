@@ -145,12 +145,17 @@ class Jobs {
             KEY flow_id (flow_id),
             KEY source (source),
             KEY parent_job_id (parent_job_id),
-            KEY user_id (user_id)
+            KEY user_id (user_id),
+            KEY idx_created_at (created_at),
+            KEY idx_flow_created (flow_id, created_at),
+            KEY idx_status_created (status(50), created_at),
+            KEY idx_source_created (source, created_at)
         ) $charset_collate;";
 
 		dbDelta( $sql );
 
 		self::migrate_columns( $table_name );
+		self::migrate_indexes( $table_name );
 
 		do_action(
 			'datamachine_log',
@@ -370,6 +375,70 @@ class Jobs {
 					array( 'table_name' => $table_name )
 				);
 			}
+		}
+	}
+
+	/**
+	 * Ensure performance indexes exist on the jobs table.
+	 *
+	 * dbDelta() is unreliable at adding indexes to existing tables, so this
+	 * method checks for each index via SHOW INDEX and adds any that are
+	 * missing. Safe to run on every activation/deploy.
+	 *
+	 * These indexes become critical once the jobs table grows past ~10k rows.
+	 * Without them, common queries (flow listing, status filtering, retention
+	 * cleanup, system task lookups) degrade from milliseconds to seconds.
+	 *
+	 * @param string $table_name Fully qualified table name.
+	 */
+	private static function migrate_indexes( string $table_name ): void {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		$existing = $wpdb->get_results( "SHOW INDEX FROM {$table_name}", ARRAY_A );
+		// phpcs:enable WordPress.DB.PreparedSQL
+
+		if ( empty( $existing ) ) {
+			return;
+		}
+
+		$index_names = array_unique( array_column( $existing, 'Key_name' ) );
+
+		$indexes_to_add = array(
+			'idx_created_at'     => '(created_at)',
+			'idx_flow_created'   => '(flow_id, created_at)',
+			'idx_status_created' => '(status(50), created_at)',
+			'idx_source_created' => '(source, created_at)',
+		);
+
+		$added = array();
+
+		foreach ( $indexes_to_add as $index_name => $index_def ) {
+			if ( in_array( $index_name, $index_names, true ) ) {
+				continue;
+			}
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table/index names from plugin constants, not user input.
+			$result = $wpdb->query( "ALTER TABLE {$table_name} ADD INDEX {$index_name} {$index_def}" );
+			// phpcs:enable WordPress.DB.PreparedSQL
+
+			if ( false !== $result ) {
+				$added[] = $index_name;
+			}
+		}
+
+		if ( ! empty( $added ) ) {
+			do_action(
+				'datamachine_log',
+				'info',
+				'Added performance indexes to jobs table',
+				array(
+					'table_name' => $table_name,
+					'indexes'    => $added,
+				)
+			);
 		}
 	}
 }
