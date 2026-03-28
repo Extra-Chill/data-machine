@@ -409,6 +409,12 @@ function datamachine_register_capabilities(): void {
 		$author->add_cap( 'datamachine_create_own_agent' );
 	}
 
+	$contributor = get_role( 'contributor' );
+	if ( $contributor ) {
+		$contributor->add_cap( 'datamachine_chat' );
+		$contributor->add_cap( 'datamachine_create_own_agent' );
+	}
+
 	$subscriber = get_role( 'subscriber' );
 	if ( $subscriber ) {
 		$subscriber->add_cap( 'datamachine_chat' );
@@ -433,7 +439,7 @@ function datamachine_remove_capabilities(): void {
 		'datamachine_create_own_agent',
 	);
 
-	$roles = array( 'administrator', 'editor', 'author', 'subscriber' );
+	$roles = array( 'administrator', 'editor', 'author', 'contributor', 'subscriber' );
 
 	foreach ( $roles as $role_name ) {
 		$role = get_role( $role_name );
