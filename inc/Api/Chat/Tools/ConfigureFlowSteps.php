@@ -222,21 +222,6 @@ class ConfigureFlowSteps extends BaseTool {
 		// 5. Global handler filter (no pipeline_id) - target all flows using this handler
 		if ( ! empty( $handler_slug ) ) {
 			// Validation: target_handler_slug requires valid handler
-			if ( ! empty( $target_handler_slug ) ) {
-				$ability = wp_get_ability( 'datamachine/validate-handler' );
-				if ( ! $ability ) {
-					return array(
-						'success'   => false,
-						'error'     => 'Handler validation ability not available',
-						'tool_name' => 'configure_flow_steps',
-					);
-				}
-				$validation_result = $ability->execute( array( 'handler_slug' => $target_handler_slug ) );
-				if ( is_wp_error( $validation_result ) || ! ( $validation_result['valid'] ?? false ) ) {
-					return $this->buildErrorResponse( "Target handler '{$target_handler_slug}' not found", 'configure_flow_steps' );
-				}
-			}
-
 			return $this->handleGlobalHandlerMode( $handler_slug, $step_type, $target_handler_slug, $field_map, $handler_config, $user_message, $validate_only );
 		}
 

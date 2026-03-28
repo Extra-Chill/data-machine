@@ -12,6 +12,7 @@
 namespace DataMachine\Abilities;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 

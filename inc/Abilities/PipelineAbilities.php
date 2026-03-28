@@ -19,6 +19,7 @@ use DataMachine\Abilities\Pipeline\UpdatePipelineAbility;
 use DataMachine\Abilities\Pipeline\DeletePipelineAbility;
 use DataMachine\Abilities\Pipeline\DuplicatePipelineAbility;
 use DataMachine\Abilities\Pipeline\ImportExportAbility;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -34,6 +35,7 @@ class PipelineAbilities {
 	private ImportExportAbility $import_export;
 
 	public function __construct() {
+		add_action('wp_abilities_api_init', array( $this, 'abilities_api_init' ));
 		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
 			return;
 		}

@@ -129,7 +129,7 @@ class ClientContextDirective {
 
 		$lines = array();
 		foreach ( $client_context as $key => $value ) {
-			$label = str_replace( '_', ' ', $key );
+			$label   = str_replace( '_', ' ', $key );
 			$lines[] = sprintf( '- %s: %s', $label, self::render_value( $value ) );
 		}
 
@@ -138,7 +138,7 @@ class ClientContextDirective {
 		}
 
 		$content = "# Current Client Context\n\n"
-			. "The user is interacting with you from a frontend interface. "
+			. 'The user is interacting with you from a frontend interface. '
 			. "Here is their current context:\n\n"
 			. implode( "\n", $lines );
 

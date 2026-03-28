@@ -18,13 +18,13 @@ All abilities support `agent_id` and `user_id` parameters for multi-agent scopin
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/get-pipelines` | List pipelines with pagination, or get single by ID | `Pipeline/GetPipelinesAbility.php` |
-| `datamachine/create-pipeline` | Create new pipeline | `Pipeline/CreatePipelineAbility.php` |
-| `datamachine/update-pipeline` | Update pipeline properties | `Pipeline/UpdatePipelineAbility.php` |
-| `datamachine/delete-pipeline` | Delete pipeline and associated flows | `Pipeline/DeletePipelineAbility.php` |
-| `datamachine/duplicate-pipeline` | Duplicate pipeline with flows | `Pipeline/DuplicatePipelineAbility.php` |
-| `datamachine/import-pipelines` | Import pipelines from JSON | `Pipeline/ImportExportAbility.php` |
-| `datamachine/export-pipelines` | Export pipelines to JSON | `Pipeline/ImportExportAbility.php` |
+| `datamachine/get-pipelines` | List pipelines with pagination, or get single by ID | `inc/Abilities/Pipeline/GetPipelinesAbility.php` |
+| `datamachine/create-pipeline` | Create new pipeline | `inc/Abilities/Pipeline/CreatePipelineAbility.php` |
+| `datamachine/update-pipeline` | Update pipeline properties | `inc/Abilities/Pipeline/UpdatePipelineAbility.php` |
+| `datamachine/delete-pipeline` | Delete pipeline and associated flows | `inc/Abilities/Pipeline/DeletePipelineAbility.php` |
+| `datamachine/duplicate-pipeline` | Duplicate pipeline with flows | `inc/Abilities/Pipeline/DuplicatePipelineAbility.php` |
+| `datamachine/import-pipelines` | Import pipelines from JSON | `inc/Abilities/Pipeline/ImportExportAbility.php` |
+| `datamachine/export-pipelines` | Export pipelines to JSON | `inc/Abilities/Pipeline/ImportExportAbility.php` |
 
 ### Pipeline Steps (5 abilities)
 
@@ -40,56 +40,56 @@ All abilities support `agent_id` and `user_id` parameters for multi-agent scopin
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/get-flows` | List flows with filtering, or get single by ID | `Flow/GetFlowsAbility.php` |
-| `datamachine/create-flow` | Create new flow from pipeline | `Flow/CreateFlowAbility.php` |
-| `datamachine/update-flow` | Update flow properties | `Flow/UpdateFlowAbility.php` |
-| `datamachine/delete-flow` | Delete flow and associated jobs | `Flow/DeleteFlowAbility.php` |
-| `datamachine/duplicate-flow` | Duplicate flow within pipeline | `Flow/DuplicateFlowAbility.php` |
+| `datamachine/get-flows` | List flows with filtering, or get single by ID | `inc/Abilities/Flow/GetFlowsAbility.php` |
+| `datamachine/create-flow` | Create new flow from pipeline | `inc/Abilities/Flow/CreateFlowAbility.php` |
+| `datamachine/update-flow` | Update flow properties | `inc/Abilities/Flow/UpdateFlowAbility.php` |
+| `datamachine/delete-flow` | Delete flow and associated jobs | `inc/Abilities/Flow/DeleteFlowAbility.php` |
+| `datamachine/duplicate-flow` | Duplicate flow within pipeline | `inc/Abilities/Flow/DuplicateFlowAbility.php` |
 
 ### Flow Steps (4 abilities)
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/get-flow-steps` | List steps for a flow, or get single by ID | `FlowStep/GetFlowStepsAbility.php` |
-| `datamachine/update-flow-step` | Update flow step config | `FlowStep/UpdateFlowStepAbility.php` |
-| `datamachine/configure-flow-steps` | Bulk configure flow steps | `FlowStep/ConfigureFlowStepsAbility.php` |
-| `datamachine/validate-flow-steps-config` | Validate flow steps configuration | `FlowStep/ValidateFlowStepsConfigAbility.php` |
+| `datamachine/get-flow-steps` | List steps for a flow, or get single by ID | `inc/Abilities/FlowStep/GetFlowStepsAbility.php` |
+| `datamachine/update-flow-step` | Update flow step config | `inc/Abilities/FlowStep/UpdateFlowStepAbility.php` |
+| `datamachine/configure-flow-steps` | Bulk configure flow steps | `inc/Abilities/FlowStep/ConfigureFlowStepsAbility.php` |
+| `datamachine/validate-flow-steps-config` | Validate flow steps configuration | `inc/Abilities/FlowStep/ValidateFlowStepsConfigAbility.php` |
 
 ### Queue Management (7 abilities)
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/queue-add` | Add item to flow queue | `Flow/QueueAbility.php` |
-| `datamachine/queue-list` | List queue entries | `Flow/QueueAbility.php` |
-| `datamachine/queue-clear` | Clear queue | `Flow/QueueAbility.php` |
-| `datamachine/queue-remove` | Remove item from queue | `Flow/QueueAbility.php` |
-| `datamachine/queue-update` | Update queue item | `Flow/QueueAbility.php` |
-| `datamachine/queue-move` | Reorder queue item | `Flow/QueueAbility.php` |
-| `datamachine/queue-settings` | Get/set queue settings | `Flow/QueueAbility.php` |
+| `datamachine/queue-add` | Add item to flow queue | `inc/Abilities/Flow/QueueAbility.php` |
+| `datamachine/queue-list` | List queue entries | `inc/Abilities/Flow/QueueAbility.php` |
+| `datamachine/queue-clear` | Clear queue | `inc/Abilities/Flow/QueueAbility.php` |
+| `datamachine/queue-remove` | Remove item from queue | `inc/Abilities/Flow/QueueAbility.php` |
+| `datamachine/queue-update` | Update queue item | `inc/Abilities/Flow/QueueAbility.php` |
+| `datamachine/queue-move` | Reorder queue item | `inc/Abilities/Flow/QueueAbility.php` |
+| `datamachine/queue-settings` | Get/set queue settings | `inc/Abilities/Flow/QueueAbility.php` |
 
 ### Webhook Triggers (5 abilities)
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/webhook-trigger-enable` | Enable webhook trigger for a flow and generate Bearer token | `Flow/WebhookTriggerAbility.php` |
-| `datamachine/webhook-trigger-disable` | Disable webhook trigger, revoke token | `Flow/WebhookTriggerAbility.php` |
-| `datamachine/webhook-trigger-regenerate` | Regenerate webhook token (old token immediately invalidated) | `Flow/WebhookTriggerAbility.php` |
-| `datamachine/webhook-trigger-rate-limit` | Set rate limiting for flow webhook trigger | `Flow/WebhookTriggerAbility.php` |
-| `datamachine/webhook-trigger-status` | Get webhook trigger status for a flow | `Flow/WebhookTriggerAbility.php` |
+| `datamachine/webhook-trigger-enable` | Enable webhook trigger for a flow and generate Bearer token | `inc/Abilities/Flow/WebhookTriggerAbility.php` |
+| `datamachine/webhook-trigger-disable` | Disable webhook trigger, revoke token | `inc/Abilities/Flow/WebhookTriggerAbility.php` |
+| `datamachine/webhook-trigger-regenerate` | Regenerate webhook token (old token immediately invalidated) | `inc/Abilities/Flow/WebhookTriggerAbility.php` |
+| `datamachine/webhook-trigger-rate-limit` | Set rate limiting for flow webhook trigger | `inc/Abilities/Flow/WebhookTriggerAbility.php` |
+| `datamachine/webhook-trigger-status` | Get webhook trigger status for a flow | `inc/Abilities/Flow/WebhookTriggerAbility.php` |
 
 ### Job Execution (9 abilities)
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/get-jobs` | List jobs with filtering, or get single by ID | `Job/GetJobsAbility.php` |
-| `datamachine/get-jobs-summary` | Get job status summary counts | `Job/JobsSummaryAbility.php` |
-| `datamachine/delete-jobs` | Delete jobs by criteria | `Job/DeleteJobsAbility.php` |
-| `datamachine/execute-workflow` | Execute workflow | `Job/ExecuteWorkflowAbility.php` |
-| `datamachine/get-flow-health` | Get flow health metrics | `Job/FlowHealthAbility.php` |
-| `datamachine/get-problem-flows` | List flows exceeding failure threshold | `Job/ProblemFlowsAbility.php` |
-| `datamachine/recover-stuck-jobs` | Recover jobs stuck in processing state | `Job/RecoverStuckJobsAbility.php` |
-| `datamachine/retry-job` | Retry a failed job | `Job/RetryJobAbility.php` |
-| `datamachine/fail-job` | Manually fail a processing job | `Job/FailJobAbility.php` |
+| `datamachine/get-jobs` | List jobs with filtering, or get single by ID | `inc/Abilities/Job/GetJobsAbility.php` |
+| `datamachine/get-jobs-summary` | Get job status summary counts | `inc/Abilities/Job/JobsSummaryAbility.php` |
+| `datamachine/delete-jobs` | Delete jobs by criteria | `inc/Abilities/Job/DeleteJobsAbility.php` |
+| `datamachine/execute-workflow` | Execute workflow | `inc/Abilities/Job/ExecuteWorkflowAbility.php` |
+| `datamachine/get-flow-health` | Get flow health metrics | `inc/Abilities/Job/FlowHealthAbility.php` |
+| `datamachine/get-problem-flows` | List flows exceeding failure threshold | `inc/Abilities/Job/ProblemFlowsAbility.php` |
+| `datamachine/recover-stuck-jobs` | Recover jobs stuck in processing state | `inc/Abilities/Job/RecoverStuckJobsAbility.php` |
+| `datamachine/retry-job` | Retry a failed job | `inc/Abilities/Job/RetryJobAbility.php` |
+| `datamachine/fail-job` | Manually fail a processing job | `inc/Abilities/Job/FailJobAbility.php` |
 
 ### Engine (4 abilities)
 
@@ -97,10 +97,10 @@ Internal abilities for the pipeline execution engine.
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/run-flow` | Run a flow | `Engine/RunFlowAbility.php` |
-| `datamachine/execute-step` | Execute a pipeline step | `Engine/ExecuteStepAbility.php` |
-| `datamachine/schedule-next-step` | Schedule the next step in pipeline execution | `Engine/ScheduleNextStepAbility.php` |
-| `datamachine/schedule-flow` | Schedule a flow for execution | `Engine/ScheduleFlowAbility.php` |
+| `datamachine/run-flow` | Run a flow | `inc/Abilities/Engine/RunFlowAbility.php` |
+| `datamachine/execute-step` | Execute a pipeline step | `inc/Abilities/Engine/ExecuteStepAbility.php` |
+| `datamachine/schedule-next-step` | Schedule the next step in pipeline execution | `inc/Abilities/Engine/ScheduleNextStepAbility.php` |
+| `datamachine/schedule-flow` | Schedule a flow for execution | `inc/Abilities/Engine/ScheduleFlowAbility.php` |
 
 ### Agent Management (6 abilities)
 
@@ -136,21 +136,21 @@ Internal abilities for the pipeline execution engine.
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/list-agent-files` | List memory files from agent identity and user layers | `File/AgentFileAbilities.php` |
-| `datamachine/get-agent-file` | Get a single agent memory file with content | `File/AgentFileAbilities.php` |
-| `datamachine/write-agent-file` | Write or update content for an agent memory file | `File/AgentFileAbilities.php` |
-| `datamachine/delete-agent-file` | Delete an agent memory file (protected files cannot be deleted) | `File/AgentFileAbilities.php` |
-| `datamachine/upload-agent-file` | Upload a file to the agent memory directory | `File/AgentFileAbilities.php` |
+| `datamachine/list-agent-files` | List memory files from agent identity and user layers | `inc/Abilities/File/AgentFileAbilities.php` |
+| `datamachine/get-agent-file` | Get a single agent memory file with content | `inc/Abilities/File/AgentFileAbilities.php` |
+| `datamachine/write-agent-file` | Write or update content for an agent memory file | `inc/Abilities/File/AgentFileAbilities.php` |
+| `datamachine/delete-agent-file` | Delete an agent memory file (protected files cannot be deleted) | `inc/Abilities/File/AgentFileAbilities.php` |
+| `datamachine/upload-agent-file` | Upload a file to the agent memory directory | `inc/Abilities/File/AgentFileAbilities.php` |
 
 ### Flow Files (5 abilities)
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/list-flow-files` | List uploaded files for a flow step | `File/FlowFileAbilities.php` |
-| `datamachine/get-flow-file` | Get metadata for a single flow file | `File/FlowFileAbilities.php` |
-| `datamachine/delete-flow-file` | Delete an uploaded file from a flow step | `File/FlowFileAbilities.php` |
-| `datamachine/upload-flow-file` | Upload a file to a flow step | `File/FlowFileAbilities.php` |
-| `datamachine/cleanup-flow-files` | Cleanup data packets and temporary files for a job or flow | `File/FlowFileAbilities.php` |
+| `datamachine/list-flow-files` | List uploaded files for a flow step | `inc/Abilities/File/FlowFileAbilities.php` |
+| `datamachine/get-flow-file` | Get metadata for a single flow file | `inc/Abilities/File/FlowFileAbilities.php` |
+| `datamachine/delete-flow-file` | Delete an uploaded file from a flow step | `inc/Abilities/File/FlowFileAbilities.php` |
+| `datamachine/upload-flow-file` | Upload a file to a flow step | `inc/Abilities/File/FlowFileAbilities.php` |
+| `datamachine/cleanup-flow-files` | Cleanup data packets and temporary files for a job or flow | `inc/Abilities/File/FlowFileAbilities.php` |
 
 ### Workspace (16 abilities)
 
@@ -177,10 +177,10 @@ Internal abilities for the pipeline execution engine.
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/create-chat-session` | Create a new chat session for a user | `Chat/CreateChatSessionAbility.php` |
-| `datamachine/list-chat-sessions` | List chat sessions with pagination and context filtering | `Chat/ListChatSessionsAbility.php` |
-| `datamachine/get-chat-session` | Retrieve a chat session with conversation and metadata | `Chat/GetChatSessionAbility.php` |
-| `datamachine/delete-chat-session` | Delete a chat session after verifying ownership | `Chat/DeleteChatSessionAbility.php` |
+| `datamachine/create-chat-session` | Create a new chat session for a user | `inc/Abilities/Chat/CreateChatSessionAbility.php` |
+| `datamachine/list-chat-sessions` | List chat sessions with pagination and context filtering | `inc/Abilities/Chat/ListChatSessionsAbility.php` |
+| `datamachine/get-chat-session` | Retrieve a chat session with conversation and metadata | `inc/Abilities/Chat/GetChatSessionAbility.php` |
+| `datamachine/delete-chat-session` | Delete a chat session after verifying ownership | `inc/Abilities/Chat/DeleteChatSessionAbility.php` |
 
 ### GitHub (6 abilities)
 
@@ -197,22 +197,22 @@ Internal abilities for the pipeline execution engine.
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/fetch-rss` | Fetch items from RSS/Atom feeds | `Fetch/FetchRssAbility.php` |
-| `datamachine/fetch-files` | Process uploaded files | `Fetch/FetchFilesAbility.php` |
-| `datamachine/fetch-wordpress-api` | Fetch posts from WordPress REST API | `Fetch/FetchWordPressApiAbility.php` |
-| `datamachine/fetch-wordpress-media` | Query WordPress media library | `Fetch/FetchWordPressMediaAbility.php` |
-| `datamachine/get-wordpress-post` | Retrieve single WordPress post by ID/URL | `Fetch/GetWordPressPostAbility.php` |
-| `datamachine/query-wordpress-posts` | Query WordPress posts with filters | `Fetch/QueryWordPressPostsAbility.php` |
-| `datamachine/publish-wordpress` | Create WordPress posts | `Publish/PublishWordPressAbility.php` |
-| `datamachine/update-wordpress` | Update existing WordPress posts | `Update/UpdateWordPressAbility.php` |
+| `datamachine/fetch-rss` | Fetch items from RSS/Atom feeds | `inc/Abilities/Fetch/FetchRssAbility.php` |
+| `datamachine/fetch-files` | Process uploaded files | `inc/Abilities/Fetch/FetchFilesAbility.php` |
+| `datamachine/fetch-wordpress-api` | Fetch posts from WordPress REST API | `inc/Abilities/Fetch/FetchWordPressApiAbility.php` |
+| `datamachine/fetch-wordpress-media` | Query WordPress media library | `inc/Abilities/Fetch/FetchWordPressMediaAbility.php` |
+| `datamachine/get-wordpress-post` | Retrieve single WordPress post by ID/URL | `inc/Abilities/Fetch/GetWordPressPostAbility.php` |
+| `datamachine/query-wordpress-posts` | Query WordPress posts with filters | `inc/Abilities/Fetch/QueryWordPressPostsAbility.php` |
+| `datamachine/publish-wordpress` | Create WordPress posts | `inc/Abilities/Publish/PublishWordPressAbility.php` |
+| `datamachine/update-wordpress` | Update existing WordPress posts | `inc/Abilities/Update/UpdateWordPressAbility.php` |
 | `datamachine/fetch-reddit` | Fetch posts from Reddit API | `Fetch/FetchRedditAbility.php` |
 
 ### Duplicate Check (2 abilities)
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/check-duplicate` | Check if similar content exists as published post or in queue | `DuplicateCheck/DuplicateCheckAbility.php` |
-| `datamachine/titles-match` | Compare two titles for semantic equivalence using similarity engine | `DuplicateCheck/DuplicateCheckAbility.php` |
+| `datamachine/check-duplicate` | Check if similar content exists as published post or in queue | `inc/Abilities/DuplicateCheck/DuplicateCheckAbility.php` |
+| `datamachine/titles-match` | Compare two titles for semantic equivalence using similarity engine | `inc/Abilities/DuplicateCheck/DuplicateCheckAbility.php` |
 
 ### Post Query (2 abilities)
 
@@ -225,34 +225,34 @@ Internal abilities for the pipeline execution engine.
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/get-post-blocks` | Get Gutenberg blocks from a post | `Content/GetPostBlocksAbility.php` |
-| `datamachine/edit-post-blocks` | Update Gutenberg blocks in a post | `Content/EditPostBlocksAbility.php` |
-| `datamachine/replace-post-blocks` | Replace specific blocks in a post | `Content/ReplacePostBlocksAbility.php` |
+| `datamachine/get-post-blocks` | Get Gutenberg blocks from a post | `inc/Abilities/Content/GetPostBlocksAbility.php` |
+| `datamachine/edit-post-blocks` | Update Gutenberg blocks in a post | `inc/Abilities/Content/EditPostBlocksAbility.php` |
+| `datamachine/replace-post-blocks` | Replace specific blocks in a post | `inc/Abilities/Content/ReplacePostBlocksAbility.php` |
 
 ### Media (7 abilities)
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/generate-alt-text` | Queue system agent generation of alt text for images | `Media/AltTextAbilities.php` |
-| `datamachine/diagnose-alt-text` | Report alt text coverage for image attachments | `Media/AltTextAbilities.php` |
-| `datamachine/generate-image` | Generate images using AI models via Replicate API | `Media/ImageGenerationAbilities.php` |
-| `datamachine/upload-media` | Upload or fetch a media file (image/video), store in repository | `Media/MediaAbilities.php` |
-| `datamachine/validate-media` | Validate a media file against platform-specific constraints | `Media/MediaAbilities.php` |
-| `datamachine/video-metadata` | Extract video metadata (duration, resolution, codec) via ffprobe | `Media/MediaAbilities.php` |
-| `datamachine/render-image-template` | Generate branded graphics from registered GD templates | `Media/ImageTemplateAbilities.php` |
+| `datamachine/generate-alt-text` | Queue system agent generation of alt text for images | `inc/Abilities/Media/AltTextAbilities.php` |
+| `datamachine/diagnose-alt-text` | Report alt text coverage for image attachments | `inc/Abilities/Media/AltTextAbilities.php` |
+| `datamachine/generate-image` | Generate images using AI models via Replicate API | `inc/Abilities/Media/ImageGenerationAbilities.php` |
+| `datamachine/upload-media` | Upload or fetch a media file (image/video), store in repository | `inc/Abilities/Media/MediaAbilities.php` |
+| `datamachine/validate-media` | Validate a media file against platform-specific constraints | `inc/Abilities/Media/MediaAbilities.php` |
+| `datamachine/video-metadata` | Extract video metadata (duration, resolution, codec) via ffprobe | `inc/Abilities/Media/MediaAbilities.php` |
+| `datamachine/render-image-template` | Generate branded graphics from registered GD templates | `inc/Abilities/Media/ImageTemplateAbilities.php` |
 
 ### Image Templates (1 ability)
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/list-image-templates` | List all registered image generation templates | `Media/ImageTemplateAbilities.php` |
+| `datamachine/list-image-templates` | List all registered image generation templates | `inc/Abilities/Media/ImageTemplateAbilities.php` |
 
 ### Image Optimization (2 abilities)
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/diagnose-images` | Scan media library for oversized images, missing WebP, missing thumbnails | `Media/ImageOptimizationAbilities.php` |
-| `datamachine/optimize-images` | Compress oversized images and generate WebP variants | `Media/ImageOptimizationAbilities.php` |
+| `datamachine/diagnose-images` | Scan media library for oversized images, missing WebP, missing thumbnails | `inc/Abilities/Media/ImageOptimizationAbilities.php` |
+| `datamachine/optimize-images` | Compress oversized images and generate WebP variants | `inc/Abilities/Media/ImageOptimizationAbilities.php` |
 
 ### Internal Linking (6 abilities)
 
@@ -269,36 +269,36 @@ Internal abilities for the pipeline execution engine.
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/generate-meta-description` | Queue system agent generation of meta descriptions | `SEO/MetaDescriptionAbilities.php` |
-| `datamachine/diagnose-meta-descriptions` | Report post excerpt (meta description) coverage | `SEO/MetaDescriptionAbilities.php` |
+| `datamachine/generate-meta-description` | Queue system agent generation of meta descriptions | `inc/Abilities/SEO/MetaDescriptionAbilities.php` |
+| `datamachine/diagnose-meta-descriptions` | Report post excerpt (meta description) coverage | `inc/Abilities/SEO/MetaDescriptionAbilities.php` |
 
 ### SEO — IndexNow (4 abilities)
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/indexnow-submit` | Submit URLs to IndexNow for instant search engine indexing | `SEO/IndexNowAbilities.php` |
-| `datamachine/indexnow-status` | Get IndexNow integration status (enabled, API key, endpoint) | `SEO/IndexNowAbilities.php` |
-| `datamachine/indexnow-generate-key` | Generate a new IndexNow API key | `SEO/IndexNowAbilities.php` |
-| `datamachine/indexnow-verify-key` | Verify that the IndexNow key file is accessible | `SEO/IndexNowAbilities.php` |
+| `datamachine/indexnow-submit` | Submit URLs to IndexNow for instant search engine indexing | `inc/Abilities/SEO/IndexNowAbilities.php` |
+| `datamachine/indexnow-status` | Get IndexNow integration status (enabled, API key, endpoint) | `inc/Abilities/SEO/IndexNowAbilities.php` |
+| `datamachine/indexnow-generate-key` | Generate a new IndexNow API key | `inc/Abilities/SEO/IndexNowAbilities.php` |
+| `datamachine/indexnow-verify-key` | Verify that the IndexNow key file is accessible | `inc/Abilities/SEO/IndexNowAbilities.php` |
 
 ### Analytics (4 abilities)
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/bing-webmaster` | Fetch search analytics from Bing Webmaster Tools API | `Analytics/BingWebmasterAbilities.php` |
-| `datamachine/google-search-console` | Fetch search analytics from Google Search Console API | `Analytics/GoogleSearchConsoleAbilities.php` |
-| `datamachine/google-analytics` | Fetch visitor analytics from Google Analytics (GA4) Data API | `Analytics/GoogleAnalyticsAbilities.php` |
-| `datamachine/pagespeed` | Run Lighthouse audits via PageSpeed Insights API | `Analytics/PageSpeedAbilities.php` |
+| `datamachine/bing-webmaster` | Fetch search analytics from Bing Webmaster Tools API | `inc/Abilities/Analytics/BingWebmasterAbilities.php` |
+| `datamachine/google-search-console` | Fetch search analytics from Google Search Console API | `inc/Abilities/Analytics/GoogleSearchConsoleAbilities.php` |
+| `datamachine/google-analytics` | Fetch visitor analytics from Google Analytics (GA4) Data API | `inc/Abilities/Analytics/GoogleAnalyticsAbilities.php` |
+| `datamachine/pagespeed` | Run Lighthouse audits via PageSpeed Insights API | `inc/Abilities/Analytics/PageSpeedAbilities.php` |
 
 ### Taxonomy (5 abilities)
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/get-taxonomy-terms` | List taxonomy terms | `Taxonomy/GetTaxonomyTermsAbility.php` |
-| `datamachine/create-taxonomy-term` | Create a taxonomy term | `Taxonomy/CreateTaxonomyTermAbility.php` |
-| `datamachine/update-taxonomy-term` | Update a taxonomy term | `Taxonomy/UpdateTaxonomyTermAbility.php` |
-| `datamachine/delete-taxonomy-term` | Delete a taxonomy term | `Taxonomy/DeleteTaxonomyTermAbility.php` |
-| `datamachine/resolve-term` | Resolve a term by name or slug | `Taxonomy/ResolveTermAbility.php` |
+| `datamachine/get-taxonomy-terms` | List taxonomy terms | `inc/Abilities/Taxonomy/GetTaxonomyTermsAbility.php` |
+| `datamachine/create-taxonomy-term` | Create a taxonomy term | `inc/Abilities/Taxonomy/CreateTaxonomyTermAbility.php` |
+| `datamachine/update-taxonomy-term` | Update a taxonomy term | `inc/Abilities/Taxonomy/UpdateTaxonomyTermAbility.php` |
+| `datamachine/delete-taxonomy-term` | Delete a taxonomy term | `inc/Abilities/Taxonomy/DeleteTaxonomyTermAbility.php` |
+| `datamachine/resolve-term` | Resolve a term by name or slug | `inc/Abilities/Taxonomy/ResolveTermAbility.php` |
 
 ### Settings (7 abilities)
 
@@ -365,7 +365,7 @@ Internal abilities for the pipeline execution engine.
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/send-ping` | Send agent ping notification | `AgentPing/SendPingAbility.php` |
+| `datamachine/send-ping` | Send agent ping notification | `inc/Abilities/AgentPing/SendPingAbility.php` |
 
 ### System Infrastructure (4 abilities)
 
@@ -423,9 +423,9 @@ Note: many ability implementations are already self-contained and do not call se
 
 Several top-level ability classes serve as facades that instantiate sub-ability classes from subdirectories:
 
-- `ChatAbilities.php` → `Chat/CreateChatSessionAbility.php`, etc.
-- `EngineAbilities.php` → `Engine/RunFlowAbility.php`, etc.
-- `FlowAbilities.php` → `Flow/QueueAbility.php`, `Flow/WebhookTriggerAbility.php`, etc.
+- `ChatAbilities.php` → `inc/Abilities/Chat/CreateChatSessionAbility.php`, etc.
+- `EngineAbilities.php` → `inc/Abilities/Engine/RunFlowAbility.php`, etc.
+- `FlowAbilities.php` → `inc/Abilities/Flow/QueueAbility.php`, `inc/Abilities/Flow/WebhookTriggerAbility.php`, etc.
 
 ### Ability Registration
 

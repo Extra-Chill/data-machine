@@ -48,7 +48,6 @@ Directives are applied in ascending priority order (lowest number = highest prio
 
 ### PipelineCoreDirective (Priority 10)
 
-**Location**: `inc/Core/Steps/AI/Directives/PipelineCoreDirective.php`
 **Contexts**: Pipeline only
 **Purpose**: Establishes foundational agent identity for pipeline AI agents
 
@@ -60,7 +59,6 @@ Provides the static core directive covering:
 
 ### ChatAgentDirective (Priority 15)
 
-**Location**: `inc/Api/Chat/ChatAgentDirective.php`
 **Contexts**: Chat only
 **Since**: 0.2.0
 **Purpose**: Defines chat agent identity and capabilities
@@ -75,7 +73,6 @@ Provides comprehensive behavioral instructions for the chat interface:
 
 ### SystemAgentDirective (Priority 20)
 
-**Location**: `inc/Api/System/SystemAgentDirective.php`
 **Contexts**: System only
 **Since**: 0.13.7
 **Purpose**: Defines system agent identity for internal operations

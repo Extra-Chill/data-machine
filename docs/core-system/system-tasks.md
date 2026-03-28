@@ -355,7 +355,6 @@ Compresses oversized images and generates WebP variants using WordPress's native
 ### GitHubIssueTask
 
 **Type:** `github_create_issue`
-**Source:** `inc/Engine/AI/System/Tasks/GitHubIssueTask.php`
 **Undo:** No
 
 The simplest task — creates GitHub issues by delegating entirely to `GitHubAbilities::createIssue()`. Validates the result and completes or fails the job. No prompt building, no normalization.

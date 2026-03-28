@@ -30,7 +30,6 @@ The workspace directory is outside the WordPress web root. It's created on first
 
 ## Workspace Service
 
-**Source:** `inc/Core/FilesRepository/Workspace.php`
 **Since:** v0.30.0
 
 The `Workspace` class is the core service handling repository management, Git operations, and path security.
@@ -85,7 +84,6 @@ The Workspace class enforces several security measures:
 
 ## WorkspaceReader
 
-**Source:** `inc/Core/FilesRepository/WorkspaceReader.php`
 
 Read-only file operations within workspace repos.
 
@@ -108,7 +106,6 @@ Returns `{success, repo, path, entries[]}`.
 
 ## WorkspaceWriter
 
-**Source:** `inc/Core/FilesRepository/WorkspaceWriter.php`
 
 Write and edit operations within workspace repos.
 
@@ -130,7 +127,6 @@ Returns `{success, file, occurrences, message}`.
 
 ## Abilities
 
-**Source:** `inc/Abilities/WorkspaceAbilities.php`
 
 Sixteen abilities registered under the `datamachine` category, split into read-only and mutating operations:
 
@@ -168,7 +164,6 @@ Read-only abilities have `show_in_rest: true`. Mutating abilities have `show_in_
 
 > **Note:** WorkspaceTools have been moved to the `data-machine-code` extension plugin.
 
-**Source:** `inc/Engine/AI/Tools/Global/WorkspaceTools.php` (in extension)
 **Tool ID:** Various (`workspace_path`, `workspace_list`, `workspace_show`, `workspace_ls`, `workspace_read`)
 **Contexts:** `chat`, `pipeline`, `standalone`
 
@@ -186,7 +181,6 @@ These tools are available whenever the workspace is configured (`is_configured()
 
 ### Scoped Tools (WorkspaceScopedTools)
 
-**Source:** `inc/Core/Steps/Workspace/Tools/WorkspaceScopedTools.php`
 
 Handler-scoped tools registered by the Workspace fetch and publish handlers. These tools enforce per-handler path allowlists — operations are restricted to the paths configured in the handler settings.
 
@@ -209,7 +203,6 @@ All operations validate paths against the handler's configured allowlist before 
 
 ### Fetch Handler
 
-**Source:** `inc/Core/Steps/Fetch/Handlers/Workspace/Workspace.php`
 
 Reads data from workspace repositories as a pipeline fetch source. Configured with:
 
@@ -226,7 +219,6 @@ The fetch handler produces structured JSON data packets and registers scoped `wo
 
 ### Publish Handler
 
-**Source:** `inc/Core/Steps/Publish/Handlers/Workspace/Workspace.php`
 
 Writes data to workspace repositories as a pipeline publish target. Configured with:
 
@@ -246,7 +238,6 @@ The publish handler registers scoped tools for writing, editing, and Git operati
 
 ## CLI
 
-**Source:** `inc/Cli/Commands/WorkspaceCommand.php`
 
 ### Repository Management
 

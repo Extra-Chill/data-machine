@@ -17,6 +17,7 @@ use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\Steps\FlowStepConfig;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
