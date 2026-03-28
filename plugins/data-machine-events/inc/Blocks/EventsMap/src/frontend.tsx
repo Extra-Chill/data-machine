@@ -5,6 +5,11 @@
  * Uses Leaflet via useRef/useEffect for map management, fetches venues
  * from the REST API, and emits custom events on bounds change.
  *
+ * Performance optimizations:
+ * - Marker clustering via leaflet.markercluster for dense areas
+ * - Marker diffing: only add/remove changed markers on pan/zoom
+ * - Viewport-based loading with debounced fetching
+ *
  * @package DataMachineEvents
  * @since 0.5.0
  */
@@ -12,6 +17,9 @@
 import { createRoot } from '@wordpress/element';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet.markercluster';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 
 import {
 	useState,
@@ -264,7 +272,8 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 	} = props;
 
 	const mapRef = useRef<L.Map | null>( null );
-	const markersRef = useRef<L.Marker[]>( [] );
+	const clusterGroupRef = useRef<L.MarkerClusterGroup | null>( null );
+	const markerMapRef = useRef<Map<number, L.Marker>>( new Map() );
 	const userMarkerRef = useRef<L.Marker | null>( null );
 	const containerRef = useRef<HTMLDivElement | null>( null );
 	const gestureOverlayRef = useRef<HTMLDivElement | null>( null );
@@ -391,6 +400,20 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 			minZoom: 8,
 		} ).addTo( map );
 
+		// Initialize marker cluster group.
+		const clusterGroup = L.markerClusterGroup( {
+			maxClusterRadius: 40,
+			spiderfyOnMaxZoom: true,
+			showCoverageOnHover: false,
+			zoomToBoundsOnClick: true,
+			disableClusteringAtZoom: 16,
+			chunkedLoading: true,
+			chunkInterval: 100,
+			chunkDelay: 10,
+		} );
+		map.addLayer( clusterGroup );
+		clusterGroupRef.current = clusterGroup;
+
 		mapRef.current = map;
 
 		// Fetch venues on pan/zoom and dispatch bounds-changed events.
@@ -412,6 +435,8 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		return () => {
 			map.remove();
 			mapRef.current = null;
+			clusterGroupRef.current = null;
+			markerMapRef.current.clear();
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [] );
@@ -482,45 +507,68 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		};
 	}, [] );
 
-	/* --- update markers when venues change --- */
+	/* --- update markers when venues change (with diffing) --- */
 	useEffect( () => {
 		const map = mapRef.current;
-		if ( ! map ) return;
-
-		// Clear existing venue markers.
-		markersRef.current.forEach( ( m ) => map.removeLayer( m ) );
-		markersRef.current = [];
+		const clusterGroup = clusterGroupRef.current;
+		if ( ! map || ! clusterGroup ) return;
 
 		const icon = createVenueIcon();
-		const newMarkers: L.Marker[] = [];
+		const currentMarkers = markerMapRef.current;
+		const newVenueIds = new Set<number>();
+
+		// Collect new venues that need markers.
+		const markersToAdd: L.Marker[] = [];
 
 		venues.forEach( ( venue ) => {
 			if ( ! venue.lat || ! venue.lon ) return;
 
-			const marker = L.marker( [ venue.lat, venue.lon ], { icon } )
-				.addTo( map )
-				.bindPopup( buildPopupHtml( venue ) );
+			newVenueIds.add( venue.term_id );
 
-			newMarkers.push( marker );
+			// Check if marker already exists for this venue.
+			const existing = currentMarkers.get( venue.term_id );
+			if ( existing ) {
+				// Update popup content if event count might have changed.
+				existing.setPopupContent( buildPopupHtml( venue ) );
+				return;
+			}
+
+			// Create new marker.
+			const marker = L.marker( [ venue.lat, venue.lon ], { icon } )
+				.bindPopup( buildPopupHtml( venue ) );
+			currentMarkers.set( venue.term_id, marker );
+			markersToAdd.push( marker );
 		} );
 
-		markersRef.current = newMarkers;
+		// Remove markers for venues no longer in the dataset.
+		const markersToRemove: L.Marker[] = [];
+		currentMarkers.forEach( ( marker, termId ) => {
+			if ( ! newVenueIds.has( termId ) ) {
+				markersToRemove.push( marker );
+				currentMarkers.delete( termId );
+			}
+		} );
+
+		// Batch update the cluster group.
+		if ( markersToRemove.length > 0 ) {
+			clusterGroup.removeLayers( markersToRemove );
+		}
+		if ( markersToAdd.length > 0 ) {
+			clusterGroup.addLayers( markersToAdd );
+		}
 
 		// Fit bounds on first load when we have a user location or
 		// initial venues (before the user has interacted with the map).
 		if ( initialVenues.length > 0 ) {
-			const allMarkers = [
-				...newMarkers,
-				...( userMarkerRef.current ? [ userMarkerRef.current ] : [] ),
-			];
+			const allLayers = clusterGroup.getLayers() as L.Marker[];
 
-			if ( hasUserLocation && allMarkers.length > 1 ) {
+			if ( hasUserLocation && allLayers.length > 0 ) {
 				map.setView( [ userLat!, userLon! ], 13 );
-			} else if ( allMarkers.length > 1 ) {
-				const group = L.featureGroup( allMarkers );
+			} else if ( allLayers.length > 1 ) {
+				const group = L.featureGroup( allLayers );
 				map.fitBounds( group.getBounds().pad( 0.1 ) );
 			} else if (
-				newMarkers.length === 1 &&
+				allLayers.length === 1 &&
 				! hasCenter
 			) {
 				map.setView( [ venues[ 0 ].lat, venues[ 0 ].lon ], 13 );

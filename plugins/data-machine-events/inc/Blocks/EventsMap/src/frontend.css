@@ -239,6 +239,47 @@ a.venue-popup-name:hover {
 	color: #dc2626;
 }
 
+/* Marker cluster overrides — match datamachine design tokens */
+.data-machine-events-map .marker-cluster {
+	background: transparent;
+}
+
+.data-machine-events-map .marker-cluster div {
+	background: var(--data-machine-background-accent, #3b82f6);
+	color: #fff;
+	font-size: 0.8125rem;
+	font-weight: 700;
+	border-radius: 50%;
+	width: 36px;
+	height: 36px;
+	line-height: 36px;
+	text-align: center;
+	margin-left: 0;
+	margin-top: 0;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.data-machine-events-map .marker-cluster-small div {
+	width: 32px;
+	height: 32px;
+	line-height: 32px;
+	font-size: 0.75rem;
+}
+
+.data-machine-events-map .marker-cluster-medium div {
+	width: 40px;
+	height: 40px;
+	line-height: 40px;
+	font-size: 0.875rem;
+}
+
+.data-machine-events-map .marker-cluster-large div {
+	width: 48px;
+	height: 48px;
+	line-height: 48px;
+	font-size: 1rem;
+}
+
 /* Responsive — map keeps rounded corners at all breakpoints.
    The parent theme handles edge-to-edge padding; the map itself
    should always retain its border-radius for visual consistency. */
