@@ -15,9 +15,14 @@
  *     <div class="text-block-15">6:00 pm</div>
  *     <div class="text-block-14"></div>
  *     <div class="w-embed">
- *       <div class="identifyer" data-date="2026-03-28T18:00:00"></div>
+ *       <div class="identifyer" data-date="2026-03-28T06:00:00"></div>
  *     </div>
  *   </div>
+ *
+ * IMPORTANT: Nocodeflow's data-date attribute stores 12-hour values in a
+ * 24-hour ISO field. "6:00 pm" is stored as T06:00:00 instead of T18:00:00.
+ * We use data-date only for the date (Y-m-d) and parse the display text
+ * for the time since it includes the correct AM/PM indicator.
  *
  * @package DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors
  */
@@ -103,24 +108,22 @@ class NocodeflowExtractor extends BaseExtractor {
 			}
 		}
 
-		// Parse the ISO data-date attribute for date and time.
+		// Parse date from the data-date attribute.
 		$start_date = '';
 		$start_time = '';
 
 		if ( ! empty( $date_attr ) ) {
-			// data-date="2026-03-28T18:00:00"
 			$parts = explode( 'T', $date_attr );
-			if ( count( $parts ) >= 2 ) {
+			if ( count( $parts ) >= 1 ) {
 				$start_date = $parts[0];
-				$time_parts = explode( ':', $parts[1] );
-				if ( count( $time_parts ) >= 2 ) {
-					$start_time = $time_parts[0] . ':' . $time_parts[1];
-				}
 			}
 		}
 
-		// Fallback: parse time from the display text if data-date didn't have it.
-		if ( empty( $start_time ) && ! empty( $time_str ) ) {
+		// Always use the display time text for the time component.
+		// Nocodeflow's data-date attribute stores 12-hour values in a 24-hour
+		// field (e.g. "6:00 pm" becomes T06:00:00 instead of T18:00:00).
+		// The display text has the correct AM/PM indicator.
+		if ( ! empty( $time_str ) ) {
 			$start_time = $this->parseTimeString( $time_str );
 		}
 

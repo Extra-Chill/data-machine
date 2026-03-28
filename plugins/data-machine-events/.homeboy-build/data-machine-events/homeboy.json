@@ -1,0 +1,26 @@
+{
+  "auto_cleanup": false,
+  "changelog_target": "docs/CHANGELOG.md",
+  "extensions": {
+    "wordpress": {
+      "php": "8.3",
+      "node": "20",
+      "database_type": "mysql"
+    }
+  },
+  "id": "data-machine-events",
+  "version_targets": [
+    {
+      "file": "data-machine-events.php",
+      "pattern": "Version:\\s*([0-9.]+)"
+    },
+    {
+      "file": "data-machine-events.php",
+      "pattern": "DATA_MACHINE_EVENTS_VERSION.+?([0-9.]+)"
+    },
+    {
+      "file": "readme.txt",
+      "pattern": "(?m)^Stable tag:\\s*([0-9.]+)"
+    }
+  ]
+}

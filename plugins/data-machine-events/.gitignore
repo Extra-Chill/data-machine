@@ -126,4 +126,4 @@ wp-content/plugins/hello.php
 *.tar.gz 
 
 # Docs tooling
-docs/.docs-sync.json
+docs/.docs-sync.json.homeboy-build/

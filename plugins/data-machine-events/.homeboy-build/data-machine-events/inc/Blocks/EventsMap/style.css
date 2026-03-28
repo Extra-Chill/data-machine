@@ -1,0 +1,24 @@
+/**
+ * Events Map Block Styles (shared: editor + frontend)
+ *
+ * Uses data-machine-* design tokens from root.css for theme agnosticism.
+ *
+ * @package DataMachineEvents
+ * @since 0.13.0
+ */
+
+.data-machine-events-map-block {
+	margin-bottom: 1.5rem;
+}
+
+.data-machine-events-map {
+	width: 100%;
+	border-radius: var(--data-machine-border-radius, 8px);
+	overflow: hidden;
+	z-index: 1;
+}
+
+.data-machine-events-map .emoji-marker {
+	background: none;
+	border: none;
+}

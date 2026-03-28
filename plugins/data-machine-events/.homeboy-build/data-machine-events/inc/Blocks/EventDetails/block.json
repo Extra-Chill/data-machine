@@ -1,0 +1,107 @@
+{
+    "apiVersion": 2,
+    "name": "data-machine-events/event-details",
+    "version": "0.12.1",
+    "title": "Event Details",
+    "category": "data-machine-events",
+    "icon": "calendar-alt",
+    "description": "Display and edit event details including date, time, venue, and other information.",
+    "textdomain": "data-machine-events",
+    "editorScript": "file:./build/index.js",
+    "style": ["data-machine-events-root", "leaflet"],
+    "editorStyle": "file:./style.css",
+    "viewStyle": "file:./build/frontend.css",
+    "attributes": {
+        "startDate": {
+            "type": "string",
+            "default": ""
+        },
+        "endDate": {
+            "type": "string",
+            "default": ""
+        },
+        "startTime": {
+            "type": "string",
+            "default": ""
+        },
+        "endTime": {
+            "type": "string",
+            "default": ""
+        },
+        "venue": {
+            "type": "string",
+            "default": ""
+        },
+        "address": {
+            "type": "string",
+            "default": ""
+        },
+        "price": {
+            "type": "string",
+            "default": ""
+        },
+        "ticketUrl": {
+            "type": "string",
+            "default": ""
+        },
+        "performer": {
+            "type": "string",
+            "default": ""
+        },
+        "performerType": {
+            "type": "string",
+            "default": "PerformingGroup"
+        },
+        "organizer": {
+            "type": "string",
+            "default": ""
+        },
+        "organizerType": {
+            "type": "string",
+            "default": "Organization"
+        },
+        "organizerUrl": {
+            "type": "string",
+            "default": ""
+        },
+        "eventStatus": {
+            "type": "string",
+            "default": "EventScheduled"
+        },
+        "previousStartDate": {
+            "type": "string",
+            "default": ""
+        },
+        "priceCurrency": {
+            "type": "string",
+            "default": "USD"
+        },
+        "offerAvailability": {
+            "type": "string",
+            "default": "InStock"
+        },
+        "validFrom": {
+            "type": "string",
+            "default": ""
+        },
+        "eventType": {
+            "type": "string",
+            "default": "Event"
+        },
+        "occurrenceDates": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "default": []
+        }
+    },
+    "supports": {
+        "html": false,
+        "align": ["wide", "full"]
+    },
+    "render": "file:./render.php",
+    "usesContext": ["postType"],
+    "allowedBlocks": [],
+    "parent": []
+} 

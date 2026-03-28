@@ -1,0 +1,224 @@
+<?php
+/**
+ * Universal Web Scraper Event Section Selector Rules
+ *
+ * Centralizes the XPath selector rules used to identify candidate event sections
+ * in HTML pages. These rules are ordered by priority.
+ *
+ * @package DataMachineEvents\Steps\EventImport\Handlers\WebScraper
+ */
+
+namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+final class EventSectionSelectors {
+
+	/**
+	 * @return array<int, array{xpath: string, enable_table_row_date_filter: bool}>
+	 */
+	public static function get_rules(): array {
+		$rules = array(
+			// Schema.org microdata (HIGHEST PRIORITY)
+			array(
+				'xpath'                        => '//*[contains(@itemtype, "Event")]',
+				'enable_table_row_date_filter' => false,
+			),
+
+			// Base64-encoded Google Calendar widget events (Starlight Motor Inn, etc.)
+			array(
+				'xpath'                        => '//*[@data-calendar-event]',
+				'enable_table_row_date_filter' => false,
+				'extract_base64_event'         => true,
+			),
+
+			// SeeTickets widget patterns (used by Resound Presents, etc.)
+			array(
+				'xpath'                        => '//*[contains(@class, "seetickets-list-event-container")]',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//*[contains(@class, "seetickets-calendar-event")]',
+				'enable_table_row_date_filter' => false,
+			),
+
+			// Turntable Tickets (Monks Jazz, etc.)
+			array(
+				'xpath'                        => '//*[contains(concat(" ", normalize-space(@class), " "), " show-card ")]',
+				'enable_table_row_date_filter' => false,
+			),
+
+			// Brown Bear Calendar (Sahara Lounge, etc.)
+			array(
+				'xpath'                        => '//*[contains(concat(" ", normalize-space(@class), " "), " CalEvent ")]',
+				'enable_table_row_date_filter' => false,
+			),
+
+			// Drupal Views patterns (Views module event listings)
+			array(
+				'xpath'                        => '//*[contains(concat(" ", normalize-space(@class), " "), " views-row ")]',
+				'enable_table_row_date_filter' => false,
+			),
+
+			// Drupal node type patterns
+			array(
+				'xpath'                        => '//*[contains(concat(" ", normalize-space(@class), " "), " node--type-event ")]',
+				'enable_table_row_date_filter' => false,
+			),
+
+			// Table-based event patterns (venue calendars often use tables)
+			array(
+				'xpath'                        => '//tr[.//td[contains(@class, "event-date") or contains(@class, "event-name") or contains(@class, "event")]]',
+				'enable_table_row_date_filter' => true,
+			),
+			array(
+				'xpath'                        => '//table[contains(@class, "calendar") or contains(@class, "events") or contains(@class, "schedule")]//tbody//tr',
+				'enable_table_row_date_filter' => true,
+			),
+			array(
+				'xpath'                        => '//section[contains(@class, "calendar")]//table//tbody//tr',
+				'enable_table_row_date_filter' => true,
+			),
+
+			// Specific event listing patterns (HIGH PRIORITY)
+			array(
+				'xpath'                        => '//*[contains(concat(" ", normalize-space(@class), " "), " recspec-events--event ")]',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//*[contains(@class, "eventlist-event")]',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//article[contains(@class, "eventlist-event")]',
+				'enable_table_row_date_filter' => false,
+			),
+
+			// Article elements with event-related classes
+			array(
+				'xpath'                        => '//article[contains(@class, "event")]',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//article[contains(@class, "show")]',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//article[contains(@class, "concert")]',
+				'enable_table_row_date_filter' => false,
+			),
+
+			// Div elements with event-related classes (Black Cat DC, hand-coded venue sites)
+			// Many indie venues use simple div.show or div.event instead of <article>.
+			array(
+				'xpath'                        => '//div[contains(concat(" ", normalize-space(@class), " "), " show ")][.//h1 or .//h2]',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//div[contains(concat(" ", normalize-space(@class), " "), " event ")][.//h1 or .//h2]',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//div[contains(concat(" ", normalize-space(@class), " "), " concert ")][.//h1 or .//h2]',
+				'enable_table_row_date_filter' => false,
+			),
+
+			// Show details containers (venues that wrap each show's details in a details div)
+			array(
+				'xpath'                        => '//*[contains(@class, "show-details")]',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//*[contains(@class, "event-details")]',
+				'enable_table_row_date_filter' => false,
+			),
+
+			// Show card link patterns (Webflow venue sites like Union Stage Presents)
+			array(
+				'xpath'                        => '//*[contains(@class, "show-card")]',
+				'enable_table_row_date_filter' => false,
+			),
+
+			// Articles containing time elements (Bricks builder, generic event cards)
+			array(
+				'xpath'                        => '//article[.//time]',
+				'enable_table_row_date_filter' => false,
+			),
+
+			// Common event class patterns
+			array(
+				'xpath'                        => '//*[contains(concat(" ", normalize-space(@class), " "), " full-event ")]',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//*[contains(@class, "event-content-row")]',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//*[contains(@class, "event-item")]',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//*[contains(@class, "show-item")]',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//*[contains(@class, "concert-item")]',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//*[contains(@class, "calendar-event")]',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//*[contains(@class, "event-card")]',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//*[contains(@class, "event-entry")]',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//*[contains(@class, "event-listing")]',
+				'enable_table_row_date_filter' => false,
+			),
+
+			// Month-heading schedule blocks (venue pages that list a month's shows in a text block).
+			// Matches a container with a descendant h2/h3 containing a month name AND enough
+			// text content (>100 chars) to hold actual schedule data. Prevents matching the
+			// tiny wrapper around just the month heading. Generic pattern — works across any
+			// CMS (WordPress/Avada/WPBakery, Squarespace, hand-coded, etc.).
+			array(
+				'xpath'                        => '//*[.//h2[contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"january") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"february") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"march") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"april") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"may") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"june") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"july") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"august") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"september") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"october") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"november") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"december")] and string-length(normalize-space()) > 100]',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//*[.//h3[contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"january") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"february") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"march") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"april") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"may") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"june") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"july") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"august") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"september") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"october") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"november") or contains(translate(text(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"december")] and string-length(normalize-space()) > 100]',
+				'enable_table_row_date_filter' => false,
+			),
+
+			// List items within event containers (lower priority - can match navigation)
+			array(
+				'xpath'                        => '//*[contains(@class, "events")]//li',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//*[contains(@class, "shows")]//li',
+				'enable_table_row_date_filter' => false,
+			),
+			array(
+				'xpath'                        => '//*[contains(@class, "calendar")]//li',
+				'enable_table_row_date_filter' => false,
+			),
+		);
+
+		/**
+		 * Filter universal web scraper selector rules.
+		 *
+		 * @param array<int, array{xpath: string, enable_table_row_date_filter: bool}> $rules
+		 */
+		return apply_filters( 'data_machine_events_universal_web_scraper_selector_rules', $rules );
+	}
+}
