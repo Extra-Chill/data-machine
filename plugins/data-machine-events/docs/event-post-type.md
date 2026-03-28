@@ -75,7 +75,7 @@ add_filter('data_machine_events_post_type_menu_items', function($items) {
 
 ## Integration Points
 
-- **Meta Storage**: Works with `meta-storage.php` for automatic datetime synchronization
+- **Event Dates Sync**: Works with `event-dates-sync.php` for automatic datetime synchronization to the `datamachine_event_dates` table
 - **Taxonomies**: Integrates with `Venue_Taxonomy` and `Promoter_Taxonomy`
 - **Blocks**: Supports Event Details and Calendar blocks
 - **REST API**: Provides REST endpoints for the post type

@@ -1,9 +1,10 @@
 <?php
 /**
- * Event DateTime Meta Storage
+ * Event Dates Sync
  *
- * Core plugin feature that stores event datetime in post meta for efficient SQL queries.
- * Monitors Event Details block changes and syncs to post meta automatically.
+ * Syncs event dates from Event Details block attributes to the
+ * datamachine_event_dates table on save_post. Also handles ticket URL
+ * normalization for duplicate detection and post_status denormalization.
  *
  * @package DataMachine_Events
  */

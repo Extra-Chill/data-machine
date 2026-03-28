@@ -21,7 +21,7 @@ The block exposes 15+ attributes (dates, venue, price, performer/organizer metad
 ## Structured Data & Maps
 
 - `EventSchemaProvider` merges block attributes with venue metadata to generate Schema.org JSON-LD that accompanies block rendering and REST responses.
-- `_datamachine_event_datetime` and `_datamachine_event_end_datetime` meta are synced in `inc/Core/meta-storage.php`, keeping calendar queries performant, powering schema fallbacks, and enabling day-based pagination and REST filtering.
+- Event dates are synced to the `datamachine_event_dates` table in `inc/Core/event-dates-sync.php`, keeping calendar queries performant, powering schema fallbacks, and enabling day-based pagination and REST filtering. Use global `datamachine_get_event_dates( $post_id )` to read.
 - Leaflet assets (`leaflet.css`, `leaflet.js`, `assets/js/venue-map.js`) load on event detail views via `enqueue_root_styles()` whenever the block or a `data_machine_events` post renders, so venue maps always display with consistent markers.
 
 ## Venue & Taxonomy Integration
