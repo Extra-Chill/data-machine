@@ -1,14 +1,14 @@
-# Meta Storage
+# Event Dates Sync
 
-Core plugin feature that stores event datetime in post meta for efficient SQL queries. Monitors Event Details block changes and syncs to post meta automatically.
+Syncs event dates from Event Details block attributes to the `datamachine_event_dates` table on save. Also handles ticket URL normalization for duplicate detection.
 
 ## Overview
 
-The meta storage system provides performant event querying by maintaining synchronized datetime metadata. When Event Details blocks are saved, the system automatically extracts datetime information and stores it in dedicated post meta fields for fast database queries.
+The event dates sync system provides performant event querying by maintaining a dedicated dates table with denormalized `post_status`. When Event Details blocks are saved, the system automatically extracts datetime information and writes it to the `datamachine_event_dates` table for fast SQL queries without parsing block content.
 
 ## Location
 
-`inc/Core/meta-storage.php`
+`inc/Core/event-dates-sync.php`
 
 ## Key Features
 

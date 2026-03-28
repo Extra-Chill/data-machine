@@ -129,7 +129,7 @@ class DisplayVars {
 	/**
 	 * Check if end time is the sentinel value used for SQL date range queries.
 	 *
-	 * When events have endDate but no endTime, meta-storage.php stores 23:59:59
+	 * When events have endDate but no endTime, event-dates-sync.php stores 23:59:59
 	 * to ensure proper date range filtering. This should not display to users.
 	 *
 	 * @param string $time Time string in HH:MM or HH:MM:SS format.

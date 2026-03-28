@@ -2,7 +2,7 @@
 
 ## System Map
 - `data-machine-events.php` wires the PSR-4 autoloader (`DataMachineEvents\` namespace) and boots admin, blocks, API, and step registrations; never `require` class files manually.
-- Event data flows Event Details block → `_datamachine_event_datetime` meta sync (`inc/Core/meta-storage.php`) → Calendar templates (`inc/Blocks/Calendar/templates`) → theme `single.php`; keep block attributes the single source of truth.
+- Event data flows Event Details block → dates sync (`inc/Core/event-dates-sync.php`) → `datamachine_event_dates` table → Calendar templates (`inc/Blocks/Calendar/templates`) → theme `single.php`; keep block attributes the single source of truth.
 - Root tokens live in `inc/Blocks/root.css` and power both CSS + JS sizing/color logic; adjust variables there before touching individual block styles.
 
 ## Data Machine Integration
@@ -20,7 +20,7 @@
 
 ## WordPress Domain Rules
 - Post type + taxonomy live in `inc/Core/Event_Post_Type.php` and `inc/Core/Venue_Taxonomy.php`; add venue meta via that class so REST + admin stay aligned.
-- `_datamachine_event_datetime` meta drives SQL pagination; when editing events outside Gutenberg, call `data_machine_events_sync_datetime_meta()` from `Core/meta-storage.php` to keep queries accurate.
+- `datamachine_event_dates` table drives SQL pagination; when editing events outside Gutenberg, call `data_machine_events_sync_datetime_meta()` from `Core/event-dates-sync.php` to keep queries accurate. Use global `datamachine_get_event_dates( $post_id )` to read dates.
 - Badges and taxonomy markup are centralized in `inc/Blocks/Calendar/Taxonomy_Badges.php`; extend via `data_machine_events_badge_wrapper_classes` / `data_machine_events_badge_classes` filters instead of editing templates.
 - Settings UI lives in `inc/Admin/Settings_Page.php`; always read settings via the provided getters (map display type, archive behavior, etc.).
 

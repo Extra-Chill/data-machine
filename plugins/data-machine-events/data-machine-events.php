@@ -51,11 +51,11 @@ if ( ! function_exists( 'data_machine_events_sanitize_query_params' ) ) {
 	}
 }
 
-// Load core meta storage (monitors Event Details block saves)
-require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/meta-storage.php';
+// Load event dates sync (monitors Event Details block saves → datamachine_event_dates table).
+require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/event-dates-sync.php';
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/EventDatesTable.php';
 
-// Global alias — meta-storage.php is namespaced so this makes the public API accessible globally.
+// Global alias — event-dates-sync.php is namespaced so this makes the public API accessible globally.
 if ( ! function_exists( 'datamachine_get_event_dates' ) ) {
 	/**
 	 * Get event dates from the dedicated event_dates table.

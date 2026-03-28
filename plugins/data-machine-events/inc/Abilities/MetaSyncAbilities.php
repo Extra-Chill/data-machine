@@ -370,7 +370,7 @@ class MetaSyncAbilities {
 
 	/**
 	 * Calculate expected end datetime value from block attributes.
-	 * Used for dry-run preview. Mirrors meta-storage.php logic:
+	 * Used for dry-run preview. Mirrors event-dates-sync.php logic:
 	 * - Has endDate + endTime: use them.
 	 * - Has endDate, no endTime: use sentinel 23:59:59.
 	 * - Has endTime, no endDate: same day as start.
