@@ -1078,12 +1078,17 @@ function datamachine_copy_directory_recursive( string $source_dir, string $targe
  * (via DirectoryManager::ensure_agent_files()). Existing files are never
  * overwritten — only missing files are recreated from scaffold defaults.
  *
+ * Returns false when the Abilities API is unavailable (e.g. during plugin
+ * activation where init callbacks haven't fired), so the caller can defer.
+ *
  * @since 0.30.0
+ *
+ * @return bool True if scaffold ran, false if abilities were unavailable.
  */
-function datamachine_ensure_default_memory_files() {
+function datamachine_ensure_default_memory_files(): bool {
 	$ability = \DataMachine\Abilities\File\ScaffoldAbilities::get_ability();
 	if ( ! $ability ) {
-		return;
+		return false;
 	}
 
 	$default_user_id = \DataMachine\Core\FilesRepository\DirectoryManager::get_default_agent_user_id();
@@ -1093,6 +1098,8 @@ function datamachine_ensure_default_memory_files() {
 
 	// Scaffold default context memory files (contexts/{context}.md).
 	datamachine_ensure_default_context_files( $default_user_id );
+
+	return true;
 }
 
 /**
