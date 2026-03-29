@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.26.1] - 2026-03-29
+
+### Fixed
+- Fix ICS timezone parsing for malformed feeds and add Dice.fm country filter
+
 ## [0.26.0] - 2026-03-29
 
 ### Changed
