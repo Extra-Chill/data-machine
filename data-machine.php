@@ -243,6 +243,20 @@ function datamachine_run_datamachine_plugin() {
 		new \DataMachine\Abilities\Handler\TestHandlerAbility();
 	} );
 
+	// Deferred scaffold: during plugin activation the Abilities API is unavailable
+	// because init fires before the plugin file is included. A transient signals that
+	// the scaffold needs to run on the first normal request where abilities are ready.
+	add_action(
+		'init',
+		function () {
+			if ( get_transient( 'datamachine_needs_scaffold' ) ) {
+				delete_transient( 'datamachine_needs_scaffold' );
+				datamachine_ensure_default_memory_files();
+			}
+		},
+		20 // After ability registration (priority 10).
+	);
+
 	// Clean up identity index rows when posts are permanently deleted.
 	add_action(
 		'before_delete_post',
@@ -543,7 +557,13 @@ function datamachine_activate_for_site() {
 	\DataMachine\Core\Database\Chat\Chat::ensure_agent_id_column();
 
 	// Ensure default agent memory files exist.
-	datamachine_ensure_default_memory_files();
+	// During activation the Abilities API is unavailable (init already fired before
+	// the plugin was included via plugin_sandbox_scrape, so our init callback that
+	// registers abilities never ran). Set a transient so the scaffold runs on the
+	// first normal request where the full hook sequence fires in order.
+	if ( ! datamachine_ensure_default_memory_files() ) {
+		set_transient( 'datamachine_needs_scaffold', 1, HOUR_IN_SECONDS );
+	}
 
 	// Run layered architecture migration (idempotent).
 	datamachine_migrate_to_layered_architecture();
