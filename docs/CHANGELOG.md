@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.62.0] - 2026-03-29
+
+### Added
+- add datamachine_can_access_agent filter to PermissionHelper
+
+### Fixed
+- defer memory file scaffold when Abilities API unavailable at activation
+
 ## [0.61.0] - 2026-03-29
 
 ### Added
