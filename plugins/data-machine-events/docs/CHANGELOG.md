@@ -2,6 +2,22 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.26.0] - 2026-03-29
+
+### Changed
+- Limit event post revisions to 2 to prevent table bloat
+- Add GenericHtmlEventsExtractor for custom WordPress event listings
+- Remove .homeboy-build/ from tracking, add to gitignore
+- Remove copilot-instructions.md — CLAUDE.md is the agent guide
+- Rename meta-storage.php → event-dates-sync.php, remove copilot instructions
+- Add global datamachine_get_event_dates() alias
+
+### Fixed
+- Fix GenericHtmlEventsExtractor: container regex and canExtract
+- add use statement for GenericHtmlEventsExtractor
+- Fix SquarespaceExtractor: probe common event collection paths
+- Fix NocodeflowExtractor: use display text for time, not data-date
+
 ## [0.25.0] - 2026-03-28
 
 ### Added
