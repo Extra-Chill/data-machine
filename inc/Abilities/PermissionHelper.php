@@ -460,7 +460,23 @@ class PermissionHelper {
 
 		// Check explicit access grants.
 		$access_repo = new \DataMachine\Core\Database\Agents\AgentAccess();
-		return $access_repo->user_can_access( $agent_id, $user_id, $minimum_role );
+		$can_access  = $access_repo->user_can_access( $agent_id, $user_id, $minimum_role );
+
+		/**
+		 * Filter whether a user can access an agent.
+		 *
+		 * Allows plugins to grant or deny agent access based on custom logic
+		 * (e.g. team membership, organization roles, subscription status).
+		 * Returning true from this filter overrides the default access check.
+		 *
+		 * @since 0.62.0
+		 *
+		 * @param bool   $can_access   Whether the user can access the agent.
+		 * @param int    $agent_id     Agent ID.
+		 * @param int    $user_id      User ID.
+		 * @param string $minimum_role Minimum role required.
+		 */
+		return apply_filters( 'datamachine_can_access_agent', $can_access, $agent_id, $user_id, $minimum_role );
 	}
 
 	/**
