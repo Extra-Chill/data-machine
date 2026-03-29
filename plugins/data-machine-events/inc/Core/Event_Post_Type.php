@@ -90,7 +90,30 @@ class Event_Post_Type {
 
 		register_post_type( self::POST_TYPE, $args );
 
+		// Limit revisions to prevent unbounded table growth. Events are
+		// machine-generated and frequently updated by pipelines, so unlimited
+		// revisions cause the posts table to bloat (e.g. 114K revisions for
+		// 23K events). Two revisions provides a safety net for rollback
+		// without the storage cost.
+		add_filter( 'wp_revisions_to_keep', array( __CLASS__, 'limit_event_revisions' ), 10, 2 );
+
 		self::setup_admin_menu_control();
+	}
+
+	/**
+	 * Limit the number of revisions kept for event posts.
+	 *
+	 * @since 0.24.0
+	 *
+	 * @param int      $num  Number of revisions to keep.
+	 * @param \WP_Post $post The post object.
+	 * @return int Filtered revision count.
+	 */
+	public static function limit_event_revisions( int $num, \WP_Post $post ): int {
+		if ( self::POST_TYPE === $post->post_type ) {
+			return 2;
+		}
+		return $num;
 	}
 
 	private static function setup_admin_menu_control() {
