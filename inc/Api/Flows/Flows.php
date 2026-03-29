@@ -12,19 +12,15 @@ namespace DataMachine\Api\Flows;
 
 use DataMachine\Abilities\PermissionHelper;
 use WP_REST_Server;
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
 class Flows {
+	use HasRegister;
 
-	/**
-	 * Register REST API routes
-	 */
-	public static function register() {
-		add_action( 'rest_api_init', array( self::class, 'register_routes' ) );
-	}
 
 	/**
 	 * Register flow CRUD endpoints

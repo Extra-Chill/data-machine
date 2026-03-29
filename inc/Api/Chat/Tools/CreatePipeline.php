@@ -17,6 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 use DataMachine\Abilities\StepTypeAbilities;
 use DataMachine\Engine\AI\Tools\BaseTool;
+use DataMachine\Api\Chat\Tools\CreateFlow;
 
 class CreatePipeline extends BaseTool {
 
@@ -256,33 +257,6 @@ class CreatePipeline extends BaseTool {
 		}
 
 		return $result;
-	}
-
-	private function validateSchedulingConfig( array $config ): bool|string {
-		if ( empty( $config ) ) {
-			return true;
-		}
-
-		$interval = $config['interval'] ?? null;
-
-		if ( null === $interval ) {
-			return 'scheduling_config requires an interval property';
-		}
-
-		$intervals       = array_keys( apply_filters( 'datamachine_scheduler_intervals', array() ) );
-		$valid_intervals = array_merge( array( 'manual', 'one_time' ), $intervals );
-		if ( ! in_array( $interval, $valid_intervals, true ) ) {
-			return 'Invalid interval. Must be one of: ' . implode( ', ', $valid_intervals );
-		}
-
-		if ( 'one_time' === $interval ) {
-			$timestamp = $config['timestamp'] ?? null;
-			if ( ! is_numeric( $timestamp ) || (int) $timestamp <= 0 ) {
-				return 'one_time interval requires a valid unix timestamp';
-			}
-		}
-
-		return true;
 	}
 
 	private function validateSteps( array $steps ): bool|string {

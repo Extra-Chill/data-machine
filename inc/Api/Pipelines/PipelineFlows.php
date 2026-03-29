@@ -11,19 +11,15 @@
 namespace DataMachine\Api\Pipelines;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
 class PipelineFlows {
+	use HasRegister;
 
-	/**
-	 * Register REST API routes
-	 */
-	public static function register() {
-		add_action( 'rest_api_init', array( self::class, 'register_routes' ) );
-	}
 
 	/**
 	 * Register pipeline flows relationship endpoint

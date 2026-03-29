@@ -15,20 +15,15 @@ use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\FlowStepAbilities;
 use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Abilities\StepTypeAbilities;
-
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
 class FlowSteps {
+	use HasRegister;
 
-	/**
-	 * Register REST API routes
-	 */
-	public static function register() {
-		add_action( 'rest_api_init', array( self::class, 'register_routes' ) );
-	}
 
 	/**
 	 * Register flow step configuration endpoints

@@ -11,10 +11,15 @@
 namespace DataMachine\Abilities\Fetch;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Abilities\Fetch\Traits\HasApplyKeywordSearch;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class FetchRssAbility {
+	use HasApplyKeywordSearch;
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -90,15 +95,6 @@ class FetchRssAbility {
 		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', $register_callback );
 		}
-	}
-
-	/**
-	 * Permission callback for ability.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 
 	/**
@@ -254,15 +250,15 @@ class FetchRssAbility {
 			$enclosure_url = $this->extractItemEnclosure( $item );
 
 			$metadata = array(
-				'source_type'            => 'rss',
-				'item_identifier'        => $guid,
-				'original_id'            => $guid,
-				'original_title'         => $title,
-				'original_date_gmt'      => $pub_date ? gmdate( 'Y-m-d\TH:i:s\Z', strtotime( $pub_date ) ) : null,
-				'author'                 => $author,
-				'categories'             => $categories,
-				'guid'                   => $guid,
-				'source_url'             => $link ? $link : '',
+				'source_type'       => 'rss',
+				'item_identifier'   => $guid,
+				'original_id'       => $guid,
+				'original_title'    => $title,
+				'original_date_gmt' => $pub_date ? gmdate( 'Y-m-d\TH:i:s\Z', strtotime( $pub_date ) ) : null,
+				'author'            => $author,
+				'categories'        => $categories,
+				'guid'              => $guid,
+				'source_url'        => $link ? $link : '',
 			);
 
 			$file_info = null;
@@ -539,28 +535,5 @@ class FetchRssAbility {
 		}
 
 		return $item_timestamp >= $cutoff;
-	}
-
-	/**
-	 * Apply keyword search filter.
-	 */
-	private function applyKeywordSearch( string $text, string $search_term ): bool {
-		if ( empty( $search_term ) ) {
-			return true;
-		}
-
-		$terms      = array_map( 'trim', explode( ',', $search_term ) );
-		$text_lower = strtolower( $text );
-
-		foreach ( $terms as $term ) {
-			if ( empty( $term ) ) {
-				continue;
-			}
-			if ( strpos( $text_lower, strtolower( $term ) ) !== false ) {
-				return true;
-			}
-		}
-
-		return false;
 	}
 }

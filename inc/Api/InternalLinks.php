@@ -19,12 +19,15 @@ namespace DataMachine\Api;
 
 use DataMachine\Abilities\PermissionHelper;
 use WP_REST_Server;
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
 class InternalLinks {
+	use HasRegister;
+
 
 	/**
 	 * Ability slugs mapped to their route names and HTTP methods.
@@ -49,13 +52,6 @@ class InternalLinks {
 			'method'  => WP_REST_Server::READABLE,
 		),
 	);
-
-	/**
-	 * Register the API endpoints.
-	 */
-	public static function register() {
-		add_action( 'rest_api_init', array( self::class, 'register_routes' ) );
-	}
 
 	/**
 	 * Register REST API routes for internal link tools.

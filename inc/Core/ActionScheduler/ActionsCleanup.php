@@ -48,6 +48,7 @@ add_action(
 
 		// Delete AS log entries for old completed/failed/canceled actions first (FK-safe order).
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$logs_deleted = $wpdb->query(
 			$wpdb->prepare(
 				"DELETE l FROM {$logs_table} l
@@ -57,9 +58,11 @@ add_action(
 				$cutoff_datetime
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		// Delete the completed/failed/canceled actions themselves.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$actions_deleted = $wpdb->query(
 			$wpdb->prepare(
 				"DELETE FROM {$actions_table}
@@ -68,6 +71,7 @@ add_action(
 				$cutoff_datetime
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		$total_deleted = ( false !== $logs_deleted ? $logs_deleted : 0 )
 			+ ( false !== $actions_deleted ? $actions_deleted : 0 );

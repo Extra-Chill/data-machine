@@ -17,8 +17,12 @@ defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Engine\AI\Tools\BaseTool;
 use DataMachine\Core\FilesRepository\DirectoryManager;
+use DataMachine\Engine\AI\Tools\Global\Traits\HasIsConfigured;
+use DataMachine\Engine\AI\Tools\Global\AgentMemory;
 
 class AgentDailyMemory extends BaseTool {
+	use HasIsConfigured;
+
 
 	public function __construct() {
 		$this->registerTool( 'agent_daily_memory', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ) );
@@ -284,37 +288,6 @@ class AgentDailyMemory extends BaseTool {
 				),
 			),
 		);
-	}
-
-	/**
-	 * Resolve scoped user ID from tool parameters.
-	 *
-	 * @param array $parameters Tool parameters.
-	 * @return int
-	 */
-	private function resolve_user_id( array $parameters ): int {
-		$directory_manager = new DirectoryManager();
-		$raw_user_id       = (int) ( $parameters['user_id'] ?? 0 );
-
-		if ( $raw_user_id > 0 ) {
-			return $directory_manager->get_effective_user_id( $raw_user_id );
-		}
-
-		$current_user_id = get_current_user_id();
-		if ( $current_user_id > 0 ) {
-			return $directory_manager->get_effective_user_id( $current_user_id );
-		}
-
-		return $directory_manager->get_effective_user_id( 0 );
-	}
-
-	/**
-	 * Always configured — no external dependencies.
-	 *
-	 * @return bool
-	 */
-	public static function is_configured(): bool {
-		return true;
 	}
 
 	/**

@@ -62,4 +62,21 @@ class EmailFetchSettings extends FetchHandlerSettings {
 		// Merge with common fetch handler fields (timeframe, keywords, max_items).
 		return array_merge( $fields, parent::get_common_fields() );
 	}
+
+	public function __construct() {
+		parent::__construct( 'email' );
+
+		self::registerHandler(
+			'email',
+			'fetch',
+			self::class,
+			'Email Inbox',
+			'Fetch emails from an IMAP inbox',
+			true,
+			EmailAuth::class,
+			self::class,
+			null,
+			'email_imap'
+		);
+	}
 }

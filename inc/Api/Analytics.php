@@ -22,12 +22,15 @@ namespace DataMachine\Api;
 
 use DataMachine\Abilities\PermissionHelper;
 use WP_REST_Server;
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
 class Analytics {
+	use HasRegister;
+
 
 	/**
 	 * Ability slugs mapped to their route names.
@@ -40,13 +43,6 @@ class Analytics {
 		'ga'        => 'datamachine/google-analytics',
 		'pagespeed' => 'datamachine/pagespeed',
 	);
-
-	/**
-	 * Register the API endpoints.
-	 */
-	public static function register() {
-		add_action( 'rest_api_init', array( self::class, 'register_routes' ) );
-	}
 
 	/**
 	 * Register REST API routes for all analytics tools.

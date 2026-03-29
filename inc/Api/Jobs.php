@@ -18,12 +18,15 @@ namespace DataMachine\Api;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\JobAbilities;
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
 class Jobs {
+	use HasRegister;
+
 
 	private static ?JobAbilities $abilities = null;
 
@@ -32,13 +35,6 @@ class Jobs {
 			self::$abilities = new JobAbilities();
 		}
 		return self::$abilities;
-	}
-
-	/**
-	 * Register REST API routes
-	 */
-	public static function register() {
-		add_action( 'rest_api_init', array( self::class, 'register_routes' ) );
 	}
 
 	/**
@@ -55,20 +51,20 @@ class Jobs {
 				'callback'            => array( self::class, 'handle_get_jobs' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
-					'orderby'     => array(
+					'orderby'       => array(
 						'required'    => false,
 						'type'        => 'string',
 						'default'     => 'job_id',
 						'description' => __( 'Order jobs by field', 'data-machine' ),
 					),
-					'order'       => array(
+					'order'         => array(
 						'required'    => false,
 						'type'        => 'string',
 						'default'     => 'DESC',
 						'enum'        => array( 'ASC', 'DESC' ),
 						'description' => __( 'Sort order', 'data-machine' ),
 					),
-					'per_page'    => array(
+					'per_page'      => array(
 						'required'    => false,
 						'type'        => 'integer',
 						'default'     => 50,
@@ -76,46 +72,46 @@ class Jobs {
 						'maximum'     => 100,
 						'description' => __( 'Number of jobs per page', 'data-machine' ),
 					),
-					'offset'      => array(
+					'offset'        => array(
 						'required'    => false,
 						'type'        => 'integer',
 						'default'     => 0,
 						'minimum'     => 0,
 						'description' => __( 'Offset for pagination', 'data-machine' ),
 					),
-					'pipeline_id' => array(
+					'pipeline_id'   => array(
 						'required'    => false,
 						'type'        => 'integer',
 						'description' => __( 'Filter by pipeline ID', 'data-machine' ),
 					),
-					'flow_id'     => array(
+					'flow_id'       => array(
 						'required'    => false,
 						'type'        => 'integer',
 						'description' => __( 'Filter by flow ID', 'data-machine' ),
 					),
-					'status'      => array(
+					'status'        => array(
 						'required'    => false,
 						'type'        => 'string',
 						'description' => __( 'Filter by job status', 'data-machine' ),
 					),
-				'user_id'        => array(
-					'required'          => false,
-					'type'              => 'integer',
-					'description'       => __( 'Filter by user ID (admin only, non-admins always see own data)', 'data-machine' ),
-					'sanitize_callback' => 'absint',
+					'user_id'       => array(
+						'required'          => false,
+						'type'              => 'integer',
+						'description'       => __( 'Filter by user ID (admin only, non-admins always see own data)', 'data-machine' ),
+						'sanitize_callback' => 'absint',
+					),
+					'parent_job_id' => array(
+						'required'    => false,
+						'type'        => 'integer',
+						'description' => __( 'Filter by parent job ID (for batch child jobs)', 'data-machine' ),
+					),
+					'hide_children' => array(
+						'required'    => false,
+						'type'        => 'boolean',
+						'default'     => false,
+						'description' => __( 'Hide child jobs from top-level list', 'data-machine' ),
+					),
 				),
-				'parent_job_id'  => array(
-					'required'    => false,
-					'type'        => 'integer',
-					'description' => __( 'Filter by parent job ID (for batch child jobs)', 'data-machine' ),
-				),
-				'hide_children'  => array(
-					'required'    => false,
-					'type'        => 'boolean',
-					'default'     => false,
-					'description' => __( 'Hide child jobs from top-level list', 'data-machine' ),
-				),
-			),
 			)
 		);
 

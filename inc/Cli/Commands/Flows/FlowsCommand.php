@@ -338,7 +338,7 @@ class FlowsCommand extends BaseCommand {
 		// Use 'full' mode for single-flow detail views.
 		$output_mode = $flow_id ? 'full' : 'list';
 
-		$result  = $ability->executeAbility(
+		$result = $ability->executeAbility(
 			array_merge(
 				$scoping,
 				array(
@@ -857,8 +857,8 @@ class FlowsCommand extends BaseCommand {
 		if ( null !== $handler_config ) {
 			// --handler-config accepts handler-keyed JSON, e.g. {"reddit":{"subreddit":"test"}}.
 			// Unwrap: the key is the handler slug, the value is the config.
-			$handler_slug       = null;
-			$unwrapped_config   = $handler_config;
+			$handler_slug        = null;
+			$unwrapped_config    = $handler_config;
 			$handler_config_keys = array_keys( $handler_config );
 
 			// If the top-level keys look like handler slugs (single key wrapping a config object),
@@ -954,8 +954,8 @@ class FlowsCommand extends BaseCommand {
 
 				// Coordinates (location field with lat,lon).
 				if ( ! empty( $hconfig['location'] ) && strpos( $hconfig['location'], ',' ) !== false ) {
-					$loc = $hconfig['location'];
-					$rad = $hconfig['radius'] ?? '';
+					$loc     = $hconfig['location'];
+					$rad     = $hconfig['radius'] ?? '';
 					$parts[] = $loc . ( $rad ? " r={$rad}" : '' );
 				}
 
@@ -966,8 +966,8 @@ class FlowsCommand extends BaseCommand {
 
 				// Source URL — show domain only.
 				if ( ! empty( $hconfig['source_url'] ) ) {
-					$host = wp_parse_url( $hconfig['source_url'], PHP_URL_HOST );
-					$parts[] = $host ?: $hconfig['source_url'];
+					$host    = wp_parse_url( $hconfig['source_url'], PHP_URL_HOST );
+					$parts[] = $host ? $host : $hconfig['source_url'];
 				}
 
 				// Venue/source name.
@@ -978,8 +978,8 @@ class FlowsCommand extends BaseCommand {
 				// Feed URL — show domain only.
 				$feed_url = $hconfig['feed_url'] ?? $hconfig['url'] ?? '';
 				if ( $feed_url && empty( $hconfig['source_url'] ) ) {
-					$host = wp_parse_url( $feed_url, PHP_URL_HOST );
-					$parts[] = $host ?: $feed_url;
+					$host    = wp_parse_url( $feed_url, PHP_URL_HOST );
+					$parts[] = $host ? $host : $feed_url;
 				}
 
 				// Taxonomy term selections (any taxonomy_*_selection key).
@@ -987,7 +987,7 @@ class FlowsCommand extends BaseCommand {
 					if ( strpos( $key, 'taxonomy_' ) === 0 && strpos( $key, '_selection' ) !== false ) {
 						if ( ! empty( $val ) && 'skip' !== $val && 'ai_decides' !== $val ) {
 							$tax_name = str_replace( array( 'taxonomy_', '_selection' ), '', $key );
-							$parts[] = "{$tax_name}={$val}";
+							$parts[]  = "{$tax_name}={$val}";
 						}
 					}
 				}
@@ -1000,7 +1000,7 @@ class FlowsCommand extends BaseCommand {
 			$summary = mb_substr( $summary, 0, 57 ) . '...';
 		}
 
-		return $summary ?: '—';
+		return $summary ? $summary : '—';
 	}
 
 	/**
@@ -1557,5 +1557,67 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		return array( 'interval' => $scheduling );
+	}
+
+	public function dispatch( array $args, array $assoc_args ): void {
+		$scope       = $assoc_args['scope'] ?? 'pipeline';
+		$handler     = $assoc_args['handler'] ?? null;
+		$config_json = $assoc_args['config'] ?? null;
+		$pipeline_id = $assoc_args['pipeline_id'] ?? null;
+		$flow_id     = $assoc_args['flow_id'] ?? null;
+		$step_type   = $assoc_args['step_type'] ?? null;
+		$dry_run     = isset( $assoc_args['dry-run'] );
+		$execute     = isset( $assoc_args['execute'] );
+		$format      = $assoc_args['format'] ?? 'table';
+
+		// Validate: must specify --dry-run or --execute.
+		if ( ! $dry_run && ! $execute ) {
+			WP_CLI::error( 'Specify --dry-run to preview or --execute to apply changes.' );
+			return;
+		}
+
+		// Validate: need a handler slug.
+		if ( empty( $handler ) ) {
+			WP_CLI::error( '--handler=<slug> is required.' );
+			return;
+		}
+
+		// Validate: need config JSON.
+		if ( empty( $config_json ) ) {
+			WP_CLI::error( '--config=<json> is required (e.g. --config=\'{"max_items":5}\').' );
+			return;
+		}
+
+		$handler_config = json_decode( wp_unslash( $config_json ), true );
+		if ( ! is_array( $handler_config ) ) {
+			WP_CLI::error( 'Invalid JSON in --config. Example: --config=\'{"max_items":5}\'' );
+			return;
+		}
+
+		// Route by scope.
+		switch ( $scope ) {
+			case 'global':
+				$this->executeGlobal( $handler, $handler_config, $step_type, $dry_run, $format );
+				break;
+
+			case 'pipeline':
+				if ( empty( $pipeline_id ) ) {
+					WP_CLI::error( '--pipeline_id=<id> is required for pipeline scope.' );
+					return;
+				}
+				$this->executePipeline( (int) $pipeline_id, $handler, $handler_config, $step_type, $dry_run, $format );
+				break;
+
+			case 'flow':
+				if ( empty( $flow_id ) ) {
+					WP_CLI::error( '--flow_id=<id> is required for flow scope.' );
+					return;
+				}
+				$this->executeFlow( (int) $flow_id, $handler, $handler_config, $step_type, $dry_run, $format );
+				break;
+
+			default:
+				WP_CLI::error( "Unknown scope: {$scope}. Use: global, pipeline, flow." );
+		}
 	}
 }

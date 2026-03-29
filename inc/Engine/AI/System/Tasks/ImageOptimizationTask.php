@@ -12,11 +12,14 @@
  * @since 0.42.0
  */
 
+use DataMachine\Engine\AI\System\Tasks\Traits\HasSupportsUndo;
 namespace DataMachine\Engine\AI\System\Tasks;
 
 defined( 'ABSPATH' ) || exit;
 
 class ImageOptimizationTask extends SystemTask {
+	use HasSupportsUndo;
+
 
 	/**
 	 * Get the task type identifier.
@@ -45,15 +48,6 @@ class ImageOptimizationTask extends SystemTask {
 	}
 
 	/**
-	 * Whether this task supports undo.
-	 *
-	 * @return bool
-	 */
-	public function supportsUndo(): bool {
-		return true;
-	}
-
-	/**
 	 * Execute image optimization for a single attachment.
 	 *
 	 * @param int   $jobId  DM Job ID.
@@ -71,7 +65,7 @@ class ImageOptimizationTask extends SystemTask {
 
 		$file_path = get_attached_file( $attachment_id );
 		if ( empty( $file_path ) || ! file_exists( $file_path ) ) {
-			$this->failJob( $jobId, 'Attachment file not found: ' . ( $file_path ?: 'empty path' ) );
+			$this->failJob( $jobId, 'Attachment file not found: ' . ( $file_path ? $file_path : 'empty path' ) );
 			return;
 		}
 
@@ -90,19 +84,19 @@ class ImageOptimizationTask extends SystemTask {
 			$compress_result = $this->compressImage( $file_path, $mime_type, $quality, $attachment_id );
 
 			if ( $compress_result['success'] ) {
-				$results['compressed']    = true;
-				$results['new_size']      = $compress_result['new_size'];
-				$results['savings']       = $original_size - $compress_result['new_size'];
-				$results['savings_pct']   = $original_size > 0 ? round( ( $results['savings'] / $original_size ) * 100, 1 ) : 0;
+				$results['compressed']  = true;
+				$results['new_size']    = $compress_result['new_size'];
+				$results['savings']     = $original_size - $compress_result['new_size'];
+				$results['savings_pct'] = $original_size > 0 ? round( ( $results['savings'] / $original_size ) * 100, 1 ) : 0;
 
 				$effects[] = array(
-					'type'           => 'attachment_file_modified',
-					'target'         => array(
+					'type'          => 'attachment_file_modified',
+					'target'        => array(
 						'attachment_id' => $attachment_id,
 						'file_path'     => $file_path,
 					),
-					'previous_size'  => $original_size,
-					'new_size'       => $compress_result['new_size'],
+					'previous_size' => $original_size,
+					'new_size'      => $compress_result['new_size'],
 				);
 
 				// Update attachment metadata with new file size.

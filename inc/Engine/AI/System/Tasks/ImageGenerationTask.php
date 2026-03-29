@@ -14,8 +14,11 @@ namespace DataMachine\Engine\AI\System\Tasks;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\HttpClient;
+use DataMachine\Engine\AI\System\Tasks\Traits\HasSupportsUndo;
 
 class ImageGenerationTask extends SystemTask {
+	use HasSupportsUndo;
+
 
 	/**
 	 * Maximum attempts for polling (24 attempts = ~120 seconds with 5s intervals).
@@ -766,15 +769,5 @@ class ImageGenerationTask extends SystemTask {
 			'trigger_type'    => 'tool',
 			'supports_run'    => false,
 		);
-	}
-
-	/**
-	 * Image generation supports undo — deletes attachment, reverts featured image and content.
-	 *
-	 * @return bool
-	 * @since 0.33.0
-	 */
-	public function supportsUndo(): bool {
-		return true;
 	}
 }

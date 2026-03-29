@@ -16,10 +16,13 @@
 namespace DataMachine\Abilities\Publish;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class SendEmailAbility {
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -124,15 +127,6 @@ class SendEmailAbility {
 	}
 
 	/**
-	 * Permission callback for ability.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
-	}
-
-	/**
 	 * Execute email send ability.
 	 *
 	 * @param array $input Input parameters.
@@ -170,8 +164,8 @@ class SendEmailAbility {
 		$headers[] = "Content-Type: {$content_type}; charset=UTF-8";
 
 		// From.
-		$from_name  = $config['from_name'] ?: get_bloginfo( 'name' );
-		$from_email = $config['from_email'] ?: get_option( 'admin_email' );
+		$from_name  = $config['from_name'] ? $config['from_name'] : get_bloginfo( 'name' );
+		$from_email = $config['from_email'] ? $config['from_email'] : get_option( 'admin_email' );
 		if ( $from_name && $from_email ) {
 			$headers[] = sprintf( 'From: %s <%s>', $from_name, $from_email );
 		}
@@ -262,7 +256,7 @@ class SendEmailAbility {
 		global $phpmailer;
 		$error_msg = 'wp_mail() returned false';
 		if ( isset( $phpmailer ) && $phpmailer instanceof \PHPMailer\PHPMailer\PHPMailer ) {
-			$error_msg = $phpmailer->ErrorInfo ?: $error_msg;
+			$error_msg = $phpmailer->ErrorInfo ? $phpmailer->ErrorInfo : $error_msg;
 		}
 
 		$logs[] = array(

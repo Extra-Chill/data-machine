@@ -16,6 +16,7 @@
 namespace DataMachine\Core\Database\Agents;
 
 use DataMachine\Core\Database\BaseRepository;
+use DataMachine\Core\Database\Agents\Agents;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -32,16 +33,6 @@ class AgentTokens extends BaseRepository {
 	 * Token prefix for identification.
 	 */
 	const TOKEN_PREFIX = 'datamachine_';
-
-	/**
-	 * Use network-level prefix so tokens are shared across the multisite network.
-	 *
-	 * @return string
-	 */
-	protected static function get_table_prefix(): string {
-		global $wpdb;
-		return $wpdb->base_prefix;
-	}
 
 	/**
 	 * Create agent_tokens table.

@@ -14,12 +14,15 @@ namespace DataMachine\Api;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\AuthAbilities;
 use WP_REST_Server;
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
 class Auth {
+	use HasRegister;
+
 
 	private static ?AuthAbilities $abilities = null;
 
@@ -28,13 +31,6 @@ class Auth {
 			self::$abilities = new AuthAbilities();
 		}
 		return self::$abilities;
-	}
-
-	/**
-	 * Register REST API routes
-	 */
-	public static function register() {
-		add_action( 'rest_api_init', array( self::class, 'register_routes' ) );
 	}
 
 	/**
@@ -277,8 +273,8 @@ class Auth {
 			return rest_ensure_response( $result );
 		}
 
-		$error   = $result['error'] ?? 'Unknown error';
-		$status  = 400;
+		$error  = $result['error'] ?? 'Unknown error';
+		$status = 400;
 
 		if ( str_contains( $error, 'not found' ) ) {
 			$status = 404;

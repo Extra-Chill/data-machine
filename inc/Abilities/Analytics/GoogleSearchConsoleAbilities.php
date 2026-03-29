@@ -13,10 +13,14 @@ namespace DataMachine\Abilities\Analytics;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
+use DataMachine\Abilities\Analytics\GoogleAnalyticsAbilities;
+use DataMachine\Abilities\Analytics\Traits\HasGetConfig;
 
 defined( 'ABSPATH' ) || exit;
 
 class GoogleSearchConsoleAbilities {
+	use HasGetConfig;
+
 
 	/**
 	 * Option key for storing GSC configuration.
@@ -651,17 +655,6 @@ class GoogleSearchConsoleAbilities {
 	}
 
 	/**
-	 * Base64url encode (RFC 7515).
-	 *
-	 * @param string $data Data to encode.
-	 * @return string Base64url encoded string.
-	 */
-	private static function base64url_encode( string $data ): string {
-		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions -- Required for API authentication, not obfuscation.
-		return rtrim( strtr( base64_encode( $data ), '+/', '-_' ), '=' );
-	}
-
-	/**
 	 * Check if Google Search Console is configured.
 	 *
 	 * @return bool
@@ -669,14 +662,5 @@ class GoogleSearchConsoleAbilities {
 	public static function is_configured(): bool {
 		$config = self::get_config();
 		return ! empty( $config['service_account_json'] );
-	}
-
-	/**
-	 * Get stored configuration.
-	 *
-	 * @return array
-	 */
-	public static function get_config(): array {
-		return get_site_option( self::CONFIG_OPTION, array() );
 	}
 }

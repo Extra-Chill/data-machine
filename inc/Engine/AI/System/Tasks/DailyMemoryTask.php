@@ -312,10 +312,10 @@ class DailyMemoryTask extends SystemTask {
 					. "- Preserve the document's existing heading structure\n"
 					. "- If a section is entirely temporal, archive the whole section\n"
 					. "- If a section mixes persistent facts with session detail, keep the facts and archive the detail\n\n"
-					. "{{activity_section}}"
+					. '{{activity_section}}'
 					. "---\n\n"
 					. "## Current MEMORY.md Content\n\n"
-					. "{{memory_content}}",
+					. '{{memory_content}}',
 				'variables'   => array(
 					'memory_content'   => 'Current full content of MEMORY.md',
 					'date'             => 'Target date for archival context (YYYY-MM-DD)',

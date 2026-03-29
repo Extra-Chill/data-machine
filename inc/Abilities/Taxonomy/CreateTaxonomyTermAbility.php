@@ -13,10 +13,13 @@ namespace DataMachine\Abilities\Taxonomy;
 use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Core\WordPress\TaxonomyHandler;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class CreateTaxonomyTermAbility {
+	use HasCheckPermission;
+
 
 	public function __construct() {
 		if ( ! class_exists( 'WP_Ability' ) ) {
@@ -211,14 +214,5 @@ class CreateTaxonomyTermAbility {
 			'created'   => true,
 			'existed'   => false,
 		);
-	}
-
-	/**
-	 * Check permission for this ability.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 }

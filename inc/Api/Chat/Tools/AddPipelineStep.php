@@ -17,16 +17,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 use DataMachine\Abilities\StepTypeAbilities;
 use DataMachine\Engine\AI\Tools\BaseTool;
+use DataMachine\Api\Chat\Tools\CreatePipeline;
 
 class AddPipelineStep extends BaseTool {
 
 	public function __construct() {
 		$this->registerTool( 'add_pipeline_step', array( $this, 'getToolDefinition' ), array( 'chat' ) );
-	}
-
-	private static function getValidStepTypes(): array {
-		$step_type_abilities = new StepTypeAbilities();
-		return array_keys( $step_type_abilities->getAllStepTypes() );
 	}
 
 	/**

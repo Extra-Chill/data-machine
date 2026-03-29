@@ -20,10 +20,13 @@ use DataMachine\Core\HttpClient;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\RequestBuilder;
 use DataMachine\Engine\Tasks\TaskScheduler;
+use DataMachine\Abilities\Analytics\Traits\HasGetConfig;
 
 defined( 'ABSPATH' ) || exit;
 
 class ImageGenerationAbilities {
+	use HasGetConfig;
+
 
 	/**
 	 * Option key for storing image generation configuration.
@@ -455,14 +458,5 @@ class ImageGenerationAbilities {
 	public static function is_configured(): bool {
 		$config = self::get_config();
 		return ! empty( $config['api_key'] );
-	}
-
-	/**
-	 * Get stored configuration.
-	 *
-	 * @return array
-	 */
-	public static function get_config(): array {
-		return get_site_option( self::CONFIG_OPTION, array() );
 	}
 }

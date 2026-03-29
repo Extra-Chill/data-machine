@@ -18,12 +18,15 @@ use DataMachine\Abilities\PermissionHelper;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Server;
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
 class AgentFiles {
+	use HasRegister;
+
 
 	private static ?AgentFileAbilities $abilities = null;
 
@@ -32,13 +35,6 @@ class AgentFiles {
 			self::$abilities = new AgentFileAbilities();
 		}
 		return self::$abilities;
-	}
-
-	/**
-	 * Register REST API routes.
-	 */
-	public static function register() {
-		add_action( 'rest_api_init', array( self::class, 'register_routes' ) );
 	}
 
 	/**
@@ -525,7 +521,7 @@ class AgentFiles {
 	 * @return string Full path to the contexts directory.
 	 */
 	private static function resolve_contexts_dir( WP_REST_Request $request ): string {
-		$dm = new \DataMachine\Core\FilesRepository\DirectoryManager();
+		$dm      = new \DataMachine\Core\FilesRepository\DirectoryManager();
 		$user_id = $dm->get_effective_user_id( self::resolve_scoped_user_id( $request ) );
 
 		$context = array( 'user_id' => $user_id );

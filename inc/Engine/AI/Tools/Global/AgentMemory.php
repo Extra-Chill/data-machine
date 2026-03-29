@@ -9,15 +9,17 @@
  * @package DataMachine\Engine\AI\Tools\Global
  * @since   0.30.0
  */
-
-	namespace DataMachine\Engine\AI\Tools\Global;
+namespace DataMachine\Engine\AI\Tools\Global;
 
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Engine\AI\Tools\BaseTool;
 use DataMachine\Core\FilesRepository\DirectoryManager;
+use DataMachine\Engine\AI\Tools\Global\Traits\HasIsConfigured;
 
 class AgentMemory extends BaseTool {
+	use HasIsConfigured;
+
 
 	public function __construct() {
 		$this->registerTool( 'agent_memory', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ) );
@@ -245,15 +247,6 @@ class AgentMemory extends BaseTool {
 		}
 
 		return $directory_manager->get_effective_user_id( 0 );
-	}
-
-	/**
-	 * Always configured — no external dependencies.
-	 *
-	 * @return bool
-	 */
-	public static function is_configured(): bool {
-		return true;
 	}
 
 	/**

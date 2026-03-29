@@ -17,19 +17,15 @@ namespace DataMachine\Api;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\LogAbilities;
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
 class Logs {
+	use HasRegister;
 
-	/**
-	 * Register REST API routes.
-	 */
-	public static function register() {
-		add_action( 'rest_api_init', array( self::class, 'register_routes' ) );
-	}
 
 	/**
 	 * Register all log-related REST endpoints.

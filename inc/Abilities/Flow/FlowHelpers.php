@@ -19,10 +19,13 @@ use DataMachine\Core\Admin\FlowFormatter;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Pipelines\Pipelines;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 trait FlowHelpers {
+	use HasCheckPermission;
+
 
 	protected Flows $db_flows;
 	protected Pipelines $db_pipelines;
@@ -32,15 +35,6 @@ trait FlowHelpers {
 		$this->db_flows     = new Flows();
 		$this->db_pipelines = new Pipelines();
 		$this->db_jobs      = new Jobs();
-	}
-
-	/**
-	 * Permission callback for abilities.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 
 	/**

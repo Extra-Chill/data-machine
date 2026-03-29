@@ -11,10 +11,15 @@
 namespace DataMachine\Abilities\Fetch;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Abilities\Fetch\Traits\HasApplyKeywordSearch;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class QueryWordPressPostsAbility {
+	use HasApplyKeywordSearch;
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -111,15 +116,6 @@ class QueryWordPressPostsAbility {
 		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', $register_callback );
 		}
-	}
-
-	/**
-	 * Permission callback for ability.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 
 	/**
@@ -273,17 +269,17 @@ class QueryWordPressPostsAbility {
 				'title'    => $title,
 				'content'  => $content,
 				'metadata' => array(
-					'source_type'            => 'wordpress_local',
-					'item_identifier'        => $post_id,
-					'original_id'            => $post_id,
-					'original_title'         => $title,
-					'original_date_gmt'      => $post->post_date_gmt,
-					'post_type'              => $post->post_type,
-					'post_status'            => $post->post_status,
-					'site_name'              => $site_name,
-					'permalink'              => get_permalink( $post_id ) ?? '',
-					'excerpt'                => $post->post_excerpt,
-					'author'                 => get_the_author_meta( 'display_name', (int) $post->post_author ),
+					'source_type'       => 'wordpress_local',
+					'item_identifier'   => $post_id,
+					'original_id'       => $post_id,
+					'original_title'    => $title,
+					'original_date_gmt' => $post->post_date_gmt,
+					'post_type'         => $post->post_type,
+					'post_status'       => $post->post_status,
+					'site_name'         => $site_name,
+					'permalink'         => get_permalink( $post_id ) ?? '',
+					'excerpt'           => $post->post_excerpt,
+					'author'            => get_the_author_meta( 'display_name', (int) $post->post_author ),
 				),
 			);
 
@@ -324,28 +320,5 @@ class QueryWordPressPostsAbility {
 		);
 
 		return array_merge( $defaults, $input );
-	}
-
-	/**
-	 * Apply keyword search filter.
-	 */
-	private function applyKeywordSearch( string $text, string $search_term ): bool {
-		if ( empty( $search_term ) ) {
-			return true;
-		}
-
-		$terms      = array_map( 'trim', explode( ',', $search_term ) );
-		$text_lower = strtolower( $text );
-
-		foreach ( $terms as $term ) {
-			if ( empty( $term ) ) {
-				continue;
-			}
-			if ( strpos( $text_lower, strtolower( $term ) ) !== false ) {
-				return true;
-			}
-		}
-
-		return false;
 	}
 }

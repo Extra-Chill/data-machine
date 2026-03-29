@@ -18,6 +18,7 @@ use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\HttpClient;
 use DataMachine\Core\WordPress\PostTracking;
+use DataMachine\Core\Steps\Fetch\Handlers\FetchHandler;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -332,17 +333,6 @@ abstract class PublishHandler {
 				$context
 			)
 		);
-	}
-
-	/**
-	 * Get OAuth provider instance.
-	 *
-	 * @param string $provider_key Provider key (e.g., 'reddit', 'googlesheets')
-	 * @return object|null Provider instance or null
-	 */
-	protected function getAuthProvider( string $provider_key ): ?object {
-		$auth_abilities = new AuthAbilities();
-		return $auth_abilities->getProvider( $provider_key );
 	}
 
 	/**

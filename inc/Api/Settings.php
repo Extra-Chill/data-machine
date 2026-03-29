@@ -15,12 +15,15 @@ use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\SettingsAbilities;
 use WP_REST_Response;
 use WP_REST_Server;
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
 class Settings {
+	use HasRegister;
+
 
 	private static ?SettingsAbilities $abilities = null;
 
@@ -29,13 +32,6 @@ class Settings {
 			self::$abilities = new SettingsAbilities();
 		}
 		return self::$abilities;
-	}
-
-	/**
-	 * Register REST API routes
-	 */
-	public static function register() {
-		add_action( 'rest_api_init', array( self::class, 'register_routes' ) );
 	}
 
 	/**

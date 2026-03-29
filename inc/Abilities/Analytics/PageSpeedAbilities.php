@@ -18,10 +18,15 @@ namespace DataMachine\Abilities\Analytics;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
+use DataMachine\Abilities\Analytics\Traits\HasGetConfig;
+use DataMachine\Engine\AI\Tools\Global\Traits\HasIsConfigured;
 
 defined( 'ABSPATH' ) || exit;
 
 class PageSpeedAbilities {
+	use HasGetConfig;
+	use HasIsConfigured;
+
 
 	/**
 	 * Option key for storing PageSpeed configuration.
@@ -408,24 +413,159 @@ class PageSpeedAbilities {
 		return $metrics;
 	}
 
-	/**
-	 * Check if PageSpeed Insights is configured.
-	 *
-	 * PageSpeed works without an API key (just rate-limited),
-	 * so we always consider it configured.
-	 *
-	 * @return bool
-	 */
-	public static function is_configured(): bool {
-		return true;
-	}
 
-	/**
-	 * Get stored configuration.
-	 *
-	 * @return array
-	 */
-	public static function get_config(): array {
-		return get_site_option( self::CONFIG_OPTION, array() );
+	public static function fetchStats( array $input ): array {
+		$action = sanitize_text_field( $input['action'] ?? '' );
+
+		$valid_actions = array_merge(
+			array_keys( self::ACTION_DIMENSIONS ),
+			array( 'inspect_url', 'list_sitemaps', 'get_sitemap', 'submit_sitemap' )
+		);
+		if ( empty( $action ) || ! in_array( $action, $valid_actions, true ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Invalid action. Must be one of: ' . implode( ', ', $valid_actions ),
+			);
+		}
+
+		$config = self::get_config();
+
+		if ( empty( $config['service_account_json'] ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Google Search Console not configured. Add service account JSON in Settings.',
+			);
+		}
+
+		$service_account = json_decode( $config['service_account_json'], true );
+
+		if ( json_last_error() !== JSON_ERROR_NONE || empty( $service_account['client_email'] ) || empty( $service_account['private_key'] ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Invalid service account JSON. Ensure it contains client_email and private_key.',
+			);
+		}
+
+		$access_token = self::get_access_token( $service_account );
+
+		if ( is_wp_error( $access_token ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to authenticate: ' . $access_token->get_error_message(),
+			);
+		}
+
+		$site_url = ! empty( $input['site_url'] ) ? sanitize_text_field( $input['site_url'] ) : ( $config['site_url'] ?? '' );
+
+		// Route to specialized handlers for non-analytics actions.
+		if ( 'inspect_url' === $action ) {
+			return self::inspectUrl( $input, $access_token, $site_url );
+		}
+		if ( 'list_sitemaps' === $action ) {
+			return self::listSitemaps( $access_token, $site_url );
+		}
+		if ( 'get_sitemap' === $action ) {
+			return self::getSitemap( $input, $access_token, $site_url );
+		}
+		if ( 'submit_sitemap' === $action ) {
+			return self::submitSitemap( $input, $access_token, $site_url );
+		}
+
+		$start_date = ! empty( $input['start_date'] ) ? sanitize_text_field( $input['start_date'] ) : gmdate( 'Y-m-d', strtotime( '-28 days' ) );
+		$end_date   = ! empty( $input['end_date'] ) ? sanitize_text_field( $input['end_date'] ) : gmdate( 'Y-m-d', strtotime( '-3 days' ) );
+		$limit      = ! empty( $input['limit'] ) ? min( (int) $input['limit'], self::MAX_LIMIT ) : self::DEFAULT_LIMIT;
+		$dimensions = self::ACTION_DIMENSIONS[ $action ];
+
+		if ( empty( $site_url ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'No site URL configured or provided.',
+			);
+		}
+
+		$request_body = array(
+			'startDate'  => $start_date,
+			'endDate'    => $end_date,
+			'dimensions' => $dimensions,
+			'rowLimit'   => $limit,
+			'dataState'  => 'final',
+		);
+
+		// Build dimension filter groups if filters provided.
+		$filters = array();
+
+		if ( ! empty( $input['url_filter'] ) ) {
+			$filters[] = array(
+				'dimension'  => 'page',
+				'operator'   => 'contains',
+				'expression' => sanitize_text_field( $input['url_filter'] ),
+			);
+		}
+
+		if ( ! empty( $input['query_filter'] ) ) {
+			$filters[] = array(
+				'dimension'  => 'query',
+				'operator'   => 'contains',
+				'expression' => sanitize_text_field( $input['query_filter'] ),
+			);
+		}
+
+		if ( ! empty( $filters ) ) {
+			$request_body['dimensionFilterGroups'] = array(
+				array(
+					'groupType' => 'and',
+					'filters'   => $filters,
+				),
+			);
+		}
+
+		$encoded_site_url = rawurlencode( $site_url );
+		$api_url          = "https://www.googleapis.com/webmasters/v3/sites/{$encoded_site_url}/searchAnalytics/query";
+
+		$result = HttpClient::post(
+			$api_url,
+			array(
+				'timeout' => 30,
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $access_token,
+					'Content-Type'  => 'application/json',
+				),
+				'body'    => wp_json_encode( $request_body ),
+				'context' => 'Google Search Console Ability',
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to connect to Google Search Console API: ' . ( $result['error'] ?? 'Unknown error' ),
+			);
+		}
+
+		$data = json_decode( $result['data'], true );
+
+		if ( json_last_error() !== JSON_ERROR_NONE ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to parse Google Search Console API response.',
+			);
+		}
+
+		if ( ! empty( $data['error'] ) ) {
+			$error_message = $data['error']['message'] ?? 'Unknown API error';
+			return array(
+				'success' => false,
+				'error'   => 'GSC API error: ' . $error_message,
+			);
+		}
+
+		$rows = $data['rows'] ?? array();
+
+		return array(
+			'success'       => true,
+			'action'        => $action,
+			'results_count' => count( $rows ),
+			'results'       => $rows,
+		);
 	}
 }

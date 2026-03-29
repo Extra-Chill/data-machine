@@ -16,12 +16,15 @@ namespace DataMachine\Api;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\ProcessedItemsAbilities;
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
 class ProcessedItems {
+	use HasRegister;
+
 
 	private static ?ProcessedItemsAbilities $abilities = null;
 
@@ -30,13 +33,6 @@ class ProcessedItems {
 			self::$abilities = new ProcessedItemsAbilities();
 		}
 		return self::$abilities;
-	}
-
-	/**
-	 * Register REST API routes
-	 */
-	public static function register() {
-		add_action( 'rest_api_init', array( self::class, 'register_routes' ) );
 	}
 
 	/**

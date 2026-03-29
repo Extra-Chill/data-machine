@@ -14,6 +14,7 @@ namespace DataMachine\Api;
 use WP_REST_Server;
 use WP_REST_Request;
 use WP_REST_Response;
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;
@@ -27,6 +28,8 @@ if ( ! defined( 'WPINC' ) ) {
  * @since 0.22.0
  */
 class AgentPing {
+	use HasRegister;
+
 
 	/**
 	 * Default callback TTL in seconds (1 hour).
@@ -34,15 +37,6 @@ class AgentPing {
 	 * @since 0.29.0
 	 */
 	const CALLBACK_TTL = HOUR_IN_SECONDS;
-
-	/**
-	 * Register the API endpoint.
-	 *
-	 * @since 0.22.0
-	 */
-	public static function register() {
-		add_action( 'rest_api_init', array( self::class, 'register_routes' ) );
-	}
 
 	/**
 	 * Register REST API routes.

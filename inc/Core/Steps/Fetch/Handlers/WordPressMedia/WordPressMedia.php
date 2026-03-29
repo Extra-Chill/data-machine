@@ -22,6 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class WordPressMedia extends FetchHandler {
 
 	use HandlerRegistrationTrait;
+	use DataMachine\Core\Steps\Fetch\Handlers\Files\Files;
 
 	public function __construct() {
 		parent::__construct( 'wordpress_media' );
@@ -89,25 +90,5 @@ class WordPressMedia extends FetchHandler {
 		}
 
 		return array( 'items' => $processed_items );
-	}
-
-	/**
-	 * Get processed items for deduplication.
-	 *
-	 * @param ExecutionContext $context Execution context.
-	 * @return array Array of processed item IDs.
-	 */
-	private function getProcessedItems( ExecutionContext $context ): array {
-		if ( $context->isDirect() ) {
-			return array();
-		}
-
-		$flow_step_id = $context->getFlowStepId();
-		if ( empty( $flow_step_id ) ) {
-			return array();
-		}
-
-		$processed_items_table = new \DataMachine\Core\Database\ProcessedItems\ProcessedItems();
-		return $processed_items_table->get_processed_item_ids( $flow_step_id );
 	}
 }

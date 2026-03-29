@@ -16,6 +16,7 @@ use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Abilities\StepTypeAbilities;
 use WP_REST_Server;
 use WP_REST_Request;
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -27,13 +28,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Provides REST endpoint for handler discovery and metadata.
  */
 class Handlers {
+	use HasRegister;
 
-	/**
-	 * Register the API endpoint.
-	 */
-	public static function register() {
-		add_action( 'rest_api_init', array( self::class, 'register_routes' ) );
-	}
 
 	/**
 	 * Register REST API routes
@@ -255,5 +251,18 @@ class Handlers {
 				),
 			)
 		);
+	}
+
+	public static function check_permission( $request ) {
+		$request;
+		if ( ! PermissionHelper::can( 'manage_flows' ) ) {
+			return new \WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to manage processed items.', 'data-machine' ),
+				array( 'status' => 403 )
+			);
+		}
+
+		return true;
 	}
 }

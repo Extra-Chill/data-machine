@@ -16,12 +16,15 @@ use DataMachine\Abilities\PermissionHelper;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Server;
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
 class FlowFiles {
+	use HasRegister;
+
 
 	private static ?FlowFileAbilities $abilities = null;
 
@@ -30,13 +33,6 @@ class FlowFiles {
 			self::$abilities = new FlowFileAbilities();
 		}
 		return self::$abilities;
-	}
-
-	/**
-	 * Register REST API routes.
-	 */
-	public static function register() {
-		add_action( 'rest_api_init', array( self::class, 'register_routes' ) );
 	}
 
 	/**

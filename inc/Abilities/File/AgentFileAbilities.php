@@ -21,10 +21,14 @@ use DataMachine\Core\FilesRepository\DailyMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Core\FilesRepository\FilesystemHelper;
 use DataMachine\Engine\AI\MemoryFileRegistry;
+use DataMachine\Abilities\Traits\HasCheckPermission;
+use DataMachine\Abilities\File\FlowFileAbilities;
 
 defined( 'ABSPATH' ) || exit;
 
 class AgentFileAbilities {
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -267,13 +271,6 @@ class AgentFileAbilities {
 	// Permission
 	// =========================================================================
 
-	/**
-	 * @return bool
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
-	}
-
 	// =========================================================================
 	// Execute callbacks
 	// =========================================================================
@@ -348,23 +345,23 @@ class AgentFileAbilities {
 			'agent_id' => (int) ( $input['agent_id'] ?? 0 ),
 			'user_id'  => $user_id,
 		);
-		$contexts_dir = $dm->get_contexts_directory( $agent_context );
+		$contexts_dir  = $dm->get_contexts_directory( $agent_context );
 
 		if ( is_dir( $contexts_dir ) ) {
 			foreach ( glob( trailingslashit( $contexts_dir ) . '*.md' ) as $filepath ) {
 				$filename = basename( $filepath );
 				$slug     = pathinfo( $filename, PATHINFO_FILENAME );
 				$files[]  = array(
-					'filename'    => $filename,
-					'size'        => filesize( $filepath ),
-					'modified'    => gmdate( 'c', filemtime( $filepath ) ),
-					'type'        => 'context',
-					'layer'       => 'context',
-					'protected'   => false,
-					'editable'    => true,
-					'registered'  => false,
-					'label'       => ucfirst( $slug ) . ' Context',
-					'description' => "Context-scoped instructions loaded when execution context is '{$slug}'.",
+					'filename'     => $filename,
+					'size'         => filesize( $filepath ),
+					'modified'     => gmdate( 'c', filemtime( $filepath ) ),
+					'type'         => 'context',
+					'layer'        => 'context',
+					'protected'    => false,
+					'editable'     => true,
+					'registered'   => false,
+					'label'        => ucfirst( $slug ) . ' Context',
+					'description'  => "Context-scoped instructions loaded when execution context is '{$slug}'.",
 					'context_slug' => $slug,
 				);
 			}
@@ -694,40 +691,5 @@ class AgentFileAbilities {
 					'user_id'  => $user_id,
 				) );
 		}
-	}
-
-	/**
-	 * Normalize and escape file response entry.
-	 *
-	 * @param array $file File data.
-	 * @return array Sanitized file data.
-	 */
-	private function sanitizeFileEntry( array $file ): array {
-		$sanitized = $file;
-
-		if ( isset( $sanitized['filename'] ) ) {
-			$sanitized['filename'] = sanitize_file_name( $sanitized['filename'] );
-		}
-
-		if ( isset( $sanitized['original_name'] ) ) {
-			$sanitized['original_name'] = sanitize_file_name( $sanitized['original_name'] );
-		}
-
-		if ( isset( $sanitized['content'] ) ) {
-			$sanitized['content'] = wp_kses_post( $sanitized['content'] );
-		}
-
-		return $sanitized;
-	}
-
-	/**
-	 * Derive a human-readable label from a filename.
-	 *
-	 * @param string $filename The filename.
-	 * @return string Label.
-	 */
-	private static function filename_to_label( string $filename ): string {
-		$name = pathinfo( $filename, PATHINFO_FILENAME );
-		return ucwords( str_replace( array( '-', '_' ), ' ', $name ) );
 	}
 }

@@ -13,8 +13,11 @@ namespace DataMachine\Engine\AI\Tools\Global;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Engine\AI\Tools\BaseTool;
+use DataMachine\Engine\AI\Tools\Global\Traits\HasIsConfigured;
 
 class LocalSearch extends BaseTool {
+	use HasIsConfigured;
+
 
 	public function __construct() {
 		$this->registerTool( 'local_search', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ) );
@@ -87,10 +90,6 @@ class LocalSearch extends BaseTool {
 				),
 			),
 		);
-	}
-
-	public static function is_configured(): bool {
-		return true;
 	}
 
 	public function check_configuration( $configured, $tool_id ) {

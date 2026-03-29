@@ -588,4 +588,143 @@ class WebhookTriggerAbility {
 	public static function get_webhook_url( int $flow_id ): string {
 		return rest_url( "datamachine/v1/trigger/{$flow_id}" );
 	}
+
+	public function execute( array $input ): array {
+		$flow_id     = isset( $input['flow_id'] ) ? (int) $input['flow_id'] : null;
+		$pipeline_id = isset( $input['pipeline_id'] ) ? (int) $input['pipeline_id'] : null;
+		$agent_id    = isset( $input['agent_id'] ) ? (int) $input['agent_id'] : null;
+
+		if ( null === $flow_id && null === $pipeline_id && null === $agent_id ) {
+			return array(
+				'success' => false,
+				'error'   => 'Must provide flow_id, pipeline_id, or agent_id.',
+			);
+		}
+
+		$flows = $this->resolveFlows( $flow_id, $pipeline_id, $agent_id );
+
+		if ( empty( $flows ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'No flows found matching the specified criteria.',
+			);
+		}
+
+		$resumed = 0;
+		$skipped = 0;
+		$errors  = 0;
+		$details = array();
+
+		foreach ( $flows as $flow ) {
+			$fid        = (int) $flow['flow_id'];
+			$scheduling = $flow['scheduling_config'] ?? array();
+
+			// Not paused — skip.
+			if ( ! isset( $scheduling['enabled'] ) || false !== $scheduling['enabled'] ) {
+				++$skipped;
+				$details[] = array(
+					'flow_id' => $fid,
+					'status'  => 'not_paused',
+				);
+				continue;
+			}
+
+			// Remove the enabled key (default is enabled) and re-register schedule.
+			unset( $scheduling['enabled'] );
+			$this->db_flows->update_flow_scheduling( $fid, $scheduling );
+
+			// Re-register Action Scheduler hooks from the preserved schedule.
+			$interval = $scheduling['interval'] ?? 'manual';
+			if ( 'manual' !== $interval ) {
+				$result = FlowScheduling::handle_scheduling_update( $fid, $scheduling, true );
+				if ( is_wp_error( $result ) ) {
+					++$errors;
+					$details[] = array(
+						'flow_id' => $fid,
+						'status'  => 'resume_error',
+						'error'   => $result->get_error_message(),
+					);
+					continue;
+				}
+			}
+
+			++$resumed;
+			$details[] = array(
+				'flow_id' => $fid,
+				'status'  => 'resumed',
+			);
+		}
+
+		$scope = $flow_id ? "flow {$flow_id}" : ( $pipeline_id ? "pipeline {$pipeline_id}" : "agent {$agent_id}" );
+
+		do_action(
+			'datamachine_log',
+			'info',
+			"Flows resumed for {$scope}",
+			array(
+				'resumed' => $resumed,
+				'skipped' => $skipped,
+				'errors'  => $errors,
+			)
+		);
+
+		return array(
+			'success' => true,
+			'resumed' => $resumed,
+			'skipped' => $skipped,
+			'errors'  => $errors,
+			'flows'   => $details,
+			'message' => sprintf( 'Resumed %d flow(s), skipped %d (not paused), %d error(s).', $resumed, $skipped, $errors ),
+		);
+	}
+
+	private function registerAbility(): void {
+		$register_callback = function () {
+			wp_register_ability(
+				'datamachine/resume-flow',
+				array(
+					'label'               => __( 'Resume Flow', 'data-machine' ),
+					'description'         => __( 'Resume one or more paused flows. Re-registers schedules.', 'data-machine' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'flow_id'     => array(
+								'type'        => 'integer',
+								'description' => __( 'Single flow ID to resume.', 'data-machine' ),
+							),
+							'pipeline_id' => array(
+								'type'        => 'integer',
+								'description' => __( 'Resume all flows in this pipeline.', 'data-machine' ),
+							),
+							'agent_id'    => array(
+								'type'        => 'integer',
+								'description' => __( 'Resume all flows for this agent.', 'data-machine' ),
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'resumed' => array( 'type' => 'integer' ),
+							'skipped' => array( 'type' => 'integer' ),
+							'errors'  => array( 'type' => 'integer' ),
+							'flows'   => array( 'type' => 'array' ),
+							'error'   => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( $this, 'execute' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+		};
+
+		if ( doing_action( 'wp_abilities_api_init' ) ) {
+			$register_callback();
+		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
+			add_action( 'wp_abilities_api_init', $register_callback );
+		}
+	}
 }

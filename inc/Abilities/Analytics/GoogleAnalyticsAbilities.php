@@ -19,10 +19,13 @@ namespace DataMachine\Abilities\Analytics;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
+use DataMachine\Abilities\Analytics\Traits\HasGetConfig;
 
 defined( 'ABSPATH' ) || exit;
 
 class GoogleAnalyticsAbilities {
+	use HasGetConfig;
+
 
 	/**
 	 * Option key for storing GA configuration.
@@ -724,14 +727,5 @@ class GoogleAnalyticsAbilities {
 	public static function is_configured(): bool {
 		$config = self::get_config();
 		return ! empty( $config['service_account_json'] ) && ! empty( $config['property_id'] );
-	}
-
-	/**
-	 * Get stored configuration.
-	 *
-	 * @return array
-	 */
-	public static function get_config(): array {
-		return get_site_option( self::CONFIG_OPTION, array() );
 	}
 }

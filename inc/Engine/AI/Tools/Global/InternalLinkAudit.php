@@ -19,8 +19,11 @@ namespace DataMachine\Engine\AI\Tools\Global;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Engine\AI\Tools\BaseTool;
+use DataMachine\Engine\AI\Tools\Global\Traits\HasIsConfigured;
 
 class InternalLinkAudit extends BaseTool {
+	use HasIsConfigured;
+
 
 	public function __construct() {
 		$this->registerTool( 'internal_link_audit', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ) );
@@ -126,10 +129,6 @@ class InternalLinkAudit extends BaseTool {
 				),
 			),
 		);
-	}
-
-	public static function is_configured(): bool {
-		return true;
 	}
 
 	public function check_configuration( $configured, $tool_id ) {

@@ -11,10 +11,15 @@
 namespace DataMachine\Abilities\Fetch;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Abilities\Fetch\Traits\HasApplyKeywordSearch;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class FetchWordPressMediaAbility {
+	use HasApplyKeywordSearch;
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -95,15 +100,6 @@ class FetchWordPressMediaAbility {
 		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', $register_callback );
 		}
-	}
-
-	/**
-	 * Permission callback for ability.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 
 	/**
@@ -262,18 +258,18 @@ class FetchWordPressMediaAbility {
 				'title'     => $content_data['title'] ?? '',
 				'content'   => $content_data['content'] ?? '',
 				'metadata'  => array(
-					'source_type'            => 'wordpress_media',
-					'item_identifier'        => $post->ID,
-					'original_id'            => $post->ID,
-					'parent_post_id'         => $post->post_parent,
-					'original_title'         => $title,
-					'original_date_gmt'      => $post->post_date_gmt,
-					'mime_type'              => $file_type,
-					'file_size'              => $file_size,
-					'site_name'              => $site_name,
-					'source_url'             => $source_url,
-					'image_file_path'        => strpos( $file_type, 'video/' ) !== 0 ? $file_path : '',
-					'_engine_data'           => $engine_data,
+					'source_type'       => 'wordpress_media',
+					'item_identifier'   => $post->ID,
+					'original_id'       => $post->ID,
+					'parent_post_id'    => $post->post_parent,
+					'original_title'    => $title,
+					'original_date_gmt' => $post->post_date_gmt,
+					'mime_type'         => $file_type,
+					'file_size'         => $file_size,
+					'site_name'         => $site_name,
+					'source_url'        => $source_url,
+					'image_file_path'   => strpos( $file_type, 'video/' ) !== 0 ? $file_path : '',
+					'_engine_data'      => $engine_data,
 				),
 				'file_info' => $file_info,
 			);
@@ -356,28 +352,5 @@ class FetchWordPressMediaAbility {
 		}
 
 		return $mime_patterns;
-	}
-
-	/**
-	 * Apply keyword search filter.
-	 */
-	private function applyKeywordSearch( string $text, string $search_term ): bool {
-		if ( empty( $search_term ) ) {
-			return true;
-		}
-
-		$terms      = array_map( 'trim', explode( ',', $search_term ) );
-		$text_lower = strtolower( $text );
-
-		foreach ( $terms as $term ) {
-			if ( empty( $term ) ) {
-				continue;
-			}
-			if ( strpos( $text_lower, strtolower( $term ) ) !== false ) {
-				return true;
-			}
-		}
-
-		return false;
 	}
 }

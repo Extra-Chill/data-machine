@@ -17,10 +17,13 @@ use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\Steps\FlowStepConfig;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 trait FlowStepHelpers {
+	use HasCheckPermission;
+
 
 	protected Flows $db_flows;
 	protected Pipelines $db_pipelines;
@@ -30,15 +33,6 @@ trait FlowStepHelpers {
 		$this->db_flows          = new Flows();
 		$this->db_pipelines      = new Pipelines();
 		$this->handler_abilities = new HandlerAbilities();
-	}
-
-	/**
-	 * Permission callback for abilities.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 
 	/**

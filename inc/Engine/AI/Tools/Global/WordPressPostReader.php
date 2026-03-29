@@ -13,8 +13,11 @@ defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Abilities\Fetch\GetWordPressPostAbility;
 use DataMachine\Engine\AI\Tools\BaseTool;
+use DataMachine\Engine\AI\Tools\Global\Traits\HasIsConfigured;
 
 class WordPressPostReader extends BaseTool {
+	use HasIsConfigured;
+
 
 	public function __construct() {
 		$this->registerTool( 'wordpress_post_reader', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ) );
@@ -110,10 +113,6 @@ class WordPressPostReader extends BaseTool {
 				),
 			),
 		);
-	}
-
-	public static function is_configured(): bool {
-		return true;
 	}
 
 	public function check_configuration( $configured, $tool_id ) {

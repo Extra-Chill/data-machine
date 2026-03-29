@@ -12,10 +12,16 @@
 namespace DataMachine\Abilities\Fetch;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Abilities\Fetch\Traits\HasApplyKeywordSearch;
+use DataMachine\Abilities\Fetch\FetchRssAbility;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class FetchWordPressApiAbility {
+	use HasApplyKeywordSearch;
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -91,15 +97,6 @@ class FetchWordPressApiAbility {
 		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', $register_callback );
 		}
-	}
-
-	/**
-	 * Permission callback for ability.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 
 	/**
@@ -280,13 +277,13 @@ class FetchWordPressApiAbility {
 				'title'    => $title,
 				'content'  => wp_strip_all_tags( $content ),
 				'metadata' => array(
-					'source_type'            => 'rest_api',
-					'item_identifier'        => $unique_id,
-					'original_id'            => $item_id,
-					'original_title'         => $title,
-					'original_date_gmt'      => $item_date,
-					'site_name'              => $site_name,
-					'source_url'             => $source_link,
+					'source_type'       => 'rest_api',
+					'item_identifier'   => $unique_id,
+					'original_id'       => $item_id,
+					'original_title'    => $title,
+					'original_date_gmt' => $item_date,
+					'site_name'         => $site_name,
+					'source_url'        => $source_link,
 				),
 			);
 
@@ -349,33 +346,6 @@ class FetchWordPressApiAbility {
 		);
 
 		return array_merge( $defaults, $input );
-	}
-
-	/**
-	 * Make HTTP GET request.
-	 */
-	private function httpGet( string $url, array $options ): array {
-		$args = array(
-			'timeout' => $options['timeout'] ?? 30,
-		);
-
-		$response = wp_remote_get( $url, $args );
-
-		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
-		}
-
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body        = wp_remote_retrieve_body( $response );
-
-		return array(
-			'success'     => $status_code >= 200 && $status_code < 300,
-			'status_code' => $status_code,
-			'data'        => $body,
-		);
 	}
 
 	/**
@@ -574,66 +544,5 @@ class FetchWordPressApiAbility {
 		}
 
 		return $endpoint_url;
-	}
-
-	/**
-	 * Apply timeframe filter to item timestamp.
-	 */
-	private function applyTimeframeFilter( int $item_timestamp, string $timeframe_limit ): bool {
-		if ( 'all_time' === $timeframe_limit ) {
-			return true;
-		}
-
-		$now    = time();
-		$cutoff = 0;
-
-		switch ( $timeframe_limit ) {
-			case '24_hours':
-				$cutoff = $now - DAY_IN_SECONDS;
-				break;
-			case '72_hours':
-				$cutoff = $now - ( 3 * DAY_IN_SECONDS );
-				break;
-			case '7_days':
-				$cutoff = $now - ( 7 * DAY_IN_SECONDS );
-				break;
-			case '30_days':
-				$cutoff = $now - ( 30 * DAY_IN_SECONDS );
-				break;
-			case '90_days':
-				$cutoff = $now - ( 90 * DAY_IN_SECONDS );
-				break;
-			case '6_months':
-				$cutoff = $now - ( 180 * DAY_IN_SECONDS );
-				break;
-			case '1_year':
-				$cutoff = $now - YEAR_IN_SECONDS;
-				break;
-		}
-
-		return $item_timestamp >= $cutoff;
-	}
-
-	/**
-	 * Apply keyword search filter.
-	 */
-	private function applyKeywordSearch( string $text, string $search_term ): bool {
-		if ( empty( $search_term ) ) {
-			return true;
-		}
-
-		$terms      = array_map( 'trim', explode( ',', $search_term ) );
-		$text_lower = strtolower( $text );
-
-		foreach ( $terms as $term ) {
-			if ( empty( $term ) ) {
-				continue;
-			}
-			if ( strpos( $text_lower, strtolower( $term ) ) !== false ) {
-				return true;
-			}
-		}
-
-		return false;
 	}
 }

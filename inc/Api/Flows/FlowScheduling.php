@@ -470,4 +470,161 @@ class FlowScheduling {
 
 		return true;
 	}
+
+	public function __construct() {
+		add_action('rest_api_init', array( $this, 'rest_api_init' ));
+	}
+
+	public static function register() {
+		add_action( 'rest_api_init', array( self::class, 'register_routes' ) );
+	}
+
+	public static function register_routes() {
+		register_rest_route(
+			'datamachine/v1',
+			'/flows/(?P<flow_id>\d+)/config',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( self::class, 'handle_get_flow_config' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => array(
+					'flow_id' => array(
+						'required'          => true,
+						'type'              => 'integer',
+						'sanitize_callback' => 'absint',
+						'description'       => __( 'Flow ID to retrieve configuration for', 'data-machine' ),
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			'datamachine/v1',
+			'/flows/steps/(?P<flow_step_id>[A-Za-z0-9_\-]+)/config',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( self::class, 'handle_get_flow_step_config' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => array(
+					'flow_step_id' => array(
+						'required'          => true,
+						'type'              => 'string',
+						'sanitize_callback' => 'sanitize_text_field',
+						'description'       => __( 'Flow step ID (composite key: pipeline_step_id_flow_id)', 'data-machine' ),
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			'datamachine/v1',
+			'/flows/steps/(?P<flow_step_id>[A-Za-z0-9_\-]+)/handler',
+			array(
+				'methods'             => 'PUT',
+				'callback'            => array( self::class, 'handle_update_flow_step_handler' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => array(
+					'flow_step_id' => array(
+						'required'          => true,
+						'type'              => 'string',
+						'sanitize_callback' => 'sanitize_text_field',
+						'description'       => __( 'Flow step ID (composite key: pipeline_step_id_flow_id)', 'data-machine' ),
+					),
+					'handler_slug' => array(
+						'required'          => true,
+						'type'              => 'string',
+						'sanitize_callback' => 'sanitize_text_field',
+						'description'       => __( 'Handler identifier', 'data-machine' ),
+					),
+					'pipeline_id'  => array(
+						'required'          => true,
+						'type'              => 'integer',
+						'sanitize_callback' => 'absint',
+						'description'       => __( 'Pipeline ID for context', 'data-machine' ),
+					),
+					'step_type'    => array(
+						'required'          => true,
+						'type'              => 'string',
+						'sanitize_callback' => 'sanitize_key',
+						'validate_callback' => function ( $param ) {
+							return ( new StepTypeAbilities() )->stepTypeExists( $param );
+						},
+						'description'       => __( 'Step type', 'data-machine' ),
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			'datamachine/v1',
+			'/flows/steps/(?P<flow_step_id>[A-Za-z0-9_\-]+)/user-message',
+			array(
+				'methods'             => 'PATCH',
+				'callback'            => array( self::class, 'handle_update_user_message' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => array(
+					'flow_step_id' => array(
+						'required'          => true,
+						'type'              => 'string',
+						'sanitize_callback' => 'sanitize_text_field',
+						'description'       => __( 'Flow step ID (composite key: pipeline_step_id_flow_id)', 'data-machine' ),
+					),
+					'user_message' => array(
+						'required'          => true,
+						'type'              => 'string',
+						'sanitize_callback' => 'sanitize_textarea_field',
+						'description'       => __( 'User message for AI step', 'data-machine' ),
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			'datamachine/v1',
+			'/flows/steps/(?P<flow_step_id>[A-Za-z0-9_\-]+)/config',
+			array(
+				'methods'             => 'PATCH',
+				'callback'            => array( self::class, 'handle_patch_flow_step_config' ),
+				'permission_callback' => array( self::class, 'check_permission' ),
+				'args'                => array(
+					'flow_step_id'   => array(
+						'required'          => true,
+						'type'              => 'string',
+						'sanitize_callback' => 'sanitize_text_field',
+						'description'       => __( 'Flow step ID (composite key: pipeline_step_id_flow_id)', 'data-machine' ),
+					),
+					'handler_slug'   => array(
+						'required'          => false,
+						'type'              => 'string',
+						'sanitize_callback' => 'sanitize_text_field',
+						'description'       => __( 'Handler identifier', 'data-machine' ),
+					),
+					'handler_config' => array(
+						'required'    => false,
+						'type'        => 'object',
+						'description' => __( 'Handler configuration settings to merge', 'data-machine' ),
+					),
+					'user_message'   => array(
+						'required'          => false,
+						'type'              => 'string',
+						'sanitize_callback' => 'sanitize_textarea_field',
+						'description'       => __( 'User message for AI step', 'data-machine' ),
+					),
+				),
+			)
+		);
+	}
+
+	public static function check_permission( $request ) {
+		$request;
+		if ( ! PermissionHelper::can( 'manage_flows' ) ) {
+			return new \WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to manage flow steps.', 'data-machine' ),
+				array( 'status' => 403 )
+			);
+		}
+
+		return true;
+	}
 }

@@ -123,6 +123,7 @@ class PostIdentityIndex extends BaseRepository {
 		$placeholders = implode( ', ', $formats );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders -- Table name from $wpdb->prefix, not user input.
 		$result = $this->wpdb->query(
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$this->wpdb->prepare(
@@ -130,6 +131,7 @@ class PostIdentityIndex extends BaseRepository {
 				...array_values( $data )
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders
 
 		if ( false === $result ) {
 			$this->log_db_error( 'PostIdentityIndex::upsert', array( 'post_id' => $post_id ) );
@@ -181,6 +183,7 @@ class PostIdentityIndex extends BaseRepository {
 
 		if ( null !== $venue_term_id && $venue_term_id > 0 ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			return $this->wpdb->get_results(
 				$this->wpdb->prepare(
 					"SELECT * FROM {$this->table_name} WHERE event_date = %s AND venue_term_id = %d LIMIT %d",
@@ -189,10 +192,20 @@ class PostIdentityIndex extends BaseRepository {
 					$limit
 				),
 				ARRAY_A
-			) ?: array();
+			) ? $this->wpdb->get_results(
+				$this->wpdb->prepare(
+					"SELECT * FROM {$this->table_name} WHERE event_date = %s AND venue_term_id = %d LIMIT %d",
+					$event_date,
+					$venue_term_id,
+					$limit
+				),
+				ARRAY_A
+			) : array();
+			// phpcs:enable WordPress.DB.PreparedSQL
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		return $this->wpdb->get_results(
 			$this->wpdb->prepare(
 				"SELECT * FROM {$this->table_name} WHERE event_date = %s LIMIT %d",
@@ -200,7 +213,15 @@ class PostIdentityIndex extends BaseRepository {
 				$limit
 			),
 			ARRAY_A
-		) ?: array();
+		) ? $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				"SELECT * FROM {$this->table_name} WHERE event_date = %s LIMIT %d",
+				$event_date,
+				$limit
+			),
+			ARRAY_A
+		) : array();
+		// phpcs:enable WordPress.DB.PreparedSQL
 	}
 
 	/**
@@ -218,6 +239,7 @@ class PostIdentityIndex extends BaseRepository {
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$row = $this->wpdb->get_row(
 			$this->wpdb->prepare(
 				"SELECT * FROM {$this->table_name} WHERE event_date = %s AND title_hash = %s LIMIT 1",
@@ -226,8 +248,9 @@ class PostIdentityIndex extends BaseRepository {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
-		return $row ?: null;
+		return $row ? $row : null;
 	}
 
 	/**
@@ -246,6 +269,7 @@ class PostIdentityIndex extends BaseRepository {
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$row = $this->wpdb->get_row(
 			$this->wpdb->prepare(
 				"SELECT * FROM {$this->table_name} WHERE ticket_url = %s AND event_date = %s LIMIT 1",
@@ -254,8 +278,9 @@ class PostIdentityIndex extends BaseRepository {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
-		return $row ?: null;
+		return $row ? $row : null;
 	}
 
 	/**
@@ -272,6 +297,7 @@ class PostIdentityIndex extends BaseRepository {
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$row = $this->wpdb->get_row(
 			$this->wpdb->prepare(
 				"SELECT * FROM {$this->table_name} WHERE source_url = %s LIMIT 1",
@@ -279,8 +305,9 @@ class PostIdentityIndex extends BaseRepository {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
-		return $row ?: null;
+		return $row ? $row : null;
 	}
 
 	/**
@@ -298,6 +325,7 @@ class PostIdentityIndex extends BaseRepository {
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		return $this->wpdb->get_results(
 			$this->wpdb->prepare(
 				"SELECT * FROM {$this->table_name} WHERE event_date = %s AND ticket_url IS NOT NULL AND ticket_url != '' LIMIT %d",
@@ -305,7 +333,15 @@ class PostIdentityIndex extends BaseRepository {
 				$limit
 			),
 			ARRAY_A
-		) ?: array();
+		) ? $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				"SELECT * FROM {$this->table_name} WHERE event_date = %s AND ticket_url IS NOT NULL AND ticket_url != '' LIMIT %d",
+				$event_date,
+				$limit
+			),
+			ARRAY_A
+		) : array();
+		// phpcs:enable WordPress.DB.PreparedSQL
 	}
 
 	/**
@@ -323,6 +359,7 @@ class PostIdentityIndex extends BaseRepository {
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		return $this->wpdb->get_results(
 			$this->wpdb->prepare(
 				"SELECT * FROM {$this->table_name} WHERE event_date = %s LIMIT %d",
@@ -330,7 +367,15 @@ class PostIdentityIndex extends BaseRepository {
 				$limit
 			),
 			ARRAY_A
-		) ?: array();
+		) ? $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				"SELECT * FROM {$this->table_name} WHERE event_date = %s LIMIT %d",
+				$event_date,
+				$limit
+			),
+			ARRAY_A
+		) : array();
+		// phpcs:enable WordPress.DB.PreparedSQL
 	}
 
 	// -----------------------------------------------------------------------
@@ -366,6 +411,7 @@ class PostIdentityIndex extends BaseRepository {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$results = $wpdb->get_col(
 			$wpdb->prepare(
+				// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 				"SELECT p.ID FROM {$wpdb->posts} p
 				LEFT JOIN {$this->table_name} idx ON p.ID = idx.post_id
 				WHERE p.post_type = %s
@@ -378,8 +424,9 @@ class PostIdentityIndex extends BaseRepository {
 				$offset
 			)
 		);
+				// phpcs:enable WordPress.DB.PreparedSQL
 
-		return array_map( 'intval', $results ?: array() );
+		return array_map( 'intval', $results ? $results : array() );
 	}
 
 	/**
@@ -390,12 +437,14 @@ class PostIdentityIndex extends BaseRepository {
 	 */
 	public function delete_by_post_type( string $post_type ): int {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$result = $this->wpdb->query(
 			$this->wpdb->prepare(
 				"DELETE FROM {$this->table_name} WHERE post_type = %s",
 				$post_type
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		return false === $result ? 0 : $result;
 	}

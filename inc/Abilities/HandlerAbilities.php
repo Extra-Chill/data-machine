@@ -12,10 +12,13 @@
 namespace DataMachine\Abilities;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class HandlerAbilities {
+	use HasCheckPermission;
+
 
 	/**
 	 * Option name for handler defaults storage.
@@ -263,15 +266,6 @@ class HandlerAbilities {
 				'meta'                => array( 'show_in_rest' => true ),
 			)
 		);
-	}
-
-	/**
-	 * Permission callback for abilities.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 
 	/**

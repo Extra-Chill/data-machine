@@ -23,6 +23,7 @@ defined( 'ABSPATH' ) || exit;
 class ResumeFlowAbility {
 
 	use FlowHelpers;
+	use DataMachine\Abilities\Flow\PauseFlowAbility;
 
 	public function __construct() {
 		$this->initDatabases();
@@ -177,30 +178,5 @@ class ResumeFlowAbility {
 			'flows'   => $details,
 			'message' => sprintf( 'Resumed %d flow(s), skipped %d (not paused), %d error(s).', $resumed, $skipped, $errors ),
 		);
-	}
-
-	/**
-	 * Resolve flows from the given scope.
-	 *
-	 * @param int|null $flow_id     Single flow ID.
-	 * @param int|null $pipeline_id Pipeline ID for bulk scope.
-	 * @param int|null $agent_id    Agent ID for bulk scope.
-	 * @return array Array of flow records.
-	 */
-	private function resolveFlows( ?int $flow_id, ?int $pipeline_id, ?int $agent_id ): array {
-		if ( null !== $flow_id ) {
-			$flow = $this->db_flows->get_flow( $flow_id );
-			return $flow ? array( $flow ) : array();
-		}
-
-		if ( null !== $pipeline_id ) {
-			return $this->db_flows->get_flows_for_pipeline( $pipeline_id );
-		}
-
-		if ( null !== $agent_id ) {
-			return $this->db_flows->get_all_flows( null, $agent_id );
-		}
-
-		return array();
 	}
 }

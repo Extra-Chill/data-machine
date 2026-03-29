@@ -16,10 +16,13 @@ use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\PluginSettings;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class PipelineStepAbilities {
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -264,15 +267,6 @@ class PipelineStepAbilities {
 				'meta'                => array( 'show_in_rest' => true ),
 			)
 		);
-	}
-
-	/**
-	 * Permission callback for abilities.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 
 	/**

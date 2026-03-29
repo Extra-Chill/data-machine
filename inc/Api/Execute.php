@@ -10,19 +10,15 @@
 namespace DataMachine\Api;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
 class Execute {
+	use HasRegister;
 
-	/**
-	 * Initialize REST API hooks
-	 */
-	public static function register() {
-		add_action( 'rest_api_init', array( self::class, 'register_routes' ) );
-	}
 
 	/**
 	 * Register execute REST route
@@ -170,5 +166,18 @@ class Execute {
 				'message' => $result['message'] ?? __( 'Execution started', 'data-machine' ),
 			)
 		);
+	}
+
+	public static function check_permission( $request ) {
+		$request;
+		if ( ! PermissionHelper::can( 'manage_flows' ) ) {
+			return new \WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to manage processed items.', 'data-machine' ),
+				array( 'status' => 403 )
+			);
+		}
+
+		return true;
 	}
 }

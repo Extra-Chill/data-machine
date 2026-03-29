@@ -22,10 +22,13 @@ use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Abilities\Job\JobsSummaryAbility;
 use DataMachine\Abilities\Job\FailJobAbility;
 use DataMachine\Abilities\Job\RetryJobAbility;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class JobAbilities {
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -40,6 +43,7 @@ class JobAbilities {
 	private RetryJobAbility $retry_job;
 
 	public function __construct() {
+		add_action('wp_abilities_api_init', array( $this, 'abilities_api_init' ));
 		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
 			return;
 		}
@@ -55,15 +59,6 @@ class JobAbilities {
 		$this->retry_job          = new RetryJobAbility();
 
 		self::$registered = true;
-	}
-
-	/**
-	 * Permission callback for abilities.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 
 	/**

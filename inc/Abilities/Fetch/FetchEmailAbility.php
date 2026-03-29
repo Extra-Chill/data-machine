@@ -19,10 +19,13 @@
 namespace DataMachine\Abilities\Fetch;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class FetchEmailAbility {
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -118,8 +121,8 @@ class FetchEmailAbility {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'     => array( 'type' => 'boolean' ),
-							'data'        => array(
+							'success' => array( 'type' => 'boolean' ),
+							'data'    => array(
 								'type'       => 'object',
 								'properties' => array(
 									'items'         => array( 'type' => 'array' ),
@@ -129,8 +132,8 @@ class FetchEmailAbility {
 									'has_more'      => array( 'type' => 'boolean' ),
 								),
 							),
-							'error'       => array( 'type' => 'string' ),
-							'logs'        => array( 'type' => 'array' ),
+							'error'   => array( 'type' => 'string' ),
+							'logs'    => array( 'type' => 'array' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'execute' ),
@@ -145,15 +148,6 @@ class FetchEmailAbility {
 		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', $register_callback );
 		}
-	}
-
-	/**
-	 * Permission callback.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 
 	/**
@@ -225,7 +219,7 @@ class FetchEmailAbility {
 					'offset'        => 0,
 					'has_more'      => false,
 				),
-				'logs' => $logs,
+				'logs'    => $logs,
 			);
 		}
 
@@ -243,7 +237,7 @@ class FetchEmailAbility {
 					'offset'        => 0,
 					'has_more'      => false,
 				),
-				'logs' => $logs,
+				'logs'    => $logs,
 			);
 		}
 
@@ -312,7 +306,7 @@ class FetchEmailAbility {
 				'offset'        => $offset,
 				'has_more'      => $has_more,
 			),
-			'logs' => $logs,
+			'logs'    => $logs,
 		);
 	}
 
@@ -365,7 +359,7 @@ class FetchEmailAbility {
 			'metadata' => array(
 				'uid'               => $uid,
 				'message_id'        => $message_id,
-				'item_identifier'         => $message_id,
+				'item_identifier'   => $message_id,
 				'from'              => $from_email,
 				'from_name'         => $from_name,
 				'to'                => $to_address,
@@ -439,7 +433,7 @@ class FetchEmailAbility {
 			'metadata' => array(
 				'uid'               => $uid,
 				'message_id'        => $message_id,
-				'item_identifier'         => $message_id,
+				'item_identifier'   => $message_id,
 				'from'              => $from_email,
 				'from_name'         => $from_name,
 				'to'                => $to_address,
@@ -536,7 +530,7 @@ class FetchEmailAbility {
 	private function decodeBody( string $body, int $encoding ): string {
 		switch ( $encoding ) {
 			case 3: // BASE64.
-				return base64_decode( $body, true ) ?: $body;
+				return base64_decode( $body, true ) ? base64_decode( $body, true ) : $body;
 			case 4: // QUOTED-PRINTABLE.
 				return quoted_printable_decode( $body );
 			case 1: // 8BIT.

@@ -18,6 +18,7 @@ namespace DataMachine\Api;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Database\Flows\Flows;
+use DataMachine\Api\Traits\HasRegister;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -30,13 +31,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  * for inbound webhook-driven flow execution.
  */
 class WebhookTrigger {
+	use HasRegister;
 
-	/**
-	 * Initialize REST API hooks.
-	 */
-	public static function register() {
-		add_action( 'rest_api_init', array( self::class, 'register_routes' ) );
-	}
 
 	/**
 	 * Register webhook trigger REST route.
@@ -456,5 +452,18 @@ class WebhookTrigger {
 		}
 
 		return $headers;
+	}
+
+	public static function check_permission( $request ) {
+		$request;
+		if ( ! PermissionHelper::can( 'manage_flows' ) ) {
+			return new \WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to manage processed items.', 'data-machine' ),
+				array( 'status' => 403 )
+			);
+		}
+
+		return true;
 	}
 }

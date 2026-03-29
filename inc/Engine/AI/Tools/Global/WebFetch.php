@@ -10,8 +10,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 use DataMachine\Core\HttpClient;
 use DataMachine\Engine\AI\Tools\BaseTool;
+use DataMachine\Engine\AI\Tools\Global\Traits\HasIsConfigured;
 
 class WebFetch extends BaseTool {
+	use HasIsConfigured;
+
 
 	public function __construct() {
 		$this->registerTool( 'web_fetch', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ) );
@@ -111,10 +114,6 @@ class WebFetch extends BaseTool {
 				),
 			),
 		);
-	}
-
-	public static function is_configured(): bool {
-		return true;
 	}
 
 	public function check_configuration( $configured, $tool_id ) {

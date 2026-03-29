@@ -42,6 +42,7 @@ class AgentAuthMiddleware {
 	 * Register the authentication filter.
 	 */
 	public function __construct() {
+		add_action('rest_api_init', array( $this, 'rest_api_init' ));
 		add_filter( 'rest_authentication_errors', array( $this, 'authenticate' ), 90 );
 	}
 
@@ -147,11 +148,11 @@ class AgentAuthMiddleware {
 			'debug',
 			'Agent auth: token authenticated',
 			array(
-				'agent_id'    => $agent_id,
-				'agent_slug'  => $agent['agent_slug'],
-				'owner_id'    => $owner_id,
-				'token_id'    => $token_id,
-				'token_label' => $token_record['label'] ?? '',
+				'agent_id'             => $agent_id,
+				'agent_slug'           => $agent['agent_slug'],
+				'owner_id'             => $owner_id,
+				'token_id'             => $token_id,
+				'token_label'          => $token_record['label'] ?? '',
 				'has_cap_restrictions' => null !== $token_capabilities,
 			)
 		);
@@ -194,5 +195,67 @@ class AgentAuthMiddleware {
 		}
 
 		return null;
+	}
+
+	public function register_routes(): void {
+		register_rest_route(
+			'datamachine/v1',
+			'/agent/auth/callback',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'handle_callback' ),
+				'permission_callback' => '__return_true',
+				'args'                => array(
+					'token'      => array(
+						'required' => false,
+						'type'     => 'string',
+					),
+					'agent_slug' => array(
+						'required' => false,
+						'type'     => 'string',
+					),
+					'agent_id'   => array(
+						'required' => false,
+						'type'     => 'integer',
+					),
+					'error'      => array(
+						'required' => false,
+						'type'     => 'string',
+					),
+				),
+			)
+		);
+
+		// Retrieve stored token for a remote site + agent (authenticated).
+		register_rest_route(
+			'datamachine/v1',
+			'/agent/auth/tokens',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'list_external_tokens' ),
+				'permission_callback' => function () {
+					return current_user_can( 'manage_options' );
+				},
+			)
+		);
+
+		// Get a specific external token by key (authenticated).
+		register_rest_route(
+			'datamachine/v1',
+			'/agent/auth/tokens/(?P<key>[a-zA-Z0-9._\-/]+)',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'get_external_token' ),
+				'permission_callback' => function () {
+					return current_user_can( 'manage_options' );
+				},
+				'args'                => array(
+					'key' => array(
+						'required' => true,
+						'type'     => 'string',
+					),
+				),
+			)
+		);
 	}
 }

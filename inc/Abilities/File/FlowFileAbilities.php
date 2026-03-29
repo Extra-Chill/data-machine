@@ -15,10 +15,13 @@ use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\FilesRepository\FileCleanup;
 use DataMachine\Core\FilesRepository\FileStorage;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class FlowFileAbilities {
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -249,13 +252,6 @@ class FlowFileAbilities {
 	// =========================================================================
 	// Permission
 	// =========================================================================
-
-	/**
-	 * @return bool
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
-	}
 
 	// =========================================================================
 	// Execute callbacks

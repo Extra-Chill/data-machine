@@ -16,8 +16,11 @@ defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\RequestBuilder;
+use DataMachine\Engine\AI\System\Tasks\Traits\HasSupportsUndo;
 
 class AltTextTask extends SystemTask {
+	use HasSupportsUndo;
+
 
 	/**
 	 * Execute alt text generation for a specific attachment.
@@ -158,16 +161,6 @@ class AltTextTask extends SystemTask {
 			'trigger_type'    => 'event',
 			'supports_run'    => true,
 		);
-	}
-
-	/**
-	 * Alt text generation supports undo — restores previous alt text value.
-	 *
-	 * @return bool
-	 * @since 0.33.0
-	 */
-	public function supportsUndo(): bool {
-		return true;
 	}
 
 	/**

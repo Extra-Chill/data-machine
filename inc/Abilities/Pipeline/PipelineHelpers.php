@@ -18,10 +18,13 @@ use DataMachine\Abilities\StepTypeAbilities;
 use DataMachine\Core\Admin\DateFormatter;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 trait PipelineHelpers {
+	use HasCheckPermission;
+
 
 	protected Pipelines $db_pipelines;
 	protected Flows $db_flows;
@@ -29,15 +32,6 @@ trait PipelineHelpers {
 	protected function initDatabases(): void {
 		$this->db_pipelines = new Pipelines();
 		$this->db_flows     = new Flows();
-	}
-
-	/**
-	 * Permission callback for abilities.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 
 	/**

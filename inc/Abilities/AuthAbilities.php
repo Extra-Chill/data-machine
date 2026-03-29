@@ -12,10 +12,13 @@
 namespace DataMachine\Abilities;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class AuthAbilities {
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -388,10 +391,6 @@ class AuthAbilities {
 				'meta'                => array( 'show_in_rest' => true ),
 			)
 		);
-	}
-
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 
 	/**

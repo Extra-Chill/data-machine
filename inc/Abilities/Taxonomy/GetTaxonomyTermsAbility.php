@@ -13,10 +13,13 @@ namespace DataMachine\Abilities\Taxonomy;
 use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Core\WordPress\TaxonomyHandler;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class GetTaxonomyTermsAbility {
+	use HasCheckPermission;
+
 
 	public function __construct() {
 		if ( ! class_exists( 'WP_Ability' ) ) {
@@ -192,14 +195,5 @@ class GetTaxonomyTermsAbility {
 			'terms'   => $formatted_terms,
 			'total'   => count( $formatted_terms ),
 		);
-	}
-
-	/**
-	 * Check permission for this ability.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 }

@@ -18,10 +18,13 @@ use DataMachine\Abilities\Taxonomy\CreateTaxonomyTermAbility;
 use DataMachine\Abilities\Taxonomy\UpdateTaxonomyTermAbility;
 use DataMachine\Abilities\Taxonomy\DeleteTaxonomyTermAbility;
 use DataMachine\Abilities\Taxonomy\ResolveTermAbility;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class TaxonomyAbilities {
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -32,6 +35,7 @@ class TaxonomyAbilities {
 	private ResolveTermAbility $resolve_term;
 
 	public function __construct() {
+		add_action('wp_abilities_api_init', array( $this, 'abilities_api_init' ));
 		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
 			return;
 		}
@@ -43,15 +47,6 @@ class TaxonomyAbilities {
 		$this->delete_taxonomy_term = new DeleteTaxonomyTermAbility();
 
 		self::$registered = true;
-	}
-
-	/**
-	 * Permission callback for abilities.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 
 	/**

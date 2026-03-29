@@ -13,16 +13,20 @@ namespace DataMachine\Abilities;
 use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Abilities\AgentPing\SendPingAbility;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class AgentPingAbilities {
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
 	private SendPingAbility $send_ping;
 
 	public function __construct() {
+		add_action('wp_abilities_api_init', array( $this, 'abilities_api_init' ));
 		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
 			return;
 		}
@@ -30,15 +34,6 @@ class AgentPingAbilities {
 		$this->send_ping = new SendPingAbility();
 
 		self::$registered = true;
-	}
-
-	/**
-	 * Permission callback for abilities.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 
 	/**

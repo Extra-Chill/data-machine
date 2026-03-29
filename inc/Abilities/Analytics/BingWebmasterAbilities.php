@@ -13,10 +13,13 @@ namespace DataMachine\Abilities\Analytics;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
+use DataMachine\Abilities\Analytics\Traits\HasGetConfig;
 
 defined( 'ABSPATH' ) || exit;
 
 class BingWebmasterAbilities {
+	use HasGetConfig;
+
 
 	/**
 	 * Option key for storing Bing Webmaster configuration.
@@ -53,7 +56,6 @@ class BingWebmasterAbilities {
 	 * @var string
 	 */
 	const DATE_REGEX = '/^\/Date\((\d+)([+-]\d{4})?\)\/$/';
-
 
 	private static bool $registered = false;
 
@@ -289,14 +291,5 @@ class BingWebmasterAbilities {
 	public static function is_configured(): bool {
 		$config = self::get_config();
 		return ! empty( $config['api_key'] );
-	}
-
-	/**
-	 * Get stored configuration.
-	 *
-	 * @return array
-	 */
-	public static function get_config(): array {
-		return get_site_option( self::CONFIG_OPTION, array() );
 	}
 }

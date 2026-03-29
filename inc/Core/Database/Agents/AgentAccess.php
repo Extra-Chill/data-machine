@@ -12,6 +12,7 @@
 namespace DataMachine\Core\Database\Agents;
 
 use DataMachine\Core\Database\BaseRepository;
+use DataMachine\Core\Database\Agents\Agents;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -32,16 +33,6 @@ class AgentAccess extends BaseRepository {
 	 * - viewer: read-only access to pipelines, flows, jobs
 	 */
 	const VALID_ROLES = array( 'admin', 'operator', 'viewer' );
-
-	/**
-	 * Use network-level prefix so access grants are shared across the multisite network.
-	 *
-	 * @return string
-	 */
-	protected static function get_table_prefix(): string {
-		global $wpdb;
-		return $wpdb->base_prefix;
-	}
 
 	/**
 	 * Create agent_access table.

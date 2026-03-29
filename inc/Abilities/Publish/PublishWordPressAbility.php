@@ -13,10 +13,13 @@ namespace DataMachine\Abilities\Publish;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\WordPress\PostTracking;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class PublishWordPressAbility {
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -119,15 +122,6 @@ class PublishWordPressAbility {
 		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', $register_callback );
 		}
-	}
-
-	/**
-	 * Permission callback for ability.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 
 	/**

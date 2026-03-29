@@ -12,10 +12,13 @@
 namespace DataMachine\Abilities;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class StepTypeAbilities {
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -122,15 +125,6 @@ class StepTypeAbilities {
 				'meta'                => array( 'show_in_rest' => true ),
 			)
 		);
-	}
-
-	/**
-	 * Permission callback for abilities.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 
 	/**

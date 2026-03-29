@@ -20,8 +20,11 @@ defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\RequestBuilder;
+use DataMachine\Engine\AI\System\Tasks\Traits\HasSupportsUndo;
 
 class MetaDescriptionTask extends SystemTask {
+	use HasSupportsUndo;
+
 
 	/**
 	 * Maximum character length for meta descriptions.
@@ -169,15 +172,6 @@ class MetaDescriptionTask extends SystemTask {
 			'trigger_type'    => 'manual',
 			'supports_run'    => false,
 		);
-	}
-
-	/**
-	 * Meta description generation supports undo — restores previous excerpt.
-	 *
-	 * @return bool
-	 */
-	public function supportsUndo(): bool {
-		return true;
 	}
 
 	/**

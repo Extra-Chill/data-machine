@@ -84,6 +84,7 @@ class ProcessedItemsCommand extends BaseCommand {
 		$where_sql = ! empty( $where_clauses ) ? 'WHERE ' . implode( ' AND ', $where_clauses ) : '';
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$results = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT
@@ -101,6 +102,7 @@ class ProcessedItemsCommand extends BaseCommand {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( empty( $results ) ) {
 			WP_CLI::log( 'No processed items found.' );
@@ -131,13 +133,13 @@ class ProcessedItemsCommand extends BaseCommand {
 			}
 
 			$rows[] = array(
-				'flow_id'         => $flow_id,
-				'flow_name'       => $flow['flow_name'] ?? '?',
-				'pipeline_id'     => $flow['pipeline_id'] ?? '?',
-				'handler'         => $row['source_type'],
-				'processed'       => $processed,
-				'first_seen'      => $row['first_processed'],
-				'last_seen'       => $row['last_processed'],
+				'flow_id'     => $flow_id,
+				'flow_name'   => $flow['flow_name'] ?? '?',
+				'pipeline_id' => $flow['pipeline_id'] ?? '?',
+				'handler'     => $row['source_type'],
+				'processed'   => $processed,
+				'first_seen'  => $row['first_processed'],
+				'last_seen'   => $row['last_processed'],
 			);
 		}
 
@@ -298,7 +300,7 @@ class ProcessedItemsCommand extends BaseCommand {
 
 			$flow_patterns = array();
 			foreach ( $flows as $flow ) {
-				$flow_patterns[] = "flow_step_id LIKE %s";
+				$flow_patterns[] = 'flow_step_id LIKE %s';
 				$values[]        = '%_' . $flow['flow_id'];
 			}
 			$where_parts[] = '(' . implode( ' OR ', $flow_patterns ) . ')';
@@ -323,9 +325,11 @@ class ProcessedItemsCommand extends BaseCommand {
 
 		// Count first.
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$count = (int) $wpdb->get_var(
 			$wpdb->prepare( "SELECT COUNT(*) FROM %i {$where_sql}", ...$values )
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( 0 === $count ) {
 			WP_CLI::log( 'No processed items match the criteria.' );
@@ -368,9 +372,11 @@ class ProcessedItemsCommand extends BaseCommand {
 
 		// Delete.
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$deleted = $wpdb->query(
 			$wpdb->prepare( "DELETE FROM %i {$where_sql}", ...$values )
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( false === $deleted ) {
 			WP_CLI::error( 'Database error during deletion: ' . $wpdb->last_error );

@@ -18,8 +18,11 @@ use DataMachine\Abilities\Content\GetPostBlocksAbility;
 use DataMachine\Abilities\Content\ReplacePostBlocksAbility;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\RequestBuilder;
+use DataMachine\Engine\AI\System\Tasks\Traits\HasSupportsUndo;
 
 class InternalLinkingTask extends SystemTask {
+	use HasSupportsUndo;
+
 
 	/**
 	 * Execute internal linking for a specific post.
@@ -243,17 +246,6 @@ class InternalLinkingTask extends SystemTask {
 	 */
 	public function getTaskType(): string {
 		return 'internal_linking';
-	}
-
-	/**
-	 * Internal linking supports undo — restores pre-modification revision
-	 * and removes the _datamachine_internal_links tracking meta.
-	 *
-	 * @return bool
-	 * @since 0.33.0
-	 */
-	public function supportsUndo(): bool {
-		return true;
 	}
 
 	/**

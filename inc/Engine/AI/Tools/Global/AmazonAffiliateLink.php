@@ -15,8 +15,11 @@ defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\HttpClient;
 use DataMachine\Engine\AI\Tools\BaseTool;
+use DataMachine\Abilities\Analytics\Traits\HasGetConfig;
 
 class AmazonAffiliateLink extends BaseTool {
+	use HasGetConfig;
+
 
 	/**
 	 * Config option name.
@@ -296,15 +299,6 @@ class AmazonAffiliateLink extends BaseTool {
 		return ! empty( $config['client_id'] )
 			&& ! empty( $config['client_secret'] )
 			&& ! empty( $config['partner_tag'] );
-	}
-
-	/**
-	 * Get stored Amazon configuration.
-	 *
-	 * @return array Configuration array.
-	 */
-	public static function get_config(): array {
-		return get_site_option( self::CONFIG_OPTION, array() );
 	}
 
 	/**
