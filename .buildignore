@@ -8,10 +8,10 @@
 .eslintrc.js
 **/.eslintrc.js
 
-# Build system (exclude build files but not the final product)
+# Build system
 build.sh
 .buildignore
-/build/
+/.homeboy-build/
 
 # Testing
 tests/
