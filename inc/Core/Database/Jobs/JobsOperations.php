@@ -575,13 +575,22 @@ class JobsOperations extends BaseRepository {
 			return false;
 		}
 
-		// Encode data as JSON for database storage
-		$encoded = wp_json_encode( $data );
-		$result  = $this->wpdb->update(
+		// Encode data as JSON for database storage.
+		$encoded     = wp_json_encode( $data );
+		$update_data = array( 'engine_data' => $encoded );
+		$format      = array( '%s' );
+
+		// Promote task_type to its own indexed column for fast lookups.
+		if ( isset( $data['task_type'] ) && is_string( $data['task_type'] ) ) {
+			$update_data['task_type'] = sanitize_key( $data['task_type'] );
+			$format[]                 = '%s';
+		}
+
+		$result = $this->wpdb->update(
 			$this->table_name,
-			array( 'engine_data' => $encoded ),
+			$update_data,
 			array( 'job_id' => $job_id ),
-			array( '%s' ),
+			$format,
 			array( '%d' )
 		);
 

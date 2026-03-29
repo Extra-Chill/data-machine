@@ -155,6 +155,7 @@ class Jobs {
 		dbDelta( $sql );
 
 		self::migrate_columns( $table_name );
+		self::migrate_task_type_column( $table_name );
 		self::migrate_indexes( $table_name );
 
 		do_action(
@@ -376,6 +377,79 @@ class Jobs {
 				);
 			}
 		}
+	}
+
+	/**
+	 * Add task_type column for indexed system task lookups.
+	 *
+	 * Replaces JSON_EXTRACT(engine_data, '$.task_type') queries with a proper
+	 * indexed column. The column is populated by store_engine_data() when the
+	 * engine snapshot contains a task_type key, and backfilled from existing
+	 * engine_data on migration.
+	 *
+	 * @since 0.30.0
+	 *
+	 * @param string $table_name Fully qualified table name.
+	 */
+	private static function migrate_task_type_column( string $table_name ): void {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$col = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COLUMN_NAME
+				 FROM information_schema.COLUMNS
+				 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'task_type'",
+				DB_NAME,
+				$table_name
+			)
+		);
+
+		if ( null !== $col ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		$result = $wpdb->query(
+			"ALTER TABLE {$table_name}
+			 ADD COLUMN task_type varchar(100) NULL DEFAULT NULL AFTER agent_id,
+			 ADD KEY idx_task_type (task_type, source)"
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL
+
+		if ( false === $result ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Failed to add task_type column to jobs table',
+				array(
+					'table_name' => $table_name,
+					'db_error'   => $wpdb->last_error,
+				)
+			);
+			return;
+		}
+
+		// Backfill task_type from engine_data for existing system/pipeline_system_task jobs.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		$wpdb->query(
+			"UPDATE {$table_name}
+			 SET task_type = JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.task_type'))
+			 WHERE source IN ('system', 'pipeline_system_task')
+			 AND engine_data IS NOT NULL
+			 AND JSON_EXTRACT(engine_data, '$.task_type') IS NOT NULL
+			 AND task_type IS NULL"
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Added task_type column to jobs table for indexed system task lookups',
+			array( 'table_name' => $table_name )
+		);
 	}
 
 	/**

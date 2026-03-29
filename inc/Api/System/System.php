@@ -504,7 +504,7 @@ class System {
 					"SELECT job_id, status, created_at, completed_at
 					 FROM {$table}
 					 WHERE source IN ('system', 'pipeline_system_task')
-					 AND JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.task_type')) = %s
+					 AND task_type = %s
 					 ORDER BY job_id DESC
 					 LIMIT 1",
 					$task_type
@@ -517,7 +517,7 @@ class System {
 					"SELECT COUNT(*)
 					 FROM {$table}
 					 WHERE source IN ('system', 'pipeline_system_task')
-					 AND JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.task_type')) = %s",
+					 AND task_type = %s",
 					$task_type
 				)
 			);
