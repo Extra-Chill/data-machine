@@ -28,12 +28,19 @@ class DiceFmSettings {
 	 */
 	public static function get_fields( array $current_config = array() ): array {
 		$handler_fields = array(
-			'city' => array(
+			'city'    => array(
 				'type'        => 'text',
 				'label'       => __( 'City', 'data-machine-events' ),
 				'description' => __( 'City name to search for events (required). This is the primary filter for Dice.fm API.', 'data-machine-events' ),
 				'placeholder' => __( 'Charleston', 'data-machine-events' ),
 				'required'    => true,
+			),
+			'country' => array(
+				'type'        => 'text',
+				'label'       => __( 'Country', 'data-machine-events' ),
+				'description' => __( 'Filter results to this country. Dice.fm returns events globally for ambiguous city names (e.g. Manchester UK vs NH). Defaults to "United States".', 'data-machine-events' ),
+				'placeholder' => __( 'United States', 'data-machine-events' ),
+				'required'    => false,
 			),
 		);
 
@@ -66,6 +73,7 @@ class DiceFmSettings {
 	public static function sanitize( array $raw_settings ): array {
 		return array(
 			'city'             => sanitize_text_field( $raw_settings['city'] ?? '' ),
+			'country'          => sanitize_text_field( $raw_settings['country'] ?? '' ),
 			'search'           => sanitize_text_field( $raw_settings['search'] ?? '' ),
 			'exclude_keywords' => sanitize_text_field( $raw_settings['exclude_keywords'] ?? '' ),
 		);
@@ -89,6 +97,7 @@ class DiceFmSettings {
 	public static function get_defaults(): array {
 		return array(
 			'city'             => '',
+			'country'          => 'United States',
 			'search'           => '',
 			'exclude_keywords' => '',
 		);

@@ -71,6 +71,9 @@ class DiceFm extends EventImportHandler {
 			return array();
 		}
 
+		// Get optional country filter (defaults to United States)
+		$country = isset( $config['country'] ) ? trim( $config['country'] ) : 'United States';
+
 		// Build configuration
 		$partner_id = ! empty( $api_config['partner_id'] ) ? trim( $api_config['partner_id'] ) : '';
 
@@ -87,10 +90,20 @@ class DiceFm extends EventImportHandler {
 			array( 'raw_events_available' => count( $raw_events ) )
 		);
 
-		$eligible_items = array();
+		$eligible_items  = array();
+		$country_skipped = 0;
 
 		foreach ( $raw_events as $raw_event ) {
 			$standardized_event = $this->convert_dice_fm_event( $raw_event );
+
+			// Filter by country — Dice.fm returns events from all countries matching the city name.
+			// e.g. "Manchester" returns Manchester UK + Manchester NH.
+			if ( ! empty( $country ) && ! empty( $standardized_event['venueCountry'] ) ) {
+				if ( strcasecmp( $standardized_event['venueCountry'], $country ) !== 0 ) {
+					++$country_skipped;
+					continue;
+				}
+			}
 
 			if ( empty( $standardized_event['title'] ) ) {
 				continue;
@@ -150,6 +163,13 @@ class DiceFm extends EventImportHandler {
 					'import_timestamp' => time(),
 					'_engine_data'     => $engine_data,
 				),
+			);
+		}
+
+		if ( $country_skipped > 0 ) {
+			$context->log(
+				'info',
+				sprintf( 'DiceFm: Skipped %d events from wrong country (expected: %s)', $country_skipped, $country )
 			);
 		}
 

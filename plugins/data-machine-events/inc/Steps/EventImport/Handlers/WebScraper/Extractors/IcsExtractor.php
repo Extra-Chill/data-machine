@@ -30,7 +30,7 @@ class IcsExtractor extends BaseExtractor {
 			return false;
 		}
 
-		return preg_match( '/^BEGIN:VCALENDAR/im', $content ) !== false;
+		return preg_match( '/^BEGIN:VCALENDAR/im', $content ) === 1;
 	}
 
 	public function extract( string $content, string $source_url ): array {
@@ -60,6 +60,14 @@ class IcsExtractor extends BaseExtractor {
 			}
 
 			$calendar_timezone = $ical->calendarTimeZone() ?? '';
+
+			// Fallback: extract timezone from X-WR-TIMEZONE when the library returned UTC.
+			// Handles two cases:
+			// 1. Non-standard syntax: "X-WR-TIMEZONE;VALUE=TEXT;US/Mountain" (semicolons, no colon value)
+			// 2. Standard syntax with deprecated tz: "X-WR-TIMEZONE:US/Mountain" (library can't resolve)
+			if ( empty( $calendar_timezone ) || 'UTC' === $calendar_timezone ) {
+				$calendar_timezone = $this->extractTimezoneFromRawContent( $content, $calendar_timezone );
+			}
 
 			$normalized = array();
 			foreach ( $events as $ical_event ) {
@@ -307,5 +315,79 @@ class IcsExtractor extends BaseExtractor {
 		} catch ( \Exception $e ) {
 			return null;
 		}
+	}
+
+	/**
+	 * Extract timezone from raw ICS content when the library fails.
+	 *
+	 * Parses the X-WR-TIMEZONE line directly from raw content, handling both
+	 * standard ("X-WR-TIMEZONE:US/Mountain") and non-standard
+	 * ("X-WR-TIMEZONE;VALUE=TEXT;US/Mountain") syntax.
+	 *
+	 * @param string $content           Raw ICS content.
+	 * @param string $current_timezone  Current timezone value to fall back to.
+	 * @return string Resolved timezone, or $current_timezone if extraction fails.
+	 */
+	private function extractTimezoneFromRawContent( string $content, string $current_timezone ): string {
+		// Match the X-WR-TIMEZONE line and capture everything after the property name.
+		if ( ! preg_match( '/^X-WR-TIMEZONE[;:](.+)$/im', $content, $line_match ) ) {
+			return $current_timezone;
+		}
+
+		$line_value = trim( $line_match[1] );
+
+		// Extract the last segment — the actual timezone identifier.
+		// Standard: "America/Chicago" (value after colon)
+		// Non-standard: "VALUE=TEXT;US/Mountain" (timezone is the last ;-delimited segment)
+		$segments = preg_split( '/[;:]/', $line_value );
+		$raw_tz   = trim( end( $segments ) );
+
+		if ( empty( $raw_tz ) ) {
+			return $current_timezone;
+		}
+
+		$resolved = self::resolveTimezoneAlias( $raw_tz );
+
+		if ( DateTimeParser::isValidTimezone( $resolved ) ) {
+			return $resolved;
+		}
+
+		return $current_timezone;
+	}
+
+	/**
+	 * Resolve deprecated/non-standard timezone identifiers to IANA names.
+	 *
+	 * ICS feeds may use old-style identifiers like "US/Mountain" or "US/Eastern"
+	 * which are not recognized by PHP's DateTimeZone on all systems.
+	 *
+	 * @param string $timezone Raw timezone identifier.
+	 * @return string Resolved IANA timezone identifier, or original if no alias found.
+	 */
+	private static function resolveTimezoneAlias( string $timezone ): string {
+		static $aliases = array(
+			'US/Eastern'    => 'America/New_York',
+			'US/Central'    => 'America/Chicago',
+			'US/Mountain'   => 'America/Denver',
+			'US/Pacific'    => 'America/Los_Angeles',
+			'US/Arizona'    => 'America/Phoenix',
+			'US/Alaska'     => 'America/Anchorage',
+			'US/Hawaii'     => 'Pacific/Honolulu',
+			'US/Samoa'      => 'Pacific/Pago_Pago',
+			'US/Aleutian'   => 'America/Adak',
+			'US/East-Indiana' => 'America/Indiana/Indianapolis',
+			'US/Indiana-Starke' => 'America/Indiana/Knox',
+			'US/Michigan'   => 'America/Detroit',
+			'Canada/Eastern'   => 'America/Toronto',
+			'Canada/Central'   => 'America/Winnipeg',
+			'Canada/Mountain'  => 'America/Edmonton',
+			'Canada/Pacific'   => 'America/Vancouver',
+			'Canada/Atlantic'  => 'America/Halifax',
+			'Canada/Newfoundland' => 'America/St_Johns',
+			'GB'            => 'Europe/London',
+			'Etc/GMT'       => 'UTC',
+		);
+
+		return $aliases[ $timezone ] ?? $timezone;
 	}
 }
