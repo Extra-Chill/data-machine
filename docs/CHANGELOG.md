@@ -2,6 +2,27 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.61.0] - 2026-03-29
+
+### Added
+- add public access level for anonymous-safe chat tools
+
+### Changed
+- Add task_type indexed column to jobs table for fast system task lookups
+- Add performance indexes to jobs table for scale
+- centralize canonical content diff previews
+- use shared chat transcript copy helper
+- Revert "chore(ci): homeboy autofix — refactor (115 files)"
+- Merge main into feat/public-tool-access-level
+- resolve chat tools per-tool instead of all-or-nothing
+
+### Fixed
+- grant datamachine_chat capability to contributor role
+- add get_username() to BaseAuthProvider for standardized username access
+- non-OAuth auth providers save config to wrong storage key
+- trust active editor client context in chat
+- resolve test merge conflict for public access level
+
 ## [0.60.0] - 2026-03-25
 
 ### Added
