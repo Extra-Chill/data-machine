@@ -343,48 +343,14 @@ class Chat {
 	 * @return WP_REST_Response Response data.
 	 */
 	public static function list_sessions( WP_REST_Request $request ) {
-		$agent_id = PermissionHelper::resolve_scoped_agent_id( $request );
-		$ability  = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/list-chat-sessions' ) : null;
-
-		if ( $ability ) {
-			$result = $ability->execute(
-				array(
-					'user_id'  => get_current_user_id(),
-					'agent_id' => $agent_id,
-					'limit'    => (int) $request->get_param( 'limit' ),
-					'offset'   => (int) $request->get_param( 'offset' ),
-					'context'  => $request->get_param( 'context' ),
-				)
-			);
-
-			return rest_ensure_response(
-				array(
-					'success' => true,
-					'data'    => $result,
-				)
-			);
-		}
-
-		// Fallback: direct DB access (should not happen when abilities are loaded).
-		$user_id = get_current_user_id();
-		$limit   = min( 100, max( 1, (int) $request->get_param( 'limit' ) ) );
-		$offset  = max( 0, (int) $request->get_param( 'offset' ) );
-		$context = $request->get_param( 'context' );
-
-		$chat_db  = new \DataMachine\Core\Database\Chat\Chat();
-		$sessions = $chat_db->get_user_sessions( $user_id, $limit, $offset, $context, $agent_id );
-		$total    = $chat_db->get_user_session_count( $user_id, $context, $agent_id );
-
-		return rest_ensure_response(
+		return self::execute_ability(
+			'datamachine/list-chat-sessions',
 			array(
-				'success' => true,
-				'data'    => array(
-					'sessions' => $sessions,
-					'total'    => $total,
-					'limit'    => $limit,
-					'offset'   => $offset,
-					'context'  => $context,
-				),
+				'user_id'  => get_current_user_id(),
+				'agent_id' => PermissionHelper::resolve_scoped_agent_id( $request ),
+				'limit'    => (int) $request->get_param( 'limit' ),
+				'offset'   => (int) $request->get_param( 'offset' ),
+				'context'  => $request->get_param( 'context' ),
 			)
 		);
 	}
@@ -396,59 +362,11 @@ class Chat {
 	 * @return WP_REST_Response|WP_Error Response data or error.
 	 */
 	public static function delete_session( WP_REST_Request $request ) {
-		$session_id = sanitize_text_field( $request->get_param( 'session_id' ) );
-		$user_id    = get_current_user_id();
-
-		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/delete-chat-session' ) : null;
-
-		if ( $ability ) {
-			$result = $ability->execute(
-				array(
-					'session_id' => $session_id,
-					'user_id'    => $user_id,
-				)
-			);
-
-			if ( empty( $result['success'] ) ) {
-				$error_code = $result['error'] ?? 'delete_failed';
-				$status     = 'session_not_found' === $error_code ? 404 : ( 'session_access_denied' === $error_code ? 403 : 500 );
-
-				return new WP_Error( $error_code, $result['error'] ?? 'Delete failed', array( 'status' => $status ) );
-			}
-
-			return rest_ensure_response(
-				array(
-					'success' => true,
-					'data'    => $result,
-				)
-			);
-		}
-
-		// Fallback: direct DB access.
-		$chat_db = new \DataMachine\Core\Database\Chat\Chat();
-		$session = $chat_db->get_session( $session_id );
-
-		if ( ! $session ) {
-			return new WP_Error( 'session_not_found', __( 'Session not found', 'data-machine' ), array( 'status' => 404 ) );
-		}
-
-		if ( (int) $session['user_id'] !== $user_id ) {
-			return new WP_Error( 'session_access_denied', __( 'Access denied to this session', 'data-machine' ), array( 'status' => 403 ) );
-		}
-
-		$deleted = $chat_db->delete_session( $session_id );
-
-		if ( ! $deleted ) {
-			return new WP_Error( 'session_delete_failed', __( 'Failed to delete session', 'data-machine' ), array( 'status' => 500 ) );
-		}
-
-		return rest_ensure_response(
+		return self::execute_ability(
+			'datamachine/delete-chat-session',
 			array(
-				'success' => true,
-				'data'    => array(
-					'session_id' => $session_id,
-					'deleted'    => true,
-				),
+				'session_id' => sanitize_text_field( $request->get_param( 'session_id' ) ),
+				'user_id'    => get_current_user_id(),
 			)
 		);
 	}
@@ -460,54 +378,11 @@ class Chat {
 	 * @return WP_REST_Response|WP_Error Response data or error.
 	 */
 	public static function get_session( WP_REST_Request $request ) {
-		$session_id = sanitize_text_field( $request->get_param( 'session_id' ) );
-		$user_id    = get_current_user_id();
-
-		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/get-chat-session' ) : null;
-
-		if ( $ability ) {
-			$result = $ability->execute(
-				array(
-					'session_id' => $session_id,
-					'user_id'    => $user_id,
-				)
-			);
-
-			if ( empty( $result['success'] ) ) {
-				$error_code = $result['error'] ?? 'get_failed';
-				$status     = 'session_not_found' === $error_code ? 404 : ( 'session_access_denied' === $error_code ? 403 : 500 );
-
-				return new WP_Error( $error_code, $result['error'] ?? 'Get failed', array( 'status' => $status ) );
-			}
-
-			return rest_ensure_response(
-				array(
-					'success' => true,
-					'data'    => $result,
-				)
-			);
-		}
-
-		// Fallback: direct DB access.
-		$chat_db = new \DataMachine\Core\Database\Chat\Chat();
-		$session = $chat_db->get_session( $session_id );
-
-		if ( ! $session ) {
-			return new WP_Error( 'session_not_found', __( 'Session not found', 'data-machine' ), array( 'status' => 404 ) );
-		}
-
-		if ( (int) $session['user_id'] !== $user_id ) {
-			return new WP_Error( 'session_access_denied', __( 'Access denied to this session', 'data-machine' ), array( 'status' => 403 ) );
-		}
-
-		return rest_ensure_response(
+		return self::execute_ability(
+			'datamachine/get-chat-session',
 			array(
-				'success' => true,
-				'data'    => array(
-					'session_id'   => $session['session_id'],
-					'conversation' => $session['messages'],
-					'metadata'     => $session['metadata'],
-				),
+				'session_id' => sanitize_text_field( $request->get_param( 'session_id' ) ),
+				'user_id'    => get_current_user_id(),
 			)
 		);
 	}
@@ -741,5 +616,69 @@ class Chat {
 		}
 
 		return $resolved;
+	}
+
+	/**
+	 * Execute an ability and return the REST response.
+	 *
+	 * Resolves the ability by slug, calls execute() with the given input,
+	 * and converts the result into a REST response. Handles WP_Error returns
+	 * from core's execute() pipeline (input validation, permissions, callback).
+	 *
+	 * For ability callbacks that still return { success: false, error: ... }
+	 * arrays (legacy convention), those are mapped to WP_Error. New abilities
+	 * should return WP_Error directly per core best practices.
+	 *
+	 * @since 0.62.0
+	 *
+	 * @see \WP_Ability::execute()
+	 *
+	 * @param string $slug  Ability slug (e.g. 'datamachine/get-chat-session').
+	 * @param array  $input Input parameters for the ability.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	private static function execute_ability( string $slug, array $input = array() ) {
+		$ability = wp_get_ability( $slug );
+
+		if ( ! $ability ) {
+			return new WP_Error(
+				'ability_not_found',
+				/* translators: %s: ability slug */
+				sprintf( __( 'Ability "%s" not registered.', 'data-machine' ), $slug ),
+				array( 'status' => 500 )
+			);
+		}
+
+		$result = $ability->execute( $input );
+
+		// Core's execute() returns WP_Error for validation/permission/callback failures.
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		// Legacy convention: ability callbacks return { success: false, error: ... }.
+		// Map to WP_Error until all abilities are migrated to return WP_Error directly.
+		// See: https://github.com/Extra-Chill/data-machine/issues/999
+		if ( is_array( $result ) && isset( $result['success'] ) && ! $result['success'] ) {
+			$error_code = $result['error'] ?? 'ability_failed';
+
+			$status_map = array(
+				'session_not_found'     => 404,
+				'session_access_denied' => 403,
+			);
+
+			return new WP_Error(
+				$error_code,
+				$result['error'] ?? 'Ability execution failed.',
+				array( 'status' => $status_map[ $error_code ] ?? 500 )
+			);
+		}
+
+		return rest_ensure_response(
+			array(
+				'success' => true,
+				'data'    => $result,
+			)
+		);
 	}
 }
