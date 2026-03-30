@@ -25,6 +25,11 @@ class InstagramReadAbility {
 	const GRAPH_API_URL = 'https://graph.instagram.com';
 
 	/**
+	 * Regex for extracting @mentions from comment text.
+	 */
+	const MENTION_REGEX = '/@([a-zA-Z0-9._]{1,30})/';
+
+	/**
 	 * Fields to request when listing media.
 	 */
 	const LIST_FIELDS = 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count';
@@ -59,12 +64,12 @@ class InstagramReadAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'action'   => array(
-								'type'        => 'string',
-								'enum'        => array( 'list', 'get', 'comments' ),
-								'default'     => 'list',
-								'description' => __( 'Action: list (recent posts), get (single post), comments (post comments)', 'data-machine-socials' ),
-							),
+						'action'   => array(
+							'type'        => 'string',
+							'enum'        => array( 'list', 'get', 'comments', 'comments_all' ),
+							'default'     => 'list',
+							'description' => __( 'Action: list (recent posts), get (single post), comments (one page), comments_all (all pages, normalized)', 'data-machine-socials' ),
+						),
 							'media_id' => array(
 								'type'        => 'string',
 								'description' => __( 'Instagram media ID (required for get and comments actions)', 'data-machine-socials' ),
@@ -158,6 +163,15 @@ class InstagramReadAbility {
 					);
 				}
 				return $this->getComments( $access_token, $input['media_id'], $input );
+
+			case 'comments_all':
+				if ( empty( $input['media_id'] ) ) {
+					return array(
+						'success' => false,
+						'error'   => 'media_id is required for the comments_all action',
+					);
+				}
+				return $this->getAllComments( $access_token, $input['media_id'] );
 
 			default:
 				return array(
@@ -322,6 +336,139 @@ class InstagramReadAbility {
 				'cursors'  => $paging['cursors'] ?? null,
 				'has_next' => ! empty( $paging['next'] ),
 			),
+		);
+	}
+
+	/**
+	 * Fetch ALL comments for a media item, auto-paginating through every page.
+	 *
+	 * Returns comments in the normalized SocialComment shape used across all
+	 * platforms. This enables generic consumers (giveaway picker, CLI, pipelines)
+	 * to work without platform-specific knowledge.
+	 *
+	 * @param string $access_token Valid access token.
+	 * @param string $media_id     Instagram media ID.
+	 * @return array Result with normalized comments.
+	 */
+	private function getAllComments( string $access_token, string $media_id ): array {
+		$all_comments = array();
+		$after        = '';
+		$page         = 0;
+		$max_pages    = 200; // Safety limit: 200 pages × 50 comments = 10,000 comments max.
+
+		do {
+			$page++;
+			$params = array(
+				'fields'       => 'id,text,timestamp,username,like_count',
+				'limit'        => 50, // Max per page for Instagram API.
+				'access_token' => $access_token,
+			);
+
+			if ( ! empty( $after ) ) {
+				$params['after'] = $after;
+			}
+
+			$url    = self::GRAPH_API_URL . "/{$media_id}/comments?" . http_build_query( $params );
+			$result = HttpClient::get( $url, array( 'context' => 'Instagram Comments All' ) );
+
+			if ( ! $result['success'] ) {
+				// If we already have some comments, return them with a warning.
+				if ( ! empty( $all_comments ) ) {
+					return array(
+						'success' => true,
+						'data'    => array(
+							'comments'  => $all_comments,
+							'count'     => count( $all_comments ),
+							'platform'  => 'instagram',
+							'partial'   => true,
+							'error'     => 'Pagination interrupted: ' . ( $result['error'] ?? 'unknown' ),
+						),
+					);
+				}
+
+				return array(
+					'success' => false,
+					'error'   => 'Instagram API request failed: ' . ( $result['error'] ?? 'unknown' ),
+				);
+			}
+
+			$data      = json_decode( $result['data'], true );
+			$http_code = $result['status_code'];
+
+			if ( 200 !== $http_code || isset( $data['error'] ) ) {
+				if ( ! empty( $all_comments ) ) {
+					return array(
+						'success' => true,
+						'data'    => array(
+							'comments'  => $all_comments,
+							'count'     => count( $all_comments ),
+							'platform'  => 'instagram',
+							'partial'   => true,
+							'error'     => $data['error']['message'] ?? 'Pagination error',
+						),
+					);
+				}
+
+				return array(
+					'success' => false,
+					'error'   => $data['error']['message'] ?? 'Failed to fetch comments',
+				);
+			}
+
+			$page_comments = $data['data'] ?? array();
+
+			foreach ( $page_comments as $comment ) {
+				$all_comments[] = self::normalizeComment( $comment );
+			}
+
+			// Check for next page.
+			$paging = $data['paging'] ?? array();
+			$after  = $paging['cursors']['after'] ?? '';
+
+			$has_next = ! empty( $paging['next'] ) && ! empty( $after );
+
+		} while ( $has_next && $page < $max_pages );
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'comments'  => $all_comments,
+				'count'     => count( $all_comments ),
+				'platform'  => 'instagram',
+				'partial'   => false,
+				'pages'     => $page,
+			),
+		);
+	}
+
+	/**
+	 * Normalize an Instagram comment into the generic SocialComment shape.
+	 *
+	 * Shape: { id, platform, author_username, text, timestamp, like_count,
+	 *          reply_count, mentions, parent_id, raw }
+	 *
+	 * @param array $comment Raw Instagram API comment data.
+	 * @return array Normalized comment.
+	 */
+	public static function normalizeComment( array $comment ): array {
+		$text     = $comment['text'] ?? '';
+		$mentions = array();
+
+		if ( preg_match_all( self::MENTION_REGEX, $text, $matches ) ) {
+			$mentions = array_values( array_unique( $matches[1] ) );
+		}
+
+		return array(
+			'id'              => $comment['id'] ?? '',
+			'platform'        => 'instagram',
+			'author_username' => $comment['username'] ?? '',
+			'text'            => $text,
+			'timestamp'       => $comment['timestamp'] ?? '',
+			'like_count'      => (int) ( $comment['like_count'] ?? 0 ),
+			'reply_count'     => 0, // Instagram top-level comments endpoint doesn't include reply count.
+			'mentions'        => $mentions,
+			'parent_id'       => null, // Top-level comments; replies would be fetched separately.
+			'raw'             => $comment,
 		);
 	}
 
