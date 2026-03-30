@@ -119,6 +119,69 @@ class RestApi {
 		);
 
 		// =====================================================================
+		// Generic Comments Endpoint (normalized shape across all platforms)
+		// =====================================================================
+
+		register_rest_route( self::NAMESPACE, '/comments/(?P<platform>[a-z]+)', array(
+			'methods'             => 'GET',
+			'callback'            => array( __CLASS__, 'get_comments' ),
+			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			'args'                => array(
+				'platform' => array(
+					'type'              => 'string',
+					'required'          => true,
+					'sanitize_callback' => 'sanitize_text_field',
+					'description'       => 'Platform slug (instagram, facebook, etc.)',
+				),
+				'media_id' => array(
+					'type'              => 'string',
+					'required'          => true,
+					'sanitize_callback' => 'sanitize_text_field',
+					'description'       => 'Platform-specific post/media ID.',
+				),
+				'all' => array(
+					'type'              => 'boolean',
+					'default'           => true,
+					'description'       => 'Fetch all comments (auto-paginate). Set false for single page.',
+				),
+				'limit' => array(
+					'type'              => 'integer',
+					'default'           => 50,
+					'sanitize_callback' => 'absint',
+					'description'       => 'Page size when all=false.',
+				),
+				'after' => array(
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_text_field',
+					'description'       => 'Pagination cursor when all=false.',
+				),
+			),
+		) );
+
+		register_rest_route( self::NAMESPACE, '/comments/(?P<platform>[a-z]+)/reply', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'post_comment_reply' ),
+			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			'args'                => array(
+				'platform'   => array(
+					'type'              => 'string',
+					'required'          => true,
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'comment_id' => array(
+					'type'              => 'string',
+					'required'          => true,
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'message'    => array(
+					'type'              => 'string',
+					'required'          => true,
+					'sanitize_callback' => 'sanitize_textarea_field',
+				),
+			),
+		) );
+
+		// =====================================================================
 		// Platform Read Endpoints
 		// =====================================================================
 
@@ -614,6 +677,111 @@ class RestApi {
 				'message'    => sanitize_textarea_field( $params['message'] ),
 			)
 		);
+
+		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
+	}
+
+	/**
+	 * Generic comments endpoint — returns normalized SocialComment shape.
+	 *
+	 * Routes to the platform's read ability with comments_all or comments action.
+	 * Provides a single, predictable endpoint for all platforms:
+	 *   GET /datamachine-socials/v1/comments/{platform}?media_id=...
+	 */
+	public static function get_comments( \WP_REST_Request $request ) {
+		$platform = $request->get_param( 'platform' );
+		$media_id = $request->get_param( 'media_id' );
+		$all      = $request->get_param( 'all' );
+
+		$slug_map = array(
+			'instagram' => 'datamachine/instagram-read',
+			'facebook'  => 'datamachine/facebook-read',
+			// Future: 'tiktok' => 'datamachine/tiktok-read', etc.
+		);
+
+		if ( ! isset( $slug_map[ $platform ] ) ) {
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => "Comments not supported for platform: {$platform}",
+			), 400 );
+		}
+
+		if ( empty( $media_id ) ) {
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => 'media_id is required',
+			), 400 );
+		}
+
+		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( $slug_map[ $platform ] ) : null;
+		if ( ! $ability ) {
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => $slug_map[ $platform ] . ' ability not registered',
+			), 500 );
+		}
+
+		$input = array(
+			'action'   => $all ? 'comments_all' : 'comments',
+			'media_id' => $media_id,
+		);
+
+		if ( ! $all ) {
+			$input['limit'] = $request->get_param( 'limit' ) ?: 50;
+			$after          = $request->get_param( 'after' );
+			if ( $after ) {
+				$input['after'] = $after;
+			}
+		}
+
+		$result = $ability->execute( $input );
+
+		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
+	}
+
+	/**
+	 * Generic comment reply endpoint.
+	 *
+	 * Routes to the platform's comment reply ability:
+	 *   POST /datamachine-socials/v1/comments/{platform}/reply
+	 */
+	public static function post_comment_reply( \WP_REST_Request $request ) {
+		$platform   = $request->get_param( 'platform' );
+		$params     = $request->get_json_params() ?: $request->get_body_params();
+		$comment_id = $params['comment_id'] ?? '';
+		$message    = $params['message'] ?? '';
+
+		$slug_map = array(
+			'instagram' => 'datamachine/instagram-comment-reply',
+			// Future: 'facebook' => 'datamachine/facebook-comment-reply', etc.
+		);
+
+		if ( ! isset( $slug_map[ $platform ] ) ) {
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => "Comment reply not supported for platform: {$platform}",
+			), 400 );
+		}
+
+		if ( empty( $comment_id ) || empty( $message ) ) {
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => 'comment_id and message are required',
+			), 400 );
+		}
+
+		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( $slug_map[ $platform ] ) : null;
+		if ( ! $ability ) {
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => $slug_map[ $platform ] . ' ability not registered',
+			), 500 );
+		}
+
+		$result = $ability->execute( array(
+			'comment_id' => sanitize_text_field( $comment_id ),
+			'message'    => sanitize_textarea_field( $message ),
+		) );
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
 	}
