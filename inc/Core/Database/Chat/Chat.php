@@ -53,6 +53,7 @@ class Chat extends BaseRepository {
 	            context VARCHAR(20) NOT NULL DEFAULT 'chat' COMMENT 'Execution context: chat, pipeline, system',
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            last_read_at DATETIME NULL COMMENT 'When the user last read this session',
             expires_at DATETIME NULL COMMENT 'Auto-cleanup timestamp',
             PRIMARY KEY  (session_id),
             KEY user_id (user_id),
@@ -143,6 +144,31 @@ class Chat extends BaseRepository {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
 			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD KEY user_context (user_id, context)', $table_name ) );
 		}
+	}
+
+	/**
+	 * Ensure last_read_at column exists for unread message tracking.
+	 *
+	 * dbDelta can miss edge cases on existing installs, so we perform an explicit
+	 * column check and ALTER as a safety net.
+	 *
+	 * @since 0.62.0
+	 * @return void
+	 */
+	public static function ensure_last_read_at_column(): void {
+		global $wpdb;
+
+		$table_name = self::get_prefixed_table_name();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$column = $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM %i LIKE %s', $table_name, 'last_read_at' ) );
+
+		if ( $column ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN last_read_at DATETIME NULL AFTER updated_at', $table_name ) );
 	}
 
 	/**
@@ -514,12 +540,15 @@ class Chat extends BaseRepository {
 				}
 			}
 
+			$last_read_at = $session['last_read_at'] ?? null;
+
 			$result[] = array(
 				'session_id'    => $session['session_id'],
 				'title'         => $session['title'] ?? null,
 				'context'       => $session['context'] ?? 'chat',
 				'first_message' => mb_substr( $first_message, 0, 100 ),
 				'message_count' => count( $messages ),
+				'unread_count'  => $this->count_unread( $messages, $last_read_at ),
 				'created_at'    => DateFormatter::format_for_api( $session['created_at'] ?? null ),
 				'updated_at'    => DateFormatter::format_for_api( $session['updated_at'] ?? $session['created_at'] ?? null ),
 			);
@@ -687,6 +716,91 @@ class Chat extends BaseRepository {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Count unread assistant messages in a session.
+	 *
+	 * Counts assistant messages whose metadata.timestamp is newer than
+	 * the given last_read_at value. If last_read_at is NULL, all assistant
+	 * messages are considered unread.
+	 *
+	 * @since 0.62.0
+	 *
+	 * @param array       $messages    Decoded messages array from the session.
+	 * @param string|null $last_read_at ISO 8601 or MySQL datetime string, or null if never read.
+	 * @return int Number of unread assistant messages.
+	 */
+	public function count_unread( array $messages, ?string $last_read_at ): int {
+		$count = 0;
+
+		foreach ( $messages as $msg ) {
+			if ( ( $msg['role'] ?? '' ) !== 'assistant' ) {
+				continue;
+			}
+
+			// Skip tool call/result messages — only count visible assistant responses.
+			$type = $msg['metadata']['type'] ?? 'text';
+			if ( 'tool_call' === $type || 'tool_result' === $type ) {
+				continue;
+			}
+
+			if ( null === $last_read_at ) {
+				++$count;
+				continue;
+			}
+
+			$timestamp = $msg['metadata']['timestamp'] ?? null;
+			if ( $timestamp && strtotime( $timestamp ) > strtotime( $last_read_at ) ) {
+				++$count;
+			}
+		}
+
+		return $count;
+	}
+
+	/**
+	 * Mark a session as read by setting last_read_at to the current time.
+	 *
+	 * @since 0.62.0
+	 *
+	 * @param string $session_id Session UUID.
+	 * @param int    $user_id    User ID for ownership verification.
+	 * @return string|false The new last_read_at value on success, false on failure.
+	 */
+	public function mark_session_read( string $session_id, int $user_id ) {
+		global $wpdb;
+
+		$table_name   = self::get_prefixed_table_name();
+		$last_read_at = current_time( 'mysql', true );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$result = $wpdb->update(
+			$table_name,
+			array( 'last_read_at' => $last_read_at ),
+			array(
+				'session_id' => $session_id,
+				'user_id'    => $user_id,
+			),
+			array( '%s' ),
+			array( '%s', '%d' )
+		);
+
+		if ( false === $result ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Failed to mark chat session as read',
+				array(
+					'session_id' => $session_id,
+					'user_id'    => $user_id,
+					'error'      => $wpdb->last_error,
+				)
+			);
+			return false;
+		}
+
+		return $last_read_at;
 	}
 
 	/**
