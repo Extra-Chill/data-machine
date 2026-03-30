@@ -102,31 +102,22 @@ class ReplyRedditAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result with reply data or error.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$thing_id     = sanitize_text_field( $input['thing_id'] ?? '' );
 		$text         = trim( $input['text'] ?? '' );
 		$access_token = $input['access_token'] ?? '';
 
 		if ( empty( $thing_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'thing_id is required (e.g. t3_abc123 for post, t1_abc123 for comment)',
-			);
+			return new \WP_Error( 'missing_param', 'thing_id is required (e.g. t3_abc123 for post, t1_abc123 for comment)', array( 'status' => 400 ) );
 		}
 
 		// Validate thing_id format: must be t1_ (comment) or t3_ (post).
 		if ( ! preg_match( '/^t[13]_[a-z0-9]+$/i', $thing_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Invalid thing_id format. Must be t3_xxx (post) or t1_xxx (comment).',
-			);
+			return new \WP_Error( 'missing_param', 'Invalid thing_id format. Must be t3_xxx (post) or t1_xxx (comment).', array( 'status' => 400 ) );
 		}
 
 		if ( empty( $text ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Reply text is required.',
-			);
+			return new \WP_Error( 'missing_param', 'Reply text is required.', array( 'status' => 400 ) );
 		}
 
 		if ( mb_strlen( $text ) > self::MAX_COMMENT_LENGTH ) {
@@ -134,10 +125,7 @@ class ReplyRedditAbility {
 		}
 
 		if ( empty( $access_token ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'access_token is required.',
-			);
+			return new \WP_Error( 'missing_param', 'access_token is required.', array( 'status' => 400 ) );
 		}
 
 		return $this->postComment( $access_token, $thing_id, $text );
@@ -151,7 +139,7 @@ class ReplyRedditAbility {
 	 * @param string $text         Comment text (markdown).
 	 * @return array Result.
 	 */
-	private function postComment( string $access_token, string $thing_id, string $text ): array {
+	private function postComment( string $access_token, string $thing_id, string $text ): array|\WP_Error {
 		$url = self::API_BASE . '/api/comment';
 
 		$response = wp_remote_post(
@@ -171,10 +159,7 @@ class ReplyRedditAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
@@ -189,17 +174,11 @@ class ReplyRedditAbility {
 				},
 				$errors
 			);
-			return array(
-				'success' => false,
-				'error'   => implode( '; ', $error_messages ),
-			);
+			return new \WP_Error( 'api_error', implode( '; ', $error_messages ), array( 'status' => 500 ) );
 		}
 
 		if ( $status_code < 200 || $status_code >= 300 ) {
-			return array(
-				'success' => false,
-				'error'   => "Reddit API returned HTTP {$status_code}",
-			);
+			return new \WP_Error( 'api_error', "Reddit API returned HTTP {$status_code}", array( 'status' => 500 ) );
 		}
 
 		// Extract the new comment data.

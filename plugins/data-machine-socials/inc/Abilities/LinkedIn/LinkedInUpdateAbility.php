@@ -83,37 +83,25 @@ class LinkedInUpdateAbility {
 		return PermissionHelper::can_manage();
 	}
 
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$post_id    = $input['post_id'] ?? '';
 		$commentary = $input['commentary'] ?? '';
 
 		if ( empty( $post_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'post_id is required',
-			);
+			return new \WP_Error( 'missing_param', 'post_id is required', array( 'status' => 400 ) );
 		}
 
 		if ( empty( $commentary ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'commentary is required',
-			);
+			return new \WP_Error( 'missing_param', 'commentary is required', array( 'status' => 400 ) );
 		}
 
 		$provider = $this->getAuthProvider();
 		if ( ! $provider ) {
-			return array(
-				'success' => false,
-				'error'   => 'LinkedIn auth provider not available',
-			);
+			return new \WP_Error( 'missing_auth', 'LinkedIn auth provider not available', array( 'status' => 401 ) );
 		}
 
 		if ( ! $provider->is_authenticated() ) {
-			return array(
-				'success' => false,
-				'error'   => 'LinkedIn not authenticated',
-			);
+			return new \WP_Error( 'missing_auth', 'LinkedIn not authenticated', array( 'status' => 401 ) );
 		}
 
 		$encoded_id = rawurlencode( $post_id );
@@ -145,10 +133,7 @@ class LinkedInUpdateAbility {
 			);
 		}
 
-		return array(
-			'success' => false,
-			'error'   => $result['error'] ?? 'Failed to update LinkedIn post',
-		);
+		return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to update LinkedIn post', array( 'status' => 500 ) );
 	}
 
 	private function getAuthProvider(): ?LinkedInAuth {

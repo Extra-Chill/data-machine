@@ -207,16 +207,13 @@ class InstagramPublishAbility {
 	 * @param array $input Ability input with publish parameters.
 	 * @return array Response with post details or error.
 	 */
-	public static function execute_publish( array $input ): array {
+	public static function execute_publish( array $input ): array|\WP_Error {
 		$content    = $input['content'] ?? '';
 		$media_kind = $input['media_kind'] ?? 'image';
 		$source_url = $input['source_url'] ?? '';
 
 		if ( empty( $content ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Content is required',
-			);
+			return new \WP_Error( 'missing_param', 'Content is required', array( 'status' => 400 ) );
 		}
 
 		// Auth check.
@@ -224,20 +221,14 @@ class InstagramPublishAbility {
 		$provider = $auth->getProvider( 'instagram' );
 
 		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return array(
-				'success' => false,
-				'error'   => 'Instagram not authenticated',
-			);
+			return new \WP_Error( 'missing_auth', 'Instagram not authenticated', array( 'status' => 401 ) );
 		}
 
 		$user_id      = $provider->get_user_id();
 		$access_token = $provider->get_valid_access_token();
 
 		if ( empty( $user_id ) || empty( $access_token ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Instagram credentials not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Instagram credentials not available', array( 'status' => 401 ) );
 		}
 
 		// Build caption with source URL if provided.
@@ -272,24 +263,18 @@ class InstagramPublishAbility {
 	 * @param string $caption      Prepared caption text.
 	 * @return array Result.
 	 */
-	private static function publish_image( array $input, string $user_id, string $access_token, string $caption ): array {
+	private static function publish_image( array $input, string $user_id, string $access_token, string $caption ): array|\WP_Error {
 		$image_urls = $input['image_urls'] ?? array();
 
 		// Validate image URLs.
 		if ( ! empty( $image_urls ) ) {
 			if ( count( $image_urls ) > self::MAX_CAROUSEL_IMAGES ) {
-				return array(
-					'success' => false,
-					'error'   => sprintf( 'Maximum %d images allowed for Instagram carousel', self::MAX_CAROUSEL_IMAGES ),
-				);
+				return new \WP_Error( 'missing_param', sprintf( 'Maximum %d images allowed for Instagram carousel', self::MAX_CAROUSEL_IMAGES ), array( 'status' => 400 ) );
 			}
 
 			foreach ( $image_urls as $url ) {
 				if ( ! filter_var( $url, FILTER_VALIDATE_URL ) ) {
-					return array(
-						'success' => false,
-						'error'   => 'Invalid image URL: ' . $url,
-					);
+					return new \WP_Error( 'missing_param', 'Invalid image URL: ' . $url, array( 'status' => 400 ) );
 				}
 			}
 		}
@@ -321,10 +306,7 @@ class InstagramPublishAbility {
 			);
 
 			if ( is_wp_error( $response ) ) {
-				return array(
-					'success' => false,
-					'error'   => 'Error creating media container: ' . $response->get_error_message(),
-				);
+				return new \WP_Error( 'api_error', 'Error creating media container: ' . $response->get_error_message(), array( 'status' => 500 ) );
 			}
 
 			$body = json_decode( wp_remote_retrieve_body( $response ), true );
@@ -334,10 +316,7 @@ class InstagramPublishAbility {
 				if ( isset( $body['error']['message'] ) ) {
 					$error_msg .= ': ' . $body['error']['message'];
 				}
-				return array(
-					'success' => false,
-					'error'   => $error_msg,
-				);
+				return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 			}
 
 			$container_id = $body['id'];
@@ -357,10 +336,7 @@ class InstagramPublishAbility {
 			}
 
 			if ( 'ERROR' === $status || 'EXPIRED' === $status ) {
-				return array(
-					'success' => false,
-					'error'   => 'Container status error: ' . $status,
-				);
+				return new \WP_Error( 'api_error', 'Container status error: ' . $status, array( 'status' => 500 ) );
 			}
 
 			$container_ids[] = $container_id;
@@ -369,10 +345,7 @@ class InstagramPublishAbility {
 			if ( 'FINISHED' !== $status ) {
 				$ready = self::wait_for_container( $access_token, $container_id );
 				if ( ! $ready ) {
-					return array(
-						'success' => false,
-						'error'   => 'Media processing failed for container: ' . $container_id,
-					);
+					return new \WP_Error( 'api_error', 'Media processing failed for container: ' . $container_id, array( 'status' => 500 ) );
 				}
 			}
 		}
@@ -396,10 +369,7 @@ class InstagramPublishAbility {
 			);
 
 			if ( is_wp_error( $carousel_resp ) ) {
-				return array(
-					'success' => false,
-					'error'   => 'Error creating carousel container: ' . $carousel_resp->get_error_message(),
-				);
+				return new \WP_Error( 'api_error', 'Error creating carousel container: ' . $carousel_resp->get_error_message(), array( 'status' => 500 ) );
 			}
 
 			$carousel_body = json_decode( wp_remote_retrieve_body( $carousel_resp ), true );
@@ -408,10 +378,7 @@ class InstagramPublishAbility {
 				if ( isset( $carousel_body['error']['message'] ) ) {
 					$error_msg .= ': ' . $carousel_body['error']['message'];
 				}
-				return array(
-					'success' => false,
-					'error'   => $error_msg,
-				);
+				return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 			}
 
 			$main_container_id = $carousel_body['id'];
@@ -420,10 +387,7 @@ class InstagramPublishAbility {
 			$main_container_id = $container_ids[0];
 		} else {
 			// No images - Instagram requires at least one image.
-			return array(
-				'success' => false,
-				'error'   => 'At least one image is required for Instagram posts',
-			);
+			return new \WP_Error( 'missing_param', 'At least one image is required for Instagram posts', array( 'status' => 400 ) );
 		}
 
 		return self::publish_container( $user_id, $access_token, $main_container_id, $media_kind );
@@ -443,23 +407,17 @@ class InstagramPublishAbility {
 	 * @param string $caption      Prepared caption text.
 	 * @return array Result.
 	 */
-	private static function publish_reel( array $input, string $user_id, string $access_token, string $caption ): array {
+	private static function publish_reel( array $input, string $user_id, string $access_token, string $caption ): array|\WP_Error {
 		$video_url     = $input['video_url'] ?? '';
 		$cover_url     = $input['cover_url'] ?? '';
 		$share_to_feed = $input['share_to_feed'] ?? true;
 
 		if ( empty( $video_url ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'video_url is required for Reel publishing',
-			);
+			return new \WP_Error( 'missing_param', 'video_url is required for Reel publishing', array( 'status' => 400 ) );
 		}
 
 		if ( ! filter_var( $video_url, FILTER_VALIDATE_URL ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Invalid video URL: ' . $video_url,
-			);
+			return new \WP_Error( 'missing_param', 'Invalid video URL: ' . $video_url, array( 'status' => 400 ) );
 		}
 
 		// Pre-publish validation via core video-metadata if local path is available.
@@ -469,10 +427,7 @@ class InstagramPublishAbility {
 
 			// Instagram Reels: max 15 min, H.264 codec recommended.
 			if ( ! empty( $metadata['duration'] ) && $metadata['duration'] > 900 ) {
-				return array(
-					'success' => false,
-					'error'   => sprintf( 'Video duration (%.0fs) exceeds Instagram Reels maximum (900s)', $metadata['duration'] ),
-				);
+				return new \WP_Error( 'missing_param', sprintf( 'Video duration (%.0fs) exceeds Instagram Reels maximum (900s)', $metadata['duration'] ), array( 'status' => 400 ) );
 			}
 		}
 
@@ -487,10 +442,7 @@ class InstagramPublishAbility {
 
 		if ( ! empty( $cover_url ) ) {
 			if ( ! filter_var( $cover_url, FILTER_VALIDATE_URL ) ) {
-				return array(
-					'success' => false,
-					'error'   => 'Invalid cover URL: ' . $cover_url,
-				);
+				return new \WP_Error( 'missing_param', 'Invalid cover URL: ' . $cover_url, array( 'status' => 400 ) );
 			}
 			$container_body['cover_url'] = $cover_url;
 		}
@@ -505,10 +457,7 @@ class InstagramPublishAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Error creating Reel container: ' . $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', 'Error creating Reel container: ' . $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
@@ -518,10 +467,7 @@ class InstagramPublishAbility {
 			if ( isset( $body['error']['message'] ) ) {
 				$error_msg .= ': ' . $body['error']['message'];
 			}
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		$container_id = $body['id'];
@@ -535,10 +481,7 @@ class InstagramPublishAbility {
 		);
 
 		if ( ! $ready ) {
-			return array(
-				'success' => false,
-				'error'   => 'Reel video processing failed or timed out for container: ' . $container_id,
-			);
+			return new \WP_Error( 'api_error', 'Reel video processing failed or timed out for container: ' . $container_id, array( 'status' => 500 ) );
 		}
 
 		// Step 3: Publish.
@@ -559,16 +502,13 @@ class InstagramPublishAbility {
 	 * @param string $access_token Valid access token.
 	 * @return array Result.
 	 */
-	private static function publish_story( array $input, string $user_id, string $access_token ): array {
+	private static function publish_story( array $input, string $user_id, string $access_token ): array|\WP_Error {
 		$story_image_url = $input['story_image_url'] ?? '';
 		$video_url       = $input['video_url'] ?? '';
 
 		// Stories require exactly one media source: image or video.
 		if ( empty( $story_image_url ) && empty( $video_url ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'story_image_url or video_url is required for Story publishing',
-			);
+			return new \WP_Error( 'missing_param', 'story_image_url or video_url is required for Story publishing', array( 'status' => 400 ) );
 		}
 
 		// Build the container request body.
@@ -579,18 +519,12 @@ class InstagramPublishAbility {
 
 		if ( ! empty( $video_url ) ) {
 			if ( ! filter_var( $video_url, FILTER_VALIDATE_URL ) ) {
-				return array(
-					'success' => false,
-					'error'   => 'Invalid video URL: ' . $video_url,
-				);
+				return new \WP_Error( 'missing_param', 'Invalid video URL: ' . $video_url, array( 'status' => 400 ) );
 			}
 			$container_body['video_url'] = $video_url;
 		} else {
 			if ( ! filter_var( $story_image_url, FILTER_VALIDATE_URL ) ) {
-				return array(
-					'success' => false,
-					'error'   => 'Invalid story image URL: ' . $story_image_url,
-				);
+				return new \WP_Error( 'missing_param', 'Invalid story image URL: ' . $story_image_url, array( 'status' => 400 ) );
 			}
 			$container_body['image_url'] = $story_image_url;
 		}
@@ -605,10 +539,7 @@ class InstagramPublishAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Error creating Story container: ' . $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', 'Error creating Story container: ' . $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
@@ -618,10 +549,7 @@ class InstagramPublishAbility {
 			if ( isset( $body['error']['message'] ) ) {
 				$error_msg .= ': ' . $body['error']['message'];
 			}
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		$container_id = $body['id'];
@@ -633,10 +561,7 @@ class InstagramPublishAbility {
 
 		$ready = self::wait_for_container( $access_token, $container_id, $max_retries, $interval );
 		if ( ! $ready ) {
-			return array(
-				'success' => false,
-				'error'   => 'Story media processing failed or timed out for container: ' . $container_id,
-			);
+			return new \WP_Error( 'api_error', 'Story media processing failed or timed out for container: ' . $container_id, array( 'status' => 500 ) );
 		}
 
 		// Step 3: Publish.
@@ -654,7 +579,7 @@ class InstagramPublishAbility {
 	 * @param string $media_kind     Media kind identifier (image, carousel, reel, story).
 	 * @return array Result with success, media_id, media_kind, permalink.
 	 */
-	private static function publish_container( string $user_id, string $access_token, string $container_id, string $media_kind ): array {
+	private static function publish_container( string $user_id, string $access_token, string $container_id, string $media_kind ): array|\WP_Error {
 		$publish_resp = wp_remote_post(
 			self::GRAPH_API_URL . "/{$user_id}/media_publish",
 			array(
@@ -667,10 +592,7 @@ class InstagramPublishAbility {
 		);
 
 		if ( is_wp_error( $publish_resp ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Error publishing to Instagram: ' . $publish_resp->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', 'Error publishing to Instagram: ' . $publish_resp->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$publish_body = json_decode( wp_remote_retrieve_body( $publish_resp ), true );
@@ -679,10 +601,7 @@ class InstagramPublishAbility {
 			if ( isset( $publish_body['error']['message'] ) ) {
 				$error_msg .= ': ' . $publish_body['error']['message'];
 			}
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		$media_id = $publish_body['id'];
@@ -750,17 +669,13 @@ class InstagramPublishAbility {
 	 * @param array $input Ability input.
 	 * @return array Account details or error.
 	 */
-	public static function get_account( array $input ): array {
+	public static function get_account( array $input ): array|\WP_Error {
 		$input;
 		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'instagram' );
 
 		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return array(
-				'success'       => false,
-				'error'         => 'Instagram not authenticated',
-				'authenticated' => false,
-			);
+			return new \WP_Error( 'missing_auth', 'Instagram not authenticated', array( 'status' => 401 ) );
 		}
 
 		return array(

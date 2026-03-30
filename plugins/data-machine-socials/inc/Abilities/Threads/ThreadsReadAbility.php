@@ -99,23 +99,17 @@ class ThreadsReadAbility {
 		return PermissionHelper::can_manage();
 	}
 
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? 'list';
 
 		$auth = $this->getAuthProvider();
 		if ( ! $auth ) {
-			return array(
-				'success' => false,
-				'error'   => 'Threads auth provider not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Threads auth provider not available', array( 'status' => 401 ) );
 		}
 
 		$access_token = $auth->get_valid_access_token();
 		if ( empty( $access_token ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Threads access token unavailable (expired or refresh failed)',
-			);
+			return new \WP_Error( 'missing_auth', 'Threads access token unavailable (expired or refresh failed)', array( 'status' => 401 ) );
 		}
 
 		switch ( $action ) {
@@ -124,37 +118,25 @@ class ThreadsReadAbility {
 
 			case 'get':
 				if ( empty( $input['thread_id'] ) ) {
-					return array(
-						'success' => false,
-						'error'   => 'thread_id is required for the get action',
-					);
+					return new \WP_Error( 'missing_param', 'thread_id is required for the get action', array( 'status' => 400 ) );
 				}
 				return $this->getThread( $access_token, $input['thread_id'] );
 
 			case 'replies':
 				if ( empty( $input['thread_id'] ) ) {
-					return array(
-						'success' => false,
-						'error'   => 'thread_id is required for the replies action',
-					);
+					return new \WP_Error( 'missing_param', 'thread_id is required for the replies action', array( 'status' => 400 ) );
 				}
 				return $this->getReplies( $access_token, $input['thread_id'], $input );
 
 			default:
-				return array(
-					'success' => false,
-					'error'   => "Unknown action: {$action}. Use list, get, or replies.",
-				);
+				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use list, get, or replies.", array( 'status' => 500 ) );
 		}
 	}
 
-	private function listThreads( ThreadsAuth $auth, string $access_token, array $input ): array {
+	private function listThreads( ThreadsAuth $auth, string $access_token, array $input ): array|\WP_Error {
 		$user_id = $auth->get_page_id();
 		if ( empty( $user_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Threads user ID not available. Try re-authenticating.',
-			);
+			return new \WP_Error( 'missing_auth', 'Threads user ID not available. Try re-authenticating.', array( 'status' => 401 ) );
 		}
 
 		$limit  = min( absint( $input['limit'] ?? 25 ), 100 );
@@ -172,10 +154,7 @@ class ThreadsReadAbility {
 		$result = HttpClient::get( $url, array( 'context' => 'Threads Read' ) );
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => 'Threads API request failed: ' . ( $result['error'] ?? 'unknown' ),
-			);
+			return new \WP_Error( 'api_error', 'Threads API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
 		}
 
 		$data      = json_decode( $result['data'], true );
@@ -183,10 +162,7 @@ class ThreadsReadAbility {
 
 		if ( 200 !== $http_code || isset( $data['error'] ) ) {
 			$error_msg = $data['error']['message'] ?? 'Failed to fetch Threads posts';
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		$threads = $data['data'] ?? array();
@@ -203,7 +179,7 @@ class ThreadsReadAbility {
 		);
 	}
 
-	private function getThread( string $access_token, string $thread_id ): array {
+	private function getThread( string $access_token, string $thread_id ): array|\WP_Error {
 		$params = array(
 			'fields'       => self::DETAIL_FIELDS,
 			'access_token' => $access_token,
@@ -213,10 +189,7 @@ class ThreadsReadAbility {
 		$result = HttpClient::get( $url, array( 'context' => 'Threads Read' ) );
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => 'Threads API request failed: ' . ( $result['error'] ?? 'unknown' ),
-			);
+			return new \WP_Error( 'api_error', 'Threads API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
 		}
 
 		$data      = json_decode( $result['data'], true );
@@ -224,10 +197,7 @@ class ThreadsReadAbility {
 
 		if ( 200 !== $http_code || isset( $data['error'] ) ) {
 			$error_msg = $data['error']['message'] ?? 'Failed to fetch thread details';
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		return array(
@@ -236,7 +206,7 @@ class ThreadsReadAbility {
 		);
 	}
 
-	private function getReplies( string $access_token, string $thread_id, array $input ): array {
+	private function getReplies( string $access_token, string $thread_id, array $input ): array|\WP_Error {
 		$limit  = min( absint( $input['limit'] ?? 25 ), 100 );
 		$params = array(
 			'fields'       => 'id,text,timestamp,username,like_count',
@@ -252,10 +222,7 @@ class ThreadsReadAbility {
 		$result = HttpClient::get( $url, array( 'context' => 'Threads Read' ) );
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => 'Threads API request failed: ' . ( $result['error'] ?? 'unknown' ),
-			);
+			return new \WP_Error( 'api_error', 'Threads API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
 		}
 
 		$data      = json_decode( $result['data'], true );
@@ -263,10 +230,7 @@ class ThreadsReadAbility {
 
 		if ( 200 !== $http_code || isset( $data['error'] ) ) {
 			$error_msg = $data['error']['message'] ?? 'Failed to fetch replies';
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		$replies = $data['data'] ?? array();

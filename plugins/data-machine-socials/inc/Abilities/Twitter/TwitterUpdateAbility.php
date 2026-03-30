@@ -94,31 +94,22 @@ class TwitterUpdateAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? '';
 
 		// Get auth provider.
 		$auth = $this->getAuthProvider();
 		if ( ! $auth ) {
-			return array(
-				'success' => false,
-				'error'   => 'Twitter auth provider not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Twitter auth provider not available', array( 'status' => 401 ) );
 		}
 
 		$connection = $auth->get_connection();
 		if ( ! $connection ) {
-			return array(
-				'success' => false,
-				'error'   => 'Twitter connection not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Twitter connection not available', array( 'status' => 401 ) );
 		}
 
 		if ( empty( $input['tweet_id'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'tweet_id is required',
-			);
+			return new \WP_Error( 'missing_param', 'tweet_id is required', array( 'status' => 400 ) );
 		}
 
 		$tweet_id = $input['tweet_id'];
@@ -140,10 +131,7 @@ class TwitterUpdateAbility {
 				return $this->unlikeTweet( $connection, $tweet_id );
 
 			default:
-				return array(
-					'success' => false,
-					'error'   => "Unknown action: {$action}. Use delete, retweet, unretweet, like, or unlike.",
-				);
+				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use delete, retweet, unretweet, like, or unlike.", array( 'status' => 500 ) );
 		}
 	}
 
@@ -174,7 +162,7 @@ class TwitterUpdateAbility {
 	 * @param string $tweet_id   Tweet ID.
 	 * @return array Result.
 	 */
-	private function deleteTweet( $connection, string $tweet_id ): array {
+	private function deleteTweet( $connection, string $tweet_id ): array|\WP_Error {
 		// Set API v2.
 		$connection->setApiVersion( '2' );
 
@@ -193,10 +181,7 @@ class TwitterUpdateAbility {
 		}
 
 		$error = $result['detail'] ?? $result['title'] ?? 'Failed to delete tweet';
-		return array(
-			'success' => false,
-			'error'   => $error,
-		);
+		return new \WP_Error( 'api_error', $error, array( 'status' => 500 ) );
 	}
 
 	/**
@@ -206,17 +191,14 @@ class TwitterUpdateAbility {
 	 * @param string $tweet_id   Tweet ID to retweet.
 	 * @return array Result.
 	 */
-	private function retweet( $connection, string $tweet_id ): array {
+	private function retweet( $connection, string $tweet_id ): array|\WP_Error {
 		// Need user ID for retweeting.
 		$auth    = $this->getAuthProvider();
 		$account = $auth->get_account_details();
 		$user_id = $account['user_id'] ?? null;
 
 		if ( ! $user_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'User ID not available for retweet',
-			);
+			return new \WP_Error( 'missing_auth', 'User ID not available for retweet', array( 'status' => 401 ) );
 		}
 
 		$connection->setApiVersion( '2' );
@@ -239,10 +221,7 @@ class TwitterUpdateAbility {
 		}
 
 		$error = $result['detail'] ?? $result['title'] ?? 'Failed to retweet';
-		return array(
-			'success' => false,
-			'error'   => $error,
-		);
+		return new \WP_Error( 'api_error', $error, array( 'status' => 500 ) );
 	}
 
 	/**
@@ -252,17 +231,14 @@ class TwitterUpdateAbility {
 	 * @param string $tweet_id   Tweet ID to unretweet.
 	 * @return array Result.
 	 */
-	private function unretweet( $connection, string $tweet_id ): array {
+	private function unretweet( $connection, string $tweet_id ): array|\WP_Error {
 		// Need user ID for unretweeting.
 		$auth    = $this->getAuthProvider();
 		$account = $auth->get_account_details();
 		$user_id = $account['user_id'] ?? null;
 
 		if ( ! $user_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'User ID not available for unretweet',
-			);
+			return new \WP_Error( 'missing_auth', 'User ID not available for unretweet', array( 'status' => 401 ) );
 		}
 
 		$connection->setApiVersion( '2' );
@@ -283,10 +259,7 @@ class TwitterUpdateAbility {
 		}
 
 		$error = $result['detail'] ?? $result['title'] ?? 'Failed to unretweet';
-		return array(
-			'success' => false,
-			'error'   => $error,
-		);
+		return new \WP_Error( 'api_error', $error, array( 'status' => 500 ) );
 	}
 
 	/**
@@ -296,17 +269,14 @@ class TwitterUpdateAbility {
 	 * @param string $tweet_id   Tweet ID to like.
 	 * @return array Result.
 	 */
-	private function likeTweet( $connection, string $tweet_id ): array {
+	private function likeTweet( $connection, string $tweet_id ): array|\WP_Error {
 		// Need user ID for liking.
 		$auth    = $this->getAuthProvider();
 		$account = $auth->get_account_details();
 		$user_id = $account['user_id'] ?? null;
 
 		if ( ! $user_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'User ID not available for like',
-			);
+			return new \WP_Error( 'missing_auth', 'User ID not available for like', array( 'status' => 401 ) );
 		}
 
 		$connection->setApiVersion( '2' );
@@ -328,10 +298,7 @@ class TwitterUpdateAbility {
 		}
 
 		$error = $result['detail'] ?? $result['title'] ?? 'Failed to like tweet';
-		return array(
-			'success' => false,
-			'error'   => $error,
-		);
+		return new \WP_Error( 'api_error', $error, array( 'status' => 500 ) );
 	}
 
 	/**
@@ -341,17 +308,14 @@ class TwitterUpdateAbility {
 	 * @param string $tweet_id   Tweet ID to unlike.
 	 * @return array Result.
 	 */
-	private function unlikeTweet( $connection, string $tweet_id ): array {
+	private function unlikeTweet( $connection, string $tweet_id ): array|\WP_Error {
 		// Need user ID for unliking.
 		$auth    = $this->getAuthProvider();
 		$account = $auth->get_account_details();
 		$user_id = $account['user_id'] ?? null;
 
 		if ( ! $user_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'User ID not available for unlike',
-			);
+			return new \WP_Error( 'missing_auth', 'User ID not available for unlike', array( 'status' => 401 ) );
 		}
 
 		$connection->setApiVersion( '2' );
@@ -371,9 +335,6 @@ class TwitterUpdateAbility {
 		}
 
 		$error = $result['detail'] ?? $result['title'] ?? 'Failed to unlike tweet';
-		return array(
-			'success' => false,
-			'error'   => $error,
-		);
+		return new \WP_Error( 'api_error', $error, array( 'status' => 500 ) );
 	}
 }

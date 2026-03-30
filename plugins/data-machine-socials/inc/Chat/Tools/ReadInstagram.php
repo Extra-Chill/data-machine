@@ -114,10 +114,6 @@ class ReadInstagram extends BaseTool {
 		}
 
 		// Get the ability.
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			return $this->buildErrorResponse( 'WordPress Abilities API not available', $tool_name );
-		}
-
 		$ability = wp_get_ability( 'datamachine/instagram-read' );
 		if ( ! $ability ) {
 			return $this->buildErrorResponse( 'datamachine/instagram-read ability not registered', $tool_name );
@@ -141,11 +137,15 @@ class ReadInstagram extends BaseTool {
 		}
 
 		// Execute via ability (which handles token retrieval internally).
+		$ability = wp_get_ability( 'datamachine/instagram-read' );
+		if ( ! $ability ) {
+			return $this->buildErrorResponse( 'datamachine/instagram-read ability not registered', $tool_name );
+		}
 		$ability_instance = $ability;
 		$result           = $ability_instance->execute( $input );
 
-		if ( ! $this->isAbilitySuccess( $result ) ) {
-			$error = $this->getAbilityError( $result, 'Failed to read from Instagram' );
+		if ( is_wp_error( $result ) || ! $this->isAbilitySuccess( $result ) ) {
+			$error = is_wp_error( $result ) ? $result->get_error_message() : $this->getAbilityError( $result, 'Failed to read from Instagram' );
 			return $this->buildErrorResponse( $error, $tool_name );
 		}
 

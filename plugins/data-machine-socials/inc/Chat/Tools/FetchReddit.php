@@ -150,10 +150,6 @@ class FetchReddit extends BaseTool {
 		}
 
 		// Get the ability.
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			return $this->buildErrorResponse( 'WordPress Abilities API not available', $tool_name );
-		}
-
 		$ability = wp_get_ability( 'datamachine/fetch-reddit' );
 		if ( ! $ability ) {
 			return $this->buildErrorResponse( 'datamachine/fetch-reddit ability not registered', $tool_name );
@@ -182,8 +178,8 @@ class FetchReddit extends BaseTool {
 
 		$result = $ability->execute( $input );
 
-		if ( ! $this->isAbilitySuccess( $result ) ) {
-			$error = $this->getAbilityError( $result, 'Failed to fetch from Reddit' );
+		if ( is_wp_error( $result ) || ! $this->isAbilitySuccess( $result ) ) {
+			$error = is_wp_error( $result ) ? $result->get_error_message() : $this->getAbilityError( $result, 'Failed to fetch from Reddit' );
 			return $this->buildErrorResponse( $error, $tool_name );
 		}
 

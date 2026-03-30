@@ -96,23 +96,17 @@ class TwitterReadAbility {
 		return PermissionHelper::can_manage();
 	}
 
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? 'list';
 
 		$auth = $this->getAuthProvider();
 		if ( ! $auth ) {
-			return array(
-				'success' => false,
-				'error'   => 'Twitter auth provider not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Twitter auth provider not available', array( 'status' => 401 ) );
 		}
 
 		$connection = $auth->get_connection();
 		if ( is_wp_error( $connection ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Twitter connection failed: ' . $connection->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', 'Twitter connection failed: ' . $connection->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$connection->setApiVersion( '2' );
@@ -123,10 +117,7 @@ class TwitterReadAbility {
 
 			case 'get':
 				if ( empty( $input['tweet_id'] ) ) {
-					return array(
-						'success' => false,
-						'error'   => 'tweet_id is required for the get action',
-					);
+					return new \WP_Error( 'missing_param', 'tweet_id is required for the get action', array( 'status' => 400 ) );
 				}
 				return $this->getTweet( $connection, $input['tweet_id'] );
 
@@ -134,21 +125,15 @@ class TwitterReadAbility {
 				return $this->getMentions( $auth, $connection, $input );
 
 			default:
-				return array(
-					'success' => false,
-					'error'   => "Unknown action: {$action}. Use list, get, or mentions.",
-				);
+				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use list, get, or mentions.", array( 'status' => 500 ) );
 		}
 	}
 
-	private function listTweets( TwitterAuth $auth, $connection, array $input ): array {
+	private function listTweets( TwitterAuth $auth, $connection, array $input ): array|\WP_Error {
 		$account = $auth->get_account_details();
 		$user_id = $account['user_id'] ?? null;
 		if ( empty( $user_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Twitter user ID not available. Try re-authenticating.',
-			);
+			return new \WP_Error( 'missing_auth', 'Twitter user ID not available. Try re-authenticating.', array( 'status' => 401 ) );
 		}
 
 		$limit  = min( absint( $input['limit'] ?? 25 ), 100 );
@@ -166,10 +151,7 @@ class TwitterReadAbility {
 
 		if ( 200 !== $http_code ) {
 			$error_msg = $this->extractError( $response, 'Failed to fetch tweets' );
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		$response = (array) $response;
@@ -189,7 +171,7 @@ class TwitterReadAbility {
 		);
 	}
 
-	private function getTweet( $connection, string $tweet_id ): array {
+	private function getTweet( $connection, string $tweet_id ): array|\WP_Error {
 		$params = array(
 			'tweet.fields' => self::TWEET_FIELDS,
 			'expansions'   => 'author_id',
@@ -201,10 +183,7 @@ class TwitterReadAbility {
 
 		if ( 200 !== $http_code ) {
 			$error_msg = $this->extractError( $response, 'Failed to fetch tweet' );
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		$response = (array) $response;
@@ -221,14 +200,11 @@ class TwitterReadAbility {
 		);
 	}
 
-	private function getMentions( TwitterAuth $auth, $connection, array $input ): array {
+	private function getMentions( TwitterAuth $auth, $connection, array $input ): array|\WP_Error {
 		$account = $auth->get_account_details();
 		$user_id = $account['user_id'] ?? null;
 		if ( empty( $user_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Twitter user ID not available. Try re-authenticating.',
-			);
+			return new \WP_Error( 'missing_auth', 'Twitter user ID not available. Try re-authenticating.', array( 'status' => 401 ) );
 		}
 
 		$limit  = min( absint( $input['limit'] ?? 25 ), 100 );
@@ -248,10 +224,7 @@ class TwitterReadAbility {
 
 		if ( 200 !== $http_code ) {
 			$error_msg = $this->extractError( $response, 'Failed to fetch mentions' );
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		$response = (array) $response;

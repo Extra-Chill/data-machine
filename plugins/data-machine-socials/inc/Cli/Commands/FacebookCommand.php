@@ -58,8 +58,8 @@ class FacebookCommand {
 			'after'  => $assoc_args['after'] ?? '',
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		$data   = $result['data'];
@@ -132,8 +132,8 @@ class FacebookCommand {
 			'post_id' => $post_id,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		$data   = $result['data'];
@@ -190,8 +190,8 @@ class FacebookCommand {
 			'limit'   => absint( $assoc_args['limit'] ?? 25 ),
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		$data     = $result['data'];
@@ -337,8 +337,8 @@ class FacebookCommand {
 
 		$result = \DataMachineSocials\Abilities\Facebook\FacebookPublishAbility::execute_publish( $input );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Published to Facebook!' );
@@ -352,10 +352,6 @@ class FacebookCommand {
 	}
 
 	private function get_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/facebook-read' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/facebook-read ability not registered.' );
@@ -365,10 +361,6 @@ class FacebookCommand {
 	}
 
 	private function get_update_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/facebook-update' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/facebook-update ability not registered.' );
@@ -378,10 +370,6 @@ class FacebookCommand {
 	}
 
 	private function get_delete_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/facebook-delete' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/facebook-delete ability not registered.' );
@@ -391,10 +379,6 @@ class FacebookCommand {
 	}
 
 	private function get_publish_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/facebook-publish' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/facebook-publish ability not registered.' );
@@ -434,8 +418,8 @@ class FacebookCommand {
 			'message' => $message,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Post updated successfully!' );
@@ -464,8 +448,8 @@ class FacebookCommand {
 			'post_id' => $post_id,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Post hidden successfully!' );
@@ -492,8 +476,8 @@ class FacebookCommand {
 			'post_id' => $post_id,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Post deleted successfully!' );

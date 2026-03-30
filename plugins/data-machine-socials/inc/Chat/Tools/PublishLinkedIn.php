@@ -130,7 +130,7 @@ class PublishLinkedIn extends BaseTool {
 		// Execute via the publish ability.
 		$result = \DataMachineSocials\Abilities\LinkedIn\LinkedInPublishAbility::execute_publish( $input );
 
-		if ( $result['success'] ) {
+		if ( ! is_wp_error( $result ) && $result['success'] ) {
 			return array(
 				'result'   => 'Post published to LinkedIn!',
 				'post_id'  => $result['post_id'] ?? '',
@@ -138,6 +138,6 @@ class PublishLinkedIn extends BaseTool {
 			);
 		}
 
-		return $this->buildErrorResponse( $result['error'] ?? 'LinkedIn publish failed', $tool_name );
+		return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'LinkedIn publish failed' ), $tool_name );
 	}
 }

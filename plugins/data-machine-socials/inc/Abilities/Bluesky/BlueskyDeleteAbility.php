@@ -77,28 +77,19 @@ class BlueskyDeleteAbility {
 		return PermissionHelper::can_manage();
 	}
 
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$auth = $this->getAuthProvider();
 		if ( ! $auth ) {
-			return array(
-				'success' => false,
-				'error'   => 'Bluesky auth provider not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Bluesky auth provider not available', array( 'status' => 401 ) );
 		}
 
 		$session = $auth->get_session();
 		if ( empty( $session['accessJwt'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Bluesky session not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Bluesky session not available', array( 'status' => 401 ) );
 		}
 
 		if ( empty( $input['post_uri'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'post_uri is required',
-			);
+			return new \WP_Error( 'missing_param', 'post_uri is required', array( 'status' => 400 ) );
 		}
 
 		$did = $session['did'];
@@ -109,10 +100,7 @@ class BlueskyDeleteAbility {
 		$rkey      = end( $uri_parts );
 
 		if ( empty( $rkey ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Could not extract rkey from post URI: ' . $post_uri,
-			);
+			return new \WP_Error( 'api_error', 'Could not extract rkey from post URI: ' . $post_uri, array( 'status' => 500 ) );
 		}
 
 		$response = wp_remote_post(
@@ -132,10 +120,7 @@ class BlueskyDeleteAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
@@ -151,10 +136,7 @@ class BlueskyDeleteAbility {
 		}
 
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
-		return array(
-			'success' => false,
-			'error'   => $body['error'] ?? 'Failed to delete post',
-		);
+		return new \WP_Error( 'api_error', $body['error'] ?? 'Failed to delete post', array( 'status' => 500 ) );
 	}
 
 	private function getAuthProvider(): ?BlueskyAuth {

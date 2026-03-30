@@ -85,30 +85,21 @@ class ThreadsUpdateAbility {
 		return PermissionHelper::can_manage();
 	}
 
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? '';
 
 		$auth = $this->getAuthProvider();
 		if ( ! $auth ) {
-			return array(
-				'success' => false,
-				'error'   => 'Threads auth provider not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Threads auth provider not available', array( 'status' => 401 ) );
 		}
 
 		$access_token = $auth->get_valid_access_token();
 		if ( empty( $access_token ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Threads access token unavailable',
-			);
+			return new \WP_Error( 'missing_auth', 'Threads access token unavailable', array( 'status' => 401 ) );
 		}
 
 		if ( empty( $input['thread_id'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'thread_id is required',
-			);
+			return new \WP_Error( 'missing_param', 'thread_id is required', array( 'status' => 400 ) );
 		}
 
 		$thread_id = $input['thread_id'];
@@ -118,10 +109,7 @@ class ThreadsUpdateAbility {
 				return $this->deleteThread( $access_token, $thread_id );
 
 			default:
-				return array(
-					'success' => false,
-					'error'   => "Unknown action: {$action}. Use delete.",
-				);
+				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use delete.", array( 'status' => 500 ) );
 		}
 	}
 
@@ -140,7 +128,7 @@ class ThreadsUpdateAbility {
 		return $provider;
 	}
 
-	private function deleteThread( string $access_token, string $thread_id ): array {
+	private function deleteThread( string $access_token, string $thread_id ): array|\WP_Error {
 		$url = self::GRAPH_API_URL . '/' . rawurlencode( $thread_id );
 
 		$response = wp_remote_post(
@@ -154,10 +142,7 @@ class ThreadsUpdateAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
@@ -173,9 +158,6 @@ class ThreadsUpdateAbility {
 			);
 		}
 
-		return array(
-			'success' => false,
-			'error'   => $body['error']['message'] ?? 'Failed to delete thread',
-		);
+		return new \WP_Error( 'api_error', $body['error']['message'] ?? 'Failed to delete thread', array( 'status' => 500 ) );
 	}
 }

@@ -99,23 +99,17 @@ class PinterestReadAbility {
 		return PermissionHelper::can_manage();
 	}
 
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? 'pins';
 
 		$auth = $this->getAuthProvider();
 		if ( ! $auth ) {
-			return array(
-				'success' => false,
-				'error'   => 'Pinterest auth provider not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Pinterest auth provider not available', array( 'status' => 401 ) );
 		}
 
 		$token = $auth->get_valid_access_token();
 		if ( empty( $token ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Pinterest access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings',
-			);
+			return new \WP_Error( 'missing_auth', 'Pinterest access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings', array( 'status' => 401 ) );
 		}
 
 		switch ( $action ) {
@@ -124,10 +118,7 @@ class PinterestReadAbility {
 
 			case 'pin':
 				if ( empty( $input['pin_id'] ) ) {
-					return array(
-						'success' => false,
-						'error'   => 'pin_id is required for the pin action',
-					);
+					return new \WP_Error( 'missing_param', 'pin_id is required for the pin action', array( 'status' => 400 ) );
 				}
 				return $this->getPin( $token, $input['pin_id'] );
 
@@ -136,22 +127,16 @@ class PinterestReadAbility {
 
 			case 'board_pins':
 				if ( empty( $input['board_id'] ) ) {
-					return array(
-						'success' => false,
-						'error'   => 'board_id is required for the board_pins action',
-					);
+					return new \WP_Error( 'missing_param', 'board_id is required for the board_pins action', array( 'status' => 400 ) );
 				}
 				return $this->getBoardPins( $token, $input['board_id'], $input );
 
 			default:
-				return array(
-					'success' => false,
-					'error'   => "Unknown action: {$action}. Use pins, pin, boards, or board_pins.",
-				);
+				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use pins, pin, boards, or board_pins.", array( 'status' => 500 ) );
 		}
 	}
 
-	private function listPins( string $token, array $input ): array {
+	private function listPins( string $token, array $input ): array|\WP_Error {
 		$limit  = min( absint( $input['limit'] ?? 25 ), 100 );
 		$params = array( 'page_size' => $limit );
 
@@ -162,7 +147,7 @@ class PinterestReadAbility {
 		return $this->apiGet( $token, '/pins?' . http_build_query( $params ), 'items', 'pins' );
 	}
 
-	private function getPin( string $token, string $pin_id ): array {
+	private function getPin( string $token, string $pin_id ): array|\WP_Error {
 		$url    = self::API_URL . "/pins/{$pin_id}";
 		$result = HttpClient::get(
 			$url,
@@ -173,10 +158,7 @@ class PinterestReadAbility {
 		);
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => 'Pinterest API request failed: ' . ( $result['error'] ?? 'unknown' ),
-			);
+			return new \WP_Error( 'api_error', 'Pinterest API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
 		}
 
 		$data      = json_decode( $result['data'], true );
@@ -184,10 +166,7 @@ class PinterestReadAbility {
 
 		if ( 200 !== $http_code || isset( $data['code'] ) ) {
 			$error_msg = $data['message'] ?? 'Failed to fetch pin details';
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		return array(
@@ -196,7 +175,7 @@ class PinterestReadAbility {
 		);
 	}
 
-	private function listBoards( string $token, array $input ): array {
+	private function listBoards( string $token, array $input ): array|\WP_Error {
 		$limit  = min( absint( $input['limit'] ?? 25 ), 100 );
 		$params = array( 'page_size' => $limit );
 
@@ -207,7 +186,7 @@ class PinterestReadAbility {
 		return $this->apiGet( $token, '/boards?' . http_build_query( $params ), 'items', 'boards' );
 	}
 
-	private function getBoardPins( string $token, string $board_id, array $input ): array {
+	private function getBoardPins( string $token, string $board_id, array $input ): array|\WP_Error {
 		$limit  = min( absint( $input['limit'] ?? 25 ), 100 );
 		$params = array( 'page_size' => $limit );
 
@@ -227,7 +206,7 @@ class PinterestReadAbility {
 	 * @param string $label     Label for the result array.
 	 * @return array
 	 */
-	private function apiGet( string $token, string $path, string $data_key, string $label ): array {
+	private function apiGet( string $token, string $path, string $data_key, string $label ): array|\WP_Error {
 		$url    = self::API_URL . $path;
 		$result = HttpClient::get(
 			$url,
@@ -238,10 +217,7 @@ class PinterestReadAbility {
 		);
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => 'Pinterest API request failed: ' . ( $result['error'] ?? 'unknown' ),
-			);
+			return new \WP_Error( 'api_error', 'Pinterest API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
 		}
 
 		$data      = json_decode( $result['data'], true );
@@ -249,10 +225,7 @@ class PinterestReadAbility {
 
 		if ( 200 !== $http_code || isset( $data['code'] ) ) {
 			$error_msg = $data['message'] ?? "Failed to fetch {$label}";
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		$items    = $data[ $data_key ] ?? array();

@@ -96,37 +96,25 @@ class VoteRedditAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$thing_id     = sanitize_text_field( $input['thing_id'] ?? '' );
 		$direction    = (int) ( $input['direction'] ?? 0 );
 		$access_token = $input['access_token'] ?? '';
 
 		if ( empty( $thing_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'thing_id is required.',
-			);
+			return new \WP_Error( 'missing_param', 'thing_id is required.', array( 'status' => 400 ) );
 		}
 
 		if ( ! preg_match( '/^t[13]_[a-z0-9]+$/i', $thing_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Invalid thing_id format. Must be t3_xxx (post) or t1_xxx (comment).',
-			);
+			return new \WP_Error( 'missing_param', 'Invalid thing_id format. Must be t3_xxx (post) or t1_xxx (comment).', array( 'status' => 400 ) );
 		}
 
 		if ( ! in_array( $direction, array( 1, 0, -1 ), true ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'direction must be 1 (upvote), 0 (unvote), or -1 (downvote).',
-			);
+			return new \WP_Error( 'missing_param', 'direction must be 1 (upvote), 0 (unvote), or -1 (downvote).', array( 'status' => 400 ) );
 		}
 
 		if ( empty( $access_token ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'access_token is required.',
-			);
+			return new \WP_Error( 'missing_param', 'access_token is required.', array( 'status' => 400 ) );
 		}
 
 		$url = self::API_BASE . '/api/vote';
@@ -147,20 +135,14 @@ class VoteRedditAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
 
 		if ( $status_code < 200 || $status_code >= 300 ) {
 			$body = json_decode( wp_remote_retrieve_body( $response ), true );
-			return array(
-				'success' => false,
-				'error'   => $body['message'] ?? "Reddit API returned HTTP {$status_code}",
-			);
+			return new \WP_Error( 'api_error', $body['message'] ?? "Reddit API returned HTTP {$status_code}", array( 'status' => 500 ) );
 		}
 
 		$direction_labels = array(

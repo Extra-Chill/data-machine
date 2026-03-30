@@ -131,36 +131,27 @@ class ThreadsPublishAbility {
 	 * @param array $input Ability input with publish parameters.
 	 * @return array Response with post details or error.
 	 */
-	public static function execute_publish( array $input ): array {
+	public static function execute_publish( array $input ): array|\WP_Error {
 		$content    = $input['content'] ?? '';
 		$image_url  = $input['image_url'] ?? '';
 		$source_url = $input['source_url'] ?? '';
 
 		if ( empty( $content ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Content is required',
-			);
+			return new \WP_Error( 'missing_param', 'Content is required', array( 'status' => 400 ) );
 		}
 
 		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'threads' );
 
 		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return array(
-				'success' => false,
-				'error'   => 'Threads not authenticated',
-			);
+			return new \WP_Error( 'missing_auth', 'Threads not authenticated', array( 'status' => 401 ) );
 		}
 
 		$user_id      = $provider->get_user_id();
 		$access_token = $provider->get_valid_access_token();
 
 		if ( empty( $user_id ) || empty( $access_token ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Threads credentials not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Threads credentials not available', array( 'status' => 401 ) );
 		}
 
 		// Format content with source URL
@@ -179,19 +170,13 @@ class ThreadsPublishAbility {
 		if ( ! empty( $image_url ) && filter_var( $image_url, FILTER_VALIDATE_URL ) ) {
 			$media_id = self::create_media_container( $access_token, $user_id, $image_url );
 			if ( is_wp_error( $media_id ) ) {
-				return array(
-					'success' => false,
-					'error'   => $media_id->get_error_message(),
-				);
+				return new \WP_Error( 'api_error', $media_id->get_error_message(), array( 'status' => 500 ) );
 			}
 
 			// Wait for media processing
 			$media_ready = self::wait_for_media( $access_token, $media_id );
 			if ( ! $media_ready ) {
-				return array(
-					'success' => false,
-					'error'   => 'Media processing failed',
-				);
+				return new \WP_Error( 'api_error', 'Media processing failed', array( 'status' => 500 ) );
 			}
 		}
 
@@ -217,10 +202,7 @@ class ThreadsPublishAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
@@ -233,10 +215,7 @@ class ThreadsPublishAbility {
 			// Step 3: Publish the thread
 			$publish_result = self::publish_thread( $access_token, $creation_id );
 			if ( is_wp_error( $publish_result ) ) {
-				return array(
-					'success' => false,
-					'error'   => $publish_result->get_error_message(),
-				);
+				return new \WP_Error( 'api_error', $publish_result->get_error_message(), array( 'status' => 500 ) );
 			}
 
 			$post_id  = $publish_result;
@@ -254,10 +233,7 @@ class ThreadsPublishAbility {
 			$error_msg = $data['error']['message'];
 		}
 
-		return array(
-			'success' => false,
-			'error'   => $error_msg,
-		);
+		return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 	}
 
 	/**
@@ -266,16 +242,13 @@ class ThreadsPublishAbility {
 	 * @param array $input Ability input.
 	 * @return array Account details or error.
 	 */
-	public static function get_account( array $input ): array {
+	public static function get_account( array $input ): array|\WP_Error {
 		$input;
 		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'threads' );
 
 		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return array(
-				'success' => false,
-				'error'   => 'Threads not authenticated',
-			);
+			return new \WP_Error( 'missing_auth', 'Threads not authenticated', array( 'status' => 401 ) );
 		}
 
 		return array(

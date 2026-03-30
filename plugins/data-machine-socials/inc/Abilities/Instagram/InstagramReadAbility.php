@@ -122,24 +122,18 @@ class InstagramReadAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? 'list';
 
 		// Get auth provider.
 		$auth = $this->getAuthProvider();
 		if ( ! $auth ) {
-			return array(
-				'success' => false,
-				'error'   => 'Instagram auth provider not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Instagram auth provider not available', array( 'status' => 401 ) );
 		}
 
 		$access_token = $auth->get_valid_access_token();
 		if ( empty( $access_token ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Instagram access token unavailable (expired or refresh failed)',
-			);
+			return new \WP_Error( 'missing_auth', 'Instagram access token unavailable (expired or refresh failed)', array( 'status' => 401 ) );
 		}
 
 		switch ( $action ) {
@@ -148,36 +142,24 @@ class InstagramReadAbility {
 
 			case 'get':
 				if ( empty( $input['media_id'] ) ) {
-					return array(
-						'success' => false,
-						'error'   => 'media_id is required for the get action',
-					);
+					return new \WP_Error( 'missing_param', 'media_id is required for the get action', array( 'status' => 400 ) );
 				}
 				return $this->getMedia( $access_token, $input['media_id'] );
 
 			case 'comments':
 				if ( empty( $input['media_id'] ) ) {
-					return array(
-						'success' => false,
-						'error'   => 'media_id is required for the comments action',
-					);
+					return new \WP_Error( 'missing_param', 'media_id is required for the comments action', array( 'status' => 400 ) );
 				}
 				return $this->getComments( $access_token, $input['media_id'], $input );
 
 			case 'comments_all':
 				if ( empty( $input['media_id'] ) ) {
-					return array(
-						'success' => false,
-						'error'   => 'media_id is required for the comments_all action',
-					);
+					return new \WP_Error( 'missing_param', 'media_id is required for the comments_all action', array( 'status' => 400 ) );
 				}
 				return $this->getAllComments( $access_token, $input['media_id'] );
 
 			default:
-				return array(
-					'success' => false,
-					'error'   => "Unknown action: {$action}. Use list, get, or comments.",
-				);
+				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use list, get, or comments.", array( 'status' => 500 ) );
 		}
 	}
 
@@ -189,13 +171,10 @@ class InstagramReadAbility {
 	 * @param array         $input        Input parameters.
 	 * @return array Result.
 	 */
-	private function listMedia( InstagramAuth $auth, string $access_token, array $input ): array {
+	private function listMedia( InstagramAuth $auth, string $access_token, array $input ): array|\WP_Error {
 		$user_id = $auth->get_user_id();
 		if ( empty( $user_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Instagram user ID not available. Try re-authenticating.',
-			);
+			return new \WP_Error( 'missing_auth', 'Instagram user ID not available. Try re-authenticating.', array( 'status' => 401 ) );
 		}
 
 		$limit  = min( absint( $input['limit'] ?? 25 ), 100 );
@@ -213,10 +192,7 @@ class InstagramReadAbility {
 		$result = HttpClient::get( $url, array( 'context' => 'Instagram Read' ) );
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => 'Instagram API request failed: ' . ( $result['error'] ?? 'unknown' ),
-			);
+			return new \WP_Error( 'api_error', 'Instagram API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
 		}
 
 		$data      = json_decode( $result['data'], true );
@@ -224,10 +200,7 @@ class InstagramReadAbility {
 
 		if ( 200 !== $http_code || isset( $data['error'] ) ) {
 			$error_msg = $data['error']['message'] ?? 'Failed to fetch Instagram media';
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		$media  = $data['data'] ?? array();
@@ -251,7 +224,7 @@ class InstagramReadAbility {
 	 * @param string $media_id     Instagram media ID.
 	 * @return array Result.
 	 */
-	private function getMedia( string $access_token, string $media_id ): array {
+	private function getMedia( string $access_token, string $media_id ): array|\WP_Error {
 		$params = array(
 			'fields'       => self::DETAIL_FIELDS,
 			'access_token' => $access_token,
@@ -261,10 +234,7 @@ class InstagramReadAbility {
 		$result = HttpClient::get( $url, array( 'context' => 'Instagram Read' ) );
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => 'Instagram API request failed: ' . ( $result['error'] ?? 'unknown' ),
-			);
+			return new \WP_Error( 'api_error', 'Instagram API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
 		}
 
 		$data      = json_decode( $result['data'], true );
@@ -272,10 +242,7 @@ class InstagramReadAbility {
 
 		if ( 200 !== $http_code || isset( $data['error'] ) ) {
 			$error_msg = $data['error']['message'] ?? 'Failed to fetch Instagram media details';
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		return array(
@@ -292,7 +259,7 @@ class InstagramReadAbility {
 	 * @param array  $input        Input parameters.
 	 * @return array Result.
 	 */
-	private function getComments( string $access_token, string $media_id, array $input ): array {
+	private function getComments( string $access_token, string $media_id, array $input ): array|\WP_Error {
 		$limit  = min( absint( $input['limit'] ?? 25 ), 100 );
 		$params = array(
 			'fields'       => 'id,text,timestamp,username,like_count',
@@ -308,10 +275,7 @@ class InstagramReadAbility {
 		$result = HttpClient::get( $url, array( 'context' => 'Instagram Read' ) );
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => 'Instagram API request failed: ' . ( $result['error'] ?? 'unknown' ),
-			);
+			return new \WP_Error( 'api_error', 'Instagram API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
 		}
 
 		$data      = json_decode( $result['data'], true );
@@ -319,10 +283,7 @@ class InstagramReadAbility {
 
 		if ( 200 !== $http_code || isset( $data['error'] ) ) {
 			$error_msg = $data['error']['message'] ?? 'Failed to fetch comments';
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		$comments = $data['data'] ?? array();
@@ -350,7 +311,7 @@ class InstagramReadAbility {
 	 * @param string $media_id     Instagram media ID.
 	 * @return array Result with normalized comments.
 	 */
-	private function getAllComments( string $access_token, string $media_id ): array {
+	private function getAllComments( string $access_token, string $media_id ): array|\WP_Error {
 		$all_comments = array();
 		$after        = '';
 		$page         = 0;
@@ -386,10 +347,7 @@ class InstagramReadAbility {
 					);
 				}
 
-				return array(
-					'success' => false,
-					'error'   => 'Instagram API request failed: ' . ( $result['error'] ?? 'unknown' ),
-				);
+				return new \WP_Error( 'api_error', 'Instagram API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
 			}
 
 			$data      = json_decode( $result['data'], true );
@@ -409,10 +367,7 @@ class InstagramReadAbility {
 					);
 				}
 
-				return array(
-					'success' => false,
-					'error'   => $data['error']['message'] ?? 'Failed to fetch comments',
-				);
+				return new \WP_Error( 'api_error', $data['error']['message'] ?? 'Failed to fetch comments', array( 'status' => 500 ) );
 			}
 
 			$page_comments = $data['data'] ?? array();
@@ -450,7 +405,7 @@ class InstagramReadAbility {
 	 * @param array $comment Raw Instagram API comment data.
 	 * @return array Normalized comment.
 	 */
-	public static function normalizeComment( array $comment ): array {
+	public static function normalizeComment( array $comment ): array|\WP_Error {
 		$text     = $comment['text'] ?? '';
 		$mentions = array();
 

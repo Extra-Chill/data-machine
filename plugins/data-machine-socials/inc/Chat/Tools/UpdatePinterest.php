@@ -67,19 +67,23 @@ class UpdatePinterest extends BaseTool {
 			);
 		}
 
+		$ability = wp_get_ability( 'datamachine/pinterest-update' );
+		if ( ! $ability ) {
+			return $this->buildErrorResponse( 'datamachine/pinterest-update ability not registered', $tool_name );
+		}
 		$ability_instance = $ability;
 		$result           = $ability_instance->execute( array(
 			'action' => sanitize_text_field( $parameters['action'] ),
 			'pin_id' => sanitize_text_field( $parameters['pin_id'] ),
 		) );
 
-		if ( $result['success'] ) {
+		if ( ! is_wp_error( $result ) && $result['success'] ) {
 			return array(
 				'result' => 'Pin deleted successfully!',
 				'pin_id' => $result['data']['pin_id'],
 			);
 		}
 
-		return $this->buildErrorResponse( $result['error'] ?? 'Delete failed', $tool_name );
+		return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Delete failed' ), $tool_name );
 	}
 }

@@ -55,19 +55,19 @@ class DeletePinterest extends BaseTool {
 			);
 		}
 
-		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/pinterest-delete' ) : null;
+		$ability = wp_get_ability( 'datamachine/pinterest-delete' );
 		if ( ! $ability ) {
 			return $this->buildErrorResponse( 'datamachine/pinterest-delete ability not registered', $tool_name );
 		}
 		$result = $ability->execute( array( 'pin_id' => $parameters['pin_id'] ) );
 
-		if ( $result['success'] ) {
+		if ( ! is_wp_error( $result ) && $result['success'] ) {
 			return array(
 				'result' => 'Pin deleted!',
 				'pin_id' => $parameters['pin_id'],
 			);
 		}
 
-		return $this->buildErrorResponse( $result['error'] ?? 'Delete failed', $tool_name );
+		return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Delete failed' ), $tool_name );
 	}
 }

@@ -93,30 +93,21 @@ class BlueskyReadAbility {
 		return PermissionHelper::can_manage();
 	}
 
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? 'list';
 
 		$auth = $this->getAuthProvider();
 		if ( ! $auth ) {
-			return array(
-				'success' => false,
-				'error'   => 'Bluesky auth provider not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Bluesky auth provider not available', array( 'status' => 401 ) );
 		}
 
 		$session = $auth->get_session();
 		if ( is_wp_error( $session ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Bluesky session creation failed: ' . $session->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', 'Bluesky session creation failed: ' . $session->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		if ( empty( $session['accessJwt'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Bluesky authentication failed (no access token in session)',
-			);
+			return new \WP_Error( 'missing_auth', 'Bluesky authentication failed (no access token in session)', array( 'status' => 401 ) );
 		}
 
 		$pds_url      = $session['pds_url'] ?? 'https://bsky.social';
@@ -130,10 +121,7 @@ class BlueskyReadAbility {
 
 			case 'get':
 				if ( empty( $input['post_uri'] ) ) {
-					return array(
-						'success' => false,
-						'error'   => 'post_uri is required for the get action',
-					);
+					return new \WP_Error( 'missing_param', 'post_uri is required for the get action', array( 'status' => 400 ) );
 				}
 				return $this->getPostThread( $pds_url, $access_token, $input['post_uri'] );
 
@@ -141,19 +129,13 @@ class BlueskyReadAbility {
 				return $this->getProfile( $pds_url, $access_token, $did ? $did : $handle );
 
 			default:
-				return array(
-					'success' => false,
-					'error'   => "Unknown action: {$action}. Use list, get, or profile.",
-				);
+				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use list, get, or profile.", array( 'status' => 500 ) );
 		}
 	}
 
-	private function listPosts( string $pds_url, string $access_token, string $actor, array $input ): array {
+	private function listPosts( string $pds_url, string $access_token, string $actor, array $input ): array|\WP_Error {
 		if ( empty( $actor ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Bluesky DID/handle not available. Try re-authenticating.',
-			);
+			return new \WP_Error( 'missing_auth', 'Bluesky DID/handle not available. Try re-authenticating.', array( 'status' => 401 ) );
 		}
 
 		$limit  = min( absint( $input['limit'] ?? 25 ), 100 );
@@ -176,10 +158,7 @@ class BlueskyReadAbility {
 		);
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => 'Bluesky API request failed: ' . ( $result['error'] ?? 'unknown' ),
-			);
+			return new \WP_Error( 'api_error', 'Bluesky API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
 		}
 
 		$data      = json_decode( $result['data'], true );
@@ -187,10 +166,7 @@ class BlueskyReadAbility {
 
 		if ( 200 !== $http_code || isset( $data['error'] ) ) {
 			$error_msg = $data['message'] ?? $data['error'] ?? 'Failed to fetch Bluesky feed';
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		$feed   = $data['feed'] ?? array();
@@ -207,7 +183,7 @@ class BlueskyReadAbility {
 		);
 	}
 
-	private function getPostThread( string $pds_url, string $access_token, string $post_uri ): array {
+	private function getPostThread( string $pds_url, string $access_token, string $post_uri ): array|\WP_Error {
 		$params = array(
 			'uri'   => $post_uri,
 			'depth' => 6,
@@ -223,10 +199,7 @@ class BlueskyReadAbility {
 		);
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => 'Bluesky API request failed: ' . ( $result['error'] ?? 'unknown' ),
-			);
+			return new \WP_Error( 'api_error', 'Bluesky API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
 		}
 
 		$data      = json_decode( $result['data'], true );
@@ -234,10 +207,7 @@ class BlueskyReadAbility {
 
 		if ( 200 !== $http_code || isset( $data['error'] ) ) {
 			$error_msg = $data['message'] ?? $data['error'] ?? 'Failed to fetch post thread';
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		return array(
@@ -246,7 +216,7 @@ class BlueskyReadAbility {
 		);
 	}
 
-	private function getProfile( string $pds_url, string $access_token, string $actor ): array {
+	private function getProfile( string $pds_url, string $access_token, string $actor ): array|\WP_Error {
 		$params = array( 'actor' => $actor );
 
 		$url    = $pds_url . '/xrpc/app.bsky.actor.getProfile?' . http_build_query( $params );
@@ -259,10 +229,7 @@ class BlueskyReadAbility {
 		);
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => 'Bluesky API request failed: ' . ( $result['error'] ?? 'unknown' ),
-			);
+			return new \WP_Error( 'api_error', 'Bluesky API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
 		}
 
 		$data      = json_decode( $result['data'], true );
@@ -270,10 +237,7 @@ class BlueskyReadAbility {
 
 		if ( 200 !== $http_code || isset( $data['error'] ) ) {
 			$error_msg = $data['message'] ?? $data['error'] ?? 'Failed to fetch profile';
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		return array(

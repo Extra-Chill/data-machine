@@ -138,7 +138,7 @@ class SubmitRedditAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result with post data or error.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$subreddit    = sanitize_text_field( $input['subreddit'] ?? '' );
 		$title        = trim( sanitize_text_field( $input['title'] ?? '' ) );
 		$text         = trim( $input['text'] ?? '' );
@@ -150,24 +150,15 @@ class SubmitRedditAbility {
 		$access_token = $input['access_token'] ?? '';
 
 		if ( empty( $subreddit ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'subreddit is required.',
-			);
+			return new \WP_Error( 'missing_param', 'subreddit is required.', array( 'status' => 400 ) );
 		}
 
 		if ( ! preg_match( '/^[a-zA-Z0-9_]+$/', $subreddit ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Invalid subreddit name format.',
-			);
+			return new \WP_Error( 'missing_param', 'Invalid subreddit name format.', array( 'status' => 400 ) );
 		}
 
 		if ( empty( $title ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'title is required.',
-			);
+			return new \WP_Error( 'missing_param', 'title is required.', array( 'status' => 400 ) );
 		}
 
 		if ( mb_strlen( $title ) > self::MAX_TITLE_LENGTH ) {
@@ -175,10 +166,7 @@ class SubmitRedditAbility {
 		}
 
 		if ( empty( $access_token ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'access_token is required.',
-			);
+			return new \WP_Error( 'missing_param', 'access_token is required.', array( 'status' => 400 ) );
 		}
 
 		// Determine post kind: 'self' for text, 'link' for URL.
@@ -217,7 +205,7 @@ class SubmitRedditAbility {
 		string $flair_text,
 		bool $nsfw,
 		bool $spoiler
-	): array {
+	): array|\WP_Error {
 		$api_url = self::API_BASE . '/api/submit';
 
 		$body = array(
@@ -259,10 +247,7 @@ class SubmitRedditAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
@@ -277,17 +262,11 @@ class SubmitRedditAbility {
 				},
 				$errors
 			);
-			return array(
-				'success' => false,
-				'error'   => implode( '; ', $error_messages ),
-			);
+			return new \WP_Error( 'api_error', implode( '; ', $error_messages ), array( 'status' => 500 ) );
 		}
 
 		if ( $status_code < 200 || $status_code >= 300 ) {
-			return array(
-				'success' => false,
-				'error'   => "Reddit API returned HTTP {$status_code}",
-			);
+			return new \WP_Error( 'api_error', "Reddit API returned HTTP {$status_code}", array( 'status' => 500 ) );
 		}
 
 		$post_data = $result['json']['data'] ?? array();

@@ -145,7 +145,7 @@ class LinkedInPublishAbility {
 	 * @param array $input Ability input with publish parameters.
 	 * @return array Response with post details or error.
 	 */
-	public static function execute_publish( array $input ): array {
+	public static function execute_publish( array $input ): array|\WP_Error {
 		$content       = $input['content'] ?? '';
 		$image_path    = $input['image_path'] ?? '';
 		$visibility    = $input['visibility'] ?? 'PUBLIC';
@@ -153,28 +153,19 @@ class LinkedInPublishAbility {
 		$article_title = $input['article_title'] ?? '';
 
 		if ( empty( $content ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Content is required',
-			);
+			return new \WP_Error( 'missing_param', 'Content is required', array( 'status' => 400 ) );
 		}
 
 		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'linkedin' );
 
 		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return array(
-				'success' => false,
-				'error'   => 'LinkedIn not authenticated',
-			);
+			return new \WP_Error( 'missing_auth', 'LinkedIn not authenticated', array( 'status' => 401 ) );
 		}
 
 		$person_urn = $provider->get_person_urn();
 		if ( empty( $person_urn ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'LinkedIn person URN not available. Try re-authenticating.',
-			);
+			return new \WP_Error( 'missing_auth', 'LinkedIn person URN not available. Try re-authenticating.', array( 'status' => 401 ) );
 		}
 
 		// Build post payload.
@@ -196,10 +187,7 @@ class LinkedInPublishAbility {
 			if ( ! empty( $image_path ) && file_exists( $image_path ) ) {
 				$image_urn = self::upload_image( $provider, $person_urn, $image_path );
 				if ( ! $image_urn ) {
-					return array(
-						'success' => false,
-						'error'   => 'Failed to upload image to LinkedIn',
-					);
+					return new \WP_Error( 'api_error', 'Failed to upload image to LinkedIn', array( 'status' => 500 ) );
 				}
 				$payload['content'] = array(
 					'media' => array(
@@ -239,15 +227,9 @@ class LinkedInPublishAbility {
 				);
 			}
 
-			return array(
-				'success' => false,
-				'error'   => $result['error'] ?? 'LinkedIn publish failed',
-			);
+			return new \WP_Error( 'api_error', $result['error'] ?? 'LinkedIn publish failed', array( 'status' => 500 ) );
 		} catch ( \Exception $e ) {
-			return array(
-				'success' => false,
-				'error'   => $e->getMessage(),
-			);
+			return new \WP_Error( 'api_error', $e->getMessage(), array( 'status' => 500 ) );
 		}
 	}
 
@@ -257,16 +239,13 @@ class LinkedInPublishAbility {
 	 * @param array $input Ability input.
 	 * @return array Account details or error.
 	 */
-	public static function get_account( array $input ): array {
+	public static function get_account( array $input ): array|\WP_Error {
 		$input;
 		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'linkedin' );
 
 		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return array(
-				'success' => false,
-				'error'   => 'LinkedIn not authenticated',
-			);
+			return new \WP_Error( 'missing_auth', 'LinkedIn not authenticated', array( 'status' => 401 ) );
 		}
 
 		$account = $provider->get_account_details();

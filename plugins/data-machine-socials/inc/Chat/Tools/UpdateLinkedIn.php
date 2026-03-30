@@ -98,8 +98,8 @@ class UpdateLinkedIn extends BaseTool {
 			'commentary' => sanitize_textarea_field( $parameters['commentary'] ),
 		) );
 
-		if ( ! $this->isAbilitySuccess( $result ) ) {
-			return $this->buildErrorResponse( $this->getAbilityError( $result, 'Failed to update LinkedIn post' ), $tool_name );
+		if ( is_wp_error( $result ) || ! $this->isAbilitySuccess( $result ) ) {
+			return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : $this->getAbilityError( $result, 'Failed to update LinkedIn post' ), $tool_name );
 		}
 
 		return array(

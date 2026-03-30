@@ -97,15 +97,15 @@ class UpdateFacebook extends BaseTool {
 		}
 
 		// Get the ability.
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			return $this->buildErrorResponse( 'WordPress Abilities API not available', $tool_name );
+		$ability = wp_get_ability( 'datamachine/facebook-update' );
+		if ( ! $ability ) {
+			return $this->buildErrorResponse( 'datamachine/facebook-update ability not registered', $tool_name );
 		}
 
 		$ability = wp_get_ability( 'datamachine/facebook-update' );
 		if ( ! $ability ) {
 			return $this->buildErrorResponse( 'datamachine/facebook-update ability not registered', $tool_name );
 		}
-
 		$ability_instance = $ability;
 		$result           = $ability_instance->execute( array(
 			'action'  => sanitize_text_field( $action ),
@@ -113,7 +113,7 @@ class UpdateFacebook extends BaseTool {
 			'message' => sanitize_text_field( $parameters['message'] ?? '' ),
 		) );
 
-		if ( $result['success'] ) {
+		if ( ! is_wp_error( $result ) && $result['success'] ) {
 			$message = '';
 			switch ( $action ) {
 				case 'edit':
@@ -137,6 +137,6 @@ class UpdateFacebook extends BaseTool {
 			);
 		}
 
-		return $this->buildErrorResponse( $result['error'] ?? 'Update failed', $tool_name );
+		return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Update failed' ), $tool_name );
 	}
 }

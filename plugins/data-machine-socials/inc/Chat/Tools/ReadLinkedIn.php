@@ -107,8 +107,8 @@ class ReadLinkedIn extends BaseTool {
 
 		$result = $ability->execute( $input );
 
-		if ( ! $this->isAbilitySuccess( $result ) ) {
-			return $this->buildErrorResponse( $this->getAbilityError( $result, 'Failed to read from LinkedIn' ), $tool_name );
+		if ( is_wp_error( $result ) || ! $this->isAbilitySuccess( $result ) ) {
+			return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : $this->getAbilityError( $result, 'Failed to read from LinkedIn' ), $tool_name );
 		}
 
 		return array(

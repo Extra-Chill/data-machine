@@ -83,19 +83,23 @@ class UpdateThreads extends BaseTool {
 			);
 		}
 
+		$ability = wp_get_ability( 'datamachine/threads-update' );
+		if ( ! $ability ) {
+			return $this->buildErrorResponse( 'datamachine/threads-update ability not registered', $tool_name );
+		}
 		$ability_instance = $ability;
 		$result           = $ability_instance->execute( array(
 			'action'    => sanitize_text_field( $parameters['action'] ),
 			'thread_id' => sanitize_text_field( $parameters['thread_id'] ),
 		) );
 
-		if ( $result['success'] ) {
+		if ( ! is_wp_error( $result ) && $result['success'] ) {
 			return array(
 				'result'    => 'Thread deleted successfully!',
 				'thread_id' => $result['data']['thread_id'],
 			);
 		}
 
-		return $this->buildErrorResponse( $result['error'] ?? 'Delete failed', $tool_name );
+		return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Delete failed' ), $tool_name );
 	}
 }

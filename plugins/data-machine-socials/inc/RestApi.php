@@ -547,7 +547,7 @@ class RestApi {
 			), 400 );
 		}
 
-		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( $slug_map[ $platform ] ) : null;
+		$ability = wp_get_ability( $slug_map[ $platform ]  );
 		if ( ! $ability ) {
 			return new \WP_REST_Response( array(
 				'success' => false,
@@ -557,6 +557,11 @@ class RestApi {
 		$input   = array_filter( $params, function ( $v ) { return '' !== $v && null !== $v;
 		} );
 		$result  = $ability->execute( $input );
+
+		if ( is_wp_error( $result ) ) {
+			$status = $result->get_error_data()['status'] ?? 500;
+			return new \WP_REST_Response( array( 'success' => false, 'error' => $result->get_error_message() ), $status );
+		}
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
 	}
@@ -621,7 +626,7 @@ class RestApi {
 			), 400 );
 		}
 
-		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( $slug_map[ $platform ] ) : null;
+		$ability = wp_get_ability( $slug_map[ $platform ]  );
 		if ( ! $ability ) {
 			return new \WP_REST_Response( array(
 				'success' => false,
@@ -643,6 +648,11 @@ class RestApi {
 		}
 
 		$result = $ability->execute( $input );
+
+		if ( is_wp_error( $result ) ) {
+			$status = $result->get_error_data()['status'] ?? 500;
+			return new \WP_REST_Response( array( 'success' => false, 'error' => $result->get_error_message() ), $status );
+		}
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
 	}
@@ -667,7 +677,7 @@ class RestApi {
 			), 400 );
 		}
 
-		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/instagram-comment-reply' ) : null;
+		$ability = wp_get_ability( 'datamachine/instagram-comment-reply' );
 		if ( ! $ability ) {
 			return new \WP_REST_Response( array( 'success' => false, 'error' => 'Ability not registered' ), 500 );
 		}
@@ -677,6 +687,11 @@ class RestApi {
 				'message'    => sanitize_textarea_field( $params['message'] ),
 			)
 		);
+
+		if ( is_wp_error( $result ) ) {
+			$status = $result->get_error_data()['status'] ?? 500;
+			return new \WP_REST_Response( array( 'success' => false, 'error' => $result->get_error_message() ), $status );
+		}
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
 	}
@@ -713,7 +728,7 @@ class RestApi {
 			), 400 );
 		}
 
-		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( $slug_map[ $platform ] ) : null;
+		$ability = wp_get_ability( $slug_map[ $platform ]  );
 		if ( ! $ability ) {
 			return new \WP_REST_Response( array(
 				'success' => false,
@@ -735,6 +750,11 @@ class RestApi {
 		}
 
 		$result = $ability->execute( $input );
+
+		if ( is_wp_error( $result ) ) {
+			$status = $result->get_error_data()['status'] ?? 500;
+			return new \WP_REST_Response( array( 'success' => false, 'error' => $result->get_error_message() ), $status );
+		}
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
 	}
@@ -770,7 +790,7 @@ class RestApi {
 			), 400 );
 		}
 
-		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( $slug_map[ $platform ] ) : null;
+		$ability = wp_get_ability( $slug_map[ $platform ]  );
 		if ( ! $ability ) {
 			return new \WP_REST_Response( array(
 				'success' => false,
@@ -782,6 +802,11 @@ class RestApi {
 			'comment_id' => sanitize_text_field( $comment_id ),
 			'message'    => sanitize_textarea_field( $message ),
 		) );
+
+		if ( is_wp_error( $result ) ) {
+			$status = $result->get_error_data()['status'] ?? 500;
+			return new \WP_REST_Response( array( 'success' => false, 'error' => $result->get_error_message() ), $status );
+		}
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
 	}
@@ -821,11 +846,16 @@ class RestApi {
 			$input['source_url'] = sanitize_url( $params['source_url'] );
 		}
 
-		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/instagram-publish' ) : null;
+		$ability = wp_get_ability( 'datamachine/instagram-publish' );
 		if ( ! $ability ) {
 			return new \WP_REST_Response( array( 'success' => false, 'error' => 'Ability not registered' ), 500 );
 		}
 		$result = $ability->execute( $input );
+
+		if ( is_wp_error( $result ) ) {
+			$status = $result->get_error_data()['status'] ?? 500;
+			return new \WP_REST_Response( array( 'success' => false, 'error' => $result->get_error_message() ), $status );
+		}
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
 	}
@@ -857,11 +887,16 @@ class RestApi {
 			$input['story_image_url'] = sanitize_url( $image_url );
 		}
 
-		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/instagram-publish' ) : null;
+		$ability = wp_get_ability( 'datamachine/instagram-publish' );
 		if ( ! $ability ) {
 			return new \WP_REST_Response( array( 'success' => false, 'error' => 'Ability not registered' ), 500 );
 		}
 		$result = $ability->execute( $input );
+
+		if ( is_wp_error( $result ) ) {
+			$status = $result->get_error_data()['status'] ?? 500;
+			return new \WP_REST_Response( array( 'success' => false, 'error' => $result->get_error_message() ), $status );
+		}
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
 	}
@@ -1076,14 +1111,6 @@ class RestApi {
 	 */
 	private static function post_to_platform( string $platform, array $images, string $caption, string $source_url, array $extra = array() ): array {
 		$ability_slug = "datamachine/{$platform}-publish";
-
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			return array(
-				'platform' => $platform,
-				'success'  => false,
-				'error'    => 'Abilities API not available',
-			);
-		}
 
 		$ability = wp_get_ability( $ability_slug );
 

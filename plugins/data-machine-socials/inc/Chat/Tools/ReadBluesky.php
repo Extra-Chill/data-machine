@@ -96,6 +96,10 @@ class ReadBluesky extends BaseTool {
 			);
 		}
 
+		$ability = wp_get_ability( 'datamachine/bluesky-read' );
+		if ( ! $ability ) {
+			return $this->buildErrorResponse( 'datamachine/bluesky-read ability not registered', $tool_name );
+		}
 		$ability_instance = $ability;
 		$input            = array( 'action' => sanitize_text_field( $action ) );
 
@@ -111,8 +115,8 @@ class ReadBluesky extends BaseTool {
 
 		$result = $ability_instance->execute( $input );
 
-		if ( ! $this->isAbilitySuccess( $result ) ) {
-			return $this->buildErrorResponse( $this->getAbilityError( $result, 'Failed to read from Bluesky' ), $tool_name );
+		if ( is_wp_error( $result ) || ! $this->isAbilitySuccess( $result ) ) {
+			return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : $this->getAbilityError( $result, 'Failed to read from Bluesky' ), $tool_name );
 		}
 
 		return array(

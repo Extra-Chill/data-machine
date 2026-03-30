@@ -155,7 +155,7 @@ class FetchRedditAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result with fetched data or error.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$logs   = array();
 		$config = $this->normalizeConfig( $input );
 
@@ -183,11 +183,7 @@ class FetchRedditAbility {
 				'level'   => 'error',
 				'message' => 'Reddit: Either subreddit or query must be provided.',
 			);
-			return array(
-				'success' => false,
-				'error'   => 'Either subreddit or query must be provided',
-				'logs'    => $logs,
-			);
+			return new \WP_Error( 'missing_param', 'Either subreddit or query must be provided', array( 'status' => 400, 'logs' => $logs ) );
 		}
 
 		if ( ! empty( $subreddit ) && ! preg_match( '/^[a-zA-Z0-9_]+$/', $subreddit ) ) {
@@ -196,11 +192,7 @@ class FetchRedditAbility {
 				'message' => 'Reddit: Invalid subreddit name format.',
 				'data'    => array( 'subreddit' => $subreddit ),
 			);
-			return array(
-				'success' => false,
-				'error'   => 'Invalid subreddit name format',
-				'logs'    => $logs,
-			);
+			return new \WP_Error( 'missing_param', 'Invalid subreddit name format', array( 'status' => 400, 'logs' => $logs ) );
 		}
 
 		$valid_sorts = array( 'hot', 'new', 'top', 'rising', 'controversial', 'relevance' );
@@ -213,11 +205,7 @@ class FetchRedditAbility {
 					'valid_sorts'  => $valid_sorts,
 				),
 			);
-			return array(
-				'success' => false,
-				'error'   => 'Invalid sort parameter',
-				'logs'    => $logs,
-			);
+			return new \WP_Error( 'missing_param', 'Invalid sort parameter', array( 'status' => 400, 'logs' => $logs ) );
 		}
 
 		$mode_label = $is_global_search ? 'global search' : ( $is_subreddit_search ? "r/{$subreddit} search" : "r/{$subreddit}" );
@@ -282,11 +270,7 @@ class FetchRedditAbility {
 						'message' => 'Reddit: API request failed.',
 						'data'    => array( 'error' => $result['error'] ),
 					);
-					return array(
-						'success' => false,
-						'error'   => $result['error'],
-						'logs'    => $logs,
-					);
+					return new \WP_Error( 'api_error', $result['error'], array( 'status' => 500, 'logs' => $logs ) );
 				} else {
 					break;
 				}
@@ -315,11 +299,7 @@ class FetchRedditAbility {
 						'message' => 'Reddit: Invalid JSON response.',
 						'data'    => array( 'error' => $error_message ),
 					);
-					return array(
-						'success' => false,
-						'error'   => $error_message,
-						'logs'    => $logs,
-					);
+					return new \WP_Error( 'api_error', $error_message, array( 'status' => 500, 'logs' => $logs ) );
 				} else {
 					break;
 				}
@@ -540,7 +520,7 @@ class FetchRedditAbility {
 	/**
 	 * Normalize input configuration with defaults.
 	 */
-	private function normalizeConfig( array $input ): array {
+	private function normalizeConfig( array $input ): array|\WP_Error {
 		$defaults = array(
 			'subreddit'         => '',
 			'query'             => '',
@@ -665,7 +645,7 @@ class FetchRedditAbility {
 	/**
 	 * Make HTTP GET request.
 	 */
-	private function httpGet( string $url, array $options ): array {
+	private function httpGet( string $url, array $options ): array|\WP_Error {
 		$args = array(
 			'timeout' => $options['timeout'] ?? 30,
 			'headers' => $options['headers'] ?? array(),
@@ -674,10 +654,7 @@ class FetchRedditAbility {
 		$response = wp_remote_get( $url, $args );
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
@@ -693,7 +670,7 @@ class FetchRedditAbility {
 	/**
 	 * Fetch comments for a Reddit post.
 	 */
-	private function fetchComments( string $permalink, string $access_token, int $comment_count ): array {
+	private function fetchComments( string $permalink, string $access_token, int $comment_count ): array|\WP_Error {
 		$comments_array  = array();
 		$comments_url    = 'https://oauth.reddit.com' . $permalink . '.json?limit=' . $comment_count . '&sort=top';
 		$comments_result = $this->httpGet(

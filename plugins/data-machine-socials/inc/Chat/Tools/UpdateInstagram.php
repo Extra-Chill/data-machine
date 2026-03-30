@@ -113,10 +113,6 @@ class UpdateInstagram extends BaseTool {
 		}
 
 		// Get the ability.
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			return $this->buildErrorResponse( 'WordPress Abilities API not available', $tool_name );
-		}
-
 		$ability = wp_get_ability( 'datamachine/instagram-update' );
 		if ( ! $ability ) {
 			return $this->buildErrorResponse( 'datamachine/instagram-update ability not registered', $tool_name );
@@ -133,11 +129,15 @@ class UpdateInstagram extends BaseTool {
 		}
 
 		// Execute via ability (which handles token retrieval internally).
+		$ability = wp_get_ability( 'datamachine/instagram-update' );
+		if ( ! $ability ) {
+			return $this->buildErrorResponse( 'datamachine/instagram-update ability not registered', $tool_name );
+		}
 		$ability_instance = $ability;
 		$result           = $ability_instance->execute( $input );
 
 		// Format response for AI.
-		if ( $result['success'] ) {
+		if ( ! is_wp_error( $result ) && $result['success'] ) {
 			$message = '';
 			switch ( $action ) {
 				case 'edit':
@@ -158,6 +158,6 @@ class UpdateInstagram extends BaseTool {
 			);
 		}
 
-		return $this->buildErrorResponse( $result['error'] ?? 'Update failed', $tool_name );
+		return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Update failed' ), $tool_name );
 	}
 }

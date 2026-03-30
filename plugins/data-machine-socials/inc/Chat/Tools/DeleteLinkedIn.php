@@ -88,8 +88,8 @@ class DeleteLinkedIn extends BaseTool {
 			'post_id' => sanitize_text_field( $parameters['post_id'] ),
 		) );
 
-		if ( ! $this->isAbilitySuccess( $result ) ) {
-			return $this->buildErrorResponse( $this->getAbilityError( $result, 'Failed to delete LinkedIn post' ), $tool_name );
+		if ( is_wp_error( $result ) || ! $this->isAbilitySuccess( $result ) ) {
+			return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : $this->getAbilityError( $result, 'Failed to delete LinkedIn post' ), $tool_name );
 		}
 
 		return array(

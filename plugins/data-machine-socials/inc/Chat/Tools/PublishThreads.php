@@ -121,7 +121,7 @@ class PublishThreads extends BaseTool {
 		// Execute via the publish ability.
 		$result = \DataMachineSocials\Abilities\Threads\ThreadsPublishAbility::execute_publish( $input );
 
-		if ( $result['success'] ) {
+		if ( ! is_wp_error( $result ) && $result['success'] ) {
 			return array(
 				'result'   => 'Post published to Threads!',
 				'post_id'  => $result['post_id'] ?? '',
@@ -129,6 +129,6 @@ class PublishThreads extends BaseTool {
 			);
 		}
 
-		return $this->buildErrorResponse( $result['error'] ?? 'Threads publish failed', $tool_name );
+		return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Threads publish failed' ), $tool_name );
 	}
 }

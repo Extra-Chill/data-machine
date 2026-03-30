@@ -575,10 +575,6 @@ class RedditCommand {
 			WP_CLI::log( "Fetching from r/{$subreddit} (sort: {$input['sort_by']})..." );
 		}
 
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/fetch-reddit' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/fetch-reddit ability not registered.' );
@@ -586,8 +582,8 @@ class RedditCommand {
 
 		$result = $ability->execute( $input );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] ?? 'Reddit fetch failed.' );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Reddit fetch failed.' ) );
 		}
 
 		// The ability returns 'items' array for multiple results.
@@ -728,10 +724,6 @@ class RedditCommand {
 		$type_label = str_starts_with( $thing_id, 't3_' ) ? 'post' : 'comment';
 		WP_CLI::log( "Replying to {$type_label} {$thing_id}..." );
 
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/reply-reddit' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/reply-reddit ability not registered.' );
@@ -743,8 +735,8 @@ class RedditCommand {
 			'access_token' => $access_token,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] ?? 'Reddit reply failed.' );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Reddit reply failed.' ) );
 		}
 
 		$data = $result['data'] ?? array();
@@ -836,10 +828,6 @@ class RedditCommand {
 		$kind = ! empty( $url ) ? 'link' : 'self';
 		WP_CLI::log( "Submitting {$kind} post to r/{$subreddit}..." );
 
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/submit-reddit' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/submit-reddit ability not registered.' );
@@ -857,8 +845,8 @@ class RedditCommand {
 			'access_token' => $access_token,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] ?? 'Reddit submit failed.' );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Reddit submit failed.' ) );
 		}
 
 		$data = $result['data'] ?? array();
@@ -929,10 +917,6 @@ class RedditCommand {
 
 		WP_CLI::log( "{$label} {$thing_id}..." );
 
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/vote-reddit' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/vote-reddit ability not registered.' );
@@ -944,8 +928,8 @@ class RedditCommand {
 			'access_token' => $access_token,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] ?? 'Reddit vote failed.' );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Reddit vote failed.' ) );
 		}
 
 		$action = $result['data']['action'] ?? 'voted';

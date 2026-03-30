@@ -86,38 +86,26 @@ class InstagramCommentReplyAbility {
 		return PermissionHelper::can_manage();
 	}
 
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$auth = $this->getAuthProvider();
 		if ( ! $auth ) {
-			return array(
-				'success' => false,
-				'error'   => 'Instagram auth provider not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Instagram auth provider not available', array( 'status' => 401 ) );
 		}
 
 		$access_token = $auth->get_valid_access_token();
 		if ( empty( $access_token ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Instagram access token unavailable (expired or refresh failed)',
-			);
+			return new \WP_Error( 'missing_auth', 'Instagram access token unavailable (expired or refresh failed)', array( 'status' => 401 ) );
 		}
 
 		$comment_id = sanitize_text_field( $input['comment_id'] ?? '' );
 		$message    = trim( sanitize_textarea_field( $input['message'] ?? '' ) );
 
 		if ( '' === $comment_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'comment_id is required',
-			);
+			return new \WP_Error( 'missing_param', 'comment_id is required', array( 'status' => 400 ) );
 		}
 
 		if ( '' === $message ) {
-			return array(
-				'success' => false,
-				'error'   => 'message is required',
-			);
+			return new \WP_Error( 'missing_param', 'message is required', array( 'status' => 400 ) );
 		}
 
 		if ( mb_strlen( $message ) > self::MAX_REPLY_LENGTH ) {
@@ -142,7 +130,7 @@ class InstagramCommentReplyAbility {
 		return $provider;
 	}
 
-	private function replyToComment( string $access_token, string $comment_id, string $message ): array {
+	private function replyToComment( string $access_token, string $comment_id, string $message ): array|\WP_Error {
 		$url = self::GRAPH_API_URL . '/' . rawurlencode( $comment_id ) . '/replies';
 
 		$response = wp_remote_post(
@@ -157,20 +145,14 @@ class InstagramCommentReplyAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
 		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
 
 		if ( 200 !== $status_code || isset( $body['error'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => $body['error']['message'] ?? 'Failed to reply to Instagram comment',
-			);
+			return new \WP_Error( 'api_error', $body['error']['message'] ?? 'Failed to reply to Instagram comment', array( 'status' => 500 ) );
 		}
 
 		return array(

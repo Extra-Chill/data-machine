@@ -83,13 +83,17 @@ class UpdateBluesky extends BaseTool {
 			);
 		}
 
+		$ability = wp_get_ability( 'datamachine/bluesky-update' );
+		if ( ! $ability ) {
+			return $this->buildErrorResponse( 'datamachine/bluesky-update ability not registered', $tool_name );
+		}
 		$ability_instance = $ability;
 		$result           = $ability_instance->execute( array(
 			'action'   => sanitize_text_field( $parameters['action'] ),
 			'post_uri' => sanitize_text_field( $parameters['post_uri'] ),
 		) );
 
-		if ( $result['success'] ) {
+		if ( ! is_wp_error( $result ) && $result['success'] ) {
 			$action = $parameters['action'];
 			$msg    = 'delete' === $action ? 'Post deleted!' : 'Post liked!';
 			return array(
@@ -98,6 +102,6 @@ class UpdateBluesky extends BaseTool {
 			);
 		}
 
-		return $this->buildErrorResponse( $result['error'] ?? 'Update failed', $tool_name );
+		return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Update failed' ), $tool_name );
 	}
 }

@@ -121,7 +121,7 @@ class PublishTwitter extends BaseTool {
 		// Execute via the publish ability.
 		$result = \DataMachineSocials\Abilities\Twitter\TwitterPublishAbility::execute_publish( $input );
 
-		if ( $result['success'] ) {
+		if ( ! is_wp_error( $result ) && $result['success'] ) {
 			$response = array(
 				'result'    => 'Tweet published to Twitter!',
 				'tweet_id'  => $result['tweet_id'] ?? '',
@@ -136,6 +136,6 @@ class PublishTwitter extends BaseTool {
 			return $response;
 		}
 
-		return $this->buildErrorResponse( $result['error'] ?? 'Twitter publish failed', $tool_name );
+		return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Twitter publish failed' ), $tool_name );
 	}
 }

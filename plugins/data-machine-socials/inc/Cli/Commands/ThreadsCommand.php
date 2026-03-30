@@ -63,8 +63,8 @@ class ThreadsCommand {
 			'after'  => $assoc_args['after'] ?? '',
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		$data    = $result['data'];
@@ -128,8 +128,8 @@ class ThreadsCommand {
 			'thread_id' => $thread_id,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		$data   = $result['data'];
@@ -185,8 +185,8 @@ class ThreadsCommand {
 			'limit'     => absint( $assoc_args['limit'] ?? 25 ),
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		$data    = $result['data'];
@@ -318,8 +318,8 @@ class ThreadsCommand {
 
 		$result = \DataMachineSocials\Abilities\Threads\ThreadsPublishAbility::execute_publish( $input );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Published to Threads!' );
@@ -328,10 +328,6 @@ class ThreadsCommand {
 	}
 
 	private function get_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/threads-read' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/threads-read ability not registered.' );
@@ -341,10 +337,6 @@ class ThreadsCommand {
 	}
 
 	private function get_update_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/threads-update' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/threads-update ability not registered.' );
@@ -354,10 +346,6 @@ class ThreadsCommand {
 	}
 
 	private function get_delete_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/threads-delete' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/threads-delete ability not registered.' );
@@ -367,10 +355,6 @@ class ThreadsCommand {
 	}
 
 	private function get_publish_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/threads-publish' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/threads-publish ability not registered.' );
@@ -400,8 +384,8 @@ class ThreadsCommand {
 			'thread_id' => $thread_id,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Thread deleted successfully!' );

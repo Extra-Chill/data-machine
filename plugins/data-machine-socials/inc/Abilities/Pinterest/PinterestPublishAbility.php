@@ -115,25 +115,19 @@ class PinterestPublishAbility {
 	 * @param array $input Ability input with publish parameters.
 	 * @return array Response with pin details or error.
 	 */
-	public static function execute_publish( array $input ): array {
+	public static function execute_publish( array $input ): array|\WP_Error {
 		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'pinterest' );
 
 		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return array(
-				'success' => false,
-				'error'   => 'Pinterest not authenticated',
-			);
+			return new \WP_Error( 'missing_auth', 'Pinterest not authenticated', array( 'status' => 401 ) );
 		}
 
 		$config = $provider->get_config();
 		$token  = $provider->get_valid_access_token();
 
 		if ( empty( $token ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Pinterest access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings',
-			);
+			return new \WP_Error( 'missing_auth', 'Pinterest access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings', array( 'status' => 401 ) );
 		}
 
 		$title       = sanitize_text_field( $input['title'] ?? '' );
@@ -143,10 +137,7 @@ class PinterestPublishAbility {
 		$board_id    = sanitize_text_field( $input['board_id'] ?? '' );
 
 		if ( empty( $title ) || empty( $description ) || empty( $image_url ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Missing required fields: title, description, image_url',
-			);
+			return new \WP_Error( 'api_error', 'Missing required fields: title, description, image_url', array( 'status' => 500 ) );
 		}
 
 		// Get default board if no board_id provided
@@ -155,10 +146,7 @@ class PinterestPublishAbility {
 		}
 
 		if ( empty( $board_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'No board ID provided and no default board configured',
-			);
+			return new \WP_Error( 'api_error', 'No board ID provided and no default board configured', array( 'status' => 500 ) );
 		}
 
 		$post_data = array(
@@ -185,19 +173,13 @@ class PinterestPublishAbility {
 		) );
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => $result['error'] ?? 'Failed to create pin',
-			);
+			return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to create pin', array( 'status' => 500 ) );
 		}
 
 		$data = json_decode( $result['data'], true );
 
 		if ( ! isset( $data['id'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Invalid response from Pinterest API',
-			);
+			return new \WP_Error( 'api_error', 'Invalid response from Pinterest API', array( 'status' => 500 ) );
 		}
 
 		$pin_id  = $data['id'];

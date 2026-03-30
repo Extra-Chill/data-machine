@@ -144,7 +144,7 @@ class FacebookPublishAbility {
 	 * @param array $input Ability input with publish parameters.
 	 * @return array Response with post details or error.
 	 */
-	public static function execute_publish( array $input ): array {
+	public static function execute_publish( array $input ): array|\WP_Error {
 		$title         = $input['title'] ?? '';
 		$content       = $input['content'] ?? '';
 		$image_url     = $input['image_url'] ?? '';
@@ -152,37 +152,25 @@ class FacebookPublishAbility {
 		$link_handling = $input['link_handling'] ?? 'append';
 
 		if ( empty( $content ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Content is required',
-			);
+			return new \WP_Error( 'missing_param', 'Content is required', array( 'status' => 400 ) );
 		}
 
 		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'facebook' );
 
 		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return array(
-				'success' => false,
-				'error'   => 'Facebook not authenticated',
-			);
+			return new \WP_Error( 'missing_auth', 'Facebook not authenticated', array( 'status' => 401 ) );
 		}
 
 		$page_id           = $provider->get_page_id();
 		$page_access_token = $provider->get_page_access_token();
 
 		if ( empty( $page_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Facebook page not found',
-			);
+			return new \WP_Error( 'not_found', 'Facebook page not found', array( 'status' => 404 ) );
 		}
 
 		if ( empty( $page_access_token ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Facebook page access token not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Facebook page access token not available', array( 'status' => 401 ) );
 		}
 
 		// Format post content
@@ -218,10 +206,7 @@ class FacebookPublishAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
@@ -255,10 +240,7 @@ class FacebookPublishAbility {
 			$error_msg = $data['error']['message'];
 		}
 
-		return array(
-			'success' => false,
-			'error'   => $error_msg,
-		);
+		return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 	}
 
 	/**
@@ -267,16 +249,13 @@ class FacebookPublishAbility {
 	 * @param array $input Ability input.
 	 * @return array Pages or error.
 	 */
-	public static function get_pages( array $input ): array {
+	public static function get_pages( array $input ): array|\WP_Error {
 		$input;
 		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'facebook' );
 
 		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return array(
-				'success' => false,
-				'error'   => 'Facebook not authenticated',
-			);
+			return new \WP_Error( 'missing_auth', 'Facebook not authenticated', array( 'status' => 401 ) );
 		}
 
 		// Get pages from provider or make API call
@@ -334,7 +313,7 @@ class FacebookPublishAbility {
 	 * @param string $access_token Access token.
 	 * @return array Comment details.
 	 */
-	private static function post_comment( string $post_id, string $message, string $access_token ): array {
+	private static function post_comment( string $post_id, string $message, string $access_token ): array|\WP_Error {
 		$url = self::build_graph_url( "{$post_id}/comments" );
 
 		$response = wp_remote_post(
@@ -349,10 +328,7 @@ class FacebookPublishAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
@@ -370,10 +346,7 @@ class FacebookPublishAbility {
 			);
 		}
 
-		return array(
-			'success' => false,
-			'error'   => $data['error']['message'] ?? 'Failed to post comment',
-		);
+		return new \WP_Error( 'api_error', $data['error']['message'] ?? 'Failed to post comment', array( 'status' => 500 ) );
 	}
 
 	/**

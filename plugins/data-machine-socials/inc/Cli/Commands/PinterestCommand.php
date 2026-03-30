@@ -45,11 +45,11 @@ class PinterestCommand {
 
 		$result = PinterestBoardsAbility::sync_boards();
 
-		if ( $result['success'] ) {
+		if ( ! is_wp_error( $result ) && $result['success'] ) {
 			WP_CLI::success( "Synced {$result['count']} boards." );
 			$this->format_items( $result['boards'], array( 'id', 'name', 'description' ), $assoc_args );
 		} else {
-			WP_CLI::error( $result['error'] );
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 	}
 
@@ -143,8 +143,8 @@ class PinterestCommand {
 			'bookmark' => $assoc_args['bookmark'] ?? '',
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		$data   = $result['data'];
@@ -205,8 +205,8 @@ class PinterestCommand {
 			'pin_id' => $pin_id,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::log( wp_json_encode( $result['data'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
@@ -252,8 +252,8 @@ class PinterestCommand {
 			'bookmark' => $assoc_args['bookmark'] ?? '',
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		$data   = $result['data'];
@@ -345,8 +345,8 @@ class PinterestCommand {
 
 		$result = \DataMachineSocials\Abilities\Pinterest\PinterestPublishAbility::execute_publish( $input );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Pin published to Pinterest!' );
@@ -360,10 +360,6 @@ class PinterestCommand {
 	 * @return \DataMachineSocials\Abilities\Pinterest\PinterestReadAbility
 	 */
 	private function get_read_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/pinterest-read' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/pinterest-read ability not registered.' );
@@ -373,10 +369,6 @@ class PinterestCommand {
 	}
 
 	private function get_update_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/pinterest-update' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/pinterest-update ability not registered.' );
@@ -386,10 +378,6 @@ class PinterestCommand {
 	}
 
 	private function get_delete_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/pinterest-delete' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/pinterest-delete ability not registered.' );
@@ -399,10 +387,6 @@ class PinterestCommand {
 	}
 
 	private function get_publish_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/pinterest-publish' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/pinterest-publish ability not registered.' );
@@ -432,8 +416,8 @@ class PinterestCommand {
 			'pin_id' => $pin_id,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Pin deleted successfully!' );

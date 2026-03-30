@@ -55,19 +55,19 @@ class DeleteTwitter extends BaseTool {
 			);
 		}
 
-		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/twitter-delete' ) : null;
+		$ability = wp_get_ability( 'datamachine/twitter-delete' );
 		if ( ! $ability ) {
 			return $this->buildErrorResponse( 'datamachine/twitter-delete ability not registered', $tool_name );
 		}
 		$result  = $ability->execute( array( 'tweet_id' => $parameters['tweet_id'] ) );
 
-		if ( $result['success'] ) {
+		if ( ! is_wp_error( $result ) && $result['success'] ) {
 			return array(
 				'result'   => 'Tweet deleted!',
 				'tweet_id' => $parameters['tweet_id'],
 			);
 		}
 
-		return $this->buildErrorResponse( $result['error'] ?? 'Delete failed', $tool_name );
+		return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Delete failed' ), $tool_name );
 	}
 }

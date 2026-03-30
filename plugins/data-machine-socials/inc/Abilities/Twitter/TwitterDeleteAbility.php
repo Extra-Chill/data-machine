@@ -77,28 +77,19 @@ class TwitterDeleteAbility {
 		return PermissionHelper::can_manage();
 	}
 
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$auth = $this->getAuthProvider();
 		if ( ! $auth ) {
-			return array(
-				'success' => false,
-				'error'   => 'Twitter auth provider not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Twitter auth provider not available', array( 'status' => 401 ) );
 		}
 
 		$connection = $auth->get_connection();
 		if ( ! $connection ) {
-			return array(
-				'success' => false,
-				'error'   => 'Twitter connection not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Twitter connection not available', array( 'status' => 401 ) );
 		}
 
 		if ( empty( $input['tweet_id'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'tweet_id is required',
-			);
+			return new \WP_Error( 'missing_param', 'tweet_id is required', array( 'status' => 400 ) );
 		}
 
 		$connection->setApiVersion( '2' );
@@ -117,10 +108,7 @@ class TwitterDeleteAbility {
 		}
 
 		$error = $result['detail'] ?? $result['title'] ?? 'Failed to delete tweet';
-		return array(
-			'success' => false,
-			'error'   => $error,
-		);
+		return new \WP_Error( 'api_error', $error, array( 'status' => 500 ) );
 	}
 
 	private function getAuthProvider(): ?TwitterAuth {

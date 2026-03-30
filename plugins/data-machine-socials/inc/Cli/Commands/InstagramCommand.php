@@ -74,8 +74,8 @@ class InstagramCommand {
 			'after'  => $assoc_args['after'] ?? '',
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		$data   = $result['data'];
@@ -156,8 +156,8 @@ class InstagramCommand {
 			'media_id' => $media_id,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		$data   = $result['data'];
@@ -221,8 +221,8 @@ class InstagramCommand {
 			'limit'    => absint( $assoc_args['limit'] ?? 25 ),
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		$data     = $result['data'];
@@ -287,8 +287,8 @@ class InstagramCommand {
 			)
 		);
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Instagram comment reply posted successfully!' );
@@ -387,8 +387,8 @@ class InstagramCommand {
 			'caption'  => $caption,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Caption updated successfully!' );
@@ -416,8 +416,8 @@ class InstagramCommand {
 			'media_id' => $media_id,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Post deleted successfully!' );
@@ -446,8 +446,8 @@ class InstagramCommand {
 			'media_id' => $media_id,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Post archived successfully!' );
@@ -534,8 +534,8 @@ class InstagramCommand {
 
 		$result = $publish_ability->execute( $input );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Published to Instagram!' );
@@ -613,8 +613,8 @@ class InstagramCommand {
 
 		$result = $publish_ability->execute( $input );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Reel published to Instagram!' );
@@ -675,8 +675,8 @@ class InstagramCommand {
 
 		$result = $publish_ability->execute( $input );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Story published to Instagram!' );
@@ -690,10 +690,6 @@ class InstagramCommand {
 	 * @return \DataMachineSocials\Abilities\Instagram\InstagramPublishAbility
 	 */
 	private function get_publish_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/instagram-publish' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/instagram-publish ability not registered.' );
@@ -708,10 +704,6 @@ class InstagramCommand {
 	 * @return \DataMachineSocials\Abilities\Instagram\InstagramReadAbility
 	 */
 	private function get_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/instagram-read' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/instagram-read ability not registered.' );
@@ -726,10 +718,6 @@ class InstagramCommand {
 	 * @return \DataMachineSocials\Abilities\Instagram\InstagramUpdateAbility
 	 */
 	private function get_update_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/instagram-update' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/instagram-update ability not registered.' );
@@ -744,10 +732,6 @@ class InstagramCommand {
 	 * @return \DataMachineSocials\Abilities\Instagram\InstagramDeleteAbility
 	 */
 	private function get_delete_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/instagram-delete' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/instagram-delete ability not registered.' );
@@ -762,10 +746,6 @@ class InstagramCommand {
 	 * @return \DataMachineSocials\Abilities\Instagram\InstagramCommentReplyAbility
 	 */
 	private function get_comment_reply_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/instagram-comment-reply' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/instagram-comment-reply ability not registered.' );

@@ -139,7 +139,7 @@ class PublishFacebook extends BaseTool {
 		// Execute via the publish ability.
 		$result = \DataMachineSocials\Abilities\Facebook\FacebookPublishAbility::execute_publish( $input );
 
-		if ( $result['success'] ) {
+		if ( ! is_wp_error( $result ) && $result['success'] ) {
 			$response = array(
 				'result'   => 'Post published to Facebook!',
 				'post_id'  => $result['post_id'] ?? '',
@@ -154,6 +154,6 @@ class PublishFacebook extends BaseTool {
 			return $response;
 		}
 
-		return $this->buildErrorResponse( $result['error'] ?? 'Facebook publish failed', $tool_name );
+		return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Facebook publish failed' ), $tool_name );
 	}
 }

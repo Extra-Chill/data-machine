@@ -79,28 +79,19 @@ class FacebookDeleteAbility {
 		return PermissionHelper::can_manage();
 	}
 
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$auth = $this->getAuthProvider();
 		if ( ! $auth ) {
-			return array(
-				'success' => false,
-				'error'   => 'Facebook auth provider not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Facebook auth provider not available', array( 'status' => 401 ) );
 		}
 
 		$access_token = $auth->get_page_access_token();
 		if ( empty( $access_token ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Facebook page access token unavailable',
-			);
+			return new \WP_Error( 'missing_auth', 'Facebook page access token unavailable', array( 'status' => 401 ) );
 		}
 
 		if ( empty( $input['post_id'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'post_id is required',
-			);
+			return new \WP_Error( 'missing_param', 'post_id is required', array( 'status' => 400 ) );
 		}
 
 		$url = self::GRAPH_API_URL . '/' . rawurlencode( $input['post_id'] );
@@ -117,10 +108,7 @@ class FacebookDeleteAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
@@ -136,10 +124,7 @@ class FacebookDeleteAbility {
 			);
 		}
 
-		return array(
-			'success' => false,
-			'error'   => $body['error']['message'] ?? 'Failed to delete post',
-		);
+		return new \WP_Error( 'api_error', $body['error']['message'] ?? 'Failed to delete post', array( 'status' => 500 ) );
 	}
 
 	private function getAuthProvider(): ?FacebookAuth {

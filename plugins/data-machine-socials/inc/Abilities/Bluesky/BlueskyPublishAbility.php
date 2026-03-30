@@ -134,36 +134,27 @@ class BlueskyPublishAbility {
 	 * @param array $input Ability input with publish parameters.
 	 * @return array Response with post details or error.
 	 */
-	public static function execute_publish( array $input ): array {
+	public static function execute_publish( array $input ): array|\WP_Error {
 		$content    = $input['content'] ?? '';
 		$title      = $input['title'] ?? '';
 		$image_url  = $input['image_url'] ?? '';
 		$source_url = $input['source_url'] ?? '';
 
 		if ( empty( $content ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Content is required',
-			);
+			return new \WP_Error( 'missing_param', 'Content is required', array( 'status' => 400 ) );
 		}
 
 		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'bluesky' );
 
 		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return array(
-				'success' => false,
-				'error'   => 'Bluesky not authenticated',
-			);
+			return new \WP_Error( 'missing_auth', 'Bluesky not authenticated', array( 'status' => 401 ) );
 		}
 
 		// Use the provider's session method which handles auth internally.
 		$session = $provider->get_session();
 		if ( is_wp_error( $session ) ) {
-			return array(
-				'success' => false,
-				'error'   => $session->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $session->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$handle       = $session['handle'];
@@ -244,10 +235,7 @@ class BlueskyPublishAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
@@ -271,10 +259,7 @@ class BlueskyPublishAbility {
 			$error_msg = $data['message'];
 		}
 
-		return array(
-			'success' => false,
-			'error'   => $error_msg,
-		);
+		return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 	}
 
 	/**
@@ -283,16 +268,13 @@ class BlueskyPublishAbility {
 	 * @param array $input Ability input.
 	 * @return array Account details or error.
 	 */
-	public static function get_account( array $input ): array {
+	public static function get_account( array $input ): array|\WP_Error {
 		$input;
 		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'bluesky' );
 
 		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return array(
-				'success' => false,
-				'error'   => 'Bluesky not authenticated',
-			);
+			return new \WP_Error( 'missing_auth', 'Bluesky not authenticated', array( 'status' => 401 ) );
 		}
 
 		$details = $provider->get_account_details();
@@ -358,7 +340,7 @@ class BlueskyPublishAbility {
 	 * @param string $text Post text to scan for URLs.
 	 * @return array Array of facet objects, empty if no URLs found.
 	 */
-	private static function extract_url_facets( string $text ): array {
+	private static function extract_url_facets( string $text ): array|\WP_Error {
 		$facets = array();
 
 		// Match URLs in the text.
@@ -401,7 +383,7 @@ class BlueskyPublishAbility {
 	 * @param string $url URL to fetch OG tags from.
 	 * @return array Associative array with 'title', 'description', 'image' keys (empty strings if not found).
 	 */
-	private static function fetch_og_tags( string $url ): array {
+	private static function fetch_og_tags( string $url ): array|\WP_Error {
 		$defaults = array(
 			'title'       => '',
 			'description' => '',

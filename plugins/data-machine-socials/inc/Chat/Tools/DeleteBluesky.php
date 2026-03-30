@@ -55,19 +55,19 @@ class DeleteBluesky extends BaseTool {
 			);
 		}
 
-		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/bluesky-delete' ) : null;
+		$ability = wp_get_ability( 'datamachine/bluesky-delete' );
 		if ( ! $ability ) {
 			return $this->buildErrorResponse( 'datamachine/bluesky-delete ability not registered', $tool_name );
 		}
 		$result = $ability->execute( array( 'post_uri' => $parameters['post_uri'] ) );
 
-		if ( $result['success'] ) {
+		if ( ! is_wp_error( $result ) && $result['success'] ) {
 			return array(
 				'result'   => 'Post deleted!',
 				'post_uri' => $parameters['post_uri'],
 			);
 		}
 
-		return $this->buildErrorResponse( $result['error'] ?? 'Delete failed', $tool_name );
+		return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Delete failed' ), $tool_name );
 	}
 }

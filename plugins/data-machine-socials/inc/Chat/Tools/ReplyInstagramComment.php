@@ -91,15 +91,15 @@ class ReplyInstagramComment extends BaseTool {
 			);
 		}
 
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			return $this->buildErrorResponse( 'WordPress Abilities API not available', $tool_name );
+		$ability = wp_get_ability( 'datamachine/instagram-comment-reply' );
+		if ( ! $ability ) {
+			return $this->buildErrorResponse( 'datamachine/instagram-comment-reply ability not registered', $tool_name );
 		}
 
 		$ability = wp_get_ability( 'datamachine/instagram-comment-reply' );
 		if ( ! $ability ) {
 			return $this->buildErrorResponse( 'datamachine/instagram-comment-reply ability not registered', $tool_name );
 		}
-
 		$ability_instance = $ability;
 		$result           = $ability_instance->execute(
 			array(
@@ -108,7 +108,7 @@ class ReplyInstagramComment extends BaseTool {
 			)
 		);
 
-		if ( ! empty( $result['success'] ) ) {
+		if ( ! is_wp_error( $result ) && ! empty( $result['success'] ) ) {
 			return array(
 				'result'     => 'Instagram comment reply posted successfully!',
 				'comment_id' => $result['data']['comment_id'] ?? $parameters['comment_id'],
@@ -117,6 +117,6 @@ class ReplyInstagramComment extends BaseTool {
 			);
 		}
 
-		return $this->buildErrorResponse( $result['error'] ?? 'Failed to reply to Instagram comment', $tool_name );
+		return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Failed to reply to Instagram comment' ), $tool_name );
 	}
 }

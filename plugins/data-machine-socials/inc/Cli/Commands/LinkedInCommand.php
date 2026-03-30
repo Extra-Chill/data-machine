@@ -62,8 +62,8 @@ class LinkedInCommand {
 			'start'  => absint( $assoc_args['start'] ?? 0 ),
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		$data   = $result['data'];
@@ -129,8 +129,8 @@ class LinkedInCommand {
 			'post_id' => $post_id,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		$data   = $result['data'];
@@ -235,8 +235,8 @@ class LinkedInCommand {
 
 		$result = \DataMachineSocials\Abilities\LinkedIn\LinkedInPublishAbility::execute_publish( $input );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Published to LinkedIn!' );
@@ -275,8 +275,8 @@ class LinkedInCommand {
 			'commentary' => $commentary,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'LinkedIn post updated successfully!' );
@@ -304,8 +304,8 @@ class LinkedInCommand {
 			'post_id' => $post_id,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'LinkedIn post deleted successfully!' );
@@ -362,10 +362,6 @@ class LinkedInCommand {
 	}
 
 	private function get_read_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/linkedin-read' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/linkedin-read ability not registered.' );
@@ -375,10 +371,6 @@ class LinkedInCommand {
 	}
 
 	private function get_update_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/linkedin-update' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/linkedin-update ability not registered.' );
@@ -388,10 +380,6 @@ class LinkedInCommand {
 	}
 
 	private function get_delete_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/linkedin-delete' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/linkedin-delete ability not registered.' );
@@ -401,10 +389,6 @@ class LinkedInCommand {
 	}
 
 	private function get_publish_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/linkedin-publish' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/linkedin-publish ability not registered.' );

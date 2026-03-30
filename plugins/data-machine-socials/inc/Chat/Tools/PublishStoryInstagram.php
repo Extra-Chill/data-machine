@@ -120,7 +120,7 @@ class PublishStoryInstagram extends BaseTool {
 		// Execute via the publish ability.
 		$result = \DataMachineSocials\Abilities\Instagram\InstagramPublishAbility::execute_publish( $input );
 
-		if ( $result['success'] ) {
+		if ( ! is_wp_error( $result ) && $result['success'] ) {
 			return array(
 				'result'     => 'Story published to Instagram! (visible for 24 hours)',
 				'media_id'   => $result['media_id'] ?? '',
@@ -129,6 +129,6 @@ class PublishStoryInstagram extends BaseTool {
 			);
 		}
 
-		return $this->buildErrorResponse( $result['error'] ?? 'Story publish failed', $tool_name );
+		return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Story publish failed' ), $tool_name );
 	}
 }

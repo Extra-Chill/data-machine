@@ -114,10 +114,6 @@ class SubmitReddit extends BaseTool {
 			);
 		}
 
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			return $this->buildErrorResponse( 'WordPress Abilities API not available', $tool_name );
-		}
-
 		$ability = wp_get_ability( 'datamachine/submit-reddit' );
 		if ( ! $ability ) {
 			return $this->buildErrorResponse( 'datamachine/submit-reddit ability not registered', $tool_name );
@@ -133,7 +129,7 @@ class SubmitReddit extends BaseTool {
 			'access_token' => $access_token,
 		) );
 
-		if ( ! empty( $result['success'] ) ) {
+		if ( ! is_wp_error( $result ) && ! empty( $result['success'] ) ) {
 			return array(
 				'result'   => 'Reddit post submitted successfully!',
 				'post_url' => $result['data']['post_url'] ?? '',
@@ -142,6 +138,6 @@ class SubmitReddit extends BaseTool {
 			);
 		}
 
-		return $this->buildErrorResponse( $result['error'] ?? 'Failed to submit Reddit post', $tool_name );
+		return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Failed to submit Reddit post' ), $tool_name );
 	}
 }

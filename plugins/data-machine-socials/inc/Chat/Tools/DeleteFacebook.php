@@ -55,19 +55,19 @@ class DeleteFacebook extends BaseTool {
 			);
 		}
 
-		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/facebook-delete' ) : null;
+		$ability = wp_get_ability( 'datamachine/facebook-delete' );
 		if ( ! $ability ) {
 			return $this->buildErrorResponse( 'datamachine/facebook-delete ability not registered', $tool_name );
 		}
 		$result = $ability->execute( array( 'post_id' => $parameters['post_id'] ) );
 
-		if ( $result['success'] ) {
+		if ( ! is_wp_error( $result ) && $result['success'] ) {
 			return array(
 				'result'  => 'Post deleted!',
 				'post_id' => $parameters['post_id'],
 			);
 		}
 
-		return $this->buildErrorResponse( $result['error'] ?? 'Delete failed', $tool_name );
+		return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Delete failed' ), $tool_name );
 	}
 }

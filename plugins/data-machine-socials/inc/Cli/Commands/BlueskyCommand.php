@@ -58,8 +58,8 @@ class BlueskyCommand {
 			'cursor' => $assoc_args['cursor'] ?? '',
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		$data   = $result['data'];
@@ -126,8 +126,8 @@ class BlueskyCommand {
 			'post_uri' => $post_uri,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		$data   = $result['data'];
@@ -173,8 +173,8 @@ class BlueskyCommand {
 
 		$result = $ability->execute( array( 'action' => 'profile' ) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		$data   = $result['data'];
@@ -294,8 +294,8 @@ class BlueskyCommand {
 
 		$result = \DataMachineSocials\Abilities\Bluesky\BlueskyPublishAbility::execute_publish( $input );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Published to Bluesky!' );
@@ -304,10 +304,6 @@ class BlueskyCommand {
 	}
 
 	private function get_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/bluesky-read' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/bluesky-read ability not registered.' );
@@ -317,10 +313,6 @@ class BlueskyCommand {
 	}
 
 	private function get_update_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/bluesky-update' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/bluesky-update ability not registered.' );
@@ -330,10 +322,6 @@ class BlueskyCommand {
 	}
 
 	private function get_delete_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/bluesky-delete' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/bluesky-delete ability not registered.' );
@@ -363,8 +351,8 @@ class BlueskyCommand {
 			'post_uri' => $post_uri,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Post deleted successfully!' );
@@ -392,18 +380,14 @@ class BlueskyCommand {
 			'post_uri' => $post_uri,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Post liked successfully!' );
 	}
 
 	private function get_publish_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/bluesky-publish' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/bluesky-publish ability not registered.' );

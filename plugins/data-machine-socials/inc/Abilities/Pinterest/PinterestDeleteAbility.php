@@ -79,29 +79,20 @@ class PinterestDeleteAbility {
 		return PermissionHelper::can_manage();
 	}
 
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$auth = $this->getAuthProvider();
 		if ( ! $auth ) {
-			return array(
-				'success' => false,
-				'error'   => 'Pinterest auth provider not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Pinterest auth provider not available', array( 'status' => 401 ) );
 		}
 
 		$access_token = $auth->get_valid_access_token();
 
 		if ( empty( $access_token ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Pinterest access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings',
-			);
+			return new \WP_Error( 'missing_auth', 'Pinterest access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings', array( 'status' => 401 ) );
 		}
 
 		if ( empty( $input['pin_id'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'pin_id is required',
-			);
+			return new \WP_Error( 'missing_param', 'pin_id is required', array( 'status' => 400 ) );
 		}
 
 		$url = self::API_URL . '/pins/' . rawurlencode( $input['pin_id'] );
@@ -118,10 +109,7 @@ class PinterestDeleteAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
@@ -137,10 +125,7 @@ class PinterestDeleteAbility {
 		}
 
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
-		return array(
-			'success' => false,
-			'error'   => $body['message'] ?? 'Failed to delete pin',
-		);
+		return new \WP_Error( 'api_error', $body['message'] ?? 'Failed to delete pin', array( 'status' => 500 ) );
 	}
 
 	private function getAuthProvider(): ?PinterestAuth {

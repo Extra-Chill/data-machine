@@ -79,28 +79,19 @@ class InstagramDeleteAbility {
 		return PermissionHelper::can_manage();
 	}
 
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$auth = $this->getAuthProvider();
 		if ( ! $auth ) {
-			return array(
-				'success' => false,
-				'error'   => 'Instagram auth provider not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Instagram auth provider not available', array( 'status' => 401 ) );
 		}
 
 		$access_token = $auth->get_valid_access_token();
 		if ( empty( $access_token ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Instagram access token unavailable',
-			);
+			return new \WP_Error( 'missing_auth', 'Instagram access token unavailable', array( 'status' => 401 ) );
 		}
 
 		if ( empty( $input['media_id'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'media_id is required',
-			);
+			return new \WP_Error( 'missing_param', 'media_id is required', array( 'status' => 400 ) );
 		}
 
 		return $this->deleteMedia( $access_token, $input['media_id'] );
@@ -131,7 +122,7 @@ class InstagramDeleteAbility {
 	 * @param string $media_id     Media ID to delete.
 	 * @return array Result.
 	 */
-	private function deleteMedia( string $access_token, string $media_id ): array {
+	private function deleteMedia( string $access_token, string $media_id ): array|\WP_Error {
 		$url = self::GRAPH_API_URL . '/' . rawurlencode( $media_id );
 
 		$response = wp_remote_request(
@@ -146,10 +137,7 @@ class InstagramDeleteAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
@@ -165,9 +153,6 @@ class InstagramDeleteAbility {
 			);
 		}
 
-		return array(
-			'success' => false,
-			'error'   => $body['error']['message'] ?? 'Delete failed. The Instagram API may not support deletion for this media type. Consider archiving instead.',
-		);
+		return new \WP_Error( 'api_error', $body['error']['message'] ?? 'Delete failed. The Instagram API may not support deletion for this media type. Consider archiving instead.', array( 'status' => 500 ) );
 	}
 }

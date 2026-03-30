@@ -115,8 +115,8 @@ class CommentsCommand {
 			'media_id' => $media_id,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		$comments = $result['data']['comments'] ?? array();
@@ -259,8 +259,8 @@ class CommentsCommand {
 			'message'    => $message,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( "Reply posted on {$platform}!" );
@@ -275,10 +275,6 @@ class CommentsCommand {
 	 * @return object Ability instance.
 	 */
 	private function get_ability( string $slug ) {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( $slug );
 		if ( ! $ability ) {
 			WP_CLI::error( "{$slug} ability not registered." );

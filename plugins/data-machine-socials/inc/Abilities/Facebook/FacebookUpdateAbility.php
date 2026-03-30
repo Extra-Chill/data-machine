@@ -100,31 +100,22 @@ class FacebookUpdateAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? '';
 
 		// Get auth provider.
 		$auth = $this->getAuthProvider();
 		if ( ! $auth ) {
-			return array(
-				'success' => false,
-				'error'   => 'Facebook auth provider not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Facebook auth provider not available', array( 'status' => 401 ) );
 		}
 
 		$access_token = $auth->get_page_access_token();
 		if ( empty( $access_token ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Facebook page access token unavailable',
-			);
+			return new \WP_Error( 'missing_auth', 'Facebook page access token unavailable', array( 'status' => 401 ) );
 		}
 
 		if ( empty( $input['post_id'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'post_id is required',
-			);
+			return new \WP_Error( 'missing_param', 'post_id is required', array( 'status' => 400 ) );
 		}
 
 		$post_id = $input['post_id'];
@@ -132,10 +123,7 @@ class FacebookUpdateAbility {
 		switch ( $action ) {
 			case 'edit':
 				if ( empty( $input['message'] ) ) {
-					return array(
-						'success' => false,
-						'error'   => 'message is required for edit action',
-					);
+					return new \WP_Error( 'missing_param', 'message is required for edit action', array( 'status' => 400 ) );
 				}
 				return $this->editPost( $access_token, $post_id, $input['message'] );
 
@@ -149,10 +137,7 @@ class FacebookUpdateAbility {
 				return $this->deletePost( $access_token, $post_id );
 
 			default:
-				return array(
-					'success' => false,
-					'error'   => "Unknown action: {$action}. Use edit, hide, unhide, or delete.",
-				);
+				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use edit, hide, unhide, or delete.", array( 'status' => 500 ) );
 		}
 	}
 
@@ -184,7 +169,7 @@ class FacebookUpdateAbility {
 	 * @param string $message      New message.
 	 * @return array Result.
 	 */
-	private function editPost( string $access_token, string $post_id, string $message ): array {
+	private function editPost( string $access_token, string $post_id, string $message ): array|\WP_Error {
 		$url = self::GRAPH_API_URL . '/' . rawurlencode( $post_id );
 
 		$response = wp_remote_post(
@@ -199,20 +184,14 @@ class FacebookUpdateAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
 		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
 
 		if ( 200 !== $status_code ) {
-			return array(
-				'success' => false,
-				'error'   => $body['error']['message'] ?? 'Failed to edit post',
-			);
+			return new \WP_Error( 'api_error', $body['error']['message'] ?? 'Failed to edit post', array( 'status' => 500 ) );
 		}
 
 		return array(
@@ -232,7 +211,7 @@ class FacebookUpdateAbility {
 	 * @param bool   $hide         Whether to hide (true) or unhide (false).
 	 * @return array Result.
 	 */
-	private function hidePost( string $access_token, string $post_id, bool $hide ): array {
+	private function hidePost( string $access_token, string $post_id, bool $hide ): array|\WP_Error {
 		$url = self::GRAPH_API_URL . '/' . rawurlencode( $post_id );
 
 		$response = wp_remote_post(
@@ -247,20 +226,14 @@ class FacebookUpdateAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
 		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
 
 		if ( 200 !== $status_code ) {
-			return array(
-				'success' => false,
-				'error'   => $body['error']['message'] ?? 'Failed to update post visibility',
-			);
+			return new \WP_Error( 'api_error', $body['error']['message'] ?? 'Failed to update post visibility', array( 'status' => 500 ) );
 		}
 
 		return array(
@@ -279,7 +252,7 @@ class FacebookUpdateAbility {
 	 * @param string $post_id      Post ID.
 	 * @return array Result.
 	 */
-	private function deletePost( string $access_token, string $post_id ): array {
+	private function deletePost( string $access_token, string $post_id ): array|\WP_Error {
 		$url = self::GRAPH_API_URL . '/' . rawurlencode( $post_id );
 
 		$response = wp_remote_post(
@@ -294,10 +267,7 @@ class FacebookUpdateAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
@@ -313,9 +283,6 @@ class FacebookUpdateAbility {
 			);
 		}
 
-		return array(
-			'success' => false,
-			'error'   => $body['error']['message'] ?? 'Failed to delete post',
-		);
+		return new \WP_Error( 'api_error', $body['error']['message'] ?? 'Failed to delete post', array( 'status' => 500 ) );
 	}
 }

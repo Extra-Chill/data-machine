@@ -154,7 +154,7 @@ class PinterestBoardsAbility {
 	 * @param array $input Ability input.
 	 * @return array Response with boards.
 	 */
-	public static function execute_list_boards( array $input ): array {
+	public static function execute_list_boards( array $input ): array|\WP_Error {
 		$input;
 		return array(
 			'success' => true,
@@ -168,7 +168,7 @@ class PinterestBoardsAbility {
 	 * @param array $input Ability input.
 	 * @return array Response with status.
 	 */
-	public static function execute_status( array $input ): array {
+	public static function execute_status( array $input ): array|\WP_Error {
 		$input;
 		$status                  = self::get_sync_status();
 		$status['success']       = true;
@@ -181,23 +181,17 @@ class PinterestBoardsAbility {
 	 *
 	 * @return array Result with success, count, and boards.
 	 */
-	public static function sync_boards(): array {
+	public static function sync_boards(): array|\WP_Error {
 		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'pinterest' );
 
 		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return array(
-				'success' => false,
-				'error'   => 'Pinterest not authenticated',
-			);
+			return new \WP_Error( 'missing_auth', 'Pinterest not authenticated', array( 'status' => 401 ) );
 		}
 
 		$token = $provider->get_valid_access_token();
 		if ( empty( $token ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Pinterest access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings',
-			);
+			return new \WP_Error( 'missing_auth', 'Pinterest access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings', array( 'status' => 401 ) );
 		}
 
 		$all_boards = array();
@@ -250,7 +244,7 @@ class PinterestBoardsAbility {
 	 *
 	 * @return array Array of cached boards.
 	 */
-	public static function get_cached_boards(): array {
+	public static function get_cached_boards(): array|\WP_Error {
 		return get_option( self::BOARDS_OPTION, array() );
 	}
 
@@ -259,7 +253,7 @@ class PinterestBoardsAbility {
 	 *
 	 * @return array Board count and last synced timestamp.
 	 */
-	public static function get_sync_status(): array {
+	public static function get_sync_status(): array|\WP_Error {
 		$boards = self::get_cached_boards();
 		$synced = get_option( self::BOARDS_SYNCED_OPTION, 0 );
 

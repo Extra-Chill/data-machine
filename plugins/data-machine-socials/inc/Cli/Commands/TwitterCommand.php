@@ -58,8 +58,8 @@ class TwitterCommand {
 			'pagination_token' => $assoc_args['pagination-token'] ?? '',
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		$data   = $result['data'];
@@ -124,8 +124,8 @@ class TwitterCommand {
 			'tweet_id' => $tweet_id,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		$data   = $result['data'];
@@ -179,8 +179,8 @@ class TwitterCommand {
 			'limit'  => absint( $assoc_args['limit'] ?? 25 ),
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		$data     = $result['data'];
@@ -270,8 +270,8 @@ class TwitterCommand {
 			'tweet_id' => $tweet_id,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Tweet deleted successfully!' );
@@ -300,8 +300,8 @@ class TwitterCommand {
 			'tweet_id' => $tweet_id,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Retweeted successfully!' );
@@ -328,8 +328,8 @@ class TwitterCommand {
 			'tweet_id' => $tweet_id,
 		) );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Tweet liked successfully!' );
@@ -409,8 +409,8 @@ class TwitterCommand {
 
 		$result = \DataMachineSocials\Abilities\Twitter\TwitterPublishAbility::execute_publish( $input );
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
 		WP_CLI::success( 'Published to Twitter!' );
@@ -424,10 +424,6 @@ class TwitterCommand {
 	}
 
 	private function get_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/twitter-read' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/twitter-read ability not registered.' );
@@ -437,10 +433,6 @@ class TwitterCommand {
 	}
 
 	private function get_update_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/twitter-update' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/twitter-update ability not registered.' );
@@ -450,10 +442,6 @@ class TwitterCommand {
 	}
 
 	private function get_delete_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/twitter-delete' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/twitter-delete ability not registered.' );
@@ -463,10 +451,6 @@ class TwitterCommand {
 	}
 
 	private function get_publish_ability() {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			WP_CLI::error( 'WordPress Abilities API not available (requires WP 6.9+).' );
-		}
-
 		$ability = wp_get_ability( 'datamachine/twitter-publish' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/twitter-publish ability not registered.' );

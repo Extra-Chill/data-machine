@@ -106,31 +106,22 @@ class InstagramUpdateAbility {
 	 * @param array $input Input parameters.
 	 * @return array Result.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? '';
 
 		// Get auth provider.
 		$auth = $this->getAuthProvider();
 		if ( ! $auth ) {
-			return array(
-				'success' => false,
-				'error'   => 'Instagram auth provider not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Instagram auth provider not available', array( 'status' => 401 ) );
 		}
 
 		$access_token = $auth->get_valid_access_token();
 		if ( empty( $access_token ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Instagram access token unavailable (expired or refresh failed)',
-			);
+			return new \WP_Error( 'missing_auth', 'Instagram access token unavailable (expired or refresh failed)', array( 'status' => 401 ) );
 		}
 
 		if ( empty( $input['media_id'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'media_id is required',
-			);
+			return new \WP_Error( 'missing_param', 'media_id is required', array( 'status' => 400 ) );
 		}
 
 		$media_id = $input['media_id'];
@@ -138,10 +129,7 @@ class InstagramUpdateAbility {
 		switch ( $action ) {
 			case 'edit':
 				if ( empty( $input['caption'] ) ) {
-					return array(
-						'success' => false,
-						'error'   => 'caption is required for edit action',
-					);
+					return new \WP_Error( 'missing_param', 'caption is required for edit action', array( 'status' => 400 ) );
 				}
 				return $this->editCaption( $access_token, $media_id, $input['caption'] );
 
@@ -152,10 +140,7 @@ class InstagramUpdateAbility {
 				return $this->archiveMedia( $access_token, $media_id );
 
 			default:
-				return array(
-					'success' => false,
-					'error'   => "Unknown action: {$action}. Use edit, delete, or archive.",
-				);
+				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use edit, delete, or archive.", array( 'status' => 500 ) );
 		}
 	}
 
@@ -187,7 +172,7 @@ class InstagramUpdateAbility {
 	 * @param string $caption       New caption.
 	 * @return array Result.
 	 */
-	private function editCaption( string $access_token, string $media_id, string $caption ): array {
+	private function editCaption( string $access_token, string $media_id, string $caption ): array|\WP_Error {
 		// Truncate to max length.
 		if ( mb_strlen( $caption ) > self::MAX_CAPTION_LENGTH ) {
 			$caption = mb_substr( $caption, 0, self::MAX_CAPTION_LENGTH - 3 ) . '...';
@@ -207,20 +192,14 @@ class InstagramUpdateAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
 		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
 
 		if ( 200 !== $status_code ) {
-			return array(
-				'success' => false,
-				'error'   => $body['error']['message'] ?? 'Failed to edit caption',
-			);
+			return new \WP_Error( 'api_error', $body['error']['message'] ?? 'Failed to edit caption', array( 'status' => 500 ) );
 		}
 
 		return array(
@@ -239,7 +218,7 @@ class InstagramUpdateAbility {
 	 * @param string $media_id      Media ID.
 	 * @return array Result.
 	 */
-	private function deleteMedia( string $access_token, string $media_id ): array {
+	private function deleteMedia( string $access_token, string $media_id ): array|\WP_Error {
 		$url = self::GRAPH_API_URL . '/' . rawurlencode( $media_id );
 
 		$response = wp_remote_post(
@@ -258,10 +237,7 @@ class InstagramUpdateAbility {
 		// For now, return an error with guidance.
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
@@ -279,10 +255,7 @@ class InstagramUpdateAbility {
 
 		// Instagram doesn't support direct delete via API for all media types.
 		// Return informative error.
-		return array(
-			'success' => false,
-			'error'   => $body['error']['message'] ?? 'Delete not supported for this media type via API. Consider archiving instead.',
-		);
+		return new \WP_Error( 'api_error', $body['error']['message'] ?? 'Delete not supported for this media type via API. Consider archiving instead.', array( 'status' => 500 ) );
 	}
 
 	/**
@@ -292,7 +265,7 @@ class InstagramUpdateAbility {
 	 * @param string $media_id      Media ID.
 	 * @return array Result.
 	 */
-	private function archiveMedia( string $access_token, string $media_id ): array {
+	private function archiveMedia( string $access_token, string $media_id ): array|\WP_Error {
 		$url = self::GRAPH_API_URL . '/' . rawurlencode( $media_id );
 
 		$response = wp_remote_post(
@@ -307,20 +280,14 @@ class InstagramUpdateAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
 		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
 
 		if ( 200 !== $status_code ) {
-			return array(
-				'success' => false,
-				'error'   => $body['error']['message'] ?? 'Failed to archive media',
-			);
+			return new \WP_Error( 'api_error', $body['error']['message'] ?? 'Failed to archive media', array( 'status' => 500 ) );
 		}
 
 		return array(

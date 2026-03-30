@@ -83,30 +83,21 @@ class BlueskyUpdateAbility {
 		return PermissionHelper::can_manage();
 	}
 
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? '';
 
 		$auth = $this->getAuthProvider();
 		if ( ! $auth ) {
-			return array(
-				'success' => false,
-				'error'   => 'Bluesky auth provider not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Bluesky auth provider not available', array( 'status' => 401 ) );
 		}
 
 		$session = $auth->get_session();
 		if ( empty( $session['accessJwt'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Bluesky session not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Bluesky session not available', array( 'status' => 401 ) );
 		}
 
 		if ( empty( $input['post_uri'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'post_uri is required',
-			);
+			return new \WP_Error( 'missing_param', 'post_uri is required', array( 'status' => 400 ) );
 		}
 
 		$post_uri = $input['post_uri'];
@@ -122,10 +113,7 @@ class BlueskyUpdateAbility {
 				return $this->unlikePost( $session);
 
 			default:
-				return array(
-					'success' => false,
-					'error'   => "Unknown action: {$action}. Use delete, like, or unlike.",
-				);
+				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use delete, like, or unlike.", array( 'status' => 500 ) );
 		}
 	}
 
@@ -144,7 +132,7 @@ class BlueskyUpdateAbility {
 		return $provider;
 	}
 
-	private function deletePost( array $session, string $post_uri ): array {
+	private function deletePost( array $session, string $post_uri ): array|\WP_Error {
 		$pds_url = $session['pds_url'];
 		$did     = $session['did'];
 
@@ -174,10 +162,7 @@ class BlueskyUpdateAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
@@ -193,13 +178,10 @@ class BlueskyUpdateAbility {
 		}
 
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
-		return array(
-			'success' => false,
-			'error'   => $body['error'] ?? 'Failed to delete post',
-		);
+		return new \WP_Error( 'api_error', $body['error'] ?? 'Failed to delete post', array( 'status' => 500 ) );
 	}
 
-	private function likePost( array $session, string $post_uri ): array {
+	private function likePost( array $session, string $post_uri ): array|\WP_Error {
 		$pds_url = $session['pds_url'];
 		$did     = $session['did'];
 
@@ -228,10 +210,7 @@ class BlueskyUpdateAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
@@ -248,21 +227,15 @@ class BlueskyUpdateAbility {
 			);
 		}
 
-		return array(
-			'success' => false,
-			'error'   => $body['error'] ?? 'Failed to like post',
-		);
+		return new \WP_Error( 'api_error', $body['error'] ?? 'Failed to like post', array( 'status' => 500 ) );
 	}
 
-	private function unlikePost( array $session): array {
+	private function unlikePost( array $session): array|\WP_Error {
 		$pds_url = $session['pds_url'];
 		$did     = $session['did'];
 
 		// Unlike requires the like URI which we don't have stored.
 		// This is a limitation - user would need to query likes first.
-		return array(
-			'success' => false,
-			'error'   => 'Unlike requires the like URI. Query likes first to get the like record to delete.',
-		);
+		return new \WP_Error( 'api_error', 'Unlike requires the like URI. Query likes first to get the like record to delete.', array( 'status' => 500 ) );
 	}
 }

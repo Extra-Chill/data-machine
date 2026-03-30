@@ -79,28 +79,19 @@ class ThreadsDeleteAbility {
 		return PermissionHelper::can_manage();
 	}
 
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$auth = $this->getAuthProvider();
 		if ( ! $auth ) {
-			return array(
-				'success' => false,
-				'error'   => 'Threads auth provider not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Threads auth provider not available', array( 'status' => 401 ) );
 		}
 
 		$access_token = $auth->get_valid_access_token();
 		if ( empty( $access_token ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Threads access token unavailable',
-			);
+			return new \WP_Error( 'missing_auth', 'Threads access token unavailable', array( 'status' => 401 ) );
 		}
 
 		if ( empty( $input['thread_id'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'thread_id is required',
-			);
+			return new \WP_Error( 'missing_param', 'thread_id is required', array( 'status' => 400 ) );
 		}
 
 		$url = self::GRAPH_API_URL . '/' . rawurlencode( $input['thread_id'] );
@@ -116,10 +107,7 @@ class ThreadsDeleteAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
@@ -135,10 +123,7 @@ class ThreadsDeleteAbility {
 			);
 		}
 
-		return array(
-			'success' => false,
-			'error'   => $body['error']['message'] ?? 'Failed to delete thread',
-		);
+		return new \WP_Error( 'api_error', $body['error']['message'] ?? 'Failed to delete thread', array( 'status' => 500 ) );
 	}
 
 	private function getAuthProvider(): ?ThreadsAuth {

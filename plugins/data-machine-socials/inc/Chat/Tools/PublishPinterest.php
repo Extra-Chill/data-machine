@@ -141,7 +141,7 @@ class PublishPinterest extends BaseTool {
 		// Execute via the publish ability.
 		$result = \DataMachineSocials\Abilities\Pinterest\PinterestPublishAbility::execute_publish( $input );
 
-		if ( $result['success'] ) {
+		if ( ! is_wp_error( $result ) && $result['success'] ) {
 			return array(
 				'result'  => 'Pin published to Pinterest!',
 				'pin_id'  => $result['pin_id'] ?? '',
@@ -149,6 +149,6 @@ class PublishPinterest extends BaseTool {
 			);
 		}
 
-		return $this->buildErrorResponse( $result['error'] ?? 'Pinterest publish failed', $tool_name );
+		return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Pinterest publish failed' ), $tool_name );
 	}
 }

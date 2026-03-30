@@ -94,22 +94,16 @@ class LinkedInReadAbility {
 		return PermissionHelper::can_manage();
 	}
 
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? 'list';
 
 		$provider = $this->getAuthProvider();
 		if ( ! $provider ) {
-			return array(
-				'success' => false,
-				'error'   => 'LinkedIn auth provider not available',
-			);
+			return new \WP_Error( 'missing_auth', 'LinkedIn auth provider not available', array( 'status' => 401 ) );
 		}
 
 		if ( ! $provider->is_authenticated() ) {
-			return array(
-				'success' => false,
-				'error'   => 'LinkedIn not authenticated',
-			);
+			return new \WP_Error( 'missing_auth', 'LinkedIn not authenticated', array( 'status' => 401 ) );
 		}
 
 		switch ( $action ) {
@@ -118,18 +112,12 @@ class LinkedInReadAbility {
 
 			case 'get':
 				if ( empty( $input['post_id'] ) ) {
-					return array(
-						'success' => false,
-						'error'   => 'post_id is required for the get action',
-					);
+					return new \WP_Error( 'missing_param', 'post_id is required for the get action', array( 'status' => 400 ) );
 				}
 				return $this->getPost( $provider, $input['post_id'] );
 
 			default:
-				return array(
-					'success' => false,
-					'error'   => "Unknown action: {$action}. Use list or get.",
-				);
+				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use list or get.", array( 'status' => 500 ) );
 		}
 	}
 
@@ -140,13 +128,10 @@ class LinkedInReadAbility {
 	 * @param array        $input    Input parameters.
 	 * @return array Response.
 	 */
-	private function listPosts( LinkedInAuth $provider, array $input ): array {
+	private function listPosts( LinkedInAuth $provider, array $input ): array|\WP_Error {
 		$person_urn = $provider->get_person_urn();
 		if ( empty( $person_urn ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'LinkedIn person URN not available. Try re-authenticating.',
-			);
+			return new \WP_Error( 'missing_auth', 'LinkedIn person URN not available. Try re-authenticating.', array( 'status' => 401 ) );
 		}
 
 		$count = min( absint( $input['limit'] ?? 10 ), 100 );
@@ -165,10 +150,7 @@ class LinkedInReadAbility {
 		);
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => $result['error'] ?? 'Failed to fetch LinkedIn posts',
-			);
+			return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to fetch LinkedIn posts', array( 'status' => 500 ) );
 		}
 
 		$data     = json_decode( $result['data'], true );
@@ -208,7 +190,7 @@ class LinkedInReadAbility {
 	 * @param string       $post_id  Post URN.
 	 * @return array Response.
 	 */
-	private function getPost( LinkedInAuth $provider, string $post_id ): array {
+	private function getPost( LinkedInAuth $provider, string $post_id ): array|\WP_Error {
 		$encoded_id = rawurlencode( $post_id );
 		$url        = LinkedInAuth::API_BASE . "/rest/posts/{$encoded_id}";
 
@@ -219,10 +201,7 @@ class LinkedInReadAbility {
 		);
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => $result['error'] ?? 'Failed to fetch LinkedIn post',
-			);
+			return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to fetch LinkedIn post', array( 'status' => 500 ) );
 		}
 
 		$data = json_decode( $result['data'], true );

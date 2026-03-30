@@ -125,23 +125,17 @@ class PinterestAnalyticsAbility {
 		return PermissionHelper::can_manage();
 	}
 
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? 'user';
 
 		$auth = $this->getAuthProvider();
 		if ( ! $auth ) {
-			return array(
-				'success' => false,
-				'error'   => 'Pinterest auth provider not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Pinterest auth provider not available', array( 'status' => 401 ) );
 		}
 
 		$token = $auth->get_valid_access_token();
 		if ( empty( $token ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Pinterest access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings',
-			);
+			return new \WP_Error( 'missing_auth', 'Pinterest access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings', array( 'status' => 401 ) );
 		}
 
 		// Parse date range
@@ -150,10 +144,7 @@ class PinterestAnalyticsAbility {
 
 		// Validate date format
 		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $start_date ) || ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $end_date ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Invalid date format. Use YYYY-MM-DD.',
-			);
+			return new \WP_Error( 'missing_param', 'Invalid date format. Use YYYY-MM-DD.', array( 'status' => 400 ) );
 		}
 
 		// Parse metrics (default to key engagement metrics)
@@ -177,27 +168,18 @@ class PinterestAnalyticsAbility {
 
 			case 'pin':
 				if ( empty( $input['pin_id'] ) ) {
-					return array(
-						'success' => false,
-						'error'   => 'pin_id is required for the pin action',
-					);
+					return new \WP_Error( 'missing_param', 'pin_id is required for the pin action', array( 'status' => 400 ) );
 				}
 				return $this->getPinAnalytics( $token, $input['pin_id'], $start_date, $end_date, $metrics_param );
 
 			case 'board':
 				if ( empty( $input['board_id'] ) ) {
-					return array(
-						'success' => false,
-						'error'   => 'board_id is required for the board action',
-					);
+					return new \WP_Error( 'missing_param', 'board_id is required for the board action', array( 'status' => 400 ) );
 				}
 				return $this->getBoardAnalytics( $token, $input['board_id'], $start_date, $end_date, $metrics_param );
 
 			default:
-				return array(
-					'success' => false,
-					'error'   => "Unknown action: {$action}. Use user, pin, or board.",
-				);
+				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use user, pin, or board.", array( 'status' => 500 ) );
 		}
 	}
 
@@ -210,7 +192,7 @@ class PinterestAnalyticsAbility {
 	 * @param string $metrics_param Comma-separated metric types.
 	 * @return array
 	 */
-	private function getUserAnalytics( string $token, string $start_date, string $end_date, string $metrics_param ): array {
+	private function getUserAnalytics( string $token, string $start_date, string $end_date, string $metrics_param ): array|\WP_Error {
 		$params = array(
 			'start_date'           => $start_date,
 			'end_date'             => $end_date,
@@ -230,10 +212,7 @@ class PinterestAnalyticsAbility {
 		);
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => 'Pinterest API request failed: ' . ( $result['error'] ?? 'unknown' ),
-			);
+			return new \WP_Error( 'api_error', 'Pinterest API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
 		}
 
 		$data      = json_decode( $result['data'], true );
@@ -241,10 +220,7 @@ class PinterestAnalyticsAbility {
 
 		if ( 200 !== $http_code || isset( $data['code'] ) ) {
 			$error_msg = $data['message'] ?? 'Failed to fetch user analytics';
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		// Build summary
@@ -267,7 +243,7 @@ class PinterestAnalyticsAbility {
 	 * @param string $metrics_param Comma-separated metric types.
 	 * @return array
 	 */
-	private function getPinAnalytics( string $token, string $pin_id, string $start_date, string $end_date, string $metrics_param ): array {
+	private function getPinAnalytics( string $token, string $pin_id, string $start_date, string $end_date, string $metrics_param ): array|\WP_Error {
 		$params = array(
 			'start_date'   => $start_date,
 			'end_date'     => $end_date,
@@ -285,10 +261,7 @@ class PinterestAnalyticsAbility {
 		);
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => 'Pinterest API request failed: ' . ( $result['error'] ?? 'unknown' ),
-			);
+			return new \WP_Error( 'api_error', 'Pinterest API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
 		}
 
 		$data      = json_decode( $result['data'], true );
@@ -296,10 +269,7 @@ class PinterestAnalyticsAbility {
 
 		if ( 200 !== $http_code || isset( $data['code'] ) ) {
 			$error_msg = $data['message'] ?? 'Failed to fetch pin analytics';
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		// Build summary
@@ -323,7 +293,7 @@ class PinterestAnalyticsAbility {
 	 * @param string $metrics_param Comma-separated metric types.
 	 * @return array
 	 */
-	private function getBoardAnalytics( string $token, string $board_id, string $start_date, string $end_date, string $metrics_param ): array {
+	private function getBoardAnalytics( string $token, string $board_id, string $start_date, string $end_date, string $metrics_param ): array|\WP_Error {
 		$params = array(
 			'start_date'   => $start_date,
 			'end_date'     => $end_date,
@@ -341,10 +311,7 @@ class PinterestAnalyticsAbility {
 		);
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => 'Pinterest API request failed: ' . ( $result['error'] ?? 'unknown' ),
-			);
+			return new \WP_Error( 'api_error', 'Pinterest API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
 		}
 
 		$data      = json_decode( $result['data'], true );
@@ -352,10 +319,7 @@ class PinterestAnalyticsAbility {
 
 		if ( 200 !== $http_code || isset( $data['code'] ) ) {
 			$error_msg = $data['message'] ?? 'Failed to fetch board analytics';
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		// Build summary
@@ -378,7 +342,7 @@ class PinterestAnalyticsAbility {
 	 * @param array $data Raw analytics data from Pinterest API.
 	 * @return array Summarized metrics.
 	 */
-	private function buildSummary( array $data ): array {
+	private function buildSummary( array $data ): array|\WP_Error {
 		$summary = array();
 
 		foreach ( self::METRIC_TYPES as $metric ) {

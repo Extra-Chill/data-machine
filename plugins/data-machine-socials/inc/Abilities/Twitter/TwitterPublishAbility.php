@@ -144,35 +144,26 @@ class TwitterPublishAbility {
 	 * @param array $input Ability input with publish parameters.
 	 * @return array Response with tweet details or error.
 	 */
-	public static function execute_publish( array $input ): array {
+	public static function execute_publish( array $input ): array|\WP_Error {
 		$content       = $input['content'] ?? '';
 		$media_path    = $input['media_path'] ?? $input['image_path'] ?? '';
 		$source_url    = $input['source_url'] ?? '';
 		$link_handling = $input['link_handling'] ?? 'append';
 
 		if ( empty( $content ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Content is required',
-			);
+			return new \WP_Error( 'missing_param', 'Content is required', array( 'status' => 400 ) );
 		}
 
 		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'twitter' );
 
 		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return array(
-				'success' => false,
-				'error'   => 'Twitter not authenticated',
-			);
+			return new \WP_Error( 'missing_auth', 'Twitter not authenticated', array( 'status' => 401 ) );
 		}
 
 		$connection = $provider->get_connection();
 		if ( is_wp_error( $connection ) ) {
-			return array(
-				'success' => false,
-				'error'   => $connection->get_error_message(),
-			);
+			return new \WP_Error( 'api_error', $connection->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		// Format tweet text with link handling
@@ -188,10 +179,7 @@ class TwitterPublishAbility {
 			if ( ! empty( $media_path ) && file_exists( $media_path ) ) {
 				$media_id = self::upload_media( $connection, $media_path );
 				if ( ! $media_id ) {
-					return array(
-						'success' => false,
-						'error'   => 'Failed to upload media',
-					);
+					return new \WP_Error( 'api_error', 'Failed to upload media', array( 'status' => 500 ) );
 				}
 			}
 
@@ -230,15 +218,9 @@ class TwitterPublishAbility {
 				$error_msg = $response->title;
 			}
 
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		} catch ( \Exception $e ) {
-			return array(
-				'success' => false,
-				'error'   => $e->getMessage(),
-			);
+			return new \WP_Error( 'api_error', $e->getMessage(), array( 'status' => 500 ) );
 		}
 	}
 
@@ -248,16 +230,13 @@ class TwitterPublishAbility {
 	 * @param array $input Ability input.
 	 * @return array Account details or error.
 	 */
-	public static function get_account( array $input ): array {
+	public static function get_account( array $input ): array|\WP_Error {
 		$input;
 		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'twitter' );
 
 		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return array(
-				'success' => false,
-				'error'   => 'Twitter not authenticated',
-			);
+			return new \WP_Error( 'missing_auth', 'Twitter not authenticated', array( 'status' => 401 ) );
 		}
 
 		$account = $provider->get_account_details();
@@ -420,7 +399,7 @@ class TwitterPublishAbility {
 	 * @param string $screen_name Twitter screen name.
 	 * @return array Reply tweet details.
 	 */
-	private static function post_reply( $connection, string $original_tweet_id, string $source_url, string $screen_name ): array {
+	private static function post_reply( $connection, string $original_tweet_id, string $source_url, string $screen_name ): array|\WP_Error {
 		try {
 			$reply_payload = array(
 				'text'  => $source_url,
@@ -443,15 +422,9 @@ class TwitterPublishAbility {
 				);
 			}
 
-			return array(
-				'success' => false,
-				'error'   => 'Failed to post reply',
-			);
+			return new \WP_Error( 'api_error', 'Failed to post reply', array( 'status' => 500 ) );
 		} catch ( \Exception $e ) {
-			return array(
-				'success' => false,
-				'error'   => $e->getMessage(),
-			);
+			return new \WP_Error( 'api_error', $e->getMessage(), array( 'status' => 500 ) );
 		}
 	}
 }

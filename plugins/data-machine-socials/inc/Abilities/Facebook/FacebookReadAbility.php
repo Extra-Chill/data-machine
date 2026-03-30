@@ -97,24 +97,18 @@ class FacebookReadAbility {
 		return PermissionHelper::can_manage();
 	}
 
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? 'list';
 
 		$auth = $this->getAuthProvider();
 		if ( ! $auth ) {
-			return array(
-				'success' => false,
-				'error'   => 'Facebook auth provider not available',
-			);
+			return new \WP_Error( 'missing_auth', 'Facebook auth provider not available', array( 'status' => 401 ) );
 		}
 
 		// Facebook uses page_access_token for page operations.
 		$page_token = $auth->get_page_access_token();
 		if ( empty( $page_token ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Facebook page access token unavailable (expired or refresh failed)',
-			);
+			return new \WP_Error( 'missing_auth', 'Facebook page access token unavailable (expired or refresh failed)', array( 'status' => 401 ) );
 		}
 
 		switch ( $action ) {
@@ -123,37 +117,25 @@ class FacebookReadAbility {
 
 			case 'get':
 				if ( empty( $input['post_id'] ) ) {
-					return array(
-						'success' => false,
-						'error'   => 'post_id is required for the get action',
-					);
+					return new \WP_Error( 'missing_param', 'post_id is required for the get action', array( 'status' => 400 ) );
 				}
 				return $this->getPost( $page_token, $input['post_id'] );
 
 			case 'comments':
 				if ( empty( $input['post_id'] ) ) {
-					return array(
-						'success' => false,
-						'error'   => 'post_id is required for the comments action',
-					);
+					return new \WP_Error( 'missing_param', 'post_id is required for the comments action', array( 'status' => 400 ) );
 				}
 				return $this->getComments( $page_token, $input['post_id'], $input );
 
 			default:
-				return array(
-					'success' => false,
-					'error'   => "Unknown action: {$action}. Use list, get, or comments.",
-				);
+				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use list, get, or comments.", array( 'status' => 500 ) );
 		}
 	}
 
-	private function listPosts( FacebookAuth $auth, string $page_token, array $input ): array {
+	private function listPosts( FacebookAuth $auth, string $page_token, array $input ): array|\WP_Error {
 		$page_id = $auth->get_page_id();
 		if ( empty( $page_id ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Facebook Page ID not available. Try re-authenticating.',
-			);
+			return new \WP_Error( 'missing_auth', 'Facebook Page ID not available. Try re-authenticating.', array( 'status' => 401 ) );
 		}
 
 		$limit  = min( absint( $input['limit'] ?? 25 ), 100 );
@@ -171,10 +153,7 @@ class FacebookReadAbility {
 		$result = HttpClient::get( $url, array( 'context' => 'Facebook Read' ) );
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => 'Facebook API request failed: ' . ( $result['error'] ?? 'unknown' ),
-			);
+			return new \WP_Error( 'api_error', 'Facebook API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
 		}
 
 		$data      = json_decode( $result['data'], true );
@@ -182,10 +161,7 @@ class FacebookReadAbility {
 
 		if ( 200 !== $http_code || isset( $data['error'] ) ) {
 			$error_msg = $data['error']['message'] ?? 'Failed to fetch Facebook posts';
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		$posts  = $data['data'] ?? array();
@@ -202,7 +178,7 @@ class FacebookReadAbility {
 		);
 	}
 
-	private function getPost( string $page_token, string $post_id ): array {
+	private function getPost( string $page_token, string $post_id ): array|\WP_Error {
 		$params = array(
 			'fields'       => self::DETAIL_FIELDS,
 			'access_token' => $page_token,
@@ -212,10 +188,7 @@ class FacebookReadAbility {
 		$result = HttpClient::get( $url, array( 'context' => 'Facebook Read' ) );
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => 'Facebook API request failed: ' . ( $result['error'] ?? 'unknown' ),
-			);
+			return new \WP_Error( 'api_error', 'Facebook API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
 		}
 
 		$data      = json_decode( $result['data'], true );
@@ -223,10 +196,7 @@ class FacebookReadAbility {
 
 		if ( 200 !== $http_code || isset( $data['error'] ) ) {
 			$error_msg = $data['error']['message'] ?? 'Failed to fetch Facebook post details';
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		return array(
@@ -235,7 +205,7 @@ class FacebookReadAbility {
 		);
 	}
 
-	private function getComments( string $page_token, string $post_id, array $input ): array {
+	private function getComments( string $page_token, string $post_id, array $input ): array|\WP_Error {
 		$limit  = min( absint( $input['limit'] ?? 25 ), 100 );
 		$params = array(
 			'fields'       => 'id,message,created_time,from,like_count',
@@ -251,10 +221,7 @@ class FacebookReadAbility {
 		$result = HttpClient::get( $url, array( 'context' => 'Facebook Read' ) );
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => 'Facebook API request failed: ' . ( $result['error'] ?? 'unknown' ),
-			);
+			return new \WP_Error( 'api_error', 'Facebook API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
 		}
 
 		$data      = json_decode( $result['data'], true );
@@ -262,10 +229,7 @@ class FacebookReadAbility {
 
 		if ( 200 !== $http_code || isset( $data['error'] ) ) {
 			$error_msg = $data['error']['message'] ?? 'Failed to fetch comments';
-			return array(
-				'success' => false,
-				'error'   => $error_msg,
-			);
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
 		}
 
 		$comments = $data['data'] ?? array();

@@ -94,10 +94,6 @@ class VoteReddit extends BaseTool {
 			);
 		}
 
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			return $this->buildErrorResponse( 'WordPress Abilities API not available', $tool_name );
-		}
-
 		$ability = wp_get_ability( 'datamachine/vote-reddit' );
 		if ( ! $ability ) {
 			return $this->buildErrorResponse( 'datamachine/vote-reddit ability not registered', $tool_name );
@@ -109,7 +105,7 @@ class VoteReddit extends BaseTool {
 			'access_token' => $access_token,
 		) );
 
-		if ( ! empty( $result['success'] ) ) {
+		if ( ! is_wp_error( $result ) && ! empty( $result['success'] ) ) {
 			$direction_labels = array(
 				1  => 'upvoted',
 				0  => 'unvoted',
@@ -124,6 +120,6 @@ class VoteReddit extends BaseTool {
 			);
 		}
 
-		return $this->buildErrorResponse( $result['error'] ?? 'Failed to vote on Reddit', $tool_name );
+		return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Failed to vote on Reddit' ), $tool_name );
 	}
 }
