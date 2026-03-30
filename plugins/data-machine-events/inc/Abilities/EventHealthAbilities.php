@@ -144,9 +144,9 @@ class EventHealthAbilities {
 	 * Execute health check.
 	 *
 	 * @param array $input Input parameters with optional 'scope', 'days_ahead', 'limit'
-	 * @return array Health check results with category counts and event lists
+	 * @return array|\WP_Error Health check results with category counts and event lists
 	 */
-	public function executeHealthCheck( array $input ): array {
+	public function executeHealthCheck( array $input ): array|\WP_Error {
 		$scope      = $input['scope'] ?? 'upcoming';
 		$days_ahead = (int) ( $input['days_ahead'] ?? self::DEFAULT_DAYS_AHEAD );
 		$limit      = (int) ( $input['limit'] ?? self::DEFAULT_LIMIT );
@@ -161,9 +161,7 @@ class EventHealthAbilities {
 		$events = $this->queryEvents( $scope, $days_ahead );
 
 		if ( is_wp_error( $events ) ) {
-			return array(
-				'error' => 'Failed to query events: ' . $events->get_error_message(),
-			);
+			return new \WP_Error( 'query_failed', 'Failed to query events: ' . $events->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		if ( empty( $events ) ) {

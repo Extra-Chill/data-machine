@@ -108,9 +108,9 @@ class SettingsAbilities {
 	 * Execute get-settings ability.
 	 *
 	 * @param array $input Input with optional 'key'.
-	 * @return array Settings data.
+	 * @return array|\WP_Error Settings data.
 	 */
-	public function executeGetSettings( array $input ): array {
+	public function executeGetSettings( array $input ): array|\WP_Error {
 		$settings = get_option( self::OPTION_KEY, self::DEFAULTS );
 		$settings = wp_parse_args( $settings, self::DEFAULTS );
 
@@ -118,7 +118,7 @@ class SettingsAbilities {
 
 		if ( ! empty( $key ) ) {
 			if ( ! array_key_exists( $key, $settings ) ) {
-				return array( 'error' => "Unknown setting key: {$key}" );
+				return new \WP_Error( 'unknown_setting_key', "Unknown setting key: {$key}", array( 'status' => 400 ) );
 			}
 			return array(
 				'key'   => $key,
@@ -176,34 +176,25 @@ class SettingsAbilities {
 	 * Execute update-setting ability.
 	 *
 	 * @param array $input Input with 'key' and 'value'.
-	 * @return array Result with old and new values.
+	 * @return array|\WP_Error Result with old and new values.
 	 */
-	public function executeUpdateSetting( array $input ): array {
+	public function executeUpdateSetting( array $input ): array|\WP_Error {
 		$key   = $input['key'] ?? '';
 		$value = $input['value'] ?? null;
 
 		if ( empty( $key ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Setting key is required.',
-			);
+			return new \WP_Error( 'missing_setting_key', 'Setting key is required.', array( 'status' => 400 ) );
 		}
 
 		if ( ! array_key_exists( $key, self::DEFAULTS ) ) {
-			return array(
-				'success' => false,
-				'error'   => "Unknown setting key: {$key}. Valid keys: " . implode( ', ', array_keys( self::DEFAULTS ) ),
-			);
+			return new \WP_Error( 'unknown_setting_key', "Unknown setting key: {$key}. Valid keys: " . implode( ', ', array_keys( self::DEFAULTS ) ), array( 'status' => 400 ) );
 		}
 
 		// Sanitize value based on the setting type.
 		$value = $this->sanitizeValue( $key, $value );
 
 		if ( is_wp_error( $value ) ) {
-			return array(
-				'success' => false,
-				'error'   => $value->get_error_message(),
-			);
+			return new \WP_Error( 'invalid_setting_value', $value->get_error_message(), array( 'status' => 400 ) );
 		}
 
 		$settings  = get_option( self::OPTION_KEY, self::DEFAULTS );
@@ -213,10 +204,7 @@ class SettingsAbilities {
 		$updated          = update_option( self::OPTION_KEY, $settings );
 
 		if ( ! $updated && $old_value !== $value ) {
-			return array(
-				'success' => false,
-				'error'   => "Failed to update setting '{$key}'.",
-			);
+			return new \WP_Error( 'update_failed', "Failed to update setting '{$key}'.", array( 'status' => 500 ) );
 		}
 
 		return array(

@@ -78,11 +78,11 @@ class DiceFmTest {
 		}
 	}
 
-	public function executeAbility( array $input ): array {
+	public function executeAbility( array $input ): array|\WP_Error {
 		$city = $input['city'] ?? '';
 
 		if ( empty( $city ) ) {
-			return $this->buildErrorResponse( 'Missing required city parameter.' );
+			return new \WP_Error( 'missing_city', 'Missing required city parameter.', array( 'status' => 400 ) );
 		}
 
 		return $this->test(
@@ -91,7 +91,7 @@ class DiceFmTest {
 		);
 	}
 
-	public function test( string $city, int $limit = 5 ): array {
+	public function test( string $city, int $limit = 5 ): array|\WP_Error {
 		$logs = array();
 		add_action(
 			'datamachine_log',
@@ -110,15 +110,7 @@ class DiceFmTest {
 		$api_config = $auth->get_account();
 
 		if ( empty( $api_config['api_key'] ) ) {
-			return array(
-				'success'         => false,
-				'status'          => 'error',
-				'api_config'      => array( 'api_key' => '***not configured***' ),
-				'api_response'    => null,
-				'events'          => array(),
-				'coverage_issues' => array( 'API key not configured' ),
-				'logs'            => $logs,
-			);
+			return new \WP_Error( 'api_key_not_configured', 'API key not configured', array( 'status' => 500 ) );
 		}
 
 		$base_url = 'https://partners-endpoint.dice.fm/api/v2/events';
@@ -155,37 +147,13 @@ class DiceFmTest {
 		);
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success'         => false,
-				'status'          => 'error',
-				'api_config'      => array(
-					'api_key'    => '***configured***',
-					'partner_id' => ! empty( $api_config['partner_id'] ) ? '***configured***' : '(not set)',
-					'city'       => $city,
-				),
-				'api_response'    => $api_response,
-				'events'          => array(),
-				'coverage_issues' => array( 'API request failed: ' . ( $result['error'] ?? 'Unknown error' ) ),
-				'logs'            => array_slice( $logs, -20 ),
-			);
+			return new \WP_Error( 'api_request_failed', 'API request failed: ' . ( $result['error'] ?? 'Unknown error' ), array( 'status' => 500 ) );
 		}
 
 		$data = json_decode( $result['data'], true );
 
 		if ( json_last_error() !== JSON_ERROR_NONE ) {
-			return array(
-				'success'         => false,
-				'status'          => 'error',
-				'api_config'      => array(
-					'api_key'    => '***configured***',
-					'partner_id' => ! empty( $api_config['partner_id'] ) ? '***configured***' : '(not set)',
-					'city'       => $city,
-				),
-				'api_response'    => $api_response,
-				'events'          => array(),
-				'coverage_issues' => array( 'Invalid JSON response from API' ),
-				'logs'            => array_slice( $logs, -20 ),
-			);
+			return new \WP_Error( 'invalid_json_response', 'Invalid JSON response from API', array( 'status' => 500 ) );
 		}
 
 		$raw_events                   = $data['data'] ?? array();
@@ -381,15 +349,7 @@ class DiceFmTest {
 		}
 	}
 
-	private function buildErrorResponse( string $message ): array {
-		return array(
-			'success'         => false,
-			'status'          => 'error',
-			'api_config'      => null,
-			'api_response'    => null,
-			'events'          => array(),
-			'coverage_issues' => array( $message ),
-			'logs'            => array(),
-		);
+	private function buildErrorResponse( string $message ): \WP_Error {
+		return new \WP_Error( 'test_error', $message, array( 'status' => 400 ) );
 	}
 }

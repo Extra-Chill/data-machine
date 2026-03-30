@@ -115,7 +115,7 @@ Key integration points:
 
 ### Available Abilities
 
-- **EventScraperTest**: Tests universal web scraper compatibility with a target URL. Ability: `datamachine/test-event-scraper`. Chat tool: `test_event_scraper`.
+- **EventScraperTest**: Tests universal web scraper compatibility with a target URL. Ability: `data-machine-events/test-event-scraper`. Chat tool: `test_event_scraper`.
 - **TimezoneAbilities**: Finds events with missing venue timezone and fixes them with geocoding support. Abilities: `data-machine-events/find-broken-timezone-events`, `data-machine-events/fix-event-timezone`. Chat tools: `find_broken_timezone_events`, `fix_event_timezone`.
 - **EventQueryAbilities**: Query events by venue with filtering options. Ability: `data-machine-events/get-venue-events`. Chat tool wrapper in `inc/Api/Chat/Tools/GetVenueEvents.php`.
 - **EventHealthAbilities**: Scans events for data quality issues (missing time, suspicious midnight, late night times, missing venue, etc.). Ability: `data-machine-events/event-health-check`. CLI wrapper: `wp data-machine-events health-check`.
@@ -153,7 +153,7 @@ Chat tools in `inc/Api/Chat/Tools` provide AI-driven venue and event management 
 
 ## WP-CLI Commands
 
-- **Test Event Scraper Command** (`wp data-machine-events test-event-scraper`): `inc/Cli/UniversalWebScraperTestCommand.php` runs the `WebScraper\\UniversalWebScraper` handler against a `--target_url`, creates a job record for context, prints a packet summary (structured vs HTML fallback), and can optionally run `EventUpsert` (`--upsert`) to validate end-to-end venue coverage. Aligns with ability (`datamachine/test-event-scraper`) and chat tool (`test_event_scraper`) naming.
+- **Test Event Scraper Command** (`wp data-machine-events test-event-scraper`): `inc/Cli/UniversalWebScraperTestCommand.php` runs the `WebScraper\\UniversalWebScraper` handler against a `--target_url`, creates a job record for context, prints a packet summary (structured vs HTML fallback), and can optionally run `EventUpsert` (`--upsert`) to validate end-to-end venue coverage. Aligns with ability (`data-machine-events/test-event-scraper`) and chat tool (`test_event_scraper`) naming.
 - **Get Venue Events Command**: `inc/Cli/GetVenueEventsCommand.php` queries events for a specific venue. Wraps `EventQueryAbilities::executeGetVenueEvents()`. Usage: `wp data-machine-events get-venue-events <venue>` or `--venue=<venue>`. Options: `--limit` (default 25, max 100), `--status` (any/publish/future/draft/pending/private), `--published_before`, `--published_after`.
 - **Health Check Command**: `inc/Cli/HealthCheckCommand.php` scans events for data quality issues. Wraps `EventHealthCheck` chat tool. Usage: `wp data-machine-events health-check`. Options: `--scope` (upcoming/all/past, default: upcoming), `--days_ahead` (default: 90), `--limit` (default: 25), `--category` (late_night_time/midnight_time/missing_time/suspicious_end_time/missing_venue/missing_description/broken_timezone), `--format` (table/json, default: table).
 - **Update Event Command**: `inc/Cli/UpdateEventCommand.php` updates event details. Wraps `UpdateEvent` chat tool. Usage: `wp data-machine-events update-event <event_ids> [--startTime=<time>]`. Accepts single ID or comma-separated IDs. Options: `--startDate`, `--startTime`, `--endDate`, `--endTime`, `--venue`, `--price`, `--ticketUrl`, `--performer`, `--performerType`, `--eventStatus`, `--eventType`, `--description`, `--format` (table/json, default: table).

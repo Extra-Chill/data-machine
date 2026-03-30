@@ -120,20 +120,16 @@ class EventQueryAbilities {
 		}
 	}
 
-	public function executeGetVenueEvents( array $input ): array {
+	public function executeGetVenueEvents( array $input ): array|\WP_Error {
 		$venue_identifier = $input['venue'] ?? null;
 
 		if ( empty( $venue_identifier ) ) {
-			return array(
-				'error' => 'venue parameter is required',
-			);
+			return new \WP_Error( 'missing_venue', 'venue parameter is required', array( 'status' => 400 ) );
 		}
 
 		$term = $this->resolveVenue( $venue_identifier );
 		if ( ! $term ) {
-			return array(
-				'error' => "Venue '{$venue_identifier}' not found",
-			);
+			return new \WP_Error( 'venue_not_found', "Venue '{$venue_identifier}' not found", array( 'status' => 404 ) );
 		}
 
 		$limit  = isset( $input['limit'] ) ? min( max( 1, (int) $input['limit'] ), self::MAX_LIMIT ) : self::DEFAULT_LIMIT;

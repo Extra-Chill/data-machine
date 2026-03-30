@@ -180,15 +180,13 @@ class EventUpdateAbilities {
 	 * Execute event update.
 	 *
 	 * @param array $input Input parameters with 'event' or 'events' and fields to update
-	 * @return array Update results with status for each event
+	 * @return array|\WP_Error Update results with status for each event
 	 */
-	public function executeUpdateEvent( array $input ): array {
+	public function executeUpdateEvent( array $input ): array|\WP_Error {
 		$events_to_update = $this->normalizeInput( $input );
 
 		if ( empty( $events_to_update ) ) {
-			return array(
-				'error' => 'Either "event" (single post ID) or "events" (array) parameter is required',
-			);
+			return new \WP_Error( 'missing_event', 'Either "event" (single post ID) or "events" (array) parameter is required', array( 'status' => 400 ) );
 		}
 
 		$results       = array();
@@ -294,6 +292,7 @@ class EventUpdateAbilities {
 				'error'   => 'Event details block not found in post content',
 			);
 		}
+
 
 		$existing_attrs = $blocks[ $block_index ]['attrs'] ?? array();
 		$new_attrs      = $this->buildUpdatedAttributes( $existing_attrs, $event_update, $updated_fields );

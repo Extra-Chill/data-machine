@@ -91,11 +91,11 @@ class TicketmasterTest {
 		}
 	}
 
-	public function executeAbility( array $input ): array {
+	public function executeAbility( array $input ): array|\WP_Error {
 		$classification_type = $input['classification_type'] ?? '';
 
 		if ( empty( $classification_type ) ) {
-			return $this->buildErrorResponse( 'Missing required classification_type parameter.' );
+			return new \WP_Error( 'missing_classification_type', 'Missing required classification_type parameter.', array( 'status' => 400 ) );
 		}
 
 		return $this->test(
@@ -113,7 +113,7 @@ class TicketmasterTest {
 		int $radius = 50,
 		string $venue_id = '',
 		int $limit = 5
-	): array {
+	): array|\WP_Error {
 		$logs = array();
 		add_action(
 			'datamachine_log',
@@ -132,34 +132,14 @@ class TicketmasterTest {
 		$api_config = $auth->get_account();
 
 		if ( empty( $api_config['api_key'] ) ) {
-			return array(
-				'success'         => false,
-				'status'          => 'error',
-				'api_config'      => array( 'api_key' => '***not configured***' ),
-				'api_response'    => null,
-				'events'          => array(),
-				'coverage_issues' => array( 'API key not configured' ),
-				'logs'            => $logs,
-			);
+			return new \WP_Error( 'api_key_not_configured', 'API key not configured', array( 'status' => 500 ) );
 		}
 
 		$classifications = Ticketmaster::get_classifications( $api_config['api_key'] );
 
 		if ( ! isset( $classifications[ $classification_type ] ) ) {
 			$valid_types = array_keys( $classifications );
-			return array(
-				'success'         => false,
-				'status'          => 'error',
-				'api_config'      => array(
-					'api_key'               => '***configured***',
-					'classification_type'   => $classification_type,
-					'valid_classifications' => $valid_types,
-				),
-				'api_response'    => null,
-				'events'          => array(),
-				'coverage_issues' => array( 'Invalid classification_type. Valid: ' . implode( ', ', $valid_types ) ),
-				'logs'            => $logs,
-			);
+			return new \WP_Error( 'invalid_classification_type', 'Invalid classification_type. Valid: ' . implode( ', ', $valid_types ), array( 'status' => 400 ) );
 		}
 
 		$segment_name = $classifications[ $classification_type ];
@@ -202,22 +182,7 @@ class TicketmasterTest {
 		);
 
 		if ( ! $result['success'] ) {
-			return array(
-				'success'         => false,
-				'status'          => 'error',
-				'api_config'      => array(
-					'api_key'             => '***configured***',
-					'classification_type' => $classification_type,
-					'segment_name'        => $segment_name,
-					'location'            => $location,
-					'radius'              => $radius,
-					'venue_id'            => $venue_id,
-				),
-				'api_response'    => $api_response,
-				'events'          => array(),
-				'coverage_issues' => array( 'API request failed: ' . ( $result['error'] ?? 'Unknown error' ) ),
-				'logs'            => array_slice( $logs, -20 ),
-			);
+			return new \WP_Error( 'api_request_failed', 'API request failed: ' . ( $result['error'] ?? 'Unknown error' ), array( 'status' => 500 ) );
 		}
 
 		$data       = json_decode( $result['data'], true );
@@ -360,15 +325,7 @@ class TicketmasterTest {
 		);
 	}
 
-	private function buildErrorResponse( string $message ): array {
-		return array(
-			'success'         => false,
-			'status'          => 'error',
-			'api_config'      => null,
-			'api_response'    => null,
-			'events'          => array(),
-			'coverage_issues' => array( $message ),
-			'logs'            => array(),
-		);
+	private function buildErrorResponse( string $message ): \WP_Error {
+		return new \WP_Error( 'test_error', $message, array( 'status' => 400 ) );
 	}
 }

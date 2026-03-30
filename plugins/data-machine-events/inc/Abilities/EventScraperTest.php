@@ -24,7 +24,7 @@ class EventScraperTest {
 		if ( ! self::$registered ) {
 			$register_callback = function () {
 				wp_register_ability(
-					'datamachine/test-event-scraper',
+					'data-machine-events/test-event-scraper',
 					array(
 						'label'               => __( 'Test Event Scraper', 'data-machine-events' ),
 						'description'         => __( 'Test universal web scraper compatibility with a target URL', 'data-machine-events' ),
@@ -75,17 +75,17 @@ class EventScraperTest {
 		}
 	}
 
-	public function executeAbility( array $input ): array {
+	public function executeAbility( array $input ): array|\WP_Error {
 		$target_url = $input['target_url'] ?? '';
 
 		if ( empty( $target_url ) ) {
-			return $this->buildErrorResponse( 'Missing required target_url parameter.' );
+			return new \WP_Error( 'missing_target_url', 'Missing required target_url parameter.', array( 'status' => 400 ) );
 		}
 
 		return $this->test( $target_url );
 	}
 
-	public function test( string $target_url ): array {
+	public function test( string $target_url ): array|\WP_Error {
 		$logs = array();
 		add_action(
 			'datamachine_log',
@@ -119,17 +119,9 @@ class EventScraperTest {
 					}
 				)
 			);
+			$warning_messages = array_map( fn( $w ) => $w['message'], $warnings );
 
-			return array(
-				'success'         => false,
-				'status'          => 'error',
-				'target_url'      => $target_url,
-				'event_data'      => null,
-				'extraction_info' => null,
-				'coverage_issues' => null,
-				'warnings'        => array_map( fn( $w ) => $w['message'], $warnings ),
-				'logs'            => array_slice( $logs, -20 ),
-			);
+			return new \WP_Error( 'scraper_failed', 'Scraper returned no results. ' . implode( '; ', $warning_messages ), array( 'status' => 500 ) );
 		}
 
 		$packet       = $results[0];
@@ -208,21 +200,7 @@ class EventScraperTest {
 		}
 
 		if ( ! is_array( $event ) ) {
-			return array(
-				'success'         => false,
-				'status'          => 'error',
-				'target_url'      => $target_url,
-				'event_data'      => null,
-				'extraction_info' => array_merge(
-					$extraction_info,
-					array(
-						'payload_type' => 'unknown',
-					)
-				),
-				'coverage_issues' => null,
-				'warnings'        => array( 'Payload did not contain an event object.' ),
-				'logs'            => array_slice( $logs, -20 ),
-			);
+			return new \WP_Error( 'no_event_data', 'Payload did not contain an event object.', array( 'status' => 500 ) );
 		}
 
 		$event_data = array(
@@ -316,16 +294,7 @@ class EventScraperTest {
 		);
 	}
 
-	private function buildErrorResponse( string $message ): array {
-		return array(
-			'success'         => false,
-			'status'          => 'error',
-			'target_url'      => '',
-			'event_data'      => null,
-			'extraction_info' => null,
-			'coverage_issues' => null,
-			'warnings'        => array( $message ),
-			'logs'            => array(),
-		);
+	private function buildErrorResponse( string $message ): \WP_Error {
+		return new \WP_Error( 'test_error', $message, array( 'status' => 400 ) );
 	}
 }

@@ -106,13 +106,13 @@ class GeocodingAbilities {
 	 * Execute geocode-address ability.
 	 *
 	 * @param array $input Input with 'query' string.
-	 * @return array Result with lat, lng, display_name, cached.
+	 * @return array|\WP_Error Result with lat, lng, display_name, cached.
 	 */
-	public function executeGeocodeAddress( array $input ): array {
+	public function executeGeocodeAddress( array $input ): array|\WP_Error {
 		$query = trim( $input['query'] ?? '' );
 
 		if ( empty( $query ) || strlen( $query ) < 3 ) {
-			return array( 'error' => 'Query must be at least 3 characters.' );
+			return new \WP_Error( 'invalid_query', 'Query must be at least 3 characters.', array( 'status' => 400 ) );
 		}
 
 		// Sanitize
@@ -132,7 +132,7 @@ class GeocodingAbilities {
 		$coordinates = Venue_Taxonomy::query_nominatim( $query );
 
 		if ( ! $coordinates ) {
-			return array( 'error' => 'Could not geocode address: no results from Nominatim.' );
+			return new \WP_Error( 'geocode_failed', 'Could not geocode address: no results from Nominatim.', array( 'status' => 404 ) );
 		}
 
 		$parts = explode( ',', $coordinates );
@@ -205,17 +205,13 @@ class GeocodingAbilities {
 	 * this returns multiple results for UI autocomplete.
 	 *
 	 * @param array $input Input with 'query', optional 'limit' and 'countrycodes'.
-	 * @return array Results array.
+	 * @return array|\WP_Error Results array.
 	 */
-	public function executeGeocodeSearch( array $input ): array {
+	public function executeGeocodeSearch( array $input ): array|\WP_Error {
 		$query = trim( $input['query'] ?? '' );
 
 		if ( empty( $query ) || strlen( $query ) < 3 ) {
-			return array(
-				'success' => false,
-				'error'   => 'Query must be at least 3 characters.',
-				'results' => array(),
-			);
+			return new \WP_Error( 'invalid_query', 'Query must be at least 3 characters.', array( 'status' => 400 ) );
 		}
 
 		$query = sanitize_text_field( $query );
@@ -244,31 +240,19 @@ class GeocodingAbilities {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Nominatim request failed: ' . $response->get_error_message(),
-				'results' => array(),
-			);
+			return new \WP_Error( 'nominatim_request_failed', 'Nominatim request failed: ' . $response->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
 		if ( 200 !== $status_code ) {
-			return array(
-				'success' => false,
-				'error'   => 'Nominatim returned status ' . $status_code,
-				'results' => array(),
-			);
+			return new \WP_Error( 'nominatim_error', 'Nominatim returned status ' . $status_code, array( 'status' => 500 ) );
 		}
 
 		$body = wp_remote_retrieve_body( $response );
 		$data = json_decode( $body, true );
 
 		if ( ! is_array( $data ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Invalid response from Nominatim.',
-				'results' => array(),
-			);
+			return new \WP_Error( 'nominatim_invalid_response', 'Invalid response from Nominatim.', array( 'status' => 500 ) );
 		}
 
 		return array(
@@ -334,9 +318,9 @@ class GeocodingAbilities {
 	 * Execute geocode-venues ability.
 	 *
 	 * @param array $input Input with optional venue_id, force, dry_run, limit.
-	 * @return array Batch results.
+	 * @return array|\WP_Error Batch results.
 	 */
-	public function executeGeocodeVenues( array $input ): array {
+	public function executeGeocodeVenues( array $input ): array|\WP_Error {
 		$venue_id = $input['venue_id'] ?? null;
 		$force    = (bool) ( $input['force'] ?? false );
 		$dry_run  = (bool) ( $input['dry_run'] ?? false );
@@ -350,7 +334,7 @@ class GeocodingAbilities {
 		if ( $venue_id ) {
 			$term = get_term( (int) $venue_id, 'venue' );
 			if ( ! $term || is_wp_error( $term ) ) {
-				return array( 'error' => "Venue term ID {$venue_id} not found." );
+				return new \WP_Error( 'venue_not_found', "Venue term ID {$venue_id} not found.", array( 'status' => 404 ) );
 			}
 			$venues = array( $term );
 		} else {
@@ -363,7 +347,7 @@ class GeocodingAbilities {
 			);
 
 			if ( is_wp_error( $venues ) ) {
-				return array( 'error' => 'Failed to query venues: ' . $venues->get_error_message() );
+				return new \WP_Error( 'query_failed', 'Failed to query venues: ' . $venues->get_error_message(), array( 'status' => 500 ) );
 			}
 		}
 
@@ -511,9 +495,9 @@ class GeocodingAbilities {
 	 * Execute audit-venues ability.
 	 *
 	 * @param array $input Input with optional format and limit.
-	 * @return array Audit results.
+	 * @return array|\WP_Error Audit results.
 	 */
-	public function executeAuditVenues( array $input ): array {
+	public function executeAuditVenues( array $input ): array|\WP_Error {
 		$format = $input['format'] ?? 'summary';
 		$limit  = (int) ( $input['limit'] ?? 25 );
 
@@ -530,7 +514,7 @@ class GeocodingAbilities {
 		);
 
 		if ( is_wp_error( $venues ) ) {
-			return array( 'error' => 'Failed to query venues: ' . $venues->get_error_message() );
+			return new \WP_Error( 'query_failed', 'Failed to query venues: ' . $venues->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$total                = count( $venues );

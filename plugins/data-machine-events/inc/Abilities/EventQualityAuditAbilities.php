@@ -100,7 +100,7 @@ class EventQualityAuditAbilities {
 		}
 	}
 
-	public function executeAudit( array $input ): array {
+	public function executeAudit( array $input ): array|\WP_Error {
 		$scope      = $input['scope'] ?? 'upcoming';
 		$days_ahead = (int) ( $input['days_ahead'] ?? self::DEFAULT_DAYS_AHEAD );
 		$flow_id    = (int) ( $input['flow_id'] ?? 0 );
@@ -118,7 +118,7 @@ class EventQualityAuditAbilities {
 
 		$events = $this->queryEvents( $scope, $days_ahead, $flow_id, $location );
 		if ( is_wp_error( $events ) ) {
-			return array( 'error' => $events->get_error_message() );
+			return new \WP_Error( 'query_failed', $events->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$missing_start_date  = array();

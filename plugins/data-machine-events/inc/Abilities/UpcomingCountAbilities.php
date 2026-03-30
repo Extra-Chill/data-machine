@@ -100,19 +100,14 @@ class UpcomingCountAbilities {
 	 * Filters to published data_machine_events with _datamachine_event_datetime >= today.
 	 *
 	 * @param array $input Input parameters.
-	 * @return array Term counts sorted by event count descending.
+	 * @return array|\WP_Error Term counts sorted by event count descending.
 	 */
-	public function executeGetUpcomingCounts( array $input ): array {
+	public function executeGetUpcomingCounts( array $input ): array|\WP_Error {
 		$taxonomy      = $input['taxonomy'];
 		$exclude_roots = $input['exclude_roots'] ?? ( is_taxonomy_hierarchical( $taxonomy ) );
 
 		if ( ! taxonomy_exists( $taxonomy ) ) {
-			return array(
-				'success'  => false,
-				'taxonomy' => $taxonomy,
-				'terms'    => array(),
-				'total'    => 0,
-			);
+			return new \WP_Error( 'invalid_taxonomy', "Taxonomy '{$taxonomy}' does not exist.", array( 'status' => 400 ) );
 		}
 
 		global $wpdb;

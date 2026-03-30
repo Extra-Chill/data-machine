@@ -114,9 +114,9 @@ class EncodingFixAbilities {
 	 * Execute encoding fix.
 	 *
 	 * @param array $input Input parameters
-	 * @return array Results with matched events and fix status
+	 * @return array|\WP_Error Results with matched events and fix status
 	 */
-	public function executeEncodingFix( array $input ): array {
+	public function executeEncodingFix( array $input ): array|\WP_Error {
 		$scope   = $input['scope'] ?? 'upcoming';
 		$limit   = (int) ( $input['limit'] ?? self::DEFAULT_LIMIT );
 		$dry_run = $input['dry_run'] ?? true;
@@ -128,7 +128,7 @@ class EncodingFixAbilities {
 		$events = $this->queryEvents( $scope );
 
 		if ( is_wp_error( $events ) ) {
-			return array( 'error' => 'Query failed: ' . $events->get_error_message() );
+			return new \WP_Error( 'query_failed', 'Query failed: ' . $events->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		$total_scanned = count( $events );

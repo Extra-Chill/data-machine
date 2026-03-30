@@ -257,7 +257,7 @@ class EventUpsert extends UpdateHandler {
 			return $this->findExistingEvent( $title, $venue, $startDate, $ticketUrl );
 		}
 
-		$duplicate_check = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/check-duplicate' ) : null;
+		$duplicate_check = wp_get_ability( 'datamachine/check-duplicate' );
 
 		if ( ! $duplicate_check ) {
 			return $this->findExistingEvent( $title, $venue, $startDate, $ticketUrl );

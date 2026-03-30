@@ -317,9 +317,9 @@ class VenueAbilities {
 	 * Execute venue health check.
 	 *
 	 * @param array $input Input parameters with optional 'limit'
-	 * @return array Health check results with category counts and venue lists
+	 * @return array|\WP_Error Health check results with category counts and venue lists
 	 */
-	public function executeHealthCheck( array $input ): array {
+	public function executeHealthCheck( array $input ): array|\WP_Error {
 		$limit = (int) ( $input['limit'] ?? self::DEFAULT_LIMIT );
 		if ( $limit <= 0 ) {
 			$limit = self::DEFAULT_LIMIT;
@@ -333,9 +333,7 @@ class VenueAbilities {
 		);
 
 		if ( is_wp_error( $venues ) ) {
-			return array(
-				'error' => 'Failed to query venues: ' . $venues->get_error_message(),
-			);
+			return new \WP_Error( 'query_failed', 'Failed to query venues: ' . $venues->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		if ( empty( $venues ) ) {
@@ -451,22 +449,18 @@ class VenueAbilities {
 	 * Execute venue update.
 	 *
 	 * @param array $input Input parameters with 'venue' identifier and optional fields
-	 * @return array Update result with venue data or error
+	 * @return array|\WP_Error Update result with venue data or error
 	 */
-	public function executeUpdateVenue( array $input ): array {
+	public function executeUpdateVenue( array $input ): array|\WP_Error {
 		$venue_identifier = $input['venue'] ?? null;
 
 		if ( empty( $venue_identifier ) ) {
-			return array(
-				'error' => 'venue parameter is required',
-			);
+			return new \WP_Error( 'missing_venue', 'venue parameter is required', array( 'status' => 400 ) );
 		}
 
 		$term = $this->resolveVenue( $venue_identifier );
 		if ( ! $term ) {
-			return array(
-				'error' => "Venue '{$venue_identifier}' not found",
-			);
+			return new \WP_Error( 'venue_not_found', "Venue '{$venue_identifier}' not found", array( 'status' => 404 ) );
 		}
 
 		$updated_fields = array();
@@ -484,9 +478,7 @@ class VenueAbilities {
 		if ( ! empty( $term_updates ) ) {
 			$result = wp_update_term( $term->term_id, 'venue', $term_updates );
 			if ( is_wp_error( $result ) ) {
-				return array(
-					'error' => 'Failed to update venue: ' . $result->get_error_message(),
-				);
+				return new \WP_Error( 'update_failed', 'Failed to update venue: ' . $result->get_error_message(), array( 'status' => 500 ) );
 			}
 		}
 
@@ -505,9 +497,7 @@ class VenueAbilities {
 		}
 
 		if ( empty( $updated_fields ) ) {
-			return array(
-				'error' => 'No fields provided to update',
-			);
+			return new \WP_Error( 'no_fields', 'No fields provided to update', array( 'status' => 400 ) );
 		}
 
 		$updated_term = get_term( $term->term_id, 'venue' );
@@ -526,23 +516,19 @@ class VenueAbilities {
 	 * Execute get venue.
 	 *
 	 * @param array $input Input parameters with 'id'
-	 * @return array Venue data or error
+	 * @return array|\WP_Error Venue data or error
 	 */
-	public function executeGetVenue( array $input ): array {
+	public function executeGetVenue( array $input ): array|\WP_Error {
 		$term_id = $input['id'] ?? null;
 
 		if ( empty( $term_id ) ) {
-			return array(
-				'error' => 'Venue ID is required',
-			);
+			return new \WP_Error( 'missing_venue_id', 'Venue ID is required', array( 'status' => 400 ) );
 		}
 
 		$venue_data = Venue_Taxonomy::get_venue_data( $term_id );
 
 		if ( empty( $venue_data ) ) {
-			return array(
-				'error' => 'Venue not found',
-			);
+			return new \WP_Error( 'venue_not_found', 'Venue not found', array( 'status' => 404 ) );
 		}
 
 		return $venue_data;
@@ -552,16 +538,14 @@ class VenueAbilities {
 	 * Execute check duplicate venue.
 	 *
 	 * @param array $input Input parameters with 'name' and optional 'address'
-	 * @return array Duplicate check result
+	 * @return array|\WP_Error Duplicate check result
 	 */
-	public function executeCheckDuplicate( array $input ): array {
+	public function executeCheckDuplicate( array $input ): array|\WP_Error {
 		$venue_name    = $input['name'] ?? null;
 		$venue_address = $input['address'] ?? '';
 
 		if ( empty( $venue_name ) ) {
-			return array(
-				'error' => 'Venue name is required',
-			);
+			return new \WP_Error( 'missing_venue_name', 'Venue name is required', array( 'status' => 400 ) );
 		}
 
 		$existing_term = get_term_by( 'name', $venue_name, 'venue' );

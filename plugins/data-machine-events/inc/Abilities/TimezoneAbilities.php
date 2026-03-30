@@ -199,14 +199,11 @@ class TimezoneAbilities {
 		return $this->findBrokenTimezoneEvents( $scope, $days_ahead, $limit );
 	}
 
-	public function executeFixAbility( array $input ): array {
+	public function executeFixAbility( array $input ): array|\WP_Error {
 		$updates = $this->normalizeFixInput( $input );
 
 		if ( empty( $updates ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Missing required event data',
-			);
+			return new \WP_Error( 'missing_event_data', 'Missing required event data', array( 'status' => 400 ) );
 		}
 
 		$results = array();

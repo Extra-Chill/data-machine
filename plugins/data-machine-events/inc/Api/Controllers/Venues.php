@@ -39,12 +39,8 @@ class Venues {
 
 		$result = $ability->execute( array( 'id' => (int) $term_id ) );
 
-		if ( isset( $result['error'] ) ) {
-			return new \WP_Error(
-				'venue_not_found',
-				$result['error'],
-				array( 'status' => 404 )
-			);
+		if ( is_wp_error( $result ) ) {
+			return $result;
 		}
 
 		return rest_ensure_response(
@@ -89,12 +85,8 @@ class Venues {
 
 		$result = $ability->execute( $input );
 
-		if ( isset( $result['error'] ) ) {
-			return new \WP_Error(
-				'check_duplicate_failed',
-				$result['error'],
-				array( 'status' => 400 )
-			);
+		if ( is_wp_error( $result ) ) {
+			return $result;
 		}
 
 		return rest_ensure_response(

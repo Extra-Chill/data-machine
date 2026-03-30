@@ -209,7 +209,7 @@ class MetaSyncAbilities {
 	 * Re-trigger meta sync for specified events.
 	 *
 	 * @param array $input Input parameters with 'event_ids' and optional 'dry_run'
-	 * @return array Results with per-event success/failure and summary
+	 * @return array|\WP_Error Results with per-event success/failure and summary
 	 */
 	public function executeResyncEventMeta( array $input ): array {
 		$event_ids = $input['event_ids'] ?? array();

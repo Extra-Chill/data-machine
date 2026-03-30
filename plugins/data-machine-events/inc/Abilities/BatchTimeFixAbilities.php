@@ -140,9 +140,9 @@ class BatchTimeFixAbilities {
 	 * Execute batch time fix.
 	 *
 	 * @param array $input Input parameters
-	 * @return array Results with matched events and fix status
+	 * @return array|\WP_Error Results with matched events and fix status
 	 */
-	public function executeBatchTimeFix( array $input ): array {
+	public function executeBatchTimeFix( array $input ): array|\WP_Error {
 		$venue          = $input['venue'] ?? '';
 		$before         = $input['before'] ?? '';
 		$after          = $input['after'] ?? '';
@@ -154,30 +154,30 @@ class BatchTimeFixAbilities {
 		$limit          = (int) ( $input['limit'] ?? self::DEFAULT_LIMIT );
 
 		if ( empty( $venue ) ) {
-			return array( 'error' => 'Venue parameter is required' );
+			return new \WP_Error( 'missing_venue', 'Venue parameter is required', array( 'status' => 400 ) );
 		}
 
 		if ( empty( $before ) && empty( $after ) ) {
-			return array( 'error' => 'At least one date filter (before or after) is required' );
+			return new \WP_Error( 'missing_date_filter', 'At least one date filter (before or after) is required', array( 'status' => 400 ) );
 		}
 
 		if ( empty( $offset ) && empty( $new_time ) ) {
-			return array( 'error' => 'Either offset or new_time parameter is required' );
+			return new \WP_Error( 'missing_time_param', 'Either offset or new_time parameter is required', array( 'status' => 400 ) );
 		}
 
 		if ( ! empty( $new_time ) && empty( $where_time ) ) {
-			return array( 'error' => 'where_time is required when using new_time (to prevent accidental overwrites)' );
+			return new \WP_Error( 'missing_where_time', 'where_time is required when using new_time (to prevent accidental overwrites)', array( 'status' => 400 ) );
 		}
 
 		$venue_term_ids = $this->resolveVenueTermIds( $venue );
 		if ( empty( $venue_term_ids ) ) {
-			return array( 'error' => "No matching venues found for: {$venue}" );
+			return new \WP_Error( 'venue_not_found', "No matching venues found for: {$venue}", array( 'status' => 404 ) );
 		}
 
 		$events = $this->queryEvents( $venue_term_ids, $before, $after, $source_pattern, $where_time, $limit );
 
 		if ( is_wp_error( $events ) ) {
-			return array( 'error' => 'Query failed: ' . $events->get_error_message() );
+			return new \WP_Error( 'query_failed', 'Query failed: ' . $events->get_error_message(), array( 'status' => 500 ) );
 		}
 
 		if ( empty( $events ) ) {
