@@ -201,6 +201,24 @@ class Chat {
 
 		register_rest_route(
 			'datamachine/v1',
+			'/chat/sessions/(?P<session_id>[a-f0-9-]+)/read',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( self::class, 'mark_session_read' ),
+				'permission_callback' => $chat_permission_callback,
+				'args'                => array(
+					'session_id' => array(
+						'type'              => 'string',
+						'required'          => true,
+						'description'       => __( 'Session ID to mark as read', 'data-machine' ),
+						'sanitize_callback' => 'sanitize_text_field',
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			'datamachine/v1',
 			'/chat/sessions',
 			array(
 				'methods'             => WP_REST_Server::READABLE,
@@ -351,6 +369,24 @@ class Chat {
 				'limit'    => (int) $request->get_param( 'limit' ),
 				'offset'   => (int) $request->get_param( 'offset' ),
 				'context'  => $request->get_param( 'context' ),
+			)
+		);
+	}
+
+	/**
+	 * Mark a chat session as read.
+	 *
+	 * @since 0.62.0
+	 *
+	 * @param WP_REST_Request $request Request object.
+	 * @return WP_REST_Response|WP_Error Response data or error.
+	 */
+	public static function mark_session_read( WP_REST_Request $request ) {
+		return self::execute_ability(
+			'datamachine/mark-session-read',
+			array(
+				'session_id' => sanitize_text_field( $request->get_param( 'session_id' ) ),
+				'user_id'    => get_current_user_id(),
 			)
 		);
 	}

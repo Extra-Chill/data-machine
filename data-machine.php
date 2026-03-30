@@ -377,6 +377,7 @@ add_action(
 	function () {
 		\DataMachine\Core\Database\Chat\Chat::ensure_context_column();
 		\DataMachine\Core\Database\Chat\Chat::ensure_agent_id_column();
+		\DataMachine\Core\Database\Chat\Chat::ensure_last_read_at_column();
 	},
 	6
 );
@@ -555,6 +556,7 @@ function datamachine_activate_for_site() {
 	\DataMachine\Core\Database\Chat\Chat::create_table();
 	\DataMachine\Core\Database\Chat\Chat::ensure_context_column();
 	\DataMachine\Core\Database\Chat\Chat::ensure_agent_id_column();
+	\DataMachine\Core\Database\Chat\Chat::ensure_last_read_at_column();
 
 	// Ensure default agent memory files exist.
 	// During activation the Abilities API is unavailable (init already fired before
