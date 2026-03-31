@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.26.2] - 2026-03-31
+
+### Changed
+- Add VenuePilot extractor for GraphQL-based event scraping
+- Migrate ability callbacks to WP_Error, fix slug prefix inconsistency
+
 ## [0.26.1] - 2026-03-29
 
 ### Fixed
