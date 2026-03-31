@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.26.3] - 2026-03-31
+
+### Fixed
+- Fix Wix HtmlComponent resolution to check all features URLs
+
 ## [0.26.2] - 2026-03-31
 
 ### Changed
