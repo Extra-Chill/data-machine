@@ -350,7 +350,7 @@ abstract class BaseExtractor implements ExtractorInterface {
 			return null;
 		}
 
-		return $result['body'] ?? null;
+		return $result['data'] ?? null;
 	}
 
 	/**
