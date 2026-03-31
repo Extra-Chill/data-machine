@@ -68,6 +68,18 @@ if ( ! function_exists( 'datamachine_get_event_dates' ) ) {
 	}
 }
 
+if ( ! function_exists( 'datamachine_get_event_timing' ) ) {
+	/**
+	 * Get event timing state (upcoming, ongoing, or past).
+	 *
+	 * @param int $post_id Event post ID.
+	 * @return string 'upcoming' | 'ongoing' | 'past'
+	 */
+	function datamachine_get_event_timing( int $post_id ): string {
+		return \DataMachineEvents\Core\datamachine_get_event_timing( $post_id );
+	}
+}
+
 // Load performance optimizations (transient-cached last-modified queries).
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/performance.php';
 \DataMachineEvents\Core\cache_last_post_time();

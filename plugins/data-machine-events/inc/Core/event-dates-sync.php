@@ -282,3 +282,37 @@ add_action( 'transition_post_status', __NAMESPACE__ . '\\data_machine_events_syn
 function datamachine_get_event_dates( int $post_id ): ?object {
 	return EventDatesTable::get( $post_id );
 }
+
+/**
+ * Get event timing state for a single event.
+ *
+ * Applies the same logic as UpcomingFilter (the SQL-level source of truth)
+ * to a single event for runtime checks:
+ *   upcoming = start >= now
+ *   ongoing  = start < now AND end >= now
+ *   past     = start < now AND (end < now OR end IS NULL)
+ *
+ * @param int $post_id Event post ID.
+ * @return string 'upcoming' | 'ongoing' | 'past'
+ */
+function datamachine_get_event_timing( int $post_id ): string {
+	$dates = datamachine_get_event_dates( $post_id );
+
+	if ( ! $dates || empty( $dates->start_datetime ) ) {
+		return 'past';
+	}
+
+	$now         = current_time( 'mysql' );
+	$event_start = $dates->start_datetime;
+	$event_end   = $dates->end_datetime ?? null;
+
+	if ( $event_start >= $now ) {
+		return 'upcoming';
+	}
+
+	if ( $event_end && $event_end >= $now ) {
+		return 'ongoing';
+	}
+
+	return 'past';
+}
