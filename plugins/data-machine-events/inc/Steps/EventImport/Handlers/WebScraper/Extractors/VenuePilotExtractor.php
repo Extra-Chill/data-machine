@@ -224,45 +224,48 @@ class VenuePilotExtractor extends BaseExtractor {
 			return array();
 		}
 
-		// Find the Thunderbolt features API URL for this page.
-		if ( ! preg_match( '#(https://siteassets\.parastorage\.com/pages/pages/thunderbolt\?[^"\']+module=thunderbolt-features[^"\']*)#', $html, $api_matches ) ) {
+		// Find ALL Thunderbolt features API URLs (masterPage + page-specific).
+		// The HtmlComponent props may be in the page-specific features, not the masterPage.
+		if ( ! preg_match_all( '#(https://siteassets\.parastorage\.com/pages/pages/thunderbolt\?[^"\']+module=thunderbolt-features[^"\']*)#', $html, $api_matches ) ) {
 			return array();
 		}
 
-		$features_url = html_entity_decode( $api_matches[1] );
-		$features_json = $this->fetchUrl( $features_url, array( 'timeout' => 20 ), 'Wix Thunderbolt features' );
+		foreach ( $api_matches[1] as $raw_url ) {
+			$features_url  = html_entity_decode( $raw_url );
+			$features_json = $this->fetchUrl( $features_url, array( 'timeout' => 20 ), 'Wix Thunderbolt features' );
 
-		if ( empty( $features_json ) ) {
-			return array();
-		}
-
-		$features = json_decode( $features_json, true );
-		if ( json_last_error() !== JSON_ERROR_NONE || empty( $features ) ) {
-			return array();
-		}
-
-		// Look for HtmlComponent props containing a filesusr.com URL.
-		$comp_props = $features['props']['render']['compProps'] ?? array();
-
-		foreach ( $comp_matches[1] as $comp_id ) {
-			$props = $comp_props[ $comp_id ] ?? array();
-			$embed_url = $props['url'] ?? '';
-
-			if ( empty( $embed_url ) || strpos( $embed_url, 'filesusr.com' ) === false ) {
+			if ( empty( $features_json ) ) {
 				continue;
 			}
 
-			// Fetch the embedded HTML and check for VenuePilot config.
-			$embed_html = $this->fetchUrl( $embed_url, array( 'timeout' => 15 ), 'Wix HtmlComponent embed' );
-
-			if ( empty( $embed_html ) ) {
+			$features = json_decode( $features_json, true );
+			if ( json_last_error() !== JSON_ERROR_NONE || empty( $features ) ) {
 				continue;
 			}
 
-			if ( preg_match( '/["\']?accountIds["\']?\s*:\s*\[\s*([\d,\s]+)\s*\]/s', $embed_html, $id_matches ) ) {
-				$ids = array_map( 'intval', array_filter( explode( ',', $id_matches[1] ) ) );
-				if ( ! empty( $ids ) ) {
-					return $ids;
+			// Look for HtmlComponent props containing a filesusr.com URL.
+			$comp_props = $features['props']['render']['compProps'] ?? array();
+
+			foreach ( $comp_matches[1] as $comp_id ) {
+				$props = $comp_props[ $comp_id ] ?? array();
+				$embed_url = $props['url'] ?? '';
+
+				if ( empty( $embed_url ) || strpos( $embed_url, 'filesusr.com' ) === false ) {
+					continue;
+				}
+
+				// Fetch the embedded HTML and check for VenuePilot config.
+				$embed_html = $this->fetchUrl( $embed_url, array( 'timeout' => 15 ), 'Wix HtmlComponent embed' );
+
+				if ( empty( $embed_html ) ) {
+					continue;
+				}
+
+				if ( preg_match( '/["\']?accountIds["\']?\s*:\s*\[\s*([\d,\s]+)\s*\]/s', $embed_html, $id_matches ) ) {
+					$ids = array_map( 'intval', array_filter( explode( ',', $id_matches[1] ) ) );
+					if ( ! empty( $ids ) ) {
+						return $ids;
+					}
 				}
 			}
 		}
