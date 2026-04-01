@@ -517,16 +517,56 @@ trait FlowHelpers {
 				continue;
 			}
 
+			// Normalize plural forms to the singular keys that UpdateFlowStepAbility expects.
+			// CLI and admin UI naturally pass handler_slugs (array) and handler_configs (keyed object),
+			// but the ability expects handler_slug (string) and handler_config (object).
+			$handler_slugs  = $config['handler_slugs'] ?? array();
+			$handler_configs = $config['handler_configs'] ?? array();
+
+			// If singular forms are provided, use those directly (backward compat with --handler-config path).
+			$single_slug   = $config['handler_slug'] ?? '';
+			$single_config = $config['handler_config'] ?? array();
+
+			// When handler_slugs is provided, add each handler with its config from handler_configs.
+			if ( ! empty( $handler_slugs ) ) {
+				foreach ( $handler_slugs as $slug ) {
+					$slug_config = $handler_configs[ $slug ] ?? array();
+					$add_result  = $flow_step_abilities->executeUpdateFlowStep(
+						array(
+							'flow_step_id'     => $flow_step_id,
+							'add_handler'      => $slug,
+							'add_handler_config' => $slug_config,
+						)
+					);
+					if ( ! $add_result['success'] ) {
+						$errors[] = array(
+							'step_type'    => $step_type,
+							'flow_step_id' => $flow_step_id,
+							'handler'      => $slug,
+							'error'        => $add_result['error'] ?? 'Failed to add handler',
+						);
+					}
+				}
+			}
+
+			// Build the base update input for singular handler_slug / handler_config / user_message.
 			$update_input = array( 'flow_step_id' => $flow_step_id );
 
-			if ( ! empty( $config['handler_slug'] ) ) {
-				$update_input['handler_slug'] = $config['handler_slug'];
+			if ( ! empty( $single_slug ) ) {
+				$update_input['handler_slug'] = $single_slug;
 			}
-			if ( ! empty( $config['handler_config'] ) ) {
-				$update_input['handler_config'] = $config['handler_config'];
+			if ( ! empty( $single_config ) ) {
+				$update_input['handler_config'] = $single_config;
 			}
 			if ( ! empty( $config['user_message'] ) ) {
 				$update_input['user_message'] = $config['user_message'];
+			}
+
+			// Only call update if there's something beyond the flow_step_id to apply.
+			if ( count( $update_input ) <= 1 && ! empty( $handler_slugs ) ) {
+				// Already handled via add_handler above — mark as applied.
+				$applied[] = $flow_step_id;
+				continue;
 			}
 
 			$result = $flow_step_abilities->executeUpdateFlowStep( $update_input );
