@@ -218,26 +218,16 @@ class PluginSettings {
 	/**
 	 * Get the list of known execution contexts.
 	 *
+	 * Delegates to ContextRegistry which provides the canonical list of
+	 * registered contexts. Core contexts register in bootstrap.php;
+	 * extensions register via the `datamachine_contexts` action.
+	 *
+	 * @since 0.63.0 Delegates to ContextRegistry.
+	 *
 	 * @return array Array of context definitions with id, label, and description.
 	 */
 	public static function getContexts(): array {
-		return array(
-			array(
-				'id'          => 'chat',
-				'label'       => __( 'Chat Agent', 'data-machine' ),
-				'description' => __( 'Interactive chat conversations. Benefits from capable models for complex reasoning.', 'data-machine' ),
-			),
-			array(
-				'id'          => 'pipeline',
-				'label'       => __( 'Pipeline Agent', 'data-machine' ),
-				'description' => __( 'Structured workflow execution. Operates within defined steps — efficient models work well.', 'data-machine' ),
-			),
-			array(
-				'id'          => 'system',
-				'label'       => __( 'System Agent', 'data-machine' ),
-				'description' => __( 'Background tasks like alt text generation and issue creation.', 'data-machine' ),
-			),
-		);
+		return \DataMachine\Engine\AI\ContextRegistry::get_for_settings();
 	}
 
 	/**
