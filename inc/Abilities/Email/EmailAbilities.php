@@ -510,6 +510,10 @@ class EmailAbilities {
 		$sent = wp_mail( $to, $input['subject'], $input['body'], $headers );
 
 		if ( $sent ) {
+			// Save a copy to the IMAP Sent folder so the message appears in
+			// the user's email client (e.g. Gmail "Sent Mail" thread view).
+			$this->saveToSentFolder( $to, $input['subject'], $input['body'], $headers );
+
 			return array(
 				'success' => true,
 				'message' => 'Reply sent to ' . implode( ', ', $to ),
@@ -1286,5 +1290,68 @@ class EmailAbilities {
 		};
 
 		return sprintf( '{%s:%d%s}%s', $host, $port, $flags, $folder );
+	}
+
+	/**
+	 * Save a sent message to the IMAP Sent folder.
+	 *
+	 * After wp_mail() sends via SMTP, the message only exists on the recipient's
+	 * server. This appends a copy to the sender's Sent folder so it appears in
+	 * their email client (e.g. Gmail thread view).
+	 *
+	 * @param array  $to      Recipient addresses.
+	 * @param string $subject Email subject.
+	 * @param string $body    Email body.
+	 * @param array  $headers Email headers (Content-Type, In-Reply-To, References, etc.).
+	 */
+	private function saveToSentFolder( array $to, string $subject, string $body, array $headers ): void {
+		// Determine the Sent folder name. Gmail uses "[Gmail]/Sent Mail".
+		$sent_folder = '[Gmail]/Sent Mail';
+
+		$connection = $this->connect( $sent_folder );
+		if ( is_array( $connection ) && ! ( $connection['success'] ?? true ) ) {
+			// Non-Gmail server or folder not found — try common alternatives.
+			foreach ( array( 'Sent', 'Sent Items', 'INBOX.Sent' ) as $fallback ) {
+				$connection = $this->connect( $fallback );
+				if ( ! is_array( $connection ) ) {
+					$sent_folder = $fallback;
+					break;
+				}
+			}
+
+			// If still no connection, silently skip — sending succeeded, saving is best-effort.
+			if ( is_array( $connection ) ) {
+				return;
+			}
+		}
+
+		$auth    = $this->getAuthProvider();
+		$from    = $auth ? $auth->getUser() : 'noreply@extrachill.com';
+		$to_str  = implode( ', ', $to );
+		$date    = gmdate( 'r' );
+
+		// Build the RFC822 message.
+		$message  = "From: {$from}\r\n";
+		$message .= "To: {$to_str}\r\n";
+		$message .= "Subject: {$subject}\r\n";
+		$message .= "Date: {$date}\r\n";
+
+		foreach ( $headers as $header ) {
+			$message .= $header . "\r\n";
+		}
+
+		$message .= "MIME-Version: 1.0\r\n";
+		$message .= "\r\n";
+		$message .= $body;
+
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		@imap_append( $connection, $this->buildMailboxString(
+			$auth->getHost(),
+			$auth->getPort(),
+			$auth->getEncryption(),
+			$sent_folder
+		), $message, '\\Seen' );
+
+		imap_close( $connection );
 	}
 }
