@@ -320,7 +320,6 @@ function datamachine_load_step_types() {
 	new \DataMachine\Core\Steps\Publish\PublishStep();
 	new \DataMachine\Core\Steps\Update\UpdateStep();
 	new \DataMachine\Core\Steps\AI\AIStep();
-	new \DataMachine\Core\Steps\AgentPing\AgentPingStep();
 	new \DataMachine\Core\Steps\WebhookGate\WebhookGateStep();
 	new \DataMachine\Core\Steps\SystemTask\SystemTaskStep();
 }
@@ -596,6 +595,9 @@ function datamachine_activate_for_site() {
 
 	// Drop orphaned per-site agent tables left behind by the migration (idempotent).
 	datamachine_drop_orphaned_agent_tables();
+
+	// Migrate agent_ping step types to flow configs (idempotent).
+	datamachine_migrate_agent_ping_to_system_task();
 
 	// Regenerate SITE.md with enriched content and clean up legacy SiteContext transient.
 	datamachine_regenerate_site_md();
