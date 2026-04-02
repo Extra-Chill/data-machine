@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.27.0] - 2026-04-02
+
+### Added
+- add datamachine_get_event_timing() core primitive
+
 ## [0.26.3] - 2026-03-31
 
 ### Fixed
