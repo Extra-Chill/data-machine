@@ -183,65 +183,74 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/Publish/SendEmailAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Update/UpdateWordPressAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Handler/TestHandlerAbility.php';
-	// Defer ability instantiation to init so translations are loaded.
-	add_action( 'init', function () {
-		new \DataMachine\Abilities\AuthAbilities();
-		new \DataMachine\Abilities\File\AgentFileAbilities();
-		new \DataMachine\Abilities\File\FlowFileAbilities();
-		new \DataMachine\Abilities\File\ScaffoldAbilities();
-		new \DataMachine\Abilities\FlowAbilities();
-		new \DataMachine\Abilities\FlowStepAbilities();
-		new \DataMachine\Abilities\JobAbilities();
-		new \DataMachine\Abilities\LogAbilities();
-		new \DataMachine\Abilities\PostQueryAbilities();
-		new \DataMachine\Abilities\PipelineAbilities();
-		new \DataMachine\Abilities\PipelineStepAbilities();
-		new \DataMachine\Abilities\DuplicateCheck\DuplicateCheckAbility();
-		new \DataMachine\Abilities\ProcessedItemsAbilities();
-		new \DataMachine\Abilities\SettingsAbilities();
-		new \DataMachine\Abilities\HandlerAbilities();
-		new \DataMachine\Abilities\StepTypeAbilities();
-		new \DataMachine\Abilities\LocalSearchAbilities();
-		new \DataMachine\Abilities\SystemAbilities();
-		new \DataMachine\Engine\AI\System\SystemAgentServiceProvider();
-		new \DataMachine\Abilities\Media\AltTextAbilities();
-		new \DataMachine\Abilities\Media\ImageGenerationAbilities();
-		new \DataMachine\Abilities\Media\MediaAbilities();
-		new \DataMachine\Abilities\SEO\MetaDescriptionAbilities();
-		new \DataMachine\Abilities\SEO\IndexNowAbilities();
-		new \DataMachine\Abilities\Media\ImageTemplateAbilities();
-		new \DataMachine\Abilities\Analytics\BingWebmasterAbilities();
-		new \DataMachine\Abilities\Analytics\GoogleAnalyticsAbilities();
-		new \DataMachine\Abilities\Analytics\GoogleSearchConsoleAbilities();
-		new \DataMachine\Abilities\Analytics\PageSpeedAbilities();
-		new \DataMachine\Abilities\AgentPingAbilities();
-		new \DataMachine\Abilities\TaxonomyAbilities();
-		new \DataMachine\Abilities\AgentAbilities();
-		new \DataMachine\Abilities\AgentTokenAbilities();
-		new \DataMachine\Abilities\AgentMemoryAbilities();
-		new \DataMachine\Abilities\DailyMemoryAbilities();
-		// WorkspaceAbilities moved to data-machine-code extension.
-		new \DataMachine\Abilities\ChatAbilities();
-		new \DataMachine\Abilities\InternalLinkingAbilities();
-		new \DataMachine\Abilities\Content\GetPostBlocksAbility();
-		new \DataMachine\Abilities\Content\EditPostBlocksAbility();
-		new \DataMachine\Abilities\Content\ReplacePostBlocksAbility();
-		new \DataMachine\Abilities\Content\InsertContentAbility();
-		new \DataMachine\Abilities\Content\ResolveDiffAbility();
-		// GitHubAbilities moved to data-machine-code extension.
-		new \DataMachine\Abilities\Fetch\FetchFilesAbility();
-		new \DataMachine\Abilities\Email\EmailAbilities();
-		new \DataMachine\Abilities\Fetch\FetchEmailAbility();
-		new \DataMachine\Abilities\Fetch\FetchRssAbility();
-		new \DataMachine\Abilities\Fetch\FetchWordPressApiAbility();
-		new \DataMachine\Abilities\Fetch\FetchWordPressMediaAbility();
-		new \DataMachine\Abilities\Fetch\GetWordPressPostAbility();
-		new \DataMachine\Abilities\Fetch\QueryWordPressPostsAbility();
-		new \DataMachine\Abilities\Publish\PublishWordPressAbility();
-		new \DataMachine\Abilities\Publish\SendEmailAbility();
-		new \DataMachine\Abilities\Update\UpdateWordPressAbility();
-		new \DataMachine\Abilities\Handler\TestHandlerAbility();
-	} );
+	// Register ability hooks immediately during plugins_loaded.
+	//
+	// Each constructor calls add_action('wp_abilities_api_init', callback) which
+	// matches WordPress core's recommended pattern (see default-filters.php:539).
+	// The actual wp_register_ability() calls happen inside wp_abilities_api_init
+	// when the registry fires lazily (always after init), so translations are
+	// already loaded by execution time.
+	//
+	// Previously this was wrapped in add_action('init', ...) at priority 10, but
+	// datamachine_maybe_run_migrations() at init priority 5 triggers the registry
+	// via ScaffoldAbilities::get_ability() → WP_Abilities_Registry::get_instance(),
+	// firing wp_abilities_api_init before the hooks were registered.
+	new \DataMachine\Abilities\AuthAbilities();
+	new \DataMachine\Abilities\File\AgentFileAbilities();
+	new \DataMachine\Abilities\File\FlowFileAbilities();
+	new \DataMachine\Abilities\File\ScaffoldAbilities();
+	new \DataMachine\Abilities\FlowAbilities();
+	new \DataMachine\Abilities\FlowStepAbilities();
+	new \DataMachine\Abilities\JobAbilities();
+	new \DataMachine\Abilities\LogAbilities();
+	new \DataMachine\Abilities\PostQueryAbilities();
+	new \DataMachine\Abilities\PipelineAbilities();
+	new \DataMachine\Abilities\PipelineStepAbilities();
+	new \DataMachine\Abilities\DuplicateCheck\DuplicateCheckAbility();
+	new \DataMachine\Abilities\ProcessedItemsAbilities();
+	new \DataMachine\Abilities\SettingsAbilities();
+	new \DataMachine\Abilities\HandlerAbilities();
+	new \DataMachine\Abilities\StepTypeAbilities();
+	new \DataMachine\Abilities\LocalSearchAbilities();
+	new \DataMachine\Abilities\SystemAbilities();
+	new \DataMachine\Engine\AI\System\SystemAgentServiceProvider();
+	new \DataMachine\Abilities\Media\AltTextAbilities();
+	new \DataMachine\Abilities\Media\ImageGenerationAbilities();
+	new \DataMachine\Abilities\Media\MediaAbilities();
+	new \DataMachine\Abilities\SEO\MetaDescriptionAbilities();
+	new \DataMachine\Abilities\SEO\IndexNowAbilities();
+	new \DataMachine\Abilities\Media\ImageTemplateAbilities();
+	new \DataMachine\Abilities\Analytics\BingWebmasterAbilities();
+	new \DataMachine\Abilities\Analytics\GoogleAnalyticsAbilities();
+	new \DataMachine\Abilities\Analytics\GoogleSearchConsoleAbilities();
+	new \DataMachine\Abilities\Analytics\PageSpeedAbilities();
+	new \DataMachine\Abilities\AgentPingAbilities();
+	new \DataMachine\Abilities\TaxonomyAbilities();
+	new \DataMachine\Abilities\AgentAbilities();
+	new \DataMachine\Abilities\AgentTokenAbilities();
+	new \DataMachine\Abilities\AgentMemoryAbilities();
+	new \DataMachine\Abilities\DailyMemoryAbilities();
+	// WorkspaceAbilities moved to data-machine-code extension.
+	new \DataMachine\Abilities\ChatAbilities();
+	new \DataMachine\Abilities\InternalLinkingAbilities();
+	new \DataMachine\Abilities\Content\GetPostBlocksAbility();
+	new \DataMachine\Abilities\Content\EditPostBlocksAbility();
+	new \DataMachine\Abilities\Content\ReplacePostBlocksAbility();
+	new \DataMachine\Abilities\Content\InsertContentAbility();
+	new \DataMachine\Abilities\Content\ResolveDiffAbility();
+	// GitHubAbilities moved to data-machine-code extension.
+	new \DataMachine\Abilities\Fetch\FetchFilesAbility();
+	new \DataMachine\Abilities\Email\EmailAbilities();
+	new \DataMachine\Abilities\Fetch\FetchEmailAbility();
+	new \DataMachine\Abilities\Fetch\FetchRssAbility();
+	new \DataMachine\Abilities\Fetch\FetchWordPressApiAbility();
+	new \DataMachine\Abilities\Fetch\FetchWordPressMediaAbility();
+	new \DataMachine\Abilities\Fetch\GetWordPressPostAbility();
+	new \DataMachine\Abilities\Fetch\QueryWordPressPostsAbility();
+	new \DataMachine\Abilities\Publish\PublishWordPressAbility();
+	new \DataMachine\Abilities\Publish\SendEmailAbility();
+	new \DataMachine\Abilities\Update\UpdateWordPressAbility();
+	new \DataMachine\Abilities\Handler\TestHandlerAbility();
 
 	// Deferred scaffold: during plugin activation the Abilities API is unavailable
 	// because init fires before the plugin file is included. A transient signals that
