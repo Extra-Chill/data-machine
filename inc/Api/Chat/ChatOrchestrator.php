@@ -64,7 +64,8 @@ class ChatOrchestrator {
 		$request_id           = $options['request_id'] ?? null;
 		$agent_id             = (int) ( $options['agent_id'] ?? 0 );
 
-		$chat_db = new ChatDatabase();
+		$chat_db          = new ChatDatabase();
+		$session_metadata = array();
 
 		// --- Session resolution ---
 		if ( $session_id ) {
@@ -87,6 +88,7 @@ class ChatOrchestrator {
 			}
 
 			$messages = $session['messages'];
+			$session_metadata = $session['metadata'] ?? array();
 		} else {
 			// Check for recent pending session to prevent duplicates from timeout retries.
 			$pending_session = $chat_db->get_recent_pending_session( $user_id, 600, 'chat' );
@@ -94,6 +96,7 @@ class ChatOrchestrator {
 			if ( $pending_session ) {
 				$session_id = $pending_session['session_id'];
 				$messages   = $pending_session['messages'];
+				$session_metadata = $pending_session['metadata'] ?? array();
 
 				do_action(
 					'datamachine_log',
@@ -132,10 +135,13 @@ class ChatOrchestrator {
 		$chat_db->update_session(
 			$session_id,
 			$messages,
-			array(
+			array_merge(
+				$session_metadata,
+				array(
 				'status'        => 'processing',
 				'started_at'    => current_time( 'mysql', true ),
 				'message_count' => count( $messages ),
+				)
 			),
 			$provider,
 			$model
@@ -576,6 +582,11 @@ class ChatOrchestrator {
 			'started_at'    => current_time( 'mysql', true ),
 			'message_count' => 0,
 		);
+
+		$acting_token_id = \DataMachine\Abilities\PermissionHelper::get_acting_token_id();
+		if ( $acting_token_id ) {
+			$metadata['token_id'] = $acting_token_id;
+		}
 
 		if ( $source ) {
 			$metadata['source'] = $source;

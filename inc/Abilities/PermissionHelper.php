@@ -69,6 +69,18 @@ class PermissionHelper {
 	private static ?int $acting_agent_id = null;
 
 	/**
+	 * Acting token ID when authenticated via agent bearer token.
+	 *
+	 * Distinguishes multiple external logins/clients authenticated to the same
+	 * agent. This is optional runtime context for integrations like chat bridges
+	 * that need login-level routing on top of agent-level authorization.
+	 *
+	 * @since 0.47.1
+	 * @var int|null
+	 */
+	private static ?int $acting_token_id = null;
+
+	/**
 	 * Owner user ID for the acting agent.
 	 *
 	 * @since 0.47.0
@@ -225,9 +237,11 @@ class PermissionHelper {
 	 * @param int        $agent_id     Agent ID.
 	 * @param int        $owner_id     Agent owner's WordPress user ID.
 	 * @param array|null $capabilities Token capability restrictions (null = unrestricted).
+	 * @param int|null   $token_id     Token ID for login-level runtime scoping.
 	 */
-	public static function set_agent_context( int $agent_id, int $owner_id, ?array $capabilities = null ): void {
+	public static function set_agent_context( int $agent_id, int $owner_id, ?array $capabilities = null, ?int $token_id = null ): void {
 		self::$acting_agent_id          = $agent_id;
+		self::$acting_token_id          = $token_id;
 		self::$agent_owner_id           = $owner_id;
 		self::$agent_token_capabilities = $capabilities;
 	}
@@ -239,6 +253,7 @@ class PermissionHelper {
 	 */
 	public static function clear_agent_context(): void {
 		self::$acting_agent_id          = null;
+		self::$acting_token_id          = null;
 		self::$agent_owner_id           = 0;
 		self::$agent_token_capabilities = null;
 	}
@@ -252,6 +267,20 @@ class PermissionHelper {
 	 */
 	public static function get_acting_agent_id(): ?int {
 		return self::$acting_agent_id;
+	}
+
+	/**
+	 * Get the acting token ID, if in agent bearer-token context.
+	 *
+	 * This enables login/client-level routing for integrations that need to
+	 * distinguish multiple active tokens for the same agent.
+	 *
+	 * @since 0.47.1
+	 *
+	 * @return int|null Token ID or null if not in agent token context.
+	 */
+	public static function get_acting_token_id(): ?int {
+		return self::$acting_token_id;
 	}
 
 	/**

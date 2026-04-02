@@ -140,7 +140,7 @@ class AgentAuthMiddleware {
 		// Set agent execution context in PermissionHelper.
 		// This adds the agent_id scoping layer and optional capability restrictions.
 		$token_capabilities = $token_record['capabilities'] ?? null;
-		PermissionHelper::set_agent_context( $agent_id, $owner_id, $token_capabilities );
+		PermissionHelper::set_agent_context( $agent_id, $owner_id, $token_capabilities, $token_id );
 
 		do_action(
 			'datamachine_log',
