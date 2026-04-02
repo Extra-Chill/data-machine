@@ -596,6 +596,9 @@ function datamachine_activate_for_site() {
 	// Drop orphaned per-site agent tables left behind by the migration (idempotent).
 	datamachine_drop_orphaned_agent_tables();
 
+	// Migrate agent_ping step types to flow configs (idempotent).
+	datamachine_migrate_agent_ping_to_system_task();
+
 	// Regenerate SITE.md with enriched content and clean up legacy SiteContext transient.
 	datamachine_regenerate_site_md();
 	delete_transient( 'datamachine_site_context_data' );
