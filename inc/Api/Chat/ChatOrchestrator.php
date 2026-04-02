@@ -250,6 +250,21 @@ class ChatOrchestrator {
 			$response_data['max_turns_reached'] = true;
 		}
 
+		/**
+		 * Fires after a chat response is fully processed and ready for external delivery.
+		 *
+		 * Extensions (e.g. chat bridge integrations) can hook here to forward
+		 * agent responses to external clients via webhooks, message queues, etc.
+		 *
+		 * @since 0.51.0
+		 *
+		 * @param string $session_id    Chat session ID.
+		 * @param array  $response_data Complete response data including response text, metadata, and conversation.
+		 * @param int    $agent_id      Agent ID that produced the response.
+		 * @param int    $user_id       WordPress user ID who owns the session.
+		 */
+		do_action( 'datamachine_chat_response_complete', $session_id, $response_data, $agent_id, $user_id );
+
 		return $response_data;
 	}
 
@@ -370,7 +385,7 @@ class ChatOrchestrator {
 			$model
 		);
 
-		return array(
+		$continue_response = array(
 			'session_id'        => $session_id,
 			'new_messages'      => $new_messages,
 			'final_content'     => $result['final_content'],
@@ -380,6 +395,11 @@ class ChatOrchestrator {
 			'max_turns'         => $max_turns,
 			'max_turns_reached' => $max_turns_reached,
 		);
+
+		/** This action is documented in inc/Api/Chat/ChatOrchestrator.php */
+		do_action( 'datamachine_chat_response_complete', $session_id, $continue_response, (int) ( $session['agent_id'] ?? 0 ), $user_id );
+
+		return $continue_response;
 	}
 
 	/**
@@ -484,12 +504,17 @@ class ChatOrchestrator {
 			)
 		);
 
-		return array(
+		$ping_response = array(
 			'session_id' => $session_id,
 			'response'   => $result['final_content'],
 			'turns'      => $result['turn_count'],
 			'completed'  => true,
 		);
+
+		/** This action is documented in inc/Api/Chat/ChatOrchestrator.php */
+		do_action( 'datamachine_chat_response_complete', $session_id, $ping_response, 0, $user_id );
+
+		return $ping_response;
 	}
 
 	/**
