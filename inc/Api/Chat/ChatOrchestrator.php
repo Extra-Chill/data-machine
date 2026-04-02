@@ -66,6 +66,7 @@ class ChatOrchestrator {
 
 		$chat_db          = new ChatDatabase();
 		$session_metadata = array();
+		$acting_token_id  = \DataMachine\Abilities\PermissionHelper::get_acting_token_id();
 
 		// --- Session resolution ---
 		if ( $session_id ) {
@@ -91,7 +92,7 @@ class ChatOrchestrator {
 			$session_metadata = $session['metadata'] ?? array();
 		} else {
 			// Check for recent pending session to prevent duplicates from timeout retries.
-			$pending_session = $chat_db->get_recent_pending_session( $user_id, 600, 'chat' );
+			$pending_session = $chat_db->get_recent_pending_session( $user_id, 600, 'chat', $acting_token_id );
 
 			if ( $pending_session ) {
 				$session_id = $pending_session['session_id'];

@@ -633,40 +633,49 @@ class Chat extends BaseRepository {
 	 * instead of creating a new one.
 	 *
 	 * @since 0.9.8
-	 * @param int    $user_id WordPress user ID
-	 * @param int    $seconds Lookback window in seconds (default 600 = 10 minutes)
-	 * @param string $context Context filter
+	 * @param int      $user_id WordPress user ID
+	 * @param int      $seconds Lookback window in seconds (default 600 = 10 minutes)
+	 * @param string   $context Context filter
+	 * @param int|null $token_id Optional token ID for login-scoped deduplication.
 	 * @return array|null Session data or null if none found
 	 */
 	public function get_recent_pending_session(
 		int $user_id,
 		int $seconds = 600,
-		string $context = 'chat'
+		string $context = 'chat',
+		?int $token_id = null
 	): ?array {
 		global $wpdb;
 
 		$table_name  = self::get_prefixed_table_name();
 		$cutoff_time = gmdate( 'Y-m-d H:i:s', time() - $seconds );
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$session = $wpdb->get_row(
-			$wpdb->prepare(
-				"SELECT * FROM %i
+		$query = "SELECT * FROM %i
 				WHERE user_id = %d
 				AND context = %s
 				AND created_at >= %s
 				AND (
 					(messages = '[]' OR messages = '' OR messages IS NULL)
 					OR (metadata LIKE %s)
-				)
-				ORDER BY created_at DESC
-				LIMIT 1",
-				$table_name,
-				$user_id,
-				$context,
-				$cutoff_time,
-				'%"status":"processing"%'
-			),
+				)";
+		$params = array(
+			$table_name,
+			$user_id,
+			$context,
+			$cutoff_time,
+			'%"status":"processing"%',
+		);
+
+		if ( null !== $token_id ) {
+			$query   .= ' AND metadata LIKE %s';
+			$params[] = '%"token_id":' . (int) $token_id . '%';
+		}
+
+		$query .= ' ORDER BY created_at DESC LIMIT 1';
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$session = $wpdb->get_row(
+			$wpdb->prepare( $query, $params ),
 			ARRAY_A
 		);
 
