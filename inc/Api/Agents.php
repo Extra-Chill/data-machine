@@ -80,6 +80,19 @@ class Agents {
 			)
 		);
 
+		// Agent self-identity (token-based, no admin caps required).
+		register_rest_route(
+			'datamachine/v1',
+			'/agents/me',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( self::class, 'handle_me' ),
+				'permission_callback' => function () {
+					return PermissionHelper::in_agent_context() || is_user_logged_in();
+				},
+			)
+		);
+
 		// Single agent: get, update, delete.
 		register_rest_route(
 			'datamachine/v1',
@@ -294,6 +307,74 @@ class Agents {
 	// ---------------------------------------------------------------
 	// Handlers
 	// ---------------------------------------------------------------
+
+	/**
+	 * Handle GET /agents/me — return identity info for the authenticated agent token.
+	 *
+	 * When called with an agent bearer token, returns the agent's identity and
+	 * site metadata. When called by a logged-in user without agent context,
+	 * returns the user's default agent (if any).
+	 *
+	 * This endpoint requires no admin capabilities — the token itself proves identity.
+	 * Designed for external integrations (chat bridges, API clients) to validate
+	 * tokens and discover agent metadata.
+	 *
+	 * @since 0.51.0
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 * @return \WP_REST_Response|WP_Error
+	 */
+	public static function handle_me( WP_REST_Request $request ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found
+		$agents_repo = new AgentsRepository();
+		$agent_id    = PermissionHelper::get_acting_agent_id();
+
+		if ( ! $agent_id ) {
+			// Not in agent context — try to find the user's default agent.
+			$user_id = get_current_user_id();
+			if ( ! $user_id ) {
+				return new WP_Error(
+					'not_authenticated',
+					__( 'Authentication required.', 'data-machine' ),
+					array( 'status' => 401 )
+				);
+			}
+
+			$agent = $agents_repo->get_by_owner_id( $user_id );
+			if ( ! $agent ) {
+				return new WP_Error(
+					'no_agent',
+					__( 'No agent found for this user.', 'data-machine' ),
+					array( 'status' => 404 )
+				);
+			}
+		} else {
+			$agent = $agents_repo->get_agent( $agent_id );
+			if ( ! $agent ) {
+				return new WP_Error(
+					'agent_not_found',
+					__( 'Agent not found.', 'data-machine' ),
+					array( 'status' => 404 )
+				);
+			}
+		}
+
+		$response = array(
+			'agent_id'   => (int) $agent['agent_id'],
+			'agent_slug' => $agent['agent_slug'],
+			'agent_name' => $agent['agent_name'],
+			'owner_id'   => (int) $agent['owner_id'],
+			'status'     => $agent['status'] ?? 'active',
+			'site_url'   => get_site_url(),
+			'site_name'  => get_bloginfo( 'name' ),
+		);
+
+		return rest_ensure_response(
+			array(
+				'success' => true,
+				'data'    => $response,
+			)
+		);
+	}
 
 	/**
 	 * Handle GET /agents — list agents the current user can access.
