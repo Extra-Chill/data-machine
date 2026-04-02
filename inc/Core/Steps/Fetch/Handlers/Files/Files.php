@@ -59,6 +59,11 @@ class Files extends FetchHandler {
 		$ability = new FetchFilesAbility();
 		$result  = $ability->execute( $ability_input );
 
+		if ( is_wp_error( $result ) ) {
+			$context->log( 'error', 'Files fetch failed: ' . $result->get_error_message() );
+			return array();
+		}
+
 		// Log ability logs
 		foreach ( $result['logs'] ?? array() as $log_entry ) {
 			$context->log(

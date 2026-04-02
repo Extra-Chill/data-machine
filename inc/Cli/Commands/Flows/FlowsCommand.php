@@ -820,6 +820,10 @@ class FlowsCommand extends BaseCommand {
 			$ability = new \DataMachine\Abilities\FlowAbilities();
 			$result  = $ability->executeUpdateFlow( $input );
 
+			if ( is_wp_error( $result ) ) {
+				WP_CLI::error( $result->get_error_message() );
+			}
+
 			if ( ! $result['success'] ) {
 				WP_CLI::error( $result['error'] ?? 'Failed to update flow' );
 				return;
@@ -845,6 +849,10 @@ class FlowsCommand extends BaseCommand {
 					'handler_config' => array( 'prompt' => $prompt ),
 				)
 			);
+
+			if ( is_wp_error( $step_result ) ) {
+				WP_CLI::error( $step_result->get_error_message() );
+			}
 
 			if ( ! $step_result['success'] ) {
 				WP_CLI::error( $step_result['error'] ?? 'Failed to update prompt' );
@@ -879,6 +887,10 @@ class FlowsCommand extends BaseCommand {
 
 			$step_ability = new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility();
 			$step_result  = $step_ability->execute( $step_input );
+
+			if ( is_wp_error( $step_result ) ) {
+				WP_CLI::error( $step_result->get_error_message() );
+			}
 
 			if ( ! $step_result['success'] ) {
 				WP_CLI::error( $step_result['error'] ?? 'Failed to update handler config' );

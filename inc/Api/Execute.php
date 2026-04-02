@@ -113,6 +113,10 @@ class Execute {
 
 		$result = $ability->execute( $input );
 
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
 		if ( ! ( $result['success'] ?? false ) ) {
 			$status = 400;
 			$error  = $result['error'] ?? __( 'Execution failed', 'data-machine' );

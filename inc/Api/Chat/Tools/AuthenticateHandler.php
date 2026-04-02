@@ -174,6 +174,10 @@ ACTIONS:
 
 		$result = $ability->execute( array( 'handler_slug' => $slug ) );
 
+		if ( is_wp_error( $result ) ) {
+			return $this->error( $result->get_error_message() );
+		}
+
 		if ( ! ( $result['success'] ?? false ) ) {
 			return $this->error( $result['error'] ?? "Auth provider not found for: $slug" );
 		}
@@ -213,6 +217,10 @@ ACTIONS:
 			)
 		);
 
+		if ( is_wp_error( $result ) ) {
+			return $this->error( $result->get_error_message() );
+		}
+
 		if ( ! ( $result['success'] ?? false ) ) {
 			return $this->error( $result['error'] ?? 'Failed to save configuration.' );
 		}
@@ -235,6 +243,10 @@ ACTIONS:
 		}
 
 		$result = $ability->execute( array( 'handler_slug' => $slug ) );
+
+		if ( is_wp_error( $result ) ) {
+			return $this->error( $result->get_error_message() );
+		}
 
 		if ( ! ( $result['success'] ?? false ) ) {
 			return $this->error( $result['error'] ?? "Auth provider not found for: $slug" );
@@ -262,6 +274,10 @@ ACTIONS:
 		}
 
 		$result = $ability->execute( array( 'handler_slug' => $slug ) );
+
+		if ( is_wp_error( $result ) ) {
+			return $this->error( $result->get_error_message() );
+		}
 
 		if ( ! ( $result['success'] ?? false ) ) {
 			return $this->error( $result['error'] ?? 'Failed to disconnect or not supported.' );

@@ -378,6 +378,10 @@ class Flows {
 
 		$result = $ability->execute( $input );
 
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
 		if ( ! $result['success'] ) {
 			return new \WP_Error(
 				'flow_creation_failed',
@@ -424,6 +428,10 @@ class Flows {
 			)
 		);
 
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
 		if ( ! $result['success'] ) {
 			return new \WP_Error(
 				'flow_deletion_failed',
@@ -465,6 +473,10 @@ class Flows {
 				'user_id'        => PermissionHelper::acting_user_id(),
 			)
 		);
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
 
 		if ( ! $result['success'] ) {
 			return new \WP_Error(
@@ -551,6 +563,10 @@ class Flows {
 
 		$result = $ability->execute( array( 'flow_id' => $flow_id ) );
 
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
 		if ( ! $result['success'] || empty( $result['flows'] ) ) {
 			$status = 400;
 			if ( false !== strpos( $result['error'] ?? '', 'not found' ) || empty( $result['flows'] ) ) {
@@ -614,6 +630,10 @@ class Flows {
 
 		$result = $ability->execute( $input );
 
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
 		if ( ! $result['success'] ) {
 			return new \WP_Error(
 				'update_failed',
@@ -627,7 +647,7 @@ class Flows {
 		$get_ability = wp_get_ability( 'datamachine/get-flows' );
 		if ( $get_ability ) {
 			$flow_result = $get_ability->execute( array( 'flow_id' => $flow_id ) );
-			if ( ( $flow_result['success'] ?? false ) && ! empty( $flow_result['flows'] ) ) {
+			if ( ! is_wp_error( $flow_result ) && ( $flow_result['success'] ?? false ) && ! empty( $flow_result['flows'] ) ) {
 				return rest_ensure_response(
 					array(
 						'success' => true,
@@ -664,6 +684,10 @@ class Flows {
 
 		$result = $ability->execute( array( 'flow_id' => $flow_id ) );
 
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
 		if ( ! $result['success'] ) {
 			return new \WP_Error(
 				'pause_failed',
@@ -691,6 +715,10 @@ class Flows {
 		}
 
 		$result = $ability->execute( array( 'flow_id' => $flow_id ) );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
 
 		if ( ! $result['success'] ) {
 			return new \WP_Error(
@@ -737,6 +765,10 @@ class Flows {
 
 		$result = $ability->execute( $input );
 
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
 		if ( ! $result['success'] ) {
 			return new \WP_Error(
 				'bulk_pause_failed',
@@ -782,6 +814,10 @@ class Flows {
 
 		$result = $ability->execute( $input );
 
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
 		if ( ! $result['success'] ) {
 			return new \WP_Error(
 				'bulk_resume_failed',
@@ -814,6 +850,10 @@ class Flows {
 		}
 
 		$result = $ability->execute( $input );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
 
 		if ( ! $result['success'] ) {
 			return new \WP_Error(

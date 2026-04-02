@@ -138,6 +138,11 @@ class WordPress extends PublishHandler {
 						)
 					);
 
+					if ( is_wp_error( $duplicate_result ) ) {
+						$this->log( 'warning', 'Duplicate check failed: ' . $duplicate_result->get_error_message() );
+						$duplicate_result = array();
+					}
+
 					if ( is_array( $duplicate_result ) && 'duplicate' === ( $duplicate_result['verdict'] ?? '' ) ) {
 						$existing_id = (int) ( $duplicate_result['match']['post_id'] ?? 0 );
 					}
@@ -191,6 +196,14 @@ class WordPress extends PublishHandler {
 
 		$ability = new PublishWordPressAbility();
 		$result  = $ability->execute( $ability_input );
+
+		if ( is_wp_error( $result ) ) {
+			$this->log( 'error', 'WordPress publish ability failed: ' . $result->get_error_message() );
+			return $this->errorResponse(
+				$result->get_error_message(),
+				array( 'wp_error_code' => $result->get_error_code() )
+			);
+		}
 
 		// Log ability logs
 		if ( ! empty( $result['logs'] ) && is_array( $result['logs'] ) ) {

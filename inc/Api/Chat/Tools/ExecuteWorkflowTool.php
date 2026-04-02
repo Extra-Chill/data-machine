@@ -112,6 +112,14 @@ EXAMPLE:
 
 		$result = $ability->execute( $input );
 
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'execute_workflow',
+			);
+		}
+
 		if ( ! ( $result['success'] ?? false ) ) {
 			do_action(
 				'datamachine_log',

@@ -42,6 +42,14 @@ class WordPressPostReader extends BaseTool {
 		$ability = new GetWordPressPostAbility();
 		$result  = $ability->execute( $ability_input );
 
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'wordpress_post_reader',
+			);
+		}
+
 		if ( ! $result['success'] ) {
 			return array(
 				'success'   => false,

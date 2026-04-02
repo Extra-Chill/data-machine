@@ -72,6 +72,14 @@ class GetProblemFlows extends BaseTool {
 
 		$result = $ability->execute( $input );
 
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'get_problem_flows',
+			);
+		}
+
 		if ( ! ( $result['success'] ?? false ) ) {
 			return array(
 				'success'   => false,

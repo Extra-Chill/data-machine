@@ -246,6 +246,10 @@ class FlowQueue {
 			)
 		);
 
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
 		if ( ! $result['success'] ) {
 			$status = 400;
 			if ( false !== strpos( $result['error'] ?? '', 'not found' ) ) {
@@ -327,6 +331,13 @@ class FlowQueue {
 				)
 			);
 
+			if ( is_wp_error( $result ) ) {
+				if ( 0 === $added_count ) {
+					return $result;
+				}
+				continue;
+			}
+
 			if ( $result['success'] ) {
 				++$added_count;
 				$queue_length = $result['queue_length'];
@@ -380,6 +391,10 @@ class FlowQueue {
 			)
 		);
 
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
 		if ( ! $result['success'] ) {
 			$status = 400;
 			if ( false !== strpos( $result['error'] ?? '', 'not found' ) ) {
@@ -427,6 +442,10 @@ class FlowQueue {
 				'index'        => (int) $request->get_param( 'index' ),
 			)
 		);
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
 
 		if ( ! $result['success'] ) {
 			$status = 400;
@@ -478,6 +497,10 @@ class FlowQueue {
 			)
 		);
 
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
 		if ( ! $result['success'] ) {
 			$status = 400;
 			if ( false !== strpos( $result['error'] ?? '', 'not found' ) ) {
@@ -526,6 +549,10 @@ class FlowQueue {
 				'queue_enabled' => (bool) $request->get_param( 'queue_enabled' ),
 			)
 		);
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
 
 		if ( ! $result['success'] ) {
 			$status = 400;

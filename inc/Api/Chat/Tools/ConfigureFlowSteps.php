@@ -297,6 +297,14 @@ class ConfigureFlowSteps extends BaseTool {
 
 		$result = $ability->execute( $input );
 
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'configure_flow_steps',
+			);
+		}
+
 		$result['tool_name'] = 'configure_flow_steps';
 
 		if ( $result['success'] ) {
@@ -457,7 +465,16 @@ class ConfigureFlowSteps extends BaseTool {
 			$input['user_message'] = $user_message;
 		}
 
-		$result              = $ability->execute( $input );
+		$result = $ability->execute( $input );
+
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'configure_flow_steps',
+			);
+		}
+
 		$result['tool_name'] = 'configure_flow_steps';
 
 		if ( $result['success'] ?? false ) {
@@ -544,6 +561,14 @@ class ConfigureFlowSteps extends BaseTool {
 		}
 
 		$result = $ability->execute( $input );
+
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'configure_flow_steps',
+			);
+		}
 
 		$result['tool_name'] = 'configure_flow_steps';
 
@@ -644,6 +669,14 @@ class ConfigureFlowSteps extends BaseTool {
 				'validate_only' => $validate_only,
 			)
 		);
+
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'configure_flow_steps',
+			);
+		}
 
 		$result['tool_name'] = 'configure_flow_steps';
 

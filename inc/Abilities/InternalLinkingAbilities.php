@@ -978,7 +978,7 @@ class InternalLinkingAbilities {
 		}
 
 		// 2. Fetch GSC page stats via the ability.
-		$gsc_ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/google-search-console' ) : null;
+		$gsc_ability = wp_get_ability( 'datamachine/google-search-console' );
 
 		if ( ! $gsc_ability ) {
 			return array(

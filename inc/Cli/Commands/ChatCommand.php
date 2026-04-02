@@ -355,6 +355,10 @@ class ChatCommand extends BaseCommand {
 			'force'      => $force,
 		) );
 
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? $result['message'] ?? 'Failed to generate title.' );
 			return;

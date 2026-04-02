@@ -84,6 +84,11 @@ class WordPressAPI extends FetchHandler {
 		$ability = new FetchWordPressApiAbility();
 		$result  = $ability->execute( $ability_input );
 
+		if ( is_wp_error( $result ) ) {
+			$context->log( 'error', 'WordPressAPI fetch failed: ' . $result->get_error_message() );
+			return array();
+		}
+
 		// Log all ability logs
 		foreach ( $result['logs'] ?? array() as $log_entry ) {
 			$context->log(
