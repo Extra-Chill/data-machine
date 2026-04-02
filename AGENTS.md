@@ -2,7 +2,7 @@
 
 Data Machine — WordPress plugin for automating content workflows with AI. Visual pipeline builder, chat agent, REST API, and extensibility via handlers and tools.
 
-This file provides a concise, present-tense technical reference for contributors and automated agents. For user-focused docs see `docs/`. For the agent skill (how to *use* Data Machine), see `skills/data-machine/SKILL.md`.
+This file provides a concise, present-tense technical reference for contributors and automated agents. For user-focused docs see `docs/`. For the agent skill (how to *use* Data Machine), see [data-machine-skills](https://github.com/Extra-Chill/data-machine-skills).
 
 ## Build system
 
@@ -143,7 +143,7 @@ Design principles
 
 Where to find more
 
-- Agent skill: `skills/data-machine/SKILL.md`
+- Agent skill: [data-machine-skills](https://github.com/Extra-Chill/data-machine-skills)
 - User docs: `docs/`
 - Code: `inc/`
 - Admin UI source: `inc/Core/Admin/Pages/`
