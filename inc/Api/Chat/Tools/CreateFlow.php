@@ -218,6 +218,14 @@ class CreateFlow extends BaseTool {
 			)
 		);
 
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'create_flow',
+			);
+		}
+
 		$result['tool_name'] = 'create_flow';
 
 		if ( $result['success'] ?? false ) {

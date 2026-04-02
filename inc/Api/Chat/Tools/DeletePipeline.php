@@ -72,6 +72,14 @@ class DeletePipeline extends BaseTool {
 		}
 		$result = $ability->execute( array( 'pipeline_id' => $pipeline_id ) );
 
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'delete_pipeline',
+			);
+		}
+
 		if ( ! $result['success'] ) {
 			return array(
 				'success'   => false,

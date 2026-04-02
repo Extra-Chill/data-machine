@@ -85,6 +85,14 @@ class DeleteFile extends BaseTool {
 
 		$result = $ability->execute( $input );
 
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'delete_file',
+			);
+		}
+
 		if ( ! $result['success'] ) {
 			return array(
 				'success'   => false,

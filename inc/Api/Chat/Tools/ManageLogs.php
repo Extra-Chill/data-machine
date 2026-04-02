@@ -119,6 +119,14 @@ NOTES:
 				: array()
 		);
 
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'manage_logs',
+			);
+		}
+
 		if ( ! ( $result['success'] ?? false ) ) {
 			return array(
 				'success'   => false,
@@ -155,6 +163,14 @@ NOTES:
 				? array( 'agent_id' => $agent_id )
 				: array()
 		);
+
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'manage_logs',
+			);
+		}
 
 		if ( ! ( $result['success'] ?? false ) ) {
 			return array(

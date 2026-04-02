@@ -263,6 +263,10 @@ class TestCommand extends BaseCommand {
 		$ability = new TestHandlerAbility();
 		$result  = $ability->execute( $input );
 
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Test failed.' );
 			return;

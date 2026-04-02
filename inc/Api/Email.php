@@ -490,8 +490,17 @@ class Email {
 
 	/**
 	 * Convert ability result to REST response.
+	 *
+	 * Accepts WP_Error (from core's WP_Ability::execute() pipeline) or the
+	 * legacy { success: bool, error?: string } array from ability callbacks.
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine/issues/999
 	 */
-	private static function to_response( array $result ): \WP_REST_Response|\WP_Error {
+	private static function to_response( \WP_Error|array $result ): \WP_REST_Response|\WP_Error {
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
 		if ( ! ( $result['success'] ?? false ) ) {
 			return new \WP_Error(
 				'email_error',

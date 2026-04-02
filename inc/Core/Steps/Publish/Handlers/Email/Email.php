@@ -124,6 +124,14 @@ class Email extends PublishHandler {
 		$ability = new SendEmailAbility();
 		$result  = $ability->execute( $ability_input );
 
+		if ( is_wp_error( $result ) ) {
+			$this->log( 'error', 'Email publish ability failed: ' . $result->get_error_message() );
+			return $this->errorResponse(
+				$result->get_error_message(),
+				array( 'wp_error_code' => $result->get_error_code() )
+			);
+		}
+
 		// Relay ability logs.
 		if ( ! empty( $result['logs'] ) && is_array( $result['logs'] ) ) {
 			foreach ( $result['logs'] as $log_entry ) {

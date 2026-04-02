@@ -92,6 +92,14 @@ class SetHandlerDefaults extends BaseTool {
 			)
 		);
 
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'set_handler_defaults',
+			);
+		}
+
 		if ( ! ( $result['success'] ?? false ) ) {
 			return array(
 				'success'   => false,

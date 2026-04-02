@@ -139,6 +139,14 @@ TIPS:
 
 		$result = $ability->execute( $input );
 
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'read_logs',
+			);
+		}
+
 		if ( ! ( $result['success'] ?? false ) ) {
 			return array(
 				'success'   => false,

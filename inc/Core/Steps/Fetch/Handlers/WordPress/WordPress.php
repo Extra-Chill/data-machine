@@ -70,6 +70,11 @@ class WordPress extends FetchHandler {
 		$ability = new GetWordPressPostAbility();
 		$result  = $ability->execute( $ability_input );
 
+		if ( is_wp_error( $result ) ) {
+			$context->log( 'error', 'WordPress fetch single post failed: ' . $result->get_error_message() );
+			return array();
+		}
+
 		// Log ability logs
 		if ( ! empty( $result['logs'] ) && is_array( $result['logs'] ) ) {
 			foreach ( $result['logs'] as $log_entry ) {
@@ -158,6 +163,11 @@ class WordPress extends FetchHandler {
 
 		$ability = new QueryWordPressPostsAbility();
 		$result  = $ability->execute( $ability_input );
+
+		if ( is_wp_error( $result ) ) {
+			$context->log( 'error', 'WordPress fetch query failed: ' . $result->get_error_message() );
+			return array();
+		}
 
 		// Log ability logs.
 		if ( ! empty( $result['logs'] ) && is_array( $result['logs'] ) ) {

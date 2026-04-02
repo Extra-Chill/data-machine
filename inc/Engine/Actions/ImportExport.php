@@ -64,13 +64,25 @@ class ImportExport {
 				$existing_id = $this->find_pipeline_by_name( $pipeline_name );
 
 				if ( ! $existing_id ) {
-					$ability     = wp_get_ability( 'datamachine/create-pipeline' );
-					$result      = $ability->execute(
+					$ability = wp_get_ability( 'datamachine/create-pipeline' );
+
+					if ( ! $ability ) {
+						do_action( 'datamachine_log', 'error', 'Import: create-pipeline ability not available' );
+						continue;
+					}
+
+					$result = $ability->execute(
 						array(
 							'pipeline_name' => $pipeline_name,
 							'flow_config'   => array( 'flow_name' => 'Default Flow' ),
 						)
 					);
+
+					if ( is_wp_error( $result ) ) {
+						do_action( 'datamachine_log', 'error', 'Import: create-pipeline failed: ' . $result->get_error_message() );
+						continue;
+					}
+
 					$existing_id = $result['success'] ? ( $result['pipeline_id'] ?? false ) : false;
 				}
 
@@ -82,12 +94,15 @@ class ImportExport {
 
 			if ( isset( $processed[ $pipeline_name ] ) && $step_type ) {
 				$add_step_ability = wp_get_ability( 'datamachine/add-pipeline-step' );
-				$add_step_ability->execute(
-					array(
-						'pipeline_id' => $processed[ $pipeline_name ],
-						'step_type'   => $step_type,
-					)
-				);
+
+				if ( $add_step_ability ) {
+					$add_step_ability->execute(
+						array(
+							'pipeline_id' => $processed[ $pipeline_name ],
+							'step_type'   => $step_type,
+						)
+					);
+				}
 			}
 		}
 

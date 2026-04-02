@@ -65,6 +65,14 @@ class DeletePipelineStep extends BaseTool {
 		}
 		$result = $ability->execute( $parameters );
 
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'delete_pipeline_step',
+			);
+		}
+
 		return array(
 			'success'   => $result['success'],
 			'data'      => $result['success'] ? $result : null,

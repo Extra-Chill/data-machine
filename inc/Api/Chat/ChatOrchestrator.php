@@ -223,7 +223,7 @@ class ChatOrchestrator {
 		if ( $update_success ) {
 			$session = $chat_db->get_session( $session_id );
 			if ( $session && empty( $session['title'] ) ) {
-				$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/generate-session-title' ) : null;
+				$ability = wp_get_ability( 'datamachine/generate-session-title' );
 				if ( $ability ) {
 					$ability->execute( array( 'session_id' => $session_id ) );
 				}
@@ -468,7 +468,7 @@ class ChatOrchestrator {
 		);
 
 		// Generate title.
-		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/generate-session-title' ) : null;
+		$ability = wp_get_ability( 'datamachine/generate-session-title' );
 		if ( $ability ) {
 			$ability->execute( array( 'session_id' => $session_id ) );
 		}
@@ -511,7 +511,7 @@ class ChatOrchestrator {
 				: 0;
 		}
 
-		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/create-chat-session' ) : null;
+		$ability = wp_get_ability( 'datamachine/create-chat-session' );
 
 		if ( $ability ) {
 			$input = array(
@@ -529,6 +529,10 @@ class ChatOrchestrator {
 					return $ability->execute( $input );
 				}
 			);
+
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
 
 			if ( empty( $result['success'] ) ) {
 				return new WP_Error(

@@ -268,6 +268,10 @@ class Settings {
 			)
 		);
 
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
 		if ( ! $result['success'] ) {
 			$status = 400;
 			if ( false !== strpos( $result['error'] ?? '', 'Unknown tool' ) ) {

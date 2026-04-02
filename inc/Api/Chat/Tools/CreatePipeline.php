@@ -144,6 +144,14 @@ class CreatePipeline extends BaseTool {
 			)
 		);
 
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'create_pipeline',
+			);
+		}
+
 		if ( ! ( $result['success'] ?? false ) ) {
 			return array(
 				'success'   => false,
@@ -231,6 +239,14 @@ class CreatePipeline extends BaseTool {
 				'validate_only' => $validate_only,
 			)
 		);
+
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'create_pipeline',
+			);
+		}
 
 		$result['tool_name'] = 'create_pipeline';
 

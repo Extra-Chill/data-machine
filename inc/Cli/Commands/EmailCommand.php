@@ -89,6 +89,10 @@ class EmailCommand extends BaseCommand {
 
 		$result = $ability->execute( $input );
 
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+
 		if ( $result['success'] ?? false ) {
 			WP_CLI::success( $result['message'] ?? 'Email sent.' );
 		} else {
@@ -187,6 +191,10 @@ class EmailCommand extends BaseCommand {
 		);
 
 		$result = $ability->execute( $input );
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
 
 		if ( ! ( $result['success'] ?? false ) ) {
 			WP_CLI::error( $result['error'] ?? 'Fetch failed.' );
@@ -298,6 +306,10 @@ class EmailCommand extends BaseCommand {
 			'uid'             => $uid,
 		) );
 
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+
 		if ( ! ( $result['success'] ?? false ) ) {
 			WP_CLI::error( $result['error'] ?? 'Message not found.' );
 		}
@@ -386,6 +398,10 @@ class EmailCommand extends BaseCommand {
 
 		$result = $ability->execute( $input );
 
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+
 		if ( $result['success'] ?? false ) {
 			WP_CLI::success( $result['message'] ?? 'Reply sent.' );
 		} else {
@@ -437,6 +453,10 @@ class EmailCommand extends BaseCommand {
 			'folder' => $assoc_args['folder'] ?? 'INBOX',
 		) );
 
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+
 		if ( $result['success'] ?? false ) {
 			WP_CLI::success( $result['message'] ?? 'Message deleted.' );
 		} else {
@@ -486,6 +506,10 @@ class EmailCommand extends BaseCommand {
 			'destination' => $destination,
 			'folder'      => $assoc_args['folder'] ?? 'INBOX',
 		) );
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
 
 		if ( $result['success'] ?? false ) {
 			WP_CLI::success( $result['message'] ?? 'Message moved.' );
@@ -546,6 +570,10 @@ class EmailCommand extends BaseCommand {
 			'action' => $assoc_args['action'] ?? 'set',
 			'folder' => $assoc_args['folder'] ?? 'INBOX',
 		) );
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
 
 		if ( $result['success'] ?? false ) {
 			WP_CLI::success( $result['message'] ?? 'Flag updated.' );
@@ -611,6 +639,10 @@ class EmailCommand extends BaseCommand {
 			'folder'      => $assoc_args['folder'] ?? 'INBOX',
 			'max'         => (int) ( $assoc_args['max'] ?? 500 ),
 		) );
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
 
 		if ( $result['success'] ?? false ) {
 			WP_CLI::success( $result['message'] ?? 'Batch move complete.' );
@@ -688,6 +720,10 @@ class EmailCommand extends BaseCommand {
 			'max'    => (int) ( $assoc_args['max'] ?? 500 ),
 		) );
 
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+
 		if ( $result['success'] ?? false ) {
 			WP_CLI::success( $result['message'] ?? 'Batch flag complete.' );
 		} else {
@@ -746,6 +782,10 @@ class EmailCommand extends BaseCommand {
 			'max'    => (int) ( $assoc_args['max'] ?? 100 ),
 		) );
 
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+
 		if ( $result['success'] ?? false ) {
 			WP_CLI::success( $result['message'] ?? 'Batch delete complete.' );
 		} else {
@@ -791,6 +831,10 @@ class EmailCommand extends BaseCommand {
 			'uid'    => $uid,
 			'folder' => $assoc_args['folder'] ?? 'INBOX',
 		) );
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
 
 		if ( $result['success'] ?? false ) {
 			WP_CLI::success( $result['message'] ?? 'Unsubscribed.' );
@@ -854,6 +898,10 @@ class EmailCommand extends BaseCommand {
 			'max'    => (int) ( $assoc_args['max'] ?? 20 ),
 		) );
 
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+
 		if ( ! ( $result['success'] ?? false ) ) {
 			WP_CLI::error( $result['error'] ?? 'Batch unsubscribe failed.' );
 		}
@@ -889,6 +937,10 @@ class EmailCommand extends BaseCommand {
 		}
 
 		$result = $ability->execute( array() );
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
 
 		if ( $result['success'] ?? false ) {
 			WP_CLI::success( $result['message'] ?? 'Connection OK.' );

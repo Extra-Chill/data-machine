@@ -81,6 +81,11 @@ class Email extends FetchHandler {
 		$ability = new FetchEmailAbility();
 		$result  = $ability->execute( $ability_input );
 
+		if ( is_wp_error( $result ) ) {
+			$context->log( 'error', 'Email fetch failed: ' . $result->get_error_message() );
+			return array();
+		}
+
 		// Relay ability logs.
 		if ( ! empty( $result['logs'] ) && is_array( $result['logs'] ) ) {
 			foreach ( $result['logs'] as $log_entry ) {
