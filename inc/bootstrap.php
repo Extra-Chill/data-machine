@@ -114,11 +114,14 @@ MemoryFileRegistry::register( 'MEMORY.md', 30, array(
 ) );
 
 // User layer — human preferences, network-scoped on multisite.
+// Only injected in interactive contexts where a human is present.
+// Pipelines can still opt in via pipeline memory file selection.
 MemoryFileRegistry::register( 'USER.md', 25, array(
 	'layer'       => MemoryFileRegistry::LAYER_USER,
 	'protected'   => true,
+	'contexts'    => array( 'chat', 'editor' ),
 	'label'       => 'User Profile',
-	'description' => 'Information about the human the agent works with.',
+	'description' => 'Information about the human the agent works with. Injected in chat and editor contexts only.',
 ) );
 
 // Network layer — multisite topology, only meaningful on multisite installs.

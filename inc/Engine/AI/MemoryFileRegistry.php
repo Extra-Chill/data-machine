@@ -15,6 +15,7 @@
  * @since   0.30.0
  * @since   0.42.0 Added layer-aware registration with metadata.
  * @since   0.50.0 Added editability control with capability gating.
+ * @since   0.60.0 Added context-aware injection control.
  */
 
 namespace DataMachine\Engine\AI;
@@ -30,6 +31,11 @@ class MemoryFileRegistry {
 	const LAYER_AGENT   = 'agent';
 	const LAYER_USER    = 'user';
 	const LAYER_NETWORK = 'network';
+
+	/**
+	 * Special context value meaning "inject in all contexts."
+	 */
+	const CONTEXT_ALL = 'all';
 
 	/**
 	 * Registered memory files.
@@ -50,6 +56,7 @@ class MemoryFileRegistry {
 	 *
 	 * @since 0.42.0 Accepts $args array with layer, protected, label, description.
 	 * @since 0.50.0 Added `editable` argument for write-permission gating.
+	 * @since 0.60.0 Added `contexts` argument for context-aware injection.
 	 *
 	 * @param string    $filename Filename (e.g. 'SOUL.md', 'brand-guidelines.md').
 	 * @param int       $priority Sort order. Lower numbers load first.
@@ -64,6 +71,10 @@ class MemoryFileRegistry {
 	 *                                    can_manage(). false = read-only (backend/filters only).
 	 *                                    A capability string (e.g. 'manage_options') = editable only
 	 *                                    by users with that WordPress capability. Default true.
+	 *     @type string[]    $contexts    Execution contexts where this file should be injected.
+	 *                                    Array of context slugs (e.g. 'chat', 'editor', 'pipeline',
+	 *                                    'system') or array( 'all' ) to inject everywhere.
+	 *                                    Default array( 'all' ).
 	 * }
 	 * @return void
 	 */
@@ -85,12 +96,20 @@ class MemoryFileRegistry {
 			$editable = true;
 		}
 
+		// Normalize contexts: array of slugs, or ['all'] (default).
+		$contexts = $args['contexts'] ?? array( self::CONTEXT_ALL );
+		if ( ! is_array( $contexts ) || empty( $contexts ) ) {
+			$contexts = array( self::CONTEXT_ALL );
+		}
+		$contexts = array_values( array_unique( array_map( 'sanitize_key', $contexts ) ) );
+
 		self::$files[ $filename ] = array(
 			'filename'    => $filename,
 			'priority'    => $priority,
 			'layer'       => $layer,
 			'protected'   => (bool) ( $args['protected'] ?? false ),
 			'editable'    => $editable,
+			'contexts'    => $contexts,
 			'label'       => $args['label'] ?? self::filename_to_label( $filename ),
 			'description' => $args['description'] ?? '',
 		);
@@ -245,6 +264,71 @@ class MemoryFileRegistry {
 				return $meta['layer'] === $layer;
 			}
 		);
+	}
+
+	/**
+	 * Get all files applicable to a specific execution context.
+	 *
+	 * Returns files that either list the context in their `contexts` array
+	 * or are registered with `['all']` (the default).
+	 *
+	 * @since 0.60.0
+	 *
+	 * @param string $context Execution context slug (e.g. 'chat', 'pipeline', 'system', 'editor').
+	 * @return array<string, array> Filtered and sorted file metadata.
+	 */
+	public static function get_for_context( string $context ): array {
+		$context = sanitize_key( $context );
+
+		if ( empty( $context ) ) {
+			return self::get_resolved();
+		}
+
+		return array_filter(
+			self::get_resolved(),
+			function ( $meta ) use ( $context ) {
+				$contexts = $meta['contexts'] ?? array( self::CONTEXT_ALL );
+				return in_array( self::CONTEXT_ALL, $contexts, true )
+					|| in_array( $context, $contexts, true );
+			}
+		);
+	}
+
+	/**
+	 * Check if a file applies to a specific execution context.
+	 *
+	 * @since 0.60.0
+	 *
+	 * @param string $filename Filename to check.
+	 * @param string $context  Execution context slug.
+	 * @return bool True if the file should be injected in this context.
+	 */
+	public static function applies_to_context( string $filename, string $context ): bool {
+		$resolved = self::get_resolved();
+		$filename = sanitize_file_name( $filename );
+		$context  = sanitize_key( $context );
+
+		if ( ! isset( $resolved[ $filename ] ) ) {
+			return true; // Unregistered files are included everywhere.
+		}
+
+		$contexts = $resolved[ $filename ]['contexts'] ?? array( self::CONTEXT_ALL );
+		return in_array( self::CONTEXT_ALL, $contexts, true )
+			|| in_array( $context, $contexts, true );
+	}
+
+	/**
+	 * Get the contexts array for a registered file.
+	 *
+	 * @since 0.60.0
+	 *
+	 * @param string $filename Filename to look up.
+	 * @return string[]|null Contexts array, or null if not registered.
+	 */
+	public static function get_contexts( string $filename ): ?array {
+		$resolved = self::get_resolved();
+		$filename = sanitize_file_name( $filename );
+		return isset( $resolved[ $filename ] ) ? ( $resolved[ $filename ]['contexts'] ?? array( self::CONTEXT_ALL ) ) : null;
 	}
 
 	/**
