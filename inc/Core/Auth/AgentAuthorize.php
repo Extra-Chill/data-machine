@@ -60,18 +60,30 @@ class AgentAuthorize {
 				'callback'            => array( $this, 'handle_authorize_get' ),
 				'permission_callback' => '__return_true',
 				'args'                => array(
-					'agent_slug'   => array(
+					'agent_slug'            => array(
 						'required' => true,
 						'type'     => 'string',
 					),
-					'redirect_uri' => array(
+					'redirect_uri'          => array(
 						'required' => true,
 						'type'     => 'string',
 					),
-					'label'        => array(
+					'label'                 => array(
 						'required' => false,
 						'type'     => 'string',
 						'default'  => '',
+					),
+					'code_challenge'        => array(
+						'required' => false,
+						'type'     => 'string',
+					),
+					'code_challenge_method' => array(
+						'required' => false,
+						'type'     => 'string',
+					),
+					'state'                 => array(
+						'required' => false,
+						'type'     => 'string',
 					),
 				),
 			)
@@ -86,26 +98,38 @@ class AgentAuthorize {
 				'callback'            => array( $this, 'handle_authorize_post' ),
 				'permission_callback' => '__return_true',
 				'args'                => array(
-					'agent_slug'   => array(
+					'agent_slug'            => array(
 						'required' => true,
 						'type'     => 'string',
 					),
-					'redirect_uri' => array(
+					'redirect_uri'          => array(
 						'required' => true,
 						'type'     => 'string',
 					),
-					'label'        => array(
+					'label'                 => array(
 						'required' => false,
 						'type'     => 'string',
 						'default'  => '',
 					),
-					'action'       => array(
+					'action'                => array(
 						'required' => true,
 						'type'     => 'string',
 						'enum'     => array( 'authorize', 'deny' ),
 					),
-					'_wpnonce'     => array(
+					'_wpnonce'              => array(
 						'required' => true,
+						'type'     => 'string',
+					),
+					'code_challenge'        => array(
+						'required' => false,
+						'type'     => 'string',
+					),
+					'code_challenge_method' => array(
+						'required' => false,
+						'type'     => 'string',
+					),
+					'state'                 => array(
+						'required' => false,
 						'type'     => 'string',
 					),
 				),
@@ -120,9 +144,12 @@ class AgentAuthorize {
 	 * @return \WP_REST_Response|void Response or redirect.
 	 */
 	public function handle_authorize_get( \WP_REST_Request $request ) {
-		$agent_slug   = sanitize_text_field( $request->get_param( 'agent_slug' ) );
-		$redirect_uri = esc_url_raw( $request->get_param( 'redirect_uri' ) );
-		$label        = sanitize_text_field( $request->get_param( 'label' ) );
+		$agent_slug            = sanitize_text_field( $request->get_param( 'agent_slug' ) );
+		$redirect_uri          = esc_url_raw( $request->get_param( 'redirect_uri' ) );
+		$label                 = sanitize_text_field( $request->get_param( 'label' ) );
+		$code_challenge        = sanitize_text_field( $request->get_param( 'code_challenge' ) );
+		$code_challenge_method = sanitize_text_field( $request->get_param( 'code_challenge_method' ) );
+		$state                 = sanitize_text_field( $request->get_param( 'state' ) );
 
 		// Look up the agent first — we need it for redirect URI validation.
 		$agents_repo = new Agents();
@@ -145,14 +172,19 @@ class AgentAuthorize {
 		// If not logged in, redirect to wp-login with return URL.
 		if ( ! is_user_logged_in() ) {
 			$authorize_url = rest_url( 'datamachine/v1/agent/authorize' );
-			$authorize_url = add_query_arg(
-				array(
-					'agent_slug'   => $agent_slug,
-					'redirect_uri' => rawurlencode( $redirect_uri ),
-					'label'        => $label,
-				),
-				$authorize_url
+			$query_args    = array(
+				'agent_slug'            => $agent_slug,
+				'redirect_uri'          => rawurlencode( $redirect_uri ),
+				'label'                 => $label,
+				'code_challenge'        => $code_challenge,
+				'code_challenge_method' => $code_challenge_method,
+				'state'                 => $state,
 			);
+			// Remove empty PKCE params so the URL stays clean for non-PKCE flows.
+			$query_args = array_filter( $query_args, function ( $v ) {
+				return '' !== $v;
+			} );
+			$authorize_url = add_query_arg( $query_args, $authorize_url );
 
 			$login_url = wp_login_url( $authorize_url );
 
@@ -172,7 +204,7 @@ class AgentAuthorize {
 		}
 
 		// Render consent screen.
-		$this->render_consent_screen( $agent, $redirect_uri, $label );
+		$this->render_consent_screen( $agent, $redirect_uri, $label, $code_challenge, $code_challenge_method, $state );
 		exit;
 	}
 
@@ -231,6 +263,40 @@ class AgentAuthorize {
 		$user_id = get_current_user_id();
 		if ( ! $this->user_can_authorize( $user_id, $agent ) ) {
 			header( 'Location: ' . add_query_arg( 'error', 'access_denied', $redirect_uri ) );
+			exit;
+		}
+
+		/**
+		 * Filter: Allow extensions to intercept the authorize flow before token minting.
+		 *
+		 * Return null to proceed with default token minting. Return a WP_Error to
+		 * abort. Return a string URL to redirect immediately (for PKCE auth code flow).
+		 *
+		 * @since 0.64.0
+		 *
+		 * @param string|null       $redirect_url  null to proceed, or URL to redirect to.
+		 * @param array             $agent         Agent row (agent_id, agent_slug, agent_name, owner_id, agent_config).
+		 * @param int               $user_id       Authorizing WordPress user ID.
+		 * @param string            $redirect_uri  The redirect_uri from the request.
+		 * @param string            $label         Token label.
+		 * @param \WP_REST_Request  $request       Full request object (access to all POST params).
+		 */
+		$redirect_override = apply_filters(
+			'datamachine_agent_authorize_pre_token',
+			null,
+			$agent,
+			$user_id,
+			$redirect_uri,
+			$label,
+			$request
+		);
+
+		if ( null !== $redirect_override ) {
+			if ( is_wp_error( $redirect_override ) ) {
+				header( 'Location: ' . add_query_arg( 'error', $redirect_override->get_error_code(), $redirect_uri ) );
+				exit;
+			}
+			header( 'Location: ' . $redirect_override );
 			exit;
 		}
 
@@ -393,11 +459,14 @@ class AgentAuthorize {
 	 *
 	 * Minimal, self-contained page — no admin chrome needed.
 	 *
-	 * @param array  $agent        Agent row.
-	 * @param string $redirect_uri Callback URI.
-	 * @param string $label        Optional token label.
+	 * @param array  $agent                  Agent row.
+	 * @param string $redirect_uri           Callback URI.
+	 * @param string $label                  Optional token label.
+	 * @param string $code_challenge         PKCE code challenge (empty if not PKCE).
+	 * @param string $code_challenge_method  PKCE method (e.g. 'S256').
+	 * @param string $state                  PKCE state parameter.
 	 */
-	private function render_consent_screen( array $agent, string $redirect_uri, string $label ): void {
+	private function render_consent_screen( array $agent, string $redirect_uri, string $label, string $code_challenge = '', string $code_challenge_method = '', string $state = '' ): void {
 		$nonce      = wp_create_nonce( self::NONCE_ACTION );
 		$user       = wp_get_current_user();
 		$action_url = rest_url( 'datamachine/v1/agent/authorize' );
@@ -542,7 +611,13 @@ class AgentAuthorize {
 			<input type="hidden" name="agent_slug" value="' . $agent_slug . '">
 			<input type="hidden" name="redirect_uri" value="' . esc_attr( $redirect_uri ) . '">
 			<input type="hidden" name="label" value="' . esc_attr( $label ) . '">
-			<input type="hidden" name="_wpnonce" value="' . esc_attr( $nonce ) . '">
+			<input type="hidden" name="_wpnonce" value="' . esc_attr( $nonce ) . '">' .
+			( ! empty( $code_challenge ) ? '
+			<input type="hidden" name="code_challenge" value="' . esc_attr( $code_challenge ) . '">' : '' ) .
+			( ! empty( $code_challenge_method ) ? '
+			<input type="hidden" name="code_challenge_method" value="' . esc_attr( $code_challenge_method ) . '">' : '' ) .
+			( ! empty( $state ) ? '
+			<input type="hidden" name="state" value="' . esc_attr( $state ) . '">' : '' ) . '
 
 			<div class="auth-actions">
 				<button type="submit" name="action" value="authorize" class="btn-authorize">Authorize</button>
