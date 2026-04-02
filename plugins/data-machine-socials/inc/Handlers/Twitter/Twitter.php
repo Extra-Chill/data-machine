@@ -70,11 +70,14 @@ class Twitter extends PublishHandler {
 			},
 			'twitter',
 			array(
-				'charLimit'          => 280,
-				'maxImages'          => 4,
-				'aspectRatios'       => array( 'any' ),
-				'defaultAspectRatio' => 'any',
-				'supportsCarousel'   => false,
+			'charLimit'          => 280,
+			'maxImages'          => 4,
+			'aspectRatios'       => array( 'any' ),
+			'defaultAspectRatio' => 'any',
+			'supportsCarousel'   => false,
+			'capabilities'       => array(
+				array( 'slug' => 'publish', 'label' => 'Publish' ),
+			),
 			)
 		);
 	}

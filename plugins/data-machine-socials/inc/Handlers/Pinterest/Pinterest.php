@@ -94,11 +94,14 @@ class Pinterest extends PublishHandler {
 			},
 			'pinterest',
 			array(
-				'charLimit'          => 500,
-				'maxImages'          => 1,
-				'aspectRatios'       => array( '2:3' ),
-				'defaultAspectRatio' => '2:3',
-				'supportsCarousel'   => false,
+			'charLimit'          => 500,
+			'maxImages'          => 1,
+			'aspectRatios'       => array( '2:3' ),
+			'defaultAspectRatio' => '2:3',
+			'supportsCarousel'   => false,
+			'capabilities'       => array(
+				array( 'slug' => 'publish', 'label' => 'Publish' ),
+			),
 			)
 		);
 	}

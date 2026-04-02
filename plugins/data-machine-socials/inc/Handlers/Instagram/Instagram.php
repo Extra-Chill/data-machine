@@ -84,13 +84,18 @@ class Instagram extends PublishHandler {
 			},
 			'instagram',
 			array(
-				'charLimit'          => 2200,
-				'maxImages'          => 10,
-				'aspectRatios'       => array( '1:1', '4:5', '3:4', '1.91:1' ),
-				'defaultAspectRatio' => '4:5',
-				'supportsCarousel'   => true,
-				'supportsVideo'      => true,
-				'supportedMediaKinds' => array( 'image', 'carousel', 'reel', 'story' ),
+			'charLimit'           => 2200,
+			'maxImages'           => 10,
+			'aspectRatios'        => array( '1:1', '4:5', '3:4', '1.91:1' ),
+			'defaultAspectRatio'  => '4:5',
+			'supportsCarousel'    => true,
+			'supportsVideo'       => true,
+			'supportedMediaKinds' => array( 'image', 'carousel', 'reel', 'story' ),
+			'capabilities'        => array(
+				array( 'slug' => 'publish', 'label' => 'Publish' ),
+				array( 'slug' => 'comments', 'label' => 'Comments' ),
+				array( 'slug' => 'giveaway', 'label' => 'Giveaway' ),
+			),
 			)
 		);
 	}

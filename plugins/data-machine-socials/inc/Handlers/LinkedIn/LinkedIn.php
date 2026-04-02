@@ -71,11 +71,14 @@ class LinkedIn extends PublishHandler {
 			},
 			'linkedin',
 			array(
-				'charLimit'          => 3000,
-				'maxImages'          => 9,
-				'aspectRatios'       => array( 'any' ),
-				'defaultAspectRatio' => 'any',
-				'supportsCarousel'   => false,
+			'charLimit'          => 3000,
+			'maxImages'          => 9,
+			'aspectRatios'       => array( 'any' ),
+			'defaultAspectRatio' => 'any',
+			'supportsCarousel'   => false,
+			'capabilities'       => array(
+				array( 'slug' => 'publish', 'label' => 'Publish' ),
+			),
 			)
 		);
 	}

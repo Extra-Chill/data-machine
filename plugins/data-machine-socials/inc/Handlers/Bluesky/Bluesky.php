@@ -59,11 +59,14 @@ class Bluesky extends PublishHandler {
 			},
 			'bluesky',
 			array(
-				'charLimit'          => 300,
-				'maxImages'          => 4,
-				'aspectRatios'       => array( 'any' ),
-				'defaultAspectRatio' => 'any',
-				'supportsCarousel'   => false,
+			'charLimit'          => 300,
+			'maxImages'          => 4,
+			'aspectRatios'       => array( 'any' ),
+			'defaultAspectRatio' => 'any',
+			'supportsCarousel'   => false,
+			'capabilities'       => array(
+				array( 'slug' => 'publish', 'label' => 'Publish' ),
+			),
 			)
 		);
 	}
