@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.9.0] - 2026-04-02
+
+### Added
+- add SocialCrossPostTask for async cross-posting via DM Task System
+
+### Changed
+- Migrate all 293 ability error returns to WP_Error, remove 57 function_exists guards
+- Add generic comments API with normalized SocialComment shape
+- clean break — drop all legacy username keys from auth providers
+- add concurrency group to cancel stale PR runs
+- Add VoteReddit chat tool and BlueskySettings handler config
+- drop cron schedule — push to main covers release
+
+### Fixed
+- normalize username storage across all social auth providers
+- Fix missing check_edit_permission method and Pinterest class reference
+
 ## [0.8.1] - 2026-03-21
 
 ### Fixed
