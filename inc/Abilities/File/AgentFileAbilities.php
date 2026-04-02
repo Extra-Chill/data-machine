@@ -334,6 +334,7 @@ class AgentFileAbilities {
 						'layer'       => $registry_meta ? $registry_meta['layer'] : $layer,
 						'protected'   => MemoryFileRegistry::is_protected( $entry ),
 						'editable'    => MemoryFileRegistry::is_editable( $entry ),
+						'contexts'    => $registry_meta['contexts'] ?? array( MemoryFileRegistry::CONTEXT_ALL ),
 						'registered'  => null !== $registry_meta,
 						'label'       => $registry_meta['label'] ?? self::filename_to_label( $entry ),
 						'description' => $registry_meta['description'] ?? '',

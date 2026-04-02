@@ -71,8 +71,13 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 
 		$outputs = array();
 
-		// Load all registered files, resolved to their layer directory.
-		foreach ( MemoryFileRegistry::get_all() as $filename => $meta ) {
+		// Load registered files applicable to the current execution context.
+		$context       = $payload['context'] ?? '';
+		$context_files = ! empty( $context )
+			? MemoryFileRegistry::get_for_context( $context )
+			: MemoryFileRegistry::get_all();
+
+		foreach ( $context_files as $filename => $meta ) {
 			$layer = $meta['layer'] ?? MemoryFileRegistry::LAYER_AGENT;
 			$dir   = $layer_dirs[ $layer ] ?? $layer_dirs[ MemoryFileRegistry::LAYER_AGENT ];
 
@@ -96,7 +101,6 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 		// Load context-specific memory file (contexts/{context}.md).
 		// The context slug comes from the payload, which the PromptBuilder
 		// passes through from the execution context ('chat', 'pipeline', 'system', etc.).
-		$context = $payload['context'] ?? '';
 		if ( ! empty( $context ) ) {
 			$agent_context = array(
 				'agent_id' => (int) ( $payload['agent_id'] ?? 0 ),
