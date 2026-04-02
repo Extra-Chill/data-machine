@@ -2,6 +2,22 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.63.0] - 2026-04-02
+
+### Added
+- add ContextRegistry for execution context registration
+- add unread messages backend
+
+### Changed
+- add is_wp_error() safety checks at all ability caller sites
+- Add context-aware injection to MemoryFileRegistry
+- Save sent emails to IMAP Sent folder after wp_mail()
+- align Chat REST handlers with core Abilities API contract
+
+### Fixed
+- Fix flows create --step_configs not applying handler configs
+- update .buildignore to exclude staging dir instead of build/
+
 ## [0.62.0] - 2026-03-29
 
 ### Added
