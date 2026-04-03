@@ -57,6 +57,14 @@ function datamachine_business_load_handlers() {
 	// Slack Handlers
 	new \DataMachineBusiness\Handlers\Slack\SlackPublish();
 	new \DataMachineBusiness\Handlers\Slack\SlackFetch();
+
+	// Discord
+	new \DataMachineBusiness\Abilities\Discord\PostMessageDiscordAbility();
+	new \DataMachineBusiness\Abilities\Discord\FetchMessagesDiscordAbility();
+
+	// Discord Handlers
+	new \DataMachineBusiness\Handlers\Discord\DiscordPublish();
+	new \DataMachineBusiness\Handlers\Discord\DiscordFetch();
 }
 
 // Hook into plugins_loaded to ensure Data Machine core is loaded first

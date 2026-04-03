@@ -8,7 +8,7 @@ This plugin extends Data Machine with business-focused integrations including:
 
 - **Google Sheets**: Fetch data from spreadsheets and append data for reporting
 - **Slack**: Post messages and fetch conversations from channels
-- **Discord** (planned): Post messages and fetch server data
+- **Discord**: Post messages and fetch messages from server channels
 
 ## Requirements
 
@@ -98,6 +98,59 @@ Fetches messages from a configured Slack channel with:
 ### Abilities (REST API / Chat Tools)
 - `datamachine/post-message-slack` — Post a message to any channel
 - `datamachine/fetch-messages-slack` — Fetch messages from any channel
+
+## Discord Setup
+
+Discord integration uses a **Bot Token** from the Discord Developer Portal. The token is long-lived and managed in your application settings.
+
+### Creating a Discord Bot
+
+1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
+2. Click **New Application**, give it a name (e.g., "Data Machine")
+3. Go to **Bot** in the sidebar
+4. Click **Reset Token** and copy the token (you only see it once)
+5. Under **Privileged Gateway Intents**, enable any intents your use case requires
+
+### Adding Bot Token Scopes
+
+1. Go to **OAuth2** → **URL Generator** in the sidebar
+2. Under **Scopes**, select `bot`
+3. Under **Bot Permissions**, select:
+   - `Send Messages` — Post messages to channels
+   - `Read Message History` — Fetch messages from channels
+4. Copy the generated URL and open it to invite the bot to your server
+
+### Configuring Data Machine
+
+1. Go to Data Machine → Settings in WordPress admin
+2. Find the Discord provider configuration
+3. Paste your Bot Token
+4. Click **Validate** to verify the connection
+
+### Adding the Bot to Channels
+
+The bot can see channels based on its server permissions:
+- Ensure the bot's role has **Read Messages** and **Send Messages** permissions in the target channel
+- For private channels, explicitly grant access to the bot's role
+
+## Discord Usage
+
+### Publish Handler
+Posts messages to a configured Discord channel. Supports:
+- Plain text messages
+- Source URL appending
+- Discord embed objects for rich formatting
+
+### Fetch Handler
+Fetches messages from a configured Discord channel with:
+- Configurable message limit (1-100)
+- Pagination via before/after message IDs
+- Per-message deduplication (skips already-processed messages)
+- Automatic filtering of join/leave and system messages
+
+### Abilities (REST API / Chat Tools)
+- `datamachine/post-message-discord` — Post a message to any channel
+- `datamachine/fetch-messages-discord` — Fetch messages from any channel
 
 ## License
 
