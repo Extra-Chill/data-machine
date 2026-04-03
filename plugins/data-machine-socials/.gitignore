@@ -26,3 +26,4 @@ wp-content/uploads/
 *.tmp
 *.temp
 .phpunit.result.cache
+.homeboy-build-meta.json
