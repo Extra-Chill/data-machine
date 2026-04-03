@@ -85,7 +85,6 @@ class ExecuteWorkflowAbility {
 							'flow_id'        => array( 'type' => 'integer' ),
 							'flow_name'      => array( 'type' => 'string' ),
 							'job_id'         => array( 'type' => 'integer' ),
-							'job_ids'        => array( 'type' => 'array' ),
 							'step_count'     => array( 'type' => 'integer' ),
 							'count'          => array( 'type' => 'integer' ),
 							'dry_run'        => array( 'type' => 'boolean' ),
@@ -146,8 +145,16 @@ class ExecuteWorkflowAbility {
 	/**
 	 * Execute a database flow.
 	 *
+	 * Pure scheduler: validates the flow, queues any initial_data for the
+	 * executor, and schedules AS actions with single-arg [flow_id].
+	 * RunFlowAbility is the sole job creator — this eliminates the dual-
+	 * signature problem where two-arg AS actions were invisible to all
+	 * cleanup/dedup paths.
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine/issues/1018
+	 *
 	 * @param array $input Input parameters with flow_id, optional count, timestamp, and initial_data.
-	 * @return array Result with job_id(s) and execution info.
+	 * @return array Result with execution info.
 	 */
 	private function executeDatabaseFlow( array $input ): array {
 		$flow_id = $input['flow_id'] ?? null;
@@ -187,37 +194,22 @@ class ExecuteWorkflowAbility {
 			);
 		}
 
-		$flow_name   = $flow['flow_name'] ?? "Flow {$flow_id}";
-		$pipeline_id = (int) $flow['pipeline_id'];
-		$jobs        = array();
+		$flow_name = $flow['flow_name'] ?? "Flow {$flow_id}";
 
+		// Queue initial_data so RunFlowAbility can merge it after creating
+		// the job. One entry per scheduled run (FIFO).
 		for ( $i = 0; $i < $count; $i++ ) {
-			$job_id = $this->createJob( $flow_id, $pipeline_id );
-
-			if ( ! $job_id ) {
-				if ( empty( $jobs ) ) {
-					return array(
-						'success' => false,
-						'error'   => 'Failed to create job record',
-					);
-				}
-				break;
-			}
-
-			// Store initial data in engine_data if provided (e.g. webhook payload).
 			if ( ! empty( $initial_data ) && is_array( $initial_data ) ) {
-				$this->db_jobs->store_engine_data( $job_id, $initial_data );
+				self::queue_initial_data( $flow_id, $initial_data );
 			}
 
 			$schedule_time = $timestamp ?? time();
 			as_schedule_single_action(
 				$schedule_time,
 				'datamachine_run_flow_now',
-				array( $flow_id, $job_id ),
+				array( $flow_id ),
 				'data-machine'
 			);
-
-			$jobs[] = $job_id;
 		}
 
 		do_action(
@@ -228,14 +220,13 @@ class ExecuteWorkflowAbility {
 				'flow_id'        => $flow_id,
 				'execution_mode' => 'database',
 				'execution_type' => $execution_type,
-				'job_count'      => count( $jobs ),
-				'job_ids'        => $jobs,
+				'run_count'      => $count,
 			)
 		);
 
 		if ( 1 === $count ) {
 			$message = 'immediate' === $execution_type
-				? 'Flow queued for immediate background execution. It will start within seconds. Use job_id to check status.'
+				? 'Flow queued for immediate background execution. It will start within seconds.'
 				: 'Flow scheduled for delayed background execution at the specified time.';
 
 			return array(
@@ -244,7 +235,6 @@ class ExecuteWorkflowAbility {
 				'execution_type' => $execution_type,
 				'flow_id'        => $flow_id,
 				'flow_name'      => $flow_name,
-				'job_id'         => $jobs[0] ?? null,
 				'message'        => $message,
 			);
 		}
@@ -255,14 +245,57 @@ class ExecuteWorkflowAbility {
 			'execution_type' => $execution_type,
 			'flow_id'        => $flow_id,
 			'flow_name'      => $flow_name,
-			'count'          => count( $jobs ),
-			'job_ids'        => $jobs,
+			'count'          => $count,
 			'message'        => sprintf(
-				'Queued %d jobs for flow "%s". Each job will process one item independently.',
-				count( $jobs ),
+				'Queued %d runs for flow "%s". Each run will create its own job and process independently.',
+				$count,
 				$flow_name
 			),
 		);
+	}
+
+	/**
+	 * Queue initial_data for a flow execution.
+	 *
+	 * Stores initial_data entries in a FIFO transient so RunFlowAbility
+	 * can consume them after creating a job. Each entry has a 1-hour TTL
+	 * to prevent stale buildup.
+	 *
+	 * @param int   $flow_id      Flow ID.
+	 * @param array $initial_data Data to queue (e.g. webhook payload).
+	 */
+	public static function queue_initial_data( int $flow_id, array $initial_data ): void {
+		$key   = "dm_flow_initial_data_{$flow_id}";
+		$queue = get_transient( $key );
+		if ( ! is_array( $queue ) ) {
+			$queue = array();
+		}
+		$queue[] = $initial_data;
+		set_transient( $key, $queue, HOUR_IN_SECONDS );
+	}
+
+	/**
+	 * Dequeue initial_data for a flow execution.
+	 *
+	 * Returns and removes the oldest pending initial_data entry (FIFO).
+	 * Returns null if no pending data exists.
+	 *
+	 * @param int $flow_id Flow ID.
+	 * @return array|null Initial data or null.
+	 */
+	public static function dequeue_initial_data( int $flow_id ): ?array {
+		$key   = "dm_flow_initial_data_{$flow_id}";
+		$queue = get_transient( $key );
+		if ( ! is_array( $queue ) || empty( $queue ) ) {
+			return null;
+		}
+		$data = array_shift( $queue );
+		if ( empty( $queue ) ) {
+			delete_transient( $key );
+		} else {
+			set_transient( $key, $queue, HOUR_IN_SECONDS );
+		}
+		return is_array( $data ) ? $data : null;
 	}
 
 	/**
