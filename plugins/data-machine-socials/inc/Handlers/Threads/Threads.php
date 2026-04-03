@@ -68,17 +68,14 @@ class Threads extends PublishHandler {
 			},
 			'threads',
 			array(
-				'charLimit'          => 500,
-				'maxImages'          => 10,
-				'aspectRatios'       => array( 'any' ),
-				'defaultAspectRatio' => 'any',
-				'supportsCarousel'   => true,
-				'capabilities'       => array(
-					array(
-						'slug'  => 'publish',
-						'label' => 'Publish',
-					),
-				),
+			'charLimit'          => 500,
+			'maxImages'          => 10,
+			'aspectRatios'       => array( 'any' ),
+			'defaultAspectRatio' => 'any',
+			'supportsCarousel'   => true,
+			'capabilities'       => array(
+				array( 'slug' => 'publish', 'label' => 'Publish' ),
+			),
 			)
 		);
 	}

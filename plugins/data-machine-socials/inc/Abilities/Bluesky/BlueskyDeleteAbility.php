@@ -13,13 +13,10 @@ namespace DataMachineSocials\Abilities\Bluesky;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Handlers\Bluesky\BlueskyAuth;
-use DataMachineSocials\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class BlueskyDeleteAbility {
-	use HasCheckPermission;
-
 
 	private static bool $registered = false;
 
@@ -74,6 +71,10 @@ class BlueskyDeleteAbility {
 		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', $register_callback );
 		}
+	}
+
+	public function checkPermission(): bool {
+		return PermissionHelper::can_manage();
 	}
 
 	public function execute( array $input ): array|\WP_Error {

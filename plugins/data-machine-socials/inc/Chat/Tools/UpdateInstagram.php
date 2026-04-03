@@ -126,6 +126,11 @@ class UpdateInstagram extends BaseTool {
 
 		if ( ! empty( $parameters['caption'] ) ) {
 			$input['caption'] = sanitize_text_field( $parameters['caption'] );
+		}
+
+		// Execute via ability (which handles token retrieval internally).
+		$ability = wp_get_ability( 'datamachine/instagram-update' );
+		if ( ! $ability ) {
 			return $this->buildErrorResponse( 'datamachine/instagram-update ability not registered', $tool_name );
 		}
 		$ability_instance = $ability;

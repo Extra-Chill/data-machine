@@ -54,7 +54,7 @@ class SocialShareTracker {
 			'shared_at'        => time(),
 			'shared_by'        => $extra['shared_by'] ?? get_current_user_id(),
 			'media_kind'       => sanitize_key( $extra['media_kind'] ?? '' ),
-			'job_id'           => intval( $extra['job_id'] ?? 0 ) ? intval( $extra['job_id'] ?? 0 ) : null,
+			'job_id'           => intval( $extra['job_id'] ?? 0 ) ?: null,
 		);
 
 		$shares[] = $record;

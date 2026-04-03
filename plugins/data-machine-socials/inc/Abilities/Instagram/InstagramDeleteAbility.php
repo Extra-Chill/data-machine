@@ -13,13 +13,10 @@ namespace DataMachineSocials\Abilities\Instagram;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Handlers\Instagram\InstagramAuth;
-use DataMachineSocials\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class InstagramDeleteAbility {
-	use HasCheckPermission;
-
 
 	private static bool $registered = false;
 
@@ -76,6 +73,10 @@ class InstagramDeleteAbility {
 		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', $register_callback );
 		}
+	}
+
+	public function checkPermission(): bool {
+		return PermissionHelper::can_manage();
 	}
 
 	public function execute( array $input ): array|\WP_Error {

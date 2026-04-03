@@ -88,7 +88,7 @@ class LinkedInCommand {
 			if ( mb_strlen( $post['commentary'] ?? '' ) > 70 ) {
 				$text .= '...';
 			}
-			$date  = isset( $post['createdAt'] )
+			$date = isset( $post['createdAt'] )
 				? wp_date( 'Y-m-d', intval( $post['createdAt'] / 1000 ) )
 				: '';
 			$state = $post['lifecycleState'] ?? '';

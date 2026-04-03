@@ -14,14 +14,10 @@ namespace DataMachineSocials\Abilities\Threads;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Handlers\Threads\ThreadsAuth;
-use DataMachineSocials\Abilities\Traits\HasCheckPermission;
-use DataMachineSocials\Abilities\Threads\ThreadsDeleteAbility;
 
 defined( 'ABSPATH' ) || exit;
 
 class ThreadsUpdateAbility {
-	use HasCheckPermission;
-
 
 	private static bool $registered = false;
 
@@ -85,6 +81,10 @@ class ThreadsUpdateAbility {
 		}
 	}
 
+	public function checkPermission(): bool {
+		return PermissionHelper::can_manage();
+	}
+
 	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? '';
 
@@ -111,6 +111,21 @@ class ThreadsUpdateAbility {
 			default:
 				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use delete.", array( 'status' => 500 ) );
 		}
+	}
+
+	private function getAuthProvider(): ?ThreadsAuth {
+		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
+			return null;
+		}
+
+		$auth     = new \DataMachine\Abilities\AuthAbilities();
+		$provider = $auth->getProvider( 'threads' );
+
+		if ( ! $provider instanceof ThreadsAuth ) {
+			return null;
+		}
+
+		return $provider;
 	}
 
 	private function deleteThread( string $access_token, string $thread_id ): array|\WP_Error {

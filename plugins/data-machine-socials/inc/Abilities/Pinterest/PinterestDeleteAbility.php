@@ -13,13 +13,10 @@ namespace DataMachineSocials\Abilities\Pinterest;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Handlers\Pinterest\PinterestAuth;
-use DataMachineSocials\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class PinterestDeleteAbility {
-	use HasCheckPermission;
-
 
 	private static bool $registered = false;
 
@@ -76,6 +73,10 @@ class PinterestDeleteAbility {
 		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', $register_callback );
 		}
+	}
+
+	public function checkPermission(): bool {
+		return PermissionHelper::can_manage();
 	}
 
 	public function execute( array $input ): array|\WP_Error {

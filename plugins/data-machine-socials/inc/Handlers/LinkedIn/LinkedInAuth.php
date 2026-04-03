@@ -13,17 +13,12 @@
 namespace DataMachineSocials\Handlers\LinkedIn;
 
 use DataMachine\Core\HttpClient;
-use DataMachineSocials\Handlers\Traits\HasGetAccountDetails;
-use DataMachineSocials\Handlers\Traits\HasRemoveAccount;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
 class LinkedInAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
-	use HasGetAccountDetails;
-	use HasRemoveAccount;
-
 
 	public const AUTH_URL     = 'https://www.linkedin.com/oauth/v2/authorization';
 	public const TOKEN_URL    = 'https://www.linkedin.com/oauth/v2/accessToken';
@@ -289,15 +284,37 @@ class LinkedInAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		}
 
 		$default_headers = array(
-			'Authorization'             => 'Bearer ' . $access_token,
-			'Linkedin-Version'          => self::API_VERSION,
-			'X-Restli-Protocol-Version' => '2.0.0',
-			'Content-Type'              => 'application/json',
+			'Authorization'              => 'Bearer ' . $access_token,
+			'Linkedin-Version'           => self::API_VERSION,
+			'X-Restli-Protocol-Version'  => '2.0.0',
+			'Content-Type'               => 'application/json',
 		);
 
 		$options['headers'] = array_merge( $default_headers, $options['headers'] ?? array() );
 		$options['context'] = $options['context'] ?? 'LinkedIn API';
 
 		return HttpClient::request( $method, $url, $options );
+	}
+
+	/**
+	 * Get stored LinkedIn account details.
+	 *
+	 * @return array|null Account details or null.
+	 */
+	public function get_account_details(): ?array {
+		$account = $this->get_account();
+		if ( empty( $account ) || ! is_array( $account ) ) {
+			return null;
+		}
+		return $account;
+	}
+
+	/**
+	 * Remove stored LinkedIn account details.
+	 *
+	 * @return bool Success status.
+	 */
+	public function remove_account(): bool {
+		return $this->clear_account();
 	}
 }

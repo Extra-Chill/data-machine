@@ -13,13 +13,10 @@
 namespace DataMachineSocials\Abilities\Reddit;
 
 use DataMachine\Abilities\PermissionHelper;
-use DataMachineSocials\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class SubmitRedditAbility {
-	use HasCheckPermission;
-
 
 	private static bool $registered = false;
 
@@ -129,6 +126,10 @@ class SubmitRedditAbility {
 		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', $register_callback );
 		}
+	}
+
+	public function checkPermission(): bool {
+		return PermissionHelper::can_manage();
 	}
 
 	/**

@@ -14,14 +14,10 @@ namespace DataMachineSocials\Abilities\Pinterest;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Handlers\Pinterest\PinterestAuth;
-use DataMachineSocials\Abilities\Traits\HasCheckPermission;
-use DataMachineSocials\Abilities\Pinterest\PinterestDeleteAbility;
 
 defined( 'ABSPATH' ) || exit;
 
 class PinterestUpdateAbility {
-	use HasCheckPermission;
-
 
 	private static bool $registered = false;
 
@@ -85,6 +81,10 @@ class PinterestUpdateAbility {
 		}
 	}
 
+	public function checkPermission(): bool {
+		return PermissionHelper::can_manage();
+	}
+
 	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? '';
 
@@ -112,6 +112,21 @@ class PinterestUpdateAbility {
 			default:
 				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use delete.", array( 'status' => 500 ) );
 		}
+	}
+
+	private function getAuthProvider(): ?PinterestAuth {
+		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
+			return null;
+		}
+
+		$auth     = new \DataMachine\Abilities\AuthAbilities();
+		$provider = $auth->getProvider( 'pinterest' );
+
+		if ( ! $provider instanceof PinterestAuth ) {
+			return null;
+		}
+
+		return $provider;
 	}
 
 	private function deletePin( string $access_token, string $pin_id ): array|\WP_Error {

@@ -15,13 +15,10 @@ namespace DataMachineSocials\Abilities\Threads;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Threads\ThreadsAuth;
-use DataMachineSocials\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class ThreadsReadAbility {
-	use HasCheckPermission;
-
 
 	private static bool $registered = false;
 
@@ -96,6 +93,10 @@ class ThreadsReadAbility {
 		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', $register_callback );
 		}
+	}
+
+	public function checkPermission(): bool {
+		return PermissionHelper::can_manage();
 	}
 
 	public function execute( array $input ): array|\WP_Error {

@@ -25,10 +25,10 @@ class SocialCrossPostTask extends SystemTask {
 	 * @param array $params Task parameters from engine_data.
 	 */
 	public function execute( int $jobId, array $params ): void {
-		$post_id      = absint( $params['post_id'] ?? 0 );
-		$platforms    = $params['platforms'] ?? array();
-		$caption      = $params['caption'] ?? '';
-		$images       = $params['images'] ?? array();
+		$post_id   = absint( $params['post_id'] ?? 0 );
+		$platforms = $params['platforms'] ?? array();
+		$caption   = $params['caption'] ?? '';
+		$images    = $params['images'] ?? array();
 		$media_kind   = $params['media_kind'] ?? 'image';
 		$aspect_ratio = $params['aspect_ratio'] ?? '4:5';
 		$video_url    = $params['video_url'] ?? '';
@@ -88,7 +88,7 @@ class SocialCrossPostTask extends SystemTask {
 				}
 			}
 		} else {
-			$log[]      = array(
+			$log[] = array(
 				'platform'  => 'system',
 				'success'   => false,
 				'error'     => $data['error'] ?? 'Cross-post API returned unexpected response.',
@@ -98,7 +98,7 @@ class SocialCrossPostTask extends SystemTask {
 		}
 
 		// Store results in post meta.
-		$existing_log = get_post_meta( $post_id, '_studio_social_publish_log', true ) ? get_post_meta( $post_id, '_studio_social_publish_log', true ) : array();
+		$existing_log = get_post_meta( $post_id, '_studio_social_publish_log', true ) ?: array();
 		$merged_log   = array_merge( $existing_log, $log );
 		update_post_meta( $post_id, '_studio_social_publish_log', $merged_log );
 

@@ -49,8 +49,4 @@ class InstagramSettings extends PublishHandlerSettings {
 
 		return array_merge( $fields, parent::get_common_fields() );
 	}
-
-	public function __construct() {
-		parent::__construct( 'instagram' );
-	}
 }

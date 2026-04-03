@@ -14,14 +14,10 @@ namespace DataMachineSocials\Abilities\Bluesky;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Handlers\Bluesky\BlueskyAuth;
-use DataMachineSocials\Abilities\Traits\HasCheckPermission;
-use DataMachineSocials\Abilities\Bluesky\BlueskyDeleteAbility;
 
 defined( 'ABSPATH' ) || exit;
 
 class BlueskyUpdateAbility {
-	use HasCheckPermission;
-
 
 	private static bool $registered = false;
 
@@ -83,6 +79,10 @@ class BlueskyUpdateAbility {
 		}
 	}
 
+	public function checkPermission(): bool {
+		return PermissionHelper::can_manage();
+	}
+
 	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? '';
 
@@ -115,6 +115,21 @@ class BlueskyUpdateAbility {
 			default:
 				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use delete, like, or unlike.", array( 'status' => 500 ) );
 		}
+	}
+
+	private function getAuthProvider(): ?BlueskyAuth {
+		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
+			return null;
+		}
+
+		$auth     = new \DataMachine\Abilities\AuthAbilities();
+		$provider = $auth->getProvider( 'bluesky' );
+
+		if ( ! $provider instanceof BlueskyAuth ) {
+			return null;
+		}
+
+		return $provider;
 	}
 
 	private function deletePost( array $session, string $post_uri ): array|\WP_Error {

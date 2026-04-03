@@ -18,15 +18,12 @@
 namespace DataMachineSocials\Handlers\Reddit;
 
 use DataMachine\Core\HttpClient;
-use DataMachineSocials\Handlers\Traits\HasRemoveAccount;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
 class RedditAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
-	use HasRemoveAccount;
-
 
 	public function __construct() {
 		parent::__construct( 'reddit' );
@@ -323,5 +320,14 @@ class RedditAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		}
 
 		return $account;
+	}
+
+	/**
+	 * Remove stored Reddit account details
+	 *
+	 * @return bool Success status
+	 */
+	public function remove_account(): bool {
+		return $this->clear_account();
 	}
 }

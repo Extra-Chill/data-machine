@@ -87,15 +87,15 @@ class SharesCommand {
 			'Found %d share(s) for post %d (%s)',
 			count( $shares ),
 			$post_id,
-			$post->post_title ? $post->post_title : '(no title)'
+			$post->post_title ?: '(no title)'
 		) );
 		WP_CLI::log( '' );
 
 		foreach ( $shares as $share ) {
-			$status     = $share['status'] ?? 'published';
-			$date       = isset( $share['shared_at'] ) ? wp_date( 'Y-m-d H:i', $share['shared_at'] ) : '';
-			$kind       = $share['media_kind'] ?? '';
-			$kind_str   = $kind ? " ({$kind})" : '';
+			$status    = $share['status'] ?? 'published';
+			$date      = isset( $share['shared_at'] ) ? wp_date( 'Y-m-d H:i', $share['shared_at'] ) : '';
+			$kind      = $share['media_kind'] ?? '';
+			$kind_str  = $kind ? " ({$kind})" : '';
 			$status_str = 'deleted' === $status ? ' [DELETED]' : '';
 
 			WP_CLI::log( sprintf(

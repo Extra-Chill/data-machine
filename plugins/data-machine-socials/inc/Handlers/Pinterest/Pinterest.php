@@ -94,17 +94,14 @@ class Pinterest extends PublishHandler {
 			},
 			'pinterest',
 			array(
-				'charLimit'          => 500,
-				'maxImages'          => 1,
-				'aspectRatios'       => array( '2:3' ),
-				'defaultAspectRatio' => '2:3',
-				'supportsCarousel'   => false,
-				'capabilities'       => array(
-					array(
-						'slug'  => 'publish',
-						'label' => 'Publish',
-					),
-				),
+			'charLimit'          => 500,
+			'maxImages'          => 1,
+			'aspectRatios'       => array( '2:3' ),
+			'defaultAspectRatio' => '2:3',
+			'supportsCarousel'   => false,
+			'capabilities'       => array(
+				array( 'slug' => 'publish', 'label' => 'Publish' ),
+			),
 			)
 		);
 	}
@@ -155,9 +152,9 @@ class Pinterest extends PublishHandler {
 		}
 
 		$source_url = $engine->getSourceUrl();
-		$media      = $this->resolveMediaUrls( $engine );
-		$image_url  = $media['image_url'];
-		$video_url  = $media['video_url'];
+		$media     = $this->resolveMediaUrls( $engine );
+		$image_url = $media['image_url'];
+		$video_url = $media['video_url'];
 
 		if ( empty( $image_url ) && empty( $video_url ) ) {
 			return $this->errorResponse(
@@ -189,9 +186,9 @@ class Pinterest extends PublishHandler {
 		// Build media source — prefer video for video pins, fall back to image.
 		if ( ! empty( $video_url ) ) {
 			$media_source = array(
-				'source_type'     => 'video_id',
-				'cover_image_url' => $image_url ? $image_url : '',
-				'url'             => $video_url,
+				'source_type' => 'video_id',
+				'cover_image_url' => $image_url ?: '',
+				'url'         => $video_url,
 			);
 		} else {
 			$media_source = array(
