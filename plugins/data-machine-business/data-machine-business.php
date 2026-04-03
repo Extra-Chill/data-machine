@@ -3,7 +3,7 @@
  * Plugin Name: Data Machine Business
  * Plugin URI: https://github.com/Extra-Chill/data-machine-business
  * Description: Business and enterprise integrations for Data Machine. Adds support for Google Sheets, Slack, Discord, and other business tools.
- * Version: 0.1.0
+ * Version: 0.2.0
  * Requires at least: 6.9
  * Requires PHP: 8.2
  * Requires Plugins: data-machine
@@ -30,7 +30,7 @@ if ( ! class_exists( 'DataMachine\Core\Steps\Publish\Handlers\PublishHandler' ) 
 	return;
 }
 
-define( 'DATAMACHINE_BUSINESS_VERSION', '0.1.0' );
+define( 'DATAMACHINE_BUSINESS_VERSION', '0.2.0' );
 define( 'DATAMACHINE_BUSINESS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_BUSINESS_URL', plugin_dir_url( __FILE__ ) );
 
@@ -48,7 +48,15 @@ function datamachine_business_load_handlers() {
 
 	// Google Sheets Handlers
 	new \DataMachineBusiness\Handlers\GoogleSheets\GoogleSheetsFetch();
-	new \DataMachineBusiness\Handlers\GoogleSheets\GoogleSheets();
+	new \DataMachineBusiness\Handlers\GoogleSheets\GoogleSheetsPublish();
+
+	// Slack
+	new \DataMachineBusiness\Abilities\Slack\PostMessageSlackAbility();
+	new \DataMachineBusiness\Abilities\Slack\FetchMessagesSlackAbility();
+
+	// Slack Handlers
+	new \DataMachineBusiness\Handlers\Slack\SlackPublish();
+	new \DataMachineBusiness\Handlers\Slack\SlackFetch();
 }
 
 // Hook into plugins_loaded to ensure Data Machine core is loaded first

@@ -7,7 +7,7 @@ Business and enterprise integrations for Data Machine.
 This plugin extends Data Machine with business-focused integrations including:
 
 - **Google Sheets**: Fetch data from spreadsheets and append data for reporting
-- **Slack** (planned): Post messages and fetch conversations
+- **Slack**: Post messages and fetch conversations from channels
 - **Discord** (planned): Post messages and fetch server data
 
 ## Requirements
@@ -43,6 +43,61 @@ Fetches data from Google Sheets with three processing modes:
 
 ### Publish Handler
 Appends structured data to Google Sheets with customizable column mapping.
+
+## Slack Setup
+
+Slack integration uses a **Bot Token** (`xoxb-...`) rather than OAuth2. The token is long-lived and managed in your Slack App settings.
+
+### Creating a Slack App
+
+1. Go to [Slack API: Applications](https://api.slack.com/apps)
+2. Click **Create New App** → **From scratch**
+3. Give it a name (e.g., "Data Machine") and select your workspace
+
+### Adding Bot Token Scopes
+
+1. Go to **OAuth & Permissions** in the sidebar
+2. Under **Bot Token Scopes**, add:
+   - `chat:write` — Send messages
+   - `channels:history` — Read messages from public channels
+   - `groups:history` — Read messages from private channels
+   - `channels:read` — List public channels (optional)
+   - `groups:read` — List private channels (optional)
+3. Click **Install to Workspace** (or reinstall if already installed)
+4. Copy the **Bot OAuth Token** (`xoxb-...`)
+
+### Configuring Data Machine
+
+1. Go to Data Machine → Settings in WordPress admin
+2. Find the Slack provider configuration
+3. Paste your Bot OAuth Token
+4. Click **Validate** to verify the connection
+
+### Adding the Bot to Channels
+
+The bot must be explicitly added to any channel it should post to or read from:
+- Open the channel in Slack
+- Type `/invite @Data Machine` (or whatever you named your app)
+
+## Slack Usage
+
+### Publish Handler
+Posts messages to a configured Slack channel. Supports:
+- Plain text and Slack mrkdwn formatting
+- Source URL appending
+- Thread replies (reply to a specific message)
+- Link unfurling (rich previews)
+
+### Fetch Handler
+Fetches messages from a configured Slack channel with:
+- Configurable message limit (1-1000)
+- Time-based filtering (oldest/latest timestamps)
+- Per-message deduplication (skips already-processed messages)
+- Automatic filtering of join/leave noise
+
+### Abilities (REST API / Chat Tools)
+- `datamachine/post-message-slack` — Post a message to any channel
+- `datamachine/fetch-messages-slack` — Fetch messages from any channel
 
 ## License
 
