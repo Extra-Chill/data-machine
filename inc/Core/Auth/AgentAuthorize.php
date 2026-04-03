@@ -144,6 +144,17 @@ class AgentAuthorize {
 	 * @return \WP_REST_Response|void Response or redirect.
 	 */
 	public function handle_authorize_get( \WP_REST_Request $request ) {
+		// This is a browser-facing endpoint (user opens it in their browser),
+		// not a typical REST API call. WordPress REST API doesn't validate
+		// cookies without an X-WP-Nonce header, so we manually validate
+		// the logged-in cookie to detect the user's session.
+		if ( ! is_user_logged_in() && ! empty( $_COOKIE[ LOGGED_IN_COOKIE ] ) ) {
+			$user_id = wp_validate_auth_cookie( $_COOKIE[ LOGGED_IN_COOKIE ], 'logged_in' );
+			if ( $user_id ) {
+				wp_set_current_user( $user_id );
+			}
+		}
+
 		$agent_slug            = sanitize_text_field( $request->get_param( 'agent_slug' ) );
 		$redirect_uri          = esc_url_raw( $request->get_param( 'redirect_uri' ) );
 		$label                 = sanitize_text_field( $request->get_param( 'label' ) );
