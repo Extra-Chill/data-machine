@@ -2,6 +2,22 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.63.1] - 2026-04-03
+
+### Added
+- add token-level runtime context for agent auth
+- add datamachine_agent_authorize_pre_token filter for PKCE support
+
+### Changed
+- Merge Agent Ping into System Task framework
+- Add chat bridge hooks: response complete action and /agents/me endpoint
+- Extract skill to standalone data-machine-skills repo
+
+### Fixed
+- scope pending session reuse by token login
+- resolve all Dependabot security alerts (lodash, picomatch, yaml, flatted, brace-expansion, serialize-javascript, path-to-regexp)
+- register ability hooks during plugins_loaded, not init
+
 ## [0.63.0] - 2026-04-02
 
 ### Added
