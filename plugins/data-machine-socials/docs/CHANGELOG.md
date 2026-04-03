@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.9.1] - 2026-04-03
+
+### Added
+- add capabilities metadata to all social platform handlers
+
+### Changed
+- migrate REST namespace from datamachine-socials/v1 to datamachine/v1/socials
+
 ## [0.9.0] - 2026-04-02
 
 ### Added
