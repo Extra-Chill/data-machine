@@ -113,7 +113,7 @@ class SocialShareTrackerTest extends WP_UnitTestCase {
 		$this->assertTrue( $result );
 
 		$shares = SocialShareTracker::get_shares( $this->post_id );
-		$ig     = array_values( array_filter( $shares, fn( $s ) => $s['platform'] === 'instagram' ) );
+		$ig     = array_values( array_filter( $shares, fn( $s ) => 'instagram' === $s['platform'] ) );
 
 		$this->assertSame( 'deleted', $ig[0]['status'] );
 		$this->assertArrayHasKey( 'deleted_at', $ig[0] );

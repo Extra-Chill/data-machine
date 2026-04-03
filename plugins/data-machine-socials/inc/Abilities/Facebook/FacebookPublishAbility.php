@@ -358,4 +358,54 @@ class FacebookPublishAbility {
 	private static function build_graph_url( string $path ): string {
 		return 'https://graph.facebook.com/v23.0/' . ltrim( $path, '/' );
 	}
+
+	private function getAuthProvider(): ?FacebookAuth {
+		$auth_abilities = new \DataMachine\Abilities\AuthAbilities();
+		$provider       = $auth_abilities->getProvider( 'facebook' );
+
+		if ( $provider instanceof FacebookAuth ) {
+			return $provider;
+		}
+
+		return null;
+	}
+
+	public function checkPermission(): bool {
+		return PermissionHelper::can_manage();
+	}
+
+	public function execute( array $input ): array|\WP_Error {
+		$action = $input['action'] ?? 'list';
+
+		$auth = $this->getAuthProvider();
+		if ( ! $auth ) {
+			return new \WP_Error( 'missing_auth', 'Facebook auth provider not available', array( 'status' => 401 ) );
+		}
+
+		// Facebook uses page_access_token for page operations.
+		$page_token = $auth->get_page_access_token();
+		if ( empty( $page_token ) ) {
+			return new \WP_Error( 'missing_auth', 'Facebook page access token unavailable (expired or refresh failed)', array( 'status' => 401 ) );
+		}
+
+		switch ( $action ) {
+			case 'list':
+				return $this->listPosts( $auth, $page_token, $input );
+
+			case 'get':
+				if ( empty( $input['post_id'] ) ) {
+					return new \WP_Error( 'missing_param', 'post_id is required for the get action', array( 'status' => 400 ) );
+				}
+				return $this->getPost( $page_token, $input['post_id'] );
+
+			case 'comments':
+				if ( empty( $input['post_id'] ) ) {
+					return new \WP_Error( 'missing_param', 'post_id is required for the comments action', array( 'status' => 400 ) );
+				}
+				return $this->getComments( $page_token, $input['post_id'], $input );
+
+			default:
+				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use list, get, or comments.", array( 'status' => 500 ) );
+		}
+	}
 }

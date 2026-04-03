@@ -191,8 +191,8 @@ class TwitterPublishAbility {
 			$http_code = $connection->getLastHttpCode();
 
 			if ( 201 === $http_code && isset( $response->data->id ) ) {
-				$tweet_id = $response->data->id;
-				$username = $provider->get_username() ?? 'twitter';
+				$tweet_id  = $response->data->id;
+				$username  = $provider->get_username() ?? 'twitter';
 				$tweet_url = "https://twitter.com/{$username}/status/{$tweet_id}";
 
 				$result = array(
@@ -426,5 +426,65 @@ class TwitterPublishAbility {
 		} catch ( \Exception $e ) {
 			return new \WP_Error( 'api_error', $e->getMessage(), array( 'status' => 500 ) );
 		}
+	}
+
+	private function getAuthProvider(): ?TwitterAuth {
+		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
+			return null;
+		}
+
+		$auth     = new \DataMachine\Abilities\AuthAbilities();
+		$provider = $auth->getProvider( 'twitter' );
+
+		if ( ! $provider instanceof TwitterAuth ) {
+			return null;
+		}
+
+		return $provider;
+	}
+
+	public function execute( array $input ): array|\WP_Error {
+		$action = $input['action'] ?? '';
+
+		// Get auth provider.
+		$auth = $this->getAuthProvider();
+		if ( ! $auth ) {
+			return new \WP_Error( 'missing_auth', 'Twitter auth provider not available', array( 'status' => 401 ) );
+		}
+
+		$connection = $auth->get_connection();
+		if ( ! $connection ) {
+			return new \WP_Error( 'missing_auth', 'Twitter connection not available', array( 'status' => 401 ) );
+		}
+
+		if ( empty( $input['tweet_id'] ) ) {
+			return new \WP_Error( 'missing_param', 'tweet_id is required', array( 'status' => 400 ) );
+		}
+
+		$tweet_id = $input['tweet_id'];
+
+		switch ( $action ) {
+			case 'delete':
+				return $this->deleteTweet( $connection, $tweet_id );
+
+			case 'retweet':
+				return $this->retweet( $connection, $tweet_id );
+
+			case 'unretweet':
+				return $this->unretweet( $connection, $tweet_id );
+
+			case 'like':
+				return $this->likeTweet( $connection, $tweet_id );
+
+			case 'unlike':
+				return $this->unlikeTweet( $connection, $tweet_id );
+
+			default:
+				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use delete, retweet, unretweet, like, or unlike.", array( 'status' => 500 ) );
+		}
+	}
+
+	public function checkPermission(): bool {
+		return PermissionHelper::can_manage();
 	}
 }

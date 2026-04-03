@@ -13,12 +13,15 @@
 namespace DataMachineSocials\Handlers\Threads;
 
 use DataMachine\Core\HttpClient;
+use DataMachineSocials\Handlers\Traits\HasGetAccountDetails;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
 class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
+	use HasGetAccountDetails;
+
 
 	const AUTH_URL    = 'https://graph.facebook.com/oauth/authorize';
 	const TOKEN_URL   = 'https://graph.threads.net/oauth/access_token';
@@ -300,19 +303,6 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
 		do_action( 'datamachine_log', 'debug', 'Threads OAuth: Profile fetched successfully', array( 'profile_id' => $data['id'] ) );
 		return $data;
-	}
-
-	/**
-	* Get stored Threads account details
-	*
-	* @return array|null Account details or null
-	*/
-	public function get_account_details(): ?array {
-		$account = $this->get_account();
-		if ( empty( $account ) || ! is_array( $account ) ) {
-			return null;
-		}
-		return $account;
 	}
 
 	/**

@@ -314,4 +314,77 @@ class PinterestBoardsAbility {
 		$provider = $auth->getProvider( 'pinterest' );
 		return $provider && $provider->is_authenticated();
 	}
+
+	public function execute( array $input ): array|\WP_Error {
+		$action = $input['action'] ?? 'user';
+
+		$auth = $this->getAuthProvider();
+		if ( ! $auth ) {
+			return new \WP_Error( 'missing_auth', 'Pinterest auth provider not available', array( 'status' => 401 ) );
+		}
+
+		$token = $auth->get_valid_access_token();
+		if ( empty( $token ) ) {
+			return new \WP_Error( 'missing_auth', 'Pinterest access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings', array( 'status' => 401 ) );
+		}
+
+		// Parse date range
+		$start_date = $input['start_date'] ?? gmdate( 'Y-m-d', strtotime( '-30 days' ) );
+		$end_date   = $input['end_date'] ?? gmdate( 'Y-m-d' );
+
+		// Validate date format
+		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $start_date ) || ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $end_date ) ) {
+			return new \WP_Error( 'missing_param', 'Invalid date format. Use YYYY-MM-DD.', array( 'status' => 400 ) );
+		}
+
+		// Parse metrics (default to key engagement metrics)
+		$default_metrics = array( 'IMPRESSION', 'SAVE', 'PIN_CLICK', 'COMMENT', 'CLOSEUP' );
+		$metrics         = $input['metrics'] ?? $default_metrics;
+
+		// Validate metrics
+		$metrics = array_filter( (array) $metrics, function ( $m ) {
+			return in_array( strtoupper( $m ), self::METRIC_TYPES, true );
+		});
+
+		if ( empty( $metrics ) ) {
+			$metrics = $default_metrics;
+		}
+
+		$metrics_param = implode( ',', array_map( 'strtoupper', $metrics ) );
+
+		switch ( $action ) {
+			case 'user':
+				return $this->getUserAnalytics( $token, $start_date, $end_date, $metrics_param );
+
+			case 'pin':
+				if ( empty( $input['pin_id'] ) ) {
+					return new \WP_Error( 'missing_param', 'pin_id is required for the pin action', array( 'status' => 400 ) );
+				}
+				return $this->getPinAnalytics( $token, $input['pin_id'], $start_date, $end_date, $metrics_param );
+
+			case 'board':
+				if ( empty( $input['board_id'] ) ) {
+					return new \WP_Error( 'missing_param', 'board_id is required for the board action', array( 'status' => 400 ) );
+				}
+				return $this->getBoardAnalytics( $token, $input['board_id'], $start_date, $end_date, $metrics_param );
+
+			default:
+				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use user, pin, or board.", array( 'status' => 500 ) );
+		}
+	}
+
+	private function getAuthProvider(): ?PinterestAuth {
+		$auth_abilities = new \DataMachine\Abilities\AuthAbilities();
+		$provider       = $auth_abilities->getProvider( 'pinterest' );
+
+		if ( $provider instanceof PinterestAuth ) {
+			return $provider;
+		}
+
+		return null;
+	}
+
+	public function checkPermission(): bool {
+		return PermissionHelper::can_manage();
+	}
 }

@@ -186,7 +186,13 @@ class FetchReddit extends BaseTool {
 		// The ability returns 'items' for multiple results, 'data' for single.
 		$items = $result['items'] ?? array();
 		if ( empty( $items ) && ! empty( $result['data'] ) ) {
-			$items = array( array( 'data' => $result['data'], 'source_url' => $result['source_url'] ?? '', 'item_id' => $result['item_id'] ?? '' ) );
+			$items = array(
+				array(
+					'data'       => $result['data'],
+					'source_url' => $result['source_url'] ?? '',
+					'item_id'    => $result['item_id'] ?? '',
+				),
+			);
 		}
 
 		if ( empty( $items ) ) {

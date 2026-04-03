@@ -15,12 +15,15 @@ namespace DataMachineSocials\Handlers\Bluesky;
 
 use DataMachine\Core\OAuth\BaseAuthProvider;
 use DataMachine\Core\HttpClient;
+use DataMachineSocials\Handlers\Traits\HasRemoveAccount;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly
 }
 
 class BlueskyAuth extends BaseAuthProvider {
+	use HasRemoveAccount;
+
 
 	public function __construct() {
 		parent::__construct( 'bluesky' );
@@ -275,9 +278,5 @@ class BlueskyAuth extends BaseAuthProvider {
 			'configured'       => true,
 			'last_verified_at' => time(), // Config doesn't have last_verified, so we just say now/configured
 		);
-	}
-
-	public function remove_account(): bool {
-		return $this->clear_account();
 	}
 }

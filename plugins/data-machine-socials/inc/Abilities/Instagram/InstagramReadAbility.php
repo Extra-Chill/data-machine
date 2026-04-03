@@ -15,10 +15,13 @@ namespace DataMachineSocials\Abilities\Instagram;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Instagram\InstagramAuth;
+use DataMachineSocials\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class InstagramReadAbility {
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -64,12 +67,12 @@ class InstagramReadAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-						'action'   => array(
-							'type'        => 'string',
-							'enum'        => array( 'list', 'get', 'comments', 'comments_all' ),
-							'default'     => 'list',
-							'description' => __( 'Action: list (recent posts), get (single post), comments (one page), comments_all (all pages, normalized)', 'data-machine-socials' ),
-						),
+							'action'   => array(
+								'type'        => 'string',
+								'enum'        => array( 'list', 'get', 'comments', 'comments_all' ),
+								'default'     => 'list',
+								'description' => __( 'Action: list (recent posts), get (single post), comments (one page), comments_all (all pages, normalized)', 'data-machine-socials' ),
+							),
 							'media_id' => array(
 								'type'        => 'string',
 								'description' => __( 'Instagram media ID (required for get and comments actions)', 'data-machine-socials' ),
@@ -105,15 +108,6 @@ class InstagramReadAbility {
 		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', $register_callback );
 		}
-	}
-
-	/**
-	 * Permission callback.
-	 *
-	 * @return bool
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 
 	/**
@@ -318,7 +312,7 @@ class InstagramReadAbility {
 		$max_pages    = 200; // Safety limit: 200 pages × 50 comments = 10,000 comments max.
 
 		do {
-			$page++;
+			++$page;
 			$params = array(
 				'fields'       => 'id,text,timestamp,username,like_count',
 				'limit'        => 50, // Max per page for Instagram API.
@@ -338,11 +332,11 @@ class InstagramReadAbility {
 					return array(
 						'success' => true,
 						'data'    => array(
-							'comments'  => $all_comments,
-							'count'     => count( $all_comments ),
-							'platform'  => 'instagram',
-							'partial'   => true,
-							'error'     => 'Pagination interrupted: ' . ( $result['error'] ?? 'unknown' ),
+							'comments' => $all_comments,
+							'count'    => count( $all_comments ),
+							'platform' => 'instagram',
+							'partial'  => true,
+							'error'    => 'Pagination interrupted: ' . ( $result['error'] ?? 'unknown' ),
 						),
 					);
 				}
@@ -358,11 +352,11 @@ class InstagramReadAbility {
 					return array(
 						'success' => true,
 						'data'    => array(
-							'comments'  => $all_comments,
-							'count'     => count( $all_comments ),
-							'platform'  => 'instagram',
-							'partial'   => true,
-							'error'     => $data['error']['message'] ?? 'Pagination error',
+							'comments' => $all_comments,
+							'count'    => count( $all_comments ),
+							'platform' => 'instagram',
+							'partial'  => true,
+							'error'    => $data['error']['message'] ?? 'Pagination error',
 						),
 					);
 				}
@@ -387,11 +381,11 @@ class InstagramReadAbility {
 		return array(
 			'success' => true,
 			'data'    => array(
-				'comments'  => $all_comments,
-				'count'     => count( $all_comments ),
-				'platform'  => 'instagram',
-				'partial'   => false,
-				'pages'     => $page,
+				'comments' => $all_comments,
+				'count'    => count( $all_comments ),
+				'platform' => 'instagram',
+				'partial'  => false,
+				'pages'    => $page,
 			),
 		);
 	}

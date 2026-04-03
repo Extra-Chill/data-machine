@@ -39,4 +39,8 @@ class LinkedInSettings extends PublishHandlerSettings {
 			)
 		);
 	}
+
+	public function __construct() {
+		parent::__construct( 'linkedin' );
+	}
 }

@@ -15,10 +15,13 @@
 namespace DataMachineSocials\Abilities\Reddit;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachineSocials\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class FetchRedditAbility {
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -138,15 +141,6 @@ class FetchRedditAbility {
 	}
 
 	/**
-	 * Permission callback for ability.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
-	}
-
-	/**
 	 * Execute Reddit fetch ability.
 	 *
 	 * Returns all eligible posts across all pages. The pipeline engine
@@ -174,7 +168,7 @@ class FetchRedditAbility {
 		$download_images       = $config['download_images'];
 
 		// Determine mode: global search vs subreddit fetch.
-		$is_global_search = ! empty( $query ) && empty( $subreddit );
+		$is_global_search    = ! empty( $query ) && empty( $subreddit );
 		$is_subreddit_search = ! empty( $query ) && ! empty( $subreddit );
 
 		// Validate: must have either subreddit or query.
@@ -183,7 +177,10 @@ class FetchRedditAbility {
 				'level'   => 'error',
 				'message' => 'Reddit: Either subreddit or query must be provided.',
 			);
-			return new \WP_Error( 'missing_param', 'Either subreddit or query must be provided', array( 'status' => 400, 'logs' => $logs ) );
+			return new \WP_Error( 'missing_param', 'Either subreddit or query must be provided', array(
+				'status' => 400,
+				'logs'   => $logs,
+			) );
 		}
 
 		if ( ! empty( $subreddit ) && ! preg_match( '/^[a-zA-Z0-9_]+$/', $subreddit ) ) {
@@ -192,7 +189,10 @@ class FetchRedditAbility {
 				'message' => 'Reddit: Invalid subreddit name format.',
 				'data'    => array( 'subreddit' => $subreddit ),
 			);
-			return new \WP_Error( 'missing_param', 'Invalid subreddit name format', array( 'status' => 400, 'logs' => $logs ) );
+			return new \WP_Error( 'missing_param', 'Invalid subreddit name format', array(
+				'status' => 400,
+				'logs'   => $logs,
+			) );
 		}
 
 		$valid_sorts = array( 'hot', 'new', 'top', 'rising', 'controversial', 'relevance' );
@@ -205,7 +205,10 @@ class FetchRedditAbility {
 					'valid_sorts'  => $valid_sorts,
 				),
 			);
-			return new \WP_Error( 'missing_param', 'Invalid sort parameter', array( 'status' => 400, 'logs' => $logs ) );
+			return new \WP_Error( 'missing_param', 'Invalid sort parameter', array(
+				'status' => 400,
+				'logs'   => $logs,
+			) );
 		}
 
 		$mode_label = $is_global_search ? 'global search' : ( $is_subreddit_search ? "r/{$subreddit} search" : "r/{$subreddit}" );
@@ -213,8 +216,8 @@ class FetchRedditAbility {
 			'level'   => 'info',
 			'message' => sprintf( 'Reddit: Starting fetch (%s, sort: %s).', $mode_label, $sort ),
 			'data'    => array(
-				'subreddit'       => $subreddit,
-				'query'           => $query,
+				'subreddit'        => $subreddit,
+				'query'            => $query,
 				'is_global_search' => $is_global_search,
 			),
 		);
@@ -270,7 +273,10 @@ class FetchRedditAbility {
 						'message' => 'Reddit: API request failed.',
 						'data'    => array( 'error' => $result['error'] ),
 					);
-					return new \WP_Error( 'api_error', $result['error'], array( 'status' => 500, 'logs' => $logs ) );
+					return new \WP_Error( 'api_error', $result['error'], array(
+						'status' => 500,
+						'logs'   => $logs,
+					) );
 				} else {
 					break;
 				}
@@ -299,7 +305,10 @@ class FetchRedditAbility {
 						'message' => 'Reddit: Invalid JSON response.',
 						'data'    => array( 'error' => $error_message ),
 					);
-					return new \WP_Error( 'api_error', $error_message, array( 'status' => 500, 'logs' => $logs ) );
+					return new \WP_Error( 'api_error', $error_message, array(
+						'status' => 500,
+						'logs'   => $logs,
+					) );
 				} else {
 					break;
 				}

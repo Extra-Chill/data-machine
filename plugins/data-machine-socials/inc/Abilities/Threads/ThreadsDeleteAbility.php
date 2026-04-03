@@ -13,10 +13,13 @@ namespace DataMachineSocials\Abilities\Threads;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Handlers\Threads\ThreadsAuth;
+use DataMachineSocials\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class ThreadsDeleteAbility {
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -73,10 +76,6 @@ class ThreadsDeleteAbility {
 		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', $register_callback );
 		}
-	}
-
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 
 	public function execute( array $input ): array|\WP_Error {

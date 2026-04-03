@@ -170,11 +170,11 @@ class CommentsCommand {
 
 		if ( 'json' === $format ) {
 			WP_CLI::log( wp_json_encode( array(
-				'platform'  => $platform,
-				'media_id'  => $media_id,
-				'total'     => $total,
-				'filtered'  => $filtered,
-				'comments'  => $comments,
+				'platform' => $platform,
+				'media_id' => $media_id,
+				'total'    => $total,
+				'filtered' => $filtered,
+				'comments' => $comments,
 			), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
@@ -182,7 +182,8 @@ class CommentsCommand {
 		if ( 'csv' === $format ) {
 			WP_CLI::log( 'id,author_username,text,timestamp,like_count,mentions' );
 			foreach ( $comments as $c ) {
-				$mentions_str = implode( ' ', array_map( function ( $m ) { return '@' . $m; }, $c['mentions'] ?? array() ) );
+				$mentions_str = implode( ' ', array_map( function ( $m ) { return '@' . $m;
+				}, $c['mentions'] ?? array() ) );
 				$text         = str_replace( '"', '""', $c['text'] ?? '' );
 				WP_CLI::log( sprintf(
 					'%s,%s,"%s",%s,%d,"%s"',

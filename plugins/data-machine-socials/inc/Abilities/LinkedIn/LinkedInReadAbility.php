@@ -15,10 +15,13 @@ namespace DataMachineSocials\Abilities\LinkedIn;
 use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Handlers\LinkedIn\LinkedInAuth;
+use DataMachineSocials\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class LinkedInReadAbility {
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -88,10 +91,6 @@ class LinkedInReadAbility {
 		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', $register_callback );
 		}
-	}
-
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 
 	public function execute( array $input ): array|\WP_Error {

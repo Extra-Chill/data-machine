@@ -14,10 +14,14 @@ namespace DataMachineSocials\Abilities\Instagram;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Handlers\Instagram\InstagramAuth;
+use DataMachineSocials\Abilities\Traits\HasCheckPermission;
+use DataMachineSocials\Abilities\Instagram\InstagramDeleteAbility;
 
 defined( 'ABSPATH' ) || exit;
 
 class InstagramUpdateAbility {
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -92,15 +96,6 @@ class InstagramUpdateAbility {
 	}
 
 	/**
-	 * Permission callback.
-	 *
-	 * @return bool
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
-	}
-
-	/**
 	 * Execute the update ability.
 	 *
 	 * @param array $input Input parameters.
@@ -142,26 +137,6 @@ class InstagramUpdateAbility {
 			default:
 				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use edit, delete, or archive.", array( 'status' => 500 ) );
 		}
-	}
-
-	/**
-	 * Get auth provider.
-	 *
-	 * @return InstagramAuth|null
-	 */
-	private function getAuthProvider(): ?InstagramAuth {
-		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
-			return null;
-		}
-
-		$auth     = new \DataMachine\Abilities\AuthAbilities();
-		$provider = $auth->getProvider( 'instagram' );
-
-		if ( ! $provider instanceof InstagramAuth ) {
-			return null;
-		}
-
-		return $provider;
 	}
 
 	/**
