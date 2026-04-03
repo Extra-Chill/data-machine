@@ -206,15 +206,8 @@ class RunFlowAbility {
 			'pipeline_config' => $pipeline_config,
 		);
 
-		// Check for pending initial_data queued by ExecuteWorkflowAbility
-		// (e.g. webhook payloads, API-provided context). Consumes one
-		// entry from the FIFO queue per execution.
-		$initial_data = \DataMachine\Abilities\Job\ExecuteWorkflowAbility::dequeue_initial_data( $flow_id );
-		if ( ! empty( $initial_data ) ) {
-			$engine_snapshot = array_merge( $initial_data, $engine_snapshot );
-		}
-
-		// Preserve any pre-existing engine data stored directly on the job.
+		// Preserve any pre-existing engine data (e.g. initial_data from ExecuteWorkflowAbility
+		// which may contain submission context, webhook payloads, etc.).
 		$existing_data = \DataMachine\Core\EngineData::retrieve( $job_id );
 		if ( ! empty( $existing_data ) ) {
 			$engine_snapshot = array_merge( $existing_data, $engine_snapshot );
