@@ -116,7 +116,7 @@ class AgentAuthorize {
 						'type'     => 'string',
 						'enum'     => array( 'authorize', 'deny' ),
 					),
-					'_wpnonce'              => array(
+					'_authorize_nonce'      => array(
 						'required' => true,
 						'type'     => 'string',
 					),
@@ -226,11 +226,19 @@ class AgentAuthorize {
 	 * @return void Redirects to redirect_uri.
 	 */
 	public function handle_authorize_post( \WP_REST_Request $request ) {
+		// Same browser cookie validation as the GET handler.
+		if ( ! is_user_logged_in() && ! empty( $_COOKIE[ LOGGED_IN_COOKIE ] ) ) {
+			$user_id = wp_validate_auth_cookie( $_COOKIE[ LOGGED_IN_COOKIE ], 'logged_in' );
+			if ( $user_id ) {
+				wp_set_current_user( $user_id );
+			}
+		}
+
 		$agent_slug   = sanitize_text_field( $request->get_param( 'agent_slug' ) );
 		$redirect_uri = esc_url_raw( $request->get_param( 'redirect_uri' ) );
 		$label        = sanitize_text_field( $request->get_param( 'label' ) );
 		$action       = sanitize_text_field( $request->get_param( 'action' ) );
-		$nonce        = $request->get_param( '_wpnonce' );
+		$nonce        = $request->get_param( '_authorize_nonce' );
 
 		// Look up agent for redirect URI validation.
 		$agents_repo = new Agents();
@@ -622,7 +630,7 @@ class AgentAuthorize {
 			<input type="hidden" name="agent_slug" value="' . $agent_slug . '">
 			<input type="hidden" name="redirect_uri" value="' . esc_attr( $redirect_uri ) . '">
 			<input type="hidden" name="label" value="' . esc_attr( $label ) . '">
-			<input type="hidden" name="_wpnonce" value="' . esc_attr( $nonce ) . '">' .
+			<input type="hidden" name="_authorize_nonce" value="' . esc_attr( $nonce ) . '">' .
 			( ! empty( $code_challenge ) ? '
 			<input type="hidden" name="code_challenge" value="' . esc_attr( $code_challenge ) . '">' : '' ) .
 			( ! empty( $code_challenge_method ) ? '
