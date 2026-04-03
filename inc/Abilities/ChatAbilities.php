@@ -15,6 +15,7 @@ use DataMachine\Abilities\Chat\GetChatSessionAbility;
 use DataMachine\Abilities\Chat\DeleteChatSessionAbility;
 use DataMachine\Abilities\Chat\CreateChatSessionAbility;
 use DataMachine\Abilities\Chat\MarkSessionReadAbility;
+use DataMachine\Abilities\Chat\SendMessageAbility;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -27,6 +28,7 @@ class ChatAbilities {
 	private DeleteChatSessionAbility $delete_session;
 	private CreateChatSessionAbility $create_session;
 	private MarkSessionReadAbility $mark_session_read;
+	private SendMessageAbility $send_message;
 
 	public function __construct() {
 		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
@@ -38,6 +40,7 @@ class ChatAbilities {
 		$this->delete_session    = new DeleteChatSessionAbility();
 		$this->create_session    = new CreateChatSessionAbility();
 		$this->mark_session_read = new MarkSessionReadAbility();
+		$this->send_message      = new SendMessageAbility();
 
 		self::$registered = true;
 	}

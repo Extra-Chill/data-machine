@@ -441,43 +441,7 @@ class Chat {
 			}
 		}
 
-		// --- Extract and resolve params ---
-		$message  = sanitize_textarea_field( wp_unslash( $request->get_param( 'message' ) ) );
-		$agent_id = (int) $request->get_param( 'agent_id' );
-
-		$provider = $request->get_param( 'provider' );
-		$model    = $request->get_param( 'model' );
-
-		if ( empty( $provider ) || empty( $model ) ) {
-			$agent_config = PluginSettings::resolveModelForAgentContext( $agent_id, 'chat' );
-			if ( empty( $provider ) ) {
-				$provider = $agent_config['provider'];
-			}
-			if ( empty( $model ) ) {
-				$model = $agent_config['model'];
-			}
-		}
-
-		$provider = sanitize_text_field( $provider );
-		$model    = sanitize_text_field( $model );
-
-		if ( empty( $provider ) ) {
-			return new WP_Error(
-				'provider_required',
-				__( 'AI provider is required. Please set a default provider in Data Machine settings or provide one in the request.', 'data-machine' ),
-				array( 'status' => 400 )
-			);
-		}
-
-		if ( empty( $model ) ) {
-			return new WP_Error(
-				'model_required',
-				__( 'AI model is required. Please set a default model in Data Machine settings or provide one in the request.', 'data-machine' ),
-				array( 'status' => 400 )
-			);
-		}
-
-		// --- Resolve attachments ---
+		// --- Resolve attachments (REST-specific path resolution) ---
 		$attachments = $request->get_param( 'attachments' );
 		if ( ! empty( $attachments ) && is_array( $attachments ) ) {
 			$attachments = self::resolve_attachment_paths( $attachments );
@@ -491,21 +455,41 @@ class Chat {
 			$client_context = array();
 		}
 
-		// --- Delegate to orchestrator ---
-		$result = ChatOrchestrator::processChat(
-			$message,
-			$provider,
-			$model,
-			get_current_user_id(),
-			array(
-				'session_id'           => $request->get_param( 'session_id' ),
-				'selected_pipeline_id' => (int) $request->get_param( 'selected_pipeline_id' ),
-				'request_id'           => $request_id,
-				'agent_id'             => $agent_id,
-				'attachments'          => $attachments,
-				'client_context'       => $client_context,
-			)
+		// --- Delegate to ability ---
+		$ability = wp_get_ability( 'datamachine/send-message' );
+
+		if ( ! $ability ) {
+			return new WP_Error(
+				'ability_not_found',
+				__( 'Send message ability not registered.', 'data-machine' ),
+				array( 'status' => 500 )
+			);
+		}
+
+		$input = array(
+			'message'        => sanitize_textarea_field( wp_unslash( $request->get_param( 'message' ) ) ),
+			'agent_id'       => (int) $request->get_param( 'agent_id' ),
+			'provider'       => (string) ( $request->get_param( 'provider' ) ?? '' ),
+			'model'          => (string) ( $request->get_param( 'model' ) ?? '' ),
+			'attachments'    => $attachments,
+			'client_context' => $client_context,
 		);
+
+		$session_id = $request->get_param( 'session_id' );
+		if ( ! empty( $session_id ) ) {
+			$input['session_id'] = $session_id;
+		}
+
+		$pipeline_id = (int) $request->get_param( 'selected_pipeline_id' );
+		if ( $pipeline_id > 0 ) {
+			$input['selected_pipeline_id'] = $pipeline_id;
+		}
+
+		if ( $request_id ) {
+			$input['request_id'] = $request_id;
+		}
+
+		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
 			return $result;
