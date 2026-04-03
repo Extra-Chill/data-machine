@@ -5,7 +5,7 @@
 import apiFetch from '@wordpress/api-fetch';
 import { CrossPostPayload, CrossPostResponse, PlatformAuthStatus } from '../types';
 
-const REST_BASE = '/wp-json/datamachine-socials/v1';
+const REST_BASE = '/wp-json/datamachine/v1/socials';
 
 export async function getAuthStatus(): Promise<PlatformAuthStatus[]> {
 	return apiFetch({ path: `${REST_BASE}/auth/status` });

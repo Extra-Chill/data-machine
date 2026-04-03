@@ -135,29 +135,29 @@ All publishing follows the Instagram Graph API container pattern:
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/datamachine-socials/v1/post` | POST | Cross-platform post (supports media_kind) |
-| `/datamachine-socials/v1/instagram/reel` | POST | Dedicated Reel publish |
-| `/datamachine-socials/v1/instagram/story` | POST | Dedicated Story publish |
+| `/datamachine/v1/socials/post` | POST | Cross-platform post (supports media_kind) |
+| `/datamachine/v1/socials/instagram/reel` | POST | Dedicated Reel publish |
+| `/datamachine/v1/socials/instagram/story` | POST | Dedicated Story publish |
 
 ### Reading
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/datamachine-socials/v1/instagram/media` | GET | List posts, get details, get comments |
+| `/datamachine/v1/socials/instagram/media` | GET | List posts, get details, get comments |
 
 ### Updating
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/datamachine-socials/v1/instagram/update` | POST | Edit caption, delete, archive |
-| `/datamachine-socials/v1/instagram/comments/reply` | POST | Reply to a comment |
+| `/datamachine/v1/socials/instagram/update` | POST | Edit caption, delete, archive |
+| `/datamachine/v1/socials/instagram/comments/reply` | POST | Reply to a comment |
 
 ### Platform Info
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/datamachine-socials/v1/platforms` | GET | Instagram config (limits, supported features) |
-| `/datamachine-socials/v1/auth/status` | GET | Auth status for all platforms |
+| `/datamachine/v1/socials/platforms` | GET | Instagram config (limits, supported features) |
+| `/datamachine/v1/socials/auth/status` | GET | Auth status for all platforms |
 
 ## CLI Commands
 

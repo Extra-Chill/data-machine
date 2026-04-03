@@ -50,7 +50,7 @@ class SocialCrossPostTask extends SystemTask {
 		}
 
 		// Call the cross-post REST endpoint internally.
-		$request = new \WP_REST_Request( 'POST', '/datamachine-socials/v1/post' );
+		$request = new \WP_REST_Request( 'POST', '/datamachine/v1/socials/post' );
 		$request->set_header( 'Content-Type', 'application/json' );
 		$request->set_body( wp_json_encode( array(
 			'platforms'     => $platforms,

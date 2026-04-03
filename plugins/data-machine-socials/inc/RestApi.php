@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class RestApi {
 
-	const NAMESPACE = 'datamachine-socials/v1';
+	const NAMESPACE = 'datamachine/v1';
 
 	/**
 	 * Register REST API routes
@@ -32,7 +32,7 @@ class RestApi {
 		// Get auth status for all platforms
 		register_rest_route(
 			self::NAMESPACE,
-			'/auth/status',
+			'/socials/auth/status',
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( __CLASS__, 'get_auth_status' ),
@@ -43,7 +43,7 @@ class RestApi {
 		// Get platform configurations
 		register_rest_route(
 			self::NAMESPACE,
-			'/platforms',
+			'/socials/platforms',
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( __CLASS__, 'get_platforms' ),
@@ -54,7 +54,7 @@ class RestApi {
 		// Cross-platform post
 		register_rest_route(
 			self::NAMESPACE,
-			'/post',
+			'/socials/post',
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( __CLASS__, 'cross_post' ),
@@ -99,7 +99,7 @@ class RestApi {
 		// Upload cropped image
 		register_rest_route(
 			self::NAMESPACE,
-			'/media/crop',
+			'/socials/media/crop',
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( __CLASS__, 'upload_cropped_image' ),
@@ -110,7 +110,7 @@ class RestApi {
 		// Get post status
 		register_rest_route(
 			self::NAMESPACE,
-			'/status/(?P<post_id>\d+)',
+			'/socials/status/(?P<post_id>\d+)',
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( __CLASS__, 'get_post_status' ),
@@ -122,7 +122,7 @@ class RestApi {
 		// Generic Comments Endpoint (normalized shape across all platforms)
 		// =====================================================================
 
-		register_rest_route( self::NAMESPACE, '/comments/(?P<platform>[a-z]+)', array(
+		register_rest_route( self::NAMESPACE, '/socials/comments/(?P<platform>[a-z]+)', array(
 			'methods'             => 'GET',
 			'callback'            => array( __CLASS__, 'get_comments' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
@@ -158,7 +158,7 @@ class RestApi {
 			),
 		) );
 
-		register_rest_route( self::NAMESPACE, '/comments/(?P<platform>[a-z]+)/reply', array(
+		register_rest_route( self::NAMESPACE, '/socials/comments/(?P<platform>[a-z]+)/reply', array(
 			'methods'             => 'POST',
 			'callback'            => array( __CLASS__, 'post_comment_reply' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
@@ -185,28 +185,28 @@ class RestApi {
 		// Platform Read Endpoints
 		// =====================================================================
 
-		register_rest_route( self::NAMESPACE, '/instagram/media', array(
+		register_rest_route( self::NAMESPACE, '/socials/instagram/media', array(
 			'methods'             => 'GET',
 			'callback'            => array( __CLASS__, 'platform_read' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
 			'args'                => self::read_endpoint_args( array( 'list', 'get', 'comments' ), 'media_id' ),
 		) );
 
-		register_rest_route( self::NAMESPACE, '/threads/posts', array(
+		register_rest_route( self::NAMESPACE, '/socials/threads/posts', array(
 			'methods'             => 'GET',
 			'callback'            => array( __CLASS__, 'platform_read' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
 			'args'                => self::read_endpoint_args( array( 'list', 'get', 'replies' ), 'thread_id' ),
 		) );
 
-		register_rest_route( self::NAMESPACE, '/facebook/posts', array(
+		register_rest_route( self::NAMESPACE, '/socials/facebook/posts', array(
 			'methods'             => 'GET',
 			'callback'            => array( __CLASS__, 'platform_read' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
 			'args'                => self::read_endpoint_args( array( 'list', 'get', 'comments' ), 'post_id' ),
 		) );
 
-		register_rest_route( self::NAMESPACE, '/facebook/update', array(
+		register_rest_route( self::NAMESPACE, '/socials/facebook/update', array(
 			'methods'             => 'POST',
 			'callback'            => array( __CLASS__, 'platform_update' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
@@ -229,7 +229,7 @@ class RestApi {
 			),
 		) );
 
-		register_rest_route( self::NAMESPACE, '/twitter/tweets', array(
+		register_rest_route( self::NAMESPACE, '/socials/twitter/tweets', array(
 			'methods'             => 'GET',
 			'callback'            => array( __CLASS__, 'platform_read' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
@@ -256,7 +256,7 @@ class RestApi {
 			),
 		) );
 
-		register_rest_route( self::NAMESPACE, '/twitter/update', array(
+		register_rest_route( self::NAMESPACE, '/socials/twitter/update', array(
 			'methods'             => 'POST',
 			'callback'            => array( __CLASS__, 'platform_update' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
@@ -275,7 +275,7 @@ class RestApi {
 			),
 		) );
 
-		register_rest_route( self::NAMESPACE, '/bluesky/posts', array(
+		register_rest_route( self::NAMESPACE, '/socials/bluesky/posts', array(
 			'methods'             => 'GET',
 			'callback'            => array( __CLASS__, 'platform_read' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
@@ -302,7 +302,7 @@ class RestApi {
 			),
 		) );
 
-		register_rest_route( self::NAMESPACE, '/pinterest/read', array(
+		register_rest_route( self::NAMESPACE, '/socials/pinterest/read', array(
 			'methods'             => 'GET',
 			'callback'            => array( __CLASS__, 'platform_read' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
@@ -333,7 +333,7 @@ class RestApi {
 			),
 		) );
 
-		register_rest_route( self::NAMESPACE, '/threads/update', array(
+		register_rest_route( self::NAMESPACE, '/socials/threads/update', array(
 			'methods'             => 'POST',
 			'callback'            => array( __CLASS__, 'platform_update' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
@@ -352,7 +352,7 @@ class RestApi {
 			),
 		) );
 
-		register_rest_route( self::NAMESPACE, '/bluesky/update', array(
+		register_rest_route( self::NAMESPACE, '/socials/bluesky/update', array(
 			'methods'             => 'POST',
 			'callback'            => array( __CLASS__, 'platform_update' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
@@ -371,7 +371,7 @@ class RestApi {
 			),
 		) );
 
-		register_rest_route( self::NAMESPACE, '/pinterest/update', array(
+		register_rest_route( self::NAMESPACE, '/socials/pinterest/update', array(
 			'methods'             => 'POST',
 			'callback'            => array( __CLASS__, 'platform_update' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
@@ -394,7 +394,7 @@ class RestApi {
 		// Platform Update Endpoints
 		// =====================================================================
 
-		register_rest_route( self::NAMESPACE, '/instagram/update', array(
+		register_rest_route( self::NAMESPACE, '/socials/instagram/update', array(
 			'methods'             => 'POST',
 			'callback'            => array( __CLASS__, 'platform_update' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
@@ -417,7 +417,7 @@ class RestApi {
 			),
 		) );
 
-		register_rest_route( self::NAMESPACE, '/instagram/comments/reply', array(
+		register_rest_route( self::NAMESPACE, '/socials/instagram/comments/reply', array(
 			'methods'             => 'POST',
 			'callback'            => array( __CLASS__, 'instagram_comment_reply' ),
 			'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
@@ -436,7 +436,7 @@ class RestApi {
 		) );
 
 		// Instagram Reel publish.
-		register_rest_route( self::NAMESPACE, '/instagram/reel', array(
+		register_rest_route( self::NAMESPACE, '/socials/instagram/reel', array(
 			'methods'             => 'POST',
 			'callback'            => array( __CLASS__, 'instagram_publish_reel' ),
 			'permission_callback' => array( __CLASS__, 'check_publish_permission' ),
@@ -470,7 +470,7 @@ class RestApi {
 		) );
 
 		// Instagram Story publish.
-		register_rest_route( self::NAMESPACE, '/instagram/story', array(
+		register_rest_route( self::NAMESPACE, '/socials/instagram/story', array(
 			'methods'             => 'POST',
 			'callback'            => array( __CLASS__, 'instagram_publish_story' ),
 			'permission_callback' => array( __CLASS__, 'check_publish_permission' ),
@@ -701,7 +701,7 @@ class RestApi {
 	 *
 	 * Routes to the platform's read ability with comments_all or comments action.
 	 * Provides a single, predictable endpoint for all platforms:
-	 *   GET /datamachine-socials/v1/comments/{platform}?media_id=...
+	 *   GET /datamachine/v1/socials/comments/{platform}?media_id=...
 	 */
 	public static function get_comments( \WP_REST_Request $request ) {
 		$platform = $request->get_param( 'platform' );
@@ -763,7 +763,7 @@ class RestApi {
 	 * Generic comment reply endpoint.
 	 *
 	 * Routes to the platform's comment reply ability:
-	 *   POST /datamachine-socials/v1/comments/{platform}/reply
+	 *   POST /datamachine/v1/socials/comments/{platform}/reply
 	 */
 	public static function post_comment_reply( \WP_REST_Request $request ) {
 		$platform   = $request->get_param( 'platform' );
