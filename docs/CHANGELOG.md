@@ -2,6 +2,20 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.64.0] - 2026-04-03
+
+### Added
+- add datamachine/send-message ability for canonical chat message dispatch
+
+### Changed
+- Revert "fix: single-arg AS scheduling for database flow execution (#1018)"
+
+### Fixed
+- eliminate dual-path flow execution — execute-workflow is ephemeral only
+- single-arg AS scheduling for database flow execution
+- rename nonce field to avoid REST API cookie auth collision
+- manually validate cookie in authorize endpoint for browser flow
+
 ## [0.63.1] - 2026-04-03
 
 ### Added
