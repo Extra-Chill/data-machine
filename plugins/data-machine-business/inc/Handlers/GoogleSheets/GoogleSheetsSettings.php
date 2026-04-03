@@ -85,4 +85,19 @@ class GoogleSheetsSettings extends PublishHandlerSettings {
 			'F' => 'job_id',
 		);
 	}
+
+	public static function validate_authentication( int $user_id ) {
+		$auth_abilities = new \DataMachine\Abilities\AuthAbilities();
+		$auth_provider  = $auth_abilities->getProvider( 'googlesheets' );
+
+		if ( ! $auth_provider ) {
+			return new \WP_Error( 'googlesheets_auth_unavailable', __( 'Google Sheets authentication service not available.', 'data-machine-business' ) );
+		}
+
+		if ( ! $auth_abilities->isHandlerAuthenticated( 'googlesheets' ) ) {
+			return new \WP_Error( 'googlesheets_not_authenticated', __( 'Google Sheets authentication required.', 'data-machine-business' ) );
+		}
+
+		return true;
+	}
 }
