@@ -17,6 +17,7 @@
 namespace DataMachineSocials\Handlers\Pinterest;
 
 use DataMachine\Core\HttpClient;
+use DataMachineSocials\Handlers\Traits\HasRemoveAccount;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -28,6 +29,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Manages Pinterest API v5 OAuth2 authentication with auto-refresh.
  */
 class PinterestAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
+	use HasRemoveAccount;
+
 
 	const AUTH_URL  = 'https://www.pinterest.com/oauth/';
 	const TOKEN_URL = 'https://api.pinterest.com/v5/oauth/token';
@@ -303,14 +306,5 @@ class PinterestAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			return null;
 		}
 		return $account;
-	}
-
-	/**
-	 * Remove Pinterest account credentials.
-	 *
-	 * @return bool True on success.
-	 */
-	public function remove_account(): bool {
-		return $this->clear_account();
 	}
 }

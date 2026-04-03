@@ -60,39 +60,39 @@ class RestApi {
 				'callback'            => array( __CLASS__, 'cross_post' ),
 				'permission_callback' => array( __CLASS__, 'check_publish_permission' ),
 				'args'                => array(
-				'platforms'    => array(
-					'required' => true,
-					'type'     => 'array',
+					'platforms'     => array(
+						'required' => true,
+						'type'     => 'array',
+					),
+					'images'        => array(
+						'type' => 'array',
+					),
+					'caption'       => array(
+						'required' => true,
+						'type'     => 'string',
+					),
+					'aspect_ratio'  => array(
+						'type'    => 'string',
+						'default' => '4:5',
+					),
+					'media_kind'    => array(
+						'type'    => 'string',
+						'default' => 'image',
+						'enum'    => array( 'image', 'carousel', 'reel', 'story' ),
+					),
+					'video_url'     => array(
+						'type'   => 'string',
+						'format' => 'uri',
+					),
+					'cover_url'     => array(
+						'type'   => 'string',
+						'format' => 'uri',
+					),
+					'share_to_feed' => array(
+						'type'    => 'boolean',
+						'default' => true,
+					),
 				),
-				'images'       => array(
-					'type' => 'array',
-				),
-				'caption'      => array(
-					'required' => true,
-					'type'     => 'string',
-				),
-				'aspect_ratio' => array(
-					'type'    => 'string',
-					'default' => '4:5',
-				),
-				'media_kind'   => array(
-					'type'    => 'string',
-					'default' => 'image',
-					'enum'    => array( 'image', 'carousel', 'reel', 'story' ),
-				),
-				'video_url'    => array(
-					'type'   => 'string',
-					'format' => 'uri',
-				),
-				'cover_url'    => array(
-					'type'   => 'string',
-					'format' => 'uri',
-				),
-				'share_to_feed' => array(
-					'type'    => 'boolean',
-					'default' => true,
-				),
-			),
 			)
 		);
 
@@ -139,18 +139,18 @@ class RestApi {
 					'sanitize_callback' => 'sanitize_text_field',
 					'description'       => 'Platform-specific post/media ID.',
 				),
-				'all' => array(
-					'type'              => 'boolean',
-					'default'           => true,
-					'description'       => 'Fetch all comments (auto-paginate). Set false for single page.',
+				'all'      => array(
+					'type'        => 'boolean',
+					'default'     => true,
+					'description' => 'Fetch all comments (auto-paginate). Set false for single page.',
 				),
-				'limit' => array(
+				'limit'    => array(
 					'type'              => 'integer',
 					'default'           => 50,
 					'sanitize_callback' => 'absint',
 					'description'       => 'Page size when all=false.',
 				),
-				'after' => array(
+				'after'    => array(
 					'type'              => 'string',
 					'sanitize_callback' => 'sanitize_text_field',
 					'description'       => 'Pagination cursor when all=false.',
@@ -554,13 +554,16 @@ class RestApi {
 				'error'   => $slug_map[ $platform ] . ' ability not registered',
 			), 500 );
 		}
-		$input   = array_filter( $params, function ( $v ) { return '' !== $v && null !== $v;
+		$input  = array_filter( $params, function ( $v ) { return '' !== $v && null !== $v;
 		} );
-		$result  = $ability->execute( $input );
+		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
 			$status = $result->get_error_data()['status'] ?? 500;
-			return new \WP_REST_Response( array( 'success' => false, 'error' => $result->get_error_message() ), $status );
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => $result->get_error_message(),
+			), $status );
 		}
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
@@ -651,7 +654,10 @@ class RestApi {
 
 		if ( is_wp_error( $result ) ) {
 			$status = $result->get_error_data()['status'] ?? 500;
-			return new \WP_REST_Response( array( 'success' => false, 'error' => $result->get_error_message() ), $status );
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => $result->get_error_message(),
+			), $status );
 		}
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
@@ -679,7 +685,10 @@ class RestApi {
 
 		$ability = wp_get_ability( 'datamachine/instagram-comment-reply' );
 		if ( ! $ability ) {
-			return new \WP_REST_Response( array( 'success' => false, 'error' => 'Ability not registered' ), 500 );
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => 'Ability not registered',
+			), 500 );
 		}
 		$result = $ability->execute(
 			array(
@@ -690,7 +699,10 @@ class RestApi {
 
 		if ( is_wp_error( $result ) ) {
 			$status = $result->get_error_data()['status'] ?? 500;
-			return new \WP_REST_Response( array( 'success' => false, 'error' => $result->get_error_message() ), $status );
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => $result->get_error_message(),
+			), $status );
 		}
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
@@ -742,7 +754,7 @@ class RestApi {
 		);
 
 		if ( ! $all ) {
-			$input['limit'] = $request->get_param( 'limit' ) ?: 50;
+			$input['limit'] = $request->get_param( 'limit' ) ? $request->get_param( 'limit' ) : 50;
 			$after          = $request->get_param( 'after' );
 			if ( $after ) {
 				$input['after'] = $after;
@@ -753,7 +765,10 @@ class RestApi {
 
 		if ( is_wp_error( $result ) ) {
 			$status = $result->get_error_data()['status'] ?? 500;
-			return new \WP_REST_Response( array( 'success' => false, 'error' => $result->get_error_message() ), $status );
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => $result->get_error_message(),
+			), $status );
 		}
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
@@ -767,7 +782,7 @@ class RestApi {
 	 */
 	public static function post_comment_reply( \WP_REST_Request $request ) {
 		$platform   = $request->get_param( 'platform' );
-		$params     = $request->get_json_params() ?: $request->get_body_params();
+		$params     = $request->get_json_params() ? $request->get_json_params() : $request->get_body_params();
 		$comment_id = $params['comment_id'] ?? '';
 		$message    = $params['message'] ?? '';
 
@@ -805,7 +820,10 @@ class RestApi {
 
 		if ( is_wp_error( $result ) ) {
 			$status = $result->get_error_data()['status'] ?? 500;
-			return new \WP_REST_Response( array( 'success' => false, 'error' => $result->get_error_message() ), $status );
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => $result->get_error_message(),
+			), $status );
 		}
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
@@ -848,13 +866,19 @@ class RestApi {
 
 		$ability = wp_get_ability( 'datamachine/instagram-publish' );
 		if ( ! $ability ) {
-			return new \WP_REST_Response( array( 'success' => false, 'error' => 'Ability not registered' ), 500 );
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => 'Ability not registered',
+			), 500 );
 		}
 		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
 			$status = $result->get_error_data()['status'] ?? 500;
-			return new \WP_REST_Response( array( 'success' => false, 'error' => $result->get_error_message() ), $status );
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => $result->get_error_message(),
+			), $status );
 		}
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
@@ -889,13 +913,19 @@ class RestApi {
 
 		$ability = wp_get_ability( 'datamachine/instagram-publish' );
 		if ( ! $ability ) {
-			return new \WP_REST_Response( array( 'success' => false, 'error' => 'Ability not registered' ), 500 );
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => 'Ability not registered',
+			), 500 );
 		}
 		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
 			$status = $result->get_error_data()['status'] ?? 500;
-			return new \WP_REST_Response( array( 'success' => false, 'error' => $result->get_error_message() ), $status );
+			return new \WP_REST_Response( array(
+				'success' => false,
+				'error'   => $result->get_error_message(),
+			), $status );
 		}
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 500 );
@@ -1236,7 +1266,7 @@ class RestApi {
 
 		$tracker = \DataMachineSocials\Tracking\SocialShareTracker::class;
 
-		$shares    = $tracker::get_shares( $post_id, $platform ?: null );
+		$shares    = $tracker::get_shares( $post_id, $platform ? $platform : null );
 		$platforms = $tracker::get_shared_platforms( $post_id );
 
 		return new \WP_REST_Response( array(

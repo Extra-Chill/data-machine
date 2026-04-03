@@ -371,4 +371,70 @@ class ThreadsPublishAbility {
 			$data['error']['message'] ?? 'Failed to publish thread'
 		);
 	}
+
+	public function checkPermission(): bool {
+		return PermissionHelper::can_manage();
+	}
+
+	public function execute( array $input ): array|\WP_Error {
+		$auth = $this->getAuthProvider();
+		if ( ! $auth ) {
+			return new \WP_Error( 'missing_auth', 'Threads auth provider not available', array( 'status' => 401 ) );
+		}
+
+		$access_token = $auth->get_valid_access_token();
+		if ( empty( $access_token ) ) {
+			return new \WP_Error( 'missing_auth', 'Threads access token unavailable', array( 'status' => 401 ) );
+		}
+
+		if ( empty( $input['thread_id'] ) ) {
+			return new \WP_Error( 'missing_param', 'thread_id is required', array( 'status' => 400 ) );
+		}
+
+		$url = self::GRAPH_API_URL . '/' . rawurlencode( $input['thread_id'] );
+
+		$response = wp_remote_post(
+			$url,
+			array(
+				'timeout' => 30,
+				'body'    => array(
+					'access_token' => $access_token,
+				),
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
+		}
+
+		$status_code = wp_remote_retrieve_response_code( $response );
+		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
+
+		if ( 200 === $status_code || 204 === $status_code ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'thread_id' => $input['thread_id'],
+					'deleted'   => true,
+				),
+			);
+		}
+
+		return new \WP_Error( 'api_error', $body['error']['message'] ?? 'Failed to delete thread', array( 'status' => 500 ) );
+	}
+
+	private function getAuthProvider(): ?ThreadsAuth {
+		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
+			return null;
+		}
+
+		$auth     = new \DataMachine\Abilities\AuthAbilities();
+		$provider = $auth->getProvider( 'threads' );
+
+		if ( ! $provider instanceof ThreadsAuth ) {
+			return null;
+		}
+
+		return $provider;
+	}
 }

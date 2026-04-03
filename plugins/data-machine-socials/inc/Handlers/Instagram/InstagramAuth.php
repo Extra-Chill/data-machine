@@ -13,12 +13,17 @@
 namespace DataMachineSocials\Handlers\Instagram;
 
 use DataMachine\Core\HttpClient;
+use DataMachineSocials\Handlers\Traits\HasGetAccountDetails;
+use DataMachineSocials\Handlers\Traits\HasRemoveAccount;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
 class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
+	use HasGetAccountDetails;
+	use HasRemoveAccount;
+
 
 	const AUTH_URL      = 'https://www.instagram.com/oauth/authorize';
 	const TOKEN_URL     = 'https://api.instagram.com/oauth/access_token';
@@ -280,27 +285,5 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		}
 
 		return $data['username'] ?? '';
-	}
-
-	/**
-	 * Get stored Instagram account details
-	 *
-	 * @return array|null Account details or null
-	 */
-	public function get_account_details(): ?array {
-		$account = $this->get_account();
-		if ( empty( $account ) || ! is_array( $account ) ) {
-			return null;
-		}
-		return $account;
-	}
-
-	/**
-	 * Remove stored Instagram account details
-	 *
-	 * @return bool Success status
-	 */
-	public function remove_account(): bool {
-		return $this->clear_account();
 	}
 }

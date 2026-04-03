@@ -91,4 +91,26 @@ class RedditSettings extends FetchHandlerSettings {
 
 		return $sanitized;
 	}
+
+	public function __construct() {
+		parent::__construct( 'reddit' );
+
+		// Self-register with filters
+		self::registerHandler(
+			'reddit',
+			'fetch',
+			self::class,
+			'Reddit',
+			'Fetch posts from Reddit subreddits',
+			true,
+			RedditAuth::class,
+			self::class,
+			null,
+			null,
+			array(
+				'charLimit' => 40000,
+				'scopes'    => 'identity read',
+			)
+		);
+	}
 }

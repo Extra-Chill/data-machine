@@ -14,10 +14,14 @@ namespace DataMachineSocials\Abilities\Twitter;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Handlers\Twitter\TwitterAuth;
+use DataMachineSocials\Abilities\Traits\HasCheckPermission;
+use DataMachineSocials\Abilities\Twitter\TwitterDeleteAbility;
 
 defined( 'ABSPATH' ) || exit;
 
 class TwitterUpdateAbility {
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -80,15 +84,6 @@ class TwitterUpdateAbility {
 	}
 
 	/**
-	 * Permission callback.
-	 *
-	 * @return bool
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
-	}
-
-	/**
 	 * Execute the update ability.
 	 *
 	 * @param array $input Input parameters.
@@ -133,26 +128,6 @@ class TwitterUpdateAbility {
 			default:
 				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use delete, retweet, unretweet, like, or unlike.", array( 'status' => 500 ) );
 		}
-	}
-
-	/**
-	 * Get auth provider.
-	 *
-	 * @return TwitterAuth|null
-	 */
-	private function getAuthProvider(): ?TwitterAuth {
-		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
-			return null;
-		}
-
-		$auth     = new \DataMachine\Abilities\AuthAbilities();
-		$provider = $auth->getProvider( 'twitter' );
-
-		if ( ! $provider instanceof TwitterAuth ) {
-			return null;
-		}
-
-		return $provider;
 	}
 
 	/**

@@ -13,12 +13,15 @@
 namespace DataMachineSocials\Handlers\Facebook;
 
 use DataMachine\Core\HttpClient;
+use DataMachineSocials\Handlers\Traits\HasGetAccountDetails;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
 class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
+	use HasGetAccountDetails;
+
 
 	public const GRAPH_API_VERSION = 'v23.0';
 	public const AUTH_URL          = 'https://www.facebook.com/' . self::GRAPH_API_VERSION . '/dialog/oauth';
@@ -540,19 +543,6 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
 		do_action( 'datamachine_log', 'error', 'Facebook: pages_manage_engagement permission not granted' );
 		return false;
-	}
-
-	/**
-	* Get stored Facebook account details
-	*
-	* @return array|null Account details or null
-	*/
-	public function get_account_details(): ?array {
-		$account = $this->get_account();
-		if ( empty( $account ) || ! is_array( $account ) ) {
-			return null;
-		}
-		return $account;
 	}
 
 	/**

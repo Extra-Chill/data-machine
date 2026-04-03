@@ -591,7 +591,13 @@ class RedditCommand {
 
 		// Backward compat: single-result 'data' key.
 		if ( empty( $items ) && ! empty( $result['data'] ) ) {
-			$items = is_array( $result['data'] ) ? array( array( 'data' => $result['data'], 'source_url' => $result['source_url'] ?? '', 'item_id' => $result['item_id'] ?? '' ) ) : array();
+			$items = is_array( $result['data'] ) ? array(
+				array(
+					'data'       => $result['data'],
+					'source_url' => $result['source_url'] ?? '',
+					'item_id'    => $result['item_id'] ?? '',
+				),
+			) : array();
 		}
 
 		if ( empty( $items ) ) {

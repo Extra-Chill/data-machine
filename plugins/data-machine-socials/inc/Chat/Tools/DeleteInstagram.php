@@ -59,7 +59,7 @@ class DeleteInstagram extends BaseTool {
 		if ( ! $ability ) {
 			return $this->buildErrorResponse( 'datamachine/instagram-delete ability not registered', $tool_name );
 		}
-		$result  = $ability->execute( array( 'media_id' => $parameters['media_id'] ) );
+		$result = $ability->execute( array( 'media_id' => $parameters['media_id'] ) );
 
 		if ( ! is_wp_error( $result ) && $result['success'] ) {
 			return array(

@@ -82,79 +82,79 @@ class InstagramPublishAbility {
 				'datamachine/instagram-publish',
 				array(
 					'label'               => __( 'Publish to Instagram', 'data-machine-socials' ),
-				'description'         => __( 'Post content to Instagram — supports single image, carousel (up to 10 images), Reel (video), and Story (image or video)', 'data-machine-socials' ),
-				'category'            => 'datamachine',
-				'input_schema'        => array(
-					'type'       => 'object',
-					'required'   => array( 'content' ),
-					'properties' => array(
-						'content'        => array(
-							'type'        => 'string',
-							'description' => 'Post caption text (max 2200 characters)',
-							'maxLength'   => 2200,
+					'description'         => __( 'Post content to Instagram — supports single image, carousel (up to 10 images), Reel (video), and Story (image or video)', 'data-machine-socials' ),
+					'category'            => 'datamachine',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'content' ),
+						'properties' => array(
+							'content'         => array(
+								'type'        => 'string',
+								'description' => 'Post caption text (max 2200 characters)',
+								'maxLength'   => 2200,
+							),
+							'media_kind'      => array(
+								'type'        => 'string',
+								'description' => 'Type of media to publish: image (default), carousel, reel, or story',
+								'enum'        => array( 'image', 'carousel', 'reel', 'story' ),
+								'default'     => 'image',
+							),
+							'image_urls'      => array(
+								'type'        => 'array',
+								'description' => 'Array of image URLs to post (1-10 for carousel, 1 for single image)',
+								'items'       => array(
+									'type'   => 'string',
+									'format' => 'uri',
+								),
+								'maxItems'    => 10,
+							),
+							'video_url'       => array(
+								'type'        => 'string',
+								'description' => 'Public video URL for Reel or Story publishing',
+								'format'      => 'uri',
+							),
+							'cover_url'       => array(
+								'type'        => 'string',
+								'description' => 'Optional cover image URL for Reel',
+								'format'      => 'uri',
+							),
+							'share_to_feed'   => array(
+								'type'        => 'boolean',
+								'description' => 'Whether to share the Reel to the main feed (default true)',
+								'default'     => true,
+							),
+							'story_image_url' => array(
+								'type'        => 'string',
+								'description' => 'Image URL for Story publishing (use this or video_url for stories)',
+								'format'      => 'uri',
+							),
+							'aspect_ratio'    => array(
+								'type'        => 'string',
+								'description' => 'Aspect ratio for images: 1:1, 4:5, 3:4, or 1.91:1',
+								'enum'        => array( '1:1', '4:5', '3:4', '1.91:1' ),
+								'default'     => '4:5',
+							),
+							'source_url'      => array(
+								'type'        => 'string',
+								'description' => 'Source URL to include in caption',
+								'format'      => 'uri',
+							),
 						),
-						'media_kind'     => array(
-							'type'        => 'string',
-							'description' => 'Type of media to publish: image (default), carousel, reel, or story',
-							'enum'        => array( 'image', 'carousel', 'reel', 'story' ),
-							'default'     => 'image',
-						),
-						'image_urls'     => array(
-							'type'        => 'array',
-							'description' => 'Array of image URLs to post (1-10 for carousel, 1 for single image)',
-							'items'       => array(
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'    => array( 'type' => 'boolean' ),
+							'media_id'   => array( 'type' => 'string' ),
+							'media_kind' => array( 'type' => 'string' ),
+							'permalink'  => array(
 								'type'   => 'string',
 								'format' => 'uri',
 							),
-							'maxItems'    => 10,
-						),
-						'video_url'      => array(
-							'type'        => 'string',
-							'description' => 'Public video URL for Reel or Story publishing',
-							'format'      => 'uri',
-						),
-						'cover_url'      => array(
-							'type'        => 'string',
-							'description' => 'Optional cover image URL for Reel',
-							'format'      => 'uri',
-						),
-						'share_to_feed'  => array(
-							'type'        => 'boolean',
-							'description' => 'Whether to share the Reel to the main feed (default true)',
-							'default'     => true,
-						),
-						'story_image_url' => array(
-							'type'        => 'string',
-							'description' => 'Image URL for Story publishing (use this or video_url for stories)',
-							'format'      => 'uri',
-						),
-						'aspect_ratio'   => array(
-							'type'        => 'string',
-							'description' => 'Aspect ratio for images: 1:1, 4:5, 3:4, or 1.91:1',
-							'enum'        => array( '1:1', '4:5', '3:4', '1.91:1' ),
-							'default'     => '4:5',
-						),
-						'source_url'     => array(
-							'type'        => 'string',
-							'description' => 'Source URL to include in caption',
-							'format'      => 'uri',
+							'error'      => array( 'type' => 'string' ),
 						),
 					),
-				),
-				'output_schema'       => array(
-					'type'       => 'object',
-					'properties' => array(
-						'success'    => array( 'type' => 'boolean' ),
-						'media_id'   => array( 'type' => 'string' ),
-						'media_kind' => array( 'type' => 'string' ),
-						'permalink'  => array(
-							'type'   => 'string',
-							'format' => 'uri',
-						),
-						'error'      => array( 'type' => 'string' ),
-					),
-				),
-				'execute_callback'    => array( self::class, 'execute_publish' ),
+					'execute_callback'    => array( self::class, 'execute_publish' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
@@ -684,5 +684,42 @@ class InstagramPublishAbility {
 			'user_id'       => $provider->get_user_id() ?? '',
 			'username'      => $provider->get_username() ?? '',
 		);
+	}
+
+	public function execute( array $input ): array|\WP_Error {
+		$auth = $this->getAuthProvider();
+		if ( ! $auth ) {
+			return new \WP_Error( 'missing_auth', 'Instagram auth provider not available', array( 'status' => 401 ) );
+		}
+
+		$access_token = $auth->get_valid_access_token();
+		if ( empty( $access_token ) ) {
+			return new \WP_Error( 'missing_auth', 'Instagram access token unavailable', array( 'status' => 401 ) );
+		}
+
+		if ( empty( $input['media_id'] ) ) {
+			return new \WP_Error( 'missing_param', 'media_id is required', array( 'status' => 400 ) );
+		}
+
+		return $this->deleteMedia( $access_token, $input['media_id'] );
+	}
+
+	private function getAuthProvider(): ?InstagramAuth {
+		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
+			return null;
+		}
+
+		$auth     = new \DataMachine\Abilities\AuthAbilities();
+		$provider = $auth->getProvider( 'instagram' );
+
+		if ( ! $provider instanceof InstagramAuth ) {
+			return null;
+		}
+
+		return $provider;
+	}
+
+	public function checkPermission(): bool {
+		return PermissionHelper::can_manage();
 	}
 }

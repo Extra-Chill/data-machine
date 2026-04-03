@@ -82,7 +82,10 @@ class SubmitReddit extends BaseTool {
 				'Reddit auth provider not available',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'reddit', 'status' => 'not_registered' ),
+				array(
+					'provider' => 'reddit',
+					'status'   => 'not_registered',
+				),
 				array(
 					'action'  => 'configure_reddit_auth',
 					'message' => 'Reddit OAuth needs to be configured in Data Machine Settings > Auth.',
@@ -95,7 +98,10 @@ class SubmitReddit extends BaseTool {
 				'Reddit is not authenticated',
 				'prerequisite_missing',
 				$tool_name,
-				array( 'provider' => 'reddit', 'status' => 'not_authenticated' ),
+				array(
+					'provider' => 'reddit',
+					'status'   => 'not_authenticated',
+				),
 				array(
 					'action'  => 'authenticate_reddit',
 					'message' => 'Reddit OAuth needs to be connected with submit scope.',
@@ -109,8 +115,14 @@ class SubmitReddit extends BaseTool {
 				'Reddit access token expired and refresh failed',
 				'system',
 				$tool_name,
-				array( 'provider' => 'reddit', 'status' => 'token_expired' ),
-				array( 'action' => 're_authenticate', 'message' => 'Reddit token refresh failed.' )
+				array(
+					'provider' => 'reddit',
+					'status'   => 'token_expired',
+				),
+				array(
+					'action'  => 're_authenticate',
+					'message' => 'Reddit token refresh failed.',
+				)
 			);
 		}
 

@@ -58,4 +58,76 @@ class PinterestSettings extends PublishHandlerSettings {
 			)
 		);
 	}
+
+	public function __construct() {
+		parent::__construct( 'pinterest' );
+
+		self::registerHandler(
+			'pinterest_publish',
+			'publish',
+			self::class,
+			'Pinterest',
+			'Pin content to Pinterest with image and link back to source',
+			true,
+			PinterestAuth::class,
+			self::class,
+			function ( $tools, $handler_slug, $handler_config ) {
+				if ( 'pinterest_publish' === $handler_slug ) {
+					$board_id_description = 'Pinterest board ID override (uses default if omitted)';
+
+					// Inject cached board names when AI decides mode is active.
+					$mode = $handler_config['board_selection_mode'] ?? 'pre_selected';
+					if ( 'ai_decides' === $mode ) {
+						$cached_boards = PinterestBoardsAbility::get_cached_boards();
+						if ( ! empty( $cached_boards ) ) {
+							$board_list           = implode( ', ', array_map( function ( $b ) {
+								return $b['name'] . ' (' . $b['id'] . ')';
+							}, $cached_boards ) );
+							$board_id_description = "Pinterest board ID. Available boards: {$board_list}";
+						}
+					}
+
+					$tools['pinterest_publish'] = array(
+						'class'       => self::class,
+						'method'      => 'handle_tool_call',
+						'handler'     => 'pinterest_publish',
+						'description' => 'Pin content to Pinterest with image, title, description, and link.',
+						'parameters'  => array(
+							'type'       => 'object',
+							'properties' => array(
+								'title'       => array(
+									'type'        => 'string',
+									'description' => 'Pin title (max 100 characters)',
+								),
+								'description' => array(
+									'type'        => 'string',
+									'description' => 'Pin description (max 500 characters)',
+								),
+								'board_id'    => array(
+									'type'        => 'string',
+									'description' => $board_id_description,
+								),
+							),
+							'required'   => array( 'title', 'description' ),
+						),
+					);
+				}
+				return $tools;
+			},
+			'pinterest',
+			array(
+				'charLimit'          => 500,
+				'maxImages'          => 1,
+				'aspectRatios'       => array( '2:3' ),
+				'defaultAspectRatio' => '2:3',
+				'supportsCarousel'   => false,
+				'capabilities'       => array(
+					array(
+						'slug'  => 'publish',
+						'label' => 'Publish',
+					),
+				),
+			)
+		);
+	}
 }

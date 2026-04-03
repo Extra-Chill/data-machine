@@ -15,10 +15,14 @@ namespace DataMachineSocials\Abilities\Pinterest;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Pinterest\PinterestAuth;
+use DataMachineSocials\Abilities\Traits\HasCheckPermission;
+use DataMachineSocials\Abilities\Pinterest\PinterestReadAbility;
 
 defined( 'ABSPATH' ) || exit;
 
 class PinterestAnalyticsAbility {
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -119,10 +123,6 @@ class PinterestAnalyticsAbility {
 		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', $register_callback );
 		}
-	}
-
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 
 	public function execute( array $input ): array|\WP_Error {
@@ -364,16 +364,5 @@ class PinterestAnalyticsAbility {
 		}
 
 		return $summary;
-	}
-
-	private function getAuthProvider(): ?PinterestAuth {
-		$auth_abilities = new \DataMachine\Abilities\AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'pinterest' );
-
-		if ( $provider instanceof PinterestAuth ) {
-			return $provider;
-		}
-
-		return null;
 	}
 }

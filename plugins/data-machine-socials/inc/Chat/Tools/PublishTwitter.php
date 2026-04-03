@@ -34,12 +34,12 @@ class PublishTwitter extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Publish a tweet to Twitter/X. Supports text (max 280 characters) with optional image and source URL. Requires Twitter OAuth to be configured.',
 			'parameters'  => array(
-				'content'    => array(
+				'content'       => array(
 					'type'        => 'string',
 					'required'    => true,
 					'description' => 'Tweet text. Max 280 characters.',
 				),
-				'source_url' => array(
+				'source_url'    => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'Optional source URL to include in or after the tweet.',

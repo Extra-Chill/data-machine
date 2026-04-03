@@ -15,10 +15,14 @@ namespace DataMachineSocials\Abilities\LinkedIn;
 use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Handlers\LinkedIn\LinkedInAuth;
+use DataMachineSocials\Abilities\Traits\HasCheckPermission;
+use DataMachineSocials\Abilities\LinkedIn\LinkedInReadAbility;
 
 defined( 'ABSPATH' ) || exit;
 
 class LinkedInUpdateAbility {
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -79,10 +83,6 @@ class LinkedInUpdateAbility {
 		}
 	}
 
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
-	}
-
 	public function execute( array $input ): array|\WP_Error {
 		$post_id    = $input['post_id'] ?? '';
 		$commentary = $input['commentary'] ?? '';
@@ -134,16 +134,5 @@ class LinkedInUpdateAbility {
 		}
 
 		return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to update LinkedIn post', array( 'status' => 500 ) );
-	}
-
-	private function getAuthProvider(): ?LinkedInAuth {
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'linkedin' );
-
-		if ( $provider instanceof LinkedInAuth ) {
-			return $provider;
-		}
-
-		return null;
 	}
 }

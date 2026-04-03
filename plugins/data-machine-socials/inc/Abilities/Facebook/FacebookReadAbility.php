@@ -15,10 +15,13 @@ namespace DataMachineSocials\Abilities\Facebook;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
+use DataMachineSocials\Abilities\Traits\HasCheckPermission;
 
 defined( 'ABSPATH' ) || exit;
 
 class FacebookReadAbility {
+	use HasCheckPermission;
+
 
 	private static bool $registered = false;
 
@@ -91,10 +94,6 @@ class FacebookReadAbility {
 		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', $register_callback );
 		}
-	}
-
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
 	}
 
 	public function execute( array $input ): array|\WP_Error {

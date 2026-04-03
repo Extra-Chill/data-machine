@@ -41,4 +41,56 @@ class BlueskySettings extends PublishHandlerSettings {
 			)
 		);
 	}
+
+	public function __construct() {
+		parent::__construct( 'bluesky' );
+
+		// Self-register with filters
+		self::registerHandler(
+			'bluesky_publish',
+			'publish',
+			self::class,
+			'Bluesky',
+			'Post content to Bluesky social network',
+			true,
+			BlueskyAuth::class,
+			self::class,
+			function ( $tools, $handler_slug, $handler_config ) {
+				$handler_config;
+				if ( 'bluesky_publish' === $handler_slug ) {
+					$tools['bluesky_publish'] = array(
+						'class'       => self::class,
+						'method'      => 'handle_tool_call',
+						'handler'     => 'bluesky_publish',
+						'description' => 'Post content to Bluesky. Supports text and images.',
+						'parameters'  => array(
+							'type'       => 'object',
+							'properties' => array(
+								'content' => array(
+									'type'        => 'string',
+									'description' => 'The text content to post to Bluesky',
+								),
+							),
+							'required'   => array( 'content' ),
+						),
+					);
+				}
+				return $tools;
+			},
+			'bluesky',
+			array(
+				'charLimit'          => 300,
+				'maxImages'          => 4,
+				'aspectRatios'       => array( 'any' ),
+				'defaultAspectRatio' => 'any',
+				'supportsCarousel'   => false,
+				'capabilities'       => array(
+					array(
+						'slug'  => 'publish',
+						'label' => 'Publish',
+					),
+				),
+			)
+		);
+	}
 }

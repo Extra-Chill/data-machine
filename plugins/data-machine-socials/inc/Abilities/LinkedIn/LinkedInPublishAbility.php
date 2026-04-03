@@ -170,16 +170,16 @@ class LinkedInPublishAbility {
 
 		// Build post payload.
 		$payload = array(
-			'author'                      => $person_urn,
-			'commentary'                  => $content,
-			'visibility'                  => $visibility,
-			'distribution'                => array(
+			'author'                    => $person_urn,
+			'commentary'                => $content,
+			'visibility'                => $visibility,
+			'distribution'              => array(
 				'feedDistribution'               => 'MAIN_FEED',
 				'targetEntities'                 => array(),
 				'thirdPartyDistributionChannels' => array(),
 			),
-			'lifecycleState'              => 'PUBLISHED',
-			'isReshareDisabledByAuthor'   => false,
+			'lifecycleState'            => 'PUBLISHED',
+			'isReshareDisabledByAuthor' => false,
 		);
 
 		try {
@@ -271,6 +271,7 @@ class LinkedInPublishAbility {
 	 * @return string|null Image URN on success, null on failure.
 	 */
 	private static function upload_image( LinkedInAuth $provider, string $owner_urn, string $image_path ): ?string {
+		global $wp_filesystem;
 		if ( ! file_exists( $image_path ) ) {
 			return null;
 		}
@@ -301,7 +302,7 @@ class LinkedInPublishAbility {
 			return null;
 		}
 
-		$init_data = json_decode( $init_result['data'], true );
+		$init_data  = json_decode( $init_result['data'], true );
 		$upload_url = $init_data['value']['uploadUrl'] ?? null;
 		$image_urn  = $init_data['value']['image'] ?? null;
 
@@ -316,7 +317,7 @@ class LinkedInPublishAbility {
 		}
 
 		// Step 2: Upload the binary image.
-		$file_contents = file_get_contents( $image_path );
+		$file_contents = $wp_filesystem->get_contents( $image_path );
 		if ( false === $file_contents ) {
 			return null;
 		}
@@ -394,5 +395,59 @@ class LinkedInPublishAbility {
 		}
 		// LinkedIn post URLs follow: https://www.linkedin.com/feed/update/{urn}
 		return 'https://www.linkedin.com/feed/update/' . $post_id;
+	}
+
+	public function execute( array $input ): array|\WP_Error {
+		$post_id = $input['post_id'] ?? '';
+
+		if ( empty( $post_id ) ) {
+			return new \WP_Error( 'missing_param', 'post_id is required', array( 'status' => 400 ) );
+		}
+
+		$provider = $this->getAuthProvider();
+		if ( ! $provider ) {
+			return new \WP_Error( 'missing_auth', 'LinkedIn auth provider not available', array( 'status' => 401 ) );
+		}
+
+		if ( ! $provider->is_authenticated() ) {
+			return new \WP_Error( 'missing_auth', 'LinkedIn not authenticated', array( 'status' => 401 ) );
+		}
+
+		$encoded_id = rawurlencode( $post_id );
+		$url        = LinkedInAuth::API_BASE . "/rest/posts/{$encoded_id}";
+
+		$result = $provider->api_request(
+			'DELETE',
+			$url,
+			array(
+				'headers' => array( 'X-RestLi-Method' => 'DELETE' ),
+				'context' => 'LinkedIn Delete Post',
+			)
+		);
+
+		// LinkedIn returns 204 on successful delete (idempotent).
+		if ( $result['success'] ) {
+			return array(
+				'success' => true,
+				'post_id' => $post_id,
+			);
+		}
+
+		return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to delete LinkedIn post', array( 'status' => 500 ) );
+	}
+
+	public function checkPermission(): bool {
+		return PermissionHelper::can_manage();
+	}
+
+	private function getAuthProvider(): ?LinkedInAuth {
+		$auth_abilities = new AuthAbilities();
+		$provider       = $auth_abilities->getProvider( 'linkedin' );
+
+		if ( $provider instanceof LinkedInAuth ) {
+			return $provider;
+		}
+
+		return null;
 	}
 }
