@@ -2,8 +2,8 @@
 /**
  * Execute Workflow Ability
  *
- * Unified primitive for workflow execution. Supports both database flows (via flow_id)
- * and ephemeral workflows (via workflow steps).
+ * Executes ephemeral workflows — raw JSON steps without a database flow
+ * or pipeline. For database flow execution, use datamachine/run-flow.
  *
  * @package DataMachine\Abilities\Job
  * @since 0.17.0
@@ -35,18 +35,15 @@ class ExecuteWorkflowAbility {
 				'datamachine/execute-workflow',
 				array(
 					'label'               => __( 'Execute Workflow', 'data-machine' ),
-					'description'         => __( 'Execute a workflow immediately or with delayed scheduling. Accepts either flow_id (database flow) OR workflow (ephemeral steps) - mutually exclusive.', 'data-machine' ),
+					'description'         => __( 'Execute an ephemeral workflow from raw JSON steps. For database flow execution, use datamachine/run-flow.', 'data-machine' ),
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
+						'required'   => array( 'workflow' ),
 						'properties' => array(
-							'flow_id'      => array(
-								'type'        => 'integer',
-								'description' => __( 'Database flow ID to execute (mutually exclusive with workflow)', 'data-machine' ),
-							),
 							'workflow'     => array(
 								'type'        => 'object',
-								'description' => __( 'Ephemeral workflow with steps array (mutually exclusive with flow_id)', 'data-machine' ),
+								'description' => __( 'Ephemeral workflow with steps array', 'data-machine' ),
 								'properties'  => array(
 									'steps' => array(
 										'type'        => 'array',
@@ -54,25 +51,18 @@ class ExecuteWorkflowAbility {
 									),
 								),
 							),
-							'count'        => array(
-								'type'        => 'integer',
-								'minimum'     => 1,
-								'maximum'     => 10,
-								'default'     => 1,
-								'description' => __( 'Number of times to run (1-10, database flow only). Each run spawns an independent job.', 'data-machine' ),
-							),
 							'timestamp'    => array(
 								'type'        => array( 'integer', 'null' ),
 								'description' => __( 'Future Unix timestamp for delayed execution. Omit for immediate execution.', 'data-machine' ),
 							),
 							'initial_data' => array(
 								'type'        => 'object',
-								'description' => __( 'Optional initial engine data to merge before workflow execution. For database flows, stored as engine_data on the job. For ephemeral workflows, merged into the engine data alongside configs.', 'data-machine' ),
+								'description' => __( 'Optional initial engine data to merge into the engine data alongside configs.', 'data-machine' ),
 							),
 							'dry_run'      => array(
 								'type'        => 'boolean',
 								'default'     => false,
-								'description' => __( 'Preview execution without creating posts. Returns preview data instead of publishing (ephemeral only).', 'data-machine' ),
+								'description' => __( 'Preview execution without creating posts. Returns preview data instead of publishing.', 'data-machine' ),
 							),
 						),
 					),
@@ -82,12 +72,8 @@ class ExecuteWorkflowAbility {
 							'success'        => array( 'type' => 'boolean' ),
 							'execution_mode' => array( 'type' => 'string' ),
 							'execution_type' => array( 'type' => 'string' ),
-							'flow_id'        => array( 'type' => 'integer' ),
-							'flow_name'      => array( 'type' => 'string' ),
 							'job_id'         => array( 'type' => 'integer' ),
-							'job_ids'        => array( 'type' => 'array' ),
 							'step_count'     => array( 'type' => 'integer' ),
-							'count'          => array( 'type' => 'integer' ),
 							'dry_run'        => array( 'type' => 'boolean' ),
 							'message'        => array( 'type' => 'string' ),
 							'error'          => array( 'type' => 'string' ),
@@ -108,170 +94,12 @@ class ExecuteWorkflowAbility {
 	}
 
 	/**
-	 * Execute workflow ability.
-	 *
-	 * Unified primitive for workflow execution. Handles both database flows (via flow_id)
-	 * and ephemeral workflows (via workflow steps).
-	 *
-	 * @param array $input Input parameters with flow_id OR workflow, plus optional timestamp/count/initial_data.
-	 * @return array Result with job_id(s) and execution info.
-	 */
-	public function execute( array $input ): array {
-		$flow_id  = $input['flow_id'] ?? null;
-		$workflow = $input['workflow'] ?? null;
-
-		// Validate: must have flow_id OR workflow (mutually exclusive)
-		if ( ! $flow_id && ! $workflow ) {
-			return array(
-				'success' => false,
-				'error'   => 'Must provide either flow_id or workflow',
-			);
-		}
-
-		if ( $flow_id && $workflow ) {
-			return array(
-				'success' => false,
-				'error'   => 'Cannot provide both flow_id and workflow',
-			);
-		}
-
-		// Route to appropriate execution path
-		if ( $flow_id ) {
-			return $this->executeDatabaseFlow( $input );
-		}
-
-		return $this->executeEphemeralWorkflow( $input );
-	}
-
-	/**
-	 * Execute a database flow.
-	 *
-	 * @param array $input Input parameters with flow_id, optional count, timestamp, and initial_data.
-	 * @return array Result with job_id(s) and execution info.
-	 */
-	private function executeDatabaseFlow( array $input ): array {
-		$flow_id = $input['flow_id'] ?? null;
-
-		if ( ! is_numeric( $flow_id ) || (int) $flow_id <= 0 ) {
-			return array(
-				'success' => false,
-				'error'   => 'flow_id must be a positive integer',
-			);
-		}
-
-		$flow_id        = (int) $flow_id;
-		$count          = max( 1, min( 10, (int) ( $input['count'] ?? 1 ) ) );
-		$timestamp      = $input['timestamp'] ?? null;
-		$initial_data   = $input['initial_data'] ?? null;
-		$execution_type = 'immediate';
-
-		if ( ! empty( $timestamp ) && is_numeric( $timestamp ) && (int) $timestamp > time() ) {
-			$timestamp      = (int) $timestamp;
-			$execution_type = 'delayed';
-
-			if ( $count > 1 ) {
-				return array(
-					'success' => false,
-					'error'   => 'Cannot schedule multiple runs with a timestamp. Use count only for immediate execution.',
-				);
-			}
-		} else {
-			$timestamp = null;
-		}
-
-		$flow = $this->db_flows->get_flow( $flow_id );
-		if ( ! $flow ) {
-			return array(
-				'success' => false,
-				'error'   => sprintf( 'Flow %d not found', $flow_id ),
-			);
-		}
-
-		$flow_name   = $flow['flow_name'] ?? "Flow {$flow_id}";
-		$pipeline_id = (int) $flow['pipeline_id'];
-		$jobs        = array();
-
-		for ( $i = 0; $i < $count; $i++ ) {
-			$job_id = $this->createJob( $flow_id, $pipeline_id );
-
-			if ( ! $job_id ) {
-				if ( empty( $jobs ) ) {
-					return array(
-						'success' => false,
-						'error'   => 'Failed to create job record',
-					);
-				}
-				break;
-			}
-
-			// Store initial data in engine_data if provided (e.g. webhook payload).
-			if ( ! empty( $initial_data ) && is_array( $initial_data ) ) {
-				$this->db_jobs->store_engine_data( $job_id, $initial_data );
-			}
-
-			$schedule_time = $timestamp ?? time();
-			as_schedule_single_action(
-				$schedule_time,
-				'datamachine_run_flow_now',
-				array( $flow_id, $job_id ),
-				'data-machine'
-			);
-
-			$jobs[] = $job_id;
-		}
-
-		do_action(
-			'datamachine_log',
-			'info',
-			'Workflow executed via ability (database mode)',
-			array(
-				'flow_id'        => $flow_id,
-				'execution_mode' => 'database',
-				'execution_type' => $execution_type,
-				'job_count'      => count( $jobs ),
-				'job_ids'        => $jobs,
-			)
-		);
-
-		if ( 1 === $count ) {
-			$message = 'immediate' === $execution_type
-				? 'Flow queued for immediate background execution. It will start within seconds. Use job_id to check status.'
-				: 'Flow scheduled for delayed background execution at the specified time.';
-
-			return array(
-				'success'        => true,
-				'execution_mode' => 'database',
-				'execution_type' => $execution_type,
-				'flow_id'        => $flow_id,
-				'flow_name'      => $flow_name,
-				'job_id'         => $jobs[0] ?? null,
-				'message'        => $message,
-			);
-		}
-
-		return array(
-			'success'        => true,
-			'execution_mode' => 'database',
-			'execution_type' => $execution_type,
-			'flow_id'        => $flow_id,
-			'flow_name'      => $flow_name,
-			'count'          => count( $jobs ),
-			'job_ids'        => $jobs,
-			'message'        => sprintf(
-				'Queued %d jobs for flow "%s". Each job will process one item independently.',
-				count( $jobs ),
-				$flow_name
-			),
-		);
-	}
-
-	/**
 	 * Execute an ephemeral workflow.
 	 *
-	 * @param array $input Input parameters with workflow, optional timestamp and initial_data.
+	 * @param array $input Input parameters with workflow, optional timestamp, initial_data, dry_run.
 	 * @return array Result with job_id and execution info.
 	 */
-	private function executeEphemeralWorkflow( array $input ): array {
+	public function execute( array $input ): array {
 		$workflow     = $input['workflow'] ?? null;
 		$timestamp    = $input['timestamp'] ?? null;
 		$initial_data = $input['initial_data'] ?? null;

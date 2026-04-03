@@ -198,19 +198,19 @@ class WebhookTrigger {
 		// Use run_as_authenticated() so the ability's permission callback
 		// recognizes this as a pre-authenticated context (Bearer token validated above).
 		// See https://github.com/Extra-Chill/data-machine/issues/346
-		$ability = wp_get_ability( 'datamachine/execute-workflow' );
+		$ability = wp_get_ability( 'datamachine/run-flow' );
 
 		if ( ! $ability ) {
 			do_action(
 				'datamachine_log',
 				'error',
-				'Webhook trigger: execute-workflow ability not registered',
+				'Webhook trigger: run-flow ability not registered',
 				array( 'flow_id' => $flow_id )
 			);
 
 			return new \WP_Error(
 				'ability_not_found',
-				__( 'Execute workflow ability not available.', 'data-machine' ),
+				__( 'Run flow ability not available.', 'data-machine' ),
 				array( 'status' => 500 )
 			);
 		}

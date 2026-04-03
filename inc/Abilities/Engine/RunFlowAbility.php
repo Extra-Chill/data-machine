@@ -45,13 +45,17 @@ class RunFlowAbility {
 						'type'       => 'object',
 						'required'   => array( 'flow_id' ),
 						'properties' => array(
-							'flow_id' => array(
+							'flow_id'      => array(
 								'type'        => 'integer',
 								'description' => __( 'Flow ID to execute.', 'data-machine' ),
 							),
-							'job_id'  => array(
+							'job_id'       => array(
 								'type'        => array( 'integer', 'null' ),
 								'description' => __( 'Pre-created job ID (optional, for API-triggered executions).', 'data-machine' ),
+							),
+							'initial_data' => array(
+								'type'        => 'object',
+								'description' => __( 'Optional initial engine data to merge (e.g. webhook payloads, API context).', 'data-machine' ),
 							),
 						),
 					),
@@ -89,7 +93,7 @@ class RunFlowAbility {
 	/**
 	 * Execute the run-flow ability.
 	 *
-	 * @param array $input Input with flow_id and optional job_id.
+	 * @param array $input Input with flow_id, optional job_id and initial_data.
 	 * @return array Result with success status and execution details.
 	 */
 	public function execute( array $input ): array {
@@ -206,8 +210,15 @@ class RunFlowAbility {
 			'pipeline_config' => $pipeline_config,
 		);
 
-		// Preserve any pre-existing engine data (e.g. initial_data from ExecuteWorkflowAbility
-		// which may contain submission context, webhook payloads, etc.).
+		// Merge initial_data (e.g. webhook payloads, API context) into the
+		// engine snapshot. initial_data keys go underneath so engine
+		// snapshot keys (job, flow, pipeline, configs) take precedence.
+		$initial_data = $input['initial_data'] ?? null;
+		if ( ! empty( $initial_data ) && is_array( $initial_data ) ) {
+			$engine_snapshot = array_merge( $initial_data, $engine_snapshot );
+		}
+
+		// Preserve any pre-existing engine data stored directly on the job.
 		$existing_data = \DataMachine\Core\EngineData::retrieve( $job_id );
 		if ( ! empty( $existing_data ) ) {
 			$engine_snapshot = array_merge( $existing_data, $engine_snapshot );
