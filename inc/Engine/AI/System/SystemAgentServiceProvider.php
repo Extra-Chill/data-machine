@@ -115,33 +115,31 @@ class SystemAgentServiceProvider {
 	/**
 	 * Manage the daily memory recurring schedule.
 	 *
-	 * Ensures the recurring Action Scheduler action exists when enabled
-	 * and is removed when disabled. Runs on every page load but the
-	 * as_next_scheduled_action check is fast.
+	 * Defers to the action_scheduler_init hook to ensure the AS data store
+	 * is initialized before calling scheduling functions. This matches the
+	 * pattern used by all other DM cleanup/scheduling classes.
 	 *
 	 * @since 0.32.0
 	 */
 	private function manageDailyMemorySchedule(): void {
-		if ( ! function_exists( 'as_next_scheduled_action' ) ) {
-			return;
-		}
+		add_action( 'action_scheduler_init', function () {
+			$enabled        = (bool) PluginSettings::get( 'daily_memory_enabled', false );
+			$next_scheduled = as_next_scheduled_action( self::DAILY_MEMORY_HOOK, array(), 'data-machine' );
 
-		$enabled        = (bool) PluginSettings::get( 'daily_memory_enabled', false );
-		$next_scheduled = as_next_scheduled_action( self::DAILY_MEMORY_HOOK, array(), 'data-machine' );
-
-		if ( $enabled && ! $next_scheduled ) {
-			// Schedule daily at midnight UTC.
-			$midnight = strtotime( 'tomorrow midnight' );
-			as_schedule_recurring_action(
-				$midnight,
-				DAY_IN_SECONDS,
-				self::DAILY_MEMORY_HOOK,
-				array(),
-				'data-machine'
-			);
-		} elseif ( ! $enabled && $next_scheduled ) {
-			as_unschedule_all_actions( self::DAILY_MEMORY_HOOK, array(), 'data-machine' );
-		}
+			if ( $enabled && ! $next_scheduled ) {
+				// Schedule daily at midnight UTC.
+				$midnight = strtotime( 'tomorrow midnight' );
+				as_schedule_recurring_action(
+					$midnight,
+					DAY_IN_SECONDS,
+					self::DAILY_MEMORY_HOOK,
+					array(),
+					'data-machine'
+				);
+			} elseif ( ! $enabled && $next_scheduled ) {
+				as_unschedule_all_actions( self::DAILY_MEMORY_HOOK, array(), 'data-machine' );
+			}
+		} );
 	}
 
 	/**
