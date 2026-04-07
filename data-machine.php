@@ -160,7 +160,6 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/AgentAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/AgentMemoryAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/DailyMemoryAbilities.php';
-	// WorkspaceAbilities moved to data-machine-code extension.
 	require_once __DIR__ . '/inc/Abilities/ChatAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/InternalLinkingAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Content/BlockSanitizer.php';
@@ -230,7 +229,6 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\AgentTokenAbilities();
 	new \DataMachine\Abilities\AgentMemoryAbilities();
 	new \DataMachine\Abilities\DailyMemoryAbilities();
-	// WorkspaceAbilities moved to data-machine-code extension.
 	new \DataMachine\Abilities\ChatAbilities();
 	new \DataMachine\Abilities\InternalLinkingAbilities();
 	new \DataMachine\Abilities\Content\GetPostBlocksAbility();
@@ -340,13 +338,9 @@ function datamachine_load_handlers() {
 	new \DataMachine\Core\Steps\Fetch\Handlers\Rss\Rss();
 	new \DataMachine\Core\Steps\Fetch\Handlers\Email\Email();
 	new \DataMachine\Core\Steps\Fetch\Handlers\Files\Files();
-	// GitHub handler moved to data-machine-code extension.
-	// Workspace fetch handler moved to data-machine-code extension.
 
 	// Update Handlers
 	new \DataMachine\Core\Steps\Update\Handlers\WordPress\WordPress();
-
-	// Workspace publish handler moved to data-machine-code extension.
 }
 
 /**

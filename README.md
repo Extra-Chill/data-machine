@@ -10,7 +10,6 @@ Data Machine turns a WordPress site into an agent runtime — persistent identit
 - **Abilities API** — Typed, permissioned functions that agents and extensions call (`datamachine/upload-media`, `datamachine/validate-media`, etc.)
 - **Agent memory** — Layered markdown files (SOUL.md + MEMORY.md in agent layer, USER.md in user layer) injected into every AI context
 - **Multi-agent** — Multiple agents with scoped pipelines, flows, jobs, and filesystem directories
-- **Workspace** — Managed directory for repo clones and file operations with security sandboxing (CLI commands in data-machine-code extension)
 - **Self-scheduling** — Agents schedule their own recurring tasks using flows, prompt queues, and Agent Pings
 
 ## Architecture
@@ -21,7 +20,7 @@ Data Machine turns a WordPress site into an agent runtime — persistent identit
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │    FETCH    │ ──▶ │     AI      │ ──▶ │   PUBLISH   │
 │  RSS, API,  │     │  Enhance,   │     │  WordPress, │
-│  WordPress  │     │  Transform  │     │  Workspace  │
+│  WordPress  │     │  Transform  │     │   Social,   │
 └─────────────┘     └─────────────┘     └─────────────┘
 ```
 
@@ -89,7 +88,7 @@ Pipelines are built from **step types**. Some use pluggable **handlers** — int
 | Step Type | Core Handlers | Extension Handlers |
 |-----------|---------------|-------------------|
 | **Fetch** | RSS, WordPress (local posts), WordPress API (remote), WordPress Media, Files | GitHub, Google Sheets, Reddit, social platforms (in extensions) |
-| **Publish** | WordPress, Workspace (in data-machine-code extension) | Twitter, Instagram, Facebook, Threads, Bluesky, Pinterest, Google Sheets, Slack, Discord (in extensions) |
+| **Publish** | WordPress | Workspace (data-machine-code), Twitter, Instagram, Facebook, Threads, Bluesky, Pinterest, Google Sheets, Slack, Discord (in extensions) |
 | **Update** | WordPress posts with AI enhancement | — |
 
 ### Self-contained steps
@@ -190,6 +189,7 @@ Full REST API under `datamachine/v1`:
 
 | Plugin | Description |
 |--------|-------------|
+| [data-machine-code](https://github.com/Extra-Chill/data-machine-code) | Workspace management, GitHub integration, git operations |
 | [data-machine-socials](https://github.com/Extra-Chill/data-machine-socials) | Publish to Instagram (images, carousels, Reels, Stories), Twitter (text + media + video), Facebook, Threads, Bluesky, Pinterest (image + video pins). Reddit fetch. |
 | [data-machine-business](https://github.com/Extra-Chill/data-machine-business) | Google Sheets (fetch + publish), Slack, Discord integrations |
 | [datamachine-events](https://github.com/Extra-Chill/datamachine-events) | Event data extraction and structured data processing |
