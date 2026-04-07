@@ -377,6 +377,9 @@ add_action( 'update_option_datamachine_settings', array( \DataMachine\Core\Plugi
 add_action(
 	'plugins_loaded',
 	function () {
+		if ( ! \DataMachine\Core\Database\Chat\Chat::table_exists() ) {
+			return;
+		}
 		\DataMachine\Core\Database\Chat\Chat::ensure_context_column();
 		\DataMachine\Core\Database\Chat\Chat::ensure_agent_id_column();
 		\DataMachine\Core\Database\Chat\Chat::ensure_last_read_at_column();

@@ -70,18 +70,24 @@ use DataMachine\Engine\AI\ContextRegistry;
 | Each specifies a priority for sort order, a label, and a description.
 */
 
-ContextRegistry::register( 'chat', 10, array(
-	'label'       => __( 'Chat Agent', 'data-machine' ),
-	'description' => __( 'Interactive chat conversations. Benefits from capable models for complex reasoning.', 'data-machine' ),
-) );
-ContextRegistry::register( 'pipeline', 20, array(
-	'label'       => __( 'Pipeline Agent', 'data-machine' ),
-	'description' => __( 'Structured workflow execution. Operates within defined steps — efficient models work well.', 'data-machine' ),
-) );
-ContextRegistry::register( 'system', 30, array(
-	'label'       => __( 'System Agent', 'data-machine' ),
-	'description' => __( 'Background tasks like alt text generation and issue creation.', 'data-machine' ),
-) );
+add_action(
+	'init',
+	function () {
+		ContextRegistry::register( 'chat', 10, array(
+			'label'       => __( 'Chat Agent', 'data-machine' ),
+			'description' => __( 'Interactive chat conversations. Benefits from capable models for complex reasoning.', 'data-machine' ),
+		) );
+		ContextRegistry::register( 'pipeline', 20, array(
+			'label'       => __( 'Pipeline Agent', 'data-machine' ),
+			'description' => __( 'Structured workflow execution. Operates within defined steps — efficient models work well.', 'data-machine' ),
+		) );
+		ContextRegistry::register( 'system', 30, array(
+			'label'       => __( 'System Agent', 'data-machine' ),
+			'description' => __( 'Background tasks like alt text generation and issue creation.', 'data-machine' ),
+		) );
+	},
+	0
+);
 
 // Shared layer — site-wide context, visible to all agents.
 MemoryFileRegistry::register( 'SITE.md', 10, array(
