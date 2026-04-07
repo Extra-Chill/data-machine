@@ -570,6 +570,17 @@ class AgentAbilities {
 			) );
 		}
 
+		/**
+		 * Fires after a new agent has been created.
+		 *
+		 * @since 0.65.0
+		 *
+		 * @param int    $agent_id Agent ID.
+		 * @param string $slug     Agent slug.
+		 * @param string $name     Agent display name.
+		 */
+		do_action( 'datamachine_agent_created', $agent_id, $slug, $name );
+
 		return array(
 			'success'    => true,
 			'agent_id'   => $agent_id,
@@ -715,6 +726,15 @@ class AgentAbilities {
 				$update['agent_name']
 			);
 		}
+
+		/**
+		 * Fires after an agent has been updated.
+		 *
+		 * @since 0.65.0
+		 *
+		 * @param int $agent_id Agent ID.
+		 */
+		do_action( 'datamachine_agent_updated', $agent_id );
 
 		// Return the updated agent.
 		return self::getAgent( array( 'agent_id' => $agent_id ) );
@@ -874,6 +894,16 @@ class AgentAbilities {
 				$files_deleted = true;
 			}
 		}
+
+		/**
+		 * Fires after an agent has been deleted.
+		 *
+		 * @since 0.65.0
+		 *
+		 * @param int    $agent_id Agent ID (no longer exists in DB).
+		 * @param string $slug     Agent slug.
+		 */
+		do_action( 'datamachine_agent_deleted', $agent_id, $slug );
 
 		return array(
 			'success'       => true,
