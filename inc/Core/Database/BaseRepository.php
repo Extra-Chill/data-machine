@@ -133,6 +133,98 @@ abstract class BaseRepository {
 	}
 
 	/**
+	 * Check whether WordPress is running on SQLite (e.g. WordPress Studio).
+	 *
+	 * The SQLite Database Integration plugin defines this constant in its
+	 * db.php drop-in. Checking it is the canonical way to detect SQLite at
+	 * runtime — no autoload, no option lookup, no file sniffing required.
+	 *
+	 * @since 0.45.0
+	 *
+	 * @return bool True when the active database driver is SQLite.
+	 */
+	public static function is_sqlite(): bool {
+		return defined( 'DATABASE_TYPE' ) && 'sqlite' === DATABASE_TYPE;
+	}
+
+	/**
+	 * Check whether a column exists on a table.
+	 *
+	 * Uses `SHOW COLUMNS FROM <table> LIKE '<col>'` which the SQLite
+	 * Database Integration translator already handles, avoiding the
+	 * MySQL-only `information_schema.COLUMNS` + `DB_NAME` pattern that
+	 * fatals on SQLite.
+	 *
+	 * @since 0.45.0
+	 *
+	 * @param string      $table_name Fully-qualified (prefixed) table name.
+	 * @param string      $column     Column name to check.
+	 * @param \wpdb|null  $wpdb       Optional wpdb instance (defaults to global).
+	 * @return bool
+	 */
+	public static function column_exists( string $table_name, string $column, ?\wpdb $wpdb = null ): bool {
+		if ( null === $wpdb ) {
+			global $wpdb;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$result = $wpdb->get_var(
+			$wpdb->prepare( 'SHOW COLUMNS FROM %i LIKE %s', $table_name, $column )
+		);
+
+		return null !== $result;
+	}
+
+	/**
+	 * Get column metadata from information_schema (MySQL only).
+	 *
+	 * Returns an object-keyed result set with DATA_TYPE,
+	 * CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE per column. On SQLite this
+	 * returns an empty array because the schema introspection queries
+	 * that consume this data (MODIFY COLUMN, etc.) are MySQL-only
+	 * operations anyway.
+	 *
+	 * @since 0.45.0
+	 *
+	 * @param string   $table_name  Fully-qualified (prefixed) table name.
+	 * @param string[] $columns     Column names to inspect.
+	 * @param \wpdb|null $wpdb      Optional wpdb instance.
+	 * @return array<string,object> Column name → metadata object. Empty on SQLite.
+	 */
+	public static function get_column_meta( string $table_name, array $columns, ?\wpdb $wpdb = null ): array {
+		if ( null === $wpdb ) {
+			global $wpdb;
+		}
+
+		// On SQLite, MODIFY COLUMN is not supported and these migrations
+		// are irrelevant — the columns were created with the correct types
+		// from the start via dbDelta / CREATE TABLE.
+		if ( self::is_sqlite() ) {
+			return array();
+		}
+
+		$placeholders = implode( ',', array_fill( 0, count( $columns ), '%s' ) );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders
+		$results = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE
+				 FROM information_schema.COLUMNS
+				 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
+				 AND COLUMN_NAME IN ({$placeholders})",
+				DB_NAME,
+				$table_name,
+				...$columns
+			),
+			OBJECT_K
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders
+
+		return is_array( $results ) ? $results : array();
+	}
+
+	/**
 	 * Log a database error if one occurred on the last query.
 	 *
 	 * @param string $context Description of the operation that failed.

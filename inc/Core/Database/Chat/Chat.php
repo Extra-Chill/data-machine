@@ -83,10 +83,7 @@ class Chat extends BaseRepository {
 
 		$table_name = self::get_prefixed_table_name();
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-		$column = $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM %i LIKE %s', $table_name, 'agent_id' ) );
-
-		if ( $column ) {
+		if ( self::column_exists( $table_name, 'agent_id', $wpdb ) ) {
 			return;
 		}
 
@@ -107,12 +104,8 @@ class Chat extends BaseRepository {
 
 		$table_name = self::get_prefixed_table_name();
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-		$context_column = $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM %i LIKE %s', $table_name, 'context' ) );
-
-		if ( ! $context_column ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-			$legacy_agent_type = $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM %i LIKE %s', $table_name, 'agent_type' ) );
+		if ( ! self::column_exists( $table_name, 'context', $wpdb ) ) {
+			$legacy_agent_type = self::column_exists( $table_name, 'agent_type', $wpdb );
 
 			if ( $legacy_agent_type ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
@@ -160,10 +153,7 @@ class Chat extends BaseRepository {
 
 		$table_name = self::get_prefixed_table_name();
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-		$column = $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM %i LIKE %s', $table_name, 'last_read_at' ) );
-
-		if ( $column ) {
+		if ( self::column_exists( $table_name, 'last_read_at', $wpdb ) ) {
 			return;
 		}
 

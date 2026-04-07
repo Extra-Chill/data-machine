@@ -13,6 +13,7 @@ namespace DataMachine\Cli\Commands;
 
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
+use DataMachine\Core\Database\BaseRepository;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -281,28 +282,44 @@ class RetentionCommand extends BaseCommand {
 
 		// Deduplicate tables for the query (jobs appears twice).
 		$unique_tables = array_unique( array_values( $tables ) );
-		$placeholders  = implode( ',', array_fill( 0, count( $unique_tables ), '%s' ) );
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$results = $wpdb->get_results(
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			$wpdb->prepare(
-				"SELECT table_name, table_rows,
-					ROUND((data_length + index_length) / 1024 / 1024, 1) AS size_mb
-				FROM information_schema.tables
-				WHERE table_schema = DATABASE()
-				AND table_name IN ({$placeholders})",
-				...$unique_tables
-			)
-		);
 
 		$table_data = array();
-		if ( $results ) {
-			foreach ( $results as $row ) {
-				$table_data[ $row->table_name ] = array(
-					'rows'    => (int) $row->table_rows,
-					'size_mb' => $row->size_mb,
+
+		if ( BaseRepository::is_sqlite() ) {
+			// SQLite: no information_schema. Count rows per table; size is unavailable.
+			foreach ( $unique_tables as $tbl ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$count = (int) $wpdb->get_var(
+					$wpdb->prepare( 'SELECT COUNT(*) FROM %i', $tbl )
 				);
+				$table_data[ $tbl ] = array(
+					'rows'    => $count,
+					'size_mb' => '0.0',
+				);
+			}
+		} else {
+			$placeholders = implode( ',', array_fill( 0, count( $unique_tables ), '%s' ) );
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$results = $wpdb->get_results(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$wpdb->prepare(
+					"SELECT table_name, table_rows,
+						ROUND((data_length + index_length) / 1024 / 1024, 1) AS size_mb
+					FROM information_schema.tables
+					WHERE table_schema = DATABASE()
+					AND table_name IN ({$placeholders})",
+					...$unique_tables
+				)
+			);
+
+			if ( $results ) {
+				foreach ( $results as $row ) {
+					$table_data[ $row->table_name ] = array(
+						'rows'    => (int) $row->table_rows,
+						'size_mb' => $row->size_mb,
+					);
+				}
 			}
 		}
 

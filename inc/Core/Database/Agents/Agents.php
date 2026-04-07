@@ -75,10 +75,7 @@ class Agents extends BaseRepository {
 
 		$table_name = $wpdb->base_prefix . self::TABLE_NAME;
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$column = $wpdb->get_var( "SHOW COLUMNS FROM `{$table_name}` LIKE 'site_scope'" );
-
-		if ( ! $column ) {
+		if ( ! BaseRepository::column_exists( $table_name, 'site_scope', $wpdb ) ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$wpdb->query( "ALTER TABLE `{$table_name}` ADD COLUMN site_scope BIGINT(20) UNSIGNED NULL DEFAULT NULL AFTER owner_id" );
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared

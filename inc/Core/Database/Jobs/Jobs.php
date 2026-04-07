@@ -8,6 +8,8 @@
 
 namespace DataMachine\Core\Database\Jobs;
 
+use DataMachine\Core\Database\BaseRepository;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -182,90 +184,83 @@ class Jobs {
 	private static function migrate_columns( string $table_name ): void {
 		global $wpdb;
 
-		// Get column info for all columns we might need to migrate
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-		$columns = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE
-                 FROM information_schema.COLUMNS 
-                 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s 
-                 AND COLUMN_NAME IN ('status', 'pipeline_id', 'flow_id', 'source', 'parent_job_id', 'user_id')",
-				DB_NAME,
-				$table_name
-			),
-			OBJECT_K
+		// Column type migrations (MODIFY COLUMN) are MySQL-only — SQLite does
+		// not support ALTER TABLE MODIFY and the columns are created with the
+		// correct types from the start via CREATE TABLE / dbDelta.
+		$columns = BaseRepository::get_column_meta(
+			$table_name,
+			array( 'status', 'pipeline_id', 'flow_id', 'source', 'parent_job_id', 'user_id' ),
+			$wpdb
 		);
 
-		if ( empty( $columns ) ) {
-			return;
-		}
+		if ( ! empty( $columns ) ) {
+			// Migrate status column: varchar(20/100) -> varchar(255)
+			if ( isset( $columns['status'] ) && (int) $columns['status']->CHARACTER_MAXIMUM_LENGTH < 255 ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+				$wpdb->query( "ALTER TABLE {$table_name} MODIFY status varchar(255) NOT NULL" );
+				// phpcs:enable WordPress.DB.PreparedSQL
+				do_action(
+					'datamachine_log',
+					'info',
+					'Migrated jobs.status column to varchar(255)',
+					array(
+						'table_name'    => $table_name,
+						'previous_size' => $columns['status']->CHARACTER_MAXIMUM_LENGTH,
+					)
+				);
+			}
 
-		// Migrate status column: varchar(20/100) -> varchar(255)
-		if ( isset( $columns['status'] ) && (int) $columns['status']->CHARACTER_MAXIMUM_LENGTH < 255 ) {
-            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
-			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-			$wpdb->query( "ALTER TABLE {$table_name} MODIFY status varchar(255) NOT NULL" );
-			// phpcs:enable WordPress.DB.PreparedSQL
-			do_action(
-				'datamachine_log',
-				'info',
-				'Migrated jobs.status column to varchar(255)',
-				array(
-					'table_name'    => $table_name,
-					'previous_size' => $columns['status']->CHARACTER_MAXIMUM_LENGTH,
-				)
-			);
-		}
+			// Migrate pipeline_id column: bigint -> varchar(20) NULL for contextless job support
+			if ( isset( $columns['pipeline_id'] ) && 'bigint' === $columns['pipeline_id']->DATA_TYPE ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+				$wpdb->query( "ALTER TABLE {$table_name} MODIFY pipeline_id varchar(20) NULL DEFAULT NULL" );
+				// phpcs:enable WordPress.DB.PreparedSQL
+				do_action(
+					'datamachine_log',
+					'info',
+					'Migrated jobs.pipeline_id column to varchar(20) NULL',
+					array(
+						'table_name' => $table_name,
+					)
+				);
+			}
 
-		// Migrate pipeline_id column: bigint -> varchar(20) NULL for contextless job support
-		if ( isset( $columns['pipeline_id'] ) && 'bigint' === $columns['pipeline_id']->DATA_TYPE ) {
-            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
-			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-			$wpdb->query( "ALTER TABLE {$table_name} MODIFY pipeline_id varchar(20) NULL DEFAULT NULL" );
-			// phpcs:enable WordPress.DB.PreparedSQL
-			do_action(
-				'datamachine_log',
-				'info',
-				'Migrated jobs.pipeline_id column to varchar(20) NULL',
-				array(
-					'table_name' => $table_name,
-				)
-			);
-		}
+			// Migrate flow_id column: bigint -> varchar(20) NULL for contextless job support
+			if ( isset( $columns['flow_id'] ) && 'bigint' === $columns['flow_id']->DATA_TYPE ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+				$wpdb->query( "ALTER TABLE {$table_name} MODIFY flow_id varchar(20) NULL DEFAULT NULL" );
+				// phpcs:enable WordPress.DB.PreparedSQL
+				do_action(
+					'datamachine_log',
+					'info',
+					'Migrated jobs.flow_id column to varchar(20) NULL',
+					array(
+						'table_name' => $table_name,
+					)
+				);
+			}
 
-		// Migrate flow_id column: bigint -> varchar(20) NULL for contextless job support
-		if ( isset( $columns['flow_id'] ) && 'bigint' === $columns['flow_id']->DATA_TYPE ) {
-            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
-			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-			$wpdb->query( "ALTER TABLE {$table_name} MODIFY flow_id varchar(20) NULL DEFAULT NULL" );
-			// phpcs:enable WordPress.DB.PreparedSQL
-			do_action(
-				'datamachine_log',
-				'info',
-				'Migrated jobs.flow_id column to varchar(20) NULL',
-				array(
-					'table_name' => $table_name,
-				)
-			);
-		}
-
-		// Migrate pipeline_id/flow_id from NOT NULL to NULL for contextless job support.
-		// Runs on existing varchar(20) installs that haven't been updated yet.
-		if ( isset( $columns['pipeline_id'] ) && 'varchar' === $columns['pipeline_id']->DATA_TYPE && 'NO' === $columns['pipeline_id']->IS_NULLABLE ) {
-            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
-			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-			$wpdb->query( "ALTER TABLE {$table_name} MODIFY pipeline_id varchar(20) NULL DEFAULT NULL" );
-			// phpcs:enable WordPress.DB.PreparedSQL
-		}
-		if ( isset( $columns['flow_id'] ) && 'varchar' === $columns['flow_id']->DATA_TYPE && 'NO' === $columns['flow_id']->IS_NULLABLE ) {
-            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
-			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-			$wpdb->query( "ALTER TABLE {$table_name} MODIFY flow_id varchar(20) NULL DEFAULT NULL" );
-			// phpcs:enable WordPress.DB.PreparedSQL
+			// Migrate pipeline_id/flow_id from NOT NULL to NULL for contextless job support.
+			// Runs on existing varchar(20) installs that haven't been updated yet.
+			if ( isset( $columns['pipeline_id'] ) && 'varchar' === $columns['pipeline_id']->DATA_TYPE && 'NO' === $columns['pipeline_id']->IS_NULLABLE ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+				$wpdb->query( "ALTER TABLE {$table_name} MODIFY pipeline_id varchar(20) NULL DEFAULT NULL" );
+				// phpcs:enable WordPress.DB.PreparedSQL
+			}
+			if ( isset( $columns['flow_id'] ) && 'varchar' === $columns['flow_id']->DATA_TYPE && 'NO' === $columns['flow_id']->IS_NULLABLE ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+				$wpdb->query( "ALTER TABLE {$table_name} MODIFY flow_id varchar(20) NULL DEFAULT NULL" );
+				// phpcs:enable WordPress.DB.PreparedSQL
+			}
 		}
 
 		// Add source and label columns for pipeline decoupling.
-		if ( ! isset( $columns['source'] ) ) {
+		if ( ! BaseRepository::column_exists( $table_name, 'source', $wpdb ) ) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$result = $wpdb->query(
@@ -304,7 +299,7 @@ class Jobs {
 		}
 
 		// Add parent_job_id column for job hierarchy (batch parents, pipeline sub-jobs).
-		if ( ! isset( $columns['parent_job_id'] ) ) {
+		if ( ! BaseRepository::column_exists( $table_name, 'parent_job_id', $wpdb ) ) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$result = $wpdb->query(
@@ -325,7 +320,7 @@ class Jobs {
 		}
 
 		// Add user_id column for multi-agent support.
-		if ( ! isset( $columns['user_id'] ) ) {
+		if ( ! BaseRepository::column_exists( $table_name, 'user_id', $wpdb ) ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$result = $wpdb->query(
@@ -346,19 +341,7 @@ class Jobs {
 		}
 
 		// Add agent_id column for agent-first scoping (#735).
-		// Re-check columns since initial batch query may not include agent_id.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-		$agent_col = $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COLUMN_NAME
-				 FROM information_schema.COLUMNS
-				 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'agent_id'",
-				DB_NAME,
-				$table_name
-			)
-		);
-
-		if ( null === $agent_col ) {
+		if ( ! BaseRepository::column_exists( $table_name, 'agent_id', $wpdb ) ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$result = $wpdb->query(
@@ -394,18 +377,7 @@ class Jobs {
 	private static function migrate_task_type_column( string $table_name ): void {
 		global $wpdb;
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-		$col = $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COLUMN_NAME
-				 FROM information_schema.COLUMNS
-				 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'task_type'",
-				DB_NAME,
-				$table_name
-			)
-		);
-
-		if ( null !== $col ) {
+		if ( BaseRepository::column_exists( $table_name, 'task_type', $wpdb ) ) {
 			return;
 		}
 
