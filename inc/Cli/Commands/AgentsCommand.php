@@ -13,6 +13,7 @@ namespace DataMachine\Cli\Commands;
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\AgentAbilities;
+use DataMachine\Core\Agents\AgentBundler;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 
 defined( 'ABSPATH' ) || exit;
@@ -886,6 +887,255 @@ class AgentsCommand extends BaseCommand {
 		$agents_repo->update_agent( $agent_id, array( 'agent_config' => $config ) );
 
 		WP_CLI::success( sprintf( 'Config updated for agent "%s".', $agent['agent_slug'] ) );
+	}
+
+	/**
+	 * Export an agent's full identity into a portable bundle.
+	 *
+	 * Exports agent config, identity files (SOUL.md, MEMORY.md), USER.md
+	 * template, pipelines, flows, and associated memory files into a
+	 * portable bundle that can be imported on another Data Machine installation.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <slug>
+	 * : Agent slug to export.
+	 *
+	 * [--format=<format>]
+	 * : Bundle format.
+	 * ---
+	 * default: zip
+	 * options:
+	 *   - zip
+	 *   - json
+	 *   - dir
+	 * ---
+	 *
+	 * [--output=<path>]
+	 * : Output path. For zip/json, a file path. For dir, a directory path.
+	 *   Defaults to current directory with auto-generated filename.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Export as ZIP (default)
+	 *     wp datamachine agents export mattic-agent
+	 *
+	 *     # Export as JSON
+	 *     wp datamachine agents export mattic-agent --format=json
+	 *
+	 *     # Export as directory
+	 *     wp datamachine agents export mattic-agent --format=dir --output=/tmp/mattic-bundle
+	 *
+	 *     # Export to specific file
+	 *     wp datamachine agents export mattic-agent --output=/tmp/mattic-agent.zip
+	 *
+	 * @subcommand export
+	 */
+	public function export( array $args, array $assoc_args ): void {
+		$slug   = sanitize_title( $args[0] ?? '' );
+		$format = $assoc_args['format'] ?? 'zip';
+		$output = $assoc_args['output'] ?? null;
+
+		if ( empty( $slug ) ) {
+			WP_CLI::error( 'Agent slug is required.' );
+			return;
+		}
+
+		WP_CLI::log( sprintf( 'Exporting agent "%s"...', $slug ) );
+
+		$bundler = new AgentBundler();
+		$result  = $bundler->export( $slug );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+			return;
+		}
+
+		$bundle = $result['bundle'];
+
+		// Log what's being exported.
+		WP_CLI::log( sprintf( '  Agent:     %s (%s)', $bundle['agent']['agent_name'], $bundle['agent']['agent_slug'] ) );
+		WP_CLI::log( sprintf( '  Files:     %d identity file(s)', count( $bundle['files'] ?? array() ) ) );
+		WP_CLI::log( sprintf( '  Pipelines: %d', count( $bundle['pipelines'] ?? array() ) ) );
+		WP_CLI::log( sprintf( '  Flows:     %d', count( $bundle['flows'] ?? array() ) ) );
+
+		switch ( $format ) {
+			case 'json':
+				$output = $output ?? $slug . '-bundle.json';
+				$json   = $bundler->to_json( $bundle );
+				file_put_contents( $output, $json ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+				WP_CLI::success( sprintf( 'Bundle exported to %s (%s)', $output, size_format( filesize( $output ) ) ) );
+				break;
+
+			case 'dir':
+				$output = $output ?? $slug . '-bundle';
+				if ( is_dir( $output ) ) {
+					WP_CLI::error( sprintf( 'Directory "%s" already exists. Remove it first or use --output=<path>.', $output ) );
+					return;
+				}
+				$wrote = $bundler->to_directory( $bundle, $output );
+				if ( ! $wrote ) {
+					WP_CLI::error( 'Failed to write bundle directory.' );
+					return;
+				}
+				WP_CLI::success( sprintf( 'Bundle exported to directory: %s', $output ) );
+				break;
+
+			case 'zip':
+			default:
+				$output = $output ?? $slug . '-bundle.zip';
+				$wrote  = $bundler->to_zip( $bundle, $output );
+				if ( ! $wrote ) {
+					WP_CLI::error( 'Failed to create ZIP archive.' );
+					return;
+				}
+				WP_CLI::success( sprintf( 'Bundle exported to %s (%s)', $output, size_format( filesize( $output ) ) ) );
+				break;
+		}
+	}
+
+	/**
+	 * Import an agent from a portable bundle.
+	 *
+	 * Creates a new agent from a previously exported bundle. Pipelines and
+	 * flows are recreated with new IDs. Flows are imported in paused/manual
+	 * state to prevent immediate execution.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <path>
+	 * : Path to the bundle file (.zip or .json) or directory.
+	 *
+	 * [--slug=<slug>]
+	 * : Override the agent slug on import (rename).
+	 *
+	 * [--owner=<user>]
+	 * : Owner WordPress user ID, login, or email. Defaults to current user.
+	 *
+	 * [--dry-run]
+	 * : Validate the bundle and show what would be imported without making changes.
+	 *
+	 * [--yes]
+	 * : Skip confirmation prompt.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Import from ZIP
+	 *     wp datamachine agents import mattic-agent-bundle.zip
+	 *
+	 *     # Import with new slug
+	 *     wp datamachine agents import mattic-agent-bundle.zip --slug=my-agent
+	 *
+	 *     # Import with specific owner
+	 *     wp datamachine agents import mattic-agent-bundle.json --owner=chubes
+	 *
+	 *     # Dry run to preview
+	 *     wp datamachine agents import mattic-agent-bundle.zip --dry-run
+	 *
+	 *     # Import from directory
+	 *     wp datamachine agents import /tmp/mattic-bundle/
+	 *
+	 * @subcommand import
+	 */
+	public function import_agent( array $args, array $assoc_args ): void {
+		$path     = $args[0] ?? '';
+		$new_slug = $assoc_args['slug'] ?? null;
+		$dry_run  = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
+
+		if ( empty( $path ) ) {
+			WP_CLI::error( 'Bundle path is required.' );
+			return;
+		}
+
+		if ( ! file_exists( $path ) ) {
+			WP_CLI::error( sprintf( 'Path not found: %s', $path ) );
+			return;
+		}
+
+		$bundler = new AgentBundler();
+
+		// Parse the bundle based on path type.
+		if ( is_dir( $path ) ) {
+			$bundle = $bundler->from_directory( $path );
+		} elseif ( preg_match( '/\.zip$/i', $path ) ) {
+			$bundle = $bundler->from_zip( $path );
+		} elseif ( preg_match( '/\.json$/i', $path ) ) {
+			$json   = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+			$bundle = $bundler->from_json( $json );
+		} else {
+			WP_CLI::error( 'Unsupported bundle format. Use .zip, .json, or a directory path.' );
+			return;
+		}
+
+		if ( ! $bundle ) {
+			WP_CLI::error( 'Failed to parse bundle. Ensure the file is a valid agent bundle.' );
+			return;
+		}
+
+		// Display bundle info.
+		$agent_data = $bundle['agent'] ?? array();
+		$target_slug = $new_slug ? sanitize_title( $new_slug ) : sanitize_title( $agent_data['agent_slug'] ?? 'unknown' );
+
+		WP_CLI::log( 'Bundle contents:' );
+		WP_CLI::log( sprintf( '  Agent:     %s (%s)', $agent_data['agent_name'] ?? '(unnamed)', $agent_data['agent_slug'] ?? '(no slug)' ) );
+		WP_CLI::log( sprintf( '  Target:    %s', $target_slug ) );
+		WP_CLI::log( sprintf( '  Files:     %d identity file(s)', count( $bundle['files'] ?? array() ) ) );
+		WP_CLI::log( sprintf( '  Pipelines: %d', count( $bundle['pipelines'] ?? array() ) ) );
+		WP_CLI::log( sprintf( '  Flows:     %d', count( $bundle['flows'] ?? array() ) ) );
+		WP_CLI::log( sprintf( '  Exported:  %s', $bundle['exported_at'] ?? 'unknown' ) );
+
+		// Resolve owner.
+		$owner_id = 0;
+		if ( isset( $assoc_args['owner'] ) ) {
+			$owner_id = $this->resolveUserId( $assoc_args['owner'] );
+		}
+
+		if ( $dry_run ) {
+			WP_CLI::log( '' );
+			WP_CLI::log( WP_CLI::colorize( '%YDry run mode — validating bundle...%n' ) );
+		} elseif ( ! isset( $assoc_args['yes'] ) ) {
+			WP_CLI::confirm( sprintf( 'Import agent "%s"?', $target_slug ) );
+		}
+
+		$result = $bundler->import( $bundle, $new_slug, $owner_id, $dry_run );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] );
+			return;
+		}
+
+		if ( $dry_run ) {
+			$summary = $result['summary'] ?? array();
+
+			WP_CLI::log( '' );
+			WP_CLI::log( 'Import preview:' );
+			WP_CLI::log( sprintf( '  Agent slug:  %s', $summary['agent_slug'] ?? $target_slug ) );
+			WP_CLI::log( sprintf( '  Agent name:  %s', $summary['agent_name'] ?? '(unnamed)' ) );
+			WP_CLI::log( sprintf( '  Owner ID:    %d', $summary['owner_id'] ?? 0 ) );
+			WP_CLI::log( sprintf( '  Files:       %d', $summary['files'] ?? 0 ) );
+			WP_CLI::log( sprintf( '  Pipelines:   %d', $summary['pipelines'] ?? 0 ) );
+			WP_CLI::log( sprintf( '  Flows:       %d (will be imported paused)', $summary['flows'] ?? 0 ) );
+
+			$missing = $summary['missing_abilities'] ?? array();
+			if ( ! empty( $missing ) ) {
+				WP_CLI::log( '' );
+				WP_CLI::warning( sprintf( '%d ability slug(s) from the bundle are not registered on this site:', count( $missing ) ) );
+				foreach ( $missing as $ability ) {
+					WP_CLI::log( '  - ' . $ability );
+				}
+			}
+
+			WP_CLI::success( 'Dry run complete — no changes made.' );
+			return;
+		}
+
+		$summary = $result['summary'] ?? array();
+		WP_CLI::log( '' );
+		WP_CLI::log( sprintf( '  Agent ID:    %d', $summary['agent_id'] ?? 0 ) );
+		WP_CLI::log( sprintf( '  Pipelines:   %d imported', $summary['pipelines_imported'] ?? 0 ) );
+		WP_CLI::log( sprintf( '  Flows:       %d imported (paused)', $summary['flows_imported'] ?? 0 ) );
+
+		WP_CLI::success( $result['message'] );
 	}
 
 	/**
