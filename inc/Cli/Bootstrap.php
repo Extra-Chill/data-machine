@@ -29,10 +29,8 @@ WP_CLI::add_command( 'datamachine agents', Commands\AgentsCommand::class );
 
 // Backwards-compatible alias: `wp datamachine memory` → agent.
 WP_CLI::add_command( 'datamachine memory', Commands\MemoryCommand::class );
-// WorkspaceCommand moved to data-machine-code extension (wp datamachine-code workspace).
 WP_CLI::add_command( 'datamachine batch', Commands\BatchCommand::class );
 WP_CLI::add_command( 'datamachine image', Commands\ImageCommand::class );
-// GitHubCommand moved to data-machine-code extension (wp datamachine-code github).
 WP_CLI::add_command( 'datamachine auth', Commands\AuthCommand::class );
 WP_CLI::add_command( 'datamachine email', Commands\EmailCommand::class );
 WP_CLI::add_command( 'datamachine system', Commands\SystemCommand::class );

@@ -96,8 +96,6 @@ The Abilities API (DataMachine\Abilities) provides direct method calls for core 
 - `AgentAbilities` manages agent CRUD, renaming (with filesystem migration), and deletion.
 - `AgentMemoryAbilities` provides section-based read, write, append, and search operations on memory files.
 - `DailyMemoryAbilities` manages daily memory files — read, write, list, search, and delete by date.
-- `WorkspaceAbilities` provides git-aware workspace operations: clone, read, write, edit files, and run git commands. **Moved to data-machine-code extension.**
-
 **Remaining Services** (utilities for cross-cutting concerns):
 - `LogsManager` aggregates log entries in the `wp_datamachine_logs` table for filtering in the admin UI.
 - Cache invalidation is handled by ability-level `clearCache()` methods to ensure dynamic handler and step type registrations are immediately reflected across the system.
@@ -135,25 +133,6 @@ Jobs that record effects in `engine_data` can be reversed. The undo system handl
 ```bash
 wp datamachine jobs undo <job_id> --allow-root
 wp datamachine jobs undo <job_id> --dry-run --allow-root
-```
-
-## Workspace System
-
-> **Note:** The workspace system has been moved to the `data-machine-code` extension plugin. The following documentation is for reference only.
-
-The workspace provides a **secure file management layer outside the web root** for agent operations:
-
-- **Location**: `/var/lib/datamachine/workspace/` (configurable via `DATAMACHINE_WORKSPACE_PATH`)
-- **Git-aware**: Clone repos, track changes, commit, push — all through the Abilities API
-- **File operations**: Read, write, edit files with `@file` syntax support in CLI
-- **Security**: Located outside the web root; mutating operations are CLI-only (not exposed via REST)
-
-Commands (requires data-machine-code extension):
-```bash
-wp datamachine-code workspace list --allow-root
-wp datamachine-code workspace clone https://github.com/org/repo.git --allow-root
-wp datamachine-code workspace read path/to/file --allow-root
-wp datamachine-code workspace git status --repo=my-repo --allow-root
 ```
 
 ## Data Flow
@@ -202,7 +181,6 @@ wp datamachine-code workspace git status --repo=my-repo --allow-root
 - **Multi-platform publishing** via dedicated fetch/publish/update handlers for files, RSS, Reddit, Google Sheets, WordPress, Twitter, Threads, Bluesky, Facebook, and Google Sheets output.
 - **Daily memory system** for automatic temporal knowledge management with AI-driven pruning.
 - **System tasks** for background AI operations (image generation, alt text, internal linking, meta descriptions) with undo support.
-- **Workspace system** for secure git-aware file management outside the web root (moved to data-machine-code extension).
 - **Extension points** through filters such as `datamachine_handlers`, `chubes_ai_tools`, `datamachine_step_types`, `datamachine_auth_providers`, and `datamachine_engine_data`.
 - **Directive orchestration** ensures every AI request is context-aware, tool-enabled, and consistent with site policies.
 - **Chartable logging, deduplication, and error handling** keep operators informed about job outcomes and prevent duplicate processing.
