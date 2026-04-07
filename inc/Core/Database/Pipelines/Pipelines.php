@@ -558,20 +558,7 @@ class Pipelines extends BaseRepository {
 	 */
 	public function migrate_columns(): void {
 		// Check if user_id column already exists.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-		$column = $this->wpdb->get_var(
-			$this->wpdb->prepare(
-				"SELECT COLUMN_NAME
-				 FROM information_schema.COLUMNS
-				 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'user_id'",
-				DB_NAME,
-				$this->table_name
-			)
-		);
-		// phpcs:enable WordPress.DB.PreparedSQL
-
-		if ( null === $column ) {
+		if ( ! self::column_exists( $this->table_name, 'user_id', $this->wpdb ) ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$result = $this->wpdb->query(
@@ -603,19 +590,7 @@ class Pipelines extends BaseRepository {
 		}
 
 		// Add agent_id column for agent-first scoping (#735).
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-		$agent_col = $this->wpdb->get_var(
-			$this->wpdb->prepare(
-				"SELECT COLUMN_NAME
-				 FROM information_schema.COLUMNS
-				 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'agent_id'",
-				DB_NAME,
-				$this->table_name
-			)
-		);
-		// phpcs:enable WordPress.DB.PreparedSQL
-
-		if ( null === $agent_col ) {
+		if ( ! self::column_exists( $this->table_name, 'agent_id', $this->wpdb ) ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 			$result = $this->wpdb->query(

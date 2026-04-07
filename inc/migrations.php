@@ -1566,15 +1566,7 @@ function datamachine_backfill_agent_ids(): void {
 		}
 
 		// Check agent_id column exists (migration may not have run yet).
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-		$col = $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'agent_id'",
-				DB_NAME,
-				$table
-			)
-		);
-		if ( null === $col ) {
+		if ( ! \DataMachine\Core\Database\BaseRepository::column_exists( $table, 'agent_id', $wpdb ) ) {
 			continue;
 		}
 
@@ -1708,15 +1700,7 @@ function datamachine_assign_orphaned_resources_to_sole_agent(): void {
 		}
 
 		// Check agent_id column exists.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-		$col = $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'agent_id'",
-				DB_NAME,
-				$table
-			)
-		);
-		if ( null === $col ) {
+		if ( ! \DataMachine\Core\Database\BaseRepository::column_exists( $table, 'agent_id', $wpdb ) ) {
 			continue;
 		}
 
