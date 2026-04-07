@@ -192,9 +192,24 @@ Full REST API under `datamachine/v1`:
 | [data-machine-code](https://github.com/Extra-Chill/data-machine-code) | Workspace management, GitHub integration, git operations |
 | [data-machine-socials](https://github.com/Extra-Chill/data-machine-socials) | Publish to Instagram (images, carousels, Reels, Stories), Twitter (text + media + video), Facebook, Threads, Bluesky, Pinterest (image + video pins). Reddit fetch. |
 | [data-machine-business](https://github.com/Extra-Chill/data-machine-business) | Google Sheets (fetch + publish), Slack, Discord integrations |
-| [datamachine-events](https://github.com/Extra-Chill/datamachine-events) | Event data extraction and structured data processing |
+| [data-machine-editor](https://github.com/Extra-Chill/data-machine-editor) | Gutenberg inline diff visualization, accept/reject review, editor sidebar |
+| [data-machine-frontend-chat](https://github.com/Extra-Chill/data-machine-frontend-chat) | Floating agent chat widget for any WordPress site |
+| [data-machine-chat-bridge](https://github.com/Extra-Chill/data-machine-chat-bridge) | Message queue, webhook delivery, and REST API for external chat clients |
+| [data-machine-events](https://github.com/Extra-Chill/data-machine-events) | Event calendar automation with AI + Gutenberg blocks |
 | [datamachine-recipes](https://github.com/Sarai-Chinwag/datamachine-recipes) | Recipe content extraction and schema processing |
 | [data-machine-quiz](https://github.com/Sarai-Chinwag/data-machine-quiz) | Quiz creation and management tools |
+
+### Skills
+
+| Package | Description |
+|---------|-------------|
+| [data-machine-skills](https://github.com/Extra-Chill/data-machine-skills) | Agent skills — discoverable instruction sets that coding agents load on demand |
+
+### Integrations
+
+| Project | Description |
+|---------|-------------|
+| [mautrix-data-machine](https://github.com/Extra-Chill/mautrix-data-machine) | Matrix/Beeper bridge — chat with your WordPress AI agent via any Matrix client |
 
 ## AI Providers
 
