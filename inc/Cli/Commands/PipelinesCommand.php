@@ -63,6 +63,9 @@ class PipelinesCommand extends BaseCommand {
 	 * [--fields=<fields>]
 	 * : Limit output to specific fields (comma-separated).
 	 *
+	 * [--search=<search>]
+	 * : Filter pipelines by name (substring match).
+	 *
 	 * [--name=<name>]
 	 * : Pipeline name (create/update subcommands).
 	 *
@@ -208,6 +211,7 @@ class PipelinesCommand extends BaseCommand {
 		$per_page = (int) ( $assoc_args['per_page'] ?? 20 );
 		$offset   = (int) ( $assoc_args['offset'] ?? 0 );
 		$format   = $assoc_args['format'] ?? 'table';
+		$search   = $assoc_args['search'] ?? null;
 
 		if ( $per_page < 1 ) {
 			$per_page = 20;
@@ -248,16 +252,20 @@ class PipelinesCommand extends BaseCommand {
 			);
 			$this->outputSinglePipeline( $single_result, $format );
 		} else {
-			$result = $ability->executeGetPipelines(
-				array_merge(
-					$scoping,
-					array(
-						'per_page'    => $per_page,
-						'offset'      => $offset,
-						'output_mode' => 'full',
-					)
+			$ability_input = array_merge(
+				$scoping,
+				array(
+					'per_page'    => $per_page,
+					'offset'      => $offset,
+					'output_mode' => 'full',
 				)
 			);
+
+			if ( null !== $search && '' !== $search ) {
+				$ability_input['search'] = $search;
+			}
+
+			$result = $ability->executeGetPipelines( $ability_input );
 
 			if ( ! $result['success'] ) {
 				WP_CLI::error( $result['error'] ?? 'Failed to get pipelines' );

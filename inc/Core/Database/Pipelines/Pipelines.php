@@ -112,20 +112,31 @@ class Pipelines extends BaseRepository {
 	/**
 	 * Get all pipelines from the database.
 	 *
-	 * @param int|null $user_id  Optional user ID to filter by.
-	 * @param int|null $agent_id Optional agent ID to filter by.
+	 * @param int|null    $user_id  Optional user ID to filter by.
+	 * @param int|null    $agent_id Optional agent ID to filter by.
+	 * @param string|null $search   Optional search term to filter by pipeline name (LIKE).
 	 * @return array Array of all pipeline records
 	 */
-	public function get_all_pipelines( ?int $user_id = null, ?int $agent_id = null ): array {
-		$where        = '';
-		$where_values = array();
+	public function get_all_pipelines( ?int $user_id = null, ?int $agent_id = null, ?string $search = null ): array {
+		$where_clauses = array();
+		$where_values  = array();
 
 		if ( null !== $agent_id ) {
-			$where          = ' WHERE agent_id = %d';
-			$where_values[] = $agent_id;
+			$where_clauses[] = 'agent_id = %d';
+			$where_values[]  = $agent_id;
 		} elseif ( null !== $user_id ) {
-			$where          = ' WHERE user_id = %d';
-			$where_values[] = $user_id;
+			$where_clauses[] = 'user_id = %d';
+			$where_values[]  = $user_id;
+		}
+
+		if ( null !== $search && '' !== $search ) {
+			$where_clauses[] = 'pipeline_name LIKE %s';
+			$where_values[]  = '%' . $this->wpdb->esc_like( $search ) . '%';
+		}
+
+		$where = '';
+		if ( ! empty( $where_clauses ) ) {
+			$where = ' WHERE ' . implode( ' AND ', $where_clauses );
 		}
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared

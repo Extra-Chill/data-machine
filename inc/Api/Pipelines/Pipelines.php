@@ -76,6 +76,12 @@ class Pipelines {
 							'description'       => __( 'Filter by user ID (admin only, non-admins always see own data)', 'data-machine' ),
 							'sanitize_callback' => 'absint',
 						),
+						'search'      => array(
+							'required'          => false,
+							'type'              => 'string',
+							'description'       => __( 'Filter pipelines by name (substring match)', 'data-machine' ),
+							'sanitize_callback' => 'sanitize_text_field',
+						),
 					),
 				),
 				array(
@@ -248,6 +254,7 @@ class Pipelines {
 		$fields          = $request->get_param( 'fields' );
 		$format          = $request->get_param( 'format' ) ?? 'json';
 		$ids             = $request->get_param( 'ids' );
+		$search          = $request->get_param( 'search' );
 		$scoped_user_id  = PermissionHelper::resolve_scoped_user_id( $request );
 		$scoped_agent_id = PermissionHelper::resolve_scoped_agent_id( $request );
 
@@ -338,6 +345,9 @@ class Pipelines {
 				$input['agent_id'] = $scoped_agent_id;
 			} elseif ( null !== $scoped_user_id ) {
 				$input['user_id'] = $scoped_user_id;
+			}
+			if ( null !== $search && '' !== $search ) {
+				$input['search'] = $search;
 			}
 			$result = $abilities->executeGetPipelines( $input );
 

@@ -65,6 +65,10 @@ class GetPipelinesAbility {
 								'minimum'     => 0,
 								'description' => __( 'Offset for pagination', 'data-machine' ),
 							),
+							'search'      => array(
+								'type'        => array( 'string', 'null' ),
+								'description' => __( 'Search pipelines by name (SQL LIKE match)', 'data-machine' ),
+							),
 							'output_mode' => array(
 								'type'        => 'string',
 								'enum'        => array( 'full', 'summary', 'ids' ),
@@ -113,6 +117,7 @@ class GetPipelinesAbility {
 			$per_page    = (int) ( $input['per_page'] ?? self::DEFAULT_PER_PAGE );
 			$offset      = (int) ( $input['offset'] ?? 0 );
 			$output_mode = $input['output_mode'] ?? 'full';
+			$search      = isset( $input['search'] ) && '' !== $input['search'] ? sanitize_text_field( $input['search'] ) : null;
 
 			if ( ! in_array( $output_mode, array( 'full', 'summary', 'ids' ), true ) ) {
 				$output_mode = 'full';
@@ -152,7 +157,7 @@ class GetPipelinesAbility {
 				);
 			}
 
-			$all_pipelines = $this->db_pipelines->get_all_pipelines( $user_id, $agent_id );
+			$all_pipelines = $this->db_pipelines->get_all_pipelines( $user_id, $agent_id, $search );
 			$total         = count( $all_pipelines );
 			$pipelines     = array_slice( $all_pipelines, $offset, $per_page );
 
