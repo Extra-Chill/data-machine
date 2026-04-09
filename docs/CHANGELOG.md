@@ -2,6 +2,24 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.65.0] - 2026-04-09
+
+### Added
+- add agent export/import CLI commands for portable agent bundles
+- add agent lifecycle hooks (created, updated, deleted)
+
+### Changed
+- Replace hardcoded agent paths with MemoryFileRegistry query
+- Delegate CLI files write to ability, fix JSON_UNQUOTE for SQLite
+- remove workspace knowledge from core
+
+### Fixed
+- Fix Action Scheduler notice on every WP-CLI command
+- create default agent on activation before scaffolding files
+- resolve startup errors on fresh installs and PHP 8.5 deprecation
+- replace MySQL-only schema queries with SQLite-compatible helpers (closes #1025)
+- Fix AS init timing error in SystemAgentServiceProvider
+
 ## [0.64.0] - 2026-04-03
 
 ### Added
