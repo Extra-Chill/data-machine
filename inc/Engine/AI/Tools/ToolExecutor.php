@@ -97,7 +97,20 @@ class ToolExecutor {
 			);
 		}
 
-		$method      = $tool_def['method'] ?? 'handle_tool_call';
+		$method = $tool_def['method'] ?? null;
+		if ( ! $method || ! method_exists($class_name, $method) ) {
+			return array(
+				'success'   => false,
+				'error'     => sprintf(
+					"Tool '%s' definition is missing required 'method' key or method '%s' does not exist on class '%s'.",
+					$tool_name,
+					$method ?? '(none)',
+					$class_name
+				),
+				'tool_name' => $tool_name,
+			);
+		}
+
 		$tool_handler = new $class_name();
 		$tool_result  = $tool_handler->$method($complete_parameters, $tool_def);
 
