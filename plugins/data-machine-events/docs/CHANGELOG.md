@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.27.1] - 2026-04-09
+
+### Changed
+- Ignore homeboy build metadata
+- Add Sofar Sounds GraphQL extractor
+
+### Fixed
+- Fix multi-currency price formatting
+
 ## [0.27.0] - 2026-04-02
 
 ### Added
