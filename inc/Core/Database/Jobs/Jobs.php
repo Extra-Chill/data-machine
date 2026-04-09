@@ -404,17 +404,31 @@ class Jobs {
 		}
 
 		// Backfill task_type from engine_data for existing system/pipeline_system_task jobs.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		// Uses PHP json_decode instead of MySQL JSON_UNQUOTE for SQLite compatibility.
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-		$wpdb->query(
-			"UPDATE {$table_name}
-			 SET task_type = JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.task_type'))
+		$backfill_rows = $wpdb->get_results(
+			"SELECT job_id, engine_data
+			 FROM {$table_name}
 			 WHERE source IN ('system', 'pipeline_system_task')
 			 AND engine_data IS NOT NULL
-			 AND JSON_EXTRACT(engine_data, '$.task_type') IS NOT NULL
 			 AND task_type IS NULL"
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL
+
+		foreach ( $backfill_rows as $row ) {
+			$engine_data = json_decode( $row->engine_data, true );
+			$task_type   = $engine_data['task_type'] ?? null;
+
+			if ( $task_type ) {
+				$wpdb->update(
+					$table_name,
+					array( 'task_type' => $task_type ),
+					array( 'job_id' => $row->job_id ),
+					array( '%s' ),
+					array( '%d' )
+				);
+			}
+		}
 
 		do_action(
 			'datamachine_log',

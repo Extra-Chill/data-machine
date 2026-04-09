@@ -570,6 +570,10 @@ class MemoryCommand extends BaseCommand {
 	 *   files instead of the current user's agent. Required for managing
 	 *   shared agents in multi-agent setups.
 	 *
+	 * [--content=<content>]
+	 * : Content to write (for write action). If omitted, reads from stdin.
+	 *   Use this flag when stdin is not available (e.g., studio wp).
+	 *
 	 * [--days=<days>]
 	 * : Staleness threshold in days for the check action.
 	 * ---
@@ -606,6 +610,9 @@ class MemoryCommand extends BaseCommand {
 	 *
 	 *     # Write to a specific agent's file via stdin
 	 *     cat soul.md | wp datamachine agent files write SOUL.md --agent=studio
+	 *
+	 *     # Write content directly (no stdin required)
+	 *     wp datamachine agent files write SOUL.md --content="# My Agent"
 	 *
 	 *     # Check for stale files (not updated in 7 days)
 	 *     wp datamachine agent files check
@@ -646,7 +653,7 @@ class MemoryCommand extends BaseCommand {
 					WP_CLI::error( 'Filename is required. Usage: wp datamachine agent files write <filename>' );
 					return;
 				}
-				$this->files_write( $filename, $user_id, $agent_id );
+				$this->files_write( $filename, $assoc_args, $user_id, $agent_id );
 				break;
 			case 'check':
 				$this->files_check( $assoc_args, $user_id, $agent_id );
@@ -714,52 +721,59 @@ class MemoryCommand extends BaseCommand {
 	}
 
 	/**
-	 * Write to an agent file from stdin.
+	 * Write to an agent file via --content flag or stdin.
 	 *
-	 * @param string $filename File name (e.g., SOUL.md).
+	 * Delegates to the datamachine/write-agent-file ability for all
+	 * validation, layer resolution, and file I/O.
+	 *
+	 * @param string $filename   File name (e.g., SOUL.md).
+	 * @param array  $assoc_args Command arguments.
+	 * @param int    $user_id    User ID.
+	 * @param int|null $agent_id Agent ID.
 	 */
-	private function files_write( string $filename, int $user_id = 0, ?int $agent_id = null ): void {
-		$fs        = FilesystemHelper::get();
-		$safe_name = $this->sanitize_agent_filename( $filename );
+	private function files_write( string $filename, array $assoc_args = array(), int $user_id = 0, ?int $agent_id = null ): void {
+		$content = $assoc_args['content'] ?? null;
 
-		// Only allow .md files.
-		if ( '.md' !== substr( $safe_name, -3 ) ) {
-			WP_CLI::error( 'Only .md files can be written to the agent directory.' );
+		if ( null === $content ) {
+			$fs      = FilesystemHelper::get();
+			$content = $fs ? $fs->get_contents( 'php://stdin' ) : false;
+
+			if ( false === $content || '' === trim( $content ) ) {
+				WP_CLI::error( 'No content provided. Use --content="..." or pipe via stdin: echo "content" | wp datamachine agent files write SOUL.md' );
+				return;
+			}
+		}
+
+		$ability = wp_get_ability( 'datamachine/write-agent-file' );
+
+		if ( ! $ability ) {
+			WP_CLI::error( "Ability 'datamachine/write-agent-file' not registered." );
 			return;
 		}
 
-		// Editability check — warn for read-only files.
-		$edit_cap = \DataMachine\Engine\AI\MemoryFileRegistry::get_edit_capability( $safe_name );
-		if ( false === $edit_cap ) {
-			WP_CLI::error( sprintf( 'File %s is read-only. It is auto-generated and can only be extended via PHP filters.', $safe_name ) );
+		$input = array(
+			'filename' => $filename,
+			'content'  => $content,
+			'user_id'  => $user_id,
+		);
+
+		if ( null !== $agent_id ) {
+			$input['agent_id'] = $agent_id;
+		}
+
+		$result = $ability->execute( $input );
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
 			return;
 		}
 
-		$agent_dir = $this->get_agent_dir( $user_id, $agent_id );
-		$filepath  = $agent_dir . '/' . $safe_name;
-
-		// Read from stdin.
-		$content = $fs->get_contents( 'php://stdin' );
-
-		if ( false === $content || '' === trim( $content ) ) {
-			WP_CLI::error( 'No content received from stdin. Pipe content in: echo "content" | wp datamachine agent files write SOUL.md' );
+		if ( empty( $result['success'] ) ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to write file.' );
 			return;
 		}
 
-		$directory_manager = new DirectoryManager();
-		$directory_manager->ensure_directory_exists( $agent_dir );
-
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-		$written = file_put_contents( $filepath, $content );
-
-		if ( false === $written ) {
-			WP_CLI::error( sprintf( 'Failed to write file: %s', $safe_name ) );
-			return;
-		}
-
-		FilesystemHelper::make_group_writable( $filepath );
-
-		WP_CLI::success( sprintf( 'Wrote %s (%s).', $safe_name, size_format( $written ) ) );
+		WP_CLI::success( sprintf( 'Wrote %s (layer: %s).', $result['filename'], $result['layer'] ) );
 	}
 
 	/**

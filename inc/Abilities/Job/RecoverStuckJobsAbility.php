@@ -107,7 +107,7 @@ class RecoverStuckJobsAbility {
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Dynamic WHERE clause
 		$stuck_jobs = $wpdb->get_results(
-			"SELECT job_id, flow_id, JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.job_status')) as target_status
+			"SELECT job_id, flow_id, engine_data
 			 FROM {$table}
 			 {$where_clause}"
 		);
@@ -122,7 +122,8 @@ class RecoverStuckJobsAbility {
 		$jobs      = array();
 
 		foreach ( $stuck_jobs as $job ) {
-			$status = $job->target_status;
+			$engine_data = json_decode( $job->engine_data, true );
+			$status      = $engine_data['job_status'] ?? null;
 
 			// Truncate to fit varchar(255) column. Full reason is in engine_data.
 			if ( $status && strlen( $status ) > 255 ) {
