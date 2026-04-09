@@ -39,7 +39,7 @@ class SystemAgentServiceProvider {
 		$this->registerTaskHandlers();
 		$this->initializeRegistry();
 		$this->registerActionSchedulerHooks();
-		$this->manageDailyMemorySchedule();
+		add_action( 'action_scheduler_init', array( $this, 'manageDailyMemorySchedule' ) );
 	}
 
 	/**
@@ -115,31 +115,29 @@ class SystemAgentServiceProvider {
 	/**
 	 * Manage the daily memory recurring schedule.
 	 *
-	 * Defers to the action_scheduler_init hook to ensure the AS data store
-	 * is initialized before calling scheduling functions. This matches the
-	 * pattern used by all other DM cleanup/scheduling classes.
+	 * Ensures the recurring Action Scheduler action exists when enabled
+	 * and is removed when disabled. Deferred to action_scheduler_init
+	 * to avoid calling AS functions before the data store is initialized.
 	 *
 	 * @since 0.32.0
 	 */
-	private function manageDailyMemorySchedule(): void {
-		add_action( 'action_scheduler_init', function () {
-			$enabled        = (bool) PluginSettings::get( 'daily_memory_enabled', false );
-			$next_scheduled = as_next_scheduled_action( self::DAILY_MEMORY_HOOK, array(), 'data-machine' );
+	public function manageDailyMemorySchedule(): void {
+		$enabled        = (bool) PluginSettings::get( 'daily_memory_enabled', false );
+		$next_scheduled = as_next_scheduled_action( self::DAILY_MEMORY_HOOK, array(), 'data-machine' );
 
-			if ( $enabled && ! $next_scheduled ) {
-				// Schedule daily at midnight UTC.
-				$midnight = strtotime( 'tomorrow midnight' );
-				as_schedule_recurring_action(
-					$midnight,
-					DAY_IN_SECONDS,
-					self::DAILY_MEMORY_HOOK,
-					array(),
-					'data-machine'
-				);
-			} elseif ( ! $enabled && $next_scheduled ) {
-				as_unschedule_all_actions( self::DAILY_MEMORY_HOOK, array(), 'data-machine' );
-			}
-		} );
+		if ( $enabled && ! $next_scheduled ) {
+			// Schedule daily at midnight UTC.
+			$midnight = strtotime( 'tomorrow midnight' );
+			as_schedule_recurring_action(
+				$midnight,
+				DAY_IN_SECONDS,
+				self::DAILY_MEMORY_HOOK,
+				array(),
+				'data-machine'
+			);
+		} elseif ( ! $enabled && $next_scheduled ) {
+			as_unschedule_all_actions( self::DAILY_MEMORY_HOOK, array(), 'data-machine' );
+		}
 	}
 
 	/**
