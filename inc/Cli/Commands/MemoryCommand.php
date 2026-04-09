@@ -25,6 +25,7 @@ use DataMachine\Core\FilesRepository\DailyMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Core\FilesRepository\FilesystemHelper;
 use DataMachine\Cli\UserResolver;
+use DataMachine\Engine\AI\MemoryFileRegistry;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -967,34 +968,27 @@ class MemoryCommand extends BaseCommand {
 		$site_root = untrailingslashit( ABSPATH );
 		$relative  = \WP_CLI\Utils\get_flag_value( $assoc_args, 'relative', false );
 
-		// Core files in injection order (matches CoreMemoryFilesDirective).
-		$core_files = array(
-			array(
-				'file'      => 'SITE.md',
-				'layer'     => 'shared',
-				'directory' => $shared_dir,
-			),
-			array(
-				'file'      => 'SOUL.md',
-				'layer'     => 'agent',
-				'directory' => $agent_dir,
-			),
-			array(
-				'file'      => 'MEMORY.md',
-				'layer'     => 'agent',
-				'directory' => $agent_dir,
-			),
-			array(
-				'file'      => 'USER.md',
-				'layer'     => 'user',
-				'directory' => $user_dir,
-			),
-			array(
-				'file'      => 'NETWORK.md',
-				'layer'     => 'network',
-				'directory' => $network_dir,
-			),
+		// Build file list from registry (sorted by priority, includes plugin-registered files).
+		$layer_dirs = array(
+			'shared'  => $shared_dir,
+			'agent'   => $agent_dir,
+			'user'    => $user_dir,
+			'network' => $network_dir,
 		);
+
+		$registry   = MemoryFileRegistry::get_all();
+		$core_files = array();
+
+		foreach ( $registry as $filename => $meta ) {
+			$layer     = $meta['layer'];
+			$directory = $layer_dirs[ $layer ] ?? $agent_dir;
+
+			$core_files[] = array(
+				'file'      => $filename,
+				'layer'     => $layer,
+				'directory' => $directory,
+			);
+		}
 
 		$format = \WP_CLI\Utils\get_flag_value( $assoc_args, 'format', 'json' );
 
