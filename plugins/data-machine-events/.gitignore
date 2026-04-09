@@ -127,3 +127,4 @@ wp-content/plugins/hello.php
 
 # Docs tooling
 docs/.docs-sync.json.homeboy-build/
+.homeboy-build-meta.json
