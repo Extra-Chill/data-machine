@@ -97,8 +97,9 @@ class ToolExecutor {
 			);
 		}
 
+		$method      = $tool_def['method'] ?? 'handle_tool_call';
 		$tool_handler = new $class_name();
-		$tool_result  = $tool_handler->handle_tool_call($complete_parameters, $tool_def);
+		$tool_result  = $tool_handler->$method($complete_parameters, $tool_def);
 
 		return $tool_result;
 	}

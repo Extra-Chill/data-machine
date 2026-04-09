@@ -135,10 +135,11 @@ class InsertContentAbility {
 	/**
 	 * Handle chat tool call.
 	 *
-	 * @param array $params Tool parameters.
+	 * @param array $params   Tool parameters.
+	 * @param array $tool_def Tool definition.
 	 * @return array Result.
 	 */
-	public static function handleChatToolCall( array $params ): array {
+	public static function handleChatToolCall( array $params, array $tool_def = array() ): array {
 		return self::execute( $params );
 	}
 
