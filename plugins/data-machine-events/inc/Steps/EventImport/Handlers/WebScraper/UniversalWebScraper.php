@@ -18,7 +18,8 @@
  * 10. Dusk.fm/BeatGig venue calendar (data-beatgig-embed → __NEXT_DATA__)
  * 11. SpotHopper API (spothopperapp.com)
  * 12. VenuePilot GraphQL API (venuepilot.co widget → GraphQL)
- * 13. Gigwell booking platform (gigwell-gigstream)
+ * 13. Sofar Sounds GraphQL API (sofarsounds.com SPA → GetEventsForFan)
+ * 14. Gigwell booking platform (gigwell-gigstream)
  * 13. DoStuff Media API (Waterloo Records, Do512)
  * 14. Nocodeflow calendar (Webflow + nocodeflow.net widget with data-date attributes)
  * 15. Webflow CMS (w-dyn-item dynamic collection lists)
@@ -80,6 +81,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\ShowareEx
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\ShowtimeExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\EventbriteExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\GenericHtmlEventsExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SofarSoundsExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\VisionExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SquareOnlineExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\VisionExtractionProcessor;
@@ -148,6 +150,7 @@ class UniversalWebScraper extends EventImportHandler {
 			new DuskFmExtractor(),
 			new SpotHopperExtractor(),
 			new VenuePilotExtractor(),
+			new SofarSoundsExtractor(),
 			new GigwellExtractor(),
 			new DoStuffExtractor(),
 			new NocodeflowExtractor(),
