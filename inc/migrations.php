@@ -1121,10 +1121,8 @@ function datamachine_ensure_default_context_files( int $user_id ): void {
 	}
 
 	global $wp_filesystem;
-	if ( ! $wp_filesystem ) {
-		require_once ABSPATH . 'wp-admin/includes/file.php';
-		\WP_Filesystem();
-	}
+	require_once ABSPATH . 'wp-admin/includes/file.php';
+	\WP_Filesystem( array( 'method' => 'direct' ) );
 
 	$defaults = datamachine_get_default_context_files();
 
