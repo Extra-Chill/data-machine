@@ -147,7 +147,11 @@ class MetaSyncAbilities {
 	}
 
 	/**
-	 * Find events where block has startDate but meta is missing.
+	 * Find events where the event_dates table has no row (meta sync failed).
+	 *
+	 * Uses a direct SQL query against the event_dates table instead of loading
+	 * all 45K+ events into memory. Identifies events with missing date rows
+	 * and cross-references block content for startDate validation.
 	 *
 	 * @param array $input Input parameters with optional 'limit'
 	 * @return array Events with missing meta sync
@@ -159,44 +163,70 @@ class MetaSyncAbilities {
 			$limit = self::DEFAULT_LIMIT;
 		}
 
-		$args = array(
-			'post_type'      => Event_Post_Type::POST_TYPE,
-			'post_status'    => 'publish',
-			'posts_per_page' => -1,
-			'orderby'        => 'date',
-			'order'          => 'DESC',
+		// Find events missing from the event_dates table via LEFT JOIN.
+		// This avoids loading all 45K+ events as WP_Post objects.
+		global $wpdb;
+		$ed_table = \DataMachineEvents\Core\EventDatesTable::table_name();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$candidate_ids = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT p.ID FROM {$wpdb->posts} p
+				LEFT JOIN {$ed_table} ed ON p.ID = ed.post_id
+				WHERE p.post_type = %s
+				AND p.post_status = 'publish'
+				AND ed.post_id IS NULL
+				ORDER BY p.post_date DESC
+				LIMIT %d",
+				Event_Post_Type::POST_TYPE,
+				$limit * 10 // Over-fetch to account for events without block attributes.
+			)
 		);
 
-		$query         = new \WP_Query( $args );
-		$missing_sync  = array();
-		$total_missing = 0;
+		if ( empty( $candidate_ids ) ) {
+			return array(
+				'count'  => 0,
+				'events' => array(),
+			);
+		}
 
-		foreach ( $query->posts as $event ) {
-			$block_attrs = $this->extractBlockAttributes( $event->ID );
+		// Get total count of events missing from event_dates table.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$total_missing = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(p.ID) FROM {$wpdb->posts} p
+				LEFT JOIN {$ed_table} ed ON p.ID = ed.post_id
+				WHERE p.post_type = %s
+				AND p.post_status = 'publish'
+				AND ed.post_id IS NULL",
+				Event_Post_Type::POST_TYPE
+			)
+		);
+
+		// Filter candidates to those with block attributes containing startDate.
+		$missing_sync = array();
+		foreach ( $candidate_ids as $post_id ) {
+			if ( count( $missing_sync ) >= $limit ) {
+				break;
+			}
+
+			$block_attrs = $this->extractBlockAttributes( (int) $post_id );
 			$start_date  = $block_attrs['startDate'] ?? '';
 
 			if ( empty( $start_date ) ) {
 				continue;
 			}
 
-			$meta_datetime = get_post_meta( $event->ID, Event_Post_Type::EVENT_DATE_META_KEY, true );
+			$venue_terms = wp_get_post_terms( (int) $post_id, 'venue', array( 'fields' => 'names' ) );
+			$venue_name  = ( ! is_wp_error( $venue_terms ) && ! empty( $venue_terms ) ) ? $venue_terms[0] : '';
 
-			if ( empty( $meta_datetime ) ) {
-				++$total_missing;
-
-				if ( count( $missing_sync ) < $limit ) {
-					$venue_terms = wp_get_post_terms( $event->ID, 'venue', array( 'fields' => 'names' ) );
-					$venue_name  = ( ! is_wp_error( $venue_terms ) && ! empty( $venue_terms ) ) ? $venue_terms[0] : '';
-
-					$missing_sync[] = array(
-						'id'        => $event->ID,
-						'title'     => $event->post_title,
-						'date'      => $start_date,
-						'startTime' => $block_attrs['startTime'] ?? '',
-						'venue'     => $venue_name,
-					);
-				}
-			}
+			$missing_sync[] = array(
+				'id'        => (int) $post_id,
+				'title'     => get_the_title( $post_id ),
+				'date'      => $start_date,
+				'startTime' => $block_attrs['startTime'] ?? '',
+				'venue'     => $venue_name,
+			);
 		}
 
 		return array(

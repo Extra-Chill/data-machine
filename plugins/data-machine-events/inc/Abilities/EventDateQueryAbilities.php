@@ -287,6 +287,13 @@ class EventDateQueryAbilities {
 			$total = $query->post_count;
 		}
 
+		// Log unbounded full-object queries for performance monitoring.
+		// These can cause massive Redis MGET calls (14K+ keys) when the
+		// events table is large. Tracks which caller triggered it.
+		if ( -1 === $per_page && 'all' === $fields && $query->post_count > 100 ) {
+			$this->logUnboundedQuery( $input, $query->post_count );
+		}
+
 		return array(
 			'posts'      => $posts,
 			'total'      => $total,
@@ -371,5 +378,51 @@ class EventDateQueryAbilities {
 
 			return $clauses;
 		};
+	}
+
+	/**
+	 * Log unbounded queries that return full WP_Post objects.
+	 *
+	 * Records caller backtrace (2 frames) and query context to the
+	 * debug log when a query returns more than 100 full post objects
+	 * without pagination. Helps identify which call sites need limits.
+	 *
+	 * Output format: [data-machine-events] Unbounded query: {count} posts | caller: {class}::{method} | scope: {scope}
+	 *
+	 * @param array $input     Query input parameters.
+	 * @param int   $post_count Number of posts returned.
+	 */
+	private function logUnboundedQuery( array $input, int $post_count ): void {
+		if ( ! defined( 'WP_DEBUG' ) || ! WP_DEBUG ) {
+			return;
+		}
+
+		// Walk the backtrace to find the first external caller (not this class).
+		$caller = 'unknown';
+		$trace  = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, 10 ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_debug_backtrace
+
+		foreach ( $trace as $frame ) {
+			$class = $frame['class'] ?? '';
+			// Skip self and core WP internals.
+			if ( __CLASS__ === $class || 'WP_Query' === $class ) {
+				continue;
+			}
+			$caller = $class . '::' . ( $frame['function'] ?? 'unknown' );
+			break;
+		}
+
+		$scope = $input['scope'] ?? 'upcoming';
+		$tax   = ! empty( $input['tax_filters'] ) ? implode( ',', array_keys( $input['tax_filters'] ) ) : 'none';
+
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		error_log(
+			sprintf(
+				'[data-machine-events] Unbounded query: %d posts | caller: %s | scope: %s | tax: %s',
+				$post_count,
+				$caller,
+				$scope,
+				$tax
+			)
+		);
 	}
 }
