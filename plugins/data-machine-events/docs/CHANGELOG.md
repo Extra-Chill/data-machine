@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.27.2] - 2026-04-10
+
+### Fixed
+- Fix MetaSyncAbilities unbounded query and add query-events logging
+
 ## [0.27.1] - 2026-04-09
 
 ### Changed
