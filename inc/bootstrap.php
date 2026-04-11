@@ -138,6 +138,7 @@ MemoryFileRegistry::register( 'NETWORK.md', 5, array(
 	'label'       => 'Network Context',
 	'description' => 'Auto-generated multisite network topology. Read-only — extend via PHP filters.',
 ) );
+
 // SITE.md auto-regeneration — replaces the former SiteContext + SiteContextDirective system.
 // SITE.md is now the single source of truth for site context, auto-refreshing on structural changes.
 add_action( 'init', 'datamachine_register_site_md_invalidation' );

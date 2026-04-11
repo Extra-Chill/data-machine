@@ -26,6 +26,8 @@ use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Core\FilesRepository\FilesystemHelper;
 use DataMachine\Cli\UserResolver;
 use DataMachine\Engine\AI\MemoryFileRegistry;
+use DataMachine\Engine\AI\SectionRegistry;
+use DataMachine\Engine\AI\ComposableFileGenerator;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -883,6 +885,185 @@ class MemoryCommand extends BaseCommand {
 		$agent_dir = $this->get_agent_dir( $user_id, $agent_id );
 		$files     = glob( $agent_dir . '/*.md' );
 		return array_map( 'basename', $files ? $files : array() );
+	}
+
+	// =========================================================================
+	// Composable files
+	// =========================================================================
+
+	/**
+	 * Regenerate composable memory files from registered sections.
+	 *
+	 * Composable files (like AGENTS.md) are auto-generated from sections
+	 * registered by plugins via SectionRegistry. This command regenerates
+	 * them on demand.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [<filename>]
+	 * : Specific composable file to regenerate (e.g. AGENTS.md).
+	 *   If omitted, regenerates all composable files.
+	 *
+	 * [--agent=<slug>]
+	 * : Agent slug for context resolution.
+	 *
+	 * [--list]
+	 * : List registered sections instead of regenerating.
+	 *
+	 * [--format=<format>]
+	 * : Output format for --list.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - csv
+	 *   - yaml
+	 * ---
+	 *
+	 * [--quiet]
+	 * : Suppress output on success.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Regenerate all composable files
+	 *     wp datamachine agent compose
+	 *
+	 *     # Regenerate a specific file
+	 *     wp datamachine agent compose AGENTS.md
+	 *
+	 *     # List registered sections for a file
+	 *     wp datamachine agent compose --list AGENTS.md
+	 *
+	 *     # List all sections across all composable files
+	 *     wp datamachine agent compose --list
+	 *
+	 * @subcommand compose
+	 */
+	public function compose( array $args, array $assoc_args ): void {
+		$filename = $args[0] ?? '';
+		$list     = \WP_CLI\Utils\get_flag_value( $assoc_args, 'list', false );
+		$quiet    = \WP_CLI\Utils\get_flag_value( $assoc_args, 'quiet', false );
+
+		if ( $list ) {
+			$this->compose_list( $filename, $assoc_args );
+			return;
+		}
+
+		// Build context from CLI flags.
+		$context = $this->build_compose_context( $assoc_args );
+
+		if ( ! empty( $filename ) ) {
+			// Regenerate a single file.
+			$result = ComposableFileGenerator::regenerate( $filename, $context );
+
+			if ( ! $result['success'] ) {
+				WP_CLI::error( $result['message'] );
+				return;
+			}
+
+			if ( ! $quiet ) {
+				WP_CLI::success( $result['message'] );
+			}
+		} else {
+			// Regenerate all composable files.
+			$result = ComposableFileGenerator::regenerate_all( $context );
+
+			if ( ! $quiet ) {
+				foreach ( $result['results'] as $file_result ) {
+					$status = ! empty( $file_result['success'] ) ? 'OK' : 'FAIL';
+					WP_CLI::log( sprintf( '  [%s] %s — %s', $status, $file_result['filename'], $file_result['message'] ) );
+				}
+				WP_CLI::success( $result['message'] );
+			}
+		}
+	}
+
+	/**
+	 * List registered sections for composable files.
+	 *
+	 * @param string $filename Optional filename filter.
+	 * @param array  $assoc_args Command arguments.
+	 */
+	private function compose_list( string $filename, array $assoc_args ): void {
+		$items = array();
+
+		if ( ! empty( $filename ) ) {
+			// Sections for a single file.
+			$sections = SectionRegistry::get_sections( $filename );
+
+			if ( empty( $sections ) ) {
+				WP_CLI::log( sprintf( 'No sections registered for "%s".', $filename ) );
+				return;
+			}
+
+			foreach ( $sections as $slug => $section ) {
+				$items[] = array(
+					'file'        => $filename,
+					'slug'        => $slug,
+					'priority'    => $section['priority'],
+					'label'       => $section['label'],
+					'description' => $section['description'],
+				);
+			}
+		} else {
+			// All sections across all composable files.
+			$composable = MemoryFileRegistry::get_composable();
+
+			if ( empty( $composable ) ) {
+				WP_CLI::log( 'No composable files registered.' );
+				return;
+			}
+
+			foreach ( $composable as $fname => $meta ) {
+				$sections = SectionRegistry::get_sections( $fname );
+				foreach ( $sections as $slug => $section ) {
+					$items[] = array(
+						'file'        => $fname,
+						'slug'        => $slug,
+						'priority'    => $section['priority'],
+						'label'       => $section['label'],
+						'description' => $section['description'],
+					);
+				}
+
+				if ( empty( $sections ) ) {
+					$items[] = array(
+						'file'        => $fname,
+						'slug'        => '(none)',
+						'priority'    => '-',
+						'label'       => '-',
+						'description' => 'No sections registered.',
+					);
+				}
+			}
+		}
+
+		if ( empty( $items ) ) {
+			WP_CLI::log( 'No sections found.' );
+			return;
+		}
+
+		$this->format_items( $items, array( 'file', 'slug', 'priority', 'label' ), $assoc_args );
+	}
+
+	/**
+	 * Build generation context from CLI flags.
+	 *
+	 * @param array $assoc_args Command arguments.
+	 * @return array Context array.
+	 */
+	private function build_compose_context( array $assoc_args ): array {
+		$context  = array();
+		$agent_id = AgentResolver::resolve( $assoc_args );
+
+		if ( null !== $agent_id ) {
+			$context['agent_id'] = $agent_id;
+		} else {
+			$context['user_id'] = UserResolver::resolve( $assoc_args );
+		}
+
+		return $context;
 	}
 
 	// =========================================================================

@@ -166,6 +166,32 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 			return null;
 		}
 
+		$content = trim( $content );
+
+		/**
+		 * Filter memory file content at read time.
+		 *
+		 * Allows plugins to contribute to or modify ANY memory file
+		 * before it is injected into the AI context. Fires for every
+		 * file read, not just composable ones.
+		 *
+		 * @since 0.66.0
+		 *
+		 * @param string     $content  File content.
+		 * @param string     $filename Filename (e.g. 'SOUL.md', 'MEMORY.md').
+		 * @param array|null $meta     Registry metadata, or null if unregistered.
+		 */
+		$content = apply_filters(
+			'datamachine_memory_file_content',
+			$content,
+			$filename,
+			MemoryFileRegistry::get( $filename )
+		);
+
+		if ( empty( trim( $content ) ) ) {
+			return null;
+		}
+
 		return trim( $content );
 	}
 }

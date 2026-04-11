@@ -16,6 +16,7 @@
  * @since   0.42.0 Added layer-aware registration with metadata.
  * @since   0.50.0 Added editability control with capability gating.
  * @since   0.60.0 Added context-aware injection control.
+ * @since   0.66.0 Added composable file support with convention_path.
  */
 
 namespace DataMachine\Engine\AI;
@@ -63,18 +64,24 @@ class MemoryFileRegistry {
 	 * @param array     $args     {
 	 *     Optional. Registration arguments.
 	 *
-	 *     @type string      $layer       One of 'shared', 'agent', 'user', 'network'. Default 'agent'.
-	 *     @type bool        $protected   Whether the file is protected from deletion. Default false.
-	 *     @type string      $label       Human-readable display label. Default derived from filename.
-	 *     @type string      $description Optional description of the file's purpose.
-	 *     @type bool|string $editable    Write-permission control. true = editable by anyone with
-	 *                                    can_manage(). false = read-only (backend/filters only).
-	 *                                    A capability string (e.g. 'manage_options') = editable only
-	 *                                    by users with that WordPress capability. Default true.
-	 *     @type string[]    $contexts    Execution contexts where this file should be injected.
-	 *                                    Array of context slugs (e.g. 'chat', 'editor', 'pipeline',
-	 *                                    'system') or array( 'all' ) to inject everywhere.
-	 *                                    Default array( 'all' ).
+	 *     @type string      $layer           One of 'shared', 'agent', 'user', 'network'. Default 'agent'.
+	 *     @type bool        $protected       Whether the file is protected from deletion. Default false.
+	 *     @type string      $label           Human-readable display label. Default derived from filename.
+	 *     @type string      $description     Optional description of the file's purpose.
+	 *     @type bool|string $editable        Write-permission control. true = editable by anyone with
+	 *                                        can_manage(). false = read-only (backend/filters only).
+	 *                                        A capability string (e.g. 'manage_options') = editable only
+	 *                                        by users with that WordPress capability. Default true.
+	 *                                        Forced to false when composable is true.
+	 *     @type string[]    $contexts        Execution contexts where this file should be injected.
+	 *                                        Array of context slugs (e.g. 'chat', 'editor', 'pipeline',
+	 *                                        'system') or array( 'all' ) to inject everywhere.
+	 *                                        Default array( 'all' ).
+	 *     @type bool        $composable      Whether this file is auto-generated from registered sections
+	 *                                        via SectionRegistry. Composable files are regenerated on
+	 *                                        demand and are not hand-editable. Default false.
+	 *     @type string      $convention_path Relative path from ABSPATH where a convention copy of this
+	 *                                        file should also be written (e.g. 'AGENTS.md'). Optional.
 	 * }
 	 * @return void
 	 */
@@ -90,8 +97,12 @@ class MemoryFileRegistry {
 			$layer = self::LAYER_AGENT;
 		}
 
+		// Composable files are auto-generated — never hand-editable.
+		$composable = (bool) ( $args['composable'] ?? false );
+
 		// Normalize editable: true (default), false, or a WordPress capability string.
-		$editable = $args['editable'] ?? true;
+		// Composable files force editable to false.
+		$editable = $composable ? false : ( $args['editable'] ?? true );
 		if ( ! is_bool( $editable ) && ! is_string( $editable ) ) {
 			$editable = true;
 		}
@@ -103,15 +114,20 @@ class MemoryFileRegistry {
 		}
 		$contexts = array_values( array_unique( array_map( 'sanitize_key', $contexts ) ) );
 
+		// Convention path: relative path from ABSPATH for an additional copy.
+		$convention_path = isset( $args['convention_path'] ) ? ltrim( $args['convention_path'], '/' ) : '';
+
 		self::$files[ $filename ] = array(
-			'filename'    => $filename,
-			'priority'    => $priority,
-			'layer'       => $layer,
-			'protected'   => (bool) ( $args['protected'] ?? false ),
-			'editable'    => $editable,
-			'contexts'    => $contexts,
-			'label'       => $args['label'] ?? self::filename_to_label( $filename ),
-			'description' => $args['description'] ?? '',
+			'filename'        => $filename,
+			'priority'        => $priority,
+			'layer'           => $layer,
+			'protected'       => (bool) ( $args['protected'] ?? false ),
+			'editable'        => $editable,
+			'composable'      => $composable,
+			'convention_path' => $convention_path,
+			'contexts'        => $contexts,
+			'label'           => $args['label'] ?? self::filename_to_label( $filename ),
+			'description'     => $args['description'] ?? '',
 		);
 	}
 
@@ -188,6 +204,36 @@ class MemoryFileRegistry {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Check if a file is composable (auto-generated from sections).
+	 *
+	 * @since 0.66.0
+	 *
+	 * @param string $filename Filename to check.
+	 * @return bool
+	 */
+	public static function is_composable( string $filename ): bool {
+		$resolved = self::get_resolved();
+		$filename = sanitize_file_name( $filename );
+		return isset( $resolved[ $filename ] ) && ! empty( $resolved[ $filename ]['composable'] );
+	}
+
+	/**
+	 * Get all composable files.
+	 *
+	 * @since 0.66.0
+	 *
+	 * @return array<string, array> Filtered and sorted file metadata.
+	 */
+	public static function get_composable(): array {
+		return array_filter(
+			self::get_resolved(),
+			function ( $meta ) {
+				return ! empty( $meta['composable'] );
+			}
+		);
 	}
 
 	/**

@@ -21,6 +21,7 @@ namespace DataMachine\Abilities\File;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Core\FilesRepository\FilesystemHelper;
+use DataMachine\Engine\AI\ComposableFileGenerator;
 use DataMachine\Engine\AI\MemoryFileRegistry;
 
 defined( 'ABSPATH' ) || exit;
@@ -183,6 +184,18 @@ class ScaffoldAbilities {
 			return array(
 				'success' => false,
 				'error'   => sprintf( 'File "%s" is not registered in the MemoryFileRegistry.', $filename ),
+			);
+		}
+
+		// Composable files delegate to ComposableFileGenerator.
+		if ( ! empty( $meta['composable'] ) ) {
+			$result = ComposableFileGenerator::regenerate( $filename, $input );
+			return array(
+				'success'  => $result['success'],
+				'message'  => $result['message'],
+				'filename' => $filename,
+				'filepath' => $result['filepath'] ?? '',
+				'created'  => $result['success'],
 			);
 		}
 
