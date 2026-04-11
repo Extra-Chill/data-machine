@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.65.2] - 2026-04-11
+
+### Changed
+- remove migrations.php monolith, switch to split files
+- restrict homeboy to audit-only (no refactor/autofix)
+
+### Fixed
+- scaffold shared-layer files (RULES.md) during agent creation
+
 ## [0.65.1] - 2026-04-11
 
 ### Changed
