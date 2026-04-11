@@ -126,7 +126,7 @@ trait FlowHelpers {
 			? $this->db_jobs->get_latest_jobs_by_flow_ids( $flow_ids )
 			: array();
 
-		$next_runs = ( 'full' === $output_mode && ! empty( $flow_ids ) )
+		$next_runs = ( in_array( $output_mode, array( 'full', 'list' ), true ) && ! empty( $flow_ids ) )
 			? FlowFormatter::batch_get_next_run_times( $flow_ids )
 			: array();
 
