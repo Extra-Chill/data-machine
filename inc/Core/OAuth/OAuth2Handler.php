@@ -3,7 +3,11 @@
  * OAuth 2.0 Handler
  *
  * Centralized OAuth 2.0 flow implementation for all OAuth2 providers.
- * Eliminates code duplication across Reddit, Facebook, Threads, and Google Sheets handlers.
+ * Supports three flow types:
+ *
+ * 1. Authorization Code (default) — server apps with a client_secret.
+ * 2. Authorization Code + PKCE — modern public clients, no secret needed.
+ * 3. Implicit (legacy) — token returned in URL fragment, no secret needed.
  *
  * @package DataMachine
  * @subpackage Core\OAuth
@@ -19,6 +23,10 @@ if ( ! defined( 'WPINC' ) ) {
 }
 
 class OAuth2Handler {
+
+	// -------------------------------------------------------------------------
+	// State Management
+	// -------------------------------------------------------------------------
 
 	/**
 	 * Create OAuth state nonce and store in transient.
@@ -71,6 +79,84 @@ class OAuth2Handler {
 		return $is_valid;
 	}
 
+	// -------------------------------------------------------------------------
+	// PKCE (Proof Key for Code Exchange)
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Generate and store a PKCE code_verifier/code_challenge pair.
+	 *
+	 * The code_verifier is stored in a transient and included in the token
+	 * exchange request. The code_challenge is sent with the authorization URL.
+	 *
+	 * Uses S256 method (SHA-256 hash of the verifier, base64url-encoded).
+	 *
+	 * @since 0.66.0
+	 * @param string $provider_key Provider identifier.
+	 * @return array{verifier: string, challenge: string, method: string} PKCE parameters.
+	 */
+	public function create_pkce( string $provider_key ): array {
+		// Generate a random 32-byte verifier (43-128 chars when base64url-encoded per RFC 7636).
+		$verifier = $this->base64url_encode( random_bytes( 32 ) );
+
+		// S256: SHA-256 hash of the verifier, base64url-encoded.
+		$challenge = $this->base64url_encode( hash( 'sha256', $verifier, true ) );
+
+		// Store verifier for token exchange (15 minutes, same as state).
+		set_transient( "datamachine_{$provider_key}_pkce_verifier", $verifier, 15 * MINUTE_IN_SECONDS );
+
+		do_action(
+			'datamachine_log',
+			'debug',
+			'OAuth2: Created PKCE challenge',
+			array(
+				'provider' => $provider_key,
+				'method'   => 'S256',
+			)
+		);
+
+		return array(
+			'verifier'  => $verifier,
+			'challenge' => $challenge,
+			'method'    => 'S256',
+		);
+	}
+
+	/**
+	 * Retrieve and consume the stored PKCE code_verifier.
+	 *
+	 * The verifier is deleted after retrieval (one-time use).
+	 *
+	 * @since 0.66.0
+	 * @param string $provider_key Provider identifier.
+	 * @return string|null Code verifier, or null if not found/expired.
+	 */
+	public function get_pkce_verifier( string $provider_key ): ?string {
+		$verifier = get_transient( "datamachine_{$provider_key}_pkce_verifier" );
+
+		if ( false === $verifier ) {
+			return null;
+		}
+
+		delete_transient( "datamachine_{$provider_key}_pkce_verifier" );
+		return $verifier;
+	}
+
+	/**
+	 * Base64url-encode a string (RFC 4648 §5, no padding).
+	 *
+	 * @since 0.66.0
+	 * @param string $data Raw binary data.
+	 * @return string Base64url-encoded string.
+	 */
+	private function base64url_encode( string $data ): string {
+		return rtrim( strtr( base64_encode( $data ), '+/', '-_' ), '=' );
+	}
+
+	// -------------------------------------------------------------------------
+	// Authorization URL
+	// -------------------------------------------------------------------------
+
 	/**
 	 * Build authorization URL with parameters.
 	 *
@@ -94,11 +180,18 @@ class OAuth2Handler {
 		return $url;
 	}
 
+	// -------------------------------------------------------------------------
+	// Authorization Code Flow (with optional PKCE)
+	// -------------------------------------------------------------------------
+
 	/**
-	 * Handle OAuth2 callback flow.
+	 * Handle OAuth2 authorization code callback flow.
 	 *
 	 * Verifies state, exchanges authorization code for access token, retrieves account details,
 	 * stores account data, and redirects with success/error messages.
+	 *
+	 * When PKCE is enabled, the stored code_verifier is automatically included
+	 * in the token exchange parameters.
 	 *
 	 * @param string        $provider_key Provider identifier.
 	 * @param string        $token_url Token exchange endpoint URL.
@@ -156,6 +249,19 @@ class OAuth2Handler {
 
 			$this->redirect_with_error( $provider_key, 'invalid_state' );
 			return new \WP_Error( 'invalid_state', __( 'Invalid OAuth state.', 'data-machine' ) );
+		}
+
+		// Include PKCE code_verifier in token exchange if one was stored.
+		$verifier = $this->get_pkce_verifier( $provider_key );
+		if ( null !== $verifier ) {
+			$token_params['code_verifier'] = $verifier;
+
+			do_action(
+				'datamachine_log',
+				'debug',
+				'OAuth2: Including PKCE code_verifier in token exchange',
+				array( 'provider' => $provider_key )
+			);
 		}
 
 		// Exchange authorization code for access token
@@ -258,6 +364,233 @@ class OAuth2Handler {
 		return true;
 	}
 
+	// -------------------------------------------------------------------------
+	// Implicit Flow
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Render a callback page for OAuth2 implicit flow.
+	 *
+	 * In the implicit flow, the provider redirects to the callback URL with
+	 * the access_token in the URL fragment (#access_token=...&token_type=bearer).
+	 * Fragments never reach the server, so this method renders a minimal HTML
+	 * page with JavaScript that:
+	 *
+	 * 1. Extracts token data from window.location.hash
+	 * 2. POSTs it to the same callback URL with a nonce for verification
+	 * 3. The server-side handle_implicit_callback() processes the token
+	 *
+	 * Called by the provider's handle_oauth_callback() when the request has
+	 * no query parameters (first hit from the redirect with only a fragment).
+	 *
+	 * @since 0.66.0
+	 * @param string $provider_key Provider identifier.
+	 * @param string $callback_url The callback URL to POST the token to.
+	 * @return void Outputs HTML and exits.
+	 */
+	public function render_implicit_callback_page( string $provider_key, string $callback_url ): void {
+		$nonce = wp_create_nonce( "datamachine_implicit_{$provider_key}" );
+
+		// Minimal HTML page — extracts fragment params and POSTs to server.
+		header( 'Content-Type: text/html; charset=utf-8' );
+		echo '<!DOCTYPE html><html><head><title>Authenticating…</title></head><body>';
+		echo '<p>Completing authentication…</p>';
+		echo '<script>';
+		echo 'var hash = window.location.hash.substring(1);';
+		echo 'if (!hash) { document.body.innerHTML = "<p>Authentication failed: no token received.</p>"; }';
+		echo 'else {';
+		echo '  var params = new URLSearchParams(hash);';
+		echo '  var token = params.get("access_token");';
+		echo '  if (!token) { document.body.innerHTML = "<p>Authentication failed: no access token in response.</p>"; }';
+		echo '  else {';
+		echo '    var data = new URLSearchParams();';
+		echo '    data.append("datamachine_implicit_flow", "1");';
+		echo '    data.append("_wpnonce", ' . wp_json_encode( $nonce ) . ');';
+		echo '    data.append("provider", ' . wp_json_encode( $provider_key ) . ');';
+		// Forward all fragment params (access_token, token_type, expires_in, site_id, etc.)
+		echo '    params.forEach(function(v, k) { data.append(k, v); });';
+		echo '    fetch(' . wp_json_encode( $callback_url ) . ', {';
+		echo '      method: "POST",';
+		echo '      headers: { "Content-Type": "application/x-www-form-urlencoded" },';
+		echo '      credentials: "same-origin",';
+		echo '      body: data.toString()';
+		echo '    }).then(function(r) { return r.json(); })';
+		echo '    .then(function(result) {';
+		echo '      if (result.success) {';
+		echo '        if (window.opener) {';
+		echo '          window.opener.postMessage({ type: "oauth_callback", success: true, account: result.data || {} }, window.location.origin);';
+		echo '          window.close();';
+		echo '        } else {';
+		echo '          window.location.href = result.redirect || ' . wp_json_encode( admin_url( 'admin.php?page=datamachine-settings&auth_success=1&provider=' . $provider_key ) ) . ';';
+		echo '        }';
+		echo '      } else {';
+		echo '        document.body.innerHTML = "<p>Authentication failed: " + (result.error || "unknown error") + "</p>";';
+		echo '      }';
+		echo '    }).catch(function(err) {';
+		echo '      document.body.innerHTML = "<p>Authentication failed: " + err.message + "</p>";';
+		echo '    });';
+		echo '  }';
+		echo '}';
+		echo '</script></body></html>';
+		exit;
+	}
+
+	/**
+	 * Handle the server-side POST from the implicit flow callback page.
+	 *
+	 * Verifies the nonce, extracts token data from the POST body, calls
+	 * the account details callback, stores the result, and returns a JSON
+	 * response for the JS callback page to handle.
+	 *
+	 * @since 0.66.0
+	 * @param string        $provider_key       Provider identifier.
+	 * @param callable      $account_details_fn Callback to retrieve account details from token data.
+	 *                                          Receives array with 'access_token', 'token_type',
+	 *                                          'expires_in', and any other fragment params.
+	 *                                          Signature: function(array $token_data): array|WP_Error
+	 * @param callable|null $storage_fn         Optional callback to store account data.
+	 *                                          Signature: function(array $account_data): bool
+	 * @return void Outputs JSON and exits.
+	 */
+	public function handle_implicit_callback(
+		string $provider_key,
+		callable $account_details_fn,
+		?callable $storage_fn = null
+	): void {
+		header( 'Content-Type: application/json; charset=utf-8' );
+
+		// Verify nonce.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Verified manually below.
+		$nonce = isset( $_POST['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ) : '';
+
+		if ( ! wp_verify_nonce( $nonce, "datamachine_implicit_{$provider_key}" ) ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'OAuth2: Implicit flow nonce verification failed',
+				array( 'provider' => $provider_key )
+			);
+
+			echo wp_json_encode( array( 'success' => false, 'error' => 'Invalid nonce.' ) );
+			exit;
+		}
+
+		// Build token data from POST params.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified above.
+		$access_token = isset( $_POST['access_token'] ) ? sanitize_text_field( wp_unslash( $_POST['access_token'] ) ) : '';
+
+		if ( empty( $access_token ) ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'OAuth2: Implicit flow missing access_token',
+				array( 'provider' => $provider_key )
+			);
+
+			echo wp_json_encode( array( 'success' => false, 'error' => 'No access token received.' ) );
+			exit;
+		}
+
+		// Collect all token-related POST params.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified above.
+		$token_data = array(
+			'access_token' => $access_token,
+			'token_type'   => isset( $_POST['token_type'] ) ? sanitize_text_field( wp_unslash( $_POST['token_type'] ) ) : 'bearer',
+		);
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified above.
+		if ( isset( $_POST['expires_in'] ) ) {
+			$token_data['expires_in'] = absint( $_POST['expires_in'] );
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified above.
+		if ( isset( $_POST['site_id'] ) ) {
+			$token_data['site_id'] = sanitize_text_field( wp_unslash( $_POST['site_id'] ) );
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified above.
+		if ( isset( $_POST['scope'] ) ) {
+			$token_data['scope'] = sanitize_text_field( wp_unslash( $_POST['scope'] ) );
+		}
+
+		do_action(
+			'datamachine_log',
+			'debug',
+			'OAuth2: Implicit flow token received',
+			array(
+				'provider'   => $provider_key,
+				'token_type' => $token_data['token_type'],
+				'expires_in' => $token_data['expires_in'] ?? 'unknown',
+			)
+		);
+
+		// Get account details using provider-specific callback.
+		$account_data = call_user_func( $account_details_fn, $token_data );
+
+		if ( is_wp_error( $account_data ) ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'OAuth2: Implicit flow account details failed',
+				array(
+					'provider' => $provider_key,
+					'error'    => $account_data->get_error_message(),
+				)
+			);
+
+			echo wp_json_encode( array( 'success' => false, 'error' => $account_data->get_error_message() ) );
+			exit;
+		}
+
+		// Store account data.
+		$stored = false;
+		if ( $storage_fn ) {
+			$stored = call_user_func( $storage_fn, $account_data );
+		}
+
+		if ( ! $stored ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'OAuth2: Implicit flow storage failed',
+				array( 'provider' => $provider_key )
+			);
+
+			echo wp_json_encode( array( 'success' => false, 'error' => 'Failed to store account data.' ) );
+			exit;
+		}
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'OAuth2: Implicit flow authentication successful',
+			array(
+				'provider'   => $provider_key,
+				'account_id' => $account_data['id'] ?? 'unknown',
+			)
+		);
+
+		$redirect_url = add_query_arg(
+			array(
+				'page'         => 'datamachine-settings',
+				'auth_success' => '1',
+				'provider'     => $provider_key,
+			),
+			admin_url( 'admin.php' )
+		);
+
+		echo wp_json_encode( array(
+			'success'  => true,
+			'data'     => $account_data,
+			'redirect' => $redirect_url,
+		) );
+		exit;
+	}
+
+	// -------------------------------------------------------------------------
+	// Token Exchange
+	// -------------------------------------------------------------------------
+
 	/**
 	 * Exchange authorization code for access token.
 	 *
@@ -307,6 +640,10 @@ class OAuth2Handler {
 
 		return $token_data;
 	}
+
+	// -------------------------------------------------------------------------
+	// Redirects
+	// -------------------------------------------------------------------------
 
 	/**
 	 * Redirect to admin with error message.

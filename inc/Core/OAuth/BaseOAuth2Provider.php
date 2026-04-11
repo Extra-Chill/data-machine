@@ -47,15 +47,74 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 	}
 
 	/**
-	 * Check if provider is properly configured
+	 * Whether this provider requires a client_secret.
+	 *
+	 * Public OAuth2 clients (e.g. WordPress.com implicit flow) don't use a
+	 * client_secret. Subclasses override this to return false when the provider
+	 * is a public client.
+	 *
+	 * @since 0.66.0
+	 * @return bool True if a client_secret is required (default). False for public clients.
+	 */
+	protected function requires_client_secret(): bool {
+		return true;
+	}
+
+	/**
+	 * Get the OAuth2 response type for this provider.
+	 *
+	 * Returns 'code' for standard authorization code flow (default).
+	 * Returns 'token' for implicit flow (legacy public clients).
+	 *
+	 * When 'token' is returned, the callback page renders a JS snippet that
+	 * extracts the access_token from the URL fragment and POSTs it to the
+	 * server via OAuth2Handler::handle_implicit_callback().
+	 *
+	 * @since 0.66.0
+	 * @return string 'code' or 'token'.
+	 */
+	public function get_oauth_response_type(): string {
+		return 'code';
+	}
+
+	/**
+	 * Whether this provider uses PKCE (Proof Key for Code Exchange).
+	 *
+	 * PKCE is the modern replacement for the implicit flow. It allows
+	 * public clients (no client_secret) to use the authorization code
+	 * flow securely by generating a one-time code_verifier/code_challenge
+	 * pair for each authorization request.
+	 *
+	 * When true, OAuth2Handler automatically:
+	 * - Generates code_verifier and code_challenge
+	 * - Stores code_verifier in a transient
+	 * - Adds code_challenge + code_challenge_method to the auth URL
+	 * - Includes code_verifier in the token exchange request
+	 *
+	 * @since 0.66.0
+	 * @return bool True to use PKCE. Default false.
+	 */
+	public function uses_pkce(): bool {
+		return false;
+	}
+
+	/**
+	 * Check if provider is properly configured.
+	 *
+	 * Requires client_id for all providers. Requires client_secret only when
+	 * requires_client_secret() returns true (the default). Public clients
+	 * override requires_client_secret() to skip the secret check.
 	 *
 	 * @return bool True if configured
 	 */
 	public function is_configured(): bool {
 		$config = $this->get_config();
-		// Default check: client_id and client_secret exist
-		// Can be overridden by child classes if keys differ (e.g. app_id vs client_id)
-		return ! empty( $config['client_id'] ) && ! empty( $config['client_secret'] );
+
+		if ( empty( $config['client_id'] ) ) {
+			return false;
+		}
+
+		return ! $this->requires_client_secret() || ! empty( $config['client_secret'] );
 	}
 
 	/**
@@ -504,6 +563,94 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 	 * Handle OAuth callback (Abstract or default implementation)
 	 */
 	abstract public function handle_oauth_callback();
+
+	// -------------------------------------------------------------------------
+	// Flow Helpers
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Build authorization URL parameters with PKCE support.
+	 *
+	 * Call this from get_authorization_url() to get base params including
+	 * state, response_type, redirect_uri, and PKCE params if enabled.
+	 * Merge the result with provider-specific params (client_id, scope, etc.).
+	 *
+	 * Example usage in a provider's get_authorization_url():
+	 *
+	 *     $params = array_merge(
+	 *         $this->build_auth_url_params(),
+	 *         array( 'client_id' => $config['client_id'], 'scope' => 'global' )
+	 *     );
+	 *     return $this->oauth2->get_authorization_url( $auth_endpoint, $params );
+	 *
+	 * @since 0.66.0
+	 * @return array Query parameters for the authorization URL.
+	 */
+	protected function build_auth_url_params(): array {
+		$params = array(
+			'response_type' => $this->get_oauth_response_type(),
+			'redirect_uri'  => $this->get_callback_url(),
+			'state'         => $this->oauth2->create_state( $this->provider_slug ),
+		);
+
+		if ( $this->uses_pkce() ) {
+			$pkce = $this->oauth2->create_pkce( $this->provider_slug );
+			$params['code_challenge']        = $pkce['challenge'];
+			$params['code_challenge_method'] = $pkce['method'];
+		}
+
+		return $params;
+	}
+
+	/**
+	 * Dispatch an implicit flow callback request.
+	 *
+	 * Call this from handle_oauth_callback() for providers using implicit flow
+	 * (get_oauth_response_type() returns 'token'). Handles both phases:
+	 *
+	 * 1. Initial redirect (no POST data) → renders the JS callback page that
+	 *    extracts the access_token from the URL fragment.
+	 * 2. JS POST (datamachine_implicit_flow=1) → processes the token server-side
+	 *    via handle_implicit_callback().
+	 *
+	 * Example usage in a provider's handle_oauth_callback():
+	 *
+	 *     public function handle_oauth_callback() {
+	 *         $this->dispatch_implicit_callback(
+	 *             fn( array $token_data ) => $this->build_account_from_token( $token_data ),
+	 *             fn( array $account )    => $this->save_account( $account )
+	 *         );
+	 *     }
+	 *
+	 * @since 0.66.0
+	 * @param callable      $account_details_fn Callback to build account data from token data.
+	 *                                          Signature: function(array $token_data): array|WP_Error
+	 * @param callable|null $storage_fn         Callback to store account data.
+	 *                                          Signature: function(array $account_data): bool
+	 *                                          Defaults to $this->save_account() if null.
+	 * @return void Outputs and exits.
+	 */
+	protected function dispatch_implicit_callback( callable $account_details_fn, ?callable $storage_fn = null ): void {
+		$storage_fn = $storage_fn ?? array( $this, 'save_account' );
+
+		// Phase 2: JS has POSTed the token back to us.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified inside handle_implicit_callback.
+		if ( ! empty( $_POST['datamachine_implicit_flow'] ) ) {
+			$this->oauth2->handle_implicit_callback(
+				$this->provider_slug,
+				$account_details_fn,
+				$storage_fn
+			);
+			return; // handle_implicit_callback exits, but just in case.
+		}
+
+		// Phase 1: Provider redirected here with token in URL fragment.
+		// Serve the JS page to extract it.
+		$this->oauth2->render_implicit_callback_page(
+			$this->provider_slug,
+			$this->get_callback_url()
+		);
+	}
 
 	/**
 	 * Refresh token (Legacy — use get_valid_access_token() instead)
