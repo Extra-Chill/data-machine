@@ -428,6 +428,55 @@ class Flows extends BaseRepository {
 	}
 
 	/**
+	 * Get all flows with only summary columns (no flow_config longtext).
+	 *
+	 * Returns flow_id, flow_name, pipeline_id, scheduling_config, user_id,
+	 * and agent_id. Skips the large flow_config column for significantly
+	 * faster queries with many flows.
+	 *
+	 * @since 0.66.1
+	 *
+	 * @param int      $per_page Items per page.
+	 * @param int      $offset   Pagination offset.
+	 * @param int|null $user_id  Optional user ID filter.
+	 * @param int|null $agent_id Optional agent ID filter.
+	 * @return array Paginated flows without flow_config.
+	 */
+	public function get_all_flows_summary( int $per_page = 20, int $offset = 0, ?int $user_id = null, ?int $agent_id = null ): array {
+		$where        = '';
+		$where_values = array();
+
+		if ( null !== $agent_id ) {
+			$where          = ' WHERE agent_id = %d';
+			$where_values[] = $agent_id;
+		} elseif ( null !== $user_id ) {
+			$where          = ' WHERE user_id = %d';
+			$where_values[] = $user_id;
+		}
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
+		$flows = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				"SELECT flow_id, flow_name, pipeline_id, scheduling_config, user_id, agent_id FROM %i{$where} ORDER BY pipeline_id ASC, flow_id ASC LIMIT %d OFFSET %d",
+				array_merge( array( $this->table_name ), $where_values, array( $per_page, $offset ) )
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
+
+		if ( null === $flows ) {
+			return array();
+		}
+
+		foreach ( $flows as &$flow ) {
+			$flow['scheduling_config'] = json_decode( $flow['scheduling_config'], true ) ?? array();
+			$flow['flow_config']       = array(); // Not loaded — placeholder for consistent interface.
+		}
+
+		return $flows;
+	}
+
+	/**
 	 * Get flows with consecutive failures or consecutive no-items at or above threshold.
 	 *
 	 * Returns flows that either:
