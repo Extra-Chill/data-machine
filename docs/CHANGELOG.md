@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.66.0] - 2026-04-11
+
+### Added
+- OAuth2 support for public clients, implicit flow, and PKCE
+
 ## [0.65.2] - 2026-04-11
 
 ### Changed
