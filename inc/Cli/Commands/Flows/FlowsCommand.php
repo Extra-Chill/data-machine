@@ -697,28 +697,67 @@ class FlowsCommand extends BaseCommand {
 			return;
 		}
 
-		$ability = new \DataMachine\Abilities\JobAbilities();
-		$result  = $ability->executeWorkflow(
-			array(
-				'flow_id'   => $flow_id,
-				'count'     => $count,
-				'timestamp' => $timestamp,
-			)
-		);
+		// Delayed execution → schedule-flow ability.
+		if ( $timestamp && $timestamp > time() ) {
+			if ( $count > 1 ) {
+				WP_CLI::error( 'Cannot schedule multiple runs with a timestamp.' );
+				return;
+			}
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] ?? 'Failed to run flow' );
+			$ability = wp_get_ability( 'datamachine/schedule-flow' );
+			if ( ! $ability ) {
+				WP_CLI::error( 'Schedule flow ability not registered.' );
+				return;
+			}
+
+			$result = $ability->execute(
+				array(
+					'flow_id'               => $flow_id,
+					'interval_or_timestamp' => $timestamp,
+				)
+			);
+
+			if ( ! ( $result['success'] ?? false ) ) {
+				WP_CLI::error( $result['error'] ?? 'Failed to schedule flow' );
+				return;
+			}
+
+			WP_CLI::success( sprintf( 'Flow %d scheduled for %s.', $flow_id, $result['scheduled_time'] ?? 'later' ) );
 			return;
 		}
 
-		// Output success message.
-		WP_CLI::success( $result['message'] ?? 'Flow execution scheduled.' );
+		// Immediate execution → run-flow ability (loop for count).
+		$ability = wp_get_ability( 'datamachine/run-flow' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'Run flow ability not registered.' );
+			return;
+		}
 
-		// Show job ID(s) for follow-up.
-		if ( isset( $result['job_id'] ) ) {
-			WP_CLI::log( sprintf( 'Job ID: %d', $result['job_id'] ) );
-		} elseif ( isset( $result['job_ids'] ) ) {
-			WP_CLI::log( sprintf( 'Job IDs: %s', implode( ', ', $result['job_ids'] ) ) );
+		$job_ids = array();
+
+		for ( $i = 0; $i < $count; $i++ ) {
+			$result = $ability->execute( array( 'flow_id' => $flow_id ) );
+
+			if ( ! ( $result['success'] ?? false ) ) {
+				if ( empty( $job_ids ) ) {
+					WP_CLI::error( $result['error'] ?? 'Failed to run flow' );
+					return;
+				}
+				WP_CLI::warning( sprintf( 'Run %d/%d failed: %s', $i + 1, $count, $result['error'] ?? 'unknown' ) );
+				break;
+			}
+
+			$job_ids[] = $result['job_id'] ?? null;
+		}
+
+		if ( 1 === $count ) {
+			WP_CLI::success( sprintf( 'Flow %d execution started.', $flow_id ) );
+			if ( ! empty( $job_ids[0] ) ) {
+				WP_CLI::log( sprintf( 'Job ID: %d', $job_ids[0] ) );
+			}
+		} else {
+			WP_CLI::success( sprintf( 'Flow %d: %d/%d runs started.', $flow_id, count( $job_ids ), $count ) );
+			WP_CLI::log( sprintf( 'Job IDs: %s', implode( ', ', array_filter( $job_ids ) ) ) );
 		}
 	}
 
