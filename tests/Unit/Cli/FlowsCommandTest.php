@@ -161,7 +161,7 @@ class FlowsCommandTest extends WP_UnitTestCase {
 		$this->assertEquals( 'ability_invalid_permissions', $result->get_error_code() );
 	}
 
-	public function test_per_page_upper_bound_rejected(): void {
+	public function test_per_page_high_value_accepted(): void {
 		$ability = wp_get_ability( 'datamachine/get-flows' );
 
 		$result = $ability->execute(
@@ -172,9 +172,9 @@ class FlowsCommandTest extends WP_UnitTestCase {
 			)
 		);
 
-		// Input schema has maximum:100 — WP 6.9 validates and rejects
-		$this->assertInstanceOf( \WP_Error::class, $result );
-		$this->assertEquals( 'ability_invalid_input', $result->get_error_code() );
+		// Schema has minimum:0 but no maximum — large values are accepted.
+		$this->assertIsArray( $result );
+		$this->assertTrue( $result['success'] );
 	}
 
 	public function test_get_flow_by_id(): void {

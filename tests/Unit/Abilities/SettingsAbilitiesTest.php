@@ -228,28 +228,27 @@ class SettingsAbilitiesTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'not found', $result['error'] );
 	}
 
-	public function test_update_settings_handles_github_pat(): void {
+	public function test_github_pat_reported_as_unhandled(): void {
+		// GitHub settings moved to data-machine-code extension.
+		// Core reports them as unhandled; the extension handles them via filter.
 		$result = $this->settings_abilities->executeUpdateSettings(
 			array( 'github_pat' => 'ghp_test123' )
 		);
 
 		$this->assertTrue( $result['success'] );
-		$this->assertArrayNotHasKey( 'unhandled_keys', $result );
-
-		$updated_settings = get_option( 'datamachine_settings', array() );
-		$this->assertSame( 'ghp_test123', $updated_settings['github_pat'] );
+		$this->assertArrayHasKey( 'unhandled_keys', $result );
+		$this->assertContains( 'github_pat', $result['unhandled_keys'] );
 	}
 
-	public function test_update_settings_handles_github_default_repo(): void {
+	public function test_github_default_repo_reported_as_unhandled(): void {
+		// GitHub settings moved to data-machine-code extension.
 		$result = $this->settings_abilities->executeUpdateSettings(
 			array( 'github_default_repo' => 'Extra-Chill/data-machine' )
 		);
 
 		$this->assertTrue( $result['success'] );
-		$this->assertArrayNotHasKey( 'unhandled_keys', $result );
-
-		$updated_settings = get_option( 'datamachine_settings', array() );
-		$this->assertSame( 'Extra-Chill/data-machine', $updated_settings['github_default_repo'] );
+		$this->assertArrayHasKey( 'unhandled_keys', $result );
+		$this->assertContains( 'github_default_repo', $result['unhandled_keys'] );
 	}
 
 	public function test_update_settings_reports_unhandled_keys(): void {

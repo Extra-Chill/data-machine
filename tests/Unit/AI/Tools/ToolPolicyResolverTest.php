@@ -19,6 +19,13 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+
+		// Ensure Data Machine capabilities are assigned to roles.
+		datamachine_register_capabilities();
+
+		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		wp_set_current_user( $user_id );
+
 		ToolManager::clearCache();
 		$this->resolver = new ToolPolicyResolver();
 	}
