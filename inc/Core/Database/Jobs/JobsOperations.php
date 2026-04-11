@@ -465,24 +465,77 @@ class JobsOperations extends BaseRepository {
 	 * @param int    $older_than_days Delete jobs older than this many days.
 	 * @return int|false Number of deleted rows, or false on error.
 	 */
+	/**
+	 * Known compound status suffixes for exact-match queries.
+	 *
+	 * Each key maps a status prefix to the known variants that share it.
+	 * Used by delete_old_jobs() and count_old_jobs() to build IN clauses
+	 * instead of LIKE, which enables efficient use of the idx_status_created
+	 * composite index.
+	 *
+	 * @var array<string, string[]>
+	 */
+	private const STATUS_VARIANTS = array(
+		'completed' => array(
+			'completed',
+			'completed_no_items',
+		),
+		'failed'    => array(
+			'failed',
+		),
+	);
+
+	/**
+	 * Resolve a status prefix to known variants for indexed lookups.
+	 *
+	 * Falls back to a LIKE pattern when the prefix is not in STATUS_VARIANTS
+	 * (e.g. custom statuses from third-party handlers).
+	 *
+	 * @param string $status_prefix The status prefix (e.g. 'completed', 'failed').
+	 * @return array{type: 'in', values: string[]} | array{type: 'like', pattern: string}
+	 */
+	private function resolve_status_match( string $status_prefix ): array {
+		if ( isset( self::STATUS_VARIANTS[ $status_prefix ] ) ) {
+			return array(
+				'type'   => 'in',
+				'values' => self::STATUS_VARIANTS[ $status_prefix ],
+			);
+		}
+
+		return array(
+			'type'    => 'like',
+			'pattern' => $this->wpdb->esc_like( $status_prefix ) . '%',
+		);
+	}
+
 	public function delete_old_jobs( string $status_pattern, int $older_than_days ): int|false {
 		if ( empty( $status_pattern ) || $older_than_days < 1 ) {
 			return false;
 		}
 
 		$cutoff_datetime = gmdate( 'Y-m-d H:i:s', time() - ( $older_than_days * DAY_IN_SECONDS ) );
-		$like_pattern    = $this->wpdb->esc_like( $status_pattern ) . '%';
+		$match           = $this->resolve_status_match( $status_pattern );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-		$result = $this->wpdb->query(
-			$this->wpdb->prepare(
-				'DELETE FROM %i WHERE status LIKE %s AND created_at < %s',
-				$this->table_name,
-				$like_pattern,
-				$cutoff_datetime
-			)
-		);
+		if ( 'in' === $match['type'] ) {
+			$placeholders = implode( ',', array_fill( 0, count( $match['values'] ), '%s' ) );
+			$args         = array_merge(
+				array( "DELETE FROM %i WHERE status IN ({$placeholders}) AND created_at < %s", $this->table_name ),
+				$match['values'],
+				array( $cutoff_datetime )
+			);
+			$result = $this->wpdb->query( $this->wpdb->prepare( ...$args ) );
+		} else {
+			$result = $this->wpdb->query(
+				$this->wpdb->prepare(
+					'DELETE FROM %i WHERE status LIKE %s AND created_at < %s',
+					$this->table_name,
+					$match['pattern'],
+					$cutoff_datetime
+				)
+			);
+		}
 		// phpcs:enable WordPress.DB.PreparedSQL
 
 		do_action(
@@ -516,18 +569,28 @@ class JobsOperations extends BaseRepository {
 		}
 
 		$cutoff_datetime = gmdate( 'Y-m-d H:i:s', time() - ( $older_than_days * DAY_IN_SECONDS ) );
-		$like_pattern    = $this->wpdb->esc_like( $status_pattern ) . '%';
+		$match           = $this->resolve_status_match( $status_pattern );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-		$count = $this->wpdb->get_var(
-			$this->wpdb->prepare(
-				'SELECT COUNT(*) FROM %i WHERE status LIKE %s AND created_at < %s',
-				$this->table_name,
-				$like_pattern,
-				$cutoff_datetime
-			)
-		);
+		if ( 'in' === $match['type'] ) {
+			$placeholders = implode( ',', array_fill( 0, count( $match['values'] ), '%s' ) );
+			$args         = array_merge(
+				array( "SELECT COUNT(*) FROM %i WHERE status IN ({$placeholders}) AND created_at < %s", $this->table_name ),
+				$match['values'],
+				array( $cutoff_datetime )
+			);
+			$count = $this->wpdb->get_var( $this->wpdb->prepare( ...$args ) );
+		} else {
+			$count = $this->wpdb->get_var(
+				$this->wpdb->prepare(
+					'SELECT COUNT(*) FROM %i WHERE status LIKE %s AND created_at < %s',
+					$this->table_name,
+					$match['pattern'],
+					$cutoff_datetime
+				)
+			);
+		}
 		// phpcs:enable WordPress.DB.PreparedSQL
 
 		return (int) $count;
