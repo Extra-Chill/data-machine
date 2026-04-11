@@ -692,7 +692,7 @@ function datamachine_on_new_site( \WP_Site $new_site ) {
 add_action( 'wp_initialize_site', 'datamachine_on_new_site', 200 );
 
 // Migrations, scaffolding, and activation helpers.
-require_once __DIR__ . '/inc/migrations.php';
+require_once __DIR__ . '/inc/migrations/load.php';
 
 
 function datamachine_check_requirements() {
