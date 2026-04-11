@@ -564,6 +564,94 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 	 */
 	abstract public function handle_oauth_callback();
 
+	// -------------------------------------------------------------------------
+	// Flow Helpers
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Build authorization URL parameters with PKCE support.
+	 *
+	 * Call this from get_authorization_url() to get base params including
+	 * state, response_type, redirect_uri, and PKCE params if enabled.
+	 * Merge the result with provider-specific params (client_id, scope, etc.).
+	 *
+	 * Example usage in a provider's get_authorization_url():
+	 *
+	 *     $params = array_merge(
+	 *         $this->build_auth_url_params(),
+	 *         array( 'client_id' => $config['client_id'], 'scope' => 'global' )
+	 *     );
+	 *     return $this->oauth2->get_authorization_url( $auth_endpoint, $params );
+	 *
+	 * @since 0.66.0
+	 * @return array Query parameters for the authorization URL.
+	 */
+	protected function build_auth_url_params(): array {
+		$params = array(
+			'response_type' => $this->get_oauth_response_type(),
+			'redirect_uri'  => $this->get_callback_url(),
+			'state'         => $this->oauth2->create_state( $this->provider_slug ),
+		);
+
+		if ( $this->uses_pkce() ) {
+			$pkce = $this->oauth2->create_pkce( $this->provider_slug );
+			$params['code_challenge']        = $pkce['challenge'];
+			$params['code_challenge_method'] = $pkce['method'];
+		}
+
+		return $params;
+	}
+
+	/**
+	 * Dispatch an implicit flow callback request.
+	 *
+	 * Call this from handle_oauth_callback() for providers using implicit flow
+	 * (get_oauth_response_type() returns 'token'). Handles both phases:
+	 *
+	 * 1. Initial redirect (no POST data) → renders the JS callback page that
+	 *    extracts the access_token from the URL fragment.
+	 * 2. JS POST (datamachine_implicit_flow=1) → processes the token server-side
+	 *    via handle_implicit_callback().
+	 *
+	 * Example usage in a provider's handle_oauth_callback():
+	 *
+	 *     public function handle_oauth_callback() {
+	 *         $this->dispatch_implicit_callback(
+	 *             fn( array $token_data ) => $this->build_account_from_token( $token_data ),
+	 *             fn( array $account )    => $this->save_account( $account )
+	 *         );
+	 *     }
+	 *
+	 * @since 0.66.0
+	 * @param callable      $account_details_fn Callback to build account data from token data.
+	 *                                          Signature: function(array $token_data): array|WP_Error
+	 * @param callable|null $storage_fn         Callback to store account data.
+	 *                                          Signature: function(array $account_data): bool
+	 *                                          Defaults to $this->save_account() if null.
+	 * @return void Outputs and exits.
+	 */
+	protected function dispatch_implicit_callback( callable $account_details_fn, ?callable $storage_fn = null ): void {
+		$storage_fn = $storage_fn ?? array( $this, 'save_account' );
+
+		// Phase 2: JS has POSTed the token back to us.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified inside handle_implicit_callback.
+		if ( ! empty( $_POST['datamachine_implicit_flow'] ) ) {
+			$this->oauth2->handle_implicit_callback(
+				$this->provider_slug,
+				$account_details_fn,
+				$storage_fn
+			);
+			return; // handle_implicit_callback exits, but just in case.
+		}
+
+		// Phase 1: Provider redirected here with token in URL fragment.
+		// Serve the JS page to extract it.
+		$this->oauth2->render_implicit_callback_page(
+			$this->provider_slug,
+			$this->get_callback_url()
+		);
+	}
+
 	/**
 	 * Refresh token (Legacy — use get_valid_access_token() instead)
 	 *
