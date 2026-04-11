@@ -2,6 +2,20 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.65.1] - 2026-04-11
+
+### Changed
+- Optimize jobs cleanup: replace LIKE with IN for status queries
+- Add composable file generation infrastructure
+- Force direct filesystem method in context file scaffolding
+- Add name search filtering to pipeline list across ability, CLI, REST, and DB layers
+
+### Fixed
+- Fix npm security vulnerabilities in transitive dependencies
+- Fix section slug example in SectionRegistry docblock
+- require explicit method key in tool definitions instead of fallback
+- respect tool definition method key in ToolExecutor::executeTool()
+
 ## [0.65.0] - 2026-04-09
 
 ### Added
