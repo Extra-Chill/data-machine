@@ -47,15 +47,74 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 	}
 
 	/**
-	 * Check if provider is properly configured
+	 * Whether this provider requires a client_secret.
+	 *
+	 * Public OAuth2 clients (e.g. WordPress.com implicit flow) don't use a
+	 * client_secret. Subclasses override this to return false when the provider
+	 * is a public client.
+	 *
+	 * @since 0.66.0
+	 * @return bool True if a client_secret is required (default). False for public clients.
+	 */
+	protected function requires_client_secret(): bool {
+		return true;
+	}
+
+	/**
+	 * Get the OAuth2 response type for this provider.
+	 *
+	 * Returns 'code' for standard authorization code flow (default).
+	 * Returns 'token' for implicit flow (legacy public clients).
+	 *
+	 * When 'token' is returned, the callback page renders a JS snippet that
+	 * extracts the access_token from the URL fragment and POSTs it to the
+	 * server via OAuth2Handler::handle_implicit_callback().
+	 *
+	 * @since 0.66.0
+	 * @return string 'code' or 'token'.
+	 */
+	public function get_oauth_response_type(): string {
+		return 'code';
+	}
+
+	/**
+	 * Whether this provider uses PKCE (Proof Key for Code Exchange).
+	 *
+	 * PKCE is the modern replacement for the implicit flow. It allows
+	 * public clients (no client_secret) to use the authorization code
+	 * flow securely by generating a one-time code_verifier/code_challenge
+	 * pair for each authorization request.
+	 *
+	 * When true, OAuth2Handler automatically:
+	 * - Generates code_verifier and code_challenge
+	 * - Stores code_verifier in a transient
+	 * - Adds code_challenge + code_challenge_method to the auth URL
+	 * - Includes code_verifier in the token exchange request
+	 *
+	 * @since 0.66.0
+	 * @return bool True to use PKCE. Default false.
+	 */
+	public function uses_pkce(): bool {
+		return false;
+	}
+
+	/**
+	 * Check if provider is properly configured.
+	 *
+	 * Requires client_id for all providers. Requires client_secret only when
+	 * requires_client_secret() returns true (the default). Public clients
+	 * override requires_client_secret() to skip the secret check.
 	 *
 	 * @return bool True if configured
 	 */
 	public function is_configured(): bool {
 		$config = $this->get_config();
-		// Default check: client_id and client_secret exist
-		// Can be overridden by child classes if keys differ (e.g. app_id vs client_id)
-		return ! empty( $config['client_id'] ) && ! empty( $config['client_secret'] );
+
+		if ( empty( $config['client_id'] ) ) {
+			return false;
+		}
+
+		return ! $this->requires_client_secret() || ! empty( $config['client_secret'] );
 	}
 
 	/**

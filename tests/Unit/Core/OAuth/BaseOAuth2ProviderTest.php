@@ -563,4 +563,176 @@ class BaseOAuth2ProviderTest extends WP_UnitTestCase {
 	public function test_is_configured_returns_false_without_credentials(): void {
 		$this->assertFalse( $this->provider->is_configured() );
 	}
+
+	public function test_is_configured_returns_false_without_secret_for_default_provider(): void {
+		$this->provider->save_config( array( 'client_id' => 'id_123' ) );
+		$this->assertFalse( $this->provider->is_configured() );
+	}
+
+	// -------------------------------------------------------------------------
+	// Public client (no client_secret required)
+	// -------------------------------------------------------------------------
+
+	public function test_public_client_is_configured_without_secret(): void {
+		$provider = new TestPublicOAuth2Provider( 'test_public' );
+		$provider->save_config( array( 'client_id' => '128117' ) );
+
+		$this->assertTrue( $provider->is_configured() );
+
+		delete_site_option( 'datamachine_auth_data' );
+	}
+
+	public function test_public_client_is_not_configured_without_client_id(): void {
+		$provider = new TestPublicOAuth2Provider( 'test_public2' );
+
+		$this->assertFalse( $provider->is_configured() );
+
+		delete_site_option( 'datamachine_auth_data' );
+	}
+
+	public function test_public_client_does_not_require_secret(): void {
+		$provider = new TestPublicOAuth2Provider( 'test_public3' );
+
+		// Access the protected method via reflection for testing.
+		$reflection = new \ReflectionMethod( $provider, 'requires_client_secret' );
+		$reflection->setAccessible( true );
+		$this->assertFalse( $reflection->invoke( $provider ) );
+
+		delete_site_option( 'datamachine_auth_data' );
+	}
+
+	// -------------------------------------------------------------------------
+	// Flow type defaults
+	// -------------------------------------------------------------------------
+
+	public function test_default_response_type_is_code(): void {
+		$this->assertSame( 'code', $this->provider->get_oauth_response_type() );
+	}
+
+	public function test_default_uses_pkce_is_false(): void {
+		$this->assertFalse( $this->provider->uses_pkce() );
+	}
+
+	public function test_implicit_provider_returns_token_response_type(): void {
+		$provider = new TestImplicitOAuth2Provider( 'test_implicit' );
+		$this->assertSame( 'token', $provider->get_oauth_response_type() );
+		delete_site_option( 'datamachine_auth_data' );
+	}
+
+	public function test_pkce_provider_uses_pkce(): void {
+		$provider = new TestPkceOAuth2Provider( 'test_pkce' );
+		$this->assertTrue( $provider->uses_pkce() );
+		$this->assertSame( 'code', $provider->get_oauth_response_type() );
+		delete_site_option( 'datamachine_auth_data' );
+	}
+
+	// -------------------------------------------------------------------------
+	// OAuth2Handler PKCE
+	// -------------------------------------------------------------------------
+
+	public function test_pkce_create_returns_verifier_challenge_method(): void {
+		$handler = new \DataMachine\Core\OAuth\OAuth2Handler();
+		$pkce    = $handler->create_pkce( 'test_pkce_flow' );
+
+		$this->assertArrayHasKey( 'verifier', $pkce );
+		$this->assertArrayHasKey( 'challenge', $pkce );
+		$this->assertArrayHasKey( 'method', $pkce );
+		$this->assertSame( 'S256', $pkce['method'] );
+		$this->assertNotEmpty( $pkce['verifier'] );
+		$this->assertNotEmpty( $pkce['challenge'] );
+		$this->assertNotSame( $pkce['verifier'], $pkce['challenge'] );
+
+		// Clean up transient.
+		delete_transient( 'datamachine_test_pkce_flow_pkce_verifier' );
+	}
+
+	public function test_pkce_verifier_stored_and_retrieved(): void {
+		$handler = new \DataMachine\Core\OAuth\OAuth2Handler();
+		$pkce    = $handler->create_pkce( 'test_pkce_store' );
+
+		$verifier = $handler->get_pkce_verifier( 'test_pkce_store' );
+
+		$this->assertSame( $pkce['verifier'], $verifier );
+	}
+
+	public function test_pkce_verifier_consumed_on_retrieval(): void {
+		$handler = new \DataMachine\Core\OAuth\OAuth2Handler();
+		$handler->create_pkce( 'test_pkce_consume' );
+
+		// First retrieval succeeds.
+		$this->assertNotNull( $handler->get_pkce_verifier( 'test_pkce_consume' ) );
+
+		// Second retrieval returns null (consumed).
+		$this->assertNull( $handler->get_pkce_verifier( 'test_pkce_consume' ) );
+	}
+
+	public function test_pkce_verifier_returns_null_when_not_created(): void {
+		$handler = new \DataMachine\Core\OAuth\OAuth2Handler();
+		$this->assertNull( $handler->get_pkce_verifier( 'nonexistent_provider' ) );
+	}
+
+	public function test_pkce_challenge_is_valid_s256(): void {
+		$handler = new \DataMachine\Core\OAuth\OAuth2Handler();
+		$pkce    = $handler->create_pkce( 'test_pkce_s256' );
+
+		// Verify S256: challenge should be base64url(sha256(verifier)).
+		$expected_hash = hash( 'sha256', $pkce['verifier'], true );
+		$expected_challenge = rtrim( strtr( base64_encode( $expected_hash ), '+/', '-_' ), '=' );
+
+		$this->assertSame( $expected_challenge, $pkce['challenge'] );
+
+		delete_transient( 'datamachine_test_pkce_s256_pkce_verifier' );
+	}
+}
+
+/**
+ * Public client test provider (no client_secret, implicit flow).
+ */
+class TestPublicOAuth2Provider extends TestOAuth2Provider {
+
+	protected function requires_client_secret(): bool {
+		return false;
+	}
+
+	public function get_oauth_response_type(): string {
+		return 'token';
+	}
+
+	public function get_config_fields(): array {
+		return array(
+			'client_id' => array(
+				'label'    => 'Client ID',
+				'type'     => 'text',
+				'required' => true,
+			),
+		);
+	}
+}
+
+/**
+ * Implicit flow test provider.
+ */
+class TestImplicitOAuth2Provider extends TestOAuth2Provider {
+
+	protected function requires_client_secret(): bool {
+		return false;
+	}
+
+	public function get_oauth_response_type(): string {
+		return 'token';
+	}
+}
+
+/**
+ * PKCE flow test provider.
+ */
+class TestPkceOAuth2Provider extends TestOAuth2Provider {
+
+	protected function requires_client_secret(): bool {
+		return false;
+	}
+
+	public function uses_pkce(): bool {
+		return true;
+	}
 }
