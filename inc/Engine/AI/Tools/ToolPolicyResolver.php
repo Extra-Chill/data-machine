@@ -230,8 +230,17 @@ class ToolPolicyResolver {
 			return true;
 		}
 
-		$required_cap = self::ACCESS_LEVELS[ $access_level ] ?? self::ACCESS_LEVELS['admin'];
-		return current_user_can( $required_cap );
+		// Map access levels to PermissionHelper actions for consistent
+		// permission resolution (WP-CLI bypass, manage_options fallback).
+		$action_map = array(
+			'authenticated' => 'chat',
+			'author'        => 'use_tools',
+			'editor'        => 'view_logs',
+			'admin'         => 'manage_settings',
+		);
+
+		$action = $action_map[ $access_level ] ?? 'manage_settings';
+		return \DataMachine\Abilities\PermissionHelper::can( $action );
 	}
 
 	/**
