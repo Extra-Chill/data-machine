@@ -36,4 +36,5 @@ jobs:
 
       - uses: Extra-Chill/homeboy-action@v2
         with:
+          commands: audit
           app-token: ${{ steps.app-token.outputs.token || '' }}
