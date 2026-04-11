@@ -245,6 +245,7 @@ function datamachine_ensure_default_memory_files(): bool {
 		return false;
 	}
 
+	$ability->execute( array( 'layer' => 'shared' ) );
 	$ability->execute( array_merge( $scaffold_context, array( 'layer' => 'agent' ) ) );
 	$ability->execute( array_merge( $scaffold_context, array( 'layer' => 'user' ) ) );
 

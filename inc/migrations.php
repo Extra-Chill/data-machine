@@ -1093,6 +1093,7 @@ function datamachine_ensure_default_memory_files(): bool {
 
 	$default_user_id = \DataMachine\Core\FilesRepository\DirectoryManager::get_default_agent_user_id();
 
+	$ability->execute( array( 'layer' => 'shared' ) );
 	$ability->execute( array( 'layer' => 'agent', 'user_id' => $default_user_id ) );
 	$ability->execute( array( 'layer' => 'user', 'user_id' => $default_user_id ) );
 
