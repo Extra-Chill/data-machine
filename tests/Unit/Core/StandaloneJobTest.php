@@ -58,7 +58,7 @@ class StandaloneJobTest extends WP_UnitTestCase {
 
 		$job = $this->db_jobs->get_job( $job_id );
 
-		$this->assertSame( 'standalone', $job['source'] );
+		$this->assertSame( 'direct', $job['source'] );
 	}
 
 	public function test_standalone_job_accepts_custom_source(): void {

@@ -190,8 +190,8 @@ class FetchHandlerDataPacketTest extends TestCase {
 	// Dedup consolidation — structural tests
 	// ---------------------------------------------------------------
 
-	public function test_dedup_method_exists_and_is_private(): void {
-		$method = new ReflectionMethod( FetchHandler::class, 'dedup' );
+	public function test_filter_processed_method_exists_and_is_private(): void {
+		$method = new ReflectionMethod( FetchHandler::class, 'filterProcessed' );
 		$this->assertTrue( $method->isPrivate() );
 	}
 

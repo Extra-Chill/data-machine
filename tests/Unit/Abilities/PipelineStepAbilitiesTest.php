@@ -297,7 +297,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'system_prompt', $result['message'] );
 	}
 
-	public function test_update_pipeline_step_provider_and_model(): void {
+	public function test_update_pipeline_step_rejects_provider_and_model(): void {
 		$add_result       = $this->step_abilities->executeAddPipelineStep(
 			array(
 				'pipeline_id' => $this->test_pipeline_id,
@@ -306,6 +306,8 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 		);
 		$pipeline_step_id = $add_result['pipeline_step_id'];
 
+		// Provider/model are no longer configurable at the pipeline step level.
+		// Model resolution is handled by the context system (context_models setting).
 		$result = $this->step_abilities->executeUpdatePipelineStep(
 			array(
 				'pipeline_step_id' => $pipeline_step_id,
@@ -314,9 +316,8 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertTrue( $result['success'] );
-		$this->assertStringContainsString( 'provider', $result['message'] );
-		$this->assertStringContainsString( 'model', $result['message'] );
+		$this->assertFalse( $result['success'] );
+		$this->assertStringContainsString( 'system_prompt or disabled_tools', $result['error'] );
 	}
 
 	public function test_update_pipeline_step_no_fields(): void {

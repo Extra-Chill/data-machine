@@ -177,6 +177,7 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 		$available_tools = array(
 			'test_tool' => array(
 				'class'      => TestToolHandler::class,
+				'method'     => 'handle_tool_call',
 				'parameters' => array(
 					'query' => array(
 						'type'     => 'string',

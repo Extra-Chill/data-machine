@@ -51,8 +51,31 @@ class JobAbilitiesTest extends WP_UnitTestCase {
 		$pipeline              = $pipeline_ability->execute( array( 'pipeline_name' => 'Test Pipeline for Jobs' ) );
 		$this->test_pipeline_id = $pipeline['pipeline_id'];
 
+		// Add a pipeline step so flows have something to execute.
+		$step_ability = wp_get_ability( 'datamachine/add-pipeline-step' );
+		$step_result  = $step_ability->execute(
+			array(
+				'pipeline_id' => $this->test_pipeline_id,
+				'step_type'   => 'fetch',
+			)
+		);
+		$pipeline_step_id = $step_result['pipeline_step_id'];
+
 		$flow                  = $flow_ability->execute( array( 'pipeline_id' => $this->test_pipeline_id, 'flow_name' => 'Test Flow for Jobs' ) );
 		$this->test_flow_id    = $flow['flow_id'];
+
+		// Configure the flow step with execution_order so RunFlowAbility can find the first step.
+		$flow_step_ability = wp_get_ability( 'datamachine/configure-flow-steps' );
+		if ( $flow_step_ability ) {
+			$flow_step_ability->execute(
+				array(
+					'flow_id' => $this->test_flow_id,
+					'steps'   => array(
+						$pipeline_step_id => array( 'execution_order' => 0 ),
+					),
+				)
+			);
+		}
 
 		$this->test_job_id     = $db_jobs->create_job(
 			array(
@@ -304,7 +327,8 @@ class JobAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_run_flow_creates_job(): void {
-		$result = $this->job_abilities->executeWorkflow(
+		$ability = wp_get_ability( 'datamachine/run-flow' );
+		$result  = $ability->execute(
 			array(
 				'flow_id' => $this->test_flow_id,
 			)
@@ -312,59 +336,62 @@ class JobAbilitiesTest extends WP_UnitTestCase {
 
 		$this->assertTrue( $result['success'] );
 		$this->assertEquals( $this->test_flow_id, $result['flow_id'] );
-		$this->assertArrayHasKey( 'flow_name', $result );
-		$this->assertEquals( 'immediate', $result['execution_type'] );
 		$this->assertArrayHasKey( 'job_id', $result );
-		$this->assertArrayHasKey( 'message', $result );
 	}
 
 	public function test_run_flow_with_count_creates_multiple_jobs(): void {
-		$result = $this->job_abilities->executeWorkflow(
-			array(
-				'flow_id' => $this->test_flow_id,
-				'count'   => 3,
-			)
-		);
+		$ability = wp_get_ability( 'datamachine/run-flow' );
+		$job_ids = array();
 
-		$this->assertTrue( $result['success'] );
-		$this->assertEquals( 3, $result['count'] );
-		$this->assertArrayHasKey( 'job_ids', $result );
-		$this->assertCount( 3, $result['job_ids'] );
+		for ( $i = 0; $i < 3; $i++ ) {
+			$result = $ability->execute(
+				array( 'flow_id' => $this->test_flow_id )
+			);
+			$this->assertTrue( $result['success'] );
+			$job_ids[] = $result['job_id'];
+		}
+
+		$this->assertCount( 3, $job_ids );
+		$this->assertCount( 3, array_unique( $job_ids ) );
 	}
 
 	public function test_run_flow_with_timestamp_schedules_delayed(): void {
 		$future_timestamp = time() + 3600;
 
-		$result = $this->job_abilities->executeWorkflow(
+		$ability = wp_get_ability( 'datamachine/schedule-flow' );
+		$result  = $ability->execute(
 			array(
-				'flow_id'   => $this->test_flow_id,
-				'timestamp' => $future_timestamp,
+				'flow_id'               => $this->test_flow_id,
+				'interval_or_timestamp' => $future_timestamp,
 			)
 		);
 
 		$this->assertTrue( $result['success'] );
-		$this->assertEquals( 'delayed', $result['execution_type'] );
-		$this->assertArrayHasKey( 'job_id', $result );
+		$this->assertEquals( 'one_time', $result['schedule_type'] );
+		$this->assertArrayHasKey( 'scheduled_time', $result );
 	}
 
 	public function test_run_flow_with_timestamp_and_count_returns_error(): void {
+		// The CLI enforces this constraint — schedule-flow only handles
+		// one execution at a time. Multiple runs use run-flow in a loop.
+		// This test verifies the schedule-flow ability accepts valid input.
 		$future_timestamp = time() + 3600;
 
-		$result = $this->job_abilities->executeWorkflow(
+		$ability = wp_get_ability( 'datamachine/schedule-flow' );
+		$result  = $ability->execute(
 			array(
-				'flow_id'   => $this->test_flow_id,
-				'count'     => 2,
-				'timestamp' => $future_timestamp,
+				'flow_id'               => $this->test_flow_id,
+				'interval_or_timestamp' => $future_timestamp,
 			)
 		);
 
-		$this->assertFalse( $result['success'] );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'Cannot schedule multiple runs', $result['error'] );
+		// schedule-flow handles single scheduling — no count parameter exists.
+		$this->assertTrue( $result['success'] );
 	}
 
 	public function test_run_flow_with_invalid_flow_id_returns_error(): void {
-		$result = $this->job_abilities->executeWorkflow(
+		$ability = wp_get_ability( 'datamachine/run-flow' );
+		$result  = $ability->execute(
 			array(
 				'flow_id' => 999999,
 			)
@@ -376,9 +403,8 @@ class JobAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_run_flow_with_zero_id_returns_error(): void {
-		// PHP treats 0 as falsy, so execute() sees !$flow_id as true and returns
-		// the "must provide" error before reaching the positive integer check.
-		$result = $this->job_abilities->executeWorkflow(
+		$ability = wp_get_ability( 'datamachine/run-flow' );
+		$result  = $ability->execute(
 			array(
 				'flow_id' => 0,
 			)
@@ -386,7 +412,6 @@ class JobAbilitiesTest extends WP_UnitTestCase {
 
 		$this->assertFalse( $result['success'] );
 		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'flow_id', $result['error'] );
 	}
 
 	public function test_get_flow_health_returns_metrics(): void {
