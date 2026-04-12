@@ -84,6 +84,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\GenericHt
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SofarSoundsExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\VisionExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SquareOnlineExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\WeeblyExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\VisionExtractionProcessor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators\PaginatorInterface;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators\JsonApiPaginator;
@@ -166,6 +167,7 @@ class UniversalWebScraper extends EventImportHandler {
 			new WordPressExtractor(),
 			new PrekindleExtractor(),
 			new WixEventsExtractor(),
+			new WeeblyExtractor(),
 			new MusicItemExtractor(),
 			new RhpEventsExtractor(),
 			new OpenDateExtractor(),
