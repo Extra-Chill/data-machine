@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.28.0] - 2026-04-12
+
+### Added
+- add WeeblyExtractor for repeating text block event listings
+- add Wix Events API fallback when warmup data is empty
+
+### Changed
+- restrict homeboy to audit-only (no refactor/autofix)
+
 ## [0.27.2] - 2026-04-10
 
 ### Fixed
