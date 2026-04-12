@@ -16,7 +16,10 @@ if ( ! defined( 'WPINC' ) ) {
  * @return string Callback URL
  */
 function datamachine_get_oauth_callback_url( string $provider ): string {
-	return site_url( "/datamachine-auth/{$provider}/" );
+	$url = site_url( "/datamachine-auth/{$provider}/" );
+
+	/** This filter is documented in inc/Core/OAuth/BaseAuthProvider.php */
+	return apply_filters( 'datamachine_oauth_callback_url', $url, $provider );
 }
 
 // Legacy storage functions removed. Use BaseAuthProvider methods instead.

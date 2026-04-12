@@ -174,4 +174,64 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 
 		$this->assertStringContainsString( '/datamachine-auth/test_provider/', $url );
 	}
+
+	public function test_callback_url_is_filterable(): void {
+		$custom_url = 'https://example.com/oauth/callback';
+
+		add_filter(
+			'datamachine_oauth_callback_url',
+			function ( $url, $slug ) use ( $custom_url ) {
+				if ( 'test_provider' === $slug ) {
+					return $custom_url;
+				}
+				return $url;
+			},
+			10,
+			2
+		);
+
+		$this->assertSame( $custom_url, $this->provider->get_callback_url() );
+
+		remove_all_filters( 'datamachine_oauth_callback_url' );
+	}
+
+	public function test_callback_url_filter_passes_provider_slug(): void {
+		$received_slug = null;
+
+		add_filter(
+			'datamachine_oauth_callback_url',
+			function ( $url, $slug ) use ( &$received_slug ) {
+				$received_slug = $slug;
+				return $url;
+			},
+			10,
+			2
+		);
+
+		$this->provider->get_callback_url();
+
+		$this->assertSame( 'test_provider', $received_slug );
+
+		remove_all_filters( 'datamachine_oauth_callback_url' );
+	}
+
+	public function test_callback_url_filter_does_not_affect_other_providers(): void {
+		add_filter(
+			'datamachine_oauth_callback_url',
+			function ( $url, $slug ) {
+				if ( 'other_provider' === $slug ) {
+					return 'https://example.com/other/callback';
+				}
+				return $url;
+			},
+			10,
+			2
+		);
+
+		$url = $this->provider->get_callback_url();
+
+		$this->assertStringContainsString( '/datamachine-auth/test_provider/', $url );
+
+		remove_all_filters( 'datamachine_oauth_callback_url' );
+	}
 }

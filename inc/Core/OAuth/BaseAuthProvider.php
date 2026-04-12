@@ -61,12 +61,27 @@ abstract class BaseAuthProvider {
 	}
 
 	/**
-	 * Get the callback URL for this provider
+	 * Get the callback URL for this provider.
+	 *
+	 * @since 0.67.0
 	 *
 	 * @return string Callback URL
 	 */
 	public function get_callback_url(): string {
-		return site_url( "/datamachine-auth/{$this->provider_slug}/" );
+		$url = site_url( "/datamachine-auth/{$this->provider_slug}/" );
+
+		/**
+		 * Filters the OAuth callback URL for an auth provider.
+		 *
+		 * Allows plugins to customize the callback URL to match their
+		 * OAuth client's registered redirect URI.
+		 *
+		 * @since 0.67.0
+		 *
+		 * @param string $url           The default callback URL.
+		 * @param string $provider_slug The provider slug (e.g. 'wpcom', 'twitter').
+		 */
+		return apply_filters( 'datamachine_oauth_callback_url', $url, $this->provider_slug );
 	}
 
 	/**
