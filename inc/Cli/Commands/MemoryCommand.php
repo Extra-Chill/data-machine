@@ -616,25 +616,19 @@ class MemoryCommand extends BaseCommand {
 	/**
 	 * Agent files operations.
 	 *
-	 * Manage all agent memory files (SOUL.md, USER.md, MEMORY.md, etc.).
-	 * Supports listing, reading, writing, and staleness detection.
+	 * List and check agent memory files (SOUL.md, USER.md, MEMORY.md, etc.).
+	 * For reading and writing file content, use `agent read` and `agent write`
+	 * which support section-level operations on any file.
 	 *
 	 * ## OPTIONS
 	 *
 	 * <action>
-	 * : Action to perform: list, read, write, check.
-	 *
-	 * [<filename>]
-	 * : Filename for read/write actions (e.g., SOUL.md, USER.md).
+	 * : Action to perform: list, check.
 	 *
 	 * [--agent=<slug>]
 	 * : Agent slug or numeric ID. When provided, operates on that agent's
 	 *   files instead of the current user's agent. Required for managing
 	 *   shared agents in multi-agent setups.
-	 *
-	 * [--content=<content>]
-	 * : Content to write (for write action). If omitted, reads from stdin.
-	 *   Use this flag when stdin is not available (e.g., studio wp).
 	 *
 	 * [--days=<days>]
 	 * : Staleness threshold in days for the check action.
@@ -661,21 +655,6 @@ class MemoryCommand extends BaseCommand {
 	 *     # List files for a specific agent
 	 *     wp datamachine agent files list --agent=studio
 	 *
-	 *     # Read an agent file
-	 *     wp datamachine agent files read SOUL.md
-	 *
-	 *     # Read a specific agent's SOUL.md
-	 *     wp datamachine agent files read SOUL.md --agent=studio
-	 *
-	 *     # Write to an agent file via stdin
-	 *     cat new-soul.md | wp datamachine agent files write SOUL.md
-	 *
-	 *     # Write to a specific agent's file via stdin
-	 *     cat soul.md | wp datamachine agent files write SOUL.md --agent=studio
-	 *
-	 *     # Write content directly (no stdin required)
-	 *     wp datamachine agent files write SOUL.md --content="# My Agent"
-	 *
 	 *     # Check for stale files (not updated in 7 days)
 	 *     wp datamachine agent files check
 	 *
@@ -689,7 +668,7 @@ class MemoryCommand extends BaseCommand {
 	 */
 	public function files( array $args, array $assoc_args ): void {
 		if ( empty( $args ) ) {
-			WP_CLI::error( 'Usage: wp datamachine agent files <list|read|write|check> [filename]' );
+			WP_CLI::error( 'Usage: wp datamachine agent files <list|check>' );
 			return;
 		}
 
@@ -701,27 +680,11 @@ class MemoryCommand extends BaseCommand {
 			case 'list':
 				$this->files_list( $assoc_args, $user_id, $agent_id );
 				break;
-			case 'read':
-				$filename = $args[1] ?? null;
-				if ( ! $filename ) {
-					WP_CLI::error( 'Filename is required. Usage: wp datamachine agent files read <filename>' );
-					return;
-				}
-				$this->files_read( $filename, $user_id, $agent_id );
-				break;
-			case 'write':
-				$filename = $args[1] ?? null;
-				if ( ! $filename ) {
-					WP_CLI::error( 'Filename is required. Usage: wp datamachine agent files write <filename>' );
-					return;
-				}
-				$this->files_write( $filename, $assoc_args, $user_id, $agent_id );
-				break;
 			case 'check':
 				$this->files_check( $assoc_args, $user_id, $agent_id );
 				break;
 			default:
-				WP_CLI::error( "Unknown files action: {$action}. Use: list, read, write, check" );
+				WP_CLI::error( "Unknown files action: {$action}. Use: list, check" );
 		}
 	}
 
@@ -761,86 +724,6 @@ class MemoryCommand extends BaseCommand {
 		}
 
 		$this->format_items( $items, array( 'file', 'size', 'modified', 'age' ), $assoc_args );
-	}
-
-	/**
-	 * Read an agent file by name.
-	 *
-	 * @deprecated 0.45.0 Use `wp datamachine agent read <file.md>` instead.
-	 * @param string $filename File name (e.g., SOUL.md).
-	 */
-	private function files_read( string $filename, int $user_id = 0, ?int $agent_id = null ): void {
-		WP_CLI::warning( sprintf( 'Deprecated: use `wp datamachine agent read %s` instead of `agent files read`.', $filename ) );
-
-		$agent_dir = $this->get_agent_dir( $user_id, $agent_id );
-		$filepath  = $agent_dir . '/' . $this->sanitize_agent_filename( $filename );
-
-		if ( ! file_exists( $filepath ) ) {
-			$available = $this->list_agent_filenames( $user_id, $agent_id );
-			WP_CLI::error( sprintf( 'File "%s" not found. Available files: %s', $filename, implode( ', ', $available ) ) );
-			return;
-		}
-
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-		WP_CLI::log( file_get_contents( $filepath ) );
-	}
-
-	/**
-	 * Write to an agent file via --content flag or stdin.
-	 *
-	 * Delegates to the datamachine/write-agent-file ability for all
-	 * validation, layer resolution, and file I/O.
-	 *
-	 * @deprecated 0.45.0 Use `wp datamachine agent write <file.md> <section> <content>` for section writes.
-	 * @param string $filename   File name (e.g., SOUL.md).
-	 * @param array  $assoc_args Command arguments.
-	 * @param int    $user_id    User ID.
-	 * @param int|null $agent_id Agent ID.
-	 */
-	private function files_write( string $filename, array $assoc_args = array(), int $user_id = 0, ?int $agent_id = null ): void {
-		WP_CLI::warning( 'Deprecated: for section-level writes, use `wp datamachine agent write <file.md> <section> <content>` instead.' );
-		$content = $assoc_args['content'] ?? null;
-
-		if ( null === $content ) {
-			$fs      = FilesystemHelper::get();
-			$content = $fs ? $fs->get_contents( 'php://stdin' ) : false;
-
-			if ( false === $content || '' === trim( $content ) ) {
-				WP_CLI::error( 'No content provided. Use --content="..." or pipe via stdin: echo "content" | wp datamachine agent files write SOUL.md' );
-				return;
-			}
-		}
-
-		$ability = wp_get_ability( 'datamachine/write-agent-file' );
-
-		if ( ! $ability ) {
-			WP_CLI::error( "Ability 'datamachine/write-agent-file' not registered." );
-			return;
-		}
-
-		$input = array(
-			'filename' => $filename,
-			'content'  => $content,
-			'user_id'  => $user_id,
-		);
-
-		if ( null !== $agent_id ) {
-			$input['agent_id'] = $agent_id;
-		}
-
-		$result = $ability->execute( $input );
-
-		if ( is_wp_error( $result ) ) {
-			WP_CLI::error( $result->get_error_message() );
-			return;
-		}
-
-		if ( empty( $result['success'] ) ) {
-			WP_CLI::error( $result['error'] ?? 'Failed to write file.' );
-			return;
-		}
-
-		WP_CLI::success( sprintf( 'Wrote %s (layer: %s).', $result['filename'], $result['layer'] ) );
 	}
 
 	/**
@@ -1005,27 +888,6 @@ class MemoryCommand extends BaseCommand {
 		}
 
 		return $directory_manager->get_agent_identity_directory_for_user( $user_id );
-	}
-
-	/**
-	 * Sanitize an agent filename (allow only alphanumeric, hyphens, underscores, dots).
-	 *
-	 * @param string $filename Raw filename.
-	 * @return string Sanitized filename.
-	 */
-	private function sanitize_agent_filename( string $filename ): string {
-		return preg_replace( '/[^a-zA-Z0-9._-]/', '', basename( $filename ) );
-	}
-
-	/**
-	 * List available agent filenames.
-	 *
-	 * @return string[]
-	 */
-	private function list_agent_filenames( int $user_id = 0, ?int $agent_id = null ): array {
-		$agent_dir = $this->get_agent_dir( $user_id, $agent_id );
-		$files     = glob( $agent_dir . '/*.md' );
-		return array_map( 'basename', $files ? $files : array() );
 	}
 
 	// =========================================================================
