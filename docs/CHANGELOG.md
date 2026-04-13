@@ -2,6 +2,20 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.67.0] - 2026-04-13
+
+### Added
+- unify agent read/write to support all files, not just MEMORY.md
+- add datamachine_oauth_callback_url filter hook (closes #1041)
+
+### Changed
+- skip flow_config longtext for summary/ids modes, fix list next_run (closes #934)
+- fix 22 stale test failures — align tests with current API surface
+
+### Fixed
+- route tool access level checks through PermissionHelper for manage_options fallback
+- route CLI flow run through run-flow ability instead of execute-workflow (closes #1036)
+
 ## [0.66.0] - 2026-04-11
 
 ### Added
