@@ -2,11 +2,13 @@
 /**
  * Agent Memory Service
  *
- * Provides structured read/write operations for agent memory files (MEMORY.md).
- * Parses markdown sections and supports section-level operations.
+ * Provides structured read/write operations for agent memory files.
+ * Parses markdown sections and supports section-level operations
+ * on any agent file (MEMORY.md, SOUL.md, USER.md, etc.).
  *
  * @package DataMachine\Core\FilesRepository
  * @since 0.30.0
+ * @since 0.45.0 Generalized to support any agent file via $filename parameter.
  */
 
 namespace DataMachine\Core\FilesRepository;
@@ -44,27 +46,70 @@ class AgentMemory {
 	private int $user_id;
 
 	/**
+	 * Target filename (e.g. MEMORY.md, SOUL.md, USER.md).
+	 *
+	 * @since 0.45.0
+	 * @var string
+	 */
+	private string $filename;
+
+	/**
 	 * @since 0.37.0 Added $user_id parameter for multi-agent partitioning.
 	 * @since 0.41.0 Added $agent_id parameter for agent-first resolution.
+	 * @since 0.45.0 Added $filename parameter for any-file support.
 	 *
-	 * @param int $user_id  WordPress user ID. 0 = legacy shared directory.
-	 * @param int $agent_id Agent ID for direct resolution. 0 = resolve from user_id.
+	 * @param int    $user_id  WordPress user ID. 0 = legacy shared directory.
+	 * @param int    $agent_id Agent ID for direct resolution. 0 = resolve from user_id.
+	 * @param string $filename Target filename. Defaults to MEMORY.md for backwards compatibility.
 	 */
-	public function __construct( int $user_id = 0, int $agent_id = 0 ) {
+	public function __construct( int $user_id = 0, int $agent_id = 0, string $filename = 'MEMORY.md' ) {
 		$this->directory_manager = new DirectoryManager();
 		$this->user_id           = $this->directory_manager->get_effective_user_id( $user_id );
-		$agent_dir               = $this->directory_manager->resolve_agent_directory( array(
-			'agent_id' => $agent_id,
-			'user_id'  => $this->user_id,
-		) );
-		$this->file_path         = "{$agent_dir}/MEMORY.md";
+		$this->filename          = $this->sanitize_filename( $filename );
+		$this->file_path         = $this->resolve_file_path( $agent_id );
 
 		// Self-heal: ensure agent files exist on first use.
 		DirectoryManager::ensure_agent_files();
 	}
 
 	/**
-	 * Get the full path to MEMORY.md.
+	 * Resolve the file path using MemoryFileRegistry layer awareness.
+	 *
+	 * For registered files, uses the canonical layer (shared, agent, user, network).
+	 * For unregistered files, defaults to the agent directory.
+	 *
+	 * @since 0.45.0
+	 * @param int $agent_id Agent ID for directory resolution.
+	 * @return string Absolute file path.
+	 */
+	private function resolve_file_path( int $agent_id ): string {
+		$registry_layer = \DataMachine\Engine\AI\MemoryFileRegistry::get_layer( $this->filename );
+		$dm             = $this->directory_manager;
+
+		if ( null !== $registry_layer ) {
+			switch ( $registry_layer ) {
+				case 'shared':
+					return $dm->get_shared_directory() . '/' . $this->filename;
+				case 'user':
+					return $dm->get_user_directory( $this->user_id ) . '/' . $this->filename;
+				case 'network':
+					return $dm->get_network_directory() . '/' . $this->filename;
+				case 'agent':
+				default:
+					break; // Fall through to agent directory below.
+			}
+		}
+
+		// Default: agent directory.
+		$agent_dir = $dm->resolve_agent_directory( array(
+			'agent_id' => $agent_id,
+			'user_id'  => $this->user_id,
+		) );
+		return "{$agent_dir}/{$this->filename}";
+	}
+
+	/**
+	 * Get the full path to the target file.
 	 *
 	 * @return string
 	 */
@@ -73,16 +118,26 @@ class AgentMemory {
 	}
 
 	/**
-	 * Read the full memory file content.
+	 * Get the target filename.
 	 *
-	 * @return array{success: bool, content?: string, message?: string}
+	 * @since 0.45.0
+	 * @return string
+	 */
+	public function get_filename(): string {
+		return $this->filename;
+	}
+
+	/**
+	 * Read the full file content.
+	 *
+	 * @return array{success: bool, content?: string, file?: string, message?: string}
 	 */
 	public function get_all(): array {
 		$fs = FilesystemHelper::get();
 		if ( ! file_exists( $this->file_path ) ) {
 			return array(
 				'success' => false,
-				'message' => 'Memory file does not exist.',
+				'message' => sprintf( 'File %s does not exist.', $this->filename ),
 			);
 		}
 
@@ -90,23 +145,24 @@ class AgentMemory {
 
 		return array(
 			'success' => true,
+			'file'    => $this->filename,
 			'content' => $content,
 		);
 	}
 
 	/**
-	 * List all section headers in the memory file.
+	 * List all section headers in the file.
 	 *
 	 * Sections are defined by markdown ## headers.
 	 *
-	 * @return array{success: bool, sections?: string[], message?: string}
+	 * @return array{success: bool, sections?: string[], file?: string, message?: string}
 	 */
 	public function get_sections(): array {
 		$fs = FilesystemHelper::get();
 		if ( ! file_exists( $this->file_path ) ) {
 			return array(
 				'success' => false,
-				'message' => 'Memory file does not exist.',
+				'message' => sprintf( 'File %s does not exist.', $this->filename ),
 			);
 		}
 
@@ -115,6 +171,7 @@ class AgentMemory {
 
 		return array(
 			'success'  => true,
+			'file'     => $this->filename,
 			'sections' => $sections,
 		);
 	}
@@ -130,7 +187,7 @@ class AgentMemory {
 		if ( ! file_exists( $this->file_path ) ) {
 			return array(
 				'success' => false,
-				'message' => 'Memory file does not exist.',
+				'message' => sprintf( 'File %s does not exist.', $this->filename ),
 			);
 		}
 
@@ -269,7 +326,7 @@ class AgentMemory {
 		if ( ! file_exists( $this->file_path ) ) {
 			return array(
 				'success'     => false,
-				'message'     => 'Memory file does not exist.',
+				'message'     => sprintf( 'File %s does not exist.', $this->filename ),
 				'matches'     => array(),
 				'match_count' => 0,
 			);
@@ -394,25 +451,47 @@ class AgentMemory {
 	}
 
 	/**
-	 * Ensure the memory file and directory exist.
+	 * Ensure the target file and directory exist.
 	 *
 	 * Uses scaffold defaults when available instead of a bare stub,
-	 * so a recreated MEMORY.md includes the standard sections.
+	 * so a recreated file includes the standard sections.
 	 */
 	private function ensure_file_exists(): void {
 		if ( ! file_exists( $this->file_path ) ) {
 			$ability = \DataMachine\Abilities\File\ScaffoldAbilities::get_ability();
 			if ( $ability ) {
 				$ability->execute( array(
-					'filename' => 'MEMORY.md',
+					'filename' => $this->filename,
 					'user_id'  => $this->user_id,
 				) );
+			}
+
+			// If scaffold didn't create it (no template for this file), create empty.
+			if ( ! file_exists( $this->file_path ) ) {
+				$dir = dirname( $this->file_path );
+				$dm  = new DirectoryManager();
+				$dm->ensure_directory_exists( $dir );
+
+				$fs = FilesystemHelper::get();
+				$fs->put_contents( $this->file_path, "# {$this->filename}\n" );
+				FilesystemHelper::make_group_writable( $this->file_path );
 			}
 		}
 	}
 
 	/**
-	 * Write content to the memory file.
+	 * Sanitize a filename to prevent directory traversal.
+	 *
+	 * @since 0.45.0
+	 * @param string $filename Raw filename.
+	 * @return string Sanitized filename.
+	 */
+	private function sanitize_filename( string $filename ): string {
+		return preg_replace( '/[^a-zA-Z0-9._-]/', '', basename( $filename ) );
+	}
+
+	/**
+	 * Write content to the target file.
 	 *
 	 * Logs a warning if the resulting file exceeds MAX_FILE_SIZE.
 	 *

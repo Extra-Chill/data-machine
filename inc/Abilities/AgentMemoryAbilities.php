@@ -3,10 +3,11 @@
  * Agent Memory Abilities
  *
  * WordPress 6.9 Abilities API primitives for agent memory operations.
- * Provides read/write access to MEMORY.md sections.
+ * Provides section-level read/write access to any agent file.
  *
  * @package DataMachine\Abilities
  * @since 0.30.0
+ * @since 0.45.0 Added file parameter to all abilities for any-file support.
  */
 
 namespace DataMachine\Abilities;
@@ -39,7 +40,7 @@ class AgentMemoryAbilities {
 				'datamachine/get-agent-memory',
 				array(
 					'label'               => 'Get Agent Memory',
-					'description'         => 'Read agent memory content — full file or a specific section',
+					'description'         => 'Read agent file content — full file or a specific section. Supports any agent file (MEMORY.md, SOUL.md, USER.md, etc.).',
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -52,6 +53,11 @@ class AgentMemoryAbilities {
 								'type'        => 'integer',
 								'description' => 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).',
 								'default'     => 0,
+							),
+							'file'     => array(
+								'type'        => 'string',
+								'description' => 'Target file (e.g. MEMORY.md, SOUL.md, USER.md). Defaults to MEMORY.md.',
+								'default'     => 'MEMORY.md',
 							),
 							'section'  => array(
 								'type'        => 'string',
@@ -82,7 +88,7 @@ class AgentMemoryAbilities {
 				'datamachine/update-agent-memory',
 				array(
 					'label'               => 'Update Agent Memory',
-					'description'         => 'Write to a specific section of agent memory — set (replace) or append',
+					'description'         => 'Write to a specific section of an agent file — set (replace) or append. Supports any agent file.',
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -95,6 +101,11 @@ class AgentMemoryAbilities {
 								'type'        => 'integer',
 								'description' => 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).',
 								'default'     => 0,
+							),
+							'file'     => array(
+								'type'        => 'string',
+								'description' => 'Target file (e.g. MEMORY.md, SOUL.md, USER.md). Defaults to MEMORY.md.',
+								'default'     => 'MEMORY.md',
 							),
 							'section'  => array(
 								'type'        => 'string',
@@ -129,7 +140,7 @@ class AgentMemoryAbilities {
 				'datamachine/search-agent-memory',
 				array(
 					'label'               => 'Search Agent Memory',
-					'description'         => 'Search across agent memory content. Returns matching lines with context, grouped by section.',
+					'description'         => 'Search across agent file content. Returns matching lines with context, grouped by section. Supports any agent file.',
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -143,6 +154,11 @@ class AgentMemoryAbilities {
 								'type'        => 'integer',
 								'description' => 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).',
 								'default'     => 0,
+							),
+							'file'     => array(
+								'type'        => 'string',
+								'description' => 'Target file to search (e.g. MEMORY.md, SOUL.md). Defaults to MEMORY.md.',
+								'default'     => 'MEMORY.md',
 							),
 							'query'    => array(
 								'type'        => 'string',
@@ -184,7 +200,7 @@ class AgentMemoryAbilities {
 				'datamachine/list-agent-memory-sections',
 				array(
 					'label'               => 'List Agent Memory Sections',
-					'description'         => 'List all section headers in agent memory',
+					'description'         => 'List all section headers in an agent file. Supports any agent file.',
 					'category'            => 'datamachine',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -197,6 +213,11 @@ class AgentMemoryAbilities {
 								'type'        => 'integer',
 								'description' => 'WordPress user ID for multi-agent scoping. Defaults to 0 (shared agent).',
 								'default'     => 0,
+							),
+							'file'     => array(
+								'type'        => 'string',
+								'description' => 'Target file (e.g. MEMORY.md, SOUL.md, USER.md). Defaults to MEMORY.md.',
+								'default'     => 'MEMORY.md',
 							),
 						),
 					),
@@ -226,16 +247,14 @@ class AgentMemoryAbilities {
 	}
 
 	/**
-	 * Read agent memory — full file or a specific section.
+	 * Read agent file — full file or a specific section.
 	 *
 	 * @param array $input Input parameters.
 	 * @return array Result.
 	 */
 	public static function getMemory( array $input ): array {
-		$user_id  = (int) ( $input['user_id'] ?? 0 );
-		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$memory   = new AgentMemory( $user_id, $agent_id );
-		$section  = $input['section'] ?? null;
+		$memory  = self::resolveMemory( $input );
+		$section = $input['section'] ?? null;
 
 		if ( null === $section || '' === $section ) {
 			return $memory->get_all();
@@ -245,18 +264,28 @@ class AgentMemoryAbilities {
 	}
 
 	/**
-	 * Update agent memory — set or append to a section.
+	 * Update agent file — set or append to a section.
 	 *
 	 * @param array $input Input parameters.
 	 * @return array Result.
 	 */
 	public static function updateMemory( array $input ): array {
-		$user_id  = (int) ( $input['user_id'] ?? 0 );
-		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$memory   = new AgentMemory( $user_id, $agent_id );
-		$section  = $input['section'];
-		$content  = $input['content'];
-		$mode     = $input['mode'];
+		$memory  = self::resolveMemory( $input );
+		$section = $input['section'];
+		$content = $input['content'];
+		$mode    = $input['mode'];
+
+		// Check editability for non-MEMORY.md files.
+		$filename = $input['file'] ?? 'MEMORY.md';
+		if ( 'MEMORY.md' !== $filename ) {
+			$editable = \DataMachine\Engine\AI\MemoryFileRegistry::is_editable( $filename );
+			if ( ! $editable ) {
+				return array(
+					'success' => false,
+					'message' => sprintf( 'File %s is read-only and cannot be edited via section write.', $filename ),
+				);
+			}
+		}
 
 		if ( 'append' === $mode ) {
 			return $memory->append_to_section( $section, $content );
@@ -266,31 +295,42 @@ class AgentMemoryAbilities {
 	}
 
 	/**
-	 * Search agent memory content.
+	 * Search agent file content.
 	 *
 	 * @param array $input Input parameters with 'query' and optional 'section'.
 	 * @return array Search results.
 	 */
 	public static function searchMemory( array $input ): array {
-		$user_id  = (int) ( $input['user_id'] ?? 0 );
-		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$memory   = new AgentMemory( $user_id, $agent_id );
-		$query    = $input['query'];
-		$section  = $input['section'] ?? null;
+		$memory  = self::resolveMemory( $input );
+		$query   = $input['query'];
+		$section = $input['section'] ?? null;
 
 		return $memory->search( $query, $section );
 	}
 
 	/**
-	 * List all section headers in agent memory.
+	 * List all section headers in an agent file.
 	 *
-	 * @param array $input Input parameters (unused).
+	 * @param array $input Input parameters.
 	 * @return array Result.
 	 */
 	public static function listSections( array $input ): array {
+		$memory = self::resolveMemory( $input );
+		return $memory->get_sections();
+	}
+
+	/**
+	 * Resolve an AgentMemory instance from input parameters.
+	 *
+	 * @since 0.45.0
+	 * @param array $input Input parameters with optional user_id, agent_id, file.
+	 * @return AgentMemory
+	 */
+	private static function resolveMemory( array $input ): AgentMemory {
 		$user_id  = (int) ( $input['user_id'] ?? 0 );
 		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$memory   = new AgentMemory( $user_id, $agent_id );
-		return $memory->get_sections();
+		$filename = $input['file'] ?? 'MEMORY.md';
+
+		return new AgentMemory( $user_id, $agent_id, $filename );
 	}
 }

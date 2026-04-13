@@ -41,48 +41,64 @@ class MemoryCommand extends BaseCommand {
 	private array $valid_modes = array( 'set', 'append' );
 
 	/**
-	 * Read agent memory — full file or a specific section.
+	 * Read an agent file — full file or a specific section.
+	 *
+	 * Supports any agent file (MEMORY.md, SOUL.md, USER.md, etc.).
+	 * If the first argument ends in .md, it is treated as a filename.
+	 * Otherwise it is treated as a section name within MEMORY.md.
 	 *
 	 * ## OPTIONS
 	 *
+	 * [<file_or_section>]
+	 * : Filename (e.g. SOUL.md) or section name (without ##).
+	 *   Arguments ending in .md are treated as filenames.
+	 *   If omitted, reads full MEMORY.md.
+	 *
 	 * [<section>]
-	 * : Section name to read (without ##). If omitted, returns full file.
+	 * : Section name when the first argument is a filename.
 	 *
 	 * [--agent=<slug>]
-	 * : Agent slug or numeric ID. When provided, reads that agent's memory
+	 * : Agent slug or numeric ID. When provided, reads that agent's file
 	 *   instead of the current user's agent.
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     # Read full memory file
+	 *     # Read full MEMORY.md (default)
 	 *     wp datamachine agent read
 	 *
-	 *     # Read a specific section
+	 *     # Read a specific section from MEMORY.md
 	 *     wp datamachine agent read "Fleet"
 	 *
-	 *     # Read lessons learned
-	 *     wp datamachine agent read "Lessons Learned"
+	 *     # Read full SOUL.md
+	 *     wp datamachine agent read SOUL.md
 	 *
-	 *     # Read memory for a specific agent
-	 *     wp datamachine agent read --agent=studio
+	 *     # Read a section from SOUL.md
+	 *     wp datamachine agent read SOUL.md "Identity"
 	 *
-	 *     # Read memory for a specific user
+	 *     # Read USER.md for a specific agent
+	 *     wp datamachine agent read USER.md --agent=studio
+	 *
+	 *     # Read for a specific user
 	 *     wp datamachine agent read --user=2
 	 *
 	 * @subcommand read
 	 */
 	public function read( array $args, array $assoc_args ): void {
-		$section = $args[0] ?? null;
-		$input   = $this->resolveMemoryScoping( $assoc_args );
+		$parsed = $this->parseFileAndSection( $args );
+		$input  = $this->resolveMemoryScoping( $assoc_args );
 
-		if ( null !== $section ) {
-			$input['section'] = $section;
+		if ( null !== $parsed['file'] ) {
+			$input['file'] = $parsed['file'];
+		}
+
+		if ( null !== $parsed['section'] ) {
+			$input['section'] = $parsed['section'];
 		}
 
 		$result = AgentMemoryAbilities::getMemory( $input );
 
 		if ( ! $result['success'] ) {
-			$message = $result['message'] ?? 'Failed to read memory.';
+			$message = $result['message'] ?? 'Failed to read file.';
 			if ( ! empty( $result['available_sections'] ) ) {
 				$message .= "\nAvailable sections: " . implode( ', ', $result['available_sections'] );
 			}
@@ -94,9 +110,12 @@ class MemoryCommand extends BaseCommand {
 	}
 
 	/**
-	 * List all sections in agent memory.
+	 * List all sections in an agent file.
 	 *
 	 * ## OPTIONS
+	 *
+	 * [--file=<file>]
+	 * : Target file (e.g. SOUL.md, USER.md). Defaults to MEMORY.md.
 	 *
 	 * [--agent=<slug>]
 	 * : Agent slug or numeric ID.
@@ -114,11 +133,14 @@ class MemoryCommand extends BaseCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     # List memory sections
+	 *     # List MEMORY.md sections (default)
 	 *     wp datamachine agent sections
 	 *
-	 *     # List as JSON
-	 *     wp datamachine agent sections --format=json
+	 *     # List SOUL.md sections
+	 *     wp datamachine agent sections --file=SOUL.md
+	 *
+	 *     # List USER.md sections as JSON
+	 *     wp datamachine agent sections --file=USER.md --format=json
 	 *
 	 *     # List sections for a specific agent
 	 *     wp datamachine agent sections --agent=studio
@@ -127,17 +149,24 @@ class MemoryCommand extends BaseCommand {
 	 */
 	public function sections( array $args, array $assoc_args ): void {
 		$scoping = $this->resolveMemoryScoping( $assoc_args );
-		$result  = AgentMemoryAbilities::listSections( $scoping );
+		$file    = $assoc_args['file'] ?? null;
+
+		if ( null !== $file ) {
+			$scoping['file'] = $file;
+		}
+
+		$result = AgentMemoryAbilities::listSections( $scoping );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['message'] ?? 'Failed to list sections.' );
 			return;
 		}
 
-		$sections = $result['sections'] ?? array();
+		$sections    = $result['sections'] ?? array();
+		$target_file = $result['file'] ?? $file ?? 'MEMORY.md';
 
 		if ( empty( $sections ) ) {
-			WP_CLI::log( 'No sections found in memory file.' );
+			WP_CLI::log( sprintf( 'No sections found in %s.', $target_file ) );
 			return;
 		}
 
@@ -152,15 +181,26 @@ class MemoryCommand extends BaseCommand {
 	}
 
 	/**
-	 * Write to a section of agent memory.
+	 * Write to a section of an agent file.
+	 *
+	 * Supports any agent file (MEMORY.md, SOUL.md, USER.md, etc.).
+	 * If the first argument ends in .md, it is treated as a filename
+	 * and the next two arguments are section and content.
+	 * Otherwise the first two arguments are section and content
+	 * targeting MEMORY.md.
 	 *
 	 * ## OPTIONS
 	 *
-	 * <section>
-	 * : Section name (without ##). Created if it does not exist.
+	 * <file_or_section>
+	 * : Filename (e.g. SOUL.md) or section name (without ##).
+	 *   Arguments ending in .md are treated as filenames.
 	 *
-	 * <content>
-	 * : Content to write. Use quotes for multi-word content.
+	 * <section_or_content>
+	 * : Section name when first arg is a filename, or content
+	 *   when first arg is a section name.
+	 *
+	 * [<content>]
+	 * : Content to write when first arg is a filename.
 	 *
 	 * [--agent=<slug>]
 	 * : Agent slug or numeric ID.
@@ -176,29 +216,32 @@ class MemoryCommand extends BaseCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     # Replace a section
+	 *     # Replace a section in MEMORY.md (default)
 	 *     wp datamachine agent write "State" "- Data Machine v0.30.0 installed"
 	 *
-	 *     # Append to a section
+	 *     # Append to a section in MEMORY.md
 	 *     wp datamachine agent write "Lessons Learned" "- Always check file permissions" --mode=append
 	 *
-	 *     # Create a new section
-	 *     wp datamachine agent write "New Section" "Initial content"
+	 *     # Write to a section in SOUL.md
+	 *     wp datamachine agent write SOUL.md "Identity" "I am chubes-bot"
 	 *
-	 *     # Write to a specific agent's memory
-	 *     wp datamachine agent write "State" "- Studio agent active" --agent=studio
+	 *     # Append to a section in USER.md
+	 *     wp datamachine agent write USER.md "Goals" "- Ship the feature" --mode=append
+	 *
+	 *     # Write to a specific agent's file
+	 *     wp datamachine agent write SOUL.md "Voice" "Concise and direct" --agent=studio
 	 *
 	 * @subcommand write
 	 */
 	public function write( array $args, array $assoc_args ): void {
-		if ( empty( $args[0] ) || empty( $args[1] ) ) {
-			WP_CLI::error( 'Both section name and content are required.' );
+		$parsed = $this->parseFileSectionContent( $args );
+
+		if ( null === $parsed ) {
+			WP_CLI::error( 'Usage: wp datamachine agent write [<file.md>] <section> <content> [--mode=set|append]' );
 			return;
 		}
 
-		$section = $args[0];
-		$content = $args[1];
-		$mode    = $assoc_args['mode'] ?? 'set';
+		$mode = $assoc_args['mode'] ?? 'set';
 
 		if ( ! in_array( $mode, $this->valid_modes, true ) ) {
 			WP_CLI::error( sprintf( 'Invalid mode "%s". Must be one of: %s', $mode, implode( ', ', $this->valid_modes ) ) );
@@ -206,20 +249,23 @@ class MemoryCommand extends BaseCommand {
 		}
 
 		$scoping = $this->resolveMemoryScoping( $assoc_args );
-
-		$result = AgentMemoryAbilities::updateMemory(
-			array_merge(
-				$scoping,
-				array(
-					'section' => $section,
-					'content' => $content,
-					'mode'    => $mode,
-				)
+		$input   = array_merge(
+			$scoping,
+			array(
+				'section' => $parsed['section'],
+				'content' => $parsed['content'],
+				'mode'    => $mode,
 			)
 		);
 
+		if ( null !== $parsed['file'] ) {
+			$input['file'] = $parsed['file'];
+		}
+
+		$result = AgentMemoryAbilities::updateMemory( $input );
+
 		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['message'] ?? 'Failed to write memory.' );
+			WP_CLI::error( $result['message'] ?? 'Failed to write.' );
 			return;
 		}
 
@@ -227,12 +273,15 @@ class MemoryCommand extends BaseCommand {
 	}
 
 	/**
-	 * Search agent memory content.
+	 * Search agent file content.
 	 *
 	 * ## OPTIONS
 	 *
 	 * <query>
 	 * : Search term (case-insensitive).
+	 *
+	 * [--file=<file>]
+	 * : Target file to search (e.g. SOUL.md, USER.md). Defaults to MEMORY.md.
 	 *
 	 * [--agent=<slug>]
 	 * : Agent slug or numeric ID.
@@ -242,14 +291,17 @@ class MemoryCommand extends BaseCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     # Search all memory
+	 *     # Search MEMORY.md (default)
 	 *     wp datamachine agent search "homeboy"
+	 *
+	 *     # Search SOUL.md
+	 *     wp datamachine agent search "identity" --file=SOUL.md
 	 *
 	 *     # Search within a section
 	 *     wp datamachine agent search "docker" --section="Lessons Learned"
 	 *
-	 *     # Search a specific agent's memory
-	 *     wp datamachine agent search "socials" --agent=studio
+	 *     # Search a specific agent's file
+	 *     wp datamachine agent search "socials" --file=USER.md --agent=studio
 	 *
 	 * @subcommand search
 	 */
@@ -260,26 +312,33 @@ class MemoryCommand extends BaseCommand {
 		}
 
 		$query   = $args[0];
+		$file    = $assoc_args['file'] ?? null;
 		$section = $assoc_args['section'] ?? null;
 		$scoping = $this->resolveMemoryScoping( $assoc_args );
 
-		$result = AgentMemoryAbilities::searchMemory(
-			array_merge(
-				$scoping,
-				array(
-					'query'   => $query,
-					'section' => $section,
-				)
+		$input = array_merge(
+			$scoping,
+			array(
+				'query'   => $query,
+				'section' => $section,
 			)
 		);
+
+		if ( null !== $file ) {
+			$input['file'] = $file;
+		}
+
+		$result = AgentMemoryAbilities::searchMemory( $input );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['message'] ?? 'Search failed.' );
 			return;
 		}
 
+		$target_file = $file ?? 'MEMORY.md';
+
 		if ( empty( $result['matches'] ) ) {
-			WP_CLI::log( sprintf( 'No matches for "%s" in agent memory.', $query ) );
+			WP_CLI::log( sprintf( 'No matches for "%s" in %s.', $query, $target_file ) );
 			return;
 		}
 
@@ -289,7 +348,7 @@ class MemoryCommand extends BaseCommand {
 			WP_CLI::log( '' );
 		}
 
-		WP_CLI::success( sprintf( '%d match(es) found.', $result['match_count'] ) );
+		WP_CLI::success( sprintf( '%d match(es) found in %s.', $result['match_count'], $target_file ) );
 	}
 
 	/**
@@ -707,9 +766,12 @@ class MemoryCommand extends BaseCommand {
 	/**
 	 * Read an agent file by name.
 	 *
+	 * @deprecated 0.45.0 Use `wp datamachine agent read <file.md>` instead.
 	 * @param string $filename File name (e.g., SOUL.md).
 	 */
 	private function files_read( string $filename, int $user_id = 0, ?int $agent_id = null ): void {
+		WP_CLI::warning( sprintf( 'Deprecated: use `wp datamachine agent read %s` instead of `agent files read`.', $filename ) );
+
 		$agent_dir = $this->get_agent_dir( $user_id, $agent_id );
 		$filepath  = $agent_dir . '/' . $this->sanitize_agent_filename( $filename );
 
@@ -729,12 +791,14 @@ class MemoryCommand extends BaseCommand {
 	 * Delegates to the datamachine/write-agent-file ability for all
 	 * validation, layer resolution, and file I/O.
 	 *
+	 * @deprecated 0.45.0 Use `wp datamachine agent write <file.md> <section> <content>` for section writes.
 	 * @param string $filename   File name (e.g., SOUL.md).
 	 * @param array  $assoc_args Command arguments.
 	 * @param int    $user_id    User ID.
 	 * @param int|null $agent_id Agent ID.
 	 */
 	private function files_write( string $filename, array $assoc_args = array(), int $user_id = 0, ?int $agent_id = null ): void {
+		WP_CLI::warning( 'Deprecated: for section-level writes, use `wp datamachine agent write <file.md> <section> <content>` instead.' );
 		$content = $assoc_args['content'] ?? null;
 
 		if ( null === $content ) {
@@ -836,6 +900,83 @@ class MemoryCommand extends BaseCommand {
 	 *
 	 * @return string
 	 */
+	// =========================================================================
+	// Argument parsing helpers
+	// =========================================================================
+
+	/**
+	 * Check if a string looks like a filename (ends in .md).
+	 *
+	 * @since 0.45.0
+	 * @param string $arg Argument to check.
+	 * @return bool
+	 */
+	private function isFilename( string $arg ): bool {
+		return (bool) preg_match( '/\.md$/i', $arg );
+	}
+
+	/**
+	 * Parse positional args into file and section for read commands.
+	 *
+	 * Disambiguation rules:
+	 * - No args: file=null, section=null (full MEMORY.md)
+	 * - One arg ending in .md: file=arg, section=null (full file)
+	 * - One arg not .md: file=null, section=arg (MEMORY.md section)
+	 * - Two args: file=first, section=second
+	 *
+	 * @since 0.45.0
+	 * @param array $args Positional arguments.
+	 * @return array{file: ?string, section: ?string}
+	 */
+	private function parseFileAndSection( array $args ): array {
+		if ( empty( $args ) ) {
+			return array( 'file' => null, 'section' => null );
+		}
+
+		if ( count( $args ) >= 2 ) {
+			return array( 'file' => $args[0], 'section' => $args[1] );
+		}
+
+		// Single argument — disambiguate.
+		if ( $this->isFilename( $args[0] ) ) {
+			return array( 'file' => $args[0], 'section' => null );
+		}
+
+		return array( 'file' => null, 'section' => $args[0] );
+	}
+
+	/**
+	 * Parse positional args into file, section, and content for write commands.
+	 *
+	 * Disambiguation rules:
+	 * - Two args, first not .md: section=first, content=second (MEMORY.md)
+	 * - Three args, first is .md: file=first, section=second, content=third
+	 * - Two args, first is .md: error (missing content)
+	 *
+	 * @since 0.45.0
+	 * @param array $args Positional arguments.
+	 * @return array{file: ?string, section: string, content: string}|null Null on invalid args.
+	 */
+	private function parseFileSectionContent( array $args ): ?array {
+		if ( count( $args ) >= 3 && $this->isFilename( $args[0] ) ) {
+			return array(
+				'file'    => $args[0],
+				'section' => $args[1],
+				'content' => $args[2],
+			);
+		}
+
+		if ( count( $args ) >= 2 && ! $this->isFilename( $args[0] ) ) {
+			return array(
+				'file'    => null,
+				'section' => $args[0],
+				'content' => $args[1],
+			);
+		}
+
+		return null;
+	}
+
 	/**
 	 * Resolve memory scoping from CLI flags.
 	 *

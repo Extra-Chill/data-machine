@@ -3,11 +3,12 @@
  * Agent Memory AI Tool - Persistent memory management for AI agents
  *
  * Delegates to AgentMemoryAbilities for section-level read/write operations
- * on the agent's MEMORY.md file. Provides persistent knowledge storage
+ * on any agent file. Provides persistent knowledge storage
  * across sessions for all agent types.
  *
  * @package DataMachine\Engine\AI\Tools\Global
  * @since   0.30.0
+ * @since   0.45.0 Added file parameter for any-file support.
  */
 
 	namespace DataMachine\Engine\AI\Tools\Global;
@@ -45,7 +46,7 @@ class AgentMemory extends BaseTool {
 	}
 
 	/**
-	 * Read full memory or a specific section.
+	 * Read full file or a specific section.
 	 *
 	 * @param array $parameters Tool parameters.
 	 * @return array Response.
@@ -61,12 +62,16 @@ class AgentMemory extends BaseTool {
 			);
 		}
 
-		$result = $ability->execute(
-			array(
-				'user_id' => $user_id,
-				'section' => $parameters['section'] ?? '',
-			)
+		$input = array(
+			'user_id' => $user_id,
+			'section' => $parameters['section'] ?? '',
 		);
+
+		if ( ! empty( $parameters['file'] ) ) {
+			$input['file'] = $parameters['file'];
+		}
+
+		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
 			return $this->buildErrorResponse( $result->get_error_message(), 'agent_memory' );
@@ -121,14 +126,18 @@ class AgentMemory extends BaseTool {
 			);
 		}
 
-		$result = $ability->execute(
-			array(
-				'user_id' => $user_id,
-				'section' => $section,
-				'content' => $content,
-				'mode'    => $mode,
-			)
+		$input = array(
+			'user_id' => $user_id,
+			'section' => $section,
+			'content' => $content,
+			'mode'    => $mode,
 		);
+
+		if ( ! empty( $parameters['file'] ) ) {
+			$input['file'] = $parameters['file'];
+		}
+
+		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
 			return $this->buildErrorResponse( $result->get_error_message(), 'agent_memory' );
@@ -136,7 +145,7 @@ class AgentMemory extends BaseTool {
 
 		if ( ! $this->isAbilitySuccess( $result ) ) {
 			return $this->buildErrorResponse(
-				$this->getAbilityError( $result, 'Failed to update agent memory.' ),
+				$this->getAbilityError( $result, 'Failed to update agent file.' ),
 				'agent_memory'
 			);
 		}
@@ -164,7 +173,13 @@ class AgentMemory extends BaseTool {
 			);
 		}
 
-		$result = $ability->execute( array( 'user_id' => $user_id ) );
+		$input = array( 'user_id' => $user_id );
+
+		if ( ! empty( $parameters['file'] ) ) {
+			$input['file'] = $parameters['file'];
+		}
+
+		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
 			return $this->buildErrorResponse( $result->get_error_message(), 'agent_memory' );
@@ -193,7 +208,7 @@ class AgentMemory extends BaseTool {
 		return array(
 			'class'           => __CLASS__,
 			'method'          => 'handle_tool_call',
-			'description'     => 'Manage persistent agent memory (MEMORY.md) — long-lived knowledge that survives across sessions. Stored as markdown sections (## headers). Use "list_sections" to see what exists, "get" to read content, and "update" to write. Use "append" mode to add new information without losing existing content. Use "set" mode to replace a section entirely. For session activity and temporal events, use agent_daily_memory instead.',
+			'description'     => 'Manage persistent agent files with section-level operations. Works on any agent file: MEMORY.md (default), SOUL.md, USER.md, etc. Stored as markdown with ## section headers. Use "list_sections" to see what exists, "get" to read content, and "update" to write. Use "append" mode to add new information without losing existing content. Use "set" mode to replace a section entirely. For session activity and temporal events, use agent_daily_memory instead.',
 			'requires_config' => false,
 			'parameters'      => array(
 				'user_id' => array(
@@ -204,12 +219,17 @@ class AgentMemory extends BaseTool {
 				'action'  => array(
 					'type'        => 'string',
 					'required'    => true,
-					'description' => 'Action to perform: "get" (read memory), "update" (write to section), or "list_sections" (show all section headers).',
+					'description' => 'Action to perform: "get" (read file/section), "update" (write to section), or "list_sections" (show all section headers).',
+				),
+				'file'    => array(
+					'type'        => 'string',
+					'required'    => false,
+					'description' => 'Target file. Defaults to MEMORY.md. Use SOUL.md, USER.md, SITE.md, etc. for other agent files.',
 				),
 				'section' => array(
 					'type'        => 'string',
 					'required'    => false,
-					'description' => 'Section name without "##" prefix. Required for "update". Optional for "get" (omit to read full memory).',
+					'description' => 'Section name without "##" prefix. Required for "update". Optional for "get" (omit to read full file).',
 				),
 				'content' => array(
 					'type'        => 'string',
