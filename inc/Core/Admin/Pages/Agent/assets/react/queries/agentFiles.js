@@ -35,7 +35,10 @@ export const useAgentFiles = () => {
 	return useQuery( {
 		queryKey: KEYS.list( agentId ),
 		queryFn: api.listAgentFiles,
-		select: ( response ) => response?.data ?? response ?? [],
+		select: ( response ) => {
+			const data = response?.data;
+			return Array.isArray( data ) ? data : [];
+		},
 	} );
 };
 

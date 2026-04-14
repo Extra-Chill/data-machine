@@ -59,7 +59,7 @@ const NoAgentSelectedMessage = ( { message } ) => (
 const AgentApp = () => {
 	const [ selectedFile, setSelectedFile ] = useState( null );
 	const { data: files } = useAgentFiles();
-	const hasFiles = files && files.length > 0;
+	const hasFiles = Array.isArray( files ) && files.length > 0;
 
 	// Get selected agent from store
 	const { selectedAgentId } = useAgentStore();
