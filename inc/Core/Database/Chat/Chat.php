@@ -42,28 +42,28 @@ class Chat extends BaseRepository {
 		$charset_collate = $wpdb->get_charset_collate();
 
 		$sql = "CREATE TABLE {$table_name} (
-            session_id VARCHAR(50) NOT NULL,
-            user_id BIGINT(20) UNSIGNED NOT NULL,
-            agent_id BIGINT(20) UNSIGNED NULL COMMENT 'First-class agent identity (nullable for backward compatibility)',
-            title VARCHAR(100) NULL COMMENT 'AI-generated or truncated first message title',
-            messages LONGTEXT NOT NULL COMMENT 'JSON array of conversation messages',
-            metadata LONGTEXT NULL COMMENT 'JSON object for session metadata',
-            provider VARCHAR(50) NULL COMMENT 'AI provider (anthropic, openai, etc)',
-            model VARCHAR(100) NULL COMMENT 'AI model identifier',
-	            context VARCHAR(20) NOT NULL DEFAULT 'chat' COMMENT 'Execution context: chat, pipeline, system',
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            last_read_at DATETIME NULL COMMENT 'When the user last read this session',
-            expires_at DATETIME NULL COMMENT 'Auto-cleanup timestamp',
-            PRIMARY KEY  (session_id),
-            KEY user_id (user_id),
-            KEY agent_id (agent_id),
-	            KEY context (context),
-	            KEY user_context (user_id, context),
-            KEY created_at (created_at),
-            KEY updated_at (updated_at),
-            KEY expires_at (expires_at)
-        ) {$charset_collate};";
+			session_id VARCHAR(50) NOT NULL,
+			user_id BIGINT(20) UNSIGNED NOT NULL,
+			agent_id BIGINT(20) UNSIGNED NULL,
+			title VARCHAR(100) NULL,
+			messages LONGTEXT NOT NULL,
+			metadata LONGTEXT NULL,
+			provider VARCHAR(50) NULL,
+			model VARCHAR(100) NULL,
+			context VARCHAR(20) NOT NULL DEFAULT 'chat',
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			last_read_at DATETIME NULL,
+			expires_at DATETIME NULL,
+			PRIMARY KEY  (session_id),
+			KEY user_id (user_id),
+			KEY agent_id (agent_id),
+			KEY context (context),
+			KEY user_context (user_id, context),
+			KEY created_at (created_at),
+			KEY updated_at (updated_at),
+			KEY expires_at (expires_at)
+		) {$charset_collate};";
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
@@ -895,6 +895,10 @@ class Chat extends BaseRepository {
 add_action(
 	'datamachine_cleanup_chat_sessions',
 	function () {
+		if ( ! Chat::table_exists() ) {
+			return;
+		}
+
 		$chat_db        = new Chat();
 		$retention_days = \DataMachine\Core\PluginSettings::get( 'chat_retention_days', 90 );
 
