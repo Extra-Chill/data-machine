@@ -98,7 +98,7 @@ class HandlerAbilities {
 			array(
 				'label'               => __( 'Get Handlers', 'data-machine' ),
 				'description'         => __( 'Get all registered handlers, optionally filtered by step type, or a single handler by slug.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/pipeline',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -135,7 +135,7 @@ class HandlerAbilities {
 			array(
 				'label'               => __( 'Validate Handler', 'data-machine' ),
 				'description'         => __( 'Validate that a handler slug exists.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/pipeline',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'handler_slug' ),
@@ -171,7 +171,7 @@ class HandlerAbilities {
 			array(
 				'label'               => __( 'Get Handler Config Fields', 'data-machine' ),
 				'description'         => __( 'Get configuration field definitions for a handler.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/pipeline',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'handler_slug' ),
@@ -204,7 +204,7 @@ class HandlerAbilities {
 			array(
 				'label'               => __( 'Apply Handler Defaults', 'data-machine' ),
 				'description'         => __( 'Apply default values to handler configuration.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/pipeline',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'handler_slug', 'config' ),
@@ -240,7 +240,7 @@ class HandlerAbilities {
 			array(
 				'label'               => __( 'Get Handler Site Defaults', 'data-machine' ),
 				'description'         => __( 'Get site-wide handler default configurations.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/pipeline',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(

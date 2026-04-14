@@ -59,7 +59,7 @@ class InternalLinkingAbilities {
 				array(
 					'label'               => 'Internal Linking',
 					'description'         => 'Queue system agent insertion of semantic internal links into posts',
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/seo',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
@@ -113,7 +113,7 @@ class InternalLinkingAbilities {
 				array(
 					'label'               => 'Diagnose Internal Links',
 					'description'         => 'Report internal link coverage across published posts',
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/seo',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(),
@@ -143,7 +143,7 @@ class InternalLinkingAbilities {
 				array(
 					'label'               => 'Audit Internal Links',
 					'description'         => 'Scan post content for internal links, build a link graph, and cache results. Does NOT check for broken links — use datamachine/check-broken-links for that.',
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/seo',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
@@ -199,7 +199,7 @@ class InternalLinkingAbilities {
 				array(
 					'label'               => 'Get Orphaned Posts',
 					'description'         => 'Return posts with zero inbound internal links from the cached link graph. Runs audit automatically if no cache exists.',
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/seo',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
@@ -239,7 +239,7 @@ class InternalLinkingAbilities {
 				array(
 					'label'               => 'Check Broken Links',
 					'description'         => 'HTTP HEAD check links from the cached link graph to find broken URLs. Supports internal, external, or all links via scope. External checks include per-domain rate limiting and HEAD→GET fallback.',
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/seo',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
@@ -291,7 +291,7 @@ class InternalLinkingAbilities {
 				array(
 					'label'               => 'Link Opportunities',
 					'description'         => 'Rank internal linking opportunities by combining GSC traffic data with the link graph. High-traffic pages with few inbound links score highest.',
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/seo',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

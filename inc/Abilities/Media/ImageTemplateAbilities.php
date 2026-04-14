@@ -38,7 +38,7 @@ class ImageTemplateAbilities {
 				array(
 					'label'               => 'Render Image Template',
 					'description'         => 'Generate branded graphics from registered GD templates',
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/media',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'template_id', 'data' ),
@@ -90,7 +90,7 @@ class ImageTemplateAbilities {
 				array(
 					'label'               => 'List Image Templates',
 					'description'         => 'List all registered image generation templates',
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/media',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(),

@@ -42,7 +42,7 @@ class EmailAbilities {
 				array(
 					'label'               => __( 'Reply to Email', 'data-machine' ),
 					'description'         => __( 'Send a reply to an email, maintaining thread headers', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/email',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'to', 'subject', 'body', 'in_reply_to' ),
@@ -99,7 +99,7 @@ class EmailAbilities {
 				array(
 					'label'               => __( 'Delete Email', 'data-machine' ),
 					'description'         => __( 'Delete (expunge) an email by UID from the IMAP server', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/email',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'uid' ),
@@ -134,7 +134,7 @@ class EmailAbilities {
 				array(
 					'label'               => __( 'Move Email', 'data-machine' ),
 					'description'         => __( 'Move an email to a different IMAP folder', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/email',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'uid', 'destination' ),
@@ -173,7 +173,7 @@ class EmailAbilities {
 				array(
 					'label'               => __( 'Flag Email', 'data-machine' ),
 					'description'         => __( 'Set or clear IMAP flags on an email (Seen, Flagged, etc.)', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/email',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'uid', 'flag' ),
@@ -217,7 +217,7 @@ class EmailAbilities {
 				array(
 					'label'               => __( 'Batch Move Emails', 'data-machine' ),
 					'description'         => __( 'Move all emails matching a search to a destination folder', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/email',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'search', 'destination' ),
@@ -263,7 +263,7 @@ class EmailAbilities {
 				array(
 					'label'               => __( 'Batch Flag Emails', 'data-machine' ),
 					'description'         => __( 'Set or clear a flag on all emails matching a search', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/email',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'search', 'flag' ),
@@ -313,7 +313,7 @@ class EmailAbilities {
 				array(
 					'label'               => __( 'Batch Delete Emails', 'data-machine' ),
 					'description'         => __( 'Delete all emails matching a search', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/email',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'search' ),
@@ -355,7 +355,7 @@ class EmailAbilities {
 				array(
 					'label'               => __( 'Unsubscribe from Email', 'data-machine' ),
 					'description'         => __( 'Unsubscribe from a mailing list using List-Unsubscribe headers', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/email',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'uid' ),
@@ -391,7 +391,7 @@ class EmailAbilities {
 				array(
 					'label'               => __( 'Batch Unsubscribe', 'data-machine' ),
 					'description'         => __( 'Unsubscribe from all mailing lists matching a search', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/email',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'search' ),
@@ -434,7 +434,7 @@ class EmailAbilities {
 				array(
 					'label'               => __( 'Test Email Connection', 'data-machine' ),
 					'description'         => __( 'Test IMAP connection with stored credentials', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/email',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => new \stdClass(),

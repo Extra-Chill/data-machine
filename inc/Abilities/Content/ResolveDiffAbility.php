@@ -41,7 +41,7 @@ class ResolveDiffAbility {
 			wp_register_ability( 'datamachine/resolve-diff', array(
 				'label'               => __( 'Resolve Diff', 'data-machine' ),
 				'description'         => __( 'Accept or reject a pending content diff.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/content',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'diff_id', 'decision' ),

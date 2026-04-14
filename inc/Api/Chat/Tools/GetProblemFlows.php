@@ -24,7 +24,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class GetProblemFlows extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'get_problem_flows', array( $this, 'getToolDefinition' ), array( 'chat' ) );
+		$this->registerTool( 'get_problem_flows', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'ability' => 'datamachine/get-problem-flows' ) );
 	}
 
 	/**

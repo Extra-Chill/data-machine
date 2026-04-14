@@ -18,7 +18,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class UpdateFlow extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'update_flow', array( $this, 'getToolDefinition' ), array( 'chat' ) );
+		$this->registerTool( 'update_flow', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'ability' => 'datamachine/update-flow' ) );
 	}
 
 	/**

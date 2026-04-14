@@ -119,14 +119,38 @@ class AllAbilitiesRegisteredTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Test datamachine category is registered at boot.
+	 * Test datamachine ability categories are registered at boot.
 	 */
-	public function test_datamachine_category_registered(): void {
+	public function test_datamachine_categories_registered(): void {
 		$categories = wp_get_ability_categories();
-		$this->assertArrayHasKey(
-			'datamachine',
-			$categories,
-			'datamachine category should be registered during plugin boot'
+
+		$expected_categories = array(
+			'datamachine/content',
+			'datamachine/media',
+			'datamachine/analytics',
+			'datamachine/seo',
+			'datamachine/memory',
+			'datamachine/taxonomy',
+			'datamachine/publishing',
+			'datamachine/fetch',
+			'datamachine/email',
+			'datamachine/pipeline',
+			'datamachine/flow',
+			'datamachine/jobs',
+			'datamachine/agent',
+			'datamachine/settings',
+			'datamachine/auth',
+			'datamachine/logging',
+			'datamachine/system',
+			'datamachine/chat',
 		);
+
+		foreach ( $expected_categories as $slug ) {
+			$this->assertArrayHasKey(
+				$slug,
+				$categories,
+				"Ability category '{$slug}' should be registered during plugin boot"
+			);
+		}
 	}
 }

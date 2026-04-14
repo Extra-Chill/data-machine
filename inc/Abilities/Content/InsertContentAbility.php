@@ -39,7 +39,7 @@ class InsertContentAbility {
 			wp_register_ability( 'datamachine/insert-content', array(
 				'label'               => 'Insert Content',
 				'description'         => 'Insert new content at a specific position in a post (beginning, end, or after a paragraph).',
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/content',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'post_id', 'content', 'position' ),
@@ -94,6 +94,7 @@ class InsertContentAbility {
 				$tools['insert_content'] = array(
 					'_callable' => array( self::class, 'getChatTool' ),
 					'contexts'  => array( 'chat', 'pipeline', 'system', 'editor' ),
+					'ability'   => 'datamachine/insert-content',
 				);
 				return $tools;
 			}

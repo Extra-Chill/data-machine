@@ -35,7 +35,7 @@ class DeletePipelineAbility {
 				array(
 					'label'               => __( 'Delete Pipeline', 'data-machine' ),
 					'description'         => __( 'Delete a pipeline and all associated flows.', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/pipeline',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'pipeline_id' ),

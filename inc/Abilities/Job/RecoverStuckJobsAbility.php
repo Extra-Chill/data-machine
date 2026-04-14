@@ -35,7 +35,7 @@ class RecoverStuckJobsAbility {
 				array(
 					'label'               => __( 'Recover Stuck Jobs', 'data-machine' ),
 					'description'         => __( 'Recover jobs stuck in processing state: jobs with status override in engine_data, and jobs exceeding timeout threshold.', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/jobs',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

@@ -20,7 +20,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class ManageQueue extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'manage_queue', array( $this, 'getToolDefinition' ), array( 'chat' ) );
+		$this->registerTool( 'manage_queue', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'abilities' => array( 'datamachine/queue-add', 'datamachine/queue-list', 'datamachine/queue-clear', 'datamachine/queue-remove', 'datamachine/queue-update', 'datamachine/queue-move', 'datamachine/queue-settings' ) ) );
 	}
 
 	/**

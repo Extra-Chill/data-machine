@@ -36,7 +36,7 @@ class ExecuteWorkflowAbility {
 				array(
 					'label'               => __( 'Execute Workflow', 'data-machine' ),
 					'description'         => __( 'Execute an ephemeral workflow from raw JSON steps. For database flow execution, use datamachine/run-flow.', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/jobs',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'workflow' ),

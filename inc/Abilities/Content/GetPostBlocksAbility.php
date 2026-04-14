@@ -37,7 +37,7 @@ class GetPostBlocksAbility {
 				array(
 					'label'               => __( 'Get Post Blocks', 'data-machine' ),
 					'description'         => __( 'Parse a post into Gutenberg blocks with optional filtering by type or content', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/content',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'post_id' ),
@@ -98,6 +98,7 @@ class GetPostBlocksAbility {
 				$tools['get_post_blocks'] = array(
 					'_callable' => array( self::class, 'getChatTool' ),
 					'contexts'  => array( 'chat' ),
+					'ability'   => 'datamachine/get-post-blocks',
 				);
 				return $tools;
 			}

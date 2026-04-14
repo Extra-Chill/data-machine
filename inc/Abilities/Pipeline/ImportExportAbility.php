@@ -47,7 +47,7 @@ class ImportExportAbility {
 			array(
 				'label'               => __( 'Import Pipelines', 'data-machine' ),
 				'description'         => __( 'Import pipelines from CSV data.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/pipeline',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'data' ),
@@ -87,7 +87,7 @@ class ImportExportAbility {
 			array(
 				'label'               => __( 'Export Pipelines', 'data-machine' ),
 				'description'         => __( 'Export pipelines to CSV format.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/pipeline',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(

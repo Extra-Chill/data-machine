@@ -20,7 +20,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class SearchTaxonomyTerms extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'search_taxonomy_terms', array( $this, 'getToolDefinition' ), array( 'chat' ) );
+		$this->registerTool( 'search_taxonomy_terms', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'access_level' => 'editor' ) );
 	}
 
 	public function getToolDefinition(): array {

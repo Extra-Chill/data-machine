@@ -33,7 +33,7 @@ class DeleteJobsAbility {
 				array(
 					'label'               => __( 'Delete Jobs', 'data-machine' ),
 					'description'         => __( 'Delete jobs by type (all or failed). Optionally cleanup processed items tracking.', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/jobs',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'type' ),

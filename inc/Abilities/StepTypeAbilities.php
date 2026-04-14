@@ -66,7 +66,7 @@ class StepTypeAbilities {
 			array(
 				'label'               => __( 'Get Step Types', 'data-machine' ),
 				'description'         => __( 'Get all registered step types, or a single step type by slug.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/pipeline',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -98,7 +98,7 @@ class StepTypeAbilities {
 			array(
 				'label'               => __( 'Validate Step Type', 'data-machine' ),
 				'description'         => __( 'Validate that a step type slug exists.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/pipeline',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'step_type' ),

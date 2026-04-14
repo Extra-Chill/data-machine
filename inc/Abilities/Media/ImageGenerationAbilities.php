@@ -75,7 +75,7 @@ class ImageGenerationAbilities {
 				array(
 					'label'               => 'Generate Image',
 					'description'         => 'Generate an image using AI models via Replicate API',
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/media',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'prompt' ),

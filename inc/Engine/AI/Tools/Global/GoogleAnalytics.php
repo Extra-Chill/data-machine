@@ -20,7 +20,7 @@ class GoogleAnalytics extends BaseTool {
 
 	public function __construct() {
 		$this->registerConfigurationHandlers( 'google_analytics' );
-		$this->registerTool( 'google_analytics', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ) );
+		$this->registerTool( 'google_analytics', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ), array( 'ability' => 'datamachine/google-analytics' ) );
 	}
 
 	/**

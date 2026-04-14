@@ -32,7 +32,7 @@ class SendPingAbility {
 				array(
 					'label'               => __( 'Send Ping', 'data-machine' ),
 					'description'         => __( 'Send pipeline context to webhook endpoints. Supports multiple URLs (one per line).', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/agent',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'webhook_url' ),

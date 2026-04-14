@@ -33,7 +33,7 @@ class GetTaxonomyTermsAbility {
 				array(
 					'label'               => __( 'Get Taxonomy Terms', 'data-machine' ),
 					'description'         => __( 'Retrieve taxonomy terms with optional filtering by taxonomy, search, and pagination.', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/taxonomy',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

@@ -36,7 +36,7 @@ class DeleteChatSessionAbility {
 				array(
 					'label'               => __( 'Delete Chat Session', 'data-machine' ),
 					'description'         => __( 'Delete a chat session after verifying ownership.', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/chat',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

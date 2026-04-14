@@ -41,7 +41,7 @@ class ProblemFlowsAbility {
 						__( 'Identify flows with issues: consecutive failures (broken) or consecutive no-items runs (source exhausted). Default threshold: %d.', 'data-machine' ),
 						$default_threshold
 					),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/jobs',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

@@ -51,7 +51,7 @@ class ImageOptimizationAbilities {
 				array(
 					'label'               => 'Diagnose Images',
 					'description'         => 'Scan the media library for oversized images, missing WebP variants, and missing thumbnail sizes.',
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/media',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
@@ -93,7 +93,7 @@ class ImageOptimizationAbilities {
 				array(
 					'label'               => 'Optimize Images',
 					'description'         => 'Compress oversized images and generate WebP variants. Uses WordPress image editor (Imagick/GD). Batch-aware.',
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/media',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

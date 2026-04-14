@@ -40,7 +40,7 @@ class ScheduleFlowAbility {
 				array(
 					'label'               => __( 'Schedule Flow', 'data-machine' ),
 					'description'         => __( 'Schedule flow execution: manual (clear), one-time timestamp, or recurring interval.', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/jobs',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'flow_id', 'interval_or_timestamp' ),

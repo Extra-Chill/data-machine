@@ -39,7 +39,7 @@ class FetchFilesAbility {
 				array(
 					'label'               => __( 'Fetch Files', 'data-machine' ),
 					'description'         => __( 'Fetch files from the file repository with deduplication support', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/fetch',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'file_context' ),

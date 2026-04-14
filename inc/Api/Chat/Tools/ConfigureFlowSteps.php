@@ -21,7 +21,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class ConfigureFlowSteps extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'configure_flow_steps', array( $this, 'getToolDefinition' ), array( 'chat' ) );
+		$this->registerTool( 'configure_flow_steps', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'abilities' => array( 'datamachine/update-flow-step', 'datamachine/validate-handler', 'datamachine/configure-flow-steps', 'datamachine/validate-flow-steps-config' ) ) );
 	}
 
 	/**

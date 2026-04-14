@@ -60,7 +60,7 @@ class QueueAbility {
 			array(
 				'label'               => __( 'Add to Queue', 'data-machine' ),
 				'description'         => __( 'Add a prompt to the flow queue.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/flow',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'flow_id', 'flow_step_id', 'prompt' ),
@@ -118,7 +118,7 @@ class QueueAbility {
 			array(
 				'label'               => __( 'List Queue', 'data-machine' ),
 				'description'         => __( 'List all prompts in the flow queue.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/flow',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'flow_id', 'flow_step_id' ),
@@ -161,7 +161,7 @@ class QueueAbility {
 			array(
 				'label'               => __( 'Clear Queue', 'data-machine' ),
 				'description'         => __( 'Clear all prompts from the flow queue.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/flow',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'flow_id', 'flow_step_id' ),
@@ -203,7 +203,7 @@ class QueueAbility {
 			array(
 				'label'               => __( 'Remove from Queue', 'data-machine' ),
 				'description'         => __( 'Remove a specific prompt from the queue by index.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/flow',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'flow_id', 'flow_step_id', 'index' ),
@@ -249,7 +249,7 @@ class QueueAbility {
 			array(
 				'label'               => __( 'Update Queue Item', 'data-machine' ),
 				'description'         => __( 'Update a prompt at a specific index in the flow queue.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/flow',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'flow_id', 'flow_step_id', 'index', 'prompt' ),
@@ -300,7 +300,7 @@ class QueueAbility {
 			array(
 				'label'               => __( 'Move Queue Item', 'data-machine' ),
 				'description'         => __( 'Move a prompt from one position to another in the queue.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/flow',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'flow_id', 'flow_step_id', 'from_index', 'to_index' ),
@@ -352,7 +352,7 @@ class QueueAbility {
 			array(
 				'label'               => __( 'Update Queue Settings', 'data-machine' ),
 				'description'         => __( 'Update queue settings for a flow step.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/flow',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'flow_id', 'flow_step_id', 'queue_enabled' ),

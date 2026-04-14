@@ -42,7 +42,7 @@ class SendMessageAbility {
 				array(
 					'label'               => __( 'Send Message', 'data-machine' ),
 					'description'         => __( 'Send a user message to an AI agent and get a response. Creates a session if needed.', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/chat',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

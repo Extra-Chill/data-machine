@@ -66,7 +66,7 @@ class DuplicateCheckAbility {
 			array(
 				'label'               => __( 'Check Duplicate', 'data-machine' ),
 				'description'         => __( 'Check if similar content already exists as a published post, in a queue, or via extension-registered strategies. Returns match details or clear verdict.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/agent',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'title' ),
@@ -236,7 +236,7 @@ class DuplicateCheckAbility {
 			array(
 				'label'               => __( 'Titles Match', 'data-machine' ),
 				'description'         => __( 'Compare two titles for semantic equivalence using the unified similarity engine. Returns match result with score and strategy.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/agent',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'title1', 'title2' ),

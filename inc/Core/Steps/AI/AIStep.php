@@ -252,6 +252,14 @@ class AIStep extends Step {
 		}
 
 		$engine_data     = $this->engine->all();
+
+		// Tool categories can be specified at the pipeline step level or pipeline level.
+		// This allows pipelines to declare which ability categories are relevant,
+		// reducing tool bloat by excluding irrelevant tools from the AI context.
+		$tool_categories = $pipeline_step_config['tool_categories']
+			?? $this->engine->get( 'pipeline_tool_categories' )
+			?? array();
+
 		$resolver        = new ToolPolicyResolver();
 		$available_tools = $resolver->resolve( array(
 			'context'              => ToolPolicyResolver::CONTEXT_PIPELINE,
@@ -260,6 +268,7 @@ class AIStep extends Step {
 			'next_step_config'     => $next_step_config,
 			'pipeline_step_id'     => $pipeline_step_id,
 			'engine_data'          => $engine_data,
+			'categories'           => $tool_categories,
 		) );
 
 		// Model/provider resolved exclusively via context system — pipeline config is ignored.

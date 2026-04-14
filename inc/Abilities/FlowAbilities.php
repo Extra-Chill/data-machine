@@ -44,8 +44,6 @@ class FlowAbilities {
 			return;
 		}
 
-		$this->registerCategory();
-
 		$this->queue           = new QueueAbility();
 		$this->get_flows       = new GetFlowsAbility();
 		$this->create_flow     = new CreateFlowAbility();
@@ -57,27 +55,6 @@ class FlowAbilities {
 		$this->webhook_trigger = new WebhookTriggerAbility();
 
 		self::$registered = true;
-	}
-
-	/**
-	 * Register the datamachine ability category.
-	 */
-	private function registerCategory(): void {
-		$category_callback = function () {
-			wp_register_ability_category(
-				'datamachine',
-				array(
-					'label'       => __( 'Data Machine', 'data-machine' ),
-					'description' => __( 'Data Machine flow and pipeline operations', 'data-machine' ),
-				)
-			);
-		};
-
-		if ( did_action( 'wp_abilities_api_categories_init' ) ) {
-			$category_callback();
-		} else {
-			add_action( 'wp_abilities_api_categories_init', $category_callback );
-		}
 	}
 
 	/**

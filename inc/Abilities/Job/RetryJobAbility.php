@@ -36,7 +36,7 @@ class RetryJobAbility {
 				array(
 					'label'               => __( 'Retry Job', 'data-machine' ),
 					'description'         => __( 'Retry a failed or stuck job by marking it failed and optionally requeuing its prompt.', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/jobs',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

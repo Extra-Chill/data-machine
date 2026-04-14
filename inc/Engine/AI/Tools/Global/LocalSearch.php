@@ -17,7 +17,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class LocalSearch extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'local_search', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ) );
+		$this->registerTool( 'local_search', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ), array( 'ability' => 'datamachine/local-search' ) );
 	}
 
 	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {

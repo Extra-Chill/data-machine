@@ -36,7 +36,7 @@ class ReplacePostBlocksAbility {
 				array(
 					'label'               => __( 'Replace Post Blocks', 'data-machine' ),
 					'description'         => __( 'Replace entire block content by index. Use for AI-rewritten paragraphs.', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/content',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'post_id', 'replacements' ),
@@ -103,6 +103,7 @@ class ReplacePostBlocksAbility {
 				$tools['replace_post_blocks'] = array(
 					'_callable' => array( self::class, 'getChatTool' ),
 					'contexts'  => array( 'chat' ),
+					'ability'   => 'datamachine/replace-post-blocks',
 				);
 				return $tools;
 			}

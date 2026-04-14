@@ -19,7 +19,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class DeleteFile extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'delete_file', array( $this, 'getToolDefinition' ), array( 'chat' ) );
+		$this->registerTool( 'delete_file', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'ability' => 'datamachine/delete-flow-file' ) );
 	}
 
 	/**

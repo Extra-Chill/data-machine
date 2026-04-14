@@ -23,7 +23,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class InternalLinkAudit extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'internal_link_audit', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ) );
+		$this->registerTool( 'internal_link_audit', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ), array( 'abilities' => array( 'datamachine/audit-internal-links', 'datamachine/get-orphaned-posts', 'datamachine/check-broken-links' ) ) );
 	}
 
 	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {

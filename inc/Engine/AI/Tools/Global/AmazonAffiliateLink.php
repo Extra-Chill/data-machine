@@ -84,7 +84,7 @@ class AmazonAffiliateLink extends BaseTool {
 	 */
 	public function __construct() {
 		$this->registerConfigurationHandlers( 'amazon_affiliate_link' );
-		$this->registerTool( 'amazon_affiliate_link', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ) );
+		$this->registerTool( 'amazon_affiliate_link', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ), array( 'access_level' => 'admin' ) );
 	}
 
 	/**
