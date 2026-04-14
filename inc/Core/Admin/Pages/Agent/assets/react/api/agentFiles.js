@@ -2,94 +2,79 @@
  * Agent Files API
  *
  * REST client functions for agent memory file operations.
+ * Uses the shared API client for automatic agent interceptor support.
  */
 
 /**
- * WordPress dependencies
+ * Internal dependencies
  */
-import apiFetch from '@wordpress/api-fetch';
+import { client } from '@shared/utils/api';
+import { useAgentStore } from '@shared/stores/agentStore';
 
-const getConfig = () => {
-	const config = window.dataMachineAgentConfig || {};
-	return { restNamespace: config.restNamespace || 'datamachine/v1' };
+/**
+ * Get agent_id params for mutation requests (PUT/DELETE).
+ * The shared client interceptor only injects into GET requests,
+ * so mutations must include agent_id explicitly.
+ *
+ * @return {Object} Object with agent_id if one is selected, empty otherwise.
+ */
+const getAgentParams = () => {
+	const { selectedAgentId } = useAgentStore.getState();
+	return selectedAgentId !== null ? { agent_id: selectedAgentId } : {};
 };
 
 export const listAgentFiles = async () => {
-	const config = getConfig();
-	return apiFetch( { path: `/${ config.restNamespace }/files/agent` } );
+	return client.get( '/files/agent' );
 };
 
 export const getAgentFile = async ( filename ) => {
-	const config = getConfig();
-	return apiFetch( {
-		path: `/${ config.restNamespace }/files/agent/${ filename }`,
-	} );
+	return client.get( `/files/agent/${ filename }` );
 };
 
 export const putAgentFile = async ( filename, content ) => {
-	const config = getConfig();
-	return apiFetch( {
-		path: `/${ config.restNamespace }/files/agent/${ filename }`,
-		method: 'PUT',
-		data: { content },
+	return client.put( `/files/agent/${ filename }`, {
+		content,
+		...getAgentParams(),
 	} );
 };
 
 export const deleteAgentFile = async ( filename ) => {
-	const config = getConfig();
-	return apiFetch( {
-		path: `/${ config.restNamespace }/files/agent/${ filename }`,
-		method: 'DELETE',
-	} );
+	return client.delete( `/files/agent/${ filename }`, getAgentParams() );
 };
 
 // Daily memory file operations.
 
 export const listDailyFiles = async () => {
-	const config = getConfig();
-	return apiFetch( {
-		path: `/${ config.restNamespace }/files/agent/daily`,
-	} );
+	return client.get( '/files/agent/daily' );
 };
 
 export const getDailyFile = async ( year, month, day ) => {
-	const config = getConfig();
-	return apiFetch( {
-		path: `/${ config.restNamespace }/files/agent/daily/${ year }/${ month }/${ day }`,
-	} );
+	return client.get( `/files/agent/daily/${ year }/${ month }/${ day }` );
 };
 
 export const putDailyFile = async ( year, month, day, content ) => {
-	const config = getConfig();
-	return apiFetch( {
-		path: `/${ config.restNamespace }/files/agent/daily/${ year }/${ month }/${ day }`,
-		method: 'PUT',
-		data: { content },
+	return client.put( `/files/agent/daily/${ year }/${ month }/${ day }`, {
+		content,
+		...getAgentParams(),
 	} );
 };
 
 export const deleteDailyFile = async ( year, month, day ) => {
-	const config = getConfig();
-	return apiFetch( {
-		path: `/${ config.restNamespace }/files/agent/daily/${ year }/${ month }/${ day }`,
-		method: 'DELETE',
-	} );
+	return client.delete(
+		`/files/agent/daily/${ year }/${ month }/${ day }`,
+		getAgentParams()
+	);
 };
 
 // Context memory file operations.
 
 export const getContextFile = async ( slug ) => {
-	const config = getConfig();
-	return apiFetch( {
-		path: `/${ config.restNamespace }/files/agent/contexts/${ slug }`,
-	} );
+	return client.get( `/files/agent/contexts/${ slug }` );
 };
 
 export const putContextFile = async ( slug, content ) => {
-	const config = getConfig();
-	return apiFetch( {
-		path: `/${ config.restNamespace }/files/agent/contexts/${ slug }`,
-		method: 'PUT',
-		data: { content },
+	return client.put( `/files/agent/contexts/${ slug }`, {
+		content,
+		...getAgentParams(),
 	} );
 };
