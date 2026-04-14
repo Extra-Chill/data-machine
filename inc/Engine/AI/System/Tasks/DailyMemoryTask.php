@@ -208,11 +208,84 @@ class DailyMemoryTask extends SystemTask {
 		$parts         = explode( '-', $date );
 
 		if ( ! empty( $parsed['archived'] ) ) {
-			$archive_header = "\n### Archived from MEMORY.md\n\n";
-			$archive_text   = $archive_header . $parsed['archived'] . "\n";
-			$archived_size  = strlen( $parsed['archived'] );
+			$archived_size = strlen( $parsed['archived'] );
 
-			$daily->append( $parts[0], $parts[1], $parts[2], $archive_text );
+			$archive_context = array(
+				'persistent'    => $parsed['persistent'],
+				'original_size' => $original_size,
+				'new_size'      => $new_size,
+				'archived_size' => $archived_size,
+				'job_id'        => $jobId,
+			);
+
+			/**
+			 * Filters whether the default daily file archive write should be skipped.
+			 *
+			 * Developers can return `true` to handle archived content storage
+			 * themselves (e.g., creating a WordPress post or page, sending to
+			 * an external service, etc.). When `true` is returned, the flat-file
+			 * write to `daily/YYYY/MM/DD.md` is skipped entirely.
+			 *
+			 * @since 0.46.0
+			 *
+			 * @param bool   $handled Whether a handler has already stored the content.
+			 *                        Default false (flat-file write proceeds).
+			 * @param string $content The archived content extracted from MEMORY.md.
+			 * @param string $date    The archive date (YYYY-MM-DD).
+			 * @param array  $context {
+			 *     Additional context about the daily memory operation.
+			 *
+			 *     @type string $persistent    The persistent content remaining in MEMORY.md.
+			 *     @type int    $original_size Original MEMORY.md size in bytes.
+			 *     @type int    $new_size      New MEMORY.md size in bytes after cleanup.
+			 *     @type int    $archived_size Archived content size in bytes.
+			 *     @type int    $job_id        The job ID for this task execution.
+			 * }
+			 */
+			$handled = apply_filters(
+				'datamachine_daily_memory_pre_archive',
+				false,
+				$parsed['archived'],
+				$date,
+				$archive_context
+			);
+
+			if ( ! $handled ) {
+				$archive_header = "\n### Archived from MEMORY.md\n\n";
+				$archive_text   = $archive_header . $parsed['archived'] . "\n";
+
+				$daily->append( $parts[0], $parts[1], $parts[2], $archive_text );
+			}
+
+			/**
+			 * Fires after daily memory archived content has been processed.
+			 *
+			 * This action fires regardless of whether the content was written to a
+			 * flat file or handled by a `datamachine_daily_memory_pre_archive` filter.
+			 * Use this for post-processing, notifications, or secondary storage.
+			 *
+			 * @since 0.46.0
+			 *
+			 * @param string $content The archived content extracted from MEMORY.md.
+			 * @param string $date    The archive date (YYYY-MM-DD).
+			 * @param bool   $handled Whether a filter handled storage (true = flat file skipped).
+			 * @param array  $context {
+			 *     Additional context about the daily memory operation.
+			 *
+			 *     @type string $persistent    The persistent content remaining in MEMORY.md.
+			 *     @type int    $original_size Original MEMORY.md size in bytes.
+			 *     @type int    $new_size      New MEMORY.md size in bytes after cleanup.
+			 *     @type int    $archived_size Archived content size in bytes.
+			 *     @type int    $job_id        The job ID for this task execution.
+			 * }
+			 */
+			do_action(
+				'datamachine_daily_memory_archived',
+				$parsed['archived'],
+				$date,
+				$handled,
+				$archive_context
+			);
 		}
 
 		do_action(
