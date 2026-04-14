@@ -438,9 +438,16 @@ class AgentFiles {
 	// =========================================================================
 
 	public static function list_daily_files( WP_REST_Request $request ) {
-		$result = DailyMemoryAbilities::listDaily( array(
+		$input = array(
 			'user_id' => self::resolve_scoped_user_id( $request ),
-		) );
+		);
+
+		$agent_id = $request->get_param( 'agent_id' );
+		if ( null !== $agent_id && '' !== $agent_id ) {
+			$input['agent_id'] = (int) $agent_id;
+		}
+
+		$result = DailyMemoryAbilities::listDaily( $input );
 
 		return rest_ensure_response( array(
 			'success' => true,
@@ -449,11 +456,18 @@ class AgentFiles {
 	}
 
 	public static function get_daily_file( WP_REST_Request $request ) {
-		$date   = sprintf( '%s-%s-%s', $request['year'], $request['month'], $request['day'] );
-		$result = DailyMemoryAbilities::readDaily( array(
+		$date  = sprintf( '%s-%s-%s', $request['year'], $request['month'], $request['day'] );
+		$input = array(
 			'date'    => $date,
 			'user_id' => self::resolve_scoped_user_id( $request ),
-		) );
+		);
+
+		$agent_id = $request->get_param( 'agent_id' );
+		if ( null !== $agent_id && '' !== $agent_id ) {
+			$input['agent_id'] = (int) $agent_id;
+		}
+
+		$result = DailyMemoryAbilities::readDaily( $input );
 
 		if ( ! $result['success'] ) {
 			return new WP_Error( 'daily_file_not_found', $result['message'], array( 'status' => 404 ) );
@@ -477,12 +491,19 @@ class AgentFiles {
 			$content = $request->get_body();
 		}
 
-		$result = DailyMemoryAbilities::writeDaily( array(
+		$input = array(
 			'date'    => $date,
 			'content' => $content,
 			'mode'    => 'write',
 			'user_id' => self::resolve_scoped_user_id( $request ),
-		) );
+		);
+
+		$agent_id = $request->get_param( 'agent_id' );
+		if ( null !== $agent_id && '' !== $agent_id ) {
+			$input['agent_id'] = (int) $agent_id;
+		}
+
+		$result = DailyMemoryAbilities::writeDaily( $input );
 
 		if ( ! $result['success'] ) {
 			$status = false !== strpos( $result['message'] ?? '', 'disabled' ) ? 403 : 500;
@@ -497,11 +518,18 @@ class AgentFiles {
 	}
 
 	public static function delete_daily_file( WP_REST_Request $request ) {
-		$date   = sprintf( '%s-%s-%s', $request['year'], $request['month'], $request['day'] );
-		$result = DailyMemoryAbilities::deleteDaily( array(
+		$date  = sprintf( '%s-%s-%s', $request['year'], $request['month'], $request['day'] );
+		$input = array(
 			'date'    => $date,
 			'user_id' => self::resolve_scoped_user_id( $request ),
-		) );
+		);
+
+		$agent_id = $request->get_param( 'agent_id' );
+		if ( null !== $agent_id && '' !== $agent_id ) {
+			$input['agent_id'] = (int) $agent_id;
+		}
+
+		$result = DailyMemoryAbilities::deleteDaily( $input );
 
 		if ( ! $result['success'] ) {
 			$status = false !== strpos( $result['message'] ?? '', 'disabled' ) ? 403 : 404;
