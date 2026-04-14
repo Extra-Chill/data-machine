@@ -3,7 +3,14 @@
  * Daily Memory Abilities
  *
  * WordPress 6.9 Abilities API primitives for daily memory operations.
- * Provides read/write/list access to daily memory files (YYYY/MM/DD.md).
+ * Provides read/write/list/search/delete access to daily memory.
+ *
+ * Each operation fires a filter (`datamachine_daily_memory_{operation}`) that
+ * allows plugins to completely replace the storage backend. If the filter
+ * returns a non-null value, the flat-file operation is skipped entirely.
+ * This enables consumers like Intelligence to store daily memory as
+ * WordPress pages, external services, or anything else — Data Machine
+ * doesn't need to know or care.
  *
  * @package DataMachine\Abilities
  * @since 0.32.0
@@ -250,10 +257,7 @@ class DailyMemoryAbilities {
 	 * @return array Result.
 	 */
 	public static function readDaily( array $input ): array {
-		$user_id  = (int) ( $input['user_id'] ?? 0 );
-		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$daily    = new DailyMemory( $user_id, $agent_id );
-		$date     = $input['date'] ?? gmdate( 'Y-m-d' );
+		$date = $input['date'] ?? gmdate( 'Y-m-d' );
 
 		$parts = DailyMemory::parse_date( $date );
 		if ( ! $parts ) {
@@ -262,6 +266,30 @@ class DailyMemoryAbilities {
 				'message' => sprintf( 'Invalid date format: %s. Use YYYY-MM-DD.', $date ),
 			);
 		}
+
+		/**
+		 * Filters the daily memory read result.
+		 *
+		 * Return a non-null array to completely replace the flat-file read.
+		 * The array should match the standard result format:
+		 * `{ success: bool, date?: string, content?: string, message?: string }`
+		 *
+		 * @since 0.47.0
+		 *
+		 * @param array|null $result   Default null (flat-file read proceeds).
+		 *                             Return an array to short-circuit.
+		 * @param string     $date     The requested date (YYYY-MM-DD).
+		 * @param array      $input    Full input parameters (includes user_id, agent_id).
+		 */
+		$result = apply_filters( 'datamachine_daily_memory_read', null, $date, $input );
+
+		if ( null !== $result ) {
+			return $result;
+		}
+
+		$user_id  = (int) ( $input['user_id'] ?? 0 );
+		$agent_id = (int) ( $input['agent_id'] ?? 0 );
+		$daily    = new DailyMemory( $user_id, $agent_id );
 
 		return $daily->read( $parts['year'], $parts['month'], $parts['day'] );
 	}
@@ -280,12 +308,9 @@ class DailyMemoryAbilities {
 			);
 		}
 
-		$user_id  = (int) ( $input['user_id'] ?? 0 );
-		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$daily    = new DailyMemory( $user_id, $agent_id );
-		$content  = $input['content'];
-		$date     = $input['date'] ?? gmdate( 'Y-m-d' );
-		$mode     = $input['mode'] ?? 'append';
+		$date    = $input['date'] ?? gmdate( 'Y-m-d' );
+		$content = $input['content'];
+		$mode    = $input['mode'] ?? 'append';
 
 		$parts = DailyMemory::parse_date( $date );
 		if ( ! $parts ) {
@@ -294,6 +319,31 @@ class DailyMemoryAbilities {
 				'message' => sprintf( 'Invalid date format: %s. Use YYYY-MM-DD.', $date ),
 			);
 		}
+
+		/**
+		 * Filters the daily memory write result.
+		 *
+		 * Return a non-null array to completely replace the flat-file write.
+		 * The array should match: `{ success: bool, message?: string }`
+		 *
+		 * @since 0.47.0
+		 *
+		 * @param array|null $result   Default null (flat-file write proceeds).
+		 *                             Return an array to short-circuit.
+		 * @param string     $date     The target date (YYYY-MM-DD).
+		 * @param string     $content  The content to write.
+		 * @param string     $mode     Write mode: 'write' or 'append'.
+		 * @param array      $input    Full input parameters (includes user_id, agent_id).
+		 */
+		$result = apply_filters( 'datamachine_daily_memory_write', null, $date, $content, $mode, $input );
+
+		if ( null !== $result ) {
+			return $result;
+		}
+
+		$user_id  = (int) ( $input['user_id'] ?? 0 );
+		$agent_id = (int) ( $input['agent_id'] ?? 0 );
+		$daily    = new DailyMemory( $user_id, $agent_id );
 
 		if ( 'write' === $mode ) {
 			return $daily->write( $parts['year'], $parts['month'], $parts['day'], $content );
@@ -305,10 +355,28 @@ class DailyMemoryAbilities {
 	/**
 	 * List all daily memory files.
 	 *
-	 * @param array $input Input parameters (unused).
+	 * @param array $input Input parameters.
 	 * @return array Result.
 	 */
 	public static function listDaily( array $input ): array {
+		/**
+		 * Filters the daily memory list result.
+		 *
+		 * Return a non-null array to completely replace the flat-file listing.
+		 * The array should match: `{ months: { 'YYYY/MM': ['DD', ...], ... } }`
+		 *
+		 * @since 0.47.0
+		 *
+		 * @param array|null $result   Default null (flat-file list proceeds).
+		 *                             Return an array to short-circuit.
+		 * @param array      $input    Full input parameters (includes user_id, agent_id).
+		 */
+		$result = apply_filters( 'datamachine_daily_memory_list', null, $input );
+
+		if ( null !== $result ) {
+			return $result;
+		}
+
 		$user_id  = (int) ( $input['user_id'] ?? 0 );
 		$agent_id = (int) ( $input['agent_id'] ?? 0 );
 		$daily    = new DailyMemory( $user_id, $agent_id );
@@ -322,12 +390,35 @@ class DailyMemoryAbilities {
 	 * @return array Search results.
 	 */
 	public static function searchDaily( array $input ): array {
+		$query = $input['query'];
+		$from  = $input['from'] ?? null;
+		$to    = $input['to'] ?? null;
+
+		/**
+		 * Filters the daily memory search result.
+		 *
+		 * Return a non-null array to completely replace the flat-file search.
+		 * The array should match:
+		 * `{ success: bool, query: string, match_count: int, matches: [...] }`
+		 *
+		 * @since 0.47.0
+		 *
+		 * @param array|null  $result  Default null (flat-file search proceeds).
+		 *                             Return an array to short-circuit.
+		 * @param string      $query   The search term.
+		 * @param string|null $from    Start date (YYYY-MM-DD) or null.
+		 * @param string|null $to      End date (YYYY-MM-DD) or null.
+		 * @param array       $input   Full input parameters (includes user_id, agent_id).
+		 */
+		$result = apply_filters( 'datamachine_daily_memory_search', null, $query, $from, $to, $input );
+
+		if ( null !== $result ) {
+			return $result;
+		}
+
 		$user_id  = (int) ( $input['user_id'] ?? 0 );
 		$agent_id = (int) ( $input['agent_id'] ?? 0 );
 		$daily    = new DailyMemory( $user_id, $agent_id );
-		$query    = $input['query'];
-		$from     = $input['from'] ?? null;
-		$to       = $input['to'] ?? null;
 
 		return $daily->search( $query, $from, $to );
 	}
@@ -348,10 +439,7 @@ class DailyMemoryAbilities {
 			);
 		}
 
-		$user_id  = (int) ( $input['user_id'] ?? 0 );
-		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$daily    = new DailyMemory( $user_id, $agent_id );
-		$date     = $input['date'] ?? gmdate( 'Y-m-d' );
+		$date = $input['date'] ?? gmdate( 'Y-m-d' );
 
 		$parts = DailyMemory::parse_date( $date );
 		if ( ! $parts ) {
@@ -360,6 +448,29 @@ class DailyMemoryAbilities {
 				'message' => sprintf( 'Invalid date format: %s. Use YYYY-MM-DD.', $date ),
 			);
 		}
+
+		/**
+		 * Filters the daily memory delete result.
+		 *
+		 * Return a non-null array to completely replace the flat-file delete.
+		 * The array should match: `{ success: bool, message?: string }`
+		 *
+		 * @since 0.47.0
+		 *
+		 * @param array|null $result   Default null (flat-file delete proceeds).
+		 *                             Return an array to short-circuit.
+		 * @param string     $date     The target date (YYYY-MM-DD).
+		 * @param array      $input    Full input parameters (includes user_id, agent_id).
+		 */
+		$result = apply_filters( 'datamachine_daily_memory_delete', null, $date, $input );
+
+		if ( null !== $result ) {
+			return $result;
+		}
+
+		$user_id  = (int) ( $input['user_id'] ?? 0 );
+		$agent_id = (int) ( $input['agent_id'] ?? 0 );
+		$daily    = new DailyMemory( $user_id, $agent_id );
 
 		return $daily->delete( $parts['year'], $parts['month'], $parts['day'] );
 	}
