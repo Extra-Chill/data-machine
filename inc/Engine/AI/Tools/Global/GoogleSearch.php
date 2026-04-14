@@ -16,7 +16,7 @@ class GoogleSearch extends BaseTool {
 
 	public function __construct() {
 		$this->registerConfigurationHandlers( 'google_search' );
-		$this->registerTool( 'google_search', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ) );
+		$this->registerTool( 'google_search', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ), array( 'access_level' => 'admin' ) );
 	}
 
 	/**

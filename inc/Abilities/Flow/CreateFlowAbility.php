@@ -35,7 +35,7 @@ class CreateFlowAbility {
 				array(
 					'label'               => __( 'Create Flow', 'data-machine' ),
 					'description'         => __( 'Create a new flow for a pipeline. Supports bulk mode via flows array.', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/flow',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

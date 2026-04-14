@@ -23,7 +23,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class QueueValidator extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'queue_validator', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ) );
+		$this->registerTool( 'queue_validator', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ), array( 'access_level' => 'admin' ) );
 	}
 
 	/**

@@ -41,7 +41,7 @@ class AgentAbilities {
 				array(
 					'label'               => 'Rename Agent',
 					'description'         => 'Rename an agent slug — updates database and moves filesystem directory',
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/agent',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'old_slug', 'new_slug' ),
@@ -78,7 +78,7 @@ class AgentAbilities {
 				array(
 					'label'               => 'List Agents',
 					'description'         => 'List all registered agent identities',
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/agent',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => new \stdClass(),
@@ -113,7 +113,7 @@ class AgentAbilities {
 				array(
 					'label'               => 'Create Agent',
 					'description'         => 'Create a new agent identity with filesystem directory and owner access. Admins can create agents for any user. Non-admins with create_own_agent can create one agent for themselves.',
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/agent',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'agent_slug' ),
@@ -160,7 +160,7 @@ class AgentAbilities {
 				array(
 					'label'               => 'Get Agent',
 					'description'         => 'Retrieve a single agent by slug or ID with access grants and directory info',
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/agent',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
@@ -199,7 +199,7 @@ class AgentAbilities {
 				array(
 					'label'               => 'Update Agent',
 					'description'         => 'Update an agent\'s mutable fields (name, config, status)',
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/agent',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'agent_id' ),
@@ -241,7 +241,7 @@ class AgentAbilities {
 				array(
 					'label'               => 'Delete Agent',
 					'description'         => 'Delete an agent record and access grants, optionally removing filesystem directory',
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/agent',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

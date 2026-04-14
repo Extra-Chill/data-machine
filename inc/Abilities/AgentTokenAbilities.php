@@ -49,7 +49,7 @@ class AgentTokenAbilities {
 			array(
 				'label'               => __( 'Create Agent Token', 'data-machine' ),
 				'description'         => __( 'Create a bearer token for agent runtime authentication. The raw token is only returned once.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/agent',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'agent_id' ),
@@ -96,7 +96,7 @@ class AgentTokenAbilities {
 			array(
 				'label'               => __( 'Revoke Agent Token', 'data-machine' ),
 				'description'         => __( 'Revoke (delete) an agent bearer token. The token will immediately stop working.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/agent',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'agent_id', 'token_id' ),
@@ -132,7 +132,7 @@ class AgentTokenAbilities {
 			array(
 				'label'               => __( 'List Agent Tokens', 'data-machine' ),
 				'description'         => __( 'List all tokens for an agent. Returns metadata only (never the token value).', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/agent',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'agent_id' ),

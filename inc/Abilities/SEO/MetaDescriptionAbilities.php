@@ -44,7 +44,7 @@ class MetaDescriptionAbilities {
 				array(
 					'label'               => 'Generate Meta Description',
 					'description'         => 'Queue system agent generation of meta descriptions (saved to post excerpt)',
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/seo',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
@@ -93,7 +93,7 @@ class MetaDescriptionAbilities {
 				array(
 					'label'               => 'Diagnose Meta Descriptions',
 					'description'         => 'Report post excerpt (meta description) coverage for posts',
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/seo',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

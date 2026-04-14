@@ -33,7 +33,7 @@ class UpdateFlowStepAbility {
 				array(
 					'label'               => __( 'Update Flow Step', 'data-machine' ),
 					'description'         => __( 'Update a single flow step handler configuration or user message.', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/flow',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'flow_step_id' ),

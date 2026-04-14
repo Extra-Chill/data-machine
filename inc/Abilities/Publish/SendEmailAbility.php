@@ -43,7 +43,7 @@ class SendEmailAbility {
 				array(
 					'label'               => __( 'Send Email', 'data-machine' ),
 					'description'         => __( 'Send an email with optional attachments via wp_mail()', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/publishing',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'to', 'subject', 'body' ),

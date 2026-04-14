@@ -61,7 +61,7 @@ class ScaffoldAbilities {
 			array(
 				'label'               => __( 'Scaffold Memory File', 'data-machine' ),
 				'description'         => __( 'Create a missing memory file with default content generated from context. Never overwrites existing files. Supports registered files (USER.md, SOUL.md, etc.) and dynamic files (daily memory).', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/memory',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(

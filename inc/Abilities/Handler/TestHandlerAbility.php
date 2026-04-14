@@ -42,7 +42,7 @@ class TestHandlerAbility {
 				array(
 					'label'               => __( 'Test Handler', 'data-machine' ),
 					'description'         => __( 'Dry-run any fetch handler with a config and return packet summaries.', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/pipeline',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

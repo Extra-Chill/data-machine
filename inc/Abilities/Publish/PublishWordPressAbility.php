@@ -40,7 +40,7 @@ class PublishWordPressAbility {
 				array(
 					'label'               => __( 'Publish WordPress Post', 'data-machine' ),
 					'description'         => __( 'Create WordPress posts with taxonomy assignment and featured images', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/publishing',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'title', 'content', 'post_type' ),

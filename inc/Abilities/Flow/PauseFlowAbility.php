@@ -42,7 +42,7 @@ class PauseFlowAbility {
 				array(
 					'label'               => __( 'Pause Flow', 'data-machine' ),
 					'description'         => __( 'Pause one or more flows. Preserves schedule for later resume.', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/flow',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

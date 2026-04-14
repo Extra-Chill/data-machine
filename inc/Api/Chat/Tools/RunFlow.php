@@ -20,7 +20,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class RunFlow extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'run_flow', array( $this, 'getToolDefinition' ), array( 'chat' ) );
+		$this->registerTool( 'run_flow', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'abilities' => array( 'datamachine/run-flow', 'datamachine/schedule-flow' ) ) );
 	}
 
 	/**

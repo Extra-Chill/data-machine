@@ -35,7 +35,7 @@ class ResolveTermAbility {
 				array(
 					'label'               => __( 'Resolve Term', 'data-machine' ),
 					'description'         => __( 'Find or create a taxonomy term by ID, name, or slug. Single source of truth for term resolution.', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/taxonomy',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

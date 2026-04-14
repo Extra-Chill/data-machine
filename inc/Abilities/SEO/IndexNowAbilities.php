@@ -418,7 +418,7 @@ class IndexNowAbilities {
 			array(
 				'label'               => __( 'IndexNow Submit', 'data-machine' ),
 				'description'         => __( 'Submit one or more URLs to IndexNow for instant search engine indexing.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/seo',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'urls' ),
@@ -458,7 +458,7 @@ class IndexNowAbilities {
 			array(
 				'label'               => __( 'IndexNow Status', 'data-machine' ),
 				'description'         => __( 'Get IndexNow integration status including enabled state and API key.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/seo',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(),
@@ -492,7 +492,7 @@ class IndexNowAbilities {
 			array(
 				'label'               => __( 'IndexNow Generate Key', 'data-machine' ),
 				'description'         => __( 'Generate a new IndexNow API key and save it to settings.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/seo',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(),
@@ -524,7 +524,7 @@ class IndexNowAbilities {
 			array(
 				'label'               => __( 'IndexNow Verify Key', 'data-machine' ),
 				'description'         => __( 'Verify that the IndexNow key file is accessible and correct.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/seo',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(),

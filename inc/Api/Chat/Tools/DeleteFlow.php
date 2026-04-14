@@ -18,7 +18,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class DeleteFlow extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'delete_flow', array( $this, 'getToolDefinition' ), array( 'chat' ) );
+		$this->registerTool( 'delete_flow', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'ability' => 'datamachine/delete-flow' ) );
 	}
 
 	/**

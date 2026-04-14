@@ -67,7 +67,7 @@ class AgentFileAbilities {
 			array(
 				'label'               => __( 'List Agent Files', 'data-machine' ),
 				'description'         => __( 'List memory files from all layers (shared, agent, user).', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/memory',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -99,7 +99,7 @@ class AgentFileAbilities {
 			array(
 				'label'               => __( 'Get Agent File', 'data-machine' ),
 				'description'         => __( 'Get a single agent memory file with content.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/memory',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'filename' ),
@@ -136,7 +136,7 @@ class AgentFileAbilities {
 			array(
 				'label'               => __( 'Write Agent File', 'data-machine' ),
 				'description'         => __( 'Write or update content for a memory file. Layer is resolved from the registry, or can be explicitly specified.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/memory',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'filename', 'content' ),
@@ -183,7 +183,7 @@ class AgentFileAbilities {
 			array(
 				'label'               => __( 'Delete Agent File', 'data-machine' ),
 				'description'         => __( 'Delete a memory file. Protected files cannot be deleted.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/memory',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'filename' ),
@@ -220,7 +220,7 @@ class AgentFileAbilities {
 			array(
 				'label'               => __( 'Upload Agent File', 'data-machine' ),
 				'description'         => __( 'Upload a file to a memory layer directory.', 'data-machine' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine/memory',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'file_data' ),

@@ -19,7 +19,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class SendPing extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'send_ping', array( $this, 'getToolDefinition' ), array( 'chat' ) );
+		$this->registerTool( 'send_ping', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'ability' => 'datamachine/send-ping' ) );
 	}
 
 	/**

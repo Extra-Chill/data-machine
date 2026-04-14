@@ -87,7 +87,7 @@ class PageSpeedAbilities {
 				array(
 					'label'               => 'PageSpeed Insights',
 					'description'         => 'Run Lighthouse audits via PageSpeed Insights API for performance, accessibility, SEO, and best practices scores',
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/analytics',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'action' ),

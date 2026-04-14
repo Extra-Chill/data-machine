@@ -21,7 +21,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class AddPipelineStep extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'add_pipeline_step', array( $this, 'getToolDefinition' ), array( 'chat' ) );
+		$this->registerTool( 'add_pipeline_step', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'ability' => 'datamachine/add-pipeline-step' ) );
 	}
 
 	private static function getValidStepTypes(): array {

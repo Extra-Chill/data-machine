@@ -37,7 +37,7 @@ class EditPostBlocksAbility {
 				array(
 					'label'               => __( 'Edit Post Blocks', 'data-machine' ),
 					'description'         => __( 'Surgical find/replace within specific Gutenberg blocks by index', 'data-machine' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine/content',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'post_id', 'edits' ),
@@ -108,6 +108,7 @@ class EditPostBlocksAbility {
 				$tools['edit_post_blocks'] = array(
 					'_callable' => array( self::class, 'getChatTool' ),
 					'contexts'  => array( 'chat' ),
+					'ability'   => 'datamachine/edit-post-blocks',
 				);
 				return $tools;
 			}

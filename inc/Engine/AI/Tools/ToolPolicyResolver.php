@@ -9,11 +9,12 @@
  *
  * Resolution precedence (highest to lowest):
  * 1. Explicit deny list (always wins)
- * 2. Per-agent tool policy (deny/allow mode from agent_config)
- * 3. Context-level allow_only (narrows to explicit subset)
- * 4. Context preset (pipeline/chat/system)
- * 5. Global enablement settings
- * 6. Tool configuration requirements
+ * 2. Per-agent tool policy (deny/allow mode from agent_config, supports categories)
+ * 3. Ability category filter (narrows tools by their linked ability's category)
+ * 4. Context-level allow_only (narrows to explicit subset)
+ * 5. Context preset (pipeline/chat/system)
+ * 6. Global enablement settings
+ * 7. Tool configuration requirements
  *
  * @package DataMachine\Engine\AI\Tools
  * @since 0.39.0
@@ -65,6 +66,8 @@ class ToolPolicyResolver {
 	 *     @type array       $engine_data           Engine data snapshot for dynamic tool generation.
 	 *     @type array       $deny                  Tool names to explicitly deny (highest precedence).
 	 *     @type array       $allow_only            If set, only these tools are allowed (allowlist mode).
+	 *     @type array       $categories            If set, only tools whose linked ability belongs to one
+	 *                                              of these categories are included. Empty = no filtering.
 	 *     @type string|null $cache_scope           Scope key for tool cache (e.g. flow_step_id).
 	 * }
 	 * @return array Resolved tools array keyed by tool name.
@@ -124,18 +127,25 @@ class ToolPolicyResolver {
 			$tools        = $this->applyAgentPolicy( $tools, $agent_policy );
 		}
 
-		// 4. Apply allowlist if specified (narrows to explicit subset).
+		// 4. Filter by ability categories (narrows to tools whose linked ability
+		//    belongs to one of the specified categories).
+		$categories = $context['categories'] ?? array();
+		if ( ! empty( $categories ) ) {
+			$tools = $this->filterByAbilityCategories( $tools, $categories );
+		}
+
+		// 5. Apply allowlist if specified (narrows to explicit subset).
 		$allow_only = $context['allow_only'] ?? array();
 		if ( ! empty( $allow_only ) ) {
 			$tools = array_intersect_key( $tools, array_flip( $allow_only ) );
 		}
 
-		// 5. Apply deny list (always wins).
+		// 6. Apply deny list (always wins).
 		if ( ! empty( $deny ) ) {
 			$tools = array_diff_key( $tools, array_flip( $deny ) );
 		}
 
-		// 6. Allow external filtering of resolved tools.
+		// 7. Allow external filtering of resolved tools.
 		$tools = apply_filters( 'datamachine_resolved_tools', $tools, $context_type, $context );
 
 		return $tools;
@@ -365,6 +375,79 @@ class ToolPolicyResolver {
 	}
 
 	/**
+	 * Filter tools by their linked ability's category.
+	 *
+	 * For each tool, resolves its ability category via the Abilities API registry.
+	 * Only tools whose ability belongs to one of the allowed categories pass through.
+	 *
+	 * Handler tools (those with a 'handler' key but no 'ability' key) are always
+	 * included — they are dynamically scoped by the pipeline engine and should not
+	 * be filtered by category.
+	 *
+	 * Tools without any ability linkage are excluded when category filtering is
+	 * active, since they cannot be categorized. To include them, add their names
+	 * to the context's `allow_only` list as an escape hatch.
+	 *
+	 * @since 0.55.0
+	 *
+	 * @param array    $tools      Resolved tools array keyed by tool name.
+	 * @param string[] $categories Allowed category slugs (e.g. 'datamachine/content').
+	 * @return array Filtered tools.
+	 */
+	private function filterByAbilityCategories( array $tools, array $categories ): array {
+		if ( empty( $categories ) ) {
+			return $tools;
+		}
+
+		$registry        = class_exists( 'WP_Abilities_Registry' ) ? \WP_Abilities_Registry::get_instance() : null;
+		$categories_flip = array_flip( $categories );
+		$filtered        = array();
+
+		foreach ( $tools as $name => $tool ) {
+			if ( ! is_array( $tool ) ) {
+				continue;
+			}
+
+			// Handler tools bypass category filtering — they're already scoped
+			// by the pipeline engine to adjacent step handlers.
+			if ( isset( $tool['handler'] ) && ! isset( $tool['ability'] ) && ! isset( $tool['abilities'] ) ) {
+				$filtered[ $name ] = $tool;
+				continue;
+			}
+
+			// Collect ability slugs from tool metadata.
+			$ability_slugs = array();
+
+			if ( ! empty( $tool['ability'] ) ) {
+				$ability_slugs[] = $tool['ability'];
+			}
+
+			if ( ! empty( $tool['abilities'] ) && is_array( $tool['abilities'] ) ) {
+				$ability_slugs = array_merge( $ability_slugs, $tool['abilities'] );
+			}
+
+			// No ability linkage — cannot determine category, excluded.
+			if ( empty( $ability_slugs ) ) {
+				continue;
+			}
+
+			// Check if ANY linked ability belongs to an allowed category.
+			if ( $registry ) {
+				foreach ( $ability_slugs as $slug ) {
+					$ability = $registry->get_registered( $slug );
+
+					if ( $ability && isset( $categories_flip[ $ability->get_category() ] ) ) {
+						$filtered[ $name ] = $tool;
+						break;
+					}
+				}
+			}
+		}
+
+		return $filtered;
+	}
+
+	/**
 	 * Get tool policy from an agent's config.
 	 *
 	 * Reads the `tool_policy` key from the agent's `agent_config` JSON.
@@ -394,8 +477,23 @@ class ToolPolicyResolver {
 
 		$policy = $config['tool_policy'];
 
-		// Validate structure: must have 'mode' and 'tools'.
-		if ( ! isset( $policy['mode'] ) || ! isset( $policy['tools'] ) || ! is_array( $policy['tools'] ) ) {
+		// Validate structure: must have 'mode' and at least 'tools' or 'categories'.
+		if ( ! isset( $policy['mode'] ) ) {
+			return null;
+		}
+
+		// Ensure tools is present and an array (may be empty if only categories are used).
+		if ( ! isset( $policy['tools'] ) || ! is_array( $policy['tools'] ) ) {
+			$policy['tools'] = array();
+		}
+
+		// Normalize categories to an array.
+		if ( isset( $policy['categories'] ) && ! is_array( $policy['categories'] ) ) {
+			return null;
+		}
+
+		// Must have at least tools or categories to be a valid policy.
+		if ( empty( $policy['tools'] ) && empty( $policy['categories'] ?? array() ) ) {
 			return null;
 		}
 
@@ -410,11 +508,18 @@ class ToolPolicyResolver {
 	/**
 	 * Apply an agent's tool policy to a set of resolved tools.
 	 *
-	 * - `deny` mode: agent can use everything EXCEPT listed tools.
-	 * - `allow` mode: agent can ONLY use listed tools.
+	 * - `deny` mode: agent can use everything EXCEPT listed tools/categories.
+	 * - `allow` mode: agent can ONLY use listed tools/categories.
 	 * - No policy (null): no restrictions (backward compatible).
 	 *
+	 * The policy supports both individual tool names (`tools` key) and ability
+	 * categories (`categories` key). When both are present, they compose:
+	 * - allow mode: tool passes if it matches a tool name OR a category.
+	 * - deny mode: tool is excluded if it matches a tool name OR a category.
+	 *
 	 * @since 0.42.0
+	 * @since 0.55.0 Added category support in tool policies.
+	 *
 	 * @param array      $tools  Resolved tools array keyed by tool name.
 	 * @param array|null $policy Tool policy from getAgentToolPolicy(), or null for no restrictions.
 	 * @return array Filtered tools array.
@@ -424,20 +529,62 @@ class ToolPolicyResolver {
 			return $tools;
 		}
 
-		$mode       = $policy['mode'];
-		$tool_names = $policy['tools'];
+		$mode             = $policy['mode'];
+		$tool_names       = $policy['tools'] ?? array();
+		$policy_categories = $policy['categories'] ?? array();
 
-		if ( empty( $tool_names ) ) {
-			// deny with empty list = no restrictions; allow with empty list = no tools.
+		// No tool names and no categories = no restrictions (deny) or no tools (allow).
+		if ( empty( $tool_names ) && empty( $policy_categories ) ) {
 			return 'allow' === $mode ? array() : $tools;
 		}
 
-		if ( 'deny' === $mode ) {
-			return array_diff_key( $tools, array_flip( $tool_names ) );
+		// Simple case: no categories, just tool names (original behavior).
+		if ( empty( $policy_categories ) ) {
+			if ( 'deny' === $mode ) {
+				return array_diff_key( $tools, array_flip( $tool_names ) );
+			}
+			return array_intersect_key( $tools, array_flip( $tool_names ) );
 		}
 
-		// 'allow' mode: only keep tools in the list.
-		return array_intersect_key( $tools, array_flip( $tool_names ) );
+		// Category-aware filtering: check both tool names and categories.
+		$registry        = class_exists( 'WP_Abilities_Registry' ) ? \WP_Abilities_Registry::get_instance() : null;
+		$tool_names_flip = ! empty( $tool_names ) ? array_flip( $tool_names ) : array();
+		$categories_flip = array_flip( $policy_categories );
+		$filtered        = array();
+
+		foreach ( $tools as $name => $tool ) {
+			$matches_tool = isset( $tool_names_flip[ $name ] );
+			$matches_cat  = false;
+
+			if ( ! $matches_tool && is_array( $tool ) && $registry ) {
+				$ability_slugs = array();
+
+				if ( ! empty( $tool['ability'] ) ) {
+					$ability_slugs[] = $tool['ability'];
+				}
+				if ( ! empty( $tool['abilities'] ) && is_array( $tool['abilities'] ) ) {
+					$ability_slugs = array_merge( $ability_slugs, $tool['abilities'] );
+				}
+
+				foreach ( $ability_slugs as $slug ) {
+					$ability = $registry->get_registered( $slug );
+					if ( $ability && isset( $categories_flip[ $ability->get_category() ] ) ) {
+						$matches_cat = true;
+						break;
+					}
+				}
+			}
+
+			$matches = $matches_tool || $matches_cat;
+
+			if ( 'allow' === $mode && $matches ) {
+				$filtered[ $name ] = $tool;
+			} elseif ( 'deny' === $mode && ! $matches ) {
+				$filtered[ $name ] = $tool;
+			}
+		}
+
+		return $filtered;
 	}
 
 	/**
