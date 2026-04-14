@@ -19,7 +19,7 @@ namespace DataMachine\Core\FilesRepository;
 
 defined( 'ABSPATH' ) || exit;
 
-class DailyMemory {
+class DailyMemory implements DailyMemoryStorage {
 
 	/**
 	 * @var DirectoryManager

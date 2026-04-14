@@ -3,7 +3,13 @@
  * Daily Memory Abilities
  *
  * WordPress 6.9 Abilities API primitives for daily memory operations.
- * Provides read/write/list access to daily memory files (YYYY/MM/DD.md).
+ * Provides read/write/list/search/delete access to daily memory.
+ *
+ * Storage is resolved via the `datamachine_daily_memory_storage` filter.
+ * The default implementation is DailyMemory (flat markdown files).
+ * Plugins can return any object implementing DailyMemoryStorage to
+ * completely replace the storage backend — Data Machine doesn't need
+ * to know or care what's behind it.
  *
  * @package DataMachine\Abilities
  * @since 0.32.0
@@ -14,6 +20,7 @@ namespace DataMachine\Abilities;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\FilesRepository\DailyMemory;
+use DataMachine\Core\FilesRepository\DailyMemoryStorage;
 use DataMachine\Core\PluginSettings;
 
 defined( 'ABSPATH' ) || exit;
@@ -33,6 +40,44 @@ class DailyMemoryAbilities {
 
 		$this->registerAbilities();
 		self::$registered = true;
+	}
+
+	/**
+	 * Resolve the daily memory storage backend for a given context.
+	 *
+	 * Returns the default filesystem-backed DailyMemory unless a plugin
+	 * provides an alternative via the `datamachine_daily_memory_storage` filter.
+	 *
+	 * @since 0.47.0
+	 *
+	 * @param int $user_id  WordPress user ID.
+	 * @param int $agent_id Agent ID.
+	 * @return DailyMemoryStorage
+	 */
+	private static function resolveStorage( int $user_id, int $agent_id ): DailyMemoryStorage {
+		$default = new DailyMemory( $user_id, $agent_id );
+
+		/**
+		 * Filters the daily memory storage backend.
+		 *
+		 * Return any object implementing DailyMemoryStorage to completely
+		 * replace the flat-file storage. All daily memory operations (read,
+		 * write, append, list, search, delete) will use the returned backend.
+		 *
+		 * @since 0.47.0
+		 *
+		 * @param DailyMemoryStorage $storage  Default filesystem implementation.
+		 * @param int                $user_id  WordPress user ID.
+		 * @param int                $agent_id Agent ID.
+		 */
+		$storage = apply_filters( 'datamachine_daily_memory_storage', $default, $user_id, $agent_id );
+
+		// Safety: if the filter returns something that doesn't implement the interface, fall back.
+		if ( ! ( $storage instanceof DailyMemoryStorage ) ) {
+			return $default;
+		}
+
+		return $storage;
 	}
 
 	private function registerAbilities(): void {
@@ -250,10 +295,7 @@ class DailyMemoryAbilities {
 	 * @return array Result.
 	 */
 	public static function readDaily( array $input ): array {
-		$user_id  = (int) ( $input['user_id'] ?? 0 );
-		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$daily    = new DailyMemory( $user_id, $agent_id );
-		$date     = $input['date'] ?? gmdate( 'Y-m-d' );
+		$date = $input['date'] ?? gmdate( 'Y-m-d' );
 
 		$parts = DailyMemory::parse_date( $date );
 		if ( ! $parts ) {
@@ -263,7 +305,11 @@ class DailyMemoryAbilities {
 			);
 		}
 
-		return $daily->read( $parts['year'], $parts['month'], $parts['day'] );
+		$user_id  = (int) ( $input['user_id'] ?? 0 );
+		$agent_id = (int) ( $input['agent_id'] ?? 0 );
+		$storage  = self::resolveStorage( $user_id, $agent_id );
+
+		return $storage->read( $parts['year'], $parts['month'], $parts['day'] );
 	}
 
 	/**
@@ -280,12 +326,9 @@ class DailyMemoryAbilities {
 			);
 		}
 
-		$user_id  = (int) ( $input['user_id'] ?? 0 );
-		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$daily    = new DailyMemory( $user_id, $agent_id );
-		$content  = $input['content'];
-		$date     = $input['date'] ?? gmdate( 'Y-m-d' );
-		$mode     = $input['mode'] ?? 'append';
+		$date    = $input['date'] ?? gmdate( 'Y-m-d' );
+		$content = $input['content'];
+		$mode    = $input['mode'] ?? 'append';
 
 		$parts = DailyMemory::parse_date( $date );
 		if ( ! $parts ) {
@@ -295,24 +338,29 @@ class DailyMemoryAbilities {
 			);
 		}
 
+		$user_id  = (int) ( $input['user_id'] ?? 0 );
+		$agent_id = (int) ( $input['agent_id'] ?? 0 );
+		$storage  = self::resolveStorage( $user_id, $agent_id );
+
 		if ( 'write' === $mode ) {
-			return $daily->write( $parts['year'], $parts['month'], $parts['day'], $content );
+			return $storage->write( $parts['year'], $parts['month'], $parts['day'], $content );
 		}
 
-		return $daily->append( $parts['year'], $parts['month'], $parts['day'], $content );
+		return $storage->append( $parts['year'], $parts['month'], $parts['day'], $content );
 	}
 
 	/**
 	 * List all daily memory files.
 	 *
-	 * @param array $input Input parameters (unused).
+	 * @param array $input Input parameters.
 	 * @return array Result.
 	 */
 	public static function listDaily( array $input ): array {
 		$user_id  = (int) ( $input['user_id'] ?? 0 );
 		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$daily    = new DailyMemory( $user_id, $agent_id );
-		return $daily->list_all();
+		$storage  = self::resolveStorage( $user_id, $agent_id );
+
+		return $storage->list_all();
 	}
 
 	/**
@@ -324,12 +372,13 @@ class DailyMemoryAbilities {
 	public static function searchDaily( array $input ): array {
 		$user_id  = (int) ( $input['user_id'] ?? 0 );
 		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$daily    = new DailyMemory( $user_id, $agent_id );
-		$query    = $input['query'];
-		$from     = $input['from'] ?? null;
-		$to       = $input['to'] ?? null;
+		$storage  = self::resolveStorage( $user_id, $agent_id );
 
-		return $daily->search( $query, $from, $to );
+		$query = $input['query'];
+		$from  = $input['from'] ?? null;
+		$to    = $input['to'] ?? null;
+
+		return $storage->search( $query, $from, $to );
 	}
 
 	/**
@@ -348,10 +397,7 @@ class DailyMemoryAbilities {
 			);
 		}
 
-		$user_id  = (int) ( $input['user_id'] ?? 0 );
-		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$daily    = new DailyMemory( $user_id, $agent_id );
-		$date     = $input['date'] ?? gmdate( 'Y-m-d' );
+		$date = $input['date'] ?? gmdate( 'Y-m-d' );
 
 		$parts = DailyMemory::parse_date( $date );
 		if ( ! $parts ) {
@@ -361,6 +407,10 @@ class DailyMemoryAbilities {
 			);
 		}
 
-		return $daily->delete( $parts['year'], $parts['month'], $parts['day'] );
+		$user_id  = (int) ( $input['user_id'] ?? 0 );
+		$agent_id = (int) ( $input['agent_id'] ?? 0 );
+		$storage  = self::resolveStorage( $user_id, $agent_id );
+
+		return $storage->delete( $parts['year'], $parts['month'], $parts['day'] );
 	}
 }
