@@ -42,7 +42,7 @@ class EventDateQueryAbilities {
 				array(
 					'label'               => __( 'Query Events', 'data-machine-events' ),
 					'description'         => __( 'Query events filtered by date scope, taxonomy, geo, and search. The single primitive for all event date queries.', 'data-machine-events' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-events/events',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

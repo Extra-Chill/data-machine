@@ -73,7 +73,7 @@ class SettingsAbilities {
 			array(
 				'label'               => __( 'Get Settings', 'data-machine-events' ),
 				'description'         => __( 'Read plugin settings. Returns all settings or a specific key.', 'data-machine-events' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine-events/settings',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -139,7 +139,7 @@ class SettingsAbilities {
 			array(
 				'label'               => __( 'Update Setting', 'data-machine-events' ),
 				'description'         => __( 'Update a single plugin setting. Validates and sanitizes the value.', 'data-machine-events' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine-events/settings',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'key', 'value' ),

@@ -39,7 +39,7 @@ class EventQueryAbilities {
 				array(
 					'label'               => __( 'Get Venue Events', 'data-machine-events' ),
 					'description'         => __( 'Query events for a specific venue', 'data-machine-events' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-events/events',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'venue' ),

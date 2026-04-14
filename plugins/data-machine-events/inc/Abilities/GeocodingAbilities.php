@@ -72,7 +72,7 @@ class GeocodingAbilities {
 			array(
 				'label'               => __( 'Geocode Address', 'data-machine-events' ),
 				'description'         => __( 'Geocode an address string to lat/lng coordinates via OpenStreetMap Nominatim. Results are cached for 30 days.', 'data-machine-events' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine-events/venues',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'query' ),
@@ -160,7 +160,7 @@ class GeocodingAbilities {
 			array(
 				'label'               => __( 'Geocode Search', 'data-machine-events' ),
 				'description'         => __( 'Search for addresses via Nominatim and return multiple results with full address details. Used for autocomplete UIs.', 'data-machine-events' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine-events/venues',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'query' ),
@@ -271,7 +271,7 @@ class GeocodingAbilities {
 			array(
 				'label'               => __( 'Geocode Venues', 'data-machine-events' ),
 				'description'         => __( 'Batch geocode venues that have an address but are missing coordinates. Respects Nominatim rate limits.', 'data-machine-events' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine-events/venues',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -453,7 +453,7 @@ class GeocodingAbilities {
 			array(
 				'label'               => __( 'Audit Venues', 'data-machine-events' ),
 				'description'         => __( 'Audit venue data quality: geocoding coverage, missing addresses, missing timezones. Returns a comprehensive data quality report.', 'data-machine-events' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine-events/venues',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(

@@ -145,7 +145,7 @@ class DuplicateDetectionAbilities {
 			array(
 				'label'               => __( 'Venues Match', 'data-machine-events' ),
 				'description'         => __( 'Compare two venue names for semantic equivalence. Handles HTML entities, parenthetical stage names, dash-separated qualifiers, and article removal.', 'data-machine-events' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine-events/venues',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'venue1', 'venue2' ),
@@ -198,7 +198,7 @@ class DuplicateDetectionAbilities {
 			array(
 				'label'               => __( 'Find Duplicate Event', 'data-machine-events' ),
 				'description'         => __( 'Search for an existing event that matches the given title, venue, and date using fuzzy matching. Returns the matching post ID or null.', 'data-machine-events' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine-events/venues',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'title', 'startDate' ),

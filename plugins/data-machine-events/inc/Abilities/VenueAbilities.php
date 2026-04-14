@@ -81,7 +81,7 @@ class VenueAbilities {
 			array(
 				'label'               => __( 'Venue Health Check', 'data-machine-events' ),
 				'description'         => __( 'Scan venues for data quality issues: missing address, coordinates, timezone, or website. Also detects suspicious websites where a ticket URL was mistakenly stored as venue website.', 'data-machine-events' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine-events/venues',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -148,7 +148,7 @@ class VenueAbilities {
 			array(
 				'label'               => __( 'Update Venue', 'data-machine-events' ),
 				'description'         => __( 'Update a venue name and/or meta fields. Address changes trigger automatic geocoding.', 'data-machine-events' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine-events/venues',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'venue' ),
@@ -233,7 +233,7 @@ class VenueAbilities {
 			array(
 				'label'               => __( 'Get Venue', 'data-machine-events' ),
 				'description'         => __( 'Get venue details by term ID', 'data-machine-events' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine-events/venues',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'id' ),
@@ -279,7 +279,7 @@ class VenueAbilities {
 			array(
 				'label'               => __( 'Check Duplicate Venue', 'data-machine-events' ),
 				'description'         => __( 'Check if a venue with the given name already exists', 'data-machine-events' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine-events/venues',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'name' ),

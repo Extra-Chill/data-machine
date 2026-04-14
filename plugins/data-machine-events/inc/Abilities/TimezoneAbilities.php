@@ -39,7 +39,7 @@ class TimezoneAbilities {
 				array(
 					'label'               => __( 'Find Events with Missing Timezone', 'data-machine-events' ),
 					'description'         => __( 'Find events where venue has no timezone or coordinates', 'data-machine-events' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-events/events',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array(),
@@ -112,7 +112,7 @@ class TimezoneAbilities {
 				array(
 					'label'               => __( 'Fix Event Timezone', 'data-machine-events' ),
 					'description'         => __( 'Update venue timezone with geocoding support. Supports batch updates with inline errors.', 'data-machine-events' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-events/events',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array(),

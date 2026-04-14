@@ -58,7 +58,7 @@ class VenueMapAbilities {
 			array(
 				'label'               => __( 'List Venues', 'data-machine-events' ),
 				'description'         => __( 'List venues with coordinates for map rendering. Supports geo proximity and viewport bounds filtering.', 'data-machine-events' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine-events/venues',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(

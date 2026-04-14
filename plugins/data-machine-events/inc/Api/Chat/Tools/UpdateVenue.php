@@ -20,7 +20,7 @@ use DataMachineEvents\Abilities\VenueAbilities;
 class UpdateVenue extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'update_venue', array( $this, 'getToolDefinition' ), array( 'chat' ) );
+		$this->registerTool( 'update_venue', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'ability' => 'data-machine-events/update-venue' ) );
 	}
 
 	public function getToolDefinition(): array {

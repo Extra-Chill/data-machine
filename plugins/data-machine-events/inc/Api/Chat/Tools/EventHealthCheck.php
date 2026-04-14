@@ -21,7 +21,7 @@ use DataMachineEvents\Abilities\EventHealthAbilities;
 class EventHealthCheck extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'event_health_check', array( $this, 'getToolDefinition' ), array( 'chat' ) );
+		$this->registerTool( 'event_health_check', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'ability' => 'data-machine-events/event-health-check' ) );
 	}
 
 	public function getToolDefinition(): array {

@@ -36,7 +36,7 @@ class UpcomingCountAbilities {
 				array(
 					'label'               => __( 'Get Upcoming Event Counts', 'data-machine-events' ),
 					'description'         => __( 'Count upcoming events grouped by taxonomy term. Returns terms sorted by event count descending.', 'data-machine-events' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-events/events',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'taxonomy' ),

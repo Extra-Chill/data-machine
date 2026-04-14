@@ -62,7 +62,7 @@ class EventUpdateAbilities {
 				array(
 					'label'               => __( 'Update Event', 'data-machine-events' ),
 					'description'         => __( 'Update event details including dates, times, venue, and metadata', 'data-machine-events' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-events/events',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
