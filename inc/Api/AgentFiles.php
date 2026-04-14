@@ -317,10 +317,18 @@ class AgentFiles {
 			$input['agent_id'] = (int) $agent_id;
 		}
 
-		$result = self::getAbilities()->executeListAgentFiles( $input );
+		try {
+			$result = self::getAbilities()->executeListAgentFiles( $input );
+		} catch ( \Throwable $e ) {
+			return new \WP_Error(
+				'list_agent_files_error',
+				$e->getMessage(),
+				array( 'status' => 500 )
+			);
+		}
 
 		if ( ! $result['success'] ) {
-			return new WP_Error( 'list_agent_files_error', $result['error'], array( 'status' => 500 ) );
+			return new \WP_Error( 'list_agent_files_error', $result['error'], array( 'status' => 500 ) );
 		}
 
 		return rest_ensure_response( array(
@@ -340,11 +348,19 @@ class AgentFiles {
 			$input['agent_id'] = (int) $agent_id;
 		}
 
-		$result = self::getAbilities()->executeGetAgentFile( $input );
+		try {
+			$result = self::getAbilities()->executeGetAgentFile( $input );
+		} catch ( \Throwable $e ) {
+			return new \WP_Error(
+				'get_agent_file_error',
+				$e->getMessage(),
+				array( 'status' => 500 )
+			);
+		}
 
 		if ( ! $result['success'] ) {
 			$status = false !== strpos( $result['error'] ?? '', 'not found' ) ? 404 : 400;
-			return new WP_Error( 'get_agent_file_error', $result['error'], array( 'status' => $status ) );
+			return new \WP_Error( 'get_agent_file_error', $result['error'], array( 'status' => $status ) );
 		}
 
 		return rest_ensure_response( array(

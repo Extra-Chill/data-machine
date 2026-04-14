@@ -171,7 +171,9 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 		}
 
 		// Check for duplicates among core files.
-		const coreFiles = files?.filter( ( f ) => f.type !== 'daily_summary' ) ?? [];
+		const coreFiles = Array.isArray( files )
+			? files.filter( ( f ) => f.type !== 'daily_summary' )
+			: [];
 		if ( coreFiles.some( ( f ) => f.filename === name ) ) {
 			setAddError( 'A file with this name already exists.' );
 			return;
