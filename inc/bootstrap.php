@@ -147,6 +147,10 @@ add_action( 'init', 'datamachine_register_site_md_invalidation' );
 // Only registers hooks on multisite installs (guard is inside the function).
 add_action( 'init', 'datamachine_register_network_md_invalidation' );
 
+// Composable file auto-regeneration — rebuilds AGENTS.md (and any other composable files)
+// when plugins are activated/deactivated, since those events change which sections are registered.
+add_action( 'init', 'datamachine_register_composable_file_invalidation' );
+
 require_once __DIR__ . '/Engine/AI/Directives/ClientContextDirective.php';
 require_once __DIR__ . '/Engine/AI/Directives/DailyMemorySelectorDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineSystemPromptDirective.php';
