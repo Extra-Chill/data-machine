@@ -300,6 +300,34 @@ class AgentFileAbilities {
 		$files = array();
 		$seen  = array();
 
+		// First, include convention-path files (e.g. AGENTS.md at site root).
+		// These live outside the layer directories but should still appear in the file list.
+		foreach ( MemoryFileRegistry::get_all() as $filename => $registry_meta ) {
+			if ( empty( $registry_meta['convention_path'] ) ) {
+				continue;
+			}
+
+			$filepath = rtrim( ABSPATH, '/' ) . '/' . $registry_meta['convention_path'];
+			if ( ! file_exists( $filepath ) ) {
+				continue;
+			}
+
+			$files[]          = array(
+				'filename'    => $filename,
+				'size'        => filesize( $filepath ),
+				'modified'    => gmdate( 'c', filemtime( $filepath ) ),
+				'type'        => 'core',
+				'layer'       => $registry_meta['layer'],
+				'protected'   => MemoryFileRegistry::is_protected( $filename ),
+				'editable'    => MemoryFileRegistry::is_editable( $filename ),
+				'contexts'    => $registry_meta['contexts'] ?? array( MemoryFileRegistry::CONTEXT_ALL ),
+				'registered'  => true,
+				'label'       => $registry_meta['label'] ?? self::filename_to_label( $filename ),
+				'description' => $registry_meta['description'] ?? '',
+			);
+			$seen[ $filename ] = true;
+		}
+
 		// Scan directories in priority order: shared (site-wide), agent identity, user.
 		// Agent layer wins on filename conflicts with user layer.
 		// Shared layer is always included (tagged separately, read-only in UI).
@@ -649,11 +677,13 @@ class AgentFileAbilities {
 		$user_dir   = $dm->get_user_directory( $user_id );
 		$shared_dir = $dm->get_shared_directory();
 
-		// If file is registered, check its canonical layer first.
+		// If file is registered, check its canonical location first.
+		// Convention-path files (e.g. AGENTS.md) live at ABSPATH, not the layer directory.
 		$registered_layer = MemoryFileRegistry::get_layer( $filename );
 		if ( $registered_layer ) {
 			$primary_dir  = $this->resolveLayerDirectory( $dm, $registered_layer, $user_id, $agent_id );
-			$primary_path = $primary_dir . '/' . $filename;
+			$primary_path = MemoryFileRegistry::resolve_filepath( $filename, $primary_dir )
+				?? $primary_dir . '/' . $filename;
 			if ( file_exists( $primary_path ) ) {
 				return $primary_path;
 			}

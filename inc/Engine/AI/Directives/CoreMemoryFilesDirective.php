@@ -81,7 +81,9 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 			$layer = $meta['layer'] ?? MemoryFileRegistry::LAYER_AGENT;
 			$dir   = $layer_dirs[ $layer ] ?? $layer_dirs[ MemoryFileRegistry::LAYER_AGENT ];
 
-			$filepath = trailingslashit( $dir ) . $filename;
+			// Convention-path files (e.g. AGENTS.md) live at ABSPATH, not the layer directory.
+			$filepath = MemoryFileRegistry::resolve_filepath( $filename, $dir )
+				?? trailingslashit( $dir ) . $filename;
 
 			if ( ! file_exists( $filepath ) ) {
 				continue;

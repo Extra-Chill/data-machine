@@ -87,16 +87,27 @@ class AgentMemory {
 		$dm             = $this->directory_manager;
 
 		if ( null !== $registry_layer ) {
+			$layer_dir = null;
+
 			switch ( $registry_layer ) {
 				case 'shared':
-					return $dm->get_shared_directory() . '/' . $this->filename;
+					$layer_dir = $dm->get_shared_directory();
+					break;
 				case 'user':
-					return $dm->get_user_directory( $this->user_id ) . '/' . $this->filename;
+					$layer_dir = $dm->get_user_directory( $this->user_id );
+					break;
 				case 'network':
-					return $dm->get_network_directory() . '/' . $this->filename;
+					$layer_dir = $dm->get_network_directory();
+					break;
 				case 'agent':
 				default:
 					break; // Fall through to agent directory below.
+			}
+
+			if ( null !== $layer_dir ) {
+				// Convention-path files (e.g. AGENTS.md) live at ABSPATH.
+				return \DataMachine\Engine\AI\MemoryFileRegistry::resolve_filepath( $this->filename, $layer_dir )
+					?? $layer_dir . '/' . $this->filename;
 			}
 		}
 
