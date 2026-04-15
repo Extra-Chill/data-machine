@@ -21,7 +21,7 @@ use DataMachineEvents\Abilities\EventQualityAuditAbilities;
 class EventQualityAudit extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'event_quality_audit', array( $this, 'getToolDefinition' ), array( 'chat' ) );
+		$this->registerTool( 'event_quality_audit', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'ability' => 'data-machine-events/event-quality-audit' ) );
 	}
 
 	public function getToolDefinition(): array {

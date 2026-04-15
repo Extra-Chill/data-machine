@@ -21,7 +21,7 @@ use DataMachineEvents\Abilities\EventUpdateAbilities;
 class UpdateEvent extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'update_event', array( $this, 'getToolDefinition' ), array( 'chat' ) );
+		$this->registerTool( 'update_event', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'ability' => 'data-machine-events/update-event' ) );
 	}
 
 	public function getToolDefinition(): array {

@@ -41,7 +41,7 @@ class EventHealthAbilities {
 				array(
 					'label'               => __( 'Event Health Check', 'data-machine-events' ),
 					'description'         => __( 'Scan events for data quality issues', 'data-machine-events' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-events/events',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

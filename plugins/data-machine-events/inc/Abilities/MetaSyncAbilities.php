@@ -40,7 +40,7 @@ class MetaSyncAbilities {
 				array(
 					'label'               => __( 'Find Missing Meta Sync', 'data-machine-events' ),
 					'description'         => __( 'Detect events where block has data but meta sync failed', 'data-machine-events' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-events/events',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
@@ -82,7 +82,7 @@ class MetaSyncAbilities {
 				array(
 					'label'               => __( 'Resync Event Meta', 'data-machine-events' ),
 					'description'         => __( 'Re-trigger meta sync for specified events', 'data-machine-events' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-events/events',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

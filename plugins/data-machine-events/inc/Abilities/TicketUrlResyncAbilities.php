@@ -45,7 +45,7 @@ class TicketUrlResyncAbilities {
 				array(
 					'label'               => __( 'Resync Ticket URLs', 'data-machine-events' ),
 					'description'         => __( 'Re-normalize ticket URL meta from block content', 'data-machine-events' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-events/events',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

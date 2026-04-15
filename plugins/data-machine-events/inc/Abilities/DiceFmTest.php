@@ -29,7 +29,7 @@ class DiceFmTest {
 					array(
 						'label'               => __( 'Test Dice FM', 'data-machine-events' ),
 						'description'         => __( 'Test Dice FM API handler with raw response data', 'data-machine-events' ),
-						'category'            => 'datamachine',
+						'category'            => 'datamachine-events/testing',
 						'input_schema'        => array(
 							'type'       => 'object',
 							'required'   => array( 'city' ),

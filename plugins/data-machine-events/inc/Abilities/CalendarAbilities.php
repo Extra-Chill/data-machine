@@ -43,7 +43,7 @@ class CalendarAbilities {
 				array(
 					'label'               => __( 'Get Calendar Page', 'data-machine-events' ),
 					'description'         => __( 'Query paginated calendar events with optional filtering and HTML rendering', 'data-machine-events' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-events/events',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

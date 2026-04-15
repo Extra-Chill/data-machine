@@ -276,6 +276,10 @@ class DATAMACHINE_Events {
 		// Notify submitters when their submitted events are published.
 		\DataMachineEvents\Core\SubmissionNotification::register();
 
+		// Register ability categories first — must happen before any ability registration.
+		require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/AbilityCategories.php';
+		\DataMachineEvents\Abilities\AbilityCategories::ensure_registered();
+
 		// Load chat tools - self-register via ToolRegistrationTrait
 		new \DataMachineEvents\Api\Chat\Tools\VenueHealthCheck();
 		new \DataMachineEvents\Api\Chat\Tools\UpdateVenue();

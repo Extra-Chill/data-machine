@@ -28,7 +28,7 @@ class EventScraperTest {
 					array(
 						'label'               => __( 'Test Event Scraper', 'data-machine-events' ),
 						'description'         => __( 'Test universal web scraper compatibility with a target URL', 'data-machine-events' ),
-						'category'            => 'datamachine',
+						'category'            => 'datamachine-events/testing',
 						'input_schema'        => array(
 							'type'       => 'object',
 							'required'   => array( 'target_url' ),

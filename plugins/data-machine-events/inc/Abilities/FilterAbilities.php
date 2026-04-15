@@ -40,7 +40,7 @@ class FilterAbilities {
 				array(
 					'label'               => __( 'Get Filter Options', 'data-machine-events' ),
 					'description'         => __( 'Get available taxonomy filter options with event counts, supporting geo-filtering, cross-filtering, and archive context', 'data-machine-events' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-events/events',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

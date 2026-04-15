@@ -39,7 +39,7 @@ class EventQualityAuditAbilities {
 				array(
 					'label'               => __( 'Event Quality Audit', 'data-machine-events' ),
 					'description'         => __( 'Unified event quality audit with flow-aware diagnostics.', 'data-machine-events' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-events/events',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

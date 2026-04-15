@@ -30,7 +30,7 @@ class TicketmasterTest {
 					array(
 						'label'               => __( 'Test Ticketmaster', 'data-machine-events' ),
 						'description'         => __( 'Test Ticketmaster API handler with raw response data', 'data-machine-events' ),
-						'category'            => 'datamachine',
+						'category'            => 'datamachine-events/testing',
 						'input_schema'        => array(
 							'type'       => 'object',
 							'required'   => array( 'classification_type' ),

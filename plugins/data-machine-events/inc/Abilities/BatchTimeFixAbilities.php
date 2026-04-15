@@ -45,7 +45,7 @@ class BatchTimeFixAbilities {
 				array(
 					'label'               => __( 'Batch Time Fix', 'data-machine-events' ),
 					'description'         => __( 'Batch fix event times with offset correction or explicit replacement', 'data-machine-events' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-events/events',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'venue' ),
