@@ -238,6 +238,54 @@ function datamachine_get_site_scaffold_content(): string {
 		$lines[] = '- (none)';
 	}
 
+	// --- Must-Use Plugins ---
+	if ( function_exists( 'get_mu_plugins' ) ) {
+		$mu_plugins = get_mu_plugins();
+		if ( ! empty( $mu_plugins ) ) {
+			$lines[] = '';
+			$lines[] = '## Must-Use Plugins';
+			foreach ( $mu_plugins as $mu_file => $mu_data ) {
+				$mu_name = ! empty( $mu_data['Name'] ) ? $mu_data['Name'] : basename( $mu_file, '.php' );
+
+				if ( 'data-machine' === strtolower( $mu_name ) ) {
+					continue;
+				}
+
+				$mu_desc_suffix = '';
+				if ( ! empty( $mu_data['Description'] ) ) {
+					$mu_desc = wp_strip_all_tags( $mu_data['Description'] );
+					if ( strlen( $mu_desc ) > 120 ) {
+						$mu_desc = substr( $mu_desc, 0, 117 ) . '...';
+					}
+					$mu_desc_suffix = ' — ' . $mu_desc;
+				}
+				$lines[] = '- **' . $mu_name . '**' . $mu_desc_suffix;
+			}
+		}
+	}
+
+	// --- Drop-ins ---
+	if ( function_exists( 'get_dropins' ) ) {
+		$dropins = get_dropins();
+		if ( ! empty( $dropins ) ) {
+			$lines[] = '';
+			$lines[] = '## Drop-ins';
+			foreach ( $dropins as $dropin_file => $dropin_data ) {
+				$dropin_name = ! empty( $dropin_data['Name'] ) ? $dropin_data['Name'] : $dropin_file;
+
+				$dropin_desc_suffix = '';
+				if ( ! empty( $dropin_data['Description'] ) ) {
+					$dropin_desc = wp_strip_all_tags( $dropin_data['Description'] );
+					if ( strlen( $dropin_desc ) > 120 ) {
+						$dropin_desc = substr( $dropin_desc, 0, 117 ) . '...';
+					}
+					$dropin_desc_suffix = ' — ' . $dropin_desc;
+				}
+				$lines[] = '- **' . $dropin_name . '** (`' . $dropin_file . '`)' . $dropin_desc_suffix;
+			}
+		}
+	}
+
 	// --- REST API namespaces ---
 	if ( ! empty( $rest_namespaces ) ) {
 		$lines[] = '';
