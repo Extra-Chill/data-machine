@@ -151,7 +151,22 @@ The difference between useful memory and noise is structure. Each core file has 
 
 ### SITE.md — Site-Wide Context (Shared Layer)
 
-SITE.md contains information about the WordPress installation that all agents share. Site URL, environment details, shared conventions.
+SITE.md contains information about the WordPress installation that all agents share. It is **read-only** — fully regenerated from live WordPress data whenever site structure changes (plugin activations, theme switches, post/term lifecycle, option updates). To extend it, use the `datamachine_site_scaffold_content` filter.
+
+**Sections generated:**
+
+| Section | Source | Notes |
+|---------|--------|-------|
+| **Identity** | `get_bloginfo()`, `wp_get_theme()`, `get_locale()`, etc. | Site name, URL, theme, language, timezone, permalink structure, multisite flag |
+| **Site Structure** | `get_option()` for front page, blog page, privacy page | Key pages and homepage display setting |
+| **Menus** | `get_registered_nav_menus()`, `get_nav_menu_locations()` | Only shown when menus are registered |
+| **Post Types** | `get_post_types( ['public' => true] )` | Table with label, slug, published count, hierarchical/flat |
+| **Taxonomies** | `get_taxonomies( ['public' => true] )` | Table with label, slug, term count, type, associated post types |
+| **User Roles** | `wp_roles()` | Only shown when custom roles exist (beyond the 5 defaults) |
+| **Active Plugins** | `get_option('active_plugins')` + network plugins on multisite | Name + truncated description. Data Machine itself is excluded |
+| **Must-Use Plugins** | `get_mu_plugins()` | Plugins in `wp-content/mu-plugins/`. Only shown when present |
+| **Drop-ins** | `get_dropins()` | Recognized drop-ins (`db.php`, `object-cache.php`, `sunrise.php`, etc.) with filename. Only shown when present. Multisite-only drop-ins (`sunrise.php`, `blog-deleted.php`, etc.) only appear on multisite installs |
+| **REST API** | `rest_get_server()->get_namespaces()` | Custom namespaces only (excludes `wp/`, `oembed/`, `wp-site-health/`) |
 
 ### RULES.md — Site-Wide Rules (Shared Layer)
 
