@@ -19,4 +19,5 @@ require_once __DIR__ . '/scaffolding.php';
 require_once __DIR__ . '/site-md.php';
 require_once __DIR__ . '/backfill.php';
 require_once __DIR__ . '/network-scope.php';
+require_once __DIR__ . '/composable-files.php';
 require_once __DIR__ . '/flows.php';
