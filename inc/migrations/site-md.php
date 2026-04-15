@@ -357,9 +357,11 @@ function datamachine_regenerate_site_md(): void {
 /**
  * Register hooks that trigger SITE.md regeneration on structural changes.
  *
- * These are the same hooks that SiteContext used for cache invalidation,
- * but now they regenerate the actual file on disk. The debounce in
- * datamachine_regenerate_site_md() prevents excessive writes.
+ * Only hooks into events that change the actual structure of the site:
+ * plugin/theme changes, site identity options, and menu changes.
+ * Post and term lifecycle hooks were intentionally removed — stale
+ * published counts and term counts are not meaningful to AI agents,
+ * and those hooks (especially save_post) fire far too frequently.
  *
  * @since 0.48.0
  * @return void
@@ -371,17 +373,6 @@ function datamachine_register_site_md_invalidation(): void {
 	add_action( 'switch_theme', $callback );
 	add_action( 'activated_plugin', $callback );
 	add_action( 'deactivated_plugin', $callback );
-
-	// Post lifecycle — updates published counts.
-	add_action( 'save_post', $callback );
-	add_action( 'delete_post', $callback );
-	add_action( 'wp_trash_post', $callback );
-	add_action( 'untrash_post', $callback );
-
-	// Term lifecycle — updates term counts.
-	add_action( 'create_term', $callback );
-	add_action( 'edit_term', $callback );
-	add_action( 'delete_term', $callback );
 
 	// Site identity and structure changes.
 	add_action( 'update_option_blogname', $callback );
