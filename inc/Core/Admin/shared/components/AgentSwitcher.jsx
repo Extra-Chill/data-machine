@@ -46,8 +46,9 @@ export default function AgentSwitcher() {
 	const queryClient = useQueryClient();
 	const [ showCreateModal, setShowCreateModal ] = useState( false );
 
-	// Auto-select the sole agent when only one exists and none is selected.
-	// Also auto-select if the previously-selected agent no longer exists.
+	// Auto-select the first agent when none is selected or the selected one
+	// no longer exists. There is no "All Agents" option — the switcher always
+	// points at a concrete agent.
 	useEffect( () => {
 		if ( agents.length === 0 ) {
 			return;
@@ -58,12 +59,7 @@ export default function AgentSwitcher() {
 		);
 
 		if ( selectedAgentId === null || ! selectedExists ) {
-			if ( agents.length === 1 ) {
-				setSelectedAgentId( agents[ 0 ].agent_id );
-			} else if ( ! selectedExists && selectedAgentId !== null ) {
-				// Selected agent was deleted — clear selection.
-				setSelectedAgentId( null );
-			}
+			setSelectedAgentId( agents[ 0 ].agent_id );
 		}
 	}, [ agents, selectedAgentId, setSelectedAgentId ] );
 
@@ -99,15 +95,6 @@ export default function AgentSwitcher() {
 
 	// Build dropdown options: agents + create action.
 	const options = [
-		// Only show "All Agents" when there are multiple agents.
-		...( agents.length > 1
-			? [
-					{
-						label: __( 'All Agents', 'data-machine' ),
-						value: '',
-					},
-				]
-			: [] ),
 		...agents.map( ( agent ) => ( {
 			label:
 				agent.agent_name ||
@@ -125,7 +112,7 @@ export default function AgentSwitcher() {
 	 * Handle agent change — update store and invalidate all cached data
 	 * except the agents list itself (that doesn't change per agent).
 	 *
-	 * @param {string} value Selected agent ID, empty string for all, or create action.
+	 * @param {string} value Selected agent ID or create action.
 	 */
 	const handleChange = ( value ) => {
 		// Intercept the create action — open modal, don't change selection.
@@ -134,7 +121,7 @@ export default function AgentSwitcher() {
 			return;
 		}
 
-		const newId = value === '' ? null : Number( value );
+		const newId = Number( value );
 		const currentId = selectedAgentId;
 
 		if ( newId === currentId ) {
