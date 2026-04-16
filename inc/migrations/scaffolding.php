@@ -140,15 +140,8 @@ function datamachine_get_scaffold_defaults( string $agent_name = '' ): array {
 ## Voice & Tone
 Write in a clear, helpful tone.
 
-## Rules
-- Follow the site's content guidelines
-- Ask for clarification when instructions are ambiguous
-
-## Context
-{$soul_context}
-
 ## Continuity
-SOUL.md (this file) defines who you are. USER.md profiles your human. MEMORY.md tracks persistent knowledge. Daily memory files (daily/YYYY/MM/DD.md) capture session activity — the system generates daily summaries automatically. Keep MEMORY.md lean: persistent facts only, not session logs.
+SOUL.md (this file) defines who you are. RULES.md contains behavioral constraints. USER.md profiles your human. MEMORY.md tracks persistent knowledge. Daily memory files (daily/YYYY/MM/DD.md) capture session activity — the system generates daily summaries automatically. Keep MEMORY.md lean: persistent facts only, not session logs.
 MD;
 
 	// --- USER.md ---
@@ -635,7 +628,6 @@ Behavioral constraints that apply to every agent on {$site_name}.
 - When in doubt, ask before acting.
 
 ## Content
-- Respect the site's content guidelines.
 - Do not publish or modify content without authorization.
 MD;
 }
