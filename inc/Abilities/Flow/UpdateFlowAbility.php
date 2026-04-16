@@ -35,7 +35,7 @@ class UpdateFlowAbility {
 				array(
 					'label'               => __( 'Update Flow', 'data-machine' ),
 					'description'         => __( 'Update flow name or scheduling.', 'data-machine' ),
-					'category'            => 'datamachine/flow',
+					'category'            => 'datamachine-flow',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'flow_id' ),

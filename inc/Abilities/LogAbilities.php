@@ -39,7 +39,7 @@ class LogAbilities {
 				array(
 					'label'               => 'Write to Data Machine Logs',
 					'description'         => 'Write log entries to the database',
-					'category'            => 'datamachine/logging',
+					'category'            => 'datamachine-logging',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
@@ -77,7 +77,7 @@ class LogAbilities {
 				array(
 					'label'               => 'Clear Data Machine Logs',
 					'description'         => 'Clear log entries for a specific agent or all logs',
-					'category'            => 'datamachine/logging',
+					'category'            => 'datamachine-logging',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
@@ -106,7 +106,7 @@ class LogAbilities {
 				array(
 					'label'               => 'Read Data Machine Logs',
 					'description'         => 'Read log entries with filtering and pagination',
-					'category'            => 'datamachine/logging',
+					'category'            => 'datamachine-logging',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
@@ -174,7 +174,7 @@ class LogAbilities {
 				array(
 					'label'               => 'Get Log Metadata',
 					'description'         => 'Get log entry counts and time range',
-					'category'            => 'datamachine/logging',
+					'category'            => 'datamachine-logging',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
@@ -205,7 +205,7 @@ class LogAbilities {
 				array(
 					'label'               => 'Read WordPress Debug Log',
 					'description'         => 'Read PHP debug.log entries from wp-content/debug.log',
-					'category'            => 'datamachine/logging',
+					'category'            => 'datamachine-logging',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

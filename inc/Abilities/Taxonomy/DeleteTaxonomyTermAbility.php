@@ -33,7 +33,7 @@ class DeleteTaxonomyTermAbility {
 				array(
 					'label'               => __( 'Delete Taxonomy Term', 'data-machine' ),
 					'description'         => __( 'Delete an existing taxonomy term. Optionally reassign posts to another term.', 'data-machine' ),
-					'category'            => 'datamachine/taxonomy',
+					'category'            => 'datamachine-taxonomy',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

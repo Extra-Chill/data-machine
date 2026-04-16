@@ -69,7 +69,7 @@ class FlowFileAbilities {
 			array(
 				'label'               => __( 'List Flow Files', 'data-machine' ),
 				'description'         => __( 'List uploaded files for a flow step.', 'data-machine' ),
-				'category'            => 'datamachine/memory',
+				'category'            => 'datamachine-memory',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'flow_step_id' ),
@@ -101,7 +101,7 @@ class FlowFileAbilities {
 			array(
 				'label'               => __( 'Get Flow File', 'data-machine' ),
 				'description'         => __( 'Get metadata for a single flow file.', 'data-machine' ),
-				'category'            => 'datamachine/memory',
+				'category'            => 'datamachine-memory',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'filename', 'flow_step_id' ),
@@ -137,7 +137,7 @@ class FlowFileAbilities {
 			array(
 				'label'               => __( 'Delete Flow File', 'data-machine' ),
 				'description'         => __( 'Delete an uploaded file from a flow step.', 'data-machine' ),
-				'category'            => 'datamachine/memory',
+				'category'            => 'datamachine-memory',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'filename', 'flow_step_id' ),
@@ -173,7 +173,7 @@ class FlowFileAbilities {
 			array(
 				'label'               => __( 'Upload Flow File', 'data-machine' ),
 				'description'         => __( 'Upload a file to a flow step.', 'data-machine' ),
-				'category'            => 'datamachine/memory',
+				'category'            => 'datamachine-memory',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'file_data', 'flow_step_id' ),
@@ -216,7 +216,7 @@ class FlowFileAbilities {
 			array(
 				'label'               => __( 'Cleanup Flow Files', 'data-machine' ),
 				'description'         => __( 'Cleanup data packets and temporary files for a job or flow.', 'data-machine' ),
-				'category'            => 'datamachine/memory',
+				'category'            => 'datamachine-memory',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(

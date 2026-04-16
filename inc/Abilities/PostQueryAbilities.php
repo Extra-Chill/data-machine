@@ -60,7 +60,7 @@ class PostQueryAbilities {
 				array(
 					'label'               => __( 'Query Posts', 'data-machine' ),
 					'description'         => __( 'Find posts created by Data Machine, filtered by handler, flow, or pipeline', 'data-machine' ),
-					'category'            => 'datamachine/content',
+					'category'            => 'datamachine-content',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'filter_by', 'filter_value' ),
@@ -116,7 +116,7 @@ class PostQueryAbilities {
 				array(
 					'label'               => __( 'List Posts', 'data-machine' ),
 					'description'         => __( 'List Data Machine posts with combinable filters (handler, flow, pipeline)', 'data-machine' ),
-					'category'            => 'datamachine/content',
+					'category'            => 'datamachine-content',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

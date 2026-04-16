@@ -38,7 +38,7 @@ class FetchWordPressMediaAbility {
 				array(
 					'label'               => __( 'Fetch WordPress Media', 'data-machine' ),
 					'description'         => __( 'Fetch media attachments from WordPress media library with filtering', 'data-machine' ),
-					'category'            => 'datamachine/fetch',
+					'category'            => 'datamachine-fetch',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

@@ -123,7 +123,7 @@ class GoogleAnalyticsAbilities {
 				array(
 					'label'               => 'Google Analytics',
 					'description'         => 'Fetch visitor analytics data from Google Analytics (GA4) Data API',
-					'category'            => 'datamachine/analytics',
+					'category'            => 'datamachine-analytics',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'action' ),

@@ -44,7 +44,7 @@ class UpdateWordPressAbility {
 				array(
 					'label'               => __( 'Update WordPress Post', 'data-machine' ),
 					'description'         => __( 'Update WordPress posts with surgical text edits, block-level edits, or full content replacement', 'data-machine' ),
-					'category'            => 'datamachine/publishing',
+					'category'            => 'datamachine-publishing',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'source_url' ),

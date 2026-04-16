@@ -87,7 +87,7 @@ class DailyMemoryAbilities {
 				array(
 					'label'               => 'Read Daily Memory',
 					'description'         => 'Read a daily memory file by date. Defaults to today if no date provided.',
-					'category'            => 'datamachine/memory',
+					'category'            => 'datamachine-memory',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
@@ -122,7 +122,7 @@ class DailyMemoryAbilities {
 				array(
 					'label'               => 'Write Daily Memory',
 					'description'         => 'Write or append to a daily memory file. Use mode "append" to add without replacing.',
-					'category'            => 'datamachine/memory',
+					'category'            => 'datamachine-memory',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
@@ -165,7 +165,7 @@ class DailyMemoryAbilities {
 				array(
 					'label'               => 'List Daily Memory Files',
 					'description'         => 'List all daily memory files grouped by month',
-					'category'            => 'datamachine/memory',
+					'category'            => 'datamachine-memory',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
@@ -197,7 +197,7 @@ class DailyMemoryAbilities {
 				array(
 					'label'               => 'Search Daily Memory',
 					'description'         => 'Search across daily memory files with optional date range. Returns matching lines with context.',
-					'category'            => 'datamachine/memory',
+					'category'            => 'datamachine-memory',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'query' ),
@@ -252,7 +252,7 @@ class DailyMemoryAbilities {
 				array(
 					'label'               => 'Delete Daily Memory',
 					'description'         => 'Delete a daily memory file by date.',
-					'category'            => 'datamachine/memory',
+					'category'            => 'datamachine-memory',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

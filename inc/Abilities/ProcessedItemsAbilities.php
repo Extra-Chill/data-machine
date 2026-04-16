@@ -62,7 +62,7 @@ class ProcessedItemsAbilities {
 			array(
 				'label'               => __( 'Clear Processed Items', 'data-machine' ),
 				'description'         => __( 'Clear processed items tracking by pipeline or flow scope. Used to reset deduplication so items can be re-processed.', 'data-machine' ),
-				'category'            => 'datamachine/agent',
+				'category'            => 'datamachine-agent',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'clear_type', 'target_id' ),
@@ -103,7 +103,7 @@ class ProcessedItemsAbilities {
 			array(
 				'label'               => __( 'Check Processed Item', 'data-machine' ),
 				'description'         => __( 'Check if a specific item has already been processed for a given flow step and source type.', 'data-machine' ),
-				'category'            => 'datamachine/agent',
+				'category'            => 'datamachine-agent',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'flow_step_id', 'source_type', 'item_identifier' ),
@@ -146,7 +146,7 @@ class ProcessedItemsAbilities {
 			array(
 				'label'               => __( 'Has Processed History', 'data-machine' ),
 				'description'         => __( 'Check if a flow step has any processed items history. Useful for distinguishing "no new items" from "first run with nothing".', 'data-machine' ),
-				'category'            => 'datamachine/agent',
+				'category'            => 'datamachine-agent',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'flow_step_id' ),

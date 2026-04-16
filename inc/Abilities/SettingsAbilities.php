@@ -63,7 +63,7 @@ class SettingsAbilities {
 			array(
 				'label'               => __( 'Get Settings', 'data-machine' ),
 				'description'         => __( 'Get all plugin settings including AI settings, enabled tools, and masked API keys.', 'data-machine' ),
-				'category'            => 'datamachine/settings',
+				'category'            => 'datamachine-settings',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(),
@@ -92,7 +92,7 @@ class SettingsAbilities {
 			array(
 				'label'               => __( 'Update Settings', 'data-machine' ),
 				'description'         => __( 'Partial update of plugin settings. Only provided fields are updated.', 'data-machine' ),
-				'category'            => 'datamachine/settings',
+				'category'            => 'datamachine-settings',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -156,7 +156,7 @@ class SettingsAbilities {
 			array(
 				'label'               => __( 'Get Scheduling Intervals', 'data-machine' ),
 				'description'         => __( 'Get available scheduling intervals for flow scheduling.', 'data-machine' ),
-				'category'            => 'datamachine/settings',
+				'category'            => 'datamachine-settings',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(),
@@ -182,7 +182,7 @@ class SettingsAbilities {
 			array(
 				'label'               => __( 'Get Tool Config', 'data-machine' ),
 				'description'         => __( 'Get configuration for a specific tool including fields and current config values.', 'data-machine' ),
-				'category'            => 'datamachine/settings',
+				'category'            => 'datamachine-settings',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'tool_id' ),
@@ -220,7 +220,7 @@ class SettingsAbilities {
 			array(
 				'label'               => __( 'Save Tool Config', 'data-machine' ),
 				'description'         => __( 'Save configuration for a specific tool. Fires tool-specific handler via action hook.', 'data-machine' ),
-				'category'            => 'datamachine/settings',
+				'category'            => 'datamachine-settings',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'tool_id', 'config_data' ),
@@ -257,7 +257,7 @@ class SettingsAbilities {
 			array(
 				'label'               => __( 'Get Handler Defaults', 'data-machine' ),
 				'description'         => __( 'Get all handler defaults grouped by step type.', 'data-machine' ),
-				'category'            => 'datamachine/settings',
+				'category'            => 'datamachine-settings',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(),
@@ -283,7 +283,7 @@ class SettingsAbilities {
 			array(
 				'label'               => __( 'Update Handler Defaults', 'data-machine' ),
 				'description'         => __( 'Update defaults for a specific handler.', 'data-machine' ),
-				'category'            => 'datamachine/settings',
+				'category'            => 'datamachine-settings',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'handler_slug', 'defaults' ),

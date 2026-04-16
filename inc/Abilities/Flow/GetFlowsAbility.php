@@ -38,7 +38,7 @@ class GetFlowsAbility {
 				array(
 					'label'               => __( 'Get Flows', 'data-machine' ),
 					'description'         => __( 'Get flows with optional filtering by pipeline ID or handler slug. Supports single flow retrieval and flexible output modes.', 'data-machine' ),
-					'category'            => 'datamachine/flow',
+					'category'            => 'datamachine-flow',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

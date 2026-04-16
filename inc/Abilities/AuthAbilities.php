@@ -197,7 +197,7 @@ class AuthAbilities {
 			array(
 				'label'               => __( 'Get Auth Status', 'data-machine' ),
 				'description'         => __( 'Get OAuth/authentication status for a handler including authorization URL if applicable.', 'data-machine' ),
-				'category'            => 'datamachine/auth',
+				'category'            => 'datamachine-auth',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'handler_slug' ),
@@ -234,7 +234,7 @@ class AuthAbilities {
 			array(
 				'label'               => __( 'Disconnect Auth', 'data-machine' ),
 				'description'         => __( 'Disconnect/revoke authentication for a handler.', 'data-machine' ),
-				'category'            => 'datamachine/auth',
+				'category'            => 'datamachine-auth',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'handler_slug' ),
@@ -266,7 +266,7 @@ class AuthAbilities {
 			array(
 				'label'               => __( 'Save Auth Config', 'data-machine' ),
 				'description'         => __( 'Save authentication configuration for a handler.', 'data-machine' ),
-				'category'            => 'datamachine/auth',
+				'category'            => 'datamachine-auth',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'handler_slug' ),
@@ -302,7 +302,7 @@ class AuthAbilities {
 			array(
 				'label'               => __( 'Set Auth Token', 'data-machine' ),
 				'description'         => __( 'Manually set authentication token and account data for a handler. Used for migration, CI, and headless auth setup.', 'data-machine' ),
-				'category'            => 'datamachine/auth',
+				'category'            => 'datamachine-auth',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'handler_slug', 'account_data' ),
@@ -338,7 +338,7 @@ class AuthAbilities {
 			array(
 				'label'               => __( 'Refresh Auth Token', 'data-machine' ),
 				'description'         => __( 'Force a token refresh for an OAuth2 handler. Only works for providers that support token refresh.', 'data-machine' ),
-				'category'            => 'datamachine/auth',
+				'category'            => 'datamachine-auth',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'handler_slug' ),
@@ -371,7 +371,7 @@ class AuthAbilities {
 			array(
 				'label'               => __( 'List Auth Providers', 'data-machine' ),
 				'description'         => __( 'List all registered authentication providers with status, config fields, and account details.', 'data-machine' ),
-				'category'            => 'datamachine/auth',
+				'category'            => 'datamachine-auth',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(),

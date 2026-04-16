@@ -39,7 +39,7 @@ class InsertContentAbility {
 			wp_register_ability( 'datamachine/insert-content', array(
 				'label'               => 'Insert Content',
 				'description'         => 'Insert new content at a specific position in a post (beginning, end, or after a paragraph).',
-				'category'            => 'datamachine/content',
+				'category'            => 'datamachine-content',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'post_id', 'content', 'position' ),

@@ -38,7 +38,7 @@ class FetchRssAbility {
 				array(
 					'label'               => __( 'Fetch RSS Feed', 'data-machine' ),
 					'description'         => __( 'Fetch and parse RSS/Atom feeds with filtering', 'data-machine' ),
-					'category'            => 'datamachine/fetch',
+					'category'            => 'datamachine-fetch',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'feed_url' ),

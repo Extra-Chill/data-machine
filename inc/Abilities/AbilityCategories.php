@@ -23,24 +23,24 @@ class AbilityCategories {
 	 * Extension plugins should define their own constants or use string
 	 * literals following the same naming convention.
 	 */
-	public const CONTENT    = 'datamachine/content';
-	public const MEDIA      = 'datamachine/media';
-	public const ANALYTICS  = 'datamachine/analytics';
-	public const SEO        = 'datamachine/seo';
-	public const MEMORY     = 'datamachine/memory';
-	public const TAXONOMY   = 'datamachine/taxonomy';
-	public const PUBLISHING = 'datamachine/publishing';
-	public const FETCH      = 'datamachine/fetch';
-	public const EMAIL      = 'datamachine/email';
-	public const PIPELINE   = 'datamachine/pipeline';
-	public const FLOW       = 'datamachine/flow';
-	public const JOBS       = 'datamachine/jobs';
-	public const AGENT      = 'datamachine/agent';
-	public const SETTINGS   = 'datamachine/settings';
-	public const AUTH       = 'datamachine/auth';
-	public const LOGGING    = 'datamachine/logging';
-	public const SYSTEM     = 'datamachine/system';
-	public const CHAT       = 'datamachine/chat';
+	public const CONTENT    = 'datamachine-content';
+	public const MEDIA      = 'datamachine-media';
+	public const ANALYTICS  = 'datamachine-analytics';
+	public const SEO        = 'datamachine-seo';
+	public const MEMORY     = 'datamachine-memory';
+	public const TAXONOMY   = 'datamachine-taxonomy';
+	public const PUBLISHING = 'datamachine-publishing';
+	public const FETCH      = 'datamachine-fetch';
+	public const EMAIL      = 'datamachine-email';
+	public const PIPELINE   = 'datamachine-pipeline';
+	public const FLOW       = 'datamachine-flow';
+	public const JOBS       = 'datamachine-jobs';
+	public const AGENT      = 'datamachine-agent';
+	public const SETTINGS   = 'datamachine-settings';
+	public const AUTH       = 'datamachine-auth';
+	public const LOGGING    = 'datamachine-logging';
+	public const SYSTEM     = 'datamachine-system';
+	public const CHAT       = 'datamachine-chat';
 
 	private static bool $registered = false;
 
@@ -48,8 +48,8 @@ class AbilityCategories {
 	 * Register all Data Machine ability categories.
 	 *
 	 * Safe to call multiple times — uses a static guard.
-	 * Should be called on `wp_abilities_api_categories_init` or
-	 * via did_action() check.
+	 * Must be called during `wp_abilities_api_categories_init` action —
+	 * WordPress core enforces this via `doing_action()` check.
 	 */
 	public static function register(): void {
 		if ( self::$registered ) {
@@ -141,19 +141,17 @@ class AbilityCategories {
 	/**
 	 * Ensure categories are registered.
 	 *
-	 * Handles timing: if the categories_init hook already fired, registers
-	 * immediately. Otherwise hooks into it. This mirrors the pattern used
-	 * by individual ability classes.
+	 * Always hooks into `wp_abilities_api_categories_init` — WordPress core
+	 * enforces that `wp_register_ability_category()` is only called during
+	 * that action (`doing_action()` check). The hook fires lazily when the
+	 * categories registry singleton is first accessed, so hooking in at
+	 * `plugins_loaded` time is safe.
 	 */
 	public static function ensure_registered(): void {
 		if ( self::$registered ) {
 			return;
 		}
 
-		if ( did_action( 'wp_abilities_api_categories_init' ) ) {
-			self::register();
-		} else {
-			add_action( 'wp_abilities_api_categories_init', array( self::class, 'register' ) );
-		}
+		add_action( 'wp_abilities_api_categories_init', array( self::class, 'register' ) );
 	}
 }

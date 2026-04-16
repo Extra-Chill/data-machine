@@ -33,7 +33,7 @@ class UpdateTaxonomyTermAbility {
 				array(
 					'label'               => __( 'Update Taxonomy Term', 'data-machine' ),
 					'description'         => __( 'Update an existing taxonomy term. Supports updating name, slug, description, and parent.', 'data-machine' ),
-					'category'            => 'datamachine/taxonomy',
+					'category'            => 'datamachine-taxonomy',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

@@ -378,17 +378,19 @@ Internal abilities for the pipeline execution engine.
 
 ## Category Registration
 
-The `datamachine` category is registered via `wp_register_ability_category()` on the `wp_abilities_api_categories_init` hook:
+Data Machine registers multiple ability categories via `wp_register_ability_category()` on the `wp_abilities_api_categories_init` hook. Category slugs use the `datamachine-{domain}` format (e.g. `datamachine-content`, `datamachine-flow`, `datamachine-pipeline`):
 
 ```php
 wp_register_ability_category(
-    'datamachine',
+    'datamachine-flow',
     array(
-        'label' => 'Data Machine',
-        'description' => 'Data Machine flow and pipeline operations',
+        'label' => 'Flow',
+        'description' => 'Flow CRUD, scheduling, queue management, and webhook triggers.',
     )
 );
 ```
+
+See `AbilityCategories.php` for the full list of registered categories.
 
 ## Permission Model
 

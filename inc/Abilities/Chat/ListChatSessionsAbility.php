@@ -36,7 +36,7 @@ class ListChatSessionsAbility {
 				array(
 					'label'               => __( 'List Chat Sessions', 'data-machine' ),
 					'description'         => __( 'List chat sessions for a user with pagination and context filtering.', 'data-machine' ),
-					'category'            => 'datamachine/chat',
+					'category'            => 'datamachine-chat',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

@@ -298,7 +298,7 @@ class AnalyticsCommand extends BaseCommand {
 			'strategy' => 'strategy',
 		) );
 
-		$this->execute_ability( 'datamachine/pagespeed', $input, $assoc_args );
+		$this->execute_ability( 'datamachine-pagespeed', $input, $assoc_args );
 	}
 
 	/**

@@ -38,7 +38,7 @@ class MarkSessionReadAbility {
 				array(
 					'label'               => __( 'Mark Session Read', 'data-machine' ),
 					'description'         => __( 'Mark a chat session as read up to the current timestamp.', 'data-machine' ),
-					'category'            => 'datamachine/chat',
+					'category'            => 'datamachine-chat',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

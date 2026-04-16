@@ -33,7 +33,7 @@ class CreateTaxonomyTermAbility {
 				array(
 					'label'               => __( 'Create Taxonomy Term', 'data-machine' ),
 					'description'         => __( 'Create a new taxonomy term. The term will be created if it does not already exist.', 'data-machine' ),
-					'category'            => 'datamachine/taxonomy',
+					'category'            => 'datamachine-taxonomy',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

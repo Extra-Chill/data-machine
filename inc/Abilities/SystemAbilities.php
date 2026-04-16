@@ -60,7 +60,7 @@ class SystemAbilities {
 			array(
 				'label'               => 'Generate Session Title',
 				'description'         => 'Generate an AI-powered title for a chat session based on conversation content',
-				'category'            => 'datamachine/system',
+				'category'            => 'datamachine-system',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -102,7 +102,7 @@ class SystemAbilities {
 			array(
 				'label'               => __( 'System Health Check', 'data-machine' ),
 				'description'         => __( 'Unified health diagnostics for Data Machine and extensions', 'data-machine' ),
-				'category'            => 'datamachine/system',
+				'category'            => 'datamachine-system',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -299,7 +299,7 @@ class SystemAbilities {
 			array(
 				'label'               => __( 'Run System Task', 'data-machine' ),
 				'description'         => __( 'Manually trigger a registered system task for immediate execution.', 'data-machine' ),
-				'category'            => 'datamachine/system',
+				'category'            => 'datamachine-system',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(

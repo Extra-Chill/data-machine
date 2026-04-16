@@ -37,7 +37,7 @@ class GetChatSessionAbility {
 				array(
 					'label'               => __( 'Get Chat Session', 'data-machine' ),
 					'description'         => __( 'Retrieve a chat session with conversation and metadata.', 'data-machine' ),
-					'category'            => 'datamachine/chat',
+					'category'            => 'datamachine-chat',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

@@ -38,7 +38,7 @@ class GetWordPressPostAbility {
 				array(
 					'label'               => __( 'Get WordPress Post', 'data-machine' ),
 					'description'         => __( 'Retrieve a single WordPress post by ID or URL with optional metadata', 'data-machine' ),
-					'category'            => 'datamachine/fetch',
+					'category'            => 'datamachine-fetch',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

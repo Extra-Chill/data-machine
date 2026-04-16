@@ -47,7 +47,7 @@ class ExecuteStepAbility {
 				array(
 					'label'               => __( 'Execute Step', 'data-machine' ),
 					'description'         => __( 'Execute a single pipeline step. Resolves config, runs the step, routes to next step or completion.', 'data-machine' ),
-					'category'            => 'datamachine/jobs',
+					'category'            => 'datamachine-jobs',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'job_id', 'flow_step_id' ),

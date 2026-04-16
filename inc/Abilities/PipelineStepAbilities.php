@@ -62,7 +62,7 @@ class PipelineStepAbilities {
 			array(
 				'label'               => __( 'Get Pipeline Steps', 'data-machine' ),
 				'description'         => __( 'Get all steps for a pipeline, or a single step by ID.', 'data-machine' ),
-				'category'            => 'datamachine/pipeline',
+				'category'            => 'datamachine-pipeline',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -103,7 +103,7 @@ class PipelineStepAbilities {
 			array(
 				'label'               => __( 'Add Pipeline Step', 'data-machine' ),
 				'description'         => __( 'Add a step to a pipeline. Automatically syncs to all flows on that pipeline.', 'data-machine' ),
-				'category'            => 'datamachine/pipeline',
+				'category'            => 'datamachine-pipeline',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'pipeline_id', 'step_type' ),
@@ -149,7 +149,7 @@ class PipelineStepAbilities {
 			array(
 				'label'               => __( 'Update Pipeline Step', 'data-machine' ),
 				'description'         => __( 'Update pipeline step configuration (system prompt, disabled tools). Model/provider are configured via context_models setting.', 'data-machine' ),
-				'category'            => 'datamachine/pipeline',
+				'category'            => 'datamachine-pipeline',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'pipeline_step_id' ),
@@ -195,7 +195,7 @@ class PipelineStepAbilities {
 			array(
 				'label'               => __( 'Delete Pipeline Step', 'data-machine' ),
 				'description'         => __( 'Remove a step from a pipeline. Removes step from all flows on the pipeline.', 'data-machine' ),
-				'category'            => 'datamachine/pipeline',
+				'category'            => 'datamachine-pipeline',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'pipeline_id', 'pipeline_step_id' ),
@@ -234,7 +234,7 @@ class PipelineStepAbilities {
 			array(
 				'label'               => __( 'Reorder Pipeline Steps', 'data-machine' ),
 				'description'         => __( 'Reorder steps within a pipeline.', 'data-machine' ),
-				'category'            => 'datamachine/pipeline',
+				'category'            => 'datamachine-pipeline',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'pipeline_id', 'step_order' ),

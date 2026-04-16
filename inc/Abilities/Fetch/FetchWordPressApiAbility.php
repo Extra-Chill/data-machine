@@ -39,7 +39,7 @@ class FetchWordPressApiAbility {
 				array(
 					'label'               => __( 'Fetch WordPress REST API', 'data-machine' ),
 					'description'         => __( 'Fetch posts from external WordPress sites via REST API', 'data-machine' ),
-					'category'            => 'datamachine/fetch',
+					'category'            => 'datamachine-fetch',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'endpoint_url' ),

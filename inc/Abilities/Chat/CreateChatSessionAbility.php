@@ -37,7 +37,7 @@ class CreateChatSessionAbility {
 				array(
 					'label'               => __( 'Create Chat Session', 'data-machine' ),
 					'description'         => __( 'Create a new chat session for a user.', 'data-machine' ),
-					'category'            => 'datamachine/chat',
+					'category'            => 'datamachine-chat',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

@@ -35,7 +35,7 @@ class CreatePipelineAbility {
 				array(
 					'label'               => __( 'Create Pipeline', 'data-machine' ),
 					'description'         => __( 'Create a new pipeline with optional steps. Pass flow_config to also create a flow; omit it for pipeline-only creation. Supports bulk mode via pipelines array.', 'data-machine' ),
-					'category'            => 'datamachine/pipeline',
+					'category'            => 'datamachine-pipeline',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
