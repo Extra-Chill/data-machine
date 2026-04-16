@@ -83,7 +83,7 @@ class PageSpeedAbilities {
 	private function registerAbilities(): void {
 		$register_callback = function () {
 			wp_register_ability(
-				'datamachine-pagespeed',
+				'datamachine/pagespeed',
 				array(
 					'label'               => 'PageSpeed Insights',
 					'description'         => 'Run Lighthouse audits via PageSpeed Insights API for performance, accessibility, SEO, and best practices scores',
