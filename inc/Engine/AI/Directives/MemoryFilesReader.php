@@ -76,7 +76,9 @@ class MemoryFilesReader {
 			$layer = MemoryFileRegistry::get_layer( $safe_filename );
 			$dir   = $layer_dirs[ $layer ?? MemoryFileRegistry::LAYER_AGENT ];
 
-			$filepath = "{$dir}/{$safe_filename}";
+			// Convention-path files (e.g. AGENTS.md) live at ABSPATH, not the layer directory.
+			$filepath = MemoryFileRegistry::resolve_filepath( $safe_filename, $dir )
+				?? "{$dir}/{$safe_filename}";
 
 			if ( ! file_exists( $filepath ) ) {
 				do_action(

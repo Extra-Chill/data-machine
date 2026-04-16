@@ -269,6 +269,37 @@ class MemoryFileRegistry {
 	}
 
 	/**
+	 * Resolve the canonical filepath for a registered file.
+	 *
+	 * For files with a convention_path, returns the convention path
+	 * (ABSPATH-relative). For all other files, returns the standard
+	 * layer directory path. Returns null if the file is not registered.
+	 *
+	 * This is the single source of truth for "where does this file live
+	 * on disk?" — all read and write paths should use this method.
+	 *
+	 * @since 0.67.0
+	 *
+	 * @param string $filename   Filename to resolve.
+	 * @param string $layer_dir  Resolved layer directory (from DirectoryManager).
+	 * @return string|null Full filepath, or null if not registered.
+	 */
+	public static function resolve_filepath( string $filename, string $layer_dir ): ?string {
+		$meta = self::get( $filename );
+
+		if ( ! $meta ) {
+			return null;
+		}
+
+		// Convention path takes precedence — file lives at ABSPATH + convention_path.
+		if ( ! empty( $meta['convention_path'] ) ) {
+			return rtrim( ABSPATH, '/' ) . '/' . $meta['convention_path'];
+		}
+
+		return trailingslashit( $layer_dir ) . $filename;
+	}
+
+	/**
 	 * Get metadata for a single file.
 	 *
 	 * @param string $filename Filename to look up.
