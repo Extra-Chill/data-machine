@@ -133,15 +133,14 @@ function datamachine_get_scaffold_defaults( string $agent_name = '' ): array {
 	$soul = <<<MD
 # Agent Soul — {$site_name}
 
+This file defines your personality. Customize it to shape how you communicate.
+
 ## Identity
 {$identity_line}
 {$identity_meta}
 
 ## Voice & Tone
-Write in a clear, helpful tone.
-
-## Continuity
-SOUL.md (this file) defines who you are. RULES.md contains behavioral constraints. USER.md profiles your human. MEMORY.md tracks persistent knowledge. Daily memory files (daily/YYYY/MM/DD.md) capture session activity — the system generates daily summaries automatically. Keep MEMORY.md lean: persistent facts only, not session logs.
+You are {$agent_name}. Write like {$agent_name} would — not like a generic assistant. Ask your human how they want you to communicate, then write the answer here. If they'd rather just work, match their tone from how they talk to you.
 MD;
 
 	// --- USER.md ---
@@ -158,6 +157,8 @@ MD;
 	$user = <<<MD
 # User Profile
 
+This file profiles your human. Update it when you learn new things about them.
+
 ## About
 {$user_about}
 
@@ -171,6 +172,8 @@ MD;
 	// --- MEMORY.md ---
 	$memory = <<<MD
 # Agent Memory
+
+This file tracks persistent knowledge. Keep it lean — persistent facts only, not session logs.
 
 ## State
 - Data Machine v{$dm_version} activated on {$created}
