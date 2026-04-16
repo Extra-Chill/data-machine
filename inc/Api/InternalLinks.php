@@ -3,10 +3,11 @@
  * Internal Links REST API Endpoints
  *
  * Provides REST API access to internal link audit and diagnostics:
- * - POST /datamachine/v1/links/audit    — Build + cache link graph.
- * - GET  /datamachine/v1/links/orphans  — Orphaned posts from cached graph.
- * - POST /datamachine/v1/links/broken   — HTTP HEAD check for broken links.
- * - GET  /datamachine/v1/links/diagnose — Meta-based coverage report.
+ * - POST /datamachine/v1/links/audit      — Build + cache link graph.
+ * - GET  /datamachine/v1/links/orphans    — Orphaned posts from cached graph.
+ * - GET  /datamachine/v1/links/backlinks  — Posts linking to a given post.
+ * - POST /datamachine/v1/links/broken     — HTTP HEAD check for broken links.
+ * - GET  /datamachine/v1/links/diagnose   — Meta-based coverage report.
  *
  * Each endpoint delegates to InternalLinkingAbilities via wp_get_ability().
  * All endpoints require manage_options capability.
@@ -36,11 +37,15 @@ class InternalLinks {
 			'ability' => 'datamachine/audit-internal-links',
 			'method'  => WP_REST_Server::CREATABLE,
 		),
-		'orphans'  => array(
+		'orphans'   => array(
 			'ability' => 'datamachine/get-orphaned-posts',
 			'method'  => WP_REST_Server::READABLE,
 		),
-		'broken'   => array(
+		'backlinks' => array(
+			'ability' => 'datamachine/get-backlinks',
+			'method'  => WP_REST_Server::READABLE,
+		),
+		'broken'    => array(
 			'ability' => 'datamachine/check-broken-links',
 			'method'  => WP_REST_Server::CREATABLE,
 		),

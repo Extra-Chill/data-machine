@@ -6,9 +6,10 @@
  * Delegates to InternalLinkingAbilities for execution.
  *
  * Available actions:
- * - audit:   Scan content and build link graph (cached 24hr).
- * - orphans: Get orphaned posts from cached graph.
- * - broken:  HTTP HEAD checks for broken links (internal, external, or all).
+ * - audit:     Scan content and build link graph (cached 24hr).
+ * - orphans:   Get orphaned posts from cached graph.
+ * - backlinks: Get all posts linking to a given post.
+ * - broken:    HTTP HEAD checks for broken links (internal, external, or all).
  *
  * @package DataMachine\Engine\AI\Tools\Global
  * @since 0.32.0
@@ -23,21 +24,22 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class InternalLinkAudit extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'internal_link_audit', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ), array( 'abilities' => array( 'datamachine/audit-internal-links', 'datamachine/get-orphaned-posts', 'datamachine/check-broken-links' ) ) );
+		$this->registerTool( 'internal_link_audit', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ), array( 'abilities' => array( 'datamachine/audit-internal-links', 'datamachine/get-orphaned-posts', 'datamachine/get-backlinks', 'datamachine/check-broken-links' ) ) );
 	}
 
 	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
 		$action = $parameters['action'] ?? 'audit';
 
 		$ability_map = array(
-			'audit'   => 'datamachine/audit-internal-links',
-			'orphans' => 'datamachine/get-orphaned-posts',
-			'broken'  => 'datamachine/check-broken-links',
+			'audit'     => 'datamachine/audit-internal-links',
+			'orphans'   => 'datamachine/get-orphaned-posts',
+			'backlinks' => 'datamachine/get-backlinks',
+			'broken'    => 'datamachine/check-broken-links',
 		);
 
 		if ( ! isset( $ability_map[ $action ] ) ) {
 			return $this->buildErrorResponse(
-				sprintf( 'Invalid action "%s". Valid: audit, orphans, broken.', $action ),
+				sprintf( 'Invalid action "%s". Valid: audit, orphans, backlinks, broken.', $action ),
 				'internal_link_audit'
 			);
 		}
@@ -89,14 +91,19 @@ class InternalLinkAudit extends BaseTool {
 		return array(
 			'class'           => __CLASS__,
 			'method'          => 'handle_tool_call',
-			'description'     => 'Audit links on this WordPress site. Three actions: "audit" scans post content to build a link graph (cached 24hr), "orphans" lists posts with zero inbound links from the cached graph, "broken" performs HTTP HEAD checks on cached links to find broken URLs (expensive, supports internal/external/all scope). Always run "audit" first, then use "orphans" or "broken" for specific checks.',
+			'description'     => 'Audit links on this WordPress site. Four actions: "audit" scans post content to build a link graph (cached 24hr), "orphans" lists posts with zero inbound links, "backlinks" gets all posts linking to a given post_id, "broken" performs HTTP HEAD checks for broken URLs (expensive, supports internal/external/all scope). Always run "audit" first, then use other actions for specific checks.',
 			'requires_config' => false,
 			'parameters'      => array(
 				'action'    => array(
 					'type'        => 'string',
 					'required'    => true,
-					'description' => 'Action to perform: "audit" (scan + cache link graph), "orphans" (list orphaned posts), or "broken" (HTTP check for broken links).',
-					'enum'        => array( 'audit', 'orphans', 'broken' ),
+					'description' => 'Action to perform: "audit" (scan + cache link graph), "orphans" (list orphaned posts), "backlinks" (get posts linking to a given post_id), or "broken" (HTTP check for broken links).',
+					'enum'        => array( 'audit', 'orphans', 'backlinks', 'broken' ),
+				),
+				'post_id'   => array(
+					'type'        => 'integer',
+					'required'    => false,
+					'description' => 'Post ID to get backlinks for (backlinks action only).',
 				),
 				'post_type' => array(
 					'type'        => 'string',

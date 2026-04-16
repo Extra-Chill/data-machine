@@ -5,11 +5,12 @@
  * Ability endpoints for AI-powered internal link insertion and diagnostics.
  * Delegates async execution to the System Agent infrastructure.
  *
- * Six abilities:
+ * Seven abilities:
  * - datamachine/internal-linking        — Queue system agent link insertion.
  * - datamachine/diagnose-internal-links — Meta-based coverage report.
  * - datamachine/audit-internal-links    — Scan content, build + cache link graph.
  * - datamachine/get-orphaned-posts      — Read orphaned posts from cached graph.
+ * - datamachine/get-backlinks           — Get all posts linking to a given post.
  * - datamachine/check-broken-links      — HTTP HEAD checks on cached graph links.
  * - datamachine/link-opportunities      — Ranked linking opportunities from GSC + link graph.
  *
@@ -229,6 +230,54 @@ class InternalLinkingAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'getOrphanedPosts' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/get-backlinks',
+				array(
+					'label'               => 'Get Backlinks',
+					'description'         => 'Get all posts that link to a given post. Returns source posts with titles and permalinks from the cached link graph. Runs audit automatically if no cache exists.',
+					'category'            => 'datamachine/seo',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'post_id' ),
+						'properties' => array(
+							'post_id'   => array(
+								'type'        => 'integer',
+								'description' => 'The post ID to get backlinks for.',
+							),
+							'post_type' => array(
+								'type'        => 'string',
+								'description' => 'Post type scope for the link graph. Default: post.',
+								'default'     => 'post',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'        => array( 'type' => 'boolean' ),
+							'post_id'        => array( 'type' => 'integer' ),
+							'backlink_count' => array( 'type' => 'integer' ),
+							'backlinks'      => array(
+								'type'  => 'array',
+								'items' => array(
+									'type'       => 'object',
+									'properties' => array(
+										'source_id'  => array( 'type' => 'integer' ),
+										'title'      => array( 'type' => 'string' ),
+										'permalink'  => array( 'type' => 'string' ),
+										'link_count' => array( 'type' => 'integer' ),
+									),
+								),
+							),
+							'from_cache'     => array( 'type' => 'boolean' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'getBacklinks' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
@@ -707,6 +756,79 @@ class InternalLinkingAbilities {
 			'orphaned_count' => count( $graph['orphaned_posts'] ?? array() ),
 			'total_scanned'  => $graph['total_scanned'] ?? 0,
 			'orphaned_posts' => $orphaned,
+			'from_cache'     => $from_cache,
+		);
+	}
+
+	/**
+	 * Get all posts that link to a given post (backlinks).
+	 *
+	 * Reads from the cached link graph. If no cache exists, runs an audit
+	 * automatically. Groups multiple links from the same source into a
+	 * single entry with a link_count.
+	 *
+	 * @since 0.68.0
+	 *
+	 * @param array $input Ability input with required 'post_id'.
+	 * @return array Ability response.
+	 */
+	public static function getBacklinks( array $input = array() ): array {
+		$post_id    = absint( $input['post_id'] ?? 0 );
+		$post_type  = sanitize_text_field( $input['post_type'] ?? 'post' );
+		$from_cache = true;
+
+		if ( 0 === $post_id ) {
+			return array(
+				'success' => false,
+				'error'   => 'post_id is required.',
+			);
+		}
+
+		$graph = get_transient( self::GRAPH_TRANSIENT_KEY );
+		if ( false === $graph || ! is_array( $graph ) || ( $graph['post_type'] ?? '' ) !== $post_type ) {
+			// No cache — run audit.
+			$graph = self::buildLinkGraph( $post_type, '', array() );
+			if ( isset( $graph['error'] ) ) {
+				return $graph;
+			}
+			set_transient( self::GRAPH_TRANSIENT_KEY, $graph, self::GRAPH_CACHE_TTL );
+			$from_cache = false;
+		}
+
+		$all_links   = $graph['_all_links'] ?? array();
+		$id_to_title = $graph['_id_to_title'] ?? array();
+
+		// Filter links where target_id matches, group by source_id.
+		$sources = array();
+		foreach ( $all_links as $link ) {
+			if ( ( $link['target_id'] ?? null ) === $post_id ) {
+				$source_id = $link['source_id'];
+				if ( ! isset( $sources[ $source_id ] ) ) {
+					$sources[ $source_id ] = 0;
+				}
+				++$sources[ $source_id ];
+			}
+		}
+
+		// Build the response array with titles and permalinks.
+		$backlinks = array();
+		foreach ( $sources as $source_id => $link_count ) {
+			$backlinks[] = array(
+				'source_id'  => $source_id,
+				'title'      => $id_to_title[ $source_id ] ?? '',
+				'permalink'  => get_permalink( $source_id ) ?: '',
+				'link_count' => $link_count,
+			);
+		}
+
+		// Sort by link count descending (most links first).
+		usort( $backlinks, fn( $a, $b ) => $b['link_count'] <=> $a['link_count'] );
+
+		return array(
+			'success'        => true,
+			'post_id'        => $post_id,
+			'backlink_count' => count( $backlinks ),
+			'backlinks'      => $backlinks,
 			'from_cache'     => $from_cache,
 		);
 	}
