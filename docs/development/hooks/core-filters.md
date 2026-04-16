@@ -902,27 +902,48 @@ Builds parameters for handler-specific tools with engine data merging (source_ur
 
 **Purpose**: Multi-turn conversation execution with automatic tool calling.
 
-**Core Method**:
+**Canonical entry point**:
 
-#### `execute()`
 ```php
-$loop = new \DataMachine\Engine\AI\AIConversationLoop();
-$final_response = $loop->execute(
-    array $initial_messages,
-    array $available_tools,
-    string $provider_name,
+$final_response = \DataMachine\Engine\AI\AIConversationLoop::run(
+    array $messages,
+    array $tools,
+    string $provider,
     string $model,
-    string $agent_type,      // 'pipeline' or 'chat'
-    array $context
+    string $context,         // 'pipeline', 'chat', etc.
+    array $payload = [],
+    int $max_turns = 25,
+    bool $single_turn = false
 ): array
 ```
+
+`run()` internally applies the `datamachine_conversation_runner` filter, giving
+a registered runtime adapter the chance to short-circuit the built-in loop. If
+no adapter returns an array, Data Machine's built-in `execute()` runs.
+
+**Filter: `datamachine_conversation_runner`**
+
+```php
+apply_filters(
+    'datamachine_conversation_runner',
+    null,           // Return non-null array to short-circuit
+    $messages, $tools, $provider, $model,
+    $context, $payload, $max_turns, $single_turn
+);
+```
+
+Return an array matching `execute()`'s documented return shape to replace the
+built-in loop. Return `null` (the default) to let Data Machine run the
+conversation. See [ai-conversation-loop.md](../../core-system/ai-conversation-loop.md#runtime-adapters)
+for the full adapter contract.
 
 **Features**:
 - Automatic tool execution during conversation turns
 - Conversation completion detection
 - Turn-based state management with chronological ordering
 - Duplicate message prevention
-- Maximum turn limiting (default: 10)
+- Maximum turn limiting (default: 25)
+- Runtime-swappable via `datamachine_conversation_runner`
 
 ### ConversationManager (`/inc/Engine/AI/ConversationManager.php`)
 

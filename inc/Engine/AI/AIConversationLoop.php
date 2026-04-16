@@ -27,6 +27,95 @@ if ( ! defined( 'ABSPATH' ) ) {
 class AIConversationLoop {
 
 	/**
+	 * Run a conversation, optionally delegating to an external runtime adapter.
+	 *
+	 * This is the canonical entry point every caller should use instead of
+	 * instantiating AIConversationLoop directly. It exposes a single filter
+	 * (`datamachine_conversation_runner`) that lets a consumer short-circuit the
+	 * built-in loop with an alternative runtime while receiving the exact
+	 * same argument list and returning the exact same result shape. If the
+	 * filter returns null (the default), the built-in loop runs unchanged.
+	 *
+	 * Adapters MUST return an array matching {@see self::execute()}'s
+	 * documented return shape.
+	 *
+	 * @param array  $messages      Initial conversation messages.
+	 * @param array  $tools         Available tools for AI.
+	 * @param string $provider      AI provider identifier.
+	 * @param string $model         AI model identifier.
+	 * @param string $context       Execution context ('pipeline', 'chat', ...).
+	 * @param array  $payload       Step payload / loop context.
+	 * @param int    $max_turns     Maximum conversation turns.
+	 * @param bool   $single_turn   Execute exactly one turn and return.
+	 * @return array Result array matching self::execute() shape.
+	 */
+	public static function run(
+		array $messages,
+		array $tools,
+		string $provider,
+		string $model,
+		string $context,
+		array $payload = array(),
+		int $max_turns = PluginSettings::DEFAULT_MAX_TURNS,
+		bool $single_turn = false
+	): array {
+		/**
+		 * Filter: allow a consumer to replace Data Machine's built-in
+		 * conversation loop with an alternative runtime.
+		 *
+		 * Return an array matching {@see AIConversationLoop::execute()}'s
+		 * documented return shape to short-circuit the built-in loop.
+		 * Return null (the default) to let the built-in loop run.
+		 *
+		 * Data Machine makes no assumptions about the consumer's runtime —
+		 * the filter is the only contract. Adapters are responsible for
+		 * executing tools, managing turns, and producing the expected
+		 * result shape.
+		 *
+		 * @since next
+		 *
+		 * @param array|null $result       Null to run the built-in loop, or an
+		 *                                 AIConversationLoop::execute() return array.
+		 * @param array      $messages     Initial conversation messages.
+		 * @param array      $tools        Available tools for AI.
+		 * @param string     $provider     AI provider identifier.
+		 * @param string     $model        AI model identifier.
+		 * @param string     $context      Execution context.
+		 * @param array      $payload      Step payload / loop context.
+		 * @param int        $max_turns    Maximum conversation turns.
+		 * @param bool       $single_turn  Single-turn mode flag.
+		 */
+		$result = apply_filters(
+			'datamachine_conversation_runner',
+			null,
+			$messages,
+			$tools,
+			$provider,
+			$model,
+			$context,
+			$payload,
+			$max_turns,
+			$single_turn
+		);
+
+		if ( is_array( $result ) ) {
+			return $result;
+		}
+
+		$loop = new self();
+		return $loop->execute(
+			$messages,
+			$tools,
+			$provider,
+			$model,
+			$context,
+			$payload,
+			$max_turns,
+			$single_turn
+		);
+	}
+
+	/**
 	 * Execute conversation loop
 	 *
 	 * @param array  $messages      Initial conversation messages

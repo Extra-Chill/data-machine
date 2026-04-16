@@ -276,9 +276,8 @@ class AIStep extends Step {
 		$provider_name = $context_model['provider'];
 		$model_name    = $context_model['model'];
 
-		// Execute conversation loop
-		$loop        = new AIConversationLoop();
-		$loop_result = $loop->execute(
+		// Execute conversation loop via runtime-adapter-aware entry point.
+		$loop_result = AIConversationLoop::run(
 			$messages,
 			$available_tools,
 			$provider_name,
