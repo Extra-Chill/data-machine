@@ -46,7 +46,7 @@ class FetchEmailAbility {
 				array(
 					'label'               => __( 'Fetch Emails', 'data-machine' ),
 					'description'         => __( 'Retrieve emails from an IMAP inbox', 'data-machine' ),
-					'category'            => 'datamachine/fetch',
+					'category'            => 'datamachine-fetch',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'imap_host', 'imap_user', 'imap_password' ),

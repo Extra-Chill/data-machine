@@ -33,7 +33,7 @@ class FlowHealthAbility {
 				array(
 					'label'               => __( 'Get Flow Health', 'data-machine' ),
 					'description'         => __( 'Get health metrics for a flow including consecutive failures and no-items counts.', 'data-machine' ),
-					'category'            => 'datamachine/jobs',
+					'category'            => 'datamachine-jobs',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'flow_id' ),

@@ -33,7 +33,7 @@ class DeleteFlowAbility {
 				array(
 					'label'               => __( 'Delete Flow', 'data-machine' ),
 					'description'         => __( 'Delete a flow and unschedule its actions.', 'data-machine' ),
-					'category'            => 'datamachine/flow',
+					'category'            => 'datamachine-flow',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'flow_id' ),

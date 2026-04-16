@@ -37,7 +37,7 @@ class EditPostBlocksAbility {
 				array(
 					'label'               => __( 'Edit Post Blocks', 'data-machine' ),
 					'description'         => __( 'Surgical find/replace within specific Gutenberg blocks by index', 'data-machine' ),
-					'category'            => 'datamachine/content',
+					'category'            => 'datamachine-content',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'post_id', 'edits' ),

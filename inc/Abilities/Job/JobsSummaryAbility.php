@@ -33,7 +33,7 @@ class JobsSummaryAbility {
 				array(
 					'label'               => __( 'Get Jobs Summary', 'data-machine' ),
 					'description'         => __( 'Get job counts grouped by base status. Compound statuses are normalized to their base status.', 'data-machine' ),
-					'category'            => 'datamachine/jobs',
+					'category'            => 'datamachine-jobs',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(),

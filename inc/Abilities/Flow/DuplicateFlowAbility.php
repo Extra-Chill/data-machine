@@ -35,7 +35,7 @@ class DuplicateFlowAbility {
 				array(
 					'label'               => __( 'Duplicate Flow', 'data-machine' ),
 					'description'         => __( 'Duplicate a flow, optionally to a different pipeline.', 'data-machine' ),
-					'category'            => 'datamachine/flow',
+					'category'            => 'datamachine-flow',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'source_flow_id' ),

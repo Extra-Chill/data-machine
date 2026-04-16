@@ -37,7 +37,7 @@ class GetPostBlocksAbility {
 				array(
 					'label'               => __( 'Get Post Blocks', 'data-machine' ),
 					'description'         => __( 'Parse a post into Gutenberg blocks with optional filtering by type or content', 'data-machine' ),
-					'category'            => 'datamachine/content',
+					'category'            => 'datamachine-content',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'post_id' ),

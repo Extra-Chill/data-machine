@@ -77,7 +77,7 @@ class BingWebmasterAbilities {
 				array(
 					'label'               => 'Bing Webmaster Tools',
 					'description'         => 'Fetch search analytics data from Bing Webmaster Tools API',
-					'category'            => 'datamachine/analytics',
+					'category'            => 'datamachine-analytics',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'action' ),

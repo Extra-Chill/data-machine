@@ -41,7 +41,7 @@ class AgentMemoryAbilities {
 				array(
 					'label'               => 'Get Agent Memory',
 					'description'         => 'Read agent file content — full file or a specific section. Supports any agent file (MEMORY.md, SOUL.md, USER.md, etc.).',
-					'category'            => 'datamachine/memory',
+					'category'            => 'datamachine-memory',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
@@ -89,7 +89,7 @@ class AgentMemoryAbilities {
 				array(
 					'label'               => 'Update Agent Memory',
 					'description'         => 'Write to a specific section of an agent file — set (replace) or append. Supports any agent file.',
-					'category'            => 'datamachine/memory',
+					'category'            => 'datamachine-memory',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
@@ -141,7 +141,7 @@ class AgentMemoryAbilities {
 				array(
 					'label'               => 'Search Agent Memory',
 					'description'         => 'Search across agent file content. Returns matching lines with context, grouped by section. Supports any agent file.',
-					'category'            => 'datamachine/memory',
+					'category'            => 'datamachine-memory',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'query' ),
@@ -201,7 +201,7 @@ class AgentMemoryAbilities {
 				array(
 					'label'               => 'List Agent Memory Sections',
 					'description'         => 'List all section headers in an agent file. Supports any agent file.',
-					'category'            => 'datamachine/memory',
+					'category'            => 'datamachine-memory',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

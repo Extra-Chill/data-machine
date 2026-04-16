@@ -34,7 +34,7 @@ class ValidateFlowStepsConfigAbility {
 				array(
 					'label'               => __( 'Validate Flow Steps Config', 'data-machine' ),
 					'description'         => __( 'Dry-run validation for configure_flow_steps operations. Validates without executing.', 'data-machine' ),
-					'category'            => 'datamachine/flow',
+					'category'            => 'datamachine-flow',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'pipeline_id' ),

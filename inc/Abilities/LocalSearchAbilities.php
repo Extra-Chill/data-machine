@@ -42,7 +42,7 @@ class LocalSearchAbilities {
 				array(
 					'label'               => __( 'Local Search', 'data-machine' ),
 					'description'         => __( 'Search WordPress site for posts by title or content', 'data-machine' ),
-					'category'            => 'datamachine/content',
+					'category'            => 'datamachine-content',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'query' ),

@@ -20,7 +20,7 @@ class PageSpeed extends BaseTool {
 
 	public function __construct() {
 		$this->registerConfigurationHandlers( 'pagespeed' );
-		$this->registerTool( 'pagespeed', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ), array( 'ability' => 'datamachine/pagespeed' ) );
+		$this->registerTool( 'pagespeed', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ), array( 'ability' => 'datamachine-pagespeed' ) );
 	}
 
 	/**
@@ -31,7 +31,7 @@ class PageSpeed extends BaseTool {
 	 * @return array Result from the ability.
 	 */
 	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
-		$ability = wp_get_ability( 'datamachine/pagespeed' );
+		$ability = wp_get_ability( 'datamachine-pagespeed' );
 
 		if ( ! $ability ) {
 			return $this->buildErrorResponse(

@@ -38,7 +38,7 @@ class QueryWordPressPostsAbility {
 				array(
 					'label'               => __( 'Query WordPress Posts', 'data-machine' ),
 					'description'         => __( 'Query WordPress posts with filtering for pipeline data fetching', 'data-machine' ),
-					'category'            => 'datamachine/fetch',
+					'category'            => 'datamachine-fetch',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

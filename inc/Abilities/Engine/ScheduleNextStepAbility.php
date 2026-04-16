@@ -42,7 +42,7 @@ class ScheduleNextStepAbility {
 				array(
 					'label'               => __( 'Schedule Next Step', 'data-machine' ),
 					'description'         => __( 'Store data packets and schedule the next pipeline step via Action Scheduler.', 'data-machine' ),
-					'category'            => 'datamachine/jobs',
+					'category'            => 'datamachine-jobs',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'job_id', 'flow_step_id' ),

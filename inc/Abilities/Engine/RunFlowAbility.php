@@ -40,7 +40,7 @@ class RunFlowAbility {
 				array(
 					'label'               => __( 'Run Flow', 'data-machine' ),
 					'description'         => __( 'Execute a flow immediately. Loads configs, creates job if needed, schedules first step.', 'data-machine' ),
-					'category'            => 'datamachine/jobs',
+					'category'            => 'datamachine-jobs',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'flow_id' ),

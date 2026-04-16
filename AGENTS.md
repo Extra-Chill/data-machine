@@ -44,7 +44,7 @@ This file provides a concise, present-tense technical reference for contributors
   - `Analytics/` — Google Search Console, Bing Webmaster
   - `SystemAbilities` — System-level operations
   - `AgentPing/` — Agent ping dispatch
-- Category registration: `datamachine` category registered via `wp_register_ability_category()` on `wp_abilities_api_categories_init` hook
+- Category registration: Multiple `datamachine-{domain}` categories registered via `wp_register_ability_category()` on `wp_abilities_api_categories_init` hook
 - Ability execution: Each ability implements `execute_callback` with `permission_callback` (checks `manage_options` or WP_CLI)
 - REST API endpoints, CLI commands, and Chat tools delegate to abilities for business logic
 

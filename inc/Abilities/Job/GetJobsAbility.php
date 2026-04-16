@@ -35,7 +35,7 @@ class GetJobsAbility {
 				array(
 					'label'               => __( 'Get Jobs', 'data-machine' ),
 					'description'         => __( 'List jobs with optional filtering by flow_id, pipeline_id, or status. Supports pagination, sorting, and single job lookup via job_id.', 'data-machine' ),
-					'category'            => 'datamachine/jobs',
+					'category'            => 'datamachine-jobs',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

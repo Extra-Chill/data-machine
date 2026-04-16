@@ -41,7 +41,7 @@ class ResumeFlowAbility {
 				array(
 					'label'               => __( 'Resume Flow', 'data-machine' ),
 					'description'         => __( 'Resume one or more paused flows. Re-registers schedules.', 'data-machine' ),
-					'category'            => 'datamachine/flow',
+					'category'            => 'datamachine-flow',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

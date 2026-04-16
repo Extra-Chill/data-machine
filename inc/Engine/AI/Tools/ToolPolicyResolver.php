@@ -391,7 +391,7 @@ class ToolPolicyResolver {
 	 * @since 0.55.0
 	 *
 	 * @param array    $tools      Resolved tools array keyed by tool name.
-	 * @param string[] $categories Allowed category slugs (e.g. 'datamachine/content').
+	 * @param string[] $categories Allowed category slugs (e.g. 'datamachine-content').
 	 * @return array Filtered tools.
 	 */
 	private function filterByAbilityCategories( array $tools, array $categories ): array {

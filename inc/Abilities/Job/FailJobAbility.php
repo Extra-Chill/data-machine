@@ -36,7 +36,7 @@ class FailJobAbility {
 				array(
 					'label'               => __( 'Fail Job', 'data-machine' ),
 					'description'         => __( 'Manually fail a processing job with an optional reason.', 'data-machine' ),
-					'category'            => 'datamachine/jobs',
+					'category'            => 'datamachine-jobs',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

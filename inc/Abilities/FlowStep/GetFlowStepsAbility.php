@@ -33,7 +33,7 @@ class GetFlowStepsAbility {
 				array(
 					'label'               => __( 'Get Flow Steps', 'data-machine' ),
 					'description'         => __( 'Get all step configurations for a flow, or a single step by ID.', 'data-machine' ),
-					'category'            => 'datamachine/flow',
+					'category'            => 'datamachine-flow',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

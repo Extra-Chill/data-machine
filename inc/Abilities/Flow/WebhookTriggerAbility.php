@@ -47,7 +47,7 @@ class WebhookTriggerAbility {
 				array(
 					'label'               => __( 'Enable Webhook Trigger', 'data-machine' ),
 					'description'         => __( 'Enable webhook trigger for a flow and generate a Bearer token. External services can POST to the trigger URL to start flow executions.', 'data-machine' ),
-					'category'            => 'datamachine/flow',
+					'category'            => 'datamachine-flow',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'flow_id' ),
@@ -80,7 +80,7 @@ class WebhookTriggerAbility {
 				array(
 					'label'               => __( 'Disable Webhook Trigger', 'data-machine' ),
 					'description'         => __( 'Disable webhook trigger for a flow. Revokes the token and stops accepting inbound webhooks.', 'data-machine' ),
-					'category'            => 'datamachine/flow',
+					'category'            => 'datamachine-flow',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'flow_id' ),
@@ -111,7 +111,7 @@ class WebhookTriggerAbility {
 				array(
 					'label'               => __( 'Regenerate Webhook Token', 'data-machine' ),
 					'description'         => __( 'Regenerate the webhook trigger token for a flow. The old token is immediately invalidated.', 'data-machine' ),
-					'category'            => 'datamachine/flow',
+					'category'            => 'datamachine-flow',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'flow_id' ),
@@ -144,7 +144,7 @@ class WebhookTriggerAbility {
 				array(
 					'label'               => __( 'Configure Webhook Rate Limit', 'data-machine' ),
 					'description'         => __( 'Set rate limiting for a flow webhook trigger. Limits the number of requests per time window.', 'data-machine' ),
-					'category'            => 'datamachine/flow',
+					'category'            => 'datamachine-flow',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'flow_id' ),
@@ -190,7 +190,7 @@ class WebhookTriggerAbility {
 				array(
 					'label'               => __( 'Webhook Trigger Status', 'data-machine' ),
 					'description'         => __( 'Get the webhook trigger status for a flow, including URL and whether it is enabled.', 'data-machine' ),
-					'category'            => 'datamachine/flow',
+					'category'            => 'datamachine-flow',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'flow_id' ),

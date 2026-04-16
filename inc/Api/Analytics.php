@@ -38,7 +38,7 @@ class Analytics {
 		'gsc'       => 'datamachine/google-search-console',
 		'bing'      => 'datamachine/bing-webmaster',
 		'ga'        => 'datamachine/google-analytics',
-		'pagespeed' => 'datamachine/pagespeed',
+		'pagespeed' => 'datamachine-pagespeed',
 	);
 
 	/**

@@ -34,7 +34,7 @@ class ConfigureFlowStepsAbility {
 				array(
 					'label'               => __( 'Configure Flow Steps', 'data-machine' ),
 					'description'         => __( 'Bulk configure flow steps across a pipeline or globally. Supports handler switching with field mapping.', 'data-machine' ),
-					'category'            => 'datamachine/flow',
+					'category'            => 'datamachine-flow',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

@@ -44,7 +44,7 @@ class AltTextAbilities {
 				array(
 					'label'               => 'Generate Alt Text',
 					'description'         => 'Queue system agent generation of alt text for images',
-					'category'            => 'datamachine/media',
+					'category'            => 'datamachine-media',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
@@ -87,7 +87,7 @@ class AltTextAbilities {
 				array(
 					'label'               => 'Diagnose Alt Text',
 					'description'         => 'Report alt text coverage for image attachments',
-					'category'            => 'datamachine/media',
+					'category'            => 'datamachine-media',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(),

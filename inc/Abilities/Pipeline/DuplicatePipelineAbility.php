@@ -33,7 +33,7 @@ class DuplicatePipelineAbility {
 				array(
 					'label'               => __( 'Duplicate Pipeline', 'data-machine' ),
 					'description'         => __( 'Duplicate a pipeline with all its flows.', 'data-machine' ),
-					'category'            => 'datamachine/pipeline',
+					'category'            => 'datamachine-pipeline',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'pipeline_id' ),

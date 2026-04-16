@@ -33,7 +33,7 @@ class UpdatePipelineAbility {
 				array(
 					'label'               => __( 'Update Pipeline', 'data-machine' ),
 					'description'         => __( 'Update pipeline name or configuration.', 'data-machine' ),
-					'category'            => 'datamachine/pipeline',
+					'category'            => 'datamachine-pipeline',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'pipeline_id' ),

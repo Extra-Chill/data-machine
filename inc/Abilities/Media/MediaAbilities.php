@@ -67,7 +67,7 @@ class MediaAbilities {
 			array(
 				'label'               => 'Upload Media',
 				'description'         => 'Upload or fetch a media file (image or video), store it in the repository, and return a reference (path, URL, or media ID). Automatically detects media type from MIME.',
-				'category'            => 'datamachine/media',
+				'category'            => 'datamachine-media',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -127,7 +127,7 @@ class MediaAbilities {
 			array(
 				'label'               => 'Validate Media',
 				'description'         => 'Validate a media file (image or video) against platform-specific constraints (duration, size, codec, aspect ratio, resolution). Auto-detects media type.',
-				'category'            => 'datamachine/media',
+				'category'            => 'datamachine-media',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'path' ),
@@ -175,7 +175,7 @@ class MediaAbilities {
 			array(
 				'label'               => 'Video Metadata',
 				'description'         => 'Extract video metadata (duration, resolution, codec, bitrate, framerate) using ffprobe with graceful degradation',
-				'category'            => 'datamachine/media',
+				'category'            => 'datamachine-media',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'path' ),

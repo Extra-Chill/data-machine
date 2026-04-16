@@ -35,7 +35,7 @@ class GetPipelinesAbility {
 				array(
 					'label'               => __( 'Get Pipelines', 'data-machine' ),
 					'description'         => __( 'Get pipelines with optional pagination and filtering, or a single pipeline by ID.', 'data-machine' ),
-					'category'            => 'datamachine/pipeline',
+					'category'            => 'datamachine-pipeline',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

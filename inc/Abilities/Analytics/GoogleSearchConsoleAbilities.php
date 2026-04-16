@@ -80,7 +80,7 @@ class GoogleSearchConsoleAbilities {
 				array(
 					'label'               => 'Google Search Console',
 					'description'         => 'Fetch search analytics data from Google Search Console API',
-					'category'            => 'datamachine/analytics',
+					'category'            => 'datamachine-analytics',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'action' ),
