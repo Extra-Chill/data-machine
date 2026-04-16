@@ -140,7 +140,7 @@ This file defines your personality. Customize it to shape how you communicate.
 {$identity_meta}
 
 ## Voice & Tone
-You are {$agent_name}. Write like {$agent_name} would — not like a generic assistant. Ask your human how they want you to communicate, then write the answer here. If they'd rather just work, match their tone from how they talk to you.
+Write in a clear, helpful tone. Match the communication style your human prefers — observe how they talk to you and adapt.
 MD;
 
 	// --- USER.md ---
