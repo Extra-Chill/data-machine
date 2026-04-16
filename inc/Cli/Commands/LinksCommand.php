@@ -10,6 +10,7 @@
  * - diagnose       — Meta-based coverage report.
  * - audit          — Scan content, build + cache link graph.
  * - orphans        — List orphaned posts (zero inbound links).
+ * - backlinks      — Get all posts linking to a given post.
  * - opportunities  — Ranked linking opportunities (GSC traffic + link graph).
  * - broken         — HTTP HEAD checks for broken internal links.
  *
@@ -529,6 +530,99 @@ class LinksCommand extends BaseCommand {
 		);
 
 		WP_CLI::success( sprintf( '%d orphaned post(s) out of %d scanned.', $orphaned_count, $total_scanned ) );
+	}
+
+	/**
+	 * Get all posts that link to a given post (backlinks).
+	 *
+	 * Reads from the cached link graph. Runs a full audit automatically
+	 * if no cache exists.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <post_id>
+	 * : The post ID to get backlinks for.
+	 *
+	 * [--post_type=<type>]
+	 * : Post type scope for the link graph.
+	 * ---
+	 * default: post
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - csv
+	 * ---
+	 *
+	 * [--fields=<fields>]
+	 * : Limit output to specific fields (comma-separated).
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Get backlinks for post 42
+	 *     wp datamachine links backlinks 42
+	 *
+	 *     # JSON output
+	 *     wp datamachine links backlinks 42 --format=json
+	 *
+	 *     # Scan wiki post type
+	 *     wp datamachine links backlinks 42 --post_type=wiki
+	 *
+	 * @subcommand backlinks
+	 */
+	public function backlinks( array $args, array $assoc_args ): void {
+		$post_id   = absint( $args[0] ?? 0 );
+		$format    = $assoc_args['format'] ?? 'table';
+		$post_type = $assoc_args['post_type'] ?? 'post';
+
+		if ( 0 === $post_id ) {
+			WP_CLI::error( 'post_id is required.' );
+			return;
+		}
+
+		$result = InternalLinkingAbilities::getBacklinks(
+			array(
+				'post_id'   => $post_id,
+				'post_type' => $post_type,
+			)
+		);
+
+		if ( empty( $result['success'] ) ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to get backlinks.' );
+			return;
+		}
+
+		$backlink_count = (int) ( $result['backlink_count'] ?? 0 );
+		$from_cache     = $result['from_cache'] ?? false;
+
+		if ( $from_cache ) {
+			WP_CLI::log( 'Reading from cached link graph.' );
+		} else {
+			WP_CLI::log( 'No cache found — ran full audit.' );
+		}
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( \wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			return;
+		}
+
+		if ( empty( $result['backlinks'] ) ) {
+			WP_CLI::success( sprintf( 'No backlinks found for post %d.', $post_id ) );
+			return;
+		}
+
+		$this->format_items(
+			$result['backlinks'],
+			array( 'source_id', 'title', 'link_count', 'permalink' ),
+			$assoc_args
+		);
+
+		WP_CLI::success( sprintf( '%d post(s) link to post %d.', $backlink_count, $post_id ) );
 	}
 
 	/**
