@@ -670,8 +670,7 @@ class ChatOrchestrator {
 				$loop_context['client_context'] = $client_context;
 			}
 
-			$loop        = new AIConversationLoop();
-			$loop_result = $loop->execute(
+			$loop_result = AIConversationLoop::run(
 				$messages,
 				$all_tools,
 				$provider,

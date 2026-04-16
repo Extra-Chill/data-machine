@@ -106,77 +106,178 @@ if ($turn_count >= $max_turns && !$conversation_complete) {
 
 ## Usage
 
-### Basic Usage
+### Canonical entry point
+
+All callers should use the static `AIConversationLoop::run()` entry point. It
+accepts the same arguments as `execute()` and returns the same result shape,
+but first gives a registered runtime adapter (via the `datamachine_conversation_runner`
+filter) the opportunity to short-circuit the built-in loop. See
+[Runtime Adapters](#runtime-adapters) below.
 
 ```php
 use DataMachine\Engine\AI\AIConversationLoop;
 
-$loop = new AIConversationLoop();
-$result = $loop->execute(
+$result = AIConversationLoop::run(
     $messages,        // Initial conversation messages
     $tools,           // Available tools for AI
     $provider,        // AI provider (openai, anthropic, etc.)
     $model,           // AI model identifier
-    $agent_type,      // 'pipeline' or 'chat'
-    $context,         // Agent-specific context data
-    $max_turns        // Maximum conversation turns (default: 8)
+    $context,         // 'pipeline' or 'chat'
+    $payload,         // Agent-specific payload data
+    $max_turns,       // Maximum conversation turns (default: 25)
+    $single_turn      // Execute exactly one turn (default: false)
 );
 ```
 
 ### Pipeline Agent Example
 
 ```php
-// Pipeline agent context includes job_id, flow_step_id, payload
-$context = [
-    'step_id' => $flow_step_id,
-    'payload' => [
-        'job_id' => $job_id,
-        'flow_step_id' => $flow_step_id,
-        'data' => $data,
-        'flow_step_config' => $flow_step_config,
-        'engine_data' => $engine_data
-    ]
+// Pipeline payload includes job_id, flow_step_id, data, flow_step_config
+$payload = [
+    'job_id'           => $job_id,
+    'flow_step_id'     => $flow_step_id,
+    'data'             => $data,
+    'flow_step_config' => $flow_step_config,
 ];
 
-$loop = new AIConversationLoop();
-$result = $loop->execute(
+$result = AIConversationLoop::run(
     $messages,
     $tools,
     $provider,
     $model,
     'pipeline',
-    $context,
-    8
+    $payload,
+    $max_turns
 );
 
 $final_data = $result['messages'];
 $turn_count = $result['turn_count'];
-$completed = $result['completed'];
+$completed  = $result['completed'];
 ```
 
 ### Chat Agent Example
 
 ```php
-// Chat agent context includes session_id
-$context = [
-    'session_id' => $session_id
+// Chat payload includes session_id, user_id, agent_id
+$payload = [
+    'session_id' => $session_id,
+    'user_id'    => $user_id,
+    'agent_id'   => $agent_id,
 ];
 
-$loop = new AIConversationLoop();
-$result = $loop->execute(
+$result = AIConversationLoop::run(
     $messages,
     $tools,
     $provider,
     $model,
     'chat',
-    $context,
-    8
+    $payload,
+    $max_turns,
+    $single_turn
 );
 
 $final_messages = $result['messages'];
-$final_content = $result['final_content'];
-$turn_count = $result['turn_count'];
+$final_content  = $result['final_content'];
+$turn_count     = $result['turn_count'];
 ```
+
+## Runtime Adapters
+
+Data Machine's built-in loop is the default, but the entire conversation
+runtime is swappable via a single filter. This lets a consumer plug Data
+Machine's pipelines, flows, tools, and memory into a different agent runtime
+(for example, a host platform that already provides its own agent loop,
+conversation storage, and channels) without Data Machine knowing anything
+about that runtime.
+
+### The filter
+
+```php
+apply_filters(
+    'datamachine_conversation_runner',
+    null,           // Return non-null to short-circuit the built-in loop
+    $messages,
+    $tools,
+    $provider,
+    $model,
+    $context,
+    $payload,
+    $max_turns,
+    $single_turn
+);
+```
+
+Return an array matching `AIConversationLoop::execute()`'s documented return
+shape to replace the built-in loop. Return `null` (the default) to let Data
+Machine run the conversation itself.
+
+### Adapter contract
+
+An adapter is responsible for:
+
+1. Executing tool calls and appending tool-result messages to `$messages`.
+2. Managing turn count and termination against `$max_turns`.
+3. Returning the exact shape `execute()` returns — `messages`, `final_content`,
+   `turn_count`, `completed`, `last_tool_calls`, `tool_execution_results`,
+   `has_pending_tools`, `usage`, plus optional `error`, `warning`, and
+   `max_turns_reached` keys.
+
+Data Machine makes no assumptions about how the adapter produces that result.
+A consumer can delegate to any external runtime — its own `Agent` subclass, a
+remote RPC service, a different language — as long as the return shape is
+honored.
+
+### Minimal adapter example
+
+```php
+add_filter(
+    'datamachine_conversation_runner',
+    function ( $result, $messages, $tools, $provider, $model, $context, $payload, $max_turns, $single_turn ) {
+        // Only take over for a specific context.
+        if ( 'chat' !== $context ) {
+            return $result;
+        }
+
+        // Delegate to an external runtime that returns the expected shape.
+        return my_external_runtime_run( [
+            'messages'    => $messages,
+            'tools'       => $tools,
+            'provider'    => $provider,
+            'model'       => $model,
+            'payload'     => $payload,
+            'max_turns'   => $max_turns,
+            'single_turn' => $single_turn,
+        ] );
+    },
+    10,
+    9
+);
+```
+
+### Mirrors the AI HTTP Client provider pattern
+
+This is the same extension shape Data Machine's AI HTTP Client uses to allow
+different LLM providers (OpenAI, Anthropic, Gemini, Grok, OpenRouter) to be
+registered via `chubes_ai_request`. A runtime adapter is the same idea, one
+layer up: providers swap how the LLM is called; runtime adapters swap how the
+conversation is run.
+
+### Relationship to wp-ai-client migration (#1027)
+
+Runtime adapters and the upcoming wp-ai-client migration operate at different
+layers and are independent:
+
+- `datamachine_conversation_runner` replaces the **conversation loop** — turn
+  management, tool execution, completion detection.
+- The wp-ai-client migration (see Extra-Chill/data-machine#1027) replaces the
+  **LLM request layer** that the built-in loop calls internally — a single
+  HTTP call to an LLM provider.
+
+When wp-ai-client lands, Data Machine's built-in `execute()` will call
+`wp_ai_client_prompt()` in place of `apply_filters('chubes_ai_request', ...)`.
+The `run()` entry point and the `datamachine_conversation_runner` filter
+contract are unchanged, and adapters that replace the entire loop are
+unaffected — they bring their own LLM client as part of their runtime.
 
 ## Configuration
 

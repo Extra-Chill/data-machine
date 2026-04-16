@@ -215,6 +215,27 @@ Full REST API under `datamachine/v1`:
 
 OpenAI, Anthropic, Google, Grok, OpenRouter — configure a global default per-site, with per-context overrides for pipeline, chat, and system.
 
+## Runtime Adapters
+
+Data Machine ships its own multi-turn conversation loop and uses it by default. The loop is also swappable: a single filter (`datamachine_conversation_runner`) lets an external runtime take over while Data Machine still provides pipelines, flows, tool resolution, abilities, and memory.
+
+```php
+add_filter(
+    'datamachine_conversation_runner',
+    function ( $result, $messages, $tools, $provider, $model, $context, $payload, $max_turns, $single_turn ) {
+        // Return an array matching AIConversationLoop::execute()'s shape to
+        // replace the built-in loop, or null to let Data Machine run it.
+        return my_runtime_run( ... );
+    },
+    10,
+    9
+);
+```
+
+This mirrors the provider pattern used by the bundled AI HTTP Client: providers swap how the LLM is called; runtime adapters swap how the conversation is run. Data Machine makes no assumptions about the host runtime — the filter is the entire contract.
+
+See [`docs/core-system/ai-conversation-loop.md`](docs/core-system/ai-conversation-loop.md#runtime-adapters) for the full adapter contract and return-shape reference.
+
 ## Requirements
 
 - WordPress 6.9+ (Abilities API)
