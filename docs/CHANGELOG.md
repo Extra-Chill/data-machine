@@ -2,6 +2,26 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.68.0] - 2026-04-15
+
+### Added
+- add datamachine/get-backlinks ability
+- ability categories and tool-ability linkage for pipeline tool scoping
+- extract DailyMemoryStorage interface with pluggable storage filter
+
+### Changed
+- Write composable files only to convention_path — stop dual-writing AGENTS.md
+- Remove post/term lifecycle hooks from SITE.md regeneration
+- Auto-regenerate composable files on plugin activation/deactivation
+- Add hooks to daily memory archive for custom storage handlers
+
+### Fixed
+- include must-use plugins and drop-ins in SITE.md scaffold
+- chat_sessions table not created on SQLite due to COMMENT clauses in dbDelta
+- harden agent files API error handling to prevent React crash
+- scope agent memory files to selected agent in admin UI
+- move Agents above Pipelines in wp-admin menu
+
 ## [0.67.0] - 2026-04-13
 
 ### Added
