@@ -131,12 +131,6 @@ class Agents {
 							'required'    => false,
 							'description' => __( 'New configuration (replaces existing).', 'data-machine' ),
 						),
-						'status'       => array(
-							'type'              => 'string',
-							'required'          => false,
-							'description'       => __( 'New status (active, inactive, archived).', 'data-machine' ),
-							'sanitize_callback' => 'sanitize_text_field',
-						),
 					),
 				),
 				array(
@@ -363,7 +357,6 @@ class Agents {
 			'agent_slug' => $agent['agent_slug'],
 			'agent_name' => $agent['agent_name'],
 			'owner_id'   => (int) $agent['owner_id'],
-			'status'     => $agent['status'] ?? 'active',
 			'site_url'   => get_site_url(),
 			'site_name'  => get_bloginfo( 'name' ),
 		);
@@ -515,9 +508,6 @@ class Agents {
 		}
 		if ( array_key_exists( 'agent_config', $json_params ) ) {
 			$input['agent_config'] = $json_params['agent_config'];
-		}
-		if ( array_key_exists( 'status', $json_params ) ) {
-			$input['status'] = $json_params['status'];
 		}
 
 		$result = AgentAbilities::updateAgent( $input );

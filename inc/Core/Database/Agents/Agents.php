@@ -51,13 +51,11 @@ class Agents extends BaseRepository {
 			owner_id BIGINT(20) UNSIGNED NOT NULL,
 			site_scope BIGINT(20) UNSIGNED NULL DEFAULT NULL,
 			agent_config LONGTEXT NULL,
-			status VARCHAR(20) NOT NULL DEFAULT 'active',
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY (agent_id),
 			UNIQUE KEY agent_slug (agent_slug),
 			KEY owner_id (owner_id),
-			KEY status (status),
 			KEY site_scope (site_scope)
 		) {$charset_collate};";
 
@@ -202,7 +200,7 @@ class Agents extends BaseRepository {
 	 * Update an agent's mutable fields.
 	 *
 	 * Only updates fields that are present in the $data array.
-	 * Allowed fields: agent_name, agent_config, status.
+	 * Allowed fields: agent_name, agent_config.
 	 *
 	 * @since 0.43.0
 	 * @param int   $agent_id Agent ID.
@@ -210,7 +208,7 @@ class Agents extends BaseRepository {
 	 * @return bool True on success, false on DB failure or no valid fields.
 	 */
 	public function update_agent( int $agent_id, array $data ): bool {
-		$allowed = array( 'agent_name', 'agent_config', 'status' );
+		$allowed = array( 'agent_name', 'agent_config' );
 		$update  = array();
 		$formats = array();
 
@@ -326,9 +324,8 @@ class Agents extends BaseRepository {
 				'agent_name'   => $agent_name,
 				'owner_id'     => $owner_id,
 				'agent_config' => wp_json_encode( $agent_config ),
-				'status'       => 'active',
 			),
-			array( '%s', '%s', '%d', '%s', '%s' )
+			array( '%s', '%s', '%d', '%s' )
 		);
 
 		return (int) $this->wpdb->insert_id;
