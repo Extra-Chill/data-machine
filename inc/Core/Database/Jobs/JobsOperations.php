@@ -525,7 +525,7 @@ class JobsOperations extends BaseRepository {
 				$match['values'],
 				array( $cutoff_datetime )
 			);
-			$result = $this->wpdb->query( $this->wpdb->prepare( ...$args ) );
+			$result       = $this->wpdb->query( $this->wpdb->prepare( ...$args ) );
 		} else {
 			$result = $this->wpdb->query(
 				$this->wpdb->prepare(
@@ -580,7 +580,7 @@ class JobsOperations extends BaseRepository {
 				$match['values'],
 				array( $cutoff_datetime )
 			);
-			$count = $this->wpdb->get_var( $this->wpdb->prepare( ...$args ) );
+			$count        = $this->wpdb->get_var( $this->wpdb->prepare( ...$args ) );
 		} else {
 			$count = $this->wpdb->get_var(
 				$this->wpdb->prepare(

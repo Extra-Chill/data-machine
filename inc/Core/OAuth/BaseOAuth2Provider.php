@@ -594,7 +594,7 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 		);
 
 		if ( $this->uses_pkce() ) {
-			$pkce = $this->oauth2->create_pkce( $this->provider_slug );
+			$pkce                            = $this->oauth2->create_pkce( $this->provider_slug );
 			$params['code_challenge']        = $pkce['challenge'];
 			$params['code_challenge_method'] = $pkce['method'];
 		}

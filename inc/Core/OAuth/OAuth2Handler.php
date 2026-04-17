@@ -471,7 +471,10 @@ class OAuth2Handler {
 				array( 'provider' => $provider_key )
 			);
 
-			echo wp_json_encode( array( 'success' => false, 'error' => 'Invalid nonce.' ) );
+			echo wp_json_encode( array(
+				'success' => false,
+				'error'   => 'Invalid nonce.',
+			) );
 			exit;
 		}
 
@@ -487,7 +490,10 @@ class OAuth2Handler {
 				array( 'provider' => $provider_key )
 			);
 
-			echo wp_json_encode( array( 'success' => false, 'error' => 'No access token received.' ) );
+			echo wp_json_encode( array(
+				'success' => false,
+				'error'   => 'No access token received.',
+			) );
 			exit;
 		}
 
@@ -538,7 +544,10 @@ class OAuth2Handler {
 				)
 			);
 
-			echo wp_json_encode( array( 'success' => false, 'error' => $account_data->get_error_message() ) );
+			echo wp_json_encode( array(
+				'success' => false,
+				'error'   => $account_data->get_error_message(),
+			) );
 			exit;
 		}
 
@@ -556,7 +565,10 @@ class OAuth2Handler {
 				array( 'provider' => $provider_key )
 			);
 
-			echo wp_json_encode( array( 'success' => false, 'error' => 'Failed to store account data.' ) );
+			echo wp_json_encode( array(
+				'success' => false,
+				'error'   => 'Failed to store account data.',
+			) );
 			exit;
 		}
 

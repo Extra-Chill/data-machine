@@ -253,7 +253,7 @@ class AIStep extends Step {
 			);
 		}
 
-		$engine_data     = $this->engine->all();
+		$engine_data = $this->engine->all();
 
 		// Tool categories can be specified at the pipeline step level or pipeline level.
 		// This allows pipelines to declare which ability categories are relevant,

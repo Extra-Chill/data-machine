@@ -140,7 +140,7 @@ class TestCommand extends BaseCommand {
 			}
 
 			$items[] = array(
-				'slug' => $slug,
+				'slug'  => $slug,
 				'label' => $handler['label'] ?? '',
 				'type'  => $handler_type,
 			);
@@ -229,10 +229,10 @@ class TestCommand extends BaseCommand {
 	 * @param array       $assoc_args   Command arguments.
 	 */
 	private function runTest( ?string $handler_slug, array $assoc_args ): void {
-		$format     = $assoc_args['format'] ?? 'table';
+		$format      = $assoc_args['format'] ?? 'table';
 		$config_json = $assoc_args['config'] ?? null;
-		$flow_id    = isset( $assoc_args['flow'] ) ? (int) $assoc_args['flow'] : null;
-		$limit      = (int) ( $assoc_args['limit'] ?? 5 );
+		$flow_id     = isset( $assoc_args['flow'] ) ? (int) $assoc_args['flow'] : null;
+		$limit       = (int) ( $assoc_args['limit'] ?? 5 );
 
 		$config = array();
 		if ( $config_json ) {
@@ -335,7 +335,7 @@ class TestCommand extends BaseCommand {
 		WP_CLI::log( '' );
 
 		// Build table rows.
-		$items = array();
+		$items             = array();
 		$all_metadata_keys = array();
 
 		foreach ( $packets as $index => $packet ) {
@@ -346,7 +346,7 @@ class TestCommand extends BaseCommand {
 			// Extract domain from source_url.
 			$source_display = '';
 			if ( $source_url ) {
-				$parsed = wp_parse_url( $source_url );
+				$parsed         = wp_parse_url( $source_url );
 				$source_display = $parsed['host'] ?? $source_url;
 			}
 

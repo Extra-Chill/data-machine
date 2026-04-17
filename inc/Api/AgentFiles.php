@@ -569,7 +569,7 @@ class AgentFiles {
 	 * @return string Full path to the contexts directory.
 	 */
 	private static function resolve_contexts_dir( WP_REST_Request $request ): string {
-		$dm = new \DataMachine\Core\FilesRepository\DirectoryManager();
+		$dm      = new \DataMachine\Core\FilesRepository\DirectoryManager();
 		$user_id = $dm->get_effective_user_id( self::resolve_scoped_user_id( $request ) );
 
 		$context = array( 'user_id' => $user_id );

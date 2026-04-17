@@ -139,11 +139,11 @@ class AgentAuthMiddleware {
 			'debug',
 			'Agent auth: token authenticated',
 			array(
-				'agent_id'    => $agent_id,
-				'agent_slug'  => $agent['agent_slug'],
-				'owner_id'    => $owner_id,
-				'token_id'    => $token_id,
-				'token_label' => $token_record['label'] ?? '',
+				'agent_id'             => $agent_id,
+				'agent_slug'           => $agent['agent_slug'],
+				'owner_id'             => $owner_id,
+				'token_id'             => $token_id,
+				'token_label'          => $token_record['label'] ?? '',
 				'has_cap_restrictions' => null !== $token_capabilities,
 			)
 		);

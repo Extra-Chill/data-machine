@@ -48,9 +48,9 @@ class AgentBundler {
 	private DirectoryManager $directory_manager;
 
 	public function __construct() {
-		$this->agents_repo      = new Agents();
-		$this->pipelines_repo   = new Pipelines();
-		$this->flows_repo       = new Flows();
+		$this->agents_repo       = new Agents();
+		$this->pipelines_repo    = new Pipelines();
+		$this->flows_repo        = new Flows();
 		$this->directory_manager = new DirectoryManager();
 	}
 
@@ -88,11 +88,11 @@ class AgentBundler {
 		$bundle['files'] = $this->collect_agent_files( $agent['agent_slug'] );
 
 		// 3. Owner's USER.md template (without sensitive data).
-		$owner_id = (int) $agent['owner_id'];
+		$owner_id                = (int) $agent['owner_id'];
 		$bundle['user_template'] = $this->collect_user_template( $owner_id );
 
 		// 4. Pipelines scoped to this agent.
-		$pipelines          = $this->pipelines_repo->get_all_pipelines( null, $agent_id );
+		$pipelines           = $this->pipelines_repo->get_all_pipelines( null, $agent_id );
 		$bundle['pipelines'] = array();
 
 		foreach ( $pipelines as $pipeline ) {
@@ -110,7 +110,7 @@ class AgentBundler {
 		}
 
 		// 5. Flows scoped to this agent.
-		$flows          = $this->flows_repo->get_all_flows( null, $agent_id );
+		$flows           = $this->flows_repo->get_all_flows( null, $agent_id );
 		$bundle['flows'] = array();
 
 		foreach ( $flows as $flow ) {
@@ -177,7 +177,7 @@ class AgentBundler {
 			$owner_id = get_current_user_id();
 			if ( $owner_id <= 0 ) {
 				// WP-CLI context: fall back to first admin.
-				$admins = get_users( array(
+				$admins   = get_users( array(
 					'role'   => 'administrator',
 					'number' => 1,
 					'fields' => 'ID',
@@ -188,18 +188,18 @@ class AgentBundler {
 
 		// Build summary for dry-run reporting.
 		$summary = array(
-			'agent_slug'     => $slug,
-			'agent_name'     => $agent_data['agent_name'],
-			'owner_id'       => $owner_id,
-			'files'          => count( $bundle['files'] ?? array() ),
-			'pipelines'      => count( $bundle['pipelines'] ?? array() ),
-			'flows'          => count( $bundle['flows'] ?? array() ),
+			'agent_slug'        => $slug,
+			'agent_name'        => $agent_data['agent_name'],
+			'owner_id'          => $owner_id,
+			'files'             => count( $bundle['files'] ?? array() ),
+			'pipelines'         => count( $bundle['pipelines'] ?? array() ),
+			'flows'             => count( $bundle['flows'] ?? array() ),
 			'has_user_template' => ! empty( $bundle['user_template'] ),
 		);
 
 		if ( $dry_run ) {
 			// Check ability mismatches.
-			$missing_abilities = $this->check_abilities_manifest( $bundle['abilities_manifest'] ?? array() );
+			$missing_abilities            = $this->check_abilities_manifest( $bundle['abilities_manifest'] ?? array() );
 			$summary['missing_abilities'] = $missing_abilities;
 
 			return array(
@@ -212,7 +212,7 @@ class AgentBundler {
 		// --- Actual import ---
 
 		// 1. Create agent record.
-		$config = $agent_data['agent_config'] ?? array();
+		$config   = $agent_data['agent_config'] ?? array();
 		$agent_id = $this->agents_repo->create_if_missing(
 			$slug,
 			$agent_data['agent_name'] ?? $slug,
@@ -238,7 +238,7 @@ class AgentBundler {
 		// 4. Import pipelines — build old→new ID map.
 		$pipeline_id_map = array(); // old_id => new_id.
 		foreach ( $bundle['pipelines'] ?? array() as $pipeline_data ) {
-			$old_id  = (int) ( $pipeline_data['original_id'] ?? 0 );
+			$old_id          = (int) ( $pipeline_data['original_id'] ?? 0 );
 			$new_pipeline_id = $this->pipelines_repo->create_pipeline( array(
 				'pipeline_name'   => $pipeline_data['pipeline_name'],
 				'pipeline_config' => $pipeline_data['pipeline_config'] ?? array(),
@@ -268,7 +268,7 @@ class AgentBundler {
 			}
 
 			// Force paused/manual scheduling on import.
-			$scheduling = $flow_data['scheduling_config'] ?? array();
+			$scheduling            = $flow_data['scheduling_config'] ?? array();
 			$scheduling['enabled'] = false;
 			if ( ! isset( $scheduling['interval'] ) || 'manual' !== $scheduling['interval'] ) {
 				$scheduling['_original_interval'] = $scheduling['interval'] ?? 'manual';
@@ -349,7 +349,7 @@ class AgentBundler {
 				if ( $file->isDot() || ! $file->isFile() ) {
 					continue;
 				}
-				$relative_path = 'contexts/' . $file->getFilename();
+				$relative_path           = 'contexts/' . $file->getFilename();
 				$files[ $relative_path ] = file_get_contents( $file->getPathname() ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 			}
 		}
@@ -677,7 +677,7 @@ class AgentBundler {
 			unset( $p['memory_file_contents'] );
 			return $p;
 		}, $manifest['pipelines'] ?? array() );
-		$manifest['flows'] = array_map( function ( $f ) {
+		$manifest['flows']     = array_map( function ( $f ) {
 			unset( $f['memory_file_contents'] );
 			return $f;
 		}, $manifest['flows'] ?? array() );
@@ -763,7 +763,7 @@ class AgentBundler {
 		}
 
 		// Read USER.md template.
-		$user_md_path = $directory . '/USER.md';
+		$user_md_path            = $directory . '/USER.md';
 		$bundle['user_template'] = file_exists( $user_md_path )
 			? file_get_contents( $user_md_path ) // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 			: '';

@@ -168,11 +168,11 @@ function datamachine_migrate_agents_to_network_scope() {
 
 	global $wpdb;
 
-	$network_agents_table  = $wpdb->base_prefix . 'datamachine_agents';
-	$network_access_table  = $wpdb->base_prefix . 'datamachine_agent_access';
-	$network_tokens_table  = $wpdb->base_prefix . 'datamachine_agent_tokens';
-	$migrated_agents       = 0;
-	$migrated_access       = 0;
+	$network_agents_table = $wpdb->base_prefix . 'datamachine_agents';
+	$network_access_table = $wpdb->base_prefix . 'datamachine_agent_access';
+	$network_tokens_table = $wpdb->base_prefix . 'datamachine_agent_tokens';
+	$migrated_agents      = 0;
+	$migrated_access      = 0;
 
 	$sites = get_sites( array( 'fields' => 'ids' ) );
 

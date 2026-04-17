@@ -198,7 +198,7 @@ class LogRepository extends BaseRepository {
 		// Fetch items.
 		$query_params = array_merge( $params, array( $per_page, $offset ) );
 		// phpcs:disable WordPress.DB.PreparedSQLPlaceholders -- Dynamic query construction with safe values.
-		$items        = $this->wpdb->get_results(
+		$items = $this->wpdb->get_results(
 			$this->wpdb->prepare(
 				"SELECT * FROM {$this->table_name} WHERE {$where_sql} ORDER BY created_at DESC, id DESC LIMIT %d OFFSET %d",
 				...$query_params

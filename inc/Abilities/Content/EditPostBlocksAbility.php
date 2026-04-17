@@ -46,32 +46,32 @@ class EditPostBlocksAbility {
 								'type'        => 'integer',
 								'description' => __( 'Post ID to edit', 'data-machine' ),
 							),
-					'edits'   => array(
-							'type'        => 'array',
-							'description' => __( 'Array of edit operations', 'data-machine' ),
-							'items'       => array(
-								'type'       => 'object',
-								'required'   => array( 'block_index', 'find', 'replace' ),
-								'properties' => array(
-									'block_index' => array(
-										'type'        => 'integer',
-										'description' => __( 'Zero-based block index to edit', 'data-machine' ),
-									),
-									'find'        => array(
-										'type'        => 'string',
-										'description' => __( 'Text to find within the block', 'data-machine' ),
-									),
-									'replace'     => array(
-										'type'        => 'string',
-										'description' => __( 'Replacement text', 'data-machine' ),
+							'edits'   => array(
+								'type'        => 'array',
+								'description' => __( 'Array of edit operations', 'data-machine' ),
+								'items'       => array(
+									'type'       => 'object',
+									'required'   => array( 'block_index', 'find', 'replace' ),
+									'properties' => array(
+										'block_index' => array(
+											'type'        => 'integer',
+											'description' => __( 'Zero-based block index to edit', 'data-machine' ),
+										),
+										'find'        => array(
+											'type'        => 'string',
+											'description' => __( 'Text to find within the block', 'data-machine' ),
+										),
+										'replace'     => array(
+											'type'        => 'string',
+											'description' => __( 'Replacement text', 'data-machine' ),
+										),
 									),
 								),
 							),
-						),
-						'preview' => array(
-							'type'        => 'boolean',
-							'description' => __( 'When true, return diff preview without applying changes', 'data-machine' ),
-						),
+							'preview' => array(
+								'type'        => 'boolean',
+								'description' => __( 'When true, return diff preview without applying changes', 'data-machine' ),
+							),
 						),
 					),
 					'output_schema'       => array(

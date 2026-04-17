@@ -262,7 +262,7 @@ function datamachine_ensure_default_memory_files(): bool {
  * @param int $user_id Default agent user ID.
  */
 function datamachine_ensure_default_context_files( int $user_id ): void {
-	$dm          = new \DataMachine\Core\FilesRepository\DirectoryManager();
+	$dm           = new \DataMachine\Core\FilesRepository\DirectoryManager();
 	$contexts_dir = $dm->get_contexts_directory( array( 'user_id' => $user_id ) );
 
 	if ( ! $dm->ensure_directory_exists( $contexts_dir ) ) {

@@ -280,13 +280,13 @@ class FetchWordPressApiAbility {
 				'title'    => $title,
 				'content'  => wp_strip_all_tags( $content ),
 				'metadata' => array(
-					'source_type'            => 'rest_api',
-					'item_identifier'        => $unique_id,
-					'original_id'            => $item_id,
-					'original_title'         => $title,
-					'original_date_gmt'      => $item_date,
-					'site_name'              => $site_name,
-					'source_url'             => $source_link,
+					'source_type'       => 'rest_api',
+					'item_identifier'   => $unique_id,
+					'original_id'       => $item_id,
+					'original_title'    => $title,
+					'original_date_gmt' => $item_date,
+					'site_name'         => $site_name,
+					'source_url'        => $source_link,
 				),
 			);
 

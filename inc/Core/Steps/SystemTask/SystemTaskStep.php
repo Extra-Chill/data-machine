@@ -196,16 +196,16 @@ class SystemTaskStep extends Step {
 
 		// Inject additional pipeline context for tasks that need it (e.g. agent_ping).
 		if ( 'agent_ping' === $task_type ) {
-			$job_context                          = $this->engine->getJobContext();
-			$child_engine_data['flow_id']          = $job_context['flow_id'] ?? null;
-			$child_engine_data['flow_step_id']     = $this->flow_step_id;
-			$child_engine_data['data_packets']     = $this->dataPackets;
-			$child_engine_data['engine_data']       = $this->engine->all();
-			$child_engine_data['job_id']            = $this->job_id;
-			$child_engine_data['pipeline_id']      = $job_context['pipeline_id'] ?? null;
+			$job_context                       = $this->engine->getJobContext();
+			$child_engine_data['flow_id']      = $job_context['flow_id'] ?? null;
+			$child_engine_data['flow_step_id'] = $this->flow_step_id;
+			$child_engine_data['data_packets'] = $this->dataPackets;
+			$child_engine_data['engine_data']  = $this->engine->all();
+			$child_engine_data['job_id']       = $this->job_id;
+			$child_engine_data['pipeline_id']  = $job_context['pipeline_id'] ?? null;
 
 			// Queue context from flow_step_config.
-			$fsc = $this->flow_step_config ?? array();
+			$fsc                                = $this->flow_step_config ?? array();
 			$child_engine_data['queue_enabled'] = ! empty( $fsc['queue_enabled'] );
 		}
 		$jobs_db->store_engine_data( (int) $child_job_id, $child_engine_data );

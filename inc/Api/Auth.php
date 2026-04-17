@@ -277,8 +277,8 @@ class Auth {
 			return rest_ensure_response( $result );
 		}
 
-		$error   = $result['error'] ?? 'Unknown error';
-		$status  = 400;
+		$error  = $result['error'] ?? 'Unknown error';
+		$status = 400;
 
 		if ( str_contains( $error, 'not found' ) ) {
 			$status = 404;

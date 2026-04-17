@@ -33,7 +33,7 @@ class InternalLinks {
 	 * @var array
 	 */
 	const ROUTE_MAP = array(
-		'audit'    => array(
+		'audit'     => array(
 			'ability' => 'datamachine/audit-internal-links',
 			'method'  => WP_REST_Server::CREATABLE,
 		),
@@ -49,7 +49,7 @@ class InternalLinks {
 			'ability' => 'datamachine/check-broken-links',
 			'method'  => WP_REST_Server::CREATABLE,
 		),
-		'diagnose' => array(
+		'diagnose'  => array(
 			'ability' => 'datamachine/diagnose-internal-links',
 			'method'  => WP_REST_Server::READABLE,
 		),

@@ -192,7 +192,7 @@ class AgentAuthorize {
 				'state'                 => $state,
 			);
 			// Remove empty PKCE params so the URL stays clean for non-PKCE flows.
-			$query_args = array_filter( $query_args, function ( $v ) {
+			$query_args    = array_filter( $query_args, function ( $v ) {
 				return '' !== $v;
 			} );
 			$authorize_url = add_query_arg( $query_args, $authorize_url );
@@ -241,7 +241,7 @@ class AgentAuthorize {
 		$nonce        = $request->get_param( '_authorize_nonce' );
 
 		// Look up agent for redirect URI validation.
-		$agents_repo = new Agents();
+		$agents_repo   = new Agents();
 		$agent_for_uri = $agents_repo->get_by_slug( $agent_slug );
 
 		if ( $agent_for_uri ) {
@@ -341,11 +341,11 @@ class AgentAuthorize {
 			'info',
 			'Agent token issued via authorize flow',
 			array(
-				'agent_id'    => (int) $agent['agent_id'],
-				'agent_slug'  => $agent['agent_slug'],
-				'user_id'     => $user_id,
-				'token_id'    => $result['token_id'],
-				'label'       => $token_label,
+				'agent_id'   => (int) $agent['agent_id'],
+				'agent_slug' => $agent['agent_slug'],
+				'user_id'    => $user_id,
+				'token_id'   => $result['token_id'],
+				'label'      => $token_label,
 			)
 		);
 
@@ -498,7 +498,7 @@ class AgentAuthorize {
 		$owner_name = $owner ? esc_html( $owner->display_name ) : 'Unknown';
 		$user_name  = esc_html( $user->display_name );
 
-		$parsed_uri = wp_parse_url( $redirect_uri );
+		$parsed_uri  = wp_parse_url( $redirect_uri );
 		$uri_display = esc_html( ( $parsed_uri['host'] ?? '' ) . ( isset( $parsed_uri['port'] ) ? ':' . $parsed_uri['port'] : '' ) );
 
 		header( 'Content-Type: text/html; charset=utf-8' );

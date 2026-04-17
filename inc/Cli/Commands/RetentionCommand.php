@@ -70,7 +70,7 @@ class RetentionCommand extends BaseCommand {
 
 		$policy_items = array();
 		foreach ( $policies as $domain => $policy ) {
-			$size_info       = $sizes[ $domain ] ?? array();
+			$size_info      = $sizes[ $domain ] ?? array();
 			$policy_items[] = array(
 				'domain'    => $domain,
 				'retention' => $policy['retention'],
@@ -159,8 +159,8 @@ class RetentionCommand extends BaseCommand {
 		}
 
 		// 3. Logs.
-		$log_days = (int) apply_filters( 'datamachine_log_max_age_days', 7 );
-		$count    = $this->count_old_logs( $log_days );
+		$log_days  = (int) apply_filters( 'datamachine_log_max_age_days', 7 );
+		$count     = $this->count_old_logs( $log_days );
 		$results[] = array(
 			'domain'    => 'Pipeline logs',
 			'threshold' => $log_days . ' days',
@@ -187,8 +187,8 @@ class RetentionCommand extends BaseCommand {
 		}
 
 		// 5. Action Scheduler actions + logs.
-		$as_days  = (int) apply_filters( 'datamachine_as_actions_max_age_days', 7 );
-		$as_count = $this->count_old_as_actions( $as_days );
+		$as_days   = (int) apply_filters( 'datamachine_as_actions_max_age_days', 7 );
+		$as_count  = $this->count_old_as_actions( $as_days );
 		$results[] = array(
 			'domain'    => 'AS actions + logs',
 			'threshold' => $as_days . ' days',
@@ -289,7 +289,7 @@ class RetentionCommand extends BaseCommand {
 			// SQLite: no information_schema. Count rows per table; size is unavailable.
 			foreach ( $unique_tables as $tbl ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-				$count = (int) $wpdb->get_var(
+				$count              = (int) $wpdb->get_var(
 					$wpdb->prepare( 'SELECT COUNT(*) FROM %i', $tbl )
 				);
 				$table_data[ $tbl ] = array(

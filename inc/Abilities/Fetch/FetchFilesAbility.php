@@ -172,12 +172,12 @@ class FetchFilesAbility {
 			);
 
 			$metadata = array(
-				'source_type'            => 'files',
-				'item_identifier'        => $file_identifier,
-				'original_id'            => $file_identifier,
-				'original_title'         => $file['original_name'],
-				'original_date_gmt'      => $file['uploaded_at'] ?? gmdate( 'Y-m-d H:i:s' ),
-				'source_url'             => '',
+				'source_type'       => 'files',
+				'item_identifier'   => $file_identifier,
+				'original_id'       => $file_identifier,
+				'original_title'    => $file['original_name'],
+				'original_date_gmt' => $file['uploaded_at'] ?? gmdate( 'Y-m-d H:i:s' ),
+				'source_url'        => '',
 			);
 
 			if ( $is_image ) {

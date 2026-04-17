@@ -131,13 +131,13 @@ class ProcessedItemsCommand extends BaseCommand {
 			}
 
 			$rows[] = array(
-				'flow_id'         => $flow_id,
-				'flow_name'       => $flow['flow_name'] ?? '?',
-				'pipeline_id'     => $flow['pipeline_id'] ?? '?',
-				'handler'         => $row['source_type'],
-				'processed'       => $processed,
-				'first_seen'      => $row['first_processed'],
-				'last_seen'       => $row['last_processed'],
+				'flow_id'     => $flow_id,
+				'flow_name'   => $flow['flow_name'] ?? '?',
+				'pipeline_id' => $flow['pipeline_id'] ?? '?',
+				'handler'     => $row['source_type'],
+				'processed'   => $processed,
+				'first_seen'  => $row['first_processed'],
+				'last_seen'   => $row['last_processed'],
 			);
 		}
 
@@ -298,7 +298,7 @@ class ProcessedItemsCommand extends BaseCommand {
 
 			$flow_patterns = array();
 			foreach ( $flows as $flow ) {
-				$flow_patterns[] = "flow_step_id LIKE %s";
+				$flow_patterns[] = 'flow_step_id LIKE %s';
 				$values[]        = '%_' . $flow['flow_id'];
 			}
 			$where_parts[] = '(' . implode( ' OR ', $flow_patterns ) . ')';

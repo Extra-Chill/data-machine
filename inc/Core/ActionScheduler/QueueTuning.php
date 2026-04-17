@@ -95,7 +95,7 @@ function datamachine_enable_cron_async_dispatch(): void {
 				! \ActionScheduler::lock()->is_locked( 'async-request-runner' )
 				&& \ActionScheduler::lock()->set( 'async-request-runner' )
 			) {
-				$ref = new \ReflectionProperty( get_class( $runner ), 'async_request' );
+				$ref           = new \ReflectionProperty( get_class( $runner ), 'async_request' );
 				$async_request = $ref->getValue( $runner );
 				$async_request->maybe_dispatch();
 			}

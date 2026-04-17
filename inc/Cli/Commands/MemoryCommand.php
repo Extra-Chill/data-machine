@@ -813,19 +813,31 @@ class MemoryCommand extends BaseCommand {
 	 */
 	private function parseFileAndSection( array $args ): array {
 		if ( empty( $args ) ) {
-			return array( 'file' => null, 'section' => null );
+			return array(
+				'file'    => null,
+				'section' => null,
+			);
 		}
 
 		if ( count( $args ) >= 2 ) {
-			return array( 'file' => $args[0], 'section' => $args[1] );
+			return array(
+				'file'    => $args[0],
+				'section' => $args[1],
+			);
 		}
 
 		// Single argument — disambiguate.
 		if ( $this->isFilename( $args[0] ) ) {
-			return array( 'file' => $args[0], 'section' => null );
+			return array(
+				'file'    => $args[0],
+				'section' => null,
+			);
 		}
 
-		return array( 'file' => null, 'section' => $args[0] );
+		return array(
+			'file'    => null,
+			'section' => $args[0],
+		);
 	}
 
 	/**

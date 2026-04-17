@@ -66,9 +66,9 @@ class InsertContentAbility {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'success'            => array( 'type' => 'boolean' ),
-						'diff_id'            => array( 'type' => 'string' ),
-						'diff'               => array( 'type' => 'object' ),
+						'success' => array( 'type' => 'boolean' ),
+						'diff_id' => array( 'type' => 'string' ),
+						'diff'    => array( 'type' => 'object' ),
 					),
 				),
 				'execute_callback'    => array( self::class, 'execute' ),
@@ -193,30 +193,30 @@ class InsertContentAbility {
 		$block_content = "\n\n<!-- wp:paragraph -->\n<p>" . wp_kses_post( $content ) . "</p>\n<!-- /wp:paragraph -->";
 
 		$insertion_point = '';
-		$block_index      = count( $current_blocks );
+		$block_index     = count( $current_blocks );
 
-			switch ( $position ) {
-				case 'beginning':
-					$new_content     = $block_content . "\n\n" . $current_content;
-					$insertion_point = 'at the beginning of the post';
-					$block_index     = 0;
-					break;
+		switch ( $position ) {
+			case 'beginning':
+				$new_content     = $block_content . "\n\n" . $current_content;
+				$insertion_point = 'at the beginning of the post';
+				$block_index     = 0;
+				break;
 
-				case 'end':
-					$new_content     = $current_content . $block_content;
-					$insertion_point = 'at the end of the post';
-					$block_index     = count( $current_blocks );
-					break;
+			case 'end':
+				$new_content     = $current_content . $block_content;
+				$insertion_point = 'at the end of the post';
+				$block_index     = count( $current_blocks );
+				break;
 
 			case 'after_paragraph':
 				$result = self::insert_after_paragraph( $current_content, $block_content, $target_paragraph_text );
 				if ( ! $result['success'] ) {
 					return $result;
-					}
+				}
 					$new_content     = $result['content'];
 					$insertion_point = $result['insertion_point'];
 					$block_index     = (int) ( $result['block_index'] ?? count( $current_blocks ) );
-					break;
+				break;
 
 			default:
 				return array(
@@ -243,12 +243,12 @@ class InsertContentAbility {
 			}
 
 			return array(
-				'success'        => true,
-				'post_id'        => $post_id,
-				'post_url'       => get_permalink( $post_id ),
-				'position'       => $position,
+				'success'         => true,
+				'post_id'         => $post_id,
+				'post_url'        => get_permalink( $post_id ),
+				'position'        => $position,
 				'insertion_point' => $insertion_point,
-				'new_content'    => $new_content,
+				'new_content'     => $new_content,
 			);
 		}
 
@@ -270,14 +270,14 @@ class InsertContentAbility {
 				),
 			),
 			'editor'              => array(
-				'toolCallId'         => $input['_original_call_id'] ?? '',
-				'editType'           => 'content',
-				'searchPattern'      => '',
-				'caseSensitive'      => false,
-				'isPreview'          => true,
-				'previewBlockContent' => $block_content,
+				'toolCallId'           => $input['_original_call_id'] ?? '',
+				'editType'             => 'content',
+				'searchPattern'        => '',
+				'caseSensitive'        => false,
+				'isPreview'            => true,
+				'previewBlockContent'  => $block_content,
 				'originalBlockContent' => '',
-				'originalBlockType'  => 'core/paragraph',
+				'originalBlockType'    => 'core/paragraph',
 			),
 		) );
 

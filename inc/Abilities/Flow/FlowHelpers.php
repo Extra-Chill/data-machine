@@ -520,7 +520,7 @@ trait FlowHelpers {
 			// Normalize plural forms to the singular keys that UpdateFlowStepAbility expects.
 			// CLI and admin UI naturally pass handler_slugs (array) and handler_configs (keyed object),
 			// but the ability expects handler_slug (string) and handler_config (object).
-			$handler_slugs  = $config['handler_slugs'] ?? array();
+			$handler_slugs   = $config['handler_slugs'] ?? array();
 			$handler_configs = $config['handler_configs'] ?? array();
 
 			// If singular forms are provided, use those directly (backward compat with --handler-config path).
@@ -533,8 +533,8 @@ trait FlowHelpers {
 					$slug_config = $handler_configs[ $slug ] ?? array();
 					$add_result  = $flow_step_abilities->executeUpdateFlowStep(
 						array(
-							'flow_step_id'     => $flow_step_id,
-							'add_handler'      => $slug,
+							'flow_step_id'       => $flow_step_id,
+							'add_handler'        => $slug,
 							'add_handler_config' => $slug_config,
 						)
 					);

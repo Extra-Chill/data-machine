@@ -640,7 +640,7 @@ class Chat extends BaseRepository {
 		$table_name  = self::get_prefixed_table_name();
 		$cutoff_time = gmdate( 'Y-m-d H:i:s', time() - $seconds );
 
-		$query = "SELECT * FROM %i
+		$query  = "SELECT * FROM %i
 				WHERE user_id = %d
 				AND context = %s
 				AND created_at >= %s

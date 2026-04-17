@@ -529,8 +529,8 @@ class ToolPolicyResolver {
 			return $tools;
 		}
 
-		$mode             = $policy['mode'];
-		$tool_names       = $policy['tools'] ?? array();
+		$mode              = $policy['mode'];
+		$tool_names        = $policy['tools'] ?? array();
 		$policy_categories = $policy['categories'] ?? array();
 
 		// No tool names and no categories = no restrictions (deny) or no tools (allow).

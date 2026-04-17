@@ -234,11 +234,11 @@ class AgentTokenAbilities {
 			'info',
 			'Agent token created',
 			array(
-				'agent_id'     => $agent_id,
-				'agent_slug'   => $agent['agent_slug'],
-				'token_id'     => $result['token_id'],
-				'label'        => $label,
-				'has_expiry'   => null !== $expires_at,
+				'agent_id'            => $agent_id,
+				'agent_slug'          => $agent['agent_slug'],
+				'token_id'            => $result['token_id'],
+				'label'               => $label,
+				'has_expiry'          => null !== $expires_at,
 				'has_cap_restriction' => null !== $capabilities,
 			)
 		);

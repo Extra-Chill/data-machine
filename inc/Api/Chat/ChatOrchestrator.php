@@ -88,15 +88,15 @@ class ChatOrchestrator {
 				);
 			}
 
-			$messages = $session['messages'];
+			$messages         = $session['messages'];
 			$session_metadata = $session['metadata'] ?? array();
 		} else {
 			// Check for recent pending session to prevent duplicates from timeout retries.
 			$pending_session = $chat_db->get_recent_pending_session( $user_id, 600, 'chat', $acting_token_id );
 
 			if ( $pending_session ) {
-				$session_id = $pending_session['session_id'];
-				$messages   = $pending_session['messages'];
+				$session_id       = $pending_session['session_id'];
+				$messages         = $pending_session['messages'];
 				$session_metadata = $pending_session['metadata'] ?? array();
 
 				do_action(
@@ -127,7 +127,10 @@ class ChatOrchestrator {
 
 		if ( ! empty( $attachments ) ) {
 			$content    = ConversationManager::buildMultiModalContent( $message, $attachments );
-			$metadata   = array( 'type' => 'multimodal', 'attachments' => $attachments );
+			$metadata   = array(
+				'type'        => 'multimodal',
+				'attachments' => $attachments,
+			);
 			$messages[] = ConversationManager::buildConversationMessage( 'user', $content, $metadata );
 		} else {
 			$messages[] = ConversationManager::buildConversationMessage( 'user', $message, array( 'type' => 'text' ) );
@@ -139,9 +142,9 @@ class ChatOrchestrator {
 			array_merge(
 				$session_metadata,
 				array(
-				'status'        => 'processing',
-				'started_at'    => current_time( 'mysql', true ),
-				'message_count' => count( $messages ),
+					'status'        => 'processing',
+					'started_at'    => current_time( 'mysql', true ),
+					'message_count' => count( $messages ),
 				)
 			),
 			$provider,
@@ -651,8 +654,8 @@ class ChatOrchestrator {
 				$agent_id = datamachine_resolve_or_create_agent_id( $user_id );
 			}
 
-			$resolver     = new ToolPolicyResolver();
-			$all_tools    = $resolver->resolve( array(
+			$resolver       = new ToolPolicyResolver();
+			$all_tools      = $resolver->resolve( array(
 				'context'  => ToolPolicyResolver::CONTEXT_CHAT,
 				'agent_id' => $agent_id,
 			) );

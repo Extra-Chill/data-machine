@@ -134,8 +134,8 @@ class ComposableFileGenerator {
 	 * @return array{success: bool, message: string, results: array}
 	 */
 	public static function regenerate_all( array $context = array() ): array {
-		$composable = MemoryFileRegistry::get_composable();
-		$results    = array();
+		$composable  = MemoryFileRegistry::get_composable();
+		$results     = array();
 		$regenerated = 0;
 
 		foreach ( $composable as $filename => $meta ) {

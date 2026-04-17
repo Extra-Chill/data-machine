@@ -68,9 +68,9 @@ function datamachine_get_site_scaffold_content(): string {
 	$post_types      = get_post_types( array( 'public' => true ), 'objects' );
 	$post_type_lines = array();
 	foreach ( $post_types as $pt ) {
-		$count     = wp_count_posts( $pt->name );
-		$published = isset( $count->publish ) ? (int) $count->publish : 0;
-		$hier      = $pt->hierarchical ? 'hierarchical' : 'flat';
+		$count             = wp_count_posts( $pt->name );
+		$published         = isset( $count->publish ) ? (int) $count->publish : 0;
+		$hier              = $pt->hierarchical ? 'hierarchical' : 'flat';
 		$post_type_lines[] = sprintf( '| %s | %s | %d | %s |', $pt->label, $pt->name, $published, $hier );
 	}
 
@@ -85,8 +85,8 @@ function datamachine_get_site_scaffold_content(): string {
 		if ( is_wp_error( $term_count ) ) {
 			$term_count = 0;
 		}
-		$hier            = $tax->hierarchical ? 'hierarchical' : 'flat';
-		$associated      = implode( ', ', $tax->object_type ?? array() );
+		$hier             = $tax->hierarchical ? 'hierarchical' : 'flat';
+		$associated       = implode( ', ', $tax->object_type ?? array() );
 		$taxonomy_lines[] = sprintf( '| %s | %s | %d | %s | %s |', $tax->label, $tax->name, (int) $term_count, $hier, $associated );
 	}
 
@@ -126,21 +126,25 @@ function datamachine_get_site_scaffold_content(): string {
 	}
 
 	// --- User roles ---
-	$wp_roles       = wp_roles();
-	$role_names     = $wp_roles->get_names();
-	$default_roles  = array( 'administrator', 'editor', 'author', 'contributor', 'subscriber' );
-	$custom_roles   = array_diff( array_keys( $role_names ), $default_roles );
-	$role_lines     = array();
+	$wp_roles      = wp_roles();
+	$role_names    = $wp_roles->get_names();
+	$default_roles = array( 'administrator', 'editor', 'author', 'contributor', 'subscriber' );
+	$custom_roles  = array_diff( array_keys( $role_names ), $default_roles );
+	$role_lines    = array();
 
 	foreach ( $role_names as $slug => $name ) {
-		$user_count   = count( get_users( array( 'role' => $slug, 'fields' => 'ID', 'number' => 1 ) ) );
+		$user_count   = count( get_users( array(
+			'role'   => $slug,
+			'fields' => 'ID',
+			'number' => 1,
+		) ) );
 		$is_custom    = in_array( $slug, $custom_roles, true ) ? ' (custom)' : '';
 		$role_lines[] = sprintf( '- %s (`%s`)%s', translate_user_role( $name ), $slug, $is_custom );
 	}
 
 	// --- REST API namespaces (custom only) ---
-	$rest_namespaces    = array();
-	$builtin_prefixes   = array( 'wp/', 'oembed/', 'wp-site-health/' );
+	$rest_namespaces  = array();
+	$builtin_prefixes = array( 'wp/', 'oembed/', 'wp-site-health/' );
 
 	if ( function_exists( 'rest_get_server' ) && did_action( 'rest_api_init' ) ) {
 		$routes = rest_get_server()->get_namespaces();

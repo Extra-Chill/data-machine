@@ -63,17 +63,17 @@ class AgentPingTask extends SystemTask {
 		}
 
 		// Pop from flow queue when running as a pipeline step.
-		$from_queue   = false;
-		$flow_id      = (int) ( $params['flow_id'] ?? 0 );
-		$flow_step_id = $params['flow_step_id'] ?? '';
+		$from_queue    = false;
+		$flow_id       = (int) ( $params['flow_id'] ?? 0 );
+		$flow_step_id  = $params['flow_step_id'] ?? '';
 		$queue_enabled = ! empty( $params['queue_enabled'] );
 
 		if ( $queue_enabled && $flow_id > 0 && ! empty( $flow_step_id ) ) {
 			$queued_item = QueueAbility::popFromQueue( $flow_id, $flow_step_id );
 
 			if ( $queued_item && ! empty( $queued_item['prompt'] ) ) {
-				$prompt      = $queued_item['prompt'];
-				$from_queue  = true;
+				$prompt     = $queued_item['prompt'];
+				$from_queue = true;
 
 				do_action(
 					'datamachine_log',
@@ -95,19 +95,19 @@ class AgentPingTask extends SystemTask {
 				);
 
 				$this->completeJob( $jobId, array(
-					'skipped'     => true,
-					'reason'      => 'Queue enabled but empty, no configured prompt',
+					'skipped'      => true,
+					'reason'       => 'Queue enabled but empty, no configured prompt',
 					'completed_at' => current_time( 'mysql' ),
 				) );
 				return;
 			}
 		}
 
-		$auth_header_name = $params['auth_header_name'] ?? '';
-		$auth_token       = $params['auth_token'] ?? '';
-		$reply_to         = $params['reply_to'] ?? '';
-		$data_packets     = $params['data_packets'] ?? array();
-		$engine_data      = $params['engine_data'] ?? array();
+		$auth_header_name          = $params['auth_header_name'] ?? '';
+		$auth_token                = $params['auth_token'] ?? '';
+		$reply_to                  = $params['reply_to'] ?? '';
+		$data_packets              = $params['data_packets'] ?? array();
+		$engine_data               = $params['engine_data'] ?? array();
 		$engine_data['from_queue'] = $from_queue;
 
 		// Delegate to SendPingAbility.

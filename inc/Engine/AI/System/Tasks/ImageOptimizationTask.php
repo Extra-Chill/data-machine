@@ -90,19 +90,19 @@ class ImageOptimizationTask extends SystemTask {
 			$compress_result = $this->compressImage( $file_path, $mime_type, $quality, $attachment_id );
 
 			if ( $compress_result['success'] ) {
-				$results['compressed']    = true;
-				$results['new_size']      = $compress_result['new_size'];
-				$results['savings']       = $original_size - $compress_result['new_size'];
-				$results['savings_pct']   = $original_size > 0 ? round( ( $results['savings'] / $original_size ) * 100, 1 ) : 0;
+				$results['compressed']  = true;
+				$results['new_size']    = $compress_result['new_size'];
+				$results['savings']     = $original_size - $compress_result['new_size'];
+				$results['savings_pct'] = $original_size > 0 ? round( ( $results['savings'] / $original_size ) * 100, 1 ) : 0;
 
 				$effects[] = array(
-					'type'           => 'attachment_file_modified',
-					'target'         => array(
+					'type'          => 'attachment_file_modified',
+					'target'        => array(
 						'attachment_id' => $attachment_id,
 						'file_path'     => $file_path,
 					),
-					'previous_size'  => $original_size,
-					'new_size'       => $compress_result['new_size'],
+					'previous_size' => $original_size,
+					'new_size'      => $compress_result['new_size'],
 				);
 
 				// Update attachment metadata with new file size.

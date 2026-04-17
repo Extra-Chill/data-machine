@@ -108,9 +108,9 @@ class Chat {
 						'sanitize_callback' => array( self::class, 'sanitize_attachments' ),
 					),
 					'client_context'       => array(
-						'type'              => 'object',
-						'required'          => false,
-						'description'       => __( 'Client-side context for the AI agent. Arbitrary key-value pairs describing what the user is currently doing (active tab, draft ID, screen, etc). Injected as a system message.', 'data-machine' ),
+						'type'        => 'object',
+						'required'    => false,
+						'description' => __( 'Client-side context for the AI agent. Arbitrary key-value pairs describing what the user is currently doing (active tab, draft ID, screen, etc). Injected as a system message.', 'data-machine' ),
 					),
 				),
 			)
