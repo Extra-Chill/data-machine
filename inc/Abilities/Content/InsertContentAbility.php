@@ -247,7 +247,7 @@ class InsertContentAbility {
 				'post_id'        => $post_id,
 				'post_url'       => get_permalink( $post_id ),
 				'position'       => $position,
-				'insertion_point'=> $insertion_point,
+				'insertion_point' => $insertion_point,
 				'new_content'    => $new_content,
 			);
 		}
@@ -275,7 +275,7 @@ class InsertContentAbility {
 				'searchPattern'      => '',
 				'caseSensitive'      => false,
 				'isPreview'          => true,
-				'previewBlockContent'=> $block_content,
+				'previewBlockContent' => $block_content,
 				'originalBlockContent' => '',
 				'originalBlockType'  => 'core/paragraph',
 			),
