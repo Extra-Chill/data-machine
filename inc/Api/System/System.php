@@ -449,6 +449,7 @@ class System {
 		if ( ! isset( $handlers[ $task_type ] ) ) {
 			return new WP_Error(
 				'invalid_task_type',
+			// translators: %s: task type identifier.
 				sprintf( __( 'Unknown task type: %s', 'data-machine' ), $task_type ),
 				array( 'status' => 404 )
 			);
@@ -459,6 +460,7 @@ class System {
 		if ( ! class_exists( $handler_class ) ) {
 			return new WP_Error(
 				'task_class_missing',
+			// translators: %s: fully-qualified task handler class name.
 				sprintf( __( 'Task handler class not found: %s', 'data-machine' ), $handler_class ),
 				array( 'status' => 500 )
 			);
@@ -470,6 +472,7 @@ class System {
 		if ( ! isset( $definitions[ $prompt_key ] ) ) {
 			return new WP_Error(
 				'invalid_prompt_key',
+			// translators: 1: prompt key name, 2: task type identifier.
 				sprintf( __( 'Unknown prompt key "%1$s" for task type "%2$s".', 'data-machine' ), $prompt_key, $task_type ),
 				array( 'status' => 404 )
 			);

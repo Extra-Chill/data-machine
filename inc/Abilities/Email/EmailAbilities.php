@@ -955,7 +955,7 @@ class EmailAbilities {
 			}
 		}
 
-		$has_one_click = stripos( $post_header, 'List-Unsubscribe=One-Click' ) !== false;
+		$has_one_click = false !== stripos( $post_header, 'List-Unsubscribe=One-Click' );
 
 		return array(
 			'urls'          => $urls,

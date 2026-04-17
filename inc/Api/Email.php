@@ -243,7 +243,7 @@ class Email {
 		);
 	}
 
-	public static function check_permission(): bool {
+	public static function check_permission( \WP_REST_Request $request ): bool {
 		return PermissionHelper::can_manage();
 	}
 
