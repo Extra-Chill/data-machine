@@ -2,8 +2,8 @@
  * AgentListTab Component
  *
  * Agent management list table with create and delete functionality.
- * WordPress admin-style list table showing all agents with status,
- * owner, and timestamps.
+ * WordPress admin-style list table showing all agents with owner
+ * and timestamps.
  */
 
 /**
@@ -27,15 +27,6 @@ import {
 } from '../queries/agents';
 import CreateAgentModal from '@shared/components/CreateAgentModal';
 import { useAgentStore } from '@shared/stores/agentStore';
-
-/**
- * Status badge colors.
- */
-const STATUS_STYLES = {
-	active: { background: '#d4edda', color: '#155724' },
-	inactive: { background: '#fff3cd', color: '#856404' },
-	archived: { background: '#f8d7da', color: '#721c24' },
-};
 
 /**
  * Format a date string for display.
@@ -127,9 +118,6 @@ const AgentListTab = ( { onSelectAgent } ) => {
 							<th className="column-slug">
 								{ __( 'Slug', 'data-machine' ) }
 							</th>
-							<th className="column-status">
-								{ __( 'Status', 'data-machine' ) }
-							</th>
 							<th className="column-created">
 								{ __( 'Created', 'data-machine' ) }
 							</th>
@@ -157,18 +145,6 @@ const AgentListTab = ( { onSelectAgent } ) => {
 								</td>
 								<td className="column-slug">
 									<code>{ agent.agent_slug }</code>
-								</td>
-								<td className="column-status">
-									<span
-										className="datamachine-status-badge"
-										style={
-											STATUS_STYLES[
-												agent.status
-											] || {}
-										}
-									>
-										{ agent.status }
-									</span>
 								</td>
 								<td className="column-created">
 									{ formatDate( agent.created_at ) }

@@ -81,7 +81,6 @@ class AgentBundler {
 				'agent_name'   => $agent['agent_name'],
 				'agent_config' => $agent['agent_config'] ?? array(),
 				'site_scope'   => $agent['site_scope'],
-				'status'       => $agent['status'],
 			),
 		);
 

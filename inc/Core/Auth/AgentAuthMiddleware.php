@@ -96,7 +96,7 @@ class AgentAuthMiddleware {
 		$agent_id = (int) $token_record['agent_id'];
 		$token_id = (int) $token_record['token_id'];
 
-		// Verify agent exists and is active.
+		// Verify agent exists.
 		$agents_repo = new Agents();
 		$agent       = $agents_repo->get_agent( $agent_id );
 
@@ -105,14 +105,6 @@ class AgentAuthMiddleware {
 				'datamachine_agent_not_found',
 				__( 'Agent associated with this token no longer exists.', 'data-machine' ),
 				array( 'status' => 401 )
-			);
-		}
-
-		if ( 'active' !== ( $agent['status'] ?? '' ) ) {
-			return new \WP_Error(
-				'datamachine_agent_inactive',
-				__( 'Agent is not active.', 'data-machine' ),
-				array( 'status' => 403 )
 			);
 		}
 

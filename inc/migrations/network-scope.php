@@ -239,11 +239,10 @@ function datamachine_migrate_agents_to_network_scope() {
 					'owner_id'     => (int) $agent['owner_id'],
 					'site_scope'   => (int) $blog_id,
 					'agent_config' => $agent['agent_config'],
-					'status'       => $agent['status'],
 					'created_at'   => $agent['created_at'],
 					'updated_at'   => $agent['updated_at'],
 				),
-				array( '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s' )
+				array( '%s', '%s', '%d', '%d', '%s', '%s', '%s' )
 			);
 
 			$new_agent_id = (int) $wpdb->insert_id;
