@@ -106,17 +106,23 @@ MemoryFileRegistry::register( 'RULES.md', 15, array(
 ) );
 
 // Agent layer — identity and knowledge, scoped to a single agent.
+// Injected in interactive contexts only (chat, pipeline). Excluded from
+// system contexts so autonomous maintenance tasks (e.g. daily memory
+// compaction) are not primed with the agent's identity while operating
+// on these files.
 MemoryFileRegistry::register( 'SOUL.md', 20, array(
 	'layer'       => MemoryFileRegistry::LAYER_AGENT,
 	'protected'   => true,
+	'contexts'    => array( 'chat', 'pipeline' ),
 	'label'       => 'Agent Identity',
-	'description' => 'Agent identity, voice, rules. Rarely changes.',
+	'description' => 'Agent identity, voice, rules. Injected in interactive contexts only.',
 ) );
 MemoryFileRegistry::register( 'MEMORY.md', 30, array(
 	'layer'       => MemoryFileRegistry::LAYER_AGENT,
 	'protected'   => true,
+	'contexts'    => array( 'chat', 'pipeline' ),
 	'label'       => 'Agent Memory',
-	'description' => 'Accumulated knowledge. Grows over time.',
+	'description' => 'Accumulated knowledge. Injected in interactive contexts only.',
 ) );
 
 // User layer — human preferences, network-scoped on multisite.
