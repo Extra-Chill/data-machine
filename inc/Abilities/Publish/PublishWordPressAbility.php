@@ -87,6 +87,11 @@ class PublishWordPressAbility {
 								'default'     => true,
 								'description' => __( 'Whether to append source attribution to content', 'data-machine' ),
 							),
+							'post_parent'            => array(
+								'type'        => 'integer',
+								'default'     => 0,
+								'description' => __( 'Parent post ID for hierarchical post types (pages, etc.)', 'data-machine' ),
+							),
 							'job_id'                 => array(
 								'type'        => 'integer',
 								'default'     => null,
@@ -211,6 +216,12 @@ class PublishWordPressAbility {
 				array( 'post_author' => $post_author )
 			),
 		);
+
+		// Support hierarchical post types (pages, custom hierarchical CPTs).
+		$post_parent = (int) ( $config['post_parent'] ?? 0 );
+		if ( $post_parent > 0 ) {
+			$post_data['post_parent'] = $post_parent;
+		}
 
 		$logs[] = array(
 			'level'   => 'debug',
@@ -359,6 +370,7 @@ class PublishWordPressAbility {
 			'featured_image_path'    => '',
 			'source_url'             => '',
 			'add_source_attribution' => true,
+			'post_parent'            => 0,
 			'job_id'                 => null,
 		);
 
