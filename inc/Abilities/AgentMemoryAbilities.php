@@ -280,6 +280,17 @@ class AgentMemoryAbilities {
 		if ( 'MEMORY.md' !== $filename ) {
 			$editable = \DataMachine\Engine\AI\MemoryFileRegistry::is_editable( $filename );
 			if ( ! $editable ) {
+				$edit_cap = \DataMachine\Engine\AI\MemoryFileRegistry::get_edit_capability( $filename );
+				if ( is_string( $edit_cap ) ) {
+					return array(
+						'success' => false,
+						'message' => sprintf(
+							'File %s requires capability \'%s\' to edit. Pass --user=<admin-id> or run as an authenticated admin.',
+							$filename,
+							$edit_cap
+						),
+					);
+				}
 				return array(
 					'success' => false,
 					'message' => sprintf( 'File %s is read-only and cannot be edited via section write.', $filename ),

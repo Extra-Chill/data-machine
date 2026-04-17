@@ -200,6 +200,14 @@ class MemoryFileRegistry {
 		// Capability string: check against user.
 		if ( is_string( $editable ) && ! empty( $editable ) ) {
 			$check_user = $user_id > 0 ? $user_id : get_current_user_id();
+
+			// WP-CLI is inherently privileged — it's how admins bootstrap,
+			// migrate, and recover sites. When no --user is set, treat the
+			// invocation as authorized rather than rejecting as anonymous.
+			if ( defined( 'WP_CLI' ) && WP_CLI && $check_user <= 0 ) {
+				return true;
+			}
+
 			return $check_user > 0 && user_can( $check_user, $editable );
 		}
 
