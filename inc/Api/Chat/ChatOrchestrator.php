@@ -543,6 +543,28 @@ class ChatOrchestrator {
 				: 0;
 		}
 
+		// Reject chat if the agent is not active.
+		if ( $agent_id > 0 ) {
+			$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+			$agent       = $agents_repo->get_agent( $agent_id );
+
+			if ( $agent && 'active' !== ( $agent['status'] ?? 'active' ) ) {
+				$status = $agent['status'];
+				if ( 'archived' === $status ) {
+					return new WP_Error(
+						'agent_archived',
+						__( 'This agent has been archived.', 'data-machine' ),
+						array( 'status' => 403 )
+					);
+				}
+				return new WP_Error(
+					'agent_inactive',
+					__( 'Your chat agent is currently disabled.', 'data-machine' ),
+					array( 'status' => 403 )
+				);
+			}
+		}
+
 		$ability = wp_get_ability( 'datamachine/create-chat-session' );
 
 		if ( $ability ) {
