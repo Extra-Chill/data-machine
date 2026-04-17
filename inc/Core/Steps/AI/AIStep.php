@@ -2,6 +2,8 @@
 
 namespace DataMachine\Core\Steps\AI;
 
+use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\Steps\Step;
@@ -276,16 +278,63 @@ class AIStep extends Step {
 		$provider_name = $context_model['provider'];
 		$model_name    = $context_model['model'];
 
-		// Execute conversation loop via runtime-adapter-aware entry point.
-		$loop_result = AIConversationLoop::run(
-			$messages,
-			$available_tools,
-			$provider_name,
-			$model_name,
-			ToolPolicyResolver::CONTEXT_PIPELINE,
-			$payload,
-			$max_turns
-		);
+		// Establish agent execution context before firing the conversation loop.
+		//
+		// Pipelines run inside the Action Scheduler queue where no WordPress user
+		// is set — get_current_user_id() returns 0 and any ability invoked as a
+		// tool call (wp_insert_post, wiki writes, taxonomy edits, etc.) either
+		// falls through to a "first administrator" fallback or relies on the
+		// blanket action_scheduler_run_queue bypass in PermissionHelper::can().
+		//
+		// When the job is owned by an agent, we resolve that agent's owner user
+		// and run the loop as that user, mirroring how AgentAuthMiddleware does
+		// this for REST bearer-token requests and ChatOrchestrator does it for
+		// in-browser chat. Tools fired inside the loop then execute with the
+		// correct identity, post_author resolves to the agent owner, and
+		// per-agent capability ceilings are enforced in pipelines the same way
+		// they are in REST.
+		$owner_id = 0;
+		if ( $agent_id > 0 ) {
+			$agents_repo  = new Agents();
+			$agent_record = $agents_repo->get_agent( $agent_id );
+			if ( $agent_record ) {
+				$owner_id = (int) ( $agent_record['owner_id'] ?? 0 );
+			}
+		}
+		if ( $owner_id <= 0 && $user_id > 0 ) {
+			// Legacy / agent-less flows: fall back to the flow's user_id.
+			$owner_id = $user_id;
+		}
+
+		$previous_user_id = get_current_user_id();
+		$context_set      = false;
+		if ( $owner_id > 0 ) {
+			wp_set_current_user( $owner_id );
+			if ( $agent_id > 0 ) {
+				PermissionHelper::set_agent_context( $agent_id, $owner_id );
+				$context_set = true;
+			}
+		}
+
+		try {
+			// Execute conversation loop via runtime-adapter-aware entry point.
+			$loop_result = AIConversationLoop::run(
+				$messages,
+				$available_tools,
+				$provider_name,
+				$model_name,
+				ToolPolicyResolver::CONTEXT_PIPELINE,
+				$payload,
+				$max_turns
+			);
+		} finally {
+			if ( $context_set ) {
+				PermissionHelper::clear_agent_context();
+			}
+			if ( $owner_id > 0 && $previous_user_id !== $owner_id ) {
+				wp_set_current_user( $previous_user_id );
+			}
+		}
 
 		// Check for errors
 		if ( isset( $loop_result['error'] ) ) {
