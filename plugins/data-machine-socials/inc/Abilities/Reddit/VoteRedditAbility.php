@@ -87,7 +87,7 @@ class VoteRedditAbility {
 	}
 
 	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
+		return PermissionHelper::can( 'use_tools' );
 	}
 
 	/**

@@ -85,7 +85,7 @@ class PinterestBoardsAbility {
 						),
 					),
 					'execute_callback'    => array( self::class, 'sync_boards' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -109,7 +109,7 @@ class PinterestBoardsAbility {
 						),
 					),
 					'execute_callback'    => array( self::class, 'execute_list_boards' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -135,7 +135,7 @@ class PinterestBoardsAbility {
 						),
 					),
 					'execute_callback'    => array( self::class, 'execute_status' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
