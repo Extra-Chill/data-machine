@@ -14,6 +14,7 @@ namespace DataMachine\Cli\Commands;
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\AuthAbilities;
+use DataMachine\Core\OAuth\BaseOAuth2Provider;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -519,15 +520,43 @@ class AuthCommand extends BaseCommand {
 			$configured    = method_exists( $provider, 'is_configured' ) ? $provider->is_configured() : false;
 			$is_oauth      = method_exists( $provider, 'get_authorization_url' );
 
-			$items[] = array(
+			$item = array(
 				'provider'      => $key,
 				'type'          => $is_oauth ? 'oauth' : 'direct',
 				'configured'    => $configured ? 'yes' : 'no',
 				'authenticated' => $authenticated ? 'yes' : 'no',
+				'expires'       => '—',
+				'health'        => '—',
 			);
+
+			// Add token expiry and health for OAuth2 providers.
+			if ( $authenticated && $provider instanceof BaseOAuth2Provider ) {
+				$account = $provider->get_account();
+
+				if ( ! empty( $account['token_expires_at'] ) ) {
+					$expires_at = intval( $account['token_expires_at'] );
+					$remaining  = $expires_at - time();
+
+					$item['expires'] = wp_date( 'Y-m-d', $expires_at );
+
+					if ( $remaining <= 0 ) {
+						$item['health'] = 'EXPIRED';
+					} elseif ( $remaining < 7 * DAY_IN_SECONDS ) {
+						$item['health'] = sprintf( '%d days', max( 1, ceil( $remaining / DAY_IN_SECONDS ) ) );
+					} else {
+						$item['health'] = sprintf( '%d days', ceil( $remaining / DAY_IN_SECONDS ) );
+					}
+				} else {
+					// No expiry — token doesn't expire (e.g. some OAuth2 providers).
+					$item['expires'] = 'never';
+					$item['health']  = 'ok';
+				}
+			}
+
+			$items[] = $item;
 		}
 
-		$this->format_items( $items, array( 'provider', 'type', 'configured', 'authenticated' ), $assoc_args );
+		$this->format_items( $items, array( 'provider', 'type', 'configured', 'authenticated', 'expires', 'health' ), $assoc_args );
 	}
 
 	/**
@@ -558,6 +587,27 @@ class AuthCommand extends BaseCommand {
 				'authenticated' => $authenticated,
 			);
 
+			// Include token expiry info for OAuth2 providers.
+			if ( $provider instanceof BaseOAuth2Provider ) {
+				$account = $provider->get_account();
+
+				if ( ! empty( $account['token_expires_at'] ) ) {
+					$expires_at = intval( $account['token_expires_at'] );
+					$remaining  = $expires_at - time();
+
+					$data['token_expires_at'] = wp_date( 'c', $expires_at );
+					$data['token_remaining']  = $remaining;
+
+					if ( $remaining <= 0 ) {
+						$data['health'] = 'EXPIRED';
+					} elseif ( $remaining < 7 * DAY_IN_SECONDS ) {
+						$data['health'] = 'WARNING';
+					} else {
+						$data['health'] = 'HEALTHY';
+					}
+				}
+			}
+
 			if ( $authenticated && method_exists( $provider, 'get_account_details' ) ) {
 				$details = $provider->get_account_details();
 				if ( $details ) {
@@ -573,6 +623,28 @@ class AuthCommand extends BaseCommand {
 		WP_CLI::log( sprintf( 'Type: %s', $is_oauth ? 'OAuth' : 'Direct' ) );
 		WP_CLI::log( sprintf( 'Configured: %s', $configured ? 'yes' : 'no' ) );
 		WP_CLI::log( sprintf( 'Authenticated: %s', $authenticated ? 'yes' : 'no' ) );
+
+		// Show token expiry for OAuth2 providers.
+		if ( $provider instanceof BaseOAuth2Provider ) {
+			$account = $provider->get_account();
+
+			if ( ! empty( $account['token_expires_at'] ) ) {
+				$expires_at = intval( $account['token_expires_at'] );
+				$remaining  = $expires_at - time();
+
+				WP_CLI::log( sprintf( 'Token expires: %s', wp_date( 'Y-m-d H:i:s', $expires_at ) ) );
+
+				if ( $remaining <= 0 ) {
+					WP_CLI::warning( sprintf( 'Token EXPIRED %s ago.', human_time_diff( $expires_at ) ) );
+				} elseif ( $remaining < 7 * DAY_IN_SECONDS ) {
+					WP_CLI::warning( sprintf( 'Token expires in %s.', human_time_diff( time(), $expires_at ) ) );
+				} else {
+					WP_CLI::log( sprintf( 'Token healthy (%s remaining).', human_time_diff( time(), $expires_at ) ) );
+				}
+			} else {
+				WP_CLI::log( 'Token expiry: N/A (no expiry or not connected)' );
+			}
+		}
 
 		// Show account details if authenticated.
 		if ( $authenticated && method_exists( $provider, 'get_account_details' ) ) {
