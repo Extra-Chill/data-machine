@@ -26,6 +26,8 @@
 namespace DataMachine\Engine\AI\Directives;
 
 use DataMachine\Core\FilesRepository\AgentMemory;
+use DataMachine\Core\FilesRepository\AgentMemoryScope;
+use DataMachine\Core\FilesRepository\AgentMemoryStoreFactory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Engine\AI\MemoryFileRegistry;
 
@@ -48,17 +50,7 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 
 		$directory_manager = new DirectoryManager();
 		$user_id           = $directory_manager->get_effective_user_id( (int) ( $payload['user_id'] ?? 0 ) );
-
-		// Resolve layer directories once.
-		$layer_dirs = array(
-			MemoryFileRegistry::LAYER_SHARED  => $directory_manager->get_shared_directory(),
-			MemoryFileRegistry::LAYER_AGENT   => $directory_manager->resolve_agent_directory( array(
-				'agent_id' => (int) ( $payload['agent_id'] ?? 0 ),
-				'user_id'  => $user_id,
-			) ),
-			MemoryFileRegistry::LAYER_USER    => $directory_manager->get_user_directory( $user_id ),
-			MemoryFileRegistry::LAYER_NETWORK => $directory_manager->get_network_directory(),
-		);
+		$agent_id          = (int) ( $payload['agent_id'] ?? 0 );
 
 		// Auto-scaffold missing user-layer files (e.g. USER.md) on first chat.
 		$scaffold_ability = \DataMachine\Abilities\File\ScaffoldAbilities::get_ability();
@@ -79,17 +71,15 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 
 		foreach ( $context_files as $filename => $meta ) {
 			$layer = $meta['layer'] ?? MemoryFileRegistry::LAYER_AGENT;
-			$dir   = $layer_dirs[ $layer ] ?? $layer_dirs[ MemoryFileRegistry::LAYER_AGENT ];
+			$scope = new AgentMemoryScope( $layer, $user_id, $agent_id, $filename );
+			$store = AgentMemoryStoreFactory::for_scope( $scope );
+			$read  = $store->read( $scope );
 
-			// Convention-path files (e.g. AGENTS.md) live at ABSPATH, not the layer directory.
-			$filepath = MemoryFileRegistry::resolve_filepath( $filename, $dir )
-				?? trailingslashit( $dir ) . $filename;
-
-			if ( ! file_exists( $filepath ) ) {
+			if ( ! $read->exists ) {
 				continue;
 			}
 
-			$content = self::get_file_content_for_output( $filepath, $filename );
+			$content = self::normalize_for_injection( $read->content, $read->bytes, $filename );
 			if ( null === $content ) {
 				continue;
 			}
@@ -100,20 +90,24 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 			);
 		}
 
-		// Load context-specific memory file (contexts/{context}.md).
-		// The context slug comes from the payload, which the PromptBuilder
-		// passes through from the execution context ('chat', 'pipeline', 'system', etc.).
+		// Load context-specific memory file (contexts/{context}.md). The
+		// context slug comes from the payload, which the PromptBuilder
+		// passes through from the execution context ('chat', 'pipeline',
+		// 'system', etc.). Filename is a relative path inside the agent
+		// layer so the store handles it like any other agent-scoped file.
 		if ( ! empty( $context ) ) {
-			$agent_context = array(
-				'agent_id' => (int) ( $payload['agent_id'] ?? 0 ),
-				'user_id'  => $user_id,
+			$context_filename = 'contexts/' . sanitize_file_name( $context ) . '.md';
+			$context_scope    = new AgentMemoryScope(
+				MemoryFileRegistry::LAYER_AGENT,
+				$user_id,
+				$agent_id,
+				$context_filename
 			);
-			$contexts_dir  = $directory_manager->get_contexts_directory( $agent_context );
-			$context_file  = sanitize_file_name( $context ) . '.md';
-			$context_path  = trailingslashit( $contexts_dir ) . $context_file;
+			$context_store    = AgentMemoryStoreFactory::for_scope( $context_scope );
+			$context_read     = $context_store->read( $context_scope );
 
-			if ( file_exists( $context_path ) ) {
-				$content = self::get_file_content_for_output( $context_path, "contexts/{$context_file}" );
+			if ( $context_read->exists ) {
+				$content = self::normalize_for_injection( $context_read->content, $context_read->bytes, $context_filename );
 				if ( null !== $content ) {
 					$outputs[] = array(
 						'type'    => 'system_text',
@@ -127,42 +121,38 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 	}
 
 	/**
-	 * Read a memory file and return normalized directive content.
+	 * Normalize file content for context injection.
 	 *
-	 * @param string $filepath Full file path.
-	 * @param string $filename Filename for logs.
+	 * Logs a size-budget warning, runs the `datamachine_memory_file_content`
+	 * filter, and trims. Returns null when the content is effectively
+	 * empty so callers can skip the directive entirely.
+	 *
+	 * @since next  Renamed from get_file_content_for_output and switched
+	 *              to operate on already-read content from the store.
+	 *
+	 * @param string $content  Raw file content (already loaded by caller).
+	 * @param int    $bytes    Content length in bytes (already known by caller).
+	 * @param string $filename Filename for logs and the content filter.
 	 * @return string|null
 	 */
-	private static function get_file_content_for_output( string $filepath, string $filename ): ?string {
-		global $wp_filesystem;
-
-		// Ensure WP_Filesystem is initialized (not available by default in REST API context).
-		if ( ! $wp_filesystem ) {
-			require_once ABSPATH . 'wp-admin/includes/file.php';
-			WP_Filesystem();
-		}
-
-		$file_size = filesize( $filepath );
-
-		if ( $file_size > AgentMemory::MAX_FILE_SIZE ) {
+	private static function normalize_for_injection( string $content, int $bytes, string $filename ): ?string {
+		if ( $bytes > AgentMemory::MAX_FILE_SIZE ) {
 			do_action(
 				'datamachine_log',
 				'warning',
 				sprintf(
 					'Memory file %s exceeds recommended size for context injection: %s (threshold %s)',
 					$filename,
-					size_format( $file_size ),
+					size_format( $bytes ),
 					size_format( AgentMemory::MAX_FILE_SIZE )
 				),
 				array(
 					'filename' => $filename,
-					'size'     => $file_size,
+					'size'     => $bytes,
 					'max'      => AgentMemory::MAX_FILE_SIZE,
 				)
 			);
 		}
-
-		$content = $wp_filesystem->get_contents( $filepath );
 
 		if ( empty( trim( $content ) ) ) {
 			return null;

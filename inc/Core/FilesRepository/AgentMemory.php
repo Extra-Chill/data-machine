@@ -6,12 +6,20 @@
  * Parses markdown sections and supports section-level operations
  * on any agent file (MEMORY.md, SOUL.md, USER.md, etc.).
  *
+ * Persistence is delegated to an {@see AgentMemoryStoreInterface} resolved
+ * via the `datamachine_memory_store` filter. The default store
+ * ({@see DiskAgentMemoryStore}) preserves the byte-for-byte filesystem
+ * behavior the codebase used before the store seam was introduced.
+ *
  * @package DataMachine\Core\FilesRepository
  * @since 0.30.0
  * @since 0.45.0 Generalized to support any agent file via $filename parameter.
+ * @since next   Whole-file IO delegated to AgentMemoryStoreInterface.
  */
 
 namespace DataMachine\Core\FilesRepository;
+
+use DataMachine\Engine\AI\MemoryFileRegistry;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -33,30 +41,20 @@ class AgentMemory {
 	private DirectoryManager $directory_manager;
 
 	/**
-	 * @var string
+	 * @var AgentMemoryScope
 	 */
-	private string $file_path;
+	private AgentMemoryScope $scope;
 
 	/**
-	 * WordPress user ID for per-agent partitioning. 0 = legacy shared directory.
-	 *
-	 * @since 0.37.0
-	 * @var int
+	 * @var AgentMemoryStoreInterface
 	 */
-	private int $user_id;
-
-	/**
-	 * Target filename (e.g. MEMORY.md, SOUL.md, USER.md).
-	 *
-	 * @since 0.45.0
-	 * @var string
-	 */
-	private string $filename;
+	private AgentMemoryStoreInterface $store;
 
 	/**
 	 * @since 0.37.0 Added $user_id parameter for multi-agent partitioning.
 	 * @since 0.41.0 Added $agent_id parameter for agent-first resolution.
 	 * @since 0.45.0 Added $filename parameter for any-file support.
+	 * @since next   Switched whole-file IO to AgentMemoryStoreInterface.
 	 *
 	 * @param int    $user_id  WordPress user ID. 0 = legacy shared directory.
 	 * @param int    $agent_id Agent ID for direct resolution. 0 = resolve from user_id.
@@ -64,68 +62,56 @@ class AgentMemory {
 	 */
 	public function __construct( int $user_id = 0, int $agent_id = 0, string $filename = 'MEMORY.md' ) {
 		$this->directory_manager = new DirectoryManager();
-		$this->user_id           = $this->directory_manager->get_effective_user_id( $user_id );
-		$this->filename          = $this->sanitize_filename( $filename );
-		$this->file_path         = $this->resolve_file_path( $agent_id );
+		$effective_user_id       = $this->directory_manager->get_effective_user_id( $user_id );
+		$safe_filename           = $this->sanitize_filename( $filename );
+
+		$this->scope = new AgentMemoryScope(
+			$this->resolve_layer( $safe_filename ),
+			$effective_user_id,
+			$agent_id,
+			$safe_filename
+		);
+		$this->store = AgentMemoryStoreFactory::for_scope( $this->scope );
 
 		// Self-heal: ensure agent files exist on first use.
 		DirectoryManager::ensure_agent_files();
 	}
 
 	/**
-	 * Resolve the file path using MemoryFileRegistry layer awareness.
-	 *
-	 * For registered files, uses the canonical layer (shared, agent, user, network).
-	 * For unregistered files, defaults to the agent directory.
-	 *
-	 * @since 0.45.0
-	 * @param int $agent_id Agent ID for directory resolution.
-	 * @return string Absolute file path.
+	 * Resolve which layer this filename belongs to via the registry,
+	 * defaulting to the agent layer for unregistered files.
 	 */
-	private function resolve_file_path( int $agent_id ): string {
-		$registry_layer = \DataMachine\Engine\AI\MemoryFileRegistry::get_layer( $this->filename );
-		$dm             = $this->directory_manager;
-
-		if ( null !== $registry_layer ) {
-			$layer_dir = null;
-
-			switch ( $registry_layer ) {
-				case 'shared':
-					$layer_dir = $dm->get_shared_directory();
-					break;
-				case 'user':
-					$layer_dir = $dm->get_user_directory( $this->user_id );
-					break;
-				case 'network':
-					$layer_dir = $dm->get_network_directory();
-					break;
-				case 'agent':
-				default:
-					break; // Fall through to agent directory below.
-			}
-
-			if ( null !== $layer_dir ) {
-				// Convention-path files (e.g. AGENTS.md) live at ABSPATH.
-				return \DataMachine\Engine\AI\MemoryFileRegistry::resolve_filepath( $this->filename, $layer_dir )
-					?? $layer_dir . '/' . $this->filename;
-			}
-		}
-
-		// Default: agent directory.
-		$agent_dir = $dm->resolve_agent_directory( array(
-			'agent_id' => $agent_id,
-			'user_id'  => $this->user_id,
-		) );
-		return "{$agent_dir}/{$this->filename}";
+	private function resolve_layer( string $filename ): string {
+		$registered = MemoryFileRegistry::get_layer( $filename );
+		return $registered ?? MemoryFileRegistry::LAYER_AGENT;
 	}
 
 	/**
-	 * Get the full path to the target file.
+	 * Get the resolved scope for this memory file.
+	 *
+	 * @since next
+	 * @return AgentMemoryScope
+	 */
+	public function get_scope(): AgentMemoryScope {
+		return $this->scope;
+	}
+
+	/**
+	 * Get the full path to the target file (disk-only convenience).
+	 *
+	 * Preserved for backward compatibility with callers that still need
+	 * to reason about an on-disk path. The path is computed from the
+	 * registry + DirectoryManager regardless of which store is active —
+	 * useful for self-hosted CLI/debug inspectors. Non-disk stores
+	 * persist content elsewhere; the returned path may not exist in
+	 * those environments. Prefer the store interface for new callers.
 	 *
 	 * @return string
 	 */
 	public function get_file_path(): string {
-		return $this->file_path;
+		$layer_dir = $this->resolve_layer_directory();
+		return MemoryFileRegistry::resolve_filepath( $this->scope->filename, $layer_dir )
+			?? $layer_dir . '/' . $this->scope->filename;
 	}
 
 	/**
@@ -135,7 +121,7 @@ class AgentMemory {
 	 * @return string
 	 */
 	public function get_filename(): string {
-		return $this->filename;
+		return $this->scope->filename;
 	}
 
 	/**
@@ -144,20 +130,19 @@ class AgentMemory {
 	 * @return array{success: bool, content?: string, file?: string, message?: string}
 	 */
 	public function get_all(): array {
-		$fs = FilesystemHelper::get();
-		if ( ! file_exists( $this->file_path ) ) {
+		$result = $this->store->read( $this->scope );
+
+		if ( ! $result->exists ) {
 			return array(
 				'success' => false,
-				'message' => sprintf( 'File %s does not exist.', $this->filename ),
+				'message' => sprintf( 'File %s does not exist.', $this->scope->filename ),
 			);
 		}
 
-		$content = $fs->get_contents( $this->file_path );
-
 		return array(
 			'success' => true,
-			'file'    => $this->filename,
-			'content' => $content,
+			'file'    => $this->scope->filename,
+			'content' => $result->content,
 		);
 	}
 
@@ -169,21 +154,19 @@ class AgentMemory {
 	 * @return array{success: bool, sections?: string[], file?: string, message?: string}
 	 */
 	public function get_sections(): array {
-		$fs = FilesystemHelper::get();
-		if ( ! file_exists( $this->file_path ) ) {
+		$result = $this->store->read( $this->scope );
+
+		if ( ! $result->exists ) {
 			return array(
 				'success' => false,
-				'message' => sprintf( 'File %s does not exist.', $this->filename ),
+				'message' => sprintf( 'File %s does not exist.', $this->scope->filename ),
 			);
 		}
 
-		$content  = $fs->get_contents( $this->file_path );
-		$sections = $this->parse_section_headers( $content );
-
 		return array(
 			'success'  => true,
-			'file'     => $this->filename,
-			'sections' => $sections,
+			'file'     => $this->scope->filename,
+			'sections' => $this->parse_section_headers( $result->content ),
 		);
 	}
 
@@ -194,23 +177,22 @@ class AgentMemory {
 	 * @return array{success: bool, section?: string, content?: string, message?: string}
 	 */
 	public function get_section( string $section_name ): array {
-		$fs = FilesystemHelper::get();
-		if ( ! file_exists( $this->file_path ) ) {
+		$result = $this->store->read( $this->scope );
+
+		if ( ! $result->exists ) {
 			return array(
 				'success' => false,
-				'message' => sprintf( 'File %s does not exist.', $this->filename ),
+				'message' => sprintf( 'File %s does not exist.', $this->scope->filename ),
 			);
 		}
 
-		$content = $fs->get_contents( $this->file_path );
-		$parsed  = $this->parse_section( $content, $section_name );
+		$parsed = $this->parse_section( $result->content, $section_name );
 
 		if ( null === $parsed ) {
-			$sections = $this->parse_section_headers( $content );
 			return array(
 				'success'            => false,
 				'message'            => sprintf( 'Section "%s" not found.', $section_name ),
-				'available_sections' => $sections,
+				'available_sections' => $this->parse_section_headers( $result->content ),
 			);
 		}
 
@@ -219,6 +201,41 @@ class AgentMemory {
 			'section' => $section_name,
 			'content' => $parsed,
 		);
+	}
+
+	/**
+	 * Replace the entire file content. Creates the file if missing.
+	 *
+	 * Used by full-file rewrites (e.g. daily memory cleanup) that
+	 * already have the final content composed in PHP and don't need
+	 * section-level merging.
+	 *
+	 * @since next
+	 * @param string $content New full file content.
+	 * @return array{success: bool, message: string, file_size?: int, warning?: string}
+	 */
+	public function replace_all( string $content ): array {
+		$write = $this->store->write( $this->scope, $content );
+
+		if ( ! $write->success ) {
+			return array(
+				'success' => false,
+				'message' => sprintf( 'Failed to write %s (%s).', $this->scope->filename, $write->error ?? 'unknown' ),
+			);
+		}
+
+		$result = array(
+			'success'   => true,
+			'message'   => sprintf( '%s written.', $this->scope->filename ),
+			'file_size' => $write->bytes,
+		);
+
+		if ( $write->bytes > self::MAX_FILE_SIZE ) {
+			$result['warning'] = self::size_warning( $write->bytes );
+			$this->log_size_warning( $write->bytes );
+		}
+
+		return $result;
 	}
 
 	/**
@@ -231,31 +248,36 @@ class AgentMemory {
 	 * @return array{success: bool, message: string}
 	 */
 	public function set_section( string $section_name, string $content ): array {
-		$fs = FilesystemHelper::get();
 		$this->ensure_file_exists();
 
-		$file_content = $fs->get_contents( $this->file_path );
+		$current      = $this->store->read( $this->scope );
+		$file_content = $current->exists ? $current->content : '';
 		$section_pos  = $this->find_section_position( $file_content, $section_name );
 
 		if ( null === $section_pos ) {
-			// Append new section at end of file.
-			$new_section   = "\n## {$section_name}\n{$content}\n";
-			$file_content .= $new_section;
+			$file_content .= "\n## {$section_name}\n{$content}\n";
 		} else {
-			// Replace existing section content.
 			$file_content = $this->replace_section_content( $file_content, $section_pos, $content );
 		}
 
-		$file_size = $this->write_file( $file_content );
+		$write = $this->store->write( $this->scope, $file_content, $current->exists ? $current->hash : null );
+
+		if ( ! $write->success ) {
+			return array(
+				'success' => false,
+				'message' => sprintf( 'Failed to update section "%s" (%s).', $section_name, $write->error ?? 'unknown' ),
+			);
+		}
 
 		$result = array(
 			'success'   => true,
 			'message'   => sprintf( 'Section "%s" updated.', $section_name ),
-			'file_size' => $file_size,
+			'file_size' => $write->bytes,
 		);
 
-		if ( $file_size > self::MAX_FILE_SIZE ) {
-			$result['warning'] = self::size_warning( $file_size );
+		if ( $write->bytes > self::MAX_FILE_SIZE ) {
+			$result['warning'] = self::size_warning( $write->bytes );
+			$this->log_size_warning( $write->bytes );
 		}
 
 		return $result;
@@ -271,33 +293,38 @@ class AgentMemory {
 	 * @return array{success: bool, message: string}
 	 */
 	public function append_to_section( string $section_name, string $content ): array {
-		$fs = FilesystemHelper::get();
 		$this->ensure_file_exists();
 
-		$file_content = $fs->get_contents( $this->file_path );
+		$current      = $this->store->read( $this->scope );
+		$file_content = $current->exists ? $current->content : '';
 		$section_pos  = $this->find_section_position( $file_content, $section_name );
 
 		if ( null === $section_pos ) {
-			// Create section with the content.
-			$new_section   = "\n## {$section_name}\n{$content}\n";
-			$file_content .= $new_section;
+			$file_content .= "\n## {$section_name}\n{$content}\n";
 		} else {
-			// Append to existing section.
-			$existing     = $this->parse_section( $file_content, $section_name );
+			$existing     = $this->parse_section( $file_content, $section_name ) ?? '';
 			$merged       = rtrim( $existing ) . "\n" . $content . "\n";
 			$file_content = $this->replace_section_content( $file_content, $section_pos, $merged );
 		}
 
-		$file_size = $this->write_file( $file_content );
+		$write = $this->store->write( $this->scope, $file_content, $current->exists ? $current->hash : null );
+
+		if ( ! $write->success ) {
+			return array(
+				'success' => false,
+				'message' => sprintf( 'Failed to append to section "%s" (%s).', $section_name, $write->error ?? 'unknown' ),
+			);
+		}
 
 		$result = array(
 			'success'   => true,
 			'message'   => sprintf( 'Content appended to section "%s".', $section_name ),
-			'file_size' => $file_size,
+			'file_size' => $write->bytes,
 		);
 
-		if ( $file_size > self::MAX_FILE_SIZE ) {
-			$result['warning'] = self::size_warning( $file_size );
+		if ( $write->bytes > self::MAX_FILE_SIZE ) {
+			$result['warning'] = self::size_warning( $write->bytes );
+			$this->log_size_warning( $write->bytes );
 		}
 
 		return $result;
@@ -333,17 +360,18 @@ class AgentMemory {
 	 * @return array{success: bool, query: string, matches: array, match_count: int}
 	 */
 	public function search( string $query, ?string $section = null, int $context_lines = 2 ): array {
-		$fs = FilesystemHelper::get();
-		if ( ! file_exists( $this->file_path ) ) {
+		$result = $this->store->read( $this->scope );
+
+		if ( ! $result->exists ) {
 			return array(
 				'success'     => false,
-				'message'     => sprintf( 'File %s does not exist.', $this->filename ),
+				'message'     => sprintf( 'File %s does not exist.', $this->scope->filename ),
 				'matches'     => array(),
 				'match_count' => 0,
 			);
 		}
 
-		$content         = $fs->get_contents( $this->file_path );
+		$content         = $result->content;
 		$lines           = explode( "\n", $content );
 		$matches         = array();
 		$current_section = null;
@@ -462,77 +490,93 @@ class AgentMemory {
 	}
 
 	/**
-	 * Ensure the target file and directory exist.
+	 * Ensure the target file exists in the store.
 	 *
-	 * Uses scaffold defaults when available instead of a bare stub,
-	 * so a recreated file includes the standard sections.
+	 * Uses scaffold defaults when available so a recreated file includes
+	 * the standard sections. When no scaffold template exists, writes a
+	 * minimal stub so subsequent section operations have something to
+	 * read–modify–write.
 	 */
 	private function ensure_file_exists(): void {
-		if ( ! file_exists( $this->file_path ) ) {
-			$ability = \DataMachine\Abilities\File\ScaffoldAbilities::get_ability();
-			if ( $ability ) {
-				$ability->execute( array(
-					'filename' => $this->filename,
-					'user_id'  => $this->user_id,
-				) );
-			}
+		if ( $this->store->exists( $this->scope ) ) {
+			return;
+		}
 
-			// If scaffold didn't create it (no template for this file), create empty.
-			if ( ! file_exists( $this->file_path ) ) {
-				$dir = dirname( $this->file_path );
-				$dm  = new DirectoryManager();
-				$dm->ensure_directory_exists( $dir );
+		$ability = \DataMachine\Abilities\File\ScaffoldAbilities::get_ability();
+		if ( $ability ) {
+			$ability->execute( array(
+				'filename' => $this->scope->filename,
+				'user_id'  => $this->scope->user_id,
+			) );
+		}
 
-				$fs = FilesystemHelper::get();
-				$fs->put_contents( $this->file_path, "# {$this->filename}\n" );
-				FilesystemHelper::make_group_writable( $this->file_path );
-			}
+		// If scaffold didn't create it (no template for this file), create a stub.
+		if ( ! $this->store->exists( $this->scope ) ) {
+			$this->store->write( $this->scope, "# {$this->scope->filename}\n", null );
 		}
 	}
 
 	/**
 	 * Sanitize a filename to prevent directory traversal.
 	 *
+	 * Allows forward-slashes so callers can address relative paths within
+	 * a layer (e.g. 'contexts/chat.md', 'daily/2026/04/17.md'); each
+	 * segment is run through basename's allow-list.
+	 *
 	 * @since 0.45.0
-	 * @param string $filename Raw filename.
+	 * @param string $filename Raw filename or relative path.
 	 * @return string Sanitized filename.
 	 */
 	private function sanitize_filename( string $filename ): string {
-		return preg_replace( '/[^a-zA-Z0-9._-]/', '', basename( $filename ) );
+		$segments = array_filter( explode( '/', $filename ), 'strlen' );
+		$clean    = array();
+		foreach ( $segments as $segment ) {
+			$clean[] = preg_replace( '/[^a-zA-Z0-9._-]/', '', basename( $segment ) );
+		}
+		return implode( '/', $clean );
 	}
 
 	/**
-	 * Write content to the target file.
+	 * Resolve the on-disk directory for the current scope's layer.
 	 *
-	 * Logs a warning if the resulting file exceeds MAX_FILE_SIZE.
-	 *
-	 * @param string $content File content.
-	 * @return int Written file size in bytes.
+	 * Used only by get_file_path() to keep backward compatibility with
+	 * callers that need a filesystem path.
 	 */
-	private function write_file( string $content ): int {
-		$fs = FilesystemHelper::get();
-		$fs->put_contents( $this->file_path, $content );
-		FilesystemHelper::make_group_writable( $this->file_path );
-		$size = strlen( $content );
-
-		if ( $size > self::MAX_FILE_SIZE ) {
-			do_action(
-				'datamachine_log',
-				'warning',
-				sprintf(
-					'Agent memory file exceeds recommended size: %s (%s, threshold %s)',
-					basename( $this->file_path ),
-					size_format( $size ),
-					size_format( self::MAX_FILE_SIZE )
-				),
-				array(
-					'file' => basename( $this->file_path ),
-					'size' => $size,
-					'max'  => self::MAX_FILE_SIZE,
-				)
-			);
+	private function resolve_layer_directory(): string {
+		switch ( $this->scope->layer ) {
+			case MemoryFileRegistry::LAYER_SHARED:
+				return $this->directory_manager->get_shared_directory();
+			case MemoryFileRegistry::LAYER_USER:
+				return $this->directory_manager->get_user_directory( $this->scope->user_id );
+			case MemoryFileRegistry::LAYER_NETWORK:
+				return $this->directory_manager->get_network_directory();
+			case MemoryFileRegistry::LAYER_AGENT:
+			default:
+				return $this->directory_manager->resolve_agent_directory( array(
+					'agent_id' => $this->scope->agent_id,
+					'user_id'  => $this->scope->user_id,
+				) );
 		}
+	}
 
-		return $size;
+	/**
+	 * Emit the size warning log entry. Side-effect-only.
+	 */
+	private function log_size_warning( int $size ): void {
+		do_action(
+			'datamachine_log',
+			'warning',
+			sprintf(
+				'Agent memory file exceeds recommended size: %s (%s, threshold %s)',
+				$this->scope->filename,
+				size_format( $size ),
+				size_format( self::MAX_FILE_SIZE )
+			),
+			array(
+				'file' => $this->scope->filename,
+				'size' => $size,
+				'max'  => self::MAX_FILE_SIZE,
+			)
+		);
 	}
 }

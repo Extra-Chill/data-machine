@@ -1,0 +1,89 @@
+<?php
+/**
+ * Agent Memory Store Interface
+ *
+ * Single seam between agent memory operations and the underlying
+ * persistence backend. Default implementation ({@see DiskAgentMemoryStore})
+ * preserves today's filesystem behavior. Consumers can swap in an
+ * alternate store via the `datamachine_memory_store` filter
+ * (e.g. a DB-backed store on managed hosts where the filesystem is
+ * not writable).
+ *
+ * Implementations are responsible for:
+ * - translating an {@see AgentMemoryScope} to a physical key (path, row, URL);
+ * - returning a stable content hash so callers can implement
+ *   compare-and-swap concurrency via the `if_match` write parameter;
+ * - honoring the layer + user_id + agent_id + filename four-tuple as the
+ *   identity model.
+ *
+ * Section parsing, scaffolding, editability gating, and registry-driven
+ * convention-path semantics all stay in the higher-level callers
+ * ({@see AgentMemory}, {@see \DataMachine\Abilities\File\AgentFileAbilities},
+ * {@see \DataMachine\Engine\AI\MemoryFileRegistry}). The store is the
+ * dumb persistence layer underneath.
+ *
+ * @package DataMachine\Core\FilesRepository
+ * @since   next
+ */
+
+namespace DataMachine\Core\FilesRepository;
+
+defined( 'ABSPATH' ) || exit;
+
+interface AgentMemoryStoreInterface {
+
+	/**
+	 * Read the full content of the file identified by $scope.
+	 *
+	 * @param AgentMemoryScope $scope Identifies the target file.
+	 * @return AgentMemoryReadResult Returns ::not_found() when the file does not exist.
+	 */
+	public function read( AgentMemoryScope $scope ): AgentMemoryReadResult;
+
+	/**
+	 * Write the full content of the file identified by $scope.
+	 *
+	 * Implementations that support concurrency MUST honor $if_match: when
+	 * non-null, the write succeeds only if the current stored content has
+	 * a matching hash. On hash mismatch, return a failure result with
+	 * error = 'conflict'.
+	 *
+	 * Implementations without concurrency support (e.g. the disk default)
+	 * MAY ignore $if_match.
+	 *
+	 * @param AgentMemoryScope $scope    Identifies the target file.
+	 * @param string           $content  Full content to persist.
+	 * @param string|null      $if_match Optional content hash for compare-and-swap.
+	 * @return AgentMemoryWriteResult
+	 */
+	public function write( AgentMemoryScope $scope, string $content, ?string $if_match = null ): AgentMemoryWriteResult;
+
+	/**
+	 * Check whether the file identified by $scope exists in the store.
+	 *
+	 * @param AgentMemoryScope $scope Identifies the target file.
+	 * @return bool
+	 */
+	public function exists( AgentMemoryScope $scope ): bool;
+
+	/**
+	 * Delete the file identified by $scope. Idempotent: a delete on a
+	 * non-existent file returns success.
+	 *
+	 * @param AgentMemoryScope $scope Identifies the target file.
+	 * @return AgentMemoryWriteResult
+	 */
+	public function delete( AgentMemoryScope $scope ): AgentMemoryWriteResult;
+
+	/**
+	 * List all files in a single layer for the given identity.
+	 *
+	 * The $scope_query's `filename` field is ignored — list operations
+	 * return all files matching `(layer, user_id, agent_id)`. The
+	 * `layer` field is required.
+	 *
+	 * @param AgentMemoryScope $scope_query Layer + identity to enumerate.
+	 * @return AgentMemoryListEntry[]
+	 */
+	public function list_layer( AgentMemoryScope $scope_query ): array;
+}

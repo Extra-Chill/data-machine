@@ -17,6 +17,8 @@
 namespace DataMachine\Abilities\File;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\FilesRepository\AgentMemoryScope;
+use DataMachine\Core\FilesRepository\AgentMemoryStoreFactory;
 use DataMachine\Core\FilesRepository\DailyMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Core\FilesRepository\FilesystemHelper;
@@ -287,37 +289,32 @@ class AgentFileAbilities {
 	public function executeListAgentFiles( array $input ): array {
 		DirectoryManager::ensure_agent_files();
 
-		$dm      = new DirectoryManager();
-		$user_id = $dm->get_effective_user_id( (int) ( $input['user_id'] ?? 0 ) );
-
-		$shared_dir = $dm->get_shared_directory();
-		$agent_dir  = $dm->resolve_agent_directory( array(
-			'agent_id' => (int) ( $input['agent_id'] ?? 0 ),
-			'user_id'  => $user_id,
-		) );
-		$user_dir   = $dm->get_user_directory( $user_id );
+		$dm       = new DirectoryManager();
+		$user_id  = $dm->get_effective_user_id( (int) ( $input['user_id'] ?? 0 ) );
+		$agent_id = (int) ( $input['agent_id'] ?? 0 );
 
 		$files = array();
 		$seen  = array();
 
-		// First, include convention-path files (e.g. AGENTS.md at site root).
-		// These live outside the layer directories but should still appear in the file list.
+		// First, include convention-path / registered files via the store.
+		// Convention-path files (e.g. AGENTS.md at site root) live outside
+		// the layer directories but should still appear in the file list.
 		foreach ( MemoryFileRegistry::get_all() as $filename => $registry_meta ) {
-			if ( empty( $registry_meta['convention_path'] ) ) {
-				continue;
-			}
+			$layer = $registry_meta['layer'] ?? MemoryFileRegistry::LAYER_AGENT;
+			$scope = new AgentMemoryScope( $layer, $user_id, $agent_id, $filename );
+			$store = AgentMemoryStoreFactory::for_scope( $scope );
+			$read  = $store->read( $scope );
 
-			$filepath = rtrim( ABSPATH, '/' ) . '/' . $registry_meta['convention_path'];
-			if ( ! file_exists( $filepath ) ) {
+			if ( ! $read->exists ) {
 				continue;
 			}
 
 			$files[]           = array(
 				'filename'    => $filename,
-				'size'        => filesize( $filepath ),
-				'modified'    => gmdate( 'c', filemtime( $filepath ) ),
+				'size'        => $read->bytes,
+				'modified'    => null !== $read->updated_at ? gmdate( 'c', $read->updated_at ) : '',
 				'type'        => 'core',
-				'layer'       => $registry_meta['layer'],
+				'layer'       => $layer,
 				'protected'   => MemoryFileRegistry::is_protected( $filename ),
 				'editable'    => MemoryFileRegistry::is_editable( $filename ),
 				'contexts'    => $registry_meta['contexts'] ?? array( MemoryFileRegistry::CONTEXT_ALL ),
@@ -328,47 +325,38 @@ class AgentFileAbilities {
 			$seen[ $filename ] = true;
 		}
 
-		// Scan directories in priority order: shared (site-wide), agent identity, user.
-		// Agent layer wins on filename conflicts with user layer.
-		// Shared layer is always included (tagged separately, read-only in UI).
-		$layers = array(
-			'shared' => $shared_dir,
-			'agent'  => $agent_dir,
-			'user'   => $user_dir,
+		// Enumerate each layer through the store. Agent layer wins on
+		// filename conflicts with user layer; shared layer is always included.
+		$layer_order = array(
+			MemoryFileRegistry::LAYER_SHARED,
+			MemoryFileRegistry::LAYER_AGENT,
+			MemoryFileRegistry::LAYER_USER,
 		);
 
-		foreach ( $layers as $layer => $dir ) {
-			if ( ! file_exists( $dir ) ) {
-				continue;
-			}
+		foreach ( $layer_order as $layer ) {
+			$scope_query = new AgentMemoryScope( $layer, $user_id, $agent_id, '' );
+			$store       = AgentMemoryStoreFactory::for_scope( $scope_query );
 
-			foreach ( array_diff( scandir( $dir ), array( '.', '..' ) ) as $entry ) {
-				if ( 'index.php' === $entry ) {
+			foreach ( $store->list_layer( $scope_query ) as $entry ) {
+				if ( isset( $seen[ $entry->filename ] ) ) {
 					continue;
 				}
 
-				if ( isset( $seen[ $entry ] ) ) {
-					continue;
-				}
-
-				$filepath = "{$dir}/{$entry}";
-				if ( is_file( $filepath ) ) {
-					$registry_meta  = MemoryFileRegistry::get( $entry );
-					$files[]        = array(
-						'filename'    => $entry,
-						'size'        => filesize( $filepath ),
-						'modified'    => gmdate( 'c', filemtime( $filepath ) ),
-						'type'        => 'core',
-						'layer'       => $registry_meta ? $registry_meta['layer'] : $layer,
-						'protected'   => MemoryFileRegistry::is_protected( $entry ),
-						'editable'    => MemoryFileRegistry::is_editable( $entry ),
-						'contexts'    => $registry_meta['contexts'] ?? array( MemoryFileRegistry::CONTEXT_ALL ),
-						'registered'  => null !== $registry_meta,
-						'label'       => $registry_meta['label'] ?? self::filename_to_label( $entry ),
-						'description' => $registry_meta['description'] ?? '',
-					);
-					$seen[ $entry ] = true;
-				}
+				$registry_meta = MemoryFileRegistry::get( $entry->filename );
+				$files[]       = array(
+					'filename'    => $entry->filename,
+					'size'        => $entry->bytes,
+					'modified'    => null !== $entry->updated_at ? gmdate( 'c', $entry->updated_at ) : '',
+					'type'        => 'core',
+					'layer'       => $registry_meta ? $registry_meta['layer'] : $layer,
+					'protected'   => MemoryFileRegistry::is_protected( $entry->filename ),
+					'editable'    => MemoryFileRegistry::is_editable( $entry->filename ),
+					'contexts'    => $registry_meta['contexts'] ?? array( MemoryFileRegistry::CONTEXT_ALL ),
+					'registered'  => null !== $registry_meta,
+					'label'       => $registry_meta['label'] ?? self::filename_to_label( $entry->filename ),
+					'description' => $registry_meta['description'] ?? '',
+				);
+				$seen[ $entry->filename ] = true;
 			}
 		}
 
@@ -431,30 +419,32 @@ class AgentFileAbilities {
 	 * @return array Result with file data.
 	 */
 	public function executeGetAgentFile( array $input ): array {
-		$fs = FilesystemHelper::get();
 		DirectoryManager::ensure_agent_files();
 
 		$filename = sanitize_file_name( $input['filename'] ?? '' );
 		$dm       = new DirectoryManager();
 		$user_id  = $dm->get_effective_user_id( (int) ( $input['user_id'] ?? 0 ) );
 		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$filepath = $this->resolveFilePath( $dm, $user_id, $filename, $agent_id );
 
-		if ( ! $filepath ) {
+		$resolved = $this->resolveScope( $filename, $user_id, $agent_id );
+
+		if ( null === $resolved ) {
 			return array(
 				'success' => false,
 				'error'   => sprintf( 'File %s not found in any layer', $filename ),
 			);
 		}
 
+		[ $scope, $store, $read ] = $resolved;
+
 		return array(
 			'success' => true,
 			'file'    => $this->sanitizeFileEntry(
 				array(
 					'filename' => $filename,
-					'size'     => filesize( $filepath ),
-					'modified' => gmdate( 'c', filemtime( $filepath ) ),
-					'content'  => $fs->get_contents( $filepath ),
+					'size'     => $read->bytes,
+					'modified' => null !== $read->updated_at ? gmdate( 'c', $read->updated_at ) : '',
+					'content'  => $read->content,
 				)
 			),
 		);
@@ -510,35 +500,22 @@ class AgentFileAbilities {
 		$dm      = new DirectoryManager();
 		$user_id = $dm->get_effective_user_id( (int) ( $input['user_id'] ?? 0 ) );
 
-		$target_dir = $this->resolveLayerDirectory( $dm, $target_layer, $user_id, (int) ( $input['agent_id'] ?? 0 ) );
+		$scope = new AgentMemoryScope(
+			$target_layer,
+			$user_id,
+			(int) ( $input['agent_id'] ?? 0 ),
+			$filename
+		);
+		$store = AgentMemoryStoreFactory::for_scope( $scope );
 
-		if ( ! $dm->ensure_directory_exists( $target_dir ) ) {
+		$write = $store->write( $scope, $content );
+
+		if ( ! $write->success ) {
 			return array(
 				'success' => false,
-				'error'   => 'Failed to create target directory',
+				'error'   => sprintf( 'Failed to write file (%s)', $write->error ?? 'unknown' ),
 			);
 		}
-
-		$filepath = "{$target_dir}/{$filename}";
-
-		$fs = FilesystemHelper::get();
-		if ( ! $fs ) {
-			return array(
-				'success' => false,
-				'error'   => 'Filesystem not available',
-			);
-		}
-
-		$written = $fs->put_contents( $filepath, $content, FS_CHMOD_FILE );
-
-		if ( ! $written ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to write file',
-			);
-		}
-
-		FilesystemHelper::make_group_writable( $filepath );
 
 		do_action(
 			'datamachine_log',
@@ -576,16 +553,26 @@ class AgentFileAbilities {
 		$dm       = new DirectoryManager();
 		$user_id  = $dm->get_effective_user_id( (int) ( $input['user_id'] ?? 0 ) );
 		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$filepath = $this->resolveFilePath( $dm, $user_id, $filename, $agent_id );
+		$resolved = $this->resolveScope( $filename, $user_id, $agent_id );
 
-		if ( ! $filepath ) {
+		if ( null === $resolved ) {
 			return array(
 				'success' => false,
 				'error'   => sprintf( 'File %s not found in any layer', $filename ),
 			);
 		}
 
-		wp_delete_file( $filepath );
+		[ $scope, $store, $read ] = $resolved;
+		unset( $read );
+
+		$delete = $store->delete( $scope );
+
+		if ( ! $delete->success ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Failed to delete file (%s)', $delete->error ?? 'unknown' ),
+			);
+		}
 
 		do_action(
 			'datamachine_log',
@@ -605,7 +592,11 @@ class AgentFileAbilities {
 	}
 
 	/**
-	 * Upload a file to a memory layer directory.
+	 * Upload a file to a memory layer.
+	 *
+	 * Reads the uploaded tmp file into memory and persists it through the
+	 * configured store, so the upload path works on any backend (disk or
+	 * DB) and not just on writable filesystems.
 	 *
 	 * @param array $input Input parameters.
 	 * @return array Result with updated file list.
@@ -613,7 +604,7 @@ class AgentFileAbilities {
 	public function executeUploadAgentFile( array $input ): array {
 		$file = $input['file_data'] ?? null;
 
-		if ( ! $file || empty( $file['tmp_name'] ) ) {
+		if ( ! $file || empty( $file['tmp_name'] ) || empty( $file['name'] ) ) {
 			return array(
 				'success' => false,
 				'error'   => 'No file data provided',
@@ -624,22 +615,35 @@ class AgentFileAbilities {
 		$user_id      = $dm->get_effective_user_id( (int) ( $input['user_id'] ?? 0 ) );
 		$agent_id     = (int) ( $input['agent_id'] ?? 0 );
 		$target_layer = $input['layer'] ?? MemoryFileRegistry::LAYER_AGENT;
-		$target_dir   = $this->resolveLayerDirectory( $dm, $target_layer, $user_id, $agent_id );
+		$filename     = sanitize_file_name( (string) $file['name'] );
 
-		if ( ! $dm->ensure_directory_exists( $target_dir ) ) {
+		// Read tmp content via the WP filesystem helper. The uploaded
+		// tmp_name lives on the local FS (PHP's upload mechanism); we then
+		// hand bytes off to the store, which decides where they land.
+		$fs = FilesystemHelper::get();
+		if ( ! $fs ) {
 			return array(
 				'success' => false,
-				'error'   => 'Failed to create target directory',
+				'error'   => 'Filesystem not available',
 			);
 		}
 
-		$destination = "{$target_dir}/{$file['name']}";
-
-		$fs = FilesystemHelper::get();
-		if ( ! $fs || ! $fs->copy( $file['tmp_name'], $destination, true ) ) {
+		$content = $fs->get_contents( $file['tmp_name'] );
+		if ( false === $content ) {
 			return array(
 				'success' => false,
-				'error'   => 'Failed to store file',
+				'error'   => 'Failed to read uploaded file',
+			);
+		}
+
+		$scope = new AgentMemoryScope( $target_layer, $user_id, $agent_id, $filename );
+		$store = AgentMemoryStoreFactory::for_scope( $scope );
+
+		$write = $store->write( $scope, (string) $content );
+		if ( ! $write->success ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Failed to store file (%s)', $write->error ?? 'unknown' ),
 			);
 		}
 
@@ -655,46 +659,42 @@ class AgentFileAbilities {
 	// =========================================================================
 
 	/**
-	 * Resolve a filename to its absolute path across layers.
+	 * Resolve a filename to a (scope, store, read-result) triple by
+	 * trying the registered layer first, then falling back agent → user
+	 * → shared.
 	 *
-	 * For registered files, checks the registered layer first.
-	 * Falls back to: agent → user → shared.
+	 * Returns null if the file does not exist in any layer.
 	 *
-	 * @since 0.41.0 Added $agent_id parameter for agent-first resolution.
-	 * @since 0.42.0 Registry-aware layer resolution.
+	 * @since next Replaces the disk-only resolveFilePath helper.
 	 *
-	 * @param DirectoryManager $dm       Directory manager instance.
-	 * @param int              $user_id  Effective user ID.
-	 * @param string           $filename Filename to resolve.
-	 * @param int              $agent_id Agent ID for direct resolution. 0 = resolve from user_id.
-	 * @return string|null Absolute file path, or null if not found.
+	 * @param string $filename Filename to resolve.
+	 * @param int    $user_id  Effective user ID.
+	 * @param int    $agent_id Agent ID for direct resolution. 0 = resolve from user_id.
+	 * @return array{0: AgentMemoryScope, 1: \DataMachine\Core\FilesRepository\AgentMemoryStoreInterface, 2: \DataMachine\Core\FilesRepository\AgentMemoryReadResult}|null
 	 */
-	private function resolveFilePath( DirectoryManager $dm, int $user_id, string $filename, int $agent_id = 0 ): ?string {
-		$agent_dir  = $dm->resolve_agent_directory( array(
-			'agent_id' => $agent_id,
-			'user_id'  => $user_id,
-		) );
-		$user_dir   = $dm->get_user_directory( $user_id );
-		$shared_dir = $dm->get_shared_directory();
+	private function resolveScope( string $filename, int $user_id, int $agent_id ): ?array {
+		$layer_order = array();
 
-		// If file is registered, check its canonical location first.
-		// Convention-path files (e.g. AGENTS.md) live at ABSPATH, not the layer directory.
+		// If file is registered, check its canonical layer first.
 		$registered_layer = MemoryFileRegistry::get_layer( $filename );
 		if ( $registered_layer ) {
-			$primary_dir  = $this->resolveLayerDirectory( $dm, $registered_layer, $user_id, $agent_id );
-			$primary_path = MemoryFileRegistry::resolve_filepath( $filename, $primary_dir )
-				?? $primary_dir . '/' . $filename;
-			if ( file_exists( $primary_path ) ) {
-				return $primary_path;
+			$layer_order[] = $registered_layer;
+		}
+
+		// Fallback: check remaining layers (agent → user → shared) without dupes.
+		foreach ( array( MemoryFileRegistry::LAYER_AGENT, MemoryFileRegistry::LAYER_USER, MemoryFileRegistry::LAYER_SHARED ) as $layer ) {
+			if ( ! in_array( $layer, $layer_order, true ) ) {
+				$layer_order[] = $layer;
 			}
 		}
 
-		// Fallback: check all layers (agent → user → shared).
-		$search_order = array( $agent_dir, $user_dir, $shared_dir );
-		foreach ( $search_order as $dir ) {
-			$path = $dir . '/' . $filename;
-			if ( file_exists( $path ) ) {
-				return $path;
+		foreach ( $layer_order as $layer ) {
+			$scope = new AgentMemoryScope( $layer, $user_id, $agent_id, $filename );
+			$store = AgentMemoryStoreFactory::for_scope( $scope );
+			$read  = $store->read( $scope );
+
+			if ( $read->exists ) {
+				return array( $scope, $store, $read );
 			}
 		}
 

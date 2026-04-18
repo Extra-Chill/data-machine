@@ -198,10 +198,13 @@ class DailyMemoryTask extends SystemTask {
 			return;
 		}
 
-		// Write cleaned MEMORY.md.
-		$fs = \DataMachine\Core\FilesRepository\FilesystemHelper::get();
-		$fs->put_contents( $memory->get_file_path(), $new_content );
-		\DataMachine\Core\FilesRepository\FilesystemHelper::make_group_writable( $memory->get_file_path() );
+		// Write cleaned MEMORY.md through the configured store so this
+		// path stays backend-agnostic (works on disk and on swap-in stores).
+		$write_result = $memory->replace_all( $new_content );
+		if ( empty( $write_result['success'] ) ) {
+			$this->failJob( $jobId, $write_result['message'] ?? 'Failed to persist cleaned memory.' );
+			return;
+		}
 
 		// Archive extracted content to the daily file.
 		$archived_size = 0;
