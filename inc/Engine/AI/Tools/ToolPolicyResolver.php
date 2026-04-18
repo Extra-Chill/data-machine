@@ -477,28 +477,31 @@ class ToolPolicyResolver {
 
 		$policy = $config['tool_policy'];
 
-		// Validate structure: must have 'mode' and at least 'tools' or 'categories'.
+		// Validate structure: must have 'mode'.
 		if ( ! isset( $policy['mode'] ) ) {
-			return null;
-		}
-
-		// Ensure tools is present and an array (may be empty if only categories are used).
-		if ( ! isset( $policy['tools'] ) || ! is_array( $policy['tools'] ) ) {
-			$policy['tools'] = array();
-		}
-
-		// Normalize categories to an array.
-		if ( isset( $policy['categories'] ) && ! is_array( $policy['categories'] ) ) {
-			return null;
-		}
-
-		// Must have at least tools or categories to be a valid policy.
-		if ( empty( $policy['tools'] ) && empty( $policy['categories'] ?? array() ) ) {
 			return null;
 		}
 
 		// Validate mode is one of the allowed values.
 		if ( ! in_array( $policy['mode'], array( 'deny', 'allow' ), true ) ) {
+			return null;
+		}
+
+		// Ensure tools is present and an array (may be empty — see note below).
+		if ( ! isset( $policy['tools'] ) || ! is_array( $policy['tools'] ) ) {
+			$policy['tools'] = array();
+		}
+
+		// Normalize categories: must be an array if present.
+		if ( isset( $policy['categories'] ) && ! is_array( $policy['categories'] ) ) {
+			return null;
+		}
+
+		// An empty tools + empty categories list is only meaningful for allow
+		// mode (means "allow nothing"). Deny mode with empty lists is a no-op
+		// and we treat it as no policy to avoid a wasted pass through
+		// applyAgentPolicy.
+		if ( empty( $policy['tools'] ) && empty( $policy['categories'] ?? array() ) && 'allow' !== $policy['mode'] ) {
 			return null;
 		}
 

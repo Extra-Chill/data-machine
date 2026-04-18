@@ -15,7 +15,14 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
-		
+
+		// The bundled ai-http-client vendor registers its own \`chubes_ai_request\`
+		// filter at priority 99 that ignores the \$request payload and always
+		// attempts a real provider call (returning an error when no API key is
+		// configured, as in the test environment). That overrides any lower-
+		// priority mock we register, so we clear the hook before each test.
+		remove_all_filters( 'chubes_ai_request' );
+
 		// Mock the RequestBuilder for testing AI requests
 		add_filter( 'chubes_ai_request', [ $this, 'mock_ai_response' ], 10, 6 );
 	}
