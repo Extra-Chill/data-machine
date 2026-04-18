@@ -992,14 +992,25 @@ add_filter( 'datamachine_memory_store', function ( $store, $scope ) {
 - `list_layer( $scope_query )` → `AgentMemoryListEntry[]` (enumerates one layer)
 
 Section parsing, scaffolding, editability gating, and registry-driven
-convention-path semantics stay in the higher-level callers (`AgentMemory`,
-`AgentFileAbilities`, `MemoryFileRegistry`). The store is the dumb
-persistence layer underneath.
+convention-path semantics stay in `AgentMemory` (the high-level facade).
+The store is the dumb persistence layer underneath.
 
-**Consumers** (all whole-file IO routes through the store):
-- `\DataMachine\Core\FilesRepository\AgentMemory` — section ops on MEMORY.md / SOUL.md / USER.md / NETWORK.md
+**Single consumer of the store**: `\DataMachine\Core\FilesRepository\AgentMemory`.
+
+`AgentMemory` is the only class in core that talks to `AgentMemoryStoreFactory`. It exposes:
+
+- Section-level ops: `get_section()`, `set_section()`, `append_to_section()`, `get_sections()`, `search()`
+- Whole-file ops: `read()` (returns `AgentMemoryReadResult`), `get_all()`, `replace_all()`, `exists()`, `delete()`
+- Static layer enumerator: `AgentMemory::list_layer( $layer, $user_id, $agent_id )` → `AgentMemoryListEntry[]`
+
+Higher-level consumers all go through this facade rather than instantiating store types directly:
+
 - `\DataMachine\Abilities\File\AgentFileAbilities` — whole-file ops backing the `/datamachine/v1/files/agent` REST routes (the React Agent UI)
 - `\DataMachine\Engine\AI\Directives\CoreMemoryFilesDirective` — file content injected into every AI conversation
+- `\DataMachine\Engine\AI\System\Tasks\DailyMemoryTask` — full-file rewrite during scheduled compaction
+- `\DataMachine\Abilities\AgentMemoryAbilities` — Abilities API surface for memory operations
+
+Outside plugins and extensions should follow the same pattern: instantiate `AgentMemory`, never reach for `AgentMemoryStoreFactory` directly.
 
 ### ConversationManager (`/inc/Engine/AI/ConversationManager.php`)
 
