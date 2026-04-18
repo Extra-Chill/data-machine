@@ -89,7 +89,7 @@ class BlueskyPublishAbility {
 						),
 					),
 					'execute_callback'    => array( self::class, 'execute_publish' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -115,7 +115,7 @@ class BlueskyPublishAbility {
 						),
 					),
 					'execute_callback'    => array( self::class, 'get_account' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);

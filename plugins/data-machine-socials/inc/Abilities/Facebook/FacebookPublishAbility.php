@@ -100,7 +100,7 @@ class FacebookPublishAbility {
 						),
 					),
 					'execute_callback'    => array( self::class, 'execute_publish' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -125,7 +125,7 @@ class FacebookPublishAbility {
 						),
 					),
 					'execute_callback'    => array( self::class, 'get_pages' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);

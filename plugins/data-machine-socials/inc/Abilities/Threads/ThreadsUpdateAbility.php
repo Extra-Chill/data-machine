@@ -82,7 +82,7 @@ class ThreadsUpdateAbility {
 	}
 
 	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
+		return PermissionHelper::can( 'use_tools' );
 	}
 
 	public function execute( array $input ): array|\WP_Error {
