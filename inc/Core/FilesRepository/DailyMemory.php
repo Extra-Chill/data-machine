@@ -10,26 +10,43 @@
  * It is NOT logs (operational telemetry). It persists agent knowledge and
  * is never auto-cleared.
  *
+ * Persistence is delegated to the {@see AgentMemoryStoreInterface}
+ * registered for the agent layer (resolved through the
+ * `datamachine_memory_store` filter). Daily files are addressed as
+ * relative paths within the agent layer (`daily/YYYY/MM/DD.md`), so a
+ * single store swap covers MEMORY.md, daily memory, and context files
+ * uniformly.
+ *
+ * Plugins that need a completely different daily backend (separate from
+ * the memory store swap) can still implement {@see DailyMemoryStorage}
+ * and register it via the `datamachine_daily_memory_storage` filter —
+ * this class is the default implementation.
+ *
  * @package DataMachine\Core\FilesRepository
  * @since 0.32.0
+ * @since next   Whole-file IO delegated to AgentMemory facade / store.
  * @see https://github.com/Extra-Chill/data-machine/issues/348
  */
 
 namespace DataMachine\Core\FilesRepository;
+
+use DataMachine\Engine\AI\MemoryFileRegistry;
 
 defined( 'ABSPATH' ) || exit;
 
 class DailyMemory implements DailyMemoryStorage {
 
 	/**
+	 * Path prefix within the agent layer that scopes all daily files.
+	 *
+	 * @var string
+	 */
+	private const PREFIX = 'daily';
+
+	/**
 	 * @var DirectoryManager
 	 */
 	private DirectoryManager $directory_manager;
-
-	/**
-	 * @var string Base path for daily memory files (agent/daily/).
-	 */
-	private string $base_path;
 
 	/**
 	 * Effective scoped user ID.
@@ -38,6 +55,14 @@ class DailyMemory implements DailyMemoryStorage {
 	 * @var int
 	 */
 	private int $user_id;
+
+	/**
+	 * Agent ID for direct scope resolution. 0 = resolve from user_id.
+	 *
+	 * @since next
+	 * @var int
+	 */
+	private int $agent_id;
 
 	/**
 	 * @since 0.37.0 Added $user_id parameter for multi-agent partitioning.
@@ -49,24 +74,30 @@ class DailyMemory implements DailyMemoryStorage {
 	public function __construct( int $user_id = 0, int $agent_id = 0 ) {
 		$this->directory_manager = new DirectoryManager();
 		$this->user_id           = $this->directory_manager->get_effective_user_id( $user_id );
-		$agent_dir               = $this->directory_manager->resolve_agent_directory( array(
-			'agent_id' => $agent_id,
-			'user_id'  => $this->user_id,
-		) );
-		$this->base_path         = "{$agent_dir}/daily";
+		$this->agent_id          = $agent_id;
 	}
 
 	/**
 	 * Get the base path for daily memory files.
 	 *
+	 * Disk-only convenience — returns the directory daily files would
+	 * live in if backed by the disk store. Non-disk stores persist
+	 * elsewhere; the path may not exist in those environments.
+	 *
 	 * @return string
 	 */
 	public function get_base_path(): string {
-		return $this->base_path;
+		$agent_dir = $this->directory_manager->resolve_agent_directory( array(
+			'agent_id' => $this->agent_id,
+			'user_id'  => $this->user_id,
+		) );
+		return "{$agent_dir}/" . self::PREFIX;
 	}
 
 	/**
 	 * Build the file path for a given date.
+	 *
+	 * Disk-only convenience — see {@see self::get_base_path()}.
 	 *
 	 * @param string $year  Four-digit year (e.g. '2026').
 	 * @param string $month Two-digit month (e.g. '02').
@@ -74,7 +105,7 @@ class DailyMemory implements DailyMemoryStorage {
 	 * @return string Full file path.
 	 */
 	public function get_file_path( string $year, string $month, string $day ): string {
-		return "{$this->base_path}/{$year}/{$month}/{$day}.md";
+		return $this->get_base_path() . "/{$year}/{$month}/{$day}.md";
 	}
 
 	/**
@@ -91,6 +122,32 @@ class DailyMemory implements DailyMemoryStorage {
 	}
 
 	/**
+	 * Build the relative filename within the agent layer for a given date.
+	 *
+	 * @since next
+	 *
+	 * @param string $year  Four-digit year.
+	 * @param string $month Two-digit month.
+	 * @param string $day   Two-digit day.
+	 * @return string Relative filename (e.g. 'daily/2026/04/17.md').
+	 */
+	private function relative_filename( string $year, string $month, string $day ): string {
+		return self::PREFIX . "/{$year}/{$month}/{$day}.md";
+	}
+
+	/**
+	 * Build an AgentMemory facade for a given daily date.
+	 */
+	private function memory_for( string $year, string $month, string $day ): AgentMemory {
+		return new AgentMemory(
+			$this->user_id,
+			$this->agent_id,
+			$this->relative_filename( $year, $month, $day ),
+			MemoryFileRegistry::LAYER_AGENT
+		);
+	}
+
+	/**
 	 * Check if a daily file exists.
 	 *
 	 * @param string $year  Four-digit year.
@@ -99,7 +156,7 @@ class DailyMemory implements DailyMemoryStorage {
 	 * @return bool
 	 */
 	public function exists( string $year, string $month, string $day ): bool {
-		return file_exists( $this->get_file_path( $year, $month, $day ) );
+		return $this->memory_for( $year, $month, $day )->exists();
 	}
 
 	/**
@@ -111,29 +168,24 @@ class DailyMemory implements DailyMemoryStorage {
 	 * @return array{success: bool, content?: string, date?: string, message?: string}
 	 */
 	public function read( string $year, string $month, string $day ): array {
-		$fs        = FilesystemHelper::get();
-		$file_path = $this->get_file_path( $year, $month, $day );
+		$result = $this->memory_for( $year, $month, $day )->read();
 
-		if ( ! file_exists( $file_path ) ) {
+		if ( ! $result->exists ) {
 			return array(
 				'success' => false,
 				'message' => sprintf( 'No daily memory for %s-%s-%s.', $year, $month, $day ),
 			);
 		}
 
-		$content = $fs->get_contents( $file_path );
-
 		return array(
 			'success' => true,
 			'date'    => "{$year}-{$month}-{$day}",
-			'content' => $content,
+			'content' => $result->content,
 		);
 	}
 
 	/**
 	 * Write (replace) content for a daily memory file.
-	 *
-	 * Creates the directory structure if needed.
 	 *
 	 * @param string $year    Four-digit year.
 	 * @param string $month   Two-digit month.
@@ -142,27 +194,14 @@ class DailyMemory implements DailyMemoryStorage {
 	 * @return array{success: bool, message: string}
 	 */
 	public function write( string $year, string $month, string $day, string $content ): array {
-		$fs        = FilesystemHelper::get();
-		$file_path = $this->get_file_path( $year, $month, $day );
-		$dir       = dirname( $file_path );
+		$result = $this->memory_for( $year, $month, $day )->replace_all( $content );
 
-		if ( ! $this->ensure_daily_directory( $dir ) ) {
+		if ( empty( $result['success'] ) ) {
 			return array(
 				'success' => false,
-				'message' => sprintf( 'Failed to create directory for %s-%s-%s.', $year, $month, $day ),
+				'message' => $result['message'] ?? sprintf( 'Failed to write daily memory for %s-%s-%s.', $year, $month, $day ),
 			);
 		}
-
-		$written = $fs->put_contents( $file_path, $content );
-
-		if ( false === $written ) {
-			return array(
-				'success' => false,
-				'message' => sprintf( 'Failed to write daily memory for %s-%s-%s.', $year, $month, $day ),
-			);
-		}
-
-		FilesystemHelper::make_group_writable( $file_path );
 
 		return array(
 			'success' => true,
@@ -182,46 +221,28 @@ class DailyMemory implements DailyMemoryStorage {
 	 * @return array{success: bool, message: string}
 	 */
 	public function append( string $year, string $month, string $day, string $content ): array {
-		$fs        = FilesystemHelper::get();
-		$file_path = $this->get_file_path( $year, $month, $day );
-		$dir       = dirname( $file_path );
+		$memory  = $this->memory_for( $year, $month, $day );
+		$current = $memory->read();
 
-		if ( ! $this->ensure_daily_directory( $dir ) ) {
-			return array(
-				'success' => false,
-				'message' => sprintf( 'Failed to create directory for %s-%s-%s.', $year, $month, $day ),
-			);
-		}
-
-		// If file doesn't exist, scaffold it with date header via ability.
-		if ( ! file_exists( $file_path ) ) {
-			$ability = \DataMachine\Abilities\File\ScaffoldAbilities::get_ability();
-			if ( $ability ) {
-				$ability->execute( array(
-					'filename' => "daily/{$year}/{$month}/{$day}.md",
-					'filepath' => $file_path,
-					'date'     => "{$year}-{$month}-{$day}",
-				) );
-			}
-
-			// Append content after the scaffolded header.
-			$_existing_content = $fs->get_contents( $file_path );
-			$_existing_content = ( false !== $_existing_content ) ? $_existing_content : '';
-			$written           = $fs->put_contents( $file_path, $_existing_content . "\n" . $content . "\n" );
+		if ( ! $current->exists ) {
+			// First write of the day: scaffold a date header inline.
+			// (The previous ScaffoldAbilities path was disk-coupled; we
+			// keep the same header format to preserve agent-readable
+			// structure across stores.)
+			$header  = "# Daily Memory: {$year}-{$month}-{$day}\n\n";
+			$payload = $header . $content . "\n";
 		} else {
-			$_existing_content = $fs->get_contents( $file_path );
-			$_existing_content = ( false !== $_existing_content ) ? $_existing_content : '';
-			$written           = $fs->put_contents( $file_path, $_existing_content . $content . "\n" );
+			$payload = $current->content . $content . "\n";
 		}
 
-		if ( false === $written ) {
+		$result = $memory->replace_all( $payload );
+
+		if ( empty( $result['success'] ) ) {
 			return array(
 				'success' => false,
-				'message' => sprintf( 'Failed to append to daily memory for %s-%s-%s.', $year, $month, $day ),
+				'message' => $result['message'] ?? sprintf( 'Failed to append to daily memory for %s-%s-%s.', $year, $month, $day ),
 			);
 		}
-
-		FilesystemHelper::make_group_writable( $file_path );
 
 		return array(
 			'success' => true,
@@ -238,22 +259,21 @@ class DailyMemory implements DailyMemoryStorage {
 	 * @return array{success: bool, message: string}
 	 */
 	public function delete( string $year, string $month, string $day ): array {
-		$file_path = $this->get_file_path( $year, $month, $day );
+		$memory = $this->memory_for( $year, $month, $day );
 
-		if ( ! file_exists( $file_path ) ) {
+		if ( ! $memory->exists() ) {
 			return array(
 				'success' => false,
 				'message' => sprintf( 'No daily memory for %s-%s-%s to delete.', $year, $month, $day ),
 			);
 		}
 
-		wp_delete_file( $file_path );
+		$result = $memory->delete();
 
-		// wp_delete_file returns void, check if file still exists.
-		if ( file_exists( $file_path ) ) {
+		if ( empty( $result['success'] ) ) {
 			return array(
 				'success' => false,
-				'message' => sprintf( 'Failed to delete daily memory for %s-%s-%s.', $year, $month, $day ),
+				'message' => $result['message'] ?? sprintf( 'Failed to delete daily memory for %s-%s-%s.', $year, $month, $day ),
 			);
 		}
 
@@ -271,41 +291,51 @@ class DailyMemory implements DailyMemoryStorage {
 	 * @return array{success: bool, months: array<string, string[]>}
 	 */
 	public function list_all(): array {
+		$entries = AgentMemory::list_subtree(
+			MemoryFileRegistry::LAYER_AGENT,
+			$this->user_id,
+			$this->agent_id,
+			self::PREFIX
+		);
+
 		$months = array();
 
-		if ( ! is_dir( $this->base_path ) ) {
-			return array(
-				'success' => true,
-				'months'  => $months,
-			);
-		}
+		foreach ( $entries as $entry ) {
+			// Filename is relative to the layer root, e.g. 'daily/2026/04/17.md'.
+			// Strip the prefix and the .md extension, then split into Y/M/D.
+			$path = substr( $entry->filename, strlen( self::PREFIX ) + 1 );
 
-		$year_dirs = $this->scan_sorted_dirs( $this->base_path );
-
-		foreach ( $year_dirs as $year ) {
-			if ( ! preg_match( '/^\d{4}$/', $year ) ) {
+			if ( '.md' !== substr( $path, -3 ) ) {
 				continue;
 			}
 
-			$year_path  = "{$this->base_path}/{$year}";
-			$month_dirs = $this->scan_sorted_dirs( $year_path );
+			$path  = substr( $path, 0, -3 );
+			$parts = explode( '/', $path );
 
-			foreach ( $month_dirs as $month ) {
-				if ( ! preg_match( '/^\d{2}$/', $month ) ) {
-					continue;
-				}
-
-				$month_path = "{$year_path}/{$month}";
-				$day_files  = $this->scan_sorted_files( $month_path, '.md' );
-
-				if ( ! empty( $day_files ) ) {
-					$key            = "{$year}/{$month}";
-					$months[ $key ] = $day_files;
-				}
+			if ( 3 !== count( $parts ) ) {
+				continue;
 			}
+
+			[ $year, $month, $day ] = $parts;
+
+			if ( ! preg_match( '/^\d{4}$/', $year )
+				|| ! preg_match( '/^\d{2}$/', $month )
+				|| ! preg_match( '/^\d{2}$/', $day ) ) {
+				continue;
+			}
+
+			$key = "{$year}/{$month}";
+			if ( ! isset( $months[ $key ] ) ) {
+				$months[ $key ] = array();
+			}
+			$months[ $key ][] = $day;
 		}
 
-		// Sort by key descending (newest months first).
+		// Days within each month sorted ascending; months descending (newest first).
+		foreach ( $months as $key => $days ) {
+			sort( $days );
+			$months[ $key ] = $days;
+		}
 		krsort( $months );
 
 		return array(
@@ -345,7 +375,7 @@ class DailyMemory implements DailyMemoryStorage {
 		$query_lower = mb_strtolower( $query );
 
 		foreach ( $all['months'] as $month_key => $days ) {
-			list( $year, $month ) = explode( '/', $month_key );
+			[ $year, $month ] = explode( '/', $month_key );
 
 			foreach ( $days as $day ) {
 				$date = "{$year}-{$month}-{$day}";
@@ -396,41 +426,6 @@ class DailyMemory implements DailyMemoryStorage {
 		);
 	}
 
-	// =========================================================================
-	// Internal Helpers
-	// =========================================================================
-
-	/**
-	 * Ensure a daily memory directory exists with group-writable permissions.
-	 *
-	 * Creates all intermediate directories (daily/YYYY/MM/) and sets 0775
-	 * so the coding agent user can also write daily memory files.
-	 *
-	 * @since 0.32.0
-	 * @param string $dir Directory path.
-	 * @return bool True if directory exists.
-	 */
-	private function ensure_daily_directory( string $dir ): bool {
-		if ( ! $this->directory_manager->ensure_directory_exists( $dir ) ) {
-			return false;
-		}
-
-		$perms = FilesystemHelper::AGENT_DIR_PERMISSIONS;
-
-		// Walk up from the leaf (MM/) through YYYY/ and daily/ — set each.
-		$current = $dir;
-		$stops   = 3; // MM, YYYY, daily.
-		for ( $i = 0; $i < $stops; $i++ ) {
-			if ( is_dir( $current ) ) {
-				// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod
-				chmod( $current, $perms );
-			}
-			$current = dirname( $current );
-		}
-
-		return true;
-	}
-
 	/**
 	 * Parse a YYYY-MM-DD date string into year/month/day components.
 	 *
@@ -447,46 +442,5 @@ class DailyMemory implements DailyMemoryStorage {
 			'month' => $matches[2],
 			'day'   => $matches[3],
 		);
-	}
-
-	/**
-	 * Scan a directory for sorted subdirectory names.
-	 *
-	 * @param string $path Directory to scan.
-	 * @return string[] Sorted directory names.
-	 */
-	private function scan_sorted_dirs( string $path ): array {
-		$entries = array();
-
-		foreach ( array_diff( scandir( $path ), array( '.', '..' ) ) as $entry ) {
-			if ( is_dir( "{$path}/{$entry}" ) ) {
-				$entries[] = $entry;
-			}
-		}
-		sort( $entries );
-
-		return $entries;
-	}
-
-	/**
-	 * Scan a directory for sorted file names (without extension).
-	 *
-	 * @param string $path      Directory to scan.
-	 * @param string $extension File extension to filter by (e.g. '.md').
-	 * @return string[] Sorted file basenames (without extension).
-	 */
-	private function scan_sorted_files( string $path, string $extension ): array {
-		$entries = array();
-
-		$ext_len = strlen( $extension );
-
-		foreach ( array_diff( scandir( $path ), array( '.', '..' ) ) as $entry ) {
-			if ( is_file( "{$path}/{$entry}" ) && substr( $entry, -$ext_len ) === $extension ) {
-				$entries[] = substr( $entry, 0, -$ext_len );
-			}
-		}
-		sort( $entries );
-
-		return $entries;
 	}
 }

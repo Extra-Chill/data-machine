@@ -563,43 +563,71 @@ class AgentFiles {
 	// =========================================================================
 
 	/**
-	 * Resolve the contexts directory for the current agent.
+	 * Path prefix within the agent layer for context memory files.
 	 *
-	 * @param WP_REST_Request $request REST request.
-	 * @return string Full path to the contexts directory.
+	 * Context files are addressed as relative paths inside the agent
+	 * layer (`contexts/<slug>.md`), so they ride the same store seam
+	 * as MEMORY.md / SOUL.md / daily memory.
+	 *
+	 * @since next
 	 */
-	private static function resolve_contexts_dir( WP_REST_Request $request ): string {
-		$dm      = new \DataMachine\Core\FilesRepository\DirectoryManager();
-		$user_id = $dm->get_effective_user_id( self::resolve_scoped_user_id( $request ) );
+	private const CONTEXTS_PREFIX = 'contexts';
 
-		$context = array( 'user_id' => $user_id );
+	/**
+	 * Build the relative filename for a context slug.
+	 *
+	 * @since next
+	 */
+	private static function context_filename( string $slug ): string {
+		return self::CONTEXTS_PREFIX . '/' . $slug . '.md';
+	}
 
+	/**
+	 * Build an AgentMemory facade for a context slug from a request.
+	 *
+	 * @since next
+	 */
+	private static function context_memory( WP_REST_Request $request, string $slug ): \DataMachine\Core\FilesRepository\AgentMemory {
+		$user_id  = self::resolve_scoped_user_id( $request );
 		$agent_id = $request->get_param( 'agent_id' );
-		if ( null !== $agent_id && '' !== $agent_id ) {
-			$context['agent_id'] = (int) $agent_id;
-		}
+		$agent_id = ( null !== $agent_id && '' !== $agent_id ) ? (int) $agent_id : 0;
 
-		return $dm->get_contexts_directory( $context );
+		return new \DataMachine\Core\FilesRepository\AgentMemory(
+			$user_id,
+			$agent_id,
+			self::context_filename( $slug ),
+			\DataMachine\Engine\AI\MemoryFileRegistry::LAYER_AGENT
+		);
 	}
 
 	/**
 	 * List all context memory files.
 	 */
 	public static function list_context_files( WP_REST_Request $request ) {
-		$dir = self::resolve_contexts_dir( $request );
+		$user_id  = self::resolve_scoped_user_id( $request );
+		$agent_id = $request->get_param( 'agent_id' );
+		$agent_id = ( null !== $agent_id && '' !== $agent_id ) ? (int) $agent_id : 0;
+
+		$entries = \DataMachine\Core\FilesRepository\AgentMemory::list_subtree(
+			\DataMachine\Engine\AI\MemoryFileRegistry::LAYER_AGENT,
+			$user_id,
+			$agent_id,
+			self::CONTEXTS_PREFIX
+		);
 
 		$files = array();
-		if ( is_dir( $dir ) ) {
-			foreach ( glob( trailingslashit( $dir ) . '*.md' ) as $filepath ) {
-				$filename = basename( $filepath );
-				$slug     = pathinfo( $filename, PATHINFO_FILENAME );
-				$files[]  = array(
-					'slug'     => $slug,
-					'filename' => $filename,
-					'size'     => filesize( $filepath ),
-					'modified' => gmdate( 'c', filemtime( $filepath ) ),
-				);
+		foreach ( $entries as $entry ) {
+			$basename = basename( $entry->filename );
+			if ( '.md' !== substr( $basename, -3 ) ) {
+				continue;
 			}
+			$slug    = substr( $basename, 0, -3 );
+			$files[] = array(
+				'slug'     => $slug,
+				'filename' => $basename,
+				'size'     => $entry->bytes,
+				'modified' => null !== $entry->updated_at ? gmdate( 'c', $entry->updated_at ) : '',
+			);
 		}
 
 		return rest_ensure_response( array(
@@ -612,18 +640,12 @@ class AgentFiles {
 	 * Read a context memory file.
 	 */
 	public static function get_context_file( WP_REST_Request $request ) {
-		$dir      = self::resolve_contexts_dir( $request );
-		$slug     = sanitize_title( $request['context_slug'] );
-		$filepath = trailingslashit( $dir ) . $slug . '.md';
+		$slug   = sanitize_title( $request['context_slug'] );
+		$memory = self::context_memory( $request, $slug );
+		$read   = $memory->read();
 
-		if ( ! file_exists( $filepath ) ) {
+		if ( ! $read->exists ) {
 			return new WP_Error( 'not_found', "Context file '{$slug}.md' not found.", array( 'status' => 404 ) );
-		}
-
-		global $wp_filesystem;
-		if ( ! $wp_filesystem ) {
-			require_once ABSPATH . 'wp-admin/includes/file.php';
-			\WP_Filesystem();
 		}
 
 		return rest_ensure_response( array(
@@ -631,9 +653,9 @@ class AgentFiles {
 			'data'    => array(
 				'slug'     => $slug,
 				'filename' => $slug . '.md',
-				'content'  => $wp_filesystem->get_contents( $filepath ),
-				'size'     => filesize( $filepath ),
-				'modified' => gmdate( 'c', filemtime( $filepath ) ),
+				'content'  => $read->content,
+				'size'     => $read->bytes,
+				'modified' => null !== $read->updated_at ? gmdate( 'c', $read->updated_at ) : '',
 			),
 		) );
 	}
@@ -642,31 +664,21 @@ class AgentFiles {
 	 * Create or update a context memory file.
 	 */
 	public static function put_context_file( WP_REST_Request $request ) {
-		$dir  = self::resolve_contexts_dir( $request );
-		$slug = sanitize_title( $request['context_slug'] );
-
-		// Ensure the contexts directory exists.
-		$dm = new \DataMachine\Core\FilesRepository\DirectoryManager();
-		if ( ! $dm->ensure_directory_exists( $dir ) ) {
-			return new WP_Error( 'create_dir_failed', 'Failed to create contexts directory.', array( 'status' => 500 ) );
-		}
-
+		$slug    = sanitize_title( $request['context_slug'] );
 		$content = $request->get_param( 'content' );
 		if ( null === $content ) {
 			$content = $request->get_body();
 		}
 
-		global $wp_filesystem;
-		if ( ! $wp_filesystem ) {
-			require_once ABSPATH . 'wp-admin/includes/file.php';
-			\WP_Filesystem();
-		}
+		$memory = self::context_memory( $request, $slug );
+		$result = $memory->replace_all( (string) $content );
 
-		$filepath = trailingslashit( $dir ) . $slug . '.md';
-		$written  = $wp_filesystem->put_contents( $filepath, $content, FS_CHMOD_FILE );
-
-		if ( ! $written ) {
-			return new WP_Error( 'write_failed', "Failed to write context file '{$slug}.md'.", array( 'status' => 500 ) );
+		if ( empty( $result['success'] ) ) {
+			return new WP_Error(
+				'write_failed',
+				$result['message'] ?? "Failed to write context file '{$slug}.md'.",
+				array( 'status' => 500 )
+			);
 		}
 
 		return rest_ensure_response( array(
@@ -680,22 +692,21 @@ class AgentFiles {
 	 * Delete a context memory file.
 	 */
 	public static function delete_context_file( WP_REST_Request $request ) {
-		$dir      = self::resolve_contexts_dir( $request );
-		$slug     = sanitize_title( $request['context_slug'] );
-		$filepath = trailingslashit( $dir ) . $slug . '.md';
+		$slug   = sanitize_title( $request['context_slug'] );
+		$memory = self::context_memory( $request, $slug );
 
-		if ( ! file_exists( $filepath ) ) {
+		if ( ! $memory->exists() ) {
 			return new WP_Error( 'not_found', "Context file '{$slug}.md' not found.", array( 'status' => 404 ) );
 		}
 
-		global $wp_filesystem;
-		if ( ! $wp_filesystem ) {
-			require_once ABSPATH . 'wp-admin/includes/file.php';
-			\WP_Filesystem();
-		}
+		$result = $memory->delete();
 
-		if ( ! $wp_filesystem->delete( $filepath ) ) {
-			return new WP_Error( 'delete_failed', "Failed to delete context file '{$slug}.md'.", array( 'status' => 500 ) );
+		if ( empty( $result['success'] ) ) {
+			return new WP_Error(
+				'delete_failed',
+				$result['message'] ?? "Failed to delete context file '{$slug}.md'.",
+				array( 'status' => 500 )
+			);
 		}
 
 		return rest_ensure_response( array(

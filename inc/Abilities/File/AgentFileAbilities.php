@@ -356,31 +356,34 @@ class AgentFileAbilities {
 			}
 		}
 
-		// Include context memory files.
-		$agent_context = array(
-			'agent_id' => (int) ( $input['agent_id'] ?? 0 ),
-			'user_id'  => $user_id,
+		// Include context memory files (contexts/*.md inside the agent layer).
+		// Goes through the store seam so this works on any backend.
+		$context_entries = AgentMemory::list_subtree(
+			MemoryFileRegistry::LAYER_AGENT,
+			$user_id,
+			(int) ( $input['agent_id'] ?? 0 ),
+			'contexts'
 		);
-		$contexts_dir  = $dm->get_contexts_directory( $agent_context );
 
-		if ( is_dir( $contexts_dir ) ) {
-			foreach ( glob( trailingslashit( $contexts_dir ) . '*.md' ) as $filepath ) {
-				$filename = basename( $filepath );
-				$slug     = pathinfo( $filename, PATHINFO_FILENAME );
-				$files[]  = array(
-					'filename'     => $filename,
-					'size'         => filesize( $filepath ),
-					'modified'     => gmdate( 'c', filemtime( $filepath ) ),
-					'type'         => 'context',
-					'layer'        => 'context',
-					'protected'    => false,
-					'editable'     => true,
-					'registered'   => false,
-					'label'        => ucfirst( $slug ) . ' Context',
-					'description'  => "Context-scoped instructions loaded when execution context is '{$slug}'.",
-					'context_slug' => $slug,
-				);
+		foreach ( $context_entries as $entry ) {
+			$basename = basename( $entry->filename );
+			if ( '.md' !== substr( $basename, -3 ) ) {
+				continue;
 			}
+			$slug    = substr( $basename, 0, -3 );
+			$files[] = array(
+				'filename'     => $basename,
+				'size'         => $entry->bytes,
+				'modified'     => null !== $entry->updated_at ? gmdate( 'c', $entry->updated_at ) : '',
+				'type'         => 'context',
+				'layer'        => 'context',
+				'protected'    => false,
+				'editable'     => true,
+				'registered'   => false,
+				'label'        => ucfirst( $slug ) . ' Context',
+				'description'  => "Context-scoped instructions loaded when execution context is '{$slug}'.",
+				'context_slug' => $slug,
+			);
 		}
 
 		// Include daily memory summary.
