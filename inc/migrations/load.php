@@ -21,3 +21,4 @@ require_once __DIR__ . '/backfill.php';
 require_once __DIR__ . '/network-scope.php';
 require_once __DIR__ . '/composable-files.php';
 require_once __DIR__ . '/flows.php';
+require_once __DIR__ . '/post-pipeline-meta.php';

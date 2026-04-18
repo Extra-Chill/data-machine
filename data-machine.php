@@ -600,6 +600,9 @@ function datamachine_activate_for_site() {
 	// Migrate agent_ping step types to flow configs (idempotent).
 	datamachine_migrate_agent_ping_to_system_task();
 
+	// Drop redundant _datamachine_post_pipeline_id rows (#1091). Idempotent.
+	datamachine_drop_redundant_post_pipeline_meta();
+
 	// Regenerate SITE.md with enriched content and clean up legacy SiteContext transient.
 	datamachine_regenerate_site_md();
 	delete_transient( 'datamachine_site_context_data' );
