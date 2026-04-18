@@ -155,6 +155,62 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 		return $entries;
 	}
 
+	/**
+	 * @inheritDoc
+	 *
+	 * Walks the filesystem recursively under `{layer_dir}/{prefix}/`.
+	 * Returned filenames are relative paths from the layer root,
+	 * including the prefix (e.g. `daily/2026/04/17.md`).
+	 */
+	public function list_subtree( AgentMemoryScope $scope_query, string $prefix ): array {
+		$prefix = trim( $prefix, '/' );
+		if ( '' === $prefix ) {
+			return array();
+		}
+
+		$layer_dir   = $this->resolve_layer_directory( $scope_query );
+		$subtree_dir = $layer_dir . '/' . $prefix;
+
+		if ( ! is_dir( $subtree_dir ) ) {
+			return array();
+		}
+
+		$entries  = array();
+		$iterator = new \RecursiveIteratorIterator(
+			new \RecursiveDirectoryIterator( $subtree_dir, \FilesystemIterator::SKIP_DOTS )
+		);
+
+		foreach ( $iterator as $file_info ) {
+			if ( ! $file_info->isFile() ) {
+				continue;
+			}
+
+			$path = $file_info->getPathname();
+			if ( 'index.php' === basename( $path ) ) {
+				continue;
+			}
+
+			// Compute filename relative to the layer root (with prefix).
+			$relative = ltrim( substr( $path, strlen( $layer_dir ) ), '/' );
+
+			$mtime     = $file_info->getMTime();
+			$entries[] = new AgentMemoryListEntry(
+				$relative,
+				$scope_query->layer,
+				(int) $file_info->getSize(),
+				false === $mtime ? null : (int) $mtime,
+			);
+		}
+
+		// Stable ordering — callers can rely on filename-sorted output.
+		usort(
+			$entries,
+			static fn( $a, $b ) => strcmp( $a->filename, $b->filename )
+		);
+
+		return $entries;
+	}
+
 	// =========================================================================
 	// Internal path resolution
 	// =========================================================================

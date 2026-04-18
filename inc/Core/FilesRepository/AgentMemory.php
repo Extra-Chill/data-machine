@@ -226,6 +226,34 @@ class AgentMemory {
 	}
 
 	/**
+	 * List all files under a path prefix within a layer.
+	 *
+	 * Static facade over {@see AgentMemoryStoreInterface::list_subtree()}.
+	 * Recursive — entries' filenames are full relative paths from the
+	 * layer root (e.g. `daily/2026/04/17.md`, `contexts/chat.md`).
+	 *
+	 * Used for path-namespaced file families that don't fit the
+	 * top-level layer model: daily memory under `daily/YYYY/MM/`, context
+	 * files under `contexts/`, future plugin-added subtrees.
+	 *
+	 * @since next
+	 *
+	 * @param string $layer    Layer identifier (shared|agent|user|network).
+	 * @param int    $user_id  WordPress user ID. 0 = default agent.
+	 * @param int    $agent_id Agent ID for direct resolution. 0 = resolve from user_id.
+	 * @param string $prefix   Path prefix without trailing slash (e.g. 'daily', 'contexts').
+	 * @return AgentMemoryListEntry[]
+	 */
+	public static function list_subtree( string $layer, int $user_id, int $agent_id, string $prefix ): array {
+		$dm                = new DirectoryManager();
+		$effective_user_id = $dm->get_effective_user_id( $user_id );
+		$scope_query       = new AgentMemoryScope( $layer, $effective_user_id, $agent_id, '' );
+		$store             = AgentMemoryStoreFactory::for_scope( $scope_query );
+
+		return $store->list_subtree( $scope_query, $prefix );
+	}
+
+	/**
 	 * List all section headers in the file.
 	 *
 	 * Sections are defined by markdown ## headers.

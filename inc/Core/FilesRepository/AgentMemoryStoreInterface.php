@@ -76,14 +76,38 @@ interface AgentMemoryStoreInterface {
 	public function delete( AgentMemoryScope $scope ): AgentMemoryWriteResult;
 
 	/**
-	 * List all files in a single layer for the given identity.
+	 * List all top-level files in a single layer for the given identity.
 	 *
 	 * The $scope_query's `filename` field is ignored — list operations
 	 * return all files matching `(layer, user_id, agent_id)`. The
 	 * `layer` field is required.
 	 *
+	 * Top-level only: subdirectories under the layer (e.g. `daily/`,
+	 * `contexts/`) are NOT recursed into. Use {@see self::list_subtree()}
+	 * to enumerate those.
+	 *
 	 * @param AgentMemoryScope $scope_query Layer + identity to enumerate.
 	 * @return AgentMemoryListEntry[]
 	 */
 	public function list_layer( AgentMemoryScope $scope_query ): array;
+
+	/**
+	 * List all files under a path prefix within a layer.
+	 *
+	 * Recursive — descends into all subdirectories beneath the prefix.
+	 * Filenames in the returned entries include the full relative path
+	 * (e.g. when listing prefix `daily`, an entry's `filename` is
+	 * `daily/2026/04/17.md`, not `2026/04/17.md`).
+	 *
+	 * Used for path-namespaced file families like daily memory
+	 * (`daily/YYYY/MM/DD.md`) and context files (`contexts/<slug>.md`).
+	 *
+	 * @since next
+	 *
+	 * @param AgentMemoryScope $scope_query Layer + identity. `filename` is ignored.
+	 * @param string           $prefix      Path prefix without trailing slash
+	 *                                      (e.g. 'daily', 'contexts'). Required.
+	 * @return AgentMemoryListEntry[]
+	 */
+	public function list_subtree( AgentMemoryScope $scope_query, string $prefix ): array;
 }
