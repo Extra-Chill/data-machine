@@ -236,6 +236,28 @@ This mirrors the provider pattern used by the bundled AI HTTP Client: providers 
 
 See [`docs/core-system/ai-conversation-loop.md`](docs/core-system/ai-conversation-loop.md#runtime-adapters) for the full adapter contract and return-shape reference.
 
+## Memory Storage Adapters
+
+Agent memory files (MEMORY.md, SOUL.md, USER.md, NETWORK.md, AGENTS.md, plus any custom files registered through `MemoryFileRegistry`) persist on the local filesystem by default. The persistence layer is swappable through a single filter (`datamachine_memory_store`), enabling DB-backed implementations on managed hosts that don't expose a writable filesystem.
+
+```php
+add_filter(
+    'datamachine_memory_store',
+    function ( $store, $scope ) {
+        // Return an AgentMemoryStoreInterface to replace the disk default
+        // for this scope, or null to let Data Machine read/write through
+        // the filesystem.
+        return new My_DB_Agent_Memory_Store();
+    },
+    10,
+    2
+);
+```
+
+Section parsing, scaffolding, and editability gating stay in Data Machine; the store is just the bytes layer underneath. All consumer paths — section reads/writes (`AgentMemory`), the React Agent UI (`AgentFileAbilities`), and AI context injection (`CoreMemoryFilesDirective`) — flow through the same store, so a single swap makes the entire memory surface backend-agnostic.
+
+See [`docs/development/hooks/core-filters.md`](docs/development/hooks/core-filters.md#agentmemorystoreinterface-inccorefilesrepositoryagentmemorystoreinterfacephp) for the full interface contract.
+
 ## Requirements
 
 - WordPress 6.9+ (Abilities API)

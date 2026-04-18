@@ -945,6 +945,62 @@ for the full adapter contract.
 - Maximum turn limiting (default: 25)
 - Runtime-swappable via `datamachine_conversation_runner`
 
+### AgentMemoryStoreInterface (`/inc/Core/FilesRepository/AgentMemoryStoreInterface.php`)
+
+**Purpose**: Single seam between agent memory operations and the underlying
+persistence backend. The disk default ([`DiskAgentMemoryStore`](../../../inc/Core/FilesRepository/DiskAgentMemoryStore.php))
+preserves byte-for-byte the filesystem behavior the codebase used before this
+seam was introduced.
+
+**Filter: `datamachine_memory_store`**
+
+```php
+apply_filters(
+    'datamachine_memory_store',
+    null,                       // Return AgentMemoryStoreInterface to short-circuit
+    AgentMemoryScope $scope     // Identifies (layer, user_id, agent_id, filename)
+);
+```
+
+Return an [`AgentMemoryStoreInterface`](../../../inc/Core/FilesRepository/AgentMemoryStoreInterface.php)
+implementation to replace the disk default for this scope. Return `null` (the
+default) to let Data Machine read and write through the filesystem.
+
+**Use case**: managed-host environments where the local filesystem is not
+writable (e.g. WordPress.com, VIP). A consumer plugin (e.g. Intelligence)
+ships a DB-backed implementation and registers it conditionally:
+
+```php
+add_filter( 'datamachine_memory_store', function ( $store, $scope ) {
+    if ( $store instanceof AgentMemoryStoreInterface ) {
+        return $store;  // someone else already swapped
+    }
+    if ( filesystem_is_writable_here() ) {
+        return $store;  // disk default wins
+    }
+    return new \My_Plugin\DB_Agent_Memory_Store();
+}, 10, 2 );
+```
+
+**Contract**:
+- `read( $scope )` → `AgentMemoryReadResult { exists, content, hash, bytes, updated_at }`
+- `write( $scope, $content, $if_match = null )` → `AgentMemoryWriteResult`
+  (implementations supporting concurrency MUST honor `$if_match` and return
+  `error = 'conflict'` on hash mismatch)
+- `exists( $scope )` → `bool`
+- `delete( $scope )` → `AgentMemoryWriteResult` (idempotent)
+- `list_layer( $scope_query )` → `AgentMemoryListEntry[]` (enumerates one layer)
+
+Section parsing, scaffolding, editability gating, and registry-driven
+convention-path semantics stay in the higher-level callers (`AgentMemory`,
+`AgentFileAbilities`, `MemoryFileRegistry`). The store is the dumb
+persistence layer underneath.
+
+**Consumers** (all whole-file IO routes through the store):
+- `\DataMachine\Core\FilesRepository\AgentMemory` — section ops on MEMORY.md / SOUL.md / USER.md / NETWORK.md
+- `\DataMachine\Abilities\File\AgentFileAbilities` — whole-file ops backing the `/datamachine/v1/files/agent` REST routes (the React Agent UI)
+- `\DataMachine\Engine\AI\Directives\CoreMemoryFilesDirective` — file content injected into every AI conversation
+
 ### ConversationManager (`/inc/Engine/AI/ConversationManager.php`)
 
 **Purpose**: Message formatting utilities for AI requests.
