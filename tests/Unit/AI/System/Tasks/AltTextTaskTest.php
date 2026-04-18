@@ -23,6 +23,14 @@ class AltTextTaskTest extends WP_UnitTestCase {
 		parent::set_up();
 		$this->task = new AltTextTask();
 
+		// The bundled ai-http-client vendor registers its own \`chubes_ai_request\`
+		// filter at priority 99 that ignores the \$request payload and always
+		// attempts a real provider call (returning an error when no API key is
+		// configured, as in the test environment). That overrides any lower-
+		// priority mock we register, so we clear the hook before each test and
+		// let each test register its own mock in isolation.
+		remove_all_filters( 'chubes_ai_request' );
+
 		// Create a test image file
 		$upload_dir = wp_upload_dir();
 		$this->test_image_path = $upload_dir['path'] . '/test-image.jpg';
