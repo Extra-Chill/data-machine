@@ -32,10 +32,35 @@ class PostQueryAbilities {
 				'meta_key'   => PostTracking::FLOW_ID_META_KEY,
 				'value_type' => 'integer',
 			),
+			// Pipeline filters resolve to a flow_id IN (...) clause rather
+			// than a direct meta match, because pipeline_id is no longer
+			// stored on posts (#1091). See build_pipeline_meta_query().
 			'pipeline' => array(
-				'meta_key'   => PostTracking::PIPELINE_ID_META_KEY,
+				'meta_key'   => PostTracking::FLOW_ID_META_KEY,
 				'value_type' => 'integer',
+				'resolver'   => 'pipeline',
 			),
+		);
+	}
+
+	/**
+	 * Build a meta_query clause that matches posts whose flow_id belongs
+	 * to the given pipeline. Returns null when the pipeline has no flows,
+	 * which should force the outer query to return no results.
+	 *
+	 * @param int $pipeline_id Pipeline ID to filter by.
+	 * @return array|null meta_query clause, or null if pipeline has no flows.
+	 */
+	private static function build_pipeline_meta_query( int $pipeline_id ): ?array {
+		$flow_ids = PostTracking::getFlowIdsForPipeline( $pipeline_id );
+		if ( empty( $flow_ids ) ) {
+			return null;
+		}
+
+		return array(
+			'key'     => PostTracking::FLOW_ID_META_KEY,
+			'value'   => $flow_ids,
+			'compare' => 'IN',
 		);
 	}
 
@@ -336,11 +361,17 @@ class PostQueryAbilities {
 		}
 
 		if ( $pipeline_id > 0 ) {
-			$meta_query[] = array(
-				'key'     => PostTracking::PIPELINE_ID_META_KEY,
-				'value'   => $pipeline_id,
-				'compare' => '=',
-			);
+			$pipeline_clause = self::build_pipeline_meta_query( $pipeline_id );
+			if ( null === $pipeline_clause ) {
+				// Pipeline has no flows, so no posts can match it.
+				return array(
+					'posts'    => array(),
+					'total'    => 0,
+					'per_page' => $per_page,
+					'offset'   => $offset,
+				);
+			}
+			$meta_query[] = $pipeline_clause;
 		}
 
 		// If no filters provided, require at least the handler meta key to exist
@@ -402,6 +433,7 @@ class PostQueryAbilities {
 		$filter_config = $filter_types[ $filter_by ];
 		$meta_key      = $filter_config['meta_key'];
 		$value_type    = $filter_config['value_type'];
+		$resolver      = $filter_config['resolver'] ?? null;
 
 		if ( 'string' === $value_type ) {
 			$filter_value = sanitize_text_field( $filter_value );
@@ -423,6 +455,26 @@ class PostQueryAbilities {
 			}
 		}
 
+		if ( 'pipeline' === $resolver ) {
+			$pipeline_clause = self::build_pipeline_meta_query( (int) $filter_value );
+			if ( null === $pipeline_clause ) {
+				// Pipeline has no flows, so no posts can match it.
+				return array(
+					'posts'    => array(),
+					'total'    => 0,
+					'per_page' => $per_page,
+					'offset'   => $offset,
+				);
+			}
+			$meta_clause = $pipeline_clause;
+		} else {
+			$meta_clause = array(
+				'key'     => $meta_key,
+				'value'   => $filter_value,
+				'compare' => '=',
+			);
+		}
+
 		$args = array(
 			'post_type'      => $post_type,
 			'post_status'    => $post_status,
@@ -430,13 +482,7 @@ class PostQueryAbilities {
 			'offset'         => $offset,
 			'orderby'        => 'date',
 			'order'          => 'DESC',
-			'meta_query'     => array(
-				array(
-					'key'     => $meta_key,
-					'value'   => $filter_value,
-					'compare' => '=',
-				),
-			),
+			'meta_query'     => array( $meta_clause ),
 		);
 
 		$query = new \WP_Query( $args );
@@ -484,7 +530,7 @@ class PostQueryAbilities {
 			'post_modified' => $post->post_modified,
 			'handler_slug'  => get_post_meta( $post->ID, PostTracking::HANDLER_META_KEY, true ),
 			'flow_id'       => (int) get_post_meta( $post->ID, PostTracking::FLOW_ID_META_KEY, true ),
-			'pipeline_id'   => (int) get_post_meta( $post->ID, PostTracking::PIPELINE_ID_META_KEY, true ),
+			'pipeline_id'   => PostTracking::getPipelineIdForPost( $post->ID ),
 			'post_url'      => get_permalink( $post->ID ),
 		);
 	}
