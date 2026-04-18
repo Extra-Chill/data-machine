@@ -2,19 +2,24 @@
 /**
  * Data Machine Post Tracking
  *
- * Automatic post origin tracking for all Data Machine handlers.
- * Stores handler_slug, flow_id, and pipeline_id as post meta on every
- * post created or updated by a handler tool call.
+ * Automatic post origin tracking for every tool invocation that produces
+ * a post. Stores handler_slug, flow_id, and pipeline_id as post meta.
  *
- * Tracking is handled automatically by the base handler classes
- * (UpdateHandler, PublishHandler) after executeUpdate/executePublish
- * returns a successful result containing a post_id. Individual handlers
- * do not need to call any tracking methods.
+ * Tracking is invoked centrally in ToolExecutor::executeTool() after
+ * every successful tool call whose result carries an extractable post_id,
+ * covering both handler tools (PublishHandler / UpdateHandler subclasses)
+ * and ability tools (PublishWordPressAbility, InsertContentAbility,
+ * EditPostBlocksAbility, ReplacePostBlocksAbility, third-party abilities
+ * registered as pipeline tools). Individual handlers and abilities do
+ * not call any tracking methods themselves.
  *
  * @package DataMachine\Core\WordPress
  * @since 0.12.0
- * @since 0.32.0 Refactored from trait to static utility. Tracking is now
+ * @since 0.32.0 Refactored from trait to static utility. Tracking is
  *               automatic in base handler handle_tool_call() methods.
+ * @since 0.69.0 Tracking moved to ToolExecutor::executeTool() so ability
+ *               tools receive the same origin meta as handler tools
+ *               (#1084).
  */
 
 namespace DataMachine\Core\WordPress;
