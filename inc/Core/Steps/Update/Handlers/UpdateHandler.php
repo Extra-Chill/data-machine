@@ -12,7 +12,6 @@
 namespace DataMachine\Core\Steps\Update\Handlers;
 
 use DataMachine\Core\EngineData;
-use DataMachine\Core\WordPress\PostTracking;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -83,13 +82,10 @@ abstract class UpdateHandler {
 		$handler_config = $tool_def['handler_config'] ?? array();
 		$result         = $this->executeUpdate( $parameters, $handler_config );
 
-		// Automatic post tracking — write origin metadata on successful results
-		if ( ! empty( $result['success'] ) ) {
-			$post_id = PostTracking::extractPostId( $result );
-			if ( $post_id > 0 ) {
-				PostTracking::store( $post_id, $tool_def, $job_id );
-			}
-		}
+		// Post origin tracking is applied centrally in ToolExecutor::executeTool()
+		// after every tool call — handler tools and ability tools share the same
+		// path now, so individual base classes no longer need to call
+		// PostTracking::store() themselves.
 
 		return $result;
 	}

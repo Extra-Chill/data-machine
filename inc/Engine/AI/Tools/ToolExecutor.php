@@ -11,6 +11,8 @@
 
 namespace DataMachine\Engine\AI\Tools;
 
+use DataMachine\Core\WordPress\PostTracking;
+
 defined('ABSPATH') || exit;
 
 class ToolExecutor {
@@ -113,6 +115,22 @@ class ToolExecutor {
 
 		$tool_handler = new $class_name();
 		$tool_result  = $tool_handler->$method($complete_parameters, $tool_def);
+
+		// Automatic post origin tracking — applies to every tool whose result
+		// contains an extractable post_id. This covers both handler tools
+		// (Publish/Update base classes) and ability tools that create or
+		// modify posts (PublishWordPressAbility, InsertContentAbility, wiki
+		// create/update, third-party abilities, etc.). update_post_meta() is
+		// idempotent, so callers that already stamped tracking themselves
+		// (e.g. legacy handler base classes before this was centralized) are
+		// safe to run through this path without double-writes.
+		if ( ! empty( $tool_result['success'] ) ) {
+			$post_id = PostTracking::extractPostId( $tool_result );
+			if ( $post_id > 0 ) {
+				$job_id = (int) ( $payload['job_id'] ?? 0 );
+				PostTracking::store( $post_id, $tool_def, $job_id );
+			}
+		}
 
 		return $tool_result;
 	}
