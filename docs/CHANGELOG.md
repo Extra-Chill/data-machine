@@ -2,6 +2,29 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.69.0] - 2026-04-17
+
+### Added
+- introduce AgentMemoryStoreInterface + datamachine_memory_store filter
+- add post_parent support to wordpress_publish ability
+
+### Changed
+- consolidate file consumers behind AgentMemory facade
+- apply phpcbf auto-fixes across 57 files
+- Scope SOUL.md and MEMORY.md to interactive contexts only
+- Remove Rules and Context from SOUL.md template, remove ghost content guidelines from RULES.md
+- Add datamachine_conversation_runner filter for runtime adapters
+- Remove 'All Agents' option from AgentSwitcher dropdown
+
+### Fixed
+- centralize post origin tracking across all tool executions
+- establish agent execution context in pipeline AI steps
+- Fix WP-CLI writes to cap-gated memory files when no user context
+- remove agent status field — dead weight with no practical enforcement
+- resolve 4 lint/audit findings across data-machine
+- restore datamachine/pagespeed ability name
+- Fix ability category slug format — use dashes instead of slashes
+
 ## [0.68.0] - 2026-04-15
 
 ### Added
