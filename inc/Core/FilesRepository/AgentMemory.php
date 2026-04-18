@@ -55,18 +55,21 @@ class AgentMemory {
 	 * @since 0.41.0 Added $agent_id parameter for agent-first resolution.
 	 * @since 0.45.0 Added $filename parameter for any-file support.
 	 * @since next   Switched whole-file IO to AgentMemoryStoreInterface.
+	 * @since next   Optional $layer override for explicit-layer addressing.
 	 *
-	 * @param int    $user_id  WordPress user ID. 0 = legacy shared directory.
-	 * @param int    $agent_id Agent ID for direct resolution. 0 = resolve from user_id.
-	 * @param string $filename Target filename. Defaults to MEMORY.md for backwards compatibility.
+	 * @param int         $user_id  WordPress user ID. 0 = legacy shared directory.
+	 * @param int         $agent_id Agent ID for direct resolution. 0 = resolve from user_id.
+	 * @param string      $filename Target filename. Defaults to MEMORY.md for backwards compatibility.
+	 * @param string|null $layer    Optional explicit layer. When null, resolved from the registry
+	 *                              (agent layer for unregistered files).
 	 */
-	public function __construct( int $user_id = 0, int $agent_id = 0, string $filename = 'MEMORY.md' ) {
+	public function __construct( int $user_id = 0, int $agent_id = 0, string $filename = 'MEMORY.md', ?string $layer = null ) {
 		$this->directory_manager = new DirectoryManager();
 		$effective_user_id       = $this->directory_manager->get_effective_user_id( $user_id );
 		$safe_filename           = $this->sanitize_filename( $filename );
 
 		$this->scope = new AgentMemoryScope(
-			$this->resolve_layer( $safe_filename ),
+			$layer ?? self::resolve_layer_for( $safe_filename ),
 			$effective_user_id,
 			$agent_id,
 			$safe_filename
@@ -78,10 +81,12 @@ class AgentMemory {
 	}
 
 	/**
-	 * Resolve which layer this filename belongs to via the registry,
+	 * Resolve which layer a filename belongs to via the registry,
 	 * defaulting to the agent layer for unregistered files.
+	 *
+	 * @since next  Static so other consumers can reuse the resolution.
 	 */
-	private function resolve_layer( string $filename ): string {
+	public static function resolve_layer_for( string $filename ): string {
 		$registered = MemoryFileRegistry::get_layer( $filename );
 		return $registered ?? MemoryFileRegistry::LAYER_AGENT;
 	}
@@ -144,6 +149,80 @@ class AgentMemory {
 			'file'    => $this->scope->filename,
 			'content' => $result->content,
 		);
+	}
+
+	/**
+	 * Low-level read returning the raw store result.
+	 *
+	 * Exposes the underlying {@see AgentMemoryReadResult} (content, hash,
+	 * bytes, updated_at, exists) for consumers that need richer metadata
+	 * than {@see self::get_all()}'s human-shaped response — e.g. directives
+	 * that want byte counts for size budgeting, the React UI's whole-file
+	 * GET that needs modified-at, or anything that wants the content hash
+	 * for compare-and-swap upstream.
+	 *
+	 * @since next
+	 * @return AgentMemoryReadResult
+	 */
+	public function read(): AgentMemoryReadResult {
+		return $this->store->read( $this->scope );
+	}
+
+	/**
+	 * Whether the underlying file exists in the store.
+	 *
+	 * @since next
+	 * @return bool
+	 */
+	public function exists(): bool {
+		return $this->store->exists( $this->scope );
+	}
+
+	/**
+	 * Delete this file from the store. Idempotent — deleting a missing
+	 * file returns success.
+	 *
+	 * @since next
+	 * @return array{success: bool, message: string}
+	 */
+	public function delete(): array {
+		$result = $this->store->delete( $this->scope );
+
+		if ( ! $result->success ) {
+			return array(
+				'success' => false,
+				'message' => sprintf( 'Failed to delete %s (%s).', $this->scope->filename, $result->error ?? 'unknown' ),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'message' => sprintf( '%s deleted.', $this->scope->filename ),
+		);
+	}
+
+	/**
+	 * List all files in a single layer for the given identity.
+	 *
+	 * Static facade over {@see AgentMemoryStoreInterface::list_layer()}
+	 * so directory enumeration goes through the same swap point as
+	 * single-file IO. Callers receive a list of {@see AgentMemoryListEntry}
+	 * value objects.
+	 *
+	 * @since next
+	 *
+	 * @param string $layer    Layer identifier (shared|agent|user|network).
+	 * @param int    $user_id  WordPress user ID. 0 = default agent.
+	 * @param int    $agent_id Agent ID for direct resolution. 0 = resolve from user_id.
+	 * @return AgentMemoryListEntry[]
+	 */
+	public static function list_layer( string $layer, int $user_id = 0, int $agent_id = 0 ): array {
+		$dm                = new DirectoryManager();
+		$effective_user_id = $dm->get_effective_user_id( $user_id );
+		$scope_query       = new AgentMemoryScope( $layer, $effective_user_id, $agent_id, '' );
+		$store             = AgentMemoryStoreFactory::for_scope( $scope_query );
+
+		return $store->list_layer( $scope_query );
 	}
 
 	/**

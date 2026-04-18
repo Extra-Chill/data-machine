@@ -26,8 +26,6 @@
 namespace DataMachine\Engine\AI\Directives;
 
 use DataMachine\Core\FilesRepository\AgentMemory;
-use DataMachine\Core\FilesRepository\AgentMemoryScope;
-use DataMachine\Core\FilesRepository\AgentMemoryStoreFactory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Engine\AI\MemoryFileRegistry;
 
@@ -70,10 +68,9 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 			: MemoryFileRegistry::get_all();
 
 		foreach ( $context_files as $filename => $meta ) {
-			$layer = $meta['layer'] ?? MemoryFileRegistry::LAYER_AGENT;
-			$scope = new AgentMemoryScope( $layer, $user_id, $agent_id, $filename );
-			$store = AgentMemoryStoreFactory::for_scope( $scope );
-			$read  = $store->read( $scope );
+			$layer  = $meta['layer'] ?? MemoryFileRegistry::LAYER_AGENT;
+			$memory = new AgentMemory( $user_id, $agent_id, $filename, $layer );
+			$read   = $memory->read();
 
 			if ( ! $read->exists ) {
 				continue;
@@ -94,17 +91,12 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 		// context slug comes from the payload, which the PromptBuilder
 		// passes through from the execution context ('chat', 'pipeline',
 		// 'system', etc.). Filename is a relative path inside the agent
-		// layer so the store handles it like any other agent-scoped file.
+		// layer so the AgentMemory facade handles it like any other
+		// agent-scoped file.
 		if ( ! empty( $context ) ) {
 			$context_filename = 'contexts/' . sanitize_file_name( $context ) . '.md';
-			$context_scope    = new AgentMemoryScope(
-				MemoryFileRegistry::LAYER_AGENT,
-				$user_id,
-				$agent_id,
-				$context_filename
-			);
-			$context_store    = AgentMemoryStoreFactory::for_scope( $context_scope );
-			$context_read     = $context_store->read( $context_scope );
+			$context_memory   = new AgentMemory( $user_id, $agent_id, $context_filename, MemoryFileRegistry::LAYER_AGENT );
+			$context_read     = $context_memory->read();
 
 			if ( $context_read->exists ) {
 				$content = self::normalize_for_injection( $context_read->content, $context_read->bytes, $context_filename );
