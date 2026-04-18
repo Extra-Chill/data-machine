@@ -68,7 +68,13 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	public function test_chat_does_not_require_use_tools_cap_by_default(): void {
-		add_filter( 'user_has_cap', array( $this, 'deny_all_datamachine_caps' ), 10, 4 );
+		// The semantic being tested: a subscriber who lacks datamachine_use_tools
+		// but retains the baseline datamachine_chat cap should still see tools
+		// whose access_level is 'authenticated'. The legacy all-or-nothing gate
+		// (which required use_tools for ANY chat tool) is disabled by default
+		// and is only restored via the datamachine_require_use_tools_for_chat_tools
+		// filter. Only the use_tools cap is stripped here — chat remains.
+		add_filter( 'user_has_cap', array( $this, 'deny_use_tools_cap' ), 10, 4 );
 
 		add_filter( 'datamachine_tools', function ( $tools ) {
 			$tools['test_authenticated_tool'] = array(
@@ -95,7 +101,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$this->assertArrayHasKey( 'test_authenticated_tool', $tools );
 
-		remove_filter( 'user_has_cap', array( $this, 'deny_all_datamachine_caps' ), 10 );
+		remove_filter( 'user_has_cap', array( $this, 'deny_use_tools_cap' ), 10 );
 		remove_all_filters( 'datamachine_tools' );
 		wp_set_current_user( 0 );
 		ToolManager::clearCache();
@@ -517,6 +523,17 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 			}
 		}
 
+		return $allcaps;
+	}
+
+	/**
+	 * Deny only the datamachine_use_tools cap, leaving other datamachine
+	 * caps (chat, view_logs, etc.) intact. Used to test that the default
+	 * chat tool resolution path no longer gates on use_tools.
+	 */
+	public function deny_use_tools_cap( array $allcaps, array $caps, array $args, $user ): array {
+		unset( $caps, $args, $user );
+		$allcaps['datamachine_use_tools'] = false;
 		return $allcaps;
 	}
 
