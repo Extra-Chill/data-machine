@@ -208,7 +208,7 @@ class Agents extends BaseRepository {
 	 * @return bool True on success, false on DB failure or no valid fields.
 	 */
 	public function update_agent( int $agent_id, array $data ): bool {
-		$allowed = array( 'agent_name', 'agent_config' );
+		$allowed = array( 'agent_name', 'agent_config', 'status' );
 		$update  = array();
 		$formats = array();
 
