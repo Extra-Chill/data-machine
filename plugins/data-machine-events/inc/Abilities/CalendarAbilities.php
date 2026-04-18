@@ -275,6 +275,7 @@ class CalendarAbilities {
 			'tax_filters' => $query_params['tax_filters'],
 			'search'      => $query_params['search_query'],
 			'order'       => $query_params['show_past'] ? 'DESC' : 'ASC',
+			'per_page'    => 500, // Safety cap — prevents loading 17K+ posts when date boundaries are empty.
 		);
 
 		// Date range overrides scope.

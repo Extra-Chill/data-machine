@@ -43,6 +43,7 @@ class Calendar {
 				'geo_radius_unit'  => $request->get_param( 'radius_unit' ) ?? 'mi',
 				'include_html'     => true,
 				'include_gaps'     => true,
+				'progressive'      => true,
 			)
 		);
 
