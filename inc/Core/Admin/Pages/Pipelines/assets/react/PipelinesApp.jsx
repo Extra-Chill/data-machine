@@ -14,7 +14,11 @@ import { Spinner, Notice, Button } from '@wordpress/components';
 /**
  * Internal dependencies
  */
-import { usePipelines, useCreatePipeline } from './queries/pipelines';
+import {
+	usePipelines,
+	usePipeline,
+	useCreatePipeline,
+} from './queries/pipelines';
 import { useFlows } from './queries/flows';
 /**
  * External dependencies
@@ -80,18 +84,35 @@ export default function PipelinesApp() {
 			setSelectedPipelineId( pipelineId );
 		},
 	} );
-	// Find selected pipeline from pipelines array
-	const selectedPipeline = pipelines?.find( ( p ) =>
+
+	// Resolve the selected pipeline: prefer the list cache, fall back to a
+	// single-pipeline fetch so the admin page works even when the selection
+	// isn't in the current selector search results (or the list is paginated).
+	const selectedFromList = pipelines?.find( ( p ) =>
 		isSameId( p.pipeline_id, selectedPipelineId )
 	);
-	const selectedPipelineLoading = false; // No separate loading for selected pipeline
-	const selectedPipelineError = null; // No separate error for selected pipeline
+	const {
+		data: fetchedSelectedPipeline,
+		isLoading: fetchedSelectedLoading,
+		error: fetchedSelectedError,
+	} = usePipeline(
+		selectedPipelineId && ! selectedFromList ? selectedPipelineId : null
+	);
+	const selectedPipeline = selectedFromList || fetchedSelectedPipeline;
+	const selectedPipelineLoading =
+		selectedPipelineId && ! selectedFromList && fetchedSelectedLoading;
+	const selectedPipelineError = fetchedSelectedError;
 
 	const [ isCreatingPipeline, setIsCreatingPipeline ] = useState( false );
 
 	/**
 	 * Set selected pipeline when pipelines load or when selected pipeline is deleted.
 	 * Waits for Zustand hydration AND pipelines query to complete before applying default selection.
+	 *
+	 * The selection is only cleared when the pipeline is confirmed to not exist
+	 * anywhere — not just missing from the paginated list. This lets the admin
+	 * hold a selection beyond the first page of pipelines without it getting
+	 * auto-reset on every reload.
 	 */
 	useEffect( () => {
 		if ( ! hasHydrated || pipelinesLoading ) {
@@ -100,16 +121,28 @@ export default function PipelinesApp() {
 
 		if ( pipelines.length > 0 && ! selectedPipelineId ) {
 			setSelectedPipelineId( pipelines[ 0 ].pipeline_id );
-		} else if ( pipelines.length > 0 && selectedPipelineId ) {
-			// Check if selected pipeline still exists, if not, select next available
-			const selectedPipelineExists = pipelines.some( ( p ) =>
-				isSameId( p.pipeline_id, selectedPipelineId )
-			);
-			if ( ! selectedPipelineExists ) {
-				setSelectedPipelineId( pipelines[ 0 ].pipeline_id );
-			}
-		} else if ( pipelines.length === 0 ) {
-			// No pipelines available
+			return;
+		}
+
+		if ( pipelines.length === 0 && ! selectedPipelineId ) {
+			return;
+		}
+
+		// Selection confirmed to exist if it's either in the list cache or
+		// the single-pipeline fetch resolved to a record.
+		const existsInList = pipelines.some( ( p ) =>
+			isSameId( p.pipeline_id, selectedPipelineId )
+		);
+		const existsOnServer = !! fetchedSelectedPipeline;
+
+		if ( existsInList || existsOnServer || fetchedSelectedLoading ) {
+			return;
+		}
+
+		// Only reach here once the single-pipeline fetch has resolved to null.
+		if ( pipelines.length > 0 ) {
+			setSelectedPipelineId( pipelines[ 0 ].pipeline_id );
+		} else {
 			setSelectedPipelineId( null );
 		}
 	}, [
@@ -118,6 +151,8 @@ export default function PipelinesApp() {
 		setSelectedPipelineId,
 		hasHydrated,
 		pipelinesLoading,
+		fetchedSelectedPipeline,
+		fetchedSelectedLoading,
 	] );
 
 	/**

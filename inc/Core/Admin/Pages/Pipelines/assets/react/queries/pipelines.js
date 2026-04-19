@@ -30,14 +30,110 @@ import {
 import { isSameId } from '../utils/ids';
 
 // Queries
+
+/**
+ * Lightweight pipelines list used by most of the admin UI.
+ *
+ * Fetches up to `perPage` pipelines without embedding flows. Each pipeline
+ * carries a numeric `flow_count` for list-view displays. Mutations in this
+ * file continue to write to the legacy `[ 'pipelines' ]` cache key so
+ * optimistic updates stay in place.
+ *
+ * For scalable search/pagination (ComboboxControl-style), use
+ * {@link usePipelineSearch}. For a single pipeline (including hydration
+ * when the selected pipeline isn't in the list cache), use
+ * {@link usePipeline}.
+ */
 export const usePipelines = () =>
 	useQuery( {
 		queryKey: [ 'pipelines' ],
 		queryFn: async () => {
 			const response = await fetchPipelines();
-			return response.success ? response.data.pipelines : [];
+			if ( ! response.success ) {
+				return [];
+			}
+			return response.data.pipelines ?? [];
 		},
 	} );
+
+/**
+ * Server-side search for pipelines — debounce the `search` argument in the
+ * caller. Designed for the PipelineSelector and similar typeahead UIs.
+ *
+ * @param {Object} [options]
+ * @param {string} [options.search]  Filter by pipeline_name substring.
+ * @param {number} [options.perPage] Items per page (default 50).
+ */
+export const usePipelineSearch = ( { search = '', perPage = 50 } = {} ) => {
+	const normalizedSearch = search ? search.trim() : '';
+
+	return useQuery( {
+		queryKey: [ 'pipelines', 'search', { search: normalizedSearch, perPage } ],
+		queryFn: async () => {
+			const response = await fetchPipelines( null, {
+				perPage,
+				offset: 0,
+				includeFlows: false,
+				search: normalizedSearch || null,
+			} );
+			if ( ! response.success ) {
+				return { pipelines: [], total: 0 };
+			}
+			return {
+				pipelines: response.data.pipelines ?? [],
+				total: response.total ?? response.data.total ?? 0,
+			};
+		},
+		keepPreviousData: true,
+		staleTime: 5_000,
+	} );
+};
+
+/**
+ * Fetch a single pipeline by ID. Falls back to the `[ 'pipelines' ]` list
+ * cache so reads are free when the pipeline is already in memory.
+ *
+ * @param {number|string|null} pipelineId
+ */
+export const usePipeline = ( pipelineId ) => {
+	const queryClient = useQueryClient();
+
+	return useQuery( {
+		queryKey: [
+			'pipelines',
+			'single',
+			pipelineId ? String( pipelineId ) : null,
+		],
+		queryFn: async () => {
+			// Prefer the list cache when the pipeline is already there.
+			const cachedList = queryClient.getQueryData( [ 'pipelines' ] );
+			if ( Array.isArray( cachedList ) ) {
+				const hit = cachedList.find( ( p ) =>
+					isSameId( p.pipeline_id, pipelineId )
+				);
+				if ( hit ) {
+					return hit;
+				}
+			}
+
+			const response = await fetchPipelines( pipelineId );
+			if ( ! response.success ) {
+				return null;
+			}
+			const pipelineRecord = response.data?.pipeline ?? null;
+			const flows = response.data?.flows ?? [];
+
+			if ( ! pipelineRecord ) {
+				return null;
+			}
+
+			// Match the shape the admin app expects when this pipeline comes
+			// from the /pipelines list endpoint.
+			return { ...pipelineRecord, flows };
+		},
+		enabled: !! pipelineId,
+	} );
+};
 
 export const useContextFiles = ( pipelineId ) =>
 	useQuery( {
