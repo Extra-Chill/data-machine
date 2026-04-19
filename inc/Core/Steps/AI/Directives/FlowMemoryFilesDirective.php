@@ -22,6 +22,7 @@ namespace DataMachine\Core\Steps\AI\Directives;
 
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Engine\AI\Directives\MemoryFilesReader;
+use DataMachine\Engine\AI\Memory\MemoryPolicyResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -56,6 +57,15 @@ class FlowMemoryFilesDirective implements \DataMachine\Engine\AI\Directives\Dire
 
 		$user_id  = (int) ( $payload['user_id'] ?? 0 );
 		$agent_id = (int) ( $payload['agent_id'] ?? 0 );
+
+		// Filter scoped memory files through the per-agent MemoryPolicy so
+		// deny/allow_only applies to flow memory, not just registered
+		// core files.
+		$resolver     = new MemoryPolicyResolver();
+		$memory_files = $resolver->filter( $memory_files, array(
+			'agent_id' => $agent_id,
+			'scope'    => 'flow',
+		) );
 
 		return MemoryFilesReader::read( $memory_files, 'Flow', $flow_id, $user_id, $agent_id );
 	}

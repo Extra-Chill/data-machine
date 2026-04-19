@@ -22,6 +22,7 @@ namespace DataMachine\Core\Steps\AI\Directives;
 
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Engine\AI\Directives\MemoryFilesReader;
+use DataMachine\Engine\AI\Memory\MemoryPolicyResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -52,6 +53,17 @@ class PipelineMemoryFilesDirective implements \DataMachine\Engine\AI\Directives\
 		$memory_files = $db_pipelines->get_pipeline_memory_files( (int) $pipeline_id );
 		$user_id      = (int) ( $payload['user_id'] ?? 0 );
 		$agent_id     = (int) ( $payload['agent_id'] ?? 0 );
+
+		// Filter scoped memory files through the per-agent MemoryPolicy so
+		// deny/allow_only applies to pipeline memory, not just registered
+		// core files. A wiki-generator agent configured to deny MEMORY.md
+		// gets the same treatment whether the file is injected by the
+		// registry or by explicit pipeline config.
+		$resolver     = new MemoryPolicyResolver();
+		$memory_files = $resolver->filter( $memory_files, array(
+			'agent_id' => $agent_id,
+			'scope'    => 'pipeline',
+		) );
 
 		return MemoryFilesReader::read( $memory_files, 'Pipeline', (int) $pipeline_id, $user_id, $agent_id );
 	}
