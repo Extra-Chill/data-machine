@@ -370,7 +370,8 @@ export const useUpdatePipelineMemoryFiles = ( pipelineId ) => {
 	const queryClient = useQueryClient();
 	return useMutation( {
 		mutationFn: ( data ) => {
-			// Support both old format (array) and new format ({ memoryFiles, dailyMemory }).
+			// Accept either a bare array of filenames or an object
+			// with a memoryFiles key (matches the flow mutation shape).
 			const filenames = Array.isArray( data ) ? data : data.memoryFiles;
 			return updatePipelineMemoryFiles( pipelineId, filenames );
 		},

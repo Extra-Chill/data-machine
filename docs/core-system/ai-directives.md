@@ -35,10 +35,10 @@ Directives are applied in ascending priority order (lowest number = highest prio
 | **15** | `ChatAgentDirective` | chat | Chat agent identity and behavioral instructions |
 | **20** | `SystemAgentDirective` | system | System agent identity and capabilities |
 | **20** | `CoreMemoryFilesDirective` | **all** | SITE.md, RULES.md, SOUL.md, MEMORY.md, USER.md, custom files |
+| **35** | `AgentDailyMemoryDirective` | chat, pipeline | Recent daily archives for agents that opt in via `agent_config.daily_memory` |
 | **40** | `PipelineMemoryFilesDirective` | pipeline | Per-pipeline selectable memory files |
 | **45** | `ChatPipelinesDirective` | chat | Pipeline/flow/handler inventory for discovery |
 | **45** | `FlowMemoryFilesDirective` | pipeline | Per-flow selectable memory files (additive) |
-| **46** | `DailyMemorySelectorDirective` | pipeline | Daily memory files by selection mode |
 | **50** | `PipelineSystemPromptDirective` | pipeline | User-configured task instructions + workflow visualization |
 | **80** | `SiteContextDirective` | **all** | WordPress site metadata (post types, taxonomies, etc.) |
 
@@ -157,28 +157,34 @@ Reads the flow's `memory_files` configuration and injects each file's content. D
 - Uses shared `MemoryFilesReader` helper
 - Supports multi-agent partitioning
 
-### DailyMemorySelectorDirective (Priority 46)
+### AgentDailyMemoryDirective (Priority 35)
 
-**Location**: `inc/Engine/AI/Directives/DailyMemorySelectorDirective.php`
-**Contexts**: Pipeline only
-**Since**: 0.40.0
-**Purpose**: Injects daily memory files based on flow-level configuration
+**Location**: `inc/Engine/AI/Directives/AgentDailyMemoryDirective.php`
+**Contexts**: Chat, Pipeline
+**Since**: 0.71.0
+**Purpose**: Injects recent daily archive files for agents that explicitly opt in
 
-Supports four selection modes configured per-flow:
+Replaces the former `DailyMemorySelectorDirective` + per-flow `flow_config.daily_memory` config.
 
-| Mode | Config Fields | Behavior |
-|------|--------------|----------|
-| `recent_days` | `days` (int, default 7) | Last N days (capped at 90) |
-| `specific_dates` | `dates` (string[]) | Specific YYYY-MM-DD dates |
-| `date_range` | `from`, `to` (YYYY-MM-DD) | All daily files within range |
-| `months` | `months` (string[], YYYY/MM) | All daily files for selected months |
-| `none` | — | No daily memory injection (default) |
+**Opt-in shape (per agent, in `agent_config`):**
+
+```json
+{
+  "daily_memory": {
+    "enabled":     true,
+    "recent_days": 3
+  }
+}
+```
+
+When disabled or absent the directive emits nothing — a stateless pipeline agent (alt-text generator, wiki builder, etc.) gets zero daily memory noise in its context. When enabled, the directive walks the **real files on disk** (`agents/{slug}/daily/YYYY/MM/DD.md`) from newest to oldest, injecting each as its own `system_text` block labelled `"## Daily Memory: YYYY-MM-DD"`.
 
 **Features**:
-- Size limit: `MAX_TOTAL_SIZE = 100KB` — stops injecting when exceeded
-- Newest-first ordering: most recent content prioritized within size cap
-- Legacy compatibility: normalizes old `include_daily: true` to `{mode: 'recent_days', days: 7}`
-- Each output formatted as `"## Daily Memory: {YYYY-MM-DD}\n{content}"`
+- Opt-in per agent — default off for every agent
+- `recent_days` default 3, hard ceiling 14 (`MAX_RECENT_DAYS`)
+- Size-bounded by `AgentMemory::MAX_FILE_SIZE` (8 KB); older days dropped first when the budget would be exceeded
+- One real file = one `system_text` block so the AI can distinguish dates rather than reasoning over a stitched-together blob
+- Precise historical lookups still available via the `agent_daily_memory` tool
 
 ### PipelineSystemPromptDirective (Priority 50)
 
@@ -279,9 +285,9 @@ Directives maintain consistent message ordering by using `array_push()` to appen
 Receive directives in order:
 1. P10 — PipelineCoreDirective (identity)
 2. P20 — CoreMemoryFilesDirective (SITE.md, RULES.md, SOUL.md, MEMORY.md, USER.md, custom)
-3. P40 — PipelineMemoryFilesDirective (pipeline-selected memory files)
-4. P45 — FlowMemoryFilesDirective (flow-selected memory files)
-5. P46 — DailyMemorySelectorDirective (daily memory by mode)
+3. P35 — AgentDailyMemoryDirective (daily archives, opt-in per agent)
+4. P40 — PipelineMemoryFilesDirective (pipeline-selected memory files)
+5. P45 — FlowMemoryFilesDirective (flow-selected memory files)
 6. P50 — PipelineSystemPromptDirective (task instructions + workflow viz)
 7. P80 — SiteContextDirective (WordPress metadata)
 
@@ -290,8 +296,9 @@ Receive directives in order:
 Receive directives in order:
 1. P15 — ChatAgentDirective (identity)
 2. P20 — CoreMemoryFilesDirective (SITE.md, RULES.md, SOUL.md, MEMORY.md, USER.md, custom)
-3. P45 — ChatPipelinesDirective (pipeline inventory)
-4. P80 — SiteContextDirective (WordPress metadata)
+3. P35 — AgentDailyMemoryDirective (daily archives, opt-in per agent)
+4. P45 — ChatPipelinesDirective (pipeline inventory)
+5. P80 — SiteContextDirective (WordPress metadata)
 
 ### System Agents
 
@@ -313,7 +320,7 @@ Several directives integrate with plugin settings:
 - **Agent Memory Files**: File-based in agent memory directory (migrated from `global_system_prompt`)
 - **Pipeline Memory Files**: Per-pipeline `memory_files` array in pipeline config
 - **Flow Memory Files**: Per-flow `memory_files` array in flow config
-- **Daily Memory**: Per-flow `daily_memory_config` with mode and parameters
+- **Daily Memory**: Per-agent `agent_config.daily_memory = { enabled: bool, recent_days: int }`. Default disabled. When enabled, the `AgentDailyMemoryDirective` injects the last N days of real daily files as individual `system_text` blocks at priority 35.
 - **Site Context**: `site_context_enabled` toggle
 
 ### Filter Hooks
