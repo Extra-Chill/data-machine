@@ -350,6 +350,55 @@ class Flows extends BaseRepository {
 	}
 
 	/**
+	 * Count flows grouped by pipeline ID.
+	 *
+	 * Single aggregate query replacing N per-pipeline COUNT queries — used by
+	 * the Pipelines admin list to show a flow_count per pipeline without
+	 * embedding full flow records.
+	 *
+	 * @since 0.60.0
+	 *
+	 * @param array $pipeline_ids Pipeline IDs to count flows for.
+	 * @return array<int, int> Map of pipeline_id => flow_count. Missing pipelines return 0.
+	 */
+	public function count_flows_grouped_by_pipeline( array $pipeline_ids ): array {
+		$result = array();
+		foreach ( $pipeline_ids as $pid ) {
+			$result[ (int) $pid ] = 0;
+		}
+
+		if ( empty( $pipeline_ids ) ) {
+			return $result;
+		}
+
+		$pipeline_ids = array_map( 'intval', $pipeline_ids );
+		$placeholders = implode( ',', array_fill( 0, count( $pipeline_ids ), '%d' ) );
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				"SELECT pipeline_id, COUNT(*) AS flow_count
+				FROM %i
+				WHERE pipeline_id IN ({$placeholders})
+				GROUP BY pipeline_id",
+				array_merge( array( $this->table_name ), $pipeline_ids )
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
+
+		if ( null === $rows ) {
+			return $result;
+		}
+
+		foreach ( $rows as $row ) {
+			$result[ (int) $row['pipeline_id'] ] = (int) $row['flow_count'];
+		}
+
+		return $result;
+	}
+
+	/**
 	 * Get all flows with pagination (single query, no per-pipeline loop).
 	 *
 	 * @since 0.54.2

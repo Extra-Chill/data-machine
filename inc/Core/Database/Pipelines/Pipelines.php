@@ -112,12 +112,23 @@ class Pipelines extends BaseRepository {
 	/**
 	 * Get all pipelines from the database.
 	 *
+	 * When $per_page is a positive integer, results are paginated at the SQL layer.
+	 * When $per_page is null (default), all matching pipelines are returned.
+	 *
 	 * @param int|null    $user_id  Optional user ID to filter by.
 	 * @param int|null    $agent_id Optional agent ID to filter by.
 	 * @param string|null $search   Optional search term to filter by pipeline name (LIKE).
-	 * @return array Array of all pipeline records
+	 * @param int|null    $per_page Optional SQL LIMIT. Null returns all rows.
+	 * @param int         $offset   SQL OFFSET (only honored when $per_page is set).
+	 * @return array Array of pipeline records
 	 */
-	public function get_all_pipelines( ?int $user_id = null, ?int $agent_id = null, ?string $search = null ): array {
+	public function get_all_pipelines(
+		?int $user_id = null,
+		?int $agent_id = null,
+		?string $search = null,
+		?int $per_page = null,
+		int $offset = 0
+	): array {
 		$where_clauses = array();
 		$where_values  = array();
 
@@ -139,11 +150,19 @@ class Pipelines extends BaseRepository {
 			$where = ' WHERE ' . implode( ' AND ', $where_clauses );
 		}
 
+		$limit_clause = '';
+		$limit_values = array();
+		if ( null !== $per_page && $per_page > 0 ) {
+			$limit_clause   = ' LIMIT %d OFFSET %d';
+			$limit_values[] = (int) $per_page;
+			$limit_values[] = max( 0, (int) $offset );
+		}
+
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
 		$results = $this->wpdb->get_results(
 			$this->wpdb->prepare(
-				"SELECT * FROM %i{$where} ORDER BY updated_at DESC",
-				array_merge( array( $this->table_name ), $where_values )
+				"SELECT * FROM %i{$where} ORDER BY updated_at DESC{$limit_clause}",
+				array_merge( array( $this->table_name ), $where_values, $limit_values )
 			),
 			ARRAY_A
 		);
@@ -385,19 +404,30 @@ class Pipelines extends BaseRepository {
 	/**
 	 * Get pipeline count.
 	 *
-	 * @param int|null $user_id  Optional user ID to filter by.
-	 * @param int|null $agent_id Optional agent ID to filter by.
+	 * @param int|null    $user_id  Optional user ID to filter by.
+	 * @param int|null    $agent_id Optional agent ID to filter by.
+	 * @param string|null $search   Optional search term to filter by pipeline name (LIKE).
 	 */
-	public function get_pipelines_count( ?int $user_id = null, ?int $agent_id = null ): int {
-		$where        = '';
-		$where_values = array();
+	public function get_pipelines_count( ?int $user_id = null, ?int $agent_id = null, ?string $search = null ): int {
+		$where_clauses = array();
+		$where_values  = array();
 
 		if ( null !== $agent_id ) {
-			$where          = ' WHERE agent_id = %d';
-			$where_values[] = $agent_id;
+			$where_clauses[] = 'agent_id = %d';
+			$where_values[]  = $agent_id;
 		} elseif ( null !== $user_id ) {
-			$where          = ' WHERE user_id = %d';
-			$where_values[] = $user_id;
+			$where_clauses[] = 'user_id = %d';
+			$where_values[]  = $user_id;
+		}
+
+		if ( null !== $search && '' !== $search ) {
+			$where_clauses[] = 'pipeline_name LIKE %s';
+			$where_values[]  = '%' . $this->wpdb->esc_like( $search ) . '%';
+		}
+
+		$where = '';
+		if ( ! empty( $where_clauses ) ) {
+			$where = ' WHERE ' . implode( ' AND ', $where_clauses );
 		}
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared

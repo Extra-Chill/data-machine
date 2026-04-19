@@ -27,16 +27,40 @@ const getAgentPayload = () => {
  */
 
 /**
- * Fetch all pipelines or a specific pipeline
+ * Fetch pipelines list or a specific pipeline.
  *
- * @param {number|null} pipelineId - Optional pipeline ID
+ * In list mode, defaults to lightweight responses (include_flows=false) so the
+ * admin UI can render hundreds of pipelines without the server embedding every
+ * flow. Each pipeline still exposes flow_count for display purposes, and the
+ * selected pipeline's flows are fetched separately via /flows.
+ *
+ * @param {number|null} pipelineId             - Optional pipeline ID (single-pipeline mode ignores list params)
+ * @param {Object}      [options]              - List-mode options
+ * @param {number}      [options.perPage]      - Items per page (default 100)
+ * @param {number}      [options.offset]       - Pagination offset (default 0)
+ * @param {boolean}     [options.includeFlows] - Embed flows per pipeline (default false)
+ * @param {string|null} [options.search]       - Filter by pipeline name (substring)
  * @return {Promise<Object>} Pipeline data
  */
-export const fetchPipelines = async ( pipelineId = null ) => {
-	return await client.get(
-		'/pipelines',
-		pipelineId ? { pipeline_id: pipelineId } : {}
-	);
+export const fetchPipelines = async (
+	pipelineId = null,
+	{ perPage = 100, offset = 0, includeFlows = false, search = null } = {}
+) => {
+	if ( pipelineId ) {
+		return await client.get( '/pipelines', { pipeline_id: pipelineId } );
+	}
+
+	const params = {
+		per_page: perPage,
+		offset,
+		include_flows: includeFlows,
+	};
+
+	if ( search ) {
+		params.search = search;
+	}
+
+	return await client.get( '/pipelines', params );
 };
 
 /**
