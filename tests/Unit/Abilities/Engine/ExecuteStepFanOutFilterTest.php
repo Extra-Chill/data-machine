@@ -57,20 +57,59 @@ class ExecuteStepFanOutFilterTest extends WP_UnitTestCase {
 		$this->assertSame( 'ai_handler_complete', $filtered[0]['type'] );
 	}
 
-	public function test_filter_preserves_multiple_ai_handler_complete_packets(): void {
+	/**
+	 * When the AI calls different handler tools, each gets its own child job.
+	 * Multi-handler pipelines (e.g. upsert_event + publish_post) need this.
+	 */
+	public function test_filter_preserves_packets_with_different_tool_names(): void {
 		$packets = array(
-			$this->make_packet( 'ai_handler_complete', array( 'handler_tool' => 'upsert_event' ) ),
-			$this->make_packet( 'ai_handler_complete', array( 'handler_tool' => 'upsert_event' ) ),
-			$this->make_packet( 'ai_handler_complete', array( 'handler_tool' => 'upsert_event' ) ),
+			$this->make_packet( 'ai_handler_complete', array( 'tool_name' => 'upsert_event', 'handler_tool' => 'upsert_event' ) ),
+			$this->make_packet( 'ai_handler_complete', array( 'tool_name' => 'publish_post', 'handler_tool' => 'publish_post' ) ),
 			$this->make_packet( 'tool_result', array( 'tool_name' => 'search' ) ),
 		);
 
 		$filtered = ExecuteStepAbility::filterPacketsForFanOut( $packets );
 
-		$this->assertCount( 3, $filtered );
-		foreach ( $filtered as $packet ) {
-			$this->assertSame( 'ai_handler_complete', $packet['type'] );
-		}
+		$this->assertCount( 2, $filtered );
+		$this->assertSame( 'upsert_event', $filtered[0]['metadata']['tool_name'] );
+		$this->assertSame( 'publish_post', $filtered[1]['metadata']['tool_name'] );
+	}
+
+	/**
+	 * Regression test for #1108: when the AI calls the same handler tool
+	 * multiple times (e.g. conversation loop didn't terminate), duplicate
+	 * ai_handler_complete packets must be collapsed to one per tool_name.
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine/issues/1108
+	 */
+	public function test_filter_deduplicates_same_tool_name_handler_packets(): void {
+		$packets = array(
+			$this->make_packet( 'ai_handler_complete', array( 'tool_name' => 'upsert_event', 'handler_tool' => 'upsert_event' ) ),
+			$this->make_packet( 'ai_handler_complete', array( 'tool_name' => 'upsert_event', 'handler_tool' => 'upsert_event' ) ),
+			$this->make_packet( 'ai_handler_complete', array( 'tool_name' => 'upsert_event', 'handler_tool' => 'upsert_event' ) ),
+			$this->make_packet( 'tool_result', array( 'tool_name' => 'search' ) ),
+		);
+
+		$filtered = ExecuteStepAbility::filterPacketsForFanOut( $packets );
+
+		$this->assertCount( 1, $filtered, 'Duplicate handler tool calls should be collapsed to one per tool_name' );
+		$this->assertSame( 'ai_handler_complete', $filtered[0]['type'] );
+		$this->assertSame( 'upsert_event', $filtered[0]['metadata']['tool_name'] );
+	}
+
+	/**
+	 * Handler packets without a tool_name should be kept unconditionally
+	 * for backward compatibility.
+	 */
+	public function test_filter_keeps_handler_packets_without_tool_name(): void {
+		$packets = array(
+			$this->make_packet( 'ai_handler_complete', array( 'handler_tool' => 'upsert_event' ) ),
+			$this->make_packet( 'ai_handler_complete', array( 'handler_tool' => 'upsert_event' ) ),
+		);
+
+		$filtered = ExecuteStepAbility::filterPacketsForFanOut( $packets );
+
+		$this->assertCount( 2, $filtered, 'Packets without tool_name cannot be deduped and should pass through' );
 	}
 
 	/**

@@ -693,6 +693,14 @@ class ExecuteStepAbility {
 	 * pre-#1096 implementation filtered on metadata.source_type, which was a
 	 * silent no-op that let every packet fan out into doomed child jobs.
 	 *
+	 * After filtering to handler packets, duplicates are removed. When the
+	 * AI conversation loop fails to terminate early (e.g. misconfigured
+	 * handler_slugs), the AI may call the same handler tool multiple times
+	 * across turns, producing duplicate ai_handler_complete packets. These
+	 * would fan out into child jobs that all process the same data.
+	 * Dedup keeps only the first packet per handler tool name.
+	 * See: https://github.com/Extra-Chill/data-machine/issues/1108
+	 *
 	 * If filtering removes all packets, the originals are returned unchanged
 	 * — the step may not require handlers, or the packets may use a different
 	 * convention (backward compatibility).
@@ -710,7 +718,38 @@ class ExecuteStepAbility {
 			)
 		);
 
-		return ! empty( $handler_packets ) ? $handler_packets : $dataPackets;
+		if ( empty( $handler_packets ) ) {
+			return $dataPackets;
+		}
+
+		// Deduplicate handler packets by tool_name. When the AI calls
+		// the same handler tool multiple times (e.g. upsert_event called
+		// on consecutive turns because the conversation didn't terminate),
+		// each call produces a separate ai_handler_complete packet with
+		// the same tool_name but possibly varied parameters. Only the
+		// first invocation per tool_name is kept — subsequent duplicates
+		// would create child jobs processing identical data.
+		$seen_tools = array();
+		$deduped    = array();
+
+		foreach ( $handler_packets as $packet ) {
+			$tool_name = $packet['metadata']['tool_name'] ?? '';
+
+			if ( '' === $tool_name ) {
+				// No tool_name — keep unconditionally.
+				$deduped[] = $packet;
+				continue;
+			}
+
+			if ( isset( $seen_tools[ $tool_name ] ) ) {
+				continue;
+			}
+
+			$seen_tools[ $tool_name ] = true;
+			$deduped[]                = $packet;
+		}
+
+		return $deduped;
 	}
 
 	/**
