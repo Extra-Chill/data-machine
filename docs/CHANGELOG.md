@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.70.1] - 2026-04-19
+
+### Changed
+- rename executeUpdate() → executeUpsert() to complete upsert rename
+
 ## [0.70.0] - 2026-04-19
 
 ### Added
