@@ -2,7 +2,7 @@
 /**
  * Base class for Update handlers providing standardized engine data access.
  *
- * Post tracking is automatic — after executeUpdate() returns a successful
+ * Post tracking is automatic — after executeUpsert() returns a successful
  * result with a post_id, the base class writes origin metadata (handler,
  * flow, pipeline) without any action needed from subclasses.
  *
@@ -46,18 +46,18 @@ abstract class UpsertHandler {
 	}
 
 	/**
-	 * Execute update operation.
+	 * Execute upsert operation.
 	 *
 	 * @param array $parameters Tool parameters including job_id
 	 * @param array $handler_config Handler configuration
 	 * @return array Success/failure response
 	 */
-	abstract protected function executeUpdate( array $parameters, array $handler_config ): array;
+	abstract protected function executeUpsert( array $parameters, array $handler_config ): array;
 
 	/**
 	 * Handle tool call with job_id validation and automatic post tracking.
 	 *
-	 * After executeUpdate() returns, if the result is successful and contains
+	 * After executeUpsert() returns, if the result is successful and contains
 	 * a post_id, origin metadata is written automatically. Subclasses never
 	 * need to call any tracking methods.
 	 *
@@ -80,7 +80,7 @@ abstract class UpsertHandler {
 		$parameters['engine'] = $engine;
 
 		$handler_config = $tool_def['handler_config'] ?? array();
-		$result         = $this->executeUpdate( $parameters, $handler_config );
+		$result         = $this->executeUpsert( $parameters, $handler_config );
 
 		// Post origin tracking is applied centrally in ToolExecutor::executeTool()
 		// after every tool call — handler tools and ability tools share the same

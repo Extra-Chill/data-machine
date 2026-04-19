@@ -103,7 +103,7 @@ class WordPress extends UpsertHandler {
 		return $tools;
 	}
 
-	protected function executeUpdate( array $parameters, array $handler_config ): array {
+	protected function executeUpsert( array $parameters, array $handler_config ): array {
 		$job_id     = $parameters['job_id'] ?? null;
 		$source_url = $parameters['source_url'] ?? '';
 
