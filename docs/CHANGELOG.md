@@ -2,6 +2,22 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.70.0] - 2026-04-19
+
+### Added
+- MemoryPolicy resolver for per-agent memory file policy
+- add token expiry and health indicators to auth status CLI
+- list_subtree + route daily memory and context files through store
+
+### Changed
+- rename `update` step type to `upsert`
+- scale Pipelines admin page — N+1 queries + selector search
+- drop redundant _datamachine_post_pipeline_id (#1091)
+
+### Fixed
+- batch child jobs silently skip update step (#1096)
+- green test suite — 0 failures, 933 passing (#1004)
+
 ## [0.69.0] - 2026-04-17
 
 ### Added
