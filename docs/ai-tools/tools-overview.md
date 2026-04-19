@@ -150,7 +150,7 @@ Available only to chat AI agents via `datamachine_chat_tools` filter. These spec
   - **Bulk mode**: Configure matching steps across all flows in a pipeline.
   - **Handler Switching**: Use `target_handler_slug` to switch handlers with optional `field_map` for data migration.
   - **Per-Flow Config**: Support for unique settings per flow in bulk mode via `flow_configs`.
-- **Use Cases**: Setting up fetch/publish/update handlers, customizing AI prompts, bulk configuration changes across pipelines, migrating handlers.
+- **Use Cases**: Setting up fetch/publish/upsert handlers, customizing AI prompts, bulk configuration changes across pipelines, migrating handlers.
 
 **ConfigurePipelineStep** (`configure_pipeline_step`) (@since v0.4.4)
 - **Purpose**: Configure pipeline-level AI settings including system prompt, provider, model, and enabled tools
@@ -512,7 +512,7 @@ $parameters = \DataMachine\Engine\AI\ToolParameters::buildParameters(
 // Returns: ['content_string' => ..., 'title' => ..., 'job_id' => ..., 'flow_step_id' => ...]
 ```
 
-**Handler Tools** (publish/update handlers):
+**Handler Tools** (publish/upsert handlers):
 ```php
 $parameters = \DataMachine\Engine\AI\ToolParameters::buildForHandlerTool(
     $data,

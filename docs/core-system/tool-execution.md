@@ -473,7 +473,7 @@ foreach ($engine_parameters as $key => $value) {
 ### Handler Tools
 
 **Registration**: `chubes_ai_tools` filter
-**Scope**: Step-specific (publish, update handlers)
+**Scope**: Step-specific (publish, upsert handlers)
 **Enablement**: Automatic if handler matches
 **Examples**: `twitter_publish`, `wordpress_publish`, `bluesky_publish`
 

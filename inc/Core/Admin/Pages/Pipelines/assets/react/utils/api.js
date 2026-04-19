@@ -103,7 +103,7 @@ export const deletePipeline = async ( pipelineId ) => {
  * Add a step to a pipeline
  *
  * @param {number} pipelineId     - Pipeline ID
- * @param {string} stepType       - Step type (fetch, ai, publish, update)
+ * @param {string} stepType       - Step type (fetch, ai, publish, upsert)
  * @param {number} executionOrder - Step position
  * @return {Promise<Object>} Created step data
  */

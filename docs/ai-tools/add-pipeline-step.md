@@ -9,7 +9,7 @@ The `add_pipeline_step` tool allows AI agents to add new steps to existing pipel
 ## Parameters
 
 - **pipeline_id** (integer, required): The ID of the pipeline to add the step to
-- **step_type** (string, required): The type of step to add. Valid types include: fetch, ai, publish, update
+- **step_type** (string, required): The type of step to add. Valid types include: fetch, ai, publish, upsert
 
 ## Usage
 

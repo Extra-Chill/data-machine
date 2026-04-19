@@ -178,7 +178,7 @@ wp datamachine jobs undo <job_id> --dry-run --allow-root
 ## Key Capabilities
 
 - **Multi-agent support** with isolated identity, memory, and resources per agent on a single WordPress installation.
-- **Multi-platform publishing** via dedicated fetch/publish/update handlers for files, RSS, Reddit, Google Sheets, WordPress, Twitter, Threads, Bluesky, Facebook, and Google Sheets output.
+- **Multi-platform publishing** via dedicated fetch/publish/upsert handlers for files, RSS, Reddit, Google Sheets, WordPress, Twitter, Threads, Bluesky, Facebook, and Google Sheets output.
 - **Daily memory system** for automatic temporal knowledge management with AI-driven pruning.
 - **System tasks** for background AI operations (image generation, alt text, internal linking, meta descriptions) with undo support.
 - **Extension points** through filters such as `datamachine_handlers`, `chubes_ai_tools`, `datamachine_step_types`, `datamachine_auth_providers`, and `datamachine_engine_data`.

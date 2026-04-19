@@ -2,7 +2,7 @@
 
 ## Overview
 
-The WordPress Shared Components are a collection of centralized WordPress functionality introduced in version 0.2.1. These components reduce code duplication and provide consistent WordPress integration across handlers, particularly the WordPress publish and update handlers.
+The WordPress Shared Components are a collection of centralized WordPress functionality introduced in version 0.2.1. These components reduce code duplication and provide consistent WordPress integration across handlers, particularly the WordPress publish and upsert handlers.
 
 As of v0.2.7, WordPress-specific publishing operations are provided by WordPressPublishHelper, while EngineData serves as a platform-agnostic data access layer.
 

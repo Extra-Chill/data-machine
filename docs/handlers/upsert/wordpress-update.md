@@ -212,7 +212,7 @@ return [];
 **Benefits**:
 - Universal search utility shared across all update handlers
 - Consistent tool result detection across step types
-- Simplified update handler implementation
+- Simplified upsert handler implementation
 - Centralized maintenance for search improvements
 
 **Metadata Preservation**: Maintains existing post metadata, publication dates, and author information.

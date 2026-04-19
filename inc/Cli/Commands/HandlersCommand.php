@@ -29,7 +29,7 @@ class HandlersCommand extends BaseCommand {
 	 * ## OPTIONS
 	 *
 	 * [--step-type=<step_type>]
-	 * : Filter by step type (fetch, publish, update, etc.).
+	 * : Filter by step type (fetch, publish, upsert, etc.).
 	 *
 	 * [--format=<format>]
 	 * : Output format.

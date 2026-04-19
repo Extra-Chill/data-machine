@@ -8,7 +8,7 @@ Provides reusable WordPress-specific settings utilities for taxonomy fields, pos
 
 ## Overview
 
-The WordPressSettingsHandler centralizes common WordPress settings logic used across fetch, publish, and update handlers. It eliminates code duplication by providing shared methods for taxonomy field generation, post type options, and user selection.
+The WordPressSettingsHandler centralizes common WordPress settings logic used across fetch, publish, and upsert handlers. It eliminates code duplication by providing shared methods for taxonomy field generation, post type options, and user selection.
 
 ## Architecture
 

@@ -133,7 +133,7 @@ class MyFetchHandler extends FetchHandler {
 
 ## Engine Data Parameters
 
-Fetch handlers should store relevant parameters for publish/update handlers:
+Fetch handlers should store relevant parameters for publish/upsert handlers:
 
 | Parameter | Description | Used By |
 |-----------|-------------|---------|

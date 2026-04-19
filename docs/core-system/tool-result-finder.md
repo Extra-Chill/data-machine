@@ -273,7 +273,7 @@ if ($result) {
 ### Code Reuse
 
 Single implementation of tool result search logic eliminates duplication across:
-- Update steps
+- Upsert steps
 - Custom step types
 - Handler verification utilities
 - Debugging tools
@@ -338,4 +338,4 @@ $result = ToolResultFinder::findHandlerResult($data, 'twitter', $type = 'tool_re
 **File**: `/inc/Engine/AI/Tools/ToolResultFinder.php`
 **Since**: 0.2.0
 **Methods**: `findHandlerResult(array $data, string $handler): ?array`
-**Usage**: Update steps, custom step types, handler verification utilities
+**Usage**: Upsert steps, custom step types, handler verification utilities

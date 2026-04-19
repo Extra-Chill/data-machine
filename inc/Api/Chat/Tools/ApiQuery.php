@@ -66,7 +66,7 @@ MODES:
 - Batch: {requests: [{endpoint, key?}, ...]}
 
 KEY ENDPOINTS:
-/datamachine/v1/handlers - List handlers (?step_type=fetch|publish|update)
+/datamachine/v1/handlers - List handlers (?step_type=fetch|publish|upsert)
 /datamachine/v1/handlers/{slug} - Handler config schema
 /datamachine/v1/pipelines - List pipelines
 /datamachine/v1/pipelines/{id} - Pipeline with flows

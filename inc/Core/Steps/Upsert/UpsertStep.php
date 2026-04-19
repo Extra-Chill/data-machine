@@ -1,6 +1,11 @@
 <?php
 /**
- * Update step with AI tool-calling architecture.
+ * Upsert step with AI tool-calling architecture.
+ *
+ * Identity-aware create-or-update step. Handlers registered here can be
+ * update-only (e.g. wordpress_update), full upsert (e.g. upsert_event,
+ * github_update), or create-always-if-new (future). The AI calls the
+ * configured handler tool; this step routes the result into a packet.
  *
  * @package DataMachine\Core\Steps\Upsert
  */
@@ -38,7 +43,7 @@ class UpsertStep extends Step {
 	}
 
 	/**
-	 * Execute update step logic.
+	 * Execute upsert step logic.
 	 *
 	 * @return array
 	 */
@@ -56,7 +61,7 @@ class UpsertStep extends Step {
 			if ( ! is_array( $tool_result_entry ) ) {
 				$this->log(
 					'error',
-					'Update step missing primary tool result despite required handlers being satisfied',
+					'Upsert step missing primary tool result despite required handlers being satisfied',
 					array(
 						'primary_handler_slug' => $primary_handler_slug,
 					)
@@ -103,7 +108,7 @@ class UpsertStep extends Step {
 
 		$this->log(
 			'warning',
-			'Update step required handler tool was not executed by AI',
+			'Upsert step required handler tool was not executed by AI',
 			array(
 				'configured_handlers'       => $configured_handler_slugs,
 				'required_handler_slugs'    => $required_handler_slugs,
@@ -115,7 +120,7 @@ class UpsertStep extends Step {
 	}
 
 	/**
-	 * Validate update step configuration.
+	 * Validate upsert step configuration.
 	 *
 	 * @return bool
 	 */
@@ -137,7 +142,7 @@ class UpsertStep extends Step {
 		if ( empty( $raw_required_handlers ) && count( $configured_handler_slugs ) > 1 ) {
 			$this->log(
 				'warning',
-				'Multi-handler update step has no required_handler_slugs set; defaulting to first handler',
+				'Multi-handler upsert step has no required_handler_slugs set; defaulting to first handler',
 				array(
 					'configured_handlers' => $configured_handler_slugs,
 					'default_required'    => array( $configured_handler_slugs[0] ),
@@ -328,7 +333,7 @@ class UpsertStep extends Step {
 	}
 
 	/**
-	 * Resolve required handler slugs for this update step.
+	 * Resolve required handler slugs for this upsert step.
 	 *
 	 * @param array $configured_handler_slugs Configured handler slugs.
 	 * @return array

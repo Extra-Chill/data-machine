@@ -443,7 +443,7 @@ class ExecuteStepAbility {
 				// Inline continuation: when a step produces 0-1 DataPackets,
 				// schedule the next step directly on the same job instead of
 				// creating child jobs. This eliminates recursive fan-out where
-				// children spawn grandchildren (e.g., AI step → update step).
+				// children spawn grandchildren (e.g., AI step → upsert step).
 				//
 				// Fan-out is only meaningful when a step produces MULTIPLE
 				// packets that need parallel processing (e.g., fetch step
