@@ -4,26 +4,26 @@
  *
  * Delegates to UpdateWordPressAbility for business logic.
  *
- * @package DataMachine\Core\Steps\Update\Handlers\WordPress
+ * @package DataMachine\Core\Steps\Upsert\Handlers\WordPress
  */
 
-namespace DataMachine\Core\Steps\Update\Handlers\WordPress;
+namespace DataMachine\Core\Steps\Upsert\Handlers\WordPress;
 
-use DataMachine\Core\Steps\Update\Handlers\UpdateHandler;
+use DataMachine\Core\Steps\Upsert\Handlers\UpsertHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
-use DataMachine\Core\Steps\Update\Handlers\WordPress\WordPressSettings;
+use DataMachine\Core\Steps\Upsert\Handlers\WordPress\WordPressSettings;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class WordPress extends UpdateHandler {
+class WordPress extends UpsertHandler {
 	use HandlerRegistrationTrait;
 
 	public function __construct() {
 		self::registerHandler(
 			'wordpress_update',
-			'update',
+			'upsert',
 			self::class,
 			'WordPress Update',
 			'Update existing WordPress posts and pages',

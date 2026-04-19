@@ -22,7 +22,7 @@ The `api_query` tool enables chat agents to query the Data Machine REST API (via
 
 ### Discovery
 - `GET /datamachine/v1/handlers` - List all handlers
-- `GET /datamachine/v1/handlers?step_type={fetch|publish|update}` - Filter by type
+- `GET /datamachine/v1/handlers?step_type={fetch|publish|upsert}` - Filter by type
 - `GET /datamachine/v1/handlers/{slug}` - Handler details and config schema
 - `GET /datamachine/v1/auth/{handler}/status` - Check OAuth connection status
 - `GET /datamachine/v1/providers` - List AI providers and models

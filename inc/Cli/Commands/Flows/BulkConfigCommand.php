@@ -48,7 +48,7 @@ class BulkConfigCommand extends BaseCommand {
 	 * : Flow ID (required for flow scope).
 	 *
 	 * [--step_type=<type>]
-	 * : Filter by step type (fetch, publish, update, ai).
+	 * : Filter by step type (fetch, publish, upsert, ai).
 	 *
 	 * [--dry-run]
 	 * : Preview changes without executing.

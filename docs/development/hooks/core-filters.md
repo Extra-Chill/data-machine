@@ -6,7 +6,7 @@ Comprehensive reference for all WordPress filters used by Data Machine for servi
 
 ### `datamachine_handlers`
 
-**Purpose**: Register fetch, publish, and update handlers
+**Purpose**: Register fetch, publish, and upsert handlers
 
 **Parameters**:
 - `$handlers` (array) - Current handlers array
@@ -16,7 +16,7 @@ Comprehensive reference for all WordPress filters used by Data Machine for servi
 **Handler Structure**:
 ```php
 $handlers['handler_slug'] = [
-    'type' => 'fetch|publish|update',
+    'type' => 'fetch|publish|upsert',
     'class' => 'HandlerClassName',
     'label' => __('Human Readable Name', 'data-machine'),
     'description' => __('Handler description', 'data-machine'),

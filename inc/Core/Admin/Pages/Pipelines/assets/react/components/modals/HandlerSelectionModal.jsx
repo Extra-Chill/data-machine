@@ -21,7 +21,7 @@ import { useHandlerContext } from '../../context/HandlerProvider';
  *
  * @param {Object}   props                 - Component props
  * @param {Function} props.onClose         - Close handler
- * @param {string}   props.stepType        - Step type (fetch, publish, update)
+ * @param {string}   props.stepType        - Step type (fetch, publish, upsert)
  * @param {Function} props.onSelectHandler - Handler selection callback
  * @param {Object}   props.handlers        - All available handlers
  * @return {React.ReactElement|null} Handler selection modal

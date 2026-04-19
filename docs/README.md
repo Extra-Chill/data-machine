@@ -24,14 +24,14 @@ Complete user documentation for Data Machine, the AI-first WordPress plugin that
 - **Parameter Systems**: Unified parameter handling across tools and handlers.
 - **Tool Result Finder**: Utility for interpreting tool responses inside data packets.
 - **OAuth Handlers**: Base classes for OAuth1/OAuth2 providers and app-password flows.
-- **Handler Registration Trait**: Centralized registration pattern for fetch, publish, and update handlers.
+- **Handler Registration Trait**: Centralized registration pattern for fetch, publish, and upsert handlers.
 - **HTTP Client**: Standardized outbound request flow for handlers with structured logging and browser-mode header support.
 - **Import/Export System**: Pipeline configuration backup, migration, and sharing functionality.
 
 ### Handler Documentation
 - **Fetch Handlers**: Source-specific data retrieval with deduplication, filtering, and engine data storage.
 - **Publish Handlers**: Modular destination integrations with consistent response formatting and logging.
-- **Update Handlers**: Idempotent WordPress updates that respect engine parameters.
+- **Upsert Handlers**: Identity-aware create-or-update operations — find existing content by identity strategy, update if changed, create if new.
 
 ### AI Tools
 - **Tools Overview**: Global and context-aware tools available to AI agents.

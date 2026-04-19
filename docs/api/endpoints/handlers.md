@@ -6,7 +6,7 @@
 
 ## Overview
 
-The Handlers endpoint provides information about registered fetch, publish, and update handlers available in Data Machine.
+The Handlers endpoint provides information about registered fetch, publish, and upsert handlers available in Data Machine.
 
 ## Authentication
 
@@ -23,7 +23,7 @@ Retrieve list of available handlers with metadata.
 **Purpose**: Discover available handlers for pipeline configuration
 
 **Parameters**:
-- `step_type` (string, optional): Filter by step type (`fetch`, `publish`, `update`)
+- `step_type` (string, optional): Filter by step type (`fetch`, `publish`, `upsert`)
 
 **Example Requests**:
 
@@ -40,7 +40,7 @@ curl https://example.com/wp-json/datamachine/v1/handlers?step_type=publish \
 curl https://example.com/wp-json/datamachine/v1/handlers?step_type=fetch \
   -u username:application_password
 
-# Get update handlers only
+# Get upsert handlers only
 curl https://example.com/wp-json/datamachine/v1/handlers?step_type=update \
   -u username:application_password
 ```
@@ -77,8 +77,8 @@ curl https://example.com/wp-json/datamachine/v1/handlers?step_type=update \
       "requires_auth": false
     },
     "wordpress-update": {
-      "type": "update",
-      "class": "DataMachine\\Core\\Steps\\Update\\Handlers\\WordPress\\WordPress",
+      "type": "upsert",
+      "class": "DataMachine\\Core\\Steps\\Upsert\\Handlers\\WordPress\\WordPress",
       "label": "WordPress Update",
       "description": "Update existing WordPress content",
       "requires_auth": false
@@ -92,7 +92,7 @@ curl https://example.com/wp-json/datamachine/v1/handlers?step_type=update \
 - `data` (object): Object of handler definitions keyed by handler slug
 
 **Handler Definition Fields**:
-- `type` (string): Handler type (`fetch`, `publish`, `update`)
+- `type` (string): Handler type (`fetch`, `publish`, `upsert`)
 - `class` (string): PHP class implementing the handler
 - `label` (string): Human-readable handler name
 - `description` (string): Handler description
@@ -136,11 +136,11 @@ Publish content to destinations.
 | **wordpress** | Config | No limit | WordPress post creation |
 | **google-sheets-output** | OAuth2 | No limit | Google Sheets row insertion |
 
-### Update Handlers
+### Upsert Handlers
 
 Modify existing content.
 
-**Available Update Handlers**:
+**Available Upsert Handlers**:
 
 | Handler | Auth | Description |
 |---------|------|-------------|

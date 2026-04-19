@@ -52,7 +52,7 @@ class ConfigureFlowStepsAbility {
 							),
 							'step_type'           => array(
 								'type'        => 'string',
-								'description' => __( 'Filter by step type (fetch, publish, update, ai)', 'data-machine' ),
+								'description' => __( 'Filter by step type (fetch, publish, upsert, ai)', 'data-machine' ),
 							),
 							'handler_slug'        => array(
 								'type'        => 'string',

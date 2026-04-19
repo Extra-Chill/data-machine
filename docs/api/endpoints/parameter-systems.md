@@ -140,7 +140,7 @@ class MyPublishHandler {
 }
 ```
 
-### Update Handlers (Engine Data)
+### Upsert Handlers (Engine Data)
 Require `source_url` from engine data stored by fetch handlers and delivered on the payload:
 
 ```php
@@ -303,7 +303,7 @@ $data = $payload['data']; // Array of data packets
 
 // Each data packet structure:
 [
-    'type' => 'fetch|ai|publish|update',
+    'type' => 'fetch|ai|publish|upsert',
     'handler' => 'rss|twitter|etc',
     'content' => ['title' => $title, 'body' => $content],
     'metadata' => ['source_type' => $type, 'source_url' => $url],

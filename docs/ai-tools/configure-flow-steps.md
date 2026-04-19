@@ -15,7 +15,7 @@ The `configure_flow_steps` tool enables configuration of flow steps after creati
 |-----------|------|----------|-------------|
 | `flow_step_id` | string | No* | Flow step ID for single-step mode |
 | `pipeline_id` | integer | No* | Pipeline ID for bulk mode |
-| `step_type` | string | No** | Filter by step type (fetch, publish, update, ai) |
+| `step_type` | string | No** | Filter by step type (fetch, publish, upsert, ai) |
 | `handler_slug` | string | No | Handler slug to set (single) or filter by (bulk) |
 | `target_handler_slug` | string | No | Handler to switch TO. When provided, `handler_slug` filters existing handlers (bulk) and `target_handler_slug` sets the new handler. |
 | `field_map` | object | No | Field mappings when switching handlers, e.g. `{"endpoint_url": "source_url"}`. |

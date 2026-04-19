@@ -1,11 +1,16 @@
 <?php
 /**
- * Update step with AI tool-calling architecture.
+ * Upsert step with AI tool-calling architecture.
  *
- * @package DataMachine\Core\Steps\Update
+ * Identity-aware create-or-update step. Handlers registered here can be
+ * update-only (e.g. wordpress_update), full upsert (e.g. upsert_event,
+ * github_update), or create-always-if-new (future). The AI calls the
+ * configured handler tool; this step routes the result into a packet.
+ *
+ * @package DataMachine\Core\Steps\Upsert
  */
 
-namespace DataMachine\Core\Steps\Update;
+namespace DataMachine\Core\Steps\Upsert;
 
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\Step;
@@ -16,20 +21,20 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class UpdateStep extends Step {
+class UpsertStep extends Step {
 
 	use StepTypeRegistrationTrait;
 
 	/**
-	 * Initialize update step.
+	 * Initialize upsert step.
 	 */
 	public function __construct() {
-		parent::__construct( 'update' );
+		parent::__construct( 'upsert' );
 
 		self::registerStepType(
-			slug: 'update',
-			label: 'Update',
-			description: 'Update existing content on external platforms',
+			slug: 'upsert',
+			label: 'Upsert',
+			description: 'Create or update content with identity-aware detection (find existing, update if changed, create if new)',
 			class_name: self::class,
 			position: 40,
 			usesHandler: true,
@@ -38,7 +43,7 @@ class UpdateStep extends Step {
 	}
 
 	/**
-	 * Execute update step logic.
+	 * Execute upsert step logic.
 	 *
 	 * @return array
 	 */
@@ -56,7 +61,7 @@ class UpdateStep extends Step {
 			if ( ! is_array( $tool_result_entry ) ) {
 				$this->log(
 					'error',
-					'Update step missing primary tool result despite required handlers being satisfied',
+					'Upsert step missing primary tool result despite required handlers being satisfied',
 					array(
 						'primary_handler_slug' => $primary_handler_slug,
 					)
@@ -103,7 +108,7 @@ class UpdateStep extends Step {
 
 		$this->log(
 			'warning',
-			'Update step required handler tool was not executed by AI',
+			'Upsert step required handler tool was not executed by AI',
 			array(
 				'configured_handlers'       => $configured_handler_slugs,
 				'required_handler_slugs'    => $required_handler_slugs,
@@ -115,7 +120,7 @@ class UpdateStep extends Step {
 	}
 
 	/**
-	 * Validate update step configuration.
+	 * Validate upsert step configuration.
 	 *
 	 * @return bool
 	 */
@@ -137,7 +142,7 @@ class UpdateStep extends Step {
 		if ( empty( $raw_required_handlers ) && count( $configured_handler_slugs ) > 1 ) {
 			$this->log(
 				'warning',
-				'Multi-handler update step has no required_handler_slugs set; defaulting to first handler',
+				'Multi-handler upsert step has no required_handler_slugs set; defaulting to first handler',
 				array(
 					'configured_handlers' => $configured_handler_slugs,
 					'default_required'    => array( $configured_handler_slugs[0] ),
@@ -175,7 +180,7 @@ class UpdateStep extends Step {
 		do_action(
 			'datamachine_fail_job',
 			$this->job_id,
-			'update_step_exception',
+			'upsert_step_exception',
 			array(
 				'flow_step_id'      => $this->flow_step_id,
 				'exception_message' => $e->getMessage(),
@@ -204,14 +209,14 @@ class UpdateStep extends Step {
 				'updated_at'    => current_time( 'mysql', true ),
 			),
 			array(
-				'step_type'           => 'update',
+				'step_type'           => 'upsert',
 				'handler'             => $handler,
 				'flow_step_id'        => $flow_step_id,
 				'success'             => $tool_result_data['success'] ?? false,
 				'executed_via'        => 'ai_tool_call',
 				'tool_execution_data' => $tool_result_data,
 			),
-			'update'
+			'upsert'
 		);
 
 		return $packet->addTo( $dataPackets );
@@ -283,14 +288,14 @@ class UpdateStep extends Step {
 				'updated_at'    => current_time( 'mysql', true ),
 			),
 			array(
-				'step_type'                 => 'update',
+				'step_type'                 => 'upsert',
 				'handler'                   => $required_handler_slugs[0] ?? ( $configured_handler_slugs[0] ?? '' ),
 				'flow_step_id'              => $this->flow_step_id,
 				'success'                   => true,
 				'fanout_sibling_handled'    => true,
 				'missing_required_handlers' => $missing_required_handlers,
 			),
-			'update'
+			'upsert'
 		);
 
 		return $packet->addTo( $this->dataPackets );
@@ -311,7 +316,7 @@ class UpdateStep extends Step {
 				'updated_at'    => current_time( 'mysql', true ),
 			),
 			array(
-				'step_type'                 => 'update',
+				'step_type'                 => 'upsert',
 				'handler'                   => $required_handler_slugs[0] ?? ( $configured_handler_slugs[0] ?? '' ),
 				'flow_step_id'              => $this->flow_step_id,
 				'success'                   => false,
@@ -321,14 +326,14 @@ class UpdateStep extends Step {
 				'required_handler_slugs'    => $required_handler_slugs,
 				'missing_required_handlers' => $missing_required_handlers,
 			),
-			'update'
+			'upsert'
 		);
 
 		return $packet->addTo( $this->dataPackets );
 	}
 
 	/**
-	 * Resolve required handler slugs for this update step.
+	 * Resolve required handler slugs for this upsert step.
 	 *
 	 * @param array $configured_handler_slugs Configured handler slugs.
 	 * @return array

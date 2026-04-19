@@ -79,7 +79,7 @@ class ConfigureFlowSteps extends BaseTool {
 				'step_type'           => array(
 					'type'        => 'string',
 					'required'    => false,
-					'description' => 'Filter by step type (fetch, publish, update, ai)',
+					'description' => 'Filter by step type (fetch, publish, upsert, ai)',
 				),
 				'handler_slug'        => array(
 					'type'        => 'string',

@@ -261,11 +261,11 @@ class CreateFlow extends BaseTool {
 	 */
 	private function applyStepConfigs( int $flow_id, array $step_configs ): array {
 		$handler_abilities   = new HandlerAbilities();
-		$update_step_ability = wp_get_ability( 'datamachine/update-flow-step' );
+		$upsert_step_ability = wp_get_ability( 'datamachine/update-flow-step' );
 		$applied             = array();
 		$errors              = array();
 
-		if ( ! $update_step_ability ) {
+		if ( ! $upsert_step_ability ) {
 			return array(
 				'applied' => array(),
 				'errors'  => array(
@@ -291,7 +291,7 @@ class CreateFlow extends BaseTool {
 					continue;
 				}
 
-				$result = $update_step_ability->execute(
+				$result = $upsert_step_ability->execute(
 					array(
 						'flow_step_id'   => $flow_step_id,
 						'handler_slug'   => $config['handler_slug'],
@@ -310,7 +310,7 @@ class CreateFlow extends BaseTool {
 			}
 
 			if ( ! empty( $config['user_message'] ) ) {
-				$result = $update_step_ability->execute(
+				$result = $upsert_step_ability->execute(
 					array(
 						'flow_step_id' => $flow_step_id,
 						'user_message' => $config['user_message'],

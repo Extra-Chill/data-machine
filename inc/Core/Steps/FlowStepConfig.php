@@ -19,7 +19,7 @@ class FlowStepConfig {
 	 *
 	 * Single source of truth for determining which slug to use when reading
 	 * or writing handler_configs. Works for both handler-based steps (fetch,
-	 * publish, update) and self-configuring steps (agent_ping, webhook_gate,
+	 * publish, upsert) and self-configuring steps (agent_ping, webhook_gate,
 	 * system_task) that use step_type as their config key.
 	 *
 	 * Priority:

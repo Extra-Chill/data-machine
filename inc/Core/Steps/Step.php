@@ -70,7 +70,7 @@ abstract class Step {
 	/**
 	 * Initialize step with type identifier.
 	 *
-	 * @param string $step_type Step type identifier (fetch, ai, publish, update)
+	 * @param string $step_type Step type identifier (fetch, ai, publish, upsert)
 	 */
 	public function __construct( string $step_type ) {
 		$this->step_type = $step_type;

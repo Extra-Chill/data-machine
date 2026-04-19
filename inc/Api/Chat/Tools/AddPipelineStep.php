@@ -37,7 +37,7 @@ class AddPipelineStep extends BaseTool {
 	 */
 	public function getToolDefinition(): array {
 		$valid_types = self::getValidStepTypes();
-		$types_list  = ! empty( $valid_types ) ? implode( ', ', $valid_types ) : 'fetch, ai, publish, update';
+		$types_list  = ! empty( $valid_types ) ? implode( ', ', $valid_types ) : 'fetch, ai, publish, upsert';
 		return array(
 			'class'       => self::class,
 			'method'      => 'handle_tool_call',

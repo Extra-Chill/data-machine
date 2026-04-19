@@ -96,7 +96,7 @@ class PipelineStepAbilities {
 	private function registerAddPipelineStepAbility(): void {
 		$step_type_abilities = new StepTypeAbilities();
 		$valid_types         = array_keys( $step_type_abilities->getAllStepTypes() );
-		$types_list          = ! empty( $valid_types ) ? implode( ', ', $valid_types ) : 'fetch, ai, publish, update';
+		$types_list          = ! empty( $valid_types ) ? implode( ', ', $valid_types ) : 'fetch, ai, publish, upsert';
 
 		wp_register_ability(
 			'datamachine/add-pipeline-step',

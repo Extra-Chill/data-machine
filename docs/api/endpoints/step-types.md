@@ -53,9 +53,9 @@ curl https://example.com/wp-json/datamachine/v1/step-types \
       "description": "Publish content to destinations"
     },
     {
-      "type": "update",
-      "label": "Update",
-      "description": "Update existing content"
+      "type": "upsert",
+      "label": "Upsert",
+      "description": "Create or update content with identity-aware detection"
     }
   ]
 }
@@ -139,16 +139,18 @@ curl https://example.com/wp-json/datamachine/v1/step-types \
 - Share to multiple platforms
 - Archive to spreadsheets
 
-### Update
+### Upsert
 
-**Type ID**: `update`
+**Type ID**: `upsert`
 
-**Purpose**: Update existing content
+**Purpose**: Create or update content with identity-aware detection
 
-**Description**: Update steps modify existing content rather than creating new items. Requires source_url from fetch handlers to identify target content.
+**Description**: Upsert steps perform find-or-create-or-update against a target system. Handlers can be update-only (modify existing content by source_url), full upsert (find-by-identity, update if changed, create if new), or create-only-if-new. Identity resolution uses the `datamachine_duplicate_strategies` filter per post type.
 
 **Available Handlers**:
-- WordPress Update
+- WordPress Update (update-only mode)
+- Event Upsert (events plugin; full upsert by title+venue+startDate)
+- GitHub Update (data-machine-code; full upsert via Contents API SHA)
 
 **Use Cases**:
 - Enhance existing posts
@@ -314,4 +316,4 @@ curl https://example.com/wp-json/datamachine/v1/step-types \
 **Base URL**: `/wp-json/datamachine/v1/step-types`
 **Permission**: `manage_options` capability required
 **Implementation**: `inc/Api/StepTypes.php`
-**Available Types**: fetch, ai, publish, update
+**Available Types**: fetch, ai, publish, upsert

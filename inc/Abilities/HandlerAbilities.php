@@ -108,7 +108,7 @@ class HandlerAbilities {
 						),
 						'step_type'    => array(
 							'type'        => array( 'string', 'null' ),
-							'description' => __( 'Step type filter (fetch, publish, update, etc.)', 'data-machine' ),
+							'description' => __( 'Step type filter (fetch, publish, upsert, etc.)', 'data-machine' ),
 						),
 					),
 				),

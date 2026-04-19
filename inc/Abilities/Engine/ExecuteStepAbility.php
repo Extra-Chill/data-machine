@@ -443,7 +443,7 @@ class ExecuteStepAbility {
 				// Inline continuation: when a step produces 0-1 DataPackets,
 				// schedule the next step directly on the same job instead of
 				// creating child jobs. This eliminates recursive fan-out where
-				// children spawn grandchildren (e.g., AI step → update step).
+				// children spawn grandchildren (e.g., AI step → upsert step).
 				//
 				// Fan-out is only meaningful when a step produces MULTIPLE
 				// packets that need parallel processing (e.g., fetch step
@@ -483,7 +483,7 @@ class ExecuteStepAbility {
 				}
 
 				// Filter packets before fan-out: only handler-complete packets
-				// carry data that downstream steps (UpdateStep) can use.
+				// carry data that downstream steps (UpsertStep) can use.
 				// Non-handler packets (tool_result, ai_response) would create
 				// child jobs guaranteed to fail with 'required_handler_tool_not_called'.
 				$fanout_packets = self::filterPacketsForFanOut( $dataPackets );
@@ -682,7 +682,7 @@ class ExecuteStepAbility {
 	 *
 	 * When the AI step produces multiple packets, the batch scheduler creates
 	 * one child job per packet. Only 'ai_handler_complete' packets carry the
-	 * handler result that downstream steps (UpdateStep, PublishStep) need via
+	 * handler result that downstream steps (UpsertStep, PublishStep) need via
 	 * ToolResultFinder. Non-handler packets ('tool_result', 'ai_response')
 	 * would create child jobs that fail with 'required_handler_tool_not_called'.
 	 *

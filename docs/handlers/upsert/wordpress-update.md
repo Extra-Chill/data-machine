@@ -179,13 +179,13 @@ $parameters = [
 
 **Source URL Requirement**: Requires source URL from centralized engine data via datamachine_engine_data filter for post identification, making it suitable for content update workflows.
 
-**ToolResultFinder Integration** (@since v0.2.0): UpdateStep uses the `ToolResultFinder` utility class for locating handler tool execution results in data packets.
+**ToolResultFinder Integration** (@since v0.2.0): UpsertStep uses the `ToolResultFinder` utility class for locating handler tool execution results in data packets.
 
 **Tool Result Search Pattern**:
 ```php
 use DataMachine\Engine\AI\ToolResultFinder;
 
-// UpdateStep.php
+// UpsertStep.php
 $tool_result_entry = ToolResultFinder::findHandlerResult($data, $handler_slug);
 
 if ($tool_result_entry) {
@@ -199,7 +199,7 @@ if ($tool_result_entry) {
 }
 
 // AI did not execute handler tool - fail cleanly
-do_action('datamachine_log', 'error', 'UpdateStep: AI did not execute handler tool');
+do_action('datamachine_log', 'error', 'UpsertStep: AI did not execute handler tool');
 return [];
 ```
 
@@ -212,7 +212,7 @@ return [];
 **Benefits**:
 - Universal search utility shared across all update handlers
 - Consistent tool result detection across step types
-- Simplified update handler implementation
+- Simplified upsert handler implementation
 - Centralized maintenance for search improvements
 
 **Metadata Preservation**: Maintains existing post metadata, publication dates, and author information.

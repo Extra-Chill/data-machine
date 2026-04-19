@@ -518,7 +518,7 @@ Both humans and agents can update memory files:
 - **Humans** edit via the WordPress admin Agent page or any text editor with server access
 - **Agents** update via REST API, Abilities API, or direct file write during workflows
 - **DailyMemoryTask** automatically archives session-specific content from MEMORY.md
-- **Pipelines** can include memory-update steps that append learned information
+- **Pipelines** can include memory-upsert steps that append learned information
 
 The most effective pattern is **agent writes, human reviews** — the agent appends what it learns, DailyMemoryTask keeps it pruned, and the human periodically curates for accuracy and relevance.
 

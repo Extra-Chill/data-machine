@@ -1,20 +1,20 @@
 <?php
 /**
- * UpdateStep tests.
+ * UpsertStep tests.
  *
- * @package DataMachine\Tests\Unit\Core\Steps\Update
+ * @package DataMachine\Tests\Unit\Core\Steps\Upsert
  */
 
-namespace DataMachine\Tests\Unit\Core\Steps\Update;
+namespace DataMachine\Tests\Unit\Core\Steps\Upsert;
 
 use DataMachine\Core\EngineData;
-use DataMachine\Core\Steps\Update\UpdateStep;
+use DataMachine\Core\Steps\Upsert\UpsertStep;
 use WP_UnitTestCase;
 
-class UpdateStepTest extends WP_UnitTestCase {
+class UpsertStepTest extends WP_UnitTestCase {
 
 	/**
-	 * Build payload for UpdateStep execution.
+	 * Build payload for UpsertStep execution.
 	 *
 	 * @param array $flow_step_config Flow step config.
 	 * @param array $data_packets Existing data packets.
@@ -51,7 +51,7 @@ class UpdateStepTest extends WP_UnitTestCase {
 	}
 
 	public function test_missing_required_handler_tool_sets_explicit_failure_reason(): void {
-		$step = new UpdateStep();
+		$step = new UpsertStep();
 
 		$result = $step->execute(
 			$this->buildPayload(
@@ -65,14 +65,14 @@ class UpdateStepTest extends WP_UnitTestCase {
 		$this->assertNotEmpty( $result );
 		$last = $result[ array_key_last( $result ) ];
 
-		$this->assertSame( 'update', $last['type'] ?? '' );
+		$this->assertSame( 'upsert', $last['type'] ?? '' );
 		$this->assertSame( 'required_handler_tool_not_called', $last['metadata']['failure_reason'] ?? '' );
 		$this->assertTrue( (bool) ( $last['metadata']['missing_handler_tool'] ?? false ) );
 		$this->assertSame( array( 'upsert_event' ), $last['metadata']['required_handler_slugs'] ?? array() );
 	}
 
 	public function test_required_handler_slugs_allows_non_first_handler_when_configured(): void {
-		$step = new UpdateStep();
+		$step = new UpsertStep();
 
 		$data_packets = array(
 			array(
@@ -103,7 +103,7 @@ class UpdateStepTest extends WP_UnitTestCase {
 		// Find the update packet — it's added alongside the original tool_result.
 		$update_packet = null;
 		foreach ( $result as $packet ) {
-			if ( ( $packet['type'] ?? '' ) === 'update' ) {
+			if ( ( $packet['type'] ?? '' ) === 'upsert' ) {
 				$update_packet = $packet;
 				break;
 			}
@@ -119,7 +119,7 @@ class UpdateStepTest extends WP_UnitTestCase {
 	 * Regression test for issue #1096.
 	 *
 	 * Batch children created by PipelineBatchScheduler each carry their own
-	 * ai_handler_complete packet. If such a child reaches UpdateStep without
+	 * ai_handler_complete packet. If such a child reaches UpsertStep without
 	 * the expected handler result (e.g. upstream filter regression or AI not
 	 * calling the handler tool), it must NOT be silenced via the legacy
 	 * fan-out skip path — that produced 8,030 orphaned jobs with status
@@ -142,7 +142,7 @@ class UpdateStepTest extends WP_UnitTestCase {
 			)
 		);
 
-		$step = new UpdateStep();
+		$step = new UpsertStep();
 
 		$result = $step->execute(
 			$this->buildPayload(
@@ -162,7 +162,7 @@ class UpdateStepTest extends WP_UnitTestCase {
 		$last = $result[ array_key_last( $result ) ];
 
 		// Must be a real failure, NOT a fan-out skip packet.
-		$this->assertSame( 'update', $last['type'] ?? '' );
+		$this->assertSame( 'upsert', $last['type'] ?? '' );
 		$this->assertSame(
 			'required_handler_tool_not_called',
 			$last['metadata']['failure_reason'] ?? '',
@@ -193,7 +193,7 @@ class UpdateStepTest extends WP_UnitTestCase {
 		// Parent has NO batch flag — legacy fan-out scenario.
 		datamachine_set_engine_data( $parent_job_id, array() );
 
-		$step = new UpdateStep();
+		$step = new UpsertStep();
 
 		$result = $step->execute(
 			$this->buildPayload(
@@ -212,7 +212,7 @@ class UpdateStepTest extends WP_UnitTestCase {
 		$this->assertNotEmpty( $result );
 		$last = $result[ array_key_last( $result ) ];
 
-		$this->assertSame( 'update', $last['type'] ?? '' );
+		$this->assertSame( 'upsert', $last['type'] ?? '' );
 		$this->assertTrue(
 			(bool) ( $last['metadata']['fanout_sibling_handled'] ?? false ),
 			'Legacy fan-out children should still skip silently as a safety net.'

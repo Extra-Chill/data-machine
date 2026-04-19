@@ -15,7 +15,7 @@ This guide explains how Data Machine extensions integrate with the REST API ecos
 ### When to Use
 
 Use filter-based integration when your extension:
-- Provides handlers for Data Machine pipelines (fetch, publish, update)
+- Provides handlers for Data Machine pipelines (fetch, publish, upsert)
 - Adds AI tools to existing workflows
 - Extends handler types with new capabilities
 - Integrates with Data Machine's execution engine

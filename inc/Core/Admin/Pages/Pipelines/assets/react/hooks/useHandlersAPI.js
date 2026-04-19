@@ -17,7 +17,7 @@ import { getHandlers } from '../utils/api';
 /**
  * Fetch handlers from REST API
  *
- * @param {string|null} stepType - Optional step type filter (fetch, publish, update)
+ * @param {string|null} stepType - Optional step type filter (fetch, publish, upsert)
  * @return {Object} Handlers data with loading and error states
  */
 export const useHandlersAPI = ( stepType = null ) => {

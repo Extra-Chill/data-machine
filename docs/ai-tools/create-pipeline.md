@@ -19,7 +19,7 @@ Each step in the `steps` array supports:
 
 ```json
 {
-  "step_type": "fetch|ai|publish|update",
+  "step_type": "fetch|ai|publish|upsert",
   "handler_slug": "handler_name",
   "handler_config": {
     // Handler-specific configuration
@@ -135,7 +135,7 @@ This tool automatically creates a flow because:
 
 Validates all step definitions:
 - Checks `step_type` against available types
-- Validates `handler_slug` for fetch/publish/update steps
+- Validates `handler_slug` for fetch/publish/upsert steps
 - Ensures AI steps have required provider/model when specified
 - Verifies execution order and step relationships
 

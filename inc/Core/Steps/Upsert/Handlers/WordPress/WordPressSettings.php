@@ -1,6 +1,6 @@
 <?php
 /**
- * WordPress Update Handler Settings
+ * WordPress Upsert Handler Settings
  *
  * Defines settings fields and sanitization for WordPress update handler.
  * Part of the modular handler architecture.
@@ -9,7 +9,7 @@
  * @since 1.0.0
  */
 
-namespace DataMachine\Core\Steps\Update\Handlers\WordPress;
+namespace DataMachine\Core\Steps\Upsert\Handlers\WordPress;
 
 use DataMachine\Core\Steps\Settings\SettingsHandler;
 use DataMachine\Core\WordPress\WordPressSettingsHandler;

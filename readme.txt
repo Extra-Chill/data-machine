@@ -50,7 +50,7 @@ Publish Destinations:
 * WordPress (with modular components for images, taxonomies, and source attribution)
 * Google Sheets
 
-Update Handlers:
+Upsert Handlers:
 * WordPress Update (modify existing posts/pages)
 
 AI Tools:

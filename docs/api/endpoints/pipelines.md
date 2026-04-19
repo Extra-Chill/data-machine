@@ -164,7 +164,7 @@ Add a step to an existing pipeline.
 
 **Parameters**:
 - `pipeline_id` (integer, required): Pipeline ID (in URL path)
-- `step_type` (string, required): Step type (`fetch`, `ai`, `publish`, `update`)
+- `step_type` (string, required): Step type (`fetch`, `ai`, `publish`, `upsert`)
 
 **Example Request**:
 

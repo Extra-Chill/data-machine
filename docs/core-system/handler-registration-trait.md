@@ -172,7 +172,7 @@ function datamachine_register_rss_filters() {
 datamachine_register_rss_filters();
 ```
 
-### Update Handler Example
+### Upsert Handler Example
 
 ```php
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
