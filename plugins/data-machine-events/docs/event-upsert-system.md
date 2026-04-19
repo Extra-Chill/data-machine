@@ -32,7 +32,7 @@ Merges engine snapshot data with AI-provided parameters, prioritizing engine dat
 
 ### Core Classes
 
-- **EventUpsert**: Main handler extending `UpdateHandler`
+- **EventUpsert**: Main handler extending `UpsertHandler`
 - **Venue**: Venue taxonomy assignment utilities
 - **Promoter**: Promoter taxonomy assignment utilities
 - **EventSchemaProvider**: Schema.org data generation

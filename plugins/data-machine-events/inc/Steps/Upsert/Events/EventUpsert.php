@@ -28,7 +28,7 @@ use const DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY;
 use function DataMachineEvents\Core\datamachine_normalize_ticket_url;
 use function DataMachineEvents\Core\datamachine_extract_ticket_identity;
 use DataMachine\Core\Similarity\SimilarityEngine;
-use DataMachine\Core\Steps\Update\Handlers\UpdateHandler;
+use DataMachine\Core\Steps\Upsert\Handlers\UpsertHandler;
 use DataMachine\Core\WordPress\TaxonomyHandler;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
 use DataMachine\Core\WordPress\WordPressPublishHelper;
@@ -36,7 +36,7 @@ use DataMachineEvents\Core\DuplicateDetection\EventIdentityWriter;
 
 defined( 'ABSPATH' ) || exit;
 
-class EventUpsert extends UpdateHandler {
+class EventUpsert extends UpsertHandler {
 
 	protected $taxonomy_handler;
 

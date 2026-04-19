@@ -34,7 +34,7 @@ class EventUpsertFilters {
 	public static function register(): void {
 		self::registerHandler(
 			'upsert_event',
-			'update',
+			'upsert',
 			EventUpsert::class,
 			__( 'Upsert to Events Calendar', 'data-machine-events' ),
 			__( 'Create or update event posts with intelligent change detection', 'data-machine-events' ),
