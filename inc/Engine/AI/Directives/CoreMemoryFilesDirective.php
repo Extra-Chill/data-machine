@@ -27,6 +27,7 @@ namespace DataMachine\Engine\AI\Directives;
 
 use DataMachine\Core\FilesRepository\AgentMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
+use DataMachine\Engine\AI\Memory\MemoryPolicyResolver;
 use DataMachine\Engine\AI\MemoryFileRegistry;
 
 defined( 'ABSPATH' ) || exit;
@@ -61,11 +62,14 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 
 		$outputs = array();
 
-		// Load registered files applicable to the current execution context.
+		// Load registered files applicable to the current execution context,
+		// filtered through the per-agent MemoryPolicy.
 		$context       = $payload['context'] ?? '';
-		$context_files = ! empty( $context )
-			? MemoryFileRegistry::get_for_context( $context )
-			: MemoryFileRegistry::get_all();
+		$resolver      = new MemoryPolicyResolver();
+		$context_files = $resolver->resolveRegistered( array(
+			'context'  => $context,
+			'agent_id' => $agent_id,
+		) );
 
 		foreach ( $context_files as $filename => $meta ) {
 			$layer  = $meta['layer'] ?? MemoryFileRegistry::LAYER_AGENT;
