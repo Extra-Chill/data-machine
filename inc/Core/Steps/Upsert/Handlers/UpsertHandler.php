@@ -6,16 +6,16 @@
  * result with a post_id, the base class writes origin metadata (handler,
  * flow, pipeline) without any action needed from subclasses.
  *
- * @package DataMachine\Core\Steps\Update\Handlers
+ * @package DataMachine\Core\Steps\Upsert\Handlers
  */
 
-namespace DataMachine\Core\Steps\Update\Handlers;
+namespace DataMachine\Core\Steps\Upsert\Handlers;
 
 use DataMachine\Core\EngineData;
 
 defined( 'ABSPATH' ) || exit;
 
-abstract class UpdateHandler {
+abstract class UpsertHandler {
 
 	/**
 	 * Get all engine data for the current job.
@@ -99,7 +99,7 @@ abstract class UpdateHandler {
 	 * @return array Error response
 	 */
 	protected function errorResponse( string $message, array $context = array(), string $level = 'error' ): array {
-		do_action( 'datamachine_log', $level, 'Update Handler Error: ' . $message, $context );
+		do_action( 'datamachine_log', $level, 'Upsert Handler Error: ' . $message, $context );
 		return array(
 			'success'   => false,
 			'error'     => $message,

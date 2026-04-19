@@ -1,20 +1,20 @@
 <?php
 /**
- * UpdateStep tests.
+ * UpsertStep tests.
  *
- * @package DataMachine\Tests\Unit\Core\Steps\Update
+ * @package DataMachine\Tests\Unit\Core\Steps\Upsert
  */
 
-namespace DataMachine\Tests\Unit\Core\Steps\Update;
+namespace DataMachine\Tests\Unit\Core\Steps\Upsert;
 
 use DataMachine\Core\EngineData;
-use DataMachine\Core\Steps\Update\UpdateStep;
+use DataMachine\Core\Steps\Upsert\UpsertStep;
 use WP_UnitTestCase;
 
-class UpdateStepTest extends WP_UnitTestCase {
+class UpsertStepTest extends WP_UnitTestCase {
 
 	/**
-	 * Build payload for UpdateStep execution.
+	 * Build payload for UpsertStep execution.
 	 *
 	 * @param array $flow_step_config Flow step config.
 	 * @param array $data_packets Existing data packets.
@@ -46,7 +46,7 @@ class UpdateStepTest extends WP_UnitTestCase {
 	}
 
 	public function test_missing_required_handler_tool_sets_explicit_failure_reason(): void {
-		$step = new UpdateStep();
+		$step = new UpsertStep();
 
 		$result = $step->execute(
 			$this->buildPayload(
@@ -67,7 +67,7 @@ class UpdateStepTest extends WP_UnitTestCase {
 	}
 
 	public function test_required_handler_slugs_allows_non_first_handler_when_configured(): void {
-		$step = new UpdateStep();
+		$step = new UpsertStep();
 
 		$data_packets = array(
 			array(

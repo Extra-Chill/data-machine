@@ -483,7 +483,7 @@ class ExecuteStepAbility {
 				}
 
 				// Filter packets before fan-out: only handler-complete packets
-				// carry data that downstream steps (UpdateStep) can use.
+				// carry data that downstream steps (UpsertStep) can use.
 				// Non-handler packets (tool_result, ai_response) would create
 				// child jobs guaranteed to fail with 'required_handler_tool_not_called'.
 				$handler_packets = array_values(

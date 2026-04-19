@@ -101,14 +101,14 @@ if ($result) {
 
 ## Integration Patterns
 
-### Update Step Integration
+### Upsert Step Integration
 
-The Update step (`/inc/Core/Steps/Update/UpdateStep.php`) uses ToolResultFinder to locate handler tool results:
+The Upsert step (`/inc/Core/Steps/Upsert/UpsertStep.php`) uses ToolResultFinder to locate handler tool results:
 
 ```php
 use DataMachine\Engine\AI\ToolResultFinder;
 
-class UpdateStep {
+class UpsertStep {
     public function execute(array $payload): array {
         $data = $payload['data'] ?? [];
         $flow_step_config = $payload['flow_step_config'] ?? [];
@@ -128,7 +128,7 @@ class UpdateStep {
         }
 
         // AI did not execute handler tool - fail cleanly
-        do_action('datamachine_log', 'error', 'UpdateStep: AI did not execute handler tool', [
+        do_action('datamachine_log', 'error', 'UpsertStep: AI did not execute handler tool', [
             'expected_handler' => $handler_slug
         ]);
 

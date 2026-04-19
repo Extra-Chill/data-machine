@@ -226,7 +226,7 @@ All notable changes to Data Machine will be documented in this file.
 
 ### Fixed
 - use get_blog_option() for multisite log level check
-- silence fan-out grandchild handler-miss noise in UpdateStep
+- silence fan-out grandchild handler-miss noise in UpsertStep
 - inline continuation for single-packet step transitions
 - prevent duplicate tool calls with full conversation history dedup
 - enforce concise skip_item reasons (2-5 words max)
@@ -308,7 +308,7 @@ All notable changes to Data Machine will be documented in this file.
 - add $meta parameter to HandlerRegistrationTrait
 
 ### Fixed
-- engine_data clobber in AIStep + revert UpdateStep fallback + transport safety
+- engine_data clobber in AIStep + revert UpsertStep fallback + transport safety
 
 ## [0.50.1] - 2026-03-21
 
@@ -626,7 +626,7 @@ All notable changes to Data Machine will be documented in this file.
 - ImageGenerationPromptRefinement and JobAbilities test rewrites (#606)
 - AI step emitting conversation turns as DataPackets (#609)
 - fail orphaned batch parents instead of leaving stuck processing jobs (#627)
-- classify update-step tool misses as agent_skipped (#628)
+- classify upsert-step tool misses as agent_skipped (#628)
 - include schedule and max_items in flows list output (#629)
 - align global AI tool classes with BaseTool conventions (#632)
 - complete global tool convention methods for QueueValidator
@@ -2192,7 +2192,7 @@ This release marks a new era of Data Machine with systematic flow monitoring and
 
 ### Removed
 - **Legacy Logs Assets** - Deleted legacy `admin-logs.js` and associated PHP template logic.
-- **Step Filter Classes** - Removed `AIStepFilters`, `FetchStepFilters`, `PublishStepFilters`, and `UpdateStepFilters`.
+- **Step Filter Classes** - Removed `AIStepFilters`, `FetchStepFilters`, `PublishStepFilters`, and `UpsertStepFilters`.
 
 ## [0.7.1] - 2026-01-02
 

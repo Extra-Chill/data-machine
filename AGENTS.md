@@ -58,7 +58,7 @@ Engine & execution
 Core architecture
 
 - **Abilities-First Architecture**: All service logic has been migrated to the WordPress 6.9 Abilities API. The Services directory is empty.
-- Base classes for `Step`, `FetchHandler`, `PublishHandler`, `UpdateHandler`, `SettingsHandler`, and `DataPacket` provide consistent behavior and reduce duplication.
+- Base classes for `Step`, `FetchHandler`, `PublishHandler`, `UpsertHandler`, `SettingsHandler`, and `DataPacket` provide consistent behavior and reduce duplication.
 - Base authentication provider architecture (`BaseAuthProvider`, `BaseOAuth1Provider`, `BaseOAuth2Provider`) centralizes option storage and authentication validation across all providers (@since v0.2.6).
 - FilesRepository is modular (storage, cleanup, validation, download, retrieval) and provides flow-isolated file handling.
 - EngineData provides platform-agnostic data access (single source of truth for engine parameters).

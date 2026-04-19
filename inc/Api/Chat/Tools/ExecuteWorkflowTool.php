@@ -31,7 +31,7 @@ class ExecuteWorkflowTool extends BaseTool {
 	 */
 	public function getToolDefinition(): array {
 		$step_types_ability = wp_get_ability( 'datamachine/get-step-types' );
-		$type_slugs         = array( 'fetch', 'ai', 'publish', 'update' );
+		$type_slugs         = array( 'fetch', 'ai', 'publish', 'upsert' );
 
 		if ( $step_types_ability ) {
 			$result = $step_types_ability->execute( array() );

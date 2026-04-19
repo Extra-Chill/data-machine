@@ -2,10 +2,10 @@
 /**
  * Update step with AI tool-calling architecture.
  *
- * @package DataMachine\Core\Steps\Update
+ * @package DataMachine\Core\Steps\Upsert
  */
 
-namespace DataMachine\Core\Steps\Update;
+namespace DataMachine\Core\Steps\Upsert;
 
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\Step;
@@ -16,20 +16,20 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class UpdateStep extends Step {
+class UpsertStep extends Step {
 
 	use StepTypeRegistrationTrait;
 
 	/**
-	 * Initialize update step.
+	 * Initialize upsert step.
 	 */
 	public function __construct() {
-		parent::__construct( 'update' );
+		parent::__construct( 'upsert' );
 
 		self::registerStepType(
-			slug: 'update',
-			label: 'Update',
-			description: 'Update existing content on external platforms',
+			slug: 'upsert',
+			label: 'Upsert',
+			description: 'Create or update content with identity-aware detection (find existing, update if changed, create if new)',
 			class_name: self::class,
 			position: 40,
 			usesHandler: true,
@@ -171,7 +171,7 @@ class UpdateStep extends Step {
 		do_action(
 			'datamachine_fail_job',
 			$this->job_id,
-			'update_step_exception',
+			'upsert_step_exception',
 			array(
 				'flow_step_id'      => $this->flow_step_id,
 				'exception_message' => $e->getMessage(),
@@ -200,14 +200,14 @@ class UpdateStep extends Step {
 				'updated_at'    => current_time( 'mysql', true ),
 			),
 			array(
-				'step_type'           => 'update',
+				'step_type'           => 'upsert',
 				'handler'             => $handler,
 				'flow_step_id'        => $flow_step_id,
 				'success'             => $tool_result_data['success'] ?? false,
 				'executed_via'        => 'ai_tool_call',
 				'tool_execution_data' => $tool_result_data,
 			),
-			'update'
+			'upsert'
 		);
 
 		return $packet->addTo( $dataPackets );
@@ -252,14 +252,14 @@ class UpdateStep extends Step {
 				'updated_at'    => current_time( 'mysql', true ),
 			),
 			array(
-				'step_type'                 => 'update',
+				'step_type'                 => 'upsert',
 				'handler'                   => $required_handler_slugs[0] ?? ( $configured_handler_slugs[0] ?? '' ),
 				'flow_step_id'              => $this->flow_step_id,
 				'success'                   => true,
 				'fanout_sibling_handled'    => true,
 				'missing_required_handlers' => $missing_required_handlers,
 			),
-			'update'
+			'upsert'
 		);
 
 		return $packet->addTo( $this->dataPackets );
@@ -280,7 +280,7 @@ class UpdateStep extends Step {
 				'updated_at'    => current_time( 'mysql', true ),
 			),
 			array(
-				'step_type'                 => 'update',
+				'step_type'                 => 'upsert',
 				'handler'                   => $required_handler_slugs[0] ?? ( $configured_handler_slugs[0] ?? '' ),
 				'flow_step_id'              => $this->flow_step_id,
 				'success'                   => false,
@@ -290,7 +290,7 @@ class UpdateStep extends Step {
 				'required_handler_slugs'    => $required_handler_slugs,
 				'missing_required_handlers' => $missing_required_handlers,
 			),
-			'update'
+			'upsert'
 		);
 
 		return $packet->addTo( $this->dataPackets );

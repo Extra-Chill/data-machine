@@ -53,9 +53,9 @@ curl https://example.com/wp-json/datamachine/v1/step-types \
       "description": "Publish content to destinations"
     },
     {
-      "type": "update",
-      "label": "Update",
-      "description": "Update existing content"
+      "type": "upsert",
+      "label": "Upsert",
+      "description": "Create or update content with identity-aware detection"
     }
   ]
 }

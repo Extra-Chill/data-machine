@@ -462,7 +462,7 @@ class AIStep extends Step {
 
 		// Process tool execution results into output packets.
 		// Only handler completions and tool results are emitted — these are
-		// consumed by downstream steps (PublishStep, UpdateStep) via ToolResultFinder.
+		// consumed by downstream steps (PublishStep, UpsertStep) via ToolResultFinder.
 		// Input DataPackets are NOT included — they cause ghost child jobs.
 		$input_source_type = $inputDataPackets[0]['metadata']['source_type'] ?? 'unknown';
 

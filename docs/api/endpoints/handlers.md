@@ -77,8 +77,8 @@ curl https://example.com/wp-json/datamachine/v1/handlers?step_type=update \
       "requires_auth": false
     },
     "wordpress-update": {
-      "type": "update",
-      "class": "DataMachine\\Core\\Steps\\Update\\Handlers\\WordPress\\WordPress",
+      "type": "upsert",
+      "class": "DataMachine\\Core\\Steps\\Upsert\\Handlers\\WordPress\\WordPress",
       "label": "WordPress Update",
       "description": "Update existing WordPress content",
       "requires_auth": false

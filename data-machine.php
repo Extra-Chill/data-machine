@@ -320,7 +320,7 @@ add_action( 'plugins_loaded', 'datamachine_run_datamachine_plugin', 20 );
 function datamachine_load_step_types() {
 	new \DataMachine\Core\Steps\Fetch\FetchStep();
 	new \DataMachine\Core\Steps\Publish\PublishStep();
-	new \DataMachine\Core\Steps\Update\UpdateStep();
+	new \DataMachine\Core\Steps\Upsert\UpsertStep();
 	new \DataMachine\Core\Steps\AI\AIStep();
 	new \DataMachine\Core\Steps\WebhookGate\WebhookGateStep();
 	new \DataMachine\Core\Steps\SystemTask\SystemTaskStep();
@@ -344,7 +344,7 @@ function datamachine_load_handlers() {
 	new \DataMachine\Core\Steps\Fetch\Handlers\Files\Files();
 
 	// Update Handlers
-	new \DataMachine\Core\Steps\Update\Handlers\WordPress\WordPress();
+	new \DataMachine\Core\Steps\Upsert\Handlers\WordPress\WordPress();
 }
 
 /**
@@ -599,6 +599,9 @@ function datamachine_activate_for_site() {
 
 	// Migrate agent_ping step types to flow configs (idempotent).
 	datamachine_migrate_agent_ping_to_system_task();
+
+	// Migrate `update` step type to `upsert` in pipeline/flow configs (idempotent).
+	datamachine_migrate_update_to_upsert_step_type();
 
 	// Drop redundant _datamachine_post_pipeline_id rows (#1091). Idempotent.
 	datamachine_drop_redundant_post_pipeline_meta();

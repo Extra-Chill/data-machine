@@ -9,7 +9,7 @@
  *
  * Tracking is invoked centrally in ToolExecutor::executeTool() after
  * every successful tool call whose result carries an extractable post_id,
- * covering both handler tools (PublishHandler / UpdateHandler subclasses)
+ * covering both handler tools (PublishHandler / UpsertHandler subclasses)
  * and ability tools (PublishWordPressAbility, InsertContentAbility,
  * EditPostBlocksAbility, ReplacePostBlocksAbility, third-party abilities
  * registered as pipeline tools). Individual handlers and abilities do

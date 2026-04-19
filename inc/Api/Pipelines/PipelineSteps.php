@@ -140,13 +140,13 @@ class PipelineSteps {
 			array(
 				array(
 					'methods'             => 'PUT',
-					'callback'            => array( self::class, 'handle_update_step_config' ),
+					'callback'            => array( self::class, 'handle_upsert_step_config' ),
 					'permission_callback' => array( self::class, 'check_permission' ),
 					'args'                => self::get_step_config_args( false ),
 				),
 				array(
 					'methods'             => 'PATCH',
-					'callback'            => array( self::class, 'handle_update_step_config' ),
+					'callback'            => array( self::class, 'handle_upsert_step_config' ),
 					'permission_callback' => array( self::class, 'check_permission' ),
 					'args'                => self::get_step_config_args( true ),
 				),
@@ -425,7 +425,7 @@ class PipelineSteps {
 	 *
 	 * PUT /datamachine/v1/pipelines/steps/{pipeline_step_id}/config
 	 */
-	public static function handle_update_step_config( $request ) {
+	public static function handle_upsert_step_config( $request ) {
 		// Validate permissions
 		if ( ! PermissionHelper::can( 'manage_flows' ) ) {
 			return new \WP_Error(

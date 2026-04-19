@@ -58,7 +58,7 @@ The ExecuteWorkflow tool enables AI agents to execute complete multi-step workfl
 }
 ```
 
-### Update Steps
+### Upsert Steps
 ```json
 {
   "step_type": "update",
