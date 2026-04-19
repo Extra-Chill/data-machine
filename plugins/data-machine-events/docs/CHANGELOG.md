@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.29.1] - 2026-04-19
+
+### Changed
+- rename executeUpdate() → executeUpsert() to match renamed base class
+
 ## [0.29.0] - 2026-04-19
 
 ### Added
