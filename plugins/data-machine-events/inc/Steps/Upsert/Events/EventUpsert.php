@@ -55,7 +55,7 @@ class EventUpsert extends UpsertHandler {
 	 * @param array $handler_config Handler configuration
 	 * @return array Tool call result with action: created|updated|no_change
 	 */
-	protected function executeUpdate( array $parameters, array $handler_config ): array {
+	protected function executeUpsert( array $parameters, array $handler_config ): array {
 		// Get engine data FIRST (before validation)
 		$job_id = (int) ( $parameters['job_id'] ?? 0 );
 		$engine = $parameters['engine'] ?? null;
@@ -123,7 +123,7 @@ class EventUpsert extends UpsertHandler {
 	/**
 	 * Execute the find-or-create logic within an advisory lock.
 	 *
-	 * Separated from executeUpdate() so the lock boundary is clear:
+	 * Separated from executeUpsert() so the lock boundary is clear:
 	 * the lock is held from before findExistingEvent() through the
 	 * completion of createEventPost() or updateEventPost().
 	 *
