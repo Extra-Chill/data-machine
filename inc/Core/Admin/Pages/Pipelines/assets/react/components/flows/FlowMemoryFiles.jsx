@@ -6,6 +6,8 @@
  * Delegates to the shared MemoryFilesSelector component.
  *
  * @since 0.40.0 Added daily memory support.
+ * @since 0.71.0 Daily memory is now a virtual file (DAILY.md) governed by
+ *               MemoryPolicy — no longer configured per-flow.
  */
 
 /**
@@ -28,18 +30,14 @@ export default function FlowMemoryFiles( { flowId } ) {
 	const { data, isLoading } = useFlowMemoryFiles( flowId );
 	const updateMutation = useUpdateFlowMemoryFiles( flowId );
 
-	// Extract memory files and daily memory from the query response.
 	const selectedFiles = data?.memoryFiles || [];
-	const dailyMemory = data?.dailyMemory || { mode: 'none' };
 
 	return (
 		<MemoryFilesSelector
 			scopeLabel="flow"
 			selectedFiles={ selectedFiles }
-			dailyMemory={ dailyMemory }
 			isLoading={ isLoading }
 			updateMutation={ updateMutation }
-			showDailyMemory={ true }
 		/>
 	);
 }

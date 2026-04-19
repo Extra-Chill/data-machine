@@ -158,7 +158,7 @@ add_action( 'init', 'datamachine_register_network_md_invalidation' );
 add_action( 'init', 'datamachine_register_composable_file_invalidation' );
 
 require_once __DIR__ . '/Engine/AI/Directives/ClientContextDirective.php';
-require_once __DIR__ . '/Engine/AI/Directives/DailyMemorySelectorDirective.php';
+require_once __DIR__ . '/Engine/AI/Directives/AgentDailyMemoryDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineSystemPromptDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineMemoryFilesDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/FlowMemoryFilesDirective.php';

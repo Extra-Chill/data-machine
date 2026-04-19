@@ -9,7 +9,7 @@ Daily memory has six components:
 1. **DailyMemory service** — filesystem storage with CRUD, search, and date-range queries
 2. **DailyMemoryTask** — AI-powered system task that synthesizes daily summaries and cleans MEMORY.md
 3. **DailyMemoryAbilities** — WordPress 6.9 Abilities API registration
-4. **DailyMemorySelectorDirective** — pipeline context injection at Priority 46
+4. **AgentDailyMemoryDirective** — opt-in injection at Priority 35 for agents that enable it via `agent_config.daily_memory` (chat + pipeline contexts). Since 0.71.0; replaces `DailyMemorySelectorDirective`.
 5. **AgentDailyMemory tool** — AI chat tool for agent self-service
 6. **CLI and REST endpoints** — human and programmatic access
 
@@ -191,46 +191,59 @@ wp_execute_ability('datamachine/search-daily-memory', [
 ]);
 ```
 
-## DailyMemorySelectorDirective
+## AgentDailyMemoryDirective
 
-**Source:** `inc/Engine/AI/Directives/DailyMemorySelectorDirective.php`
-**Since:** v0.40.0
-**Priority:** 46
+**Source:** `inc/Engine/AI/Directives/AgentDailyMemoryDirective.php`
+**Since:** v0.71.0
+**Priority:** 35
+**Contexts:** `chat`, `pipeline`
 
-A pipeline directive that injects daily memory files into AI context based on per-flow configuration. This allows pipelines to reference recent activity history during execution.
+Opt-in directive that reads recent daily archive files directly from disk and injects each one as its own `system_text` block into the AI context. Replaces the former `DailyMemorySelectorDirective` + per-flow `flow_config.daily_memory` config.
 
-### Selection Modes
+### Opt-in per agent
 
-Each flow can configure daily memory injection via `flow_config.daily_memory`:
+Daily memory injection is **off by default for every agent**. A stateless agent (alt-text generator, wiki builder, one-shot pipeline worker) should never carry `what happened yesterday` in its context — session continuity matters for personal assistants, not for purpose-built workers.
 
-| Mode | Description |
-|------|-------------|
-| `none` | No daily memory injected (default) |
-| `recent` | Inject the most recent N days (configurable `days` count) |
-| `specific` | Inject specific dates (array of `YYYY-MM-DD` strings) |
-| `range` | Inject all dates within a range (`from` and `to` dates) |
-| `month` | Inject all dates for a specific month (`YYYY/MM`) |
+Enable per agent via `agent_config`:
 
-### Size Limits
+```json
+{
+  "daily_memory": {
+    "enabled":     true,
+    "recent_days": 3
+  }
+}
+```
 
-- **Maximum total size:** 100 KB (`MAX_TOTAL_SIZE`)
-- Files are injected newest-first
-- If the total size limit is reached, remaining files are truncated
-- Each file is injected as a `system_text` output with a `## Daily Memory: YYYY-MM-DD` header
+| Field | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `false` | bool | Master switch. When false, the directive emits nothing. |
+| `recent_days` | `3` | `1` – `14` | Number of most recent days to include. Hard-clamped. |
 
-### Priority in Directive Chain
+### How it reads
+
+- Walks `agents/{slug}/daily/YYYY/MM/DD.md` on disk from newest to oldest.
+- Each available day becomes one `system_text` block labelled `"## Daily Memory: YYYY-MM-DD"`.
+- Real filenames and dates stay intact — the AI sees discrete files, not a stitched-together blob.
+- Total injected size is bounded by `AgentMemory::MAX_FILE_SIZE` (8 KB). When adding an older day would push total past the budget, iteration stops — the freshest days always win.
+
+### Priority in directive chain
 
 ```
 Priority 10 — Plugin Core (agent identity)
-Priority 20 — Core Memory Files (SOUL.md, USER.md, MEMORY.md)
+Priority 20 — Core Memory Files (SOUL.md, USER.md, MEMORY.md, etc.)
+Priority 35 — Agent Daily Memory (THIS; chat + pipeline, opt-in)
 Priority 40 — Pipeline Memory Files
 Priority 45 — Flow Memory Files
-Priority 46 — Daily Memory Selector (THIS)
 Priority 50 — Pipeline System Prompt
 Priority 60 — Pipeline Context Files
 Priority 70 — Tool Definitions
 Priority 80 — Site Context
 ```
+
+### For precise historical lookups
+
+The directive only injects *recent* days on a rolling window. Anything beyond `recent_days`, or any specific date / date range / month query, should be served by the `agent_daily_memory` tool on demand — it covers every former selector mode with more precision than a pre-configured dropdown ever did.
 
 ## AgentDailyMemory Tool
 
@@ -340,7 +353,7 @@ The AI tool and REST API go through the Abilities layer. The CLI accesses the `D
 | `inc/Core/FilesRepository/DailyMemory.php` | Core service — file storage, CRUD, search |
 | `inc/Engine/AI/System/Tasks/DailyMemoryTask.php` | System task — AI synthesis and MEMORY.md cleanup |
 | `inc/Abilities/DailyMemoryAbilities.php` | WordPress 6.9 Abilities (5 abilities) |
-| `inc/Engine/AI/Directives/DailyMemorySelectorDirective.php` | Pipeline context injection (Priority 46) |
+| `inc/Engine/AI/Directives/AgentDailyMemoryDirective.php` | Opt-in chat + pipeline context injection (Priority 35, since v0.71.0) |
 | `inc/Engine/AI/Tools/Global/AgentDailyMemory.php` | AI chat tool for daily memory access |
 | `inc/Cli/Commands/MemoryCommand.php` | CLI subcommands (daily list/read/write/append/delete/search) |
 | `inc/Api/AgentFiles.php` | REST endpoints for daily file operations |

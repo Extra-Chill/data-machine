@@ -490,7 +490,7 @@ export const updatePipelineMemoryFiles = async ( pipelineId, memoryFiles ) => {
  * Fetch memory files for a flow
  *
  * @param {number} flowId - Flow ID
- * @return {Promise<Object>} Object with memory_files and daily_memory
+ * @return {Promise<Object>} Object with memory_files array
  */
 export const fetchFlowMemoryFiles = async ( flowId ) => {
 	return await client.get( `/flows/${ flowId }/memory-files` );
@@ -501,15 +501,12 @@ export const fetchFlowMemoryFiles = async ( flowId ) => {
  *
  * @param {number}        flowId       - Flow ID
  * @param {Array<string>} memoryFiles  - Array of filenames
- * @param {Object|null}   dailyMemory  - Optional daily memory config
  * @return {Promise<Object>} Update confirmation
  */
-export const updateFlowMemoryFiles = async ( flowId, memoryFiles, dailyMemory = null ) => {
-	const payload = { memory_files: memoryFiles };
-	if ( dailyMemory !== null ) {
-		payload.daily_memory = dailyMemory;
-	}
-	return await client.put( `/flows/${ flowId }/memory-files`, payload );
+export const updateFlowMemoryFiles = async ( flowId, memoryFiles ) => {
+	return await client.put( `/flows/${ flowId }/memory-files`, {
+		memory_files: memoryFiles,
+	} );
 };
 
 /**
