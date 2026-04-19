@@ -214,6 +214,8 @@ Internal abilities for the pipeline execution engine.
 | `datamachine/check-duplicate` | Check if similar content exists as published post or in queue | `DuplicateCheck/DuplicateCheckAbility.php` |
 | `datamachine/titles-match` | Compare two titles for semantic equivalence using similarity engine | `DuplicateCheck/DuplicateCheckAbility.php` |
 
+> **Extensions:** `datamachine/check-duplicate` runs extension strategies before core's generic matching via the `datamachine_duplicate_strategies` filter. See [Duplicate Detection Filters](../development/hooks/core-filters.md#duplicate-detection-filters) for the strategy contract and registration example.
+
 ### Post Query (2 abilities)
 
 | Ability | Description | Location |
