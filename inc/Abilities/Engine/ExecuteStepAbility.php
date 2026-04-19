@@ -486,18 +486,7 @@ class ExecuteStepAbility {
 				// carry data that downstream steps (UpsertStep) can use.
 				// Non-handler packets (tool_result, ai_response) would create
 				// child jobs guaranteed to fail with 'required_handler_tool_not_called'.
-				$handler_packets = array_values(
-					array_filter(
-						$dataPackets,
-						function ( $packet ) {
-							return ( $packet['metadata']['source_type'] ?? '' ) === 'ai_handler_complete';
-						}
-					)
-				);
-
-				// If filtering removed all packets, keep the originals — the step
-				// may not require handlers, or the packets may use a different convention.
-				$fanout_packets = ! empty( $handler_packets ) ? $handler_packets : $dataPackets;
+				$fanout_packets = self::filterPacketsForFanOut( $dataPackets );
 
 				// After filtering, check if we're back to ≤1 packet — inline instead of fan-out.
 				if ( count( $fanout_packets ) <= 1 ) {
@@ -686,6 +675,42 @@ class ExecuteStepAbility {
 				'fetch_flow_step_id' => $fetch_flow_step_id,
 			)
 		);
+	}
+
+	/**
+	 * Filter data packets to only those safe to fan out into child jobs.
+	 *
+	 * When the AI step produces multiple packets, the batch scheduler creates
+	 * one child job per packet. Only 'ai_handler_complete' packets carry the
+	 * handler result that downstream steps (UpsertStep, PublishStep) need via
+	 * ToolResultFinder. Non-handler packets ('tool_result', 'ai_response')
+	 * would create child jobs that fail with 'required_handler_tool_not_called'.
+	 *
+	 * The DataPacket structure stores the packet kind in the top-level 'type'
+	 * key (set by DataPacket::__construct's third argument).
+	 * 'metadata.source_type' carries the ORIGINAL input source_type (e.g.
+	 * 'ticketmaster', 'web_scraper') — never 'ai_handler_complete'. The
+	 * pre-#1096 implementation filtered on metadata.source_type, which was a
+	 * silent no-op that let every packet fan out into doomed child jobs.
+	 *
+	 * If filtering removes all packets, the originals are returned unchanged
+	 * — the step may not require handlers, or the packets may use a different
+	 * convention (backward compatibility).
+	 *
+	 * @param array $dataPackets Data packets returned from the step.
+	 * @return array Packets safe to fan out.
+	 */
+	public static function filterPacketsForFanOut( array $dataPackets ): array {
+		$handler_packets = array_values(
+			array_filter(
+				$dataPackets,
+				static function ( $packet ) {
+					return ( $packet['type'] ?? '' ) === 'ai_handler_complete';
+				}
+			)
+		);
+
+		return ! empty( $handler_packets ) ? $handler_packets : $dataPackets;
 	}
 
 	/**

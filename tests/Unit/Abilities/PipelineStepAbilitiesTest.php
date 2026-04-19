@@ -190,16 +190,16 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 		$this->assertEquals( 'publish', $result['step_type'] );
 	}
 
-	public function test_add_pipeline_step_update_type(): void {
+	public function test_add_pipeline_step_upsert_type(): void {
 		$result = $this->step_abilities->executeAddPipelineStep(
 			array(
 				'pipeline_id' => $this->test_pipeline_id,
-				'step_type'   => 'update',
+				'step_type'   => 'upsert',
 			)
 		);
 
 		$this->assertTrue( $result['success'] );
-		$this->assertEquals( 'update', $result['step_type'] );
+		$this->assertEquals( 'upsert', $result['step_type'] );
 	}
 
 	public function test_add_pipeline_step_invalid_type(): void {
