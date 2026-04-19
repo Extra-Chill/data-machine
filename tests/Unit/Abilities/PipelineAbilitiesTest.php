@@ -162,6 +162,30 @@ class PipelineAbilitiesTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'pipeline_name', $first_pipeline );
 		$this->assertArrayHasKey( 'pipeline_config', $first_pipeline );
 		$this->assertArrayHasKey( 'flows', $first_pipeline );
+		$this->assertArrayHasKey( 'flow_count', $first_pipeline );
+	}
+
+	public function test_output_mode_full_without_flows_embed(): void {
+		$result = $this->pipeline_abilities->executeGetPipelines(
+			array(
+				'output_mode'   => 'full',
+				'per_page'      => 20,
+				'offset'        => 0,
+				'include_flows' => false,
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertEquals( 'full', $result['output_mode'] );
+		$this->assertGreaterThan( 0, count( $result['pipelines'] ) );
+
+		$first_pipeline = $result['pipelines'][0];
+		$this->assertArrayHasKey( 'pipeline_id', $first_pipeline );
+		$this->assertArrayHasKey( 'pipeline_name', $first_pipeline );
+		$this->assertArrayHasKey( 'pipeline_config', $first_pipeline );
+		$this->assertArrayHasKey( 'flow_count', $first_pipeline );
+		$this->assertArrayNotHasKey( 'flows', $first_pipeline );
+		$this->assertIsInt( $first_pipeline['flow_count'] );
 	}
 
 	public function test_output_mode_summary(): void {

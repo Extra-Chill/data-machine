@@ -43,11 +43,17 @@ trait PipelineHelpers {
 	/**
 	 * Format pipelines based on output mode.
 	 *
-	 * @param array  $pipelines Pipelines to format.
-	 * @param string $output_mode Output mode (full, summary, ids).
+	 * Batch-fetches flow counts (and optionally full flows) in a single query to
+	 * avoid N+1 per-pipeline lookups when formatting the admin list.
+	 *
+	 * @param array  $pipelines     Pipelines to format.
+	 * @param string $output_mode   Output mode (full, summary, ids).
+	 * @param bool   $include_flows When true, embed the full flows array on each pipeline
+	 *                              (only honored in 'full' mode). Defaults to true for
+	 *                              backward compatibility.
 	 * @return array Formatted pipelines.
 	 */
-	protected function formatPipelinesByMode( array $pipelines, string $output_mode ): array {
+	protected function formatPipelinesByMode( array $pipelines, string $output_mode, bool $include_flows = true ): array {
 		if ( 'ids' === $output_mode ) {
 			return array_map(
 				function ( $pipeline ) {
@@ -57,9 +63,35 @@ trait PipelineHelpers {
 			);
 		}
 
+		// Batch flow data to avoid N+1 queries across the list.
+		$pipeline_ids = array_map( fn( $p ) => (int) $p['pipeline_id'], $pipelines );
+
+		$flow_counts = array();
+		$flows_by_pipeline = array();
+
+		if ( ! empty( $pipeline_ids ) ) {
+			if ( 'full' === $output_mode && $include_flows ) {
+				// Legacy behavior: hydrate full flows per pipeline.
+				foreach ( $pipeline_ids as $pid ) {
+					$pipeline_flows            = $this->db_flows->get_flows_for_pipeline( $pid );
+					$flows_by_pipeline[ $pid ] = $pipeline_flows;
+					$flow_counts[ $pid ]       = count( $pipeline_flows );
+				}
+			} else {
+				// Lightweight: single aggregate query for counts only.
+				$flow_counts = $this->db_flows->count_flows_grouped_by_pipeline( $pipeline_ids );
+			}
+		}
+
 		return array_map(
-			function ( $pipeline ) use ( $output_mode ) {
-				return $this->formatPipelineByMode( $pipeline, $output_mode );
+			function ( $pipeline ) use ( $output_mode, $include_flows, $flow_counts, $flows_by_pipeline ) {
+				return $this->formatPipelineByMode(
+					$pipeline,
+					$output_mode,
+					$include_flows,
+					$flow_counts,
+					$flows_by_pipeline
+				);
 			},
 			$pipelines
 		);
@@ -68,30 +100,56 @@ trait PipelineHelpers {
 	/**
 	 * Format a single pipeline based on output mode.
 	 *
-	 * @param array  $pipeline Pipeline data.
-	 * @param string $output_mode Output mode.
+	 * @param array $pipeline           Pipeline data.
+	 * @param string $output_mode       Output mode.
+	 * @param bool  $include_flows      When true, embed the full flows array (full mode only).
+	 * @param array $flow_counts        Pre-fetched map of pipeline_id => flow_count.
+	 * @param array $flows_by_pipeline  Pre-fetched map of pipeline_id => flows[].
 	 * @return array|int Formatted pipeline data or ID.
 	 */
-	protected function formatPipelineByMode( array $pipeline, string $output_mode ): array|int {
+	protected function formatPipelineByMode(
+		array $pipeline,
+		string $output_mode,
+		bool $include_flows = true,
+		array $flow_counts = array(),
+		array $flows_by_pipeline = array()
+	): array|int {
+		$pipeline_id = (int) $pipeline['pipeline_id'];
+
 		if ( 'ids' === $output_mode ) {
-			return (int) $pipeline['pipeline_id'];
+			return $pipeline_id;
 		}
 
 		if ( 'summary' === $output_mode ) {
+			$count = array_key_exists( $pipeline_id, $flow_counts )
+				? (int) $flow_counts[ $pipeline_id ]
+				: $this->db_flows->count_flows_for_pipeline( $pipeline_id );
+
 			return array(
-				'pipeline_id'   => (int) $pipeline['pipeline_id'],
+				'pipeline_id'   => $pipeline_id,
 				'pipeline_name' => $pipeline['pipeline_name'] ?? '',
-				'flow_count'    => $this->db_flows->count_flows_for_pipeline( (int) $pipeline['pipeline_id'] ),
+				'flow_count'    => $count,
 			);
 		}
 
 		$pipeline = $this->addDisplayFields( $pipeline );
-		$flows    = $this->db_flows->get_flows_for_pipeline( (int) $pipeline['pipeline_id'] );
 
-		return array_merge(
-			$pipeline,
-			array( 'flows' => $flows )
-		);
+		if ( $include_flows ) {
+			$flows = array_key_exists( $pipeline_id, $flows_by_pipeline )
+				? $flows_by_pipeline[ $pipeline_id ]
+				: $this->db_flows->get_flows_for_pipeline( $pipeline_id );
+
+			$pipeline['flows']      = $flows;
+			$pipeline['flow_count'] = count( $flows );
+			return $pipeline;
+		}
+
+		// Lightweight list mode: expose flow_count, omit flows payload entirely.
+		$pipeline['flow_count'] = array_key_exists( $pipeline_id, $flow_counts )
+			? (int) $flow_counts[ $pipeline_id ]
+			: $this->db_flows->count_flows_for_pipeline( $pipeline_id );
+
+		return $pipeline;
 	}
 
 	/**

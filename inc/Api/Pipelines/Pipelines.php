@@ -82,6 +82,30 @@ class Pipelines {
 							'description'       => __( 'Filter pipelines by name (substring match)', 'data-machine' ),
 							'sanitize_callback' => 'sanitize_text_field',
 						),
+						'per_page'    => array(
+							'required'          => false,
+							'type'              => 'integer',
+							'default'           => 20,
+							'minimum'           => 1,
+							'maximum'           => 100,
+							'description'       => __( 'Number of pipelines per page', 'data-machine' ),
+							'sanitize_callback' => 'absint',
+						),
+						'offset'      => array(
+							'required'          => false,
+							'type'              => 'integer',
+							'default'           => 0,
+							'minimum'           => 0,
+							'description'       => __( 'Offset for pagination', 'data-machine' ),
+							'sanitize_callback' => 'absint',
+						),
+						'include_flows' => array(
+							'required'          => false,
+							'type'              => 'boolean',
+							'default'           => true,
+							'description'       => __( 'Include full flows array per pipeline. Set false for list views — response returns flow_count only.', 'data-machine' ),
+							'sanitize_callback' => 'rest_sanitize_boolean',
+						),
 					),
 				),
 				array(
@@ -255,6 +279,9 @@ class Pipelines {
 		$format          = $request->get_param( 'format' ) ?? 'json';
 		$ids             = $request->get_param( 'ids' );
 		$search          = $request->get_param( 'search' );
+		$per_page_param  = $request->get_param( 'per_page' );
+		$offset_param    = $request->get_param( 'offset' );
+		$include_flows_param = $request->get_param( 'include_flows' );
 		$scoped_user_id  = PermissionHelper::resolve_scoped_user_id( $request );
 		$scoped_agent_id = PermissionHelper::resolve_scoped_agent_id( $request );
 
@@ -336,10 +363,20 @@ class Pipelines {
 				)
 			);
 		} else {
+			$per_page = ( null !== $per_page_param ) ? max( 1, (int) $per_page_param ) : 20;
+			$offset   = ( null !== $offset_param ) ? max( 0, (int) $offset_param ) : 0;
+			// Default include_flows to false for list mode — callers explicitly
+			// opt-in when they need full flows embedded. This avoids the N+1
+			// flow query and the large payload on admin list loads.
+			$include_flows = ( null !== $include_flows_param )
+				? (bool) $include_flows_param
+				: false;
+
 			$input = array(
-				'per_page'    => 100,
-				'offset'      => 0,
-				'output_mode' => 'full',
+				'per_page'      => $per_page,
+				'offset'        => $offset,
+				'output_mode'   => 'full',
+				'include_flows' => $include_flows,
 			);
 			if ( null !== $scoped_agent_id ) {
 				$input['agent_id'] = $scoped_agent_id;
@@ -372,8 +409,11 @@ class Pipelines {
 
 			return rest_ensure_response(
 				array(
-					'success' => true,
-					'data'    => array(
+					'success'  => true,
+					'per_page' => $result['per_page'] ?? $per_page,
+					'offset'   => $result['offset'] ?? $offset,
+					'total'    => $result['total'],
+					'data'     => array(
 						'pipelines' => $pipelines,
 						'total'     => $result['total'],
 					),

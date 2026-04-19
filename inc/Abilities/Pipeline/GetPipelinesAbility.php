@@ -75,6 +75,11 @@ class GetPipelinesAbility {
 								'default'     => 'full',
 								'description' => __( 'Output mode: full=all data with flows, summary=key fields only, ids=just pipeline_ids', 'data-machine' ),
 							),
+							'include_flows' => array(
+								'type'        => 'boolean',
+								'default'     => true,
+								'description' => __( 'Include full flows array per pipeline in "full" mode. Set false for list views — response returns flow_count only and avoids N+1 flow queries.', 'data-machine' ),
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -111,19 +116,22 @@ class GetPipelinesAbility {
 	 */
 	public function execute( array $input ): array {
 		try {
-			$pipeline_id = $input['pipeline_id'] ?? null;
-			$user_id     = isset( $input['user_id'] ) ? (int) $input['user_id'] : null;
-			$agent_id    = isset( $input['agent_id'] ) ? (int) $input['agent_id'] : null;
-			$per_page    = (int) ( $input['per_page'] ?? self::DEFAULT_PER_PAGE );
-			$offset      = (int) ( $input['offset'] ?? 0 );
-			$output_mode = $input['output_mode'] ?? 'full';
-			$search      = isset( $input['search'] ) && '' !== $input['search'] ? sanitize_text_field( $input['search'] ) : null;
+			$pipeline_id   = $input['pipeline_id'] ?? null;
+			$user_id       = isset( $input['user_id'] ) ? (int) $input['user_id'] : null;
+			$agent_id      = isset( $input['agent_id'] ) ? (int) $input['agent_id'] : null;
+			$per_page      = (int) ( $input['per_page'] ?? self::DEFAULT_PER_PAGE );
+			$offset        = (int) ( $input['offset'] ?? 0 );
+			$output_mode   = $input['output_mode'] ?? 'full';
+			$search        = isset( $input['search'] ) && '' !== $input['search'] ? sanitize_text_field( $input['search'] ) : null;
+			$include_flows = array_key_exists( 'include_flows', $input ) ? (bool) $input['include_flows'] : true;
 
 			if ( ! in_array( $output_mode, array( 'full', 'summary', 'ids' ), true ) ) {
 				$output_mode = 'full';
 			}
 
 			// Direct pipeline lookup by ID - bypasses pagination.
+			// Single-pipeline fetches always embed flows for backward compatibility
+			// (this is what callers like the REST /pipelines/{id} endpoint rely on).
 			if ( null !== $pipeline_id ) {
 				if ( ! is_numeric( $pipeline_id ) || (int) $pipeline_id <= 0 ) {
 					return array(
@@ -145,7 +153,11 @@ class GetPipelinesAbility {
 					);
 				}
 
-				$formatted_pipeline = $this->formatPipelineByMode( $pipeline, $output_mode );
+				$formatted_pipeline = $this->formatPipelineByMode(
+					$pipeline,
+					$output_mode,
+					true
+				);
 
 				return array(
 					'success'     => true,
@@ -157,11 +169,22 @@ class GetPipelinesAbility {
 				);
 			}
 
-			$all_pipelines = $this->db_pipelines->get_all_pipelines( $user_id, $agent_id, $search );
-			$total         = count( $all_pipelines );
-			$pipelines     = array_slice( $all_pipelines, $offset, $per_page );
+			// List mode: paginate at the SQL layer instead of loading all rows
+			// into memory and slicing. Count runs as a separate COUNT(*) query.
+			$pipelines = $this->db_pipelines->get_all_pipelines(
+				$user_id,
+				$agent_id,
+				$search,
+				$per_page,
+				$offset
+			);
+			$total     = $this->db_pipelines->get_pipelines_count( $user_id, $agent_id, $search );
 
-			$formatted_pipelines = $this->formatPipelinesByMode( $pipelines, $output_mode );
+			$formatted_pipelines = $this->formatPipelinesByMode(
+				$pipelines,
+				$output_mode,
+				$include_flows
+			);
 
 			return array(
 				'success'     => true,

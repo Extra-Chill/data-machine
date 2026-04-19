@@ -100,7 +100,12 @@ export default function PipelineCheckboxTable( {
 						const stepCount = Object.keys(
 							pipeline.pipeline_config || {}
 						).length;
-						const flowCount = pipeline.flows?.length || 0;
+						// Prefer the lightweight flow_count field exposed by the
+						// /pipelines list endpoint. Fall back to counting an
+						// embedded flows array (include_flows=true responses)
+						// for back-compat.
+						const flowCount =
+							pipeline.flow_count ?? pipeline.flows?.length ?? 0;
 						const isSelected = includesId(
 							selectedIds,
 							pipeline.pipeline_id
