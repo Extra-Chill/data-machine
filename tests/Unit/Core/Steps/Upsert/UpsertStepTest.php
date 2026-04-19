@@ -118,15 +118,12 @@ class UpsertStepTest extends WP_UnitTestCase {
 	/**
 	 * Regression test for issue #1096.
 	 *
-	 * Batch children created by PipelineBatchScheduler each carry their own
-	 * ai_handler_complete packet. If such a child reaches UpsertStep without
-	 * the expected handler result (e.g. upstream filter regression or AI not
-	 * calling the handler tool), it must NOT be silenced via the legacy
-	 * fan-out skip path — that produced 8,030 orphaned jobs with status
-	 * 'completed_no_items' across 7 days on events.extrachill.com.
-	 *
-	 * The parent job's engine_data['batch'] flag is the signal that this
-	 * child owns its own packet (set by PipelineBatchScheduler::fanOut()).
+	 * A missing handler result at the upsert step is always a real failure —
+	 * there is no longer a silent-skip path. Every child job created by
+	 * PipelineBatchScheduler carries its own packet, so a missing handler
+	 * result means the AI didn't call the tool (or an upstream filter
+	 * regression dropped it). The legacy "sibling handled it" fan-out model
+	 * has been removed entirely; see commit removing isLegacyFanOutChild().
 	 */
 	public function test_batch_child_with_missing_handler_produces_real_failure(): void {
 		$parent_job_id = 999001;
@@ -177,46 +174,5 @@ class UpsertStepTest extends WP_UnitTestCase {
 
 		// Clean up engine data.
 		datamachine_set_engine_data( $parent_job_id, array() );
-	}
-
-	/**
-	 * Legacy fan-out siblings (no batch flag on parent) still skip silently.
-	 *
-	 * Preserves the original safety-net behavior for the legacy fan-out model
-	 * where multiple packets land in one job and only one sibling owns the
-	 * handler result.
-	 */
-	public function test_legacy_fanout_child_without_batch_parent_skips_silently(): void {
-		$parent_job_id = 999003;
-		$child_job_id  = 999004;
-
-		// Parent has NO batch flag — legacy fan-out scenario.
-		datamachine_set_engine_data( $parent_job_id, array() );
-
-		$step = new UpsertStep();
-
-		$result = $step->execute(
-			$this->buildPayload(
-				array(
-					'handler_slugs'   => array( 'upsert_event' ),
-					'handler_configs' => array(),
-				),
-				array(),
-				array(
-					'job_id'        => $child_job_id,
-					'parent_job_id' => $parent_job_id,
-				)
-			)
-		);
-
-		$this->assertNotEmpty( $result );
-		$last = $result[ array_key_last( $result ) ];
-
-		$this->assertSame( 'upsert', $last['type'] ?? '' );
-		$this->assertTrue(
-			(bool) ( $last['metadata']['fanout_sibling_handled'] ?? false ),
-			'Legacy fan-out children should still skip silently as a safety net.'
-		);
-		$this->assertTrue( (bool) ( $last['metadata']['success'] ?? false ) );
 	}
 }
