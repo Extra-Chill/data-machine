@@ -2,6 +2,18 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.29.0] - 2026-04-19
+
+### Added
+- add multi-artist showcase pattern to WeeblyExtractor
+- migrate from flat 'datamachine' category to semantic subcategories
+
+### Changed
+- align EventUpsert with renamed `upsert` step type
+
+### Fixed
+- cap unbounded calendar queries at 500 posts, enable progressive rendering in REST API
+
 ## [0.28.0] - 2026-04-12
 
 ### Added
