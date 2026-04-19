@@ -673,6 +673,142 @@ $data = apply_filters('datamachine_data_packet', $data, $packet_data, $flow_step
 **Return**: Boolean processed status
 
 
+## Duplicate Detection Filters
+
+### `datamachine_duplicate_strategies`
+
+**Since**: v0.39.0
+
+**Purpose**: Register domain-specific duplicate detection strategies for the `datamachine/check-duplicate` ability. Extensions use this to add post-type-specific matching logic (e.g., event identity via venue + date + ticket URL) that runs before core's generic title/source-URL strategies.
+
+**Parameters**:
+- `$strategies` (array) - Array of strategy definitions (see structure below)
+- `$post_type` (string) - The post type being checked
+
+**Return**: Array of strategy definitions
+
+**Strategy Definition Structure**:
+```php
+[
+    'id'        => 'event_identity_index',      // string, required. Stable id, surfaced as `strategy` in the ability result.
+    'post_type' => 'data_machine_events',       // string, required. Specific post type or '*' for all types.
+    'callback'  => [Strategy::class, 'check'],  // callable, required. See callback contract below.
+    'priority'  => 5,                           // int, optional (default: 50). Lower runs first.
+]
+```
+
+**Cascade Order**:
+1. Extension strategies registered on this filter (sorted by `priority`, lowest first).
+2. Core `published_post_source_url` match (exact source URL via `PostIdentityIndex`).
+3. Core `published_post` title match (similarity engine).
+4. Core `queue_item` Jaccard match (only when `scope` includes `queue`).
+
+First strategy to return a `duplicate` verdict short-circuits the cascade.
+
+**Callback Contract**:
+
+The callback receives the full ability input merged with normalized `title`, `post_type`, and `context`:
+
+```php
+function(array $input): ?array {
+    // $input['title']      string — incoming title
+    // $input['post_type']  string — resolved post type
+    // $input['context']    array  — domain-specific payload (venue, startDate, ticketUrl, ...)
+    // $input['source_url'] string — optional canonical source URL
+    // ...plus any other fields the caller passed to datamachine/check-duplicate
+}
+```
+
+Return `null` to pass (let the cascade continue), or an array with:
+
+```php
+[
+    'verdict'  => 'duplicate',              // string, required — must be 'duplicate' to short-circuit
+    'source'   => 'identity_index',         // string, optional — origin of the match
+    'match'    => [                         // array, required — match details
+        'post_id' => 123,
+        'title'   => 'Existing Post',
+        'url'     => 'https://example.com/existing',
+        // strategy-specific fields are allowed
+    ],
+    'reason'   => 'Matched existing ...',   // string, optional — human-readable explanation
+    'strategy' => 'event_identity_index',   // string, optional — overrides `id` in the final result
+]
+```
+
+Any non-`duplicate` verdict (or missing `verdict`) is treated as a pass.
+
+**Usage Example** (from `data-machine-events`):
+
+```php
+namespace DataMachineEvents\Core\DuplicateDetection;
+
+class EventDuplicateStrategy {
+
+    public static function register(): void {
+        add_filter( 'datamachine_duplicate_strategies', [ static::class, 'addStrategy' ] );
+    }
+
+    public static function addStrategy( array $strategies ): array {
+        $strategies[] = [
+            'id'        => 'event_identity_index',
+            'post_type' => 'data_machine_events',
+            'callback'  => [ static::class, 'check' ],
+            'priority'  => 5, // Run before core strategies.
+        ];
+        return $strategies;
+    }
+
+    public static function check( array $input ): ?array {
+        $title   = $input['title'] ?? '';
+        $context = $input['context'] ?? [];
+        $venue   = $context['venue'] ?? '';
+        $date    = $context['startDate'] ?? '';
+
+        if ( empty( $title ) || empty( $date ) ) {
+            return null;
+        }
+
+        // ... domain-specific lookup against PostIdentityIndex ...
+        $post_id = $this->lookup( $title, $venue, $date );
+
+        if ( ! $post_id ) {
+            return null;
+        }
+
+        return [
+            'verdict' => 'duplicate',
+            'source'  => 'identity_index',
+            'match'   => [
+                'post_id' => $post_id,
+                'title'   => get_the_title( $post_id ),
+                'url'     => get_permalink( $post_id ),
+            ],
+            'reason'  => 'Matched existing event via venue + date.',
+        ];
+    }
+}
+```
+
+**Working with `PostIdentityIndex`**:
+
+Core ships `DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex` — an indexed lookup table (post_id, source_url, title_hash, event-related columns) used by the core source-URL strategy. Extensions have three options:
+
+1. **Use the index** for lookups (indexed columns → fast). Safe for reading. See `EventDuplicateStrategy::findByTicketUrl()` for a canonical example.
+2. **Write to the index** via the same writers core uses (e.g., `EventIdentityWriter::syncIdentityRow()` in `data-machine-events`). Recommended when your extension owns a custom post type and wants fast identity lookups.
+3. **Maintain your own lookup** (e.g., an existing indexed column on `wp_posts` like `post_name` + `post_parent`). Valid for cases where the identity index would be redundant.
+
+There is no requirement to use `PostIdentityIndex` — the filter accepts any callback. Choose based on what's already indexed for your post type.
+
+**Stability**:
+
+This filter, the strategy definition shape, the callback signature, and the return array shape are considered a public API as of 0.39.0. They will not change in a backward-incompatible way without a deprecation cycle.
+
+**See Also**:
+- Source: `inc/Abilities/DuplicateCheck/DuplicateCheckAbility.php::getStrategies()`
+- Canonical consumer: `data-machine-events/inc/Core/DuplicateDetection/EventDuplicateStrategy.php`
+- Ability docs: [datamachine/check-duplicate](../../ai-tools/) in ai-tools reference
+
 ## Files Repository Filters
 
 ### `datamachine_files_repository`

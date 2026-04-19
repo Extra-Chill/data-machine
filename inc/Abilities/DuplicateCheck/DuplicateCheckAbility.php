@@ -310,9 +310,60 @@ class DuplicateCheckAbility {
 		/**
 		 * Filter the registered duplicate detection strategies.
 		 *
-		 * @since 0.39.0
+		 * Public extension point for registering domain-specific duplicate
+		 * detection strategies. Strategies run before core's published-post
+		 * title match and queue-item Jaccard match. First strategy to return
+		 * a `duplicate` verdict short-circuits the cascade.
 		 *
-		 * @param array  $strategies Array of strategy definitions.
+		 * ## Strategy definition shape
+		 *
+		 *     [
+		 *         'id'        => 'event_identity_index', // string, required. Stable id, used in `strategy` field of result.
+		 *         'post_type' => 'data_machine_events',  // string, required. Specific post type or '*' for all types.
+		 *         'callback'  => [Strategy::class, 'check'], // callable, required. Signature: function(array $input): ?array
+		 *         'priority'  => 5,                      // int, optional (default: 50). Lower runs first.
+		 *     ]
+		 *
+		 * ## Callback contract
+		 *
+		 * The callback receives the full ability input merged with normalized
+		 * `title`, `post_type`, and `context`:
+		 *
+		 *     function(array $input): ?array {
+		 *         // $input['title']     string  — incoming title
+		 *         // $input['post_type'] string  — resolved post type
+		 *         // $input['context']   array   — domain-specific payload (venue, startDate, etc.)
+		 *         // $input['source_url'] string — optional canonical source URL
+		 *         // ...plus any other fields the caller passed
+		 *     }
+		 *
+		 * Return `null` to pass (let the cascade continue), or an array with:
+		 *
+		 *     [
+		 *         'verdict'  => 'duplicate',          // string, required — must be 'duplicate' to short-circuit
+		 *         'source'   => 'identity_index',     // string, optional — origin of the match
+		 *         'match'    => [                     // array, required — match details
+		 *             'post_id' => 123,
+		 *             'title'   => 'Existing Post',
+		 *             'url'     => 'https://example.com/existing',
+		 *             // ...strategy-specific fields allowed
+		 *         ],
+		 *         'reason'   => 'Matched existing ...', // string, optional — human-readable explanation
+		 *         'strategy' => 'event_identity_index', // string, optional — overrides 'id' in the result
+		 *     ]
+		 *
+		 * Any non-`duplicate` verdict (or missing `verdict`) is treated as a pass.
+		 *
+		 * ## Stability
+		 *
+		 * This filter and the strategy contract above are considered a public
+		 * API as of 0.39.0. The callback signature, return shape, and the
+		 * input fields documented above will not change in a backward-incompatible
+		 * way without a deprecation cycle.
+		 *
+		 * @since 0.39.0 Public extension point.
+		 *
+		 * @param array  $strategies Array of strategy definitions (see shape above).
 		 * @param string $post_type  The post type being checked.
 		 */
 		$strategies = apply_filters( 'datamachine_duplicate_strategies', array(), $post_type );
