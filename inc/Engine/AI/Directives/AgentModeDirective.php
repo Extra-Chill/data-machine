@@ -134,7 +134,7 @@ MD;
 	 * @return array Directive outputs.
 	 */
 	public static function get_outputs( string $provider_name, array $tools, ?string $step_id = null, array $payload = array() ): array {
-		$mode = $payload['agent_mode'] ?? $payload['context'] ?? '';
+		$mode = $payload['agent_mode'] ?? '';
 
 		if ( empty( $mode ) ) {
 			return array();

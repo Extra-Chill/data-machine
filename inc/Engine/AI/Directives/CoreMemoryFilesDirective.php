@@ -64,7 +64,7 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 
 		// Load registered files applicable to the current execution mode,
 		// filtered through the per-agent MemoryPolicy.
-		$context       = $payload['agent_mode'] ?? $payload['context'] ?? '';
+		$context       = $payload['agent_mode'] ?? '';
 		$resolver      = new MemoryPolicyResolver();
 		$context_files = $resolver->resolveRegistered( array(
 			'context'  => $context,

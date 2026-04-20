@@ -77,7 +77,6 @@ class MemoryFileRegistry {
 	 *                                        Array of mode slugs (e.g. 'chat', 'editor', 'pipeline',
 	 *                                        'system') or array( 'all' ) to inject everywhere.
 	 *                                        Default array( 'all' ).
-	 *     @type string[]    $contexts        Deprecated. Alias for $modes — use $modes instead.
 	 *     @type bool        $composable      Whether this file is auto-generated from registered sections
 	 *                                        via SectionRegistry. Composable files are regenerated on
 	 *                                        demand and are not hand-editable. Default false.
@@ -109,8 +108,7 @@ class MemoryFileRegistry {
 		}
 
 		// Normalize modes: array of slugs, or ['all'] (default).
-		// Back-compat: accept 'contexts' key as alias for 'modes'.
-		$modes = $args['modes'] ?? $args['contexts'] ?? array( self::CONTEXT_ALL );
+		$modes = $args['modes'] ?? array( self::CONTEXT_ALL );
 		if ( ! is_array( $modes ) || empty( $modes ) ) {
 			$modes = array( self::CONTEXT_ALL );
 		}
@@ -410,7 +408,7 @@ class MemoryFileRegistry {
 	 * Get the modes array for a registered file.
 	 *
 	 * @since 0.60.0
-	 * @since 0.68.0 Renamed from get_contexts() — old name still works via this method.
+	 * @since 0.68.0 Renamed from get_contexts().
 	 *
 	 * @param string $filename Filename to look up.
 	 * @return string[]|null Modes array, or null if not registered.
@@ -419,19 +417,6 @@ class MemoryFileRegistry {
 		$resolved = self::get_resolved();
 		$filename = sanitize_file_name( $filename );
 		return isset( $resolved[ $filename ] ) ? ( $resolved[ $filename ]['modes'] ?? array( self::CONTEXT_ALL ) ) : null;
-	}
-
-	/**
-	 * Get the contexts array for a registered file.
-	 *
-	 * @since 0.60.0
-	 * @deprecated 0.68.0 Use get_modes() instead.
-	 *
-	 * @param string $filename Filename to look up.
-	 * @return string[]|null Modes array, or null if not registered.
-	 */
-	public static function get_contexts( string $filename ): ?array {
-		return self::get_modes( $filename );
 	}
 
 	/**

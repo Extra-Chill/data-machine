@@ -222,25 +222,12 @@ class PluginSettings {
 	 * registered modes. Core modes register in bootstrap.php;
 	 * extensions register via the `datamachine_agent_modes` action.
 	 *
-	 * @since 0.63.0 Delegates to ContextRegistry.
-	 * @since 0.68.0 Renamed from getContexts(). Old name still works.
+	 * @since 0.68.0 Renamed from getContexts(). Delegates to AgentModeRegistry.
 	 *
 	 * @return array Array of mode definitions with id, label, and description.
 	 */
 	public static function getAgentModes(): array {
 		return \DataMachine\Engine\AI\AgentModeRegistry::get_for_settings();
-	}
-
-	/**
-	 * Get the list of known execution contexts.
-	 *
-	 * @since 0.63.0
-	 * @deprecated 0.68.0 Use getAgentModes() instead.
-	 *
-	 * @return array Array of mode definitions with id, label, and description.
-	 */
-	public static function getContexts(): array {
-		return self::getAgentModes();
 	}
 
 	/**
