@@ -13,7 +13,7 @@ namespace DataMachine\Engine\AI\Tools;
 
 use DataMachine\Core\WordPress\PostTracking;
 
-defined('ABSPATH') || exit;
+defined( 'ABSPATH' ) || exit;
 
 class ToolExecutor {
 
@@ -21,7 +21,7 @@ class ToolExecutor {
 	/**
 	 * Get available tools for AI agent execution.
 	 *
-	 * @deprecated 0.39.0 Use ToolPolicyResolver::resolve() with CONTEXT_PIPELINE instead.
+	 * @deprecated 0.39.0 Use ToolPolicyResolver::resolve() with MODE_PIPELINE instead.
 	 *             Delegates to ToolPolicyResolver internally.
 	 *
 	 * @param  array|null  $previous_step_config     Previous step configuration (pipeline only)
@@ -33,13 +33,15 @@ class ToolExecutor {
 	public static function getAvailableTools( ?array $previous_step_config = null, ?array $next_step_config = null, ?string $current_pipeline_step_id = null, array $engine_data = array() ): array {
 		$resolver = new ToolPolicyResolver();
 
-		return $resolver->resolve( array(
-			'context'              => ToolPolicyResolver::CONTEXT_PIPELINE,
-			'previous_step_config' => $previous_step_config,
-			'next_step_config'     => $next_step_config,
-			'pipeline_step_id'     => $current_pipeline_step_id,
-			'engine_data'          => $engine_data,
-		) );
+		return $resolver->resolve(
+			array(
+				'mode'                 => ToolPolicyResolver::MODE_PIPELINE,
+				'previous_step_config' => $previous_step_config,
+				'next_step_config'     => $next_step_config,
+				'pipeline_step_id'     => $current_pipeline_step_id,
+				'engine_data'          => $engine_data,
+			)
+		);
 	}
 
 	/**
@@ -62,14 +64,14 @@ class ToolExecutor {
 			);
 		}
 
-		$validation = self::validateRequiredParameters($tool_parameters, $tool_def);
+		$validation = self::validateRequiredParameters( $tool_parameters, $tool_def );
 		if ( ! $validation['valid'] ) {
 			return array(
 				'success'   => false,
 				'error'     => sprintf(
 					'%s requires the following parameters: %s. Please provide these parameters and try again.',
-					ucwords(str_replace('_', ' ', $tool_name)),
-					implode(', ', $validation['missing'])
+					ucwords( str_replace( '_', ' ', $tool_name ) ),
+					implode( ', ', $validation['missing'] )
 				),
 				'tool_name' => $tool_name,
 			);
@@ -82,7 +84,7 @@ class ToolExecutor {
 		);
 
 		// Ensure tool definition has required 'class' key
-		if ( ! isset($tool_def['class']) || empty($tool_def['class']) ) {
+		if ( ! isset( $tool_def['class'] ) || empty( $tool_def['class'] ) ) {
 			return array(
 				'success'   => false,
 				'error'     => "Tool '{$tool_name}' is missing required 'class' definition. This may indicate the tool was not properly resolved from a callable.",
@@ -91,7 +93,7 @@ class ToolExecutor {
 		}
 
 		$class_name = $tool_def['class'];
-		if ( ! class_exists($class_name) ) {
+		if ( ! class_exists( $class_name ) ) {
 			return array(
 				'success'   => false,
 				'error'     => "Tool class '{$class_name}' not found",
@@ -100,7 +102,7 @@ class ToolExecutor {
 		}
 
 		$method = $tool_def['method'] ?? null;
-		if ( ! $method || ! method_exists($class_name, $method) ) {
+		if ( ! $method || ! method_exists( $class_name, $method ) ) {
 			return array(
 				'success'   => false,
 				'error'     => sprintf(
@@ -114,7 +116,7 @@ class ToolExecutor {
 		}
 
 		$tool_handler = new $class_name();
-		$tool_result  = $tool_handler->$method($complete_parameters, $tool_def);
+		$tool_result  = $tool_handler->$method( $complete_parameters, $tool_def );
 
 		// Automatic post origin tracking — applies to every tool whose result
 		// contains an extractable post_id. This covers both handler tools
@@ -149,21 +151,21 @@ class ToolExecutor {
 		$param_defs = $tool_def['parameters'] ?? array();
 
 		foreach ( $param_defs as $param_name => $param_config ) {
-			if ( ! is_array($param_config) ) {
+			if ( ! is_array( $param_config ) ) {
 				continue;
 			}
 
-			if ( ! empty($param_config['required']) ) {
+			if ( ! empty( $param_config['required'] ) ) {
 				$required[] = $param_name;
 
-				if ( ! isset($tool_parameters[ $param_name ]) || '' === $tool_parameters[ $param_name ] ) {
+				if ( ! isset( $tool_parameters[ $param_name ] ) || '' === $tool_parameters[ $param_name ] ) {
 					$missing[] = $param_name;
 				}
 			}
 		}
 
 		return array(
-			'valid'    => empty($missing),
+			'valid'    => empty( $missing ),
 			'required' => $required,
 			'missing'  => $missing,
 		);

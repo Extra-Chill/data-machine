@@ -330,7 +330,7 @@ Several directives integrate with plugin settings:
 $directives[] = [
     'class' => 'My\Directive\Class',
     'priority' => 25,
-    'contexts' => ['chat', 'pipeline', 'all']
+    'modes'    => ['chat', 'pipeline', 'all']
 ];
 ```
 

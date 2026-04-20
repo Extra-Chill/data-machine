@@ -164,7 +164,7 @@ add_filter(
 		$directives[] = array(
 			'class'    => ClientContextDirective::class,
 			'priority' => 35,
-			'contexts' => array( 'all' ),
+			'modes'    => array( 'all' ),
 		);
 		return $directives;
 	}

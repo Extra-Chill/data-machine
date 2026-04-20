@@ -81,7 +81,7 @@ add_filter('datamachine_tools', function($tools) {
             ];
         },
         'handler'      => 'twitter',
-        'contexts'     => ['pipeline'],
+        'modes'        => ['pipeline'],
         'access_level' => 'admin',
     ];
     return $tools;
@@ -550,7 +550,7 @@ add_filter('datamachine_tools', function($tools) {
             ];
         },
         'handler'      => 'my_handler',
-        'contexts'     => ['pipeline'],
+        'modes'        => ['pipeline'],
         'access_level' => 'admin',
     ];
     return $tools;

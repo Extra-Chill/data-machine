@@ -175,7 +175,7 @@ class ChatOrchestrator {
 				'single_turn'          => true,
 				'max_turns'            => $max_turns,
 				'selected_pipeline_id' => $selected_pipeline_id ? $selected_pipeline_id : null,
-				'context'              => 'chat',
+				'mode'                 => ToolPolicyResolver::MODE_CHAT,
 				'user_id'              => $user_id,
 				'agent_id'             => $agent_id,
 				'client_context'       => $options['client_context'] ?? array(),
@@ -344,7 +344,7 @@ class ChatOrchestrator {
 				'single_turn'          => true,
 				'max_turns'            => $max_turns,
 				'selected_pipeline_id' => $selected_pipeline_id,
-				'context'              => 'chat',
+				'mode'                 => ToolPolicyResolver::MODE_CHAT,
 				'user_id'              => (int) ( $session['user_id'] ?? 0 ),
 			)
 		);
@@ -467,7 +467,7 @@ class ChatOrchestrator {
 			$provider,
 			$model,
 			array(
-				'context' => 'chat',
+				'mode'    => ToolPolicyResolver::MODE_CHAT,
 				'user_id' => $user_id,
 			)
 		);
@@ -626,7 +626,7 @@ class ChatOrchestrator {
 	 *     @type bool   $single_turn          Whether to run single turn (default false).
 	 *     @type int    $max_turns             Maximum turns allowed (default 25).
 	 *     @type int    $selected_pipeline_id  Currently selected pipeline ID.
-	 *     @type string $context               Execution context (default 'chat').
+	 *     @type string $mode                  Agent mode (default 'chat').
 	 * }
 	 * @return array|WP_Error Result array with messages, final_content, completed, turn_count,
 	 *                        last_tool_calls, and optional warning/max_turns_reached keys.
@@ -642,7 +642,7 @@ class ChatOrchestrator {
 		$single_turn          = $options['single_turn'] ?? false;
 		$max_turns            = $options['max_turns'] ?? PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
 		$selected_pipeline_id = $options['selected_pipeline_id'] ?? null;
-		$context              = $options['context'] ?? ToolPolicyResolver::CONTEXT_CHAT;
+		$mode                 = $options['mode'] ?? ToolPolicyResolver::MODE_CHAT;
 		$agent_id             = (int) ( $options['agent_id'] ?? 0 );
 
 		$chat_db = ConversationStoreFactory::get();
@@ -655,10 +655,12 @@ class ChatOrchestrator {
 			}
 
 			$resolver       = new ToolPolicyResolver();
-			$all_tools      = $resolver->resolve( array(
-				'context'  => ToolPolicyResolver::CONTEXT_CHAT,
-				'agent_id' => $agent_id,
-			) );
+			$all_tools      = $resolver->resolve(
+				array(
+					'mode'     => ToolPolicyResolver::MODE_CHAT,
+					'agent_id' => $agent_id,
+				)
+			);
 			$client_context = $options['client_context'] ?? array();
 
 			$loop_context = array(
@@ -678,7 +680,7 @@ class ChatOrchestrator {
 				$all_tools,
 				$provider,
 				$model,
-				$context,
+				$mode,
 				$loop_context,
 				$max_turns,
 				$single_turn
@@ -705,7 +707,7 @@ class ChatOrchestrator {
 					array(
 						'session_id' => $session_id,
 						'error'      => $loop_result['error'],
-						'context'    => $context,
+						'mode'       => $mode,
 					)
 				);
 
@@ -734,7 +736,7 @@ class ChatOrchestrator {
 				array(
 					'session_id' => $session_id,
 					'error'      => $e->getMessage(),
-					'context'    => $context,
+					'mode'       => $mode,
 				)
 			);
 

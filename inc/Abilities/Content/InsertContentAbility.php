@@ -2,8 +2,8 @@
 /**
  * InsertContentAbility — positional content insertion with diff preview.
  *
-	 * Inserts new content at the beginning, end, or after a specific paragraph
-	 * in a post. Returns canonical diff preview data for frontend/editor review.
+ * Inserts new content at the beginning, end, or after a specific paragraph
+ * in a post. Returns canonical diff preview data for frontend/editor review.
  *
  * Ported from Wordsurf's insert_content tool (Phase 2 migration).
  *
@@ -36,45 +36,48 @@ class InsertContentAbility {
 	 */
 	private function register_ability(): void {
 		$register = function () {
-			wp_register_ability( 'datamachine/insert-content', array(
-				'label'               => 'Insert Content',
-				'description'         => 'Insert new content at a specific position in a post (beginning, end, or after a paragraph).',
-				'category'            => 'datamachine-content',
-				'input_schema'        => array(
-					'type'       => 'object',
-					'required'   => array( 'post_id', 'content', 'position' ),
-					'properties' => array(
-						'post_id'               => array(
-							'type'        => 'integer',
-							'description' => 'The post to insert content into.',
-						),
-						'content'               => array(
-							'type'        => 'string',
-							'description' => 'The new content to insert (will be wrapped in WordPress paragraph blocks).',
-						),
-						'position'              => array(
-							'type'        => 'string',
-							'enum'        => array( 'beginning', 'end', 'after_paragraph' ),
-							'description' => 'Where to insert: beginning, end, or after_paragraph.',
-						),
-						'target_paragraph_text' => array(
-							'type'        => 'string',
-							'description' => 'Required when position is after_paragraph. A short phrase (3-8 words) from the paragraph to insert after.',
+			wp_register_ability(
+				'datamachine/insert-content',
+				array(
+					'label'               => 'Insert Content',
+					'description'         => 'Insert new content at a specific position in a post (beginning, end, or after a paragraph).',
+					'category'            => 'datamachine-content',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'post_id', 'content', 'position' ),
+						'properties' => array(
+							'post_id'               => array(
+								'type'        => 'integer',
+								'description' => 'The post to insert content into.',
+							),
+							'content'               => array(
+								'type'        => 'string',
+								'description' => 'The new content to insert (will be wrapped in WordPress paragraph blocks).',
+							),
+							'position'              => array(
+								'type'        => 'string',
+								'enum'        => array( 'beginning', 'end', 'after_paragraph' ),
+								'description' => 'Where to insert: beginning, end, or after_paragraph.',
+							),
+							'target_paragraph_text' => array(
+								'type'        => 'string',
+								'description' => 'Required when position is after_paragraph. A short phrase (3-8 words) from the paragraph to insert after.',
+							),
 						),
 					),
-				),
-				'output_schema'       => array(
-					'type'       => 'object',
-					'properties' => array(
-						'success' => array( 'type' => 'boolean' ),
-						'diff_id' => array( 'type' => 'string' ),
-						'diff'    => array( 'type' => 'object' ),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'diff_id' => array( 'type' => 'string' ),
+							'diff'    => array( 'type' => 'object' ),
+						),
 					),
-				),
-				'execute_callback'    => array( self::class, 'execute' ),
-				'permission_callback' => fn() => PermissionHelper::can( 'chat' ),
-				'meta'                => array( 'show_in_rest' => false ),
-			) );
+					'execute_callback'    => array( self::class, 'execute' ),
+					'permission_callback' => fn() => PermissionHelper::can( 'chat' ),
+					'meta'                => array( 'show_in_rest' => false ),
+				)
+			);
 		};
 
 		if ( doing_action( 'wp_abilities_api_init' ) ) {
@@ -93,7 +96,7 @@ class InsertContentAbility {
 			function ( $tools ) {
 				$tools['insert_content'] = array(
 					'_callable' => array( self::class, 'getChatTool' ),
-					'contexts'  => array( 'chat', 'pipeline', 'system', 'editor' ),
+					'modes'     => array( 'chat', 'pipeline', 'system', 'editor' ),
 					'ability'   => 'datamachine/insert-content',
 				);
 				return $tools;
@@ -254,44 +257,49 @@ class InsertContentAbility {
 
 		$diff_id = PendingDiffStore::generate_id();
 
-		$diff = CanonicalDiffPreview::build( array(
-			'diff_id'             => $diff_id,
-			'diff_type'           => 'insert',
-			'original_content'    => '',
-			'replacement_content' => $content,
-			'summary'             => sprintf( 'Prepared content insertion %s.', $insertion_point ),
-			'position'            => $position,
-			'insertion_point'     => $insertion_point,
-			'items'               => array(
-				array(
-					'blockIndex'         => $block_index,
-					'originalContent'    => '',
-					'replacementContent' => $content,
+		$diff = CanonicalDiffPreview::build(
+			array(
+				'diff_id'             => $diff_id,
+				'diff_type'           => 'insert',
+				'original_content'    => '',
+				'replacement_content' => $content,
+				'summary'             => sprintf( 'Prepared content insertion %s.', $insertion_point ),
+				'position'            => $position,
+				'insertion_point'     => $insertion_point,
+				'items'               => array(
+					array(
+						'blockIndex'         => $block_index,
+						'originalContent'    => '',
+						'replacementContent' => $content,
+					),
 				),
-			),
-			'editor'              => array(
-				'toolCallId'           => $input['_original_call_id'] ?? '',
-				'editType'             => 'content',
-				'searchPattern'        => '',
-				'caseSensitive'        => false,
-				'isPreview'            => true,
-				'previewBlockContent'  => $block_content,
-				'originalBlockContent' => '',
-				'originalBlockType'    => 'core/paragraph',
-			),
-		) );
+				'editor'              => array(
+					'toolCallId'           => $input['_original_call_id'] ?? '',
+					'editType'             => 'content',
+					'searchPattern'        => '',
+					'caseSensitive'        => false,
+					'isPreview'            => true,
+					'previewBlockContent'  => $block_content,
+					'originalBlockContent' => '',
+					'originalBlockType'    => 'core/paragraph',
+				),
+			)
+		);
 
-		CanonicalDiffPreview::store_pending( $diff_id, array(
-			'type'    => 'insert_content',
-			'post_id' => $post_id,
-			'input'   => array(
-				'post_id'               => $post_id,
-				'content'               => $content,
-				'position'              => $position,
-				'target_paragraph_text' => $target_paragraph_text,
-			),
-			'diff'    => $diff,
-		) );
+		CanonicalDiffPreview::store_pending(
+			$diff_id,
+			array(
+				'type'    => 'insert_content',
+				'post_id' => $post_id,
+				'input'   => array(
+					'post_id'               => $post_id,
+					'content'               => $content,
+					'position'              => $position,
+					'target_paragraph_text' => $target_paragraph_text,
+				),
+				'diff'    => $diff,
+			)
+		);
 
 		return CanonicalDiffPreview::response(
 			$post_id,

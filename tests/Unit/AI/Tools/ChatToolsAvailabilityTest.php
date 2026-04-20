@@ -28,7 +28,7 @@ class ChatToolsAvailabilityTest extends WP_UnitTestCase {
 
 	public function test_chat_tools_include_update_flow(): void {
 		$tools = $this->resolver->resolve( [
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
+			'mode'     => ToolPolicyResolver::MODE_CHAT,
 		] );
 
 		$this->assertIsArray( $tools );
@@ -40,7 +40,7 @@ class ChatToolsAvailabilityTest extends WP_UnitTestCase {
 
 	public function test_chat_tools_include_web_fetch(): void {
 		$tools = $this->resolver->resolve( [
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
+			'mode'     => ToolPolicyResolver::MODE_CHAT,
 		] );
 
 		$this->assertIsArray( $tools );

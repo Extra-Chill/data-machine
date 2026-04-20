@@ -111,7 +111,7 @@ add_filter('datamachine_tools', function($tools) use ($slug, $tools_callback) {
     $tools['__handler_tools_' . $slug] = [
         '_handler_callable' => $tools_callback,
         'handler'           => $slug,
-        'contexts'          => ['pipeline'],
+        'modes'             => ['pipeline'],
         'access_level'      => 'admin',
     ];
     return $tools;
@@ -332,7 +332,7 @@ add_filter('datamachine_tools', function($tools) {
             return ['my_tool' => [/* ... */]];
         },
         'handler'           => 'my_handler',
-        'contexts'          => ['pipeline'],
+        'modes'             => ['pipeline'],
         'access_level'      => 'admin',
     ];
     return $tools;

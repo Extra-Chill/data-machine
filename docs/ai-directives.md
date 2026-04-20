@@ -86,7 +86,7 @@ add_filter('datamachine_directives', function($directives) {
     $directives[] = [
         'class'       => MyCustomDirective::class,
         'priority'    => 25,
-        'contexts'    => ['pipeline', 'chat', 'all'],
+        'modes'       => ['pipeline', 'chat', 'all'],
     ];
     return $directives;
 });

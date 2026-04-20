@@ -107,7 +107,7 @@ class EditPostBlocksAbility {
 			function ( $tools ) {
 				$tools['edit_post_blocks'] = array(
 					'_callable' => array( self::class, 'getChatTool' ),
-					'contexts'  => array( 'chat' ),
+					'modes'     => array( 'chat' ),
 					'ability'   => 'datamachine/edit-post-blocks',
 				);
 				return $tools;
@@ -292,24 +292,29 @@ class EditPostBlocksAbility {
 				}
 			}
 
-			$diff = CanonicalDiffPreview::build( array(
-				'diff_id'             => $diff_id,
-				'diff_type'           => 'edit',
-				'original_content'    => implode( "\n", array_column( $diffs, 'originalContent' ) ),
-				'replacement_content' => implode( "\n", array_column( $diffs, 'replacementContent' ) ),
-				'summary'             => 'Preview generated. Accept or reject to apply changes.',
-				'items'               => $diffs,
-			) );
+			$diff = CanonicalDiffPreview::build(
+				array(
+					'diff_id'             => $diff_id,
+					'diff_type'           => 'edit',
+					'original_content'    => implode( "\n", array_column( $diffs, 'originalContent' ) ),
+					'replacement_content' => implode( "\n", array_column( $diffs, 'replacementContent' ) ),
+					'summary'             => 'Preview generated. Accept or reject to apply changes.',
+					'items'               => $diffs,
+				)
+			);
 
-			CanonicalDiffPreview::store_pending( $diff_id, array(
-				'type'    => 'edit_post_blocks',
-				'post_id' => $post_id,
-				'input'   => array(
+			CanonicalDiffPreview::store_pending(
+				$diff_id,
+				array(
+					'type'    => 'edit_post_blocks',
 					'post_id' => $post_id,
-					'edits'   => $edits,
-				),
-				'diff'    => $diff,
-			) );
+					'input'   => array(
+						'post_id' => $post_id,
+						'edits'   => $edits,
+					),
+					'diff'    => $diff,
+				)
+			);
 
 			return CanonicalDiffPreview::response(
 				$post_id,

@@ -105,7 +105,7 @@ Returns a `filename => metadata` map of registered files after policy is applied
 ```php
 $resolver = new MemoryPolicyResolver();
 $files    = $resolver->resolveRegistered( array(
-    'context'  => MemoryPolicyResolver::CONTEXT_CHAT,
+    'mode'     => MemoryPolicyResolver::MODE_CHAT,
     'agent_id' => $agent_id,
 ) );
 ```
@@ -140,9 +140,9 @@ Use these to inject cross-cutting policy logic (org-wide deny lists, environment
 Match `ToolPolicyResolver` for consistency across the policy layer:
 
 ```php
-MemoryPolicyResolver::CONTEXT_PIPELINE  // pipeline step AI execution
-MemoryPolicyResolver::CONTEXT_CHAT      // admin chat session
-MemoryPolicyResolver::CONTEXT_SYSTEM    // system task execution
+MemoryPolicyResolver::MODE_PIPELINE  // pipeline step AI execution
+MemoryPolicyResolver::MODE_CHAT      // admin chat session
+MemoryPolicyResolver::MODE_SYSTEM    // system task execution
 ```
 
 Custom contexts (e.g. `'editor'`, `'automation'`) are supported everywhere the registry accepts them — the resolver just passes them through.

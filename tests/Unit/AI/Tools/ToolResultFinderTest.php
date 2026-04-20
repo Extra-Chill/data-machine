@@ -21,7 +21,7 @@ class ToolResultFinderTest extends TestCase {
 				$logged[] = array(
 					'level'   => $level,
 					'message' => $message,
-					'context' => $context,
+					'mode'     => $context,
 				);
 			},
 			10,
@@ -46,7 +46,7 @@ class ToolResultFinderTest extends TestCase {
 				$logged[] = array(
 					'level'   => $level,
 					'message' => $message,
-					'context' => $context,
+					'mode'     => $context,
 				);
 			},
 			10,

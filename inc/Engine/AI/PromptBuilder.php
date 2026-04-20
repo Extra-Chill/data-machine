@@ -73,14 +73,14 @@ class PromptBuilder {
 	 *
 	 * @param string|object $directive Directive class name or instance
 	 * @param int           $priority Priority for ordering (lower = applied first)
-	 * @param array         $contexts Contexts this directive applies to ('all' for global)
+	 * @param array         $modes    Agent modes this directive applies to ('all' for global)
 	 * @return self
 	 */
-	public function addDirective( $directive, int $priority, array $contexts = array( 'all' ) ): self {
+	public function addDirective( $directive, int $priority, array $modes = array( 'all' ) ): self {
 		$this->directives[] = array(
 			'directive' => $directive,
 			'priority'  => $priority,
-			'contexts'  => $contexts,
+			'modes'     => $modes,
 		);
 		return $this;
 	}
@@ -88,12 +88,12 @@ class PromptBuilder {
 	/**
 	 * Build the final AI request with directives applied
 	 *
-	 * @param string $context Execution context ('pipeline', 'chat', etc.)
+	 * @param string $mode     Agent mode ('pipeline', 'chat', etc.)
 	 * @param string $provider AI provider name
-	 * @param array  $payload Request payload
+	 * @param array  $payload  Request payload
 	 * @return array Request array with 'messages', 'tools', and 'applied_directives' metadata
 	 */
-	public function build( string $context, string $provider, array $payload = array() ): array {
+	public function build( string $mode, string $provider, array $payload = array() ): array {
 		usort(
 			$this->directives,
 			function ( $a, $b ) {
@@ -101,9 +101,9 @@ class PromptBuilder {
 			}
 		);
 
-		// Ensure directives can access the current execution mode.
+		// Ensure directives can access the current agent mode.
 		if ( ! isset( $payload['agent_mode'] ) ) {
-			$payload['agent_mode'] = $context;
+			$payload['agent_mode'] = $mode;
 		}
 
 		$conversation_messages = $this->messages;
@@ -112,9 +112,9 @@ class PromptBuilder {
 
 		foreach ( $this->directives as $directiveConfig ) {
 			$directive = $directiveConfig['directive'];
-			$contexts  = $directiveConfig['contexts'];
+			$modes     = $directiveConfig['modes'];
 
-			if ( ! in_array( 'all', $contexts, true ) && ! in_array( $context, $contexts, true ) ) {
+			if ( ! in_array( 'all', $modes, true ) && ! in_array( $mode, $modes, true ) ) {
 				continue;
 			}
 

@@ -62,7 +62,7 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 						);
 					},
 					'handler'           => 'widget_publish',
-					'contexts'          => array( 'pipeline' ),
+					'modes'             => array( 'pipeline' ),
 					'access_level'      => 'admin',
 				);
 				return $tools;
@@ -81,7 +81,7 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 		$this->assertSame( 'widget_publish', $resolved['widget_publish']['handler'] );
 		$this->assertSame(
 			array( 'pipeline' ),
-			$resolved['widget_publish']['contexts']
+			$resolved['widget_publish']['modes']
 		);
 		$this->assertSame( 'admin', $resolved['widget_publish']['access_level'] );
 		$this->assertSame( 'widget_publish', $resolved['widget_publish']['_observed']['slug'] );
@@ -96,7 +96,7 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 				$tools['__handler_tools_widget_publish'] = array(
 					'_handler_callable' => static fn() => array( 'widget_publish' => array( 'description' => 'x' ) ),
 					'handler'           => 'widget_publish',
-					'contexts'          => array( 'pipeline' ),
+					'modes'             => array( 'pipeline' ),
 				);
 				return $tools;
 			}
@@ -119,7 +119,7 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 				$tools['__handler_tools_widget'] = array(
 					'_handler_callable' => static fn() => null,
 					'handler'           => 'widget',
-					'contexts'          => array( 'pipeline' ),
+					'modes'             => array( 'pipeline' ),
 				);
 				return $tools;
 			}
@@ -162,7 +162,7 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 						);
 					},
 					'handler_types'     => array( 'fetch', 'event_import' ),
-					'contexts'          => array( 'pipeline' ),
+					'modes'             => array( 'pipeline' ),
 					'access_level'      => 'admin',
 				);
 				return $tools;
@@ -200,7 +200,7 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 				$tools['__handler_tools_skip_item_test'] = array(
 					'_handler_callable' => static fn() => array( 'skip_item_test' => array( 'description' => 'x' ) ),
 					'handler_types'     => array( 'fetch' ),
-					'contexts'          => array( 'pipeline' ),
+					'modes'             => array( 'pipeline' ),
 				);
 				return $tools;
 			}
@@ -231,7 +231,7 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 						return array( 'caching' => array( 'description' => 'x' ) );
 					},
 					'handler'           => 'caching',
-					'contexts'          => array( 'pipeline' ),
+					'modes'             => array( 'pipeline' ),
 				);
 				return $tools;
 			}
@@ -258,7 +258,7 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 						return array( 'no_cache' => array( 'description' => 'x' ) );
 					},
 					'handler'           => 'no_cache',
-					'contexts'          => array( 'pipeline' ),
+					'modes'             => array( 'pipeline' ),
 				);
 				return $tools;
 			}
@@ -280,12 +280,12 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 			function ( array $tools ): array {
 				$tools['static_global']          = array(
 					'description' => 'A static tool',
-					'contexts'    => array( 'chat' ),
+					'modes'       => array( 'chat' ),
 				);
 				$tools['__handler_tools_widget'] = array(
 					'_handler_callable' => static fn() => array( 'widget' => array() ),
 					'handler'           => 'widget',
-					'contexts'          => array( 'pipeline' ),
+					'modes'             => array( 'pipeline' ),
 				);
 				return $tools;
 			}
@@ -316,7 +316,7 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 						);
 					},
 					'handler'           => 'pubtest',
-					'contexts'          => array( 'pipeline' ),
+					'modes'             => array( 'pipeline' ),
 					'access_level'      => 'admin',
 				);
 				return $tools;
@@ -326,7 +326,7 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 		$resolver = new ToolPolicyResolver();
 		$tools    = $resolver->resolve(
 			array(
-				'context'          => ToolPolicyResolver::CONTEXT_PIPELINE,
+				'mode'             => ToolPolicyResolver::MODE_PIPELINE,
 				'next_step_config' => array(
 					'flow_step_id'    => 'fs_pipeline_test',
 					'handler_slugs'   => array( 'pubtest' ),
@@ -347,7 +347,7 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 				$tools['__handler_tools_unused'] = array(
 					'_handler_callable' => static fn() => array( 'unused' => array() ),
 					'handler'           => 'no_match',
-					'contexts'          => array( 'pipeline' ),
+					'modes'             => array( 'pipeline' ),
 				);
 				return $tools;
 			}
@@ -356,7 +356,7 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 		$resolver = new ToolPolicyResolver();
 		$tools    = $resolver->resolve(
 			array(
-				'context' => ToolPolicyResolver::CONTEXT_PIPELINE,
+				'mode' => ToolPolicyResolver::MODE_PIPELINE,
 			)
 		);
 

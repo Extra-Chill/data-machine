@@ -112,7 +112,7 @@ trait HandlerRegistrationTrait {
 					$tools[ '__handler_tools_' . $slug ] = array(
 						'_handler_callable' => $aiToolCallback,
 						'handler'           => $slug,
-						'contexts'          => array( 'pipeline' ),
+						'modes'             => array( 'pipeline' ),
 						'access_level'      => 'admin',
 					);
 					return $tools;

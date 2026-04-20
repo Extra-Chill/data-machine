@@ -245,7 +245,7 @@ available tool set for a pipeline or chat context.
 add_filter('datamachine_tools', function($tools) {
     $tools['my_tool'] = [
         '_callable'     => [$this, 'getToolDefinition'],  // Lazy resolution
-        'contexts'      => ['chat', 'pipeline'],
+        'modes'         => ['chat', 'pipeline'],
         'ability'       => 'datamachine/my-ability',      // Links to an ability for permission resolution
         'access_level'  => 'admin',                       // Fallback when no ability is linked
     ];
@@ -280,7 +280,7 @@ add_filter('datamachine_tools', function($tools) {
             ];
         },
         'handler'      => 'wordpress_publish',  // Exact slug match against adjacent step
-        'contexts'     => ['pipeline'],
+        'modes'        => ['pipeline'],
         'access_level' => 'admin',
     ];
     return $tools;
@@ -322,7 +322,7 @@ the resolved definition follows the same shape:
     'handler'        => 'handler_slug',      // Optional: handler-owned tool
     'requires_config' => true|false,         // Optional: UI configuration indicator
     'handler_config' => $handler_config,     // Optional: passed to tool execution
-    'contexts'       => ['pipeline'],        // Filled by registry wrapper if absent
+    'modes'          => ['pipeline'],        // Filled by registry wrapper if absent
     'ability'        => 'datamachine/...',   // Optional: permission link
     'access_level'   => 'admin',             // Optional: permission fallback
 ]

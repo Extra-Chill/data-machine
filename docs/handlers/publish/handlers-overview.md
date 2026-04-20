@@ -122,7 +122,7 @@ add_filter('datamachine_tools', function($tools) {
             ];
         },
         'handler'      => 'wordpress_publish',
-        'contexts'     => ['pipeline'],
+        'modes'        => ['pipeline'],
         'access_level' => 'admin',
     ];
     return $tools;
@@ -365,7 +365,7 @@ add_filter('datamachine_tools', function($tools) {
             ];
         },
         'handler'      => 'custom_platform',
-        'contexts'     => ['pipeline'],
+        'modes'        => ['pipeline'],
         'access_level' => 'admin',
     ];
     return $tools;

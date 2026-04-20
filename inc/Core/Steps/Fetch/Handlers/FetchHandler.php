@@ -430,7 +430,7 @@ abstract class FetchHandler {
 				$tools['__handler_tools_skip_item'] = array(
 					'_handler_callable' => array( self::class, 'resolveSkipItemTool' ),
 					'handler_types'     => array( 'fetch', 'event_import' ),
-					'contexts'          => array( 'pipeline' ),
+					'modes'             => array( 'pipeline' ),
 					'access_level'      => 'admin',
 				);
 				return $tools;

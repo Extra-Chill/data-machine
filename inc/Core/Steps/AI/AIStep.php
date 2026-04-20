@@ -110,9 +110,9 @@ class AIStep extends Step {
 		// entirely when identity fields in engine_data match an existing record.
 		//
 		// Filter returns null to proceed normally, or an array with:
-		//   'skip'   => true
-		//   'reason' => string (for logging)
-		//   'status' => string (job status override, e.g. 'completed_no_items')
+		// 'skip'   => true
+		// 'reason' => string (for logging)
+		// 'status' => string (job status override, e.g. 'completed_no_items')
 		$pre_check = apply_filters( 'datamachine_pre_ai_step_check', null, $this->engine, $this->flow_step_config, $this->job_id );
 
 		if ( is_array( $pre_check ) && ! empty( $pre_check['skip'] ) ) {
@@ -258,15 +258,17 @@ class AIStep extends Step {
 			?? array();
 
 		$resolver        = new ToolPolicyResolver();
-		$available_tools = $resolver->resolve( array(
-			'context'              => ToolPolicyResolver::CONTEXT_PIPELINE,
-			'agent_id'             => $agent_id,
-			'previous_step_config' => $previous_step_config,
-			'next_step_config'     => $next_step_config,
-			'pipeline_step_id'     => $pipeline_step_id,
-			'engine_data'          => $engine_data,
-			'categories'           => $tool_categories,
-		) );
+		$available_tools = $resolver->resolve(
+			array(
+				'mode'                 => ToolPolicyResolver::MODE_PIPELINE,
+				'agent_id'             => $agent_id,
+				'previous_step_config' => $previous_step_config,
+				'next_step_config'     => $next_step_config,
+				'pipeline_step_id'     => $pipeline_step_id,
+				'engine_data'          => $engine_data,
+				'categories'           => $tool_categories,
+			)
+		);
 
 		// Filter handler slugs to only those that are actual AI tools.
 		// Previous-step handler slugs (e.g. 'universal_web_scraper') are
@@ -276,10 +278,12 @@ class AIStep extends Step {
 		// calling the same handler tool on every turn until max_turns.
 		// See: https://github.com/Extra-Chill/data-machine/issues/1108
 		if ( ! empty( $all_handler_slugs ) ) {
-			$ai_tool_handler_slugs = array_values( array_intersect(
-				array_unique( $all_handler_slugs ),
-				array_keys( $available_tools )
-			) );
+			$ai_tool_handler_slugs = array_values(
+				array_intersect(
+					array_unique( $all_handler_slugs ),
+					array_keys( $available_tools )
+				)
+			);
 
 			if ( ! empty( $ai_tool_handler_slugs ) ) {
 				$payload['flow_step_config'] = array(
@@ -338,7 +342,7 @@ class AIStep extends Step {
 				$available_tools,
 				$provider_name,
 				$model_name,
-				ToolPolicyResolver::CONTEXT_PIPELINE,
+				ToolPolicyResolver::MODE_PIPELINE,
 				$payload,
 				$max_turns
 			);

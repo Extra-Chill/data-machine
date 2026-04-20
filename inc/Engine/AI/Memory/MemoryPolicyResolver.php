@@ -17,7 +17,7 @@
  * 2. Per-agent policy deny list (from agent_config.memory_policy)
  * 3. Per-agent policy allow-only (narrows to subset)
  * 4. Context-level allow_only (narrows to subset)
- * 5. Context preset (registry's get_for_context)
+ * 5. Mode preset (registry's get_for_mode)
  *
  * @package DataMachine\Engine\AI\Memory
  * @since   0.67.0
@@ -33,38 +33,38 @@ defined( 'ABSPATH' ) || exit;
 class MemoryPolicyResolver {
 
 	/**
-	 * Context presets, aligned with ToolPolicyResolver for consistency.
+	 * Agent mode presets, aligned with ToolPolicyResolver for consistency.
 	 */
-	public const CONTEXT_PIPELINE = 'pipeline';
-	public const CONTEXT_CHAT     = 'chat';
-	public const CONTEXT_SYSTEM   = 'system';
+	public const MODE_PIPELINE = 'pipeline';
+	public const MODE_CHAT     = 'chat';
+	public const MODE_SYSTEM   = 'system';
 
 	/**
-	 * Resolve the set of registered memory files applicable to a context
+	 * Resolve the set of registered memory files applicable to a mode
 	 * after agent policy is applied.
 	 *
 	 * Used by CoreMemoryFilesDirective to replace its direct
-	 * MemoryFileRegistry::get_for_context() call. The registry remains
+	 * MemoryFileRegistry::get_for_mode() call. The registry remains
 	 * the source of truth for which files exist and where they live;
 	 * this method is a per-agent filter on top.
 	 *
-	 * @param array $context {
-	 *     Execution context describing the request.
+	 * @param array $args {
+	 *     Resolution arguments describing the request.
 	 *
-	 *     @type string   $context    Required. Execution context slug (e.g. 'chat', 'pipeline').
+	 *     @type string   $mode       Required. Agent mode slug (e.g. 'chat', 'pipeline').
 	 *     @type int|null $agent_id   Optional agent ID for per-agent policy filtering.
 	 *     @type array    $deny       Filenames to explicitly deny (highest precedence).
-	 *     @type array    $allow_only Context-level allowlist narrowing.
+	 *     @type array    $allow_only Mode-level allowlist narrowing.
 	 * }
 	 * @return array<string, array> Filename => metadata map, sorted by priority ascending.
 	 */
-	public function resolveRegistered( array $context ): array {
-		$context_type = $context['context'] ?? '';
-		$agent_id     = isset( $context['agent_id'] ) ? (int) $context['agent_id'] : 0;
+	public function resolveRegistered( array $args ): array {
+		$mode     = $args['mode'] ?? '';
+		$agent_id = isset( $args['agent_id'] ) ? (int) $args['agent_id'] : 0;
 
-		// 1. Start with registry output filtered by context (already priority-sorted).
-		$files = ! empty( $context_type )
-			? MemoryFileRegistry::get_for_context( $context_type )
+		// 1. Start with registry output filtered by mode (already priority-sorted).
+		$files = ! empty( $mode )
+			? MemoryFileRegistry::get_for_mode( $mode )
 			: MemoryFileRegistry::get_all();
 
 		// 2. Apply per-agent policy.
@@ -73,20 +73,20 @@ class MemoryPolicyResolver {
 			$files  = $this->applyAgentPolicyToRegistered( $files, $policy );
 		}
 
-		// 3. Context-level allow_only (narrows to explicit subset).
-		$allow_only = $context['allow_only'] ?? array();
+		// 3. Mode-level allow_only (narrows to explicit subset).
+		$allow_only = $args['allow_only'] ?? array();
 		if ( ! empty( $allow_only ) ) {
 			$files = array_intersect_key( $files, array_flip( array_map( 'sanitize_file_name', $allow_only ) ) );
 		}
 
 		// 4. Explicit deny list (always wins).
-		$deny = $context['deny'] ?? array();
+		$deny = $args['deny'] ?? array();
 		if ( ! empty( $deny ) ) {
 			$files = array_diff_key( $files, array_flip( array_map( 'sanitize_file_name', $deny ) ) );
 		}
 
 		// 5. Allow external filtering of the resolved registered set.
-		$files = apply_filters( 'datamachine_resolved_memory_files', $files, $context_type, $context );
+		$files = apply_filters( 'datamachine_resolved_memory_files', $files, $mode, $args );
 
 		return $files;
 	}
@@ -129,12 +129,14 @@ class MemoryPolicyResolver {
 		$deny = $context['deny'] ?? array();
 		if ( ! empty( $deny ) ) {
 			$deny_set  = array_flip( array_map( 'sanitize_file_name', $deny ) );
-			$filenames = array_values( array_filter(
-				$filenames,
-				function ( $name ) use ( $deny_set ) {
-					return ! isset( $deny_set[ $name ] );
-				}
-			) );
+			$filenames = array_values(
+				array_filter(
+					$filenames,
+					function ( $name ) use ( $deny_set ) {
+						return ! isset( $deny_set[ $name ] );
+					}
+				)
+			);
 		}
 
 		/**
@@ -269,12 +271,14 @@ class MemoryPolicyResolver {
 				return $filenames;
 			}
 			$deny_set = array_flip( $policy['deny'] );
-			return array_values( array_filter(
-				$filenames,
-				function ( $name ) use ( $deny_set ) {
-					return ! isset( $deny_set[ $name ] );
-				}
-			) );
+			return array_values(
+				array_filter(
+					$filenames,
+					function ( $name ) use ( $deny_set ) {
+						return ! isset( $deny_set[ $name ] );
+					}
+				)
+			);
 		}
 
 		if ( 'allow_only' === $mode ) {
@@ -282,27 +286,29 @@ class MemoryPolicyResolver {
 				return array();
 			}
 			$allow_set = array_flip( $policy['allow_only'] );
-			return array_values( array_filter(
-				$filenames,
-				function ( $name ) use ( $allow_set ) {
-					return isset( $allow_set[ $name ] );
-				}
-			) );
+			return array_values(
+				array_filter(
+					$filenames,
+					function ( $name ) use ( $allow_set ) {
+						return isset( $allow_set[ $name ] );
+					}
+				)
+			);
 		}
 
 		return $filenames;
 	}
 
 	/**
-	 * Get available context presets.
+	 * Get available agent mode presets.
 	 *
-	 * @return array<string, string> Context key => description.
+	 * @return array<string, string> Mode slug => description.
 	 */
-	public static function getContexts(): array {
+	public static function getModes(): array {
 		return array(
-			self::CONTEXT_PIPELINE => 'Pipeline step AI execution',
-			self::CONTEXT_CHAT     => 'Admin chat session',
-			self::CONTEXT_SYSTEM   => 'System task execution',
+			self::MODE_PIPELINE => 'Pipeline step AI execution',
+			self::MODE_CHAT     => 'Admin chat session',
+			self::MODE_SYSTEM   => 'System task execution',
 		);
 	}
 }
