@@ -202,14 +202,25 @@ Hooks the `datamachine_tasks` filter to register the seven built-in task types:
 | `datamachine_task_handle` | `handleScheduledTask` | Dispatches a scheduled task job |
 | `datamachine_task_process_batch` | `handleBatchChunk` | Processes a batch chunk |
 | `datamachine_system_agent_set_featured_image` | `handleDeferredFeaturedImage` | Retries featured image assignment (up to 12 × 15s = 3 minutes) |
-| `datamachine_system_agent_daily_memory` | `handleDailyMemoryGeneration` | Triggers daily memory task |
+| `datamachine_recurring_<task_type>` | `TaskScheduler::handleRecurringHook` | Fires a recurring task — generic hook auto-registered for every task whose metadata declares `trigger_type='cron'` and a `setting_key` |
 
-### Daily Memory Schedule Management
+### Recurring Schedule Management
 
-On every page load (fast check via `as_next_scheduled_action`):
+Any task whose metadata declares both `trigger_type='cron'` and a `setting_key` is automatically managed by `TaskScheduler::ensureRecurringSchedule()` on every `action_scheduler_init`:
 
-- If `daily_memory_enabled` is true and no schedule exists → create recurring schedule at midnight UTC
-- If `daily_memory_enabled` is false and a schedule exists → unschedule all actions
+- If the setting is `true` and no schedule exists → create recurring action on hook `datamachine_recurring_<task_type>`.
+- If the setting is `false` and a schedule exists → unschedule all matching actions.
+- Otherwise → no-op (idempotent).
+
+Defaults are filterable per task type:
+
+| Filter | Default | Notes |
+|--------|---------|-------|
+| `datamachine_task_recurring_interval` | `DAY_IN_SECONDS` | Clamped to `HOUR_IN_SECONDS` minimum |
+| `datamachine_task_recurring_start_time` | Next midnight UTC for daily+, else `time()+interval` | Unix timestamp for the first run |
+| `datamachine_task_recurring_params` | `[]` | Params passed to `TaskScheduler::schedule()` when the hook fires |
+
+Extensions that register a task with this metadata shape (e.g. `data-machine-code`'s `worktree_cleanup`) get automatic schedule management with zero additional glue.
 
 ## SystemTaskStep
 

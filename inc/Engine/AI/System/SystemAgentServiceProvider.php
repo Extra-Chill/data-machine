@@ -23,14 +23,19 @@ use DataMachine\Engine\AI\System\Tasks\InternalLinkingTask;
 use DataMachine\Engine\AI\System\Tasks\MetaDescriptionTask;
 use DataMachine\Engine\Tasks\TaskRegistry;
 use DataMachine\Engine\Tasks\TaskScheduler;
-use DataMachine\Core\PluginSettings;
 
 class SystemAgentServiceProvider {
 
 	/**
-	 * Action Scheduler hook name for daily memory generation.
+	 * Legacy Action Scheduler hook name for the daily memory task.
+	 *
+	 * Kept only so `manageRecurringSchedules()` can unschedule any action
+	 * left over from plugin versions before the generic recurring helper
+	 * landed. New code should use `TaskScheduler::getRecurringHook()`.
+	 *
+	 * @deprecated 0.48.0 Replaced by generic `datamachine_recurring_<task_type>` hooks.
 	 */
-	const DAILY_MEMORY_HOOK = 'datamachine_system_agent_daily_memory';
+	const LEGACY_DAILY_MEMORY_HOOK = 'datamachine_system_agent_daily_memory';
 
 	/**
 	 * Constructor - registers all task infrastructure.
@@ -39,7 +44,8 @@ class SystemAgentServiceProvider {
 		$this->registerTaskHandlers();
 		$this->initializeRegistry();
 		$this->registerActionSchedulerHooks();
-		add_action( 'action_scheduler_init', array( $this, 'manageDailyMemorySchedule' ) );
+		$this->registerRecurringTaskHooks();
+		add_action( 'action_scheduler_init', array( $this, 'manageRecurringSchedules' ) );
 	}
 
 	/**
@@ -105,50 +111,58 @@ class SystemAgentServiceProvider {
 			10,
 			3
 		);
-
-		add_action(
-			self::DAILY_MEMORY_HOOK,
-			array( $this, 'handleDailyMemoryGeneration' )
-		);
 	}
 
 	/**
-	 * Manage the daily memory recurring schedule.
+	 * Register one Action Scheduler callback per recurring task type.
 	 *
-	 * Ensures the recurring Action Scheduler action exists when enabled
-	 * and is removed when disabled. Deferred to action_scheduler_init
-	 * to avoid calling AS functions before the data store is initialized.
+	 * Iterates the task registry and binds
+	 * `datamachine_recurring_<task_type>` for every task that opts in via
+	 * `trigger_type='cron'` + `setting_key`. The callback fires
+	 * `TaskScheduler::handleRecurringHook($taskType)`, which in turn
+	 * creates a DM Job through the standard schedule() path.
 	 *
-	 * @since 0.32.0
+	 * Registered at bootstrap (before `action_scheduler_init`) so Action
+	 * Scheduler can locate the callback when recurring actions fire.
+	 *
+	 * @since 0.48.0
 	 */
-	public function manageDailyMemorySchedule(): void {
-		$enabled        = (bool) PluginSettings::get( 'daily_memory_enabled', false );
-		$next_scheduled = as_next_scheduled_action( self::DAILY_MEMORY_HOOK, array(), 'data-machine' );
-
-		if ( $enabled && ! $next_scheduled ) {
-			// Schedule daily at midnight UTC.
-			$midnight = strtotime( 'tomorrow midnight' );
-			as_schedule_recurring_action(
-				$midnight,
-				DAY_IN_SECONDS,
-				self::DAILY_MEMORY_HOOK,
-				array(),
-				'data-machine'
+	private function registerRecurringTaskHooks(): void {
+		foreach ( TaskScheduler::getRecurringTasks() as $task_type => $_meta ) {
+			$hook = TaskScheduler::getRecurringHook( $task_type );
+			add_action(
+				$hook,
+				static function () use ( $task_type ) {
+					TaskScheduler::handleRecurringHook( $task_type );
+				}
 			);
-		} elseif ( ! $enabled && $next_scheduled ) {
-			as_unschedule_all_actions( self::DAILY_MEMORY_HOOK, array(), 'data-machine' );
 		}
 	}
 
 	/**
-	 * Handle the daily memory generation Action Scheduler callback.
+	 * Reconcile recurring Action Scheduler schedules with current task settings.
 	 *
-	 * @since 0.32.0
+	 * Iterates every cron-triggered task in the registry and calls
+	 * `TaskScheduler::ensureRecurringSchedule()` — scheduling when enabled,
+	 * unscheduling when disabled. Idempotent. Deferred to
+	 * `action_scheduler_init` so the AS data store is ready.
+	 *
+	 * Also cleans up any legacy `datamachine_system_agent_daily_memory`
+	 * action left behind by pre-0.48 installs. Safe to remove after a
+	 * release or two when the legacy hook is no longer in flight.
+	 *
+	 * @since 0.48.0
 	 */
-	public function handleDailyMemoryGeneration(): void {
-		TaskScheduler::schedule( 'daily_memory_generation', array(
-			'date' => gmdate( 'Y-m-d' ),
-		) );
+	public function manageRecurringSchedules(): void {
+		// Remove leftover legacy daily-memory schedule from pre-0.48 installs.
+		if ( function_exists( 'as_next_scheduled_action' )
+			&& as_next_scheduled_action( self::LEGACY_DAILY_MEMORY_HOOK, array(), 'data-machine' ) ) {
+			as_unschedule_all_actions( self::LEGACY_DAILY_MEMORY_HOOK, array(), 'data-machine' );
+		}
+
+		foreach ( TaskScheduler::getRecurringTasks() as $task_type => $_meta ) {
+			TaskScheduler::ensureRecurringSchedule( $task_type );
+		}
 	}
 
 	/**

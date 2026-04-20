@@ -36,6 +36,209 @@ class TaskScheduler {
 	const BATCH_CHUNK_DELAY = 30;
 
 	/**
+	 * Hook prefix for recurring task Action Scheduler actions.
+	 *
+	 * Each cron-triggered task gets a hook named "{prefix}{task_type}".
+	 * Extensions may rely on this prefix when introspecting scheduled
+	 * actions, but the preferred lookup is via getRecurringHook().
+	 *
+	 * @since 0.48.0
+	 */
+	const RECURRING_HOOK_PREFIX = 'datamachine_recurring_';
+
+	/**
+	 * Derive the Action Scheduler hook name for a recurring task.
+	 *
+	 * @since 0.48.0
+	 *
+	 * @param string $taskType Task type identifier.
+	 * @return string Hook name (e.g. "datamachine_recurring_daily_memory_generation").
+	 */
+	public static function getRecurringHook( string $taskType ): string {
+		return self::RECURRING_HOOK_PREFIX . $taskType;
+	}
+
+	/**
+	 * Get task types that qualify for automatic recurring-schedule management.
+	 *
+	 * A task qualifies when its metadata declares both:
+	 * - `trigger_type` === 'cron'
+	 * - a non-empty `setting_key` so enable/disable can be toggled
+	 *
+	 * @since 0.48.0
+	 *
+	 * @return array<string, array> Task type => registry entry.
+	 */
+	public static function getRecurringTasks(): array {
+		$recurring = array();
+
+		foreach ( TaskRegistry::getRegistry() as $task_type => $meta ) {
+			if ( ( $meta['trigger_type'] ?? '' ) !== 'cron' ) {
+				continue;
+			}
+			if ( empty( $meta['setting_key'] ) ) {
+				continue;
+			}
+			$recurring[ $task_type ] = $meta;
+		}
+
+		return $recurring;
+	}
+
+	/**
+	 * Ensure a recurring Action Scheduler action exists that matches the task's setting.
+	 *
+	 * Idempotent — safe to call on every `action_scheduler_init`. Performs the
+	 * minimal transition to reconcile setting state with scheduled state:
+	 *
+	 * - setting enabled  + no scheduled action → schedule recurring action
+	 * - setting disabled + scheduled action    → unschedule all instances
+	 * - otherwise                              → no-op
+	 *
+	 * Does nothing for tasks that are not `trigger_type='cron'` or lack a
+	 * `setting_key`. Does nothing when Action Scheduler is not loaded.
+	 *
+	 * @since 0.48.0
+	 *
+	 * @param string $taskType Task type identifier.
+	 * @return void
+	 */
+	public static function ensureRecurringSchedule( string $taskType ): void {
+		if ( ! function_exists( 'as_next_scheduled_action' ) ) {
+			return;
+		}
+
+		$registry = TaskRegistry::getRegistry();
+		if ( ! isset( $registry[ $taskType ] ) ) {
+			return;
+		}
+
+		$meta = $registry[ $taskType ];
+		if ( ( $meta['trigger_type'] ?? '' ) !== 'cron' ) {
+			return;
+		}
+		if ( empty( $meta['setting_key'] ) ) {
+			return;
+		}
+
+		$hook    = self::getRecurringHook( $taskType );
+		$enabled = (bool) ( $meta['enabled'] ?? false );
+		$next    = as_next_scheduled_action( $hook, array(), 'data-machine' );
+
+		if ( $enabled && ! $next ) {
+			/**
+			 * Filter the interval (in seconds) for a recurring task schedule.
+			 *
+			 * Default is DAY_IN_SECONDS. Values below HOUR_IN_SECONDS are
+			 * clamped to HOUR_IN_SECONDS to prevent accidental self-DoS.
+			 *
+			 * @since 0.48.0
+			 *
+			 * @param int    $interval Interval in seconds. Default DAY_IN_SECONDS.
+			 * @param string $taskType Task type identifier.
+			 */
+			$interval = (int) apply_filters(
+				'datamachine_task_recurring_interval',
+				DAY_IN_SECONDS,
+				$taskType
+			);
+
+			if ( $interval < HOUR_IN_SECONDS ) {
+				$interval = HOUR_IN_SECONDS;
+			}
+
+			// Default start time: next midnight UTC for daily (or slower) cadences,
+			// otherwise the first slot one interval from now. Filterable for full control.
+			$default_start = $interval >= DAY_IN_SECONDS
+				? strtotime( 'tomorrow midnight' )
+				: time() + $interval;
+
+			/**
+			 * Filter the first-run timestamp for a recurring task schedule.
+			 *
+			 * @since 0.48.0
+			 *
+			 * @param int    $start    Unix timestamp for the first scheduled run.
+			 * @param string $taskType Task type identifier.
+			 * @param int    $interval Interval in seconds (post-clamp).
+			 */
+			$start = (int) apply_filters(
+				'datamachine_task_recurring_start_time',
+				$default_start,
+				$taskType,
+				$interval
+			);
+
+			as_schedule_recurring_action(
+				$start,
+				$interval,
+				$hook,
+				array(),
+				'data-machine'
+			);
+
+			do_action(
+				'datamachine_log',
+				'info',
+				"Recurring task scheduled: {$taskType}",
+				array(
+					'task_type' => $taskType,
+					'hook'      => $hook,
+					'interval'  => $interval,
+					'start'     => $start,
+					'context'   => 'system',
+				)
+			);
+		} elseif ( ! $enabled && $next ) {
+			as_unschedule_all_actions( $hook, array(), 'data-machine' );
+
+			do_action(
+				'datamachine_log',
+				'info',
+				"Recurring task unscheduled: {$taskType}",
+				array(
+					'task_type' => $taskType,
+					'hook'      => $hook,
+					'context'   => 'system',
+				)
+			);
+		}
+	}
+
+	/**
+	 * Action Scheduler callback for a recurring task hook.
+	 *
+	 * Invoked when the recurring action fires. Creates a proper DM Job
+	 * via TaskScheduler::schedule() so the task runs through the standard
+	 * job pipeline (pending → processing → completed/failed).
+	 *
+	 * Params default to an empty array and are filterable per task type.
+	 *
+	 * @since 0.48.0
+	 *
+	 * @param string $taskType Task type identifier.
+	 * @return void
+	 */
+	public static function handleRecurringHook( string $taskType ): void {
+		/**
+		 * Filter the parameters passed to TaskScheduler::schedule() when a
+		 * recurring task hook fires.
+		 *
+		 * @since 0.48.0
+		 *
+		 * @param array  $params   Task parameters. Default empty array.
+		 * @param string $taskType Task type identifier.
+		 */
+		$params = apply_filters( 'datamachine_task_recurring_params', array(), $taskType );
+
+		if ( ! is_array( $params ) ) {
+			$params = array();
+		}
+
+		self::schedule( $taskType, $params );
+	}
+
+	/**
 	 * Schedule an async task.
 	 *
 	 * Creates a DM Job record and schedules an Action Scheduler action for

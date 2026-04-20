@@ -134,12 +134,14 @@ SystemTask::setPromptOverride('daily_memory_generation', 'memory_cleanup', 'Your
 
 ### Scheduling
 
-The `SystemAgentServiceProvider` manages the recurring Action Scheduler action:
+The `SystemAgentServiceProvider` wires the generic recurring-schedule helper (`TaskScheduler::ensureRecurringSchedule()`) for every task whose metadata declares `trigger_type='cron'` + a `setting_key`. Daily memory is just the first task to use it:
 
-- **Hook:** `datamachine_system_agent_daily_memory`
-- **Schedule:** Daily at midnight UTC (via `as_schedule_recurring_action`)
-- **Setting:** `daily_memory_enabled` (default: false) — when disabled, the schedule is unregistered
+- **Hook:** `datamachine_recurring_daily_memory_generation` (derived from task type)
+- **Schedule:** Daily at midnight UTC (via `as_schedule_recurring_action`, interval filterable via `datamachine_task_recurring_interval`)
+- **Setting:** `daily_memory_enabled` (default: false) — when disabled, the schedule is unregistered on the next `action_scheduler_init`
 - **Manual run:** Supported (`supports_run: true` in task meta) — can be triggered via CLI
+
+> Pre-0.48 installs used the hook `datamachine_system_agent_daily_memory`. On upgrade, that legacy action is auto-unscheduled by `SystemAgentServiceProvider::manageRecurringSchedules()` and replaced with the new generic hook.
 
 ### Task Metadata
 
