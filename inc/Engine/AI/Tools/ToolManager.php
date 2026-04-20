@@ -199,6 +199,152 @@ class ToolManager {
 	}
 
 	/**
+	 * Resolve handler tools for a specific adjacent-step handler.
+	 *
+	 * Iterates the unified `datamachine_tools` registry and resolves every
+	 * entry whose `_handler_callable` matches the given handler slug. Two
+	 * matching modes are supported:
+	 *
+	 * - **Exact slug**: `['handler' => 'wordpress_publish']` — the entry only
+	 *   applies when the adjacent step's handler_slug equals `'wordpress_publish'`.
+	 * - **Type match**: `['handler_types' => ['fetch', 'event_import']]` — the
+	 *   entry applies to any handler whose registered type is in the list
+	 *   (used by cross-cutting tools like `skip_item`).
+	 *
+	 * Callbacks receive `(handler_slug, handler_config, engine_data)` and
+	 * return an `['tool_name' => $tool_definition]` array (empty to opt out).
+	 * Multiple tools per handler are allowed.
+	 *
+	 * Results are cached per `flow_step_id|handler_slug` scope so repeated
+	 * lookups within the same pipeline execution don't re-invoke callbacks.
+	 *
+	 * @since NEXT
+	 *
+	 * @param string $handler_slug   Adjacent step handler slug.
+	 * @param array  $handler_config Handler configuration from flow step.
+	 * @param array  $engine_data    Engine data snapshot for dynamic generation.
+	 * @param string $cache_scope    Scope key (e.g. flow_step_id + handler_slug).
+	 * @return array Resolved tools keyed by tool name.
+	 */
+	public function resolveHandlerTools(
+		string $handler_slug,
+		array $handler_config,
+		array $engine_data,
+		string $cache_scope = ''
+	): array {
+		$cache_key = $cache_scope . '|handler_tools|' . $handler_slug;
+
+		if ( '' !== $cache_scope && isset( self::$resolved_cache[ $cache_key ] ) ) {
+			return self::$resolved_cache[ $cache_key ];
+		}
+
+		$raw_tools        = $this->get_raw_tools();
+		$resolved         = array();
+		$handlers_by_slug = null; // Lazy-loaded only when handler_types matching is needed.
+
+		foreach ( $raw_tools as $definition ) {
+			if ( ! is_array( $definition ) ) {
+				continue;
+			}
+			if ( ! isset( $definition['_handler_callable'] ) || ! is_callable( $definition['_handler_callable'] ) ) {
+				continue;
+			}
+
+			$matches = false;
+
+			// Exact-slug match.
+			if ( isset( $definition['handler'] ) && $definition['handler'] === $handler_slug ) {
+				$matches = true;
+			}
+
+			// Handler-type match (cross-cutting tools).
+			if ( ! $matches && ! empty( $definition['handler_types'] ) && is_array( $definition['handler_types'] ) ) {
+				if ( null === $handlers_by_slug ) {
+					$handlers_by_slug = apply_filters( 'datamachine_handlers', array() );
+				}
+				$handler_meta = $handlers_by_slug[ $handler_slug ] ?? null;
+				$handler_type = $handler_meta['type'] ?? '';
+				if ( $handler_type && in_array( $handler_type, $definition['handler_types'], true ) ) {
+					$matches = true;
+				}
+			}
+
+			if ( ! $matches ) {
+				continue;
+			}
+
+			$tool_map = call_user_func(
+				$definition['_handler_callable'],
+				$handler_slug,
+				$handler_config,
+				$engine_data
+			);
+
+			if ( ! is_array( $tool_map ) ) {
+				continue;
+			}
+
+			$access_level = $definition['access_level'] ?? 'admin';
+			$ability      = $definition['ability'] ?? null;
+
+			foreach ( $tool_map as $tool_name => $tool_def ) {
+				if ( ! is_string( $tool_name ) || '' === $tool_name || ! is_array( $tool_def ) ) {
+					continue;
+				}
+
+				// Ensure a handler link is set so downstream filters (handler
+				// context, permission resolution) know which handler owns
+				// the tool.
+				if ( ! isset( $tool_def['handler'] ) ) {
+					$tool_def['handler'] = $handler_slug;
+				}
+
+				// Apply registry-level meta unless the resolved tool
+				// explicitly overrides.
+				if ( ! isset( $tool_def['contexts'] ) ) {
+					$tool_def['contexts'] = array( 'pipeline' );
+				}
+				if ( null !== $ability && ! isset( $tool_def['ability'] ) ) {
+					$tool_def['ability'] = $ability;
+				}
+				if ( ! isset( $tool_def['access_level'] ) && ! isset( $tool_def['ability'] ) ) {
+					$tool_def['access_level'] = $access_level;
+				}
+
+				$resolved[ $tool_name ] = $tool_def;
+			}
+		}
+
+		if ( '' !== $cache_scope ) {
+			self::$resolved_cache[ $cache_key ] = $resolved;
+		}
+
+		return $resolved;
+	}
+
+	/**
+	 * Get raw registry entries for handler tools.
+	 *
+	 * Returns unresolved entries from `datamachine_tools` that have a
+	 * `_handler_callable` key. Useful for admin UIs that need to enumerate
+	 * registered handler tools without invoking their callbacks.
+	 *
+	 * @since NEXT
+	 *
+	 * @return array Raw entries keyed by registry key.
+	 */
+	public function get_handler_tool_entries(): array {
+		$raw_tools = $this->get_raw_tools();
+
+		return array_filter(
+			$raw_tools,
+			function ( $definition ) {
+				return is_array( $definition ) && isset( $definition['_handler_callable'] );
+			}
+		);
+	}
+
+	/**
 	 * Get contexts for a tool from its raw (unresolved) definition.
 	 *
 	 * Extracts contexts without resolving callable definitions.
@@ -489,8 +635,10 @@ class ToolManager {
 	public function getAvailableToolsForChat(): array {
 		$resolver = new ToolPolicyResolver( $this );
 
-		return $resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
-		) );
+		return $resolver->resolve(
+			array(
+				'context' => ToolPolicyResolver::CONTEXT_CHAT,
+			)
+		);
 	}
 }

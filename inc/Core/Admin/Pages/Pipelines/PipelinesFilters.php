@@ -128,18 +128,30 @@ function datamachine_get_ai_providers_for_react() {
 }
 
 /**
- * Get AI tools formatted for React
+ * Get AI tools formatted for React.
+ *
+ * Returns only global (non-handler) tools from the unified `datamachine_tools`
+ * registry. Handler tools are excluded because their definitions are shaped
+ * by runtime handler config and are only meaningful inside a pipeline
+ * execution context.
  *
  * @return array AI tools with configuration status
  */
-function datamachine_get_chubes_ai_tools_for_react() {
-	// Get all available tools
-	$all_tools = apply_filters( 'chubes_ai_tools', array() );
+function datamachine_get_ai_tools_for_react() {
+	$tool_manager = new \DataMachine\Engine\AI\Tools\ToolManager();
+	$all_tools    = $tool_manager->get_all_tools();
 
-	// Filter to only global tools (no handler property)
+	// Filter to only global tools — exclude both per-handler tools (carry
+	// a 'handler' link) and handler tool registry wrappers.
 	$global_tools = array_filter(
 		$all_tools,
 		function ( $tool_def ) {
+			if ( ! is_array( $tool_def ) ) {
+				return false;
+			}
+			if ( isset( $tool_def['_handler_callable'] ) ) {
+				return false;
+			}
 			return ! isset( $tool_def['handler'] );
 		}
 	);

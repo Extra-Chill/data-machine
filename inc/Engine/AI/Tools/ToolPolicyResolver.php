@@ -116,7 +116,7 @@ class ToolPolicyResolver {
 		$tools = $this->gatherByContext( $context_type, $context );
 
 		// 2. Filter by linked ability permissions (from Abilities API).
-		//    Only applies in chat context — pipeline/system run as admin.
+		// Only applies in chat context — pipeline/system run as admin.
 		if ( self::CONTEXT_CHAT === $context_type ) {
 			$tools = $this->filterByAbilityPermissions( $tools );
 		}
@@ -128,7 +128,7 @@ class ToolPolicyResolver {
 		}
 
 		// 4. Filter by ability categories (narrows to tools whose linked ability
-		//    belongs to one of the specified categories).
+		// belongs to one of the specified categories).
 		$categories = $context['categories'] ?? array();
 		if ( ! empty( $categories ) ) {
 			$tools = $this->filterByAbilityCategories( $tools, $categories );
@@ -290,13 +290,19 @@ class ToolPolicyResolver {
 
 	/**
 	 * Pipeline context: context-filtered tools + handler tools from adjacent steps.
+	 *
+	 * Handler tools are resolved from the unified `datamachine_tools` registry
+	 * via {@see ToolManager::resolveHandlerTools()}. Each adjacent step contributes
+	 * the handler tools owned by its handler_slug (exact match) plus any
+	 * cross-cutting tools registered against its handler type (e.g. `skip_item`
+	 * for fetch-type handlers).
 	 */
 	private function gatherPipelineTools( array $context ): array {
 		$available_tools  = array();
 		$pipeline_step_id = $context['pipeline_step_id'] ?? null;
 		$engine_data      = $context['engine_data'] ?? array();
 
-		// Handler tools from adjacent steps (dynamic, not part of the static registry).
+		// Handler tools from adjacent steps (dynamic, resolved per-execution).
 		foreach ( array( $context['previous_step_config'] ?? null, $context['next_step_config'] ?? null ) as $step_config ) {
 			if ( ! $step_config ) {
 				continue;
@@ -308,17 +314,15 @@ class ToolPolicyResolver {
 
 			foreach ( $handler_slugs as $slug ) {
 				$handler_config = $handler_configs_map[ $slug ] ?? array();
-				$tools          = apply_filters( 'chubes_ai_tools', array(), $slug, $handler_config, $engine_data );
-				$tools          = $this->tool_manager->resolveAllTools( $tools, $cache_scope );
+				$tools          = $this->tool_manager->resolveHandlerTools(
+					$slug,
+					$handler_config,
+					$engine_data,
+					$cache_scope
+				);
 
 				foreach ( $tools as $tool_name => $tool_config ) {
-					if ( ! is_array( $tool_config ) ) {
-						continue;
-					}
-					// Handler tools only included if they match the current handler.
-					if ( isset( $tool_config['handler'] ) && $tool_config['handler'] === $slug ) {
-						$available_tools[ $tool_name ] = $tool_config;
-					}
+					$available_tools[ $tool_name ] = $tool_config;
 				}
 			}
 		}
@@ -328,7 +332,14 @@ class ToolPolicyResolver {
 		$pipeline_tools = $this->filterByContext( $all_tools, 'pipeline' );
 
 		foreach ( $pipeline_tools as $tool_name => $tool_config ) {
-			if ( is_array( $tool_config ) && $this->tool_manager->is_tool_available( $tool_name, $pipeline_step_id ) ) {
+			if ( ! is_array( $tool_config ) ) {
+				continue;
+			}
+			// Skip handler tool registry wrappers — those are resolved above.
+			if ( isset( $tool_config['_handler_callable'] ) ) {
+				continue;
+			}
+			if ( $this->tool_manager->is_tool_available( $tool_name, $pipeline_step_id ) ) {
 				$available_tools[ $tool_name ] = $tool_config;
 			}
 		}

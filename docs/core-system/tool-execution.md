@@ -53,31 +53,44 @@ $tools = ToolExecutor::getAvailableTools(null, null, null);
 
 #### 1. Handler Tools (Step-Specific)
 
-Tools registered via `chubes_ai_tools` filter, scoped to specific handlers:
+Tools registered into the unified `datamachine_tools` registry as
+`_handler_callable` entries — runtime-resolved with the adjacent step's
+handler config so parameter shapes can adapt to per-step settings (e.g.
+AI-decides taxonomies, character limits, etc.). The preferred path is
+`HandlerRegistrationTrait::registerHandler()`; manual shape:
 
 ```php
-add_filter('chubes_ai_tools', function($tools, $handler_slug = null, $handler_config = []) {
-    if ($handler_slug === 'twitter') {
-        $tools['twitter_publish'] = [
-            'class' => 'DataMachine\\Core\\Steps\\Publish\\Handlers\\Twitter\\Twitter',
-            'method' => 'handle_tool_call',
-            'handler' => 'twitter',
-            'description' => 'Post content to Twitter (280 character limit)',
-            'parameters' => [
-                'content' => [
-                    'type' => 'string',
-                    'required' => true,
-                    'description' => 'Tweet content (max 280 chars)'
-                ]
-            ],
-            'handler_config' => $handler_config
-        ];
-    }
+add_filter('datamachine_tools', function($tools) {
+    $tools['__handler_tools_twitter'] = [
+        '_handler_callable' => function($handler_slug, $handler_config, $engine_data) {
+            return [
+                'twitter_publish' => [
+                    'class'          => 'DataMachine\\Core\\Steps\\Publish\\Handlers\\Twitter\\Twitter',
+                    'method'         => 'handle_tool_call',
+                    'handler'        => $handler_slug,
+                    'description'    => 'Post content to Twitter (280 character limit)',
+                    'parameters'     => [
+                        'content' => [
+                            'type'        => 'string',
+                            'required'    => true,
+                            'description' => 'Tweet content (max 280 chars)',
+                        ],
+                    ],
+                    'handler_config' => $handler_config,
+                ],
+            ];
+        },
+        'handler'      => 'twitter',
+        'contexts'     => ['pipeline'],
+        'access_level' => 'admin',
+    ];
     return $tools;
-}, 10, 3);
+});
 ```
 
-**Key**: Tools with `'handler'` field are automatically filtered to matching handler slug.
+**Key**: `ToolPolicyResolver::gatherPipelineTools()` resolves these entries
+against the adjacent pipeline step's `handler_slug` (or `handler_types` for
+cross-cutting tools like `skip_item`).
 
 #### 2. Global Tools (All Agents)
 
@@ -472,14 +485,15 @@ foreach ($engine_parameters as $key => $value) {
 
 ### Handler Tools
 
-**Registration**: `chubes_ai_tools` filter
+**Registration**: `datamachine_tools` filter — `_handler_callable` entries
 **Scope**: Step-specific (publish, upsert handlers)
-**Enablement**: Automatic if handler matches
+**Enablement**: Automatic when adjacent step's handler slug or type matches
 **Examples**: `twitter_publish`, `wordpress_publish`, `bluesky_publish`
 
 **Characteristics**:
-- Registered with `'handler'` field matching handler slug
-- Automatically filtered to current/next step handler
+- Registry entry carries `'handler' => 'slug'` (exact match) or
+  `'handler_types' => [...]` (cross-cutting tools like `skip_item`)
+- Resolved at pipeline execution time with the adjacent step's handler config
 - Receive data packets and engine parameters
 - Execute final workflow actions (publishing, updating)
 
@@ -513,27 +527,34 @@ foreach ($engine_parameters as $key => $value) {
 
 ### Tool Registration
 
-**Handler Tools**:
+**Handler Tools** (preferred path is `HandlerRegistrationTrait::registerHandler()`):
 ```php
-add_filter('chubes_ai_tools', function($tools, $handler_slug, $handler_config) {
-    if ($handler_slug === 'my_handler') {
-        $tools['my_tool'] = [
-            'class' => 'MyNamespace\\MyHandler',
-            'method' => 'handle_tool_call',
-            'handler' => 'my_handler',  // Critical for automatic filtering
-            'description' => 'Clear, concise tool description',
-            'parameters' => [
-                'param_name' => [
-                    'type' => 'string',
-                    'required' => true,
-                    'description' => 'Parameter description for AI'
-                ]
-            ],
-            'handler_config' => $handler_config
-        ];
-    }
+add_filter('datamachine_tools', function($tools) {
+    $tools['__handler_tools_my_handler'] = [
+        '_handler_callable' => function($handler_slug, $handler_config, $engine_data) {
+            return [
+                'my_tool' => [
+                    'class'          => 'MyNamespace\\MyHandler',
+                    'method'         => 'handle_tool_call',
+                    'handler'        => $handler_slug,
+                    'description'    => 'Clear, concise tool description',
+                    'parameters'     => [
+                        'param_name' => [
+                            'type'        => 'string',
+                            'required'    => true,
+                            'description' => 'Parameter description for AI',
+                        ],
+                    ],
+                    'handler_config' => $handler_config,
+                ],
+            ];
+        },
+        'handler'      => 'my_handler',
+        'contexts'     => ['pipeline'],
+        'access_level' => 'admin',
+    ];
     return $tools;
-}, 10, 3);
+});
 ```
 
 **Global Tools**:

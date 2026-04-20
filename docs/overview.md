@@ -181,6 +181,6 @@ wp datamachine jobs undo <job_id> --dry-run --allow-root
 - **Multi-platform publishing** via dedicated fetch/publish/upsert handlers for files, RSS, Reddit, Google Sheets, WordPress, Twitter, Threads, Bluesky, Facebook, and Google Sheets output.
 - **Daily memory system** for automatic temporal knowledge management with AI-driven pruning.
 - **System tasks** for background AI operations (image generation, alt text, internal linking, meta descriptions) with undo support.
-- **Extension points** through filters such as `datamachine_handlers`, `chubes_ai_tools`, `datamachine_step_types`, `datamachine_auth_providers`, and `datamachine_engine_data`.
+- **Extension points** through filters such as `datamachine_handlers`, `datamachine_tools`, `datamachine_step_types`, `datamachine_auth_providers`, and `datamachine_engine_data`.
 - **Directive orchestration** ensures every AI request is context-aware, tool-enabled, and consistent with site policies.
 - **Chartable logging, deduplication, and error handling** keep operators informed about job outcomes and prevent duplicate processing.

@@ -96,28 +96,37 @@ abstract protected function executePublish(array $parameters, array $handler_con
 
 ### AI Tool Registration
 
-Each handler registers its tool via filters:
+Each handler registers its tool through the unified `datamachine_tools` registry.
+The preferred path is `HandlerRegistrationTrait::registerHandler()` which wires
+the callback for you; the equivalent manual registration shape is:
 
 ```php
-add_filter('chubes_ai_tools', function($tools, $handler_slug = null, $handler_config = []) {
-    if ($handler_slug === 'wordpress_publish') {
-        $tools['wordpress_publish'] = [
-            'class' => 'DataMachine\\Core\\Steps\\Publish\\Handlers\\WordPress\\WordPress',
-            'method' => 'handle_tool_call',
-            'handler' => 'wordpress_publish',
-            'description' => 'Publish content to WordPress',
-            'parameters' => [
-                'content' => [
-                    'type' => 'string',
-                    'required' => true,
-                    'description' => 'Content to publish'
-                ]
-            ],
-            'handler_config' => $handler_config
-        ];
-    }
+add_filter('datamachine_tools', function($tools) {
+    $tools['__handler_tools_wordpress_publish'] = [
+        '_handler_callable' => function($handler_slug, $handler_config, $engine_data) {
+            return [
+                'wordpress_publish' => [
+                    'class'          => 'DataMachine\\Core\\Steps\\Publish\\Handlers\\WordPress\\WordPress',
+                    'method'         => 'handle_tool_call',
+                    'handler'        => $handler_slug,
+                    'description'    => 'Publish content to WordPress',
+                    'parameters'     => [
+                        'content' => [
+                            'type'        => 'string',
+                            'required'    => true,
+                            'description' => 'Content to publish',
+                        ],
+                    ],
+                    'handler_config' => $handler_config,
+                ],
+            ];
+        },
+        'handler'      => 'wordpress_publish',
+        'contexts'     => ['pipeline'],
+        'access_level' => 'admin',
+    ];
     return $tools;
-}, 10, 3);
+});
 ```
 
 ## Common Features
@@ -335,23 +344,30 @@ class CustomPublishHandler {
 ### Tool Registration
 
 ```php
-add_filter('chubes_ai_tools', function($tools, $handler_slug = null, $handler_config = []) {
-    if ($handler_slug === 'custom_platform') {
-        $tools['custom_publish'] = [
-            'class' => 'CustomPublishHandler',
-            'method' => 'handle_tool_call',
-            'handler' => 'custom_platform',
-            'description' => 'Publish content to custom platform',
-            'parameters' => [
-                'content' => [
-                    'type' => 'string',
-                    'required' => true,
-                    'description' => 'Content to publish'
-                ]
-            ],
-            'handler_config' => $handler_config
-        ];
-    }
+add_filter('datamachine_tools', function($tools) {
+    $tools['__handler_tools_custom_platform'] = [
+        '_handler_callable' => function($handler_slug, $handler_config, $engine_data) {
+            return [
+                'custom_publish' => [
+                    'class'          => 'CustomPublishHandler',
+                    'method'         => 'handle_tool_call',
+                    'handler'        => $handler_slug,
+                    'description'    => 'Publish content to custom platform',
+                    'parameters'     => [
+                        'content' => [
+                            'type'        => 'string',
+                            'required'    => true,
+                            'description' => 'Content to publish',
+                        ],
+                    ],
+                    'handler_config' => $handler_config,
+                ],
+            ];
+        },
+        'handler'      => 'custom_platform',
+        'contexts'     => ['pipeline'],
+        'access_level' => 'admin',
+    ];
     return $tools;
-}, 10, 3);
+});
 ```

@@ -228,20 +228,23 @@ class Handlers {
 		$settings_display_service = new \DataMachine\Core\Steps\Settings\SettingsDisplayService();
 		$field_state              = $settings_display_service->getFieldState( $handler_slug, $handler_defaults );
 
-		// Get AI tool definition
-		$ai_tool = null;
-		$tools   = apply_filters( 'chubes_ai_tools', array(), $handler_slug, array() );
+		// Resolve handler tool definition from the unified registry using
+		// empty handler_config/engine_data — the admin details endpoint wants
+		// the shape-at-registration-time, not a pipeline-specific rendering.
+		$ai_tool      = null;
+		$tool_manager = new \DataMachine\Engine\AI\Tools\ToolManager();
+		$tools        = $tool_manager->resolveHandlerTools( $handler_slug, array(), array() );
 
-		// Find the tool associated with this handler
 		foreach ( $tools as $tool_name => $tool_def ) {
-			if ( ( $tool_def['handler'] ?? '' ) === $handler_slug ) {
-				$ai_tool = array(
-					'tool_name'   => $tool_name,
-					'description' => $tool_def['description'] ?? '',
-					'parameters'  => $tool_def['parameters'] ?? array(),
-				);
-				break;
+			if ( ( $tool_def['handler'] ?? '' ) !== $handler_slug ) {
+				continue;
 			}
+			$ai_tool = array(
+				'tool_name'   => $tool_name,
+				'description' => $tool_def['description'] ?? '',
+				'parameters'  => $tool_def['parameters'] ?? array(),
+			);
+			break;
 		}
 
 		return rest_ensure_response(

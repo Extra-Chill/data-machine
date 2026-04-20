@@ -417,48 +417,50 @@ abstract class FetchHandler {
 	/**
 	 * Initialize FetchHandler static functionality.
 	 *
-	 * Registers the skip_item tool filter for all fetch-type handlers.
-	 * Called during plugin bootstrap after handlers are loaded.
+	 * Registers the skip_item tool in the unified `datamachine_tools` registry
+	 * as a cross-cutting handler tool — ToolPolicyResolver resolves it for any
+	 * adjacent step whose handler type is `fetch` or `event_import`.
 	 *
 	 * @since 0.9.7
 	 */
 	public static function init(): void {
-		add_filter( 'chubes_ai_tools', array( self::class, 'registerSkipItemTool' ), 10, 4 );
+		add_filter(
+			'datamachine_tools',
+			static function ( array $tools ): array {
+				$tools['__handler_tools_skip_item'] = array(
+					'_handler_callable' => array( self::class, 'resolveSkipItemTool' ),
+					'handler_types'     => array( 'fetch', 'event_import' ),
+					'contexts'          => array( 'pipeline' ),
+					'access_level'      => 'admin',
+				);
+				return $tools;
+			}
+		);
 	}
 
 	/**
-	 * Register skip_item tool for fetch-type handlers.
+	 * Resolve the skip_item tool for a specific fetch-type handler.
 	 *
-	 * The skip_item tool is available when the previous step (before the AI step)
-	 * is a fetch-type handler. This allows the AI to explicitly skip items that
-	 * don't meet processing criteria (e.g., non-music events).
+	 * Invoked lazily by ToolManager::resolveHandlerTools() when ANY adjacent
+	 * step handler's registered type is `fetch` or `event_import`. The tool
+	 * is re-shaped per-handler so the description can reference the concrete
+	 * source in pipeline prompts.
 	 *
-	 * @param array       $tools          Current tools array
-	 * @param string|null $handler_slug   Handler slug being queried
-	 * @param array       $handler_config Handler configuration
-	 * @param array       $engine_data    Engine data snapshot
-	 * @return array Modified tools array
+	 * @param string $handler_slug   Resolved adjacent-step handler slug.
+	 * @param array  $handler_config Handler configuration.
+	 * @param array  $engine_data    Engine data snapshot (unused).
+	 * @return array{skip_item: array} Tool map with the skip_item definition.
 	 * @since 0.9.7
 	 */
-	public static function registerSkipItemTool( array $tools, ?string $handler_slug = null, array $handler_config = array(), array $engine_data = array() ): array {
-		$engine_data;
-		if ( empty( $handler_slug ) ) {
-			return $tools;
-		}
-
-		// Check if this handler_slug is a fetch-type or event_import-type handler
-		$fetch_handlers        = apply_filters( 'datamachine_handlers', array(), 'fetch' );
-		$event_import_handlers = apply_filters( 'datamachine_handlers', array(), 'event_import' );
-		$all_fetch_handlers    = array_merge( $fetch_handlers, $event_import_handlers );
-
-		if ( ! isset( $all_fetch_handlers[ $handler_slug ] ) ) {
-			return $tools;
-		}
-
-		// Register skip_item tool with handler association
-		$tools['skip_item'] = self::getSkipItemToolDefinition( $handler_slug, $handler_config );
-
-		return $tools;
+	public static function resolveSkipItemTool(
+		string $handler_slug,
+		array $handler_config,
+		array $engine_data
+	): array {
+		unset( $engine_data );
+		return array(
+			'skip_item' => self::getSkipItemToolDefinition( $handler_slug, $handler_config ),
+		);
 	}
 
 	/**

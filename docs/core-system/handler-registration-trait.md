@@ -97,14 +97,29 @@ add_filter('datamachine_handler_settings', function($settings, $handler_slug_par
 }, 10, 2);
 ```
 
-### 4. chubes_ai_tools
+### 4. datamachine_tools (handler tools)
 
-AI tool registration via callback (conditional on tools_callback provided).
+AI tool registration via callback (conditional on tools_callback provided). The
+trait wires the callback into the unified `datamachine_tools` registry as a
+deferred `_handler_callable` entry. `ToolPolicyResolver::gatherPipelineTools()`
+resolves it at pipeline execution time using the runtime handler config and
+engine data from the adjacent step.
 
 ```php
 // Only registered if tools_callback is provided
-add_filter('chubes_ai_tools', $tools_callback, 10, 3);
+add_filter('datamachine_tools', function($tools) use ($slug, $tools_callback) {
+    $tools['__handler_tools_' . $slug] = [
+        '_handler_callable' => $tools_callback,
+        'handler'           => $slug,
+        'contexts'          => ['pipeline'],
+        'access_level'      => 'admin',
+    ];
+    return $tools;
+});
 ```
+
+The callback receives `(string $handler_slug, array $handler_config, array $engine_data)`
+and returns `['tool_name' => $tool_definition]` (empty array to opt out).
 
 ## Usage Example
 
@@ -126,11 +141,10 @@ class TwitterFilters {
             true,  // Requires OAuth
             TwitterAuth::class,
             TwitterSettings::class,
-            function($tools, $handler_slug, $handler_config) {
-                if ($handler_slug === 'twitter') {
-                    $tools['twitter_publish'] = datamachine_get_twitter_tool($handler_config);
-                }
-                return $tools;
+            function($handler_slug, $handler_config, $engine_data) {
+                return [
+                    'twitter_publish' => datamachine_get_twitter_tool($handler_config),
+                ];
             }
         );
     }
@@ -190,11 +204,10 @@ class WordPressUpdateFilters {
             false,
             null,
             WordPressUpdateSettings::class,
-            function($tools, $handler_slug, $handler_config) {
-                if ($handler_slug === 'wordpress_update') {
-                    $tools['wordpress_update'] = datamachine_get_wordpress_update_tool($handler_config);
-                }
-                return $tools;
+            function($handler_slug, $handler_config, $engine_data) {
+                return [
+                    'wordpress_update' => datamachine_get_wordpress_update_tool($handler_config),
+                ];
             }
         );
     }
@@ -225,7 +238,7 @@ Custom handlers should adopt this pattern by:
    add_filter('datamachine_handlers', function($handlers) { /* ... */ });
    add_filter('datamachine_auth_providers', function($providers) { /* ... */ });
    add_filter('datamachine_handler_settings', function($settings) { /* ... */ });
-   add_filter('chubes_ai_tools', function($tools) { /* ... */ });
+   add_filter('datamachine_tools', function($tools) { /* ... */ });  // manual _handler_callable wiring
 
    // After (trait registration)
    self::registerHandler(
@@ -243,17 +256,19 @@ Custom handlers should adopt this pattern by:
 
 3. **Move tool registration to callback parameter**:
    ```php
-   function($tools, $handler_slug, $handler_config) {
-       if ($handler_slug === 'my_handler') {
-           $tools['my_tool'] = [
+   // Receives (handler_slug, handler_config, engine_data) and returns
+   // [tool_name => definition]. The trait handles routing to the adjacent
+   // step's handler — no manual slug check needed.
+   function($handler_slug, $handler_config, $engine_data) {
+       return [
+           'my_tool' => [
                'class' => MyHandler::class,
                'method' => 'handle_tool_call',
                'handler' => 'my_handler',
                'description' => 'Tool description',
-               'parameters' => [/* ... */]
-           ];
-       }
-       return $tools;
+               'parameters' => [/* ... */],
+           ],
+       ];
    }
    ```
 
@@ -311,12 +326,17 @@ add_filter('datamachine_handler_settings', function($settings, $handler_slug) {
     return $settings;
 }, 10, 2);
 
-add_filter('chubes_ai_tools', function($tools, $handler_slug, $handler_config) {
-    if ($handler_slug === 'my_handler') {
-        $tools['my_tool'] = [/* ... */];
-    }
+add_filter('datamachine_tools', function($tools) {
+    $tools['__handler_tools_my_handler'] = [
+        '_handler_callable' => function($handler_slug, $handler_config, $engine_data) {
+            return ['my_tool' => [/* ... */]];
+        },
+        'handler'           => 'my_handler',
+        'contexts'          => ['pipeline'],
+        'access_level'      => 'admin',
+    ];
     return $tools;
-}, 10, 3);
+});
 ```
 
 After trait (same functionality):
@@ -331,11 +351,8 @@ self::registerHandler(
     true,
     MyHandlerAuth::class,
     MyHandlerSettings::class,
-    function($tools, $handler_slug, $handler_config) {
-        if ($handler_slug === 'my_handler') {
-            $tools['my_tool'] = [/* ... */];
-        }
-        return $tools;
+    function($handler_slug, $handler_config, $engine_data) {
+        return ['my_tool' => [/* ... */]];
     }
 );
 ```

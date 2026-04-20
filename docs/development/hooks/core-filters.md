@@ -131,8 +131,10 @@ Authentication provider registration (conditional on `requires_auth=true`)
 #### datamachine_handler_settings
 Settings class registration (always registered if settings_class provided)
 
-#### chubes_ai_tools
-AI tool registration via callback (conditional on tools_callback provided)
+#### datamachine_tools (handler tools)
+AI tool registration via callback (conditional on tools_callback provided). The
+trait wires the callback into the unified `datamachine_tools` registry as a
+deferred `_handler_callable` entry resolved at pipeline execution time.
 
 ### Usage Pattern
 
@@ -182,11 +184,10 @@ class TwitterFilters {
             true,  // Requires OAuth
             TwitterAuth::class,
             TwitterSettings::class,
-            function($tools, $handler_slug, $handler_config) {
-                if ($handler_slug === 'twitter') {
-                    $tools['twitter_publish'] = datamachine_get_twitter_tool($handler_config);
-                }
-                return $tools;
+            function($handler_slug, $handler_config, $engine_data) {
+                return [
+                    'twitter_publish' => datamachine_get_twitter_tool($handler_config),
+                ];
             }
         );
     }
@@ -227,34 +228,104 @@ See Handler Registration Trait for complete documentation.
 
 ## AI Integration Filters
 
-### `chubes_ai_tools`
+### `datamachine_tools`
 
-**Purpose**: Register AI tools for agentic execution
+**Purpose**: Unified registry for every AI tool — static global tools AND per-handler
+runtime-generated tools. Consumed by `ToolPolicyResolver` when gathering the
+available tool set for a pipeline or chat context.
 
 **Parameters**:
-- `$tools` (array) - Current tools array
-- `$handler_slug` (string|null) - Target handler slug (for handler-specific tools)
-- `$handler_config` (array) - Handler configuration
+- `$tools` (array) - Current tools registry (keyed by tool name or internal wrapper key)
 
-**Return**: Array of tool definitions
+**Return**: Modified tools array
 
-**Tool Structure**:
+#### Static tool entry (global tools)
+
 ```php
-$tools['tool_name'] = [
-    'class' => 'ToolClassName',
-    'method' => 'handle_tool_call',
-    'description' => 'Tool description for AI',
-    'parameters' => [
+add_filter('datamachine_tools', function($tools) {
+    $tools['my_tool'] = [
+        '_callable'     => [$this, 'getToolDefinition'],  // Lazy resolution
+        'contexts'      => ['chat', 'pipeline'],
+        'ability'       => 'datamachine/my-ability',      // Links to an ability for permission resolution
+        'access_level'  => 'admin',                       // Fallback when no ability is linked
+    ];
+    return $tools;
+});
+```
+
+The `_callable` resolves to the full tool definition array (name, description,
+parameters, etc.) at first access. See
+[Tool Registration](../../core-system/tool-execution.md) for the resolved
+definition contract.
+
+#### Handler tool entry (dynamic, runtime-generated)
+
+Handler tools are shaped by the runtime handler configuration of the adjacent
+pipeline step (e.g. `ai_decides` taxonomy choices produce different tool
+parameter schemas). The registry entry contains a `_handler_callable` that
+receives runtime context and returns one or more tool definitions.
+
+```php
+add_filter('datamachine_tools', function($tools) {
+    $tools['__handler_tools_wordpress_publish'] = [
+        '_handler_callable' => function($handler_slug, $handler_config, $engine_data) {
+            return [
+                'wordpress_publish' => [
+                    'class'       => WordPressPublishTool::class,
+                    'method'      => 'handle_tool_call',
+                    'handler'     => $handler_slug,
+                    'description' => 'Publish content to WordPress',
+                    'parameters'  => build_params_from_config($handler_config),
+                ],
+            ];
+        },
+        'handler'      => 'wordpress_publish',  // Exact slug match against adjacent step
+        'contexts'     => ['pipeline'],
+        'access_level' => 'admin',
+    ];
+    return $tools;
+});
+```
+
+Matching modes:
+- `'handler' => 'slug'` — entry applies only when the adjacent step's handler
+  slug equals `'slug'`.
+- `'handler_types' => ['fetch', 'event_import']` — entry applies to any
+  handler whose registered `type` is in the list. Used for cross-cutting
+  tools (e.g. `skip_item` exposed to every fetch-type handler).
+
+The callback signature is `(string $handler_slug, array $handler_config, array $engine_data): array`.
+Returned array is `['tool_name' => $tool_definition]` (empty array to opt out).
+
+**Preferred pattern**: use `HandlerRegistrationTrait::registerHandler()` — the
+trait wires the callback into this filter with the correct wrapper shape. Manual
+registration is only needed for cross-cutting tools that register against
+`handler_types`.
+
+#### Resolved tool definition contract
+
+Whether a tool comes from a static `_callable` or a handler `_handler_callable`,
+the resolved definition follows the same shape:
+
+```php
+[
+    'class'          => 'ToolClassName',
+    'method'         => 'handle_tool_call',
+    'description'    => 'Tool description for AI',
+    'parameters'     => [
         'param_name' => [
-            'type' => 'string|integer|boolean',
-            'required' => true|false,
-            'description' => 'Parameter description'
-        ]
+            'type'        => 'string|integer|boolean',
+            'required'    => true|false,
+            'description' => 'Parameter description',
+        ],
     ],
-    'handler' => 'handler_slug', // Optional: makes tool handler-specific
-    'requires_config' => true|false, // Optional: UI configuration indicator
-    'handler_config' => $handler_config // Optional: passed to tool execution
-];
+    'handler'        => 'handler_slug',      // Optional: handler-owned tool
+    'requires_config' => true|false,         // Optional: UI configuration indicator
+    'handler_config' => $handler_config,     // Optional: passed to tool execution
+    'contexts'       => ['pipeline'],        // Filled by registry wrapper if absent
+    'ability'        => 'datamachine/...',   // Optional: permission link
+    'access_level'   => 'admin',             // Optional: permission fallback
+]
 ```
 
 ### `chubes_ai_request`
@@ -1029,7 +1100,7 @@ Builds parameters for handler-specific tools with engine data merging (source_ur
 ```
 
 **Discovery Process**:
-1. Handler Tools - Retrieved via `chubes_ai_tools` filter
+1. Handler Tools - Retrieved via `datamachine_tools` filter (runtime-resolved `_handler_callable` entries)
 2. Global Tools - Retrieved via `datamachine_global_tools` filter
 3. Chat Tools - Retrieved via `datamachine_chat_tools` filter (chat only)
 4. Enablement Check - Each tool filtered through `datamachine_tool_enabled`

@@ -305,7 +305,7 @@ Data Machine v0.2.0 introduced a universal Engine layer (`/inc/Engine/AI/`) that
 ### Filter-Based Discovery
 All components self-register via WordPress filters:
 - `datamachine_handlers` - Register fetch/publish/upsert handlers
-- `chubes_ai_tools` - Register AI tools and capabilities
+- `datamachine_tools` - Register AI tools and capabilities (unified static + runtime handler tool registry)
 - `datamachine_auth_providers` - Register authentication providers
 - `datamachine_step_types` - Register custom step types
 - `datamachine_directives` - Register AI context directives
