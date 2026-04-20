@@ -28,14 +28,6 @@ class FlowScheduling {
 	public const FLOW_HOOK = 'datamachine_run_flow_now';
 
 	/**
-	 * Maximum stagger offset in seconds.
-	 *
-	 * Kept as a back-compat constant; canonical source lives on
-	 * RecurringScheduler::MAX_STAGGER_SECONDS.
-	 */
-	private const MAX_STAGGER_SECONDS = RecurringScheduler::MAX_STAGGER_SECONDS;
-
-	/**
 	 * Calculate a deterministic stagger offset for a flow.
 	 *
 	 * Back-compat forward to RecurringScheduler::calculateStaggerOffset().
