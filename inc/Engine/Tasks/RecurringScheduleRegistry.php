@@ -6,28 +6,23 @@
  * are a first-class concept, registered via the `datamachine_recurring_schedules`
  * filter independently of task handlers. A task is a handler (what runs); a
  * schedule is a binding (when it runs). One task can have zero or many
- * schedules. This separation replaces the earlier `trigger_type: cron`
- * coupling where task metadata tried to describe its own invocation pattern.
+ * schedules.
  *
  * Registration shape:
  *
  *     add_filter( 'datamachine_recurring_schedules', function ( $schedules ) {
  *         $schedules['daily_memory_generation'] = array(
- *             'task_type'         => 'daily_memory_generation',
- *             'interval'          => 'daily',
- *             'enabled_setting'   => 'daily_memory_enabled',
- *             'default_enabled'   => false,
- *             'task_params'       => array( 'date' => gmdate( 'Y-m-d' ) ),
- *             'first_run_callback'=> 'strtotime',
- *             'first_run_arg'     => 'tomorrow midnight',
- *             'label'             => 'Daily at midnight UTC',
+ *             'task_type'          => 'daily_memory_generation',
+ *             'interval'           => 'daily',
+ *             'enabled_setting'    => 'daily_memory_enabled',
+ *             'default_enabled'    => false,
+ *             'task_params'        => array( 'date' => gmdate( 'Y-m-d' ) ),
+ *             'first_run_callback' => 'strtotime',
+ *             'first_run_arg'      => 'tomorrow midnight',
+ *             'label'              => 'Daily at midnight UTC',
  *         );
  *         return $schedules;
  *     } );
- *
- * Back-compat: tasks that still declare legacy `trigger_type: cron` +
- * `setting_key` metadata are auto-registered as daily schedules so existing
- * external code keeps working.
  *
  * @package DataMachine\Engine\Tasks
  * @since   0.71.0
@@ -60,34 +55,6 @@ class RecurringScheduleRegistry {
 
 		$registered = apply_filters( 'datamachine_recurring_schedules', array() );
 
-		// Back-compat shim: auto-register legacy tasks that declared
-		// `trigger_type: cron` + `setting_key` in their getTaskMeta().
-		// External plugins get a grace period — they continue to work
-		// without changing their task declarations.
-		foreach ( TaskRegistry::getHandlers() as $task_type => $handler_class ) {
-			if ( isset( $registered[ $task_type ] ) ) {
-				continue;
-			}
-			if ( ! method_exists( $handler_class, 'getTaskMeta' ) ) {
-				continue;
-			}
-			$meta = $handler_class::getTaskMeta();
-			if ( ( $meta['trigger_type'] ?? '' ) !== 'cron' ) {
-				continue;
-			}
-			if ( empty( $meta['setting_key'] ) ) {
-				continue;
-			}
-			$registered[ $task_type ] = array(
-				'task_type'        => $task_type,
-				'interval'         => 'daily',
-				'enabled_setting'  => $meta['setting_key'],
-				'default_enabled'  => (bool) ( $meta['default_enabled'] ?? false ),
-				'label'            => $meta['trigger'] ?? 'Daily',
-				'legacy_autoshim'  => true,
-			);
-		}
-
 		// Normalize each entry so downstream code can rely on the shape.
 		self::$schedules = array();
 		foreach ( $registered as $schedule_id => $def ) {
@@ -106,7 +73,6 @@ class RecurringScheduleRegistry {
 					'first_run_callback' => null,
 					'first_run_arg'      => null,
 					'label'              => null,
-					'legacy_autoshim'    => false,
 				),
 				$def
 			);

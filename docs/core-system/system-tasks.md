@@ -216,9 +216,9 @@ Scheduler:
   pending → schedule via `RecurringScheduler::ensureSchedule()`.
 - If the setting resolves to false → unschedule.
 
-The legacy `datamachine_system_agent_daily_memory` hook is kept on the
-handler map for one release so in-flight AS actions from before this
-refactor still fire correctly; it is unscheduled on reconciliation.
+On upgrade, any pending AS action queued under the pre-refactor hook
+`datamachine_system_agent_daily_memory` is unscheduled during the first
+reconciliation so no zombie recurring action remains in the queue.
 
 ## SystemTaskStep
 

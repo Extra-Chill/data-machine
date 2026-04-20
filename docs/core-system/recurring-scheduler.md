@@ -130,17 +130,15 @@ for `datamachine_recurring_<task_type>`, and its only job is to call
 `TaskScheduler::schedule()` with the task params from the schedule
 definition.
 
-## Back-compat
+## Upgrade migration
 
-- `FlowScheduling::is_valid_cron_expression()`,
-  `looks_like_cron_expression()`, `describe_cron_expression()`, and
-  `calculate_stagger_offset()` are preserved as thin forwards to the
-  equivalent methods on `RecurringScheduler`.
-- Tasks still declaring legacy `trigger_type: 'cron'` + `setting_key` in
-  their `getTaskMeta()` are auto-registered as daily schedules by
-  `RecurringScheduleRegistry::load()` so external code keeps working
-  without modification. New code should register explicit schedules via
-  the filter instead.
-- The legacy `datamachine_system_agent_daily_memory` AS hook is kept on
-  the handler map for one release so in-flight AS actions from before
-  the refactor still dispatch correctly; reconciliation unschedules it.
+The only non-additive change for existing installs is the AS hook
+rename for daily memory generation
+(`datamachine_system_agent_daily_memory` → `datamachine_recurring_daily_memory_generation`).
+`SystemAgentServiceProvider::manageRecurringTaskSchedules()` runs on
+`action_scheduler_init` and unschedules any pending action queued under
+the old hook before the new schedule gets a chance to dispatch, so
+upgrading sites don't carry a zombie recurring action. No other contract
+changes; `FlowScheduling::handle_scheduling_update()` signature, REST
+endpoints, CLI commands, the `datamachine_scheduler_intervals` filter,
+and `TaskScheduler::schedule()` are all unchanged.

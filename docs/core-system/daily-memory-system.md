@@ -146,9 +146,9 @@ All AS plumbing runs through the shared `RecurringScheduler` primitive
 - **Manual run:** Supported (`supports_run: true` in task meta) — can be
   triggered via CLI / REST / UI
 
-The legacy hook `datamachine_system_agent_daily_memory` is still wired for
-one release so in-flight AS actions enqueued before the refactor continue
-to dispatch correctly.
+Upgrading sites have any pending action under the pre-refactor hook
+(`datamachine_system_agent_daily_memory`) unscheduled during the first
+`action_scheduler_init` reconciliation.
 
 ### Task Metadata
 

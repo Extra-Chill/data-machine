@@ -426,7 +426,7 @@ class FlowsCommand extends BaseCommand {
 		WP_CLI::log( sprintf( 'Name:         %s', $flow['flow_name'] ) );
 		WP_CLI::log( sprintf( 'Pipeline ID:  %s', $flow['pipeline_id'] ?? 'N/A' ) );
 		if ( 'cron' === $interval && ! empty( $scheduling['cron_expression'] ) ) {
-			$cron_desc = \DataMachine\Api\Flows\FlowScheduling::describe_cron_expression( $scheduling['cron_expression'] );
+			$cron_desc = \DataMachine\Engine\Tasks\RecurringScheduler::describeCronExpression( $scheduling['cron_expression'] );
 			WP_CLI::log( sprintf( 'Scheduling:   cron (%s) — %s', $scheduling['cron_expression'], $cron_desc ) );
 		} else {
 			WP_CLI::log( sprintf( 'Scheduling:   %s', $interval ) );
@@ -1600,7 +1600,7 @@ class FlowsCommand extends BaseCommand {
 			\WP_CLI::error( 'one_time scheduling requires --scheduled-at=<datetime> (ISO-8601 format).' );
 		}
 
-		if ( \DataMachine\Api\Flows\FlowScheduling::looks_like_cron_expression( $scheduling ) ) {
+		if ( \DataMachine\Engine\Tasks\RecurringScheduler::looksLikeCronExpression( $scheduling ) ) {
 			return array(
 				'interval'        => 'cron',
 				'cron_expression' => $scheduling,

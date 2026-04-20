@@ -34,14 +34,13 @@ use DataMachine\Engine\Tasks\TaskScheduler;
 class SystemAgentServiceProvider {
 
 	/**
-	 * Legacy Action Scheduler hook name for daily memory generation.
+	 * Legacy Action Scheduler hook for daily memory generation.
 	 *
-	 * Retained only to unschedule lingering AS actions after the refactor;
-	 * new scheduling uses `datamachine_recurring_daily_memory_generation`.
-	 *
-	 * @deprecated 0.71.0 use RecurringScheduleRegistry::hookFor() instead.
+	 * Used solely to unschedule stale AS actions queued under the old name
+	 * on sites upgrading from before the recurring-scheduler refactor. New
+	 * scheduling runs under `datamachine_recurring_daily_memory_generation`.
 	 */
-	const LEGACY_DAILY_MEMORY_HOOK = 'datamachine_system_agent_daily_memory';
+	private const LEGACY_DAILY_MEMORY_HOOK = 'datamachine_system_agent_daily_memory';
 
 	/**
 	 * Constructor - registers all task infrastructure.
@@ -134,9 +133,6 @@ class SystemAgentServiceProvider {
 	 *   - datamachine_task_process_batch  → process batch chunks
 	 *   - datamachine_recurring_<task>    → one hook per registered schedule,
 	 *     turns each AS tick into an ephemeral job via TaskScheduler.
-	 *
-	 * The legacy daily-memory hook is kept on the handler map for one
-	 * release so AS actions enqueued before this refactor still fire.
 	 */
 	private function registerActionSchedulerHooks(): void {
 		add_action( 'datamachine_task_handle', array( $this, 'handleScheduledTask' ) );
@@ -152,8 +148,8 @@ class SystemAgentServiceProvider {
 		// recurring schedule. Action Scheduler fires the hook; the closure
 		// enqueues an ephemeral DM job with the task's params.
 		foreach ( RecurringScheduleRegistry::all() as $schedule ) {
-			$hook      = RecurringScheduleRegistry::hookFor( $schedule );
-			$task_type = $schedule['task_type'];
+			$hook        = RecurringScheduleRegistry::hookFor( $schedule );
+			$task_type   = $schedule['task_type'];
 			$schedule_id = $schedule['schedule_id'];
 
 			add_action(
@@ -173,19 +169,6 @@ class SystemAgentServiceProvider {
 				}
 			);
 		}
-
-		// Legacy daily-memory hook: still route to the new task handler so
-		// any AS action enqueued before the refactor still fires correctly.
-		// Will be removed after one release.
-		add_action(
-			self::LEGACY_DAILY_MEMORY_HOOK,
-			static function (): void {
-				TaskScheduler::schedule(
-					'daily_memory_generation',
-					array( 'date' => gmdate( 'Y-m-d' ) )
-				);
-			}
-		);
 	}
 
 	/**
@@ -196,8 +179,9 @@ class SystemAgentServiceProvider {
 	 *     RecurringScheduler::ensureSchedule().
 	 *   - If disabled → unschedule.
 	 *
-	 * Also unschedules the legacy daily-memory hook so ghost AS actions
-	 * from before this refactor don't linger in the queue.
+	 * Also unschedules any stale AS action still queued under the
+	 * pre-refactor daily-memory hook so upgrading sites don't carry a
+	 * zombie recurring action that fires forever with no handler.
 	 *
 	 * Deferred to action_scheduler_init to avoid calling AS functions
 	 * before the data store is initialized.
@@ -205,7 +189,9 @@ class SystemAgentServiceProvider {
 	 * @since 0.71.0
 	 */
 	public function manageRecurringTaskSchedules(): void {
-		// One-time cleanup: legacy daily-memory hook.
+		// Upgrade cleanup: strip any pending AS action queued under the
+		// legacy daily-memory hook before this refactor. One-shot migration;
+		// no-op on fresh installs.
 		RecurringScheduler::unschedule( self::LEGACY_DAILY_MEMORY_HOOK, array() );
 
 		foreach ( RecurringScheduleRegistry::all() as $schedule ) {

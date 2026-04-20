@@ -5,10 +5,6 @@
  * Persists flow-specific scheduling config to the flows table and delegates
  * all Action Scheduler plumbing to the shared RecurringScheduler primitive.
  *
- * The cron helpers and stagger offset logic originally lived here; they now
- * live on RecurringScheduler. Back-compat forwards are kept so external
- * callers (and this plugin's own utility code) keep working unchanged.
- *
  * @package DataMachine\Api\Flows
  */
 
@@ -26,55 +22,6 @@ class FlowScheduling {
 	 * Action Scheduler hook fired when a flow is due to run.
 	 */
 	public const FLOW_HOOK = 'datamachine_run_flow_now';
-
-	/**
-	 * Calculate a deterministic stagger offset for a flow.
-	 *
-	 * Back-compat forward to RecurringScheduler::calculateStaggerOffset().
-	 *
-	 * @param int $flow_id          Flow ID used as seed.
-	 * @param int $interval_seconds Interval in seconds.
-	 * @return int Offset in seconds.
-	 */
-	public static function calculate_stagger_offset( int $flow_id, int $interval_seconds ): int {
-		return RecurringScheduler::calculateStaggerOffset( $flow_id, $interval_seconds );
-	}
-
-	/**
-	 * Validate a cron expression string.
-	 *
-	 * Back-compat forward to RecurringScheduler::isValidCronExpression().
-	 *
-	 * @param string $expression Cron expression to validate.
-	 * @return bool True if valid.
-	 */
-	public static function is_valid_cron_expression( string $expression ): bool {
-		return RecurringScheduler::isValidCronExpression( $expression );
-	}
-
-	/**
-	 * Detect if a string looks like a cron expression.
-	 *
-	 * Back-compat forward to RecurringScheduler::looksLikeCronExpression().
-	 *
-	 * @param string $value Value to check.
-	 * @return bool True if it looks like a cron expression.
-	 */
-	public static function looks_like_cron_expression( string $value ): bool {
-		return RecurringScheduler::looksLikeCronExpression( $value );
-	}
-
-	/**
-	 * Get a human-readable description of a cron expression.
-	 *
-	 * Back-compat forward to RecurringScheduler::describeCronExpression().
-	 *
-	 * @param string $expression Cron expression.
-	 * @return string Human-readable description.
-	 */
-	public static function describe_cron_expression( string $expression ): string {
-		return RecurringScheduler::describeCronExpression( $expression );
-	}
 
 	/**
 	 * Check if the incoming scheduling config matches what's already set
