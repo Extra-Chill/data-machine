@@ -1081,6 +1081,89 @@ for the full adapter contract.
 - Maximum turn limiting (default: 25)
 - Runtime-swappable via `datamachine_conversation_runner`
 
+### ConversationStoreInterface (`/inc/Core/Database/Chat/ConversationStoreInterface.php`)
+
+**Purpose**: Single seam between chat session persistence and the underlying
+storage backend. The default implementation ([`Chat`](../../../inc/Core/Database/Chat/Chat.php))
+preserves byte-for-byte the MySQL-table behavior the codebase used before
+this seam was introduced — self-hosted users see no change.
+
+**Filter: `datamachine_conversation_store`**
+
+```php
+apply_filters(
+    'datamachine_conversation_store',
+    ConversationStoreInterface $default  // the built-in MySQL-table Chat store
+);
+```
+
+Return a different `ConversationStoreInterface` implementation to swap the
+backend. Return the default (or anything not implementing the interface) to
+keep the built-in store. Misuse falls back to the default and logs via
+`datamachine_log`.
+
+**Use case**: managed-host environments where chat sessions should live in
+a framework-provided conversation store rather than the site DB (e.g.
+Intelligence on WordPress.com routing through `\WPCOM\AI\Services\Conversation_Storage`).
+A consumer plugin ships an adapter and registers it conditionally:
+
+```php
+add_filter( 'datamachine_conversation_store', function ( $store ) {
+    if ( $store instanceof My_AIFramework_Conversation_Store ) {
+        return $store; // already swapped
+    }
+    if ( ! function_exists( 'my_host_is_wpcom' ) || ! my_host_is_wpcom() ) {
+        return $store; // self-hosted — keep MySQL default
+    }
+    return new My_AIFramework_Conversation_Store();
+}, 10, 1 );
+```
+
+**Single consumer of the store**: `\DataMachine\Core\Database\Chat\ConversationStoreFactory::get()`.
+
+Every core caller — `ChatOrchestrator`, the five Chat Session abilities
+(via `ChatSessionHelpers`), `ChatCommand`, `SystemAbilities`, the
+scheduled cleanup action — resolves the store through the factory. The
+factory caches the store per request and applies the filter exactly once.
+
+**Message shape contract**
+
+Stores MUST normalize messages on read to Data Machine message shape:
+
+```php
+[
+    'id'         => string,                 // Stable message identifier
+    'role'       => 'user'|'assistant'|'system'|'tool',
+    'content'    => string|array,
+    'metadata'   => array,                  // Tool calls, tokens, provider-specific fields
+    'created_at' => string,                 // MySQL DATETIME (UTC)
+    'updated_at' => string,                 // MySQL DATETIME (UTC)
+]
+```
+
+The five Chat Session abilities and the DM chat UI consume this shape.
+Adapter stores (e.g. around `WPCOM\AI\Message` with `data` instead of
+`metadata`) are responsible for aliasing on the way out.
+
+**Swap boundary**
+
+- ✅ What stays stable: all 5 chat abilities, REST endpoints, the DM chat
+  UI, the session switcher, title generation, unread counts, last-read logic.
+- 🔄 What swaps: concrete storage (MySQL table vs. framework-managed store
+  vs. in-memory test fixture).
+- ❌ What is NOT a replacement point: session ownership checks, agent
+  adoption, token resolution, title generation. Those stay in the higher-
+  level callers.
+
+**Contract summary** (full signatures in [`ConversationStoreInterface.php`](../../../inc/Core/Database/Chat/ConversationStoreInterface.php)):
+
+- `create_session / get_session / update_session / delete_session`
+- `get_user_sessions / get_user_session_count` — switcher data
+- `get_recent_pending_session` — timeout-retry dedup
+- `update_title / mark_session_read` — UI state
+- `count_unread` — pure derivation from a messages array
+- `cleanup_expired_sessions / cleanup_old_sessions / cleanup_orphaned_sessions` — scheduled cleanup
+
 ### AgentMemoryStoreInterface (`/inc/Core/FilesRepository/AgentMemoryStoreInterface.php`)
 
 **Purpose**: Single seam between agent memory operations and the underlying

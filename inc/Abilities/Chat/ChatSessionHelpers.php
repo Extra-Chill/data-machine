@@ -12,16 +12,17 @@
 namespace DataMachine\Abilities\Chat;
 
 use DataMachine\Abilities\PermissionHelper;
-use DataMachine\Core\Database\Chat\Chat as ChatDatabase;
+use DataMachine\Core\Database\Chat\ConversationStoreFactory;
+use DataMachine\Core\Database\Chat\ConversationStoreInterface;
 
 defined( 'ABSPATH' ) || exit;
 
 trait ChatSessionHelpers {
 
-	protected ChatDatabase $chat_db;
+	protected ConversationStoreInterface $chat_db;
 
 	protected function initDatabase(): void {
-		$this->chat_db = new ChatDatabase();
+		$this->chat_db = ConversationStoreFactory::get();
 	}
 
 	/**

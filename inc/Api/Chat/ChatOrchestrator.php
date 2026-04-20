@@ -16,7 +16,7 @@
 
 namespace DataMachine\Api\Chat;
 
-use DataMachine\Core\Database\Chat\Chat as ChatDatabase;
+use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\ConversationManager;
 use DataMachine\Engine\AI\AIConversationLoop;
@@ -64,7 +64,7 @@ class ChatOrchestrator {
 		$request_id           = $options['request_id'] ?? null;
 		$agent_id             = (int) ( $options['agent_id'] ?? 0 );
 
-		$chat_db          = new ChatDatabase();
+		$chat_db          = ConversationStoreFactory::get();
 		$session_metadata = array();
 		$acting_token_id  = \DataMachine\Abilities\PermissionHelper::get_acting_token_id();
 
@@ -293,7 +293,7 @@ class ChatOrchestrator {
 	public static function processContinue( string $session_id, int $user_id ): array|WP_Error {
 		$max_turns = PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
 
-		$chat_db = new ChatDatabase();
+		$chat_db = ConversationStoreFactory::get();
 		$session = $chat_db->get_session( $session_id );
 
 		if ( ! $session ) {
@@ -437,7 +437,7 @@ class ChatOrchestrator {
 		);
 		$user_id     = ! empty( $admin_users ) ? $admin_users[0]->ID : 1;
 
-		$chat_db = new ChatDatabase();
+		$chat_db = ConversationStoreFactory::get();
 
 		$session_id = self::createSession( $user_id, 'ping' );
 
@@ -580,8 +580,8 @@ class ChatOrchestrator {
 			return $result['session_id'];
 		}
 
-		// Fallback: direct DB access.
-		$chat_db  = new ChatDatabase();
+		// Fallback: direct store access.
+		$chat_db  = ConversationStoreFactory::get();
 		$metadata = array(
 			'started_at'    => current_time( 'mysql', true ),
 			'message_count' => 0,
@@ -645,7 +645,7 @@ class ChatOrchestrator {
 		$context              = $options['context'] ?? ToolPolicyResolver::CONTEXT_CHAT;
 		$agent_id             = (int) ( $options['agent_id'] ?? 0 );
 
-		$chat_db = new ChatDatabase();
+		$chat_db = ConversationStoreFactory::get();
 
 		try {
 			$user_id = $options['user_id'] ?? 0;

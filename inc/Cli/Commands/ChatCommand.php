@@ -12,7 +12,7 @@ namespace DataMachine\Cli\Commands;
 
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
-use DataMachine\Core\Database\Chat\Chat as ChatDatabase;
+use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -75,7 +75,7 @@ class ChatCommand extends BaseCommand {
 		$offset  = max( 0, (int) ( $assoc_args['offset'] ?? 0 ) );
 		$context = ! empty( $assoc_args['context'] ) ? sanitize_text_field( $assoc_args['context'] ) : null;
 
-		$chat_db  = new ChatDatabase();
+		$chat_db  = ConversationStoreFactory::get();
 		$sessions = $chat_db->get_user_sessions( $user_id, $limit, $offset, $context );
 		$total    = $chat_db->get_user_session_count( $user_id, $context );
 
@@ -142,7 +142,7 @@ class ChatCommand extends BaseCommand {
 		}
 
 		$user_id = $this->get_user_id( $assoc_args );
-		$chat_db = new ChatDatabase();
+		$chat_db = ConversationStoreFactory::get();
 
 		$session = $chat_db->get_session( $session_id );
 
@@ -241,7 +241,7 @@ class ChatCommand extends BaseCommand {
 			'source'        => $source,
 		);
 
-		$chat_db    = new ChatDatabase();
+		$chat_db    = ConversationStoreFactory::get();
 		$session_id = $chat_db->create_session( $user_id, $agent_id, $metadata, $context );
 
 		if ( empty( $session_id ) ) {
@@ -283,7 +283,7 @@ class ChatCommand extends BaseCommand {
 		}
 
 		$user_id = $this->get_user_id( $assoc_args );
-		$chat_db = new ChatDatabase();
+		$chat_db = ConversationStoreFactory::get();
 
 		$session = $chat_db->get_session( $session_id );
 

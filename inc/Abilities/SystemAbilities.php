@@ -14,7 +14,7 @@ namespace DataMachine\Abilities;
 use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Engine\AI\RequestBuilder;
-use DataMachine\Core\Database\Chat\Chat as ChatDatabase;
+use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\Tasks\TaskScheduler;
 use DataMachine\Engine\Tasks\TaskRegistry;
@@ -391,7 +391,7 @@ class SystemAbilities {
 		$session_id = $input['session_id'];
 		$force      = $input['force'] ?? false;
 
-		$chat_db = new ChatDatabase();
+		$chat_db = ConversationStoreFactory::get();
 		$session = $chat_db->get_session($session_id);
 
 		if ( ! $session ) {
