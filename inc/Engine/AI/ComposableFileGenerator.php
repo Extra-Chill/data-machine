@@ -72,14 +72,6 @@ class ComposableFileGenerator {
 			);
 		}
 
-		// Prepend the registrar-owned header, if any. Core does not inject
-		// editorial content (titles, warnings) — the file's owner supplies
-		// its own header via MemoryFileRegistry::register( ..., array( 'header' => ... ) ).
-		$header = isset( $meta['header'] ) && is_string( $meta['header'] ) ? trim( $meta['header'] ) : '';
-		if ( '' !== $header ) {
-			$content = $header . "\n\n" . $content;
-		}
-
 		// Resolve write target.
 		// Files with a convention_path write ONLY to that path (e.g. AGENTS.md → site root).
 		// Files without one write to their layer directory as before.
