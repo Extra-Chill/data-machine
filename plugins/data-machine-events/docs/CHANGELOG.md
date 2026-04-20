@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.29.2] - 2026-04-20
+
+### Fixed
+- Fix event dedup falsely matching recurring series as duplicates
+
 ## [0.29.1] - 2026-04-19
 
 ### Changed
