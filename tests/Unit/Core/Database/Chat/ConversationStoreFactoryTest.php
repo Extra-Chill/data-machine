@@ -116,6 +116,96 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 	// End-to-end: abilities observe the swap through ChatSessionHelpers
 	// -----------------------------------------------------------------
 
+	// -----------------------------------------------------------------
+	// New methods that seal the raw-SQL leaks
+	// -----------------------------------------------------------------
+
+	public function test_list_sessions_for_day_returns_rows_in_chronological_order(): void {
+		$store = new InMemoryConversationStore();
+		$user  = 42;
+
+		// Seed three sessions across two days with explicit created_at values
+		// by updating the in-memory rows directly via reflection — we don't
+		// want test timing to race the day boundary.
+		$today     = gmdate( 'Y-m-d' );
+		$yesterday = gmdate( 'Y-m-d', time() - DAY_IN_SECONDS );
+
+		$a = $store->create_session( $user );
+		$b = $store->create_session( $user );
+		$c = $store->create_session( $user );
+
+		$ref      = new \ReflectionClass( $store );
+		$sessions = $ref->getProperty( 'sessions' );
+		$sessions->setAccessible( true );
+		$raw = $sessions->getValue( $store );
+
+		$raw[ $a ]['created_at'] = "{$today} 09:00:00";
+		$raw[ $a ]['title']      = 'First of today';
+		$raw[ $b ]['created_at'] = "{$today} 14:30:00";
+		$raw[ $b ]['title']      = 'Later today';
+		$raw[ $c ]['created_at'] = "{$yesterday} 23:00:00";
+		$raw[ $c ]['title']      = 'From yesterday';
+
+		$sessions->setValue( $store, $raw );
+
+		$rows = $store->list_sessions_for_day( $today );
+
+		$this->assertCount( 2, $rows );
+		$this->assertSame( 'First of today', $rows[0]['title'] );
+		$this->assertSame( 'Later today', $rows[1]['title'] );
+		// Full shape contract:
+		$this->assertSame( array( 'session_id', 'title', 'context', 'created_at' ), array_keys( $rows[0] ) );
+		$this->assertSame( 'chat', $rows[0]['context'] );
+	}
+
+	public function test_list_sessions_for_day_returns_empty_when_no_sessions(): void {
+		$store = new InMemoryConversationStore();
+		$this->assertSame( array(), $store->list_sessions_for_day( '1999-01-01' ) );
+	}
+
+	public function test_get_storage_metrics_returns_rows_shape(): void {
+		$store = new InMemoryConversationStore();
+
+		$metrics = $store->get_storage_metrics();
+
+		$this->assertIsArray( $metrics );
+		$this->assertArrayHasKey( 'rows', $metrics );
+		$this->assertArrayHasKey( 'size_mb', $metrics );
+		$this->assertSame( 0, $metrics['rows'] );
+
+		$store->create_session( 1 );
+		$store->create_session( 1 );
+		$store->create_session( 2 );
+
+		$metrics = $store->get_storage_metrics();
+		$this->assertSame( 3, $metrics['rows'] );
+	}
+
+	public function test_list_sessions_for_day_observed_by_swapped_store_through_factory(): void {
+		$store = new InMemoryConversationStore();
+		add_filter(
+			'datamachine_conversation_store',
+			static fn() => $store,
+			10,
+			1
+		);
+		ConversationStoreFactory::reset();
+
+		$session_id = $store->create_session( 7, 0, array(), 'chat' );
+		$ref        = new \ReflectionClass( $store );
+		$sessions   = $ref->getProperty( 'sessions' );
+		$sessions->setAccessible( true );
+		$raw                           = $sessions->getValue( $store );
+		$raw[ $session_id ]['title']   = 'Pinned day-scoped session';
+		$raw[ $session_id ]['created_at'] = '2026-04-20 10:00:00';
+		$sessions->setValue( $store, $raw );
+
+		$rows = ConversationStoreFactory::get()->list_sessions_for_day( '2026-04-20' );
+
+		$this->assertCount( 1, $rows );
+		$this->assertSame( 'Pinned day-scoped session', $rows[0]['title'] );
+	}
+
 	public function test_list_chat_sessions_ability_routes_through_swapped_store(): void {
 		$memory_store = new InMemoryConversationStore();
 		$user_id      = self::factory()->user->create( array( 'role' => 'administrator' ) );
